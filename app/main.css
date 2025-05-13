@@ -1,0 +1,63 @@
+@import "./reset.css";
+
+body {
+	font-family: system-ui, sans-serif;
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+#app {
+	display: flex;
+	flex-direction: row;
+}
+.controls {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	padding: 0.25rem;
+	overflow: hidden;
+	> pre {
+		padding: 0.25rem;
+		outline: 1px solid rgba(0, 0, 0, 0.15);
+		width: 100%;
+		overflow: scroll;
+	}
+	> table {
+		overflow: scroll;
+	}
+}
+#map {
+	flex: 3;
+	height: 100vh;
+}
+table {
+	border-collapse: collapse;
+	width: 100%;
+	table-layout: fixed;
+}
+td {
+	border: 1px solid rgba(0, 0, 0, 0.5);
+	padding: 0 0.2rem;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	overflow: hidden;
+}
+td:hover {
+	word-break: break-all;
+	white-space: normal;
+}
+
+.deck-tooltip {
+	background-color: rgba(0, 0, 0, 0.9) !important;
+	padding: 0 !important;
+	max-width: 400px;
+	color: white !important;
+	font-variant-numeric: tabular-nums;
+	font-size: 12px;
+
+	h3 {
+		padding: 0 0.2rem;
+	}
+	td {
+		border: 1px solid white;
+	}
+}
