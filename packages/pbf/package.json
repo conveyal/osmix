@@ -1,0 +1,49 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/pbf",
+	"description": "A low level, modern, runtime agnostic OSM PBF parser and writer written in TypeScript.",
+	"version": "0.0.0",
+	"type": "module",
+	"main": "./src/index.ts",
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"import": "./dist/index.js",
+				"types": "./dist/index.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
+	"sideEffects": false,
+	"scripts": {
+		"bench": "vitest bench",
+		"build": "tsc",
+		"test": "vitest",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@osmix/shared": "workspace:*",
+		"@types/node": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"dependencies": {
+		"pbf": "catalog:"
+	}
+}

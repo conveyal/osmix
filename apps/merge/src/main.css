@@ -1,0 +1,198 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+@import "tw-animate-css";
+
+/* roboto-mono-latin-wght-normal */
+@font-face {
+	font-family: "Roboto Mono Variable";
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 700;
+	src: url("@fontsource-variable/roboto-mono/files/roboto-mono-latin-wght-normal.woff2")
+		format("woff2-variations");
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@theme inline {
+	--radius-sm: calc(var(--radius) * 0.5);
+	--radius-md: calc(var(--radius) * 0.75);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 2);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+	--font-mono: "Roboto Mono Variable", monospace;
+}
+
+:root {
+	--radius: 0.125rem;
+	--background: oklch(1 0 0);
+	--foreground: oklch(0.129 0.042 264.695);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.129 0.042 264.695);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.129 0.042 264.695);
+	--primary: var(--color-slate-800);
+	--primary-foreground: oklch(0.984 0.003 247.858);
+	--secondary: oklch(0.968 0.007 247.896);
+	--secondary-foreground: oklch(0.208 0.042 265.755);
+	--muted: oklch(0.968 0.007 247.896);
+	--muted-foreground: oklch(0.554 0.046 257.417);
+	--accent: oklch(0.968 0.007 247.896);
+	--accent-foreground: oklch(0.208 0.042 265.755);
+	--destructive: oklch(0.577 0.245 27.325);
+	--border: var(--color-slate-400);
+	--input: oklch(0.929 0.013 255.508);
+	--ring: oklch(0.704 0.04 256.788);
+	--chart-1: oklch(0.646 0.222 41.116);
+	--chart-2: oklch(0.6 0.118 184.704);
+	--chart-3: oklch(0.398 0.07 227.392);
+	--chart-4: oklch(0.828 0.189 84.429);
+	--chart-5: oklch(0.769 0.188 70.08);
+	--sidebar: oklch(0.984 0.003 247.858);
+	--sidebar-foreground: oklch(0.129 0.042 264.695);
+	--sidebar-primary: oklch(0.208 0.042 265.755);
+	--sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+	--sidebar-accent: oklch(0.968 0.007 247.896);
+	--sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+	--sidebar-border: oklch(0.929 0.013 255.508);
+	--sidebar-ring: oklch(0.704 0.04 256.788);
+}
+
+@layer base {
+	* {
+		border-color: var(--border);
+	}
+
+	body {
+		background-color: var(--background);
+		color: var(--foreground);
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		font-variant-numeric: tabular-nums;
+		min-height: 100vh;
+		overscroll-behavior: none;
+	}
+
+	:focus-visible {
+		outline-style: solid;
+	}
+
+	p {
+		line-height: var(--leading-relaxed);
+	}
+}
+
+nav {
+	a {
+		color: var(--color-blue-600);
+		text-underline-offset: 4px;
+	}
+
+	a:hover {
+		text-decoration-line: underline;
+	}
+}
+
+.maplibregl-map {
+	font-family: var(--font-mono);
+	font-size: var(--text-xs);
+}
+
+#root {
+	min-height: 100vh;
+}
+
+table {
+	border-collapse: collapse;
+	width: 100%;
+
+	td {
+		border-color: var(--color-border);
+		border-width: 1px;
+		padding: 0.25rem;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		overflow: hidden;
+		user-select: all;
+	}
+
+	td:hover {
+		background-color: var(--color-slate-100);
+	}
+}
+
+.filters {
+	label {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+	}
+}
+
+.maplibregl-ctrl {
+	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
+	border-radius: var(--radius);
+}
+
+.maplibregl-ctrl button:not(:disabled):hover {
+	background-color: var(--color-accent);
+}
+
+.osmix-overlay-popup {
+	max-width: 320px;
+	pointer-events: none;
+	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
+	border-radius: var(--radius);
+	padding: 0;
+}
+
+.osmix-overlay-popup .maplibregl-popup-content {
+	background-color: white;
+	border-radius: var(--radius);
+	color: var(--foreground);
+	font-family: var(--font-mono);
+	font-size: var(--text-xs);
+	font-weight: var(--font-weight-bold);
+	padding: 0;
+	pointer-events: none;
+}
+
+.osmix-overlay-popup .maplibregl-popup-tip {
+	display: none;
+}
+
+.osmix-overlay-tooltip {
+	padding: 0.25rem 0.5rem;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,53 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/core",
+	"type": "module",
+	"version": "0.0.0",
+	"description": "An OSM PBF reader, writer, and merge tool written in TypeScript",
+	"main": "./src/index.ts",
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"import": "./dist/index.js",
+				"types": "./dist/index.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
+	"sideEffects": false,
+	"scripts": {
+		"build": "tsc",
+		"bench": "vitest bench",
+		"test": "vitest",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/geojson": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"dependencies": {
+		"@osmix/json": "workspace:*",
+		"@osmix/pbf": "workspace:*",
+		"@osmix/shared": "workspace:*",
+		"flatbush": "^4.4.1",
+		"kdbush": "mourner/kdbush#16416cd",
+		"sweepline-intersections": "^1.5.0"
+	}
+}

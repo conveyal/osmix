@@ -1,0 +1,49 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/raster",
+	"type": "module",
+	"version": "0.0.0",
+	"description": "An OSM raster tile generator",
+	"main": "./src/index.ts",
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"import": "./dist/index.js",
+				"types": "./dist/index.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
+	"sideEffects": false,
+	"scripts": {
+		"build": "tsc",
+		"bench": "vitest bench",
+		"test": "vitest",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/geojson": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:",
+		"maplibre-gl": "catalog:"
+	},
+	"dependencies": {
+		"@osmix/shared": "workspace:*"
+	}
+}

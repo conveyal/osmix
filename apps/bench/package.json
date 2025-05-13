@@ -1,0 +1,36 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/bench",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"bench": "vitest bench",
+		"build": "vite build",
+		"dev": "vite",
+		"test": "vitest",
+		"typecheck": "tsc --build --noEmit"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.0",
+		"@types/react-dom": "^19.2.0",
+		"@vitejs/plugin-react": "^5.0.4",
+		"@vitest/browser-preview": "^4.0.1",
+		"typescript": "catalog:",
+		"vite": "catalog:",
+		"vitest": "catalog:"
+	},
+	"dependencies": {
+		"@duckdb/duckdb-wasm": "^1.31.0",
+		"@osmix/core": "workspace:*",
+		"@osmix/json": "workspace:*",
+		"@osmix/pbf": "workspace:*",
+		"@osmix/shared": "workspace:*",
+		"@osmix/vt": "workspace:*",
+		"apache-arrow": "^17.0.0",
+		"comlink": "^4.4.2",
+		"maplibre-gl": "catalog:",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0",
+		"react-map-gl": "^8.0.4"
+	}
+}

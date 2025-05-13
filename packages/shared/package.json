@@ -1,0 +1,52 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/shared",
+	"type": "module",
+	"version": "0.0.0",
+	"description": "Shared utilities for Osmix",
+	"exports": {
+		"./*": "./src/*.ts",
+		"./tsconfig/base.json": "./tsconfig/base.json",
+		"./tsconfig/test.json": "./tsconfig/test.json",
+		"./tsconfig/app.json": "./tsconfig/app.json",
+		"./test/*": "./src/test/*.ts"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			"./*": {
+				"import": "./dist/*.js",
+				"types": "./dist/*.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
+	"sideEffects": false,
+	"scripts": {
+		"build": "tsc",
+		"bench": "vitest bench",
+		"test": "vitest",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"dependencies": {
+		"@mapbox/sphericalmercator": "catalog:",
+		"lineclip": "^2.0.0"
+	}
+}
