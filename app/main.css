@@ -1,5 +1,9 @@
 @import "./reset.css";
 
+:root {
+	--slate-950: oklch(12.9% 0.042 264.695);
+}
+
 body {
 	font-family: system-ui, sans-serif;
 	font-size: 12px;
@@ -47,17 +51,32 @@ td:hover {
 }
 
 .deck-tooltip {
-	background-color: rgba(0, 0, 0, 0.9) !important;
+	background-color: white !important;
 	padding: 0 !important;
 	max-width: 400px;
-	color: white !important;
+	color: var(--slate-950) !important;
 	font-variant-numeric: tabular-nums;
 	font-size: 12px;
 
 	h3 {
+		margin: 0;
+		padding: 0.2rem 0.2rem;
+		text-align: center;
+	}
+	h6 {
+		margin: 0;
 		padding: 0 0.2rem;
+		font-size: 12px;
+		font-weight: bold;
+		text-align: center;
 	}
 	td {
-		border: 1px solid white;
+		border: 1px solid oklch(12.9% 0.042 264.695 / 0.5);
+	}
+	td:first-of-type {
+		border-left: none;
+	}
+	td:last-of-type {
+		border-right: none;
 	}
 }
