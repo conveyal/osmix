@@ -1,6 +1,6 @@
 import { GeoJsonLayer } from "@deck.gl/layers"
 import { MapboxOverlay } from "@deck.gl/mapbox"
-import { type LngLatBoundsLike, Map as MapLibreMap } from "maplibre-gl"
+import { Map as MapLibreMap } from "maplibre-gl"
 import "maplibre-gl/dist/maplibre-gl.css"
 import * as osm from "./lib/index.ts"
 
@@ -94,18 +94,9 @@ async function readFile(file: Blob) {
 	const osmPbfStream = await osm.createOsmPbfStream(fileStream)
 	headerEl.innerHTML = `<tbody>${objectToHtmlTableString(osmPbfStream.header)}</tbody>`
 
-	const bbox: LngLatBoundsLike = [
-		Number.POSITIVE_INFINITY,
-		Number.POSITIVE_INFINITY,
-		Number.NEGATIVE_INFINITY,
-		Number.NEGATIVE_INFINITY,
-	]
 	if (osmPbfStream.header.bbox) {
-		bbox[0] = osmPbfStream.header.bbox.left
-		bbox[1] = osmPbfStream.header.bbox.bottom
-		bbox[2] = osmPbfStream.header.bbox.right
-		bbox[3] = osmPbfStream.header.bbox.top
-		map.fitBounds(bbox)
+		const hbb = osmPbfStream.header.bbox
+		map.fitBounds([hbb.left, hbb.bottom, hbb.right, hbb.top])
 	}
 
 	const features: osm.OsmGeoJSONFeature[] = []
@@ -148,10 +139,14 @@ async function readFile(file: Blob) {
 	}
 
 	let totalFeatures = 0
-	for await (const feature of osm.blocksToGeoJSON(osmPbfStream.blocks, {
-		withTags: true,
-		withInfo: true,
-	})) {
+	const { generateFeatures, bbox } = await osm.blocksToGeoJSON(
+		osmPbfStream.blocks,
+		{
+			withInfo: true,
+			withTags: true,
+		},
+	)
+	for await (const feature of generateFeatures) {
 		features.push(feature)
 		totalFeatures++
 		entitiesEl.textContent = `${totalFeatures}`
@@ -174,6 +169,7 @@ async function readFile(file: Blob) {
 		}
 	}
 	setGeoJsonLayer()
+	map.fitBounds(bbox)
 
 	bboxEl.textContent = `${bbox.join(",")}`
 	statsEl.innerHTML = `<tbody>${objectToHtmlTableString({
