@@ -12,7 +12,7 @@ export default defineConfig({
 				read: resolve(__dirname, "lib/read.ts"),
 				write: resolve(__dirname, "lib/write.ts"),
 			},
-			name: "osm.pbf",
+			name: "osm.ts",
 		},
 	},
 })

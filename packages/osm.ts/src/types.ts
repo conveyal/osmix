@@ -9,6 +9,13 @@ export * from "./proto/osmformat"
  */
 export type Bbox = [number, number, number, number]
 
+export type OsmReadStats = {
+	blocks: number
+	chunks: number
+	inflateMs: number
+	inflateBytes: number
+}
+
 export interface OsmPbfInfoParsed extends OsmPbfInfo {
 	user?: string
 }

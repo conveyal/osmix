@@ -1,49 +1,20 @@
 {
 	"$schema": "https://json.schemastore.org/package",
-	"name": "osm.ts",
-	"type": "module",
-	"version": "0.0.1",
-	"description": "An OSM PBF reader, writer, and merge tool written in TypeScript",
-	"main": "./dist/index.cjs",
-	"module": "./dist/index.js",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"require": "./dist/index.cjs"
-		},
-		"./read": {
-			"import": "./dist/read.js",
-			"require": "./dist/read.cjs"
-		},
-		"./write": {
-			"import": "./dist/write.js",
-			"require": "./dist/write.cjs"
-		}
-	},
-	"files": ["dist"],
-	"scripts": {
-		"check": "biome check --fix .",
-		"dev": "vite",
-		"bench": "vitest bench",
-		"build": "vite build",
-		"format": "biome format --write .",
-		"lint": "biome lint --fix .",
-		"test": "vitest",
-		"types:check": "tsc --noEmit"
-	},
+	"name": "osm",
+	"packageManager": "bun@1.2.13",
+	"private": true,
+	"workspaces": ["apps/*", "packages/*"],
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
-		"@deck.gl/mapbox": "^9.1.11",
-		"@types/geojson": "^7946.0.16",
 		"@types/node": "^22.15.15",
-		"maplibre-gl": "^5.5.0",
-		"typescript": "^5.8.3",
-		"vite": "^6.3.5",
-		"vitest": "^3.1.3"
+		"typescript": "^5.8.3"
 	},
-	"dependencies": {
-		"@deck.gl/core": "^9.1.11",
-		"@deck.gl/layers": "^9.1.11",
-		"pbf": "^4.0.1"
+	"scripts": {
+		"dev": "bun run --filter '*' dev",
+		"check": "biome check --fix .",
+		"format": "biome format --write .",
+		"lint": "biome lint --fix .",
+		"test": "bun run --filter '*' test",
+		"types:check": "tsc --noEmit"
 	}
 }

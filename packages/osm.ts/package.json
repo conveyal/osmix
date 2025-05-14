@@ -1,0 +1,20 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "osm.ts",
+	"type": "module",
+	"version": "0.0.1",
+	"description": "An OSM PBF reader, writer, and merge tool written in TypeScript",
+	"main": "./src/index.ts",
+	"scripts": {
+		"bench": "vitest bench",
+		"test": "vitest"
+	},
+	"devDependencies": {
+		"@types/geojson": "^7946.0.16",
+		"typescript": "^5.8.3",
+		"vitest": "^3.1.3"
+	},
+	"dependencies": {
+		"pbf": "^4.0.1"
+	}
+}

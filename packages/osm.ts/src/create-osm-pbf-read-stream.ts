@@ -6,6 +6,7 @@ import {
 	readHeaderBlock,
 	readPrimitiveBlock,
 } from "./proto/osmformat"
+import type { OsmReadStats } from "./types"
 import { nativeDecompress, streamToAsyncIterator } from "./utils"
 
 const HEADER_BYTES_LENGTH = 4
@@ -18,23 +19,18 @@ const State = {
 type HeaderType = "OSMHeader" | "OSMData"
 
 /**
- * Parse an OSM PBF stream. Returns the parsed header and an async generator which yields decompressed primitive blocks.
+ * Read an OSM PBF stream. Returns the parsed header and an async generator which yields decompressed primitive blocks.
  * @param chunks - A stream of Uint8Arrays.
  * @param decompress - A function to decompress the data.
  * @returns An async generator of OSM PBF header and primitive blocks.
  */
-export async function createOsmPbfStream(
+export async function createOsmPbfReadStream(
 	chunks: ReadableStream<Uint8Array>,
 	decompress: (data: Uint8Array) => Promise<ArrayBuffer> = nativeDecompress,
 ): Promise<{
 	header: OsmPbfHeaderBlock
 	blocks: AsyncGenerator<OsmPbfPrimitiveBlock>
-	stats: {
-		inflateMs: number
-		inflateBytes: number
-		blocks: number
-		chunks: number
-	}
+	stats: OsmReadStats
 }> {
 	let pbf: Pbf | null = null
 	let state = State.READ_HEADER_LENGTH

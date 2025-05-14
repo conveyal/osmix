@@ -1,0 +1,32 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "osm-merge",
+	"type": "module",
+	"version": "0.0.1",
+	"private": true,
+	"scripts": {
+		"dev": "vite"
+	},
+	"devDependencies": {
+		"@tailwindcss/vite": "^4.1.6",
+		"@types/geojson": "^7946.0.16",
+		"@types/node": "^22.15.15",
+		"@types/react": "^19.1.4",
+		"@types/react-dom": "^19.1.5",
+		"@vitejs/plugin-react": "^4.4.1",
+		"tailwindcss": "^4.1.6",
+		"vite": "^6.3.5"
+	},
+	"dependencies": {
+		"@deck.gl/core": "^9.1.11",
+		"@deck.gl/layers": "^9.1.11",
+		"@deck.gl/mapbox": "^9.1.11",
+		"@deck.gl/react": "^9.1.11",
+		"@fontsource-variable/roboto-mono": "^5.2.5",
+		"maplibre-gl": "^5.5.0",
+		"osm.ts": "workspace:*",
+		"react": "^19.1.0",
+		"react-dom": "^19.1.0",
+		"react-map-gl": "^8.0.4"
+	}
+}
