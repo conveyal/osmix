@@ -8,9 +8,9 @@ export default defineConfig({
 	build: {
 		lib: {
 			entry: {
-				index: resolve(__dirname, "lib/index.ts"),
-				read: resolve(__dirname, "lib/read.ts"),
-				write: resolve(__dirname, "lib/write.ts"),
+				index: resolve(__dirname, "src/index.ts"),
+				read: resolve(__dirname, "src/read.ts"),
+				write: resolve(__dirname, "src/write.ts"),
 			},
 			name: "osm.ts",
 		},
