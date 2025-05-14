@@ -14,7 +14,7 @@ export interface OsmPbfInfoParsed extends OsmPbfInfo {
 }
 
 export interface OsmTags {
-	[key: string]: string | number | boolean
+	[key: string]: string
 }
 
 export interface OsmEntity {
