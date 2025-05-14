@@ -1,3 +1,5 @@
+import type { OsmTags } from "./types"
+
 export function nativeDecompress(data: Uint8Array) {
 	const stream = new DecompressionStream("deflate")
 	const decompressedStream = new Blob([data]).stream().pipeThrough(stream)
@@ -29,7 +31,7 @@ export function getTags(
 	table: string[],
 	keys: number[],
 	vals: number[],
-): Record<string, string> {
+): OsmTags {
 	return Object.fromEntries(
 		keys
 			.map((_, i) => [getString(table, keys, i), getString(table, vals, i)])
