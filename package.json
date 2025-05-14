@@ -20,9 +20,7 @@
 			"require": "./dist/write.cjs"
 		}
 	},
-	"files": [
-		"dist"
-	],
+	"files": ["dist"],
 	"scripts": {
 		"check": "biome check --fix .",
 		"dev": "vite",
@@ -39,7 +37,7 @@
 		"@types/geojson": "^7946.0.16",
 		"@types/node": "^22.15.15",
 		"maplibre-gl": "^5.5.0",
-		"typescript": "^5",
+		"typescript": "^5.8.3",
 		"vite": "^6.3.5",
 		"vitest": "^3.1.3"
 	},
