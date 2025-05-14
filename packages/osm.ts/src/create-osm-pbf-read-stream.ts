@@ -100,9 +100,7 @@ export async function createOsmPbfReadStream(
 	}
 
 	const reader = readBlocks()
-	console.log("created reader")
 	const header = (await reader.next()).value as OsmPbfHeaderBlock
-	console.log("read header", header)
 	if (header == null) throw new Error("Header not found")
 
 	return {
