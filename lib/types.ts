@@ -3,6 +3,12 @@ import type { OsmPbfInfo } from "./proto/osmformat"
 export * from "./proto/fileformat"
 export * from "./proto/osmformat"
 
+/**
+ * A bounding box in the format [minLon, minLat, maxLon, maxLat].
+ * GeoJSON.BBox allows for 3D bounding boxes, but we use tools that expect 2D bounding boxes.
+ */
+export type Bbox = [number, number, number, number]
+
 export interface OsmPbfInfoParsed extends OsmPbfInfo {
 	user?: string
 }
