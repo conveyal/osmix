@@ -1,7 +1,7 @@
-import { createReadStream } from "node:fs"
+import { createReadStream, createWriteStream } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
-import { Readable } from "node:stream"
+import { Readable, Writable } from "node:stream"
 import { fileURLToPath } from "node:url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -32,9 +32,15 @@ export async function getFile(url: string): Promise<ArrayBuffer> {
 	}
 }
 
-export async function getFileStream(url: string) {
+export async function getFileReadStream(url: string) {
 	await getFile(url)
 	return Readable.toWeb(
 		createReadStream(getPath(url)),
 	) as ReadableStream<Uint8Array>
+}
+
+export async function getFileWriteStream(url: string) {
+	return Writable.toWeb(
+		createWriteStream(getPath(url)),
+	) as WritableStream<Uint8Array>
 }

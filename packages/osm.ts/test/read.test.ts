@@ -5,7 +5,7 @@ import { createOsmPbfReadStream } from "../src/create-osm-pbf-read-stream"
 import { readOsmPbfPrimitiveBlocks } from "../src/read-osm-pbf-blocks"
 
 import { PBFs } from "./files"
-import { getFileStream } from "./utils"
+import { getFileReadStream } from "./utils"
 
 for (const [name, pbf] of Object.entries(PBFs)) {
 	test(
@@ -14,9 +14,7 @@ for (const [name, pbf] of Object.entries(PBFs)) {
 			timeout: 100_000,
 		},
 		async () => {
-			const fileStream = await getFileStream(pbf.url)
-			console.time(`full stream parse ${name}`)
-			console.time(`parse header ${name}`)
+			const fileStream = await getFileReadStream(pbf.url)
 			const pbfStream = await createOsmPbfReadStream(fileStream)
 			assert.deepEqual(pbfStream.header.bbox, pbf.bbox)
 

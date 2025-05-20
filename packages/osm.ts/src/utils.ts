@@ -3,13 +3,13 @@ import type { OsmTags } from "./types"
 export function nativeDecompress(data: Uint8Array) {
 	const stream = new DecompressionStream("deflate")
 	const decompressedStream = new Blob([data]).stream().pipeThrough(stream)
-	return new Response(decompressedStream).arrayBuffer()
+	return new Response(decompressedStream).bytes()
 }
 
-export function nativeCompress(data: ArrayBuffer) {
+export function nativeCompress(data: Uint8Array) {
 	const stream = new CompressionStream("deflate")
 	const compressedStream = new Blob([data]).stream().pipeThrough(stream)
-	return new Response(compressedStream).arrayBuffer()
+	return new Response(compressedStream).bytes()
 }
 
 export function assertNonNull(

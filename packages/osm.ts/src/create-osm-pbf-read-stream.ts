@@ -20,13 +20,13 @@ type HeaderType = "OSMHeader" | "OSMData"
 
 /**
  * Read an OSM PBF stream. Returns the parsed header and an async generator which yields decompressed primitive blocks.
- * @param chunks - A stream of Uint8Arrays.
+ * @param chunks - A ReadableStream of binary data, usually from a file.
  * @param decompress - A function to decompress the data.
  * @returns An async generator of OSM PBF header and primitive blocks.
  */
 export async function createOsmPbfReadStream(
 	chunks: ReadableStream<Uint8Array>,
-	decompress: (data: Uint8Array) => Promise<ArrayBuffer> = nativeDecompress,
+	decompress: (data: Uint8Array) => Promise<Uint8Array> = nativeDecompress,
 ): Promise<{
 	header: OsmPbfHeaderBlock
 	blocks: AsyncGenerator<OsmPbfPrimitiveBlock>
@@ -78,6 +78,10 @@ export async function createOsmPbfReadStream(
 					if (headerType == null)
 						throw new Error("Blob header has not been read")
 					const blob = readBlob(pbf, pbf.pos + bytesNeeded)
+					if (blob.data) {
+						console.log("blob data", blob.data)
+					}
+					if (!blob.zlib_data) throw new Error("Blob has no zlib data")
 
 					const start = performance.now()
 					const data = await decompress(blob.zlib_data)

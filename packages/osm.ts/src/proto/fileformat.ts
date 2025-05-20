@@ -3,58 +3,39 @@
 import type Pbf from "pbf"
 
 export type OsmPbfBlob = {
-	raw_size: number
-	raw: Uint8Array
-	data: string
-	zlib_data: Uint8Array
-	lzma_data: Uint8Array
-	OBSOLETE_bzip2_data: Uint8Array
-	lz4_data: Uint8Array
-	zstd_data: Uint8Array
+	raw_size?: number
+	raw?: Uint8Array
+	zlib_data?: Uint8Array
+	lzma_data?: Uint8Array
+	OBSOLETE_bzip2_data?: Uint8Array
+	lz4_data?: Uint8Array
+	zstd_data?: Uint8Array
 }
 
 export type OsmPbfBlobHeader = {
-	type: string
-	indexdata: Uint8Array
+	type: "OSMHeader" | "OSMData"
+	indexdata?: Uint8Array
 	datasize: number
 }
 
 export function readBlob(pbf: Pbf, end?: number): OsmPbfBlob {
-	return pbf.readFields(
-		readBlobField,
-		{
-			raw_size: 0,
-			raw: new Uint8Array(),
-			data: "",
-			zlib_data: new Uint8Array(),
-			lzma_data: new Uint8Array(),
-			OBSOLETE_bzip2_data: new Uint8Array(),
-			lz4_data: new Uint8Array(),
-			zstd_data: new Uint8Array(),
-		},
-		end,
-	)
+	return pbf.readFields(readBlobField, {}, end)
 }
 function readBlobField(tag: number, obj: OsmPbfBlob, pbf: Pbf) {
+	console.log("read blob field", tag)
 	if (tag === 2) obj.raw_size = pbf.readVarint(true)
 	else if (tag === 1) {
 		obj.raw = pbf.readBytes()
-		obj.data = "raw"
 	} else if (tag === 3) {
 		obj.zlib_data = pbf.readBytes()
-		obj.data = "zlib_data"
 	} else if (tag === 4) {
 		obj.lzma_data = pbf.readBytes()
-		obj.data = "lzma_data"
 	} else if (tag === 5) {
 		obj.OBSOLETE_bzip2_data = pbf.readBytes()
-		obj.data = "OBSOLETE_bzip2_data"
 	} else if (tag === 6) {
 		obj.lz4_data = pbf.readBytes()
-		obj.data = "lz4_data"
 	} else if (tag === 7) {
 		obj.zstd_data = pbf.readBytes()
-		obj.data = "zstd_data"
 	}
 }
 export function writeBlob(obj: OsmPbfBlob, pbf: Pbf) {
@@ -72,12 +53,12 @@ export function writeBlob(obj: OsmPbfBlob, pbf: Pbf) {
 export function readBlobHeader(pbf: Pbf, end?: number): OsmPbfBlobHeader {
 	return pbf.readFields(
 		readBlobHeaderField,
-		{ type: "", indexdata: new Uint8Array(), datasize: 0 },
+		{ type: "OSMData", datasize: 0 },
 		end,
 	)
 }
 function readBlobHeaderField(tag: number, obj: OsmPbfBlobHeader, pbf: Pbf) {
-	if (tag === 1) obj.type = pbf.readString()
+	if (tag === 1) obj.type = pbf.readString() as OsmPbfBlobHeader["type"]
 	else if (tag === 2) obj.indexdata = pbf.readBytes()
 	else if (tag === 3) obj.datasize = pbf.readVarint(true)
 }
