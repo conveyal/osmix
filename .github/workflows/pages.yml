@@ -38,8 +38,8 @@ jobs:
         run: bun install
       - name: Build
         run: bun run build
-      - name: Copy PBFs to /dist/public/pbfs
-        run: cp -r ./fixtures/*.pbf ./apps/osm-merge/dist/public/pbfs
+      - name: Copy PBFs to /dist/pbfs
+        run: cp -r ./fixtures/*.pbf ./apps/osm-merge/dist/pbfs
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
