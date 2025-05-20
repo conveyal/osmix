@@ -1,8 +1,9 @@
 import type { DeckProps } from "@deck.gl/core"
 import { GeoJsonLayer } from "@deck.gl/layers"
 import { MapboxOverlay } from "@deck.gl/mapbox"
+import { showSaveFilePicker } from "native-file-system-adapter"
 import * as osm from "osm.ts"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
 	type MapRef,
 	Map as MaplibreMap,
@@ -11,6 +12,9 @@ import {
 } from "react-map-gl/maplibre"
 import ObjectToTable from "./object-to-table"
 import { objectToHtmlTableString } from "./utils"
+
+const DEFAULT_PBF_FILE = "monaco-250101.osm.pbf"
+const DEFAULT_PBF_URL = `./pbfs/${DEFAULT_PBF_FILE}`
 
 function DeckGlOverlay(props: DeckProps) {
 	const overlay = useControl<MapboxOverlay>(() => new MapboxOverlay(props))
@@ -27,12 +31,17 @@ export default function App() {
 	const mapRef = useRef<MapRef>(null)
 	const [file, setFile] = useState<Blob | null>(null)
 	const [fileName, setFileName] = useState<string | null>(null)
-	const [headerBlock, setHeaderBlock] = useState<osm.OsmPbfHeaderBlock | null>(
-		null,
-	)
+	const [headerBlock, setHeaderBlock] =
+		useState<osm.proto.OsmPbfHeaderBlock | null>(null)
 	const [bbox, setBbox] = useState<osm.Bbox | null>(null)
 	const [stats, setStats] = useState<osm.OsmReadStats | null>(null)
-	const [features, setFeatures] = useState<osm.OsmGeoJSONFeature[]>([])
+
+	const [nodes, setNodes] = useState<Map<number, osm.OsmNode>>(new Map())
+	const [ways, setWays] = useState<osm.OsmWay[]>([])
+
+	const features = useMemo(() => {
+		return Array.fromAsync(osm.entitiesToGeoJSON({ nodes, ways }))
+	}, [nodes, ways])
 
 	useEffect(() => {
 		if (mapRef.current == null) return
@@ -78,18 +87,22 @@ export default function App() {
 	)
 
 	useEffect(() => {
+		setHeaderBlock(null)
+		setNodes(new Map())
+		setWays([])
+		setStats(null)
 		if (file == null) {
-			fetch("./pbfs/spokane.osm.pbf")
+			fetch(DEFAULT_PBF_URL)
 				.then((res) => res.blob())
 				.then((blob) => {
 					setFile(blob)
-					setFileName("spokane.osm.pbf")
+					setFileName(DEFAULT_PBF_FILE)
 				})
 		} else {
 			const fileStream = file.stream()
 			osm
-				.createOsmPbfReadStream(fileStream)
-				.then(async ({ header, blocks, stats }) => {
+				.readOsmPbf(fileStream, { withTags: true })
+				.then(async ({ header, nodes, ways, stats }) => {
 					setHeaderBlock(header)
 					if (header.bbox) {
 						setBbox([
@@ -102,22 +115,36 @@ export default function App() {
 						setBbox(null)
 					}
 
-					const r = await osm.blocksToGeoJSON(blocks, {
-						withInfo: true,
-						withTags: true,
-					})
-					const features = await Array.fromAsync(r.generateFeatures)
-					setFeatures(features)
+					setNodes(nodes)
+					setWays(ways)
 					setStats(stats)
 				})
 		}
 	}, [file])
 
+	const downloadPbf = useCallback(async () => {
+		if (headerBlock == null) return
+		const fileHandle = await showSaveFilePicker({
+			suggestedName: "test-file.osm.pbf",
+			types: [
+				{
+					description: "OSM PBF",
+					accept: { "application/x-protobuf": [".pbf"] },
+				},
+			],
+		})
+		const stream = await fileHandle.createWritable()
+		const primitives = osm.osmToPrimitiveBlocks({ nodes, ways, relations: [] })
+		await osm.writePbfToStream(stream, headerBlock, primitives)
+		await stream.close()
+		window.alert(`PBF file saved to ${fileHandle.name}!`)
+	}, [headerBlock, nodes, ways])
+
 	return (
 		<div className="flex flex-row">
 			<div className="flex flex-col flex-1 pt-3 px-2">
 				<h1 className="text-2xl font-bold">osm merge</h1>
-				<input type="file" id="file" />
+				<input className="border border-slate-300 p-2" type="file" id="file" />
 				<div>File name: {fileName}</div>
 				<div>BBox: {bbox ? bbox.join(",") : "unknown"}</div>
 				<h2>File header</h2>
@@ -128,6 +155,14 @@ export default function App() {
 				<table>
 					<ObjectToTable object={stats} />
 				</table>
+				<button
+					className="bg-slate-950 text-white p-2 rounded-md cursor-pointer"
+					type="button"
+					onClick={downloadPbf}
+					disabled={headerBlock == null}
+				>
+					Download
+				</button>
 			</div>
 			<div className="h-dvh grow-3 relative">
 				<MaplibreMap

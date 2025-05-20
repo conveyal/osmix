@@ -24,6 +24,7 @@
 		"@deck.gl/react": "^9.1.11",
 		"@fontsource-variable/roboto-mono": "^5.2.5",
 		"maplibre-gl": "^5.5.0",
+		"native-file-system-adapter": "^3.0.1",
 		"osm.ts": "workspace:*",
 		"react": "^19.1.0",
 		"react-dom": "^19.1.0",
