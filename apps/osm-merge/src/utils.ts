@@ -21,8 +21,9 @@ export function flattenValue(value: unknown): string {
 	return ""
 }
 export function objectToHtmlTableString(
-	object: Record<string, string | number | boolean | unknown>,
+	object?: Record<string, string | number | boolean | unknown>,
 ) {
+	if (object == null) return ""
 	return Object.entries(object)
 		.filter(([key, value]) => {
 			return typeof value !== "undefined"
