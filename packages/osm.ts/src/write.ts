@@ -1,12 +1,6 @@
 import Pbf from "pbf"
+import { writeBlob, writeBlobHeader } from "./proto/fileformat"
 import {
-	type OsmPbfBlob,
-	readBlob,
-	writeBlob,
-	writeBlobHeader,
-} from "./proto/fileformat"
-import {
-	type OsmPbfChangeSet,
 	type OsmPbfHeaderBlock,
 	type OsmPbfNode,
 	type OsmPbfPrimitiveBlock,
@@ -16,8 +10,9 @@ import {
 	writeHeaderBlock,
 	writePrimitiveBlock,
 } from "./proto/osmformat"
-import type { OsmNode, OsmWay } from "./types"
-import { nativeCompress, nativeDecompress } from "./utils"
+import { MEMBER_TYPES } from "./read-osm-pbf-blocks"
+import type { OsmNode, OsmPbfDenseNodes, OsmRelation, OsmWay } from "./types"
+import { nativeCompress } from "./utils"
 
 export * from "./write-osm-pbf"
 
@@ -59,13 +54,12 @@ export async function writePbfToStream(
 	blocks: OsmPbfPrimitiveBlock[],
 ) {
 	const writer = stream.getWriter()
-	for await (const blobs of generatePbfs(header, blocks)) {
-		const headerBuffer = blobs.header.finish()
-		const length = headerBuffer.byteLength
+	for await (const blob of generatePbfs(header, blocks)) {
+		const length = blob.header.byteLength
 
 		writer.write(uint32BE(length))
-		writer.write(headerBuffer)
-		writer.write(blobs.content.finish())
+		writer.write(blob.header)
+		writer.write(blob.content)
 	}
 	writer.close()
 }
@@ -73,10 +67,10 @@ export async function writePbfToStream(
 const MAX_ENTITIES_PER_BLOCK = 8_000
 
 class PrimitiveGroup implements OsmPbfPrimitiveGroup {
+	dense?: OsmPbfDenseNodes
 	nodes: OsmPbfNode[] = []
 	ways: OsmPbfWay[] = []
 	relations: OsmPbfRelation[] = []
-	changesets: OsmPbfChangeSet[] = []
 }
 
 class PrimitiveBlock implements OsmPbfPrimitiveBlock {
@@ -103,24 +97,27 @@ class PrimitiveBlock implements OsmPbfPrimitiveBlock {
 		return g
 	}
 
+	getStringtableIndex(key: string) {
+		let index = this.stringtable.findIndex((t) => t === key)
+		if (index === -1) {
+			this.stringtable.push(key)
+			index = this.stringtable.length - 1
+		}
+		return index
+	}
+
 	addTags(tags: Record<string, string>) {
 		const keys = []
 		const vals = []
 		for (const [key, val] of Object.entries(tags)) {
-			let keyIndex = this.stringtable.findIndex((t) => t === key)
-			let valIndex = this.stringtable.findIndex((t) => t === val)
-			if (keyIndex === -1) {
-				this.stringtable.push(key)
-				keyIndex = this.stringtable.length - 1
-			}
-			if (valIndex === -1) {
-				this.stringtable.push(val)
-				valIndex = this.stringtable.length - 1
-			}
-			keys.push(keyIndex)
-			vals.push(valIndex)
+			keys.push(this.getStringtableIndex(key))
+			vals.push(this.getStringtableIndex(val))
 		}
 		return { keys, vals }
+	}
+
+	addDenseNode(node: OsmNode) {
+		const tags = this.addTags(node.tags ?? {})
 	}
 
 	addNode(node: OsmNode) {
@@ -134,15 +131,45 @@ class PrimitiveBlock implements OsmPbfPrimitiveBlock {
 	}
 
 	addWay(way: OsmWay) {
+		let lastRef = 0
+		const refs = way.refs.map((ref) => {
+			const delta = ref - lastRef
+			lastRef = ref
+			return delta
+		})
 		const tags = this.addTags(way.tags ?? {})
 		this.group.ways.push({
 			...way,
+			refs,
 			keys: tags.keys,
 			vals: tags.vals,
-			lat: [],
-			lon: [],
 		})
 		this.#entities++
+	}
+
+	addRelation(relation: OsmRelation) {
+		const memids: number[] = []
+		const roles_sid: number[] = []
+		const types: number[] = []
+
+		// Delta code the memids
+		let lastMemId = 0
+		for (const member of relation.members) {
+			memids.push(member.ref - lastMemId)
+			lastMemId = member.ref
+			roles_sid.push(this.getStringtableIndex(member.role ?? ""))
+			types.push(MEMBER_TYPES.indexOf(member.type))
+		}
+
+		const tags = this.addTags(relation.tags ?? {})
+		this.group.relations.push({
+			...relation,
+			keys: tags.keys,
+			vals: tags.vals,
+			memids,
+			roles_sid,
+			types,
+		})
 	}
 }
 
@@ -150,7 +177,6 @@ class PrimitiveBlock implements OsmPbfPrimitiveBlock {
  * Convert an OSM object to a list of primitive blocks.
  *
  * TODO: Sort nodes and ways?
- * TODO: Add support for relations
  * TODO: Add support for dense nodes
  * @param osm - The OSM object to convert
  * @returns a generator that produces primitive blocks
@@ -158,6 +184,7 @@ class PrimitiveBlock implements OsmPbfPrimitiveBlock {
 export async function* osmToPrimitiveBlocks(osm: {
 	nodes: OsmNode[]
 	ways: OsmWay[]
+	relations: OsmRelation[]
 }): AsyncGenerator<OsmPbfPrimitiveBlock> {
 	let block = new PrimitiveBlock()
 	for (const node of osm.nodes) {
@@ -179,13 +206,23 @@ export async function* osmToPrimitiveBlocks(osm: {
 		block.addWay(way)
 	}
 
+	block.addGroup()
+
+	for (const relation of osm.relations) {
+		if (block.isFull()) {
+			yield block
+			block = new PrimitiveBlock()
+		}
+		block.addRelation(relation)
+	}
+
 	yield block
 }
 
 export async function* generatePbfs(
 	header: OsmPbfHeaderBlock,
 	blocks: OsmPbfPrimitiveBlock[],
-): AsyncGenerator<{ header: Pbf; content: Pbf }> {
+): AsyncGenerator<{ header: Uint8Array; content: Uint8Array }> {
 	const osmHeader = new Pbf()
 	writeHeaderBlock(header, osmHeader)
 	const osmHeaderBlob = await createBlobPbf(osmHeader.finish())
@@ -198,7 +235,7 @@ export async function* generatePbfs(
 		osmHeaderBlobHeader,
 	)
 
-	yield { header: osmHeaderBlobHeader, content: osmHeaderBlob }
+	yield { header: osmHeaderBlobHeader.finish(), content: osmHeaderBlob }
 	for await (const block of blocks) {
 		const blockPbf = new Pbf()
 		writePrimitiveBlock(block, blockPbf)
@@ -211,50 +248,26 @@ export async function* generatePbfs(
 			},
 			osmDataBlobHeader,
 		)
-		yield { header: osmDataBlobHeader, content: osmDataBlob }
+		yield { header: osmDataBlobHeader.finish(), content: osmDataBlob }
 	}
 }
 
-async function createBlobPbf(
-	data: Uint8Array,
-	compression: OsmPbfBlob["data"] = "zlib_data",
-): Promise<Pbf> {
+async function createBlobPbf(data: Uint8Array): Promise<Uint8Array> {
 	const blobPbf = new Pbf()
 	const raw_size = data.length
-
-	if (compression === "zlib_data") {
-		const compressedBuffer = await nativeCompress(data)
-		writeBlob(
-			{
-				zlib_data: compressedBuffer,
-				raw_size,
-			},
-			blobPbf,
-		)
-		const blob = readBlob(blobPbf)
-		if (!blob.zlib_data) {
-			console.error(blob)
-			throw new Error("No zlib data")
-		}
-		const uncompressedData = await nativeDecompress(blob.zlib_data)
-		console.assert(uncompressedData.length === data.length)
-		console.log("Uncompressed data works")
-	} else if (compression === "raw") {
-		writeBlob(
-			{
-				raw: data,
-				raw_size,
-			},
-			blobPbf,
-		)
-	} else {
-		throw new Error(`Unknown compression: ${compression}`)
-	}
+	const compressedBuffer = await nativeCompress(data)
+	writeBlob(
+		{
+			raw_size,
+			zlib_data: compressedBuffer,
+		},
+		blobPbf,
+	)
 
 	// Check if the length is greater than 32M
 	if (blobPbf.length > 32 * 1024 * 1024) {
 		throw new Error("Each OSM PBF blob must be less than 32MB")
 	}
 
-	return blobPbf
+	return blobPbf.finish()
 }

@@ -18,6 +18,10 @@ for (const [name, pbf] of Object.entries(PBFs)) {
 			const originalPbfReadStream = await createOsmPbfReadStream(fileStream)
 			const originalBlocks = await Array.fromAsync(originalPbfReadStream.blocks)
 
+			/* for await (const entity of readOsmPbfPrimitiveBlocks(originalPbfReadStream.blocks) {
+                
+            }*/
+
 			console.time(`full stream write ${name}`)
 			const writeStream = await getFileWriteStream(testFileName)
 			await writePbfToStream(
@@ -27,7 +31,6 @@ for (const [name, pbf] of Object.entries(PBFs)) {
 			)
 			console.timeEnd(`full stream write ${name}`)
 
-			console.log("re-reading")
 			const testDataStream = await getFileReadStream(testFileName)
 			const testPbfReadStream = await createOsmPbfReadStream(testDataStream)
 			const testBlocks = await Array.fromAsync(testPbfReadStream.blocks)

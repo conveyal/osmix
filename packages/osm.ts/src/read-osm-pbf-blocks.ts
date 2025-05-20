@@ -29,9 +29,11 @@ export async function* readOsmPbfPrimitiveBlocks(
 ): AsyncGenerator<OsmNode | OsmWay | OsmRelation> {
 	for await (const block of blocks) {
 		for (const group of block.primitivegroup) {
-			if (group.changesets && group.changesets.length > 0) {
-				throw new Error("changesets not implemented")
-			}
+			console.log("processing group")
+			console.log("nodes", group.nodes.length)
+			console.log("dense", group.dense?.id.length)
+			console.log("ways", group.ways.length)
+			console.log("relations", group.relations.length)
 			for (const n of group.nodes) {
 				yield parseNode(n, block, opts)
 			}
@@ -50,7 +52,7 @@ export async function* readOsmPbfPrimitiveBlocks(
 	}
 }
 
-const MEMBER_TYPES = ["node", "way", "relation"]
+export const MEMBER_TYPES = ["node", "way", "relation"]
 export function parseRelation(
 	r: OsmPbfRelation,
 	block: OsmPbfPrimitiveBlock,

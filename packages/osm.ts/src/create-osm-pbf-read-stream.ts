@@ -78,10 +78,8 @@ export async function createOsmPbfReadStream(
 					if (headerType == null)
 						throw new Error("Blob header has not been read")
 					const blob = readBlob(pbf, pbf.pos + bytesNeeded)
-					if (blob.data) {
-						console.log("blob data", blob.data)
-					}
-					if (!blob.zlib_data) throw new Error("Blob has no zlib data")
+					if (!blob.zlib_data || blob.zlib_data.length === 0)
+						throw new Error("Blob has no zlib data")
 
 					const start = performance.now()
 					const data = await decompress(blob.zlib_data)

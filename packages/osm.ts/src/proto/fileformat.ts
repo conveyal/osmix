@@ -6,48 +6,35 @@ export type OsmPbfBlob = {
 	raw_size?: number
 	raw?: Uint8Array
 	zlib_data?: Uint8Array
-	lzma_data?: Uint8Array
-	OBSOLETE_bzip2_data?: Uint8Array
-	lz4_data?: Uint8Array
-	zstd_data?: Uint8Array
 }
 
 export type OsmPbfBlobHeader = {
 	type: "OSMHeader" | "OSMData"
-	indexdata?: Uint8Array
 	datasize: number
 }
 
 export function readBlob(pbf: Pbf, end?: number): OsmPbfBlob {
-	return pbf.readFields(readBlobField, {}, end)
+	return pbf.readFields(
+		readBlobField,
+		{
+			raw_size: 0,
+		},
+		end,
+	)
 }
 function readBlobField(tag: number, obj: OsmPbfBlob, pbf: Pbf) {
-	console.log("read blob field", tag)
 	if (tag === 2) obj.raw_size = pbf.readVarint(true)
 	else if (tag === 1) {
 		obj.raw = pbf.readBytes()
 	} else if (tag === 3) {
 		obj.zlib_data = pbf.readBytes()
-	} else if (tag === 4) {
-		obj.lzma_data = pbf.readBytes()
-	} else if (tag === 5) {
-		obj.OBSOLETE_bzip2_data = pbf.readBytes()
-	} else if (tag === 6) {
-		obj.lz4_data = pbf.readBytes()
-	} else if (tag === 7) {
-		obj.zstd_data = pbf.readBytes()
 	}
 }
 export function writeBlob(obj: OsmPbfBlob, pbf: Pbf) {
+	// console.log("writeBlob", obj)
 	if (obj.raw_size) pbf.writeVarintField(2, obj.raw_size)
 	if (obj.raw != null) pbf.writeBytesField(1, obj.raw)
 	if (obj.zlib_data != null) pbf.writeBytesField(3, obj.zlib_data)
-	if (obj.lzma_data != null) pbf.writeBytesField(4, obj.lzma_data)
-	if (obj.OBSOLETE_bzip2_data != null) {
-		pbf.writeBytesField(5, obj.OBSOLETE_bzip2_data)
-	}
-	if (obj.lz4_data != null) pbf.writeBytesField(6, obj.lz4_data)
-	if (obj.zstd_data != null) pbf.writeBytesField(7, obj.zstd_data)
 }
 
 export function readBlobHeader(pbf: Pbf, end?: number): OsmPbfBlobHeader {
@@ -59,11 +46,9 @@ export function readBlobHeader(pbf: Pbf, end?: number): OsmPbfBlobHeader {
 }
 function readBlobHeaderField(tag: number, obj: OsmPbfBlobHeader, pbf: Pbf) {
 	if (tag === 1) obj.type = pbf.readString() as OsmPbfBlobHeader["type"]
-	else if (tag === 2) obj.indexdata = pbf.readBytes()
 	else if (tag === 3) obj.datasize = pbf.readVarint(true)
 }
 export function writeBlobHeader(obj: OsmPbfBlobHeader, pbf: Pbf) {
 	if (obj.type) pbf.writeStringField(1, obj.type)
-	if (obj.indexdata != null) pbf.writeBytesField(2, obj.indexdata)
 	if (obj.datasize) pbf.writeVarintField(3, obj.datasize)
 }

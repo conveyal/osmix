@@ -34,7 +34,6 @@ export type OsmPbfPrimitiveGroup = {
 	dense?: OsmPbfDenseNodes
 	ways: OsmPbfWay[]
 	relations: OsmPbfRelation[]
-	changesets: OsmPbfChangeSet[]
 }
 
 export type OsmPbfStringTable = {
@@ -66,10 +65,6 @@ export interface OsmPbfPrimitive {
 	info?: OsmPbfInfo
 }
 
-export type OsmPbfChangeSet = {
-	id: number
-}
-
 export interface OsmPbfNode extends OsmPbfPrimitive {
 	lat: number
 	lon: number
@@ -85,8 +80,6 @@ export type OsmPbfDenseNodes = {
 
 export interface OsmPbfWay extends OsmPbfPrimitive {
 	refs: number[]
-	lat: number[]
-	lon: number[]
 }
 
 export interface OsmPbfRelation extends OsmPbfPrimitive {
@@ -228,7 +221,7 @@ export function readPrimitiveGroup(
 ): OsmPbfPrimitiveGroup {
 	return pbf.readFields(
 		readPrimitiveGroupField,
-		{ nodes: [], ways: [], relations: [], changesets: [] },
+		{ nodes: [], ways: [], relations: [] },
 		end,
 	)
 }
@@ -243,8 +236,6 @@ function readPrimitiveGroupField(
 	} else if (tag === 3) obj.ways.push(readWay(pbf, pbf.readVarint() + pbf.pos))
 	else if (tag === 4) {
 		obj.relations.push(readRelation(pbf, pbf.readVarint() + pbf.pos))
-	} else if (tag === 5) {
-		obj.changesets.push(readChangeSet(pbf, pbf.readVarint() + pbf.pos))
 	}
 }
 export function writePrimitiveGroup(obj: OsmPbfPrimitiveGroup, pbf: Pbf) {
@@ -257,11 +248,6 @@ export function writePrimitiveGroup(obj: OsmPbfPrimitiveGroup, pbf: Pbf) {
 	}
 	if (obj.relations) {
 		for (const item of obj.relations) pbf.writeMessage(4, writeRelation, item)
-	}
-	if (obj.changesets) {
-		for (const item of obj.changesets) {
-			pbf.writeMessage(5, writeChangeSet, item)
-		}
 	}
 }
 
@@ -330,16 +316,6 @@ export function writeDenseInfo(obj: OsmPbfDenseInfo, pbf: Pbf) {
 	if (obj.visible) pbf.writePackedBoolean(6, obj.visible)
 }
 
-export function readChangeSet(pbf: Pbf, end?: number): OsmPbfChangeSet {
-	return pbf.readFields(readChangeSetField, { id: 0 }, end)
-}
-function readChangeSetField(tag: number, obj: OsmPbfChangeSet, pbf: Pbf) {
-	if (tag === 1) obj.id = pbf.readVarint(true)
-}
-export function writeChangeSet(obj: OsmPbfChangeSet, pbf: Pbf) {
-	if (obj.id) pbf.writeVarintField(1, obj.id)
-}
-
 export function readNode(pbf: Pbf, end?: number): OsmPbfNode {
 	return pbf.readFields(
 		readNodeField,
@@ -400,8 +376,6 @@ function readWayField(tag: number, obj: OsmPbfWay, pbf: Pbf) {
 	else if (tag === 3) pbf.readPackedVarint(obj.vals)
 	else if (tag === 4) obj.info = readInfo(pbf, pbf.readVarint() + pbf.pos)
 	else if (tag === 8) pbf.readPackedSVarint(obj.refs)
-	else if (tag === 9) pbf.readPackedSVarint(obj.lat)
-	else if (tag === 10) pbf.readPackedSVarint(obj.lon)
 }
 export function writeWay(obj: OsmPbfWay, pbf: Pbf) {
 	if (obj.id) pbf.writeVarintField(1, obj.id)
@@ -409,8 +383,6 @@ export function writeWay(obj: OsmPbfWay, pbf: Pbf) {
 	if (obj.vals) pbf.writePackedVarint(3, obj.vals)
 	if (obj.info) pbf.writeMessage(4, writeInfo, obj.info)
 	if (obj.refs) pbf.writePackedSVarint(8, obj.refs)
-	if (obj.lat) pbf.writePackedSVarint(9, obj.lat)
-	if (obj.lon) pbf.writePackedSVarint(10, obj.lon)
 }
 
 export function readRelation(pbf: Pbf, end?: number): OsmPbfRelation {
