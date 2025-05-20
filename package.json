@@ -11,6 +11,7 @@
 	},
 	"scripts": {
 		"dev": "bun run --filter '*' dev",
+		"build": "bun run --filter '*' build",
 		"check": "biome check --fix .",
 		"format": "biome format --write .",
 		"lint": "biome lint --fix .",
