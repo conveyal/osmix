@@ -3,7 +3,7 @@ import { PBFs } from "./files"
 import { getFile, getFileReadStream } from "./utils"
 
 import { createOsmPbfReadStream } from "../src/create-osm-pbf-read-stream"
-import { readOsmPbfPrimitiveBlocks } from "../src/read-osm-pbf-blocks"
+import { readOsmPbfPrimitiveBlocks } from "../src/read-osm-pbf"
 
 await Promise.all(Object.values(PBFs).map((p) => getFile(p.url)))
 

@@ -1,6 +1,7 @@
 import Pbf from "pbf"
 import { writeBlob, writeBlobHeader } from "./proto/fileformat"
 import {
+	type OsmPbfDenseNodes,
 	type OsmPbfHeaderBlock,
 	type OsmPbfNode,
 	type OsmPbfPrimitiveBlock,
@@ -10,8 +11,8 @@ import {
 	writeHeaderBlock,
 	writePrimitiveBlock,
 } from "./proto/osmformat"
-import { MEMBER_TYPES } from "./read-osm-pbf-blocks"
-import type { OsmNode, OsmPbfDenseNodes, OsmRelation, OsmWay } from "./types"
+import { MEMBER_TYPES } from "./read-osm-pbf"
+import type { OsmNode, OsmRelation, OsmWay } from "./types"
 import { nativeCompress } from "./utils"
 
 export * from "./write-osm-pbf"
@@ -51,7 +52,7 @@ function uint32BE(n: number): Uint8Array {
 export async function writePbfToStream(
 	stream: WritableStream<Uint8Array>,
 	header: OsmPbfHeaderBlock,
-	blocks: OsmPbfPrimitiveBlock[],
+	blocks: AsyncGenerator<OsmPbfPrimitiveBlock>,
 ) {
 	const writer = stream.getWriter()
 	for await (const blob of generatePbfs(header, blocks)) {
@@ -221,7 +222,7 @@ export async function* osmToPrimitiveBlocks(osm: {
 
 export async function* generatePbfs(
 	header: OsmPbfHeaderBlock,
-	blocks: OsmPbfPrimitiveBlock[],
+	blocks: AsyncGenerator<OsmPbfPrimitiveBlock>,
 ): AsyncGenerator<{ header: Uint8Array; content: Uint8Array }> {
 	const osmHeader = new Pbf()
 	writeHeaderBlock(header, osmHeader)

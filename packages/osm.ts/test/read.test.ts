@@ -2,7 +2,7 @@ import assert from "node:assert"
 import { test } from "vitest"
 
 import { createOsmPbfReadStream } from "../src/create-osm-pbf-read-stream"
-import { readOsmPbfPrimitiveBlocks } from "../src/read-osm-pbf-blocks"
+import { readOsmPbfPrimitiveBlocks } from "../src/read-osm-pbf"
 
 import { PBFs } from "./files"
 import { getFileReadStream } from "./utils"

@@ -31,7 +31,6 @@ function readBlobField(tag: number, obj: OsmPbfBlob, pbf: Pbf) {
 	}
 }
 export function writeBlob(obj: OsmPbfBlob, pbf: Pbf) {
-	// console.log("writeBlob", obj)
 	if (obj.raw_size) pbf.writeVarintField(2, obj.raw_size)
 	if (obj.raw != null) pbf.writeBytesField(1, obj.raw)
 	if (obj.zlib_data != null) pbf.writeBytesField(3, obj.zlib_data)

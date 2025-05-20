@@ -1,8 +1,7 @@
 import { assert, test } from "vitest"
 
-import { createOsmPbfReadStream } from "../src/create-osm-pbf-read-stream"
-
-import { writePbfToStream } from "../src/write"
+import { readOsmPbf } from "../src"
+import { osmToPrimitiveBlocks, writePbfToStream } from "../src/write-osm-pbf"
 import { PBFs } from "./files"
 import { getFileReadStream, getFileWriteStream } from "./utils"
 
@@ -15,28 +14,29 @@ for (const [name, pbf] of Object.entries(PBFs)) {
 		async () => {
 			const testFileName = `${name}.test.pbf`
 			const fileStream = await getFileReadStream(pbf.url)
-			const originalPbfReadStream = await createOsmPbfReadStream(fileStream)
-			const originalBlocks = await Array.fromAsync(originalPbfReadStream.blocks)
-
-			/* for await (const entity of readOsmPbfPrimitiveBlocks(originalPbfReadStream.blocks) {
-                
-            }*/
+			const originalOsmPbf = await readOsmPbf(fileStream, {
+				withTags: true,
+				withInfo: true,
+			})
+			// const originalBlocks = await Array.fromAsync(originalPbfReadStream.blocks)
 
 			console.time(`full stream write ${name}`)
 			const writeStream = await getFileWriteStream(testFileName)
 			await writePbfToStream(
 				writeStream,
-				originalPbfReadStream.header,
-				originalBlocks,
+				originalOsmPbf.header,
+				osmToPrimitiveBlocks(originalOsmPbf),
 			)
 			console.timeEnd(`full stream write ${name}`)
 
 			const testDataStream = await getFileReadStream(testFileName)
-			const testPbfReadStream = await createOsmPbfReadStream(testDataStream)
-			const testBlocks = await Array.fromAsync(testPbfReadStream.blocks)
+			const testOsmPbf = await readOsmPbf(testDataStream)
+			// const testBlocks = await Array.fromAsync(testOsmPbf.blocks)
 
-			assert.deepEqual(originalPbfReadStream.header, testPbfReadStream.header)
-			assert.equal(originalBlocks.length, testBlocks.length)
+			assert.deepEqual(originalOsmPbf.header, testOsmPbf.header)
+			assert.equal(originalOsmPbf.nodes.size, testOsmPbf.nodes.size)
+			assert.equal(originalOsmPbf.ways.length, testOsmPbf.ways.length)
+			assert.equal(originalOsmPbf.relations.length, testOsmPbf.relations.length)
 		},
 	)
 }

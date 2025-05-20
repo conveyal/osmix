@@ -1,8 +1,5 @@
 import type { OsmPbfInfo } from "./proto/osmformat"
 
-export * from "./proto/fileformat"
-export * from "./proto/osmformat"
-
 /**
  * A bounding box in the format [minLon, minLat, maxLon, maxLat].
  * GeoJSON.BBox allows for 3D bounding boxes, but we use tools that expect 2D bounding boxes.
@@ -48,3 +45,13 @@ export interface OsmRelationMember {
 export interface OsmRelation extends OsmEntity {
 	members: OsmRelationMember[]
 }
+
+export type OsmGeoJSONProperties = {
+	info?: OsmPbfInfoParsed
+	tags?: OsmTags
+}
+
+export type OsmGeoJSONFeature = GeoJSON.Feature<
+	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon,
+	OsmGeoJSONProperties
+>

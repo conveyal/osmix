@@ -1,3 +1,4 @@
+import { createOsmPbfReadStream } from "./create-osm-pbf-read-stream.ts"
 import type {
 	OsmPbfDenseNodes,
 	OsmPbfInfo,
@@ -21,6 +22,55 @@ export type ReadOptions = {
 }
 
 /**
+ * Read an OSM PBF from a ReadableStream and return the nodes, ways, and relations.
+ *
+ * @param stream - The stream to read the OSM PBF file from.
+ * @param opts - Include tags and info in the returned nodes, ways, and relations.
+ * @returns The header, nodes, ways, and relations.
+ */
+export async function readOsmPbf(
+	stream: ReadableStream<Uint8Array>,
+	opts?: ReadOptions,
+) {
+	const osmPbfStream = await createOsmPbfReadStream(stream)
+	const osm = await readOsmEntities(osmPbfStream.blocks, opts)
+	return {
+		header: osmPbfStream.header,
+		stats: osmPbfStream.stats,
+		...osm,
+	}
+}
+
+/**
+ * Fully read OSM entities from a stream of OSM PBF primitive blocks.
+ * @param blocks - The generator of OSM PBF primitive blocks.
+ * @param opts - Include tags and info in the returned nodes, ways, and relations.
+ * @returns The nodes, ways, and relations.
+ */
+export async function readOsmEntities(
+	blocks: AsyncGenerator<OsmPbfPrimitiveBlock>,
+	opts?: ReadOptions,
+) {
+	const nodes: Map<number, OsmNode> = new Map()
+	const ways: OsmWay[] = []
+	const relations: OsmRelation[] = []
+	for await (const entity of readOsmPbfPrimitiveBlocks(blocks, opts)) {
+		if ("members" in entity) {
+			relations.push(entity)
+		} else if ("refs" in entity) {
+			ways.push(entity)
+		} else {
+			nodes.set(entity.id, entity)
+		}
+	}
+	return {
+		nodes,
+		ways,
+		relations,
+	}
+}
+
+/**
  * Parse primitive blocks from an OSM PBF stream and return nodes, ways, and relations.
  */
 export async function* readOsmPbfPrimitiveBlocks(
@@ -29,11 +79,6 @@ export async function* readOsmPbfPrimitiveBlocks(
 ): AsyncGenerator<OsmNode | OsmWay | OsmRelation> {
 	for await (const block of blocks) {
 		for (const group of block.primitivegroup) {
-			console.log("processing group")
-			console.log("nodes", group.nodes.length)
-			console.log("dense", group.dense?.id.length)
-			console.log("ways", group.ways.length)
-			console.log("relations", group.relations.length)
 			for (const n of group.nodes) {
 				yield parseNode(n, block, opts)
 			}
