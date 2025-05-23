@@ -24,7 +24,7 @@ type HeaderType = "OSMHeader" | "OSMData"
  * @param decompress - A function to decompress the data.
  * @returns An async generator of OSM PBF header and primitive blocks.
  */
-export async function createOsmPbfReadStream(
+export async function pbfToBlocks(
 	chunks: ReadableStream<Uint8Array>,
 	decompress: (data: Uint8Array) => Promise<Uint8Array> = nativeDecompress,
 ): Promise<{

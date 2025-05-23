@@ -1,4 +1,4 @@
-export * from "./create-osm-pbf-read-stream"
+export * from "./pbf-to-blocks"
 export * as proto from "./proto/osmformat"
 export * from "./read-osm-pbf"
 export * from "./to-geojson"

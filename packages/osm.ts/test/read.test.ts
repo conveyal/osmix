@@ -1,7 +1,7 @@
 import assert from "node:assert"
 import { describe, it } from "vitest"
 
-import { createOsmPbfReadStream } from "../src/create-osm-pbf-read-stream"
+import { pbfToBlocks } from "../src/pbf-to-blocks"
 import { readOsmPbfPrimitiveBlocks } from "../src/read-osm-pbf"
 
 import { PBFs } from "./files"
@@ -16,7 +16,7 @@ describe("parse osm pbf", () => {
 			},
 			async () => {
 				const fileStream = await getFileReadStream(pbf.url)
-				const pbfStream = await createOsmPbfReadStream(fileStream)
+				const pbfStream = await pbfToBlocks(fileStream)
 				assert.deepEqual(pbfStream.header.bbox, pbf.bbox)
 
 				let nodes = 0

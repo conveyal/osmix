@@ -1,4 +1,4 @@
-import { createOsmPbfReadStream } from "./create-osm-pbf-read-stream.ts"
+import { pbfToBlocks } from "./pbf-to-blocks.ts"
 import type {
 	OsmPbfDenseNodes,
 	OsmPbfInfo,
@@ -32,7 +32,7 @@ export async function readOsmPbf(
 	stream: ReadableStream<Uint8Array>,
 	opts?: ReadOptions,
 ) {
-	const osmPbfStream = await createOsmPbfReadStream(stream)
+	const osmPbfStream = await pbfToBlocks(stream)
 	const osm = await readOsmEntities(osmPbfStream.blocks, opts)
 	return {
 		header: osmPbfStream.header,
