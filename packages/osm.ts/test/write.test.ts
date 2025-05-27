@@ -1,11 +1,11 @@
 import { assert, describe, it } from "vitest"
 
-import { readOsmPbf } from "../src"
+import { createOsmPbfReader } from "../src"
 import { osmToPrimitiveBlocks, writePbfToStream } from "../src/write-osm-pbf"
 import { PBFs } from "./files"
 import { getFileReadStream, getFileWriteStream } from "./utils"
 
-describe.skip("write osm primitive blocks", () => {
+describe("write osm primitive blocks", () => {
 	for (const [name, pbf] of Object.entries(PBFs)) {
 		it(
 			`${name}`,
@@ -15,32 +15,24 @@ describe.skip("write osm primitive blocks", () => {
 			async () => {
 				const testFileName = `${name}.test.pbf`
 				const fileStream = await getFileReadStream(pbf.url)
-				const originalOsmPbf = await readOsmPbf(fileStream, {
-					withTags: true,
-					withInfo: true,
-				})
-				// const originalBlocks = await Array.fromAsync(originalPbfReadStream.blocks)
+				const osmReader = await createOsmPbfReader(fileStream)
+				const osm = await osmReader.readEntities()
 
-				console.time(`full stream write ${name}`)
 				const writeStream = await getFileWriteStream(testFileName)
 				await writePbfToStream(
 					writeStream,
-					originalOsmPbf.header,
-					osmToPrimitiveBlocks(originalOsmPbf),
+					osm.header,
+					osmToPrimitiveBlocks(osm),
 				)
-				console.timeEnd(`full stream write ${name}`)
 
 				const testDataStream = await getFileReadStream(testFileName)
-				const testOsmPbf = await readOsmPbf(testDataStream)
-				// const testBlocks = await Array.fromAsync(testOsmPbf.blocks)
+				const testOsmPbf = await createOsmPbfReader(testDataStream)
+				const testOsm = await testOsmPbf.readEntities()
 
-				assert.deepEqual(originalOsmPbf.header, testOsmPbf.header)
-				assert.equal(originalOsmPbf.nodes.size, testOsmPbf.nodes.size)
-				assert.equal(originalOsmPbf.ways.length, testOsmPbf.ways.length)
-				assert.equal(
-					originalOsmPbf.relations.length,
-					testOsmPbf.relations.length,
-				)
+				assert.deepEqual(osm.header, testOsm.header)
+				assert.equal(osm.nodes.size, testOsm.nodes.size)
+				assert.equal(osm.ways.size, testOsm.ways.size)
+				assert.equal(osm.relations.size, testOsm.relations.size)
 			},
 		)
 	}

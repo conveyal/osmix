@@ -15,6 +15,8 @@
 		"vitest": "^3.1.3"
 	},
 	"dependencies": {
-		"pbf": "^4.0.1"
+		"pbf": "^4.0.1",
+		"geokdbush": "^2.0.1",
+		"kdbush": "^4.0.2"
 	}
 }

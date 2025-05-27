@@ -1,12 +1,4 @@
-import type { OsmPbfPrimitiveBlock } from "./proto/osmformat"
-import {
-	type ReadOptions,
-	parseDenseNodes,
-	parseNode,
-	parseWay,
-} from "./read-osm-pbf"
 import type {
-	Bbox,
 	OsmGeoJSONProperties,
 	OsmNode,
 	OsmRelation,
@@ -14,83 +6,43 @@ import type {
 } from "./types"
 import { wayIsArea } from "./way-is-area"
 
-export async function blocksToGeoJSON(
-	blocks: AsyncGenerator<OsmPbfPrimitiveBlock>,
-	opts?: ReadOptions,
-): Promise<{
-	generateFeatures: AsyncGenerator<
-		GeoJSON.Feature<
-			GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon,
-			OsmGeoJSONProperties
-		>
-	>
-	bbox: Bbox
-}> {
+export async function* generateGeoJsonFromEntities(
+	entities: AsyncGenerator<OsmNode | OsmWay | OsmRelation | OsmNode[]>,
+) {
 	const nodes: Map<number, OsmNode> = new Map()
-	const bbox: Bbox = [
-		Number.POSITIVE_INFINITY,
-		Number.POSITIVE_INFINITY,
-		Number.NEGATIVE_INFINITY,
-		Number.NEGATIVE_INFINITY,
-	]
-	const updateBbox = (node: OsmNode) => {
-		bbox[0] = Math.min(bbox[0], node.lon)
-		bbox[1] = Math.min(bbox[1], node.lat)
-		bbox[2] = Math.max(bbox[2], node.lon)
-		bbox[3] = Math.max(bbox[3], node.lat)
-	}
-
-	async function* generateFeatures() {
-		for await (const block of blocks) {
-			for (const group of block.primitivegroup) {
-				for (const n of group.nodes) {
-					const node = parseNode(n, block, opts)
-					nodes.set(n.id, node)
-					updateBbox(node)
-					if (n.keys.length > 0) {
-						yield nodeToFeature(node)
-					}
-				}
-				if (group.dense) {
-					for (const n of parseDenseNodes(group.dense, block, opts)) {
-						nodes.set(n.id, n)
-						updateBbox(n)
-						if (n.tags && Object.keys(n.tags).length > 0) {
-							yield nodeToFeature(n)
-						}
-					}
-				}
-				if (group.ways) {
-					for (const w of group.ways) {
-						yield wayToFeature(parseWay(w, block, opts), nodes)
-					}
+	for await (const entity of entities) {
+		if (Array.isArray(entity)) {
+			for (const node of entity) {
+				nodes.set(node.id, node)
+				if (node.tags && Object.keys(node.tags).length > 0) {
+					yield nodeToFeature(node)
 				}
 			}
+		} else if (entity.type === "node") {
+			nodes.set(entity.id, entity)
+			if (entity.tags && Object.keys(entity.tags).length > 0) {
+				yield nodeToFeature(entity)
+			}
+		} else if (entity.type === "way") {
+			yield wayToFeature(entity, nodes)
 		}
-	}
-
-	return {
-		generateFeatures: generateFeatures(),
-		bbox,
 	}
 }
 
-export function* entitiesToGeoJSON(osm: {
+export function entitiesToGeoJSON(osm: {
 	nodes: Map<number, OsmNode>
-	ways: OsmWay[]
-	relations?: OsmRelation[]
+	ways: Map<number, OsmWay>
 }) {
-	for (const node of osm.nodes.values()) {
-		if (node.tags && Object.keys(node.tags).length > 0) {
-			yield nodeToFeature(node)
-		}
-	}
-	for (const way of osm.ways) {
-		yield wayToFeature(way, osm.nodes)
-	}
+	return [...nodesToFeatures(osm.nodes), ...waysToFeatures(osm.ways, osm.nodes)]
 }
 
-function nodeToFeature(
+export function nodesToFeatures(nodes: Map<number, OsmNode>) {
+	return Array.from(
+		nodes.values().filter((n) => n.tags && Object.keys(n.tags).length > 0),
+	).map(nodeToFeature)
+}
+
+export function nodeToFeature(
 	node: OsmNode,
 ): GeoJSON.Feature<GeoJSON.Point, OsmGeoJSONProperties> {
 	return {
@@ -107,7 +59,14 @@ function nodeToFeature(
 	}
 }
 
-function wayToFeature(
+export function waysToFeatures(
+	ways: Map<number, OsmWay>,
+	nodes: Map<number, OsmNode>,
+) {
+	return Array.from(ways.values()).map((way) => wayToFeature(way, nodes))
+}
+
+export function wayToFeature(
 	way: OsmWay,
 	nodes: Map<number, OsmNode>,
 ): GeoJSON.Feature<GeoJSON.LineString | GeoJSON.Polygon, OsmGeoJSONProperties> {

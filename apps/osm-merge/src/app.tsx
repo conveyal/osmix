@@ -2,7 +2,12 @@ import type { DeckProps } from "@deck.gl/core"
 import { GeoJsonLayer } from "@deck.gl/layers"
 import { MapboxOverlay } from "@deck.gl/mapbox"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import * as osm from "osm.ts"
+import {
+	type Osm,
+	createOsmPbfReader,
+	osmToPrimitiveBlocks,
+	writePbfToStream,
+} from "osm.ts"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
 	type MapRef,
@@ -29,19 +34,13 @@ const MAP_ZOOM = 10
 
 export default function App() {
 	const mapRef = useRef<MapRef>(null)
+	const [osm, setOsm] = useState<Osm | null>(null)
 	const [file, setFile] = useState<Blob | null>(null)
 	const [fileName, setFileName] = useState<string | null>(null)
-	const [headerBlock, setHeaderBlock] =
-		useState<osm.proto.OsmPbfHeaderBlock | null>(null)
-	const [bbox, setBbox] = useState<osm.Bbox | null>(null)
-	const [stats, setStats] = useState<osm.OsmReadStats | null>(null)
-
-	const [nodes, setNodes] = useState<Map<number, osm.OsmNode>>(new Map())
-	const [ways, setWays] = useState<osm.OsmWay[]>([])
-
 	const features = useMemo(() => {
-		return Array.fromAsync(osm.entitiesToGeoJSON({ nodes, ways }))
-	}, [nodes, ways])
+		return osm?.toGeoJSON()
+	}, [osm])
+	const bbox = useMemo(() => osm?.bbox(), [osm])
 
 	useEffect(() => {
 		if (mapRef.current == null) return
@@ -87,10 +86,7 @@ export default function App() {
 	)
 
 	useEffect(() => {
-		setHeaderBlock(null)
-		setNodes(new Map())
-		setWays([])
-		setStats(null)
+		setOsm(null)
 		if (file == null) {
 			fetch(DEFAULT_PBF_URL)
 				.then((res) => res.blob())
@@ -100,30 +96,15 @@ export default function App() {
 				})
 		} else {
 			const fileStream = file.stream()
-			osm
-				.readOsmPbf(fileStream, { withTags: true })
-				.then(async ({ header, nodes, ways, stats }) => {
-					setHeaderBlock(header)
-					if (header.bbox) {
-						setBbox([
-							header.bbox.left,
-							header.bbox.bottom,
-							header.bbox.right,
-							header.bbox.top,
-						])
-					} else {
-						setBbox(null)
-					}
-
-					setNodes(nodes)
-					setWays(ways)
-					setStats(stats)
-				})
+			createOsmPbfReader(fileStream).then(async (osmPbf) => {
+				const osm = await osmPbf.readEntities()
+				setOsm(osm)
+			})
 		}
 	}, [file])
 
 	const downloadPbf = useCallback(async () => {
-		if (headerBlock == null) return
+		if (osm == null) return
 		const fileHandle = await showSaveFilePicker({
 			suggestedName: "test-file.osm.pbf",
 			types: [
@@ -134,32 +115,39 @@ export default function App() {
 			],
 		})
 		const stream = await fileHandle.createWritable()
-		const primitives = osm.osmToPrimitiveBlocks({ nodes, ways, relations: [] })
-		await osm.writePbfToStream(stream, headerBlock, primitives)
+		const primitives = osmToPrimitiveBlocks(osm)
+		await writePbfToStream(stream, osm.header, primitives)
 		await stream.close()
 		window.alert(`PBF file saved to ${fileHandle.name}!`)
-	}, [headerBlock, nodes, ways])
+	}, [osm])
 
 	return (
 		<div className="flex flex-row">
 			<div className="flex flex-col flex-1 pt-3 px-2">
 				<h1 className="text-2xl font-bold">osm merge</h1>
-				<input className="border border-slate-300 p-2" type="file" id="file" />
+				<input
+					className="border border-slate-300 p-2"
+					type="file"
+					id="file"
+					onChange={(e) => {
+						const file = e.target.files?.[0]
+						if (file) {
+							setFile(file)
+							setFileName(file.name)
+						}
+					}}
+				/>
 				<div>File name: {fileName}</div>
 				<div>BBox: {bbox ? bbox.join(",") : "unknown"}</div>
 				<h2>File header</h2>
 				<table>
-					<ObjectToTable object={headerBlock} />
-				</table>
-				<h2>Stats</h2>
-				<table>
-					<ObjectToTable object={stats} />
+					<ObjectToTable object={osm?.header ?? null} />
 				</table>
 				<button
 					className="bg-slate-950 text-white p-2 rounded-md cursor-pointer"
 					type="button"
 					onClick={downloadPbf}
-					disabled={headerBlock == null}
+					disabled={osm?.header == null}
 				>
 					Download
 				</button>

@@ -1,5 +1,6 @@
 import Pbf from "pbf"
-import { PrimitiveBlock } from "./primitive-block"
+import type { Osm } from "./osm"
+import { OsmPrimitiveBlock } from "./osm-primitive-block"
 import { writeBlob, writeBlobHeader } from "./proto/fileformat"
 import {
 	type OsmPbfHeaderBlock,
@@ -7,28 +8,7 @@ import {
 	writeHeaderBlock,
 	writePrimitiveBlock,
 } from "./proto/osmformat"
-import type { OsmNode, OsmRelation, OsmWay } from "./types"
 import { nativeCompress } from "./utils"
-
-export * from "./write-osm-pbf"
-
-/* 
-export async function createDownloadUrlForPbf(
-	fileName: string,
-	header: OsmPbfHeaderBlock,
-	blocks: OsmPbfPrimitiveBlock[],
-) {
-	// create a new handle
-	const newHandle = await window.showSaveFilePicker()
-
-	// create a FileSystemWritableFileStream to write to
-	const writableStream = await newHandle.createWritable()
-	await writePbfToStream(writableStream, header, blocks)
-	const blob = new Blob(newHandle, { type: "application/octet-stream" })
-	const url = URL.createObjectURL(blob)
-	const a = document.createElement("a")
-}
-*/
 
 /**
  * Encode a 32-bit *big-endian* unsigned integer.
@@ -66,16 +46,14 @@ export async function writePbfToStream(
  * @param osm - The OSM object to convert
  * @returns a generator that produces primitive blocks
  */
-export async function* osmToPrimitiveBlocks(osm: {
-	nodes: Map<number, OsmNode>
-	ways: OsmWay[]
-	relations: OsmRelation[]
-}): AsyncGenerator<OsmPbfPrimitiveBlock> {
-	let block = new PrimitiveBlock()
+export async function* osmToPrimitiveBlocks(
+	osm: Osm,
+): AsyncGenerator<OsmPbfPrimitiveBlock> {
+	let block = new OsmPrimitiveBlock()
 	for (const node of osm.nodes.values()) {
 		if (block.isFull()) {
 			yield block
-			block = new PrimitiveBlock()
+			block = new OsmPrimitiveBlock()
 		}
 		block.addNode(node)
 	}
@@ -83,20 +61,20 @@ export async function* osmToPrimitiveBlocks(osm: {
 	// Primitive groups only have one type of entity
 	block.addGroup()
 
-	for (const way of osm.ways) {
+	for (const way of osm.ways.values()) {
 		if (block.isFull()) {
 			yield block
-			block = new PrimitiveBlock()
+			block = new OsmPrimitiveBlock()
 		}
 		block.addWay(way)
 	}
 
 	block.addGroup()
 
-	for (const relation of osm.relations) {
+	for (const relation of osm.relations.values()) {
 		if (block.isFull()) {
 			yield block
-			block = new PrimitiveBlock()
+			block = new OsmPrimitiveBlock()
 		}
 		block.addRelation(relation)
 	}
