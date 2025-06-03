@@ -1,6 +1,7 @@
 import assert from "node:assert"
 import { describe, it } from "vitest"
 
+import { Osm } from "../src/osm"
 import { createOsmPbfReader } from "../src/osm-pbf-reader"
 import { PBFs } from "./files"
 import { getFile, getFileReadStream } from "./utils"
@@ -20,7 +21,7 @@ describe("parse osm pbf stream", () => {
 				let nodes = 0
 				let ways = 0
 				let relations = 0
-				for await (const entity of osm.generateEntities()) {
+				for await (const entity of osm) {
 					if (Array.isArray(entity)) {
 						nodes += entity.length
 					} else if (entity.type === "relation") {
@@ -53,7 +54,7 @@ describe("parse osm pbf buffer", () => {
 				let nodes = 0
 				let ways = 0
 				let relations = 0
-				for await (const entity of osm.generateEntities()) {
+				for await (const entity of osm) {
 					if (Array.isArray(entity)) {
 						nodes += entity.length
 					} else if (entity.type === "relation") {
@@ -73,7 +74,7 @@ describe("parse osm pbf buffer", () => {
 			it(`read ${name} entities`, async () => {
 				const fileData = await getFile(pbf.url)
 				const osm = await createOsmPbfReader(fileData)
-				const entities = await osm.readEntities()
+				const entities = await Osm.fromPbfReader(osm)
 				assert.equal(entities.nodes.size, pbf.nodes)
 				assert.equal(entities.ways.size, pbf.ways)
 			})

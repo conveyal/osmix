@@ -1,14 +1,8 @@
 import Pbf from "pbf"
-import { Osm } from "./osm"
 import { OsmPrimitiveBlock } from "./osm-primitive-block"
 import { readBlob, readBlobHeader } from "./proto/fileformat"
-import {
-	type OsmPbfHeaderBlock,
-	readHeaderBlock,
-	readPrimitiveBlock,
-} from "./proto/osmformat"
-import { nodeToFeature, wayToFeature } from "./to-geojson"
-import type { OsmNode } from "./types"
+import { readHeaderBlock, readPrimitiveBlock } from "./proto/osmformat"
+import type { OsmPbfHeaderBlock } from "./types"
 import { streamToAsyncIterator } from "./utils"
 
 const HEADER_BYTES_LENGTH = 4
@@ -34,60 +28,23 @@ export async function createOsmPbfReader(
  * chunk or a stream of chunks.
  */
 export class OsmPbfReader {
-	pbf: Pbf | null = null
-	state: number = State.READ_HEADER_LENGTH
-	bytesNeeded: number = HEADER_BYTES_LENGTH
-	headerType: HeaderType | null = null
-
 	header: OsmPbfHeaderBlock
-	generateBlocks: AsyncGenerator<OsmPrimitiveBlock>
+	blocks: AsyncGenerator<OsmPrimitiveBlock>
 
 	constructor(
 		header: OsmPbfHeaderBlock,
-		generateBlocks: AsyncGenerator<OsmPrimitiveBlock>,
+		blocksGenerator: AsyncGenerator<OsmPrimitiveBlock>,
 	) {
 		this.header = header
-		this.generateBlocks = generateBlocks
+		this.blocks = blocksGenerator
 	}
 
-	async *generateEntities() {
-		for await (const block of this.generateBlocks) {
+	async *[Symbol.asyncIterator]() {
+		for await (const block of this.blocks) {
 			for (const entity of block) {
 				yield entity
 			}
 		}
-	}
-
-	async *generateGeoJSON() {
-		const nodes = new Map<number, OsmNode>()
-		for await (const entity of this.generateEntities()) {
-			if (Array.isArray(entity)) {
-				for (const node of entity) {
-					nodes.set(node.id, node)
-					if (node.tags && Object.keys(node.tags).length > 0) {
-						yield nodeToFeature(node)
-					}
-				}
-			} else if (entity.type === "way") {
-				yield wayToFeature(entity, nodes)
-			}
-		}
-	}
-
-	async readEntities() {
-		const osm = new Osm(this.header)
-		for await (const entity of this.generateEntities()) {
-			if (Array.isArray(entity)) {
-				for (const node of entity) {
-					osm.nodes.set(node.id, node)
-				}
-			} else if (entity.type === "way") {
-				osm.ways.set(entity.id, entity)
-			} else if (entity.type === "relation") {
-				osm.relations.set(entity.id, entity)
-			}
-		}
-		return osm
 	}
 }
 

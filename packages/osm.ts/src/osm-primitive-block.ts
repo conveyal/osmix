@@ -1,17 +1,16 @@
 import type {
+	OsmNode,
 	OsmPbfDenseNodes,
 	OsmPbfInfo,
+	OsmPbfInfoParsed,
 	OsmPbfNode,
 	OsmPbfPrimitiveBlock,
 	OsmPbfPrimitiveGroup,
 	OsmPbfRelation,
 	OsmPbfWay,
-} from "./proto/osmformat"
-import type {
-	OsmNode,
-	OsmPbfInfoParsed,
 	OsmRelation,
 	OsmRelationMember,
+	OsmTags,
 	OsmWay,
 } from "./types"
 import { assertNonNull } from "./utils"
@@ -30,21 +29,22 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 	stringtable: string[] = [""]
 	primitivegroup: OsmPbfPrimitiveGroup[] = []
 
-	date_granularity?: number | undefined
-	granularity?: number | undefined
-	lat_offset?: number | undefined
-	lon_offset?: number | undefined
+	date_granularity = 1_000
+	granularity = 1e7
+	lat_offset = 0
+	lon_offset = 0
 
 	#entities = 0
+	#includeInfo = false
 
 	constructor(block?: OsmPbfPrimitiveBlock) {
 		if (block) {
-			this.date_granularity = block.date_granularity
+			this.date_granularity = block.date_granularity ?? 1_000
 			this.stringtable = block.stringtable
 			this.primitivegroup = block.primitivegroup
-			this.granularity = block.granularity
-			this.lat_offset = block.lat_offset
-			this.lon_offset = block.lon_offset
+			this.granularity = block.granularity ?? 1e7
+			this.lat_offset = block.lat_offset ?? 0
+			this.lon_offset = block.lon_offset ?? 0
 		} else {
 			this.addGroup()
 		}
@@ -68,13 +68,13 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 	}
 
 	fillInfo(info: OsmPbfInfo | undefined): OsmPbfInfoParsed | undefined {
-		if (!info) return undefined
+		if (!this.#includeInfo || !info) return undefined
 		return {
 			...info,
 			timestamp:
 				info.timestamp === undefined || info.timestamp === 0
 					? undefined
-					: info.timestamp * (this.date_granularity ?? 1000),
+					: info.timestamp * this.date_granularity,
 			user:
 				info.user_sid === undefined || this.stringtable[info.user_sid]
 					? undefined
@@ -119,12 +119,12 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 		return index
 	}
 
-	addTags(tags: Record<string, string>) {
+	addTags(tags: OsmTags) {
 		const keys = []
 		const vals = []
 		for (const [key, val] of Object.entries(tags)) {
 			keys.push(this.getStringtableIndex(key))
-			vals.push(this.getStringtableIndex(val))
+			vals.push(this.getStringtableIndex(val.toString()))
 		}
 		return { keys, vals }
 	}
@@ -143,8 +143,8 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 		return {
 			id: n.id,
 			type: "node",
-			lon: (this.lon_offset ?? 0) + n.lon / (this.granularity ?? 1e7),
-			lat: (this.lat_offset ?? 0) + n.lat / (this.granularity ?? 1e7),
+			lon: this.lon_offset + n.lon / this.granularity,
+			lat: this.lat_offset + n.lat / this.granularity,
 			tags: this.getTags(n.keys, n.vals),
 			info: this.fillInfo(n.info),
 		}
@@ -247,11 +247,6 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 		}
 		let keysValsIndex = 0
 
-		const granularity = this.granularity ?? 1e7
-		const latOffset = this.lat_offset ?? 0
-		const lonOffset = this.lon_offset ?? 0
-		const dateGranularity = this.date_granularity ?? 1000
-
 		return dense.id.map((idSid, nodeIndex) => {
 			delta.id += idSid
 
@@ -266,8 +261,8 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 			const node: OsmNode = {
 				id: delta.id,
 				type: "node",
-				lon: lonOffset + delta.lon / granularity,
-				lat: latOffset + delta.lat / granularity,
+				lon: this.lon_offset + delta.lon / this.granularity,
+				lat: this.lat_offset + delta.lat / this.granularity,
 			}
 			if (dense.keys_vals.length > 0) {
 				node.tags = {}
@@ -281,7 +276,7 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 				}
 				keysValsIndex++
 			}
-			if (dense.denseinfo) {
+			if (dense.denseinfo && this.#includeInfo) {
 				const iTime = dense.denseinfo.timestamp[nodeIndex]
 				const iChangeset = dense.denseinfo.changeset[nodeIndex]
 				const iUid = dense.denseinfo.uid[nodeIndex]
@@ -300,7 +295,7 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 
 				node.info = {
 					version: iVersion,
-					timestamp: delta.timestamp * dateGranularity,
+					timestamp: delta.timestamp * this.date_granularity,
 					changeset: delta.changeset,
 					uid: delta.uid,
 					user_sid: delta.user_sid,

@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import { createOsmPbfReader } from "../src"
+import { Osm, createOsmPbfReader } from "../src"
 import { getConflictingIds, merge } from "../src/merge"
 import { getFile } from "./utils"
 
@@ -17,11 +17,11 @@ describe("merge osm", () => {
 
 			const osm1Data = await getFile(osm1Name)
 			const osm1Reader = await createOsmPbfReader(osm1Data)
-			const osm1 = await osm1Reader.readEntities()
+			const osm1 = await Osm.fromPbfReader(osm1Reader)
 
 			const osm2Data = await getFile(osm2Name)
 			const osm2Reader = await createOsmPbfReader(osm2Data)
-			const osm2 = await osm2Reader.readEntities()
+			const osm2 = await Osm.fromPbfReader(osm2Reader)
 
 			const conflictingIds = getConflictingIds(osm1, osm2)
 			assert.equal(conflictingIds.nodes.size, 0)

@@ -2,12 +2,7 @@ import type { DeckProps } from "@deck.gl/core"
 import { GeoJsonLayer } from "@deck.gl/layers"
 import { MapboxOverlay } from "@deck.gl/mapbox"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import {
-	type Osm,
-	createOsmPbfReader,
-	osmToPrimitiveBlocks,
-	writePbfToStream,
-} from "osm.ts"
+import { Osm, osmToPrimitiveBlocks, writePbfToStream } from "osm.ts"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
 	type MapRef,
@@ -96,8 +91,7 @@ export default function App() {
 				})
 		} else {
 			const fileStream = file.stream()
-			createOsmPbfReader(fileStream).then(async (osmPbf) => {
-				const osm = await osmPbf.readEntities()
+			Osm.fromPbfData(fileStream).then(async (osm) => {
 				setOsm(osm)
 			})
 		}

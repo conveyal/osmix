@@ -1,4 +1,105 @@
-import type { OsmPbfInfo } from "./proto/osmformat"
+export type OsmPbfBlob = {
+	raw_size?: number
+	raw?: Uint8Array
+	zlib_data?: Uint8Array
+}
+
+export type OsmPbfBlobHeader = {
+	type: "OSMHeader" | "OSMData"
+	datasize: number
+}
+
+export type OsmPbfHeaderBBox = {
+	left: number
+	right: number
+	top: number
+	bottom: number
+}
+
+export type OsmPbfHeaderBlock = {
+	bbox?: OsmPbfHeaderBBox
+	required_features: string[]
+	optional_features: string[]
+	writingprogram?: string
+	source?: string
+	osmosis_replication_timestamp?: number
+	osmosis_replication_sequence_number?: number
+	osmosis_replication_base_url?: string
+}
+
+export type OsmPbfPrimitiveBlock = {
+	stringtable: string[]
+	primitivegroup: OsmPbfPrimitiveGroup[]
+	granularity?: number
+	lat_offset?: number
+	lon_offset?: number
+	date_granularity?: number
+}
+
+export type OsmPbfPrimitiveGroup = {
+	nodes: OsmPbfNode[]
+	dense?: OsmPbfDenseNodes
+	ways: OsmPbfWay[]
+	relations: OsmPbfRelation[]
+}
+
+export type OsmPbfStringTable = {
+	s: Uint8Array[]
+}
+
+export interface OsmPbfInfo {
+	version?: number
+	timestamp?: number
+	changeset?: number
+	uid?: number
+	user_sid?: number
+	visible?: boolean
+}
+
+export type OsmPbfDenseInfo = {
+	version: number[]
+	timestamp: number[]
+	changeset: number[]
+	uid: number[]
+	user_sid: number[]
+	visible: boolean[]
+}
+
+export interface OsmPbfPrimitive {
+	id: number
+	keys: number[]
+	vals: number[]
+	info?: OsmPbfInfo
+}
+
+export interface OsmPbfNode extends OsmPbfPrimitive {
+	lat: number
+	lon: number
+}
+
+export type OsmPbfDenseNodes = {
+	id: number[]
+	denseinfo?: OsmPbfDenseInfo
+	lat: number[]
+	lon: number[]
+	keys_vals: number[]
+}
+
+export interface OsmPbfWay extends OsmPbfPrimitive {
+	refs: number[]
+}
+
+export interface OsmPbfRelation extends OsmPbfPrimitive {
+	roles_sid: number[]
+	memids: number[]
+	types: number[]
+}
+
+export const RelationMemberType = {
+	NODE: 0,
+	WAY: 1,
+	RELATION: 2,
+} as const
 
 /**
  * A bounding box in the format [minLon, minLat, maxLon, maxLat].
@@ -6,19 +107,12 @@ import type { OsmPbfInfo } from "./proto/osmformat"
  */
 export type Bbox = [left: number, bottom: number, right: number, top: number]
 
-export type OsmReadStats = {
-	blocks: number
-	chunks: number
-	inflateMs: number
-	inflateBytes: number
-}
-
 export interface OsmPbfInfoParsed extends OsmPbfInfo {
 	user?: string
 }
 
 export interface OsmTags {
-	[key: string]: string
+	[key: string]: string | number
 }
 
 export interface OsmEntity {
@@ -50,9 +144,8 @@ export interface OsmRelation extends OsmEntity {
 	members: OsmRelationMember[]
 }
 
-export type OsmGeoJSONProperties = {
-	info?: OsmPbfInfoParsed
-	tags?: OsmTags
+export interface OsmGeoJSONProperties extends OsmTags {
+	id: number
 }
 
 export type OsmGeoJSONFeature = GeoJSON.Feature<

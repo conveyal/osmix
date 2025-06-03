@@ -1,19 +1,47 @@
-import KDBush from "kdbush"
-import type { OsmPbfHeaderBlock } from "./proto/osmformat"
+import { type OsmPbfReader, createOsmPbfReader } from "./osm-pbf-reader"
 import { nodesToFeatures, waysToFeatures } from "./to-geojson"
-import type { Bbox, OsmNode, OsmRelation, OsmWay } from "./types"
+import type {
+	Bbox,
+	OsmNode,
+	OsmPbfHeaderBlock,
+	OsmRelation,
+	OsmWay,
+} from "./types"
 
+/**
+ * Requires sorted IDs.
+ */
 export class Osm {
 	header: OsmPbfHeaderBlock
 	nodes: Map<number, OsmNode> = new Map()
 	ways: Map<number, OsmWay> = new Map()
 	relations: Map<number, OsmRelation> = new Map()
 
+	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
+		const reader = await createOsmPbfReader(data)
+		return Osm.fromPbfReader(reader)
+	}
+
+	static async fromPbfReader(reader: OsmPbfReader) {
+		const osm = new Osm(reader.header)
+		for await (const entity of reader) {
+			osm.addEntity(entity)
+		}
+		return osm
+	}
+
 	constructor(header: OsmPbfHeaderBlock) {
 		this.header = header
 	}
 
-	addEntity(entity: OsmNode | OsmWay | OsmRelation) {
+	addEntity(entity: OsmNode | OsmWay | OsmRelation | OsmNode[]) {
+		if (Array.isArray(entity)) {
+			for (const node of entity) {
+				this.addEntity(node)
+			}
+			return
+		}
+
 		if (entity.type === "node") {
 			this.nodes.set(entity.id, entity)
 		} else if (entity.type === "way") {
@@ -51,14 +79,5 @@ export class Osm {
 			...nodesToFeatures(this.nodes),
 			...waysToFeatures(this.ways, this.nodes),
 		]
-	}
-
-	createSpatialIndex() {
-		const index = new KDBush(this.nodes.size)
-		for (const node of this.nodes.values()) {
-			index.add(node.lon, node.lat)
-		}
-		index.finish()
-		return index
 	}
 }

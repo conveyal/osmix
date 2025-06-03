@@ -12,7 +12,7 @@ for (const [name, pbf] of Object.entries(PBFs)) {
 		const osm = await createOsmPbfReader(stream)
 
 		let count = 0
-		for await (const entity of osm.generateEntities()) {
+		for await (const entity of osm) {
 			count++
 		}
 	})

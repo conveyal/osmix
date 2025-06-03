@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import { createOsmPbfReader } from "../src"
+import { Osm, createOsmPbfReader } from "../src"
 import { osmToPrimitiveBlocks, writePbfToStream } from "../src/write-osm-pbf"
 import { PBFs } from "./files"
 import { getFileReadStream, getFileWriteStream } from "./utils"
@@ -16,7 +16,7 @@ describe("write osm primitive blocks", () => {
 				const testFileName = `${name}.test.pbf`
 				const fileStream = await getFileReadStream(pbf.url)
 				const osmReader = await createOsmPbfReader(fileStream)
-				const osm = await osmReader.readEntities()
+				const osm = await Osm.fromPbfReader(osmReader)
 
 				const writeStream = await getFileWriteStream(testFileName)
 				await writePbfToStream(
@@ -27,7 +27,7 @@ describe("write osm primitive blocks", () => {
 
 				const testDataStream = await getFileReadStream(testFileName)
 				const testOsmPbf = await createOsmPbfReader(testDataStream)
-				const testOsm = await testOsmPbf.readEntities()
+				const testOsm = await Osm.fromPbfReader(testOsmPbf)
 
 				assert.deepEqual(osm.header, testOsm.header)
 				assert.equal(osm.nodes.size, testOsm.nodes.size)

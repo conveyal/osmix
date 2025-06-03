@@ -1,27 +1,18 @@
-import type {
-	OsmGeoJSONProperties,
-	OsmNode,
-	OsmRelation,
-	OsmWay,
-} from "./types"
+import type { OsmPbfReader } from "./osm-pbf-reader"
+import type { OsmGeoJSONProperties, OsmNode, OsmWay } from "./types"
 import { wayIsArea } from "./way-is-area"
 
-export async function* generateGeoJsonFromEntities(
-	entities: AsyncGenerator<OsmNode | OsmWay | OsmRelation | OsmNode[]>,
+export async function* generateGeoJsonFromOsmPbfReader(
+	osmReader: OsmPbfReader,
 ) {
 	const nodes: Map<number, OsmNode> = new Map()
-	for await (const entity of entities) {
+	for await (const entity of osmReader) {
 		if (Array.isArray(entity)) {
 			for (const node of entity) {
 				nodes.set(node.id, node)
 				if (node.tags && Object.keys(node.tags).length > 0) {
 					yield nodeToFeature(node)
 				}
-			}
-		} else if (entity.type === "node") {
-			nodes.set(entity.id, entity)
-			if (entity.tags && Object.keys(entity.tags).length > 0) {
-				yield nodeToFeature(entity)
 			}
 		} else if (entity.type === "way") {
 			yield wayToFeature(entity, nodes)
@@ -53,8 +44,8 @@ export function nodeToFeature(
 			coordinates: [node.lon, node.lat],
 		},
 		properties: {
-			info: node.info,
-			tags: node.tags,
+			id: node.id,
+			...(node.tags ?? {}),
 		},
 	}
 }
@@ -88,8 +79,8 @@ export function wayToFeature(
 					coordinates: way.refs.map(getNode),
 				},
 		properties: {
-			info: way.info,
-			tags: way.tags,
+			id: way.id,
+			...(way.tags ?? {}),
 		},
 	}
 }
