@@ -15,4 +15,9 @@ export default defineConfig({
 			name: "osm.ts",
 		},
 	},
+	test: {
+		benchmark: {
+			include: ["**/**.bench.ts"],
+		},
+	},
 })
