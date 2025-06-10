@@ -105,7 +105,12 @@ export const RelationMemberType = {
  * A bounding box in the format [minLon, minLat, maxLon, maxLat].
  * GeoJSON.BBox allows for 3D bounding boxes, but we use tools that expect 2D bounding boxes.
  */
-export type Bbox = [left: number, bottom: number, right: number, top: number]
+export type Bbox = [
+	minLon: number,
+	minLat: number,
+	maxLon: number,
+	maxLat: number,
+]
 
 export interface OsmPbfInfoParsed extends OsmPbfInfo {
 	user?: string
@@ -144,9 +149,7 @@ export interface OsmRelation extends OsmEntity {
 	members: OsmRelationMember[]
 }
 
-export interface OsmGeoJSONProperties extends OsmTags {
-	id: number
-}
+export interface OsmGeoJSONProperties extends OsmTags {}
 
 export type OsmGeoJSONFeature = GeoJSON.Feature<
 	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon,

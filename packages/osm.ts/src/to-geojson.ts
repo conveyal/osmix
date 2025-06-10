@@ -1,5 +1,5 @@
 import type { OsmPbfReader } from "./osm-pbf-reader"
-import type { OsmGeoJSONProperties, OsmNode, OsmWay } from "./types"
+import type { OsmGeoJSONProperties, OsmNode, OsmTags, OsmWay } from "./types"
 import { wayIsArea } from "./way-is-area"
 
 export async function* generateGeoJsonFromOsmPbfReader(
@@ -27,10 +27,16 @@ export function entitiesToGeoJSON(osm: {
 	return [...nodesToFeatures(osm.nodes), ...waysToFeatures(osm.ways, osm.nodes)]
 }
 
-export function nodesToFeatures(nodes: Map<number, OsmNode>) {
-	return Array.from(
-		nodes.values().filter((n) => n.tags && Object.keys(n.tags).length > 0),
-	).map(nodeToFeature)
+function includeNode(node: OsmNode) {
+	if (!node.tags || Object.keys(node.tags).length === 0) return false
+	return true
+}
+
+export function nodesToFeatures(
+	nodes: Map<number, OsmNode>,
+	filter = includeNode,
+) {
+	return Array.from(nodes.values().filter(filter)).map(nodeToFeature)
 }
 
 export function nodeToFeature(
@@ -43,18 +49,23 @@ export function nodeToFeature(
 			type: "Point",
 			coordinates: [node.lon, node.lat],
 		},
-		properties: {
-			id: node.id,
-			...(node.tags ?? {}),
-		},
+		properties: node.tags ?? {},
 	}
+}
+
+function includeWay(way: OsmWay) {
+	if (!way.tags || Object.keys(way.tags).length === 0) return false
+	return true
 }
 
 export function waysToFeatures(
 	ways: Map<number, OsmWay>,
 	nodes: Map<number, OsmNode>,
+	filter = includeWay,
 ) {
-	return Array.from(ways.values()).map((way) => wayToFeature(way, nodes))
+	return Array.from(ways.values().filter(filter))
+		.map((way) => wayToFeature(way, nodes))
+		.filter((f) => f.geometry.type !== "Polygon")
 }
 
 export function wayToFeature(
@@ -78,9 +89,30 @@ export function wayToFeature(
 					type: "LineString",
 					coordinates: way.refs.map(getNode),
 				},
-		properties: {
-			id: way.id,
-			...(way.tags ?? {}),
-		},
+		properties: way.tags ?? {},
+	}
+}
+
+export function wayToEditableGeoJson(
+	way: OsmWay,
+	nodes: Map<number, OsmNode>,
+): GeoJSON.FeatureCollection<
+	GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.Point,
+	OsmGeoJSONProperties
+> {
+	const getNode = (r: number) => {
+		const n = nodes.get(r)
+		if (!n) throw new Error(`Node ${r} not found`)
+		return n
+	}
+	const wayFeature = wayToFeature(way, nodes)
+	const wayNodes = way.refs.map((id) => {
+		const node = getNode(id)
+		return nodeToFeature(node)
+	})
+
+	return {
+		type: "FeatureCollection",
+		features: [wayFeature, ...wayNodes],
 	}
 }

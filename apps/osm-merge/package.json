@@ -16,6 +16,7 @@
 		"@types/react-dom": "^19.1.5",
 		"@vitejs/plugin-react": "^4.4.1",
 		"tailwindcss": "^4.1.6",
+		"tw-animate-css": "^1.3.4",
 		"vite": "^6.3.5"
 	},
 	"dependencies": {
@@ -24,11 +25,19 @@
 		"@deck.gl/mapbox": "^9.1.11",
 		"@deck.gl/react": "^9.1.11",
 		"@fontsource-variable/roboto-mono": "^5.2.5",
+		"@radix-ui/react-slot": "^1.2.3",
+		"@turf/turf": "^7.2.0",
+		"class-variance-authority": "^0.7.1",
+		"clsx": "^2.1.1",
+		"jotai": "^2.12.5",
+		"kdbush": "^4.0.2",
+		"lucide-react": "^0.513.0",
 		"maplibre-gl": "^5.5.0",
 		"native-file-system-adapter": "^3.0.1",
 		"osm.ts": "workspace:*",
 		"react": "^19.1.0",
 		"react-dom": "^19.1.0",
-		"react-map-gl": "^8.0.4"
+		"react-map-gl": "^8.0.4",
+		"tailwind-merge": "^3.3.0"
 	}
 }

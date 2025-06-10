@@ -79,13 +79,13 @@ export function wayIsArea(refs: number[], tags?: OsmTags): boolean {
 	// 3. Tags that are area only for INCLUDED values
 	for (const [key, included] of Object.entries(INCLUDED_VALUE_TAGS)) {
 		const v = tags[key]
-		if (v && included.has(v)) return true
+		if (v && included.has(`${v}`)) return true
 	}
 
 	// 4. Tags that are area unless value is excluded
 	for (const [key, excluded] of Object.entries(EXCLUDED_VALUE_TAGS)) {
 		const v = tags[key]
-		if (v && !excluded.has(v)) return true
+		if (v && !excluded.has(`${v}`)) return true
 	}
 
 	return false

@@ -1,34 +1,19 @@
-import type { DeckProps } from "@deck.gl/core"
+import { mapAtom } from "@/atoms"
+import Basemap from "@/components/basemap"
+import DeckGlOverlay from "@/components/deckgl-overlay"
 import { GeoJsonLayer } from "@deck.gl/layers"
-import { MapboxOverlay } from "@deck.gl/mapbox"
+import { useAtomValue } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { Osm, osmToPrimitiveBlocks, writePbfToStream } from "osm.ts"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import {
-	type MapRef,
-	Map as MaplibreMap,
-	NavigationControl,
-	useControl,
-} from "react-map-gl/maplibre"
-import ObjectToTable from "./object-to-table"
-import { objectToHtmlTableString } from "./utils"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import ObjectToTable from "../object-to-table"
+import { objectToHtmlTableString } from "../utils"
 
 const DEFAULT_PBF_FILE = "monaco-250101.osm.pbf"
 const DEFAULT_PBF_URL = `./pbfs/${DEFAULT_PBF_FILE}`
 
-function DeckGlOverlay(props: DeckProps) {
-	const overlay = useControl<MapboxOverlay>(() => new MapboxOverlay(props))
-	overlay.setProps(props)
-	return null
-}
-
-const MAP_STYLE =
-	"https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-const MAP_CENTER = [7.5, 43.6] as const
-const MAP_ZOOM = 10
-
-export default function App() {
-	const mapRef = useRef<MapRef>(null)
+export default function ViewPage() {
+	const map = useAtomValue(mapAtom)
 	const [osm, setOsm] = useState<Osm | null>(null)
 	const [file, setFile] = useState<Blob | null>(null)
 	const [fileName, setFileName] = useState<string | null>(null)
@@ -38,11 +23,9 @@ export default function App() {
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 
 	useEffect(() => {
-		if (mapRef.current == null) return
-		if (bbox == null) return
-		const map = mapRef.current.getMap()
+		if (map == null || bbox == null) return
 		map.fitBounds(bbox)
-	}, [bbox])
+	}, [bbox, map])
 
 	const layers = useMemo(
 		() => [
@@ -147,16 +130,7 @@ export default function App() {
 				</button>
 			</div>
 			<div className="h-dvh grow-3 relative">
-				<MaplibreMap
-					ref={mapRef}
-					mapStyle={MAP_STYLE}
-					initialViewState={{
-						longitude: MAP_CENTER[0],
-						latitude: MAP_CENTER[1],
-						zoom: MAP_ZOOM,
-					}}
-				>
-					<NavigationControl />
+				<Basemap>
 					<DeckGlOverlay
 						layers={layers}
 						getTooltip={({ object }) => {
@@ -173,7 +147,7 @@ export default function App() {
 							}
 						}}
 					/>
-				</MaplibreMap>
+				</Basemap>
 			</div>
 		</div>
 	)
