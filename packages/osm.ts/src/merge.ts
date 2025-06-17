@@ -1,6 +1,16 @@
 import { Osm } from "./osm"
 import type { OsmNode } from "./types"
 
+export class OsmMergeTask {
+	base: Osm
+	patch: Osm
+
+	constructor(a: Osm, b: Osm) {
+		this.base = a
+		this.patch = b
+	}
+}
+
 /**
  * Merge two OSM objects.
  *

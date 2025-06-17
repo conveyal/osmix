@@ -1,3 +1,5 @@
+export type OsmEntityType = "node" | "way" | "relation"
+
 export type OsmPbfBlob = {
 	raw_size?: number
 	raw?: Uint8Array
@@ -122,7 +124,7 @@ export interface OsmTags {
 
 export interface OsmEntity {
 	id: number
-	type: "node" | "way" | "relation"
+	type: OsmEntityType
 	tags?: OsmTags
 	info?: OsmPbfInfoParsed
 }
@@ -155,3 +157,21 @@ export type OsmGeoJSONFeature = GeoJSON.Feature<
 	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon,
 	OsmGeoJSONProperties
 >
+
+export type OsmChange =
+	| {
+			name?: string
+			changeType: "create"
+			entity: OsmNode | OsmWay | OsmRelation
+	  }
+	| {
+			name?: string
+			changeType: "delete"
+			entityType: OsmEntityType
+			entityId: number
+	  }
+	| {
+			name?: string
+			changeType: "modify"
+			entity: OsmNode | OsmWay | OsmRelation
+	  }

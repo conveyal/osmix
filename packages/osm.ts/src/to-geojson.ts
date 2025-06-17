@@ -93,6 +93,21 @@ export function wayToFeature(
 	}
 }
 
+export function wayToLineString(
+	way: OsmWay,
+	refToPosition: (r: number) => [number, number],
+): GeoJSON.Feature<GeoJSON.LineString, OsmGeoJSONProperties> {
+	return {
+		type: "Feature",
+		id: way.id,
+		geometry: {
+			type: "LineString",
+			coordinates: way.refs.map(refToPosition),
+		},
+		properties: way.tags ?? {},
+	}
+}
+
 export function wayToEditableGeoJson(
 	way: OsmWay,
 	nodes: Map<number, OsmNode>,

@@ -1,21 +1,23 @@
-import { bbox } from "@turf/turf"
-import KDBush from "kdbush"
+import { geojsonRbush, lineIntersect, nearestPointOnLine } from "@turf/turf"
+import NodeSpatialIndex from "./node-spatial-index"
+import { generateOsmChanges } from "./osm-change"
 import { type OsmPbfReader, createOsmPbfReader } from "./osm-pbf-reader"
 import {
 	nodesToFeatures,
-	wayToEditableGeoJson,
 	wayToFeature,
+	wayToLineString,
 	waysToFeatures,
 } from "./to-geojson"
 import type {
 	Bbox,
-	OsmGeoJSONProperties,
+	OsmChange,
+	OsmEntityType,
 	OsmNode,
 	OsmPbfHeaderBlock,
 	OsmRelation,
-	OsmTags,
 	OsmWay,
 } from "./types"
+import { wayIsArea } from "./way-is-area"
 
 /**
  * Requires sorted IDs.
@@ -26,8 +28,7 @@ export class Osm {
 	ways: Map<number, OsmWay> = new Map()
 	relations: Map<number, OsmRelation> = new Map()
 
-	// For generating a spatial index
-	nodeIds: number[] = []
+	maxNodeId = 0
 
 	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
 		const reader = await createOsmPbfReader(data)
@@ -42,32 +43,85 @@ export class Osm {
 		return osm
 	}
 
-	constructor(header: OsmPbfHeaderBlock) {
-		this.header = header
+	constructor(header?: OsmPbfHeaderBlock) {
+		this.header = header ?? {
+			required_features: [],
+			optional_features: [],
+		}
 	}
 
-	way(id: number) {
+	getNode(id: number) {
+		const node = this.nodes.get(id)
+		if (!node) throw new Error(`Node ${id} not found`)
+		return node
+	}
+
+	getNodePosition(id: number): [number, number] {
+		const node = this.getNode(id)
+		return [node.lon, node.lat]
+	}
+
+	getWay(id: number): OsmWay {
 		const way = this.ways.get(id)
-		if (!way) return null
-		return new Way(this, way)
+		if (!way) throw Error(`Way ${id} not found`)
+		return way
+	}
+
+	wayToLineString(way: number | OsmWay) {
+		return wayToLineString(
+			typeof way === "number" ? this.getWay(way) : way,
+			(r) => this.getNodePosition(r),
+		)
+	}
+
+	addNode(node: OsmNode) {
+		if (node.id >= this.maxNodeId) this.maxNodeId = node.id
+		this.nodes.set(node.id, node)
+		return node
+	}
+
+	createNode(lon: number, lat: number) {
+		return this.addNode({
+			id: this.maxNodeId++,
+			lon,
+			lat,
+			type: "node",
+		})
 	}
 
 	addEntity(entity: OsmNode | OsmWay | OsmRelation | OsmNode[]) {
 		if (Array.isArray(entity)) {
 			for (const node of entity) {
-				this.addEntity(node)
-				this.nodeIds.push(node.id)
+				this.addNode(node)
 			}
 			return
 		}
 
 		if (entity.type === "node") {
-			this.nodes.set(entity.id, entity)
+			this.addNode(entity)
 		} else if (entity.type === "way") {
 			this.ways.set(entity.id, entity)
 		} else if (entity.type === "relation") {
 			this.relations.set(entity.id, entity)
 		}
+	}
+
+	getEntity(type: OsmEntityType, id: number) {
+		if (type === "node") return this.nodes.get(id)
+		if (type === "way") return this.ways.get(id)
+		if (type === "relation") return this.relations.get(id)
+	}
+
+	deleteEntity(type: OsmEntityType, id: number) {
+		if (type === "node") this.nodes.delete(id)
+		if (type === "way") this.ways.delete(id)
+		if (type === "relation") this.relations.delete(id)
+	}
+
+	setEntity(entity: OsmNode | OsmWay | OsmRelation) {
+		if (entity.type === "node") this.nodes.set(entity.id, entity)
+		if (entity.type === "way") this.ways.set(entity.id, entity)
+		if (entity.type === "relation") this.relations.set(entity.id, entity)
 	}
 
 	bbox(): Bbox {
@@ -106,72 +160,185 @@ export class Osm {
 		return wayToFeature(way, this.nodes)
 	}
 
-	#nodeSpatialIndex: KDBush | null = null
-	get nodeSpatialIndex() {
-		if (!this.#nodeSpatialIndex) {
-			console.time("osm.ts: nodeIndex")
-			this.#nodeSpatialIndex = new KDBush(this.nodeIds.length)
-			for (const nodeId of this.nodeIds) {
-				const node = this.nodes.get(nodeId)
-				if (!node) continue
-				this.#nodeSpatialIndex.add(node.lon, node.lat)
-			}
-			this.#nodeSpatialIndex.finish()
-			console.timeEnd("osm.ts: nodeIndex")
+	applyChange(change: OsmChange) {
+		if (change.changeType === "create") {
+			this.addEntity(change.entity)
+		} else if (change.changeType === "delete") {
+			this.deleteEntity(change.entityType, change.entityId)
+		} else {
+			this.setEntity(change.entity)
+		}
+	}
+
+	applyChanges(changes: OsmChange[]) {
+		for (const change of changes) {
+			this.applyChange(change)
+		}
+	}
+
+	/**
+	 * Merge all entities from the other OSM into this OSM.
+	 * @param other The OSM to merge into this OSM.
+	 */
+	merge(other: Osm) {
+		this.applyChanges(generateOsmChanges(this, other))
+	}
+
+	#nodeSpatialIndex: NodeSpatialIndex | null = null
+	loadNodeSpatialIndex() {
+		this.#nodeSpatialIndex = new NodeSpatialIndex(this.nodes)
+		return this.#nodeSpatialIndex
+	}
+	get nodeIndex() {
+		if (this.#nodeSpatialIndex == null) {
+			return this.loadNodeSpatialIndex()
 		}
 		return this.#nodeSpatialIndex
 	}
 
-	nodeIndexToNode(index: number) {
-		const id = this.nodeIds[index]
-		if (id == null) throw new Error("Node ID is null")
-		const node = this.nodes.get(id)
-		if (!node) throw new Error("Node not found")
-		return node
-	}
+	/**
+	 * Deduplicate nodes by merging overlapping nodes.
+	 * @param nodes The nodes to check for deduplication. If not provided, all nodes will be checked.
+	 */
+	dedupeOverlappingNodes(nodes?: Map<number, OsmNode>) {
+		const overlapping = this.nodeIndex.findOverlappingNodes(nodes ?? this.nodes)
 
-	nodesWithin(x: number, y: number, radius: number) {
-		const ids = this.nodeSpatialIndex.within(x, y, radius)
-		return ids.map((i) => this.nodeIndexToNode(i))
-	}
-
-	nodesWithinBbox(bbox: Bbox) {
-		const ids = this.nodeSpatialIndex.range(bbox[0], bbox[1], bbox[2], bbox[3])
-		return ids.map((i) => this.nodeIndexToNode(i))
-	}
-}
-
-class Way implements OsmWay {
-	id: number
-	refs: number[]
-	tags: OsmTags
-	type: OsmWay["type"] = "way"
-
-	#osm: Osm
-
-	constructor(osm: Osm, way: OsmWay) {
-		this.id = way.id
-		this.refs = way.refs
-		this.tags = way.tags ?? {}
-		this.#osm = osm
-	}
-
-	#geojson: GeoJSON.FeatureCollection<
-		GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.Point,
-		OsmGeoJSONProperties
-	> | null = null
-	get geojson() {
-		if (!this.#geojson) {
-			this.#geojson = wayToEditableGeoJson(this, this.#osm.nodes)
+		// This inner loop can be manually verified in the UI
+		for (const [id, overlappingNodes] of overlapping) {
+			const baseNode = this.nodes.get(id)
+			if (baseNode == null) continue
+			for (const overlappingNodeId of overlappingNodes) {
+				const patchNode = this.nodes.get(overlappingNodeId)
+				if (patchNode == null) continue
+				this.replaceNode(id, {
+					...patchNode,
+					tags: {
+						...baseNode.tags,
+						...patchNode.tags,
+					},
+					info: {
+						...baseNode.info,
+						...patchNode.info,
+					},
+				})
+			}
+			this.nodes.delete(id)
 		}
-		return this.#geojson
 	}
 
-	#bbox: Bbox | null = null
-	get bbox() {
-		if (!this.#bbox) {
-			this.#bbox = bbox(this.geojson) as Bbox
+	/**
+	 * Replace a node in the OSM data with a new node. Remove references to the old node in all ways and relations.
+	 * @param oldId The ID of the node to replace.
+	 * @param newNode The new node to replace the old node with.
+	 */
+	replaceNode(oldId: number, newNode: OsmNode) {
+		// Replace the node in all ways
+		for (const way of this.ways.values()) {
+			for (let i = 0; i < way.refs.length; i++) {
+				if (way.refs[i] === oldId) {
+					way.refs[i] = newNode.id
+				}
+			}
 		}
-		return this.#bbox
+
+		// Replace the node in all relations
+		for (const relation of this.relations.values()) {
+			for (let i = 0; i < relation.members.length; i++) {
+				const member = relation.members[i]
+				if (member == null) continue
+				if (member.ref === oldId && member.type === "node") {
+					member.ref = newNode.id
+				}
+			}
+		}
+
+		// Ensure the new node is in the index
+		this.nodes.set(newNode.id, newNode)
+	}
+
+	#waySpatialIndex: ReturnType<typeof geojsonRbush> | null = null
+	loadWaySpatialIndex() {
+		console.time("osm.loadWaySpatialIndex")
+		this.#waySpatialIndex = geojsonRbush()
+		const ways = Array.from(this.ways.values()).map((w) =>
+			wayToLineString(w, (r) => this.getNodePosition(r)),
+		)
+		this.#waySpatialIndex.load(ways)
+		console.timeEnd("osm.loadWaySpatialIndex")
+		return this.#waySpatialIndex
+	}
+	get wayIndex() {
+		if (this.#waySpatialIndex == null) {
+			return this.loadWaySpatialIndex()
+		}
+		return this.#waySpatialIndex
+	}
+
+	/**
+	 * Find the IDs of ways that intersect with the given way.
+	 * @param way
+	 * @returns
+	 */
+	findIntersectingWayIds(way: number | OsmWay) {
+		const wayLineString = this.wayToLineString(way)
+		const intersectingWays = this.wayIndex.search(wayLineString)
+		const intersectingIds = new Set<number>()
+
+		for (const intersectingWay of intersectingWays.features) {
+			if (
+				intersectingWay.id !== wayLineString.id &&
+				typeof intersectingWay.id === "number"
+			) {
+				intersectingIds.add(intersectingWay.id)
+			}
+		}
+
+		return intersectingIds
+	}
+
+	findIntersectingPoints(way1: number | OsmWay, way2: number | OsmWay) {
+		const way1LineString = this.wayToLineString(way1)
+		const way2LineString = this.wayToLineString(way2)
+		const intersectingPoints = lineIntersect(way1LineString, way2LineString)
+		return intersectingPoints.features
+	}
+
+	/**
+	 * Search along the way for the nearest point to the node and insert the node into the way at the correct position.
+	 * @param wayId
+	 * @param nodeId
+	 */
+	insertNodeIntoWay(wayId: number, nodeId: number): boolean {
+		const way = this.getWay(wayId)
+		if (wayIsArea(way.refs, way.tags) || way.refs.indexOf(nodeId) !== -1)
+			return false
+		const node = this.getNode(nodeId)
+		const nearestPoint = nearestPointOnLine(
+			wayToLineString(way, (r) => this.getNodePosition(r)),
+			[node.lon, node.lat],
+		)
+		this.setEntity({
+			...way,
+			refs: way.refs.toSpliced(nearestPoint.properties.index, 0, nodeId),
+		})
+		return true
+	}
+
+	/**
+	 * Create a deep clone of the OSM data.
+	 * @returns A new Osm object with the same header and entities.
+	 */
+	clone() {
+		const clone = new Osm(this.header)
+		for (const node of this.nodes.values()) {
+			clone.addEntity(structuredClone(node))
+		}
+		for (const way of this.ways.values()) {
+			clone.addEntity(structuredClone(way))
+		}
+		for (const relation of this.relations.values()) {
+			clone.addEntity(structuredClone(relation))
+		}
+		return clone
 	}
 }

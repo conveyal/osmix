@@ -1,6 +1,11 @@
 "use client"
 
-import { baseNodesNearPatchAtom, beginMergeAtom, mapAtom } from "@/atoms"
+import {
+	baseNodesNearPatchAtom,
+	beginMergeAtom,
+	currentWayBboxAtom,
+	mapAtom,
+} from "@/atoms"
 import Basemap from "@/components/basemap"
 import DeckGlOverlay from "@/components/deckgl-overlay"
 import OsmPbfFilePicker from "@/components/filepicker"
@@ -42,6 +47,7 @@ export default function MergePage() {
 	const map = useAtomValue(mapAtom)
 	const deckGlLayers = useAtomValue(deckGlLayersAtom)
 	const currentWay = useAtomValue(currentWayAtom)
+	const currentWayBbox = useAtomValue(currentWayBboxAtom)
 	const baseNodesNearWay = useAtomValue(baseNodesNearPatchAtom)
 
 	console.log("base nodes", baseNodesNearWay)
@@ -49,14 +55,14 @@ export default function MergePage() {
 	const mergeInProgress = patchIndex >= 0
 
 	useEffect(() => {
-		if (map && currentWay) {
-			map.fitBounds(currentWay.bbox, {
+		if (map && currentWayBbox) {
+			map.fitBounds(currentWayBbox, {
 				padding: 100,
 				maxDuration: 200,
 				maxZoom: 19,
 			})
 		}
-	}, [map, currentWay])
+	}, [map, currentWayBbox])
 
 	// Auto load default files for faster testing
 	useEffect(() => {
@@ -135,9 +141,23 @@ export default function MergePage() {
 							<h3>Way ID: {currentWay.id}</h3>
 							<div>Nodes: {currentWay.refs.length}</div>
 							<div className="flex flex-col">
+								<h3>Patch - Base Node Candidates</h3>
+								<table>
+									<tbody>
+										{baseNodesNearWay.map((node) => (
+											<tr key={`${node.patchNode.id}-${node.baseNode.id}`}>
+												<td>{node.patchNode.id}</td>
+												<td>{node.baseNode.id}</td>
+												<td>{node.distance.toFixed(2)}</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+							<div className="flex flex-col">
 								<h3 className="border-t border-l border-r px-2 py-1">Tags</h3>
 								<table>
-									<ObjectToTable object={currentWay.tags} />
+									<ObjectToTable object={currentWay.tags ?? {}} />
 								</table>
 							</div>
 						</div>

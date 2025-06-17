@@ -194,7 +194,7 @@ table {
 	font-variant-numeric: tabular-nums;
 	font-size: 12px;
 	font-family: "Roboto Mono Variable", monospace;
-	border-radius: 0.2rem;
+	@apply rounded;
 
 	h3 {
 		margin: 0;
@@ -215,5 +215,9 @@ table {
 	}
 	td:last-of-type {
 		border-right: none;
+	}
+
+	tr:last-of-type {
+		@apply rounded-b-md;
 	}
 }

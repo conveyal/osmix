@@ -2,13 +2,9 @@ import Pbf from "pbf"
 import type { Osm } from "./osm"
 import { OsmPrimitiveBlock } from "./osm-primitive-block"
 import { writeBlob, writeBlobHeader } from "./proto/fileformat"
-import {
-	type OsmPbfHeaderBlock,
-	type OsmPbfPrimitiveBlock,
-	writeHeaderBlock,
-	writePrimitiveBlock,
-} from "./proto/osmformat"
+import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat"
 import { nativeCompress } from "./utils"
+import type { OsmPbfHeaderBlock, OsmPbfPrimitiveBlock } from "./types"
 
 /**
  * Encode a 32-bit *big-endian* unsigned integer.

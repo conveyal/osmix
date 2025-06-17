@@ -2,13 +2,21 @@ import { atom } from "jotai"
 import type { MapRef } from "react-map-gl/maplibre"
 import { GeoJsonLayer } from "@deck.gl/layers"
 import { atomFamily } from "jotai/utils"
-import { Osm, type OsmNode } from "osm.ts"
-import { distance } from "@turf/turf"
+import { Osm, type Bbox, type OsmNode } from "osm.ts"
+import { bbox, distance } from "@turf/turf"
 import { nodeToFeature, wayToEditableGeoJson } from "osm.ts/src/to-geojson"
 
 export const mapAtom = atom<MapRef | null>(null)
 export const zoomAtom = atom<number | null>(null)
 export const mapCenterAtom = atom<maplibregl.LngLat | null>(null)
+
+const LINE_WIDTH_METERS = 3
+const POINT_RADIUS_METERS = 1.5
+
+const MIN_WIDTH_PIXELS = 1
+const MAX_WIDTH_PIXELS = 10
+const MIN_RADIUS_PIXELS = 1
+const MAX_RADIUS_PIXELS = 5
 
 export const fileAtomFamily = atomFamily((_: "base" | "patch") =>
 	atom<File | null>(null),
@@ -34,7 +42,14 @@ export const currentWayAtom = atom(async (get) => {
 	if (patches.length === 0 || !patchOsm || patchIndex < 0) return null
 	const patch = patches[patchIndex]
 	if (!patch) return null
-	return patchOsm.way(patch.wayId)
+	return patchOsm.getWay(patch.wayId)
+})
+
+export const currentWayBboxAtom = atom(async (get) => {
+	const way = await get(currentWayAtom)
+	const patchOsm = await get(osmAtomFamily("patch"))
+	if (!way || !patchOsm) return null
+	return bbox(patchOsm.wayToLineString(way)) as Bbox
 })
 
 export const beginMergeAtom = atom(null, async (get, set) => {
@@ -65,7 +80,11 @@ export const baseNodesNearPatchAtom = atom(async (get) => {
 	for (const ref of way.refs) {
 		const patchNode = patchOsm.nodes.get(ref)
 		if (!patchNode) continue
-		const baseNodes = baseOsm.nodesWithin(patchNode.lon, patchNode.lat, 0.001)
+		const baseNodes = baseOsm.nodeIndex.nodesWithin(
+			patchNode.lon,
+			patchNode.lat,
+			0.001,
+		)
 		for (const baseNode of baseNodes) {
 			const d = distance(
 				[patchNode.lon, patchNode.lat],
@@ -99,13 +118,13 @@ export const patchGeoJsonLayerAtom = atom(async (get) => {
 		getFillColor: [255, 255, 255],
 		getPointRadius: (d) => {
 			if (d.geometry.type === "Point") {
-				return 5
+				return POINT_RADIUS_METERS
 			}
 			return 0
 		},
 		pointRadiusUnits: "meters",
-		pointRadiusMinPixels: 1,
-		pointRadiusMaxPixels: 5,
+		pointRadiusMinPixels: MIN_RADIUS_PIXELS,
+		pointRadiusMaxPixels: MAX_RADIUS_PIXELS,
 		getLineColor: (d) => {
 			if (d.geometry.type === "Point") {
 				return [0, 255, 0]
@@ -114,14 +133,13 @@ export const patchGeoJsonLayerAtom = atom(async (get) => {
 		},
 		getLineWidth: (d) => {
 			if (d.geometry.type === "Point" || d.geometry.type === "Polygon") {
-				return 0.5
+				return 0
 			}
-			return 4
+			return LINE_WIDTH_METERS
 		},
 		lineWidthUnits: "meters",
-		lineWidthMaxPixels: 5,
-		lineWidthMinPixels: 1,
-		lineCapRounded: false,
+		lineWidthMaxPixels: MAX_WIDTH_PIXELS,
+		lineWidthMinPixels: MIN_WIDTH_PIXELS,
 		lineJointRounded: true,
 		opacity: 0.75,
 	})
@@ -137,22 +155,21 @@ export const patchWayGeoJsonLayerAtom = atom(async (get) => {
 				? wayToEditableGeoJson(patchWay, patchOsm.nodes)
 				: [],
 		pickable: true,
-		pointRadiusMaxPixels: 8,
-		pointRadiusMinPixels: 2,
-		getPointRadius: 10,
+		pointRadiusMaxPixels: MAX_RADIUS_PIXELS,
+		pointRadiusMinPixels: MIN_RADIUS_PIXELS,
+		getPointRadius: POINT_RADIUS_METERS,
 		pointRadiusUnits: "meters",
-		getFillColor: [255, 255, 255, 0.9 * 255],
+		getFillColor: [255, 255, 255],
 		getLineColor: [255, 0, 0, 255],
 		getLineWidth: (d) => {
 			if (d.geometry.type === "Point" || d.geometry.type === "Polygon") {
-				return 0.5
+				return 0
 			}
-			return 4
+			return LINE_WIDTH_METERS
 		},
 		lineWidthUnits: "meters",
-		lineWidthMaxPixels: 10,
-		lineWidthMinPixels: 1,
-		lineCapRounded: false,
+		lineWidthMaxPixels: MAX_WIDTH_PIXELS,
+		lineWidthMinPixels: MIN_WIDTH_PIXELS,
 		lineJointRounded: true,
 	})
 })
@@ -163,9 +180,9 @@ export const baseGeoJsonLayerAtom = atom(async (get) => {
 		id: "osm-tk:base-geojson",
 		data: baseOsm?.toGeoJSON(),
 		pickable: true,
-		pointRadiusMaxPixels: 5,
-		pointRadiusMinPixels: 1,
-		getPointRadius: 10,
+		pointRadiusMaxPixels: MAX_RADIUS_PIXELS,
+		pointRadiusMinPixels: MIN_RADIUS_PIXELS,
+		getPointRadius: POINT_RADIUS_METERS,
 		pointRadiusUnits: "meters",
 		autoHighlight: true,
 		highlightColor: [255, 0, 0, 0.5 * 255],
@@ -181,16 +198,15 @@ export const baseGeoJsonLayerAtom = atom(async (get) => {
 		getLineColor: [255, 255, 255],
 		getLineWidth: (d) => {
 			if (d.geometry.type === "Point" || d.geometry.type === "Polygon") {
-				return 2
+				return 0
 			}
-			return 10
+			return LINE_WIDTH_METERS
 		},
-		lineWidthMaxPixels: 10,
-		lineWidthMinPixels: 1,
+		lineWidthMaxPixels: MAX_WIDTH_PIXELS,
+		lineWidthMinPixels: MIN_WIDTH_PIXELS,
 		lineWidthUnits: "meters",
-		lineCapRounded: false,
 		lineJointRounded: true,
-		opacity: 0.5,
+		opacity: 0.75,
 	})
 })
 
@@ -200,16 +216,12 @@ export const baseNodesNearPatchGeoJsonLayerAtom = atom(async (get) => {
 		id: "osm-tk:base-nodes-near-patch-geojson",
 		data: baseNodesNearPatch.map((node) => nodeToFeature(node.baseNode)),
 		pickable: true,
-		pointRadiusMaxPixels: 5,
-		pointRadiusMinPixels: 1,
-		getPointRadius: 10,
+		pointRadiusMaxPixels: MAX_RADIUS_PIXELS * 2,
+		pointRadiusMinPixels: MIN_RADIUS_PIXELS * 2,
+		getPointRadius: POINT_RADIUS_METERS * 2,
 		pointRadiusUnits: "meters",
-		getFillColor: [255, 0, 0, 0.5 * 255],
-		getLineColor: [255, 0, 0, 0.5 * 255],
-		getLineWidth: 1,
-		lineWidthUnits: "meters",
-		lineWidthMaxPixels: 10,
-		lineWidthMinPixels: 1,
+		getFillColor: [255, 255, 0],
+		getLineWidth: 0,
 	})
 })
 
