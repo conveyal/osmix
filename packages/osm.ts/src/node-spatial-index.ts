@@ -1,5 +1,5 @@
 import KDBush from "kdbush"
-import type { Bbox, OsmNode } from "./types"
+import type { OsmNode } from "./types"
 
 export default class NodeSpatialIndex {
 	#nodes: Map<number, OsmNode>
@@ -42,12 +42,7 @@ export default class NodeSpatialIndex {
 		return ids.map((i) => this.nodeIndexToNode(i))
 	}
 
-	nodesWithinBbox(bbox: Bbox) {
-		const ids = this.#index.range(bbox[0], bbox[1], bbox[2], bbox[3])
-		return ids.map((i) => this.nodeIndexToNode(i))
-	}
-
-	findOverlappingNodes(nodes: Map<number, OsmNode>, radius = 0) {
+	findOverlappingNodes(nodes: OsmNode[], radius = 0) {
 		return findOverlappingNodes(this, nodes, radius)
 	}
 }
@@ -56,16 +51,16 @@ export default class NodeSpatialIndex {
  * Find nodes that are within a certain radius of each other.
  * @param index The index to search in.
  * @param nodes The nodes to search for.
- * @param radius The radius to search for. Defaults to 0, which means the nodes must be exactly the same.
+ * @param radius The radius to search for. Defaults to 0, which means the nodes must be at the same location.
  * @returns A map of node IDs to sets of node IDs that are within the radius.
  */
 export function findOverlappingNodes(
 	index: NodeSpatialIndex,
-	nodes: Map<number, OsmNode>,
+	nodes: OsmNode[],
 	radius = 0,
 ) {
 	const overlapping = new Map<number, Set<number>>()
-	for (const node of nodes.values()) {
+	for (const node of nodes) {
 		const closeNodes = index.findNeighborsWithin(node, radius)
 		if (closeNodes.length === 0) continue
 		const overlappingNodes = new Set<number>()

@@ -1,5 +1,10 @@
 export type OsmEntityType = "node" | "way" | "relation"
 
+export interface LonLat {
+	lon: number
+	lat: number
+}
+
 export type OsmPbfBlob = {
 	raw_size?: number
 	raw?: Uint8Array
@@ -74,10 +79,7 @@ export interface OsmPbfPrimitive {
 	info?: OsmPbfInfo
 }
 
-export interface OsmPbfNode extends OsmPbfPrimitive {
-	lat: number
-	lon: number
-}
+export interface OsmPbfNode extends OsmPbfPrimitive, LonLat {}
 
 export type OsmPbfDenseNodes = {
 	id: number[]
@@ -129,10 +131,8 @@ export interface OsmEntity {
 	info?: OsmPbfInfoParsed
 }
 
-export interface OsmNode extends OsmEntity {
+export interface OsmNode extends OsmEntity, LonLat {
 	type: "node"
-	lat: number
-	lon: number
 }
 
 export interface OsmWay extends OsmEntity {
@@ -158,20 +158,7 @@ export type OsmGeoJSONFeature = GeoJSON.Feature<
 	OsmGeoJSONProperties
 >
 
-export type OsmChange =
-	| {
-			name?: string
-			changeType: "create"
-			entity: OsmNode | OsmWay | OsmRelation
-	  }
-	| {
-			name?: string
-			changeType: "delete"
-			entityType: OsmEntityType
-			entityId: number
-	  }
-	| {
-			name?: string
-			changeType: "modify"
-			entity: OsmNode | OsmWay | OsmRelation
-	  }
+export type OsmChange = {
+	changeType: "modify" | "create" | "delete"
+	entity: OsmNode | OsmWay | OsmRelation
+}

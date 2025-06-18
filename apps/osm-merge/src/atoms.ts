@@ -1,10 +1,12 @@
-import { atom } from "jotai"
-import type { MapRef } from "react-map-gl/maplibre"
 import { GeoJsonLayer } from "@deck.gl/layers"
+import { distance } from "@turf/turf"
+import { atom } from "jotai"
 import { atomFamily } from "jotai/utils"
-import { Osm, type Bbox, type OsmNode } from "osm.ts"
-import { bbox, distance } from "@turf/turf"
+import { Osm, type OsmNode, mergeOsm } from "osm.ts"
+import { generateOsmChanges } from "osm.ts/src/osm-change"
 import { nodeToFeature, wayToEditableGeoJson } from "osm.ts/src/to-geojson"
+import type { OsmChange } from "osm.ts/src/types"
+import type { MapRef } from "react-map-gl/maplibre"
 
 export const mapAtom = atom<MapRef | null>(null)
 export const zoomAtom = atom<number | null>(null)
@@ -18,6 +20,31 @@ const MAX_WIDTH_PIXELS = 10
 const MIN_RADIUS_PIXELS = 1
 const MAX_RADIUS_PIXELS = 5
 
+declare global {
+	interface Window {
+		osm: {
+			base: Osm | null
+			patch: Osm | null
+		}
+	}
+}
+
+if (typeof window !== "undefined") {
+	window.osm = {
+		base: null,
+		patch: null,
+	}
+}
+
+type WorkflowStep =
+	| "select-files"
+	| "verify-changes"
+	| "deduplicate-nodes"
+	| "create-intersections"
+	| "merge-complete"
+
+export const workflowStepAtom = atom<WorkflowStep>("select-files")
+
 export const fileAtomFamily = atomFamily((_: "base" | "patch") =>
 	atom<File | null>(null),
 )
@@ -25,44 +52,106 @@ export const osmAtomFamily = atomFamily((name: "base" | "patch") =>
 	atom(async (get) => {
 		const file = get(fileAtomFamily(name))
 		if (!file) return null
-		return Osm.fromPbfData(file.stream())
+		const osm = await Osm.fromPbfData(file.stream())
+		window.osm[name] = osm
+		return osm
 	}),
 )
 
-type Patch = {
-	type: "add" | "delete" | "update"
-	wayId: number
-}
-export const patchesAtom = atom<Patch[]>([])
+export const patchesAtom = atom<OsmChange[]>([])
 export const patchIndexAtom = atom(-1)
-export const currentWayAtom = atom(async (get) => {
+export const currentChangeEntityAtom = atom(async (get) => {
 	const patchIndex = get(patchIndexAtom)
 	const patchOsm = await get(osmAtomFamily("patch"))
 	const patches = get(patchesAtom)
 	if (patches.length === 0 || !patchOsm || patchIndex < 0) return null
 	const patch = patches[patchIndex]
 	if (!patch) return null
-	return patchOsm.getWay(patch.wayId)
+	return patch.entity
 })
 
-export const currentWayBboxAtom = atom(async (get) => {
-	const way = await get(currentWayAtom)
+export const currentChangeEntityBboxAtom = atom(async (get) => {
+	const changeEntity = await get(currentChangeEntityAtom)
 	const patchOsm = await get(osmAtomFamily("patch"))
-	if (!way || !patchOsm) return null
-	return bbox(patchOsm.wayToLineString(way)) as Bbox
+	if (!changeEntity || !patchOsm) return null
+	return patchOsm.getEntityBbox(changeEntity)
 })
 
 export const beginMergeAtom = atom(null, async (get, set) => {
+	const baseOsm = await get(osmAtomFamily("base"))
 	const patchOsm = await get(osmAtomFamily("patch"))
-	if (!patchOsm) return
-	set(
-		patchesAtom,
-		Array.from(patchOsm.ways.values()).map((way) => ({
-			wayId: way.id,
-			type: "add",
-		})) as Patch[],
-	)
+	if (!baseOsm || !patchOsm) return
+	set(workflowStepAtom, "verify-changes")
+	set(patchesAtom, generateOsmChanges(baseOsm, patchOsm))
 	set(patchIndexAtom, 0)
+})
+
+export const applyAllChangesAtom = atom(null, async (get, set) => {
+	const baseOsm = await get(osmAtomFamily("base"))
+	const changes = get(patchesAtom)
+	if (!baseOsm || changes.length === 0) return
+	baseOsm.applyChanges(changes)
+	set(patchIndexAtom, -1)
+	set(patchesAtom, [])
+	set(workflowStepAtom, "deduplicate-nodes")
+})
+
+type Status = {
+	type: "info" | "ready" | "error"
+	message: string
+	timestamp: number
+}
+
+export const logAtom = atom<Status[]>([
+	{
+		type: "info",
+		message: "Initializing application...",
+		timestamp: Date.now(),
+	},
+])
+
+export const addLogMessageAtom = atom(
+	null,
+	(get, set, message: string, type: Status["type"] = "info") => {
+		const log = get(logAtom)
+		if (type === "error") {
+			console.error(`${type}:`, message)
+		} else {
+			console.log(`${type}:`, message)
+		}
+		set(logAtom, [
+			...log,
+			{
+				type,
+				message,
+				timestamp: Date.now(),
+			},
+		])
+	},
+)
+
+export const currentStatusAtom = atom((get) => {
+	const log = get(logAtom)
+	return log[log.length - 1]
+})
+
+export const runFullMergeAtom = atom(null, async (get, set) => {
+	set(addLogMessageAtom, "Running automatic merge.")
+	const patchOsm = await get(osmAtomFamily("patch"))
+	const baseOsm = await get(osmAtomFamily("base"))
+	if (!patchOsm || !baseOsm) return
+
+	try {
+		mergeOsm(baseOsm, patchOsm, (message, type) => {
+			set(addLogMessageAtom, message, type)
+		})
+
+		set(addLogMessageAtom, "Merge complete.", "ready")
+		set(workflowStepAtom, "merge-complete")
+	} catch (error) {
+		set(addLogMessageAtom, "Error running automatic merge.", "error")
+		console.error(error)
+	}
 })
 
 type NodeCandidate = {
@@ -74,8 +163,8 @@ type NodeCandidate = {
 export const baseNodesNearPatchAtom = atom(async (get) => {
 	const patchOsm = await get(osmAtomFamily("patch"))
 	const baseOsm = await get(osmAtomFamily("base"))
-	const way = await get(currentWayAtom)
-	if (!patchOsm || !baseOsm || !way) return []
+	const way = await get(currentChangeEntityAtom)
+	if (!patchOsm || !baseOsm || !way || way.type !== "way") return []
 	const candidates: NodeCandidate[] = []
 	for (const ref of way.refs) {
 		const patchNode = patchOsm.nodes.get(ref)
@@ -111,9 +200,11 @@ function includeNode(node: OsmNode) {
 
 export const patchGeoJsonLayerAtom = atom(async (get) => {
 	const patchOsm = await get(osmAtomFamily("patch"))
+	const workflowStep = get(workflowStepAtom)
 	return new GeoJsonLayer({
 		id: "osm-tk:patch-geojson",
-		data: patchOsm?.toGeoJSON(includeNode),
+		data:
+			workflowStep !== "merge-complete" ? patchOsm?.toGeoJSON(includeNode) : [],
 		pickable: true,
 		getFillColor: [255, 255, 255],
 		getPointRadius: (d) => {
@@ -147,11 +238,15 @@ export const patchGeoJsonLayerAtom = atom(async (get) => {
 
 export const patchWayGeoJsonLayerAtom = atom(async (get) => {
 	const patchOsm = await get(osmAtomFamily("patch"))
-	const patchWay = await get(currentWayAtom)
+	const patchWay = await get(currentChangeEntityAtom)
+	const workflowStep = get(workflowStepAtom)
 	return new GeoJsonLayer({
 		id: "osm-tk:patch-way-geojson",
 		data:
-			patchWay && patchOsm
+			workflowStep !== "merge-complete" &&
+			patchWay &&
+			patchOsm &&
+			patchWay.type === "way"
 				? wayToEditableGeoJson(patchWay, patchOsm.nodes)
 				: [],
 		pickable: true,
@@ -212,9 +307,13 @@ export const baseGeoJsonLayerAtom = atom(async (get) => {
 
 export const baseNodesNearPatchGeoJsonLayerAtom = atom(async (get) => {
 	const baseNodesNearPatch = await get(baseNodesNearPatchAtom)
+	const workflowStep = get(workflowStepAtom)
 	return new GeoJsonLayer({
 		id: "osm-tk:base-nodes-near-patch-geojson",
-		data: baseNodesNearPatch.map((node) => nodeToFeature(node.baseNode)),
+		data:
+			workflowStep !== "merge-complete"
+				? baseNodesNearPatch.map((node) => nodeToFeature(node.baseNode))
+				: [],
 		pickable: true,
 		pointRadiusMaxPixels: MAX_RADIUS_PIXELS * 2,
 		pointRadiusMinPixels: MIN_RADIUS_PIXELS * 2,

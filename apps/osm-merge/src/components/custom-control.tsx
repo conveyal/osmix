@@ -1,7 +1,7 @@
 import * as React from "react"
-import { useState, cloneElement } from "react"
-import { useControl } from "react-map-gl/maplibre"
+import { cloneElement, useState } from "react"
 import { createPortal } from "react-dom"
+import { useControl } from "react-map-gl/maplibre"
 
 import type {
 	ControlPosition,

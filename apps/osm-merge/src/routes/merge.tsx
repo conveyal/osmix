@@ -1,31 +1,38 @@
 "use client"
 
 import {
+	addLogMessageAtom,
+	applyAllChangesAtom,
 	baseNodesNearPatchAtom,
 	beginMergeAtom,
-	currentWayBboxAtom,
+	currentChangeEntityBboxAtom,
+	currentStatusAtom,
 	mapAtom,
+	runFullMergeAtom,
+	workflowStepAtom,
+} from "@/atoms"
+import {
+	currentChangeEntityAtom,
+	deckGlLayersAtom,
+	fileAtomFamily,
+	osmAtomFamily,
+	patchIndexAtom,
+	patchesAtom,
 } from "@/atoms"
 import Basemap from "@/components/basemap"
+import CenterInfo from "@/components/center-info"
 import DeckGlOverlay from "@/components/deckgl-overlay"
 import OsmPbfFilePicker from "@/components/filepicker"
 import { Button } from "@/components/ui/button"
+import ZoomInfo from "@/components/zoom-info"
+import { cn } from "@/lib/utils"
 import ObjectToTable from "@/object-to-table"
 import { objectToHtmlTableString } from "@/utils"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
-import { ArrowLeft, ArrowRight } from "lucide-react"
-import type { Osm } from "osm.ts"
-import { useEffect } from "react"
-import {
-	fileAtomFamily,
-	osmAtomFamily,
-	patchesAtom,
-	patchIndexAtom,
-	currentWayAtom,
-	deckGlLayersAtom,
-} from "@/atoms"
-import CenterInfo from "@/components/center-info"
-import ZoomInfo from "@/components/zoom-info"
+import { ArrowLeft, ArrowRight, Loader2Icon, MaximizeIcon } from "lucide-react"
+import { showSaveFilePicker } from "native-file-system-adapter"
+import { osmToPrimitiveBlocks, writePbfToStream, type Osm } from "osm.ts"
+import { useCallback, useEffect } from "react"
 
 function layerIdToName(id: string) {
 	if (id === "osm-tk:patch-geojson") return "Patch"
@@ -37,22 +44,35 @@ function layerIdToName(id: string) {
 const DEFAULT_BASE_PBF_URL = "./pbfs/yakima-full.osm.pbf"
 const DEFAULT_PATCH_PBF_URL = "./pbfs/yakima-osw.osm.pbf"
 
+/**
+ * Eventual workflow:
+ * Step 1: Select base and patch OSM files. View OSM data on the map.
+ * Step 2: Click "Begin Merge" to start the merge process.
+ * Step 3: View all initial changes (adding new nodes, ways, etc. and replacing existing ones with the same ID). Can click "next", "previous", or "exclude"
+ * Step 4: Click "Accept changes" to apply them to the base OSM.
+ * Step 5: Handle overlapping nodes (where nodes have the same coordinates).
+ * Step 6: Handle intersecting ways -- how to filter? Only with `tag[highway]`?
+ * Step 7: Show "disconnected ways" -- ways that are not connected to any other way.
+ * Step 8: Click "Download Merged OSM" to download the merged OSM file.
+ */
+
 export default function MergePage() {
 	const [baseFile, setBaseFile] = useAtom(fileAtomFamily("base"))
 	const [patchFile, setPatchFile] = useAtom(fileAtomFamily("patch"))
 	const beginMerge = useSetAtom(beginMergeAtom)
+	const applyAllChanges = useSetAtom(applyAllChangesAtom)
+	const runFullMerge = useSetAtom(runFullMergeAtom)
+	const logMessage = useSetAtom(addLogMessageAtom)
+	const baseOsm = useAtomValue(osmAtomFamily("base"))
+	const workflowStep = useAtomValue(workflowStepAtom)
 
 	const [patches, setPatches] = useAtom(patchesAtom)
 	const [patchIndex, setPatchIndex] = useAtom(patchIndexAtom)
 	const map = useAtomValue(mapAtom)
 	const deckGlLayers = useAtomValue(deckGlLayersAtom)
-	const currentWay = useAtomValue(currentWayAtom)
-	const currentWayBbox = useAtomValue(currentWayBboxAtom)
+	const currentWay = useAtomValue(currentChangeEntityAtom)
+	const currentWayBbox = useAtomValue(currentChangeEntityBboxAtom)
 	const baseNodesNearWay = useAtomValue(baseNodesNearPatchAtom)
-
-	console.log("base nodes", baseNodesNearWay)
-
-	const mergeInProgress = patchIndex >= 0
 
 	useEffect(() => {
 		if (map && currentWayBbox) {
@@ -66,28 +86,56 @@ export default function MergePage() {
 
 	// Auto load default files for faster testing
 	useEffect(() => {
-		if (process.env.NODE_ENV !== "development") return
-		if (!baseFile && !patchFile) {
-			fetch(DEFAULT_BASE_PBF_URL)
-				.then((res) => res.blob())
-				.then((blob) => {
-					setBaseFile(new File([blob], "yakima-full.osm.pbf"))
-				})
-			fetch(DEFAULT_PATCH_PBF_URL)
-				.then((res) => res.blob())
-				.then((blob) => {
-					setPatchFile(new File([blob], "yakima-osw.osm.pbf"))
-					beginMerge()
-				})
+		if (process.env.NODE_ENV !== "development") {
+			logMessage("Ready", "ready")
+			return
 		}
-	}, [baseFile, patchFile, setBaseFile, setPatchFile, beginMerge])
+		if (!baseFile && !patchFile) {
+			logMessage("Loading development files...")
+			Promise.all([
+				fetch(DEFAULT_BASE_PBF_URL)
+					.then((res) => res.blob())
+					.then((blob) => {
+						setBaseFile(new File([blob], "yakima-full.osm.pbf"))
+					}),
+				fetch(DEFAULT_PATCH_PBF_URL)
+					.then((res) => res.blob())
+					.then((blob) => {
+						setPatchFile(new File([blob], "yakima-osw.osm.pbf"))
+					}),
+			]).then(() => {
+				// beginMerge()
+				logMessage("Ready", "ready")
+			})
+		}
+	}, [baseFile, patchFile, setBaseFile, setPatchFile, logMessage])
+
+	const downloadPbf = useCallback(async () => {
+		if (baseOsm == null) return
+		logMessage("Generating OSM file to download", "info")
+		const fileHandle = await showSaveFilePicker({
+			suggestedName: "merged.osm.pbf",
+			types: [
+				{
+					description: "OSM PBF",
+					accept: { "application/x-protobuf": [".pbf"] },
+				},
+			],
+		})
+		const stream = await fileHandle.createWritable()
+		const primitives = osmToPrimitiveBlocks(baseOsm)
+		await writePbfToStream(stream, baseOsm.header, primitives)
+		await stream.close()
+		logMessage(`Created ${fileHandle.name} PBF for download`, "ready")
+	}, [baseOsm, logMessage])
 
 	return (
-		<div className="h-dvh w-dvw flex flex-col">
+		<div className="h-screen w-screen flex flex-col">
 			<div className="border-b flex flex-row justify-between items-center">
 				<h1 className="py-2 px-4">OSM Merge</h1>
-				<div className="flex flex-row gap-2 items-center px-4">
-					<div className="border-r pr-2">
+				<Status />
+				<div className="flex flex-row gap-4 items-center px-4">
+					<div className="border-r pr-4">
 						<CenterInfo />
 					</div>
 					<div>
@@ -95,20 +143,42 @@ export default function MergePage() {
 					</div>
 				</div>
 			</div>
-			<div className="flex flex-row grow-1">
-				<div className="flex flex-col w-96 gap-4 pt-4">
+			<div className="flex flex-row grow-1 h-full overflow-hidden">
+				<div className="flex flex-col w-96 gap-4 py-4 overflow-y-auto">
 					<OsmFilePicker />
-					{!mergeInProgress && (
-						<Button className="mx-4" onClick={() => beginMerge()}>
-							Begin Merge
+					{workflowStep === "merge-complete" && (
+						<Button
+							className="mx-4"
+							onClick={() => {
+								downloadPbf()
+							}}
+						>
+							Download Merged OSM
 						</Button>
 					)}
-					{mergeInProgress && currentWay && (
+					{workflowStep === "select-files" && (
+						<>
+							<Button
+								className="mx-4"
+								onClick={() => {
+									runFullMerge()
+								}}
+							>
+								Run auto-merge
+							</Button>
+							<Button className="mx-4" onClick={() => beginMerge()}>
+								Begin merge workflow
+							</Button>
+						</>
+					)}
+					{workflowStep === "verify-changes" && currentWay && (
 						<div className="flex flex-col gap-2 px-4">
-							<Button>Download Merged OSM</Button>
+							<Button onClick={() => applyAllChanges()}>
+								Accept all changes
+							</Button>
 
 							<div className="flex flex-row justify-between items-center">
-								<h3>Verify Patches</h3>
+								<h3>Verify Changes</h3>
 								<div className="flex flex-row gap-2 items-center">
 									<Button
 										disabled={patchIndex === 0}
@@ -122,7 +192,7 @@ export default function MergePage() {
 										<ArrowLeft />
 									</Button>
 									<div>
-										Patch {patchIndex + 1} / {patches.length}
+										{patchIndex + 1} / {patches.length.toLocaleString()}
 									</div>
 									<Button
 										size="icon"
@@ -137,9 +207,12 @@ export default function MergePage() {
 								</div>
 							</div>
 							<hr />
-							<h3>Type: {patches[patchIndex].type}</h3>
-							<h3>Way ID: {currentWay.id}</h3>
-							<div>Nodes: {currentWay.refs.length}</div>
+							<h3>Type: {patches[patchIndex].changeType}</h3>
+							<h3>Entity Type: {currentWay.type}</h3>
+							<h3>Entity ID: {currentWay.id}</h3>
+							<div>
+								Nodes: {currentWay.type === "way" ? currentWay.refs.length : 0}
+							</div>
 							<div className="flex flex-col">
 								<h3>Patch - Base Node Candidates</h3>
 								<table>
@@ -160,6 +233,16 @@ export default function MergePage() {
 									<ObjectToTable object={currentWay.tags ?? {}} />
 								</table>
 							</div>
+						</div>
+					)}
+					{workflowStep === "deduplicate-nodes" && (
+						<div className="flex flex-col gap-2 px-4">
+							<h3>Deduplicate Nodes</h3>
+						</div>
+					)}
+					{workflowStep === "create-intersections" && (
+						<div className="flex flex-col gap-2 px-4">
+							<h3>Create Intersections</h3>
 						</div>
 					)}
 				</div>
@@ -189,23 +272,63 @@ export default function MergePage() {
 }
 
 function OsmFilePicker() {
+	const workflowStep = useAtomValue(workflowStepAtom)
 	const [baseFile, setBaseFile] = useAtom(fileAtomFamily("base"))
 	const [patchFile, setPatchFile] = useAtom(fileAtomFamily("patch"))
 	const baseOsm = useAtomValue(osmAtomFamily("base"))
 	const patchOsm = useAtomValue(osmAtomFamily("patch"))
-	const mergeInProgress = useAtomValue(patchIndexAtom) >= 0
+	const map = useAtomValue(mapAtom)
+
 	return (
 		<div className="flex flex-col gap-2 px-4">
 			<div className="flex flex-col gap-1">
-				<h3>Base: {baseFile?.name}</h3>
-				{!mergeInProgress && (
+				<div className="flex flex-row justify-between items-center">
+					<h3>Base: {baseFile?.name}</h3>
+					<div>
+						<Button
+							variant="ghost"
+							size="icon"
+							title="Fit map to OSM bounds"
+							onClick={() => {
+								const bbox = baseOsm?.bbox()
+								if (!bbox) return
+								map?.fitBounds(bbox, {
+									padding: 100,
+									maxDuration: 200,
+								})
+							}}
+						>
+							<MaximizeIcon />
+						</Button>
+					</div>
+				</div>
+				{workflowStep === "select-files" && (
 					<OsmPbfFilePicker file={baseFile} setFile={setBaseFile} />
 				)}
 				<OsmInfoTable osm={baseOsm} />
 			</div>
 			<div className="flex flex-col gap-1">
-				<h3>Patch: {patchFile?.name}</h3>
-				{!mergeInProgress && (
+				<div className="flex flex-row justify-between items-center">
+					<h3>Patch: {patchFile?.name}</h3>
+					<div>
+						<Button
+							variant="ghost"
+							size="icon"
+							title="Fit map to OSM bounds"
+							onClick={() => {
+								const bbox = patchOsm?.bbox()
+								if (!bbox) return
+								map?.fitBounds(bbox, {
+									padding: 100,
+									maxDuration: 200,
+								})
+							}}
+						>
+							<MaximizeIcon />
+						</Button>
+					</div>
+				</div>
+				{workflowStep === "select-files" && (
 					<OsmPbfFilePicker file={patchFile} setFile={setPatchFile} />
 				)}
 				<OsmInfoTable osm={patchOsm} />
@@ -237,5 +360,28 @@ function OsmInfoTable({ osm }: { osm: Osm | null }) {
 				</tbody>
 			</table>
 		</details>
+	)
+}
+
+function Status() {
+	const status = useAtomValue(currentStatusAtom)
+	console.log("current status", status)
+	return (
+		<div className="flex flex-row gap-2 items-center px-4">
+			<div className="flex flex-row gap-2 items-center">
+				{status.type === "info" ? (
+					<Loader2Icon className="animate-spin size-4" />
+				) : (
+					<div
+						className={cn(
+							"w-2 h-2 rounded-full",
+							status.type === "ready" && "bg-green-500",
+							status.type === "error" && "bg-red-500",
+						)}
+					/>
+				)}
+				<div>{status.message}</div>
+			</div>
+		</div>
 	)
 }

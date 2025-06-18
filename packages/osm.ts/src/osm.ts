@@ -1,15 +1,25 @@
-import { geojsonRbush, lineIntersect, nearestPointOnLine } from "@turf/turf"
+import {
+	bbox,
+	booleanTouches,
+	cleanCoords,
+	geojsonRbush,
+	lineIntersect,
+	nearestPointOnLine,
+} from "@turf/turf"
+import { mergeOsm } from "./merge"
 import NodeSpatialIndex from "./node-spatial-index"
-import { generateOsmChanges } from "./osm-change"
 import { type OsmPbfReader, createOsmPbfReader } from "./osm-pbf-reader"
 import {
+	nodeToFeature,
 	nodesToFeatures,
+	relationToFeature,
 	wayToFeature,
 	wayToLineString,
 	waysToFeatures,
 } from "./to-geojson"
 import type {
 	Bbox,
+	LonLat,
 	OsmChange,
 	OsmEntityType,
 	OsmNode,
@@ -17,6 +27,7 @@ import type {
 	OsmRelation,
 	OsmWay,
 } from "./types"
+import UnorderedPairMap from "./unordered-pair-map"
 import { wayIsArea } from "./way-is-area"
 
 /**
@@ -67,11 +78,22 @@ export class Osm {
 		return way
 	}
 
-	wayToLineString(way: number | OsmWay) {
+	wayToLineString(way: number) {
 		return wayToLineString(
 			typeof way === "number" ? this.getWay(way) : way,
 			(r) => this.getNodePosition(r),
 		)
+	}
+
+	getEntityBbox(entity: OsmNode | OsmWay | OsmRelation): Bbox {
+		switch (entity.type) {
+			case "node":
+				return bbox(nodeToFeature(entity)) as Bbox
+			case "way":
+				return bbox(wayToFeature(entity, this.nodes)) as Bbox
+			case "relation":
+				return bbox(relationToFeature(entity, this.nodes)) as Bbox
+		}
 	}
 
 	addNode(node: OsmNode) {
@@ -80,12 +102,11 @@ export class Osm {
 		return node
 	}
 
-	createNode(lon: number, lat: number) {
+	createNode(lonLat: LonLat) {
 		return this.addNode({
 			id: this.maxNodeId++,
-			lon,
-			lat,
 			type: "node",
+			...lonLat,
 		})
 	}
 
@@ -112,10 +133,10 @@ export class Osm {
 		if (type === "relation") return this.relations.get(id)
 	}
 
-	deleteEntity(type: OsmEntityType, id: number) {
-		if (type === "node") this.nodes.delete(id)
-		if (type === "way") this.ways.delete(id)
-		if (type === "relation") this.relations.delete(id)
+	deleteEntity(entity: OsmNode | OsmWay | OsmRelation) {
+		if (entity.type === "node") this.nodes.delete(entity.id)
+		if (entity.type === "way") this.ways.delete(entity.id)
+		if (entity.type === "relation") this.relations.delete(entity.id)
 	}
 
 	setEntity(entity: OsmNode | OsmWay | OsmRelation) {
@@ -164,7 +185,7 @@ export class Osm {
 		if (change.changeType === "create") {
 			this.addEntity(change.entity)
 		} else if (change.changeType === "delete") {
-			this.deleteEntity(change.entityType, change.entityId)
+			this.deleteEntity(change.entity)
 		} else {
 			this.setEntity(change.entity)
 		}
@@ -174,14 +195,8 @@ export class Osm {
 		for (const change of changes) {
 			this.applyChange(change)
 		}
-	}
-
-	/**
-	 * Merge all entities from the other OSM into this OSM.
-	 * @param other The OSM to merge into this OSM.
-	 */
-	merge(other: Osm) {
-		this.applyChanges(generateOsmChanges(this, other))
+		this.loadNodeSpatialIndex()
+		this.loadWaySpatialIndex()
 	}
 
 	#nodeSpatialIndex: NodeSpatialIndex | null = null
@@ -201,41 +216,45 @@ export class Osm {
 	 * @param nodes The nodes to check for deduplication. If not provided, all nodes will be checked.
 	 */
 	dedupeOverlappingNodes(nodes?: Map<number, OsmNode>) {
-		const overlapping = this.nodeIndex.findOverlappingNodes(nodes ?? this.nodes)
+		const nodesToBeDeleted = new Set<number>()
+		const replacedPairs = new Set<string>()
+		for (const [nodeId] of nodes ?? this.nodes) {
+			const node = this.getNode(nodeId)
+			const closeNodes = this.nodeIndex.findNeighborsWithin(node, 0)
+			const closeNode = closeNodes[0]
+			if (closeNode == null) continue
 
-		// This inner loop can be manually verified in the UI
-		for (const [id, overlappingNodes] of overlapping) {
-			const baseNode = this.nodes.get(id)
-			if (baseNode == null) continue
-			for (const overlappingNodeId of overlappingNodes) {
-				const patchNode = this.nodes.get(overlappingNodeId)
-				if (patchNode == null) continue
-				this.replaceNode(id, {
-					...patchNode,
-					tags: {
-						...baseNode.tags,
-						...patchNode.tags,
-					},
-					info: {
-						...baseNode.info,
-						...patchNode.info,
-					},
-				})
-			}
-			this.nodes.delete(id)
+			const pairKey = [node.id, closeNode.id].toSorted().join("|")
+			if (replacedPairs.has(pairKey)) continue
+			this.replaceNode(node, closeNode)
+			replacedPairs.add(pairKey)
+
+			// Delete the original node later so we don't mess up the index
+			nodesToBeDeleted.add(node.id)
 		}
+
+		for (const nodeId of nodesToBeDeleted) {
+			this.deleteEntity(this.getNode(nodeId))
+		}
+
+		// Rebuild the spatial indexes
+		this.loadNodeSpatialIndex()
+		this.loadWaySpatialIndex()
+
+		return { replaced: replacedPairs.size, deleted: nodesToBeDeleted.size }
 	}
 
 	/**
 	 * Replace a node in the OSM data with a new node. Remove references to the old node in all ways and relations.
 	 * @param oldId The ID of the node to replace.
 	 * @param newNode The new node to replace the old node with.
+	 * @param mergeTagsAndInfo Whether to merge the tags and info of the old and new nodes or just use the new node.
 	 */
-	replaceNode(oldId: number, newNode: OsmNode) {
+	replaceNode(oldNode: OsmNode, newNode: OsmNode, mergeTagsAndInfo = false) {
 		// Replace the node in all ways
 		for (const way of this.ways.values()) {
 			for (let i = 0; i < way.refs.length; i++) {
-				if (way.refs[i] === oldId) {
+				if (way.refs[i] === oldNode.id) {
 					way.refs[i] = newNode.id
 				}
 			}
@@ -246,14 +265,29 @@ export class Osm {
 			for (let i = 0; i < relation.members.length; i++) {
 				const member = relation.members[i]
 				if (member == null) continue
-				if (member.ref === oldId && member.type === "node") {
+				if (member.ref === oldNode.id && member.type === "node") {
 					member.ref = newNode.id
 				}
 			}
 		}
 
-		// Ensure the new node is in the index
-		this.nodes.set(newNode.id, newNode)
+		const finalNode = mergeTagsAndInfo
+			? {
+					...oldNode,
+					...newNode,
+					tags: {
+						...oldNode.tags,
+						...newNode.tags,
+					},
+					info: {
+						...oldNode.info,
+						...newNode.info,
+					},
+				}
+			: newNode
+
+		// Store the new node in the index
+		this.nodes.set(finalNode.id, finalNode)
 	}
 
 	#waySpatialIndex: ReturnType<typeof geojsonRbush> | null = null
@@ -275,48 +309,122 @@ export class Osm {
 	}
 
 	/**
-	 * Find the IDs of ways that intersect with the given way.
-	 * @param way
-	 * @returns
+	 * Find the intersections for a set of ways.
+	 * @param wayIds The IDs of the ways to find intersections for.
+	 * @returns An object containing the intersections and possible disconnected ways.
 	 */
-	findIntersectingWayIds(way: number | OsmWay) {
-		const wayLineString = this.wayToLineString(way)
-		const intersectingWays = this.wayIndex.search(wayLineString)
-		const intersectingIds = new Set<number>()
+	findIntersectionCandidatesForWays(ways: Map<number, OsmWay>) {
+		const disconnectedWays = new Set<number>()
+		const intersectionCandidates = new UnorderedPairMap<
+			GeoJSON.Feature<GeoJSON.Point>[]
+		>()
 
-		for (const intersectingWay of intersectingWays.features) {
-			if (
-				intersectingWay.id !== wayLineString.id &&
-				typeof intersectingWay.id === "number"
-			) {
-				intersectingIds.add(intersectingWay.id)
+		// Find intersecting way IDs. Each way should have at least one intersecting way or it is disconnected from the rest of the network.
+		for (const [wayId] of ways) {
+			const lineString = this.wayToLineString(wayId)
+			const intersectingWays = this.findIntersectingWays(lineString)
+			if (intersectingWays.size > 0) {
+				for (const intersectingWay of intersectingWays) {
+					intersectionCandidates.set(
+						wayId,
+						intersectingWay[0],
+						intersectingWay[1],
+					)
+				}
+			} else if (!this.isWayDisconnected(wayId)) {
+				disconnectedWays.add(wayId)
 			}
 		}
 
-		return intersectingIds
+		return {
+			intersectionCandidates,
+			disconnectedWays,
+		}
 	}
 
-	findIntersectingPoints(way1: number | OsmWay, way2: number | OsmWay) {
-		const way1LineString = this.wayToLineString(way1)
-		const way2LineString = this.wayToLineString(way2)
-		const intersectingPoints = lineIntersect(way1LineString, way2LineString)
-		return intersectingPoints.features
+	/**
+	 * Find the IDs of ways that intersect with the given feature.
+	 * TODO handle ways with tags indicating they are under or over the current way
+	 * @param way
+	 * @returns
+	 */
+	findIntersectingWays(feature: GeoJSON.Feature<GeoJSON.LineString>) {
+		// const feature = this.wayToLineString(wayId)
+		const { features } = this.wayIndex.search(feature)
+		const intersectingWayIds = new Map<
+			number,
+			GeoJSON.Feature<GeoJSON.Point>[]
+		>()
+
+		for (const intersectingWay of features) {
+			if (
+				intersectingWay.id !== feature.id &&
+				typeof intersectingWay.id === "number"
+			) {
+				const intersections = lineIntersect(
+					feature,
+					intersectingWay as GeoJSON.Feature<GeoJSON.LineString>,
+				)
+				if (intersections.features.length > 0) {
+					intersectingWayIds.set(intersectingWay.id, intersections.features)
+				}
+			}
+		}
+
+		return intersectingWayIds
+	}
+
+	isWayDisconnected(wayId: number) {
+		const wayLineString = this.wayToLineString(wayId)
+		const { features } = this.wayIndex.search(wayLineString)
+		for (const feature of features) {
+			if (feature.id !== wayId) {
+				if (booleanTouches(wayLineString, feature)) return true
+				if (
+					lineIntersect(
+						wayLineString,
+						feature as GeoJSON.Feature<GeoJSON.LineString>,
+					).features.length > 0
+				)
+					return false
+			}
+		}
+
+		return true
+	}
+
+	findIntersectingPoints(wayId1: number, wayId2: number) {
+		const way1LineString = this.wayToLineString(wayId1)
+		const way2LineString = this.wayToLineString(wayId2)
+		return lineIntersect(way1LineString, way2LineString).features
+	}
+
+	pointToNode(point: GeoJSON.Feature<GeoJSON.Point>): {
+		coords: LonLat
+		existingNode: OsmNode | null
+	} {
+		const [lon, lat] = point.geometry.coordinates as [number, number]
+		const existingNode = this.nodeIndex.nodesWithin(lon, lat)[0]
+		return {
+			coords: { lon, lat },
+			existingNode: existingNode ?? null,
+		}
 	}
 
 	/**
 	 * Search along the way for the nearest point to the node and insert the node into the way at the correct position.
+	 * Note: both entities must be present in the OSM data. If the node already exists in the way, return false.
 	 * @param wayId
 	 * @param nodeId
 	 */
-	insertNodeIntoWay(wayId: number, nodeId: number): boolean {
+	insertNodeIntoWay(nodeId: number, wayId: number): boolean {
+		const node = this.getNode(nodeId)
 		const way = this.getWay(wayId)
 		if (wayIsArea(way.refs, way.tags) || way.refs.indexOf(nodeId) !== -1)
 			return false
-		const node = this.getNode(nodeId)
-		const nearestPoint = nearestPointOnLine(
-			wayToLineString(way, (r) => this.getNodePosition(r)),
-			[node.lon, node.lat],
-		)
+		const wayLineString = this.wayToLineString(wayId)
+		const nodePt = [node.lon, node.lat]
+		const nearestPoint = nearestPointOnLine(cleanCoords(wayLineString), nodePt)
 		this.setEntity({
 			...way,
 			refs: way.refs.toSpliced(nearestPoint.properties.index, 0, nodeId),

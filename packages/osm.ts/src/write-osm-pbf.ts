@@ -3,8 +3,8 @@ import type { Osm } from "./osm"
 import { OsmPrimitiveBlock } from "./osm-primitive-block"
 import { writeBlob, writeBlobHeader } from "./proto/fileformat"
 import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat"
-import { nativeCompress } from "./utils"
 import type { OsmPbfHeaderBlock, OsmPbfPrimitiveBlock } from "./types"
+import { nativeCompress } from "./utils"
 
 /**
  * Encode a 32-bit *big-endian* unsigned integer.

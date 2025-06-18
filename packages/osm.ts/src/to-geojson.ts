@@ -1,5 +1,10 @@
 import type { OsmPbfReader } from "./osm-pbf-reader"
-import type { OsmGeoJSONProperties, OsmNode, OsmTags, OsmWay } from "./types"
+import type {
+	OsmGeoJSONProperties,
+	OsmNode,
+	OsmRelation,
+	OsmWay,
+} from "./types"
 import { wayIsArea } from "./way-is-area"
 
 export async function* generateGeoJsonFromOsmPbfReader(
@@ -129,5 +134,27 @@ export function wayToEditableGeoJson(
 	return {
 		type: "FeatureCollection",
 		features: [wayFeature, ...wayNodes],
+	}
+}
+
+export function relationToFeature(
+	relation: OsmRelation,
+	nodes: Map<number, OsmNode>,
+): GeoJSON.Feature<GeoJSON.Polygon, OsmGeoJSONProperties> {
+	return {
+		type: "Feature",
+		id: relation.id,
+		geometry: {
+			type: "Polygon",
+			coordinates: [
+				relation.members.map((member, i) => {
+					// const type = member.type
+					const node = nodes.get(member.ref)
+					if (!node) throw new Error(`Node ${member.ref} not found`)
+					return [node.lon, node.lat]
+				}),
+			],
+		},
+		properties: relation.tags ?? {},
 	}
 }

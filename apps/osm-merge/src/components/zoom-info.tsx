@@ -1,5 +1,5 @@
-import { useAtomValue } from "jotai"
 import { zoomAtom } from "@/atoms"
+import { useAtomValue } from "jotai"
 
 export default function ZoomInfo() {
 	const zoom = useAtomValue(zoomAtom)

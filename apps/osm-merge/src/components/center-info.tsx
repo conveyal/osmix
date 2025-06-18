@@ -1,5 +1,5 @@
-import { useAtomValue } from "jotai"
 import { mapCenterAtom } from "@/atoms"
+import { useAtomValue } from "jotai"
 
 export default function CenterInfo() {
 	const center = useAtomValue(mapCenterAtom)
