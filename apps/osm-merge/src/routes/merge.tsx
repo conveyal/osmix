@@ -64,6 +64,7 @@ export default function MergePage() {
 	const runFullMerge = useSetAtom(runFullMergeAtom)
 	const logMessage = useSetAtom(addLogMessageAtom)
 	const baseOsm = useAtomValue(osmAtomFamily("base"))
+	const patchOsm = useAtomValue(osmAtomFamily("patch"))
 	const workflowStep = useAtomValue(workflowStepAtom)
 
 	const [patches, setPatches] = useAtom(patchesAtom)
@@ -156,7 +157,7 @@ export default function MergePage() {
 							Download Merged OSM
 						</Button>
 					)}
-					{workflowStep === "select-files" && (
+					{workflowStep === "select-files" && baseOsm && patchOsm && (
 						<>
 							<Button
 								className="mx-4"
