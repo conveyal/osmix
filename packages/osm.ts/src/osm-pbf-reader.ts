@@ -111,6 +111,12 @@ export async function* createOsmPbfBlockGenerator(
 	}
 }
 
+/**
+ * Decompress a zlib-compressed array of bytes.
+ *
+ * @param data - The compressed data.
+ * @returns The decompressed array of bytes.
+ */
 function decompress(data: Uint8Array) {
 	const decompressedStream = new Blob([data])
 		.stream()
