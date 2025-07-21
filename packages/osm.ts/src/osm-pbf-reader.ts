@@ -50,7 +50,7 @@ export class OsmPbfReader {
 
 export async function* createOsmPbfBlockGenerator(
 	data: ReadableStream<Uint8Array> | ArrayBuffer,
-) {
+): AsyncGenerator<OsmPbfHeaderBlock | OsmPrimitiveBlock> {
 	let pbf: Pbf | null = null
 	let state: number = State.READ_HEADER_LENGTH
 	let bytesNeeded: number = HEADER_BYTES_LENGTH
