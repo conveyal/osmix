@@ -6,7 +6,6 @@ import {
 	lineIntersect,
 	nearestPointOnLine,
 } from "@turf/turf"
-import { mergeOsm } from "./merge"
 import NodeSpatialIndex from "./node-spatial-index"
 import { type OsmPbfReader, createOsmPbfReader } from "./osm-pbf-reader"
 import {
@@ -324,12 +323,8 @@ export class Osm {
 			const lineString = this.wayToLineString(wayId)
 			const intersectingWays = this.findIntersectingWays(lineString)
 			if (intersectingWays.size > 0) {
-				for (const intersectingWay of intersectingWays) {
-					intersectionCandidates.set(
-						wayId,
-						intersectingWay[0],
-						intersectingWay[1],
-					)
+				for (const [intersectingWayId, intersections] of intersectingWays) {
+					intersectionCandidates.set(wayId, intersectingWayId, intersections)
 				}
 			} else if (!this.isWayDisconnected(wayId)) {
 				disconnectedWays.add(wayId)
