@@ -6,12 +6,14 @@
 	"private": true,
 	"scripts": {
 		"build": "vite build",
-		"dev": "vite"
+		"dev": "vite",
+		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
+		"typescript": "catalog:",
 		"@tailwindcss/vite": "^4.1.6",
-		"@types/geojson": "^7946.0.16",
-		"@types/node": "^22.15.15",
+		"@types/geojson": "catalog:",
+		"@types/node": "catalog:",
 		"@types/react": "^19.1.4",
 		"@types/react-dom": "^19.1.5",
 		"@vitejs/plugin-react": "^4.4.1",
@@ -26,7 +28,7 @@
 		"@deck.gl/react": "^9.1.11",
 		"@fontsource-variable/roboto-mono": "^5.2.5",
 		"@radix-ui/react-slot": "^1.2.3",
-		"@turf/turf": "^7.2.0",
+		"@turf/turf": "catalog:",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"jotai": "^2.12.5",
