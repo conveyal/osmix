@@ -7,11 +7,16 @@ import {
 	nearestPointOnLine,
 } from "@turf/turf"
 import NodeSpatialIndex from "./node-spatial-index"
-import { createOsmPbfReader } from "./osm-pbf-reader"
+import { createOsmPbfReader } from "./pbf/osm-pbf-reader"
 import {
+	PrimitiveBlockBuilder,
 	MAX_ENTITIES_PER_BLOCK,
-	PrimitiveBlockParser,
-} from "./primitive-block-parser"
+} from "./pbf/primitive-block-builder"
+import { PrimitiveBlockParser } from "./pbf/primitive-block-parser"
+import type {
+	OsmPbfHeaderBlock,
+	OsmPbfPrimitiveBlock,
+} from "./pbf/proto/osmformat"
 import {
 	nodeToFeature,
 	nodesToFeatures,
@@ -26,15 +31,12 @@ import type {
 	OsmChange,
 	OsmEntityType,
 	OsmNode,
-	OsmPbfHeaderBlock,
-	OsmPbfPrimitiveBlock,
 	OsmRelation,
 	OsmWay,
 } from "./types"
 import UnorderedPairMap from "./unordered-pair-map"
+import { isNode, isRelation, isWay } from "./utils"
 import { wayIsArea } from "./way-is-area"
-import { getEntityType, isNode, isRelation, isWay } from "./utils"
-import { PrimitiveBlockBuilder } from "./primitive-block-builder"
 
 /**
  * Requires sorted IDs.

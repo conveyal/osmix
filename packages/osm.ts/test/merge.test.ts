@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import { Osm, createOsmPbfReader } from "../src"
+import { Osm } from "../src"
 import { getConflictingIds, mergeOsm } from "../src/merge"
 import { generateOsmChanges } from "../src/osm-change"
 import { createBaseOsm, createPatchOsm } from "./mock-osm"
@@ -18,12 +18,10 @@ describe("merge osm", () => {
 			const osmMergedName = "yakima-merged.osm.pbf"
 
 			const osm1Data = await getFile(osm1Name)
-			const osm1Reader = await createOsmPbfReader(osm1Data)
-			const osm1 = await Osm.fromPbfReader(osm1Reader.header, osm1Reader.blocks)
+			const osm1 = await Osm.fromPbfData(osm1Data)
 
 			const osm2Data = await getFile(osm2Name)
-			const osm2Reader = await createOsmPbfReader(osm2Data)
-			const osm2 = await Osm.fromPbfReader(osm2Reader.header, osm2Reader.blocks)
+			const osm2 = await Osm.fromPbfData(osm2Data)
 
 			const osmMerged = mergeOsm(osm1, osm2)
 		},

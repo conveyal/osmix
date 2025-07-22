@@ -2,10 +2,10 @@ import assert from "node:assert"
 import { describe, it } from "vitest"
 
 import { Osm } from "../src/osm"
-import { createOsmPbfReader } from "../src/osm-pbf-reader"
+import { createOsmPbfReader } from "../src/pbf/osm-pbf-reader"
 import { PBFs } from "./files"
 import { getFile, getFileReadStream } from "./utils"
-import { PrimitiveBlockParser } from "../src/primitive-block-parser"
+import { PrimitiveBlockParser } from "../src/pbf/primitive-block-parser"
 import { isRelation, isWay } from "../src/utils"
 
 describe("parse osm pbf stream", () => {

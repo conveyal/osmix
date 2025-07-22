@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 
-import { Osm, createOsmPbfReader } from "../src"
-import { writePbfToStream } from "../src/osm-pbf-writer"
+import { Osm } from "../src"
+import { writePbfToStream } from "../src/pbf/osm-pbf-writer"
 import { PBFs } from "./files"
 import { getFileReadStream, getFileWriteStream } from "./utils"
 
@@ -12,8 +12,7 @@ describe("write osm primitive blocks", () => {
 		async (name, pbf) => {
 			// Parse the original PBF
 			const fileStream = await getFileReadStream(pbf.url)
-			const osmReader = await createOsmPbfReader(fileStream)
-			const osm = await Osm.fromPbfReader(osmReader.header, osmReader.blocks)
+			const osm = await Osm.fromPbfData(fileStream)
 
 			// Get the first node, way, and relation
 			const node1 = osm.nodes.values().next().value
@@ -31,11 +30,7 @@ describe("write osm primitive blocks", () => {
 
 			// Re-parse the new PBF
 			const testDataStream = await getFileReadStream(testFileName)
-			const testOsmPbf = await createOsmPbfReader(testDataStream)
-			const testOsm = await Osm.fromPbfReader(
-				testOsmPbf.header,
-				testOsmPbf.blocks,
-			)
+			const testOsm = await Osm.fromPbfData(testDataStream)
 
 			// Compare the original parsed PBF and newly parsed/written/re-parsed PBF
 			assert.deepEqual(osm.header, testOsm.header)

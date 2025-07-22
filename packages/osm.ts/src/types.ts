@@ -1,105 +1,10 @@
+import type { OsmPbfInfo } from "./pbf/proto/osmformat"
+
 export type OsmEntityType = "node" | "way" | "relation"
 
 export interface LonLat {
 	lon: number
 	lat: number
-}
-
-export type OsmPbfBlob = {
-	raw_size?: number
-	raw?: Uint8Array
-	zlib_data?: Uint8Array
-}
-
-export type OsmPbfBlobHeader = {
-	type: "OSMHeader" | "OSMData"
-	datasize: number
-}
-
-export type OsmPbfHeaderBBox = {
-	left: number
-	right: number
-	top: number
-	bottom: number
-}
-
-export type OsmPbfHeaderBlock = {
-	bbox?: OsmPbfHeaderBBox
-	required_features: string[]
-	optional_features: string[]
-	writingprogram?: string
-	source?: string
-	osmosis_replication_timestamp?: number
-	osmosis_replication_sequence_number?: number
-	osmosis_replication_base_url?: string
-}
-
-export interface OsmPbfBlockSettings {
-	granularity?: number
-	lat_offset?: number
-	lon_offset?: number
-	date_granularity?: number
-}
-
-export interface OsmPbfPrimitiveBlock extends OsmPbfBlockSettings {
-	stringtable: string[]
-	primitivegroup: OsmPbfPrimitiveGroup[]
-}
-
-export type OsmPbfPrimitiveGroup = {
-	nodes: OsmPbfNode[]
-	dense?: OsmPbfDenseNodes
-	ways: OsmPbfWay[]
-	relations: OsmPbfRelation[]
-}
-
-export type OsmPbfStringTable = {
-	s: Uint8Array[]
-}
-
-export interface OsmPbfInfo {
-	version?: number
-	timestamp?: number
-	changeset?: number
-	uid?: number
-	user_sid?: number
-	visible?: boolean
-}
-
-export type OsmPbfDenseInfo = {
-	version: number[]
-	timestamp: number[]
-	changeset: number[]
-	uid: number[]
-	user_sid: number[]
-	visible: boolean[]
-}
-
-export interface OsmPbfPrimitive {
-	id: number
-	keys: number[]
-	vals: number[]
-	info?: OsmPbfInfo
-}
-
-export interface OsmPbfNode extends OsmPbfPrimitive, LonLat {}
-
-export type OsmPbfDenseNodes = {
-	id: number[]
-	denseinfo?: OsmPbfDenseInfo
-	lat: number[]
-	lon: number[]
-	keys_vals: number[]
-}
-
-export interface OsmPbfWay extends OsmPbfPrimitive {
-	refs: number[]
-}
-
-export interface OsmPbfRelation extends OsmPbfPrimitive {
-	roles_sid: number[]
-	memids: number[]
-	types: number[]
 }
 
 export const RelationMemberType = {
@@ -119,7 +24,7 @@ export type Bbox = [
 	maxLat: number,
 ]
 
-export interface OsmPbfInfoParsed extends OsmPbfInfo {
+export interface OsmInfoParsed extends OsmPbfInfo {
 	user?: string
 }
 
@@ -130,7 +35,7 @@ export interface OsmTags {
 export interface OsmEntity {
 	id: number
 	tags?: OsmTags
-	info?: OsmPbfInfoParsed
+	info?: OsmInfoParsed
 }
 
 export interface OsmNode extends OsmEntity, LonLat {}

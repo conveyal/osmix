@@ -1,16 +1,13 @@
+import type { OsmNode, OsmRelation, OsmTags, OsmWay } from "../types"
+import { isNode, isRelation, isWay } from "../utils"
+import { MEMBER_TYPES } from "./primitive-block-parser"
 import type {
-	OsmNode,
 	OsmPbfBlockSettings,
 	OsmPbfNode,
 	OsmPbfPrimitiveBlock,
 	OsmPbfPrimitiveGroup,
-	OsmRelation,
-	OsmTags,
-	OsmWay,
-} from "./types"
-import { isNode, isRelation, isWay } from "./utils"
+} from "./proto/osmformat"
 
-export const MEMBER_TYPES = ["node", "way", "relation"]
 export const MAX_ENTITIES_PER_BLOCK = 8_000
 
 export class PrimitiveBlockBuilder implements OsmPbfPrimitiveBlock {

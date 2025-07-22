@@ -2,7 +2,8 @@ import { bench } from "vitest"
 import { PBFs } from "./files"
 import { getFile, getFileReadStream } from "./utils"
 
-import { createOsmPbfReader } from "../src/osm-pbf-reader"
+import { createOsmPbfReader } from "../src/pbf/osm-pbf-reader"
+import { PrimitiveBlockParser } from "../src/pbf/primitive-block-parser"
 
 await Promise.all(Object.values(PBFs).map((p) => getFile(p.url)))
 
@@ -12,8 +13,11 @@ for (const [name, pbf] of Object.entries(PBFs)) {
 		const osm = await createOsmPbfReader(stream)
 
 		let count = 0
-		for await (const entity of osm) {
-			count++
+		for await (const block of osm.blocks) {
+			const parser = new PrimitiveBlockParser(block)
+			for (const entity of parser) {
+				count++
+			}
 		}
 	})
 }

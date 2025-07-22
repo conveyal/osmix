@@ -1,22 +1,22 @@
 import type {
 	OsmNode,
+	OsmInfoParsed,
+	OsmRelation,
+	OsmRelationMember,
+	OsmTags,
+	OsmWay,
+} from "../types"
+import type {
 	OsmPbfDenseNodes,
 	OsmPbfInfo,
-	OsmPbfInfoParsed,
 	OsmPbfNode,
 	OsmPbfPrimitiveBlock,
 	OsmPbfPrimitiveGroup,
 	OsmPbfRelation,
 	OsmPbfWay,
-	OsmRelation,
-	OsmRelationMember,
-	OsmTags,
-	OsmWay,
-} from "./types"
-import { assertNonNull } from "./utils"
+} from "./proto/osmformat"
 
 export const MEMBER_TYPES = ["node", "way", "relation"]
-export const MAX_ENTITIES_PER_BLOCK = 8_000
 
 export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 	stringtable: string[] = [""]
@@ -58,7 +58,7 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 		}
 	}
 
-	fillInfo(info: OsmPbfInfo | undefined): OsmPbfInfoParsed | undefined {
+	fillInfo(info: OsmPbfInfo | undefined): OsmInfoParsed | undefined {
 		if (!this.#includeInfo || !info) return undefined
 		return {
 			...info,
@@ -85,31 +85,6 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 				.map((_, i) => [this.getString(keys, i), this.getString(vals, i)])
 				.filter(([key, val]) => key && val),
 		)
-	}
-
-	get group() {
-		const g = this.primitivegroup[this.primitivegroup.length - 1]
-		if (g == null) throw new Error("No group found")
-		return g
-	}
-
-	getStringtableIndex(key: string) {
-		let index = this.stringtable.findIndex((t) => t === key)
-		if (index === -1) {
-			this.stringtable.push(key)
-			index = this.stringtable.length - 1
-		}
-		return index
-	}
-
-	addTags(tags: OsmTags) {
-		const keys = []
-		const vals = []
-		for (const [key, val] of Object.entries(tags)) {
-			keys.push(this.getStringtableIndex(key))
-			vals.push(this.getStringtableIndex(val.toString()))
-		}
-		return { keys, vals }
 	}
 
 	parseNode(n: OsmPbfNode): OsmNode {
@@ -240,4 +215,11 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 			return node
 		})
 	}
+}
+
+function assertNonNull(
+	o: unknown,
+	message?: string,
+): asserts o is NonNullable<typeof o> {
+	if (o == null) throw Error(message ?? "Expected non-null value")
 }

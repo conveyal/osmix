@@ -1,10 +1,10 @@
 import assert from "node:assert"
 import { describe, it } from "vitest"
 
-import { createOsmPbfReader } from "../src/osm-pbf-reader"
+import { createOsmPbfReader } from "../src/pbf/osm-pbf-reader"
 import { PBFs } from "./files"
 import { getFileReadStream } from "./utils"
-import { PrimitiveBlockParser } from "../src/primitive-block-parser"
+import { PrimitiveBlockParser } from "../src/pbf/primitive-block-parser"
 import { nodeToFeature, wayToFeature } from "../src/to-geojson"
 import type { OsmNode } from "../src/types"
 import { isWay } from "../src/utils"

@@ -9,6 +9,7 @@
 		".": "./src/index.ts",
 		"./changes": "./src/osm-change.ts",
 		"./geojson": "./src/to-geojson.ts",
+		"./pbf": "./src/pbf/index.ts",
 		"./utils": "./src/utils.ts"
 	},
 	"sideEffects": false,

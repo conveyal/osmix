@@ -1,8 +1,11 @@
 import Pbf from "pbf"
 import { readBlob, readBlobHeader } from "./proto/fileformat"
-import { readHeaderBlock, readPrimitiveBlock } from "./proto/osmformat"
-import type { OsmPbfHeaderBlock, OsmPbfPrimitiveBlock } from "./types"
-import { streamToAsyncIterator } from "./utils"
+import {
+	readHeaderBlock,
+	readPrimitiveBlock,
+	type OsmPbfHeaderBlock,
+	type OsmPbfPrimitiveBlock,
+} from "./proto/osmformat"
 
 const HEADER_BYTES_LENGTH = 4
 const State = {
@@ -108,4 +111,25 @@ function decompress(data: Uint8Array) {
 		.stream()
 		.pipeThrough(new DecompressionStream("deflate"))
 	return new Response(decompressedStream).bytes()
+}
+
+/**
+ * Convert a stream to an async iterator.
+ */
+async function* streamToAsyncIterator<T>(stream: ReadableStream<T>) {
+	// Get a lock on the stream
+	const reader = stream.getReader()
+
+	try {
+		while (true) {
+			// Read from the stream
+			const { done, value } = await reader.read()
+			// Exit if we're done
+			if (done) return
+			// Else yield the chunk
+			yield value
+		}
+	} finally {
+		reader.releaseLock()
+	}
 }

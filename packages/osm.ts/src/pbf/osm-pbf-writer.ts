@@ -1,8 +1,11 @@
 import Pbf from "pbf"
 import { writeBlob, writeBlobHeader } from "./proto/fileformat"
-import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat"
-import type { OsmPbfHeaderBlock, OsmPbfPrimitiveBlock } from "./types"
-import { nativeCompress } from "./utils"
+import {
+	writeHeaderBlock,
+	writePrimitiveBlock,
+	type OsmPbfHeaderBlock,
+	type OsmPbfPrimitiveBlock,
+} from "./proto/osmformat"
 
 /**
  * Write OSM PBF data to a stream.
@@ -116,4 +119,13 @@ function uint32BE(n: number): Uint8Array {
 	out[2] = (n >>> 8) & 0xff
 	out[3] = n & 0xff
 	return out
+}
+
+/**
+ * Compress data using the native browser/runtime compression stream.
+ */
+function nativeCompress(data: Uint8Array) {
+	const stream = new CompressionStream("deflate")
+	const compressedStream = new Blob([data]).stream().pipeThrough(stream)
+	return new Response(compressedStream).bytes()
 }
