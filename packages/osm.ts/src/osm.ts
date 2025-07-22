@@ -7,7 +7,11 @@ import {
 	nearestPointOnLine,
 } from "@turf/turf"
 import NodeSpatialIndex from "./node-spatial-index"
-import { type OsmPbfReader, createOsmPbfReader } from "./osm-pbf-reader"
+import { createOsmPbfReader } from "./osm-pbf-reader"
+import {
+	MAX_ENTITIES_PER_BLOCK,
+	PrimitiveBlockParser,
+} from "./primitive-block-parser"
 import {
 	nodeToFeature,
 	nodesToFeatures,
@@ -23,11 +27,14 @@ import type {
 	OsmEntityType,
 	OsmNode,
 	OsmPbfHeaderBlock,
+	OsmPbfPrimitiveBlock,
 	OsmRelation,
 	OsmWay,
 } from "./types"
 import UnorderedPairMap from "./unordered-pair-map"
 import { wayIsArea } from "./way-is-area"
+import { getEntityType, isNode, isRelation, isWay } from "./utils"
+import { PrimitiveBlockBuilder } from "./primitive-block-builder"
 
 /**
  * Requires sorted IDs.
@@ -42,13 +49,19 @@ export class Osm {
 
 	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
 		const reader = await createOsmPbfReader(data)
-		return Osm.fromPbfReader(reader)
+		return Osm.fromPbfReader(reader.header, reader.blocks)
 	}
 
-	static async fromPbfReader(reader: OsmPbfReader) {
-		const osm = new Osm(reader.header)
-		for await (const entity of reader) {
-			osm.addEntity(entity)
+	static async fromPbfReader(
+		header: OsmPbfHeaderBlock,
+		blocks: AsyncGenerator<OsmPbfPrimitiveBlock>,
+	) {
+		const osm = new Osm(header)
+		for await (const block of blocks) {
+			const blockParser = new PrimitiveBlockParser(block)
+			for (const entity of blockParser) {
+				osm.addEntity(entity)
+			}
 		}
 		return osm
 	}
@@ -85,14 +98,16 @@ export class Osm {
 	}
 
 	getEntityBbox(entity: OsmNode | OsmWay | OsmRelation): Bbox {
-		switch (entity.type) {
-			case "node":
-				return bbox(nodeToFeature(entity)) as Bbox
-			case "way":
-				return bbox(wayToFeature(entity, this.nodes)) as Bbox
-			case "relation":
-				return bbox(relationToFeature(entity, this.nodes)) as Bbox
+		if (isNode(entity)) {
+			return bbox(nodeToFeature(entity)) as Bbox
 		}
+		if (isWay(entity)) {
+			return bbox(wayToFeature(entity, this.nodes)) as Bbox
+		}
+		if (isRelation(entity)) {
+			return bbox(relationToFeature(entity, this.nodes)) as Bbox
+		}
+		throw new Error("Unknown entity type")
 	}
 
 	addNode(node: OsmNode) {
@@ -104,7 +119,6 @@ export class Osm {
 	createNode(lonLat: LonLat) {
 		return this.addNode({
 			id: this.maxNodeId++,
-			type: "node",
 			...lonLat,
 		})
 	}
@@ -117,11 +131,11 @@ export class Osm {
 			return
 		}
 
-		if (entity.type === "node") {
+		if (isNode(entity)) {
 			this.addNode(entity)
-		} else if (entity.type === "way") {
+		} else if (isWay(entity)) {
 			this.ways.set(entity.id, entity)
-		} else if (entity.type === "relation") {
+		} else if (isRelation(entity)) {
 			this.relations.set(entity.id, entity)
 		}
 	}
@@ -133,15 +147,15 @@ export class Osm {
 	}
 
 	deleteEntity(entity: OsmNode | OsmWay | OsmRelation) {
-		if (entity.type === "node") this.nodes.delete(entity.id)
-		if (entity.type === "way") this.ways.delete(entity.id)
-		if (entity.type === "relation") this.relations.delete(entity.id)
+		if (isNode(entity)) this.nodes.delete(entity.id)
+		if (isWay(entity)) this.ways.delete(entity.id)
+		if (isRelation(entity)) this.relations.delete(entity.id)
 	}
 
 	setEntity(entity: OsmNode | OsmWay | OsmRelation) {
-		if (entity.type === "node") this.nodes.set(entity.id, entity)
-		if (entity.type === "way") this.ways.set(entity.id, entity)
-		if (entity.type === "relation") this.relations.set(entity.id, entity)
+		if (isNode(entity)) this.nodes.set(entity.id, entity)
+		if (isWay(entity)) this.ways.set(entity.id, entity)
+		if (isRelation(entity)) this.relations.set(entity.id, entity)
 	}
 
 	bbox(): Bbox {
@@ -443,5 +457,45 @@ export class Osm {
 			clone.addEntity(structuredClone(relation))
 		}
 		return clone
+	}
+
+	/**
+	 * Generate primitive blocks from this OSM object for writing to a PBF file.
+	 *
+	 * TODO: Sort nodes and ways?
+	 * @returns a generator that produces primitive blocks
+	 */
+	async *generatePbfPrimitiveBlocks(): AsyncGenerator<OsmPbfPrimitiveBlock> {
+		const nodes = Array.from(this.nodes.values())
+		for (let i = 0; i < nodes.length; i += MAX_ENTITIES_PER_BLOCK) {
+			const block = new PrimitiveBlockBuilder()
+			block.addDenseNodes(nodes.slice(i, i + MAX_ENTITIES_PER_BLOCK))
+			yield block
+		}
+
+		let block = new PrimitiveBlockBuilder()
+		for (const [, way] of this.ways) {
+			if (block.isFull()) {
+				yield block
+				block = new PrimitiveBlockBuilder()
+			}
+			block.addEntity(way)
+		}
+		if (!block.isEmpty()) {
+			yield block
+		}
+
+		block = new PrimitiveBlockBuilder()
+		for (const [, relation] of this.relations) {
+			if (block.isFull()) {
+				yield block
+				block = new PrimitiveBlockBuilder()
+			}
+			block.addEntity(relation)
+		}
+
+		if (!block.isEmpty()) {
+			yield block
+		}
 	}
 }

@@ -1,4 +1,3 @@
-import type { OsmPbfReader } from "./osm-pbf-reader"
 import type {
 	OsmGeoJSONProperties,
 	OsmNode,
@@ -6,24 +5,6 @@ import type {
 	OsmWay,
 } from "./types"
 import { wayIsArea } from "./way-is-area"
-
-export async function* generateGeoJsonFromOsmPbfReader(
-	osmReader: OsmPbfReader,
-) {
-	const nodes: Map<number, OsmNode> = new Map()
-	for await (const entity of osmReader) {
-		if (Array.isArray(entity)) {
-			for (const node of entity) {
-				nodes.set(node.id, node)
-				if (node.tags && Object.keys(node.tags).length > 0) {
-					yield nodeToFeature(node)
-				}
-			}
-		} else if (entity.type === "way") {
-			yield wayToFeature(entity, nodes)
-		}
-	}
-}
 
 export function entitiesToGeoJSON(osm: {
 	nodes: Map<number, OsmNode>

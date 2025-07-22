@@ -2,9 +2,12 @@ import assert from "node:assert"
 import { describe, it } from "vitest"
 
 import { createOsmPbfReader } from "../src/osm-pbf-reader"
-import { generateGeoJsonFromOsmPbfReader } from "../src/to-geojson"
 import { PBFs } from "./files"
 import { getFileReadStream } from "./utils"
+import { PrimitiveBlockParser } from "../src/primitive-block-parser"
+import { nodeToFeature, wayToFeature } from "../src/to-geojson"
+import type { OsmNode } from "../src/types"
+import { isWay } from "../src/utils"
 
 describe("generate geojson from osm pbf", () => {
 	it.each(Object.entries(PBFs))("%s", { timeout: 100_000 }, async (_, pbf) => {
@@ -12,11 +15,24 @@ describe("generate geojson from osm pbf", () => {
 		const osm = await createOsmPbfReader(fileStream)
 		assert.deepEqual(osm.header.bbox, pbf.bbox)
 
-		let features = 0
-		for await (const feature of generateGeoJsonFromOsmPbfReader(osm)) {
-			features++
+		const features: GeoJSON.Feature[] = []
+		const nodes: Map<number, OsmNode> = new Map()
+		for await (const block of osm.blocks) {
+			const blockParser = new PrimitiveBlockParser(block)
+			for await (const entity of blockParser) {
+				if (Array.isArray(entity)) {
+					for (const node of entity) {
+						nodes.set(node.id, node)
+						if (node.tags && Object.keys(node.tags).length > 0) {
+							features.push(nodeToFeature(node))
+						}
+					}
+				} else if (isWay(entity)) {
+					features.push(wayToFeature(entity, nodes))
+				}
+			}
 		}
 
-		assert.equal(features, pbf.geoJsonFeatures)
+		assert.equal(features.length, pbf.geoJsonFeatures)
 	})
 })

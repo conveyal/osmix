@@ -19,11 +19,11 @@ describe("merge osm", () => {
 
 			const osm1Data = await getFile(osm1Name)
 			const osm1Reader = await createOsmPbfReader(osm1Data)
-			const osm1 = await Osm.fromPbfReader(osm1Reader)
+			const osm1 = await Osm.fromPbfReader(osm1Reader.header, osm1Reader.blocks)
 
 			const osm2Data = await getFile(osm2Name)
 			const osm2Reader = await createOsmPbfReader(osm2Data)
-			const osm2 = await Osm.fromPbfReader(osm2Reader)
+			const osm2 = await Osm.fromPbfReader(osm2Reader.header, osm2Reader.blocks)
 
 			const osmMerged = mergeOsm(osm1, osm2)
 		},

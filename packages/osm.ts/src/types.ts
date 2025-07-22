@@ -34,13 +34,16 @@ export type OsmPbfHeaderBlock = {
 	osmosis_replication_base_url?: string
 }
 
-export type OsmPbfPrimitiveBlock = {
-	stringtable: string[]
-	primitivegroup: OsmPbfPrimitiveGroup[]
+export interface OsmPbfBlockSettings {
 	granularity?: number
 	lat_offset?: number
 	lon_offset?: number
 	date_granularity?: number
+}
+
+export interface OsmPbfPrimitiveBlock extends OsmPbfBlockSettings {
+	stringtable: string[]
+	primitivegroup: OsmPbfPrimitiveGroup[]
 }
 
 export type OsmPbfPrimitiveGroup = {
@@ -126,17 +129,13 @@ export interface OsmTags {
 
 export interface OsmEntity {
 	id: number
-	type: OsmEntityType
 	tags?: OsmTags
 	info?: OsmPbfInfoParsed
 }
 
-export interface OsmNode extends OsmEntity, LonLat {
-	type: "node"
-}
+export interface OsmNode extends OsmEntity, LonLat {}
 
 export interface OsmWay extends OsmEntity {
-	type: "way"
 	refs: number[]
 }
 
@@ -147,7 +146,6 @@ export interface OsmRelationMember {
 }
 
 export interface OsmRelation extends OsmEntity {
-	type: "relation"
 	members: OsmRelationMember[]
 }
 

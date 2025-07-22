@@ -18,14 +18,7 @@ import { assertNonNull } from "./utils"
 export const MEMBER_TYPES = ["node", "way", "relation"]
 export const MAX_ENTITIES_PER_BLOCK = 8_000
 
-class PrimitiveGroup implements OsmPbfPrimitiveGroup {
-	dense?: OsmPbfDenseNodes
-	nodes: OsmPbfNode[] = []
-	ways: OsmPbfWay[] = []
-	relations: OsmPbfRelation[] = []
-}
-
-export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
+export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 	stringtable: string[] = [""]
 	primitivegroup: OsmPbfPrimitiveGroup[] = []
 
@@ -34,22 +27,20 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 	lat_offset = 0
 	lon_offset = 0
 
-	#entities = 0
 	#includeInfo = false
 
-	constructor(block?: OsmPbfPrimitiveBlock) {
-		if (block) {
-			this.date_granularity = block.date_granularity ?? 1_000
-			this.stringtable = block.stringtable
-			this.primitivegroup = block.primitivegroup
-			this.granularity = block.granularity ?? 1e7
-			this.lat_offset = block.lat_offset ?? 0
-			this.lon_offset = block.lon_offset ?? 0
-		} else {
-			this.addGroup()
-		}
+	constructor(block: OsmPbfPrimitiveBlock) {
+		this.date_granularity = block.date_granularity ?? 1_000
+		this.stringtable = block.stringtable
+		this.primitivegroup = block.primitivegroup
+		this.granularity = block.granularity ?? 1e7
+		this.lat_offset = block.lat_offset ?? 0
+		this.lon_offset = block.lon_offset ?? 0
 	}
 
+	/**
+	 * Make this class iterable. Iterates over the primitive groups and yields their parsed entities.
+	 */
 	*[Symbol.iterator]() {
 		for (const group of this.primitivegroup) {
 			if (group.nodes) {
@@ -96,14 +87,6 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 		)
 	}
 
-	addGroup() {
-		this.primitivegroup.push(new PrimitiveGroup())
-	}
-
-	isFull() {
-		return this.#entities >= MAX_ENTITIES_PER_BLOCK
-	}
-
 	get group() {
 		const g = this.primitivegroup[this.primitivegroup.length - 1]
 		if (g == null) throw new Error("No group found")
@@ -129,81 +112,36 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 		return { keys, vals }
 	}
 
-	addNode(node: OsmNode) {
-		const tags = this.addTags(node.tags ?? {})
-		this.group.nodes.push({
-			...node,
-			keys: tags.keys,
-			vals: tags.vals,
-		})
-		this.#entities++
-	}
-
 	parseNode(n: OsmPbfNode): OsmNode {
-		return {
+		if (n.id === 21911883) {
+			console.error("parser", n)
+		}
+		const node: OsmNode = {
 			id: n.id,
-			type: "node",
 			lon: this.lon_offset + n.lon / this.granularity,
 			lat: this.lat_offset + n.lat / this.granularity,
 			tags: this.getTags(n.keys, n.vals),
-			info: this.fillInfo(n.info),
 		}
-	}
-
-	addWay(way: OsmWay) {
-		let lastRef = 0
-		const refs = way.refs.map((ref) => {
-			const delta = ref - lastRef
-			lastRef = ref
-			return delta
-		})
-		const tags = this.addTags(way.tags ?? {})
-		this.group.ways.push({
-			...way,
-			refs,
-			keys: tags.keys,
-			vals: tags.vals,
-		})
-		this.#entities++
+		if (this.#includeInfo && n.info) {
+			node.info = this.fillInfo(n.info)
+		}
+		return node
 	}
 
 	parseWay(w: OsmPbfWay): OsmWay {
 		let ref = 0
-		return {
+		const way: OsmWay = {
 			id: w.id,
-			type: "way",
 			refs: w.refs.map((refSid) => {
 				ref += refSid
 				return ref
 			}),
 			tags: this.getTags(w.keys, w.vals),
-			info: this.fillInfo(w.info),
 		}
-	}
-
-	addRelation(relation: OsmRelation) {
-		const memids: number[] = []
-		const roles_sid: number[] = []
-		const types: number[] = []
-
-		// Delta code the memids
-		let lastMemId = 0
-		for (const member of relation.members) {
-			memids.push(member.ref - lastMemId)
-			lastMemId = member.ref
-			roles_sid.push(this.getStringtableIndex(member.role ?? ""))
-			types.push(MEMBER_TYPES.indexOf(member.type))
+		if (this.#includeInfo && w.info) {
+			way.info = this.fillInfo(w.info)
 		}
-
-		const tags = this.addTags(relation.tags ?? {})
-		this.group.relations.push({
-			...relation,
-			keys: tags.keys,
-			vals: tags.vals,
-			memids,
-			roles_sid,
-			types,
-		})
+		return way
 	}
 
 	parseRelation(r: OsmPbfRelation): OsmRelation {
@@ -222,17 +160,15 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 			}
 		})
 
-		return {
+		const relation: OsmRelation = {
 			id: r.id,
-			type: "relation",
 			tags: this.getTags(r.keys, r.vals),
-			info: this.fillInfo(r.info),
 			members,
 		}
-	}
-
-	addDenseNode(node: OsmNode) {
-		const tags = this.addTags(node.tags ?? {})
+		if (this.#includeInfo && r.info) {
+			relation.info = this.fillInfo(r.info)
+		}
+		return relation
 	}
 
 	parseDenseNodes(dense: OsmPbfDenseNodes): OsmNode[] {
@@ -260,7 +196,6 @@ export class OsmPrimitiveBlock implements OsmPbfPrimitiveBlock {
 
 			const node: OsmNode = {
 				id: delta.id,
-				type: "node",
 				lon: this.lon_offset + delta.lon / this.granularity,
 				lat: this.lat_offset + delta.lat / this.granularity,
 			}

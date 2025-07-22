@@ -3,10 +3,11 @@ import { distance } from "@turf/turf"
 import { atom } from "jotai"
 import { atomFamily } from "jotai/utils"
 import { Osm, type OsmNode, mergeOsm } from "osm.ts"
-import { generateOsmChanges } from "osm.ts/src/osm-change"
-import { nodeToFeature, wayToEditableGeoJson } from "osm.ts/src/to-geojson"
-import type { OsmChange } from "osm.ts/src/types"
+import { generateOsmChanges } from "osm.ts/changes"
+import { nodeToFeature, wayToEditableGeoJson } from "osm.ts/geojson"
+import type { OsmChange } from "osm.ts"
 import type { MapRef } from "react-map-gl/maplibre"
+import { isWay } from "osm.ts/utils"
 
 export const mapAtom = atom<MapRef | null>(null)
 export const zoomAtom = atom<number | null>(null)
@@ -164,7 +165,7 @@ export const baseNodesNearPatchAtom = atom(async (get) => {
 	const patchOsm = await get(osmAtomFamily("patch"))
 	const baseOsm = await get(osmAtomFamily("base"))
 	const way = await get(currentChangeEntityAtom)
-	if (!patchOsm || !baseOsm || !way || way.type !== "way") return []
+	if (!patchOsm || !baseOsm || !way || !isWay(way)) return []
 	const candidates: NodeCandidate[] = []
 	for (const ref of way.refs) {
 		const patchNode = patchOsm.nodes.get(ref)
@@ -246,7 +247,7 @@ export const patchWayGeoJsonLayerAtom = atom(async (get) => {
 			workflowStep !== "merge-complete" &&
 			patchWay &&
 			patchOsm &&
-			patchWay.type === "way"
+			isWay(patchWay)
 				? wayToEditableGeoJson(patchWay, patchOsm.nodes)
 				: [],
 		pickable: true,

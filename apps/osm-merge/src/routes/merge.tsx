@@ -31,7 +31,8 @@ import { objectToHtmlTableString } from "@/utils"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { ArrowLeft, ArrowRight, Loader2Icon, MaximizeIcon } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import { osmToPrimitiveBlocks, writePbfToStream, type Osm } from "osm.ts"
+import { getEntityType, writePbfToStream, type Osm } from "osm.ts"
+import { isWay } from "osm.ts/utils"
 import { useCallback, useEffect } from "react"
 
 function layerIdToName(id: string) {
@@ -124,7 +125,7 @@ export default function MergePage() {
 			],
 		})
 		const stream = await fileHandle.createWritable()
-		const primitives = osmToPrimitiveBlocks(baseOsm)
+		const primitives = baseOsm.generatePbfPrimitiveBlocks()
 		await writePbfToStream(stream, baseOsm.header, primitives)
 		await stream.close()
 		logMessage(`Created ${fileHandle.name} PBF for download`, "ready")
@@ -209,11 +210,9 @@ export default function MergePage() {
 							</div>
 							<hr />
 							<h3>Type: {patches[patchIndex].changeType}</h3>
-							<h3>Entity Type: {currentWay.type}</h3>
+							<h3>Entity Type: {getEntityType(currentWay)}</h3>
 							<h3>Entity ID: {currentWay.id}</h3>
-							<div>
-								Nodes: {currentWay.type === "way" ? currentWay.refs.length : 0}
-							</div>
+							<div>Nodes: {isWay(currentWay) ? currentWay.refs.length : 0}</div>
 							<div className="flex flex-col">
 								<h3>Patch - Base Node Candidates</h3>
 								<table>

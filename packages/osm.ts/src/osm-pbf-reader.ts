@@ -1,8 +1,7 @@
 import Pbf from "pbf"
-import { OsmPrimitiveBlock } from "./osm-primitive-block"
 import { readBlob, readBlobHeader } from "./proto/fileformat"
 import { readHeaderBlock, readPrimitiveBlock } from "./proto/osmformat"
-import type { OsmPbfHeaderBlock } from "./types"
+import type { OsmPbfHeaderBlock, OsmPbfPrimitiveBlock } from "./types"
 import { streamToAsyncIterator } from "./utils"
 
 const HEADER_BYTES_LENGTH = 4
@@ -14,43 +13,30 @@ const State = {
 
 type HeaderType = "OSMHeader" | "OSMData"
 
+/**
+ * Read an OSM PBF from binary data and generate a header and primitive blocks from its contents.
+ *
+ * @param data - The binary data to read as a single chunk or a stream of chunks.
+ * @returns A parsed header and a generator that yields the primitive blocks.
+ */
 export async function createOsmPbfReader(
 	data: ReadableStream<Uint8Array> | ArrayBuffer,
 ) {
 	const reader = createOsmPbfBlockGenerator(data)
 	const header = (await reader.next()).value as OsmPbfHeaderBlock
 	if (header == null) throw new Error("Header not found")
-	return new OsmPbfReader(header, reader as AsyncGenerator<OsmPrimitiveBlock>)
+	return { header, blocks: reader as AsyncGenerator<OsmPbfPrimitiveBlock> }
 }
 
 /**
- * Read an OSM PBF from binary data and generate a header and primitive blocks from its contents. Can handle a single
- * chunk or a stream of chunks.
+ * Create a generator that yields the header and primitive blocks from an OSM PBF.
+ *
+ * @param data - The binary data to read.
+ * @returns A generator that yields the header and primitive blocks.
  */
-export class OsmPbfReader {
-	header: OsmPbfHeaderBlock
-	blocks: AsyncGenerator<OsmPrimitiveBlock>
-
-	constructor(
-		header: OsmPbfHeaderBlock,
-		blocksGenerator: AsyncGenerator<OsmPrimitiveBlock>,
-	) {
-		this.header = header
-		this.blocks = blocksGenerator
-	}
-
-	async *[Symbol.asyncIterator]() {
-		for await (const block of this.blocks) {
-			for (const entity of block) {
-				yield entity
-			}
-		}
-	}
-}
-
-export async function* createOsmPbfBlockGenerator(
+async function* createOsmPbfBlockGenerator(
 	data: ReadableStream<Uint8Array> | ArrayBuffer,
-): AsyncGenerator<OsmPbfHeaderBlock | OsmPrimitiveBlock> {
+): AsyncGenerator<OsmPbfHeaderBlock | OsmPbfPrimitiveBlock> {
 	let pbf: Pbf | null = null
 	let state: number = State.READ_HEADER_LENGTH
 	let bytesNeeded: number = HEADER_BYTES_LENGTH
@@ -93,7 +79,7 @@ export async function* createOsmPbfBlockGenerator(
 				if (headerType === "OSMHeader") {
 					yield readHeaderBlock(blobPbf)
 				} else {
-					yield new OsmPrimitiveBlock(readPrimitiveBlock(blobPbf))
+					yield readPrimitiveBlock(blobPbf)
 				}
 				state = State.READ_HEADER_LENGTH
 				bytesNeeded = HEADER_BYTES_LENGTH
@@ -103,11 +89,11 @@ export async function* createOsmPbfBlockGenerator(
 	}
 
 	if (data instanceof ArrayBuffer) {
-		yield* generateBlocksFromChunk(data)
-	} else {
-		for await (const chunk of streamToAsyncIterator(data)) {
-			yield* generateBlocksFromChunk(chunk.buffer as ArrayBuffer)
-		}
+		return generateBlocksFromChunk(data)
+	}
+
+	for await (const chunk of streamToAsyncIterator(data)) {
+		yield* generateBlocksFromChunk(chunk.buffer as ArrayBuffer)
 	}
 }
 

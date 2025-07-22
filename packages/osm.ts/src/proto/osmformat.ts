@@ -107,8 +107,8 @@ function readPrimitiveBlockField(
 		obj.primitivegroup.push(readPrimitiveGroup(pbf, pbf.readVarint() + pbf.pos))
 	} else if (tag === 17) {
 		obj.granularity = pbf.readVarint(true)
-		obj.granularity =
-			!obj.granularity || obj.granularity === 100 ? 1e7 : 1e9 / obj.granularity
+		obj.granularity = !obj.granularity ? 1e7 : 1e9 / obj.granularity
+		console.error("readGranularity", obj.granularity)
 	} else if (tag === 19) obj.lat_offset = pbf.readVarint(true) * 1e-9
 	else if (tag === 20) obj.lon_offset = pbf.readVarint(true) * 1e-9
 	else if (tag === 18) obj.date_granularity = pbf.readVarint(true) ?? 1000
@@ -125,8 +125,9 @@ export function writePrimitiveBlock(obj: OsmPbfPrimitiveBlock, pbf: Pbf) {
 			pbf.writeMessage(2, writePrimitiveGroup, item)
 		}
 	}
-	if (obj.granularity != null && obj.granularity !== 100) {
-		pbf.writeVarintField(17, obj.granularity)
+	if (obj.granularity != null && obj.granularity !== 1e7) {
+		console.error("writeGranularity", obj.granularity)
+		pbf.writeVarintField(17, 1e9 / obj.granularity)
 	}
 	if (obj.lat_offset) pbf.writeVarintField(19, obj.lat_offset / 1e-9)
 	if (obj.lon_offset) pbf.writeVarintField(20, obj.lon_offset / 1e-9)

@@ -5,6 +5,12 @@
 	"version": "0.0.1",
 	"description": "An OSM PBF reader, writer, and merge tool written in TypeScript",
 	"main": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./changes": "./src/osm-change.ts",
+		"./geojson": "./src/to-geojson.ts",
+		"./utils": "./src/utils.ts"
+	},
 	"sideEffects": false,
 	"scripts": {
 		"bench": "vitest bench",
