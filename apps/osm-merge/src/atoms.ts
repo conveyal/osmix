@@ -38,6 +38,7 @@ if (typeof window !== "undefined") {
 }
 
 type WorkflowStep =
+	| "view"
 	| "select-files"
 	| "verify-changes"
 	| "deduplicate-nodes"
@@ -146,6 +147,8 @@ export const runFullMergeAtom = atom(null, async (get, set) => {
 		mergeOsm(baseOsm, patchOsm, (message, type) => {
 			set(addLogMessageAtom, message, type)
 		})
+
+		set(fileAtomFamily("patch"), null)
 
 		set(addLogMessageAtom, "Merge complete.", "ready")
 		set(workflowStepAtom, "merge-complete")

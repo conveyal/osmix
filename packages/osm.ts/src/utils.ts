@@ -41,3 +41,22 @@ export function getEntityType(entity: OsmEntity): OsmEntityType {
 	if (isRelation(entity)) return "relation"
 	throw Error("Unknown entity type")
 }
+
+/**
+ * Calculate the haversine distance between two nodes.
+ * @param node1 - The first node
+ * @param node2 - The second node
+ * @returns The haversine distance in kilometers
+ */
+export function haversineDistance(node1: OsmNode, node2: OsmNode): number {
+	const R = 6371 // Earth's radius in kilometers
+	const dLat = (node2.lat - node1.lat) * (Math.PI / 180)
+	const dLon = (node2.lon - node1.lon) * (Math.PI / 180)
+	const lat1 = node1.lat * (Math.PI / 180)
+	const lat2 = node2.lat * (Math.PI / 180)
+	const a =
+		Math.sin(dLat / 2) ** 2 +
+		Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2)
+	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+	return R * c
+}

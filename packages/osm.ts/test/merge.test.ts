@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 
 import { Osm } from "../src"
-import { getConflictingIds, mergeOsm } from "../src/merge"
+import { mergeOsm } from "../src/merge"
 import { generateOsmChanges } from "../src/osm-change"
 import { createBaseOsm, createPatchOsm } from "./mock-osm"
 import { getFile } from "./utils"

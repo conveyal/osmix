@@ -12,7 +12,7 @@ import { isNodeEqual, isRelationEqual, isWayEqual } from "./utils"
 export function generateOsmChanges(baseOsm: Osm, patchOsm: Osm): OsmChange[] {
 	const changes: OsmChange[] = []
 
-	for (const [id, entity] of patchOsm.nodes.entries()) {
+	for (const [id, entity] of patchOsm.nodes) {
 		const existingNode = baseOsm.nodes.get(id)
 		if (existingNode && isNodeEqual(existingNode, entity)) continue
 
@@ -22,7 +22,7 @@ export function generateOsmChanges(baseOsm: Osm, patchOsm: Osm): OsmChange[] {
 		})
 	}
 
-	for (const [id, entity] of patchOsm.ways.entries()) {
+	for (const [id, entity] of patchOsm.ways) {
 		const existingWay = baseOsm.ways.get(id)
 		if (existingWay && isWayEqual(existingWay, entity)) continue
 
@@ -32,7 +32,7 @@ export function generateOsmChanges(baseOsm: Osm, patchOsm: Osm): OsmChange[] {
 		})
 	}
 
-	for (const [id, entity] of patchOsm.relations.entries()) {
+	for (const [id, entity] of patchOsm.relations) {
 		const existingRelation = baseOsm.relations.get(id)
 		if (existingRelation && isRelationEqual(existingRelation, entity)) continue
 

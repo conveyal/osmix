@@ -37,6 +37,7 @@ import type {
 import UnorderedPairMap from "./unordered-pair-map"
 import { isNode, isRelation, isWay } from "./utils"
 import { wayIsArea } from "./way-is-area"
+import { OsmPbfWriter } from "./pbf/osm-pbf-writer"
 
 /**
  * Requires sorted IDs.
@@ -168,6 +169,10 @@ export class Osm {
 				this.header.bbox.right,
 				this.header.bbox.top,
 			]
+		return this.getBboxOfNodes()
+	}
+
+	getBboxOfNodes() {
 		const bbox: Bbox = [
 			Number.POSITIVE_INFINITY,
 			Number.POSITIVE_INFINITY,
@@ -459,6 +464,26 @@ export class Osm {
 			clone.addEntity(structuredClone(relation))
 		}
 		return clone
+	}
+
+	async writePbfToStream(stream: WritableStream<Uint8Array>) {
+		const writer = new OsmPbfWriter(stream)
+		const bbox = this.getBboxOfNodes()
+		await writer.writeHeader({
+			...this.header,
+			bbox: {
+				left: bbox[0],
+				bottom: bbox[1],
+				right: bbox[2],
+				top: bbox[3],
+			},
+			writingprogram: "@conveyal/osm.ts",
+			osmosis_replication_timestamp: Date.now(),
+		})
+		const primitives = this.generatePbfPrimitiveBlocks()
+		for await (const block of primitives) {
+			await writer.writePrimitiveBlock(block)
+		}
 	}
 
 	/**

@@ -37,3 +37,10 @@ export function objectToHtmlTableString(
 		})
 		.join("")
 }
+
+export function layerIdToName(id: string) {
+	if (id === "osm-tk:patch-geojson") return "Patch"
+	if (id === "osm-tk:base-geojson") return "Base"
+	if (id === "osm-tk:patch-way-geojson") return "Current Way"
+	return id
+}
