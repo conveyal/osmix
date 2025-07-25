@@ -1,4 +1,4 @@
-import { flattenValue } from "./utils"
+import { flattenValue } from "../utils"
 
 export default function ObjectToTable({
 	object,

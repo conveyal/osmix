@@ -1,5 +1,5 @@
 import type { Osm } from "osm.ts"
-import ObjectToTable from "../object-to-table"
+import ObjectToTable from "./object-to-table"
 
 export default function OsmInfoTable({ osm }: { osm: Osm | null }) {
 	if (!osm) return null

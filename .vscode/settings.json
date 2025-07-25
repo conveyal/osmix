@@ -6,5 +6,8 @@
 	"editor.codeActionsOnSave": {
 		"source.fixAll.biome": "explicit"
 	},
-	"editor.formatOnSave": true
+	"editor.formatOnSave": true,
+	"debug.javascript.defaultRuntimeExecutable": {
+		"pwa-node": "/Users/trevorgerhardt/.local/share/mise/shims/node"
+	}
 }

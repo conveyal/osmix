@@ -16,13 +16,13 @@ import {
 	runFullMergeAtom,
 	workflowStepAtom,
 } from "@/atoms"
-import Basemap from "@/components/basemap"
+import Basemap from "./basemap"
 
-import DeckGlOverlay from "@/components/deckgl-overlay"
-import OsmPbfFilePicker from "@/components/filepicker"
-import { Button } from "@/components/ui/button"
-import ObjectToTable from "@/object-to-table"
-import { objectToHtmlTableString } from "@/utils"
+import DeckGlOverlay from "./deckgl-overlay"
+import OsmPbfFilePicker from "./filepicker"
+import { Button } from "./ui/button"
+import ObjectToTable from "./object-to-table"
+import { objectToHtmlTableString } from "../utils"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"

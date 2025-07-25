@@ -1,9 +1,9 @@
 import { baseGeoJsonLayerAtom } from "@/atoms"
-import Basemap from "@/components/basemap"
-import DeckGlOverlay from "@/components/deckgl-overlay"
+import Basemap from "./basemap"
+import DeckGlOverlay from "./deckgl-overlay"
 import { useAtomValue } from "jotai"
 import { objectToHtmlTableString, layerIdToName } from "../utils"
-import OsmPbfFilePicker from "@/components/filepicker"
+import OsmPbfFilePicker from "./filepicker"
 
 export default function ViewPage() {
 	const baseGeoJsonLayer = useAtomValue(baseGeoJsonLayerAtom)
