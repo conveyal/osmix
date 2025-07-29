@@ -88,9 +88,6 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 	}
 
 	parseNode(n: OsmPbfNode): OsmNode {
-		if (n.id === 21911883) {
-			console.error("parser", n)
-		}
 		const node: OsmNode = {
 			id: n.id,
 			lon: this.lon_offset + n.lon / this.granularity,

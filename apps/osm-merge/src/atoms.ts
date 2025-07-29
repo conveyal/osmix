@@ -173,11 +173,7 @@ export const baseNodesNearPatchAtom = atom(async (get) => {
 	for (const ref of way.refs) {
 		const patchNode = patchOsm.nodes.get(ref)
 		if (!patchNode) continue
-		const baseNodes = baseOsm.nodeIndex.nodesWithin(
-			patchNode.lon,
-			patchNode.lat,
-			0.001,
-		)
+		const baseNodes = baseOsm.nodes.within(patchNode.lon, patchNode.lat, 0.001)
 		for (const baseNode of baseNodes) {
 			const d = distance(
 				[patchNode.lon, patchNode.lat],

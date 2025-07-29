@@ -6,7 +6,7 @@ export class WaySpatialIndex {
 	index = geojsonRbush()
 	constructor(osm: Osm) {
 		const ways = Array.from(osm.ways.values()).map((w) =>
-			wayToLineString(w, (r) => osm.getNodePosition(r)),
+			wayToLineString(w, (r) => osm.nodes.getNodePosition(r)),
 		)
 		this.index.load(ways)
 	}

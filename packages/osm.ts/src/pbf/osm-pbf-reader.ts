@@ -92,11 +92,11 @@ async function* createOsmPbfBlockGenerator(
 	}
 
 	if (data instanceof ArrayBuffer) {
-		return generateBlocksFromChunk(data)
-	}
-
-	for await (const chunk of streamToAsyncIterator(data)) {
-		yield* generateBlocksFromChunk(chunk.buffer as ArrayBuffer)
+		yield* generateBlocksFromChunk(data)
+	} else {
+		for await (const chunk of streamToAsyncIterator(data)) {
+			yield* generateBlocksFromChunk(chunk.buffer as ArrayBuffer)
+		}
 	}
 }
 
@@ -114,7 +114,7 @@ function decompress(data: Uint8Array) {
 }
 
 /**
- * Convert a stream to an async iterator.
+ * Convert a readable stream to an async iterator.
  */
 async function* streamToAsyncIterator<T>(stream: ReadableStream<T>) {
 	// Get a lock on the stream

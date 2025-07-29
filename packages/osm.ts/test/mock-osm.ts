@@ -12,19 +12,16 @@ const ONE_KM_LAT = 0.009
 export function createBaseOsm(): Osm {
 	const base = new Osm()
 	base.addEntity({
-		type: "node",
 		id: 0,
 		lat: YAKIM_LAT,
 		lon: YAKIM_LON,
 	})
 	base.addEntity({
-		type: "node",
 		id: 1,
 		lat: YAKIM_LAT,
 		lon: YAKIM_LON + ONE_KM_LON, // approximately 1km east
 	})
 	base.addEntity({
-		type: "way",
 		id: 1,
 		refs: [0, 1],
 		tags: {
@@ -48,18 +45,21 @@ export function createPatchOsm(): Osm {
 		key: "newValue",
 	}
 
+	const node1 = osm.nodes.get(1)
+	const node2 = osm.nodes.get(2)
+	if (!node1 || !node2) throw new Error("node not found")
+
 	// Add disconnected way
 	osm.addEntity({
-		...osm.getNode(1),
+		...node1,
 		id: 2,
 	})
 	osm.addEntity({
-		...osm.getNode(1),
+		...node2,
 		id: 3,
 		lon: YAKIM_LON + ONE_KM_LON * 2, // ends 2km east of the center point
 	})
 	osm.addEntity({
-		type: "way",
 		id: 2,
 		refs: [2, 3],
 		tags: {
@@ -69,19 +69,16 @@ export function createPatchOsm(): Osm {
 
 	// Add way that crosses, and should generate an intersection
 	osm.addEntity({
-		type: "node",
 		id: 4,
 		lat: YAKIM_LAT - ONE_KM_LAT, // 1km south
 		lon: YAKIM_LON + ONE_KM_LON / 4, // 250m east
 	})
 	osm.addEntity({
-		type: "node",
 		id: 5,
 		lat: YAKIM_LAT + ONE_KM_LAT, // 1km north
 		lon: YAKIM_LON + ONE_KM_LON / 4, // 250m east
 	})
 	osm.addEntity({
-		type: "way",
 		id: 3,
 		refs: [4, 5],
 		tags: {
@@ -91,19 +88,16 @@ export function createPatchOsm(): Osm {
 
 	// Add a way that crosses, but has a tag indicating it is an underpass and should be left alone
 	osm.addEntity({
-		type: "node",
 		id: 6,
 		lat: YAKIM_LAT - ONE_KM_LAT, // 1km south
 		lon: YAKIM_LON + ONE_KM_LON / 2, // 500m east
 	})
 	osm.addEntity({
-		type: "node",
 		id: 7,
 		lat: YAKIM_LAT + ONE_KM_LAT, // 1km north
 		lon: YAKIM_LON + ONE_KM_LON / 2, // 500m east
 	})
 	osm.addEntity({
-		type: "way",
 		id: 4,
 		refs: [6, 7],
 		tags: {

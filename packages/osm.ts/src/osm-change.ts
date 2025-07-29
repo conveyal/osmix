@@ -12,8 +12,8 @@ import { isNodeEqual, isRelationEqual, isWayEqual } from "./utils"
 export function generateOsmChanges(baseOsm: Osm, patchOsm: Osm): OsmChange[] {
 	const changes: OsmChange[] = []
 
-	for (const [id, entity] of patchOsm.nodes) {
-		const existingNode = baseOsm.nodes.get(id)
+	for (const entity of patchOsm.nodes) {
+		const existingNode = baseOsm.nodes.get(entity.id)
 		if (existingNode && isNodeEqual(existingNode, entity)) continue
 
 		changes.push({

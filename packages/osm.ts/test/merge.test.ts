@@ -50,9 +50,7 @@ describe("merge osm", () => {
 
 		assert.equal(base.nodes.size, 8)
 
-		const overlapping = base.nodeIndex.findOverlappingNodes(
-			Array.from(patch.nodes.values()),
-		)
+		const overlapping = base.nodes.findOverlappingNodes(Array.from(patch.nodes))
 		console.log(overlapping)
 		assert.equal(overlapping.size, 1)
 		assert.equal(overlapping.get(1)?.size, 1)

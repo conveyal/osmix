@@ -21,7 +21,7 @@ export function mergeOsm(baseOsm: Osm, patchOsm: Osm, log = console.log) {
 	baseOsm.applyChanges(changes)
 
 	log("Building node spatial index.")
-	baseOsm.loadNodeSpatialIndex()
+	baseOsm.nodes.rebuildSpatialIndex()
 
 	log("Merging overlapping nodes.")
 	const dedupeResults = baseOsm.dedupeOverlappingNodes(patchOsm.nodes)
@@ -31,7 +31,7 @@ export function mergeOsm(baseOsm: Osm, patchOsm: Osm, log = console.log) {
 			`Deduplicated overlapping nodes. Replaced ${dedupeResults.replaced} nodes and deleted ${dedupeResults.deleted} nodes.`,
 		)
 		log("Rebuilding node spatial index.")
-		baseOsm.loadNodeSpatialIndex()
+		baseOsm.nodes.rebuildSpatialIndex()
 	} else {
 		log("No overlapping nodes found.")
 	}
@@ -82,7 +82,7 @@ export function mergeOsm(baseOsm: Osm, patchOsm: Osm, log = console.log) {
 	}
 
 	log("Rebuilding node and way spatial indexes.")
-	baseOsm.loadNodeSpatialIndex()
+	baseOsm.nodes.rebuildSpatialIndex()
 	baseOsm.loadWaySpatialIndex()
 
 	return baseOsm
