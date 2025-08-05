@@ -1,14 +1,10 @@
 import { useRef } from "react"
 import { Button } from "./ui/button"
 import { useAtom, useAtomValue } from "jotai"
-import {
-	fileAtomFamily,
-	mapAtom,
-	osmAtomFamily,
-	workflowStepAtom,
-} from "@/atoms"
+import { fileAtomFamily, osmAtomFamily, workflowStepAtom } from "@/atoms"
 import { MaximizeIcon } from "lucide-react"
 import OsmInfoTable from "./osm-info-table"
+import { mapAtom } from "@/state/map"
 
 function isOsmPbfFile(file: File | undefined): file is File {
 	if (file == null) return false
