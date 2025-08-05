@@ -42,6 +42,8 @@ jobs:
         run: cp -r ./fixtures/*.pbf ./apps/osm-merge/dist/pbfs
       - name: Setup Pages
         uses: actions/configure-pages@v5
+      - name: Copy index.html to /dist/404.html
+        run: cp ./apps/osm-merge/dist/index.html ./apps/osm-merge/dist/404.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

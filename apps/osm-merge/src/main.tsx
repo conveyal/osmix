@@ -1,6 +1,6 @@
 import { StrictMode, Suspense } from "react"
 import { createRoot } from "react-dom/client"
-import { BrowserRouter, Route, Routes, Outlet, HashRouter } from "react-router"
+import { BrowserRouter, Route, Routes, Outlet } from "react-router"
 import Nav from "./components/nav"
 import ViewPage from "./components/view-page"
 import MergePage from "./components/merge-page"
@@ -21,7 +21,7 @@ if (!rootEl) throw new Error("Root element not found")
 
 createRoot(rootEl).render(
 	<StrictMode>
-		<HashRouter>
+		<BrowserRouter>
 			<Routes>
 				<Route
 					path={process.env.NODE_ENV === "production" ? "/osm.ts" : "/"}
@@ -32,6 +32,6 @@ createRoot(rootEl).render(
 					<Route path="view" element={<ViewPage />} />
 				</Route>
 			</Routes>
-		</HashRouter>
+		</BrowserRouter>
 	</StrictMode>,
 )
