@@ -22,7 +22,6 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "comlink": "^4.4.2",
-        "flatbush": "^4.4.1",
         "jotai": "^2.12.5",
         "kdbush": "^4.0.2",
         "lucide-react": "^0.513.0",
