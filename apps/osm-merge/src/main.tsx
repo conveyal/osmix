@@ -27,7 +27,7 @@ createRoot(rootEl).render(
 					path={process.env.NODE_ENV === "production" ? "/osm.ts" : "/"}
 					element={<RootLayout />}
 				>
-					<Route path="" element={<MergePage />} />
+					<Route path="" element={<ViewPage />} />
 					<Route path="merge" element={<MergePage />} />
 					<Route path="view" element={<ViewPage />} />
 				</Route>
