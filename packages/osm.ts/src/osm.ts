@@ -140,7 +140,7 @@ export class Osm {
 				}
 			}
 		}
-
+		this.relations.finish()
 		this.finish()
 		onProgress(`Added ${entityCount.toLocaleString()} entities.`)
 		console.timeEnd("Osm.initFromPbfData")
