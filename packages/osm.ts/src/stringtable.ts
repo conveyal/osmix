@@ -22,6 +22,10 @@ export default class StringTable {
 		return this.strings[index]
 	}
 
+	get length() {
+		return this.strings.length
+	}
+
 	compact() {
 		this.indexes = null
 	}
