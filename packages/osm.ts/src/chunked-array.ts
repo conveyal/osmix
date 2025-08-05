@@ -69,9 +69,9 @@ export class ResizeableTypedArray<T extends TypedArray>
 }
 
 export class ResizeableCoordinateArray extends ResizeableTypedArray<
-	Float32Array<ArrayBuffer>
+	Float64Array<ArrayBuffer>
 > {
 	constructor() {
-		super(Float32Array)
+		super(Float64Array)
 	}
 }
