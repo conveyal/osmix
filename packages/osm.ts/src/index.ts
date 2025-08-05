@@ -1,4 +1,12 @@
 export { Osm } from "./osm"
-export type { Bbox, OsmNode, OsmRelation, OsmWay, OsmChange } from "./types"
+export type {
+	GeoBbox2D,
+	OsmNode,
+	OsmRelation,
+	OsmWay,
+	OsmChange,
+	TileIndex,
+} from "./types"
 export { mergeOsm } from "./merge"
 export { getEntityType } from "./utils"
+export { NodeIndex } from "./node-index"

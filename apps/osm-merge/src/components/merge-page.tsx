@@ -9,7 +9,6 @@ import {
 	currentChangeEntityBboxAtom,
 	deckGlLayersAtom,
 	fileAtomFamily,
-	mapAtom,
 	osmAtomFamily,
 	patchIndexAtom,
 	patchesAtom,
@@ -29,6 +28,7 @@ import { showSaveFilePicker } from "native-file-system-adapter"
 import { getEntityType } from "osm.ts"
 import { isWay } from "osm.ts/utils"
 import { useCallback, useEffect } from "react"
+import { mapAtom } from "@/state/map"
 
 function layerIdToName(id: string) {
 	if (id === "osm-tk:patch-geojson") return "Patch"

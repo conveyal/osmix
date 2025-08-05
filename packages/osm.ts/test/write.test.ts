@@ -18,8 +18,8 @@ describe("write", () => {
 					const osm = await Osm.fromPbfData(fileStream)
 
 					// Get the first node, way, and relation
-					const node1 = osm.nodes.get(osm.nodes.idByIndex[0])
-					const way1 = osm.ways.values().next().value
+					const node1 = osm.nodes.getByIndex(0)
+					const way1 = osm.ways.getByIndex(0)
 					const relation1 = osm.relations.values().next().value
 
 					// Write the PBF to a new file
@@ -42,7 +42,7 @@ describe("write", () => {
 					assert.equal(osm.relations.size, testOsm.relations.size)
 
 					if (node1) {
-						const testNode1 = testOsm.nodes.get(node1.id)
+						const testNode1 = testOsm.nodes.getById(node1.id)
 						assert.deepEqual(node1, testNode1)
 						assert.equal(node1.id, testNode1?.id)
 						assert.equal(node1.lon, testNode1?.lon)
@@ -50,7 +50,7 @@ describe("write", () => {
 						assert.deepEqual(node1.tags, testNode1?.tags)
 					}
 					if (way1) {
-						const testWay1 = testOsm.ways.get(way1.id)
+						const testWay1 = testOsm.ways.getById(way1.id)
 						assert.equal(way1.id, testWay1?.id)
 						assert.deepEqual(way1.refs, testWay1?.refs)
 						assert.deepEqual(way1.tags, testWay1?.tags)

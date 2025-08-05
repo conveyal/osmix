@@ -7,6 +7,12 @@ export interface LonLat {
 	lat: number
 }
 
+export type TileIndex = {
+	z: number
+	x: number
+	y: number
+}
+
 export const RelationMemberType = {
 	NODE: 0,
 	WAY: 1,
@@ -17,7 +23,7 @@ export const RelationMemberType = {
  * A bounding box in the format [minLon, minLat, maxLon, maxLat].
  * GeoJSON.BBox allows for 3D bounding boxes, but we use tools that expect 2D bounding boxes.
  */
-export type Bbox = [
+export type GeoBbox2D = [
 	minLon: number,
 	minLat: number,
 	maxLon: number,
@@ -34,13 +40,14 @@ export interface OsmTags {
 
 export interface OsmEntity {
 	id: number
-	tags?: OsmTags
 	info?: OsmInfoParsed
+	tags?: OsmTags
 }
 
 export interface OsmNode extends OsmEntity, LonLat {}
 
 export interface OsmWay extends OsmEntity {
+	// OSM IDs of the nodes that make up this way
 	refs: number[]
 }
 

@@ -44,7 +44,7 @@
 }
 
 :root {
-	--radius: 0.625rem;
+	--radius: 0.25rem;
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.129 0.042 264.695);
 	--card: oklch(1 0 0);
@@ -138,6 +138,7 @@ body {
 	font-size: 12px;
 	font-variant-numeric: tabular-nums;
 	min-height: 100vh;
+	overscroll-behavior: none;
 }
 
 h1 {

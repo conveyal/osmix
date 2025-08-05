@@ -3,7 +3,6 @@ import type {
 	OsmInfoParsed,
 	OsmRelation,
 	OsmRelationMember,
-	OsmTags,
 	OsmWay,
 } from "../types"
 import type {
@@ -18,6 +17,11 @@ import type {
 
 export const MEMBER_TYPES = ["node", "way", "relation"]
 
+type ParseOptions = {
+	parseTags?: boolean
+	includeInfo?: boolean
+}
+
 export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 	stringtable: string[] = [""]
 	primitivegroup: OsmPbfPrimitiveGroup[] = []
@@ -27,7 +31,11 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 	lat_offset = 0
 	lon_offset = 0
 
-	#includeInfo = false
+	parseOptions: ParseOptions = {
+		// Include tags as indexes in table or as parsed objects
+		parseTags: true,
+		includeInfo: false,
+	}
 
 	constructor(block: OsmPbfPrimitiveBlock) {
 		this.date_granularity = block.date_granularity ?? 1_000
@@ -44,22 +52,41 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 	*[Symbol.iterator]() {
 		for (const group of this.primitivegroup) {
 			if (group.nodes) {
-				yield group.nodes.map((n) => this.parseNode(n))
+				yield group.nodes.map((n) => this.parseNode(n, this.parseOptions))
 			}
 			if (group.dense) {
-				yield this.parseDenseNodes(group.dense)
+				yield this.parseDenseNodes(group.dense, this.parseOptions)
 			}
 			for (const w of group.ways) {
-				yield this.parseWay(w)
+				yield this.parseWay(w, this.parseOptions)
 			}
 			for (const r of group.relations) {
-				yield this.parseRelation(r)
+				yield this.parseRelation(r, this.parseOptions)
 			}
 		}
 	}
 
-	fillInfo(info: OsmPbfInfo | undefined): OsmInfoParsed | undefined {
-		if (!this.#includeInfo || !info) return undefined
+	*groups() {
+		for (const group of this.primitivegroup) {
+			yield group
+		}
+	}
+
+	*entities(options: ParseOptions = {}) {
+		for (const group of this.groups()) {
+			if (group.nodes) {
+				yield group.nodes.map((n) => this.parseNode(n, options))
+			} else if (group.dense) {
+				yield this.parseDenseNodes(group.dense, options)
+			} else if (group.ways) {
+				yield group.ways.map((w) => this.parseWay(w, options))
+			} else if (group.relations) {
+				yield group.relations.map((r) => this.parseRelation(r, options))
+			}
+		}
+	}
+
+	fillInfo(info: OsmPbfInfo): OsmInfoParsed {
 		return {
 			...info,
 			timestamp:
@@ -75,7 +102,7 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 
 	getString(keys: number[], index: number) {
 		const key = keys[index]
-		if (key === undefined) return undefined
+		if (!key) return
 		return this.stringtable[key]
 	}
 
@@ -87,20 +114,28 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 		)
 	}
 
-	parseNode(n: OsmPbfNode): OsmNode {
+	parseNode(
+		n: OsmPbfNode,
+		{ parseTags = true, includeInfo = false }: ParseOptions = {},
+	): OsmNode {
 		const node: OsmNode = {
 			id: n.id,
 			lon: this.lon_offset + n.lon / this.granularity,
 			lat: this.lat_offset + n.lat / this.granularity,
-			tags: this.getTags(n.keys, n.vals),
 		}
-		if (this.#includeInfo && n.info) {
+		if (parseTags) {
+			node.tags = this.getTags(n.keys, n.vals)
+		}
+		if (includeInfo && n.info) {
 			node.info = this.fillInfo(n.info)
 		}
 		return node
 	}
 
-	parseWay(w: OsmPbfWay): OsmWay {
+	parseWay(
+		w: OsmPbfWay,
+		{ parseTags = true, includeInfo = false }: ParseOptions = {},
+	): OsmWay {
 		let ref = 0
 		const way: OsmWay = {
 			id: w.id,
@@ -108,15 +143,20 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 				ref += refSid
 				return ref
 			}),
-			tags: this.getTags(w.keys, w.vals),
 		}
-		if (this.#includeInfo && w.info) {
+		if (parseTags) {
+			way.tags = this.getTags(w.keys, w.vals)
+		}
+		if (includeInfo && w.info) {
 			way.info = this.fillInfo(w.info)
 		}
 		return way
 	}
 
-	parseRelation(r: OsmPbfRelation): OsmRelation {
+	parseRelation(
+		r: OsmPbfRelation,
+		{ parseTags = true, includeInfo = false }: ParseOptions = {},
+	): OsmRelation {
 		let ref = 0
 		const members: OsmRelationMember[] = r.memids.map((memid, i) => {
 			ref += memid
@@ -134,16 +174,21 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 
 		const relation: OsmRelation = {
 			id: r.id,
-			tags: this.getTags(r.keys, r.vals),
 			members,
 		}
-		if (this.#includeInfo && r.info) {
+		if (parseTags) {
+			relation.tags = this.getTags(r.keys, r.vals)
+		}
+		if (includeInfo && r.info) {
 			relation.info = this.fillInfo(r.info)
 		}
 		return relation
 	}
 
-	parseDenseNodes(dense: OsmPbfDenseNodes): OsmNode[] {
+	parseDenseNodes(
+		dense: OsmPbfDenseNodes,
+		{ parseTags = true, includeInfo = false }: ParseOptions = {},
+	): OsmNode[] {
 		const delta = {
 			id: 0,
 			lat: 0,
@@ -172,18 +217,20 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 				lat: this.lat_offset + delta.lat / this.granularity,
 			}
 			if (dense.keys_vals.length > 0) {
-				node.tags = {}
-				while (dense.keys_vals[keysValsIndex] !== 0) {
-					const key = this.getString(dense.keys_vals, keysValsIndex)
-					const val = this.getString(dense.keys_vals, keysValsIndex + 1)
-					if (key && val) {
-						node.tags[key] = val
+				if (parseTags) {
+					node.tags = {}
+					while (dense.keys_vals[keysValsIndex] !== 0) {
+						const key = this.getString(dense.keys_vals, keysValsIndex)
+						const val = this.getString(dense.keys_vals, keysValsIndex + 1)
+						if (key && val) {
+							node.tags[key] = val
+						}
+						keysValsIndex += 2
 					}
-					keysValsIndex += 2
+					keysValsIndex++
 				}
-				keysValsIndex++
 			}
-			if (dense.denseinfo && this.#includeInfo) {
+			if (includeInfo && dense.denseinfo) {
 				const iTime = dense.denseinfo.timestamp[nodeIndex]
 				const iChangeset = dense.denseinfo.changeset[nodeIndex]
 				const iUid = dense.denseinfo.uid[nodeIndex]

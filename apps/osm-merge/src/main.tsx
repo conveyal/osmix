@@ -1,4 +1,4 @@
-import { StrictMode } from "react"
+import { StrictMode, Suspense } from "react"
 import { createRoot } from "react-dom/client"
 import { BrowserRouter, Route, Routes, Outlet } from "react-router"
 import Nav from "./components/nav"
@@ -9,7 +9,9 @@ function RootLayout() {
 	return (
 		<div className="h-screen w-screen flex flex-col">
 			<Nav />
-			<Outlet />
+			<Suspense fallback={<div>Loading...</div>}>
+				<Outlet />
+			</Suspense>
 		</div>
 	)
 }

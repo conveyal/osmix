@@ -1,4 +1,4 @@
-import { zoomAtom } from "@/atoms"
+import { zoomAtom } from "@/state/map"
 import { useAtomValue } from "jotai"
 
 export default function ZoomInfo() {

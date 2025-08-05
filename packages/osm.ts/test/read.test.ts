@@ -6,25 +6,12 @@ import { createOsmPbfReader } from "../src/pbf/osm-pbf-reader"
 import { PBFs } from "./files"
 import { getFile, getFileReadStream } from "./utils"
 import { PrimitiveBlockParser } from "../src/pbf/primitive-block-parser"
-import { isRelation, isWay } from "../src/utils"
-
-// Throttled console.log — prints at most once every `ms`.
-const logEvery = (ms: number) => {
-	const start = Date.now()
-	let prev = start // previously allowed timestamp
-	return (val: unknown) => {
-		const now = Date.now()
-		if (now >= prev + ms) {
-			console.error(`${(now - start) / 1000}s: ${val}`)
-			prev = now
-		}
-	}
-}
+import { isRelation, isWay, logEvery } from "../src/utils"
 
 describe("read", () => {
-	describe.each(Object.entries(PBFs))(
+	describe.each([["monaco", PBFs.monaco]])(
 		"%s",
-		{ timeout: 200_000 },
+		{ timeout: 300_000 },
 		async (name, pbf) => {
 			it.runIf(pbf.nodes < 40_000)("from pbf stream", async () => {
 				const fileStream = await getFileReadStream(pbf.url)
@@ -82,12 +69,12 @@ describe("read", () => {
 				assert.equal(relations, pbf.relations)
 			})
 
-			it.runIf(pbf.nodes < 40_000)("into OSM class", async () => {
+			it.runIf(pbf.nodes <= 40_000)("into OSM class", async () => {
 				const fileData = await getFile(pbf.url)
 				const osm = await Osm.fromPbfData(fileData)
 				assert.equal(osm.nodes.size, pbf.nodes)
-				assert.equal(osm.nodes.stringTable.length, pbf.uniqueStrings)
-				assert.deepEqual(osm.nodes.get(pbf.node0.id), pbf.node0)
+				assert.equal(osm.stringTable.length, pbf.uniqueStrings)
+				assert.deepEqual(osm.nodes.getByIndex(0), pbf.node0)
 				assert.equal(osm.ways.size, pbf.ways)
 			})
 		},

@@ -21,7 +21,7 @@ export function mergeOsm(baseOsm: Osm, patchOsm: Osm, log = console.log) {
 	baseOsm.applyChanges(changes)
 
 	log("Building node spatial index.")
-	baseOsm.nodes.rebuildSpatialIndex()
+	baseOsm.nodes.buildSpatialIndex()
 
 	log("Merging overlapping nodes.")
 	const dedupeResults = baseOsm.dedupeOverlappingNodes(patchOsm.nodes)
@@ -31,18 +31,18 @@ export function mergeOsm(baseOsm: Osm, patchOsm: Osm, log = console.log) {
 			`Deduplicated overlapping nodes. Replaced ${dedupeResults.replaced} nodes and deleted ${dedupeResults.deleted} nodes.`,
 		)
 		log("Rebuilding node spatial index.")
-		baseOsm.nodes.rebuildSpatialIndex()
+		baseOsm.nodes.buildSpatialIndex()
 	} else {
 		log("No overlapping nodes found.")
 	}
 
 	log("Searching for intersecting ways. Building way spatial index.")
-	baseOsm.loadWaySpatialIndex()
+	baseOsm.ways.buildSpatialIndex(baseOsm.nodes)
 	// Find intersecting way IDs. Each way should have at least one intersecting way or it is disconnected from the rest of the network.
-	console.time("osm.ts:findIntersectionCandidatesForWays")
+	console.time("osm.ts:findIntersectionCandidatesForOsm")
 	const { intersectionCandidates, disconnectedWays } =
-		baseOsm.findIntersectionCandidatesForWays(patchOsm.ways)
-	console.timeEnd("osm.ts:findIntersectionCandidatesForWays")
+		baseOsm.findIntersectionCandidatesForOsm(patchOsm)
+	console.timeEnd("osm.ts:findIntersectionCandidatesForOsm")
 
 	let insertedNodes = 0
 	let createdNodes = 0
@@ -82,8 +82,8 @@ export function mergeOsm(baseOsm: Osm, patchOsm: Osm, log = console.log) {
 	}
 
 	log("Rebuilding node and way spatial indexes.")
-	baseOsm.nodes.rebuildSpatialIndex()
-	baseOsm.loadWaySpatialIndex()
+	baseOsm.nodes.buildSpatialIndex()
+	baseOsm.ways.buildSpatialIndex(baseOsm.nodes)
 
 	return baseOsm
 }

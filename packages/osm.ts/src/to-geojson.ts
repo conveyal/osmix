@@ -5,17 +5,8 @@ import type {
 	OsmRelation,
 	OsmWay,
 } from "./types"
+import type { WayIndex } from "./way-index"
 import { wayIsArea } from "./way-is-area"
-
-export function entitiesToGeoJSON(osm: {
-	nodes: NodeIndex
-	ways: Map<number, OsmWay>
-}) {
-	return [
-		...nodesToFeatures(osm.nodes),
-		...osm.ways.values().map((way) => wayToFeature(way, osm.nodes)),
-	]
-}
 
 function includeNode(node: OsmNode) {
 	if (!node.tags || Object.keys(node.tags).length === 0) return false
@@ -52,13 +43,20 @@ function includeWay(way: OsmWay) {
 }
 
 export function waysToFeatures(
-	ways: Map<number, OsmWay>,
+	ways: WayIndex,
 	nodes: NodeIndex,
 	filter = includeWay,
 ) {
-	return Array.from(ways.values().filter(filter))
-		.map((way) => wayToFeature(way, nodes))
-		.filter((f) => f.geometry.type !== "Polygon")
+	const features: GeoJSON.Feature<
+		GeoJSON.LineString | GeoJSON.Polygon,
+		OsmGeoJSONProperties
+	>[] = []
+	for (const way of ways) {
+		if (filter(way)) {
+			features.push(wayToFeature(way, nodes))
+		}
+	}
+	return features
 }
 
 export function wayToFeature(
@@ -71,11 +69,11 @@ export function wayToFeature(
 		geometry: wayIsArea(way.refs, way.tags)
 			? {
 					type: "Polygon",
-					coordinates: [way.refs.map((r) => nodes.getNodePosition(r))],
+					coordinates: [way.refs.map((r) => nodes.getNodeLonLat({ id: r }))],
 				}
 			: {
 					type: "LineString",
-					coordinates: way.refs.map((r) => nodes.getNodePosition(r)),
+					coordinates: way.refs.map((r) => nodes.getNodeLonLat({ id: r })),
 				},
 		properties: way.tags ?? {},
 	}
@@ -104,7 +102,7 @@ export function wayToEditableGeoJson(
 	OsmGeoJSONProperties
 > {
 	const getNode = (r: number) => {
-		const n = nodes.get(r)
+		const n = nodes.getById(r)
 		if (!n) throw new Error(`Node ${r} not found`)
 		return n
 	}
@@ -130,7 +128,9 @@ export function relationToFeature(
 		geometry: {
 			type: "Polygon",
 			coordinates: [
-				relation.members.map((member) => nodes.getNodePosition(member.ref)),
+				relation.members.map((member) =>
+					nodes.getNodeLonLat({ id: member.ref }),
+				),
 			],
 		},
 		properties: relation.tags ?? {},

@@ -6,12 +6,7 @@ import { Osm, type OsmNode, mergeOsm } from "osm.ts"
 import { generateOsmChanges } from "osm.ts/changes"
 import { nodeToFeature, wayToEditableGeoJson } from "osm.ts/geojson"
 import type { OsmChange } from "osm.ts"
-import type { MapRef } from "react-map-gl/maplibre"
 import { isWay } from "osm.ts/utils"
-
-export const mapAtom = atom<MapRef | null>(null)
-export const zoomAtom = atom<number | null>(null)
-export const mapCenterAtom = atom<maplibregl.LngLat | null>(null)
 
 const LINE_WIDTH_METERS = 3
 const POINT_RADIUS_METERS = 1.5
@@ -101,6 +96,7 @@ export const applyAllChangesAtom = atom(null, async (get, set) => {
 type Status = {
 	type: "info" | "ready" | "error"
 	message: string
+	duration: number
 	timestamp: number
 }
 
@@ -108,6 +104,7 @@ export const logAtom = atom<Status[]>([
 	{
 		type: "info",
 		message: "Initializing application...",
+		duration: 0,
 		timestamp: Date.now(),
 	},
 ])
@@ -116,16 +113,19 @@ export const addLogMessageAtom = atom(
 	null,
 	(get, set, message: string, type: Status["type"] = "info") => {
 		const log = get(logAtom)
+		const msSinceLastLog = Date.now() - log[log.length - 1].timestamp
+		const durationSeconds = `${(msSinceLastLog / 1000).toFixed(2)}s`
 		if (type === "error") {
-			console.error(`${type}:`, message)
+			console.error(`${type} (${durationSeconds}):`, message)
 		} else {
-			console.log(`${type}:`, message)
+			console.log(`${type} (${durationSeconds}):`, message)
 		}
 		set(logAtom, [
 			...log,
 			{
 				type,
 				message,
+				duration: msSinceLastLog,
 				timestamp: Date.now(),
 			},
 		])
@@ -171,10 +171,12 @@ export const baseNodesNearPatchAtom = atom(async (get) => {
 	if (!patchOsm || !baseOsm || !way || !isWay(way)) return []
 	const candidates: NodeCandidate[] = []
 	for (const ref of way.refs) {
-		const patchNode = patchOsm.nodes.get(ref)
+		const patchNode = patchOsm.nodes.getById(ref)
 		if (!patchNode) continue
 		const baseNodes = baseOsm.nodes.within(patchNode.lon, patchNode.lat, 0.001)
-		for (const baseNode of baseNodes) {
+		for (const baseNodeIndex of baseNodes) {
+			const baseNode = baseOsm.nodes.getByIndex(baseNodeIndex)
+			if (!baseNode) continue
 			const d = distance(
 				[patchNode.lon, patchNode.lat],
 				[baseNode.lon, baseNode.lat],

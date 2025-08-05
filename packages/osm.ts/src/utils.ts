@@ -43,6 +43,23 @@ export function getEntityType(entity: OsmEntity): OsmEntityType {
 }
 
 /**
+ * Create a throttled console.log which prints at most once every `ms`.
+ * @param ms - The minimum time between logs in milliseconds
+ * @returns A function that can be called to log a value
+ */
+export function logEvery(ms: number) {
+	const start = Date.now()
+	let prev = start // previously allowed timestamp
+	return (val: unknown) => {
+		const now = Date.now()
+		if (now >= prev + ms) {
+			console.error(`${(now - start) / 1000}s: ${val}`)
+			prev = now
+		}
+	}
+}
+
+/**
  * Calculate the haversine distance between two nodes.
  * @param node1 - The first node
  * @param node2 - The second node

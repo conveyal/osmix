@@ -2,7 +2,6 @@ import {
 	bbox,
 	booleanTouches,
 	cleanCoords,
-	geojsonRbush,
 	lineIntersect,
 	nearestPointOnLine,
 } from "@turf/turf"
@@ -21,11 +20,10 @@ import {
 	nodesToFeatures,
 	relationToFeature,
 	wayToFeature,
-	wayToLineString,
 	waysToFeatures,
 } from "./to-geojson"
 import type {
-	Bbox,
+	GeoBbox2D,
 	LonLat,
 	OsmChange,
 	OsmEntityType,
@@ -38,36 +36,29 @@ import { isNode, isRelation, isWay } from "./utils"
 import { wayIsArea } from "./way-is-area"
 import { OsmPbfWriter } from "./pbf/osm-pbf-writer"
 import { NodeIndex } from "./node-index"
+import { WayIndex } from "./way-index"
+import { RelationIndex } from "./relation-index"
+import StringTable from "./stringtable"
+import { ResizeableTypedArray } from "./chunked-array"
 
 /**
  * Requires sorted IDs.
  */
 export class Osm {
 	header: OsmPbfHeaderBlock
+	blocksGenerator: AsyncGenerator<OsmPbfPrimitiveBlock> | null = null
 
 	// Shared string lookup table for all nodes, ways, and relations
-	stringTable: string[] = []
+	stringTable = new StringTable()
 	nodes: NodeIndex = new NodeIndex(this.stringTable)
-	ways: Map<number, OsmWay> = new Map()
-	relations: Map<number, OsmRelation> = new Map()
+	ways: WayIndex = new WayIndex(this.stringTable, this.nodes)
+	relations: RelationIndex = new RelationIndex(this.stringTable)
 
-	maxNodeId = Number.NEGATIVE_INFINITY
-	minNodeId = Number.POSITIVE_INFINITY
+	#finished = false
 
 	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
-		const reader = await createOsmPbfReader(data)
-		return Osm.fromPbfReader(reader.header, reader.blocks)
-	}
-
-	static async fromPbfReader(
-		header: OsmPbfHeaderBlock,
-		blocks: AsyncGenerator<OsmPbfPrimitiveBlock>,
-	) {
-		const osm = new Osm(header)
-		for await (const block of blocks) {
-			osm.addBlock(block)
-		}
-		osm.finish()
+		const osm = new Osm()
+		await osm.initFromPbfData(data, () => {})
 		return osm
 	}
 
@@ -78,57 +69,201 @@ export class Osm {
 		}
 	}
 
+	initialize(header?: OsmPbfHeaderBlock) {
+		this.#finished = false
+		this.header = header ?? {
+			required_features: [],
+			optional_features: [],
+		}
+		this.stringTable = new StringTable()
+		this.nodes = new NodeIndex(this.stringTable)
+		this.ways = new WayIndex(this.stringTable, this.nodes)
+		this.relations = new RelationIndex(this.stringTable)
+	}
+
+	async initFromPbfData(
+		data: ArrayBuffer | ReadableStream<Uint8Array>,
+		onProgress: (...args: string[]) => void,
+	) {
+		console.time("Osm.initFromPbfData")
+		const reader = await createOsmPbfReader(data)
+		this.initialize(reader.header)
+
+		let entityCount = 0
+		let finishedNodes = false
+		let finishedWays = false
+		let entityUpdateInterval = 100_000
+		for await (const block of reader.blocks) {
+			const blockParser = new PrimitiveBlockParser(block)
+			for await (const group of blockParser.groups()) {
+				if (group.ways.length > 0 && !finishedNodes) {
+					onProgress(
+						`Loaded ${this.nodes.size.toLocaleString()} nodes. Building node spatial index...`,
+					)
+					this.nodes.finish()
+					finishedNodes = true
+				}
+
+				if (group.relations.length > 0 && !finishedWays) {
+					onProgress(
+						`Loaded ${this.ways.size.toLocaleString()} ways. Building way spatial index...`,
+					)
+					this.ways.finish()
+					finishedWays = true
+				}
+
+				if (group.dense) {
+					for (const denseNode of blockParser.parseDenseNodes(group.dense)) {
+						this.nodes.add(denseNode)
+						entityCount++
+					}
+				}
+
+				for (const node of group.nodes) {
+					this.nodes.add(blockParser.parseNode(node))
+					entityCount++
+				}
+
+				for (const way of group.ways) {
+					this.ways.add(blockParser.parseWay(way))
+					entityCount++
+				}
+
+				for (const relation of group.relations) {
+					this.relations.add(blockParser.parseRelation(relation))
+					entityCount++
+				}
+
+				if (entityCount % entityUpdateInterval === 0) {
+					onProgress(`${entityCount.toLocaleString()} entities loaded`)
+					if (entityCount > 1_000_000) entityUpdateInterval = 1_000_000
+				}
+			}
+		}
+
+		this.finish()
+		onProgress(`Added ${entityCount.toLocaleString()} entities.`)
+		console.timeEnd("Osm.initFromPbfData")
+	}
+
 	finish() {
-		this.nodes.finish()
+		this.stringTable.compact()
+		this.#finished = true
 	}
 
-	getNode(id: number) {
-		const node = this.nodes.get(id)
-		if (!node) throw new Error(`Node ${id} not found`)
-		return node
+	isFinished() {
+		return this.#finished
 	}
 
-	getWay(id: number): OsmWay {
-		const way = this.ways.get(id)
-		if (!way) throw Error(`Way ${id} not found`)
-		return way
+	getNodesInBbox(bbox: GeoBbox2D) {
+		if (!this.#finished) throw new Error("Osm not finished")
+		console.time("Osm.getNodesInBbox")
+		const nodeCandidates = this.nodes.within(bbox)
+		const nodePositions = new Float32Array(nodeCandidates.length * 2)
+		const nodeIndexes = new Uint32Array(nodeCandidates.length)
+		let pIndex = 0
+		for (const nodeIndex of nodeCandidates) {
+			// Skip nodes with no tags, likely just a way node
+			if (this.nodes.tagCountByIndex.at(nodeIndex) === 0) continue
+
+			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
+			nodeIndexes[pIndex] = nodeIndex
+			nodePositions[pIndex++] = lon
+			nodePositions[pIndex++] = lat
+		}
+		console.timeEnd("Osm.getNodesInBbox")
+		return {
+			indexes: nodeIndexes,
+			positions: nodePositions,
+		}
 	}
 
-	wayToLineString(way: number) {
-		return wayToLineString(
-			typeof way === "number" ? this.getWay(way) : way,
-			(r) => this.nodes.getNodePosition(r),
-		)
+	getWaysInBbox(bbox: GeoBbox2D) {
+		console.time("Osm.getWaysInBbox")
+		const wayCandidates = this.ways.intersects(bbox)
+		const wayIndexes = new Uint32Array(wayCandidates.length)
+		const wayPositions = new ResizeableTypedArray(Float32Array)
+		const wayStartIndices = new Uint32Array(wayCandidates.length + 1)
+		wayStartIndices[0] = 0
+
+		for (let i = 0; i < wayCandidates.length; i++) {
+			const w = wayCandidates[i]
+			wayIndexes[i] = w
+			const way = this.ways.getLine(w)
+			wayPositions.pushMany(way)
+			wayStartIndices[i + 1] = wayStartIndices[i] + way.length / 2
+		}
+
+		console.timeEnd("Osm.getWaysInBbox")
+		return {
+			indexes: wayIndexes,
+			positions: wayPositions.compact(),
+			startIndices: wayStartIndices,
+		}
 	}
 
-	getEntityBbox(entity: OsmNode | OsmWay | OsmRelation): Bbox {
+	getEntitiesInBbox(bbox: GeoBbox2D) {
+		if (!this.#finished) throw new Error("Osm not finished")
+
+		const nodeCandidates = this.nodes.within(bbox)
+		const nodePositions = new Float32Array(nodeCandidates.length * 2)
+		const nodeIndexes = new Uint32Array(nodeCandidates.length)
+		let pIndex = 0
+		for (const nodeIndex of nodeCandidates) {
+			// Skip nodes with no tags, likely just a way node
+			if (this.nodes.tagCountByIndex.at(nodeIndex) === 0) continue
+
+			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
+			nodeIndexes[pIndex] = nodeIndex
+			nodePositions[pIndex++] = lon
+			nodePositions[pIndex++] = lat
+		}
+
+		const wayCandidates = this.ways.intersects(bbox)
+		const wayIndexes = new Uint32Array(wayCandidates.length)
+		const wayPositions = new ResizeableTypedArray(Float32Array)
+		const wayStartIndices = new Uint32Array(wayCandidates.length + 1)
+		wayStartIndices[0] = 0
+
+		for (let i = 0; i < wayCandidates.length; i++) {
+			const w = wayCandidates[i]
+			wayIndexes[i] = w
+			const way = this.ways.getLine(w)
+			wayPositions.pushMany(way)
+			wayStartIndices[i + 1] = wayStartIndices[i] + way.length / 2
+		}
+
+		return {
+			nodeIndexes,
+			nodePositions,
+			wayIndexes,
+			wayPositions: wayPositions.compact(),
+			wayStartIndices,
+		}
+	}
+
+	getEntityBbox(entity: OsmNode | OsmWay | OsmRelation): GeoBbox2D {
 		if (isNode(entity)) {
-			return bbox(nodeToFeature(entity)) as Bbox
+			return bbox(nodeToFeature(entity)) as GeoBbox2D
 		}
 		if (isWay(entity)) {
-			return bbox(wayToFeature(entity, this.nodes)) as Bbox
+			return bbox(wayToFeature(entity, this.nodes)) as GeoBbox2D
 		}
 		if (isRelation(entity)) {
-			return bbox(relationToFeature(entity, this.nodes)) as Bbox
+			return bbox(relationToFeature(entity, this.nodes)) as GeoBbox2D
 		}
 		throw new Error("Unknown entity type")
 	}
 
-	addBlock(block: OsmPbfPrimitiveBlock) {
-		const blockParser = new PrimitiveBlockParser(block)
-		for (const entity of blockParser) {
-			this.addEntity(entity)
-		}
-	}
-
 	addNode(node: OsmNode) {
-		this.nodes.addNode(node)
+		this.nodes.add(node)
 		return node
 	}
 
 	createNode(lonLat: LonLat) {
+		const maxNodeId = this.nodes.idsSorted.at(-1) ?? 0
 		return this.addNode({
-			id: this.maxNodeId++,
+			id: maxNodeId + 1,
 			...lonLat,
 		})
 	}
@@ -136,47 +271,51 @@ export class Osm {
 	addEntity(entity: OsmNode | OsmWay | OsmRelation | OsmNode[]) {
 		if (Array.isArray(entity)) {
 			for (const node of entity) {
-				this.addEntity(node)
+				this.nodes.add(node)
 			}
 			return
 		}
 
 		if (isNode(entity)) {
-			this.addNode(entity)
+			this.nodes.add(entity)
 		} else if (isWay(entity)) {
-			this.ways.set(entity.id, entity)
+			this.ways.add(entity)
 		} else if (isRelation(entity)) {
-			this.relations.set(entity.id, entity)
+			this.relations.add(entity)
 		}
 	}
 
 	getEntity(type: OsmEntityType, id: number) {
-		if (type === "node") return this.nodes.get(id)
-		if (type === "way") return this.ways.get(id)
-		if (type === "relation") return this.relations.get(id)
+		if (type === "node") return this.nodes.getById(id)
+		if (type === "way") return this.ways.getById(id)
+		if (type === "relation") return this.relations.getById(id)
 	}
 
 	deleteEntity(entity: OsmNode | OsmWay | OsmRelation) {
-		if (isNode(entity)) this.nodes.delete(entity.id)
-		if (isWay(entity)) this.ways.delete(entity.id)
-		if (isRelation(entity)) this.relations.delete(entity.id)
+		if (isNode(entity)) this.nodes.remove(entity.id)
+		if (isWay(entity)) this.ways.remove(entity.id)
+		if (isRelation(entity)) this.relations.remove(entity.id)
 	}
 
 	setEntity(entity: OsmNode | OsmWay | OsmRelation) {
 		if (isNode(entity)) this.nodes.set(entity)
-		if (isWay(entity)) this.ways.set(entity.id, entity)
-		if (isRelation(entity)) this.relations.set(entity.id, entity)
+		if (isWay(entity)) this.ways.set(entity)
+		if (isRelation(entity)) this.relations.set(entity)
 	}
 
-	bbox(): Bbox {
-		if (this.header.bbox)
+	headerBbox(): GeoBbox2D | undefined {
+		if (this.header.bbox) {
 			return [
 				this.header.bbox.left,
 				this.header.bbox.bottom,
 				this.header.bbox.right,
 				this.header.bbox.top,
 			]
-		return this.getBboxOfNodes()
+		}
+	}
+
+	bbox(): GeoBbox2D | undefined {
+		return this.nodes.bbox ?? this.headerBbox()
 	}
 
 	getBboxOfNodes() {
@@ -188,12 +327,6 @@ export class Osm {
 			...nodesToFeatures(this.nodes, nodeFilter),
 			...waysToFeatures(this.ways, this.nodes),
 		]
-	}
-
-	wayToGeoJson(wayId: number) {
-		const way = this.ways.get(wayId)
-		if (!way) return null
-		return wayToFeature(way, this.nodes)
 	}
 
 	applyChange(change: OsmChange) {
@@ -210,8 +343,8 @@ export class Osm {
 		for (const change of changes) {
 			this.applyChange(change)
 		}
-		this.nodes.rebuildSpatialIndex()
-		this.loadWaySpatialIndex()
+		this.nodes.buildIdIndex()
+		this.ways.buildSpatialIndex()
 	}
 
 	/**
@@ -236,12 +369,12 @@ export class Osm {
 		}
 
 		for (const nodeId of nodesToBeDeleted) {
-			this.nodes.delete(nodeId)
+			this.nodes.remove(nodeId)
 		}
 
 		// Rebuild the spatial indexes
-		this.nodes.rebuildSpatialIndex()
-		this.loadWaySpatialIndex()
+		this.nodes.buildSpatialIndex()
+		this.ways.buildSpatialIndex()
 
 		return { replaced: replacedPairs.size, deleted: nodesToBeDeleted.size }
 	}
@@ -254,7 +387,7 @@ export class Osm {
 	 */
 	replaceNode(oldNode: OsmNode, newNode: OsmNode, mergeTagsAndInfo = false) {
 		// Replace the node in all ways
-		for (const way of this.ways.values()) {
+		for (const way of this.ways) {
 			for (let i = 0; i < way.refs.length; i++) {
 				if (way.refs[i] === oldNode.id) {
 					way.refs[i] = newNode.id
@@ -263,7 +396,7 @@ export class Osm {
 		}
 
 		// Replace the node in all relations
-		for (const relation of this.relations.values()) {
+		for (const relation of this.relations) {
 			for (let i = 0; i < relation.members.length; i++) {
 				const member = relation.members[i]
 				if (member == null) continue
@@ -292,44 +425,28 @@ export class Osm {
 		this.nodes.set(finalNode)
 	}
 
-	#waySpatialIndex: ReturnType<typeof geojsonRbush> | null = null
-	loadWaySpatialIndex() {
-		console.time("osm.loadWaySpatialIndex")
-		this.#waySpatialIndex = geojsonRbush()
-		const ways = Array.from(this.ways.values()).map((w) =>
-			wayToLineString(w, (r) => this.nodes.getNodePosition(r)),
-		)
-		this.#waySpatialIndex.load(ways)
-		console.timeEnd("osm.loadWaySpatialIndex")
-		return this.#waySpatialIndex
-	}
-	get wayIndex() {
-		if (this.#waySpatialIndex == null) {
-			return this.loadWaySpatialIndex()
-		}
-		return this.#waySpatialIndex
-	}
-
 	/**
 	 * Find the intersections for a set of ways.
 	 * @param wayIds The IDs of the ways to find intersections for.
 	 * @returns An object containing the intersections and possible disconnected ways.
 	 */
-	findIntersectionCandidatesForWays(ways: Map<number, OsmWay>) {
+	findIntersectionCandidatesForOsm(osm: Osm) {
 		const disconnectedWays = new Set<number>()
 		const intersectionCandidates = new UnorderedPairMap<
 			GeoJSON.Feature<GeoJSON.Point>[]
 		>()
 
 		// Find intersecting way IDs. Each way should have at least one intersecting way or it is disconnected from the rest of the network.
-		for (const [wayId] of ways) {
-			const lineString = this.wayToLineString(wayId)
+		for (let wayIndex = 0; wayIndex < osm.ways.size; wayIndex++) {
+			const wayId = osm.ways.idByIndex.at(wayIndex)
+			if (wayId == null) continue
+			const lineString = osm.ways.getLineString({ index: wayIndex })
 			const intersectingWays = this.findIntersectingWays(lineString)
 			if (intersectingWays.size > 0) {
 				for (const [intersectingWayId, intersections] of intersectingWays) {
 					intersectionCandidates.set(wayId, intersectingWayId, intersections)
 				}
-			} else if (!this.isWayDisconnected(wayId)) {
+			} else if (!this.isWayDisconnected(lineString)) {
 				disconnectedWays.add(wayId)
 			}
 		}
@@ -347,24 +464,27 @@ export class Osm {
 	 * @returns
 	 */
 	findIntersectingWays(feature: GeoJSON.Feature<GeoJSON.LineString>) {
-		// const feature = this.wayToLineString(wayId)
-		const { features } = this.wayIndex.search(feature)
+		const featureBbox = bbox(feature)
+		const intersectingWayIndexes = this.ways.intersects(
+			featureBbox as GeoBbox2D,
+		)
 		const intersectingWayIds = new Map<
 			number,
 			GeoJSON.Feature<GeoJSON.Point>[]
 		>()
 
-		for (const intersectingWay of features) {
+		for (const intersectingWayIndex of intersectingWayIndexes) {
+			const intersectingWayId = this.ways.idByIndex.at(intersectingWayIndex)
 			if (
-				intersectingWay.id !== feature.id &&
-				typeof intersectingWay.id === "number"
+				intersectingWayId !== feature.id &&
+				typeof intersectingWayId === "number"
 			) {
-				const intersections = lineIntersect(
+				const intersectionPoints = lineIntersect(
 					feature,
-					intersectingWay as GeoJSON.Feature<GeoJSON.LineString>,
+					this.ways.getLineString({ index: intersectingWayIndex }),
 				)
-				if (intersections.features.length > 0) {
-					intersectingWayIds.set(intersectingWay.id, intersections.features)
+				if (intersectionPoints.features.length > 0) {
+					intersectingWayIds.set(intersectingWayId, intersectionPoints.features)
 				}
 			}
 		}
@@ -372,11 +492,15 @@ export class Osm {
 		return intersectingWayIds
 	}
 
-	isWayDisconnected(wayId: number) {
-		const wayLineString = this.wayToLineString(wayId)
-		const { features } = this.wayIndex.search(wayLineString)
-		for (const feature of features) {
-			if (feature.id !== wayId) {
+	isWayDisconnected(wayLineString: GeoJSON.Feature<GeoJSON.LineString>) {
+		const featureBbox = bbox(wayLineString)
+		const intersectingWayIndexes = this.ways.intersects(
+			featureBbox as GeoBbox2D,
+		)
+		for (const intersectingWayIndex of intersectingWayIndexes) {
+			const intersectingWayId = this.ways.idByIndex.at(intersectingWayIndex)
+			if (intersectingWayId !== wayLineString.id) {
+				const feature = this.ways.getLineString({ index: intersectingWayIndex })
 				if (booleanTouches(wayLineString, feature)) return true
 				if (
 					lineIntersect(
@@ -391,18 +515,16 @@ export class Osm {
 		return true
 	}
 
-	findIntersectingPoints(wayId1: number, wayId2: number) {
-		const way1LineString = this.wayToLineString(wayId1)
-		const way2LineString = this.wayToLineString(wayId2)
-		return lineIntersect(way1LineString, way2LineString).features
-	}
-
 	pointToNode(point: GeoJSON.Feature<GeoJSON.Point>): {
 		coords: LonLat
 		existingNode: OsmNode | null
 	} {
 		const [lon, lat] = point.geometry.coordinates as [number, number]
-		const existingNode = this.nodes.within(lon, lat)[0]
+		const existingNodeIndex = this.nodes.within(lon, lat)
+		const existingNode =
+			existingNodeIndex.length > 0
+				? this.nodes.getByIndex(existingNodeIndex[0])
+				: null
 		return {
 			coords: { lon, lat },
 			existingNode: existingNode ?? null,
@@ -416,15 +538,16 @@ export class Osm {
 	 * @param nodeId
 	 */
 	insertNodeIntoWay(nodeId: number, wayId: number): boolean {
-		const node = this.nodes.get(nodeId)
-		const way = this.getWay(wayId)
+		const node = this.nodes.getById(nodeId)
+		const way = this.ways.getById(wayId)
 		if (
 			node === null ||
+			way === null ||
 			wayIsArea(way.refs, way.tags) ||
 			way.refs.indexOf(nodeId) !== -1
 		)
 			return false
-		const wayLineString = this.wayToLineString(wayId)
+		const wayLineString = this.ways.getLineString({ id: wayId })
 		const nodePt = [node.lon, node.lat]
 		const nearestPoint = nearestPointOnLine(cleanCoords(wayLineString), nodePt)
 		this.setEntity({
@@ -436,6 +559,7 @@ export class Osm {
 
 	/**
 	 * Create a deep clone of the OSM data.
+	 * TODO clone the indexes and string table directly.
 	 * @returns A new Osm object with the same header and entities.
 	 */
 	clone() {
@@ -443,10 +567,12 @@ export class Osm {
 		for (const node of this.nodes) {
 			clone.addEntity(structuredClone(node))
 		}
-		for (const way of this.ways.values()) {
+		clone.nodes.finish()
+		for (const way of this.ways) {
 			clone.addEntity(structuredClone(way))
 		}
-		for (const relation of this.relations.values()) {
+		clone.ways.finish()
+		for (const relation of this.relations) {
 			clone.addEntity(structuredClone(relation))
 		}
 		clone.finish()
@@ -488,7 +614,7 @@ export class Osm {
 		}
 
 		let block = new PrimitiveBlockBuilder()
-		for (const [, way] of this.ways) {
+		for (const way of this.ways) {
 			if (block.isFull()) {
 				yield block
 				block = new PrimitiveBlockBuilder()
@@ -500,7 +626,7 @@ export class Osm {
 		}
 
 		block = new PrimitiveBlockBuilder()
-		for (const [, relation] of this.relations) {
+		for (const relation of this.relations) {
 			if (block.isFull()) {
 				yield block
 				block = new PrimitiveBlockBuilder()

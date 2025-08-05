@@ -38,7 +38,7 @@ export const PBFs: Record<
 			lon: 7.4229093,
 			id: 21911883,
 		},
-		uniqueStrings: 3190,
+		uniqueStrings: 5050,
 		primitiveGroups: 7,
 	},
 	montenegro: {
@@ -79,7 +79,7 @@ export const PBFs: Record<
 			lon: 17.021989,
 			id: 4_511_653,
 		},
-		uniqueStrings: 3190,
+		uniqueStrings: 151_777,
 	},
 	italy: {
 		url: "https://download.geofabrik.de/europe/italy-250101.osm.pbf",
@@ -114,11 +114,13 @@ export const PBFs: Record<
 		ways: 4_541_651,
 		relations: 44_373,
 		node0: {
-			lat: 47.5,
-			lon: -120.5,
-			id: 1,
+			lat: 47.64248,
+			lon: -122.3196898,
+			id: 29445653,
 		},
-		uniqueStrings: 3190,
+		uniqueStrings: 219_760,
 		primitiveGroups: 34_901,
 	},
 }
+
+export const smallPBFs = [PBFs.monaco]

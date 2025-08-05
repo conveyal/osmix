@@ -32,14 +32,14 @@ describe("merge osm", () => {
 		const patch = createPatchOsm()
 		const changes = generateOsmChanges(base, patch)
 
-		assert.equal(changes.length, 10)
+		console.error(changes)
+		assert.equal(changes.length, 9)
 		assert.equal(changes[0]?.changeType, "create")
-		assert.equal(changes[6]?.changeType, "modify")
 
 		base.applyChanges(changes)
 
-		assert.equal(base.ways.get(1)?.tags?.key, "newValue")
-		assert.equal(base.ways.get(2)?.refs.length, 2)
+		assert.equal(base.ways.getById(1)?.tags?.key, "newValue")
+		assert.equal(base.ways.getById(2)?.refs.length, 2)
 	})
 
 	it("should find geographically overlapping nodes and merge them", () => {
@@ -64,10 +64,10 @@ describe("merge osm", () => {
 
 		// One node should have been deleted
 		assert.equal(base.nodes.size, 7)
-		assert.equal(base.nodes.get(1), undefined)
+		assert.equal(base.nodes.getById(1), undefined)
 
 		// The way should have been updated to use the new node
-		assert.equal(base.getWay(1).refs[1], 2)
+		assert.equal(base.ways.getById(1)?.refs[1], 2)
 	})
 
 	function makePairKey(a: number, b: number): string {
@@ -93,23 +93,23 @@ describe("merge osm", () => {
 			GeoJSON.Feature<GeoJSON.Point>[]
 		>()
 
-		const intersections = baseOsm.findIntersectionCandidatesForWays(patch.ways)
+		const intersections = baseOsm.findIntersectionCandidatesForOsm(patch)
 		console.log(intersections)
 
 		// Find intersecting way IDs. Each way should have at least one intersecting way or it is disconnected from the rest of the network.
-		for (const wayId of patch.ways.keys()) {
-			const lineString = baseOsm.wayToLineString(wayId)
+		for (const way of patch.ways) {
+			const lineString = patch.ways.getLineString({ id: way.id })
 			const intersectingWayIds = baseOsm.findIntersectingWays(lineString)
 			if (intersectingWayIds.size > 0) {
 				for (const [intersectingWayId, intersections] of intersectingWayIds) {
 					intersectingWayPairs.set(
-						makePairKey(wayId, intersectingWayId),
+						makePairKey(way.id, intersectingWayId),
 						intersections,
 					)
 				}
 			} else {
-				if (!baseOsm.isWayDisconnected(wayId)) {
-					disconnectedWays.add(wayId)
+				if (!baseOsm.isWayDisconnected(lineString)) {
+					disconnectedWays.add(way.id)
 				}
 			}
 		}

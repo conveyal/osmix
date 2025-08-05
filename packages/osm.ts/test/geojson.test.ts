@@ -3,7 +3,7 @@ import { describe, it } from "vitest"
 
 import { PBFs } from "./files"
 import { getFileReadStream } from "./utils"
-import { entitiesToGeoJSON } from "../src/to-geojson"
+import { nodesToFeatures, waysToFeatures } from "../src/to-geojson"
 import { Osm } from "../src/osm"
 
 describe("geojson", () => {
@@ -16,9 +16,10 @@ describe("geojson", () => {
 				const osm = await Osm.fromPbfData(fileStream)
 				assert.deepEqual(osm.header.bbox, pbf.bbox)
 
-				const features: GeoJSON.Feature[] = entitiesToGeoJSON(osm)
+				const nodes = nodesToFeatures(osm.nodes)
+				const ways = waysToFeatures(osm.ways, osm.nodes, () => true)
 
-				assert.equal(features.length, pbf.geoJsonFeatures)
+				assert.equal(pbf.geoJsonFeatures, nodes.length + ways.length)
 			})
 		},
 	)

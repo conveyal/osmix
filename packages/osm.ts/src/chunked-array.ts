@@ -1,72 +1,20 @@
-// 1. Define a generic constructor type for TypedArrays
 type TypedArray =
-	| Int8Array
-	| Uint8Array
-	| Uint8ClampedArray
-	| Int16Array
-	| Uint16Array
-	| Int32Array
-	| Uint32Array
-	| Float32Array
-	| Float64Array
+	| Int8Array<ArrayBuffer>
+	| Uint8Array<ArrayBuffer>
+	| Uint8ClampedArray<ArrayBuffer>
+	| Int16Array<ArrayBuffer>
+	| Uint16Array<ArrayBuffer>
+	| Int32Array<ArrayBuffer>
+	| Uint32Array<ArrayBuffer>
+	| Float32Array<ArrayBuffer>
+	| Float64Array<ArrayBuffer>
 
 interface TypedArrayConstructor<T extends TypedArray> {
 	new (length: number): T
 	readonly BYTES_PER_ELEMENT: number
 }
 
-// 2. Generic ChunkedArray class
-export class ChunkedArray<T extends TypedArray> {
-	#chunks: T[] = []
-	length = 0
-	ArrayType: TypedArrayConstructor<T>
-	chunkSize: number
-
-	constructor(ArrayType: TypedArrayConstructor<T>, chunkSize = 1024) {
-		this.ArrayType = ArrayType
-		this.chunkSize = chunkSize
-		// Initialize with one chunk
-		this.#chunks.push(new this.ArrayType(this.chunkSize))
-	}
-
-	push(value: number): number {
-		const idx = this.length++
-		const chunkIndex = Math.floor(idx / this.chunkSize)
-		const offset = idx % this.chunkSize
-
-		// Allocate a new chunk if needed
-		if (chunkIndex >= this.#chunks.length)
-			this.#chunks.push(new this.ArrayType(this.chunkSize))
-		if (this.#chunks[chunkIndex] === undefined)
-			throw new Error("Chunk is undefined")
-
-		// Assign the value (casts/truncates as appropriate for integer arrays)
-		this.#chunks[chunkIndex][offset] = value as T[number]
-		return idx
-	}
-
-	// Optionally push multiple values at once
-	pushMany(values: number[]) {
-		for (const v of values) this.push(v)
-	}
-
-	// Produce one contiguous TypedArray trimmed to actual length
-	finalize(): T {
-		const result = new this.ArrayType(this.length)
-		let pos = 0
-
-		for (const chunk of this.#chunks) {
-			const take = Math.min(chunk.length, this.length - pos)
-			result.set(chunk.subarray(0, take), pos)
-			pos += take
-			if (pos >= this.length) break
-		}
-
-		return result
-	}
-}
-
-export class ResizeableArray<T extends TypedArray>
+export class ResizeableTypedArray<T extends TypedArray>
 	implements RelativeIndexable<number>
 {
 	ArrayType: TypedArrayConstructor<T>
@@ -92,6 +40,14 @@ export class ResizeableArray<T extends TypedArray>
 		this.length--
 	}
 
+	removeRange(start: number, end: number) {
+		const result = new this.ArrayType(this.length - (end - start))
+		result.set(this.array.subarray(0, start))
+		result.set(this.array.subarray(end), start)
+		this.array = result
+		this.length -= end - start
+	}
+
 	push(value: number): number {
 		if (this.length >= this.array.length) {
 			const newArray = new this.ArrayType(this.array.length * 2)
@@ -102,7 +58,20 @@ export class ResizeableArray<T extends TypedArray>
 		return this.length - 1
 	}
 
-	condense() {
+	pushMany(values: number[] | T) {
+		for (const v of values) this.push(v)
+	}
+
+	compact() {
 		this.array = this.array.slice(0, this.length) as T
+		return this.array
+	}
+}
+
+export class ResizeableCoordinateArray extends ResizeableTypedArray<
+	Float32Array<ArrayBuffer>
+> {
+	constructor() {
+		super(Float32Array)
 	}
 }

@@ -47,7 +47,6 @@ export default function Nav() {
 
 function Status() {
 	const status = useAtomValue(currentStatusAtom)
-	console.log("current status", status)
 	return (
 		<div className="flex flex-row gap-2 items-center px-4">
 			<div className="flex flex-row gap-2 items-center">
