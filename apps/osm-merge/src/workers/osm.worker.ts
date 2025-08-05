@@ -14,6 +14,10 @@ const osmWorker = {
 		data: ArrayBuffer | ReadableStream<Uint8Array>,
 		onProgress: (...args: string[]) => void,
 	) {
+		// By default, delete all existing OSM instances
+		for (const id in this.ids) {
+			delete this.ids[id]
+		}
 		const osm = new Osm()
 		this.ids[id] = osm
 		return osm.initFromPbfData(data, onProgress)
