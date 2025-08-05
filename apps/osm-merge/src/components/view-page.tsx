@@ -136,6 +136,11 @@ export default function ViewPage() {
 		})
 	}, [map, bbox])
 
+	// Set message to "Ready" when the application is ready
+	useEffect(() => {
+		logMessage("Ready", "ready")
+	}, [logMessage])
+
 	// Auto load default file for faster testing
 	useEffect(() => {
 		if (process.env.NODE_ENV !== "development") return
