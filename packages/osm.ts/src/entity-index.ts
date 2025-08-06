@@ -10,19 +10,21 @@ export abstract class EntityIndex<T extends OsmEntity> {
 	tagCountByIndex = new ResizeableTypedArray(Uint32Array)
 	tagIndexes = new ResizeableTypedArray(Uint32Array)
 
-	#indexBuilt = false
+	private indexBuilt = false
+	private idsAreSorted = true
 	idByIndex = new ResizeableTypedArray(Float64Array)
-	idsSorted: Float64Array = new Float64Array(0)
-	sortedIdPositionToIndex: Uint32Array = new Uint32Array(0)
-	anchors: Float64Array = new Float64Array(0)
-	blockSize = 256
+	private idsSorted: Float64Array = new Float64Array(0)
+	private sortedIdPositionToIndex: Uint32Array = new Uint32Array(0)
+	private anchors: Float64Array = new Float64Array(0)
+	private blockSize = 256
 
 	constructor(stringTable: StringTable) {
 		this.stringTable = stringTable
 	}
 
 	add(entity: T): void {
-		if (this.#indexBuilt) throw Error("ID index already built.")
+		if (this.indexBuilt) throw Error("ID index already built.")
+		if (entity.id < this.idByIndex.at(-1)) this.idsAreSorted = false
 		this.idByIndex.push(entity.id)
 		this.addTags(entity.tags)
 		this.size++
@@ -51,29 +53,44 @@ export abstract class EntityIndex<T extends OsmEntity> {
 		return [i.index, this.idByIndex.at(i.index)]
 	}
 
+	/**
+	 * Build the index of IDs to positions.
+	 *
+	 * If the IDs are not sorted, we need to sort them and build a new index.
+	 * If the IDs are sorted, we can use the existing index.
+	 */
 	buildIdIndex() {
-		if (this.#indexBuilt) throw Error("ID index already build.")
+		if (this.indexBuilt) throw Error("ID index already build.")
 		console.time("EntityIndex.buildIdIndex")
-		// Build the sorted index
-		this.idsSorted = new Float64Array(this.size)
-		this.sortedIdPositionToIndex = new Uint32Array(this.size)
 
-		// Fill and sort with positions.
-		for (let i = 0; i < this.size; i++) {
-			this.idsSorted[i] = this.idByIndex.at(i)
-			this.sortedIdPositionToIndex[i] = i
-		}
+		if (!this.idsAreSorted) {
+			console.warn("OSM IDs were not sorted. Sorting now...")
+			// Build the sorted index
+			this.idsSorted = new Float64Array(this.size)
+			this.sortedIdPositionToIndex = new Uint32Array(this.size)
 
-		// Sort by id, carrying position; use native sort on chunks or a custom radix/merge for stability.
-		// For simplicity:
-		const tmp = Array.from({ length: this.size }, (_, i) => ({
-			id: this.idsSorted[i],
-			pos: this.sortedIdPositionToIndex[i],
-		}))
-		tmp.sort((a, b) => a.id - b.id)
-		for (let i = 0; i < this.size; i++) {
-			this.idsSorted[i] = tmp[i].id
-			this.sortedIdPositionToIndex[i] = tmp[i].pos
+			// Fill and sort with positions.
+			for (let i = 0; i < this.size; i++) {
+				this.idsSorted[i] = this.idByIndex.at(i)
+				this.sortedIdPositionToIndex[i] = i
+			}
+
+			// Sort by id, carrying position; use native sort on chunks or a custom radix/merge for stability.
+			// For simplicity:
+			console.time("EntityIndex.buildIdIndex.sort")
+			const tmp = Array.from({ length: this.size }, (_, i) => ({
+				id: this.idsSorted[i],
+				pos: this.sortedIdPositionToIndex[i],
+			}))
+			tmp.sort((a, b) => a.id - b.id)
+			for (let i = 0; i < this.size; i++) {
+				this.idsSorted[i] = tmp[i].id
+				this.sortedIdPositionToIndex[i] = tmp[i].pos
+			}
+			console.timeEnd("EntityIndex.buildIdIndex.sort")
+		} else {
+			// Point to the same array
+			this.idsSorted = this.idByIndex.array
 		}
 
 		// Build anchors (every blockSize-th key)
@@ -84,7 +101,7 @@ export abstract class EntityIndex<T extends OsmEntity> {
 				this.idsSorted[Math.min(j * this.blockSize, this.size - 1)]
 		}
 
-		this.#indexBuilt = true
+		this.indexBuilt = true
 		console.timeEnd("EntityIndex.buildIdIndex")
 	}
 
@@ -103,7 +120,7 @@ export abstract class EntityIndex<T extends OsmEntity> {
 	}
 
 	isReady() {
-		return this.#indexBuilt
+		return this.indexBuilt
 	}
 
 	abstract getFullEntity(index: number, id: number, tags?: OsmTags): T
@@ -165,7 +182,7 @@ export abstract class EntityIndex<T extends OsmEntity> {
 
 	// Lookup id → index
 	getIndexFromId(id: number): number {
-		if (!this.#indexBuilt)
+		if (!this.indexBuilt)
 			throw Error("Index not built. You must call finish() first.")
 		// binary search anchors
 		let lo = 0
@@ -184,7 +201,12 @@ export abstract class EntityIndex<T extends OsmEntity> {
 		while (l <= r) {
 			const m = (l + r) >>> 1
 			const v = this.idsSorted[m]
-			if (v === id) return this.sortedIdPositionToIndex[m]
+			if (v === id) {
+				if (this.idsAreSorted) {
+					return m
+				}
+				return this.sortedIdPositionToIndex[m]
+			}
 			if (v < id) l = m + 1
 			else r = m - 1
 		}
