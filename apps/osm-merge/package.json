@@ -28,6 +28,7 @@
 		"@deck.gl/mapbox": "^9.1.11",
 		"@deck.gl/react": "^9.1.11",
 		"@fontsource-variable/roboto-mono": "^5.2.5",
+		"@radix-ui/react-dialog": "^1.1.14",
 		"@radix-ui/react-slot": "^1.2.3",
 		"@turf/turf": "catalog:",
 		"class-variance-authority": "^0.7.1",
