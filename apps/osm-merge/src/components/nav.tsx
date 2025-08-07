@@ -4,12 +4,9 @@ import ZoomInfo from "@/components/zoom-info"
 import { cn } from "@/lib/utils"
 import { useAtomValue } from "jotai"
 import { Loader2Icon } from "lucide-react"
-import { Button } from "./ui/button"
-import { useSetAtom } from "jotai"
-import { workflowStepAtom } from "@/atoms"
+import BrowserCheck from "./browser-check"
 
 export default function Nav() {
-	const setWorkflowStep = useSetAtom(workflowStepAtom)
 	return (
 		<div className="border-b flex flex-row justify-between items-center">
 			<div className="flex flex-row gap-4 items-center px-4">
@@ -30,6 +27,7 @@ export default function Nav() {
 				>
 					View
 				</Button> */}
+				{process.env.NODE_ENV === "development" && <BrowserCheck />}
 			</div>
 
 			<Status />
