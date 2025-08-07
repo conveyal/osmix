@@ -1,54 +1,72 @@
-import { ResizeableTypedArray } from "./chunked-array"
+import {
+	ResizeableIdArray,
+	ResizeableIndexArray,
+	ResizeableTypedArray,
+} from "./typed-arrays"
 import type StringTable from "./stringtable"
 import type { OsmEntity, OsmTags } from "./types"
 
-export abstract class EntityIndex<T extends OsmEntity> {
-	size = 0
+export type IdOrIndex = { id: number } | { index: number }
 
+export abstract class EntityIndex<T extends OsmEntity> {
+	indexType: "node" | "way" | "relation"
 	stringTable: StringTable
-	tagStartByIndex = new ResizeableTypedArray(Uint32Array)
-	tagCountByIndex = new ResizeableTypedArray(Uint32Array)
-	tagIndexes = new ResizeableTypedArray(Uint32Array)
+	tagStartByIndex = new ResizeableIndexArray()
+	tagCountByIndex = new ResizeableTypedArray(Uint8Array) // Maximum 255 tags per entity
+	tagKeyIndexes = new ResizeableIndexArray()
+	tagValIndexes = new ResizeableIndexArray()
 
 	private indexBuilt = false
 	private idsAreSorted = true
-	idByIndex = new ResizeableTypedArray(Float64Array)
+	idByIndex = new ResizeableIdArray()
 	private idsSorted: Float64Array = new Float64Array(0)
 	private sortedIdPositionToIndex: Uint32Array = new Uint32Array(0)
 	private anchors: Float64Array = new Float64Array(0)
 	private blockSize = 256
 
-	constructor(stringTable: StringTable) {
+	constructor(
+		stringTable: StringTable,
+		indexType: "node" | "way" | "relation",
+	) {
 		this.stringTable = stringTable
+		this.indexType = indexType
 	}
 
-	add(entity: T): void {
+	get size() {
+		return this.idByIndex.length
+	}
+
+	add(id: number): void {
 		if (this.indexBuilt) throw Error("ID index already built.")
-		if (entity.id < this.idByIndex.at(-1)) this.idsAreSorted = false
-		this.idByIndex.push(entity.id)
-		this.addTags(entity.tags)
-		this.size++
+		if (id < this.idByIndex.at(-1)) this.idsAreSorted = false
+		this.idByIndex.push(id)
 	}
 
 	addTags(tags?: OsmTags) {
-		const tagKeyValues: number[] = []
+		const tagKeys: number[] = []
+		const tagValues: number[] = []
+
 		if (tags) {
 			for (const [key, value] of Object.entries(tags)) {
-				tagKeyValues.push(this.stringTable.add(key))
-				tagKeyValues.push(this.stringTable.add(value.toString()))
+				tagKeys.push(this.stringTable.add(key))
+				tagValues.push(this.stringTable.add(String(value)))
 			}
 		}
 
-		this.tagStartByIndex.push(this.tagIndexes.length)
-		this.tagCountByIndex.push(tagKeyValues.length)
-		for (const tagKeyValueIndex of tagKeyValues) {
-			this.tagIndexes.push(tagKeyValueIndex)
-		}
+		this.tagStartByIndex.push(this.tagKeyIndexes.length)
+		this.tagCountByIndex.push(tagKeys.length)
+		this.tagKeyIndexes.pushMany(tagKeys)
+		this.tagValIndexes.pushMany(tagValues)
 	}
 
-	idOrIndex(
-		i: { id: number } | { index: number },
-	): [index: number, id: number] {
+	addTagKeysAndValues(keys: number[], values: number[]) {
+		this.tagStartByIndex.push(this.tagKeyIndexes.length)
+		this.tagCountByIndex.push(keys.length)
+		this.tagKeyIndexes.pushMany(keys)
+		this.tagValIndexes.pushMany(values)
+	}
+
+	idOrIndex(i: IdOrIndex): [index: number, id: number] {
 		if ("id" in i) return [this.getIndexFromId(i.id), i.id]
 		return [i.index, this.idByIndex.at(i.index)]
 	}
@@ -61,7 +79,7 @@ export abstract class EntityIndex<T extends OsmEntity> {
 	 */
 	buildIdIndex() {
 		if (this.indexBuilt) throw Error("ID index already build.")
-		console.time("EntityIndex.buildIdIndex")
+		console.time(`${this.indexType}Index.buildIdIndex`)
 
 		if (!this.idsAreSorted) {
 			console.warn("OSM IDs were not sorted. Sorting now...")
@@ -77,7 +95,7 @@ export abstract class EntityIndex<T extends OsmEntity> {
 
 			// Sort by id, carrying position; use native sort on chunks or a custom radix/merge for stability.
 			// For simplicity:
-			console.time("EntityIndex.buildIdIndex.sort")
+			console.time(`${this.indexType}Index.buildIdIndex.sort`)
 			const tmp = Array.from({ length: this.size }, (_, i) => ({
 				id: this.idsSorted[i],
 				pos: this.sortedIdPositionToIndex[i],
@@ -87,7 +105,7 @@ export abstract class EntityIndex<T extends OsmEntity> {
 				this.idsSorted[i] = tmp[i].id
 				this.sortedIdPositionToIndex[i] = tmp[i].pos
 			}
-			console.timeEnd("EntityIndex.buildIdIndex.sort")
+			console.timeEnd(`${this.indexType}Index.buildIdIndex.sort`)
 		} else {
 			// Point to the same array
 			this.idsSorted = this.idByIndex.array
@@ -102,21 +120,21 @@ export abstract class EntityIndex<T extends OsmEntity> {
 		}
 
 		this.indexBuilt = true
-		console.timeEnd("EntityIndex.buildIdIndex")
+		console.timeEnd(`${this.indexType}Index.buildIdIndex`)
 	}
 
 	abstract finishEntityIndex(): void
 
 	finish() {
-		console.time("EntityIndex.finish")
+		console.time(`${this.indexType}Index.finish`)
 		this.idByIndex.compact()
 		this.tagStartByIndex.compact()
 		this.tagCountByIndex.compact()
-		this.tagIndexes.compact()
-		this.size = this.idByIndex.length
+		this.tagKeyIndexes.compact()
+		this.tagValIndexes.compact()
 		this.buildIdIndex()
 		this.finishEntityIndex()
-		console.timeEnd("EntityIndex.finish")
+		console.timeEnd(`${this.indexType}Index.finish`)
 	}
 
 	isReady() {
@@ -133,14 +151,18 @@ export abstract class EntityIndex<T extends OsmEntity> {
 		const tagCount = this.tagCountByIndex.at(index)
 		if (tagCount === 0) return
 		const tagStart = this.tagStartByIndex.at(index)
-		const tagIndexes = this.tagIndexes.array.slice(
+		const tagKeyIndexes = this.tagKeyIndexes.array.slice(
+			tagStart,
+			tagStart + tagCount,
+		)
+		const tagValIndexes = this.tagValIndexes.array.slice(
 			tagStart,
 			tagStart + tagCount,
 		)
 		const tags: OsmTags = {}
-		for (let i = 0; i < tagCount; i += 2) {
-			tags[this.stringTable.get(tagIndexes[i])] = this.stringTable.get(
-				tagIndexes[i + 1],
+		for (let i = 0; i < tagCount; i++) {
+			tags[this.stringTable.get(tagKeyIndexes[i])] = this.stringTable.get(
+				tagValIndexes[i],
 			)
 		}
 		return tags

@@ -1,3 +1,6 @@
+/**
+ * Currently limited to 4,000,000 strings due to using a `Map` to store the indexes. This is a browser limitation.
+ */
 export default class StringTable {
 	strings: string[] = []
 	indexes: Map<string, number> | null = new Map()
@@ -28,5 +31,6 @@ export default class StringTable {
 
 	compact() {
 		this.indexes = null
+		return this.strings
 	}
 }

@@ -15,7 +15,7 @@ import type {
 	OsmPbfWay,
 } from "./proto/osmformat"
 
-export const MEMBER_TYPES = ["node", "way", "relation"]
+export const MEMBER_TYPES = ["node", "way", "relation"] as const
 
 type ParseOptions = {
 	parseTags?: boolean
@@ -66,14 +66,8 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 		}
 	}
 
-	*groups() {
-		for (const group of this.primitivegroup) {
-			yield group
-		}
-	}
-
 	*entities(options: ParseOptions = {}) {
-		for (const group of this.groups()) {
+		for (const group of this.primitivegroup) {
 			if (group.nodes) {
 				yield group.nodes.map((n) => this.parseNode(n, options))
 			} else if (group.dense) {

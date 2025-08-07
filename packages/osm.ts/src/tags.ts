@@ -1,4 +1,4 @@
-import { ResizeableTypedArray } from "./chunked-array"
+import { ResizeableTypedArray } from "./typed-arrays"
 import type { OsmTags } from "./types"
 
 export class TagStringTable {

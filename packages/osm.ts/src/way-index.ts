@@ -1,18 +1,16 @@
 import { EntityIndex } from "./entity-index"
 import type { GeoBbox2D, OsmTags, OsmWay } from "./types"
-import {
-	ResizeableCoordinateArray,
-	ResizeableTypedArray,
-} from "./chunked-array"
+import { ResizeableCoordinateArray, ResizeableTypedArray } from "./typed-arrays"
 import type { NodeIndex } from "./node-index"
 import type StringTable from "./stringtable"
 import Flatbush from "flatbush"
+import type { OsmPbfPrimitiveBlock, OsmPbfWay } from "./pbf"
 
 export class WayIndex extends EntityIndex<OsmWay> {
 	spatialIndex: Flatbush = new Flatbush(1)
 
 	refStartByIndex = new ResizeableTypedArray(Uint32Array)
-	refCountByIndex = new ResizeableTypedArray(Uint32Array)
+	refCountByIndex = new ResizeableTypedArray(Uint16Array) // Maximum 2,000 nodes per way
 
 	// Store the index of the node in the node index. Not the ID
 	refIndexes = new ResizeableTypedArray(Uint32Array)
@@ -24,12 +22,13 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	nodeIndex: NodeIndex
 
 	constructor(stringTable: StringTable, nodeIndex: NodeIndex) {
-		super(stringTable)
+		super(stringTable, "way")
 		this.nodeIndex = nodeIndex
 	}
 
-	add(way: OsmWay) {
-		super.add(way)
+	addWay(way: OsmWay) {
+		super.add(way.id)
+		this.addTags(way.tags)
 		this.refStartByIndex.push(this.refIndexes.length)
 		this.refCountByIndex.push(way.refs.length)
 		const bbox = [
@@ -52,6 +51,52 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		this.bbox.push(bbox[1])
 		this.bbox.push(bbox[2])
 		this.bbox.push(bbox[3])
+	}
+
+	/**
+	 * Bulk add ways directly from a PBF PrimitiveBlock.
+	 */
+	addWays(ways: OsmPbfWay[], block: OsmPbfPrimitiveBlock) {
+		for (const way of ways) {
+			super.add(way.id)
+
+			let refId = 0
+			const bbox = [
+				Number.POSITIVE_INFINITY,
+				Number.POSITIVE_INFINITY,
+				Number.NEGATIVE_INFINITY,
+				Number.NEGATIVE_INFINITY,
+			]
+			this.refStartByIndex.push(this.refIndexes.length)
+			this.refCountByIndex.push(way.refs.length)
+
+			for (const refSid of way.refs) {
+				refId += refSid
+				const nodeIndex = this.nodeIndex.getIndexFromId(refId)
+				this.refIndexes.push(nodeIndex)
+				const lon = this.nodeIndex.lons.at(nodeIndex)
+				const lat = this.nodeIndex.lats.at(nodeIndex)
+				if (lon < bbox[0]) bbox[0] = lon
+				if (lon > bbox[2]) bbox[2] = lon
+				if (lat < bbox[1]) bbox[1] = lat
+				if (lat > bbox[3]) bbox[3] = lat
+			}
+
+			this.bbox.push(bbox[0])
+			this.bbox.push(bbox[1])
+			this.bbox.push(bbox[2])
+			this.bbox.push(bbox[3])
+
+			const tagKeys: number[] = []
+			const tagValues: number[] = []
+			for (let i = 0; i < way.keys.length; i++) {
+				const key = way.keys[i]
+				const val = way.vals[i]
+				tagKeys.push(this.stringTable.add(block.stringtable[key]))
+				tagValues.push(this.stringTable.add(block.stringtable[val]))
+			}
+			this.addTagKeysAndValues(tagKeys, tagValues)
+		}
 	}
 
 	finishEntityIndex() {
@@ -107,7 +152,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 
 	getLine(index: number) {
 		const refs = this.getRefIndexes(index)
-		const line = new Float32Array(refs.length * 2)
+		const line = new Float64Array(refs.length * 2)
 		for (let i = 0; i < refs.length; i++) {
 			const ref = refs.at(i)
 			if (ref == null) continue

@@ -39,7 +39,7 @@ import { NodeIndex } from "./node-index"
 import { WayIndex } from "./way-index"
 import { RelationIndex } from "./relation-index"
 import StringTable from "./stringtable"
-import { ResizeableTypedArray } from "./chunked-array"
+import { ResizeableCoordinateArray, ResizeableTypedArray } from "./typed-arrays"
 
 /**
  * Requires sorted IDs.
@@ -52,9 +52,14 @@ export class Osm {
 	stringTable = new StringTable()
 	nodes: NodeIndex = new NodeIndex(this.stringTable)
 	ways: WayIndex = new WayIndex(this.stringTable, this.nodes)
-	relations: RelationIndex = new RelationIndex(this.stringTable)
+	relations: RelationIndex = new RelationIndex(
+		this.stringTable,
+		this.nodes,
+		this.ways,
+	)
 
 	#finished = false
+	parsingTimeMs = 0
 
 	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
 		const osm = new Osm()
@@ -69,81 +74,75 @@ export class Osm {
 		}
 	}
 
-	initialize(header?: OsmPbfHeaderBlock) {
-		this.#finished = false
-		this.header = header ?? {
-			required_features: [],
-			optional_features: [],
-		}
-		this.stringTable = new StringTable()
-		this.nodes = new NodeIndex(this.stringTable)
-		this.ways = new WayIndex(this.stringTable, this.nodes)
-		this.relations = new RelationIndex(this.stringTable)
-	}
-
 	async initFromPbfData(
 		data: ArrayBuffer | ReadableStream<Uint8Array>,
 		onProgress: (...args: string[]) => void,
 	) {
-		console.time("Osm.initFromPbfData")
+		const start = performance.now()
 		const reader = await createOsmPbfReader(data)
-		this.initialize(reader.header)
+		this.header = reader.header
 
 		let entityCount = 0
-		let finishedNodes = false
-		let finishedWays = false
+		let stage: "nodes" | "ways" | "relations" = "nodes"
 		let entityUpdateInterval = 100_000
 		for await (const block of reader.blocks) {
 			const blockParser = new PrimitiveBlockParser(block)
-			for await (const group of blockParser.groups()) {
-				if (group.ways.length > 0 && !finishedNodes) {
+			for (const group of block.primitivegroup) {
+				if (group.ways.length > 0 && stage === "nodes") {
 					onProgress(
 						`Loaded ${this.nodes.size.toLocaleString()} nodes. Building node spatial index...`,
 					)
 					this.nodes.finish()
-					finishedNodes = true
+					stage = "ways"
+					entityCount = 0
+					entityUpdateInterval = 100_000
 				}
 
-				if (group.relations.length > 0 && !finishedWays) {
+				if (group.relations.length > 0 && stage === "ways") {
 					onProgress(
 						`Loaded ${this.ways.size.toLocaleString()} ways. Building way spatial index...`,
 					)
 					this.ways.finish()
-					finishedWays = true
+					stage = "relations"
+					entityCount = 0
+					entityUpdateInterval = 100_000
 				}
 
 				if (group.dense) {
-					for (const denseNode of blockParser.parseDenseNodes(group.dense)) {
-						this.nodes.add(denseNode)
-						entityCount++
-					}
+					this.nodes.addDenseNodes(group.dense, block)
 				}
 
 				for (const node of group.nodes) {
-					this.nodes.add(blockParser.parseNode(node))
-					entityCount++
+					this.nodes.addNode(blockParser.parseNode(node))
 				}
 
-				for (const way of group.ways) {
-					this.ways.add(blockParser.parseWay(way))
-					entityCount++
+				if (group.ways.length > 0) {
+					this.ways.addWays(group.ways, block)
 				}
 
 				for (const relation of group.relations) {
-					this.relations.add(blockParser.parseRelation(relation))
-					entityCount++
+					this.relations.addRelation(blockParser.parseRelation(relation))
 				}
 
+				entityCount +=
+					group.nodes.length +
+					group.ways.length +
+					group.relations.length +
+					(group.dense?.id.length ?? 0)
 				if (entityCount % entityUpdateInterval === 0) {
-					onProgress(`${entityCount.toLocaleString()} entities loaded`)
+					onProgress(`${entityCount.toLocaleString()} ${stage} loaded`)
 					if (entityCount > 1_000_000) entityUpdateInterval = 1_000_000
 				}
 			}
 		}
-		this.relations.finish()
+		if (!this.nodes.isReady()) this.nodes.finish()
+		if (!this.ways.isReady()) this.ways.finish()
+		if (!this.relations.isReady()) this.relations.finish()
 		this.finish()
-		onProgress(`Added ${entityCount.toLocaleString()} entities.`)
-		console.timeEnd("Osm.initFromPbfData")
+		onProgress(
+			`Added ${this.nodes.size.toLocaleString()} nodes, ${this.ways.size.toLocaleString()} ways, and ${this.relations.size.toLocaleString()} relations.`,
+		)
+		this.parsingTimeMs = performance.now() - start
 	}
 
 	finish() {
@@ -182,7 +181,7 @@ export class Osm {
 		console.time("Osm.getWaysInBbox")
 		const wayCandidates = this.ways.intersects(bbox)
 		const wayIndexes = new Uint32Array(wayCandidates.length)
-		const wayPositions = new ResizeableTypedArray(Float32Array)
+		const wayPositions = new ResizeableCoordinateArray()
 		const wayStartIndices = new Uint32Array(wayCandidates.length + 1)
 		wayStartIndices[0] = 0
 
@@ -255,14 +254,9 @@ export class Osm {
 		throw new Error("Unknown entity type")
 	}
 
-	addNode(node: OsmNode) {
-		this.nodes.add(node)
-		return node
-	}
-
 	createNode(lonLat: LonLat) {
-		const maxNodeId = this.nodes.idsSorted.at(-1) ?? 0
-		return this.addNode({
+		const maxNodeId = this.nodes.idByIndex.at(-1) ?? 0
+		return this.nodes.addNode({
 			id: maxNodeId + 1,
 			...lonLat,
 		})
@@ -271,17 +265,17 @@ export class Osm {
 	addEntity(entity: OsmNode | OsmWay | OsmRelation | OsmNode[]) {
 		if (Array.isArray(entity)) {
 			for (const node of entity) {
-				this.nodes.add(node)
+				this.nodes.addNode(node)
 			}
 			return
 		}
 
 		if (isNode(entity)) {
-			this.nodes.add(entity)
+			this.nodes.addNode(entity)
 		} else if (isWay(entity)) {
-			this.ways.add(entity)
+			this.ways.addWay(entity)
 		} else if (isRelation(entity)) {
-			this.relations.add(entity)
+			this.relations.addRelation(entity)
 		}
 	}
 

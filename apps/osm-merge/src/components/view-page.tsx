@@ -1,6 +1,6 @@
 import { useOsmWorker } from "@/hooks/osm"
 import { mapAtom } from "@/state/map"
-import type { Layer as DeckGlLayer } from "@deck.gl/core"
+import { COORDINATE_SYSTEM, type Layer as DeckGlLayer } from "@deck.gl/core"
 import { type GeoBoundingBox, TileLayer } from "@deck.gl/geo-layers"
 import {
 	BitmapLayer,
@@ -28,6 +28,7 @@ import { Button } from "./ui/button"
 import type { OsmPbfHeaderBlock } from "../../../../packages/osm.ts/src/pbf/proto/osmformat"
 import { addLogMessageAtom } from "@/atoms"
 import { MIN_PICKABLE_ZOOM } from "@/settings"
+import * as Performance from "osm.ts/performance"
 import Log from "./log"
 
 const TILE_SIZE = 512
@@ -113,6 +114,7 @@ export default function ViewPage() {
 		nodes: number
 		ways: number
 		header: OsmPbfHeaderBlock
+		parsingTimeMs: number
 	} | null>(null)
 	const { bbox } = osmInfo ?? {}
 	const logMessage = useSetAtom(addLogMessageAtom)
@@ -139,13 +141,14 @@ export default function ViewPage() {
 	// Set message to "Ready" when the application is ready
 	useEffect(() => {
 		logMessage("Ready", "ready")
+		Performance.mark("Ready")
 	}, [logMessage])
 
 	// Auto load default file for faster testing
 	useEffect(() => {
 		if (process.env.NODE_ENV !== "development") return
 		if (!file) {
-			fetch("./pbfs/monaco-250101.osm.pbf")
+			fetch("./pbfs/monaco.pbf")
 				.then((res) => res.blob())
 				.then((blob) => {
 					setFile((file) => (file ? file : new File([blob], "monaco.pbf")))
@@ -187,7 +190,6 @@ export default function ViewPage() {
 		> | null>({
 			id: `osm-tk:tiles-${osmId}`,
 			extent: bbox,
-			tileSize: TILE_SIZE,
 			getTileData: async (tile) => {
 				const bbox = tile.bbox as GeoBoundingBox
 				console.log("getTileData", tile)
@@ -222,6 +224,7 @@ export default function ViewPage() {
 					layers.push(
 						new BitmapLayer({
 							id: `osm-tk:bitmap-${x}-${y}-${z}`,
+							_imageCoordinateSystem: COORDINATE_SYSTEM.LNGLAT,
 							bounds: [
 								tileBbox.west,
 								tileBbox.south,
@@ -236,7 +239,7 @@ export default function ViewPage() {
 						}),
 					)
 				}
-				if (data.nodes.positions && z > 10) {
+				if (data.nodes.positions && z > MIN_PICKABLE_ZOOM) {
 					layers.push(
 						new ScatterplotLayer({
 							id: `osm-tk:nodes-${x}-${y}-${z}`,
@@ -246,8 +249,8 @@ export default function ViewPage() {
 									getPosition: { value: data.nodes.positions, size: 2 },
 								},
 							},
-							pickable: z > MIN_PICKABLE_ZOOM,
-							autoHighlight: z > MIN_PICKABLE_ZOOM,
+							pickable: true,
+							autoHighlight: true,
 							radiusUnits: "meters",
 							getRadius: 3,
 							radiusMinPixels: 1,
@@ -297,8 +300,8 @@ export default function ViewPage() {
 							widthMinPixels: 0.5,
 							widthMaxPixels: 10,
 							getColor: [255, 255, 255, 255],
-							pickable: z > 12,
-							autoHighlight: z > 12,
+							pickable: true,
+							autoHighlight: true,
 							highlightColor: [255, 0, 0, 255 * 0.5],
 							_pathType: "open",
 							onClick: (info) => {
@@ -338,6 +341,7 @@ export default function ViewPage() {
 								tile.bbox.north,
 							]),
 							lineWidthUnits: "pixels",
+							lineDashArray: [10, 10],
 							getLineColor: [255, 0, 0, 255 * 0.25],
 							filled: false,
 						}),
@@ -351,16 +355,22 @@ export default function ViewPage() {
 	return (
 		<div className="flex flex-row grow-1 h-full overflow-hidden">
 			<div className="flex flex-col w-96 gap-4 py-4 px-4 overflow-y-auto">
-				<div>
-					<OsmPbfFileInput
-						file={file}
-						setFile={(file) => {
-							setOsmInfo(null)
-							dispatch({ type: "CLEAR" })
-							setFile(file)
-						}}
-					/>
+				<OsmPbfFileInput
+					file={file}
+					setFile={(file) => {
+						setOsmInfo(null)
+						dispatch({ type: "CLEAR" })
+						setFile(file)
+					}}
+				/>
+				<div className="flex flex-col gap-2">
 					<div>file: {osmId}</div>
+					<div>
+						parsing time:{" "}
+						{osmInfo
+							? `${(osmInfo.parsingTimeMs / 1_000).toFixed(3)}s`
+							: "incomplete"}
+					</div>
 				</div>
 				<div className="h-48">
 					<Log />
@@ -481,7 +491,7 @@ function NodeList({ nodes }: { nodes: OsmNode[] }) {
 				{open ? "hide" : "show"}
 			</Button>
 			{open &&
-				nodes.map((node, i) => {
+				nodes.map((node) => {
 					return (
 						<Fragment key={node.id}>
 							<hr className="col-span-2" />

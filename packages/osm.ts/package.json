@@ -10,7 +10,8 @@
 		"./changes": "./src/osm-change.ts",
 		"./geojson": "./src/to-geojson.ts",
 		"./pbf": "./src/pbf/index.ts",
-		"./utils": "./src/utils.ts"
+		"./utils": "./src/utils.ts",
+		"./performance": "./src/performance.ts"
 	},
 	"sideEffects": false,
 	"scripts": {

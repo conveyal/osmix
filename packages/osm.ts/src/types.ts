@@ -52,7 +52,7 @@ export interface OsmWay extends OsmEntity {
 }
 
 export interface OsmRelationMember {
-	type: string
+	type: "node" | "way" | "relation"
 	ref: number
 	role?: string
 }

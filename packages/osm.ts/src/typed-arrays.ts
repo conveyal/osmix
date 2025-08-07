@@ -18,16 +18,28 @@ export class ResizeableTypedArray<T extends TypedArray>
 	implements RelativeIndexable<number>
 {
 	ArrayType: TypedArrayConstructor<T>
-	length = 0
+	items = 0
 	array: T
 
-	constructor(ArrayType: TypedArrayConstructor<T>, startSize = 1_000) {
+	constructor(ArrayType: TypedArrayConstructor<T>, startSize = 100_000_000) {
 		this.ArrayType = ArrayType
-		this.array = new this.ArrayType(startSize)
+		this.array = new this.ArrayType(
+			startSize / this.ArrayType.BYTES_PER_ELEMENT,
+		)
+	}
+
+	expandArray() {
+		const newArray = new this.ArrayType(this.array.length * 2)
+		newArray.set(this.array)
+		this.array = newArray
 	}
 
 	at(index: number): number {
 		return this.array[index]
+	}
+
+	get length() {
+		return this.items
 	}
 
 	remove(index: number) {
@@ -37,7 +49,7 @@ export class ResizeableTypedArray<T extends TypedArray>
 
 		this.array.copyWithin(index, index + 1, this.length)
 		this.array = result
-		this.length--
+		this.items--
 	}
 
 	removeRange(start: number, end: number) {
@@ -45,7 +57,7 @@ export class ResizeableTypedArray<T extends TypedArray>
 		result.set(this.array.subarray(0, start))
 		result.set(this.array.subarray(end), start)
 		this.array = result
-		this.length -= end - start
+		this.items -= end - start
 	}
 
 	push(value: number): number {
@@ -54,12 +66,14 @@ export class ResizeableTypedArray<T extends TypedArray>
 			newArray.set(this.array)
 			this.array = newArray
 		}
-		this.array[this.length++] = value
+		this.array[this.items++] = value
 		return this.length - 1
 	}
 
 	pushMany(values: number[] | T) {
-		for (const v of values) this.push(v)
+		while (this.length + values.length > this.array.length) this.expandArray()
+		this.array.set(values, this.length)
+		this.items += values.length
 	}
 
 	compact() {
@@ -68,10 +82,36 @@ export class ResizeableTypedArray<T extends TypedArray>
 	}
 }
 
+/**
+ * OSM IDs can be stored as 64-bit floating point numbers.
+ */
+export class ResizeableIdArray extends ResizeableTypedArray<
+	Float64Array<ArrayBuffer>
+> {
+	constructor() {
+		super(Float64Array)
+	}
+}
+
+/**
+ * When we are storing coordinates, we need to be able to store 64-bit floating point numbers.
+ * However, for benchmarking it is handy to test 32-bit floating point numbers.
+ */
 export class ResizeableCoordinateArray extends ResizeableTypedArray<
 	Float64Array<ArrayBuffer>
 > {
 	constructor() {
 		super(Float64Array)
+	}
+}
+
+/**
+ * When we are storing indexes into other arrays, we never need an index to exceed 2^32.
+ */
+export class ResizeableIndexArray extends ResizeableTypedArray<
+	Uint32Array<ArrayBuffer>
+> {
+	constructor() {
+		super(Uint32Array)
 	}
 }

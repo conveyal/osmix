@@ -1,7 +1,9 @@
 import KDBush from "kdbush"
-import { ResizeableCoordinateArray } from "./chunked-array"
+import { ResizeableCoordinateArray } from "./typed-arrays"
 import type { GeoBbox2D, OsmNode, OsmTags } from "./types"
-import { EntityIndex } from "./entity-index"
+import { EntityIndex, type IdOrIndex } from "./entity-index"
+import type StringTable from "./stringtable"
+import type { OsmPbfDenseNodes, OsmPbfPrimitiveBlock } from "./pbf"
 
 export class NodeIndex extends EntityIndex<OsmNode> {
 	lons = new ResizeableCoordinateArray()
@@ -14,8 +16,13 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 	]
 	spatialIndex: KDBush = new KDBush(0)
 
-	add(node: OsmNode) {
-		super.add(node)
+	constructor(stringTable: StringTable) {
+		super(stringTable, "node")
+	}
+
+	addNode(node: OsmNode) {
+		super.add(node.id)
+		this.addTags(node.tags)
 
 		this.lons.push(node.lon)
 		this.lats.push(node.lat)
@@ -24,6 +31,67 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 		if (node.lat < this.bbox[1]) this.bbox[1] = node.lat
 		if (node.lon > this.bbox[2]) this.bbox[2] = node.lon
 		if (node.lat > this.bbox[3]) this.bbox[3] = node.lat
+	}
+
+	addDenseNodes(dense: OsmPbfDenseNodes, block: OsmPbfPrimitiveBlock) {
+		const lon_offset = block.lon_offset ?? 0
+		const lat_offset = block.lat_offset ?? 0
+		const granularity = block.granularity ?? 1e7
+		const delta = {
+			id: 0,
+			lat: 0,
+			lon: 0,
+			timestamp: 0,
+			changeset: 0,
+			uid: 0,
+			user_sid: 0,
+		}
+
+		const getStringIndex = (keys: number[], index: number) => {
+			const key = keys[index]
+			if (!key) return
+			const blockString = block.stringtable[key]
+			return this.stringTable.add(blockString)
+		}
+
+		let keysValsIndex = 0
+		for (let i = 0; i < dense.id.length; i++) {
+			const idSid = dense.id[i]
+			const latSid = dense.lat[i]
+			const lonSid = dense.lon[i]
+
+			delta.id += idSid
+			delta.lat += latSid
+			delta.lon += lonSid
+
+			const lon = lon_offset + delta.lon / granularity
+			const lat = lat_offset + delta.lat / granularity
+
+			const tagKeys: number[] = []
+			const tagValues: number[] = []
+			if (dense.keys_vals.length > 0) {
+				while (dense.keys_vals[keysValsIndex] !== 0) {
+					const key = getStringIndex(dense.keys_vals, keysValsIndex)
+					const val = getStringIndex(dense.keys_vals, keysValsIndex + 1)
+					if (key && val) {
+						tagKeys.push(key)
+						tagValues.push(val)
+					}
+					keysValsIndex += 2
+				}
+				keysValsIndex++
+			}
+
+			super.add(delta.id)
+			this.lons.push(lon)
+			this.lats.push(lat)
+
+			if (lon < this.bbox[0]) this.bbox[0] = lon
+			if (lat < this.bbox[1]) this.bbox[1] = lat
+			if (lon > this.bbox[2]) this.bbox[2] = lon
+			if (lat > this.bbox[3]) this.bbox[3] = lat
+			this.addTagKeysAndValues(tagKeys, tagValues)
+		}
 	}
 
 	finishEntityIndex() {
@@ -42,7 +110,7 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 		console.timeEnd("NodeIndex.buildSpatialIndex")
 	}
 
-	getNodeLonLat(i: { id: number } | { index: number }): [number, number] {
+	getNodeLonLat(i: IdOrIndex): [number, number] {
 		const [index] = this.idOrIndex(i)
 		return [this.lons.at(index), this.lats.at(index)]
 	}
