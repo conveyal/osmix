@@ -149,12 +149,13 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	}
 
 	getLine(index: number) {
-		const refs = this.getRefIndexes(index)
-		const line = new Float64Array(refs.length * 2)
-		for (let i = 0; i < refs.length; i++) {
-			const ref = refs[i]
-			line[i * 2] = this.nodeIndex.lons.at(ref)
-			line[i * 2 + 1] = this.nodeIndex.lats.at(ref)
+		const count = this.refCountByIndex.at(index)
+		const start = this.refStartByIndex.at(index)
+		const line = new Float64Array(count * 2)
+		for (let i = start; i < start + count; i++) {
+			const ref = this.refIndexes.at(i)
+			line[(i - start) * 2] = this.nodeIndex.lons.at(ref)
+			line[(i - start) * 2 + 1] = this.nodeIndex.lats.at(ref)
 		}
 		return line
 	}
