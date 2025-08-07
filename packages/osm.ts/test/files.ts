@@ -38,7 +38,7 @@ export const PBFs: Record<
 			lon: 7.4229093,
 			id: 21911883,
 		},
-		uniqueStrings: 6825,
+		uniqueStrings: 6968,
 		primitiveGroups: 7,
 	},
 	montenegro: {

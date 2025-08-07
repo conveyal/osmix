@@ -39,7 +39,7 @@ import { NodeIndex } from "./node-index"
 import { WayIndex } from "./way-index"
 import { RelationIndex } from "./relation-index"
 import StringTable from "./stringtable"
-import { ResizeableCoordinateArray, ResizeableTypedArray } from "./typed-arrays"
+import { ResizeableCoordinateArray } from "./typed-arrays"
 
 /**
  * Requires sorted IDs.
@@ -205,7 +205,7 @@ export class Osm {
 		if (!this.#finished) throw new Error("Osm not finished")
 
 		const nodeCandidates = this.nodes.within(bbox)
-		const nodePositions = new Float32Array(nodeCandidates.length * 2)
+		const nodePositions = new Float64Array(nodeCandidates.length * 2)
 		const nodeIndexes = new Uint32Array(nodeCandidates.length)
 		let pIndex = 0
 		for (const nodeIndex of nodeCandidates) {
@@ -220,7 +220,7 @@ export class Osm {
 
 		const wayCandidates = this.ways.intersects(bbox)
 		const wayIndexes = new Uint32Array(wayCandidates.length)
-		const wayPositions = new ResizeableTypedArray(Float32Array)
+		const wayPositions = new ResizeableCoordinateArray()
 		const wayStartIndices = new Uint32Array(wayCandidates.length + 1)
 		wayStartIndices[0] = 0
 

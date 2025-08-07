@@ -47,8 +47,8 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 			user_sid: 0,
 		}
 
-		const getStringIndex = (keys: number[], index: number) => {
-			const key = keys[index]
+		const getStringTableIndex = (index: number) => {
+			const key = dense.keys_vals[index]
 			if (!key) return
 			const blockString = block.stringtable[key]
 			return this.stringTable.add(blockString)
@@ -71,8 +71,8 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 			const tagValues: number[] = []
 			if (dense.keys_vals.length > 0) {
 				while (dense.keys_vals[keysValsIndex] !== 0) {
-					const key = getStringIndex(dense.keys_vals, keysValsIndex)
-					const val = getStringIndex(dense.keys_vals, keysValsIndex + 1)
+					const key = getStringTableIndex(keysValsIndex)
+					const val = getStringTableIndex(keysValsIndex + 1)
 					if (key && val) {
 						tagKeys.push(key)
 						tagValues.push(val)

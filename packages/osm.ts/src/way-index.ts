@@ -87,14 +87,12 @@ export class WayIndex extends EntityIndex<OsmWay> {
 			this.bbox.push(bbox[2])
 			this.bbox.push(bbox[3])
 
-			const tagKeys: number[] = []
-			const tagValues: number[] = []
-			for (let i = 0; i < way.keys.length; i++) {
-				const key = way.keys[i]
-				const val = way.vals[i]
-				tagKeys.push(this.stringTable.add(block.stringtable[key]))
-				tagValues.push(this.stringTable.add(block.stringtable[val]))
-			}
+			const tagKeys: number[] = way.keys.map((key) =>
+				this.stringTable.add(block.stringtable[key]),
+			)
+			const tagValues: number[] = way.vals.map((val) =>
+				this.stringTable.add(block.stringtable[val]),
+			)
 			this.addTagKeysAndValues(tagKeys, tagValues)
 		}
 	}
