@@ -39,7 +39,6 @@ import { NodeIndex } from "./node-index"
 import { WayIndex } from "./way-index"
 import { RelationIndex } from "./relation-index"
 import StringTable from "./stringtable"
-import { ResizeableCoordinateArray } from "./typed-arrays"
 import { Bitmap } from "./raster"
 
 /**
@@ -158,7 +157,7 @@ export class Osm {
 	getNodesInBbox(bbox: GeoBbox2D) {
 		if (!this.#finished) throw new Error("Osm not finished")
 		console.time("Osm.getNodesInBbox")
-		const nodeCandidates = this.nodes.within(bbox)
+		const nodeCandidates = this.nodes.withinBbox(bbox)
 		const nodePositions = new Float32Array(nodeCandidates.length * 2)
 		const nodeIndexes = new Uint32Array(nodeCandidates.length)
 		let pIndex = 0
@@ -186,7 +185,6 @@ export class Osm {
 		const wayStartIndices = new Uint32Array(wayCandidates.length + 1)
 		wayStartIndices[0] = 0
 
-		console.log("wayCandidates.length", wayCandidates.length)
 		console.time("Osm.getWaysInBbox.loop")
 		let size = 0
 		for (let i = 0; i < wayCandidates.length; i++) {
@@ -217,19 +215,23 @@ export class Osm {
 	getBitmapForBbox(bbox: GeoBbox2D, tileSize = 512) {
 		console.time("Osm.getBitmapForBbox")
 		const bitmap = new Bitmap(bbox, tileSize)
-		const wayCandidates = this.ways.intersects(bbox)
 
+		const wayCandidates = this.ways.intersects(bbox)
+		console.time("Osm.getBitmapForBbox.ways")
 		for (const wayIndex of wayCandidates) {
 			const wayPositions = this.ways.getLine(wayIndex)
 			bitmap.drawWay(wayPositions)
 		}
+		console.timeEnd("Osm.getBitmapForBbox.ways")
 
-		const nodeCandidates = this.nodes.within(bbox)
+		const nodeCandidates = this.nodes.withinBbox(bbox)
+		console.time("Osm.getBitmapForBbox.nodes")
 		for (const nodeIndex of nodeCandidates) {
 			if (this.nodes.tagCountByIndex.at(nodeIndex) === 0) continue
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
 			bitmap.setLonLat(lon, lat, [255, 0, 0, 254])
 		}
+		console.timeEnd("Osm.getBitmapForBbox.nodes")
 
 		console.timeEnd("Osm.getBitmapForBbox")
 		return bitmap.data
@@ -238,7 +240,7 @@ export class Osm {
 	getNodesBitmapForBbox(bbox: GeoBbox2D, tileSize = 512) {
 		console.time("Osm.getNodesBitmapForBbox")
 		const bitmap = new Bitmap(bbox, tileSize)
-		const nodeCandidates = this.nodes.within(bbox)
+		const nodeCandidates = this.nodes.withinBbox(bbox)
 		for (const nodeIndex of nodeCandidates) {
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
 			bitmap.setLonLat(lon, lat, [255, 0, 0, 254])
@@ -533,7 +535,7 @@ export class Osm {
 		existingNode: OsmNode | null
 	} {
 		const [lon, lat] = point.geometry.coordinates as [number, number]
-		const existingNodeIndex = this.nodes.within(lon, lat)
+		const existingNodeIndex = this.nodes.withinRadius(lon, lat, 0)
 		const existingNode =
 			existingNodeIndex.length > 0
 				? this.nodes.getByIndex(existingNodeIndex[0])

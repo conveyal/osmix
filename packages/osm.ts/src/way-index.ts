@@ -107,7 +107,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 
 	buildSpatialIndex() {
 		console.time("WayIndex.buildSpatialIndex")
-		this.spatialIndex = new Flatbush(this.size)
+		this.spatialIndex = new Flatbush(this.size, 128)
 		for (let i = 0; i < this.size; i++) {
 			const [minX, minY, maxX, maxY] = this.getBbox(i)
 			this.spatialIndex.add(minX, minY, maxX, maxY)

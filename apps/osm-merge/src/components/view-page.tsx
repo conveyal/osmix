@@ -192,7 +192,6 @@ export default function ViewPage() {
 			extent: bbox,
 			getTileData: async (tile) => {
 				const bbox = tile.bbox as GeoBoundingBox
-				console.log("getTileData", tile)
 				logMessage(
 					`generating data for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
 				)

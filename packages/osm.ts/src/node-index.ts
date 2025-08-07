@@ -102,7 +102,7 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 
 	buildSpatialIndex() {
 		console.time("NodeIndex.buildSpatialIndex")
-		this.spatialIndex = new KDBush(this.size)
+		this.spatialIndex = new KDBush(this.size, 128)
 		for (let i = 0; i < this.size; i++) {
 			this.spatialIndex.add(this.lons.at(i), this.lats.at(i))
 		}
@@ -137,17 +137,15 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 	}
 
 	// Spatial operations
+	withinBbox(bbox: GeoBbox2D): number[] {
+		console.time("NodeIndex.withinBbox")
+		const results = this.spatialIndex.range(bbox[0], bbox[1], bbox[2], bbox[3])
+		console.timeEnd("NodeIndex.withinBbox")
+		return results
+	}
 
-	within(bbox: GeoBbox2D): number[]
-	within(x: number, y: number, radius?: number): number[]
-	within(bbox: GeoBbox2D | number, y?: number, radius = 0): number[] {
-		if (Array.isArray(bbox)) {
-			return this.spatialIndex.range(bbox[0], bbox[1], bbox[2], bbox[3])
-		}
-		if (y !== undefined) {
-			return this.spatialIndex.within(bbox, y, radius)
-		}
-		throw Error("Invalid arguments")
+	withinRadius(x: number, y: number, radius: number): number[] {
+		return this.spatialIndex.within(x, y, radius)
 	}
 
 	findNeighborsWithin(node: OsmNode, radius = 0): OsmNode[] {
