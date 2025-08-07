@@ -40,6 +40,7 @@ import { WayIndex } from "./way-index"
 import { RelationIndex } from "./relation-index"
 import StringTable from "./stringtable"
 import { ResizeableCoordinateArray } from "./typed-arrays"
+import { Bitmap } from "./raster"
 
 /**
  * Requires sorted IDs.
@@ -213,44 +214,50 @@ export class Osm {
 		}
 	}
 
-	getEntitiesInBbox(bbox: GeoBbox2D) {
-		if (!this.#finished) throw new Error("Osm not finished")
+	getBitmapForBbox(bbox: GeoBbox2D, tileSize = 512) {
+		console.time("Osm.getBitmapForBbox")
+		const bitmap = new Bitmap(bbox, tileSize)
+		const wayCandidates = this.ways.intersects(bbox)
+
+		for (const wayIndex of wayCandidates) {
+			const wayPositions = this.ways.getLine(wayIndex)
+			bitmap.drawWay(wayPositions)
+		}
 
 		const nodeCandidates = this.nodes.within(bbox)
-		const nodePositions = new Float64Array(nodeCandidates.length * 2)
-		const nodeIndexes = new Uint32Array(nodeCandidates.length)
-		let pIndex = 0
 		for (const nodeIndex of nodeCandidates) {
-			// Skip nodes with no tags, likely just a way node
 			if (this.nodes.tagCountByIndex.at(nodeIndex) === 0) continue
-
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
-			nodeIndexes[pIndex] = nodeIndex
-			nodePositions[pIndex++] = lon
-			nodePositions[pIndex++] = lat
+			bitmap.setLonLat(lon, lat, [255, 0, 0, 254])
 		}
 
+		console.timeEnd("Osm.getBitmapForBbox")
+		return bitmap.data
+	}
+
+	getNodesBitmapForBbox(bbox: GeoBbox2D, tileSize = 512) {
+		console.time("Osm.getNodesBitmapForBbox")
+		const bitmap = new Bitmap(bbox, tileSize)
+		const nodeCandidates = this.nodes.within(bbox)
+		for (const nodeIndex of nodeCandidates) {
+			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
+			bitmap.setLonLat(lon, lat, [255, 0, 0, 254])
+		}
+		console.timeEnd("Osm.getNodesBitmapForBbox")
+		return bitmap.data
+	}
+
+	getWaysBitmapForBbox(bbox: GeoBbox2D, tileSize = 512) {
+		console.time("Osm.getWaysBitmapForBbox")
+		const bitmap = new Bitmap(bbox, tileSize)
 		const wayCandidates = this.ways.intersects(bbox)
-		const wayIndexes = new Uint32Array(wayCandidates.length)
-		const wayPositions = new ResizeableCoordinateArray()
-		const wayStartIndices = new Uint32Array(wayCandidates.length + 1)
-		wayStartIndices[0] = 0
 
-		for (let i = 0; i < wayCandidates.length; i++) {
-			const w = wayCandidates[i]
-			wayIndexes[i] = w
-			const way = this.ways.getLine(w)
-			wayPositions.pushMany(way)
-			wayStartIndices[i + 1] = wayStartIndices[i] + way.length / 2
+		for (const wayIndex of wayCandidates) {
+			const wayPositions = this.ways.getLine(wayIndex)
+			bitmap.drawWay(wayPositions)
 		}
-
-		return {
-			nodeIndexes,
-			nodePositions,
-			wayIndexes,
-			wayPositions: wayPositions.compact(),
-			wayStartIndices,
-		}
+		console.timeEnd("Osm.getWaysBitmapForBbox")
+		return bitmap.data
 	}
 
 	getEntityBbox(entity: OsmNode | OsmWay | OsmRelation): GeoBbox2D {

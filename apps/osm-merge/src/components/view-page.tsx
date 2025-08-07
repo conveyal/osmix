@@ -31,7 +31,7 @@ import { MIN_PICKABLE_ZOOM } from "@/settings"
 import * as Performance from "osm.ts/performance"
 import Log from "./log"
 
-const TILE_SIZE = 512
+const TILE_SIZE = 1024
 
 type SelectedEntityState = {
 	index: number | null
@@ -220,7 +220,7 @@ export default function ViewPage() {
 				if (!data) return null
 				const tileBbox = tile.bbox as GeoBoundingBox
 				const layers: DeckGlLayer[] = []
-				if (data.bitmap) {
+				if ("bitmap" in data) {
 					layers.push(
 						new BitmapLayer({
 							id: `osm-tk:bitmap-${x}-${y}-${z}`,
@@ -238,8 +238,7 @@ export default function ViewPage() {
 							},
 						}),
 					)
-				}
-				if (data.nodes.positions && z > MIN_PICKABLE_ZOOM) {
+				} else {
 					layers.push(
 						new ScatterplotLayer({
 							id: `osm-tk:nodes-${x}-${y}-${z}`,
@@ -283,8 +282,6 @@ export default function ViewPage() {
 							},
 						}),
 					)
-				}
-				if (data.ways !== null) {
 					layers.push(
 						new PathLayer({
 							id: `osm-tk:ways-${x}-${y}-${z}`,
@@ -330,6 +327,7 @@ export default function ViewPage() {
 						}),
 					)
 				}
+
 				if (tile.bbox && "west" in tile.bbox) {
 					layers.push(
 						new GeoJsonLayer({

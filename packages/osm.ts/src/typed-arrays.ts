@@ -42,24 +42,6 @@ export class ResizeableTypedArray<T extends TypedArray>
 		return this.items
 	}
 
-	remove(index: number) {
-		const result = new this.ArrayType(this.length - 1)
-		result.set(this.array.subarray(0, index))
-		result.set(this.array.subarray(index + 1), index)
-
-		this.array.copyWithin(index, index + 1, this.length)
-		this.array = result
-		this.items--
-	}
-
-	removeRange(start: number, end: number) {
-		const result = new this.ArrayType(this.length - (end - start))
-		result.set(this.array.subarray(0, start))
-		result.set(this.array.subarray(end), start)
-		this.array = result
-		this.items -= end - start
-	}
-
 	push(value: number): number {
 		if (this.length >= this.array.length) {
 			const newArray = new this.ArrayType(this.array.length * 2)
