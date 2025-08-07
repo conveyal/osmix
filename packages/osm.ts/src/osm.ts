@@ -181,22 +181,34 @@ export class Osm {
 		console.time("Osm.getWaysInBbox")
 		const wayCandidates = this.ways.intersects(bbox)
 		const wayIndexes = new Uint32Array(wayCandidates.length)
-		const wayPositions = new ResizeableCoordinateArray()
+		const wayPositions: Float64Array[] = []
 		const wayStartIndices = new Uint32Array(wayCandidates.length + 1)
 		wayStartIndices[0] = 0
 
+		console.log("wayCandidates.length", wayCandidates.length)
+		console.time("Osm.getWaysInBbox.loop")
+		let size = 0
 		for (let i = 0; i < wayCandidates.length; i++) {
 			const w = wayCandidates[i]
 			wayIndexes[i] = w
 			const way = this.ways.getLine(w)
-			wayPositions.pushMany(way)
+			size += way.length
+			wayPositions.push(way)
 			wayStartIndices[i + 1] = wayStartIndices[i] + way.length / 2
+		}
+		console.timeEnd("Osm.getWaysInBbox.loop")
+
+		const wayPositionsArray = new Float64Array(size)
+		let pIndex = 0
+		for (const way of wayPositions) {
+			wayPositionsArray.set(way, pIndex)
+			pIndex += way.length
 		}
 
 		console.timeEnd("Osm.getWaysInBbox")
 		return {
 			indexes: wayIndexes,
-			positions: wayPositions.compact(),
+			positions: wayPositionsArray,
 			startIndices: wayStartIndices,
 		}
 	}

@@ -127,11 +127,11 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	getRefIndexes(index: number): Uint32Array {
 		const start = this.refStartByIndex.at(index)
 		const count = this.refCountByIndex.at(index)
-		const refs = new ResizeableTypedArray(Uint32Array)
+		const refs = new Uint32Array(count)
 		for (let i = start; i < start + count; i++) {
-			refs.push(this.refIndexes.at(i))
+			refs[i - start] = this.refIndexes.at(i)
 		}
-		return refs.compact()
+		return refs
 	}
 
 	getRefIds(index: number): number[] {
@@ -152,8 +152,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		const refs = this.getRefIndexes(index)
 		const line = new Float64Array(refs.length * 2)
 		for (let i = 0; i < refs.length; i++) {
-			const ref = refs.at(i)
-			if (ref == null) continue
+			const ref = refs[i]
 			line[i * 2] = this.nodeIndex.lons.at(ref)
 			line[i * 2 + 1] = this.nodeIndex.lats.at(ref)
 		}
@@ -189,6 +188,9 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	}
 
 	intersects(bbox: GeoBbox2D): number[] {
-		return this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3])
+		console.time("WayIndex.intersects")
+		const results = this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3])
+		console.timeEnd("WayIndex.intersects")
+		return results
 	}
 }
