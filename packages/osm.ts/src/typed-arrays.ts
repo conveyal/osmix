@@ -21,7 +21,7 @@ export class ResizeableTypedArray<T extends TypedArray>
 	items = 0
 	array: T
 
-	constructor(ArrayType: TypedArrayConstructor<T>, startSize = 100_000_000) {
+	constructor(ArrayType: TypedArrayConstructor<T>, startSize = 1_000) {
 		this.ArrayType = ArrayType
 		this.array = new this.ArrayType(
 			startSize / this.ArrayType.BYTES_PER_ELEMENT,
