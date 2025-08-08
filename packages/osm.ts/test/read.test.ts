@@ -9,7 +9,7 @@ import { PrimitiveBlockParser } from "../src/pbf/primitive-block-parser"
 import { isRelation, isWay, logEvery } from "../src/utils"
 
 describe("read", () => {
-	describe.each([["monaco", PBFs.monaco]])(
+	describe.each(Object.entries(PBFs))(
 		"%s",
 		{ timeout: 300_000 },
 		async (name, pbf) => {
