@@ -13,7 +13,7 @@ export function generateOsmChanges(baseOsm: Osm, patchOsm: Osm): OsmChange[] {
 	const changes: OsmChange[] = []
 
 	for (const entity of patchOsm.nodes) {
-		const existingNode = baseOsm.nodes.getById(entity.id)
+		const existingNode = baseOsm.nodes.get({ id: entity.id })
 		if (existingNode && isNodeEqual(existingNode, entity)) continue
 
 		changes.push({
@@ -23,7 +23,7 @@ export function generateOsmChanges(baseOsm: Osm, patchOsm: Osm): OsmChange[] {
 	}
 
 	for (const way of patchOsm.ways) {
-		const existingWay = baseOsm.ways.getById(way.id)
+		const existingWay = baseOsm.ways.get({ id: way.id })
 		if (existingWay && isWayEqual(existingWay, way)) continue
 
 		changes.push({
@@ -32,13 +32,14 @@ export function generateOsmChanges(baseOsm: Osm, patchOsm: Osm): OsmChange[] {
 		})
 	}
 
-	for (const [id, entity] of patchOsm.relations) {
-		const existingRelation = baseOsm.relations.get(id)
-		if (existingRelation && isRelationEqual(existingRelation, entity)) continue
+	for (const relation of patchOsm.relations) {
+		const existingRelation = baseOsm.relations.get({ id: relation.id })
+		if (existingRelation && isRelationEqual(existingRelation, relation))
+			continue
 
 		changes.push({
 			changeType: existingRelation ? "modify" : "create",
-			entity,
+			entity: relation,
 		})
 	}
 

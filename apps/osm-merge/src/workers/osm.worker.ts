@@ -75,7 +75,7 @@ const osmWorker = {
 		if (!way) return null
 		return {
 			way,
-			nodes: this.osm(id).nodes.getEntitiesById(way.refs),
+			nodes: way.refs.map((ref) => this.osm(id).nodes.getById(ref)),
 		}
 	},
 	async getTileData(

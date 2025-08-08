@@ -1,9 +1,10 @@
 import KDBush from "kdbush"
 import { ResizeableCoordinateArray } from "./typed-arrays"
 import type { GeoBbox2D, OsmNode, OsmTags } from "./types"
-import { EntityIndex, type IdOrIndex } from "./entity-index"
+import { EntityIndex } from "./entity-index"
 import type StringTable from "./stringtable"
 import type { OsmPbfDenseNodes, OsmPbfPrimitiveBlock } from "./pbf"
+import type { IdOrIndex } from "./id-index"
 
 export class NodeIndex extends EntityIndex<OsmNode> {
 	lons = new ResizeableCoordinateArray()
@@ -21,8 +22,8 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 	}
 
 	addNode(node: OsmNode) {
-		super.add(node.id)
-		this.addTags(node.tags)
+		this.ids.add(node.id)
+		this.tags.addTags(node.tags)
 
 		this.lons.push(node.lon)
 		this.lats.push(node.lat)
@@ -82,7 +83,7 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 				keysValsIndex++
 			}
 
-			super.add(delta.id)
+			this.ids.add(delta.id)
 			this.lons.push(lon)
 			this.lats.push(lat)
 
@@ -90,7 +91,7 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 			if (lat < this.bbox[1]) this.bbox[1] = lat
 			if (lon > this.bbox[2]) this.bbox[2] = lon
 			if (lat > this.bbox[3]) this.bbox[3] = lat
-			this.addTagKeysAndValues(tagKeys, tagValues)
+			this.tags.addTagKeysAndValues(tagKeys, tagValues)
 		}
 	}
 
@@ -111,7 +112,7 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 	}
 
 	getNodeLonLat(i: IdOrIndex): [number, number] {
-		const [index] = this.idOrIndex(i)
+		const [index] = this.ids.idOrIndex(i)
 		return [this.lons.at(index), this.lats.at(index)]
 	}
 
@@ -130,10 +131,6 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 			lat,
 			lon,
 		}
-	}
-
-	set(_: OsmNode) {
-		throw Error("NodeIndex.set not implemented yet")
 	}
 
 	// Spatial operations

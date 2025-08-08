@@ -27,8 +27,8 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	}
 
 	addWay(way: OsmWay) {
-		super.add(way.id)
-		this.addTags(way.tags)
+		this.ids.add(way.id)
+		this.tags.addTags(way.tags)
 		this.refStartByIndex.push(this.refIndexes.length)
 		this.refCountByIndex.push(way.refs.length)
 		const bbox = [
@@ -38,7 +38,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 			Number.NEGATIVE_INFINITY,
 		]
 		for (const ref of way.refs) {
-			const index = this.nodeIndex.getIndexFromId(ref)
+			const index = this.nodeIndex.ids.getIndexFromId(ref)
 			this.refIndexes.push(index)
 			const lon = this.nodeIndex.lons.at(index)
 			const lat = this.nodeIndex.lats.at(index)
@@ -58,7 +58,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	 */
 	addWays(ways: OsmPbfWay[], block: OsmPbfPrimitiveBlock) {
 		for (const way of ways) {
-			super.add(way.id)
+			this.ids.add(way.id)
 
 			let refId = 0
 			const bbox = [
@@ -72,7 +72,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 
 			for (const refSid of way.refs) {
 				refId += refSid
-				const nodeIndex = this.nodeIndex.getIndexFromId(refId)
+				const nodeIndex = this.nodeIndex.ids.getIndexFromId(refId)
 				this.refIndexes.push(nodeIndex)
 				const lon = this.nodeIndex.lons.at(nodeIndex)
 				const lat = this.nodeIndex.lats.at(nodeIndex)
@@ -93,7 +93,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 			const tagValues: number[] = way.vals.map((val) =>
 				this.stringTable.add(block.stringtable[val]),
 			)
-			this.addTagKeysAndValues(tagKeys, tagValues)
+			this.tags.addTagKeysAndValues(tagKeys, tagValues)
 		}
 	}
 
@@ -136,7 +136,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 
 	getRefIds(index: number): number[] {
 		const refs = this.getRefIndexes(index)
-		return Array.from(refs).map((r) => this.nodeIndex.idByIndex.at(r))
+		return Array.from(refs).map((r) => this.nodeIndex.ids.at(r))
 	}
 
 	getBbox(index: number): GeoBbox2D {
@@ -172,7 +172,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	getLineString(
 		i: { index: number } | { id: number },
 	): GeoJSON.Feature<GeoJSON.LineString, OsmTags> {
-		const [index, id] = this.idOrIndex(i)
+		const [index, id] = this.ids.idOrIndex(i)
 		return {
 			type: "Feature",
 			geometry: {
@@ -180,12 +180,8 @@ export class WayIndex extends EntityIndex<OsmWay> {
 				coordinates: this.getCoordinates(index),
 			},
 			id,
-			properties: this.getTags(index) ?? {},
+			properties: this.tags.getTags(index) ?? {},
 		}
-	}
-
-	set(_: OsmWay) {
-		throw Error("WayIndex.set not implemented yet")
 	}
 
 	intersects(bbox: GeoBbox2D): number[] {

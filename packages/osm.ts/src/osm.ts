@@ -30,7 +30,6 @@ import type {
 	OsmNode,
 	OsmRelation,
 	OsmWay,
-	Rgba,
 } from "./types"
 import UnorderedPairMap from "./unordered-pair-map"
 import { isNode, isRelation, isWay } from "./utils"
@@ -64,7 +63,7 @@ export class Osm {
 
 	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
 		const osm = new Osm()
-		await osm.initFromPbfData(data, () => {})
+		await osm.initFromPbfData(data, console.log)
 		return osm
 	}
 
@@ -109,17 +108,13 @@ export class Osm {
 					entityUpdateInterval = 100_000
 				}
 
-				if (group.dense) {
-					this.nodes.addDenseNodes(group.dense, block)
-				}
+				if (group.dense) this.nodes.addDenseNodes(group.dense, block)
 
 				for (const node of group.nodes) {
 					this.nodes.addNode(blockParser.parseNode(node))
 				}
 
-				if (group.ways.length > 0) {
-					this.ways.addWays(group.ways, block)
-				}
+				if (group.ways.length > 0) this.ways.addWays(group.ways, block)
 
 				for (const relation of group.relations) {
 					this.relations.addRelation(blockParser.parseRelation(relation))
@@ -136,9 +131,6 @@ export class Osm {
 				}
 			}
 		}
-		if (!this.nodes.isReady()) this.nodes.finish()
-		if (!this.ways.isReady()) this.ways.finish()
-		if (!this.relations.isReady()) this.relations.finish()
 		this.finish()
 		onProgress(
 			`Added ${this.nodes.size.toLocaleString()} nodes, ${this.ways.size.toLocaleString()} ways, and ${this.relations.size.toLocaleString()} relations.`,
@@ -147,6 +139,9 @@ export class Osm {
 	}
 
 	finish() {
+		if (!this.nodes.isReady) this.nodes.finish()
+		if (!this.ways.isReady) this.ways.finish()
+		if (!this.relations.isReady) this.relations.finish()
 		this.stringTable.compact()
 		this.#finished = true
 	}
@@ -164,7 +159,7 @@ export class Osm {
 		let pIndex = 0
 		for (const nodeIndex of nodeCandidates) {
 			// Skip nodes with no tags, likely just a way node
-			if (this.nodes.tagCountByIndex.at(nodeIndex) === 0) continue
+			if (!this.nodes.tags.hasTags(nodeIndex)) continue
 
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
 			nodeIndexes[pIndex] = nodeIndex
@@ -228,7 +223,7 @@ export class Osm {
 		const nodeCandidates = this.nodes.withinBbox(bbox)
 		console.time("Osm.getBitmapForBbox.nodes")
 		for (const nodeIndex of nodeCandidates) {
-			if (this.nodes.tagCountByIndex.at(nodeIndex) === 0) continue
+			if (!this.nodes.tags.hasTags(nodeIndex)) continue
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
 			bitmap.setLonLat(lon, lat, [255, 0, 0, 255])
 		}
@@ -244,7 +239,7 @@ export class Osm {
 		const nodeCandidates = this.nodes.withinBbox(bbox)
 		for (const nodeIndex of nodeCandidates) {
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
-			if (this.nodes.tagCountByIndex.at(nodeIndex) === 0) {
+			if (!this.nodes.tags.hasTags(nodeIndex)) {
 				bitmap.setLonLat(lon, lat)
 			} else {
 				bitmap.setLonLat(lon, lat, [255, 0, 0, 255])
@@ -306,9 +301,9 @@ export class Osm {
 	}
 
 	getEntity(type: OsmEntityType, id: number) {
-		if (type === "node") return this.nodes.getById(id)
-		if (type === "way") return this.ways.getById(id)
-		if (type === "relation") return this.relations.getById(id)
+		if (type === "node") return this.nodes.get({ id })
+		if (type === "way") return this.ways.get({ id })
+		if (type === "relation") return this.relations.get({ id })
 	}
 
 	deleteEntity(entity: OsmNode | OsmWay | OsmRelation) {
@@ -458,7 +453,7 @@ export class Osm {
 
 		// Find intersecting way IDs. Each way should have at least one intersecting way or it is disconnected from the rest of the network.
 		for (let wayIndex = 0; wayIndex < osm.ways.size; wayIndex++) {
-			const wayId = osm.ways.idByIndex.at(wayIndex)
+			const wayId = osm.ways.ids.at(wayIndex)
 			if (wayId == null) continue
 			const lineString = osm.ways.getLineString({ index: wayIndex })
 			const intersectingWays = this.findIntersectingWays(lineString)
@@ -494,7 +489,7 @@ export class Osm {
 		>()
 
 		for (const intersectingWayIndex of intersectingWayIndexes) {
-			const intersectingWayId = this.ways.idByIndex.at(intersectingWayIndex)
+			const intersectingWayId = this.ways.ids.at(intersectingWayIndex)
 			if (
 				intersectingWayId !== feature.id &&
 				typeof intersectingWayId === "number"
@@ -518,7 +513,7 @@ export class Osm {
 			featureBbox as GeoBbox2D,
 		)
 		for (const intersectingWayIndex of intersectingWayIndexes) {
-			const intersectingWayId = this.ways.idByIndex.at(intersectingWayIndex)
+			const intersectingWayId = this.ways.ids.at(intersectingWayIndex)
 			if (intersectingWayId !== wayLineString.id) {
 				const feature = this.ways.getLineString({ index: intersectingWayIndex })
 				if (booleanTouches(wayLineString, feature)) return true

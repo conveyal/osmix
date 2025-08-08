@@ -1,15 +1,11 @@
-import {
-	ResizeableIdArray,
-	ResizeableIndexArray,
-	ResizeableTypedArray,
-} from "./typed-arrays"
+import { ResizeableIdArray, ResizeableTypedArray } from "./typed-arrays"
 import { EntityIndex } from "./entity-index"
 import type { NodeIndex } from "./node-index"
 import type StringTable from "./stringtable"
 import type { OsmRelation, OsmRelationMember, OsmTags } from "./types"
 import type { WayIndex } from "./way-index"
 
-const MEMBER_TYPES = ["node", "way", "relation"] as const
+const RELATION_MEMBER_TYPES = ["node", "way", "relation"] as const
 
 export class RelationIndex extends EntityIndex<OsmRelation> {
 	memberStartByIndex = new ResizeableTypedArray(Uint32Array)
@@ -34,13 +30,13 @@ export class RelationIndex extends EntityIndex<OsmRelation> {
 	}
 
 	addRelation(relation: OsmRelation) {
-		super.add(relation.id)
-		this.addTags(relation.tags)
+		this.ids.add(relation.id)
+		this.tags.addTags(relation.tags)
 		this.memberStartByIndex.push(this.memberRefsIndex.length)
 		this.memberCountByIndex.push(relation.members.length)
 		for (const member of relation.members) {
 			this.memberRefsIndex.push(member.ref)
-			this.memberTypesIndex.push(MEMBER_TYPES.indexOf(member.type))
+			this.memberTypesIndex.push(RELATION_MEMBER_TYPES.indexOf(member.type))
 			this.memberRolesIndex.push(this.stringTable.add(member.role ?? ""))
 		}
 	}
@@ -67,14 +63,10 @@ export class RelationIndex extends EntityIndex<OsmRelation> {
 		const members: OsmRelationMember[] = []
 		for (let i = start; i < start + count; i++) {
 			const ref = this.memberRefsIndex.at(i)
-			const type = MEMBER_TYPES[this.memberTypesIndex.at(i)]
+			const type = RELATION_MEMBER_TYPES[this.memberTypesIndex.at(i)]
 			const role = this.stringTable.get(this.memberRolesIndex.at(i))
 			members.push({ ref, type, role })
 		}
 		return members
-	}
-
-	set(_: OsmRelation) {
-		throw Error("RelationIndex.set not implemented yet")
 	}
 }
