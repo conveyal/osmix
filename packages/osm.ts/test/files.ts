@@ -29,7 +29,7 @@ export const PBFs: Record<
 			left: 7.408583,
 			right: 7.595671,
 		},
-		geoJsonFeatures: 9_362,
+		geoJsonFeatures: 9_302,
 		nodes: 38_995,
 		ways: 5_708,
 		relations: 308,
