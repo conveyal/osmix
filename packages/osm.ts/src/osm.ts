@@ -30,6 +30,7 @@ import type {
 	OsmNode,
 	OsmRelation,
 	OsmWay,
+	Rgba,
 } from "./types"
 import UnorderedPairMap from "./unordered-pair-map"
 import { isNode, isRelation, isWay } from "./utils"
@@ -237,13 +238,17 @@ export class Osm {
 		return bitmap.data
 	}
 
-	getNodesBitmapForBbox(bbox: GeoBbox2D, tileSize = 512) {
+	getNodesBitmapForBbox(
+		bbox: GeoBbox2D,
+		tileSize = 512,
+		color: Rgba = [255, 0, 0, 254],
+	) {
 		console.time("Osm.getNodesBitmapForBbox")
 		const bitmap = new Bitmap(bbox, tileSize)
 		const nodeCandidates = this.nodes.withinBbox(bbox)
 		for (const nodeIndex of nodeCandidates) {
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
-			bitmap.setLonLat(lon, lat, [255, 0, 0, 254])
+			bitmap.setLonLat(lon, lat, color)
 		}
 		console.timeEnd("Osm.getNodesBitmapForBbox")
 		return bitmap.data

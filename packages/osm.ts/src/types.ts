@@ -30,6 +30,8 @@ export type GeoBbox2D = [
 	maxLat: number,
 ]
 
+export type Rgba = [number, number, number, number]
+
 export interface OsmInfoParsed extends OsmPbfInfo {
 	user?: string
 }

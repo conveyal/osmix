@@ -1,4 +1,4 @@
-import type { GeoBbox2D } from "./types"
+import type { GeoBbox2D, Rgba } from "./types"
 
 export function lonLatToPixel(
 	lon: number,
@@ -16,8 +16,6 @@ export function lonLatToPixel(
 }
 
 const TILE_EPS = 1e-12
-
-type Rgba = [number, number, number, number]
 
 /**
  * Blend two RGBA colors.
@@ -138,7 +136,13 @@ export class Bitmap {
 		this.data[idx + 3] = color[3]
 	}
 
-	drawLine(x0: number, y0: number, x1: number, y1: number) {
+	drawLine(
+		x0: number,
+		y0: number,
+		x1: number,
+		y1: number,
+		color: Rgba = [255, 255, 255, 254],
+	) {
 		const dx = Math.abs(x1 - x0)
 		const dy = Math.abs(y1 - y0)
 		const sx = x0 < x1 ? 1 : -1
@@ -148,7 +152,11 @@ export class Bitmap {
 		let y = y0
 
 		while (true) {
-			this.setPixel(x, y)
+			const idx = (y * this.tileSize + x) * 4
+			this.data[idx] = color[0]
+			this.data[idx + 1] = color[1]
+			this.data[idx + 2] = color[2]
+			this.data[idx + 3] = color[3]
 			if (x === x1 && y === y1) break
 			const e2 = 2 * err
 			if (e2 > -dy) {
