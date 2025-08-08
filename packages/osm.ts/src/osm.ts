@@ -230,7 +230,7 @@ export class Osm {
 		for (const nodeIndex of nodeCandidates) {
 			if (this.nodes.tagCountByIndex.at(nodeIndex) === 0) continue
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
-			bitmap.setLonLat(lon, lat, [255, 0, 0, 254])
+			bitmap.setLonLat(lon, lat, [255, 0, 0, 255])
 		}
 		console.timeEnd("Osm.getBitmapForBbox.nodes")
 
@@ -238,17 +238,17 @@ export class Osm {
 		return bitmap.data
 	}
 
-	getNodesBitmapForBbox(
-		bbox: GeoBbox2D,
-		tileSize = 512,
-		color: Rgba = [255, 0, 0, 254],
-	) {
+	getNodesBitmapForBbox(bbox: GeoBbox2D, tileSize = 512) {
 		console.time("Osm.getNodesBitmapForBbox")
 		const bitmap = new Bitmap(bbox, tileSize)
 		const nodeCandidates = this.nodes.withinBbox(bbox)
 		for (const nodeIndex of nodeCandidates) {
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
-			bitmap.setLonLat(lon, lat, color)
+			if (this.nodes.tagCountByIndex.at(nodeIndex) === 0) {
+				bitmap.setLonLat(lon, lat)
+			} else {
+				bitmap.setLonLat(lon, lat, [255, 0, 0, 255])
+			}
 		}
 		console.timeEnd("Osm.getNodesBitmapForBbox")
 		return bitmap.data
