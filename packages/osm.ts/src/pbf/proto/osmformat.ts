@@ -184,7 +184,6 @@ function readPrimitiveBlockField(
 	} else if (tag === 17) {
 		obj.granularity = pbf.readVarint(true)
 		obj.granularity = !obj.granularity ? 1e7 : 1e9 / obj.granularity
-		console.error("readGranularity", obj.granularity)
 	} else if (tag === 19) obj.lat_offset = pbf.readVarint(true) * 1e-9
 	else if (tag === 20) obj.lon_offset = pbf.readVarint(true) * 1e-9
 	else if (tag === 18) obj.date_granularity = pbf.readVarint(true) ?? 1000
