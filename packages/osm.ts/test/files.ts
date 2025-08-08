@@ -118,7 +118,7 @@ export const PBFs: Record<
 			lon: -122.3196898,
 			id: 29445653,
 		},
-		uniqueStrings: 219_760,
+		uniqueStrings: 598_993,
 		primitiveGroups: 34_901,
 	},
 }
