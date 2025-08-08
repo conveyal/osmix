@@ -52,9 +52,6 @@
       "name": "osm.ts",
       "version": "0.0.1",
       "dependencies": {
-        "@mapbox/sphericalmercator": "^2.0.1",
-        "@mapbox/tilebelt": "^2.0.2",
-        "@math.gl/web-mercator": "^4.1.0",
         "@turf/turf": "catalog:",
         "dequal": "^2.0.3",
         "flatbush": "^4.4.1",
@@ -270,10 +267,6 @@
     "@mapbox/martini": ["@mapbox/martini@0.2.0", "", {}, "sha512-7hFhtkb0KTLEls+TRw/rWayq5EeHtTaErgm/NskVoXmtgAQu/9D299aeyj6mzAR/6XUnYRp2lU+4IcrYRFjVsQ=="],
 
     "@mapbox/point-geometry": ["@mapbox/point-geometry@0.1.0", "", {}, "sha512-6j56HdLTwWGO0fJPlrZtdU/B13q8Uwmo18Ck2GnGgN9PCFyKTZ3UbXeEdRFh18i9XQ92eH2VdtpJHpBD3aripQ=="],
-
-    "@mapbox/sphericalmercator": ["@mapbox/sphericalmercator@2.0.1", "", {}, "sha512-k1vM33y0oGIgip01EqdrWEMZLsYj9fP3jH7PZmeSCsCuubTQGjyrOANGSsqh+JtyqydYfXk9VBUVcyabvNTYXg=="],
-
-    "@mapbox/tilebelt": ["@mapbox/tilebelt@2.0.2", "", {}, "sha512-pzFgrmsCUjOAAeYns1MKJ1dJICYdEC+sYwtWLdxO7iJwmDlepGrEXDqP9ejApO/YUVctA/SYKDS4Oc0mBNNLZw=="],
 
     "@mapbox/tiny-sdf": ["@mapbox/tiny-sdf@2.0.6", "", {}, "sha512-qMqa27TLw+ZQz5Jk+RcwZGH7BQf5G/TrutJhspsca/3SHwmgKQ1iq+d3Jxz5oysPVYTGP6aXxCo5Lk9Er6YBAA=="],
 
