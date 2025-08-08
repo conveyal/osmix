@@ -1,5 +1,7 @@
 import type { GeoBbox2D, Rgba } from "./types"
 
+const DEFAULT_COLOR: Rgba = [255, 255, 255, 255] // white
+
 export function lonLatToPixel(
 	lon: number,
 	lat: number,
@@ -127,7 +129,7 @@ export class Bitmap {
 		this.data.set(blendRgba([r, g, b, a], color), idx)
 	}
 
-	setPixel(x: number, y: number, color: Rgba = [255, 255, 255, 254]) {
+	setPixel(x: number, y: number, color: Rgba = DEFAULT_COLOR) {
 		if (x < 0 || x >= this.tileSize || y < 0 || y >= this.tileSize) return
 		const idx = (y * this.tileSize + x) * 4
 		this.data[idx] = color[0]
@@ -141,7 +143,7 @@ export class Bitmap {
 		y0: number,
 		x1: number,
 		y1: number,
-		color: Rgba = [255, 255, 255, 254],
+		color: Rgba = DEFAULT_COLOR,
 	) {
 		const dx = Math.abs(x1 - x0)
 		const dy = Math.abs(y1 - y0)
