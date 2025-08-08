@@ -12,7 +12,7 @@ export class RelationIndex extends EntityIndex<OsmRelation> {
 	memberCountByIndex = new ResizeableTypedArray(Uint16Array) // Maximum 65,535 members per relation
 
 	// Store the ID of the member because relations have other relations as members.
-	memberRefsIndex = new ResizeableIdArray()
+	memberRefs = new ResizeableIdArray()
 	memberTypesIndex = new ResizeableTypedArray(Uint8Array)
 	memberRolesIndex = new ResizeableTypedArray(Uint32Array)
 
@@ -32,10 +32,10 @@ export class RelationIndex extends EntityIndex<OsmRelation> {
 	addRelation(relation: OsmRelation) {
 		this.ids.add(relation.id)
 		this.tags.addTags(relation.tags)
-		this.memberStartByIndex.push(this.memberRefsIndex.length)
+		this.memberStartByIndex.push(this.memberRefs.length)
 		this.memberCountByIndex.push(relation.members.length)
 		for (const member of relation.members) {
-			this.memberRefsIndex.push(member.ref)
+			this.memberRefs.push(member.ref)
 			this.memberTypesIndex.push(RELATION_MEMBER_TYPES.indexOf(member.type))
 			this.memberRolesIndex.push(this.stringTable.add(member.role ?? ""))
 		}
@@ -44,7 +44,7 @@ export class RelationIndex extends EntityIndex<OsmRelation> {
 	finishEntityIndex() {
 		this.memberStartByIndex.compact()
 		this.memberCountByIndex.compact()
-		this.memberRefsIndex.compact()
+		this.memberRefs.compact()
 		this.memberTypesIndex.compact()
 		this.memberRolesIndex.compact()
 	}
@@ -62,7 +62,7 @@ export class RelationIndex extends EntityIndex<OsmRelation> {
 		const count = this.memberCountByIndex.at(index)
 		const members: OsmRelationMember[] = []
 		for (let i = start; i < start + count; i++) {
-			const ref = this.memberRefsIndex.at(i)
+			const ref = this.memberRefs.at(i)
 			const type = RELATION_MEMBER_TYPES[this.memberTypesIndex.at(i)]
 			const role = this.stringTable.get(this.memberRolesIndex.at(i))
 			members.push({ ref, type, role })

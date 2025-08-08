@@ -1,10 +1,15 @@
 import { EntityIndex } from "./entity-index"
 import type { GeoBbox2D, OsmTags, OsmWay } from "./types"
-import { ResizeableCoordinateArray, ResizeableTypedArray } from "./typed-arrays"
+import {
+	ResizeableCoordinateArray,
+	ResizeableIdArray,
+	ResizeableTypedArray,
+} from "./typed-arrays"
 import type { NodeIndex } from "./node-index"
 import type StringTable from "./stringtable"
 import Flatbush from "flatbush"
 import type { OsmPbfPrimitiveBlock, OsmPbfWay } from "./pbf"
+import type { IdOrIndex } from "./id-index"
 
 export class WayIndex extends EntityIndex<OsmWay> {
 	spatialIndex: Flatbush = new Flatbush(1)
@@ -12,8 +17,8 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	refStartByIndex = new ResizeableTypedArray(Uint32Array)
 	refCountByIndex = new ResizeableTypedArray(Uint16Array) // Maximum 2,000 nodes per way
 
-	// Store the index of the node in the node index. Not the ID
-	refIndexes = new ResizeableTypedArray(Uint32Array)
+	// Node IDs
+	refs = new ResizeableIdArray()
 
 	// Bounding box of the way in geographic coordinates
 	bbox = new ResizeableCoordinateArray()
@@ -29,7 +34,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	addWay(way: OsmWay) {
 		this.ids.add(way.id)
 		this.tags.addTags(way.tags)
-		this.refStartByIndex.push(this.refIndexes.length)
+		this.refStartByIndex.push(this.refs.length)
 		this.refCountByIndex.push(way.refs.length)
 		const bbox = [
 			Number.POSITIVE_INFINITY,
@@ -38,10 +43,8 @@ export class WayIndex extends EntityIndex<OsmWay> {
 			Number.NEGATIVE_INFINITY,
 		]
 		for (const ref of way.refs) {
-			const index = this.nodeIndex.ids.getIndexFromId(ref)
-			this.refIndexes.push(index)
-			const lon = this.nodeIndex.lons.at(index)
-			const lat = this.nodeIndex.lats.at(index)
+			this.refs.push(ref)
+			const [lon, lat] = this.nodeIndex.getNodeLonLat({ id: ref })
 			if (lon < bbox[0]) bbox[0] = lon
 			if (lon > bbox[2]) bbox[2] = lon
 			if (lat < bbox[1]) bbox[1] = lat
@@ -67,15 +70,13 @@ export class WayIndex extends EntityIndex<OsmWay> {
 				Number.NEGATIVE_INFINITY,
 				Number.NEGATIVE_INFINITY,
 			]
-			this.refStartByIndex.push(this.refIndexes.length)
+			this.refStartByIndex.push(this.refs.length)
 			this.refCountByIndex.push(way.refs.length)
 
 			for (const refSid of way.refs) {
 				refId += refSid
-				const nodeIndex = this.nodeIndex.ids.getIndexFromId(refId)
-				this.refIndexes.push(nodeIndex)
-				const lon = this.nodeIndex.lons.at(nodeIndex)
-				const lat = this.nodeIndex.lats.at(nodeIndex)
+				this.refs.push(refId)
+				const [lon, lat] = this.nodeIndex.getNodeLonLat({ id: refId })
 				if (lon < bbox[0]) bbox[0] = lon
 				if (lon > bbox[2]) bbox[2] = lon
 				if (lat < bbox[1]) bbox[1] = lat
@@ -100,7 +101,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	finishEntityIndex() {
 		this.refStartByIndex.compact()
 		this.refCountByIndex.compact()
-		this.refIndexes.compact()
+		this.refs.compact()
 		this.bbox.compact()
 		this.buildSpatialIndex()
 	}
@@ -124,19 +125,14 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		}
 	}
 
-	getRefIndexes(index: number): Uint32Array {
+	getRefIds(index: number): number[] {
 		const start = this.refStartByIndex.at(index)
 		const count = this.refCountByIndex.at(index)
-		const refs = new Uint32Array(count)
+		const refs: number[] = []
 		for (let i = start; i < start + count; i++) {
-			refs[i - start] = this.refIndexes.at(i)
+			refs.push(this.refs.at(i))
 		}
 		return refs
-	}
-
-	getRefIds(index: number): number[] {
-		const refs = this.getRefIndexes(index)
-		return Array.from(refs).map((r) => this.nodeIndex.ids.at(r))
 	}
 
 	getBbox(index: number): GeoBbox2D {
@@ -152,10 +148,11 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		const count = this.refCountByIndex.at(index)
 		const start = this.refStartByIndex.at(index)
 		const line = new Float64Array(count * 2)
-		for (let i = start; i < start + count; i++) {
-			const ref = this.refIndexes.at(i)
-			line[(i - start) * 2] = this.nodeIndex.lons.at(ref)
-			line[(i - start) * 2 + 1] = this.nodeIndex.lats.at(ref)
+		for (let i = 0; i < count; i++) {
+			const ref = this.refs.at(start + i)
+			const [lon, lat] = this.nodeIndex.getNodeLonLat({ id: ref })
+			line[i * 2] = lon
+			line[i * 2 + 1] = lat
 		}
 		return line
 	}
@@ -169,15 +166,18 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		return coords
 	}
 
-	getLineString(
-		i: { index: number } | { id: number },
-	): GeoJSON.Feature<GeoJSON.LineString, OsmTags> {
+	getLineString(i: IdOrIndex): GeoJSON.Feature<GeoJSON.LineString, OsmTags> {
 		const [index, id] = this.ids.idOrIndex(i)
+		const line = this.getLine(index)
+		const coordinates: [number, number][] = []
+		for (let i = 0; i < line.length; i += 2) {
+			coordinates.push([line[i], line[i + 1]])
+		}
 		return {
 			type: "Feature",
 			geometry: {
 				type: "LineString",
-				coordinates: this.getCoordinates(index),
+				coordinates,
 			},
 			id,
 			properties: this.tags.getTags(index) ?? {},

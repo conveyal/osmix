@@ -150,11 +150,6 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 		return this.getEntitiesByIndex(nodeIndexes).filter((n) => n.id !== node.id)
 	}
 
-	/* within(x: number, y: number, radius = 0): OsmNode[] {
-		const nodeIndexes = this.spatialIndex.within(x, y, radius)
-		return this.getEntitiesByIndex(nodeIndexes)
-	}*/
-
 	findOverlappingNodes(nodes: OsmNode[], radius = 0) {
 		return findOverlappingNodes(this, nodes, radius)
 	}
