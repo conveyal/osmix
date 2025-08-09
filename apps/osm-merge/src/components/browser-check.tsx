@@ -34,10 +34,12 @@ export default function BrowserCheck() {
 function SecureContext() {
 	const [secure, setSecure] = useState(false)
 	const [crossOriginIsolated, setCrossOriginIsolated] = useState(false)
+	const [hardwareConcurrency, setHardwareConcurrency] = useState(0)
 
 	useEffect(() => {
 		setSecure(window.isSecureContext)
 		setCrossOriginIsolated(window.crossOriginIsolated)
+		setHardwareConcurrency(navigator.hardwareConcurrency)
 	}, [])
 
 	return (
@@ -46,6 +48,8 @@ function SecureContext() {
 			<div>{secure ? "yes" : "no"}</div>
 			<div className="font-bold">Cross origin isolated</div>
 			<div>{crossOriginIsolated ? "yes" : "no"}</div>
+			<div className="font-bold">Hardware concurrency</div>
+			<div>{hardwareConcurrency}</div>
 		</div>
 	)
 }
