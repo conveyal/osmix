@@ -33,15 +33,19 @@ export default function BrowserCheck() {
 
 function SecureContext() {
 	const [secure, setSecure] = useState(false)
+	const [crossOriginIsolated, setCrossOriginIsolated] = useState(false)
 
 	useEffect(() => {
 		setSecure(window.isSecureContext)
+		setCrossOriginIsolated(window.crossOriginIsolated)
 	}, [])
 
 	return (
 		<div>
 			<div className="font-bold">Secure context</div>
 			<div>{secure ? "yes" : "no"}</div>
+			<div className="font-bold">Cross origin isolated</div>
+			<div>{crossOriginIsolated ? "yes" : "no"}</div>
 		</div>
 	)
 }
