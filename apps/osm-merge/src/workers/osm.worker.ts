@@ -2,7 +2,6 @@ import { Osm, type GeoBbox2D, type TileIndex } from "osm.ts"
 import * as Performance from "osm.ts/performance"
 import { expose, transfer } from "comlink"
 import type { _TileLoadProps } from "@deck.gl/geo-layers"
-import { MIN_PICKABLE_ZOOM } from "@/settings"
 
 const osmWorker = {
 	subscribeToPerformanceObserver(
@@ -72,30 +71,33 @@ const osmWorker = {
 	},
 	getWay(id: string, index: number) {
 		const way = this.osm(id).ways.getByIndex(index)
-		if (!way) return null
+		if (!way) throw Error(`Way not found for index ${index}`)
 		return {
 			way,
 			nodes: way.refs.map((ref) => this.osm(id).nodes.getById(ref)),
 		}
 	},
-	async getTileData(
+	async getTileBitmap(
 		id: string,
 		bbox: GeoBbox2D,
 		tileIndex: TileIndex,
 		tileSize = 512,
 	) {
 		const measure = Performance.createMeasure(
-			`generating tile data ${tileIndex.z}/${tileIndex.x}/${tileIndex.y}`,
+			`generating tile bitmap ${tileIndex.z}/${tileIndex.x}/${tileIndex.y}`,
 		)
 		try {
-			if (tileIndex.z < MIN_PICKABLE_ZOOM) {
-				const bitmap =
-					tileIndex.z < 9
-						? this.osm(id).getNodesBitmapForBbox(bbox, tileSize)
-						: this.osm(id).getBitmapForBbox(bbox, tileSize)
-				return transfer({ bitmap }, [bitmap.buffer])
-			}
-
+			const bitmap = this.osm(id).getBitmapForBbox(bbox, tileSize)
+			return transfer({ bitmap }, [bitmap.buffer])
+		} finally {
+			measure()
+		}
+	},
+	async getTileData(id: string, bbox: GeoBbox2D) {
+		const measure = Performance.createMeasure(
+			`generating nodes and ways within bbox ${bbox.join(", ")}`,
+		)
+		try {
 			const nodeResults = this.osm(id).getNodesInBbox(bbox)
 			const wayResults = this.osm(id).getWaysInBbox(bbox)
 			return transfer(

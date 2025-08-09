@@ -183,14 +183,15 @@ export class Osm {
 
 		console.time("Osm.getWaysInBbox.loop")
 		let size = 0
-		for (let i = 0; i < wayCandidates.length; i++) {
-			const w = wayCandidates[i]
+		wayCandidates.forEach((w, i) => {
 			wayIndexes[i] = w
 			const way = this.ways.getLine(w)
 			size += way.length
 			wayPositions.push(way)
-			wayStartIndices[i + 1] = wayStartIndices[i] + way.length / 2
-		}
+			const prevIndex = wayStartIndices[i]
+			if (prevIndex === undefined) throw Error("Previous index is undefined")
+			wayStartIndices[i + 1] = prevIndex + way.length / 2
+		})
 		console.timeEnd("Osm.getWaysInBbox.loop")
 
 		const wayPositionsArray = new Float64Array(size)
@@ -276,7 +277,7 @@ export class Osm {
 	}
 
 	createNode(lonLat: LonLat) {
-		const maxNodeId = this.nodes.idByIndex.at(-1) ?? 0
+		const maxNodeId = this.nodes.ids.at(-1) ?? 0
 		return this.nodes.addNode({
 			id: maxNodeId + 1,
 			...lonLat,
@@ -358,7 +359,7 @@ export class Osm {
 		for (const change of changes) {
 			this.applyChange(change)
 		}
-		this.nodes.buildIdIndex()
+		this.nodes.buildSpatialIndex()
 		this.ways.buildSpatialIndex()
 	}
 

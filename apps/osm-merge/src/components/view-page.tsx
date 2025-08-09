@@ -27,7 +27,7 @@ import { Source, Layer } from "react-map-gl/maplibre"
 import { Button } from "./ui/button"
 import type { OsmPbfHeaderBlock } from "../../../../packages/osm.ts/src/pbf/proto/osmformat"
 import { addLogMessageAtom } from "@/atoms"
-import { MIN_PICKABLE_ZOOM } from "@/settings"
+import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
 import * as Performance from "osm.ts/performance"
 import Log from "./log"
 
@@ -183,24 +183,74 @@ export default function ViewPage() {
 			})
 	}, [file, osmId, osmWorker, logMessage, map])
 
-	const tileLayer = useMemo(() => {
-		if (!osmWorker || !osmInfo || !bbox) return null
+	const tiledBitmapLayer = useMemo(() => {
+		if (!osmWorker || !bbox) return null
+		const idPrefix = `${APPID}:${osmId}:bitmap-tiles`
 		return new TileLayer<Awaited<
-			ReturnType<typeof osmWorker.getTileData>
+			ReturnType<typeof osmWorker.getTileBitmap>
 		> | null>({
-			id: `osm-tk:tiles-${osmId}`,
+			id: idPrefix,
 			extent: bbox,
 			getTileData: async (tile) => {
-				const bbox = tile.bbox as GeoBoundingBox
+				if (tile.index.z >= MIN_PICKABLE_ZOOM) return null
 				logMessage(
-					`generating data for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
+					`generating bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
 				)
-				const data = await osmWorker.getTileData(
+				const bbox = tile.bbox as GeoBoundingBox
+				const data = await osmWorker.getTileBitmap(
 					osmId,
 					[bbox.west, bbox.south, bbox.east, bbox.north],
 					tile.index,
 					TILE_SIZE,
 				)
+				return data
+			},
+			renderSubLayers: (props) => {
+				const { tile, data } = props
+				const { x, y, z } = tile.index
+				const tileBbox = tile.bbox as GeoBoundingBox
+				return [
+					new BitmapLayer({
+						id: `${idPrefix}:${z}/${x}/${y}`,
+						visible: z < MIN_PICKABLE_ZOOM,
+						_imageCoordinateSystem: COORDINATE_SYSTEM.LNGLAT,
+						bounds: [
+							tileBbox.west,
+							tileBbox.south,
+							tileBbox.east,
+							tileBbox.north,
+						],
+						image: {
+							data: data?.bitmap ?? new Uint8Array(TILE_SIZE * TILE_SIZE * 4),
+							width: TILE_SIZE,
+							height: TILE_SIZE,
+						},
+					}),
+				]
+			},
+		})
+	}, [logMessage, osmId, osmWorker, bbox])
+
+	const tileLayer = useMemo(() => {
+		if (!osmWorker || !osmInfo || !bbox) return null
+		const idPrefix = `${APPID}:${osmId}:tiles`
+		return new TileLayer<Awaited<
+			ReturnType<typeof osmWorker.getTileData>
+		> | null>({
+			id: idPrefix,
+			extent: bbox,
+			getTileData: async (tile) => {
+				if (tile.index.z < MIN_PICKABLE_ZOOM) return null
+				const bbox = tile.bbox as GeoBoundingBox
+				logMessage(
+					`generating data for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
+				)
+				const data = await osmWorker.getTileData(osmId, [
+					bbox.west,
+					bbox.south,
+					bbox.east,
+					bbox.north,
+				])
 				logMessage(
 					`tile data for ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
 					"ready",
@@ -215,122 +265,100 @@ export default function ViewPage() {
 			},
 			renderSubLayers: (props) => {
 				const { tile, data } = props
-				const { x, y, z } = tile.index
 				if (!data) return null
-				const tileBbox = tile.bbox as GeoBoundingBox
+				const { x, y, z } = tile.index
+				const tilePrefix = `${idPrefix}:${z}/${x}/${y}`
 				const layers: DeckGlLayer[] = []
-				if ("bitmap" in data) {
-					layers.push(
-						new BitmapLayer({
-							id: `osm-tk:bitmap-${x}-${y}-${z}`,
-							_imageCoordinateSystem: COORDINATE_SYSTEM.LNGLAT,
-							bounds: [
-								tileBbox.west,
-								tileBbox.south,
-								tileBbox.east,
-								tileBbox.north,
-							],
-							image: {
-								data: data.bitmap,
-								width: TILE_SIZE,
-								height: TILE_SIZE,
+				layers.push(
+					new ScatterplotLayer({
+						id: `${tilePrefix}:nodes`,
+						data: {
+							length: data.nodes.positions.length / 2,
+							attributes: {
+								getPosition: { value: data.nodes.positions, size: 2 },
 							},
-						}),
-					)
-				} else {
-					layers.push(
-						new ScatterplotLayer({
-							id: `osm-tk:nodes-${x}-${y}-${z}`,
-							data: {
-								length: data.nodes.positions.length / 2,
-								attributes: {
-									getPosition: { value: data.nodes.positions, size: 2 },
-								},
-							},
-							pickable: true,
-							autoHighlight: true,
-							radiusUnits: "meters",
-							getRadius: 3,
-							radiusMinPixels: 1,
-							radiusMaxPixels: 10,
-							getFillColor: [255, 255, 255, 255],
-							highlightColor: [255, 0, 0, 255 * 0.5],
-							onClick: (info) => {
-								console.log("ScatterplotLayer.onClick", info)
-								if (info.picked) {
-									const nodeIndex = data.nodes.indexes.at(info.index)
-									if (nodeIndex) {
+						},
+						pickable: true,
+						autoHighlight: true,
+						radiusUnits: "meters",
+						getRadius: 3,
+						radiusMinPixels: 1,
+						radiusMaxPixels: 10,
+						getFillColor: [255, 255, 255, 255],
+						highlightColor: [255, 0, 0, 255 * 0.5],
+						onClick: (info) => {
+							console.log("ScatterplotLayer.onClick", info)
+							if (info.picked) {
+								const nodeIndex = data.nodes.indexes.at(info.index)
+								if (nodeIndex) {
+									dispatch({
+										type: "SELECT",
+										tileIndex: info.index,
+										index: nodeIndex,
+										entityType: "node",
+									})
+									osmWorker.getNode(osmId, nodeIndex).then((node) => {
+										if (!node)
+											throw Error(`Node not found for index ${nodeIndex}`)
 										dispatch({
-											type: "SELECT",
-											tileIndex: info.index,
+											type: "SET_NODE",
 											index: nodeIndex,
-											entityType: "node",
+											node,
 										})
-										osmWorker.getNode(osmId, nodeIndex).then((node) => {
-											if (!node)
-												throw Error(`Node not found for index ${nodeIndex}`)
-											dispatch({
-												type: "SET_NODE",
-												index: nodeIndex,
-												node,
-											})
-										})
-									}
-									return true
+									})
 								}
+								return true
+							}
+						},
+					}),
+				)
+				layers.push(
+					new PathLayer({
+						id: `${tilePrefix}:ways`,
+						data: {
+							length: data.ways.positions.length / 2,
+							startIndices: data.ways.startIndices,
+							attributes: {
+								getPath: { value: data.ways.positions, size: 2 },
 							},
-						}),
-					)
-					layers.push(
-						new PathLayer({
-							id: `osm-tk:ways-${x}-${y}-${z}`,
-							data: {
-								length: data.ways.positions.length / 2,
-								startIndices: data.ways.startIndices,
-								attributes: {
-									getPath: { value: data.ways.positions, size: 2 },
-								},
-							},
-							getWidth: 3,
-							widthUnits: "meters",
-							widthMinPixels: 0.5,
-							widthMaxPixels: 10,
-							getColor: [255, 255, 255, 255],
-							pickable: true,
-							autoHighlight: true,
-							highlightColor: [255, 0, 0, 255 * 0.5],
-							_pathType: "open",
-							onClick: (info) => {
-								console.log("PathLayer.onClick", info)
-								if (info.picked && data.ways) {
-									const wayIndex = data.ways.indexes.at(info.index)
-									if (wayIndex) {
+						},
+						getWidth: 3,
+						widthUnits: "meters",
+						widthMinPixels: 0.5,
+						widthMaxPixels: 10,
+						getColor: [255, 255, 255, 255],
+						pickable: true,
+						autoHighlight: true,
+						highlightColor: [255, 0, 0, 255 * 0.5],
+						_pathType: "open",
+						onClick: (info) => {
+							console.log("PathLayer.onClick", info)
+							if (info.picked && data.ways) {
+								const wayIndex = data.ways.indexes.at(info.index)
+								if (wayIndex !== undefined) {
+									dispatch({
+										type: "SELECT",
+										tileIndex: info.index,
+										index: wayIndex,
+										entityType: "way",
+									})
+									osmWorker.getWay(osmId, wayIndex).then((way) => {
 										dispatch({
-											type: "SELECT",
-											tileIndex: info.index,
+											type: "SET_WAY",
 											index: wayIndex,
-											entityType: "way",
+											way,
 										})
-										osmWorker.getWay(osmId, wayIndex).then((way) => {
-											if (!way)
-												throw Error(`Way not found for index ${wayIndex}`)
-											dispatch({
-												type: "SET_WAY",
-												index: wayIndex,
-												way,
-											})
-										})
-									}
+									})
 								}
-							},
-						}),
-					)
-				}
+							}
+						},
+					}),
+				)
 
 				if (tile.bbox && "west" in tile.bbox) {
 					layers.push(
 						new GeoJsonLayer({
-							id: `osm-tk:bbox-${x}-${y}-${z}`,
+							id: `${tilePrefix}:bbox`,
 							data: bboxPolygon([
 								tile.bbox.west,
 								tile.bbox.south,
@@ -436,15 +464,18 @@ export default function ViewPage() {
 					)}
 					<DeckGlOverlay
 						// useDevicePixels={false}
-						layers={[tileLayer]}
+						layers={[tiledBitmapLayer, tileLayer]}
 						pickingRadius={5}
 						getTooltip={(pickingInfo) => {
 							// console.log("getTooltip", pickingInfo)
-							if (pickingInfo.sourceLayer?.id?.startsWith("osm-tk:nodes-")) {
-								return "node"
-							}
-							if (pickingInfo.sourceLayer?.id?.startsWith("osm-tk:ways-")) {
-								return "way"
+							const sourceLayerId = pickingInfo.sourceLayer?.id
+							if (sourceLayerId?.startsWith(`${APPID}:${osmId}`)) {
+								if (sourceLayerId.includes("nodes")) {
+									return "node"
+								}
+								if (sourceLayerId.includes("ways")) {
+									return "way"
+								}
 							}
 							return null
 						}}
