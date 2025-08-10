@@ -76,11 +76,14 @@ export class RelationIndex extends EntityIndex<OsmRelation> {
 		}
 	}
 
-	addRelations(relations: OsmPbfRelation[], block: OsmPbfPrimitiveBlock) {
+	addRelations(
+		relations: OsmPbfRelation[],
+		blockStringIndexMap: Map<number, number>,
+	) {
 		const blockToStringTable = (k: number) => {
-			const bytesString = block.stringtable[k]
-			if (!bytesString) throw Error("Tag key not found")
-			return this.stringTable.addBytes(bytesString)
+			const index = blockStringIndexMap.get(k)
+			if (index === undefined) throw Error("Tag key not found")
+			return index
 		}
 
 		for (const relation of relations) {

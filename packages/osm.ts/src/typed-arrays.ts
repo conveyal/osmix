@@ -67,7 +67,7 @@ export class ResizeableTypedArray<T extends TypedArray>
 		return rta
 	}
 
-	constructor(ArrayType: TypedArrayConstructor<T>, startingLength = 1_000) {
+	constructor(ArrayType: TypedArrayConstructor<T>, startingLength = 10_000) {
 		this.ArrayType = ArrayType
 		this.bufferSize = startingLength * this.ArrayType.BYTES_PER_ELEMENT
 		this.buffer = new BufferConstructor(this.bufferSize)

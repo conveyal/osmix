@@ -10,7 +10,11 @@ import {
 import type { NodeIndex } from "./node-index"
 import type StringTable from "./stringtable"
 import Flatbush from "flatbush"
-import type { OsmPbfPrimitiveBlock, OsmPbfWay } from "./pbf"
+import type {
+	OsmPbfPrimitiveBlock,
+	OsmPbfWay,
+	PrimitiveBlockParser,
+} from "./pbf"
 import { IdIndex, type IdOrIndex } from "./id-index"
 import { TagIndex } from "./tag-index"
 
@@ -103,7 +107,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	/**
 	 * Bulk add ways directly from a PBF PrimitiveBlock.
 	 */
-	addWays(ways: OsmPbfWay[], block: OsmPbfPrimitiveBlock) {
+	addWays(ways: OsmPbfWay[], blockStringIndexMap: Map<number, number>) {
 		for (const way of ways) {
 			this.ids.add(way.id)
 
@@ -133,14 +137,14 @@ export class WayIndex extends EntityIndex<OsmWay> {
 			this.bbox.push(bbox[3])
 
 			const tagKeys: number[] = way.keys.map((key) => {
-				const bytesString = block.stringtable[key]
-				if (!bytesString) throw Error("Tag key not found")
-				return this.stringTable.addBytes(bytesString)
+				const index = blockStringIndexMap.get(key)
+				if (index === undefined) throw Error("Tag key not found")
+				return index
 			})
 			const tagValues: number[] = way.vals.map((val) => {
-				const bytesString = block.stringtable[val]
-				if (!bytesString) throw Error("Tag value not found")
-				return this.stringTable.addBytes(bytesString)
+				const index = blockStringIndexMap.get(val)
+				if (index === undefined) throw Error("Tag value not found")
+				return index
 			})
 			this.tags.addTagKeysAndValues(tagKeys, tagValues)
 		}

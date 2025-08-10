@@ -112,10 +112,11 @@ export class Osm {
 		let stage: "nodes" | "ways" | "relations" = "nodes"
 		let entityUpdateCount = 8_000
 		for await (const block of reader.blocks) {
+			const blockStringIndexMap = this.stringTable.createBlockIndexMap(block)
 			const blockParser = new PrimitiveBlockParser(block)
 			for (const { nodes, ways, relations, dense } of block.primitivegroup) {
 				if (dense) {
-					this.nodes.addDenseNodes(dense, block)
+					this.nodes.addDenseNodes(dense, block, blockStringIndexMap)
 					entityCount += dense.id.length
 				}
 
@@ -136,7 +137,7 @@ export class Osm {
 						entityCount = 0
 						entityUpdateCount = 1_000
 					}
-					this.ways.addWays(ways, block)
+					this.ways.addWays(ways, blockStringIndexMap)
 					entityCount += ways.length
 				}
 
@@ -150,7 +151,7 @@ export class Osm {
 						entityCount = 0
 						entityUpdateCount = 1_000
 					}
-					this.relations.addRelations(relations, block)
+					this.relations.addRelations(relations, blockStringIndexMap)
 					entityCount += relations.length
 				}
 

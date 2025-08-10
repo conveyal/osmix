@@ -73,7 +73,11 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 		if (node.lat > this.bbox[3]) this.bbox[3] = node.lat
 	}
 
-	addDenseNodes(dense: OsmPbfDenseNodes, block: OsmPbfPrimitiveBlock) {
+	addDenseNodes(
+		dense: OsmPbfDenseNodes,
+		block: OsmPbfPrimitiveBlock,
+		blockStringIndexMap: Map<number, number>,
+	) {
 		const lon_offset = block.lon_offset ?? 0
 		const lat_offset = block.lat_offset ?? 0
 		const granularity = block.granularity ?? 1e7
@@ -87,12 +91,12 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 			user_sid: 0,
 		}
 
-		const getStringTableIndex = (index: number) => {
-			const key = dense.keys_vals[index]
+		const getStringTableIndex = (keyIndex: number) => {
+			const key = dense.keys_vals[keyIndex]
 			if (!key) return
-			const blockString = block.stringtable[key]
-			if (!blockString) throw Error("Block string not found")
-			return this.stringTable.addBytes(blockString)
+			const index = blockStringIndexMap.get(key)
+			if (index === undefined) throw Error("Block string not found")
+			return index
 		}
 
 		let keysValsIndex = 0

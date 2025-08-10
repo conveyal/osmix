@@ -217,6 +217,10 @@ export default function ViewPage() {
 					tile.index,
 					TILE_SIZE,
 				)
+				logMessage(
+					`bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
+					"ready",
+				)
 				return data
 			},
 			renderSubLayers: (props) => {
