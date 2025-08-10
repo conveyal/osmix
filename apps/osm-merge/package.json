@@ -35,7 +35,6 @@
 		"clsx": "^2.1.1",
 		"comlink": "^4.4.2",
 		"jotai": "^2.12.5",
-		"kdbush": "^4.0.2",
 		"lucide-react": "^0.513.0",
 		"maplibre-gl": "^5.5.0",
 		"native-file-system-adapter": "^3.0.1",
