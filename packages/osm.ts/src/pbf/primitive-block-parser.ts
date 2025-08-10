@@ -12,6 +12,7 @@ import type {
 	OsmPbfPrimitiveBlock,
 	OsmPbfPrimitiveGroup,
 	OsmPbfRelation,
+	OsmPbfStringTable,
 	OsmPbfWay,
 } from "./proto/osmformat"
 
@@ -23,8 +24,9 @@ type ParseOptions = {
 }
 
 export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
-	stringtable: string[] = [""]
+	stringtable: OsmPbfStringTable
 	primitivegroup: OsmPbfPrimitiveGroup[] = []
+	textDecoder = new TextDecoder()
 
 	date_granularity = 1_000
 	granularity = 1e7
@@ -44,6 +46,10 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 		this.granularity = block.granularity ?? 1e7
 		this.lat_offset = block.lat_offset ?? 0
 		this.lon_offset = block.lon_offset ?? 0
+	}
+
+	decodeString(index: number) {
+		return this.textDecoder.decode(this.stringtable[index])
 	}
 
 	/**
@@ -88,16 +94,16 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 					? undefined
 					: info.timestamp * this.date_granularity,
 			user:
-				info.user_sid === undefined || this.stringtable[info.user_sid]
+				info.user_sid === undefined
 					? undefined
-					: this.stringtable[info.user_sid],
+					: this.decodeString(info.user_sid),
 		}
 	}
 
 	getString(keys: number[], index: number) {
 		const key = keys[index]
 		if (!key) return
-		return this.stringtable[key]
+		return this.decodeString(key)
 	}
 
 	getTags(keys: number[], vals: number[]) {

@@ -49,33 +49,7 @@ const osmWorker = {
 		this.ids[id] = osm
 		await osm.initFromPbfData(data, onProgress)
 		measure()
-	},
-	bbox(id: string) {
-		return this.osm(id).bbox()
-	},
-	info(id: string) {
-		const osm = this.osm(id)
-		const bbox = osm.bbox()
-		if (!bbox) throw Error("Osm not loaded. No bbox.")
-		return {
-			bbox,
-			nodes: osm.nodes.size,
-			ways: osm.ways.size,
-			relations: osm.relations.size,
-			header: osm.header,
-			parsingTimeMs: osm.parsingTimeMs,
-		}
-	},
-	getNode(id: string, index: number) {
-		return this.osm(id).nodes.getByIndex(index)
-	},
-	getWay(id: string, index: number) {
-		const way = this.osm(id).ways.getByIndex(index)
-		if (!way) throw Error(`Way not found for index ${index}`)
-		return {
-			way,
-			nodes: way.refs.map((ref) => this.osm(id).nodes.getById(ref)),
-		}
+		return this.ids[id].transferables()
 	},
 	async getTileBitmap(
 		id: string,
@@ -88,7 +62,7 @@ const osmWorker = {
 		)
 		try {
 			const bitmap = this.osm(id).getBitmapForBbox(bbox, tileSize)
-			return transfer({ bitmap }, [bitmap.buffer])
+			return transfer(bitmap, [bitmap.buffer])
 		} finally {
 			measure()
 		}

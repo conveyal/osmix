@@ -35,11 +35,23 @@ import UnorderedPairMap from "./unordered-pair-map"
 import { isNode, isRelation, isWay } from "./utils"
 import { wayIsArea } from "./way-is-area"
 import { OsmPbfWriter } from "./pbf/osm-pbf-writer"
-import { NodeIndex } from "./node-index"
-import { WayIndex } from "./way-index"
-import { RelationIndex } from "./relation-index"
-import StringTable from "./stringtable"
+import { NodeIndex, type NodeIndexTransferables } from "./node-index"
+import { WayIndex, type WayIndexTransferables } from "./way-index"
+import {
+	RelationIndex,
+	type RelationIndexTransferables,
+} from "./relation-index"
+import StringTable, { type StringTableTransferables } from "./stringtable"
 import { Bitmap } from "./raster"
+
+export interface OsmTransferables {
+	header: OsmPbfHeaderBlock
+	stringTable: StringTableTransferables
+	nodes: NodeIndexTransferables
+	ways: WayIndexTransferables
+	relations: RelationIndexTransferables
+	parsingTimeMs: number
+}
 
 /**
  * Requires sorted IDs.
@@ -49,17 +61,31 @@ export class Osm {
 	blocksGenerator: AsyncGenerator<OsmPbfPrimitiveBlock> | null = null
 
 	// Shared string lookup table for all nodes, ways, and relations
-	stringTable = new StringTable()
+	stringTable: StringTable = new StringTable()
 	nodes: NodeIndex = new NodeIndex(this.stringTable)
 	ways: WayIndex = new WayIndex(this.stringTable, this.nodes)
-	relations: RelationIndex = new RelationIndex(
-		this.stringTable,
-		this.nodes,
-		this.ways,
-	)
+	relations: RelationIndex = new RelationIndex(this.stringTable)
 
 	#finished = false
 	parsingTimeMs = 0
+
+	static from({
+		header,
+		stringTable,
+		nodes,
+		ways,
+		relations,
+		parsingTimeMs,
+	}: OsmTransferables) {
+		const osm = new Osm(header)
+		osm.stringTable = StringTable.from(stringTable)
+		osm.nodes = NodeIndex.from(osm.stringTable, nodes)
+		osm.ways = WayIndex.from(osm.stringTable, osm.nodes, ways)
+		osm.relations = RelationIndex.from(osm.stringTable, relations)
+		osm.parsingTimeMs = parsingTimeMs
+		osm.#finished = true
+		return osm
+	}
 
 	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
 		const osm = new Osm()
@@ -84,50 +110,53 @@ export class Osm {
 
 		let entityCount = 0
 		let stage: "nodes" | "ways" | "relations" = "nodes"
-		let entityUpdateInterval = 100_000
+		let entityUpdateCount = 8_000
 		for await (const block of reader.blocks) {
 			const blockParser = new PrimitiveBlockParser(block)
-			for (const group of block.primitivegroup) {
-				if (group.ways.length > 0 && stage === "nodes") {
-					onProgress(
-						`Loaded ${this.nodes.size.toLocaleString()} nodes. Building node spatial index...`,
-					)
-					this.nodes.finish()
-					stage = "ways"
-					entityCount = 0
-					entityUpdateInterval = 100_000
+			for (const { nodes, ways, relations, dense } of block.primitivegroup) {
+				if (dense) {
+					this.nodes.addDenseNodes(dense, block)
+					entityCount += dense.id.length
 				}
 
-				if (group.relations.length > 0 && stage === "ways") {
-					onProgress(
-						`Loaded ${this.ways.size.toLocaleString()} ways. Building way spatial index...`,
-					)
-					this.ways.finish()
-					stage = "relations"
-					entityCount = 0
-					entityUpdateInterval = 100_000
+				if (nodes.length > 0) {
+					for (const node of nodes) {
+						this.nodes.addNode(blockParser.parseNode(node))
+					}
+					entityCount += nodes.length
 				}
 
-				if (group.dense) this.nodes.addDenseNodes(group.dense, block)
-
-				for (const node of group.nodes) {
-					this.nodes.addNode(blockParser.parseNode(node))
+				if (ways.length > 0) {
+					if (stage === "nodes") {
+						onProgress(
+							`Loaded ${this.nodes.size.toLocaleString()} nodes. Building node spatial index...`,
+						)
+						this.nodes.finish()
+						stage = "ways"
+						entityCount = 0
+						entityUpdateCount = 1_000
+					}
+					this.ways.addWays(ways, block)
+					entityCount += ways.length
 				}
 
-				if (group.ways.length > 0) this.ways.addWays(group.ways, block)
-
-				for (const relation of group.relations) {
-					this.relations.addRelation(blockParser.parseRelation(relation))
+				if (relations.length > 0) {
+					if (stage === "ways") {
+						onProgress(
+							`Loaded ${this.ways.size.toLocaleString()} ways. Building way spatial index...`,
+						)
+						this.ways.finish()
+						stage = "relations"
+						entityCount = 0
+						entityUpdateCount = 1_000
+					}
+					this.relations.addRelations(relations, block)
+					entityCount += relations.length
 				}
 
-				entityCount +=
-					group.nodes.length +
-					group.ways.length +
-					group.relations.length +
-					(group.dense?.id.length ?? 0)
-				if (entityCount % entityUpdateInterval === 0) {
+				if (entityCount >= entityUpdateCount) {
 					onProgress(`${entityCount.toLocaleString()} ${stage} loaded`)
-					if (entityCount > 1_000_000) entityUpdateInterval = 1_000_000
+					entityUpdateCount *= 2
 				}
 			}
 		}
@@ -150,11 +179,22 @@ export class Osm {
 		return this.#finished
 	}
 
+	transferables(): OsmTransferables {
+		return {
+			header: this.header,
+			stringTable: this.stringTable.transferables(),
+			nodes: this.nodes.transferables(),
+			ways: this.ways.transferables(),
+			relations: this.relations.transferables(),
+			parsingTimeMs: this.parsingTimeMs,
+		}
+	}
+
 	getNodesInBbox(bbox: GeoBbox2D) {
 		if (!this.#finished) throw new Error("Osm not finished")
 		console.time("Osm.getNodesInBbox")
 		const nodeCandidates = this.nodes.withinBbox(bbox)
-		const nodePositions = new Float32Array(nodeCandidates.length * 2)
+		const nodePositions = new Float64Array(nodeCandidates.length * 2)
 		const nodeIndexes = new Uint32Array(nodeCandidates.length)
 		let pIndex = 0
 		for (const nodeIndex of nodeCandidates) {

@@ -1,18 +1,55 @@
-import { ResizeableIndexArray, ResizeableTypedArray } from "./typed-arrays"
+import {
+	IndexArrayType,
+	ResizeableTypedArray,
+	type TypedArrayBuffer,
+} from "./typed-arrays"
 import type StringTable from "./stringtable"
 import type { OsmTags } from "./types"
 
+export type TagIndexTransferables = {
+	tagStart: TypedArrayBuffer
+	tagCount: TypedArrayBuffer
+	tagKeys: TypedArrayBuffer
+	tagVals: TypedArrayBuffer
+}
+
 export class TagIndex {
 	private stringTable: StringTable
-	private tagStartByIndex = new ResizeableIndexArray()
-	private tagCountByIndex = new ResizeableTypedArray(Uint8Array) // Maximum 255 tags per entity
-	private tagKeyIndexes = new ResizeableIndexArray()
-	private tagValIndexes = new ResizeableIndexArray()
+	private tagStart = new ResizeableTypedArray(IndexArrayType)
+	private tagCount = new ResizeableTypedArray(Uint8Array) // Maximum 255 tags per entity
+	private tagKeys = new ResizeableTypedArray(IndexArrayType)
+	private tagVals = new ResizeableTypedArray(IndexArrayType)
 
 	private indexBuilt = false
 
+	static from(
+		stringTable: StringTable,
+		{ tagStart, tagCount, tagKeys, tagVals }: TagIndexTransferables,
+	) {
+		const tagIndex = new TagIndex(stringTable)
+		tagIndex.tagStart = ResizeableTypedArray.from(IndexArrayType, tagStart)
+		tagIndex.tagCount = ResizeableTypedArray.from(Uint8Array, tagCount)
+		tagIndex.tagKeys = ResizeableTypedArray.from(IndexArrayType, tagKeys)
+		tagIndex.tagVals = ResizeableTypedArray.from(IndexArrayType, tagVals)
+		tagIndex.indexBuilt = true
+		return tagIndex
+	}
+
 	constructor(stringTable: StringTable) {
 		this.stringTable = stringTable
+	}
+
+	transferables() {
+		return {
+			tagStart: this.tagStart.array.buffer,
+			tagCount: this.tagCount.array.buffer,
+			tagKeys: this.tagKeys.array.buffer,
+			tagVals: this.tagVals.array.buffer,
+		}
+	}
+
+	addString(s: string) {
+		return this.stringTable.add(s)
 	}
 
 	addTags(tags?: OsmTags) {
@@ -21,8 +58,8 @@ export class TagIndex {
 
 		if (tags) {
 			for (const [key, value] of Object.entries(tags)) {
-				tagKeys.push(this.stringTable.add(key))
-				tagValues.push(this.stringTable.add(String(value)))
+				tagKeys.push(this.addString(key))
+				tagValues.push(this.addString(String(value)))
 			}
 		}
 
@@ -30,17 +67,17 @@ export class TagIndex {
 	}
 
 	addTagKeysAndValues(keys: number[], values: number[]) {
-		this.tagStartByIndex.push(this.tagKeyIndexes.length)
-		this.tagCountByIndex.push(keys.length)
-		this.tagKeyIndexes.pushMany(keys)
-		this.tagValIndexes.pushMany(values)
+		this.tagStart.push(this.tagKeys.length)
+		this.tagCount.push(keys.length)
+		this.tagKeys.pushMany(keys)
+		this.tagVals.pushMany(values)
 	}
 
 	finish() {
-		this.tagStartByIndex.compact()
-		this.tagCountByIndex.compact()
-		this.tagKeyIndexes.compact()
-		this.tagValIndexes.compact()
+		this.tagStart.compact()
+		this.tagCount.compact()
+		this.tagKeys.compact()
+		this.tagVals.compact()
 		this.indexBuilt = true
 	}
 
@@ -49,26 +86,28 @@ export class TagIndex {
 	}
 
 	hasTags(index: number): boolean {
-		return this.tagCountByIndex.at(index) > 0
+		return this.tagCount.at(index) > 0
 	}
 
 	getTags(index: number): OsmTags | undefined {
-		const tagCount = this.tagCountByIndex.at(index)
+		const tagCount = this.tagCount.at(index)
 		if (tagCount === 0) return
-		const tagStart = this.tagStartByIndex.at(index)
-		const tagKeyIndexes = this.tagKeyIndexes.array.slice(
+		const tagStart = this.tagStart.at(index)
+		const tagKeyIndexes = this.tagKeys.array.slice(
 			tagStart,
 			tagStart + tagCount,
 		)
-		const tagValIndexes = this.tagValIndexes.array.slice(
+		const tagValIndexes = this.tagVals.array.slice(
 			tagStart,
 			tagStart + tagCount,
 		)
 		const tags: OsmTags = {}
 		for (let i = 0; i < tagCount; i++) {
-			tags[this.stringTable.get(tagKeyIndexes[i])] = this.stringTable.get(
-				tagValIndexes[i],
-			)
+			const keyIndex = tagKeyIndexes[i]
+			const valIndex = tagValIndexes[i]
+			if (keyIndex === undefined || valIndex === undefined)
+				throw Error("Tag key or value not found")
+			tags[this.stringTable.get(keyIndex)] = this.stringTable.get(valIndex)
 		}
 		return tags
 	}

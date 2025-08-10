@@ -6,12 +6,15 @@ import type {
 	OsmPbfNode,
 	OsmPbfPrimitiveBlock,
 	OsmPbfPrimitiveGroup,
+	OsmPbfStringTable,
 } from "./proto/osmformat"
 
 export const MAX_ENTITIES_PER_BLOCK = 8_000
 
 export class PrimitiveBlockBuilder implements OsmPbfPrimitiveBlock {
-	stringtable: string[] = [""]
+	stringtable: OsmPbfStringTable = []
+	private stringToIndex = new Map<string, number>()
+	private encoder = new TextEncoder()
 
 	// Only one group is allowed in a block
 	primitivegroup: OsmPbfPrimitiveGroup[] = [
@@ -58,12 +61,13 @@ export class PrimitiveBlockBuilder implements OsmPbfPrimitiveBlock {
 		return g
 	}
 
-	getStringtableIndex(key: string) {
-		let index = this.stringtable.findIndex((t) => t === key)
-		if (index === -1) {
-			this.stringtable.push(key)
-			index = this.stringtable.length - 1
-		}
+	getStringtableIndex(key: string): number {
+		const existingIndex = this.stringToIndex.get(key)
+		if (existingIndex !== undefined) return existingIndex
+		const index = this.stringtable.length
+		const encoded = this.encoder.encode(key)
+		this.stringtable.push(encoded)
+		this.stringToIndex.set(key, index)
 		return index
 	}
 

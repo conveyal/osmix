@@ -1,14 +1,27 @@
 import KDBush from "kdbush"
-import { ResizeableCoordinateArray } from "./typed-arrays"
+import {
+	BufferConstructor,
+	CoordinateArrayType,
+	ResizeableTypedArray,
+	type TypedArrayBuffer,
+} from "./typed-arrays"
 import type { GeoBbox2D, OsmNode, OsmTags } from "./types"
-import { EntityIndex } from "./entity-index"
+import { EntityIndex, type EntityIndexTransferables } from "./entity-index"
 import type StringTable from "./stringtable"
 import type { OsmPbfDenseNodes, OsmPbfPrimitiveBlock } from "./pbf"
-import type { IdOrIndex } from "./id-index"
+import { IdIndex, type IdOrIndex } from "./id-index"
+import { TagIndex } from "./tag-index"
+
+export interface NodeIndexTransferables extends EntityIndexTransferables {
+	lons: TypedArrayBuffer
+	lats: TypedArrayBuffer
+	bbox: GeoBbox2D
+	spatialIndex: TypedArrayBuffer
+}
 
 export class NodeIndex extends EntityIndex<OsmNode> {
-	lons = new ResizeableCoordinateArray()
-	lats = new ResizeableCoordinateArray()
+	lons = new ResizeableTypedArray(CoordinateArrayType)
+	lats = new ResizeableTypedArray(CoordinateArrayType)
 	bbox: GeoBbox2D = [
 		Number.POSITIVE_INFINITY,
 		Number.POSITIVE_INFINITY,
@@ -17,8 +30,34 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 	]
 	spatialIndex: KDBush = new KDBush(0)
 
-	constructor(stringTable: StringTable) {
-		super(stringTable, "node")
+	static from(stringTable: StringTable, nits: NodeIndexTransferables) {
+		const idIndex = IdIndex.from(nits)
+		const tagIndex = TagIndex.from(stringTable, nits)
+		const nodeIndex = new NodeIndex(stringTable, idIndex, tagIndex)
+		nodeIndex.lons = ResizeableTypedArray.from(Float64Array, nits.lons)
+		nodeIndex.lats = ResizeableTypedArray.from(Float64Array, nits.lats)
+		nodeIndex.bbox = nits.bbox
+		nodeIndex.spatialIndex = KDBush.from(nits.spatialIndex)
+		return nodeIndex
+	}
+
+	constructor(
+		stringTable: StringTable,
+		idIndex?: IdIndex,
+		tagIndex?: TagIndex,
+	) {
+		super("node", stringTable, idIndex, tagIndex)
+	}
+
+	transferables(): NodeIndexTransferables {
+		return {
+			lons: this.lons.array.buffer,
+			lats: this.lats.array.buffer,
+			bbox: this.bbox,
+			spatialIndex: this.spatialIndex.data,
+			...this.ids.transferables(),
+			...this.tags.transferables(),
+		}
 	}
 
 	addNode(node: OsmNode) {
@@ -52,7 +91,8 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 			const key = dense.keys_vals[index]
 			if (!key) return
 			const blockString = block.stringtable[key]
-			return this.stringTable.add(blockString)
+			if (!blockString) throw Error("Block string not found")
+			return this.stringTable.addBytes(blockString)
 		}
 
 		let keysValsIndex = 0
@@ -60,6 +100,10 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 			const idSid = dense.id[i]
 			const latSid = dense.lat[i]
 			const lonSid = dense.lon[i]
+
+			if (idSid === undefined) throw Error("Dense node ID not found")
+			if (latSid === undefined) throw Error("Dense node lat not found")
+			if (lonSid === undefined) throw Error("Dense node lon not found")
 
 			delta.id += idSid
 			delta.lat += latSid
@@ -103,7 +147,12 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 
 	buildSpatialIndex() {
 		console.time("NodeIndex.buildSpatialIndex")
-		this.spatialIndex = new KDBush(this.size, 128)
+		this.spatialIndex = new KDBush(
+			this.size,
+			128,
+			Float64Array,
+			BufferConstructor,
+		)
 		for (let i = 0; i < this.size; i++) {
 			this.spatialIndex.add(this.lons.at(i), this.lats.at(i))
 		}

@@ -11,7 +11,7 @@ import {
 import { bboxPolygon } from "@turf/turf"
 import * as Comlink from "comlink"
 import { useAtomValue, useSetAtom } from "jotai"
-import type { GeoBbox2D, OsmNode, OsmWay } from "osm.ts"
+import { Osm, type GeoBbox2D, type OsmNode, type OsmWay } from "osm.ts"
 import {
 	Fragment,
 	useEffect,
@@ -109,10 +109,12 @@ export default function ViewPage() {
 	const currentFileRef = useRef<File | null>(null)
 	const map = useAtomValue(mapAtom)
 	const osmWorker = useOsmWorker()
+	const [osm, setOsm] = useState<Osm | null>(null)
 	const [osmInfo, setOsmInfo] = useState<{
 		bbox: GeoBbox2D
 		nodes: number
 		ways: number
+		relations: number
 		header: OsmPbfHeaderBlock
 		parsingTimeMs: number
 	} | null>(null)
@@ -163,6 +165,7 @@ export default function ViewPage() {
 		}
 		logMessage(`Processing file ${file.name}...`)
 		const stream = file.stream()
+		setOsm(null)
 		setOsmInfo(null)
 		osmWorker
 			.initFromPbfData(
@@ -170,21 +173,32 @@ export default function ViewPage() {
 				Comlink.transfer(stream, [stream]),
 				Comlink.proxy((msg) => logMessage(msg)),
 			)
-			.then(async () => {
+			.then(async (osmBuffers) => {
 				if (file === currentFileRef.current) {
-					const info = await osmWorker.info(osmId)
-					if (info) {
-						setOsmInfo(info)
-						logMessage(`${file.name} fully loaded.`, "ready")
-					} else {
-						logMessage(`${file.name} failed to load.`, "error")
-					}
+					const osm = Osm.from(osmBuffers)
+					const bbox = osm.bbox()
+					if (!bbox) throw Error("Osm not loaded. No bbox.")
+
+					setOsm(osm)
+					setOsmInfo({
+						bbox,
+						nodes: osm.nodes.size,
+						ways: osm.ways.size,
+						relations: osm.relations.size,
+						header: osm.header,
+						parsingTimeMs: osm.parsingTimeMs,
+					})
+					logMessage(`${file.name} fully loaded.`, "ready")
 				}
+			})
+			.catch((e) => {
+				console.error(e)
+				logMessage(`${file.name} failed to load.`, "error")
 			})
 	}, [file, osmId, osmWorker, logMessage, map])
 
 	const tiledBitmapLayer = useMemo(() => {
-		if (!osmWorker || !bbox) return null
+		if (!osmId || !osmWorker || !bbox) return null
 		const idPrefix = `${APPID}:${osmId}:bitmap-tiles`
 		return new TileLayer<Awaited<
 			ReturnType<typeof osmWorker.getTileBitmap>
@@ -221,7 +235,7 @@ export default function ViewPage() {
 							tileBbox.north,
 						],
 						image: {
-							data: data?.bitmap ?? new Uint8Array(TILE_SIZE * TILE_SIZE * 4),
+							data: data ?? new Uint8Array(TILE_SIZE * TILE_SIZE * 4),
 							width: TILE_SIZE,
 							height: TILE_SIZE,
 						},
@@ -232,7 +246,7 @@ export default function ViewPage() {
 	}, [logMessage, osmId, osmWorker, bbox])
 
 	const tileLayer = useMemo(() => {
-		if (!osmWorker || !osmInfo || !bbox) return null
+		if (!osmWorker || !osmInfo || !bbox || !osm) return null
 		const idPrefix = `${APPID}:${osmId}:tiles`
 		return new TileLayer<Awaited<
 			ReturnType<typeof osmWorker.getTileData>
@@ -297,14 +311,11 @@ export default function ViewPage() {
 										index: nodeIndex,
 										entityType: "node",
 									})
-									osmWorker.getNode(osmId, nodeIndex).then((node) => {
-										if (!node)
-											throw Error(`Node not found for index ${nodeIndex}`)
-										dispatch({
-											type: "SET_NODE",
-											index: nodeIndex,
-											node,
-										})
+									const node = osm.nodes.getByIndex(nodeIndex)
+									dispatch({
+										type: "SET_NODE",
+										index: nodeIndex,
+										node,
 									})
 								}
 								return true
@@ -342,12 +353,15 @@ export default function ViewPage() {
 										index: wayIndex,
 										entityType: "way",
 									})
-									osmWorker.getWay(osmId, wayIndex).then((way) => {
-										dispatch({
-											type: "SET_WAY",
-											index: wayIndex,
+									const way = osm.ways.getByIndex(wayIndex)
+									const nodes = way.refs.map((ref) => osm.nodes.getById(ref))
+									dispatch({
+										type: "SET_WAY",
+										index: wayIndex,
+										way: {
 											way,
-										})
+											nodes,
+										},
 									})
 								}
 							}
@@ -375,7 +389,7 @@ export default function ViewPage() {
 				return layers
 			},
 		})
-	}, [bbox, logMessage, osmId, osmInfo, osmWorker])
+	}, [bbox, logMessage, osm, osmId, osmInfo, osmWorker])
 
 	return (
 		<div className="flex flex-row grow-1 h-full overflow-hidden">
@@ -384,6 +398,7 @@ export default function ViewPage() {
 					file={file}
 					setFile={(file) => {
 						setOsmInfo(null)
+						setOsm(null)
 						dispatch({ type: "CLEAR" })
 						setFile(file)
 					}}

@@ -27,7 +27,7 @@ export interface OsmPbfBlockSettings {
 }
 
 export interface OsmPbfPrimitiveBlock extends OsmPbfBlockSettings {
-	stringtable: string[]
+	stringtable: OsmPbfStringTable
 	primitivegroup: OsmPbfPrimitiveGroup[]
 }
 
@@ -38,9 +38,7 @@ export type OsmPbfPrimitiveGroup = {
 	relations: OsmPbfRelation[]
 }
 
-export type OsmPbfStringTable = {
-	s: Uint8Array[]
-}
+export type OsmPbfStringTable = Uint8Array[]
 
 export interface OsmPbfInfo {
 	version?: number
@@ -169,16 +167,13 @@ export function readPrimitiveBlock(
 	)
 }
 
-const textDecoder = new TextDecoder()
 function readPrimitiveBlockField(
 	tag: number,
 	obj: OsmPbfPrimitiveBlock,
 	pbf: Pbf,
 ) {
 	if (tag === 1) {
-		obj.stringtable = readStringTable(pbf, pbf.readVarint() + pbf.pos).s.map(
-			(s) => textDecoder.decode(s),
-		)
+		obj.stringtable = readStringTable(pbf, pbf.readVarint() + pbf.pos)
 	} else if (tag === 2) {
 		obj.primitivegroup.push(readPrimitiveGroup(pbf, pbf.readVarint() + pbf.pos))
 	} else if (tag === 17) {
@@ -189,12 +184,8 @@ function readPrimitiveBlockField(
 	else if (tag === 18) obj.date_granularity = pbf.readVarint(true) ?? 1000
 }
 
-const textEncoder = new TextEncoder()
 export function writePrimitiveBlock(obj: OsmPbfPrimitiveBlock, pbf: Pbf) {
-	if (obj.stringtable)
-		pbf.writeMessage(1, writeStringTable, {
-			s: obj.stringtable.map((s) => textEncoder.encode(s)),
-		})
+	if (obj.stringtable) pbf.writeMessage(1, writeStringTable, obj.stringtable)
 	if (obj.primitivegroup) {
 		for (const item of obj.primitivegroup) {
 			pbf.writeMessage(2, writePrimitiveGroup, item)
@@ -245,14 +236,14 @@ function writePrimitiveGroup(obj: OsmPbfPrimitiveGroup, pbf: Pbf) {
 }
 
 function readStringTable(pbf: Pbf, end?: number): OsmPbfStringTable {
-	return pbf.readFields(readStringTableField, { s: [] }, end)
+	return pbf.readFields(readStringTableField, [], end)
 }
-function readStringTableField(tag: number, obj: OsmPbfStringTable, pbf: Pbf) {
-	if (tag === 1) obj.s.push(pbf.readBytes())
+function readStringTableField(tag: number, obj: Uint8Array[], pbf: Pbf) {
+	if (tag === 1) obj.push(pbf.readBytes())
 }
 function writeStringTable(obj: OsmPbfStringTable, pbf: Pbf) {
-	if (obj.s) {
-		for (const item of obj.s) pbf.writeBytesField(1, item)
+	if (obj) {
+		for (const item of obj) pbf.writeBytesField(1, item)
 	}
 }
 

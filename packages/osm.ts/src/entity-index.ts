@@ -1,22 +1,30 @@
 import type StringTable from "./stringtable"
 import type { OsmEntity, OsmTags } from "./types"
-import { IdIndex, type IdOrIndex } from "./id-index"
-import { TagIndex } from "./tag-index"
+import { IdIndex, type IdIndexTransferables, type IdOrIndex } from "./id-index"
+import { TagIndex, type TagIndexTransferables } from "./tag-index"
+import type { TypedArrayBufferConstructor } from "./typed-arrays"
+
+export interface EntityIndexTransferables
+	extends IdIndexTransferables,
+		TagIndexTransferables {}
 
 export abstract class EntityIndex<T extends OsmEntity> {
 	indexType: "node" | "way" | "relation"
 
 	stringTable: StringTable
-	ids = new IdIndex()
+	ids: IdIndex
 	tags: TagIndex
 
 	constructor(
-		stringTable: StringTable,
 		indexType: "node" | "way" | "relation",
+		stringTable: StringTable,
+		ids?: IdIndex,
+		tags?: TagIndex,
 	) {
 		this.stringTable = stringTable
 		this.indexType = indexType
-		this.tags = new TagIndex(stringTable)
+		this.ids = ids ?? new IdIndex()
+		this.tags = tags ?? new TagIndex(stringTable)
 	}
 
 	get isReady() {
@@ -44,9 +52,9 @@ export abstract class EntityIndex<T extends OsmEntity> {
 		return this.getFullEntity(index, id, this.tags.getTags(index))
 	}
 
-	getByIndex(index: number): T | null {
+	getByIndex(index: number): T {
 		const id = this.ids.at(index)
-		if (id === -1) return null
+		if (id === -1) throw Error(`Entity not found at index ${index}`)
 		return this.getFullEntity(index, id, this.tags.getTags(index))
 	}
 
@@ -68,9 +76,9 @@ export abstract class EntityIndex<T extends OsmEntity> {
 		}
 	}
 
-	getById(id: number): T | null {
+	getById(id: number): T {
 		const index = this.ids.getIndexFromId(id)
-		if (index === -1) return null
+		if (index === -1) throw Error(`Entity not found for id ${id}`)
 		return this.getByIndex(index)
 	}
 }

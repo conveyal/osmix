@@ -1,52 +1,113 @@
-import { ResizeableIdArray, ResizeableTypedArray } from "./typed-arrays"
-import { EntityIndex } from "./entity-index"
-import type { NodeIndex } from "./node-index"
+import { EntityIndex, type EntityIndexTransferables } from "./entity-index"
+import { IdIndex } from "./id-index"
+import type {
+	OsmPbfPrimitiveBlock,
+	OsmPbfRelation,
+} from "./pbf/proto/osmformat"
 import type StringTable from "./stringtable"
+import { TagIndex } from "./tag-index"
+import {
+	IdArrayType,
+	ResizeableTypedArray,
+	type TypedArrayBuffer,
+} from "./typed-arrays"
 import type { OsmRelation, OsmRelationMember, OsmTags } from "./types"
-import type { WayIndex } from "./way-index"
 
 const RELATION_MEMBER_TYPES = ["node", "way", "relation"] as const
 
+export interface RelationIndexTransferables extends EntityIndexTransferables {
+	memberStart: TypedArrayBuffer
+	memberCount: TypedArrayBuffer
+	memberRefs: TypedArrayBuffer
+	memberTypes: TypedArrayBuffer
+	memberRoles: TypedArrayBuffer
+}
+
 export class RelationIndex extends EntityIndex<OsmRelation> {
-	memberStartByIndex = new ResizeableTypedArray(Uint32Array)
-	memberCountByIndex = new ResizeableTypedArray(Uint16Array) // Maximum 65,535 members per relation
+	memberStart = new ResizeableTypedArray(Uint32Array)
+	memberCount = new ResizeableTypedArray(Uint16Array) // Maximum 65,535 members per relation
 
 	// Store the ID of the member because relations have other relations as members.
-	memberRefs = new ResizeableIdArray()
-	memberTypesIndex = new ResizeableTypedArray(Uint8Array)
-	memberRolesIndex = new ResizeableTypedArray(Uint32Array)
+	memberRefs = new ResizeableTypedArray(IdArrayType)
+	memberTypes = new ResizeableTypedArray(Uint8Array)
+	memberRoles = new ResizeableTypedArray(Uint32Array)
 
-	nodeIndex: NodeIndex
-	wayIndex: WayIndex
+	static from(stringTable: StringTable, rit: RelationIndexTransferables) {
+		const idIndex = IdIndex.from(rit)
+		const tagIndex = TagIndex.from(stringTable, rit)
+		const ri = new RelationIndex(stringTable, idIndex, tagIndex)
+		ri.memberStart = ResizeableTypedArray.from(Uint32Array, rit.memberStart)
+		ri.memberCount = ResizeableTypedArray.from(Uint16Array, rit.memberCount)
+		ri.memberRefs = ResizeableTypedArray.from(IdArrayType, rit.memberRefs)
+		ri.memberTypes = ResizeableTypedArray.from(Uint8Array, rit.memberTypes)
+		ri.memberRoles = ResizeableTypedArray.from(Uint32Array, rit.memberRoles)
+		return ri
+	}
 
 	constructor(
 		stringTable: StringTable,
-		nodeIndex: NodeIndex,
-		wayIndex: WayIndex,
+		idIndex?: IdIndex,
+		tagIndex?: TagIndex,
 	) {
-		super(stringTable, "relation")
-		this.nodeIndex = nodeIndex
-		this.wayIndex = wayIndex
+		super("relation", stringTable, idIndex, tagIndex)
+	}
+
+	transferables(): RelationIndexTransferables {
+		return {
+			memberStart: this.memberStart.array.buffer,
+			memberCount: this.memberCount.array.buffer,
+			memberRefs: this.memberRefs.array.buffer,
+			memberTypes: this.memberTypes.array.buffer,
+			memberRoles: this.memberRoles.array.buffer,
+			...this.ids.transferables(),
+			...this.tags.transferables(),
+		}
 	}
 
 	addRelation(relation: OsmRelation) {
 		this.ids.add(relation.id)
 		this.tags.addTags(relation.tags)
-		this.memberStartByIndex.push(this.memberRefs.length)
-		this.memberCountByIndex.push(relation.members.length)
+		this.memberStart.push(this.memberRefs.length)
+		this.memberCount.push(relation.members.length)
 		for (const member of relation.members) {
 			this.memberRefs.push(member.ref)
-			this.memberTypesIndex.push(RELATION_MEMBER_TYPES.indexOf(member.type))
-			this.memberRolesIndex.push(this.stringTable.add(member.role ?? ""))
+			this.memberTypes.push(RELATION_MEMBER_TYPES.indexOf(member.type))
+			this.memberRoles.push(this.stringTable.add(member.role ?? ""))
+		}
+	}
+
+	addRelations(relations: OsmPbfRelation[], block: OsmPbfPrimitiveBlock) {
+		const blockToStringTable = (k: number) => {
+			const bytesString = block.stringtable[k]
+			if (!bytesString) throw Error("Tag key not found")
+			return this.stringTable.addBytes(bytesString)
+		}
+
+		for (const relation of relations) {
+			this.ids.add(relation.id)
+			this.memberStart.push(this.memberRefs.length)
+			this.memberCount.push(relation.memids.length)
+
+			let refId = 0
+			for (let i = 0; i < relation.memids.length; i++) {
+				refId += relation.memids[i]
+				this.memberRefs.push(refId)
+				this.memberTypes.push(relation.types[i])
+				this.memberRoles.push(blockToStringTable(relation.roles_sid[i]))
+			}
+
+			const tagKeys: number[] = relation.keys.map(blockToStringTable)
+			const tagValues: number[] = relation.vals.map(blockToStringTable)
+			this.tags.addTagKeysAndValues(tagKeys, tagValues)
 		}
 	}
 
 	finishEntityIndex() {
-		this.memberStartByIndex.compact()
-		this.memberCountByIndex.compact()
+		this.memberStart.compact()
+		this.memberCount.compact()
 		this.memberRefs.compact()
-		this.memberTypesIndex.compact()
-		this.memberRolesIndex.compact()
+		this.memberTypes.compact()
+		this.memberRoles.compact()
 	}
 
 	getFullEntity(index: number, id: number, tags?: OsmTags): OsmRelation {
@@ -58,13 +119,14 @@ export class RelationIndex extends EntityIndex<OsmRelation> {
 	}
 
 	getMembersByIndex(index: number) {
-		const start = this.memberStartByIndex.at(index)
-		const count = this.memberCountByIndex.at(index)
+		const start = this.memberStart.at(index)
+		const count = this.memberCount.at(index)
 		const members: OsmRelationMember[] = []
 		for (let i = start; i < start + count; i++) {
 			const ref = this.memberRefs.at(i)
-			const type = RELATION_MEMBER_TYPES[this.memberTypesIndex.at(i)]
-			const role = this.stringTable.get(this.memberRolesIndex.at(i))
+			const type = RELATION_MEMBER_TYPES[this.memberTypes.at(i)]
+			if (type === undefined) throw Error(`Member type not found: ${i}`)
+			const role = this.stringTable.get(this.memberRoles.at(i))
 			members.push({ ref, type, role })
 		}
 		return members

@@ -28,7 +28,7 @@
 		"@turf/turf": "catalog:",
 		"dequal": "^2.0.3",
 		"flatbush": "^4.4.1",
-		"kdbush": "^4.0.2",
+		"kdbush": "mourner/kdbush#16416cd",
 		"pbf": "^4.0.1"
 	}
 }

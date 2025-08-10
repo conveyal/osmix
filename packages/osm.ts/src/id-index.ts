@@ -1,6 +1,20 @@
-import { ResizeableIdArray } from "./typed-arrays"
+import {
+	BufferConstructor,
+	IdArrayType,
+	ResizeableTypedArray,
+	type TypedArrayBuffer,
+} from "./typed-arrays"
 
 export type IdOrIndex = { id: number } | { index: number }
+
+const BLOCK_SIZE = 256
+
+export type IdIndexTransferables = {
+	ids: TypedArrayBuffer
+	sortedIds: TypedArrayBuffer
+	sortedIdPositionToIndex: TypedArrayBuffer
+	anchors: TypedArrayBuffer
+}
 
 /**
  * Efficiently store and lookup IDs.
@@ -9,13 +23,36 @@ export type IdOrIndex = { id: number } | { index: number }
  * Maps max out at 2^32 IDs.
  */
 export class IdIndex {
-	private ids = new ResizeableIdArray()
+	private ids = new ResizeableTypedArray(IdArrayType)
 	private indexBuilt = false
 	private idsAreSorted = true
 	private idsSorted: Float64Array = new Float64Array(0)
 	private sortedIdPositionToIndex: Uint32Array = new Uint32Array(0)
 	private anchors: Float64Array = new Float64Array(0)
-	private blockSize = 256
+
+	static from({
+		ids,
+		sortedIds,
+		sortedIdPositionToIndex,
+		anchors,
+	}: IdIndexTransferables) {
+		const idIndex = new IdIndex()
+		idIndex.ids = ResizeableTypedArray.from(IdArrayType, ids)
+		idIndex.idsSorted = new Float64Array(sortedIds)
+		idIndex.sortedIdPositionToIndex = new Uint32Array(sortedIdPositionToIndex)
+		idIndex.anchors = new Float64Array(anchors)
+		idIndex.indexBuilt = true
+		return idIndex
+	}
+
+	transferables(): IdIndexTransferables {
+		return {
+			ids: this.ids.array.buffer,
+			sortedIds: this.idsSorted.buffer,
+			sortedIdPositionToIndex: this.sortedIdPositionToIndex.buffer,
+			anchors: this.anchors.buffer,
+		}
+	}
 
 	get size() {
 		return this.ids.length
@@ -73,11 +110,11 @@ export class IdIndex {
 		}
 
 		// Build anchors (every blockSize-th key)
-		const aLen = Math.ceil(this.size / this.blockSize)
-		this.anchors = new Float64Array(aLen)
+		const aLen = Math.ceil(this.size / BLOCK_SIZE)
+		const sab = new BufferConstructor(aLen * Float64Array.BYTES_PER_ELEMENT)
+		this.anchors = new Float64Array(sab, 0, aLen)
 		for (let j = 0; j < aLen; j++) {
-			this.anchors[j] =
-				this.idsSorted[Math.min(j * this.blockSize, this.size - 1)]
+			this.anchors[j] = this.idsSorted[Math.min(j * BLOCK_SIZE, this.size - 1)]
 		}
 
 		this.indexBuilt = true
@@ -95,8 +132,8 @@ export class IdIndex {
 			if (this.anchors[mid] <= id) lo = mid
 			else hi = mid - 1
 		}
-		const start = lo * this.blockSize
-		const end = Math.min(start + this.blockSize, this.idsSorted.length)
+		const start = lo * BLOCK_SIZE
+		const end = Math.min(start + BLOCK_SIZE, this.idsSorted.length)
 
 		// binary search within block
 		let l = start
