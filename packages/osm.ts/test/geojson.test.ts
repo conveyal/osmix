@@ -1,51 +1,56 @@
+import * as turf from "@turf/turf"
 import assert from "node:assert"
 import { describe, it } from "vitest"
-import * as turf from "@turf/turf"
 
+import { Osm } from "../src/osm"
+import { nodeToFeature, wayToFeature } from "../src/to-geojson"
 import { PBFs } from "./files"
 import { getFileReadStream } from "./utils"
-import { nodesToFeatures, waysToFeatures } from "../src/to-geojson"
-import { Osm } from "../src/osm"
 
 describe("geojson", () => {
 	describe.each(Object.entries(PBFs))(
 		"%s",
 		{ timeout: 100_000 },
 		async (_, pbf) => {
-			it.runIf(pbf.nodes <= 1_000_000)("generate from pbf", async () => {
+			it.runIf(pbf.nodes < 100_000)("generate from pbf", async () => {
 				const fileStream = await getFileReadStream(pbf.url)
 				const osm = await Osm.fromPbfData(fileStream)
 				assert.deepEqual(osm.header.bbox, pbf.bbox)
 
-				const nodes = nodesToFeatures(osm.nodes)
-				const ways = waysToFeatures(osm.ways, osm.nodes, () => true)
-
 				// Check that all features are valid GeoJSON and have unique IDs
-				const seenIds = new Set()
-				for (const feature of nodes) {
+				const seenNodeIds = new Set()
+				let nodeFeatures = 0
+				for (const node of osm.nodes) {
+					if (!node.tags || Object.keys(node.tags).length === 0) continue
+					const feature = nodeToFeature(node)
 					turf.featureOf(feature, "Point", "test")
 					assert.equal(feature.type, "Feature")
 					assert.ok(feature.id !== undefined && feature.id !== null)
 					assert.ok(
-						!seenIds.has(feature.id),
+						!seenNodeIds.has(feature.id),
 						`Duplicate feature id: ${feature.id}`,
 					)
-					seenIds.add(feature.id)
+					seenNodeIds.add(feature.id)
 					assert.ok(feature.geometry)
 					assert.ok(feature.geometry.type === "Point")
 					assert.ok(
 						Array.isArray(feature.geometry.coordinates) &&
 							feature.geometry.coordinates.length === 2,
 					)
+					nodeFeatures++
 				}
-				for (const feature of ways) {
+
+				const seenWayIds = new Set()
+				let wayFeatures = 0
+				for (const way of osm.ways) {
+					const feature = wayToFeature(way, osm.nodes)
 					assert.equal(feature.type, "Feature")
 					assert.ok(feature.id !== undefined && feature.id !== null)
 					assert.ok(
-						!seenIds.has(feature.id),
+						!seenWayIds.has(feature.id),
 						`Duplicate feature id: ${feature.id}`,
 					)
-					seenIds.add(feature.id)
+					seenWayIds.add(feature.id)
 					assert.ok(["LineString", "Polygon"].includes(turf.getType(feature)))
 					const coords = turf.getCoords(feature)
 					assert.ok(Array.isArray(coords))
@@ -54,9 +59,11 @@ describe("geojson", () => {
 						assert.ok(Array.isArray(c))
 						assert.ok(c.length === 2)
 					})
+					wayFeatures++
 				}
 
-				assert.equal(pbf.geoJsonFeatures, nodes.length + ways.length)
+				assert.equal(wayFeatures, pbf.ways)
+				assert.equal(nodeFeatures, pbf.nodesWithTags)
 			})
 		},
 	)

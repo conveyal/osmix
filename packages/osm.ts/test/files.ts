@@ -8,7 +8,7 @@ export const PBFs: Record<
 			left: number
 			right: number
 		}
-		geoJsonFeatures: number
+		nodesWithTags: number
 		nodes: number
 		ways: number
 		relations: number
@@ -29,7 +29,7 @@ export const PBFs: Record<
 			left: 7.408583,
 			right: 7.595671,
 		},
-		geoJsonFeatures: 9_302,
+		nodesWithTags: 3_654,
 		nodes: 38_995,
 		ways: 5_708,
 		relations: 308,
@@ -49,7 +49,7 @@ export const PBFs: Record<
 			left: 18.17282,
 			right: 20.358827,
 		},
-		geoJsonFeatures: 384_651,
+		nodesWithTags: 63_321,
 		nodes: 3_915_383,
 		ways: 321_330,
 		relations: 5_501,
@@ -69,7 +69,7 @@ export const PBFs: Record<
 			left: 13.08916,
 			right: 19.459968,
 		},
-		geoJsonFeatures: 1_000_000,
+		nodesWithTags: 481_613,
 		nodes: 23_063_621,
 		ways: 2_315_247,
 		relations: 39_098,
@@ -89,7 +89,7 @@ export const PBFs: Record<
 			right: 19.12499,
 			top: 47.100045,
 		},
-		geoJsonFeatures: 1_000_000,
+		nodesWithTags: 1_513_303,
 		nodes: 250_818_620,
 		ways: 27_837_987,
 		relations: 100_000,
@@ -109,7 +109,7 @@ export const PBFs: Record<
 			left: -126.7423,
 			right: -116.911526,
 		},
-		geoJsonFeatures: 1_000_000,
+		nodesWithTags: 1_513_303,
 		nodes: 43_032_447,
 		ways: 4_541_651,
 		relations: 44_373,
