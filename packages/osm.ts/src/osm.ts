@@ -32,7 +32,7 @@ import type {
 	OsmWay,
 } from "./types"
 import UnorderedPairMap from "./unordered-pair-map"
-import { isNode, isRelation, isWay } from "./utils"
+import { isNode, isRelation, isWay, throttle } from "./utils"
 import { wayIsArea } from "./way-is-area"
 import { OsmPbfWriter } from "./pbf/osm-pbf-writer"
 import { NodeIndex, type NodeIndexTransferables } from "./node-index"
@@ -108,12 +108,12 @@ export class Osm {
 		const reader = await createOsmPbfReader(data)
 		this.header = reader.header
 
+		const logEverySecond = throttle(onProgress, 1_000)
+
 		let entityCount = 0
 		let stage: "nodes" | "ways" | "relations" = "nodes"
-		let entityUpdateCount = 8_000
 		for await (const block of reader.blocks) {
 			const blockStringIndexMap = this.stringTable.createBlockIndexMap(block)
-			const blockParser = new PrimitiveBlockParser(block)
 			for (const { nodes, ways, relations, dense } of block.primitivegroup) {
 				if (dense) {
 					this.nodes.addDenseNodes(dense, block, blockStringIndexMap)
@@ -122,7 +122,7 @@ export class Osm {
 
 				if (nodes.length > 0) {
 					for (const node of nodes) {
-						this.nodes.addNode(blockParser.parseNode(node))
+						this.nodes.addNode(node, blockStringIndexMap)
 					}
 					entityCount += nodes.length
 				}
@@ -135,7 +135,6 @@ export class Osm {
 						this.nodes.finish()
 						stage = "ways"
 						entityCount = 0
-						entityUpdateCount = 1_000
 					}
 					this.ways.addWays(ways, blockStringIndexMap)
 					entityCount += ways.length
@@ -149,16 +148,12 @@ export class Osm {
 						this.ways.finish()
 						stage = "relations"
 						entityCount = 0
-						entityUpdateCount = 1_000
 					}
 					this.relations.addRelations(relations, blockStringIndexMap)
 					entityCount += relations.length
 				}
 
-				if (entityCount >= entityUpdateCount) {
-					onProgress(`${entityCount.toLocaleString()} ${stage} loaded`)
-					entityUpdateCount *= 2
-				}
+				logEverySecond(`${entityCount.toLocaleString()} ${stage} loaded`)
 			}
 		}
 		this.finish()

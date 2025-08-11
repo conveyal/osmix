@@ -42,6 +42,20 @@ export function getEntityType(entity: OsmEntity): OsmEntityType {
 	throw Error("Unknown entity type")
 }
 
+export function throttle<T extends unknown[]>(
+	func: (...args: T) => void,
+	timeFrame: number,
+) {
+	let lastTime = 0
+	return (...args: T) => {
+		const now = Date.now()
+		if (now - lastTime >= timeFrame) {
+			func(...args)
+			lastTime = now
+		}
+	}
+}
+
 /**
  * Create a throttled console.log which prints at most once every `ms`.
  * @param ms - The minimum time between logs in milliseconds
