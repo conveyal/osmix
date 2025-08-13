@@ -1,5 +1,11 @@
+import { cleanCoords, nearestPointOnLine } from "@turf/turf"
+import Flatbush from "flatbush"
 import { EntityIndex, type EntityIndexTransferables } from "./entity-index"
-import type { GeoBbox2D, OsmTags, OsmWay } from "./types"
+import { IdIndex, type IdOrIndex } from "./id-index"
+import type { NodeIndex } from "./node-index"
+import type { OsmPbfWay } from "./pbf"
+import type StringTable from "./stringtable"
+import { TagIndex } from "./tag-index"
 import {
 	BufferConstructor,
 	CoordinateArrayType,
@@ -7,16 +13,7 @@ import {
 	ResizeableTypedArray,
 	type TypedArrayBuffer,
 } from "./typed-arrays"
-import type { NodeIndex } from "./node-index"
-import type StringTable from "./stringtable"
-import Flatbush from "flatbush"
-import type {
-	OsmPbfPrimitiveBlock,
-	OsmPbfWay,
-	PrimitiveBlockParser,
-} from "./pbf"
-import { IdIndex, type IdOrIndex } from "./id-index"
-import { TagIndex } from "./tag-index"
+import type { GeoBbox2D, LonLat, OsmTags, OsmWay } from "./types"
 
 export interface WayIndexTransferables extends EntityIndexTransferables {
 	refStart: TypedArrayBuffer
@@ -167,7 +164,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 			BufferConstructor,
 		)
 		for (let i = 0; i < this.size; i++) {
-			const [minX, minY, maxX, maxY] = this.getBbox(i)
+			const [minX, minY, maxX, maxY] = this.getBbox({ index: i })
 			this.spatialIndex.add(minX, minY, maxX, maxY)
 		}
 		this.spatialIndex.finish()
@@ -192,7 +189,8 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		return refs
 	}
 
-	getBbox(index: number): GeoBbox2D {
+	getBbox(idOrIndex: IdOrIndex): GeoBbox2D {
+		const [index] = this.ids.idOrIndex(idOrIndex)
 		return [
 			this.bbox.at(index * 4),
 			this.bbox.at(index * 4 + 1),
@@ -242,9 +240,24 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	}
 
 	intersects(bbox: GeoBbox2D): number[] {
-		console.time("WayIndex.intersects")
-		const results = this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3])
-		console.timeEnd("WayIndex.intersects")
-		return results
+		return this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3])
+	}
+
+	neighbors(
+		x: number,
+		y: number,
+		maxResults?: number,
+		maxDistance?: number,
+	): number[] {
+		return this.spatialIndex.neighbors(x, y, maxResults, maxDistance)
+	}
+
+	nearestPointOnLine(index: number, ll: LonLat) {
+		const lineString = this.getLineString({ index })
+		const nearestPoint = nearestPointOnLine(cleanCoords(lineString), [
+			ll.lon,
+			ll.lat,
+		])
+		return nearestPoint
 	}
 }

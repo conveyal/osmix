@@ -1,13 +1,31 @@
 import { assert, describe, it } from "vitest"
 
-import { Osm } from "../src"
-import { mergeOsm } from "../src/merge"
-import { generateOsmChanges } from "../src/osm-change"
+import { Osm, type OsmNode } from "../src"
 import { createBaseOsm, createPatchOsm } from "./mock-osm"
 import { getFile } from "./utils"
+import Changeset from "../src/changeset"
+
+const testNode: OsmNode = {
+	id: 2135545,
+	lat: 46.5708361,
+	lon: -120.5622905,
+	tags: {
+		barrier: "kerb",
+		"ext:corner_id": "1-2",
+		"ext:intersection_id": "51791186.0",
+		"ext:ixn_id": "686813.527,5160370.0576",
+		"ext:level_1": "4.0",
+		"ext:link_type": "end",
+		"ext:node_type": "curb",
+		"ext:osm_version": "2",
+		"ext:sw_id": "l_9247",
+		kerb: "lowered",
+		tactile_paving: "yes",
+	},
+}
 
 describe("merge osm", () => {
-	it.only(
+	it(
 		"should merge two real osm objects",
 		{
 			timeout: 100_000,
@@ -19,130 +37,65 @@ describe("merge osm", () => {
 
 			const osm1Data = await getFile(osm1Name)
 			const osm1 = await Osm.fromPbfData(osm1Data)
+			assert.equal(osm1.nodes.getById(testNode.id), null)
 
 			const osm2Data = await getFile(osm2Name)
 			const osm2 = await Osm.fromPbfData(osm2Data)
+			assert.deepEqual(osm2.nodes.getById(testNode.id), testNode)
 
-			const osmMerged = mergeOsm(osm1, osm2)
+			const changeset = new Changeset(osm1)
+			changeset.generateFullChangeset(osm2)
+			const nodeChanges = Array.from(changeset.nodeChanges.values())
+			const wayChanges = Array.from(changeset.wayChanges.values())
+			const relationChanges = Array.from(changeset.relationChanges.values())
+
+			assert.equal(nodeChanges.length, 11_643)
+			assert.deepEqual(nodeChanges[0], {
+				changeType: "create",
+				entity: testNode,
+			})
+
+			assert.equal(wayChanges.length, 4_232)
+			assert.equal(relationChanges.length, 0)
+
+			assert.equal(changeset.stats.deduplicatedNodes, 0)
+			assert.equal(changeset.stats.deduplicatedNodesReplaced, 0)
+			assert.equal(changeset.stats.intersectionPointsFound, 1678)
+
+			const merged = changeset.applyChanges()
+
+			for (const entity of merged) {
+				console.error(entity)
+			}
+
+			assert.equal(osm1.nodes.size + osm2.nodes.size, merged.nodes.size)
+			assert.deepEqual(merged.nodes.getById(testNode.id), testNode)
 		},
 	)
 
 	it("should generate and apply osm changes", () => {
 		const base = createBaseOsm()
 		const patch = createPatchOsm()
-		const changes = generateOsmChanges(base, patch)
+		const changeset = new Changeset(base)
+		changeset.generateFullChangeset(patch)
+		const nodeChanges = Array.from(changeset.nodeChanges.values())
 
-		console.error(changes)
-		assert.equal(changes.length, 9)
-		assert.equal(changes[0]?.changeType, "create")
+		assert.equal(nodeChanges.length, 7)
+		assert.equal(nodeChanges[0]?.changeType, "create")
 
-		base.applyChanges(changes)
+		const wayChanges = Array.from(changeset.wayChanges.values())
+		assert.equal(wayChanges.length, 4)
+		assert.equal(wayChanges[0]?.changeType, "create")
+		assert.equal(wayChanges[0]?.entity.tags?.highway, "secondary")
+		assert.equal(wayChanges[0]?.entity.refs.length, 2)
 
-		assert.equal(base.ways.getById(1)?.tags?.key, "newValue")
-		assert.equal(base.ways.getById(2)?.refs.length, 2)
-	})
+		assert.equal(changeset.stats.deduplicatedNodes, 1)
+		assert.equal(changeset.stats.deduplicatedNodesReplaced, 1)
+		assert.equal(changeset.stats.intersectionPointsFound, 1)
 
-	it("should find geographically overlapping nodes and merge them", () => {
-		const base = createBaseOsm()
-		const patch = createPatchOsm()
-		const changes = generateOsmChanges(base, patch)
-		base.applyChanges(changes)
+		const result = changeset.applyChanges()
 
-		assert.equal(base.nodes.size, 8)
-
-		const overlapping = base.nodes.findOverlappingNodes(Array.from(patch.nodes))
-		console.log(overlapping)
-		assert.equal(overlapping.size, 1)
-		assert.equal(overlapping.get(1)?.size, 1)
-		assert.equal(overlapping.get(1)?.has(2), true)
-
-		// Deduplicate the nodes
-		const results = base.dedupeOverlappingNodes(patch.nodes)
-
-		assert.equal(results.replaced, 1)
-		assert.equal(results.deleted, 1)
-
-		// One node should have been deleted
-		assert.equal(base.nodes.size, 7)
-		assert.equal(base.nodes.getById(1), undefined)
-
-		// The way should have been updated to use the new node
-		assert.equal(base.ways.getById(1)?.refs[1], 2)
-	})
-
-	function makePairKey(a: number, b: number): string {
-		return [a, b].sort().join("|") // canonical key, "a|b" === "b|a"
-	}
-
-	function parsePairKey(key: string): [number, number] {
-		const [a, b] = key.split("|")
-		return [Number.parseInt(a ?? "0"), Number.parseInt(b ?? "0")]
-	}
-
-	it("should find intersecting ways and add intersections", () => {
-		const baseOsm = createBaseOsm()
-		const patch = createPatchOsm()
-		const changes = generateOsmChanges(baseOsm, patch)
-		baseOsm.applyChanges(changes)
-
-		baseOsm.dedupeOverlappingNodes()
-
-		const disconnectedWays = new Set<number>()
-		const intersectingWayPairs = new Map<
-			string,
-			GeoJSON.Feature<GeoJSON.Point>[]
-		>()
-
-		const intersections = baseOsm.findIntersectionCandidatesForOsm(patch)
-		console.log(intersections)
-
-		// Find intersecting way IDs. Each way should have at least one intersecting way or it is disconnected from the rest of the network.
-		for (const way of patch.ways) {
-			const lineString = patch.ways.getLineString({ id: way.id })
-			const intersectingWayIds = baseOsm.findIntersectingWays(lineString)
-			if (intersectingWayIds.size > 0) {
-				for (const [intersectingWayId, intersections] of intersectingWayIds) {
-					intersectingWayPairs.set(
-						makePairKey(way.id, intersectingWayId),
-						intersections,
-					)
-				}
-			} else {
-				if (!baseOsm.isWayDisconnected(lineString)) {
-					disconnectedWays.add(way.id)
-				}
-			}
-		}
-
-		assert.equal(intersectingWayPairs.size, 2)
-		assert.equal(intersectingWayPairs.has("1|3"), true)
-		assert.equal(intersectingWayPairs.has("1|4"), true)
-
-		assert.equal(disconnectedWays.size, 0)
-
-		// Convert intersecting ways into intersecting nodes
-		let insertions = 0
-		for (const [intersectingWayKey, intersections] of intersectingWayPairs) {
-			const [wayId, intersectingWayId] = parsePairKey(intersectingWayKey)
-			for (const { coords, existingNode } of intersections.map((p) =>
-				baseOsm.pointToNode(p),
-			)) {
-				const node = existingNode ?? baseOsm.createNode(coords)
-				if (baseOsm.insertNodeIntoWay(node.id, wayId)) insertions++
-				if (baseOsm.insertNodeIntoWay(node.id, intersectingWayId)) insertions++
-			}
-		}
-
-		assert.equal(insertions, 4)
-	})
-
-	it("should fully merge two osm objects", () => {
-		const base = createBaseOsm()
-		const patch = createPatchOsm()
-		const merged = mergeOsm(base, patch)
-
-		assert.equal(merged.nodes.size, 8)
-		assert.equal(merged.ways.size, 4)
-		assert.equal(merged.relations.size, 0)
+		assert.equal(result.ways.getById(1)?.tags?.highway, "primary")
+		assert.equal(result.ways.getById(2)?.refs.length, 2)
 	})
 })

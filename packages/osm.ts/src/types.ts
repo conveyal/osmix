@@ -2,6 +2,12 @@ import type { OsmPbfInfo } from "./pbf/proto/osmformat"
 
 export type OsmEntityType = "node" | "way" | "relation"
 
+export interface OsmEntityTypeMap extends Record<OsmEntityType, IOsmEntity> {
+	node: OsmNode
+	way: OsmWay
+	relation: OsmRelation
+}
+
 export interface LonLat {
 	lon: number
 	lat: number
@@ -40,28 +46,30 @@ export interface OsmTags {
 	[key: string]: string | number
 }
 
-export interface OsmEntity {
+interface IOsmEntity {
 	id: number
 	info?: OsmInfoParsed
 	tags?: OsmTags
 }
 
-export interface OsmNode extends OsmEntity, LonLat {}
+export interface OsmNode extends IOsmEntity, LonLat {}
 
-export interface OsmWay extends OsmEntity {
+export interface OsmWay extends IOsmEntity {
 	// OSM IDs of the nodes that make up this way
 	refs: number[]
 }
 
 export interface OsmRelationMember {
-	type: "node" | "way" | "relation"
+	type: OsmEntityType
 	ref: number
 	role?: string
 }
 
-export interface OsmRelation extends OsmEntity {
+export interface OsmRelation extends IOsmEntity {
 	members: OsmRelationMember[]
 }
+
+export type OsmEntity = OsmNode | OsmWay | OsmRelation
 
 export interface OsmGeoJSONProperties extends OsmTags {}
 
@@ -70,7 +78,7 @@ export type OsmGeoJSONFeature = GeoJSON.Feature<
 	OsmGeoJSONProperties
 >
 
-export type OsmChange = {
+export type OsmChange<T extends IOsmEntity> = {
 	changeType: "modify" | "create" | "delete"
-	entity: OsmNode | OsmWay | OsmRelation
+	entity: T
 }

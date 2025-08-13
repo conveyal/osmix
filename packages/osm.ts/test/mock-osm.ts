@@ -7,12 +7,12 @@ const ONE_KM_LON = 0.0131 // approximately
 const ONE_KM_LAT = 0.009
 
 function addBaseNodes(osm: Osm) {
-	osm.addEntity({
+	osm.nodes.addNode({
 		id: 0,
 		lat: YAKIM_LAT,
 		lon: YAKIM_LON,
 	})
-	osm.addEntity({
+	osm.nodes.addNode({
 		id: 1,
 		lat: YAKIM_LAT,
 		lon: YAKIM_LON + ONE_KM_LON, // approximately 1km east
@@ -20,11 +20,11 @@ function addBaseNodes(osm: Osm) {
 }
 
 function addBaseWays(osm: Osm) {
-	osm.addEntity({
+	osm.ways.addWay({
 		id: 1,
 		refs: [0, 1],
 		tags: {
-			key: "value",
+			highway: "primary",
 		},
 	})
 }
@@ -37,7 +37,6 @@ export function createBaseOsm(): Osm {
 	addBaseNodes(base)
 	base.nodes.finish()
 	addBaseWays(base)
-	base.ways.finish()
 	base.finish()
 	return base
 }
@@ -59,35 +58,35 @@ export function createPatchOsm(): Osm {
 	if (!node1 || !node2) throw new Error("node not found")
 
 	// Add disconnected way
-	osm.addEntity({
+	osm.nodes.addNode({
 		...node1,
 		id: 2,
 	})
-	osm.addEntity({
+	osm.nodes.addNode({
 		...node2,
 		id: 3,
 		lon: YAKIM_LON + ONE_KM_LON * 2, // ends 2km east of the center point
 	})
 
 	// Add nodes for disconnected way
-	osm.addEntity({
+	osm.nodes.addNode({
 		id: 4,
 		lat: YAKIM_LAT - ONE_KM_LAT, // 1km south
 		lon: YAKIM_LON + ONE_KM_LON / 4, // 250m east
 	})
-	osm.addEntity({
+	osm.nodes.addNode({
 		id: 5,
 		lat: YAKIM_LAT + ONE_KM_LAT, // 1km north
 		lon: YAKIM_LON + ONE_KM_LON / 4, // 250m east
 	})
 
 	// Add nodes for crossing way
-	osm.addEntity({
+	osm.nodes.addNode({
 		id: 6,
 		lat: YAKIM_LAT - ONE_KM_LAT, // 1km south
 		lon: YAKIM_LON + ONE_KM_LON / 2, // 500m east
 	})
-	osm.addEntity({
+	osm.nodes.addNode({
 		id: 7,
 		lat: YAKIM_LAT + ONE_KM_LAT, // 1km north
 		lon: YAKIM_LON + ONE_KM_LON / 2, // 500m east
@@ -96,41 +95,41 @@ export function createPatchOsm(): Osm {
 	osm.nodes.finish()
 
 	// Add base way with new tags
-	osm.addEntity({
+	osm.ways.addWay({
 		id: 1,
 		refs: [0, 1],
 		tags: {
-			key: "newValue",
+			highway: "primary",
 		},
 	})
 
-	osm.addEntity({
+	osm.ways.addWay({
 		id: 2,
 		refs: [2, 3],
 		tags: {
-			key: "disconnected",
+			highway: "secondary",
 		},
 	})
 
 	// Add way that crosses, and should generate an intersection
-	osm.addEntity({
+	osm.ways.addWay({
 		id: 3,
 		refs: [4, 5],
 		tags: {
-			key: "intersecting",
+			highway: "primary",
 		},
 	})
 
 	// Add a way that crosses, but has a tag indicating it is an underpass and should be left alone
-	osm.addEntity({
+	osm.ways.addWay({
 		id: 4,
 		refs: [6, 7],
 		tags: {
-			highway: "intersecting",
+			highway: "underpass",
+			tunnel: "yes",
 		},
 	})
 
-	osm.ways.finish()
 	osm.finish()
 	return osm
 }

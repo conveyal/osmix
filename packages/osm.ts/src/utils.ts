@@ -1,11 +1,13 @@
 import { dequal } from "dequal/lite"
 import type {
-	OsmEntity,
+	LonLat,
 	OsmEntityType,
 	OsmNode,
 	OsmRelation,
 	OsmWay,
+	OsmEntity,
 } from "./types"
+import { lineIntersect } from "@turf/turf"
 
 function isTagsAndInfoEqual(a: OsmEntity, b: OsmEntity) {
 	return dequal(a.tags, b.tags) && dequal(a.info, b.info)
@@ -33,6 +35,15 @@ export function isWayEqual(a: OsmWay, b: OsmWay) {
 
 export function isRelationEqual(a: OsmRelation, b: OsmRelation) {
 	return dequal(a.members, b.members) && isTagsAndInfoEqual(a, b)
+}
+
+export function entityPropertiesEqual(a: OsmEntity, b: OsmEntity) {
+	if (!dequal(a.tags, b.tags)) return false
+	if (!dequal(a.info, b.info)) return false
+	if (isNode(a) && isNode(b)) return isNodeEqual(a, b)
+	if (isWay(a) && isWay(b)) return isWayEqual(a, b)
+	if (isRelation(a) && isRelation(b)) return isRelationEqual(a, b)
+	return false
 }
 
 export function getEntityType(entity: OsmEntity): OsmEntityType {
@@ -90,4 +101,29 @@ export function haversineDistance(node1: OsmNode, node2: OsmNode): number {
 		Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2)
 	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 	return R * c
+}
+
+export function wayIntersections(
+	way1: Float64Array,
+	way2: Float64Array,
+): LonLat[] {
+	const [line1, line2] = [way1, way2].map((way) => {
+		const coordinates: [number, number][] = []
+		for (let i = 0; i < way.length; i += 2) {
+			coordinates.push([way[i], way[i + 1]])
+		}
+		return {
+			type: "Feature",
+			geometry: {
+				type: "LineString",
+				coordinates,
+			},
+			properties: {},
+		} as GeoJSON.Feature<GeoJSON.LineString>
+	})
+	const intersectionPoints = lineIntersect(line1, line2)
+	return intersectionPoints.features.map((f) => ({
+		lon: f.geometry.coordinates[0],
+		lat: f.geometry.coordinates[1],
+	}))
 }

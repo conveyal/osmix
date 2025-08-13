@@ -1,8 +1,7 @@
-import type StringTable from "./stringtable"
-import type { OsmEntity, OsmTags } from "./types"
 import { IdIndex, type IdIndexTransferables, type IdOrIndex } from "./id-index"
+import type StringTable from "./stringtable"
 import { TagIndex, type TagIndexTransferables } from "./tag-index"
-import type { TypedArrayBufferConstructor } from "./typed-arrays"
+import type { OsmEntity, OsmTags } from "./types"
 
 export interface EntityIndexTransferables
 	extends IdIndexTransferables,
@@ -47,8 +46,9 @@ export abstract class EntityIndex<T extends OsmEntity> {
 
 	abstract getFullEntity(index: number, id: number, tags?: OsmTags): T
 
-	get(idOrIndex: IdOrIndex): T {
+	get(idOrIndex: IdOrIndex): T | null {
 		const [index, id] = this.ids.idOrIndex(idOrIndex)
+		if (index === -1 || id === -1) return null
 		return this.getFullEntity(index, id, this.tags.getTags(index))
 	}
 
@@ -70,15 +70,15 @@ export abstract class EntityIndex<T extends OsmEntity> {
 
 	*[Symbol.iterator](): Generator<T> {
 		for (let i = 0; i < this.size; i++) {
-			const entity = this.getByIndex(i)
-			if (entity) yield entity as T
+			const id = this.ids.at(i)
+			if (id !== -1) yield this.getFullEntity(i, id, this.tags.getTags(i))
 			else console.error(`Entity not found at index ${i}`)
 		}
 	}
 
-	getById(id: number): T {
+	getById(id: number): T | null {
 		const index = this.ids.getIndexFromId(id)
-		if (index === -1) throw Error(`Entity not found for id ${id}`)
-		return this.getByIndex(index)
+		if (index !== -1) return this.getByIndex(index)
+		return null
 	}
 }

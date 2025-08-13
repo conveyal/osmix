@@ -7,6 +7,5 @@ export type {
 	OsmChange,
 	TileIndex,
 } from "./types"
-export { mergeOsm } from "./merge"
 export { getEntityType } from "./utils"
 export { NodeIndex } from "./node-index"

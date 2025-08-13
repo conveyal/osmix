@@ -82,7 +82,7 @@ export class IdIndex {
 		if (this.indexBuilt) throw Error("ID index already build.")
 		this.ids.compact()
 		if (!this.idsAreSorted) {
-			console.warn("OSM IDs were not sorted. Sorting now...")
+			console.error("OSM IDs were not sorted. Sorting now...")
 			// Build the sorted index
 			this.idsSorted = new Float64Array(this.size)
 			this.sortedIdPositionToIndex = new Uint32Array(this.size)
