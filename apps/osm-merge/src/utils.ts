@@ -46,6 +46,7 @@ export function layerIdToName(id: string) {
 }
 
 const formatMmSsMs = new Intl.DateTimeFormat("en-US", {
+	hour: "2-digit",
 	minute: "2-digit",
 	second: "2-digit",
 	fractionalSecondDigits: 3,
@@ -53,7 +54,7 @@ const formatMmSsMs = new Intl.DateTimeFormat("en-US", {
 })
 
 /**
- * Format a timestamp as "MM:SS.sss"
+ * Format a timestamp as "HH:MM:SS.sss"
  */
 export function formatTimestampMs(timestamp: number) {
 	return formatMmSsMs.format(new Date(timestamp))
