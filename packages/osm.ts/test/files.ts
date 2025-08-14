@@ -1,26 +1,25 @@
-export const PBFs: Record<
-	string,
-	{
-		url: string
-		bbox: {
-			bottom: number
-			top: number
-			left: number
-			right: number
-		}
-		nodesWithTags: number
-		nodes: number
-		ways: number
-		relations: number
-		node0: {
-			lat: number
-			lon: number
-			id: number
-		}
-		uniqueStrings: number
-		primitiveGroups: number
+export type PbfFixture = {
+	url: string
+	bbox: {
+		bottom: number
+		top: number
+		left: number
+		right: number
 	}
-> = {
+	nodesWithTags: number
+	nodes: number
+	ways: number
+	relations: number
+	node0: {
+		lat: number
+		lon: number
+		id: number
+	}
+	uniqueStrings: number
+	primitiveGroups: number
+}
+
+export const PBFs: Record<string, PbfFixture> = {
 	monaco: {
 		url: "https://download.geofabrik.de/europe/monaco-250101.osm.pbf",
 		bbox: {

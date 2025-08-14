@@ -6,6 +6,7 @@ import {
 	type OsmPbfHeaderBlock,
 	type OsmPbfPrimitiveBlock,
 } from "./proto/osmformat"
+import { nativeDecompress, streamToAsyncIterator } from "./utils"
 
 const HEADER_BYTES_LENGTH = 4
 const State = {
@@ -16,28 +17,39 @@ const State = {
 
 type HeaderType = "OSMHeader" | "OSMData"
 
-/**
- * Read an OSM PBF from binary data and generate a header and primitive blocks from its contents.
- *
- * @param data - The binary data to read as a single chunk or a stream of chunks.
- * @returns A parsed header and a generator that yields the primitive blocks.
- */
-export async function createOsmPbfReader(
-	data: ReadableStream<Uint8Array> | ArrayBuffer,
-) {
-	const reader = createOsmPbfBlockGenerator(data)
-	const header = (await reader.next()).value as OsmPbfHeaderBlock
-	if (header == null) throw new Error("Header not found")
-	return { header, blocks: reader as AsyncGenerator<OsmPbfPrimitiveBlock> }
+export class OsmPbfReader {
+	header: OsmPbfHeaderBlock
+	blocks: AsyncGenerator<OsmPbfPrimitiveBlock>
+
+	/**
+	 * Create an `OsmPbfReader` from binary data. Automatically parse the header and allow user to stream blocks from its contents.
+	 */
+	static async from(data: ReadableStream<Uint8Array> | ArrayBuffer) {
+		const reader = createOsmPbfBlockGenerator(data)
+		const header = (await reader.next()).value as OsmPbfHeaderBlock
+		if (header == null) throw new Error("Header not found")
+		return new OsmPbfReader(
+			header,
+			reader as AsyncGenerator<OsmPbfPrimitiveBlock>,
+		)
+	}
+
+	constructor(
+		header: OsmPbfHeaderBlock,
+		blocks: AsyncGenerator<OsmPbfPrimitiveBlock>,
+	) {
+		this.header = header
+		this.blocks = blocks
+	}
 }
 
 /**
- * Create a generator that yields the header and primitive blocks from an OSM PBF.
+ * Create a generator that yields the header and primitive blocks from a PBF binary data.
  *
  * @param data - The binary data to read.
  * @returns A generator that yields the header and primitive blocks.
  */
-async function* createOsmPbfBlockGenerator(
+export async function* createOsmPbfBlockGenerator(
 	data: ReadableStream<Uint8Array> | ArrayBuffer,
 ): AsyncGenerator<OsmPbfHeaderBlock | OsmPbfPrimitiveBlock> {
 	let pbf: Pbf | null = null
@@ -77,7 +89,7 @@ async function* createOsmPbfBlockGenerator(
 				const blob = readBlob(pbf, pbf.pos + bytesNeeded)
 				if (!blob.zlib_data || blob.zlib_data.length === 0)
 					throw new Error("Blob has no zlib data")
-				const data = await decompress(blob.zlib_data)
+				const data = await nativeDecompress(blob.zlib_data)
 				const blobPbf = new Pbf(data)
 				if (headerType === "OSMHeader") {
 					yield readHeaderBlock(blobPbf)
@@ -97,39 +109,5 @@ async function* createOsmPbfBlockGenerator(
 		for await (const chunk of streamToAsyncIterator(data)) {
 			yield* generateBlocksFromChunk(chunk.buffer as ArrayBuffer)
 		}
-	}
-}
-
-/**
- * Decompress a zlib-compressed array of bytes.
- *
- * @param data - The compressed data.
- * @returns The decompressed array of bytes.
- */
-function decompress(data: Uint8Array) {
-	const decompressedStream = new Blob([data])
-		.stream()
-		.pipeThrough(new DecompressionStream("deflate"))
-	return new Response(decompressedStream).bytes()
-}
-
-/**
- * Convert a readable stream to an async iterator.
- */
-async function* streamToAsyncIterator<T>(stream: ReadableStream<T>) {
-	// Get a lock on the stream
-	const reader = stream.getReader()
-
-	try {
-		while (true) {
-			// Read from the stream
-			const { done, value } = await reader.read()
-			// Exit if we're done
-			if (done) return
-			// Else yield the chunk
-			yield value
-		}
-	} finally {
-		reader.releaseLock()
 	}
 }

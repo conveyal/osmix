@@ -1,7 +1,8 @@
-import { Osm, type GeoBbox2D, type TileIndex } from "osm.ts"
+import type { Osm, GeoBbox2D, TileIndex } from "osm.ts"
 import * as Performance from "osm.ts/performance"
 import { expose, transfer } from "comlink"
 import type { _TileLoadProps } from "@deck.gl/geo-layers"
+import { createOsmIndexFromPbfData } from "../../../../packages/osm.ts/src/osm-from-pbf"
 
 const osmWorker = {
 	subscribeToPerformanceObserver(
@@ -45,9 +46,8 @@ const osmWorker = {
 			delete this.ids[id]
 		}
 		const measure = Performance.createMeasure("initializing PBF from data")
-		const osm = new Osm()
+		const osm = await createOsmIndexFromPbfData(data, onProgress)
 		this.ids[id] = osm
-		await osm.initFromPbfData(data, onProgress)
 		measure()
 		return this.ids[id].transferables()
 	},

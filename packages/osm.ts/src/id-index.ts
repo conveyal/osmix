@@ -62,9 +62,13 @@ export class IdIndex {
 		return this.indexBuilt
 	}
 
+	isSorted() {
+		return this.idsAreSorted
+	}
+
 	add(id: number): void {
 		if (this.indexBuilt) throw Error("ID index already built.")
-		if (id < this.ids.at(-1)) this.idsAreSorted = false
+		if (this.ids.length > 0 && id < this.ids.at(-1)) this.idsAreSorted = false
 		this.ids.push(id)
 	}
 
@@ -82,7 +86,7 @@ export class IdIndex {
 		if (this.indexBuilt) throw Error("ID index already build.")
 		this.ids.compact()
 		if (!this.idsAreSorted) {
-			console.error("OSM IDs were not sorted. Sorting now...")
+			console.error("IDs were not sorted. Sorting now...")
 			// Build the sorted index
 			this.idsSorted = new Float64Array(this.size)
 			this.sortedIdPositionToIndex = new Uint32Array(this.size)

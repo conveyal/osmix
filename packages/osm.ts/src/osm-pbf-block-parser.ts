@@ -4,7 +4,8 @@ import type {
 	OsmRelation,
 	OsmRelationMember,
 	OsmWay,
-} from "../types"
+} from "./types"
+import { ENTITY_MEMBER_TYPES } from "./pbf/constants"
 import type {
 	OsmPbfDenseNodes,
 	OsmPbfInfo,
@@ -14,16 +15,21 @@ import type {
 	OsmPbfRelation,
 	OsmPbfStringTable,
 	OsmPbfWay,
-} from "./proto/osmformat"
-
-export const MEMBER_TYPES = ["node", "way", "relation"] as const
+} from "./pbf/proto/osmformat"
 
 type ParseOptions = {
 	parseTags?: boolean
 	includeInfo?: boolean
 }
 
-export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
+/**
+ * Parse a primitive block into usable entities.
+ * - Dense nodes are parsed into a list of nodes
+ * - Tag keys and values are parsed into a map of strings
+ * - Info is parsed into a map of strings
+ * - Delta encoding, offsets, and other PBF-specific encoding details are handled
+ */
+export class OsmPbfBlockParser implements OsmPbfPrimitiveBlock {
 	stringtable: OsmPbfStringTable
 	primitivegroup: OsmPbfPrimitiveGroup[] = []
 	textDecoder = new TextDecoder()
@@ -39,13 +45,17 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 		includeInfo: false,
 	}
 
-	constructor(block: OsmPbfPrimitiveBlock) {
+	constructor(block: OsmPbfPrimitiveBlock, options: ParseOptions = {}) {
 		this.date_granularity = block.date_granularity ?? 1_000
 		this.stringtable = block.stringtable
 		this.primitivegroup = block.primitivegroup
 		this.granularity = block.granularity ?? 1e7
 		this.lat_offset = block.lat_offset ?? 0
 		this.lon_offset = block.lon_offset ?? 0
+		this.parseOptions = {
+			...this.parseOptions,
+			...options,
+		}
 	}
 
 	decodeString(index: number) {
@@ -57,31 +67,19 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 	 */
 	*[Symbol.iterator]() {
 		for (const group of this.primitivegroup) {
-			if (group.nodes) {
+			if (group.nodes.length > 0) {
 				yield group.nodes.map((n) => this.parseNode(n, this.parseOptions))
 			}
-			if (group.dense) {
+			if (group.dense != null) {
 				yield this.parseDenseNodes(group.dense, this.parseOptions)
 			}
-			for (const w of group.ways) {
-				yield this.parseWay(w, this.parseOptions)
+			if (group.ways.length > 0) {
+				yield group.ways.map((w) => this.parseWay(w, this.parseOptions))
 			}
-			for (const r of group.relations) {
-				yield this.parseRelation(r, this.parseOptions)
-			}
-		}
-	}
-
-	*entities(options: ParseOptions = {}) {
-		for (const group of this.primitivegroup) {
-			if (group.nodes) {
-				yield group.nodes.map((n) => this.parseNode(n, options))
-			} else if (group.dense) {
-				yield this.parseDenseNodes(group.dense, options)
-			} else if (group.ways) {
-				yield group.ways.map((w) => this.parseWay(w, options))
-			} else if (group.relations) {
-				yield group.relations.map((r) => this.parseRelation(r, options))
+			if (group.relations.length > 0) {
+				yield group.relations.map((r) =>
+					this.parseRelation(r, this.parseOptions),
+				)
 			}
 		}
 	}
@@ -163,7 +161,7 @@ export class PrimitiveBlockParser implements OsmPbfPrimitiveBlock {
 
 			const memberType = r.types[i]
 			assertNonNull(memberType)
-			const type = MEMBER_TYPES[memberType]
+			const type = ENTITY_MEMBER_TYPES[memberType]
 			assertNonNull(type)
 			return {
 				type,

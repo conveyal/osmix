@@ -48,14 +48,16 @@ export abstract class EntityIndex<T extends OsmEntity> {
 
 	get(idOrIndex: IdOrIndex): T | null {
 		const [index, id] = this.ids.idOrIndex(idOrIndex)
-		if (index === -1 || id === -1) return null
+		if (index === -1) return null
 		return this.getFullEntity(index, id, this.tags.getTags(index))
 	}
 
 	getByIndex(index: number): T {
-		const id = this.ids.at(index)
-		if (id === -1) throw Error(`Entity not found at index ${index}`)
-		return this.getFullEntity(index, id, this.tags.getTags(index))
+		return this.getFullEntity(
+			index,
+			this.ids.at(index),
+			this.tags.getTags(index),
+		)
 	}
 
 	getEntitiesByIndex(indexes: number[]): T[] {
@@ -70,9 +72,7 @@ export abstract class EntityIndex<T extends OsmEntity> {
 
 	*[Symbol.iterator](): Generator<T> {
 		for (let i = 0; i < this.size; i++) {
-			const id = this.ids.at(i)
-			if (id !== -1) yield this.getFullEntity(i, id, this.tags.getTags(i))
-			else console.error(`Entity not found at index ${i}`)
+			yield this.getFullEntity(i, this.ids.at(i), this.tags.getTags(i))
 		}
 	}
 

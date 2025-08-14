@@ -1,11 +1,6 @@
 import { bbox } from "@turf/turf"
 import { NodeIndex, type NodeIndexTransferables } from "./node-index"
-import { createOsmPbfReader } from "./pbf/osm-pbf-reader"
-import { OsmPbfWriter } from "./pbf/osm-pbf-writer"
-import {
-	MAX_ENTITIES_PER_BLOCK,
-	PrimitiveBlockBuilder,
-} from "./pbf/primitive-block-builder"
+import { OsmPbfReader } from "./pbf/osm-pbf-reader"
 import type {
 	OsmPbfHeaderBlock,
 	OsmPbfPrimitiveBlock,
@@ -26,7 +21,6 @@ import {
 import type {
 	GeoBbox2D,
 	LonLat,
-	OsmEntity,
 	OsmEntityType,
 	OsmEntityTypeMap,
 	OsmNode,
@@ -35,7 +29,7 @@ import type {
 } from "./types"
 import { isNode, isRelation, isWay, throttle } from "./utils"
 import { WayIndex, type WayIndexTransferables } from "./way-index"
-import Changeset from "./changeset"
+import { createOsmIndexFromPbfData } from "./osm-from-pbf"
 
 export interface OsmTransferables {
 	header: OsmPbfHeaderBlock
@@ -47,7 +41,7 @@ export interface OsmTransferables {
 }
 
 /**
- * Requires sorted IDs.
+ * OSM Entity Index.
  */
 export class Osm {
 	header: OsmPbfHeaderBlock
@@ -60,6 +54,7 @@ export class Osm {
 	relations: RelationIndex = new RelationIndex(this.stringTable)
 
 	#finished = false
+	#startTime = performance.now()
 	parsingTimeMs = 0
 
 	static from({
@@ -81,9 +76,7 @@ export class Osm {
 	}
 
 	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
-		const osm = new Osm()
-		await osm.initFromPbfData(data, console.log)
-		return osm
+		return createOsmIndexFromPbfData(data, console.log)
 	}
 
 	constructor(header?: OsmPbfHeaderBlock) {
@@ -93,75 +86,13 @@ export class Osm {
 		}
 	}
 
-	async initFromPbfData(
-		data: ArrayBuffer | ReadableStream<Uint8Array>,
-		onProgress: (...args: string[]) => void,
-	) {
-		const start = performance.now()
-		const reader = await createOsmPbfReader(data)
-		this.header = reader.header
-
-		const logEverySecond = throttle(onProgress, 1_000)
-
-		let entityCount = 0
-		let stage: "nodes" | "ways" | "relations" = "nodes"
-		for await (const block of reader.blocks) {
-			const blockStringIndexMap = this.stringTable.createBlockIndexMap(block)
-			for (const { nodes, ways, relations, dense } of block.primitivegroup) {
-				if (dense) {
-					this.nodes.addDenseNodes(dense, block, blockStringIndexMap)
-					entityCount += dense.id.length
-				}
-
-				if (nodes.length > 0) {
-					for (const node of nodes) {
-						this.nodes.addNode(node)
-					}
-					entityCount += nodes.length
-				}
-
-				if (ways.length > 0) {
-					if (stage === "nodes") {
-						onProgress(
-							`Loaded ${this.nodes.size.toLocaleString()} nodes. Building node spatial index...`,
-						)
-						this.nodes.finish()
-						stage = "ways"
-						entityCount = 0
-					}
-					this.ways.addWays(ways, blockStringIndexMap)
-					entityCount += ways.length
-				}
-
-				if (relations.length > 0) {
-					if (stage === "ways") {
-						onProgress(
-							`Loaded ${this.ways.size.toLocaleString()} ways. Building way spatial index...`,
-						)
-						this.ways.finish()
-						stage = "relations"
-						entityCount = 0
-					}
-					this.relations.addRelations(relations, blockStringIndexMap)
-					entityCount += relations.length
-				}
-
-				logEverySecond(`${entityCount.toLocaleString()} ${stage} loaded`)
-			}
-		}
-		this.finish()
-		onProgress(
-			`Added ${this.nodes.size.toLocaleString()} nodes, ${this.ways.size.toLocaleString()} ways, and ${this.relations.size.toLocaleString()} relations.`,
-		)
-		this.parsingTimeMs = performance.now() - start
-	}
-
 	finish() {
 		if (!this.nodes.isReady) this.nodes.finish()
 		if (!this.ways.isReady) this.ways.finish()
 		if (!this.relations.isReady) this.relations.finish()
 		this.stringTable.compact()
 		this.#finished = true
+		this.parsingTimeMs = performance.now() - this.#startTime
 	}
 
 	isFinished() {
@@ -177,12 +108,6 @@ export class Osm {
 			relations: this.relations.transferables(),
 			parsingTimeMs: this.parsingTimeMs,
 		}
-	}
-
-	*[Symbol.iterator]() {
-		yield* this.nodes
-		yield* this.ways
-		yield* this.relations
 	}
 
 	get<T extends OsmEntityType>(
@@ -342,104 +267,5 @@ export class Osm {
 
 	bbox(): GeoBbox2D | undefined {
 		return this.nodes.bbox ?? this.headerBbox()
-	}
-
-	getBboxOfNodes() {
-		return this.nodes.bbox
-	}
-
-	generateChangeset(patch: Osm): Changeset {
-		const changeset = new Changeset(this)
-		changeset.generateFullChangeset(patch)
-		return changeset
-	}
-
-	toGeoJSON(nodeFilter?: (node: OsmNode) => boolean) {
-		return [
-			...nodesToFeatures(this.nodes, nodeFilter),
-			...waysToFeatures(this.ways, this.nodes),
-		]
-	}
-
-	/**
-	 * Create a deep clone of the OSM data.
-	 * TODO clone the indexes and string table directly.
-	 * @returns A new Osm object with the same header and entities.
-	 */
-	clone() {
-		const clone = new Osm(this.header)
-		for (const node of this.nodes) {
-			clone.nodes.addNode(structuredClone(node))
-		}
-		clone.nodes.finish()
-		for (const way of this.ways) {
-			clone.ways.addWay(structuredClone(way))
-		}
-		clone.ways.finish()
-		for (const relation of this.relations) {
-			clone.relations.addRelation(structuredClone(relation))
-		}
-		clone.finish()
-		return clone
-	}
-
-	async writePbfToStream(stream: WritableStream<Uint8Array>) {
-		const writer = new OsmPbfWriter(stream)
-		const bbox = this.getBboxOfNodes()
-		await writer.writeHeader({
-			...this.header,
-			bbox: {
-				left: bbox[0],
-				bottom: bbox[1],
-				right: bbox[2],
-				top: bbox[3],
-			},
-			writingprogram: "@conveyal/osm.ts",
-			osmosis_replication_timestamp: Date.now(),
-		})
-		const primitives = this.generatePbfPrimitiveBlocks()
-		for await (const block of primitives) {
-			await writer.writePrimitiveBlock(block)
-		}
-	}
-
-	/**
-	 * Generate primitive blocks from this OSM object for writing to a PBF file.
-	 *
-	 * TODO: Sort nodes and ways?
-	 * @returns a generator that produces primitive blocks
-	 */
-	async *generatePbfPrimitiveBlocks(): AsyncGenerator<OsmPbfPrimitiveBlock> {
-		const nodes = Array.from(this.nodes)
-		for (let i = 0; i < nodes.length; i += MAX_ENTITIES_PER_BLOCK) {
-			const block = new PrimitiveBlockBuilder()
-			block.addDenseNodes(nodes.slice(i, i + MAX_ENTITIES_PER_BLOCK))
-			yield block
-		}
-
-		let block = new PrimitiveBlockBuilder()
-		for (const way of this.ways) {
-			if (block.isFull()) {
-				yield block
-				block = new PrimitiveBlockBuilder()
-			}
-			block.addEntity(way)
-		}
-		if (!block.isEmpty()) {
-			yield block
-		}
-
-		block = new PrimitiveBlockBuilder()
-		for (const relation of this.relations) {
-			if (block.isFull()) {
-				yield block
-				block = new PrimitiveBlockBuilder()
-			}
-			block.addEntity(relation)
-		}
-
-		if (!block.isEmpty()) {
-			yield block
-		}
 	}
 }

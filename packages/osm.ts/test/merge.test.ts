@@ -49,10 +49,18 @@ describe("merge osm", () => {
 			const wayChanges = Array.from(changeset.wayChanges.values())
 			const relationChanges = Array.from(changeset.relationChanges.values())
 
+			const testNodeWithCrossing = {
+				...testNode,
+				tags: {
+					...testNode.tags,
+					crossing: "yes",
+				},
+			}
+
 			assert.equal(nodeChanges.length, 11_643)
 			assert.deepEqual(nodeChanges[0], {
 				changeType: "create",
-				entity: testNode,
+				entity: testNodeWithCrossing,
 			})
 
 			assert.equal(wayChanges.length, 4_232)
@@ -60,16 +68,12 @@ describe("merge osm", () => {
 
 			assert.equal(changeset.stats.deduplicatedNodes, 0)
 			assert.equal(changeset.stats.deduplicatedNodesReplaced, 0)
-			assert.equal(changeset.stats.intersectionPointsFound, 1678)
+			assert.equal(changeset.stats.intersectionPointsFound, 3176)
 
 			const merged = changeset.applyChanges()
 
-			for (const entity of merged) {
-				console.error(entity)
-			}
-
 			assert.equal(osm1.nodes.size + osm2.nodes.size, merged.nodes.size)
-			assert.deepEqual(merged.nodes.getById(testNode.id), testNode)
+			assert.deepEqual(merged.nodes.getById(testNode.id), testNodeWithCrossing)
 		},
 	)
 

@@ -48,18 +48,14 @@ export class TagIndex {
 		}
 	}
 
-	addString(s: string) {
-		return this.stringTable.add(s)
-	}
-
 	addTags(tags?: OsmTags) {
 		const tagKeys: number[] = []
 		const tagValues: number[] = []
 
 		if (tags) {
 			for (const [key, value] of Object.entries(tags)) {
-				tagKeys.push(this.addString(key))
-				tagValues.push(this.addString(String(value)))
+				tagKeys.push(this.stringTable.add(key))
+				tagValues.push(this.stringTable.add(String(value)))
 			}
 		}
 
@@ -86,13 +82,13 @@ export class TagIndex {
 	}
 
 	hasTags(index: number): boolean {
-		return this.tagCount.at(index) > 0
+		return (this.tagCount.at(index) ?? 0) > 0
 	}
 
 	getTags(index: number): OsmTags | undefined {
-		const tagCount = this.tagCount.at(index)
+		const tagCount = this.tagCount.at(index) ?? 0
 		if (tagCount === 0) return
-		const tagStart = this.tagStart.at(index)
+		const tagStart = this.tagStart.at(index) ?? 0
 		const tagKeyIndexes = this.tagKeys.array.slice(
 			tagStart,
 			tagStart + tagCount,

@@ -7,17 +7,10 @@ import type {
 	OsmEntityType,
 	OsmEntityTypeMap,
 	OsmNode,
-	OsmRelation,
 	OsmTags,
 	OsmWay,
 } from "./types"
-import {
-	entityPropertiesEqual,
-	getEntityType,
-	isNode,
-	isRelation,
-	isWay,
-} from "./utils"
+import { entityPropertiesEqual, getEntityType } from "./utils"
 
 export default class Changeset {
 	nodeChanges = new Map<number, OsmChange<OsmEntityTypeMap["node"]>>()
@@ -228,23 +221,61 @@ export default class Changeset {
 	}
 
 	generateFullChangeset(patch: Osm) {
+		if (this.osm.nodes.size === 0 || patch.nodes.size === 0) {
+			throw Error("No nodes in base or patch")
+		}
+
 		// Reset the current node ID to the highest node ID in the base or patch
 		this.currentNodeId = Math.max(
 			this.osm.nodes.ids.at(-1),
 			patch.nodes.ids.at(-1),
 		)
 
-		// First, create or modify all entities in the patch
-		for (const entity of patch) {
-			const type = getEntityType(entity)
-			const existingEntity = this.osm.get(type, entity.id)
-			if (existingEntity == null) {
-				this.create(entity)
-			} else if (!entityPropertiesEqual(existingEntity, entity)) {
+		// First, create or modify all nodes, ways, and relations in the patch
+		for (const node of patch.nodes) {
+			const existingNode = this.osm.nodes.getById(node.id)
+			if (existingNode == null) {
+				this.nodeChanges.set(node.id, {
+					changeType: "create",
+					entity: node,
+				})
+			} else if (!entityPropertiesEqual(existingNode, node)) {
 				// Replace the existing entity with the patch entity
-				this.changes(type).set(entity.id, {
+				this.nodeChanges.set(node.id, {
 					changeType: "modify",
-					entity,
+					entity: node,
+				})
+			}
+		}
+
+		for (const way of patch.ways) {
+			const existingWay = this.osm.ways.getById(way.id)
+			if (existingWay == null) {
+				this.wayChanges.set(way.id, {
+					changeType: "create",
+					entity: way,
+				})
+			} else if (!entityPropertiesEqual(existingWay, way)) {
+				// Replace the existing entity with the patch entity
+				this.wayChanges.set(way.id, {
+					changeType: "modify",
+					entity: way,
+				})
+			}
+		}
+
+		for (const relation of patch.relations) {
+			const existingRelation = this.osm.relations.getById(relation.id)
+			if (existingRelation == null) {
+				this.relationChanges.set(relation.id, {
+					changeType: "create",
+					entity: relation,
+				})
+			} else if (!entityPropertiesEqual(existingRelation, relation)) {
+				// Replace the existing entity with the patch entity
+				this.relationChanges.set(relation.id, {
+					changeType: "modify",
+					entity: relation,
 				})
 			}
 		}
@@ -260,6 +291,9 @@ export default class Changeset {
 		}
 	}
 
+	/**
+	 * TODO: This produces unsorted IDs.
+	 */
 	applyChanges() {
 		const osm = new Osm(this.osm.header)
 
@@ -267,7 +301,6 @@ export default class Changeset {
 		for (const node of this.osm.nodes) {
 			const change = this.nodeChanges.get(node.id)
 			if (change) {
-				console.error(change)
 				// Remove the change from the changeset so we don't apply it twice
 				this.nodeChanges.delete(node.id)
 				if (change.changeType === "delete") continue // Don't add deleted nodes
@@ -282,9 +315,6 @@ export default class Changeset {
 		for (const change of this.nodeChanges.values()) {
 			if (change.changeType !== "create") {
 				throw Error("Changeset still contains node changes in incorrect stage.")
-			}
-			if (change.entity.id === 2135545) {
-				console.error(change)
 			}
 			osm.nodes.addNode(change.entity)
 		}

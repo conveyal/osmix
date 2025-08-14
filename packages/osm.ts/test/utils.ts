@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { Readable, Writable } from "node:stream"
 import { fileURLToPath } from "node:url"
+import { ResizeableTypedArray } from "../src/typed-arrays"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURES_DIR = resolve(__dirname, "../../../fixtures")
@@ -43,4 +44,21 @@ export async function getFileWriteStream(url: string) {
 	return Writable.toWeb(
 		createWriteStream(getPath(url)),
 	) as WritableStream<Uint8Array>
+}
+
+export class WriteableStreamArrayBuffer extends WritableStream<
+	Uint8Array<ArrayBuffer>
+> {
+	data = new ResizeableTypedArray(Uint8Array)
+	buffer: ArrayBuffer | null = null
+	constructor() {
+		super({
+			write: (chunk) => {
+				this.data.pushMany(chunk)
+			},
+			close: () => {
+				this.buffer = this.data.compact().buffer
+			},
+		})
+	}
 }
