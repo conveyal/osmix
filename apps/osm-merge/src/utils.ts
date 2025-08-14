@@ -44,3 +44,17 @@ export function layerIdToName(id: string) {
 	if (id === "osm-tk:patch-way-geojson") return "Current Way"
 	return id
 }
+
+const formatMmSsMs = new Intl.DateTimeFormat("en-US", {
+	minute: "2-digit",
+	second: "2-digit",
+	fractionalSecondDigits: 3,
+	hour12: false,
+})
+
+/**
+ * Format a timestamp as "MM:SS.sss"
+ */
+export function formatTimestampMs(timestamp: number) {
+	return formatMmSsMs.format(new Date(timestamp))
+}

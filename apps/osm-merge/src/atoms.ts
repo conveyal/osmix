@@ -7,6 +7,7 @@ import { generateOsmChanges } from "osm.ts/changes"
 import { nodeToFeature, wayToEditableGeoJson } from "osm.ts/geojson"
 import type { OsmChange } from "osm.ts"
 import { isWay } from "osm.ts/utils"
+import { addLogMessageAtom } from "./state/log"
 
 const LINE_WIDTH_METERS = 3
 const POINT_RADIUS_METERS = 1.5
@@ -91,50 +92,6 @@ export const applyAllChangesAtom = atom(null, async (get, set) => {
 	set(patchIndexAtom, -1)
 	set(patchesAtom, [])
 	set(workflowStepAtom, "deduplicate-nodes")
-})
-
-type Status = {
-	type: "info" | "ready" | "error"
-	message: string
-	duration: number
-	timestamp: number
-}
-
-export const logAtom = atom<Status[]>([
-	{
-		type: "info",
-		message: "Initializing application...",
-		duration: 0,
-		timestamp: Date.now(),
-	},
-])
-
-export const addLogMessageAtom = atom(
-	null,
-	(get, set, message: string, type: Status["type"] = "info") => {
-		const log = get(logAtom)
-		const msSinceLastLog = Date.now() - log[log.length - 1].timestamp
-		const durationSeconds = `${(msSinceLastLog / 1000).toFixed(2)}s`
-		if (type === "error") {
-			console.error(`${type} (${durationSeconds}):`, message)
-		} else {
-			console.log(`${type} (${durationSeconds}):`, message)
-		}
-		set(logAtom, [
-			...log,
-			{
-				type,
-				message,
-				duration: msSinceLastLog,
-				timestamp: Date.now(),
-			},
-		])
-	},
-)
-
-export const currentStatusAtom = atom((get) => {
-	const log = get(logAtom)
-	return log[log.length - 1]
 })
 
 export const runFullMergeAtom = atom(null, async (get, set) => {

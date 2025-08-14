@@ -22,14 +22,15 @@ import {
 } from "react"
 import Basemap from "./basemap"
 import DeckGlOverlay from "./deckgl-overlay"
-import { OsmPbfFileInput } from "./filepicker"
+import OsmPbfFileInput from "./osm-pbf-file-input"
 import { Source, Layer } from "react-map-gl/maplibre"
 import { Button } from "./ui/button"
 import type { OsmPbfHeaderBlock } from "../../../../packages/osm.ts/src/pbf/proto/osmformat"
-import { addLogMessageAtom } from "@/atoms"
+import { addLogMessageAtom } from "@/state/log"
 import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
 import * as Performance from "osm.ts/performance"
-import Log from "./log"
+import FitBounds from "./fit-bounds"
+import CustomControl from "./custom-control"
 
 const TILE_SIZE = 1024
 
@@ -358,7 +359,9 @@ export default function ViewPage() {
 										entityType: "way",
 									})
 									const way = osm.ways.getByIndex(wayIndex)
-									const nodes = way.refs.map((ref) => osm.nodes.getById(ref))
+									const nodes = way.refs
+										.map((ref) => osm.nodes.getById(ref))
+										.filter((n) => n != null)
 									dispatch({
 										type: "SET_WAY",
 										index: wayIndex,
@@ -416,27 +419,12 @@ export default function ViewPage() {
 							: "incomplete"}
 					</div>
 				</div>
-				<div className="h-48">
-					<Log />
-				</div>
 				<div className="grid grid-cols-2 gap-2.5 text-xs">
 					{osmInfo && (
 						<>
 							<div className="col-span-2">
 								bbox: {bbox?.map((n) => n.toFixed(6)).join(", ")}
 							</div>
-							<Button
-								className="col-span-2"
-								size="xs"
-								onClick={() => {
-									map?.fitBounds(osmInfo.bbox, {
-										padding: 100,
-										maxDuration: 200,
-									})
-								}}
-							>
-								fit bounds
-							</Button>
 							<div>nodes</div>
 							<div>{osmInfo.nodes.toLocaleString()}</div>
 							<div>ways</div>
@@ -480,6 +468,11 @@ export default function ViewPage() {
 								paint={{ "line-color": "red", "line-width": 10 }}
 							/>
 						</Source>
+					)}
+					{bbox && (
+						<CustomControl position="top-left">
+							<FitBounds bounds={bbox} />
+						</CustomControl>
 					)}
 					<DeckGlOverlay
 						// useDevicePixels={false}

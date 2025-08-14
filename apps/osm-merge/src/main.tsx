@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client"
 import { BrowserRouter, Route, Routes, Outlet } from "react-router"
 import Nav from "./components/nav"
 import ViewPage from "./components/view-page"
-import MergePage from "./components/merge-page"
+// import MergePage from "./components/merge-page"
 
 function RootLayout() {
 	return (
@@ -28,7 +28,7 @@ createRoot(rootEl).render(
 					element={<RootLayout />}
 				>
 					<Route path="" element={<ViewPage />} />
-					<Route path="merge" element={<MergePage />} />
+					{/* <Route path="merge" element={<MergePage />} /> */}
 					<Route path="view" element={<ViewPage />} />
 				</Route>
 			</Routes>
