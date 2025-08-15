@@ -1,6 +1,6 @@
 import { bbox } from "@turf/turf"
 import { NodeIndex, type NodeIndexTransferables } from "./node-index"
-import { OsmPbfReader } from "./pbf/osm-pbf-reader"
+import { createOsmIndexFromPbfData } from "./osm-from-pbf"
 import type {
 	OsmPbfHeaderBlock,
 	OsmPbfPrimitiveBlock,
@@ -11,13 +11,7 @@ import {
 	type RelationIndexTransferables,
 } from "./relation-index"
 import StringTable, { type StringTableTransferables } from "./stringtable"
-import {
-	nodeToFeature,
-	nodesToFeatures,
-	relationToFeature,
-	wayToFeature,
-	waysToFeatures,
-} from "./to-geojson"
+import { nodeToFeature, relationToFeature, wayToFeature } from "./to-geojson"
 import type {
 	GeoBbox2D,
 	LonLat,
@@ -27,9 +21,8 @@ import type {
 	OsmRelation,
 	OsmWay,
 } from "./types"
-import { isNode, isRelation, isWay, throttle } from "./utils"
+import { isNode, isRelation, isWay } from "./utils"
 import { WayIndex, type WayIndexTransferables } from "./way-index"
-import { createOsmIndexFromPbfData } from "./osm-from-pbf"
 
 export interface OsmTransferables {
 	header: OsmPbfHeaderBlock
@@ -50,7 +43,7 @@ export class Osm {
 	// Shared string lookup table for all nodes, ways, and relations
 	stringTable: StringTable = new StringTable()
 	nodes: NodeIndex = new NodeIndex(this.stringTable)
-	ways: WayIndex = new WayIndex(this.stringTable, this.nodes)
+	ways: WayIndex = new WayIndex(this.stringTable)
 	relations: RelationIndex = new RelationIndex(this.stringTable)
 
 	#finished = false
@@ -68,7 +61,7 @@ export class Osm {
 		const osm = new Osm(header)
 		osm.stringTable = StringTable.from(stringTable)
 		osm.nodes = NodeIndex.from(osm.stringTable, nodes)
-		osm.ways = WayIndex.from(osm.stringTable, osm.nodes, ways)
+		osm.ways = WayIndex.from(osm.stringTable, ways)
 		osm.relations = RelationIndex.from(osm.stringTable, relations)
 		osm.parsingTimeMs = parsingTimeMs
 		osm.#finished = true
@@ -86,10 +79,16 @@ export class Osm {
 		}
 	}
 
+	buildSpatialIndexes() {
+		this.nodes.buildSpatialIndex()
+		this.ways.buildSpatialIndex(this.nodes)
+	}
+
 	finish() {
 		if (!this.nodes.isReady) this.nodes.finish()
 		if (!this.ways.isReady) this.ways.finish()
 		if (!this.relations.isReady) this.relations.finish()
+		this.buildSpatialIndexes()
 		this.stringTable.compact()
 		this.#finished = true
 		this.parsingTimeMs = performance.now() - this.#startTime
@@ -155,7 +154,7 @@ export class Osm {
 		let size = 0
 		wayCandidates.forEach((w, i) => {
 			wayIndexes[i] = w
-			const way = this.ways.getLine(w)
+			const way = this.ways.getLine(w, this.nodes)
 			size += way.length
 			wayPositions.push(way)
 			const prevIndex = wayStartIndices[i]
@@ -186,7 +185,7 @@ export class Osm {
 		const wayCandidates = this.ways.intersects(bbox)
 		console.time("Osm.getBitmapForBbox.ways")
 		for (const wayIndex of wayCandidates) {
-			const wayPositions = this.ways.getLine(wayIndex)
+			const wayPositions = this.ways.getLine(wayIndex, this.nodes)
 			bitmap.drawWay(wayPositions)
 		}
 		console.timeEnd("Osm.getBitmapForBbox.ways")
@@ -226,7 +225,7 @@ export class Osm {
 		const wayCandidates = this.ways.intersects(bbox)
 
 		for (const wayIndex of wayCandidates) {
-			const wayPositions = this.ways.getLine(wayIndex)
+			const wayPositions = this.ways.getLine(wayIndex, this.nodes)
 			bitmap.drawWay(wayPositions)
 		}
 		console.timeEnd("Osm.getWaysBitmapForBbox")

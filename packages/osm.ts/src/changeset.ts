@@ -156,8 +156,8 @@ export default class Changeset {
 				waysShouldConnect(patchWay.tags, baseWay.tags)
 			) {
 				const intersectingPoints: LonLat[] = lineIntersect(
-					patch.ways.getLineString({ index: patchWayIndex }),
-					this.osm.ways.getLineString({ index: baseWayIndex }),
+					patch.ways.getLineString({ index: patchWayIndex }, patch.nodes),
+					this.osm.ways.getLineString({ index: baseWayIndex }, this.osm.nodes),
 				).features.map((f) => ({
 					lon: f.geometry.coordinates[0],
 					lat: f.geometry.coordinates[1],
@@ -165,14 +165,22 @@ export default class Changeset {
 
 				for (const ll of intersectingPoints) {
 					this.stats.intersectionPointsFound++
-					const onBase = this.osm.ways.nearestPointOnLine(baseWayIndex, ll)
+					const onBase = this.osm.ways.nearestPointOnLine(
+						baseWayIndex,
+						ll,
+						this.osm.nodes,
+					)
 					const closestBaseNodeId = baseWay.refs.at(onBase.properties.index)
 					const baseNode =
 						closestBaseNodeId && onBase.properties.dist < 0.001 // within 1 meter
 							? this.osm.nodes.getById(closestBaseNodeId)
 							: null
 
-					const onPatch = patch.ways.nearestPointOnLine(patchWayIndex, ll)
+					const onPatch = patch.ways.nearestPointOnLine(
+						patchWayIndex,
+						ll,
+						patch.nodes,
+					)
 					const closestPatchNodeId = patchWay.refs.at(onPatch.properties.index)
 					const patchNode =
 						closestPatchNodeId && onPatch.properties.dist < 0.001 // within 1 meter

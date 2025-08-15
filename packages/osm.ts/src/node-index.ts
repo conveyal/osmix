@@ -146,7 +146,6 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 	finishEntityIndex() {
 		this.lons.compact()
 		this.lats.compact()
-		this.buildSpatialIndex()
 	}
 
 	buildSpatialIndex() {

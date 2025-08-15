@@ -1,9 +1,6 @@
 import { EntityIndex, type EntityIndexTransferables } from "./entity-index"
 import { IdIndex } from "./id-index"
-import type {
-	OsmPbfPrimitiveBlock,
-	OsmPbfRelation,
-} from "./pbf/proto/osmformat"
+import type { OsmPbfRelation } from "./pbf/proto/osmformat"
 import type StringTable from "./stringtable"
 import { TagIndex } from "./tag-index"
 import {
