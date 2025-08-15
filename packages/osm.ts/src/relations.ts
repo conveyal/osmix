@@ -1,8 +1,8 @@
-import { EntityIndex, type EntityIndexTransferables } from "./entity-index"
-import { IdIndex } from "./id-index"
+import { Entities, type EntitiesTransferables } from "./entities"
+import { Ids } from "./ids"
 import type { OsmPbfRelation } from "./pbf/proto/osmformat"
 import type StringTable from "./stringtable"
-import { TagIndex } from "./tag-index"
+import { Tags } from "./tags"
 import {
 	IdArrayType,
 	ResizeableTypedArray,
@@ -12,7 +12,7 @@ import type { OsmRelation, OsmRelationMember, OsmTags } from "./types"
 
 const RELATION_MEMBER_TYPES = ["node", "way", "relation"] as const
 
-export interface RelationIndexTransferables extends EntityIndexTransferables {
+export interface RelationsTransferables extends EntitiesTransferables {
 	memberStart: TypedArrayBuffer
 	memberCount: TypedArrayBuffer
 	memberRefs: TypedArrayBuffer
@@ -20,7 +20,7 @@ export interface RelationIndexTransferables extends EntityIndexTransferables {
 	memberRoles: TypedArrayBuffer
 }
 
-export class RelationIndex extends EntityIndex<OsmRelation> {
+export class Relations extends Entities<OsmRelation> {
 	memberStart = new ResizeableTypedArray(Uint32Array)
 	memberCount = new ResizeableTypedArray(Uint16Array) // Maximum 65,535 members per relation
 
@@ -29,10 +29,10 @@ export class RelationIndex extends EntityIndex<OsmRelation> {
 	memberTypes = new ResizeableTypedArray(Uint8Array)
 	memberRoles = new ResizeableTypedArray(Uint32Array)
 
-	static from(stringTable: StringTable, rit: RelationIndexTransferables) {
-		const idIndex = IdIndex.from(rit)
-		const tagIndex = TagIndex.from(stringTable, rit)
-		const ri = new RelationIndex(stringTable, idIndex, tagIndex)
+	static from(stringTable: StringTable, rit: RelationsTransferables) {
+		const idIndex = Ids.from(rit)
+		const tagIndex = Tags.from(stringTable, rit)
+		const ri = new Relations(stringTable, idIndex, tagIndex)
 		ri.memberStart = ResizeableTypedArray.from(Uint32Array, rit.memberStart)
 		ri.memberCount = ResizeableTypedArray.from(Uint16Array, rit.memberCount)
 		ri.memberRefs = ResizeableTypedArray.from(IdArrayType, rit.memberRefs)
@@ -41,15 +41,11 @@ export class RelationIndex extends EntityIndex<OsmRelation> {
 		return ri
 	}
 
-	constructor(
-		stringTable: StringTable,
-		idIndex?: IdIndex,
-		tagIndex?: TagIndex,
-	) {
+	constructor(stringTable: StringTable, idIndex?: Ids, tagIndex?: Tags) {
 		super("relation", stringTable, idIndex, tagIndex)
 	}
 
-	transferables(): RelationIndexTransferables {
+	transferables(): RelationsTransferables {
 		return {
 			memberStart: this.memberStart.array.buffer,
 			memberCount: this.memberCount.array.buffer,

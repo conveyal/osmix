@@ -9,7 +9,7 @@ export type IdOrIndex = { id: number } | { index: number }
 
 const BLOCK_SIZE = 256
 
-export type IdIndexTransferables = {
+export type IdsTransferables = {
 	ids: TypedArrayBuffer
 	sortedIds: TypedArrayBuffer
 	sortedIdPositionToIndex: TypedArrayBuffer
@@ -22,7 +22,7 @@ export type IdIndexTransferables = {
  * This is used to store IDs in a sorted array and then use binary search to find the index of an ID.
  * Maps max out at 2^32 IDs.
  */
-export class IdIndex {
+export class Ids {
 	private ids = new ResizeableTypedArray(IdArrayType)
 	private indexBuilt = false
 	private idsAreSorted = true
@@ -35,8 +35,8 @@ export class IdIndex {
 		sortedIds,
 		sortedIdPositionToIndex,
 		anchors,
-	}: IdIndexTransferables) {
-		const idIndex = new IdIndex()
+	}: IdsTransferables) {
+		const idIndex = new Ids()
 		idIndex.ids = ResizeableTypedArray.from(IdArrayType, ids)
 		idIndex.idsSorted = new Float64Array(sortedIds)
 		idIndex.sortedIdPositionToIndex = new Uint32Array(sortedIdPositionToIndex)
@@ -45,7 +45,7 @@ export class IdIndex {
 		return idIndex
 	}
 
-	transferables(): IdIndexTransferables {
+	transferables(): IdsTransferables {
 		return {
 			ids: this.ids.array.buffer,
 			sortedIds: this.idsSorted.buffer,

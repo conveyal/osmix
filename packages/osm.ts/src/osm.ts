@@ -1,15 +1,12 @@
 import { bbox } from "@turf/turf"
-import { NodeIndex, type NodeIndexTransferables } from "./node-index"
+import { Nodes, type NodesTransferables } from "./nodes"
 import { createOsmIndexFromPbfData } from "./osm-from-pbf"
 import type {
 	OsmPbfHeaderBlock,
 	OsmPbfPrimitiveBlock,
 } from "./pbf/proto/osmformat"
 import { Bitmap } from "./raster"
-import {
-	RelationIndex,
-	type RelationIndexTransferables,
-} from "./relation-index"
+import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { nodeToFeature, relationToFeature, wayToFeature } from "./to-geojson"
 import type {
@@ -22,14 +19,14 @@ import type {
 	OsmWay,
 } from "./types"
 import { isNode, isRelation, isWay } from "./utils"
-import { WayIndex, type WayIndexTransferables } from "./way-index"
+import { Ways, type WaysTransferables } from "./ways"
 
 export interface OsmTransferables {
 	header: OsmPbfHeaderBlock
 	stringTable: StringTableTransferables
-	nodes: NodeIndexTransferables
-	ways: WayIndexTransferables
-	relations: RelationIndexTransferables
+	nodes: NodesTransferables
+	ways: WaysTransferables
+	relations: RelationsTransferables
 	parsingTimeMs: number
 }
 
@@ -42,9 +39,9 @@ export class Osm {
 
 	// Shared string lookup table for all nodes, ways, and relations
 	stringTable: StringTable = new StringTable()
-	nodes: NodeIndex = new NodeIndex(this.stringTable)
-	ways: WayIndex = new WayIndex(this.stringTable)
-	relations: RelationIndex = new RelationIndex(this.stringTable)
+	nodes: Nodes = new Nodes(this.stringTable)
+	ways: Ways = new Ways(this.stringTable)
+	relations: Relations = new Relations(this.stringTable)
 
 	#finished = false
 	#startTime = performance.now()
@@ -60,9 +57,9 @@ export class Osm {
 	}: OsmTransferables) {
 		const osm = new Osm(header)
 		osm.stringTable = StringTable.from(stringTable)
-		osm.nodes = NodeIndex.from(osm.stringTable, nodes)
-		osm.ways = WayIndex.from(osm.stringTable, ways)
-		osm.relations = RelationIndex.from(osm.stringTable, relations)
+		osm.nodes = Nodes.from(osm.stringTable, nodes)
+		osm.ways = Ways.from(osm.stringTable, ways)
+		osm.relations = Relations.from(osm.stringTable, relations)
 		osm.parsingTimeMs = parsingTimeMs
 		osm.#finished = true
 		return osm

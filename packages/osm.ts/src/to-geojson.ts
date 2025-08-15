@@ -1,11 +1,11 @@
-import type { NodeIndex } from "./node-index"
+import type { Nodes } from "./nodes"
 import type {
 	OsmGeoJSONProperties,
 	OsmNode,
 	OsmRelation,
 	OsmWay,
 } from "./types"
-import type { WayIndex } from "./way-index"
+import type { Ways } from "./ways"
 import { wayIsArea } from "./way-is-area"
 
 function includeNode(node: OsmNode) {
@@ -13,7 +13,7 @@ function includeNode(node: OsmNode) {
 	return true
 }
 
-export function nodesToFeatures(nodes: NodeIndex, filter = includeNode) {
+export function nodesToFeatures(nodes: Nodes, filter = includeNode) {
 	const features: GeoJSON.Feature<GeoJSON.Point, OsmGeoJSONProperties>[] = []
 	for (const node of nodes) {
 		if (filter(node)) {
@@ -42,11 +42,7 @@ function includeWay(way: OsmWay) {
 	return true
 }
 
-export function waysToFeatures(
-	ways: WayIndex,
-	nodes: NodeIndex,
-	filter = includeWay,
-) {
+export function waysToFeatures(ways: Ways, nodes: Nodes, filter = includeWay) {
 	const features: GeoJSON.Feature<
 		GeoJSON.LineString | GeoJSON.Polygon,
 		OsmGeoJSONProperties
@@ -61,7 +57,7 @@ export function waysToFeatures(
 
 export function wayToFeature(
 	way: OsmWay,
-	nodes: NodeIndex,
+	nodes: Nodes,
 ): GeoJSON.Feature<GeoJSON.LineString | GeoJSON.Polygon, OsmGeoJSONProperties> {
 	return {
 		type: "Feature",
@@ -96,7 +92,7 @@ export function wayToLineString(
 
 export function wayToEditableGeoJson(
 	way: OsmWay,
-	nodes: NodeIndex,
+	nodes: Nodes,
 ): GeoJSON.FeatureCollection<
 	GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.Point,
 	OsmGeoJSONProperties
@@ -120,7 +116,7 @@ export function wayToEditableGeoJson(
 
 export function relationToFeature(
 	relation: OsmRelation,
-	nodes: NodeIndex,
+	nodes: Nodes,
 ): GeoJSON.Feature<GeoJSON.Polygon, OsmGeoJSONProperties> {
 	return {
 		type: "Feature",

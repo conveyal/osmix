@@ -1,11 +1,11 @@
 import { cleanCoords, nearestPointOnLine } from "@turf/turf"
 import Flatbush from "flatbush"
-import { EntityIndex, type EntityIndexTransferables } from "./entity-index"
-import { IdIndex, type IdOrIndex } from "./id-index"
-import type { NodeIndex } from "./node-index"
+import { Entities, type EntitiesTransferables } from "./entities"
+import { Ids, type IdOrIndex } from "./ids"
+import type { Nodes } from "./nodes"
 import type { OsmPbfWay } from "./pbf"
 import type StringTable from "./stringtable"
-import { TagIndex } from "./tag-index"
+import { Tags } from "./tags"
 import {
 	BufferConstructor,
 	CoordinateArrayType,
@@ -15,7 +15,7 @@ import {
 } from "./typed-arrays"
 import type { GeoBbox2D, LonLat, OsmTags, OsmWay } from "./types"
 
-export interface WayIndexTransferables extends EntityIndexTransferables {
+export interface WaysTransferables extends EntitiesTransferables {
 	refStart: TypedArrayBuffer
 	refCount: TypedArrayBuffer
 	refs: TypedArrayBuffer
@@ -23,7 +23,7 @@ export interface WayIndexTransferables extends EntityIndexTransferables {
 	spatialIndex: TypedArrayBuffer
 }
 
-export class WayIndex extends EntityIndex<OsmWay> {
+export class Ways extends Entities<OsmWay> {
 	spatialIndex: Flatbush = new Flatbush(1)
 
 	refStart = new ResizeableTypedArray(Uint32Array)
@@ -35,10 +35,10 @@ export class WayIndex extends EntityIndex<OsmWay> {
 	// Bounding box of the way in geographic coordinates
 	bbox = new ResizeableTypedArray(CoordinateArrayType)
 
-	static from(stringTable: StringTable, wits: WayIndexTransferables) {
-		const idIndex = IdIndex.from(wits)
-		const tagIndex = TagIndex.from(stringTable, wits)
-		const wayIndex = new WayIndex(stringTable, idIndex, tagIndex)
+	static from(stringTable: StringTable, wits: WaysTransferables) {
+		const idIndex = Ids.from(wits)
+		const tagIndex = Tags.from(stringTable, wits)
+		const wayIndex = new Ways(stringTable, idIndex, tagIndex)
 		wayIndex.refStart = ResizeableTypedArray.from(Uint32Array, wits.refStart)
 		wayIndex.refCount = ResizeableTypedArray.from(Uint16Array, wits.refCount)
 		wayIndex.refs = ResizeableTypedArray.from(IdArrayType, wits.refs)
@@ -47,15 +47,11 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		return wayIndex
 	}
 
-	constructor(
-		stringTable: StringTable,
-		idIndex?: IdIndex,
-		tagIndex?: TagIndex,
-	) {
+	constructor(stringTable: StringTable, idIndex?: Ids, tagIndex?: Tags) {
 		super("way", stringTable, idIndex, tagIndex)
 	}
 
-	transferables(): WayIndexTransferables {
+	transferables(): WaysTransferables {
 		return {
 			refStart: this.refStart.array.buffer,
 			refCount: this.refCount.array.buffer,
@@ -111,7 +107,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		this.refs.compact()
 	}
 
-	buildSpatialIndex(nodeIndex: NodeIndex) {
+	buildSpatialIndex(nodeIndex: Nodes) {
 		console.time("WayIndex.buildSpatialIndex")
 		this.spatialIndex = new Flatbush(
 			this.size,
@@ -173,7 +169,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		]
 	}
 
-	getLine(index: number, nodeIndex: NodeIndex) {
+	getLine(index: number, nodeIndex: Nodes) {
 		const count = this.refCount.at(index)
 		const start = this.refStart.at(index)
 		const line = new Float64Array(count * 2)
@@ -186,7 +182,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		return line
 	}
 
-	getCoordinates(index: number, nodeIndex: NodeIndex): [number, number][] {
+	getCoordinates(index: number, nodeIndex: Nodes): [number, number][] {
 		const line = this.getLine(index, nodeIndex)
 		const coords: [number, number][] = []
 		for (let i = 0; i < line.length; i += 2) {
@@ -201,7 +197,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 
 	getLineString(
 		i: IdOrIndex,
-		nodeIndex: NodeIndex,
+		nodeIndex: Nodes,
 	): GeoJSON.Feature<GeoJSON.LineString, OsmTags> {
 		const [index, id] = this.ids.idOrIndex(i)
 		const coordinates = this.getCoordinates(index, nodeIndex)
@@ -229,7 +225,7 @@ export class WayIndex extends EntityIndex<OsmWay> {
 		return this.spatialIndex.neighbors(x, y, maxResults, maxDistance)
 	}
 
-	nearestPointOnLine(index: number, ll: LonLat, nodeIndex: NodeIndex) {
+	nearestPointOnLine(index: number, ll: LonLat, nodeIndex: Nodes) {
 		const lineString = this.getLineString({ index }, nodeIndex)
 		const nearestPoint = nearestPointOnLine(cleanCoords(lineString), [
 			ll.lon,

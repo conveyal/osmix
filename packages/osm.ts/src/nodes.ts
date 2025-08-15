@@ -6,20 +6,20 @@ import {
 	type TypedArrayBuffer,
 } from "./typed-arrays"
 import type { GeoBbox2D, OsmNode, OsmTags } from "./types"
-import { EntityIndex, type EntityIndexTransferables } from "./entity-index"
+import { Entities, type EntitiesTransferables } from "./entities"
 import type StringTable from "./stringtable"
 import type { OsmPbfDenseNodes, OsmPbfPrimitiveBlock } from "./pbf"
-import { IdIndex, type IdOrIndex } from "./id-index"
-import { TagIndex } from "./tag-index"
+import { Ids, type IdOrIndex } from "./ids"
+import { Tags } from "./tags"
 
-export interface NodeIndexTransferables extends EntityIndexTransferables {
+export interface NodesTransferables extends EntitiesTransferables {
 	lons: TypedArrayBuffer
 	lats: TypedArrayBuffer
 	bbox: GeoBbox2D
 	spatialIndex: TypedArrayBuffer
 }
 
-export class NodeIndex extends EntityIndex<OsmNode> {
+export class Nodes extends Entities<OsmNode> {
 	lons = new ResizeableTypedArray(CoordinateArrayType)
 	lats = new ResizeableTypedArray(CoordinateArrayType)
 	bbox: GeoBbox2D = [
@@ -30,10 +30,10 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 	]
 	spatialIndex: KDBush = new KDBush(0)
 
-	static from(stringTable: StringTable, nits: NodeIndexTransferables) {
-		const idIndex = IdIndex.from(nits)
-		const tagIndex = TagIndex.from(stringTable, nits)
-		const nodeIndex = new NodeIndex(stringTable, idIndex, tagIndex)
+	static from(stringTable: StringTable, nits: NodesTransferables) {
+		const idIndex = Ids.from(nits)
+		const tagIndex = Tags.from(stringTable, nits)
+		const nodeIndex = new Nodes(stringTable, idIndex, tagIndex)
 		nodeIndex.lons = ResizeableTypedArray.from(Float64Array, nits.lons)
 		nodeIndex.lats = ResizeableTypedArray.from(Float64Array, nits.lats)
 		nodeIndex.bbox = nits.bbox
@@ -41,15 +41,11 @@ export class NodeIndex extends EntityIndex<OsmNode> {
 		return nodeIndex
 	}
 
-	constructor(
-		stringTable: StringTable,
-		idIndex?: IdIndex,
-		tagIndex?: TagIndex,
-	) {
+	constructor(stringTable: StringTable, idIndex?: Ids, tagIndex?: Tags) {
 		super("node", stringTable, idIndex, tagIndex)
 	}
 
-	transferables(): NodeIndexTransferables {
+	transferables(): NodesTransferables {
 		return {
 			lons: this.lons.array.buffer,
 			lats: this.lats.array.buffer,
@@ -215,7 +211,7 @@ export class NodeIndex extends EntityIndex<OsmNode> {
  * @returns A map of node IDs to sets of node IDs that are within the radius.
  */
 export function findOverlappingNodes(
-	index: NodeIndex,
+	index: Nodes,
 	nodes: OsmNode[],
 	radius = 0,
 ) {

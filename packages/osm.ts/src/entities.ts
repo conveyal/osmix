@@ -1,29 +1,29 @@
-import { IdIndex, type IdIndexTransferables, type IdOrIndex } from "./id-index"
+import { Ids, type IdsTransferables, type IdOrIndex } from "./ids"
 import type StringTable from "./stringtable"
-import { TagIndex, type TagIndexTransferables } from "./tag-index"
+import { Tags, type TagsTransferables } from "./tags"
 import type { OsmEntity, OsmTags } from "./types"
 
-export interface EntityIndexTransferables
-	extends IdIndexTransferables,
-		TagIndexTransferables {}
+export interface EntitiesTransferables
+	extends IdsTransferables,
+		TagsTransferables {}
 
-export abstract class EntityIndex<T extends OsmEntity> {
+export abstract class Entities<T extends OsmEntity> {
 	indexType: "node" | "way" | "relation"
 
 	stringTable: StringTable
-	ids: IdIndex
-	tags: TagIndex
+	ids: Ids
+	tags: Tags
 
 	constructor(
 		indexType: "node" | "way" | "relation",
 		stringTable: StringTable,
-		ids?: IdIndex,
-		tags?: TagIndex,
+		ids?: Ids,
+		tags?: Tags,
 	) {
 		this.stringTable = stringTable
 		this.indexType = indexType
-		this.ids = ids ?? new IdIndex()
-		this.tags = tags ?? new TagIndex(stringTable)
+		this.ids = ids ?? new Ids()
+		this.tags = tags ?? new Tags(stringTable)
 	}
 
 	get isReady() {
