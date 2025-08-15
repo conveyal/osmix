@@ -3,7 +3,7 @@ import { describe, it } from "vitest"
 
 import { Osm } from "../src/osm"
 import { PBFs } from "./files"
-import { getFile } from "./utils"
+import { getFileReadStream } from "./utils"
 
 describe("read", () => {
 	describe.each(Object.entries(PBFs))(
@@ -11,8 +11,8 @@ describe("read", () => {
 		{ timeout: 300_000 },
 		async (name, pbf) => {
 			it.runIf(pbf.nodes <= 40_000)("into OSM class", async () => {
-				const fileData = await getFile(pbf.url)
-				const osm = await Osm.fromPbfData(fileData)
+				const fileStream = await getFileReadStream(pbf.url)
+				const osm = await Osm.fromPbfData(fileStream)
 				assert.equal(osm.nodes.size, pbf.nodes)
 				assert.equal(osm.stringTable.length, pbf.uniqueStrings)
 				assert.deepEqual(osm.nodes.getByIndex(0), pbf.node0)
