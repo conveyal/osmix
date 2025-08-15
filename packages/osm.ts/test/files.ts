@@ -57,7 +57,7 @@ export const PBFs: Record<string, PbfFixture> = {
 			lon: 18.9656482,
 			id: 26860768,
 		},
-		uniqueStrings: 35744,
+		uniqueStrings: 55_071,
 		primitiveGroups: 532,
 	},
 	croatia: {
@@ -78,7 +78,7 @@ export const PBFs: Record<string, PbfFixture> = {
 			lon: 17.021989,
 			id: 4_511_653,
 		},
-		uniqueStrings: 151_777,
+		uniqueStrings: 269_315,
 	},
 	italy: {
 		url: "https://download.geofabrik.de/europe/italy-250101.osm.pbf",
