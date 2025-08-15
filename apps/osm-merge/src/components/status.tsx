@@ -23,7 +23,7 @@ export default function Status() {
 					/>
 				)}
 				<div>
-					{formatTimestampMs(status.timestamp)} &rarr; {status.message}
+					[{formatTimestampMs(status.timestamp)}] {status.message}
 				</div>
 			</HoverCardTrigger>
 			<HoverCardContent className="max-h-96 overflow-y-scroll w-96">

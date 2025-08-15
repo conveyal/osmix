@@ -11,7 +11,7 @@ export default function LogContent() {
 					key={`${index}-${message.timestamp}`}
 					className="whitespace-nowrap"
 				>
-					{formatTimestampMs(message.timestamp)} &rarr; {message.message}
+					[{formatTimestampMs(message.timestamp)}] {message.message}
 				</div>
 			))}
 		</div>
