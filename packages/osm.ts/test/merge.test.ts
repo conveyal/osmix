@@ -3,7 +3,7 @@ import { assert, describe, it } from "vitest"
 import { Osm, type OsmNode } from "../src"
 import { createBaseOsm, createPatchOsm } from "./mock-osm"
 import { getFile } from "./utils"
-import Changeset from "../src/changeset"
+import OsmChangeset, { applyChangesetToOsm } from "../src/changeset"
 
 const testNode: OsmNode = {
 	id: 2135545,
@@ -43,7 +43,7 @@ describe("merge osm", () => {
 			const osm2 = await Osm.fromPbfData(osm2Data)
 			assert.deepEqual(osm2.nodes.getById(testNode.id), testNode)
 
-			const changeset = new Changeset(osm1)
+			const changeset = new OsmChangeset(osm1)
 			changeset.generateFullChangeset(osm2)
 			const nodeChanges = Array.from(changeset.nodeChanges.values())
 			const wayChanges = Array.from(changeset.wayChanges.values())
@@ -70,7 +70,7 @@ describe("merge osm", () => {
 			assert.equal(changeset.stats.deduplicatedNodesReplaced, 0)
 			assert.equal(changeset.stats.intersectionPointsFound, 3176)
 
-			const merged = changeset.applyChanges()
+			const merged = applyChangesetToOsm(osm1, changeset)
 
 			assert.equal(osm1.nodes.size + osm2.nodes.size, merged.nodes.size)
 			assert.deepEqual(merged.nodes.getById(testNode.id), testNodeWithCrossing)
@@ -80,7 +80,7 @@ describe("merge osm", () => {
 	it("should generate and apply osm changes", () => {
 		const base = createBaseOsm()
 		const patch = createPatchOsm()
-		const changeset = new Changeset(base)
+		const changeset = new OsmChangeset(base)
 		changeset.generateFullChangeset(patch)
 		const nodeChanges = Array.from(changeset.nodeChanges.values())
 
@@ -97,7 +97,7 @@ describe("merge osm", () => {
 		assert.equal(changeset.stats.deduplicatedNodesReplaced, 1)
 		assert.equal(changeset.stats.intersectionPointsFound, 1)
 
-		const result = changeset.applyChanges()
+		const result = applyChangesetToOsm(base, changeset)
 
 		assert.equal(result.ways.getById(1)?.tags?.highway, "primary")
 		assert.equal(result.ways.getById(2)?.refs.length, 2)

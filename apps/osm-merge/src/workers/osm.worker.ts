@@ -1,10 +1,22 @@
-import type { Osm, GeoBbox2D, TileIndex } from "osm.ts"
+import {
+	type Osm,
+	type GeoBbox2D,
+	type TileIndex,
+	OsmChangeset,
+	type OsmChanges,
+} from "osm.ts"
 import * as Performance from "osm.ts/performance"
 import { expose, transfer } from "comlink"
 import type { _TileLoadProps } from "@deck.gl/geo-layers"
 import { createOsmIndexFromPbfData } from "../../../../packages/osm.ts/src/osm-from-pbf"
+import type { StatusType } from "@/state/log"
 
 const osmWorker = {
+	log: (message: string, type: StatusType) =>
+		type === "error" ? console.error(message) : console.log(message),
+	subscribeToLog(fn: typeof this.log) {
+		this.log = fn
+	},
 	subscribeToPerformanceObserver(
 		onEntry: (
 			entryType: string,
@@ -32,21 +44,18 @@ const osmWorker = {
 		observer.observe({ entryTypes: ["mark", "measure"] })
 	},
 	osm(id: string) {
-		if (!this.ids[id]) throw Error("Osm not loaded.")
+		if (!this.ids[id]) throw Error(`Osm for ${id} not loaded.`)
 		return this.ids[id]
 	},
 	ids: {} as Record<string, Osm>,
 	async initFromPbfData(
 		id: string,
 		data: ArrayBuffer | ReadableStream<Uint8Array>,
-		onProgress: (...args: string[]) => void,
 	) {
-		// By default, delete all existing OSM instances
-		for (const id in this.ids) {
-			delete this.ids[id]
-		}
 		const measure = Performance.createMeasure("initializing PBF from data")
-		const osm = await createOsmIndexFromPbfData(data, onProgress)
+		const osm = await createOsmIndexFromPbfData(id, data, (m) =>
+			this.log(m, "info"),
+		)
 		this.ids[id] = osm
 		measure()
 		return this.ids[id].transferables()
@@ -62,7 +71,7 @@ const osmWorker = {
 		)
 		try {
 			const bitmap = this.osm(id).getBitmapForBbox(bbox, tileSize)
-			return transfer(bitmap, [bitmap.buffer])
+			return transfer({ bitmap }, [bitmap.buffer])
 		} finally {
 			measure()
 		}
@@ -92,6 +101,18 @@ const osmWorker = {
 			throw e
 		} finally {
 			measure()
+		}
+	},
+	activeChangeset: null as OsmChangeset | null,
+	generateChangeset(baseOsmId: string, patchOsmId: string): OsmChanges {
+		const changeset = new OsmChangeset(this.osm(baseOsmId))
+		this.activeChangeset = changeset
+		changeset.generateFullChangeset(this.osm(patchOsmId))
+		return {
+			nodes: changeset.nodeChanges,
+			ways: changeset.wayChanges,
+			relations: changeset.relationChanges,
+			stats: changeset.stats,
 		}
 	},
 }

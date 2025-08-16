@@ -1,7 +1,9 @@
 import { atom } from "jotai"
 
+export type StatusType = "info" | "debug" | "ready" | "error"
+
 export type Status = {
-	type: "info" | "debug" | "ready" | "error"
+	type: StatusType
 	message: string
 	duration: number
 	timestamp: number

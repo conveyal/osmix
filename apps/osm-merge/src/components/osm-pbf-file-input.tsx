@@ -1,6 +1,6 @@
+import { FilesIcon, Loader2Icon } from "lucide-react"
 import { useRef } from "react"
 import { Button } from "./ui/button"
-import { FilesIcon, Loader2Icon, LoaderIcon } from "lucide-react"
 
 function isOsmPbfFile(file: File | undefined): file is File {
 	if (file == null) return false
@@ -48,7 +48,6 @@ export default function OsmPbfFileInput({
 			/>
 			<Button
 				disabled={disabled || isLoading}
-				size="lg"
 				type="button"
 				onClick={() => fileInputRef.current?.click()}
 				variant="default"

@@ -23,6 +23,7 @@ import { Ways, type WaysTransferables } from "./ways"
 import { IdArrayType } from "./typed-arrays"
 
 export interface OsmTransferables {
+	id: string
 	header: OsmPbfHeaderBlock
 	stringTable: StringTableTransferables
 	nodes: NodesTransferables
@@ -35,6 +36,8 @@ export interface OsmTransferables {
  * OSM Entity Index.
  */
 export class Osm {
+	// Filename or ID of this OSM Entity index.
+	id: string
 	header: OsmPbfHeaderBlock
 	blocksGenerator: AsyncGenerator<OsmPbfPrimitiveBlock> | null = null
 
@@ -49,6 +52,7 @@ export class Osm {
 	parsingTimeMs = 0
 
 	static from({
+		id,
 		header,
 		stringTable,
 		nodes,
@@ -56,7 +60,7 @@ export class Osm {
 		relations,
 		parsingTimeMs,
 	}: OsmTransferables) {
-		const osm = new Osm(header)
+		const osm = new Osm(id, header)
 		osm.stringTable = StringTable.from(stringTable)
 		osm.nodes = Nodes.from(osm.stringTable, nodes)
 		osm.ways = Ways.from(osm.stringTable, ways)
@@ -66,15 +70,20 @@ export class Osm {
 		return osm
 	}
 
-	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
-		return createOsmIndexFromPbfData(data, console.log)
+	static async fromFile(file: File) {
+		return createOsmIndexFromPbfData(file.name, file.stream(), console.log)
 	}
 
-	constructor(header?: OsmPbfHeaderBlock) {
+	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
+		return createOsmIndexFromPbfData("default", data, console.log)
+	}
+
+	constructor(id?: string, header?: OsmPbfHeaderBlock) {
 		this.header = header ?? {
 			required_features: [],
 			optional_features: [],
 		}
+		this.id = id ?? "unknown"
 	}
 
 	buildSpatialIndexes() {
@@ -98,6 +107,7 @@ export class Osm {
 
 	transferables(): OsmTransferables {
 		return {
+			id: this.id,
 			header: this.header,
 			stringTable: this.stringTable.transferables(),
 			nodes: this.nodes.transferables(),

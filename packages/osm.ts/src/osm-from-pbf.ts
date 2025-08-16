@@ -10,10 +10,11 @@ import { throttle } from "./utils"
  * @returns The OSM index.
  */
 export async function createOsmIndexFromPbfData(
+	id: string,
 	data: ArrayBuffer | ReadableStream<Uint8Array>,
 	onProgress: (...args: string[]) => void = console.log,
 ) {
-	const osm = new Osm()
+	const osm = new Osm(id)
 	const reader = await OsmPbfReader.from(data)
 	osm.header = reader.header
 

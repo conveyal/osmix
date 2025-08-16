@@ -4,12 +4,17 @@ import { bytesSizeToHuman } from "@/utils"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 
 export default function OsmInfoTable({
+	defaultOpen,
 	osm,
 	file,
-}: { osm: Osm | null; file: File | null }) {
+}: {
+	defaultOpen?: boolean
+	osm: Osm | null
+	file: File | null
+}) {
 	if (!osm || !file) return null
 	return (
-		<Details open>
+		<Details open={defaultOpen}>
 			<DetailsSummary>FILE: {file.name}</DetailsSummary>
 			<DetailsContent className="overflow-auto">
 				<table>
@@ -20,7 +25,7 @@ export default function OsmInfoTable({
 						</tr>
 						<tr>
 							<td>parse time</td>
-							<td>{(osm.parsingTimeMs / 1_000).toFixed(3)}</td>
+							<td>{(osm.parsingTimeMs / 1_000).toFixed(3)}s</td>
 						</tr>
 						<tr>
 							<td>nodes</td>
@@ -39,7 +44,7 @@ export default function OsmInfoTable({
 							<td>{osm.bbox()?.join(",")}</td>
 						</tr>
 						<tr>
-							<td>Header</td>
+							<td className="font-bold">HEADER</td>
 						</tr>
 						<ObjectToTableRows object={osm.header} />
 					</tbody>
