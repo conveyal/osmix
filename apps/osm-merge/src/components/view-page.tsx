@@ -1,7 +1,9 @@
 import { useOsmWorker } from "@/hooks/osm"
+import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
+import { addLogMessageAtom } from "@/state/log"
 import { mapAtom } from "@/state/map"
 import { COORDINATE_SYSTEM, type Layer as DeckGlLayer } from "@deck.gl/core"
-import { type GeoBoundingBox, TileLayer } from "@deck.gl/geo-layers"
+import { TileLayer, type GeoBoundingBox } from "@deck.gl/geo-layers"
 import {
 	BitmapLayer,
 	GeoJsonLayer,
@@ -11,28 +13,19 @@ import {
 import { bboxPolygon } from "@turf/turf"
 import * as Comlink from "comlink"
 import { useAtomValue, useSetAtom } from "jotai"
-import { Osm, type GeoBbox2D, type OsmNode, type OsmWay } from "osm.ts"
-import {
-	Fragment,
-	useEffect,
-	useMemo,
-	useReducer,
-	useRef,
-	useState,
-} from "react"
+import { MaximizeIcon } from "lucide-react"
+import { Osm, type OsmNode, type OsmWay } from "osm.ts"
+import * as Performance from "osm.ts/performance"
+import { isNode, isWay } from "osm.ts/utils"
+import { Fragment, useEffect, useMemo, useState } from "react"
+import { Layer, Source } from "react-map-gl/maplibre"
 import Basemap from "./basemap"
 import DeckGlOverlay from "./deckgl-overlay"
-import OsmPbfFileInput from "./osm-pbf-file-input"
-import { Source, Layer } from "react-map-gl/maplibre"
-import { Button } from "./ui/button"
-import { addLogMessageAtom } from "@/state/log"
-import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
-import * as Performance from "osm.ts/performance"
-import FitBounds from "./fit-bounds"
-import CustomControl from "./custom-control"
+import { Details, DetailsContent, DetailsSummary } from "./details"
 import OsmInfoTable from "./osm-info-table"
-import { isNode, isWay } from "osm.ts/utils"
-import { MaximizeIcon } from "lucide-react"
+import OsmPbfFileInput from "./osm-pbf-file-input"
+import { Button } from "./ui/button"
+import useTaskStatus from "@/hooks/task-status"
 
 const TILE_SIZE = 1024
 
@@ -45,6 +38,7 @@ export default function ViewPage() {
 	const [osm, setOsm] = useState<Osm | null>(null)
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const logMessage = useSetAtom(addLogMessageAtom)
+	const [, startTask] = useTaskStatus()
 	const [selectedEntity, setSelectedEntity] = useState<OsmNode | OsmWay | null>(
 		null,
 	)
@@ -72,7 +66,7 @@ export default function ViewPage() {
 		if (!file || !map || !osmWorker) {
 			return
 		}
-		logMessage(`Processing file ${file.name}...`)
+		const endOsmInitTask = startTask(`Processing file ${file.name}...`)
 		const stream = file.stream()
 		setOsm(null)
 		setSelectedEntity(null)
@@ -94,16 +88,16 @@ export default function ViewPage() {
 				})
 
 				setOsm(osm)
-				logMessage(`${file.name} fully loaded.`, "ready")
+				endOsmInitTask(`${file.name} fully loaded.`)
 			})
 			.catch((e) => {
 				console.error(e)
-				logMessage(`${file.name} failed to load.`, "error")
+				endOsmInitTask(`${file.name} failed to load.`, "error")
 			})
 			.finally(() => {
 				setIsLoadingFile(false)
 			})
-	}, [file, osmId, osmWorker, logMessage, map])
+	}, [file, osmId, osmWorker, logMessage, map, startTask])
 
 	const tiledBitmapLayer = useMemo(() => {
 		if (!osmId || !osmWorker || !bbox) return null
@@ -115,7 +109,7 @@ export default function ViewPage() {
 			extent: bbox,
 			getTileData: async (tile) => {
 				if (tile.index.z >= MIN_PICKABLE_ZOOM) return null
-				logMessage(
+				const endBitmapGenerationTask = startTask(
 					`generating bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
 					"debug",
 				)
@@ -126,7 +120,7 @@ export default function ViewPage() {
 					tile.index,
 					TILE_SIZE,
 				)
-				logMessage(
+				endBitmapGenerationTask(
 					`bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
 					"debug",
 				)
@@ -156,7 +150,7 @@ export default function ViewPage() {
 				]
 			},
 		})
-	}, [logMessage, osmId, osmWorker, bbox])
+	}, [startTask, osmId, osmWorker, bbox])
 
 	const tileLayer = useMemo(() => {
 		if (!osmWorker || !bbox || !osm) return null
@@ -169,7 +163,7 @@ export default function ViewPage() {
 			getTileData: async (tile) => {
 				if (tile.index.z < MIN_PICKABLE_ZOOM) return null
 				const bbox = tile.bbox as GeoBoundingBox
-				logMessage(
+				const endTask = startTask(
 					`generating data for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
 					"debug",
 				)
@@ -179,7 +173,7 @@ export default function ViewPage() {
 					bbox.east,
 					bbox.north,
 				])
-				logMessage(
+				endTask(
 					`tile data for ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
 					"debug",
 				)
@@ -204,6 +198,7 @@ export default function ViewPage() {
 							length: data.nodes.positions.length / 2,
 							attributes: {
 								getPosition: { value: data.nodes.positions, size: 2 },
+								ids: data.nodes.ids,
 							},
 						},
 						pickable: true,
@@ -217,9 +212,9 @@ export default function ViewPage() {
 						onClick: (info) => {
 							console.log("ScatterplotLayer.onClick", info)
 							if (info.picked) {
-								const nodeIndex = data.nodes.indexes.at(info.index)
-								if (nodeIndex) {
-									setSelectedEntity(osm.nodes.getByIndex(nodeIndex))
+								const nodeId = data.nodes.ids.at(info.index)
+								if (nodeId) {
+									setSelectedEntity(osm.nodes.getById(nodeId))
 								}
 								return true
 							}
@@ -248,9 +243,9 @@ export default function ViewPage() {
 						onClick: (info) => {
 							console.log("PathLayer.onClick", info)
 							if (info.picked && data.ways) {
-								const wayIndex = data.ways.indexes.at(info.index)
-								if (wayIndex !== undefined) {
-									setSelectedEntity(osm.ways.getByIndex(wayIndex))
+								const wayId = data.ways.ids.at(info.index)
+								if (wayId !== undefined) {
+									setSelectedEntity(osm.ways.getById(wayId))
 								}
 							}
 						},
@@ -277,7 +272,7 @@ export default function ViewPage() {
 				return layers
 			},
 		})
-	}, [bbox, logMessage, osm, osmId, osmWorker])
+	}, [bbox, osm, osmId, osmWorker, startTask])
 
 	return (
 		<div className="flex flex-row grow-1 h-full overflow-hidden">
@@ -341,42 +336,46 @@ export default function ViewPage() {
 									</Button>
 								</div>
 								{isNode(selectedEntity) && (
-									<details open className="border-l border-b border-slate-950">
-										<summary className="font-bold p-1">
+									<Details open>
+										<DetailsSummary className="font-bold p-1">
 											NODE {selectedEntity.id}
-										</summary>
-										<table className="w-full">
-											<tbody>
-												<tr>
-													<td>lon</td>
-													<td>{selectedEntity.lon}</td>
-												</tr>
-												<tr>
-													<td>lat</td>
-													<td>{selectedEntity.lat}</td>
-												</tr>
-												<TagList tags={selectedEntity.tags} />
-											</tbody>
-										</table>
-									</details>
+										</DetailsSummary>
+										<DetailsContent>
+											<table className="w-full">
+												<tbody>
+													<tr>
+														<td>lon</td>
+														<td>{selectedEntity.lon}</td>
+													</tr>
+													<tr>
+														<td>lat</td>
+														<td>{selectedEntity.lat}</td>
+													</tr>
+													<TagList tags={selectedEntity.tags} />
+												</tbody>
+											</table>
+										</DetailsContent>
+									</Details>
 								)}
 								{isWay(selectedEntity) && (
-									<details open className="border-l border-b border-slate-950">
-										<summary className="font-bold p-1">
+									<Details open>
+										<DetailsSummary className="font-bold p-1">
 											WAY {selectedEntity.id}
-										</summary>
-										<table className="w-full">
-											<tbody>
-												<TagList tags={selectedEntity.tags} />
-											</tbody>
-										</table>
-										<NodeList
-											onSelectNode={setSelectedEntity}
-											nodes={selectedEntity.refs
-												.map((nodeId) => osm.nodes.getById(nodeId))
-												.filter((n) => n != null)}
-										/>
-									</details>
+										</DetailsSummary>
+										<DetailsContent>
+											<table className="w-full">
+												<tbody>
+													<TagList tags={selectedEntity.tags} />
+												</tbody>
+											</table>
+											<NodeList
+												onSelectNode={setSelectedEntity}
+												nodes={selectedEntity.refs
+													.map((nodeId) => osm.nodes.getById(nodeId))
+													.filter((n) => n != null)}
+											/>
+										</DetailsContent>
+									</Details>
 								)}
 							</div>
 						)}
@@ -393,23 +392,19 @@ export default function ViewPage() {
 							/>
 						</Source>
 					)}
-					{bbox && (
-						<CustomControl position="top-left">
-							<FitBounds bounds={bbox} />
-						</CustomControl>
-					)}
 					<DeckGlOverlay
-						// useDevicePixels={false}
 						layers={[tiledBitmapLayer, tileLayer]}
 						pickingRadius={5}
 						getTooltip={(pickingInfo) => {
-							// console.log("getTooltip", pickingInfo)
 							const sourceLayerId = pickingInfo.sourceLayer?.id
+							// console.log(pickingInfo)
 							if (sourceLayerId?.startsWith(`${APPID}:${osmId}`)) {
 								if (sourceLayerId.includes("nodes")) {
+									console.log(pickingInfo)
 									return "node"
 								}
 								if (sourceLayerId.includes("ways")) {
+									console.log(osm?.ways.getByIndex(pickingInfo.index))
 									return "way"
 								}
 							}
@@ -442,11 +437,11 @@ function NodeList({
 	onSelectNode,
 }: { nodes: OsmNode[]; onSelectNode: (node: OsmNode) => void }) {
 	return (
-		<details open className="border-b border-l border-slate-950">
-			<summary className="p-1 font-bold shadow">
-				NODE REFS ({nodes.length})
-			</summary>
-			<div className="max-h-96 overflow-y-scroll">
+		<Details open>
+			<DetailsSummary className="p-1 font-bold">
+				NODES ({nodes.length})
+			</DetailsSummary>
+			<DetailsContent className="max-h-48 overflow-y-scroll">
 				<table className="table-auto">
 					<tbody>
 						{nodes.map((node, i) => (
@@ -474,7 +469,7 @@ function NodeList({
 						))}
 					</tbody>
 				</table>
-			</div>
-		</details>
+			</DetailsContent>
+		</Details>
 	)
 }

@@ -81,9 +81,9 @@ const osmWorker = {
 				},
 				[
 					nodeResults.positions.buffer,
-					nodeResults.indexes.buffer,
+					nodeResults.ids.buffer,
 					wayResults.positions.buffer,
-					wayResults.indexes.buffer,
+					wayResults.ids.buffer,
 					wayResults.startIndices.buffer,
 				],
 			)

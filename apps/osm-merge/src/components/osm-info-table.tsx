@@ -1,6 +1,7 @@
 import type { Osm } from "osm.ts"
 import ObjectToTableRows from "./object-to-table"
 import { bytesSizeToHuman } from "@/utils"
+import { Details, DetailsContent, DetailsSummary } from "./details"
 
 export default function OsmInfoTable({
 	osm,
@@ -8,9 +9,9 @@ export default function OsmInfoTable({
 }: { osm: Osm | null; file: File | null }) {
 	if (!osm || !file) return null
 	return (
-		<details open className="border-l border-b border-slate-950">
-			<summary className="p-1 font-bold">FILE: {file.name}</summary>
-			<div className="overflow-auto">
+		<Details open>
+			<DetailsSummary>FILE: {file.name}</DetailsSummary>
+			<DetailsContent className="overflow-auto">
 				<table>
 					<tbody>
 						<tr>
@@ -43,7 +44,7 @@ export default function OsmInfoTable({
 						<ObjectToTableRows object={osm.header} />
 					</tbody>
 				</table>
-			</div>
-		</details>
+			</DetailsContent>
+		</Details>
 	)
 }

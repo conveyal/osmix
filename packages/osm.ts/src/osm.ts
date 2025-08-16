@@ -20,6 +20,7 @@ import type {
 } from "./types"
 import { isNode, isRelation, isWay } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
+import { IdArrayType } from "./typed-arrays"
 
 export interface OsmTransferables {
 	header: OsmPbfHeaderBlock
@@ -121,20 +122,20 @@ export class Osm {
 		console.time("Osm.getNodesInBbox")
 		const nodeCandidates = this.nodes.withinBbox(bbox)
 		const nodePositions = new Float64Array(nodeCandidates.length * 2)
-		const nodeIndexes = new Uint32Array(nodeCandidates.length)
+		const ids = new IdArrayType(nodeCandidates.length)
 		let pIndex = 0
 		for (const nodeIndex of nodeCandidates) {
 			// Skip nodes with no tags, likely just a way node
 			if (!this.nodes.tags.hasTags(nodeIndex)) continue
 
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
-			nodeIndexes[pIndex] = nodeIndex
+			ids[pIndex] = this.nodes.ids.at(nodeIndex)
 			nodePositions[pIndex++] = lon
 			nodePositions[pIndex++] = lat
 		}
 		console.timeEnd("Osm.getNodesInBbox")
 		return {
-			indexes: nodeIndexes,
+			ids,
 			positions: nodePositions,
 		}
 	}
@@ -142,16 +143,16 @@ export class Osm {
 	getWaysInBbox(bbox: GeoBbox2D) {
 		console.time("Osm.getWaysInBbox")
 		const wayCandidates = this.ways.intersects(bbox)
-		const wayIndexes = new Uint32Array(wayCandidates.length)
+		const ids = new IdArrayType(wayCandidates.length)
 		const wayPositions: Float64Array[] = []
 		const wayStartIndices = new Uint32Array(wayCandidates.length + 1)
 		wayStartIndices[0] = 0
 
 		console.time("Osm.getWaysInBbox.loop")
 		let size = 0
-		wayCandidates.forEach((w, i) => {
-			wayIndexes[i] = w
-			const way = this.ways.getLine(w, this.nodes)
+		wayCandidates.forEach((wayIndex, i) => {
+			ids[i] = this.ways.ids.at(wayIndex)
+			const way = this.ways.getLine(wayIndex, this.nodes)
 			size += way.length
 			wayPositions.push(way)
 			const prevIndex = wayStartIndices[i]
@@ -169,7 +170,7 @@ export class Osm {
 
 		console.timeEnd("Osm.getWaysInBbox")
 		return {
-			indexes: wayIndexes,
+			ids,
 			positions: wayPositionsArray,
 			startIndices: wayStartIndices,
 		}
