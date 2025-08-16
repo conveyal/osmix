@@ -1,13 +1,13 @@
 import { flattenValue } from "../utils"
 
-export default function ObjectToTable({
+export default function ObjectToTableRows({
 	object,
 }: {
 	object: null | Record<string, string | number | boolean | unknown>
 }) {
 	if (!object) return null
 	return (
-		<tbody>
+		<>
 			{Object.entries(object)
 				.filter(([key, value]) => {
 					return typeof value !== "undefined"
@@ -24,6 +24,6 @@ export default function ObjectToTable({
 						</tr>
 					)
 				})}
-		</tbody>
+		</>
 	)
 }

@@ -39,7 +39,7 @@ export async function createOsmIndexFromPbfData(
 			if (ways.length > 0) {
 				if (stage === "nodes") {
 					onProgress(
-						`Loaded ${osm.nodes.size.toLocaleString()} nodes. Building node spatial index...`,
+						`Loaded ${osm.nodes.size.toLocaleString()} nodes. Sorting node IDs...`,
 					)
 					osm.nodes.finish()
 					stage = "ways"
@@ -52,7 +52,7 @@ export async function createOsmIndexFromPbfData(
 			if (relations.length > 0) {
 				if (stage === "ways") {
 					onProgress(
-						`Loaded ${osm.ways.size.toLocaleString()} ways. Building way spatial index...`,
+						`Loaded ${osm.ways.size.toLocaleString()} ways. Sorting way IDs...`,
 					)
 					osm.ways.finish()
 					stage = "relations"
@@ -65,6 +65,11 @@ export async function createOsmIndexFromPbfData(
 			logEverySecond(`${entityCount.toLocaleString()} ${stage} loaded`)
 		}
 	}
+	onProgress(
+		`Loaded ${osm.relations.size.toLocaleString()} relations. Sorting relation IDs...`,
+	)
+	osm.relations.finish()
+	onProgress("Building spatial indexes for nodes and ways...")
 	osm.finish()
 	onProgress(
 		`Added ${osm.nodes.size.toLocaleString()} nodes, ${osm.ways.size.toLocaleString()} ways, and ${osm.relations.size.toLocaleString()} relations.`,

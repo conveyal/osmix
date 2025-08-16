@@ -1,7 +1,6 @@
 "use client"
 
 import {
-	addLogMessageAtom,
 	applyAllChangesAtom,
 	baseNodesNearPatchAtom,
 	beginMergeAtom,
@@ -20,15 +19,16 @@ import Basemap from "./basemap"
 import DeckGlOverlay from "./deckgl-overlay"
 import OsmPbfFilePicker from "./filepicker"
 import { Button } from "./ui/button"
-import ObjectToTable from "./object-to-table"
+import ObjectToTableRows from "./object-to-table"
 import { objectToHtmlTableString } from "../utils"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import { getEntityType } from "osm.ts"
+import { getEntityType, writeOsmToPbfStream } from "osm.ts"
 import { isWay } from "osm.ts/utils"
 import { useCallback, useEffect } from "react"
 import { mapAtom } from "@/state/map"
+import { addLogMessageAtom } from "@/state/log"
 
 function layerIdToName(id: string) {
 	if (id === "osm-tk:patch-geojson") return "Patch"
@@ -120,7 +120,7 @@ export default function MergePage() {
 			],
 		})
 		const stream = await fileHandle.createWritable()
-		await baseOsm.writePbfToStream(stream)
+		await writeOsmToPbfStream(baseOsm, stream)
 		await stream.close()
 		logMessage(`Created ${fileHandle.name} PBF for download`, "ready")
 	}, [baseOsm, logMessage])
@@ -214,7 +214,7 @@ export default function MergePage() {
 						<div className="flex flex-col">
 							<h3 className="border-t border-l border-r px-2 py-1">Tags</h3>
 							<table>
-								<ObjectToTable object={currentWay.tags ?? {}} />
+								<ObjectToTableRows object={currentWay.tags ?? {}} />
 							</table>
 						</div>
 					</div>
@@ -230,7 +230,7 @@ export default function MergePage() {
 					</div>
 				)}
 			</div>
-			<div className="relative grow-3">
+			<div className="relative grow-3 bg-slate-950">
 				<Basemap>
 					<DeckGlOverlay
 						layers={deckGlLayers}

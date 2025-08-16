@@ -1,5 +1,6 @@
 import { useRef } from "react"
 import { Button } from "./ui/button"
+import { FilesIcon, Loader2Icon, LoaderIcon } from "lucide-react"
 
 function isOsmPbfFile(file: File | undefined): file is File {
 	if (file == null) return false
@@ -9,10 +10,12 @@ function isOsmPbfFile(file: File | undefined): file is File {
 
 export default function OsmPbfFileInput({
 	disabled,
+	isLoading,
 	file,
 	setFile,
 }: {
 	disabled?: boolean
+	isLoading?: boolean
 	file: File | null
 	setFile: (file: File) => void
 }) {
@@ -44,13 +47,22 @@ export default function OsmPbfFileInput({
 				ref={fileInputRef}
 			/>
 			<Button
-				disabled={disabled}
-				size="sm"
+				disabled={disabled || isLoading}
+				size="lg"
 				type="button"
 				onClick={() => fileInputRef.current?.click()}
-				variant="outline"
+				variant="default"
 			>
-				Choose file
+				{file && isLoading ? (
+					<>
+						<Loader2Icon className="animate-spin" /> Loading {file.name}...
+					</>
+				) : (
+					<>
+						<FilesIcon />
+						Select OSM PBF file
+					</>
+				)}
 			</Button>
 		</label>
 	)

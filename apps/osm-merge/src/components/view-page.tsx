@@ -25,121 +25,29 @@ import DeckGlOverlay from "./deckgl-overlay"
 import OsmPbfFileInput from "./osm-pbf-file-input"
 import { Source, Layer } from "react-map-gl/maplibre"
 import { Button } from "./ui/button"
-import type { OsmPbfHeaderBlock } from "../../../../packages/osm.ts/src/pbf/proto/osmformat"
 import { addLogMessageAtom } from "@/state/log"
 import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
 import * as Performance from "osm.ts/performance"
 import FitBounds from "./fit-bounds"
 import CustomControl from "./custom-control"
+import OsmInfoTable from "./osm-info-table"
+import { isNode, isWay } from "osm.ts/utils"
+import { MaximizeIcon } from "lucide-react"
 
 const TILE_SIZE = 1024
 
-type SelectedEntityState = {
-	index: number | null
-	tileIndex: number | null
-	type: "node" | "way" | null
-	entity: OsmNode | { way: OsmWay; nodes: OsmNode[] } | null
-}
-
-type SelectedEntityActions =
-	| {
-			type: "SELECT"
-			tileIndex: number
-			index: number
-			entityType: "node" | "way"
-	  }
-	| {
-			type: "CLEAR"
-	  }
-	| {
-			type: "SET_NODE"
-			index: number
-			node: OsmNode
-	  }
-	| {
-			type: "SET_WAY"
-			index: number
-			way: {
-				way: OsmWay
-				nodes: OsmNode[]
-			}
-	  }
-
-function reducer(
-	state: SelectedEntityState,
-	action: SelectedEntityActions,
-): SelectedEntityState {
-	switch (action.type) {
-		case "SELECT":
-			return {
-				...state,
-				index: action.index,
-				tileIndex: action.tileIndex,
-				type: action.entityType,
-				entity: null,
-			}
-		case "CLEAR":
-			return {
-				tileIndex: null,
-				index: null,
-				type: null,
-				entity: null,
-			}
-		case "SET_NODE":
-			if (action.index === state.index && state.type === "node") {
-				return {
-					...state,
-					entity: action.node,
-				}
-			}
-			return state
-		case "SET_WAY":
-			if (action.index === state.index && state.type === "way") {
-				return {
-					...state,
-					entity: action.way,
-				}
-			}
-			return state
-	}
-}
-
 export default function ViewPage() {
+	const [isLoadingFile, setIsLoadingFile] = useState(false)
 	const [file, setFile] = useState<File | null>(null)
 	const osmId = useMemo(() => file?.name ?? "default", [file])
-	const currentFileRef = useRef<File | null>(null)
 	const map = useAtomValue(mapAtom)
 	const osmWorker = useOsmWorker()
 	const [osm, setOsm] = useState<Osm | null>(null)
-	const [osmInfo, setOsmInfo] = useState<{
-		bbox: GeoBbox2D
-		nodes: number
-		ways: number
-		relations: number
-		header: OsmPbfHeaderBlock
-		parsingTimeMs: number
-	} | null>(null)
-	const { bbox } = osmInfo ?? {}
+	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const logMessage = useSetAtom(addLogMessageAtom)
-
-	const [selectedState, dispatch] = useReducer(reducer, {
-		tileIndex: null,
-		index: null,
-		type: null,
-		entity: null,
-	})
-
-	useEffect(() => {
-		currentFileRef.current = file
-	})
-
-	useEffect(() => {
-		if (!map || !bbox) return
-		map.fitBounds(bbox, {
-			padding: 100,
-			maxDuration: 200,
-		})
-	}, [map, bbox])
+	const [selectedEntity, setSelectedEntity] = useState<OsmNode | OsmWay | null>(
+		null,
+	)
 
 	// Set message to "Ready" when the application is ready
 	useEffect(() => {
@@ -155,19 +63,20 @@ export default function ViewPage() {
 				.then((res) => res.blob())
 				.then((blob) => {
 					setFile((file) => (file ? file : new File([blob], "monaco.pbf")))
+					setIsLoadingFile(true)
 				})
 		}
 	}, [file])
 
 	useEffect(() => {
 		if (!file || !map || !osmWorker) {
-			setOsmInfo(null)
 			return
 		}
 		logMessage(`Processing file ${file.name}...`)
 		const stream = file.stream()
 		setOsm(null)
-		setOsmInfo(null)
+		setSelectedEntity(null)
+		setIsLoadingFile(true)
 		osmWorker
 			.initFromPbfData(
 				osmId,
@@ -175,26 +84,24 @@ export default function ViewPage() {
 				Comlink.proxy((msg) => logMessage(msg)),
 			)
 			.then(async (osmBuffers) => {
-				if (file === currentFileRef.current) {
-					const osm = Osm.from(osmBuffers)
-					const bbox = osm.bbox()
-					if (!bbox) throw Error("Osm not loaded. No bbox.")
+				const osm = Osm.from(osmBuffers)
+				const bbox = osm.bbox()
+				if (!bbox) throw Error("Osm not loaded. No bbox.")
 
-					setOsm(osm)
-					setOsmInfo({
-						bbox,
-						nodes: osm.nodes.size,
-						ways: osm.ways.size,
-						relations: osm.relations.size,
-						header: osm.header,
-						parsingTimeMs: osm.parsingTimeMs,
-					})
-					logMessage(`${file.name} fully loaded.`, "ready")
-				}
+				map.fitBounds(bbox, {
+					padding: 100,
+					maxDuration: 200,
+				})
+
+				setOsm(osm)
+				logMessage(`${file.name} fully loaded.`, "ready")
 			})
 			.catch((e) => {
 				console.error(e)
 				logMessage(`${file.name} failed to load.`, "error")
+			})
+			.finally(() => {
+				setIsLoadingFile(false)
 			})
 	}, [file, osmId, osmWorker, logMessage, map])
 
@@ -210,6 +117,7 @@ export default function ViewPage() {
 				if (tile.index.z >= MIN_PICKABLE_ZOOM) return null
 				logMessage(
 					`generating bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
+					"debug",
 				)
 				const bbox = tile.bbox as GeoBoundingBox
 				const data = await osmWorker.getTileBitmap(
@@ -220,7 +128,7 @@ export default function ViewPage() {
 				)
 				logMessage(
 					`bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
-					"ready",
+					"debug",
 				)
 				return data
 			},
@@ -251,7 +159,7 @@ export default function ViewPage() {
 	}, [logMessage, osmId, osmWorker, bbox])
 
 	const tileLayer = useMemo(() => {
-		if (!osmWorker || !osmInfo || !bbox || !osm) return null
+		if (!osmWorker || !bbox || !osm) return null
 		const idPrefix = `${APPID}:${osmId}:tiles`
 		return new TileLayer<Awaited<
 			ReturnType<typeof osmWorker.getTileData>
@@ -263,6 +171,7 @@ export default function ViewPage() {
 				const bbox = tile.bbox as GeoBoundingBox
 				logMessage(
 					`generating data for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
+					"debug",
 				)
 				const data = await osmWorker.getTileData(osmId, [
 					bbox.west,
@@ -272,7 +181,7 @@ export default function ViewPage() {
 				])
 				logMessage(
 					`tile data for ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
-					"ready",
+					"debug",
 				)
 				if (tile.signal?.aborted || !data) return null
 				return data
@@ -310,18 +219,7 @@ export default function ViewPage() {
 							if (info.picked) {
 								const nodeIndex = data.nodes.indexes.at(info.index)
 								if (nodeIndex) {
-									dispatch({
-										type: "SELECT",
-										tileIndex: info.index,
-										index: nodeIndex,
-										entityType: "node",
-									})
-									const node = osm.nodes.getByIndex(nodeIndex)
-									dispatch({
-										type: "SET_NODE",
-										index: nodeIndex,
-										node,
-									})
+									setSelectedEntity(osm.nodes.getByIndex(nodeIndex))
 								}
 								return true
 							}
@@ -352,24 +250,7 @@ export default function ViewPage() {
 							if (info.picked && data.ways) {
 								const wayIndex = data.ways.indexes.at(info.index)
 								if (wayIndex !== undefined) {
-									dispatch({
-										type: "SELECT",
-										tileIndex: info.index,
-										index: wayIndex,
-										entityType: "way",
-									})
-									const way = osm.ways.getByIndex(wayIndex)
-									const nodes = way.refs
-										.map((ref) => osm.nodes.getById(ref))
-										.filter((n) => n != null)
-									dispatch({
-										type: "SET_WAY",
-										index: wayIndex,
-										way: {
-											way,
-											nodes,
-										},
-									})
+									setSelectedEntity(osm.ways.getByIndex(wayIndex))
 								}
 							}
 						},
@@ -396,70 +277,113 @@ export default function ViewPage() {
 				return layers
 			},
 		})
-	}, [bbox, logMessage, osm, osmId, osmInfo, osmWorker])
+	}, [bbox, logMessage, osm, osmId, osmWorker])
 
 	return (
 		<div className="flex flex-row grow-1 h-full overflow-hidden">
-			<div className="flex flex-col w-96 gap-4 py-4 px-4 overflow-y-auto">
-				<OsmPbfFileInput
-					file={file}
-					setFile={(file) => {
-						setOsmInfo(null)
-						setOsm(null)
-						dispatch({ type: "CLEAR" })
-						setFile(file)
-					}}
-				/>
-				<div className="flex flex-col gap-2">
-					<div>file: {osmId}</div>
-					<div>
-						parsing time:{" "}
-						{osmInfo
-							? `${(osmInfo.parsingTimeMs / 1_000).toFixed(3)}s`
-							: "incomplete"}
-					</div>
+			<div className="flex flex-col w-96 gap-2 py-1 overflow-y-auto overflow-x-hidden">
+				<div className="px-1">
+					<OsmPbfFileInput
+						isLoading={isLoadingFile}
+						file={file}
+						setFile={(file) => {
+							setSelectedEntity(null)
+							setOsm(null)
+							setFile(file)
+						}}
+					/>
 				</div>
-				<div className="grid grid-cols-2 gap-2.5 text-xs">
-					{osmInfo && (
-						<>
-							<div className="col-span-2">
-								bbox: {bbox?.map((n) => n.toFixed(6)).join(", ")}
+				{osm && file && (
+					<>
+						<div className="px-1 flex justify-between">
+							<div className="font-bold">OPENSTREETMAP PBF</div>
+							<Button
+								onClick={() => {
+									const bbox = osm.bbox()
+									if (bbox)
+										map?.fitBounds(bbox, {
+											padding: 100,
+											maxDuration: 0,
+										})
+								}}
+								variant="ghost"
+								size="icon"
+								className="size-4"
+								title="Fit bounds to file bbox"
+							>
+								<MaximizeIcon />
+							</Button>
+						</div>
+						<OsmInfoTable file={file} osm={osm} />
+						{selectedEntity == null ? (
+							<div className="px-1 text-center font-bold">
+								SELECT ENTITY ON MAP (Z{MIN_PICKABLE_ZOOM} AND UP)
 							</div>
-							<div>nodes</div>
-							<div>{osmInfo.nodes.toLocaleString()}</div>
-							<div>ways</div>
-							<div>{osmInfo.ways.toLocaleString()}</div>
-							<div className="col-span-2">header</div>
-							{Object.entries(osmInfo.header).map(([k, v]) => {
-								return (
-									<Fragment key={k}>
-										<div className="break-all">{k}</div>
-										<div className="break-all">
-											{Array.isArray(v) ? v.join(", ") : String(v)}
-										</div>
-									</Fragment>
-								)
-							})}
-						</>
-					)}
-					{selectedState.entity && "id" in selectedState.entity && (
-						<>
-							<div>node</div>
-							<div>{selectedState.entity.id}</div>
-							<TagList tags={selectedState.entity.tags} />
-						</>
-					)}
-					{selectedState.entity && "way" in selectedState.entity && (
-						<>
-							<div>way id</div>
-							<div>{selectedState.entity.way.id}</div>
-							<TagList tags={selectedState.entity.way.tags} />
-							<NodeList nodes={selectedState.entity.nodes} />
-						</>
-					)}
-				</div>
+						) : (
+							<div>
+								<div className="px-1 flex justify-between">
+									<div className="font-bold">SELECTED ENTITY</div>
+									<Button
+										onClick={() => {
+											const bbox = osm?.getEntityBbox(selectedEntity)
+											if (bbox)
+												map?.fitBounds(bbox, {
+													padding: 100,
+													maxDuration: 0,
+												})
+										}}
+										variant="ghost"
+										size="icon"
+										className="size-4"
+										title="Fit bounds to entity"
+									>
+										<MaximizeIcon />
+									</Button>
+								</div>
+								{isNode(selectedEntity) && (
+									<details open className="border-l border-b border-slate-950">
+										<summary className="font-bold p-1">
+											NODE {selectedEntity.id}
+										</summary>
+										<table className="w-full">
+											<tbody>
+												<tr>
+													<td>lon</td>
+													<td>{selectedEntity.lon}</td>
+												</tr>
+												<tr>
+													<td>lat</td>
+													<td>{selectedEntity.lat}</td>
+												</tr>
+												<TagList tags={selectedEntity.tags} />
+											</tbody>
+										</table>
+									</details>
+								)}
+								{isWay(selectedEntity) && (
+									<details open className="border-l border-b border-slate-950">
+										<summary className="font-bold p-1">
+											WAY {selectedEntity.id}
+										</summary>
+										<table className="w-full">
+											<tbody>
+												<TagList tags={selectedEntity.tags} />
+											</tbody>
+										</table>
+										<NodeList
+											onSelectNode={setSelectedEntity}
+											nodes={selectedEntity.refs
+												.map((nodeId) => osm.nodes.getById(nodeId))
+												.filter((n) => n != null)}
+										/>
+									</details>
+								)}
+							</div>
+						)}
+					</>
+				)}
 			</div>
-			<div className="relative grow-3">
+			<div className="relative grow-3 bg-slate-900">
 				<Basemap>
 					{bbox && (
 						<Source type="geojson" data={bboxPolygon(bbox)}>
@@ -503,48 +427,54 @@ function TagList({ tags }: { tags?: Record<string, unknown> }) {
 	if (entries.length === 0) return null
 	return (
 		<>
-			<div className="font-bold">tags</div>
-			<div>{entries.length}</div>
-			{entries.map(([k, v]) => {
-				return (
-					<Fragment key={k}>
-						<div>{k}</div>
-						<div>{String(v)}</div>
-					</Fragment>
-				)
-			})}
+			{entries.map(([k, v]) => (
+				<tr key={k}>
+					<td>{k}</td>
+					<td>{String(v)}</td>
+				</tr>
+			))}
 		</>
 	)
 }
 
-function NodeList({ nodes }: { nodes: OsmNode[] }) {
-	const [open, setOpen] = useState(true)
+function NodeList({
+	nodes,
+	onSelectNode,
+}: { nodes: OsmNode[]; onSelectNode: (node: OsmNode) => void }) {
 	return (
-		<>
-			<div className="font-bold">nodes</div>
-			<div>{nodes.length}</div>
-			<Button
-				className="col-span-2"
-				size="xs"
-				onClick={() => setOpen((open) => !open)}
-			>
-				{open ? "hide" : "show"}
-			</Button>
-			{open &&
-				nodes.map((node) => {
-					return (
-						<Fragment key={node.id}>
-							<hr className="col-span-2" />
-							<div className="font-bold">node id</div>
-							<div>{node.id}</div>
-							<div>lon</div>
-							<div>{node.lon}</div>
-							<div>lat</div>
-							<div>{node.lat}</div>
-							<TagList tags={node.tags} />
-						</Fragment>
-					)
-				})}
-		</>
+		<details open className="border-b border-l border-slate-950">
+			<summary className="p-1 font-bold shadow">
+				NODE REFS ({nodes.length})
+			</summary>
+			<div className="max-h-96 overflow-y-scroll">
+				<table className="table-auto">
+					<tbody>
+						{nodes.map((node, i) => (
+							<Fragment key={node.id}>
+								<tr
+									onClick={() => onSelectNode(node)}
+									onKeyDown={() => onSelectNode(node)}
+									className="cursor-pointer"
+								>
+									<td>{i + 1}</td>
+									<td>{node.id}</td>
+									<td>
+										{node.lon}, {node.lat}
+									</td>
+								</tr>
+								{node.tags &&
+									Object.entries(node.tags).map(([k, v]) => (
+										<tr key={k}>
+											<td />
+											<td>{k}</td>
+											<td>{String(v)}</td>
+										</tr>
+									))}
+							</Fragment>
+						))}
+					</tbody>
+				</table>
+			</div>
+		</details>
 	)
 }

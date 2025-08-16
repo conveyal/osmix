@@ -44,7 +44,7 @@
 }
 
 :root {
-	--radius: 0.25rem;
+	--radius: 0;
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.129 0.042 264.695);
 	--card: oklch(1 0 0);
@@ -169,21 +169,19 @@ h3 {
 table {
 	border-collapse: collapse;
 	width: 100%;
-	table-layout: fixed;
 
 	td {
-		@apply border-border;
-		@apply border;
-		padding: 0.25rem 0.5rem;
+		border-color: var(--color-border);
+		border-width: 1px;
+		padding: 0.25rem;
 		white-space: nowrap;
 		text-overflow: ellipsis;
 		overflow: hidden;
+		user-select: all;
 	}
 
 	td:hover {
 		background-color: var(--color-slate-100);
-		white-space: normal;
-		word-break: break-all;
 	}
 }
 

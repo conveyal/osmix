@@ -2,8 +2,7 @@ import { GeoJsonLayer } from "@deck.gl/layers"
 import { distance } from "@turf/turf"
 import { atom } from "jotai"
 import { atomFamily } from "jotai/utils"
-import { Osm, type OsmNode, mergeOsm } from "osm.ts"
-import { generateOsmChanges } from "osm.ts/changes"
+import { Osm, type OsmNode } from "osm.ts"
 import { nodeToFeature, wayToEditableGeoJson } from "osm.ts/geojson"
 import type { OsmChange } from "osm.ts"
 import { isWay } from "osm.ts/utils"
@@ -56,7 +55,7 @@ export const osmAtomFamily = atomFamily((name: "base" | "patch") =>
 	}),
 )
 
-export const patchesAtom = atom<OsmChange[]>([])
+export const patchesAtom = atom<unknown[]>([])
 export const patchIndexAtom = atom(-1)
 export const currentChangeEntityAtom = atom(async (get) => {
 	const patchIndex = get(patchIndexAtom)
@@ -65,7 +64,7 @@ export const currentChangeEntityAtom = atom(async (get) => {
 	if (patches.length === 0 || !patchOsm || patchIndex < 0) return null
 	const patch = patches[patchIndex]
 	if (!patch) return null
-	return patch.entity
+	return null
 })
 
 export const currentChangeEntityBboxAtom = atom(async (get) => {
@@ -80,7 +79,7 @@ export const beginMergeAtom = atom(null, async (get, set) => {
 	const patchOsm = await get(osmAtomFamily("patch"))
 	if (!baseOsm || !patchOsm) return
 	set(workflowStepAtom, "verify-changes")
-	set(patchesAtom, generateOsmChanges(baseOsm, patchOsm))
+	set(patchesAtom, []) // generateOsmChanges(baseOsm, patchOsm))
 	set(patchIndexAtom, 0)
 })
 
@@ -88,7 +87,7 @@ export const applyAllChangesAtom = atom(null, async (get, set) => {
 	const baseOsm = await get(osmAtomFamily("base"))
 	const changes = get(patchesAtom)
 	if (!baseOsm || changes.length === 0) return
-	baseOsm.applyChanges(changes)
+	// baseOsm.applyChanges(changes)
 	set(patchIndexAtom, -1)
 	set(patchesAtom, [])
 	set(workflowStepAtom, "deduplicate-nodes")
@@ -101,9 +100,9 @@ export const runFullMergeAtom = atom(null, async (get, set) => {
 	if (!patchOsm || !baseOsm) return
 
 	try {
-		mergeOsm(baseOsm, patchOsm, (message, type) => {
+		/* mergeOsm(baseOsm, patchOsm, (message, type) => {
 			set(addLogMessageAtom, message, type)
-		})
+		})*/
 
 		set(fileAtomFamily("patch"), null)
 
@@ -130,11 +129,11 @@ export const baseNodesNearPatchAtom = atom(async (get) => {
 	for (const ref of way.refs) {
 		const patchNode = patchOsm.nodes.getById(ref)
 		if (!patchNode) continue
-		const baseNodes = baseOsm.nodes.withinBbox(
+		const baseNodes: number[] = [] /*baseOsm.nodes.withinBbox(
 			patchNode.lon,
 			patchNode.lat,
 			0.001,
-		)
+		) */
 		for (const baseNodeIndex of baseNodes) {
 			const baseNode = baseOsm.nodes.getByIndex(baseNodeIndex)
 			if (!baseNode) continue
@@ -166,8 +165,7 @@ export const patchGeoJsonLayerAtom = atom(async (get) => {
 	const workflowStep = get(workflowStepAtom)
 	return new GeoJsonLayer({
 		id: "osm-tk:patch-geojson",
-		data:
-			workflowStep !== "merge-complete" ? patchOsm?.toGeoJSON(includeNode) : [],
+		data: workflowStep !== "merge-complete" ? [] : [], // patchOsm?.toGeoJSON(includeNode) : [],
 		pickable: true,
 		getFillColor: [255, 255, 255],
 		getPointRadius: (d) => {
@@ -236,7 +234,7 @@ export const baseGeoJsonLayerAtom = atom(async (get) => {
 	const baseOsm = await get(osmAtomFamily("base"))
 	return new GeoJsonLayer({
 		id: "osm-tk:base-geojson",
-		data: baseOsm?.toGeoJSON(),
+		data: [], // baseOsm?.toGeoJSON(),
 		pickable: true,
 		pointRadiusMaxPixels: MAX_RADIUS_PIXELS,
 		pointRadiusMinPixels: MIN_RADIUS_PIXELS,

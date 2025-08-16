@@ -2,28 +2,19 @@ import CenterInfo from "@/components/center-info"
 import ZoomInfo from "@/components/zoom-info"
 import BrowserCheck from "./browser-check"
 import Status from "./status"
+import { Button } from "./ui/button"
 
 export default function Nav() {
 	return (
 		<div className="border-b flex flex-row justify-between items-center">
 			<div className="flex flex-row gap-4 items-center px-4">
 				<h1 className="py-2">OSM.ts</h1>
-				{/* <Button
-					onClick={() => setWorkflowStep("select-files")}
-					size="sm"
-					variant="link"
-					className="cursor-pointer"
-				>
-					Merge
+				<Button asChild size="sm" variant="link" className="cursor-pointer">
+					<a href="/merge">Merge</a>
 				</Button>
-				<Button
-					onClick={() => setWorkflowStep("view")}
-					size="sm"
-					variant="link"
-					className="cursor-pointer"
-				>
-					View
-				</Button> */}
+				<Button asChild size="sm" variant="link" className="cursor-pointer">
+					<a href="/view">View</a>
+				</Button>
 				{process.env.NODE_ENV === "development" && <BrowserCheck />}
 			</div>
 
@@ -33,7 +24,7 @@ export default function Nav() {
 					<CenterInfo />
 				</div>
 				<div>
-					<ZoomInfo />z
+					z<ZoomInfo />
 				</div>
 			</div>
 		</div>

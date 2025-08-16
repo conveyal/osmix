@@ -1,20 +1,20 @@
 import { atom } from "jotai"
 
 export type Status = {
-	type: "info" | "ready" | "error"
+	type: "info" | "debug" | "ready" | "error"
 	message: string
 	duration: number
 	timestamp: number
 }
 
-export const logAtom = atom<Status[]>([
-	{
-		type: "info",
-		message: "Initializing application...",
-		duration: 0,
-		timestamp: Date.now(),
-	},
-])
+const INITIAL_STATUS: Status = {
+	type: "info",
+	message: "Initializing application...",
+	duration: 0,
+	timestamp: Date.now(),
+}
+
+export const logAtom = atom<Status[]>([INITIAL_STATUS])
 
 export const addLogMessageAtom = atom(
 	null,
@@ -41,5 +41,6 @@ export const addLogMessageAtom = atom(
 
 export const currentStatusAtom = atom((get) => {
 	const log = get(logAtom)
-	return log[log.length - 1]
+	// don't show the debug logs in the status bar
+	return log.findLast((l) => l.type !== "debug") ?? INITIAL_STATUS
 })

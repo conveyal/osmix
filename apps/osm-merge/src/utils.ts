@@ -59,3 +59,15 @@ const formatMmSsMs = new Intl.DateTimeFormat("en-US", {
 export function formatTimestampMs(timestamp: number) {
 	return formatMmSsMs.format(new Date(timestamp))
 }
+
+const KB = 1024
+const MB = 1024 * KB
+const GB = 1024 * MB
+
+export function bytesSizeToHuman(size?: number) {
+	if (size == null) return "none"
+	if (size < KB) return `${size}B`
+	if (size < MB) return `${(size / KB).toFixed(2)}KB`
+	if (size < GB) return `${(size / MB).toFixed(2)}MB`
+	return `${(size / GB).toFixed(2)}GB`
+}
