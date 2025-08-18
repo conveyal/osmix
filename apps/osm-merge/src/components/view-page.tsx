@@ -1,5 +1,5 @@
+import useStartTask from "@/hooks/log"
 import { useOsmFile, useOsmWorker } from "@/hooks/osm"
-import useTaskStatus from "@/hooks/log"
 import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
 import { addLogMessageAtom } from "@/state/log"
 import { mapAtom } from "@/state/map"
@@ -12,10 +12,9 @@ import {
 	ScatterplotLayer,
 } from "@deck.gl/layers"
 import { bboxPolygon } from "@turf/turf"
-import * as Comlink from "comlink"
 import { useAtomValue, useSetAtom } from "jotai"
 import { MaximizeIcon } from "lucide-react"
-import { Osm, type OsmNode, type OsmWay } from "osm.ts"
+import type { OsmNode, OsmWay } from "osm.ts"
 import * as Performance from "osm.ts/performance"
 import { useEffect, useMemo, useState } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
@@ -26,7 +25,6 @@ import { Main, MapContent, Sidebar } from "./layout"
 import OsmInfoTable from "./osm-info-table"
 import OsmPbfFileInput from "./osm-pbf-file-input"
 import { Button } from "./ui/button"
-import useStartTask from "@/hooks/log"
 
 const TILE_SIZE = 1024
 
@@ -232,7 +230,7 @@ export default function ViewPage() {
 	return (
 		<Main>
 			<Sidebar>
-				<div className="px-1 pt-1">
+				<div className="flex flex-col p-4 gap-2">
 					<OsmPbfFileInput
 						isLoading={isLoadingFile}
 						file={file}
@@ -241,63 +239,64 @@ export default function ViewPage() {
 							setFile(file)
 						}}
 					/>
-				</div>
-				{osm && file && (
-					<>
-						<div className="px-1 flex justify-between">
-							<div className="font-bold">OPENSTREETMAP PBF</div>
-							<Button
-								onClick={() => {
-									const bbox = osm.bbox()
-									if (bbox)
-										map?.fitBounds(bbox, {
-											padding: 100,
-											maxDuration: 0,
-										})
-								}}
-								variant="ghost"
-								size="icon"
-								className="size-4"
-								title="Fit bounds to file bbox"
-							>
-								<MaximizeIcon />
-							</Button>
-						</div>
-						<OsmInfoTable file={file} osm={osm} />
-						{selectedEntity == null ? (
-							<div className="px-1 text-center font-bold">
-								SELECT ENTITY ON MAP (Z{MIN_PICKABLE_ZOOM} AND UP)
+
+					{osm && file && (
+						<>
+							<div className="px-1 flex justify-between">
+								<div className="font-bold">OPENSTREETMAP PBF</div>
+								<Button
+									onClick={() => {
+										const bbox = osm.bbox()
+										if (bbox)
+											map?.fitBounds(bbox, {
+												padding: 100,
+												maxDuration: 0,
+											})
+									}}
+									variant="ghost"
+									size="icon"
+									className="size-4"
+									title="Fit bounds to file bbox"
+								>
+									<MaximizeIcon />
+								</Button>
 							</div>
-						) : (
-							<div>
-								<div className="px-1 flex justify-between">
-									<div className="font-bold">SELECTED ENTITY</div>
-									<Button
-										onClick={() => {
-											const bbox = osm?.getEntityBbox(selectedEntity)
-											if (bbox)
-												map?.fitBounds(bbox, {
-													padding: 100,
-													maxDuration: 0,
-												})
-										}}
-										variant="ghost"
-										size="icon"
-										className="size-4"
-										title="Fit bounds to entity"
-									>
-										<MaximizeIcon />
-									</Button>
+							<OsmInfoTable file={file} osm={osm} />
+							{selectedEntity == null ? (
+								<div className="px-1 text-center font-bold">
+									SELECT ENTITY ON MAP (Z{MIN_PICKABLE_ZOOM} AND UP)
 								</div>
-								<EntityDetails
-									entity={selectedEntity}
-									osm={osm}
-									onSelect={setSelectedEntity}
-								/>
-							</div>
-						)}
-					</>
-				)}
+							) : (
+								<div>
+									<div className="px-1 flex justify-between">
+										<div className="font-bold">SELECTED ENTITY</div>
+										<Button
+											onClick={() => {
+												const bbox = osm?.getEntityBbox(selectedEntity)
+												if (bbox)
+													map?.fitBounds(bbox, {
+														padding: 100,
+														maxDuration: 0,
+													})
+											}}
+											variant="ghost"
+											size="icon"
+											className="size-4"
+											title="Fit bounds to entity"
+										>
+											<MaximizeIcon />
+										</Button>
+									</div>
+									<EntityDetails
+										entity={selectedEntity}
+										osm={osm}
+										onSelect={setSelectedEntity}
+									/>
+								</div>
+							)}
+						</>
+					)}
+				</div>
 			</Sidebar>
 			<MapContent>
 				<Basemap>

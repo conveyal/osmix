@@ -10,7 +10,7 @@ export function Main({ children }: { children: ReactNode }) {
 
 export function Sidebar({ children }: { children: ReactNode }) {
 	return (
-		<div className="flex flex-col w-96 gap-2 overflow-y-auto overflow-x-hidden">
+		<div className="flex flex-col w-lg gap-2 overflow-y-auto overflow-x-hidden">
 			{children}
 		</div>
 	)
