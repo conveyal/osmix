@@ -1,18 +1,16 @@
 import { useBitmapTileLayer } from "@/hooks/map"
 import { useOsmFile, useOsmWorker } from "@/hooks/osm"
-import { mapAtom } from "@/state/map"
-import { useAtomValue } from "jotai"
-import { OsmChangeset, type OsmChanges } from "osm.ts"
-import { useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
+import { ArrowLeft, ArrowRight, Loader2Icon } from "lucide-react"
+import type { OsmChanges } from "osm.ts"
+import { useEffect, useRef, useState, useTransition } from "react"
 import Basemap from "./basemap"
 import DeckGlOverlay from "./deckgl-overlay"
 import { Main, MapContent, Sidebar } from "./layout"
+import LogContent from "./log"
 import OsmInfoTable from "./osm-info-table"
 import OsmPbfFileInput from "./osm-pbf-file-input"
 import { Button } from "./ui/button"
-import LogContent from "./log"
-import { ArrowLeft, ArrowRight, Loader2Icon } from "lucide-react"
-import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 
 export default function Merge() {
 	const [baseFile, setBaseFile] = useState<File | null>(null)
@@ -25,8 +23,6 @@ export default function Merge() {
 
 	const baseTileLayer = useBitmapTileLayer(baseOsm)
 	const patchTileLayer = useBitmapTileLayer(patchOsm)
-
-	const [showMergeWizard, setShowMergeWizard] = useState(false)
 
 	const [step, setStep] = useState<number>(1)
 
