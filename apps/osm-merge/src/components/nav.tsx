@@ -13,8 +13,7 @@ export default function Nav() {
 					className={({ isActive }) =>
 						isActive ? "text-blue-600" : "text-slate-950"
 					}
-					to="../merge"
-					relative="path"
+					to="merge"
 				>
 					Merge
 				</NavLink>
@@ -22,8 +21,7 @@ export default function Nav() {
 					className={({ isActive }) =>
 						isActive ? "text-blue-600" : "text-slate-950"
 					}
-					to="../view"
-					relative="path"
+					to="view"
 				>
 					View
 				</NavLink>
