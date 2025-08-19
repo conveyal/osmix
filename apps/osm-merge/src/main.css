@@ -119,6 +119,20 @@
 	body {
 		@apply bg-background text-foreground;
 	}
+	h1 {
+		font-size: var(--text-2xl);
+	}
+	h2 {
+		font-size: var(--text-xl);
+	}
+	h3 {
+		font-size: var(--text-lg);
+	}
+	a {
+		color: var(--color-blue-600);
+		text-decoration-line: underline;
+		text-underline-offset: 4px;
+	}
 }
 
 /* roboto-mono-latin-wght-normal */
@@ -139,27 +153,6 @@ body {
 	font-variant-numeric: tabular-nums;
 	min-height: 100vh;
 	overscroll-behavior: none;
-}
-
-h1 {
-	@apply text-xl;
-	@apply font-extrabold;
-	@apply tracking-tight;
-	@apply text-balance;
-}
-
-h2 {
-	@apply text-lg;
-	@apply font-semibold;
-	@apply tracking-tight;
-	@apply text-balance;
-}
-
-h3 {
-	@apply text-sm;
-	@apply font-semibold;
-	@apply tracking-tight;
-	@apply text-balance;
 }
 
 #root {
@@ -197,7 +190,6 @@ table {
 	font-variant-numeric: tabular-nums;
 	font-size: 12px;
 	font-family: "Roboto Mono Variable", monospace;
-	@apply rounded;
 
 	h3 {
 		margin: 0;
@@ -218,9 +210,5 @@ table {
 	}
 	td:last-of-type {
 		border-right: none;
-	}
-
-	tr:last-of-type {
-		@apply rounded-b-md;
 	}
 }

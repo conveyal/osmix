@@ -13,7 +13,9 @@ export default function BrowserCheck() {
 	return (
 		<Dialog>
 			<DialogTrigger asChild>
-				<Button size="sm">Check system</Button>
+				<Button size="sm" variant="link">
+					Check system
+				</Button>
 			</DialogTrigger>
 			<DialogContent>
 				<DialogHeader>

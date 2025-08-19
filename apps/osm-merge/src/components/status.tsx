@@ -12,7 +12,7 @@ export default function Status() {
 	const status = useAtomValue(currentStatusAtom)
 	return (
 		<HoverCard openDelay={0}>
-			<HoverCardTrigger className="flex flex-row gap-2 items-center">
+			<HoverCardTrigger className="flex flex-row gap-2 items-center no-underline">
 				{isActive ? (
 					<Loader2Icon className="animate-spin size-4" />
 				) : (
@@ -23,7 +23,7 @@ export default function Status() {
 						)}
 					/>
 				)}
-				<div>
+				<div className="text-slate-950 no-underline">
 					[{formatTimestampMs(status.timestamp)}] {status.message}
 				</div>
 			</HoverCardTrigger>

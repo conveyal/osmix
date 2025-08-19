@@ -3,7 +3,7 @@ import { useOsmFile, useOsmWorker } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { ArrowLeft, ArrowRight, Loader2Icon } from "lucide-react"
 import type { OsmChanges } from "osm.ts"
-import { useEffect, useRef, useState, useTransition } from "react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import Basemap from "./basemap"
 import DeckGlOverlay from "./deckgl-overlay"
 import { Main, MapContent, Sidebar } from "./layout"
@@ -53,15 +53,24 @@ export default function Merge() {
 		}
 	}, [baseFile, patchFile])
 
+	const prevStep = useCallback(() => {
+		setStep((s) => s - 1)
+	}, [])
+	const nextStep = useCallback(() => {
+		setStep((s) => s + 1)
+	}, [])
+
 	return (
 		<Main>
 			<Sidebar>
-				<div className="flex flex-col p-4 gap-2">
+				<div className="flex flex-col p-4 gap-4">
 					<If t={step === 1}>
-						<div className="font-bold">1: SELECT OSM PBF FILES</div>
 						<div>
-							Select two PBF files to merge. Note: entities from the patch file
-							are prioritized over matching entities in the base file.
+							<div className="font-bold">1: SELECT OSM PBF FILES</div>
+							<div>
+								Select two PBF files to merge. Note: entities from the patch
+								file are prioritized over matching entities in the base file.
+							</div>
 						</div>
 						<hr />
 						<div>
@@ -86,25 +95,31 @@ export default function Merge() {
 								file={patchFile}
 							/>
 						</div>
-						<Button disabled={!baseOsm || !patchOsm} onClick={() => setStep(2)}>
+						<Button disabled={!baseOsm || !patchOsm} onClick={nextStep}>
 							<ArrowRight /> Next step
 						</Button>
 					</If>
 
 					<If t={step === 2}>
-						<div className="font-bold">2: SELECT MERGE OPTIONS</div>
 						<div>
-							Select merge options before generating a changeset. Note:
-							changeset generation can take some time.
+							<div className="font-bold">2: SELECT MERGE OPTIONS</div>
+							<div>
+								Select merge options before generating a changeset. Note:
+								changeset generation can take some time.
+							</div>
 						</div>
 						<hr />
 						<div>
 							<div className="font-bold">BASE OSM PBF</div>
-							<OsmInfoTable osm={baseOsm} file={baseFile} />
+							<OsmInfoTable defaultOpen={false} osm={baseOsm} file={baseFile} />
 						</div>
 						<div>
 							<div className="font-bold">PATCH OSM PBF</div>
-							<OsmInfoTable osm={patchOsm} file={patchFile} />
+							<OsmInfoTable
+								defaultOpen={false}
+								osm={patchOsm}
+								file={patchFile}
+							/>
 						</div>
 						<div className="p-2 border border-slate-950 flex gap-2">
 							<p>
@@ -163,7 +178,7 @@ export default function Merge() {
 
 						<Button
 							onClick={() => {
-								setStep(3)
+								nextStep()
 								startTransition(async () => {
 									if (!baseOsm || !patchOsm || !osmWorker)
 										throw Error("Missing data to generate changes")
@@ -171,13 +186,14 @@ export default function Merge() {
 										baseOsm.id,
 										patchOsm.id,
 									)
+									console.log(results)
 									setChanges(results)
 								})
 							}}
 						>
 							Generate changeset
 						</Button>
-						<Button variant="outline" onClick={() => setStep(1)}>
+						<Button variant="outline" onClick={prevStep}>
 							<ArrowLeft /> Back
 						</Button>
 					</If>
@@ -194,13 +210,30 @@ export default function Merge() {
 								<div>
 									Changes have been generated and can be reviewed below. Once
 									the review is complete you can apply changes to generate a new
-									OSM file ready to be downloaded.
+									OSM file ready to be downloaded. You cannot go back from the
+									next step.
 								</div>
 							</>
 						)}
 						<div className="border border-slate-950 p-1 max-h-96">
-							<LogContent />
+							{changes && <ChangesSummary changes={changes} />}
 						</div>
+						<Button
+							variant="outline"
+							onClick={() => {
+								if (!osmWorker) throw Error("No OSM worker")
+								nextStep()
+								startTransition(async () => {
+									if (!changes) throw Error("No changes to apply")
+									// await osmWorker.applyChangeset()
+								})
+							}}
+						>
+							<ArrowRight /> Apply changes
+						</Button>
+						<Button variant="outline" onClick={prevStep}>
+							<ArrowLeft /> Back
+						</Button>
 					</If>
 
 					<If t={step === 4}>
@@ -234,4 +267,8 @@ export default function Merge() {
 function If({ children, t }: { children: React.ReactNode; t: boolean }) {
 	if (!t) return null
 	return <>{children}</>
+}
+
+function ChangesSummary({ changes }: { changes: OsmChanges }) {
+	return <div>ChangesSummary</div>
 }
