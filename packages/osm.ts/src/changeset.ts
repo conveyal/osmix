@@ -12,11 +12,17 @@ import type {
 } from "./types"
 import { entityPropertiesEqual, getEntityType } from "./utils"
 
+export type OsmChangesStats = {
+	deduplicatedNodes: number
+	deduplicatedNodesReplaced: number
+	intersectionPointsFound: number
+}
+
 export type OsmChanges = {
 	nodes: Record<number, OsmChange<OsmEntityTypeMap["node"]>>
 	ways: Record<number, OsmChange<OsmEntityTypeMap["way"]>>
 	relations: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>
-	stats: Record<string, number>
+	stats: OsmChangesStats
 }
 
 export default class OsmChangeset {
@@ -29,7 +35,7 @@ export default class OsmChangeset {
 	// Next node ID
 	currentNodeId: number
 
-	stats = {
+	stats: OsmChangesStats = {
 		deduplicatedNodes: 0,
 		deduplicatedNodesReplaced: 0,
 		intersectionPointsFound: 0,

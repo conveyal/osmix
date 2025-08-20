@@ -2,7 +2,13 @@ import { useBitmapTileLayer } from "@/hooks/map"
 import { useOsmFile, useOsmWorker } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { ArrowLeft, ArrowRight, Loader2Icon } from "lucide-react"
-import { Osm, writeOsmToPbfStream, type OsmChanges } from "osm.ts"
+import {
+	Osm,
+	writeOsmToPbfStream,
+	type OsmChange,
+	type OsmChanges,
+	type OsmEntity,
+} from "osm.ts"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import Basemap from "./basemap"
@@ -13,6 +19,8 @@ import OsmInfoTable from "./osm-info-table"
 import OsmPbfFileInput from "./osm-pbf-file-input"
 import { Button } from "./ui/button"
 import useStartTask from "@/hooks/log"
+import { Details, DetailsContent, DetailsSummary } from "./details"
+import EntityDetails from "./entity-details"
 
 export default function Merge() {
 	const [baseFile, setBaseFile] = useState<File | null>(null)
@@ -128,7 +136,7 @@ export default function Merge() {
 							/>
 						</div>
 						<Button disabled={!baseOsm || !patchOsm} onClick={nextStep}>
-							<ArrowRight /> Next step
+							<ArrowRight /> Select merge options
 						</Button>
 					</If>
 
@@ -246,9 +254,7 @@ export default function Merge() {
 								</div>
 							</>
 						)}
-						<div className="border border-slate-950 p-1 max-h-96">
-							{changes && <ChangesSummary changes={changes} />}
-						</div>
+						{changes && <ChangesSummary changes={changes} />}
 						<Button
 							disabled={changes == null || isTransitioning}
 							onClick={() => {
@@ -266,7 +272,7 @@ export default function Merge() {
 								})
 							}}
 						>
-							<ArrowRight /> Apply changes (irreversible)
+							<ArrowRight /> Apply changes
 						</Button>
 						<Button variant="outline" onClick={prevStep}>
 							<ArrowLeft /> Back
@@ -312,5 +318,156 @@ function If({ children, t }: { children: React.ReactNode; t: boolean }) {
 }
 
 function ChangesSummary({ changes }: { changes: OsmChanges }) {
-	return <div>ChangesSummary</div>
+	const [currentPage, setCurrentPage] = useState(0)
+	const changesPerPage = 10
+
+	// Get all changes for pagination
+	const allChanges: Array<OsmChange & { type: "node" | "way" | "relation" }> = [
+		...Object.values(changes.nodes).map((change) => ({
+			...change,
+			type: "node" as const,
+		})),
+		...Object.values(changes.ways).map((change) => ({
+			...change,
+			type: "way" as const,
+		})),
+		...Object.values(changes.relations).map((change) => ({
+			...change,
+			type: "relation" as const,
+		})),
+	]
+
+	const totalPages = Math.ceil(allChanges.length / changesPerPage)
+	const startIndex = currentPage * changesPerPage
+	const endIndex = startIndex + changesPerPage
+	const currentChanges = allChanges.slice(startIndex, endIndex)
+
+	const goToNextPage = () => {
+		if (currentPage < totalPages - 1) {
+			setCurrentPage(currentPage + 1)
+		}
+	}
+
+	const goToPrevPage = () => {
+		if (currentPage > 0) {
+			setCurrentPage(currentPage - 1)
+		}
+	}
+
+	const nodeChanges = Object.keys(changes.nodes).length
+	const wayChanges = Object.keys(changes.ways).length
+	const relationChanges = Object.keys(changes.relations).length
+	const totalChanges = nodeChanges + wayChanges + relationChanges
+
+	return (
+		<div className="flex flex-col gap-2">
+			<Details open={true}>
+				<DetailsSummary>CHANGES SUMMARY</DetailsSummary>
+				<DetailsContent>
+					<table>
+						<tbody>
+							<tr>
+								<td>node changes</td>
+								<td>{nodeChanges.toLocaleString()}</td>
+							</tr>
+							<tr>
+								<td>way changes</td>
+								<td>{wayChanges.toLocaleString()}</td>
+							</tr>
+							<tr>
+								<td>relation changes</td>
+								<td>{relationChanges.toLocaleString()}</td>
+							</tr>
+							<tr>
+								<td>total changes</td>
+								<td>{totalChanges.toLocaleString()}</td>
+							</tr>
+							<tr>
+								<td>deduplicated nodes</td>
+								<td>{changes.stats.deduplicatedNodes.toLocaleString()}</td>
+							</tr>
+							<tr>
+								<td>deduplicated nodes replaced</td>
+								<td>
+									{changes.stats.deduplicatedNodesReplaced.toLocaleString()}
+								</td>
+							</tr>
+							<tr>
+								<td>intersection points found</td>
+								<td>
+									{changes.stats.intersectionPointsFound.toLocaleString()}
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</DetailsContent>
+			</Details>
+
+			{/* Changes List */}
+			<Details>
+				<DetailsSummary>CHANGES PREVIEW</DetailsSummary>
+				<DetailsContent>
+					<div className="max-h-64 overflow-y-auto flex flex-col gap-2">
+						{currentChanges.map((change, i) => (
+							<ChangePreview
+								key={`${change.type}-${change.entity.id}`}
+								change={change}
+								entityType={change.type}
+								count={i + 1}
+							/>
+						))}
+					</div>
+					{totalPages > 1 && (
+						<div className="flex items-center justify-between">
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={goToPrevPage}
+								disabled={currentPage === 0}
+							>
+								<ArrowLeft className="w-3 h-3 mr-1" />
+							</Button>
+							<span className="text-xs text-slate-500">
+								{currentPage + 1} of {totalPages}
+							</span>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={goToNextPage}
+								disabled={currentPage === totalPages - 1}
+							>
+								<ArrowRight className="w-3 h-3 ml-1" />
+							</Button>
+						</div>
+					)}
+				</DetailsContent>
+			</Details>
+		</div>
+	)
+}
+
+function ChangePreview({
+	count,
+	change,
+	entityType,
+}: {
+	count: number
+	change: OsmChange
+	entityType: string
+}) {
+	const { changeType, entity } = change
+	const changeTypeColor = {
+		create: "text-green-600",
+		modify: "text-yellow-600",
+		delete: "text-red-600",
+	}[changeType]
+
+	return (
+		<div key={`${entityType}-${entity.id}`} className="flex flex-col">
+			<div className={`border-l pl-2 font-bold ${changeTypeColor}`}>
+				{count}. {changeType.toUpperCase()}
+			</div>
+			<EntityDetails entity={entity} open={false} />
+		</div>
+	)
 }

@@ -1,6 +1,7 @@
 export { Osm } from "./osm"
 export type {
 	GeoBbox2D,
+	OsmEntity,
 	OsmNode,
 	OsmRelation,
 	OsmWay,

@@ -1,36 +1,50 @@
-import type { Osm, OsmNode, OsmWay } from "osm.ts"
+import type { Osm, OsmEntity, OsmNode, OsmRelation, OsmWay } from "osm.ts"
 import { Details, DetailsContent, DetailsSummary } from "./details"
-import { isNode, isWay } from "osm.ts/utils"
+import { isNode, isRelation, isWay } from "osm.ts/utils"
 import { Fragment } from "react/jsx-runtime"
 
 const noop = (_: OsmNode) => undefined
 
 export default function EntityDetails({
+	open,
 	entity,
 	onSelect,
 	osm,
 }: {
-	entity: OsmNode | OsmWay
+	open?: boolean
+	entity: OsmEntity
 	onSelect?: (node: OsmNode) => void
-	osm: Osm
+	osm?: Osm
 }) {
-	if (isNode(entity)) return <NodeDetails node={entity} />
+	if (isNode(entity)) return <NodeDetails node={entity} open={open} />
 	if (isWay(entity))
 		return (
-			<WayDetails
-				way={entity}
-				nodes={entity.refs
-					.map((ref) => osm.nodes.getById(ref))
-					.filter((n) => n != null)}
-				onSelect={onSelect ?? noop}
-			/>
+			<WayDetails way={entity} open={open}>
+				{osm ? (
+					<NodeList
+						nodes={entity.refs
+							.map((ref) => osm.nodes.getById(ref))
+							.filter((n) => n != null)}
+						onSelect={onSelect ?? noop}
+					/>
+				) : (
+					<tbody>
+						<tr>
+							<td>refs</td>
+							<td>{entity.refs.join(", ")}</td>
+						</tr>
+					</tbody>
+				)}
+			</WayDetails>
 		)
+	if (isRelation(entity))
+		return <RelationDetails relation={entity} open={open} />
 }
 
-export function NodeDetails({ node }: { node: OsmNode }) {
+export function NodeDetails({ node, open }: { node: OsmNode; open?: boolean }) {
 	return (
-		<Details open>
-			<DetailsSummary className="font-bold p-1">NODE {node.id}</DetailsSummary>
+		<Details open={open}>
+			<DetailsSummary className="font-bold">NODE {node.id}</DetailsSummary>
 			<DetailsContent>
 				<table className="w-full">
 					<tbody>
@@ -52,23 +66,52 @@ export function NodeDetails({ node }: { node: OsmNode }) {
 
 export function WayDetails({
 	way,
-	nodes,
-	onSelect,
+	children,
+	open,
 }: {
 	way: OsmWay
-	nodes: OsmNode[]
-	onSelect: (node: OsmNode) => void
+	children: React.ReactNode
+	open?: boolean
 }) {
 	return (
-		<Details open>
-			<DetailsSummary className="font-bold p-1">WAY {way.id}</DetailsSummary>
+		<Details open={open}>
+			<DetailsSummary>WAY {way.id}</DetailsSummary>
 			<DetailsContent>
 				<table className="w-full">
 					<tbody>
 						<TagList tags={way.tags} />
 					</tbody>
 				</table>
-				<NodeList onSelect={onSelect} nodes={nodes} />
+				{children}
+			</DetailsContent>
+		</Details>
+	)
+}
+
+export function RelationDetails({
+	relation,
+	open,
+}: { relation: OsmRelation; open?: boolean }) {
+	return (
+		<Details open={open}>
+			<DetailsSummary>RELATION {relation.id}</DetailsSummary>
+			<DetailsContent>
+				<table className="w-full">
+					<tbody>
+						<tr>
+							<td colSpan={2}>members</td>
+						</tr>
+						{relation.members.map((m) => (
+							<tr key={m.ref}>
+								<td>
+									{m.type}: {m.ref}
+								</td>
+								<td>{m.role}</td>
+							</tr>
+						))}
+						<TagList tags={relation.tags} />
+					</tbody>
+				</table>
 			</DetailsContent>
 		</Details>
 	)
@@ -95,9 +138,7 @@ export function NodeList({
 }: { nodes: OsmNode[]; onSelect: (node: OsmNode) => void }) {
 	return (
 		<Details open>
-			<DetailsSummary className="p-1 font-bold">
-				NODES ({nodes.length})
-			</DetailsSummary>
+			<DetailsSummary>NODES ({nodes.length})</DetailsSummary>
 			<DetailsContent className="max-h-48 overflow-y-scroll">
 				<table className="table-auto">
 					<tbody>

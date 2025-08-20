@@ -78,7 +78,7 @@ export type OsmGeoJSONFeature = GeoJSON.Feature<
 	OsmGeoJSONProperties
 >
 
-export type OsmChange<T extends IOsmEntity> = {
+export type OsmChange<T extends IOsmEntity = OsmEntity> = {
 	changeType: "modify" | "create" | "delete"
 	entity: T
 }
