@@ -33,7 +33,7 @@ export default function ViewPage() {
 	const osmId = useMemo(() => file?.name ?? "default", [file])
 	const map = useAtomValue(mapAtom)
 	const osmWorker = useOsmWorker()
-	const [osm, isLoadingFile] = useOsmFile(file)
+	const [osm, setOsm, isLoadingFile] = useOsmFile(file)
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const logMessage = useSetAtom(addLogMessageAtom)
 	const startTask = useStartTask()
