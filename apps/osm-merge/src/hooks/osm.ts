@@ -47,7 +47,7 @@ export function useOsmFile(file: File | null, id?: string) {
 
 	useEffect(() => {
 		if (!osmWorker || !file) return
-		const endOsmInitTask = startTask(`Processing file ${file.name}...`)
+		const task = startTask(`Processing file ${file.name}...`)
 		const stream = file.stream()
 		setOsm(null)
 		setIsLoading(true)
@@ -55,16 +55,16 @@ export function useOsmFile(file: File | null, id?: string) {
 			.initFromPbfData(id ?? file.name, Comlink.transfer(stream, [stream]))
 			.then(async (osmBuffers) => {
 				setOsm(Osm.from(osmBuffers))
-				endOsmInitTask(`${file.name} fully loaded.`)
+				task.end(`${file.name} fully loaded.`)
 			})
 			.catch((e) => {
 				console.error(e)
-				endOsmInitTask(`${file.name} failed to load.`, "error")
+				task.end(`${file.name} failed to load.`, "error")
 			})
 			.finally(() => {
 				setIsLoading(false)
 			})
 	}, [file, id, osmWorker, startTask])
 
-	return [osm, isLoading] as const
+	return [osm, setOsm, isLoading] as const
 }

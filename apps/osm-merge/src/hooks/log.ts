@@ -11,12 +11,14 @@ export default function useStartTask() {
 		function startTaskMessage(message: string, type: Status["type"] = "info") {
 			setTasks((t) => t + 1)
 			logMessage(message, type)
-			return function endTaskMessage(
-				message: string,
-				type: Status["type"] = "info",
-			) {
-				setTasks((t) => t - 1)
-				logMessage(message, type)
+			return {
+				update: (message: string, type: Status["type"] = "info") => {
+					logMessage(message, type)
+				},
+				end: (message: string, type: Status["type"] = "info") => {
+					setTasks((t) => t - 1)
+					logMessage(message, type)
+				},
 			}
 		},
 		[setTasks, logMessage],

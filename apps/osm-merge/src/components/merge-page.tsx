@@ -2,7 +2,8 @@ import { useBitmapTileLayer } from "@/hooks/map"
 import { useOsmFile, useOsmWorker } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { ArrowLeft, ArrowRight, Loader2Icon } from "lucide-react"
-import type { OsmChanges } from "osm.ts"
+import { Osm, writeOsmToPbfStream, type OsmChanges } from "osm.ts"
+import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import Basemap from "./basemap"
 import DeckGlOverlay from "./deckgl-overlay"
@@ -11,18 +12,25 @@ import LogContent from "./log"
 import OsmInfoTable from "./osm-info-table"
 import OsmPbfFileInput from "./osm-pbf-file-input"
 import { Button } from "./ui/button"
+import useStartTask from "@/hooks/log"
 
 export default function Merge() {
 	const [baseFile, setBaseFile] = useState<File | null>(null)
 	const [patchFile, setPatchFile] = useState<File | null>(null)
-	const [baseOsm, baseOsmIsLoading] = useOsmFile(baseFile, "base")
-	const [patchOsm, patchOsmIsLoading] = useOsmFile(patchFile, "patch")
+	const [baseOsm, setBaseOsm, baseOsmIsLoading] = useOsmFile(baseFile, "base")
+	const [patchOsm, setPatchOsm, patchOsmIsLoading] = useOsmFile(
+		patchFile,
+		"patch",
+	)
+	const [mergedOsm, setMergedOsm] = useState<Osm | null>(null)
 	const osmWorker = useOsmWorker()
 	const [isTransitioning, startTransition] = useTransition()
 	const [changes, setChanges] = useState<OsmChanges | null>(null)
+	const startTask = useStartTask()
 
 	const baseTileLayer = useBitmapTileLayer(baseOsm)
 	const patchTileLayer = useBitmapTileLayer(patchOsm)
+	const mergedTileLayer = useBitmapTileLayer(mergedOsm)
 
 	const [step, setStep] = useState<number>(1)
 
@@ -59,6 +67,30 @@ export default function Merge() {
 	const nextStep = useCallback(() => {
 		setStep((s) => s + 1)
 	}, [])
+
+	const downloadOsm = useCallback(
+		async (osm: Osm, name?: string) => {
+			startTransition(async () => {
+				const task = startTask("Generating OSM file to download", "info")
+				const suggestedName =
+					name ?? (osm.id.endsWith(".pbf") ? osm.id : `${osm.id}.pbf`)
+				const fileHandle = await showSaveFilePicker({
+					suggestedName,
+					types: [
+						{
+							description: "OSM PBF",
+							accept: { "application/x-protobuf": [".pbf"] },
+						},
+					],
+				})
+				const stream = await fileHandle.createWritable()
+				await writeOsmToPbfStream(osm, stream)
+				await stream.close()
+				task.end(`Created ${fileHandle.name} PBF for download`, "ready")
+			})
+		},
+		[startTask],
+	)
 
 	return (
 		<Main>
@@ -199,7 +231,7 @@ export default function Merge() {
 					</If>
 
 					<If t={step === 3}>
-						{isTransitioning ? (
+						{isTransitioning || changes == null ? (
 							<div className="flex items-center gap-1">
 								<Loader2Icon className="animate-spin size-4" />
 								<div className="font-bold">GENERATING CHANGESET</div>
@@ -210,8 +242,7 @@ export default function Merge() {
 								<div>
 									Changes have been generated and can be reviewed below. Once
 									the review is complete you can apply changes to generate a new
-									OSM file ready to be downloaded. You cannot go back from the
-									next step.
+									OSM file ready to be downloaded.
 								</div>
 							</>
 						)}
@@ -219,17 +250,23 @@ export default function Merge() {
 							{changes && <ChangesSummary changes={changes} />}
 						</div>
 						<Button
-							variant="outline"
+							disabled={changes == null || isTransitioning}
 							onClick={() => {
 								if (!osmWorker) throw Error("No OSM worker")
 								nextStep()
 								startTransition(async () => {
 									if (!changes) throw Error("No changes to apply")
-									// await osmWorker.applyChangeset()
+									if (!baseOsm) throw Error("No base OSM")
+									const newOsm = await osmWorker.applyChanges(
+										`merged-${baseOsm.id}`,
+									)
+									setBaseOsm(null)
+									setPatchOsm(null)
+									setMergedOsm(Osm.from(newOsm))
 								})
 							}}
 						>
-							<ArrowRight /> Apply changes
+							<ArrowRight /> Apply changes (irreversible)
 						</Button>
 						<Button variant="outline" onClick={prevStep}>
 							<ArrowLeft /> Back
@@ -237,7 +274,7 @@ export default function Merge() {
 					</If>
 
 					<If t={step === 4}>
-						{isTransitioning ? (
+						{isTransitioning || mergedOsm == null ? (
 							<div className="flex items-center gap-1">
 								<Loader2Icon className="animate-spin size-4" />
 								<div className="font-bold">APPLYING CHANGES</div>
@@ -249,6 +286,9 @@ export default function Merge() {
 									Changes have been applied and a new OSM dataset has been
 									created. It can be inspected here and downloaded as a new PBF.
 								</div>
+								<Button onClick={() => downloadOsm(mergedOsm)}>
+									Download merged OSM PBF
+								</Button>
 								{/* INSERT OSM VIEW CODE HERE */}
 							</>
 						)}
@@ -257,7 +297,9 @@ export default function Merge() {
 			</Sidebar>
 			<MapContent>
 				<Basemap>
-					<DeckGlOverlay layers={[baseTileLayer, patchTileLayer]} />
+					<DeckGlOverlay
+						layers={[baseTileLayer, patchTileLayer, mergedTileLayer]}
+					/>
 				</Basemap>
 			</MapContent>
 		</Main>

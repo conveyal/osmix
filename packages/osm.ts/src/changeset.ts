@@ -312,13 +312,21 @@ export default class OsmChangeset {
 			this.handleIntersectingWays(way, patch)
 		}
 	}
+
+	applyChanges(newId: string) {
+		return applyChangesetToOsm(newId, this.osm, this)
+	}
 }
 
 /**
  * Apply a changeset to an Osm index, generating a new Osm index. Usually done on a changeset made from the base osm index.
  */
-export function applyChangesetToOsm(baseOsm: Osm, changeset: OsmChangeset) {
-	const osm = new Osm(baseOsm.id, baseOsm.header)
+export function applyChangesetToOsm(
+	newId: string,
+	baseOsm: Osm,
+	changeset: OsmChangeset,
+) {
+	const osm = new Osm(newId, baseOsm.header)
 
 	const { nodeChanges, wayChanges, relationChanges } = changeset
 

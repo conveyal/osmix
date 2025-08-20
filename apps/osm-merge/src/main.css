@@ -130,8 +130,11 @@
 	}
 	a {
 		color: var(--color-blue-600);
-		text-decoration-line: underline;
 		text-underline-offset: 4px;
+	}
+
+	a:hover {
+		text-decoration-line: underline;
 	}
 }
 

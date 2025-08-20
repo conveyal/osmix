@@ -70,7 +70,7 @@ export default function ViewPage() {
 			extent: bbox,
 			getTileData: async (tile) => {
 				if (tile.index.z < MIN_PICKABLE_ZOOM) {
-					const endBitmapGenerationTask = startTask(
+					const task = startTask(
 						`generating bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
 						"debug",
 					)
@@ -81,7 +81,7 @@ export default function ViewPage() {
 						tile.index,
 						TILE_SIZE,
 					)
-					endBitmapGenerationTask(
+					task.end(
 						`bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
 						"debug",
 					)
@@ -90,7 +90,7 @@ export default function ViewPage() {
 
 				// Show pickable data
 				const bbox = tile.bbox as GeoBoundingBox
-				const endTask = startTask(
+				const task = startTask(
 					`generating data for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
 					"debug",
 				)
@@ -100,7 +100,7 @@ export default function ViewPage() {
 					bbox.east,
 					bbox.north,
 				])
-				endTask(
+				task.end(
 					`tile data for ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
 					"debug",
 				)

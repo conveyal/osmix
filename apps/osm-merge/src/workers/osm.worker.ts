@@ -43,6 +43,9 @@ const osmWorker = {
 
 		observer.observe({ entryTypes: ["mark", "measure"] })
 	},
+	clearAllOsm() {
+		this.ids = {}
+	},
 	osm(id: string) {
 		if (!this.ids[id]) throw Error(`Osm for ${id} not loaded.`)
 		return this.ids[id]
@@ -114,6 +117,14 @@ const osmWorker = {
 			relations: changeset.relationChanges,
 			stats: changeset.stats,
 		}
+	},
+	applyChanges(newId: string) {
+		if (!this.activeChangeset) throw Error("No active changeset")
+		const osm = this.activeChangeset.applyChanges(newId)
+		this.activeChangeset = null
+		this.clearAllOsm()
+		this.ids[osm.id] = osm
+		return osm.transferables()
 	},
 }
 
