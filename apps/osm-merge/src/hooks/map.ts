@@ -278,7 +278,7 @@ export function useSelectedEntityLayer(osm?: Osm | null) {
 		if (!osm || !selectedEntity) return null
 		const geojson = osm.getEntityGeoJson(selectedEntity)
 		return new GeoJsonLayer({
-			id: `${APPID}:selected-entity`,
+			id: `${APPID}:${osm.id}:selected-entity`,
 			data: geojson,
 			getLineColor: [255, 0, 0, 255],
 			getLineWidth: 3,
