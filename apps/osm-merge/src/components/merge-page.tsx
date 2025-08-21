@@ -163,7 +163,7 @@ export default function Merge() {
 						</div>
 						<div className="p-2 border border-slate-950 flex gap-2">
 							<p>
-								<b>SIMPLE MERGE:</b> Add all new entities from the patch onto
+								<b>DIRECT MERGE:</b> Add all new entities from the patch onto
 								the base data set. Overwrite any entities that have matching
 								IDs.
 							</p>
@@ -181,7 +181,7 @@ export default function Merge() {
 						</div>
 						<div className="p-2 border border-slate-950 flex gap-2">
 							<p>
-								<b>DEDUPLICATE NODES:</b> Search for geographically identical
+								<b>DE-DUPLICATE NODES:</b> Search for geographically identical
 								nodes in the two datasets and deduplicate them. Replaces
 								references in ways and relations.
 							</p>
@@ -199,7 +199,7 @@ export default function Merge() {
 						</div>
 						<div className="p-2 border border-slate-950 flex gap-2">
 							<p>
-								<b>CREATE INTERSECTIONS:</b> Look for new ways that cross over
+								<b>ADD INTERSECTIONS:</b> Look for new ways that cross over
 								existing ways and determine if they are candidates for creating
 								intersection nodes by checking their tags.
 							</p>
