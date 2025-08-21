@@ -13,14 +13,14 @@ import {
 	type OsmChanges,
 } from "osm.ts"
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
-import Basemap from "./basemap"
-import DeckGlOverlay from "./deckgl-overlay"
-import { Details, DetailsContent, DetailsSummary } from "./details"
-import EntityDetails from "./entity-details"
-import { Main, MapContent, Sidebar } from "./layout"
-import OsmInfoTable from "./osm-info-table"
-import OsmPbfFileInput from "./osm-pbf-file-input"
-import { Button } from "./ui/button"
+import Basemap from "../components/basemap"
+import DeckGlOverlay from "../components/deckgl-overlay"
+import { Details, DetailsContent, DetailsSummary } from "../components/details"
+import EntityDetails from "../components/entity-details"
+import { Main, MapContent, Sidebar } from "../components/layout"
+import OsmInfoTable from "../components/osm-info-table"
+import OsmPbfFileInput from "../components/osm-pbf-file-input"
+import { Button } from "../components/ui/button"
 
 export default function Merge() {
 	const [baseFile, setBaseFile] = useState<File | null>(null)

@@ -22,9 +22,9 @@ export default function Nav() {
 					className={({ isActive }) =>
 						cn("text-slate-950 py-4 px-2", isActive && "text-blue-600")
 					}
-					to="view"
+					to="inspect"
 				>
-					View
+					Inspect
 				</NavLink>
 				{process.env.NODE_ENV === "development" && <BrowserCheck />}
 			</div>

@@ -2,8 +2,8 @@ import { StrictMode, Suspense } from "react"
 import { createRoot } from "react-dom/client"
 import { BrowserRouter, Route, Routes, Outlet } from "react-router"
 import Nav from "./components/nav"
-import ViewPage from "./components/view-page"
-import MergePage from "./components/merge-page"
+import InspectPage from "./pages/inspect"
+import MergePage from "./pages/merge"
 
 function RootLayout() {
 	return (
@@ -27,9 +27,9 @@ createRoot(rootEl).render(
 					path={process.env.NODE_ENV === "production" ? "/osm.ts" : "/"}
 					element={<RootLayout />}
 				>
-					<Route path="" element={<ViewPage />} />
+					<Route path="" element={<InspectPage />} />
 					<Route path="merge" element={<MergePage />} />
-					<Route path="view" element={<ViewPage />} />
+					<Route path="inspect" element={<InspectPage />} />
 				</Route>
 			</Routes>
 		</BrowserRouter>
