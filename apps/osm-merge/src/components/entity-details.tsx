@@ -140,7 +140,7 @@ export function NodeListDetails({
 				<table className="table-auto">
 					<tbody>
 						{nodes.map((node, i) => (
-							<Fragment key={node.id}>
+							<Fragment key={`${node.id}-${i}`}>
 								<tr
 									onClick={() => onSelect(node)}
 									onKeyDown={() => onSelect(node)}
@@ -154,7 +154,7 @@ export function NodeListDetails({
 								</tr>
 								{node.tags &&
 									Object.entries(node.tags).map(([k, v]) => (
-										<tr key={k}>
+										<tr key={`${node.id}-${k}`}>
 											<td />
 											<td>{k}</td>
 											<td>{String(v)}</td>

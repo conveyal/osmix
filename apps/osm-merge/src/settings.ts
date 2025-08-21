@@ -1,4 +1,4 @@
-export const APPID = "osmtk"
+export const APPID = "osm.ts"
 export const MIN_NODE_ZOOM = 10
 export const MIN_PICKABLE_ZOOM = 12
 export const BITMAP_TILE_SIZE = 1024

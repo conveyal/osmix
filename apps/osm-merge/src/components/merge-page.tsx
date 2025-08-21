@@ -1,43 +1,51 @@
-import { useBitmapTileLayer } from "@/hooks/map"
+import useStartTask from "@/hooks/log"
+import { useBitmapTileLayer, usePickableOsmTileLayer } from "@/hooks/map"
 import { useOsmFile, useOsmWorker } from "@/hooks/osm"
-import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
-import { ArrowLeft, ArrowRight, Loader2Icon } from "lucide-react"
+import { APPID, DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
+import { mapAtom } from "@/state/map"
+import { useAtomValue } from "jotai"
+import { ArrowLeft, ArrowRight, Loader2Icon, MaximizeIcon } from "lucide-react"
+import { showSaveFilePicker } from "native-file-system-adapter"
 import {
 	Osm,
 	writeOsmToPbfStream,
 	type OsmChange,
 	type OsmChanges,
-	type OsmEntity,
 } from "osm.ts"
-import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import Basemap from "./basemap"
 import DeckGlOverlay from "./deckgl-overlay"
+import { Details, DetailsContent, DetailsSummary } from "./details"
+import EntityDetails from "./entity-details"
 import { Main, MapContent, Sidebar } from "./layout"
 import OsmInfoTable from "./osm-info-table"
 import OsmPbfFileInput from "./osm-pbf-file-input"
 import { Button } from "./ui/button"
-import useStartTask from "@/hooks/log"
-import { Details, DetailsContent, DetailsSummary } from "./details"
-import EntityDetails from "./entity-details"
 
 export default function Merge() {
 	const [baseFile, setBaseFile] = useState<File | null>(null)
 	const [patchFile, setPatchFile] = useState<File | null>(null)
-	const [baseOsm, setBaseOsm, baseOsmIsLoading] = useOsmFile(baseFile, "base")
-	const [patchOsm, setPatchOsm, patchOsmIsLoading] = useOsmFile(
-		patchFile,
-		"patch",
-	)
+	const {
+		osm: baseOsm,
+		setOsm: setBaseOsm,
+		isLoading: baseOsmIsLoading,
+	} = useOsmFile(baseFile, "base")
+	const {
+		osm: patchOsm,
+		setOsm: setPatchOsm,
+		isLoading: patchOsmIsLoading,
+	} = useOsmFile(patchFile, "patch")
 	const [mergedOsm, setMergedOsm] = useState<Osm | null>(null)
 	const osmWorker = useOsmWorker()
 	const [isTransitioning, startTransition] = useTransition()
 	const [changes, setChanges] = useState<OsmChanges | null>(null)
 	const startTask = useStartTask()
+	const map = useAtomValue(mapAtom)
 
 	const baseTileLayer = useBitmapTileLayer(baseOsm)
 	const patchTileLayer = useBitmapTileLayer(patchOsm)
-	const mergedTileLayer = useBitmapTileLayer(mergedOsm)
+	const { layer: mergedTileLayer, selectedEntity: mergedSelectedEntity } =
+		usePickableOsmTileLayer(mergedOsm)
 
 	const [step, setStep] = useState<number>(1)
 
@@ -92,7 +100,6 @@ export default function Merge() {
 				})
 				const stream = await fileHandle.createWritable()
 				await writeOsmToPbfStream(osm, stream)
-				await stream.close()
 				task.end(`Created ${fileHandle.name} PBF for download`, "ready")
 			})
 		},
@@ -279,7 +286,7 @@ export default function Merge() {
 					</If>
 
 					<If t={step === 4}>
-						{isTransitioning || mergedOsm == null ? (
+						{mergedOsm == null ? (
 							<div className="flex items-center gap-1">
 								<Loader2Icon className="animate-spin size-4" />
 								<div className="font-bold">APPLYING CHANGES</div>
@@ -290,11 +297,51 @@ export default function Merge() {
 								<div>
 									Changes have been applied and a new OSM dataset has been
 									created. It can be inspected here and downloaded as a new PBF.
+									Zoom in to select entities and see the changes.
 								</div>
-								<Button onClick={() => downloadOsm(mergedOsm)}>
-									Download merged OSM PBF
+								<hr />
+								{mergedSelectedEntity && (
+									<div>
+										<div className="px-1 flex justify-between">
+											<div className="font-bold">SELECTED ENTITY</div>
+											<Button
+												onClick={() => {
+													const bbox =
+														mergedOsm?.getEntityBbox(mergedSelectedEntity)
+													if (bbox)
+														map?.fitBounds(bbox, {
+															padding: 100,
+															maxDuration: 0,
+														})
+												}}
+												variant="ghost"
+												size="icon"
+												className="size-4"
+												title="Fit bounds to entity"
+											>
+												<MaximizeIcon />
+											</Button>
+										</div>
+										<EntityDetails
+											entity={mergedSelectedEntity}
+											open={true}
+											osm={mergedOsm}
+										/>
+									</div>
+								)}
+								<Button
+									onClick={() => downloadOsm(mergedOsm)}
+									disabled={isTransitioning}
+								>
+									{isTransitioning ? (
+										<>
+											<Loader2Icon className="animate-spin size-4" /> Creating
+											PBF...
+										</>
+									) : (
+										"Download merged OSM PBF"
+									)}
 								</Button>
-								{/* INSERT OSM VIEW CODE HERE */}
 							</>
 						)}
 					</If>
@@ -304,6 +351,24 @@ export default function Merge() {
 				<Basemap>
 					<DeckGlOverlay
 						layers={[baseTileLayer, patchTileLayer, mergedTileLayer]}
+						getTooltip={(pickingInfo) => {
+							const sourceLayerId = pickingInfo.sourceLayer?.id
+							if (sourceLayerId?.startsWith(`${APPID}:${mergedOsm?.id}`)) {
+								if (sourceLayerId.includes("nodes")) {
+									return {
+										className: "deck-tooltip",
+										html: `<h3 className="p-2">node</h3>`,
+									}
+								}
+								if (sourceLayerId.includes("ways")) {
+									return {
+										className: "deck-tooltip",
+										html: `<h3 className="p-2">way</h3>`,
+									}
+								}
+							}
+							return null
+						}}
 					/>
 				</Basemap>
 			</MapContent>

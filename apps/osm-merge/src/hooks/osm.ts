@@ -1,34 +1,11 @@
 import { addLogMessageAtom } from "@/state/log"
-import { createOsmWorker } from "@/workers/osm"
+import { osmWorkerAtom } from "@/state/worker"
 import * as Comlink from "comlink"
-import { atom, useAtomValue, useSetAtom } from "jotai"
+import { useAtomValue, useSetAtom } from "jotai"
 import { Osm } from "osm.ts"
 import { useEffect, useMemo, useState } from "react"
 import useStartTask from "./log"
 import { useFitBoundsOnChange } from "./map"
-
-declare global {
-	interface Window {
-		osmWorker: Awaited<ReturnType<typeof createOsmWorker>>
-	}
-}
-
-const osmWorkerAtom = atom<Awaited<ReturnType<typeof createOsmWorker>> | null>(
-	null,
-)
-
-osmWorkerAtom.onMount = (setAtom) => {
-	let unmounted = false
-	createOsmWorker().then(async (newOsmWorker) => {
-		if (unmounted) return
-		window.osmWorker = newOsmWorker
-		// React treats the return value as a function and tries to call it, so it must be wrapped.
-		setAtom(() => newOsmWorker)
-	})
-	return () => {
-		unmounted = true
-	}
-}
 
 export function useOsmWorker() {
 	const osmWorker = useAtomValue(osmWorkerAtom)
@@ -74,5 +51,5 @@ export function useOsmFile(file: File | null, id?: string) {
 			})
 	}, [file, id, osmWorker, startTask])
 
-	return [osm, setOsm, isLoading] as const
+	return { osm, setOsm, isLoading }
 }
