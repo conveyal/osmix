@@ -16,6 +16,7 @@ import type {
 	OsmEntityTypeMap,
 	OsmNode,
 	OsmRelation,
+	OsmTags,
 	OsmWay,
 } from "./types"
 import { isNode, isRelation, isWay } from "./utils"
@@ -254,6 +255,21 @@ export class Osm {
 		}
 		if (isRelation(entity)) {
 			return bbox(relationToFeature(entity, this.nodes)) as GeoBbox2D
+		}
+		throw new Error("Unknown entity type")
+	}
+
+	getEntityGeoJson(
+		entity: OsmNode | OsmWay | OsmRelation,
+	): GeoJSON.Feature<GeoJSON.Geometry, OsmTags> {
+		if (isNode(entity)) {
+			return nodeToFeature(entity)
+		}
+		if (isWay(entity)) {
+			return wayToFeature(entity, this.nodes)
+		}
+		if (isRelation(entity)) {
+			return relationToFeature(entity, this.nodes)
 		}
 		throw new Error("Unknown entity type")
 	}

@@ -1,5 +1,9 @@
 import useStartTask from "@/hooks/log"
-import { useBitmapTileLayer, usePickableOsmTileLayer } from "@/hooks/map"
+import {
+	useBitmapTileLayer,
+	usePickableOsmTileLayer,
+	useSelectedEntityLayer,
+} from "@/hooks/map"
 import { useOsmFile, useOsmWorker } from "@/hooks/osm"
 import { APPID, DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { mapAtom } from "@/state/map"
@@ -46,6 +50,8 @@ export default function Merge() {
 	const patchTileLayer = useBitmapTileLayer(patchOsm)
 	const { layer: mergedTileLayer, selectedEntity: mergedSelectedEntity } =
 		usePickableOsmTileLayer(mergedOsm)
+
+	const selectedEntityLayer = useSelectedEntityLayer(mergedOsm)
 
 	const [step, setStep] = useState<number>(1)
 
@@ -350,7 +356,12 @@ export default function Merge() {
 			<MapContent>
 				<Basemap>
 					<DeckGlOverlay
-						layers={[baseTileLayer, patchTileLayer, mergedTileLayer]}
+						layers={[
+							baseTileLayer,
+							patchTileLayer,
+							mergedTileLayer,
+							selectedEntityLayer,
+						]}
 						getTooltip={(pickingInfo) => {
 							const sourceLayerId = pickingInfo.sourceLayer?.id
 							if (sourceLayerId?.startsWith(`${APPID}:${mergedOsm?.id}`)) {

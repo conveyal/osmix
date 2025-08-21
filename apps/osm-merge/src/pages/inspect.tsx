@@ -1,4 +1,4 @@
-import { usePickableOsmTileLayer } from "@/hooks/map"
+import { usePickableOsmTileLayer, useSelectedEntityLayer } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
 import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
 import { addLogMessageAtom } from "@/state/log"
@@ -45,6 +45,7 @@ export default function ViewPage() {
 	}, [file])
 
 	const { layer: tileLayer, selectedEntity } = usePickableOsmTileLayer(osm)
+	const selectedEntityLayer = useSelectedEntityLayer(osm)
 
 	return (
 		<Main>
@@ -128,7 +129,7 @@ export default function ViewPage() {
 						</Source>
 					)}
 					<DeckGlOverlay
-						layers={[tileLayer]}
+						layers={[tileLayer, selectedEntityLayer]}
 						pickingRadius={5}
 						getTooltip={(pickingInfo) => {
 							const sourceLayerId = pickingInfo.sourceLayer?.id

@@ -87,6 +87,7 @@ export function useBitmapTileLayer(osm?: Osm | null) {
 export function usePickableOsmTileLayer(osm?: Osm | null) {
 	const startTask = useStartTask()
 	const osmWorker = useOsmWorker()
+
 	const [selectedEntity, setSelectedEntity] = useAtom(selectedEntityAtom)
 	const layer = useMemo(() => {
 		const bbox = osm?.bbox()
@@ -266,6 +267,26 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 
 	return {
 		layer,
+		setSelectedEntity,
 		selectedEntity,
 	}
+}
+
+export function useSelectedEntityLayer(osm?: Osm | null) {
+	const selectedEntity = useAtomValue(selectedEntityAtom)
+	return useMemo(() => {
+		if (!osm || !selectedEntity) return null
+		const geojson = osm.getEntityGeoJson(selectedEntity)
+		return new GeoJsonLayer({
+			id: `${APPID}:selected-entity`,
+			data: geojson,
+			getLineColor: [255, 0, 0, 255],
+			getLineWidth: 3,
+			pointRadiusMinPixels: 2,
+			pointRadiusMaxPixels: 10,
+			lineWidthMinPixels: 2,
+			lineWidthMaxPixels: 10,
+			filled: false,
+		})
+	}, [osm, selectedEntity])
 }
