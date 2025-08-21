@@ -302,4 +302,8 @@ export class Osm {
 		changeset.generateFullChangeset(other, options)
 		return changeset
 	}
+
+	createChangeset() {
+		return new OsmChangeset(this)
+	}
 }

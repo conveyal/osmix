@@ -8,7 +8,7 @@ export type {
 	OsmChange,
 	TileIndex,
 } from "./types"
-export { getEntityType } from "./utils"
+export { getEntityType, throttle } from "./utils"
 export { Nodes as NodeIndex } from "./nodes"
 export { createOsmIndexFromPbfData } from "./osm-from-pbf"
 export { writeOsmToPbfStream } from "./osm-to-pbf"

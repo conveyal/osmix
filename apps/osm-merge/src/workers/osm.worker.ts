@@ -2,6 +2,7 @@ import type { StatusType } from "@/state/log"
 import { expose, transfer } from "comlink"
 import {
 	Osm,
+	throttle,
 	type GeoBbox2D,
 	type OsmChanges,
 	type OsmChangeset,
@@ -109,10 +110,40 @@ const osmWorker = {
 		patchOsmId: string,
 		options: OsmMergeOptions,
 	): OsmChanges {
-		const changeset = this.osm(baseOsmId).generateChangeset(
-			this.osm(patchOsmId),
-			options,
-		)
+		const patchOsm = this.osm(patchOsmId)
+		const changeset = this.osm(baseOsmId).createChangeset()
+
+		const logEverySecond = throttle(this.log, 1_000)
+
+		if (options.directMerge) {
+			this.log("Generating direct changes...", "info")
+			changeset.generateDirectChanges(patchOsm)
+		}
+		if (options.deduplicateNodes) {
+			let checkedNodes = 0
+			this.log("Deduplicating nodes...", "info")
+			for (const node of patchOsm.nodes) {
+				checkedNodes++
+				changeset.deduplicateOverlappingNodes(node)
+				logEverySecond(
+					`Node deduplication progress: ${checkedNodes.toLocaleString()} checked, ${changeset.stats.deduplicatedNodes.toLocaleString()} deduplicated, ${changeset.stats.deduplicatedNodesReplaced.toLocaleString()} replaced`,
+					"info",
+				)
+			}
+		}
+		if (options.createIntersections) {
+			let checkedWays = 0
+			this.log("Creating intersections...", "info")
+			for (const way of patchOsm.ways) {
+				checkedWays++
+				changeset.handleIntersectingWays(way, patchOsm)
+				logEverySecond(
+					`Intersection creation progress: ${checkedWays.toLocaleString()} ways checked, ${changeset.stats.intersectionPointsFound.toLocaleString()} intersections created`,
+					"info",
+				)
+			}
+		}
+
 		this.activeChangeset = changeset
 		return {
 			nodes: changeset.nodeChanges,

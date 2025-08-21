@@ -125,18 +125,19 @@ export default class OsmChangeset {
 		}
 	}
 
-	deduplicateOverlappingNodes(node: OsmNode) {
+	deduplicateOverlappingNodes(node: OsmNode): number {
 		const existingNodes = this.osm.nodes.findNeighborsWithin(node, 0)
 		const existingNode = existingNodes[0]
-		if (existingNode == null) return
+		if (existingNode == null) return -1
 		this.stats.deduplicatedNodes++
 		this.delete(existingNode)
 
+		let deduplicatedNodesReplaced = 0
 		// Find ways that contain the replaced node and modify them.
 		for (const wayIndex of this.osm.ways.neighbors(node.lon, node.lat, 10)) {
 			const way = this.osm.ways.getByIndex(wayIndex)
 			if (way.refs.includes(existingNode.id)) {
-				this.stats.deduplicatedNodesReplaced++
+				deduplicatedNodesReplaced++
 				this.modify("way", way.id, (way) => ({
 					...way,
 					refs: way.refs.map((ref) =>
@@ -150,7 +151,7 @@ export default class OsmChangeset {
 		for (const relation of this.osm.relations) {
 			for (const member of relation.members) {
 				if (member.type === "node" && member.ref === existingNode.id) {
-					this.stats.deduplicatedNodesReplaced++
+					deduplicatedNodesReplaced++
 					this.modify("relation", relation.id, (relation) => ({
 						...relation,
 						members: relation.members.map((member) =>
@@ -162,6 +163,8 @@ export default class OsmChangeset {
 				}
 			}
 		}
+		this.stats.deduplicatedNodesReplaced += deduplicatedNodesReplaced
+		return deduplicatedNodesReplaced
 	}
 
 	// Find intersecting way IDs and points for this way
@@ -311,6 +314,18 @@ export default class OsmChangeset {
 		}
 	}
 
+	deduplicateNodes(patch: Osm) {
+		for (const node of patch.nodes) {
+			this.deduplicateOverlappingNodes(node)
+		}
+	}
+
+	createIntersections(patch: Osm) {
+		for (const way of patch.ways) {
+			this.handleIntersectingWays(way, patch)
+		}
+	}
+
 	generateFullChangeset(
 		patch: Osm,
 		{ directMerge, deduplicateNodes, createIntersections }: OsmMergeOptions = {
@@ -324,17 +339,11 @@ export default class OsmChangeset {
 		}
 
 		if (deduplicateNodes) {
-			// Then de-duplicate overlapping nodes
-			for (const node of patch.nodes) {
-				this.deduplicateOverlappingNodes(node)
-			}
+			this.deduplicateNodes(patch)
 		}
 
 		if (createIntersections) {
-			// Then handle intersecting ways
-			for (const way of patch.ways) {
-				this.handleIntersectingWays(way, patch)
-			}
+			this.createIntersections(patch)
 		}
 	}
 

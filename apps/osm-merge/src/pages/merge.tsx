@@ -34,6 +34,7 @@ import { Main, MapContent, Sidebar } from "../components/layout"
 import OsmInfoTable from "../components/osm-info-table"
 import OsmPbfFileInput from "../components/osm-pbf-file-input"
 import { Button } from "../components/ui/button"
+import LogContent from "@/components/log"
 
 export default function Merge() {
 	const [baseFile, setBaseFile] = useState<File | null>(null)
@@ -243,6 +244,7 @@ export default function Merge() {
 						<Button
 							onClick={() => {
 								nextStep()
+								const task = startTask("Generating changeset", "info")
 								startTransition(async () => {
 									if (!baseOsm || !patchOsm || !osmWorker)
 										throw Error("Missing data to generate changes")
@@ -251,8 +253,8 @@ export default function Merge() {
 										patchOsm.id,
 										mergeOptions,
 									)
-									console.log(results)
 									setChanges(results)
+									task.end("Changeset generated", "ready")
 								})
 							}}
 						>
@@ -266,9 +268,16 @@ export default function Merge() {
 
 					<If t={step === 3}>
 						{isTransitioning || changes == null ? (
-							<div className="flex items-center gap-1">
-								<Loader2Icon className="animate-spin size-4" />
-								<div className="font-bold">GENERATING CHANGESET</div>
+							<div className="flex flex-col gap-2">
+								<div className="flex items-center gap-1">
+									<Loader2Icon className="animate-spin size-4" />
+									<div className="font-bold">
+										GENERATING CHANGESET. PLEASE WAIT...
+									</div>
+								</div>
+								<div className="h-48 p-2 border inset-shadow-xs">
+									<LogContent />
+								</div>
 							</div>
 						) : (
 							<>
@@ -286,6 +295,7 @@ export default function Merge() {
 							onClick={() => {
 								if (!osmWorker) throw Error("No OSM worker")
 								nextStep()
+								const task = startTask("Applying changes to OSM", "info")
 								startTransition(async () => {
 									if (!changes) throw Error("No changes to apply")
 									if (!baseOsm) throw Error("No base OSM")
@@ -295,6 +305,7 @@ export default function Merge() {
 									setBaseOsm(null)
 									setPatchOsm(null)
 									setMergedOsm(Osm.from(newOsm))
+									task.end("Changes applied", "ready")
 								})
 							}}
 						>
@@ -519,7 +530,8 @@ function ChangesSummary({ changes }: { changes: OsmChanges }) {
 								<ArrowLeft className="w-3 h-3 mr-1" />
 							</Button>
 							<span className="text-xs text-slate-500">
-								{currentPage + 1} of {totalPages}
+								{(currentPage + 1).toLocaleString()} of{" "}
+								{totalPages.toLocaleString()}
 							</span>
 							<Button
 								variant="ghost"
