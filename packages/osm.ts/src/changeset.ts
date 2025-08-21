@@ -313,7 +313,11 @@ export default class OsmChangeset {
 
 	generateFullChangeset(
 		patch: Osm,
-		{ directMerge, deduplicateNodes, createIntersections }: OsmMergeOptions,
+		{ directMerge, deduplicateNodes, createIntersections }: OsmMergeOptions = {
+			directMerge: true,
+			deduplicateNodes: true,
+			createIntersections: true,
+		},
 	) {
 		if (directMerge) {
 			this.generateDirectChanges(patch)
