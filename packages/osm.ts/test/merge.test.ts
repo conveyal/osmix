@@ -3,7 +3,6 @@ import { assert, describe, it } from "vitest"
 import { Osm, type OsmNode } from "../src"
 import { createBaseOsm, createPatchOsm } from "./mock-osm"
 import { getFile } from "./utils"
-import OsmChangeset, { applyChangesetToOsm } from "../src/changeset"
 
 const testNode: OsmNode = {
 	id: 2135545,
@@ -43,11 +42,10 @@ describe("merge osm", () => {
 			const osm2 = await Osm.fromPbfData(osm2Data)
 			assert.deepEqual(osm2.nodes.getById(testNode.id), testNode)
 
-			const changeset = new OsmChangeset(osm1)
-			changeset.generateFullChangeset(osm2)
-			const nodeChanges = Array.from(changeset.nodeChanges.values())
-			const wayChanges = Array.from(changeset.wayChanges.values())
-			const relationChanges = Array.from(changeset.relationChanges.values())
+			const changeset = osm1.generateChangeset(osm2)
+			const nodeChanges = Object.values(changeset.nodeChanges)
+			const wayChanges = Object.values(changeset.wayChanges)
+			const relationChanges = Object.values(changeset.relationChanges)
 
 			const testNodeWithCrossing = {
 				...testNode,
@@ -70,7 +68,7 @@ describe("merge osm", () => {
 			assert.equal(changeset.stats.deduplicatedNodesReplaced, 0)
 			assert.equal(changeset.stats.intersectionPointsFound, 3176)
 
-			const merged = applyChangesetToOsm(osm1, changeset)
+			const merged = changeset.applyChanges()
 
 			assert.equal(osm1.nodes.size + osm2.nodes.size, merged.nodes.size)
 			assert.deepEqual(merged.nodes.getById(testNode.id), testNodeWithCrossing)
@@ -80,24 +78,24 @@ describe("merge osm", () => {
 	it("should generate and apply osm changes", () => {
 		const base = createBaseOsm()
 		const patch = createPatchOsm()
-		const changeset = new OsmChangeset(base)
-		changeset.generateFullChangeset(patch)
-		const nodeChanges = Array.from(changeset.nodeChanges.values())
+		const changeset = base.generateChangeset(patch)
+		const nodeChanges = Object.values(changeset.nodeChanges)
 
 		assert.equal(nodeChanges.length, 7)
-		assert.equal(nodeChanges[0]?.changeType, "create")
+		assert.equal(nodeChanges[0]?.changeType, "delete") // deduplicate node
 
-		const wayChanges = Array.from(changeset.wayChanges.values())
+		const wayChanges = Object.values(changeset.wayChanges)
 		assert.equal(wayChanges.length, 4)
-		assert.equal(wayChanges[0]?.changeType, "create")
-		assert.equal(wayChanges[0]?.entity.tags?.highway, "secondary")
-		assert.equal(wayChanges[0]?.entity.refs.length, 2)
+		assert.equal(wayChanges[0]?.entity.id, 1)
+		assert.equal(wayChanges[0]?.changeType, "modify")
+		assert.equal(wayChanges[0]?.entity.tags?.highway, "primary")
+		assert.equal(wayChanges[0]?.entity.refs.length, 3)
 
 		assert.equal(changeset.stats.deduplicatedNodes, 1)
 		assert.equal(changeset.stats.deduplicatedNodesReplaced, 1)
 		assert.equal(changeset.stats.intersectionPointsFound, 1)
 
-		const result = applyChangesetToOsm(base, changeset)
+		const result = changeset.applyChanges()
 
 		assert.equal(result.ways.getById(1)?.tags?.highway, "primary")
 		assert.equal(result.ways.getById(2)?.refs.length, 2)

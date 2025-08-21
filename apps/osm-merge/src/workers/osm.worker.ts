@@ -1,15 +1,13 @@
+import type { StatusType } from "@/state/log"
+import { expose, transfer } from "comlink"
 import {
-	type Osm,
+	Osm,
 	type GeoBbox2D,
-	type TileIndex,
-	OsmChangeset,
 	type OsmChanges,
+	type OsmChangeset,
+	type TileIndex,
 } from "osm.ts"
 import * as Performance from "osm.ts/performance"
-import { expose, transfer } from "comlink"
-import type { _TileLoadProps } from "@deck.gl/geo-layers"
-import { createOsmIndexFromPbfData } from "../../../../packages/osm.ts/src/osm-from-pbf"
-import type { StatusType } from "@/state/log"
 
 const osmWorker = {
 	log: (message: string, type: StatusType) =>
@@ -56,9 +54,7 @@ const osmWorker = {
 		data: ArrayBuffer | ReadableStream<Uint8Array>,
 	) {
 		const measure = Performance.createMeasure("initializing PBF from data")
-		const osm = await createOsmIndexFromPbfData(id, data, (m) =>
-			this.log(m, "info"),
-		)
+		const osm = await Osm.fromPbfData(data, id, (m) => this.log(m, "info"))
 		this.ids[id] = osm
 		measure()
 		return this.ids[id].transferables()
@@ -108,9 +104,10 @@ const osmWorker = {
 	},
 	activeChangeset: null as OsmChangeset | null,
 	generateChangeset(baseOsmId: string, patchOsmId: string): OsmChanges {
-		const changeset = new OsmChangeset(this.osm(baseOsmId))
+		const changeset = this.osm(baseOsmId).generateChangeset(
+			this.osm(patchOsmId),
+		)
 		this.activeChangeset = changeset
-		changeset.generateFullChangeset(this.osm(patchOsmId))
 		return {
 			nodes: changeset.nodeChanges,
 			ways: changeset.wayChanges,

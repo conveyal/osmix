@@ -319,8 +319,8 @@ export default class OsmChangeset {
 		}
 	}
 
-	applyChanges(newId: string) {
-		return applyChangesetToOsm(newId, this.osm, this)
+	applyChanges(newId?: string) {
+		return applyChangesetToOsm(newId ?? `${this.osm.id}-merged`, this.osm, this)
 	}
 }
 

@@ -21,6 +21,7 @@ import type {
 import { isNode, isRelation, isWay } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 import { IdArrayType } from "./typed-arrays"
+import OsmChangeset from "./changeset"
 
 export interface OsmTransferables {
 	id: string
@@ -74,8 +75,12 @@ export class Osm {
 		return createOsmIndexFromPbfData(file.name, file.stream(), console.log)
 	}
 
-	static async fromPbfData(data: ArrayBuffer | ReadableStream<Uint8Array>) {
-		return createOsmIndexFromPbfData("default", data, console.log)
+	static async fromPbfData(
+		data: ArrayBuffer | ReadableStream<Uint8Array>,
+		id = "unknown",
+		onProgess: (...args: string[]) => void = console.log,
+	) {
+		return createOsmIndexFromPbfData(id, data, onProgess)
 	}
 
 	constructor(id?: string, header?: OsmPbfHeaderBlock) {
@@ -274,5 +279,11 @@ export class Osm {
 
 	bbox(): GeoBbox2D | undefined {
 		return this.nodes.bbox ?? this.headerBbox()
+	}
+
+	generateChangeset(other: Osm) {
+		const changeset = new OsmChangeset(this)
+		changeset.generateFullChangeset(other)
+		return changeset
 	}
 }
