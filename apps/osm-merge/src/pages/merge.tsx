@@ -15,6 +15,7 @@ import {
 	writeOsmToPbfStream,
 	type OsmChange,
 	type OsmChanges,
+	type OsmMergeOptions,
 } from "osm.ts"
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import Basemap from "../components/basemap"
@@ -55,8 +56,8 @@ export default function Merge() {
 
 	const [step, setStep] = useState<number>(1)
 
-	const [mergeOptions, setMergeOptions] = useState({
-		simple: true,
+	const [mergeOptions, setMergeOptions] = useState<OsmMergeOptions>({
+		directMerge: true,
 		deduplicateNodes: true,
 		createIntersections: true,
 	})
@@ -178,15 +179,18 @@ export default function Merge() {
 								<b>DIRECT MERGE:</b> Add all new entities from the patch onto
 								the base data set. Overwrite any entities that have matching
 								IDs.
+								<br />
+								<span className="font-bold">Direct merge is required.</span>
 							</p>
 							<input
 								type="checkbox"
-								checked={mergeOptions.simple}
+								disabled={true}
+								checked={mergeOptions.directMerge}
 								onChange={(e) => {
 									const simple = e.currentTarget.checked
 									setMergeOptions((m) => ({
 										...m,
-										simple,
+										directMerge: simple,
 									}))
 								}}
 							/>
@@ -237,6 +241,7 @@ export default function Merge() {
 									const results = await osmWorker.generateChangeset(
 										baseOsm.id,
 										patchOsm.id,
+										mergeOptions,
 									)
 									console.log(results)
 									setChanges(results)

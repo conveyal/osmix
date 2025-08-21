@@ -12,6 +12,12 @@ import type {
 } from "./types"
 import { entityPropertiesEqual, getEntityType } from "./utils"
 
+export type OsmMergeOptions = {
+	directMerge: boolean
+	deduplicateNodes: boolean
+	createIntersections: boolean
+}
+
 export type OsmChangesStats = {
 	deduplicatedNodes: number
 	deduplicatedNodesReplaced: number
@@ -305,17 +311,26 @@ export default class OsmChangeset {
 		}
 	}
 
-	generateFullChangeset(patch: Osm) {
-		this.generateDirectChanges(patch)
-
-		// Then de-duplicate overlapping nodes
-		for (const node of patch.nodes) {
-			this.deduplicateOverlappingNodes(node)
+	generateFullChangeset(
+		patch: Osm,
+		{ directMerge, deduplicateNodes, createIntersections }: OsmMergeOptions,
+	) {
+		if (directMerge) {
+			this.generateDirectChanges(patch)
 		}
 
-		// Then handle intersecting ways
-		for (const way of patch.ways) {
-			this.handleIntersectingWays(way, patch)
+		if (deduplicateNodes) {
+			// Then de-duplicate overlapping nodes
+			for (const node of patch.nodes) {
+				this.deduplicateOverlappingNodes(node)
+			}
+		}
+
+		if (createIntersections) {
+			// Then handle intersecting ways
+			for (const way of patch.ways) {
+				this.handleIntersectingWays(way, patch)
+			}
 		}
 	}
 

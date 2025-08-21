@@ -5,6 +5,7 @@ import {
 	type GeoBbox2D,
 	type OsmChanges,
 	type OsmChangeset,
+	type OsmMergeOptions,
 	type TileIndex,
 } from "osm.ts"
 import * as Performance from "osm.ts/performance"
@@ -103,9 +104,14 @@ const osmWorker = {
 		}
 	},
 	activeChangeset: null as OsmChangeset | null,
-	generateChangeset(baseOsmId: string, patchOsmId: string): OsmChanges {
+	generateChangeset(
+		baseOsmId: string,
+		patchOsmId: string,
+		options: OsmMergeOptions,
+	): OsmChanges {
 		const changeset = this.osm(baseOsmId).generateChangeset(
 			this.osm(patchOsmId),
+			options,
 		)
 		this.activeChangeset = changeset
 		return {

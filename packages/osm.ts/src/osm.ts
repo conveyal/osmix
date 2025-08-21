@@ -22,7 +22,7 @@ import type {
 import { isNode, isRelation, isWay } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 import { IdArrayType } from "./typed-arrays"
-import OsmChangeset from "./changeset"
+import OsmChangeset, { type OsmMergeOptions } from "./changeset"
 
 export interface OsmTransferables {
 	id: string
@@ -297,9 +297,9 @@ export class Osm {
 		return this.nodes.bbox ?? this.headerBbox()
 	}
 
-	generateChangeset(other: Osm) {
+	generateChangeset(other: Osm, options: OsmMergeOptions) {
 		const changeset = new OsmChangeset(this)
-		changeset.generateFullChangeset(other)
+		changeset.generateFullChangeset(other, options)
 		return changeset
 	}
 }

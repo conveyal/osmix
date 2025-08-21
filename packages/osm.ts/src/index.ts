@@ -12,4 +12,8 @@ export { getEntityType } from "./utils"
 export { Nodes as NodeIndex } from "./nodes"
 export { createOsmIndexFromPbfData } from "./osm-from-pbf"
 export { writeOsmToPbfStream } from "./osm-to-pbf"
-export { default as OsmChangeset, type OsmChanges } from "./changeset"
+export {
+	default as OsmChangeset,
+	type OsmChanges,
+	type OsmMergeOptions,
+} from "./changeset"
