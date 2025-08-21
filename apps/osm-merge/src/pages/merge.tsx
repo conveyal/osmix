@@ -8,7 +8,15 @@ import { useOsmFile, useOsmWorker } from "@/hooks/osm"
 import { APPID, DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { mapAtom } from "@/state/map"
 import { useAtomValue } from "jotai"
-import { ArrowLeft, ArrowRight, Loader2Icon, MaximizeIcon } from "lucide-react"
+import {
+	ArrowLeft,
+	ArrowRight,
+	DownloadIcon,
+	FileDiff,
+	Loader2Icon,
+	MaximizeIcon,
+	MergeIcon,
+} from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import {
 	Osm,
@@ -248,6 +256,7 @@ export default function Merge() {
 								})
 							}}
 						>
+							<FileDiff />
 							Generate changeset
 						</Button>
 						<Button variant="outline" onClick={prevStep}>
@@ -289,7 +298,7 @@ export default function Merge() {
 								})
 							}}
 						>
-							<ArrowRight /> Apply changes
+							<MergeIcon /> Apply changes
 						</Button>
 						<Button variant="outline" onClick={prevStep}>
 							<ArrowLeft /> Back
@@ -350,7 +359,9 @@ export default function Merge() {
 											PBF...
 										</>
 									) : (
-										"Download merged OSM PBF"
+										<>
+											<DownloadIcon /> Download merged OSM PBF
+										</>
 									)}
 								</Button>
 							</>
