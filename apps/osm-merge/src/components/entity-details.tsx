@@ -20,20 +20,13 @@ export default function EntityDetails({
 	if (isWay(entity))
 		return (
 			<WayDetails way={entity} open={open}>
-				{osm ? (
-					<NodeList
+				{osm && (
+					<NodeListDetails
 						nodes={entity.refs
 							.map((ref) => osm.nodes.getById(ref))
 							.filter((n) => n != null)}
 						onSelect={onSelect ?? noop}
 					/>
-				) : (
-					<tbody>
-						<tr>
-							<td>refs</td>
-							<td>{entity.refs.join(", ")}</td>
-						</tr>
-					</tbody>
 				)}
 			</WayDetails>
 		)
@@ -79,6 +72,10 @@ export function WayDetails({
 			<DetailsContent>
 				<table className="w-full">
 					<tbody>
+						<tr>
+							<td>refs</td>
+							<td>{way.refs.join(",")}</td>
+						</tr>
 						<TagList tags={way.tags} />
 					</tbody>
 				</table>
@@ -132,7 +129,7 @@ export function TagList({ tags }: { tags?: Record<string, unknown> }) {
 	)
 }
 
-export function NodeList({
+export function NodeListDetails({
 	nodes,
 	onSelect,
 }: { nodes: OsmNode[]; onSelect: (node: OsmNode) => void }) {
