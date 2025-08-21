@@ -158,7 +158,7 @@ export default function Merge() {
 							/>
 						</div>
 						<Button disabled={!baseOsm || !patchOsm} onClick={nextStep}>
-							<ArrowRight /> Select merge options
+							Select merge options <ArrowRight />
 						</Button>
 					</If>
 
@@ -241,29 +241,31 @@ export default function Merge() {
 							/>
 						</div>
 
-						<Button
-							onClick={() => {
-								nextStep()
-								const task = startTask("Generating changeset", "info")
-								startTransition(async () => {
-									if (!baseOsm || !patchOsm || !osmWorker)
-										throw Error("Missing data to generate changes")
-									const results = await osmWorker.generateChangeset(
-										baseOsm.id,
-										patchOsm.id,
-										mergeOptions,
-									)
-									setChanges(results)
-									task.end("Changeset generated", "ready")
-								})
-							}}
-						>
-							<FileDiff />
-							Generate changeset
-						</Button>
-						<Button variant="outline" onClick={prevStep}>
-							<ArrowLeft /> Back
-						</Button>
+						<div className="flex gap-2 justify-between">
+							<Button className="flex-1/2" variant="outline" onClick={prevStep}>
+								<ArrowLeft /> Back
+							</Button>
+							<Button
+								className="flex-1/2"
+								onClick={() => {
+									nextStep()
+									const task = startTask("Generating changeset", "info")
+									startTransition(async () => {
+										if (!baseOsm || !patchOsm || !osmWorker)
+											throw Error("Missing data to generate changes")
+										const results = await osmWorker.generateChangeset(
+											baseOsm.id,
+											patchOsm.id,
+											mergeOptions,
+										)
+										setChanges(results)
+										task.end("Changeset generated", "ready")
+									})
+								}}
+							>
+								Generate changeset <FileDiff />
+							</Button>
+						</div>
 					</If>
 
 					<If t={step === 3}>
@@ -290,30 +292,33 @@ export default function Merge() {
 							</>
 						)}
 						{changes && <ChangesSummary changes={changes} />}
-						<Button
-							disabled={changes == null || isTransitioning}
-							onClick={() => {
-								if (!osmWorker) throw Error("No OSM worker")
-								nextStep()
-								const task = startTask("Applying changes to OSM", "info")
-								startTransition(async () => {
-									if (!changes) throw Error("No changes to apply")
-									if (!baseOsm) throw Error("No base OSM")
-									const newOsm = await osmWorker.applyChanges(
-										`merged-${baseOsm.id}`,
-									)
-									setBaseOsm(null)
-									setPatchOsm(null)
-									setMergedOsm(Osm.from(newOsm))
-									task.end("Changes applied", "ready")
-								})
-							}}
-						>
-							<MergeIcon /> Apply changes
-						</Button>
-						<Button variant="outline" onClick={prevStep}>
-							<ArrowLeft /> Back
-						</Button>
+						<div className="flex gap-2 justify-between">
+							<Button className="flex-1/2" variant="outline" onClick={prevStep}>
+								<ArrowLeft /> Back
+							</Button>
+							<Button
+								className="flex-1/2"
+								disabled={changes == null || isTransitioning}
+								onClick={() => {
+									if (!osmWorker) throw Error("No OSM worker")
+									nextStep()
+									const task = startTask("Applying changes to OSM", "info")
+									startTransition(async () => {
+										if (!changes) throw Error("No changes to apply")
+										if (!baseOsm) throw Error("No base OSM")
+										const newOsm = await osmWorker.applyChanges(
+											`merged-${baseOsm.id}`,
+										)
+										setBaseOsm(null)
+										setPatchOsm(null)
+										setMergedOsm(Osm.from(newOsm))
+										task.end("Changes applied", "ready")
+									})
+								}}
+							>
+								Apply changes <MergeIcon />
+							</Button>
+						</div>
 					</If>
 
 					<If t={step === 4}>
