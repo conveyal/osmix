@@ -9,6 +9,7 @@ import { MaximizeIcon } from "lucide-react"
 import * as Performance from "osm.ts/performance"
 import { useEffect, useMemo, useState } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
+import { useSearchParams } from "react-router"
 import Basemap from "../components/basemap"
 import DeckGlOverlay from "../components/deckgl-overlay"
 import EntityDetails from "../components/entity-details"
@@ -16,7 +17,6 @@ import { Main, MapContent, Sidebar } from "../components/layout"
 import OsmInfoTable from "../components/osm-info-table"
 import OsmPbfFileInput from "../components/osm-pbf-file-input"
 import { Button } from "../components/ui/button"
-import { useSearchParams } from "react-router"
 
 export default function InspectPage() {
 	const [searchParams] = useSearchParams()
