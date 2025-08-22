@@ -21,7 +21,7 @@ export default function ViewPage() {
 	const [file, setFile] = useState<File | null>(null)
 	const osmId = useMemo(() => file?.name ?? "default", [file])
 	const map = useAtomValue(mapAtom)
-	const { osm, isLoading: isLoadingFile } = useOsmFile(file)
+	const { osm, isLoading: isLoadingFile } = useOsmFile("inspect", file)
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const logMessage = useSetAtom(addLogMessageAtom)
 	const setSelectedEntity = useSetAtom(selectedEntityAtom)

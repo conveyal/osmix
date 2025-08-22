@@ -297,7 +297,7 @@ export class Osm {
 		return this.nodes.bbox ?? this.headerBbox()
 	}
 
-	generateChangeset(other: Osm, options: OsmMergeOptions) {
+	generateChangeset(other: Osm, options?: OsmMergeOptions) {
 		const changeset = new OsmChangeset(this)
 		changeset.generateFullChangeset(other, options)
 		return changeset

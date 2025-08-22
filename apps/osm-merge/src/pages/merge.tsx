@@ -43,13 +43,13 @@ export default function Merge() {
 		osm: baseOsm,
 		setOsm: setBaseOsm,
 		isLoading: baseOsmIsLoading,
-	} = useOsmFile(baseFile, "base")
+	} = useOsmFile("base", baseFile)
 	const {
 		osm: patchOsm,
 		setOsm: setPatchOsm,
 		isLoading: patchOsmIsLoading,
-	} = useOsmFile(patchFile, "patch")
-	const [mergedOsm, setMergedOsm] = useState<Osm | null>(null)
+	} = useOsmFile("patch", patchFile)
+	const { osm: mergedOsm, setOsm: setMergedOsm } = useOsmFile("inspect", null)
 	const osmWorker = useOsmWorker()
 	const [isTransitioning, startTransition] = useTransition()
 	const [changes, setChanges] = useState<OsmChanges | null>(null)

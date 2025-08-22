@@ -1,11 +1,12 @@
 import { addLogMessageAtom } from "@/state/log"
 import { osmWorkerAtom } from "@/state/worker"
 import * as Comlink from "comlink"
-import { useAtomValue, useSetAtom } from "jotai"
+import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { Osm } from "osm.ts"
 import { useEffect, useMemo, useState } from "react"
 import useStartTask from "./log"
 import { useFitBoundsOnChange } from "./map"
+import { osmAtomFamily } from "@/state/osm"
 
 export function useOsmWorker() {
 	const osmWorker = useAtomValue(osmWorkerAtom)
@@ -20,8 +21,8 @@ export function useOsmWorker() {
 	return osmWorker
 }
 
-export function useOsmFile(file: File | null, id?: string) {
-	const [osm, setOsm] = useState<Osm | null>(null)
+export function useOsmFile(id: string, file: File | null) {
+	const [osm, setOsm] = useAtom(osmAtomFamily(id))
 	const [isLoading, setIsLoading] = useState(false)
 	const osmWorker = useOsmWorker()
 	const startTask = useStartTask()
@@ -49,7 +50,7 @@ export function useOsmFile(file: File | null, id?: string) {
 			.finally(() => {
 				setIsLoading(false)
 			})
-	}, [file, id, osmWorker, startTask])
+	}, [file, id, osmWorker, setOsm, startTask])
 
 	return { osm, setOsm, isLoading }
 }
