@@ -18,7 +18,7 @@ import OsmPbfFileInput from "../components/osm-pbf-file-input"
 import { Button } from "../components/ui/button"
 import { useSearchParams } from "react-router"
 
-export default function ViewPage() {
+export default function InspectPage() {
 	const [searchParams] = useSearchParams()
 	const [file, setFile] = useState<File | null>(null)
 	const osmId = useMemo(
@@ -55,7 +55,7 @@ export default function ViewPage() {
 	return (
 		<Main>
 			<Sidebar>
-				<div className="flex flex-col p-4 gap-2">
+				<div className="flex flex-col p-4 gap-4">
 					<OsmPbfFileInput
 						isLoading={isLoadingFile}
 						file={file}
@@ -65,35 +65,37 @@ export default function ViewPage() {
 						}}
 					/>
 
-					{osm && file && (
-						<>
-							<div className="px-1 flex justify-between">
-								<div className="font-bold">OPENSTREETMAP PBF</div>
-								<Button
-									onClick={() => {
-										const bbox = osm.bbox()
-										if (bbox)
-											map?.fitBounds(bbox, {
-												padding: 100,
-												maxDuration: 0,
-											})
-									}}
-									variant="ghost"
-									size="icon"
-									className="size-4"
-									title="Fit bounds to file bbox"
-								>
-									<MaximizeIcon />
-								</Button>
+					{osm && file ? (
+						<div className="flex flex-col gap-2">
+							<div className="flex flex-col">
+								<div className="flex justify-between">
+									<div className="font-bold">OPENSTREETMAP PBF</div>
+									<Button
+										onClick={() => {
+											const bbox = osm.bbox()
+											if (bbox)
+												map?.fitBounds(bbox, {
+													padding: 100,
+													maxDuration: 0,
+												})
+										}}
+										variant="ghost"
+										size="icon"
+										className="size-4"
+										title="Fit bounds to file bbox"
+									>
+										<MaximizeIcon />
+									</Button>
+								</div>
+								<OsmInfoTable file={file} osm={osm} />
 							</div>
-							<OsmInfoTable file={file} osm={osm} />
 							{selectedEntity == null ? (
 								<div className="px-1 text-center font-bold">
 									SELECT ENTITY ON MAP (Z{MIN_PICKABLE_ZOOM} AND UP)
 								</div>
 							) : (
 								<div>
-									<div className="px-1 flex justify-between">
+									<div className="flex justify-between">
 										<div className="font-bold">SELECTED ENTITY</div>
 										<Button
 											onClick={() => {
@@ -119,7 +121,38 @@ export default function ViewPage() {
 									/>
 								</div>
 							)}
-						</>
+						</div>
+					) : (
+						<div className="flex flex-col gap-2">
+							<div>
+								Looking for OpenStreetMap PBF data? We recommend the following
+								services:
+							</div>
+							<ul className="list-disc list-inside space-y-1">
+								<li>
+									<a
+										href="https://slice.openstreetmap.us/#0/0/0"
+										target="_blank"
+										rel="noreferrer"
+									>
+										SliceOSM
+									</a>
+									: Create a slice for any custom bounding box, GeoJSON polygon
+									or multipolygon area.
+								</li>
+								<li>
+									<a
+										href="https://download.geofabrik.de"
+										target="_blank"
+										rel="noreferrer"
+									>
+										Geofabrik Extracts
+									</a>
+									: Extracts for the world, continents, countries,
+									regions--updated daily.
+								</li>
+							</ul>
+						</div>
 					)}
 				</div>
 			</Sidebar>
