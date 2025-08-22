@@ -6,6 +6,7 @@ import type {
 	OsmRelation,
 	OsmWay,
 	OsmEntity,
+	OsmTags,
 } from "./types"
 import { lineIntersect } from "@turf/turf"
 
@@ -126,4 +127,12 @@ export function wayIntersections(
 		lon: f.geometry.coordinates[0],
 		lat: f.geometry.coordinates[1],
 	}))
+}
+
+export function osmTagsToOscTags(tags: OsmTags): string {
+	return Object.entries(tags)
+		.map(([key, value]) => {
+			return `<tag k="${key}" v="${value}" />`
+		})
+		.join("")
 }

@@ -122,6 +122,22 @@ export default function Merge() {
 		[startTask],
 	)
 
+	const downloadJsonChanges = useCallback(async () => {
+		if (!changes) return
+		startTransition(async () => {
+			const task = startTask("Converting changeset to JSON", "info")
+			const json = JSON.stringify(changes, null, 2)
+			const fileHandle = await showSaveFilePicker({
+				suggestedName: "osm-changes.json",
+			})
+			if (!fileHandle) return
+			const stream = await fileHandle.createWritable()
+			await stream.write(json)
+			stream.close()
+			task.end("Changeset converted to JSON", "ready")
+		})
+	}, [changes, startTask])
+
 	return (
 		<Main>
 			<Sidebar>
@@ -289,9 +305,24 @@ export default function Merge() {
 									the review is complete you can apply changes to generate a new
 									OSM file ready to be downloaded.
 								</div>
+								<div className="flex gap-2">
+									<Button
+										className="flex-1/2"
+										disabled={isTransitioning}
+										onClick={() => {
+											downloadJsonChanges()
+										}}
+									>
+										<DownloadIcon /> Download JSON changes
+									</Button>
+									<Button className="flex-1/2" disabled>
+										<DownloadIcon /> Download .osc changes
+									</Button>
+								</div>
+								{changes && <ChangesSummary changes={changes} />}
 							</>
 						)}
-						{changes && <ChangesSummary changes={changes} />}
+
 						<div className="flex gap-2 justify-between">
 							<Button className="flex-1/2" variant="outline" onClick={prevStep}>
 								<ArrowLeft /> Back

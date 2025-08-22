@@ -10,7 +10,7 @@ import type {
 	OsmTags,
 	OsmWay,
 } from "./types"
-import { entityPropertiesEqual, getEntityType } from "./utils"
+import { entityPropertiesEqual, getEntityType, osmTagsToOscTags } from "./utils"
 
 export type OsmMergeOptions = {
 	directMerge: boolean
@@ -45,6 +45,14 @@ export default class OsmChangeset {
 		deduplicatedNodes: 0,
 		deduplicatedNodesReplaced: 0,
 		intersectionPointsFound: 0,
+	}
+
+	static fromJson(base: Osm, json: OsmChanges) {
+		const changeset = new OsmChangeset(base)
+		changeset.nodeChanges = json.nodes
+		changeset.wayChanges = json.ways
+		changeset.relationChanges = json.relations
+		return changeset
 	}
 
 	constructor(base: Osm) {
@@ -134,9 +142,15 @@ export default class OsmChangeset {
 
 		let deduplicatedNodesReplaced = 0
 		// Find ways that contain the replaced node and modify them.
-		for (const wayIndex of this.osm.ways.neighbors(node.lon, node.lat, 10)) {
-			const way = this.osm.ways.getByIndex(wayIndex)
-			if (way.refs.includes(existingNode.id)) {
+		for (const wayIndex of this.osm.ways.neighbors(
+			node.lon,
+			node.lat,
+			10,
+			0.01,
+		)) {
+			const wayRefs = this.osm.ways.getRefIds(wayIndex)
+			if (wayRefs.includes(existingNode.id)) {
+				const way = this.osm.ways.getByIndex(wayIndex)
 				deduplicatedNodesReplaced++
 				this.modify("way", way.id, (way) => ({
 					...way,
@@ -349,6 +363,44 @@ export default class OsmChangeset {
 
 	applyChanges(newId?: string) {
 		return applyChangesetToOsm(newId ?? `${this.osm.id}-merged`, this.osm, this)
+	}
+
+	// TODO: Finish this
+	generateOscChanges() {
+		let create = ""
+		let modify = ""
+		let del = ""
+
+		for (const node of Object.values(this.nodeChanges)) {
+			const tags = node.entity.tags ? osmTagsToOscTags(node.entity.tags) : ""
+			if (node.changeType === "create") {
+				create += `<node id="${node.entity.id}" lon="${node.entity.lon}" lat="${node.entity.lat}">${tags}</node>`
+			} else if (node.changeType === "modify") {
+				modify += `<node id="${node.entity.id}" lon="${node.entity.lon}" lat="${node.entity.lat}">${tags}</node>`
+			} else if (node.changeType === "delete") {
+				del += `<node id="${node.entity.id}" />`
+			}
+		}
+
+		for (const way of Object.values(this.wayChanges)) {
+			const tags = way.entity.tags ? osmTagsToOscTags(way.entity.tags) : ""
+			const nodes = way.entity.refs.map((ref) => `<nd id="${ref}" />`).join("")
+			if (way.changeType === "create") {
+				create += `<way id="${way.entity.id}">${tags}${nodes}</way>`
+			} else if (way.changeType === "modify") {
+				modify += `<way id="${way.entity.id}">${tags}${nodes}</way>`
+			} else if (way.changeType === "delete") {
+				del += `<way id="${way.entity.id}" />`
+			}
+		}
+
+		return `
+			<osmChange version="0.6" generator="osm.ts">
+				<create>${create}</create>
+				<modify>${modify}</modify>
+				<delete>${del}</delete>
+			</osmChange>
+		`
 	}
 }
 
