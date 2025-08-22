@@ -16,12 +16,17 @@ import { Main, MapContent, Sidebar } from "../components/layout"
 import OsmInfoTable from "../components/osm-info-table"
 import OsmPbfFileInput from "../components/osm-pbf-file-input"
 import { Button } from "../components/ui/button"
+import { useSearchParams } from "react-router"
 
 export default function ViewPage() {
+	const [searchParams] = useSearchParams()
 	const [file, setFile] = useState<File | null>(null)
-	const osmId = useMemo(() => file?.name ?? "default", [file])
+	const osmId = useMemo(
+		() => file?.name ?? searchParams.get("osmId") ?? "inspect",
+		[file, searchParams],
+	)
 	const map = useAtomValue(mapAtom)
-	const { osm, isLoading: isLoadingFile } = useOsmFile("inspect", file)
+	const { osm, isLoading: isLoadingFile } = useOsmFile(osmId, file)
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const logMessage = useSetAtom(addLogMessageAtom)
 	const setSelectedEntity = useSetAtom(selectedEntityAtom)
