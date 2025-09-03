@@ -144,19 +144,15 @@ export class Ways extends Entities<OsmWay> {
 	getFullEntity(index: number, id: number, tags?: OsmTags): OsmWay {
 		return {
 			id,
-			refs: this.getRefIds(index),
+			refs: [...this.getRefIds(index)],
 			tags,
 		}
 	}
 
-	getRefIds(index: number): number[] {
-		const start = this.refStart.at(index)
-		const count = this.refCount.at(index)
-		const refs: number[] = []
-		for (let i = start; i < start + count; i++) {
-			refs.push(this.refs.at(i))
-		}
-		return refs
+	getRefIds(index: number) {
+		const start = this.refStart.array[index]
+		const count = this.refCount.array[index]
+		return this.refs.slice(start, start + count)
 	}
 
 	getBbox(idOrIndex: IdOrIndex): GeoBbox2D {
@@ -170,11 +166,11 @@ export class Ways extends Entities<OsmWay> {
 	}
 
 	getLine(index: number, nodeIndex: Nodes) {
-		const count = this.refCount.at(index)
-		const start = this.refStart.at(index)
+		const count = this.refCount.array[index]
+		const start = this.refStart.array[index]
 		const line = new Float64Array(count * 2)
 		for (let i = 0; i < count; i++) {
-			const ref = this.refs.at(start + i)
+			const ref = this.refs.array[start + i]
 			const [lon, lat] = nodeIndex.getNodeLonLat({ id: ref })
 			line[i * 2] = lon
 			line[i * 2 + 1] = lat

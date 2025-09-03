@@ -107,6 +107,10 @@ export class ResizeableTypedArray<T extends TypedArray>
 		return result
 	}
 
+	slice(start: number, end: number): T {
+		return this.array.slice(start, end) as T
+	}
+
 	get length() {
 		return this.items
 	}
