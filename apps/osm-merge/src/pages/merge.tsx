@@ -37,31 +37,20 @@ import { Button } from "../components/ui/button"
 import LogContent from "@/components/log"
 
 export default function Merge() {
-	const [baseFile, setBaseFile] = useState<File | null>(null)
-	const [patchFile, setPatchFile] = useState<File | null>(null)
-	const {
-		osm: baseOsm,
-		setOsm: setBaseOsm,
-		isLoading: baseOsmIsLoading,
-	} = useOsmFile("base", baseFile)
-	const {
-		osm: patchOsm,
-		setOsm: setPatchOsm,
-		isLoading: patchOsmIsLoading,
-	} = useOsmFile("patch", patchFile)
-	const { osm: mergedOsm, setOsm: setMergedOsm } = useOsmFile("inspect", null)
+	const base = useOsmFile("base")
+	const patch = useOsmFile("patch")
+	const merged = useOsmFile("inspect")
 	const osmWorker = useOsmWorker()
 	const [isTransitioning, startTransition] = useTransition()
 	const [changes, setChanges] = useState<OsmChanges | null>(null)
 	const startTask = useStartTaskLog()
 	const map = useAtomValue(mapAtom)
 
-	const baseTileLayer = useBitmapTileLayer(baseOsm)
-	const patchTileLayer = useBitmapTileLayer(patchOsm)
+	const baseTileLayer = usePickableOsmTileLayer(base.osm)
+	const patchTileLayer = usePickableOsmTileLayer(patch.osm)
 	const { layer: mergedTileLayer, selectedEntity: mergedSelectedEntity } =
-		usePickableOsmTileLayer(mergedOsm)
-
-	const selectedEntityLayer = useSelectedEntityLayer(mergedOsm)
+		usePickableOsmTileLayer(merged.osm)
+	const selectedEntityLayer = useSelectedEntityLayer(merged.osm)
 
 	const [step, setStep] = useState<number>(1)
 
@@ -75,22 +64,22 @@ export default function Merge() {
 	const isLoadingDefaultFilesRef = useRef(false)
 	useEffect(() => {
 		if (process.env.NODE_ENV !== "development") return
-		if (!baseFile && !patchFile && !isLoadingDefaultFilesRef.current) {
+		if (!base.file && !patch.file && !isLoadingDefaultFilesRef.current) {
 			isLoadingDefaultFilesRef.current = true
 			Promise.all([
 				fetch(DEFAULT_BASE_PBF_URL)
 					.then((res) => res.blob())
 					.then((blob) => {
-						setBaseFile(new File([blob], "yakima-full.osm.pbf"))
+						base.setFile(new File([blob], "yakima-full.osm.pbf"))
 					}),
 				fetch(DEFAULT_PATCH_PBF_URL)
 					.then((res) => res.blob())
 					.then((blob) => {
-						setPatchFile(new File([blob], "yakima-osw.osm.pbf"))
+						patch.setFile(new File([blob], "yakima-osw.osm.pbf"))
 					}),
 			])
 		}
-	}, [baseFile, patchFile])
+	}, [base.file, patch.file, base.setFile, patch.setFile])
 
 	const prevStep = useCallback(() => {
 		setStep((s) => s - 1)
@@ -154,26 +143,30 @@ export default function Merge() {
 						<div>
 							<div className="font-bold">BASE OSM PBF</div>
 							<OsmPbfFileInput
-								file={baseFile}
-								isLoading={baseOsmIsLoading}
-								setFile={setBaseFile}
+								file={base.file}
+								isLoading={base.isLoading}
+								setFile={base.setFile}
 							/>
-							<OsmInfoTable defaultOpen={false} osm={baseOsm} file={baseFile} />
+							<OsmInfoTable
+								defaultOpen={false}
+								osm={base.osm}
+								file={base.file}
+							/>
 						</div>
 						<div>
 							<div className="font-bold">PATCH OSM PBF</div>
 							<OsmPbfFileInput
-								file={patchFile}
-								isLoading={patchOsmIsLoading}
-								setFile={setPatchFile}
+								file={patch.file}
+								isLoading={patch.isLoading}
+								setFile={patch.setFile}
 							/>
 							<OsmInfoTable
 								defaultOpen={false}
-								osm={patchOsm}
-								file={patchFile}
+								osm={patch.osm}
+								file={patch.file}
 							/>
 						</div>
-						<Button disabled={!baseOsm || !patchOsm} onClick={nextStep}>
+						<Button disabled={!base.osm || !patch.osm} onClick={nextStep}>
 							Select merge options <ArrowRight />
 						</Button>
 					</If>
@@ -189,14 +182,18 @@ export default function Merge() {
 						<hr />
 						<div>
 							<div className="font-bold">BASE OSM PBF</div>
-							<OsmInfoTable defaultOpen={false} osm={baseOsm} file={baseFile} />
+							<OsmInfoTable
+								defaultOpen={false}
+								osm={base.osm}
+								file={base.file}
+							/>
 						</div>
 						<div>
 							<div className="font-bold">PATCH OSM PBF</div>
 							<OsmInfoTable
 								defaultOpen={false}
-								osm={patchOsm}
-								file={patchFile}
+								osm={patch.osm}
+								file={patch.file}
 							/>
 						</div>
 						<div className="p-2 border border-slate-950 flex gap-2">
@@ -267,11 +264,11 @@ export default function Merge() {
 									nextStep()
 									const task = startTask("Generating changeset", "info")
 									startTransition(async () => {
-										if (!baseOsm || !patchOsm || !osmWorker)
+										if (!base.osm || !patch.osm || !osmWorker)
 											throw Error("Missing data to generate changes")
 										const results = await osmWorker.generateChangeset(
-											baseOsm.id,
-											patchOsm.id,
+											base.osm.id,
+											patch.osm.id,
 											mergeOptions,
 										)
 										setChanges(results)
@@ -336,13 +333,13 @@ export default function Merge() {
 									const task = startTask("Applying changes to OSM", "info")
 									startTransition(async () => {
 										if (!changes) throw Error("No changes to apply")
-										if (!baseOsm) throw Error("No base OSM")
+										if (!base.osm) throw Error("No base OSM")
 										const newOsm = await osmWorker.applyChanges(
-											`merged-${baseOsm.id}`,
+											`merged-${base.osm.id}`,
 										)
-										setBaseOsm(null)
-										setPatchOsm(null)
-										setMergedOsm(Osm.from(newOsm))
+										base.setOsm(null)
+										patch.setOsm(null)
+										merged.setOsm(Osm.from(newOsm))
 										task.end("Changes applied", "ready")
 									})
 								}}
@@ -353,7 +350,7 @@ export default function Merge() {
 					</If>
 
 					<If t={step === 4}>
-						{mergedOsm == null ? (
+						{merged.osm == null ? (
 							<div className="flex items-center gap-1">
 								<Loader2Icon className="animate-spin size-4" />
 								<div className="font-bold">APPLYING CHANGES</div>
@@ -374,7 +371,7 @@ export default function Merge() {
 											<Button
 												onClick={() => {
 													const bbox =
-														mergedOsm?.getEntityBbox(mergedSelectedEntity)
+														merged.osm?.getEntityBbox(mergedSelectedEntity)
 													if (bbox)
 														map?.fitBounds(bbox, {
 															padding: 100,
@@ -392,12 +389,15 @@ export default function Merge() {
 										<EntityDetails
 											entity={mergedSelectedEntity}
 											open={true}
-											osm={mergedOsm}
+											osm={merged.osm}
 										/>
 									</div>
 								)}
 								<Button
-									onClick={() => downloadOsm(mergedOsm)}
+									onClick={() => {
+										if (!merged.osm) return // TODO shouldn't be necessary but TypeScript cries
+										downloadOsm(merged.osm)
+									}}
 									disabled={isTransitioning}
 								>
 									{isTransitioning ? (
@@ -420,14 +420,17 @@ export default function Merge() {
 				<Basemap>
 					<DeckGlOverlay
 						layers={[
-							baseTileLayer,
-							patchTileLayer,
+							baseTileLayer.layer,
+							patchTileLayer.layer,
 							mergedTileLayer,
 							selectedEntityLayer,
 						]}
 						getTooltip={(pickingInfo) => {
 							const sourceLayerId = pickingInfo.sourceLayer?.id
-							if (sourceLayerId?.startsWith(`${APPID}:${mergedOsm?.id}`)) {
+							if (
+								mergedTileLayer &&
+								sourceLayerId?.startsWith(mergedTileLayer.id)
+							) {
 								if (sourceLayerId.includes("nodes")) {
 									return {
 										className: "deck-tooltip",

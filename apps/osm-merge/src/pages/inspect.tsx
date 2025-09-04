@@ -7,7 +7,7 @@ import { bboxPolygon } from "@turf/turf"
 import { useAtomValue, useSetAtom } from "jotai"
 import { MaximizeIcon } from "lucide-react"
 import * as Performance from "osm.ts/performance"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
 import { useSearchParams } from "react-router"
 import Basemap from "../components/basemap"
@@ -20,13 +20,12 @@ import { Button } from "../components/ui/button"
 
 export default function InspectPage() {
 	const [searchParams] = useSearchParams()
-	const [file, setFile] = useState<File | null>(null)
 	const osmId = useMemo(
-		() => file?.name ?? searchParams.get("osmId") ?? "inspect",
-		[file, searchParams],
+		() => searchParams.get("osmId") ?? "inspect",
+		[searchParams],
 	)
 	const map = useAtomValue(mapAtom)
-	const { osm, isLoading: isLoadingFile } = useOsmFile(osmId, file)
+	const { osm, isLoading: isLoadingFile, file, setFile } = useOsmFile(osmId)
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const logMessage = useSetAtom(addLogMessageAtom)
 	const setSelectedEntity = useSetAtom(selectedEntityAtom)
@@ -47,7 +46,7 @@ export default function InspectPage() {
 					setFile((file) => (file ? file : new File([blob], "monaco.pbf")))
 				})
 		}
-	}, [file])
+	}, [file, setFile])
 
 	const { layer: tileLayer, selectedEntity } = usePickableOsmTileLayer(osm)
 	const selectedEntityLayer = useSelectedEntityLayer(osm)

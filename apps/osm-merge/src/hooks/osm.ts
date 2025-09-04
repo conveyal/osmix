@@ -6,7 +6,7 @@ import { Osm } from "osm.ts"
 import { useEffect, useMemo, useState } from "react"
 import useStartTaskLog from "./log"
 import { useFitBoundsOnChange } from "./map"
-import { osmAtomFamily } from "@/state/osm"
+import { osmAtomFamily, osmFileAtomFamily } from "@/state/osm"
 
 export function useOsmWorker() {
 	const osmWorker = useAtomValue(osmWorkerAtom)
@@ -21,7 +21,8 @@ export function useOsmWorker() {
 	return osmWorker
 }
 
-export function useOsmFile(id: string, file: File | null) {
+export function useOsmFile(id: string) {
+	const [file, setFile] = useAtom(osmFileAtomFamily(id))
 	const [osm, setOsm] = useAtom(osmAtomFamily(id))
 	const [isLoading, setIsLoading] = useState(false)
 	const osmWorker = useOsmWorker()
@@ -52,5 +53,5 @@ export function useOsmFile(id: string, file: File | null) {
 			})
 	}, [file, id, osmWorker, setOsm, startTask])
 
-	return { osm, setOsm, isLoading }
+	return { file, setFile, osm, setOsm, isLoading }
 }
