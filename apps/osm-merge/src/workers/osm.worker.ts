@@ -11,6 +11,8 @@ import {
 } from "osm.ts"
 import * as Performance from "osm.ts/performance"
 
+// TODO: Use a "WorkerCache" instead of `this.[]` structure
+
 const osmWorker = {
 	log: (message: string, type: StatusType) =>
 		type === "error" ? console.error(message) : console.log(message),

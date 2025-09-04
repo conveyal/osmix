@@ -3,7 +3,7 @@ import { activeTasksAtom } from "@/state/status"
 import { useAtomValue, useSetAtom } from "jotai"
 import { useCallback } from "react"
 
-export default function useStartTask() {
+export default function useStartTaskLog() {
 	const setTasks = useSetAtom(activeTasksAtom)
 	const logMessage = useSetAtom(addLogMessageAtom)
 

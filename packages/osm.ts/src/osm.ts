@@ -139,15 +139,15 @@ export class Osm {
 		const nodeCandidates = this.nodes.withinBbox(bbox)
 		const nodePositions = new Float64Array(nodeCandidates.length * 2)
 		const ids = new IdArrayType(nodeCandidates.length)
-		let pIndex = 0
-		for (const nodeIndex of nodeCandidates) {
+		for (let i = 0; i < nodeCandidates.length; i++) {
+			const nodeIndex = nodeCandidates[i]
 			// Skip nodes with no tags, likely just a way node
 			if (!this.nodes.tags.hasTags(nodeIndex)) continue
 
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
-			ids[pIndex] = this.nodes.ids.at(nodeIndex)
-			nodePositions[pIndex++] = lon
-			nodePositions[pIndex++] = lat
+			ids[i] = this.nodes.ids.at(nodeIndex)
+			nodePositions[i * 2] = lon
+			nodePositions[i * 2 + 1] = lat
 		}
 		console.timeEnd("Osm.getNodesInBbox")
 		return {

@@ -12,7 +12,7 @@ import {
 	PathLayer,
 	ScatterplotLayer,
 } from "@deck.gl/layers"
-import useStartTask from "./log"
+import useStartTaskLog from "./log"
 import { bboxPolygon } from "@turf/turf"
 
 export function useFitBoundsOnChange(bbox?: GeoBbox2D) {
@@ -85,7 +85,7 @@ export function useBitmapTileLayer(osm?: Osm | null) {
 }
 
 export function usePickableOsmTileLayer(osm?: Osm | null) {
-	const startTask = useStartTask()
+	const startTaskLog = useStartTaskLog()
 	const osmWorker = useOsmWorker()
 
 	const [selectedEntity, setSelectedEntity] = useAtom(selectedEntityAtom)
@@ -102,7 +102,7 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 			extent: bbox,
 			getTileData: async (tile) => {
 				if (tile.index.z < MIN_PICKABLE_ZOOM) {
-					const task = startTask(
+					const taskLog = startTaskLog(
 						`generating bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
 						"debug",
 					)
@@ -113,7 +113,7 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 						tile.index,
 						BITMAP_TILE_SIZE,
 					)
-					task.end(
+					taskLog.end(
 						`bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
 						"debug",
 					)
@@ -122,7 +122,7 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 
 				// Show pickable data
 				const bbox = tile.bbox as GeoBoundingBox
-				const task = startTask(
+				const taskLog = startTaskLog(
 					`generating data for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
 					"debug",
 				)
@@ -132,7 +132,7 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 					bbox.east,
 					bbox.north,
 				])
-				task.end(
+				taskLog.end(
 					`tile data for ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
 					"debug",
 				)
@@ -174,38 +174,6 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 					)
 				}
 
-				if ("nodes" in data) {
-					layers.push(
-						new ScatterplotLayer({
-							id: `${tilePrefix}:nodes`,
-							data: {
-								length: data.nodes.positions.length / 2,
-								attributes: {
-									getPosition: { value: data.nodes.positions, size: 2 },
-									ids: data.nodes.ids,
-								},
-							},
-							pickable: true,
-							autoHighlight: true,
-							radiusUnits: "meters",
-							getRadius: 3,
-							radiusMinPixels: 1,
-							radiusMaxPixels: 10,
-							getFillColor: [255, 255, 255, 255],
-							highlightColor: [255, 0, 0, 255 * 0.5],
-							onClick: (info) => {
-								console.log("ScatterplotLayer.onClick", info)
-								if (info.picked) {
-									const nodeId = data.nodes.ids.at(info.index)
-									if (nodeId) {
-										setSelectedEntity(osm.nodes.getById(nodeId))
-									}
-									return true
-								}
-							},
-						}),
-					)
-				}
 				if ("ways" in data) {
 					layers.push(
 						new PathLayer({
@@ -239,6 +207,40 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 					)
 				}
 
+				if ("nodes" in data) {
+					layers.push(
+						new ScatterplotLayer({
+							id: `${tilePrefix}:nodes`,
+							data: {
+								length: data.nodes.positions.length / 2,
+								attributes: {
+									getPosition: { value: data.nodes.positions, size: 2 },
+								},
+							},
+							pickable: true,
+							autoHighlight: true,
+							radiusUnits: "meters",
+							getRadius: 3,
+							radiusMinPixels: 1,
+							radiusMaxPixels: 10,
+							getFillColor: [255, 255, 255, 255],
+							highlightColor: [255, 0, 0, 255 * 0.5],
+							onClick: (info) => {
+								if (info.picked) {
+									const nodeId = data.nodes.ids.at(info.index)
+									console.log("ScatterplotLayer.onClick", nodeId, info)
+									if (nodeId) {
+										setSelectedEntity(osm.nodes.getById(nodeId))
+									} else {
+										setSelectedEntity(null)
+									}
+									return true
+								}
+							},
+						}),
+					)
+				}
+
 				if (
 					process.env.NODE_ENV === "development" &&
 					tile.bbox &&
@@ -263,7 +265,7 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 				return layers
 			},
 		})
-	}, [osm, osmWorker, setSelectedEntity, startTask])
+	}, [osm, osmWorker, setSelectedEntity, startTaskLog])
 
 	return {
 		layer,

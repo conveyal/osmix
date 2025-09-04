@@ -4,7 +4,7 @@ import * as Comlink from "comlink"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { Osm } from "osm.ts"
 import { useEffect, useMemo, useState } from "react"
-import useStartTask from "./log"
+import useStartTaskLog from "./log"
 import { useFitBoundsOnChange } from "./map"
 import { osmAtomFamily } from "@/state/osm"
 
@@ -25,7 +25,7 @@ export function useOsmFile(id: string, file: File | null) {
 	const [osm, setOsm] = useAtom(osmAtomFamily(id))
 	const [isLoading, setIsLoading] = useState(false)
 	const osmWorker = useOsmWorker()
-	const startTask = useStartTask()
+	const startTask = useStartTaskLog()
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 
 	useFitBoundsOnChange(bbox)

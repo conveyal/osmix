@@ -1,4 +1,4 @@
-import useStartTask from "@/hooks/log"
+import useStartTaskLog from "@/hooks/log"
 import {
 	useBitmapTileLayer,
 	usePickableOsmTileLayer,
@@ -53,7 +53,7 @@ export default function Merge() {
 	const osmWorker = useOsmWorker()
 	const [isTransitioning, startTransition] = useTransition()
 	const [changes, setChanges] = useState<OsmChanges | null>(null)
-	const startTask = useStartTask()
+	const startTask = useStartTaskLog()
 	const map = useAtomValue(mapAtom)
 
 	const baseTileLayer = useBitmapTileLayer(baseOsm)
