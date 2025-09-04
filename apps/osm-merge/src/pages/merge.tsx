@@ -458,9 +458,13 @@ function If({ children, t }: { children: React.ReactNode; t: boolean }) {
 	return <>{children}</>
 }
 
-function ChangesSummary({ changes }: { changes: OsmChanges }) {
+const PAGE_SIZE = 5
+
+function ChangesSummary({
+	changes,
+	pageSize = PAGE_SIZE,
+}: { changes: OsmChanges; pageSize?: number }) {
 	const [currentPage, setCurrentPage] = useState(0)
-	const changesPerPage = 10
 
 	// Get all changes for pagination
 	const allChanges: Array<OsmChange & { type: "node" | "way" | "relation" }> = [
@@ -478,9 +482,9 @@ function ChangesSummary({ changes }: { changes: OsmChanges }) {
 		})),
 	]
 
-	const totalPages = Math.ceil(allChanges.length / changesPerPage)
-	const startIndex = currentPage * changesPerPage
-	const endIndex = startIndex + changesPerPage
+	const totalPages = Math.ceil(allChanges.length / pageSize)
+	const startIndex = currentPage * pageSize
+	const endIndex = startIndex + pageSize
 	const currentChanges = allChanges.slice(startIndex, endIndex)
 
 	const goToNextPage = () => {
@@ -548,13 +552,13 @@ function ChangesSummary({ changes }: { changes: OsmChanges }) {
 			<Details>
 				<DetailsSummary>CHANGES PREVIEW</DetailsSummary>
 				<DetailsContent>
-					<div className="max-h-64 overflow-y-auto flex flex-col gap-2">
+					<div className="flex flex-col gap-2">
 						{currentChanges.map((change, i) => (
 							<ChangePreview
 								key={`${change.type}-${change.entity.id}`}
 								change={change}
 								entityType={change.type}
-								count={i + 1}
+								count={startIndex + i + 1}
 							/>
 						))}
 					</div>
