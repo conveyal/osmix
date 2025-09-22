@@ -1,4 +1,4 @@
-import { wrap, proxy } from "comlink"
+import { proxy, wrap } from "comlink"
 import type { OsmWorker } from "./osm.worker"
 
 export async function createOsmWorker() {

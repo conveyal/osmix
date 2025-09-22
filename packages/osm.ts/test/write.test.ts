@@ -1,13 +1,13 @@
 import { assert, describe, it } from "vitest"
 
 import { Osm } from "../src"
+import { writeOsmToPbfStream } from "../src/osm-to-pbf"
 import { PBFs } from "./files"
 import {
+	WriteableStreamArrayBuffer,
 	getFileReadStream,
 	getFileWriteStream,
-	WriteableStreamArrayBuffer,
 } from "./utils"
-import { writeOsmToPbfStream } from "../src/osm-to-pbf"
 
 describe("write", () => {
 	describe.each(Object.entries(PBFs))(

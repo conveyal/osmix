@@ -1,4 +1,4 @@
-import { FilesIcon, Loader2Icon } from "lucide-react"
+import { FilesIcon, Loader2Icon, XIcon } from "lucide-react"
 import { useRef } from "react"
 import { Button } from "./ui/button"
 
@@ -17,12 +17,12 @@ export default function OsmPbfFileInput({
 	disabled?: boolean
 	isLoading?: boolean
 	file: File | null
-	setFile: (file: File) => void
+	setFile: (file: File | null) => void
 }) {
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	return (
 		<label
-			className="flex flex-col"
+			className="flex"
 			onDragEnter={(e) => e.preventDefault()}
 			onDragOver={(e) => e.preventDefault()}
 			onDrop={(e) => {
@@ -47,6 +47,7 @@ export default function OsmPbfFileInput({
 				ref={fileInputRef}
 			/>
 			<Button
+				className="flex-1"
 				disabled={disabled || isLoading}
 				type="button"
 				onClick={() => fileInputRef.current?.click()}
@@ -59,9 +60,16 @@ export default function OsmPbfFileInput({
 				) : (
 					<>
 						<FilesIcon />
-						Select OSM PBF file
+						Select new OSM PBF file
 					</>
 				)}
+			</Button>
+			<Button
+				disabled={disabled || isLoading}
+				onClick={() => setFile(null)}
+				title="Clear file"
+			>
+				<XIcon />
 			</Button>
 		</label>
 	)

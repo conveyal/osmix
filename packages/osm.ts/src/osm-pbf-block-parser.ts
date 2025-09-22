@@ -1,10 +1,3 @@
-import type {
-	OsmNode,
-	OsmInfoParsed,
-	OsmRelation,
-	OsmRelationMember,
-	OsmWay,
-} from "./types"
 import { ENTITY_MEMBER_TYPES } from "./pbf/constants"
 import type {
 	OsmPbfDenseNodes,
@@ -16,6 +9,13 @@ import type {
 	OsmPbfStringTable,
 	OsmPbfWay,
 } from "./pbf/proto/osmformat"
+import type {
+	OsmInfoParsed,
+	OsmNode,
+	OsmRelation,
+	OsmRelationMember,
+	OsmWay,
+} from "./types"
 
 type ParseOptions = {
 	parseTags?: boolean

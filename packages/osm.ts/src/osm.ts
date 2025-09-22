@@ -9,9 +9,11 @@ import { Bitmap } from "./raster"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { nodeToFeature, relationToFeature, wayToFeature } from "./to-geojson"
+import { IdArrayType } from "./typed-arrays"
 import type {
 	GeoBbox2D,
 	LonLat,
+	OsmEntity,
 	OsmEntityType,
 	OsmEntityTypeMap,
 	OsmNode,
@@ -21,8 +23,6 @@ import type {
 } from "./types"
 import { isNode, isRelation, isWay } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
-import { IdArrayType } from "./typed-arrays"
-import OsmChangeset, { type OsmMergeOptions } from "./changeset"
 
 export interface OsmTransferables {
 	id: string
@@ -131,6 +131,26 @@ export class Osm {
 		if (type === "way") return this.ways.get({ id }) as OsmEntityTypeMap[T]
 		if (type === "relation")
 			return this.relations.get({ id }) as OsmEntityTypeMap[T]
+	}
+
+	getById(eid: string): OsmEntity | null {
+		const id = Number(eid.slice(1))
+		switch (eid.charAt(0)) {
+			case "n":
+				return this.nodes.getById(id)
+			case "w":
+				return this.ways.getById(id)
+			case "r":
+				return this.relations.getById(id)
+			default: {
+				const fid = Number(eid)
+				return (
+					this.nodes.getById(fid) ??
+					this.ways.getById(fid) ??
+					this.relations.getById(fid)
+				)
+			}
+		}
 	}
 
 	getNodesInBbox(bbox: GeoBbox2D) {
@@ -295,15 +315,5 @@ export class Osm {
 
 	bbox(): GeoBbox2D | undefined {
 		return this.nodes.bbox ?? this.headerBbox()
-	}
-
-	generateChangeset(other: Osm, options?: OsmMergeOptions) {
-		const changeset = new OsmChangeset(this)
-		changeset.generateFullChangeset(other, options)
-		return changeset
-	}
-
-	createChangeset() {
-		return new OsmChangeset(this)
 	}
 }

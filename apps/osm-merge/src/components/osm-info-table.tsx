@@ -1,7 +1,7 @@
-import type { Osm } from "osm.ts"
-import ObjectToTableRows from "./object-to-table"
 import { bytesSizeToHuman } from "@/utils"
+import type { Osm } from "osm.ts"
 import { Details, DetailsContent, DetailsSummary } from "./details"
+import ObjectToTableRows from "./object-to-table"
 
 export default function OsmInfoTable({
 	defaultOpen,

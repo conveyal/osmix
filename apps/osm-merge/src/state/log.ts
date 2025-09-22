@@ -20,21 +20,26 @@ export const logAtom = atom<Status[]>([INITIAL_STATUS])
 
 export const addLogMessageAtom = atom(
 	null,
-	(get, set, message: string, type: Status["type"] = "info") => {
+	(
+		get,
+		set,
+		message: string,
+		type: Status["type"] = "info",
+		durationMs?: number,
+	) => {
 		const log = get(logAtom)
 		const msSinceLastLog = Date.now() - log[log.length - 1].timestamp
-		const durationSeconds = `${(msSinceLastLog / 1000).toFixed(2)}s`
 		if (type === "error") {
-			console.error(`${type} (${durationSeconds}):`, message)
+			console.error(message)
 		} else {
-			console.log(`${type} (${durationSeconds}):`, message)
+			console.log(`${type}:`, message)
 		}
 		set(logAtom, [
 			...log,
 			{
 				type,
 				message,
-				duration: msSinceLastLog,
+				duration: durationMs ?? msSinceLastLog,
 				timestamp: Date.now(),
 			},
 		])

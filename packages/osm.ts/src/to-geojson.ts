@@ -5,8 +5,8 @@ import type {
 	OsmRelation,
 	OsmWay,
 } from "./types"
-import type { Ways } from "./ways"
 import { wayIsArea } from "./way-is-area"
+import type { Ways } from "./ways"
 
 function includeNode(node: OsmNode) {
 	if (!node.tags || Object.keys(node.tags).length === 0) return false

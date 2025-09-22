@@ -1,7 +1,6 @@
-import { cleanCoords, nearestPointOnLine } from "@turf/turf"
 import Flatbush from "flatbush"
 import { Entities, type EntitiesTransferables } from "./entities"
-import { Ids, type IdOrIndex } from "./ids"
+import { type IdOrIndex, Ids } from "./ids"
 import type { Nodes } from "./nodes"
 import type { OsmPbfWay } from "./pbf"
 import type StringTable from "./stringtable"
@@ -13,7 +12,7 @@ import {
 	ResizeableTypedArray,
 	type TypedArrayBuffer,
 } from "./typed-arrays"
-import type { GeoBbox2D, LonLat, OsmTags, OsmWay } from "./types"
+import type { GeoBbox2D, OsmTags, OsmWay } from "./types"
 
 export interface WaysTransferables extends EntitiesTransferables {
 	refStart: TypedArrayBuffer
@@ -156,12 +155,13 @@ export class Ways extends Entities<OsmWay> {
 	}
 
 	getBbox(idOrIndex: IdOrIndex): GeoBbox2D {
-		const [index] = this.ids.idOrIndex(idOrIndex)
+		const index =
+			"index" in idOrIndex ? idOrIndex.index : this.ids.idOrIndex(idOrIndex)[0]
 		return [
-			this.bbox.at(index * 4),
-			this.bbox.at(index * 4 + 1),
-			this.bbox.at(index * 4 + 2),
-			this.bbox.at(index * 4 + 3),
+			this.bbox.array[index * 4],
+			this.bbox.array[index * 4 + 1],
+			this.bbox.array[index * 4 + 2],
+			this.bbox.array[index * 4 + 3],
 		]
 	}
 
@@ -179,33 +179,25 @@ export class Ways extends Entities<OsmWay> {
 	}
 
 	getCoordinates(index: number, nodeIndex: Nodes): [number, number][] {
-		const line = this.getLine(index, nodeIndex)
+		const count = this.refCount.array[index]
+		const start = this.refStart.array[index]
 		const coords: [number, number][] = []
-		for (let i = 0; i < line.length; i += 2) {
-			const lon = line[i]
-			const lat = line[i + 1]
-			if (lon === undefined || lat === undefined)
-				throw Error("Invalid coordinate")
-			coords.push([lon, lat])
+		for (let refIndex = start; refIndex < start + count; refIndex++) {
+			const ref = this.refs.array[refIndex]
+			const coord = nodeIndex.getNodeLonLat({ id: ref })
+			if (
+				coord === undefined ||
+				coord[0] === undefined ||
+				coord[1] === undefined
+			) {
+				console.error("node index has ref", nodeIndex.ids.has(ref))
+				throw Error(
+					`Invalid coordinate for way id ${this.ids.at(index)}, index ${index}, node ref ${ref}, ref index ${refIndex}`,
+				)
+			}
+			coords.push(coord)
 		}
 		return coords
-	}
-
-	getLineString(
-		i: IdOrIndex,
-		nodeIndex: Nodes,
-	): GeoJSON.Feature<GeoJSON.LineString, OsmTags> {
-		const [index, id] = this.ids.idOrIndex(i)
-		const coordinates = this.getCoordinates(index, nodeIndex)
-		return {
-			type: "Feature",
-			geometry: {
-				type: "LineString",
-				coordinates,
-			},
-			id,
-			properties: this.tags.getTags(index) ?? {},
-		}
 	}
 
 	intersects(bbox: GeoBbox2D): number[] {
@@ -219,14 +211,5 @@ export class Ways extends Entities<OsmWay> {
 		maxDistance?: number,
 	): number[] {
 		return this.spatialIndex.neighbors(x, y, maxResults, maxDistance)
-	}
-
-	nearestPointOnLine(index: number, ll: LonLat, nodeIndex: Nodes) {
-		const lineString = this.getLineString({ index }, nodeIndex)
-		const nearestPoint = nearestPointOnLine(cleanCoords(lineString), [
-			ll.lon,
-			ll.lat,
-		])
-		return nearestPoint
 	}
 }

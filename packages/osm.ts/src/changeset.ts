@@ -1,16 +1,26 @@
-import { lineIntersect } from "@turf/turf"
+import { distance, lineIntersect } from "@turf/turf"
+import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
 import { Osm } from "./osm"
 import type {
-	LonLat,
 	OsmChange,
 	OsmEntity,
 	OsmEntityType,
 	OsmEntityTypeMap,
 	OsmNode,
-	OsmTags,
+	OsmRelation,
 	OsmWay,
 } from "./types"
-import { entityPropertiesEqual, getEntityType, osmTagsToOscTags } from "./utils"
+import {
+	cleanCoords,
+	entityPropertiesEqual,
+	getEntityType,
+	isWayEqual,
+	isWayIntersectionCandidate,
+	osmTagsToOscTags,
+	removeDuplicateAdjacentOsmWayRefs,
+	waysShouldConnect,
+} from "./utils"
+import type { Ways } from "./ways"
 
 export type OsmMergeOptions = {
 	directMerge: boolean
@@ -21,7 +31,9 @@ export type OsmMergeOptions = {
 export type OsmChangesStats = {
 	deduplicatedNodes: number
 	deduplicatedNodesReplaced: number
+	deduplicatedWays: number
 	intersectionPointsFound: number
+	intersectionNodesCreated: number
 }
 
 export type OsmChanges = {
@@ -31,6 +43,9 @@ export type OsmChanges = {
 	stats: OsmChangesStats
 }
 
+/**
+ * Each step is optimized to minimize the retrieval of the full entity data.
+ */
 export default class OsmChangeset {
 	nodeChanges: Record<number, OsmChange<OsmEntityTypeMap["node"]>> = {}
 	wayChanges: Record<number, OsmChange<OsmEntityTypeMap["way"]>> = {}
@@ -44,7 +59,9 @@ export default class OsmChangeset {
 	stats: OsmChangesStats = {
 		deduplicatedNodes: 0,
 		deduplicatedNodesReplaced: 0,
+		deduplicatedWays: 0,
 		intersectionPointsFound: 0,
+		intersectionNodesCreated: 0,
 	}
 
 	static fromJson(base: Osm, json: OsmChanges) {
@@ -90,29 +107,23 @@ export default class OsmChangeset {
 		}
 	}
 
-	createNode(ll: LonLat, tags?: OsmTags) {
-		const node: OsmNode = {
-			id: this.nextNodeId(),
-			lon: ll.lon,
-			lat: ll.lat,
-			tags,
-		}
-		this.changes("node")[node.id] = {
-			changeType: "create",
-			entity: node,
-		}
-		return node
-	}
-
 	/**
 	 * Add or update an `OsmChange` for a given entity. There must be an existing entity in the base OSM, otherwise a `create` change
-	 * should have been added instead. If a
+	 * should have been used instead.
 	 */
 	modify<T extends OsmEntityType>(
 		type: T,
 		id: number,
 		modify: (entity: OsmEntityTypeMap[T]) => OsmEntityTypeMap[T],
 	): void {
+		if (this.changes(type)[id]?.changeType === "delete") {
+			console.error("Attempting to modify an entity scheduled for deletion", {
+				type,
+				id,
+			})
+			return
+		}
+
 		const changes = this.changes(type)
 		const change = changes[id]
 		const changeEntity = change
@@ -126,243 +137,555 @@ export default class OsmChangeset {
 		}
 	}
 
-	delete(entity: OsmEntity) {
+	delete(entity: OsmEntity, note?: string) {
 		this.changes(getEntityType(entity))[entity.id] = {
 			changeType: "delete",
 			entity,
+			note,
 		}
 	}
 
-	deduplicateOverlappingNodes(node: OsmNode): number {
-		const existingNodes = this.osm.nodes.findNeighborsWithin(node, 0)
-		const existingNode = existingNodes[0]
-		if (existingNode == null) return -1
-		this.stats.deduplicatedNodes++
-		this.delete(existingNode)
+	deduplicateOverlappingNodes(
+		nodeIndex: number,
+		osm: Osm,
+		idPairs: IdPairs,
+	): number {
+		const nodeId = osm.nodes.ids.at(nodeIndex)
+		if (nodeId == null) return -1
 
+		// Has this node already been deduplicated? (scheduled for deletion)
+		if (this.nodeChanges[nodeId]?.changeType === "delete") return -1
+
+		const ll = osm.nodes.getNodeLonLat({ index: nodeIndex })
+		const existingNodes = osm.nodes.withinRadius(ll[0], ll[1], 0)
+		const existingNodeIds = existingNodes
+			.map((index) => ({ id: this.osm.nodes.ids.at(index), index }))
+			.filter((n) => n.id !== nodeId && !idPairs.has(n.id, nodeId))
+		if (existingNodeIds.length === 0) return -1
+
+		// Found a duplicate, load the full node
 		let deduplicatedNodesReplaced = 0
-		// Find ways that contain the replaced node and modify them.
-		for (const wayIndex of this.osm.ways.neighbors(
-			node.lon,
-			node.lat,
-			10,
-			0.01,
-		)) {
-			const wayRefs = this.osm.ways.getRefIds(wayIndex)
-			if (wayRefs.includes(existingNode.id)) {
-				const way = this.osm.ways.getByIndex(wayIndex)
+		for (const { index: existingNodeIndex } of existingNodeIds) {
+			const existingNode = osm.nodes.getByIndex(existingNodeIndex)
+			if (existingNode == null) continue
+
+			// Add this pair to the deduped ID pairs
+			idPairs.add(existingNode.id, nodeId)
+
+			const patchNode = osm.nodes.getByIndex(nodeIndex)
+
+			const neigborWayIndexes = this.osm.ways.neighbors(
+				patchNode.lon,
+				patchNode.lat,
+				20,
+				0,
+			)
+
+			// Find ways that contain the replaced node
+			const candidateWays: OsmWay[] = []
+			for (const wayIndex of neigborWayIndexes) {
+				const wayRefs = osm.ways.getRefIds(wayIndex)
+				if (wayRefs.includes(existingNode.id)) {
+					// Do not de-duplicate when both nodes exist in the same way
+					if (wayRefs.includes(patchNode.id)) return -1
+					const way = this.osm.ways.getByIndex(wayIndex)
+					candidateWays.push(way)
+				}
+			}
+
+			// Find relations that contain the replaced node
+			const candidateRelations: OsmRelation[] = []
+			for (
+				let relationIndex = 0;
+				relationIndex < this.osm.relations.ids.size;
+				relationIndex++
+			) {
+				if (
+					this.osm.relations.includesMember(
+						relationIndex,
+						existingNode.id,
+						"node",
+					)
+				) {
+					// Do not de-duplicate when both nodes exist in the same relation
+					if (
+						this.osm.relations.includesMember(
+							relationIndex,
+							patchNode.id,
+							"node",
+						)
+					)
+						return -1
+					candidateRelations.push(this.osm.relations.getByIndex(relationIndex))
+				}
+			}
+
+			// Modify ways that contain the replaced node
+			for (const way of candidateWays) {
 				deduplicatedNodesReplaced++
 				this.modify("way", way.id, (way) => ({
 					...way,
 					refs: way.refs.map((ref) =>
-						ref === existingNode.id ? node.id : ref,
+						ref === existingNode.id ? patchNode.id : ref,
 					),
 				}))
 			}
+
+			// Modify relations that contain the replaced node
+			for (const relation of candidateRelations) {
+				deduplicatedNodesReplaced++
+				this.modify("relation", relation.id, (relation) => ({
+					...relation,
+					members: relation.members.map((member) =>
+						member.ref === existingNode.id
+							? { ...member, ref: patchNode.id }
+							: member,
+					),
+				}))
+			}
+
+			// Schedule node for deletion
+			this.stats.deduplicatedNodes++
+			this.delete(existingNode, `Replaced by node ${patchNode.id}`)
 		}
 
-		// Find relations that contain the replaced node and modify them.
-		for (const relation of this.osm.relations) {
-			for (const member of relation.members) {
-				if (member.type === "node" && member.ref === existingNode.id) {
-					deduplicatedNodesReplaced++
-					this.modify("relation", relation.id, (relation) => ({
-						...relation,
-						members: relation.members.map((member) =>
-							member.ref === existingNode.id
-								? { ...member, ref: node.id }
-								: member,
-						),
-					}))
-				}
-			}
-		}
+		// Increment the total number of nodes replaced
 		this.stats.deduplicatedNodesReplaced += deduplicatedNodesReplaced
 		return deduplicatedNodesReplaced
 	}
 
-	// Find intersecting way IDs and points for this way
-	handleIntersectingWays(patchWay: OsmWay, patch: Osm) {
-		const patchWayIndex = patch.ways.ids.getIndexFromId(patchWay.id)
-		const intersectingWayIndexes = this.osm.ways.intersects(
-			patch.ways.getBbox({ index: patchWayIndex }),
+	/**
+	 * TODO: replace refs in relations with new way
+	 */
+	deduplicateWay(wayIndex: number, osm: Osm, dedupedIdPairs: IdPairs) {
+		const way = osm.ways.getByIndex(wayIndex)
+		const wayCoords = osm.ways.getCoordinates(wayIndex, osm.nodes)
+
+		// Look for duplicate ways in the patch
+		const closeWayIndexes = osm.ways.intersects(osm.ways.getBbox(way))
+		const wayVersion = getEntityVersion(way)
+		const wayTagCount = Object.keys(way.tags ?? {}).length
+		const candidateDuplicateWays: OsmWay[] = closeWayIndexes
+			.map((index) => {
+				const otherWay = osm.ways.getByIndex(index)
+				if (otherWay.id === way.id) return null
+
+				// Has this pair been deduped or checked already?
+				if (dedupedIdPairs.has(way.id, otherWay.id)) return null
+				dedupedIdPairs.add(way.id, otherWay.id)
+
+				// Check if all way properties other than the ID are equal
+				if (isWayEqual(way, otherWay)) return otherWay
+
+				// Check geometry
+				const coords = osm.ways.getCoordinates(index, osm.nodes)
+				if (!dequal(wayCoords, coords)) return null
+
+				// Check version
+				const otherWayVersion = getEntityVersion(otherWay)
+				if (otherWayVersion < wayVersion) return null
+				if (otherWayVersion > wayVersion) return otherWay
+
+				// Ways are geometrically equal, with same version. Keep the way with more tags
+				const tagCount = Object.keys(otherWay.tags ?? {}).length
+				return tagCount >= wayTagCount ? otherWay : null
+			})
+			.filter((way) => way != null)
+
+		if (candidateDuplicateWays.length === 0) return 0
+
+		// Delete this way
+		this.delete(
+			way,
+			`Replaced by way ${candidateDuplicateWays.map((way) => way.id).join(", ")}`,
 		)
+		this.stats.deduplicatedWays++
 
-		for (const baseWayIndex of intersectingWayIndexes) {
-			const baseWay = this.osm.ways.getByIndex(baseWayIndex)
-			if (
-				baseWay.id !== patchWay.id &&
-				waysShouldConnect(patchWay.tags, baseWay.tags)
-			) {
-				const intersectingPoints: LonLat[] = lineIntersect(
-					patch.ways.getLineString({ index: patchWayIndex }, patch.nodes),
-					this.osm.ways.getLineString({ index: baseWayIndex }, this.osm.nodes),
-				).features.map((f) => ({
-					lon: f.geometry.coordinates[0],
-					lat: f.geometry.coordinates[1],
-				}))
+		return candidateDuplicateWays.length
+	}
 
-				for (const ll of intersectingPoints) {
-					this.stats.intersectionPointsFound++
-					const onBase = this.osm.ways.nearestPointOnLine(
-						baseWayIndex,
-						ll,
-						this.osm.nodes,
-					)
-					const closestBaseNodeId = baseWay.refs.at(onBase.properties.index)
-					const baseNode =
-						closestBaseNodeId && onBase.properties.dist < 0.001 // within 1 meter
-							? this.osm.nodes.getById(closestBaseNodeId)
-							: null
-
-					const onPatch = patch.ways.nearestPointOnLine(
-						patchWayIndex,
-						ll,
-						patch.nodes,
-					)
-					const closestPatchNodeId = patchWay.refs.at(onPatch.properties.index)
-					const patchNode =
-						closestPatchNodeId && onPatch.properties.dist < 0.001 // within 1 meter
-							? patch.nodes.getById(closestPatchNodeId)
-							: null
-
-					// If patch node and existing node both exist here they should have been deduplicated. Use the patch node.
-					const intersectionNode = patchNode ?? baseNode ?? this.createNode(ll)
-
-					if (baseNode == null) {
-						this.modify("way", baseWay.id, (way) => {
-							return {
-								...way,
-								refs: way.refs.toSpliced(
-									onBase.properties.index,
-									0,
-									intersectionNode.id,
-								),
-							}
-						})
-					}
-
-					if (patchNode == null) {
-						this.modify("way", patchWay.id, (way) => {
-							return {
-								...way,
-								refs: way.refs.toSpliced(
-									onPatch.properties.index,
-									0,
-									intersectionNode.id,
-								),
-							}
-						})
-					}
-
-					this.modify("node", intersectionNode.id, (node) => ({
-						...node,
-						tags: {
-							...node.tags,
-							crossing: "yes",
-						},
-					}))
-				}
-			}
+	*deduplicateWays(osm?: Osm) {
+		const dedupedIdPairs = new IdPairs()
+		for (let wayIndex = 0; wayIndex < (osm ?? this.osm).ways.size; wayIndex++) {
+			yield this.deduplicateWay(wayIndex, osm ?? this.osm, dedupedIdPairs)
 		}
 	}
 
-	generateDirectChanges(patch: Osm) {
-		if (this.osm.nodes.size === 0 || patch.nodes.size === 0) {
-			throw Error("No nodes in base or patch")
+	nearestNodeOnWay(
+		way: OsmWay,
+		wayCoords: [number, number][],
+		point: [number, number],
+		MAX_DISTANCE_METERS = 1,
+	) {
+		let nearestDistance = Number.POSITIVE_INFINITY
+		let nearestNodeId = null
+		let nearestNodeRefIndex = -1
+		for (let i = 0; i < wayCoords.length; i++) {
+			const nodeDistance = distance(wayCoords[i], point, { units: "meters" })
+			if (
+				nodeDistance < nearestDistance &&
+				nodeDistance < MAX_DISTANCE_METERS
+			) {
+				nearestDistance = nodeDistance
+				nearestNodeId = way.refs[i]
+				nearestNodeRefIndex = i
+			}
+		}
+		return {
+			refIndex: nearestNodeRefIndex,
+			nodeId: nearestNodeId,
+		}
+	}
+
+	/**
+	 * Way must exist in the base OSM. Add it first, if merging.
+	 */
+	createIntersectionsForWay(way: OsmWay, wayIdPairs: IdPairs) {
+		let intersectionsFound = 0
+		let intersectionsCreated = 0
+
+		const wayIndex = this.osm.ways.ids.getIndexFromId(way.id)
+
+		// Check for intersecting ways. Since the way exists in the base OSM, there will always be at least one way.
+		const bbox = this.osm.ways.getBbox({ index: wayIndex })
+		const intersectingWayIndexes = this.osm.ways.intersects(bbox)
+		if (intersectingWayIndexes.length <= 1) return // No candidates
+
+		const coordinates = cleanCoords(
+			this.osm.ways.getCoordinates(wayIndex, this.osm.nodes),
+		)
+
+		for (const intersectingWayIndex of intersectingWayIndexes) {
+			const intersectingWayId = this.osm.ways.ids.at(intersectingWayIndex)
+
+			// Skip self and null ways
+			if (intersectingWayId == null || intersectingWayId === way.id) continue
+			if (wayIdPairs.has(way.id, intersectingWayId)) continue
+			wayIdPairs.add(way.id, intersectingWayId)
+
+			// Skip ways that aren't applicable for connecting
+			const intersectingWay = this.osm.ways.getByIndex(intersectingWayIndex)
+			if (!waysShouldConnect(way.tags, intersectingWay.tags)) continue
+
+			const intersectingWayCoords = cleanCoords(
+				this.osm.ways.getCoordinates(intersectingWayIndex, this.osm.nodes),
+			)
+
+			// Skip ways that are geometrically equal
+			if (dequal(coordinates, intersectingWayCoords)) continue
+
+			const intersectingPoints = waysIntersect(
+				coordinates,
+				intersectingWayCoords,
+			)
+			for (const point of intersectingPoints.features) {
+				const pt = point.geometry.coordinates as [number, number]
+				intersectionsFound++
+
+				const intersectingWayNodeId = this.nearestNodeOnWay(
+					intersectingWay,
+					intersectingWayCoords,
+					pt,
+				).nodeId
+				const wayNodeId = this.nearestNodeOnWay(way, coordinates, pt).nodeId
+
+				// Prefer the incoming way node, then the intersecting way node, then a new node.
+				if (wayNodeId) {
+					const wayNode = this.osm.nodes.getById(wayNodeId)
+					if (wayNode == null) throw Error(`Way node ${wayNodeId} not found`)
+					if (intersectingWayNodeId) {
+						// Replace in intersecting way
+						this.modify("way", intersectingWay.id, (way) => {
+							return {
+								...way,
+								refs: way.refs.map((ref) =>
+									ref === intersectingWayNodeId ? wayNodeId : ref,
+								),
+							}
+						})
+					} else {
+						this.spliceNodeIntoWay(intersectingWay, wayNode)
+					}
+
+					if (wayNode.tags?.crossing !== "yes") {
+						this.modify("node", wayNode.id, (node) => {
+							return {
+								...node,
+								tags: { ...node.tags, crossing: "yes" },
+							}
+						})
+					}
+				} else if (intersectingWayNodeId) {
+					const intersectingWayNode = this.osm.nodes.getById(
+						intersectingWayNodeId,
+					)
+					if (intersectingWayNode == null)
+						throw Error(
+							`Intersecting way node ${intersectingWayNodeId} not found`,
+						)
+
+					this.spliceNodeIntoWay(way, intersectingWayNode)
+					if (intersectingWayNode.tags?.crossing !== "yes") {
+						this.modify("node", intersectingWayNode.id, (node) => {
+							return {
+								...node,
+								tags: { ...node.tags, crossing: "yes" },
+							}
+						})
+					}
+				} else {
+					intersectionsCreated++
+
+					const newIntersectionNode: OsmNode = {
+						id: this.nextNodeId(),
+						lon: pt[0],
+						lat: pt[1],
+						tags: {
+							crossing: "yes",
+						},
+					}
+					this.create(newIntersectionNode)
+
+					// Splice into the existing ways
+					this.spliceNodeIntoWay(way, newIntersectionNode)
+					this.spliceNodeIntoWay(intersectingWay, newIntersectionNode)
+				}
+			}
 		}
 
+		this.stats.intersectionPointsFound += intersectionsFound
+		this.stats.intersectionNodesCreated += intersectionsCreated
+
+		return {
+			intersectionsFound,
+			intersectionsCreated,
+		}
+	}
+
+	/**
+	 * We do not pass coordinates here because the way may have already been modified.
+	 */
+	spliceNodeIntoWay(way: OsmWay, node: OsmNode) {
+		this.modify("way", way.id, (way) => {
+			const coords = way.refs.map((ref) =>
+				this.osm.nodes.getNodeLonLat({ id: ref }),
+			)
+			const { refIndex } = this.nearestNodeOnWay(
+				way,
+				coords,
+				[node.lon, node.lat],
+				Number.POSITIVE_INFINITY,
+			)
+			return {
+				...way,
+				refs: way.refs.toSpliced(refIndex, 0, node.id),
+			}
+		})
+	}
+
+	/**
+	 * Create changes to merge nodes, ways, and relations from a patch OSM file into the base OSM.
+	 * - Check for duplicate nodes in the patch, replace the existing nodes where appropriate.
+	 * - Check for duplicate incoming ways, only add single instances of geometrically equal ways.
+	 * TODOS:
+	 * - If I add ways first, then nodes, the node de-duplication may work better. I can de-duplicate the nodes in the changesets.
+	 * - Replace existing nodes in relations where appropriate.
+	 */
+	generateDirectChanges(patch: Osm) {
 		// Reset the current node ID to the highest node ID in the base or patch
 		this.currentNodeId = Math.max(
 			this.osm.nodes.ids.at(-1),
 			patch.nodes.ids.at(-1),
 		)
 
-		// First, create or modify all nodes, ways, and relations in the patch
-		for (const node of patch.nodes) {
-			const existingNode = this.osm.nodes.getById(node.id)
-			if (existingNode == null) {
-				this.nodeChanges[node.id] = {
-					changeType: "create",
-					entity: node,
+		// First, create or modify all ways in the patch
+		for (let patchIndex = 0; patchIndex < patch.ways.size; patchIndex++) {
+			const way = patch.ways.getByIndex(patchIndex)
+			if (this.osm.ways.ids.has(way.id)) {
+				const existingWay = this.osm.ways.getById(way.id)
+				if (existingWay && !entityPropertiesEqual(existingWay, way)) {
+					// Replace the existing entity with the patch entity
+					this.modify("way", way.id, (_existingWay) =>
+						removeDuplicateAdjacentOsmWayRefs(way),
+					)
 				}
-			} else if (!entityPropertiesEqual(existingNode, node)) {
-				// Replace the existing entity with the patch entity
-				this.nodeChanges[node.id] = {
-					changeType: "modify",
-					entity: node,
+			} else {
+				const patchWayCoords = patch.ways.getCoordinates(
+					patchIndex,
+					patch.nodes,
+				)
+
+				// Look for duplicate ways in the patch
+				const closePatchWayIndexes = patch.ways.intersects(
+					patch.ways.getBbox(way),
+				)
+				const patchWayVersion = getEntityVersion(way)
+				const patchWayTagCount = Object.keys(way.tags ?? {}).length
+				const validPatchWays: OsmWay[] = closePatchWayIndexes
+					.map((index) => {
+						const otherWay = patch.ways.getByIndex(index)
+						if (otherWay.id === way.id) return null
+						// Check if all way properties other than the ID are equal
+						if (isWayEqual(way, otherWay)) return otherWay
+						const otherWayVersion = getEntityVersion(otherWay)
+						if (otherWayVersion < patchWayVersion) return null
+						const coords = patch.ways.getCoordinates(index, patch.nodes)
+						if (!dequal(patchWayCoords, coords)) return null
+						if (otherWayVersion > patchWayVersion) return otherWay
+						// Ways are geometrically equal, with same version. Keep the way with more tags
+						const tagCount = Object.keys(otherWay.tags ?? {}).length
+						return tagCount >= patchWayTagCount ? otherWay : null
+					})
+					.filter((way) => way !== null)
+				// Newer version of this way exists, skip creating it
+				if (validPatchWays.length > 0) {
+					this.stats.deduplicatedWays++
+					continue
 				}
+
+				// Create the way
+				this.create(removeDuplicateAdjacentOsmWayRefs(way))
+
+				// Check for duplicate ways
+				const closeWayIndexes = this.osm.ways.intersects(
+					patch.ways.getBbox(way),
+				)
+
+				const duplicateWayIndexes: OsmWay[] = []
+				for (const closeWayIndex of closeWayIndexes) {
+					const closeWayCoords = this.osm.ways.getCoordinates(
+						closeWayIndex,
+						this.osm.nodes,
+					)
+					if (dequal(patchWayCoords, closeWayCoords)) {
+						duplicateWayIndexes.push(this.osm.ways.getByIndex(closeWayIndex))
+					}
+				}
+
+				if (duplicateWayIndexes.length === 0) continue
+				if (duplicateWayIndexes.length > 1)
+					throw Error("MULTIPLE DUPLICATE WAYS FOUND")
+
+				const duplicateWay = duplicateWayIndexes[0]
+				// Already scheduled for deletion? Continue
+				if (this.wayChanges[duplicateWay.id]?.changeType === "delete") continue
+				// TODO: Should we merge the tags from this way?
+				this.delete(duplicateWay)
+				this.stats.deduplicatedWays++
 			}
 		}
 
-		for (const way of patch.ways) {
-			const existingWay = this.osm.ways.getById(way.id)
-			if (existingWay == null) {
-				this.wayChanges[way.id] = {
-					changeType: "create",
-					entity: way,
+		// Second, create or modify all nodes in the patch. This is after ways to properly de-duplicate nodes.
+		for (const node of patch.nodes) {
+			if (this.osm.nodes.ids.has(node.id)) {
+				const existingNode = this.osm.nodes.getById(node.id)
+				if (existingNode && !entityPropertiesEqual(existingNode, node)) {
+					// Replace the existing entity with the patch entity
+					this.modify("node", node.id, (_existingNode) => node)
 				}
-			} else if (!entityPropertiesEqual(existingWay, way)) {
-				// Replace the existing entity with the patch entity
-				this.wayChanges[way.id] = {
-					changeType: "modify",
-					entity: way,
+			} else {
+				this.create(node)
+
+				// Check for duplicate nodes
+				const duplicateNodes = this.osm.nodes.withinRadius(
+					node.lon,
+					node.lat,
+					0,
+				)
+				if (duplicateNodes.length === 0) continue
+				if (duplicateNodes.length > 1)
+					throw Error("MULTIPLE DUPLICATE NODES FOUND")
+
+				// Set duplicate node to be deleted
+				const duplicateNode = this.osm.nodes.getByIndex(duplicateNodes[0])
+
+				// Already scheduled for deletion? Continue
+				if (this.nodeChanges[duplicateNode.id]?.changeType === "delete")
+					continue
+
+				// Schedule for deletion
+				this.delete(duplicateNode)
+				this.stats.deduplicatedNodes++
+
+				// Find ways that contain the existing node
+				const wayIndexes = this.osm.ways.neighbors(
+					node.lon,
+					node.lat,
+					Number.POSITIVE_INFINITY,
+					0, // If the node is within the bounding box of a way, it will be found
+				)
+				if (wayIndexes.length === 0)
+					throw Error("NO WAYS FOUND FOR DUPLICATE NODE")
+
+				for (const wayIndex of wayIndexes) {
+					const way = this.osm.ways.getByIndex(wayIndex)
+					if (!way.refs.includes(duplicateNode.id)) continue
+
+					this.stats.deduplicatedNodesReplaced++
+					this.modify("way", way.id, (way) => ({
+						...way,
+						refs: way.refs.map((ref) =>
+							ref === duplicateNode.id ? node.id : ref,
+						),
+					}))
 				}
+
+				// TODO replace refs in relations
 			}
 		}
 
 		for (const relation of patch.relations) {
-			const existingRelation = this.osm.relations.getById(relation.id)
-			if (existingRelation == null) {
-				this.relationChanges[relation.id] = {
-					changeType: "create",
-					entity: relation,
+			if (this.osm.relations.ids.has(relation.id)) {
+				const existingRelation = this.osm.relations.getById(relation.id)
+				if (
+					existingRelation &&
+					!entityPropertiesEqual(existingRelation, relation)
+				) {
+					// Replace the existing entity with the patch entity
+					this.modify("relation", relation.id, (_existingRelation) => relation)
 				}
-			} else if (!entityPropertiesEqual(existingRelation, relation)) {
-				// Replace the existing entity with the patch entity
-				this.relationChanges[relation.id] = {
-					changeType: "modify",
-					entity: relation,
-				}
+			} else {
+				this.create(relation)
 			}
 		}
 	}
 
-	deduplicateNodes(patch: Osm) {
-		for (const node of patch.nodes) {
-			this.deduplicateOverlappingNodes(node)
+	*deduplicateNodes(osm?: Osm) {
+		const dedupedIdPairs = new IdPairs()
+		for (
+			let nodeIndex = 0;
+			nodeIndex < (osm ?? this.osm).nodes.size;
+			nodeIndex++
+		) {
+			yield this.deduplicateOverlappingNodes(
+				nodeIndex,
+				osm ?? this.osm,
+				dedupedIdPairs,
+			)
 		}
 	}
 
-	createIntersections(patch: Osm) {
-		for (const way of patch.ways) {
-			this.handleIntersectingWays(way, patch)
+	/**
+	 *
+	 * @param patch
+	 */
+	*generateIntersectionsForWays(ways: Ways) {
+		const wayIdPairs = new IdPairs()
+		for (const way of ways) {
+			if (!isWayIntersectionCandidate(way)) continue
+			if (!this.osm.ways.ids.has(way.id)) continue
+			yield this.createIntersectionsForWay(way, wayIdPairs)
 		}
 	}
 
-	generateFullChangeset(
-		patch: Osm,
-		{ directMerge, deduplicateNodes, createIntersections }: OsmMergeOptions = {
-			directMerge: true,
-			deduplicateNodes: true,
-			createIntersections: true,
-		},
-	) {
-		if (directMerge) {
-			this.generateDirectChanges(patch)
-		}
-
-		if (deduplicateNodes) {
-			this.deduplicateNodes(patch)
-		}
-
-		if (createIntersections) {
-			this.createIntersections(patch)
+	createIntersectionsForWays(ways: Ways) {
+		for (const _ of this.generateIntersectionsForWays(ways)) {
+			// Do nothing
 		}
 	}
 
 	applyChanges(newId?: string) {
-		return applyChangesetToOsm(newId ?? `${this.osm.id}-merged`, this.osm, this)
+		return applyChangesetToOsm(this, newId)
 	}
 
 	// TODO: Finish this
@@ -404,15 +727,39 @@ export default class OsmChangeset {
 	}
 }
 
+function getEntityVersion(entity: OsmEntity) {
+	return entity.tags && "ext:osm_version" in entity.tags
+		? Number(entity.tags["ext:osm_version"])
+		: 0
+}
+
+function waysIntersect(wayA: [number, number][], wayB: [number, number][]) {
+	return lineIntersect(
+		{
+			type: "Feature",
+			geometry: {
+				type: "LineString",
+				coordinates: wayA,
+			},
+			properties: {},
+		},
+		{
+			type: "Feature",
+			geometry: {
+				type: "LineString",
+				coordinates: wayB,
+			},
+			properties: {},
+		},
+	)
+}
+
 /**
  * Apply a changeset to an Osm index, generating a new Osm index. Usually done on a changeset made from the base osm index.
  */
-export function applyChangesetToOsm(
-	newId: string,
-	baseOsm: Osm,
-	changeset: OsmChangeset,
-) {
-	const osm = new Osm(newId, baseOsm.header)
+export function applyChangesetToOsm(changeset: OsmChangeset, newId?: string) {
+	const baseOsm = changeset.osm
+	const osm = new Osm(newId ?? `${baseOsm.id}-merged`, baseOsm.header)
 
 	const { nodeChanges, wayChanges, relationChanges } = changeset
 
@@ -449,6 +796,7 @@ export function applyChangesetToOsm(
 				throw Error("Changeset contains create changes for existing entities")
 			}
 		}
+		// Remove duplicate refs back to back, but not when they are separated by other refs
 		osm.ways.addWay(change?.entity ?? way)
 	}
 
@@ -489,27 +837,22 @@ export function applyChangesetToOsm(
 	return osm
 }
 
-/**
- * Determine if two ways should be connected based on their tags
- */
-function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
-	const a = tagsA || {}
-	const b = tagsB || {}
-	const isHighway = (t: OsmTags) => t.highway != null
-	const isFootish = (t: OsmTags) =>
-		["footway", "path", "cycleway", "bridleway", "steps"].includes(
-			String(t.highway),
-		)
-	const isPolygonish = (t: OsmTags) => !!(t.building || t.landuse || t.natural)
-	const isSeparated = !!(a.bridge || a.tunnel || b.bridge || b.tunnel)
-	const diffLayer = (a.layer ?? "0") !== (b.layer ?? "0")
+class IdPairs {
+	#idPairs = new Set<string>()
 
-	if (isPolygonish(a) || isPolygonish(b)) return false
-	if (isSeparated || diffLayer) return false
+	#makeIdsKey(wayIds: number[]) {
+		return wayIds.toSorted((a, b) => a - b).join(",")
+	}
 
-	if (isHighway(a) && isHighway(b)) return true
-	if (isHighway(a) && isFootish(b)) return true
-	if (isHighway(b) && isFootish(a)) return true
+	add(...wayIds: number[]) {
+		this.#idPairs.add(this.#makeIdsKey(wayIds))
+	}
 
-	return false
+	has(...wayIds: number[]) {
+		return this.#idPairs.has(this.#makeIdsKey(wayIds))
+	}
+
+	clear() {
+		this.#idPairs.clear()
+	}
 }

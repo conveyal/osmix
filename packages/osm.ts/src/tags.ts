@@ -1,9 +1,9 @@
+import type StringTable from "./stringtable"
 import {
 	IndexArrayType,
 	ResizeableTypedArray,
 	type TypedArrayBuffer,
 } from "./typed-arrays"
-import type StringTable from "./stringtable"
 import type { OsmTags } from "./types"
 
 export type TagsTransferables = {

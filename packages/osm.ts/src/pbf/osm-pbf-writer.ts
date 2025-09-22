@@ -1,12 +1,12 @@
 import Pbf from "pbf"
+import { MAX_BLOB_SIZE_BYTES } from "./constants"
 import { writeBlob, writeBlobHeader } from "./proto/fileformat"
 import {
-	writeHeaderBlock,
-	writePrimitiveBlock,
 	type OsmPbfHeaderBlock,
 	type OsmPbfPrimitiveBlock,
+	writeHeaderBlock,
+	writePrimitiveBlock,
 } from "./proto/osmformat"
-import { MAX_BLOB_SIZE_BYTES } from "./constants"
 import { nativeCompress, uint32BE } from "./utils"
 
 /**

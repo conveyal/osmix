@@ -1,19 +1,19 @@
 import { APPID, BITMAP_TILE_SIZE, MIN_PICKABLE_ZOOM } from "@/settings"
 import { mapAtom, selectedEntityAtom } from "@/state/map"
-import { useAtom, useAtomValue } from "jotai"
-import type { GeoBbox2D, Osm } from "osm.ts"
-import { useEffect, useMemo } from "react"
-import { useOsmWorker } from "./osm"
 import { COORDINATE_SYSTEM, type Layer as DeckGlLayer } from "@deck.gl/core"
-import { TileLayer, type GeoBoundingBox } from "@deck.gl/geo-layers"
+import { type GeoBoundingBox, TileLayer } from "@deck.gl/geo-layers"
 import {
 	BitmapLayer,
 	GeoJsonLayer,
 	PathLayer,
 	ScatterplotLayer,
 } from "@deck.gl/layers"
-import useStartTaskLog from "./log"
 import { bboxPolygon } from "@turf/turf"
+import { useAtom, useAtomValue } from "jotai"
+import type { GeoBbox2D, Osm } from "osm.ts"
+import { useEffect, useMemo } from "react"
+import useStartTaskLog from "./log"
+import { useOsmWorker } from "./osm"
 
 export function useFitBoundsOnChange(bbox?: GeoBbox2D) {
 	const map = useAtomValue(mapAtom)
@@ -195,12 +195,14 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 							highlightColor: [255, 0, 0, 255 * 0.5],
 							_pathType: "open",
 							onClick: (info) => {
-								console.log("PathLayer.onClick", info)
 								if (info.picked && data.ways) {
 									const wayId = data.ways.ids.at(info.index)
 									if (wayId !== undefined) {
 										setSelectedEntity(osm.ways.getById(wayId))
+									} else {
+										setSelectedEntity(null)
 									}
+									return true
 								}
 							},
 						}),
@@ -228,7 +230,6 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 							onClick: (info) => {
 								if (info.picked) {
 									const nodeId = data.nodes.ids.at(info.index)
-									console.log("ScatterplotLayer.onClick", nodeId, info)
 									if (nodeId) {
 										setSelectedEntity(osm.nodes.getById(nodeId))
 									} else {

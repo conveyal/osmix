@@ -1,4 +1,4 @@
-import { Ids, type IdsTransferables, type IdOrIndex } from "./ids"
+import { type IdOrIndex, Ids, type IdsTransferables } from "./ids"
 import type StringTable from "./stringtable"
 import { Tags, type TagsTransferables } from "./tags"
 import type { OsmEntity, OsmTags } from "./types"
@@ -78,7 +78,8 @@ export abstract class Entities<T extends OsmEntity> {
 
 	getById(id: number): T | null {
 		const index = this.ids.getIndexFromId(id)
-		if (index !== -1) return this.getByIndex(index)
+		if (index !== -1)
+			return this.getFullEntity(index, id, this.tags.getTags(index))
 		return null
 	}
 }

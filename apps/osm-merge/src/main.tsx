@@ -1,7 +1,8 @@
 import { StrictMode, Suspense } from "react"
 import { createRoot } from "react-dom/client"
-import { BrowserRouter, Route, Routes, Outlet } from "react-router"
+import { BrowserRouter, Outlet, Route, Routes } from "react-router"
 import Nav from "./components/nav"
+import FilterPage from "./pages/filter"
 import InspectPage from "./pages/inspect"
 import MergePage from "./pages/merge"
 
@@ -30,6 +31,7 @@ createRoot(rootEl).render(
 					<Route path="" element={<InspectPage />} />
 					<Route path="merge" element={<MergePage />} />
 					<Route path="inspect" element={<InspectPage />} />
+					<Route path="filter" element={<FilterPage />} />
 				</Route>
 			</Routes>
 		</BrowserRouter>

@@ -1,13 +1,17 @@
+import LogContent from "@/components/log"
+import ChangesSummary, {
+	ChangesExpandableList,
+	ChangesFilters,
+	ChangesList,
+	ChangesPagination,
+} from "@/components/osm-changes-summary"
 import useStartTaskLog from "@/hooks/log"
-import {
-	useBitmapTileLayer,
-	usePickableOsmTileLayer,
-	useSelectedEntityLayer,
-} from "@/hooks/map"
+import { usePickableOsmTileLayer, useSelectedEntityLayer } from "@/hooks/map"
 import { useOsmFile, useOsmWorker } from "@/hooks/osm"
-import { APPID, DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
+import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
+import { changesAtom } from "@/state/changes"
 import { mapAtom } from "@/state/map"
-import { useAtomValue } from "jotai"
+import { atom, useAtom, useAtomValue } from "jotai"
 import {
 	ArrowLeft,
 	ArrowRight,
@@ -16,49 +20,51 @@ import {
 	Loader2Icon,
 	MaximizeIcon,
 	MergeIcon,
+	SkipForwardIcon,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import {
-	Osm,
-	writeOsmToPbfStream,
-	type OsmChange,
-	type OsmChanges,
-	type OsmMergeOptions,
-} from "osm.ts"
-import { useCallback, useEffect, useRef, useState, useTransition } from "react"
+import { Osm, writeOsmToPbfStream } from "osm.ts"
+import { useCallback, useEffect, useRef, useTransition } from "react"
 import Basemap from "../components/basemap"
 import DeckGlOverlay from "../components/deckgl-overlay"
-import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import EntityDetails from "../components/entity-details"
 import { Main, MapContent, Sidebar } from "../components/layout"
 import OsmInfoTable from "../components/osm-info-table"
 import OsmPbfFileInput from "../components/osm-pbf-file-input"
 import { Button } from "../components/ui/button"
-import LogContent from "@/components/log"
+import { Details, DetailsContent, DetailsSummary } from "@/components/details"
+
+const STEPS = [
+	"select-osm-pbf-files",
+	"direct-merge",
+	"review-changeset",
+	"deduplicate-nodes",
+	"review-changeset",
+	"create-intersections",
+	"review-changeset",
+	"inspect-osm",
+] as const
+
+const stepIndexAtom = atom<number>(0)
+const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
+	const stepIndex = get(stepIndexAtom)
+	return STEPS[stepIndex]
+})
 
 export default function Merge() {
 	const base = useOsmFile("base")
 	const patch = useOsmFile("patch")
-	const merged = useOsmFile("inspect")
 	const osmWorker = useOsmWorker()
 	const [isTransitioning, startTransition] = useTransition()
-	const [changes, setChanges] = useState<OsmChanges | null>(null)
+	const [changes, setChanges] = useAtom(changesAtom)
 	const startTask = useStartTaskLog()
 	const map = useAtomValue(mapAtom)
 
 	const baseTileLayer = usePickableOsmTileLayer(base.osm)
 	const patchTileLayer = usePickableOsmTileLayer(patch.osm)
-	const { layer: mergedTileLayer, selectedEntity: mergedSelectedEntity } =
-		usePickableOsmTileLayer(merged.osm)
-	const selectedEntityLayer = useSelectedEntityLayer(merged.osm)
+	const selectedEntityLayer = useSelectedEntityLayer(base.osm)
 
-	const [step, setStep] = useState<number>(1)
-
-	const [mergeOptions, setMergeOptions] = useState<OsmMergeOptions>({
-		directMerge: true,
-		deduplicateNodes: true,
-		createIntersections: true,
-	})
+	const [stepIndex, setStepIndex] = useAtom(stepIndexAtom)
 
 	// Auto load default files for faster testing
 	const isLoadingDefaultFilesRef = useRef(false)
@@ -70,23 +76,30 @@ export default function Merge() {
 				fetch(DEFAULT_BASE_PBF_URL)
 					.then((res) => res.blob())
 					.then((blob) => {
-						base.setFile(new File([blob], "yakima-full.osm.pbf"))
+						base.setFile(new File([blob], "seattle.osm.pbf"))
 					}),
 				fetch(DEFAULT_PATCH_PBF_URL)
 					.then((res) => res.blob())
 					.then((blob) => {
-						patch.setFile(new File([blob], "yakima-osw.osm.pbf"))
+						patch.setFile(new File([blob], "seattle-osw.pbf"))
 					}),
 			])
 		}
 	}, [base.file, patch.file, base.setFile, patch.setFile])
 
 	const prevStep = useCallback(() => {
-		setStep((s) => s - 1)
-	}, [])
+		setStepIndex((s) => s - 1)
+	}, [setStepIndex])
 	const nextStep = useCallback(() => {
-		setStep((s) => s + 1)
-	}, [])
+		setStepIndex((s) => s + 1)
+	}, [setStepIndex])
+	const goToStep = useCallback(
+		(step: number | (typeof STEPS)[number]) => {
+			const stepIndex = typeof step === "number" ? step : STEPS.indexOf(step)
+			setStepIndex(stepIndex)
+		},
+		[setStepIndex],
+	)
 
 	const downloadOsm = useCallback(
 		async (osm: Osm, name?: string) => {
@@ -127,17 +140,26 @@ export default function Merge() {
 		})
 	}, [changes, startTask])
 
+	const applyChanges = useCallback(async () => {
+		if (!osmWorker) throw Error("No OSM worker")
+		const task = startTask("Applying changes to OSM", "info")
+		startTransition(async () => {
+			if (!changes) throw Error("No changes to apply")
+			if (!base.osm) throw Error("No base OSM")
+			const newOsm = await osmWorker.applyChangesAndReplace(base.osm.id)
+			base.setOsm(Osm.from(newOsm))
+			task.end("Changes applied", "ready")
+		})
+	}, [changes, base.osm, base.setOsm, osmWorker, startTask])
+
 	return (
 		<Main>
 			<Sidebar>
 				<div className="flex flex-col p-4 gap-4">
-					<If t={step === 1}>
+					<Step step="select-osm-pbf-files" title="SELECT OSM PBF FILES">
 						<div>
-							<div className="font-bold">1: SELECT OSM PBF FILES</div>
-							<div>
-								Select two PBF files to merge. Note: entities from the patch
-								file are prioritized over matching entities in the base file.
-							</div>
+							Select two PBF files to merge. Note: entities from the patch file
+							are prioritized over matching entities in the base file.
 						</div>
 						<hr />
 						<div>
@@ -169,15 +191,14 @@ export default function Merge() {
 						<Button disabled={!base.osm || !patch.osm} onClick={nextStep}>
 							Select merge options <ArrowRight />
 						</Button>
-					</If>
+					</Step>
 
-					<If t={step === 2}>
+					<Step step="direct-merge" title="DIRECT MERGE">
 						<div>
-							<div className="font-bold">2: SELECT MERGE OPTIONS</div>
-							<div>
-								Select merge options before generating a changeset. Note:
-								changeset generation can take some time.
-							</div>
+							Add all new entities from the patch onto the base data set.
+							Overwrite any entities that have matching IDs.
+							<br />
+							<span className="font-bold">Direct merge is required.</span>
 						</div>
 						<hr />
 						<div>
@@ -196,63 +217,6 @@ export default function Merge() {
 								file={patch.file}
 							/>
 						</div>
-						<div className="p-2 border border-slate-950 flex gap-2">
-							<p>
-								<b>DIRECT MERGE:</b> Add all new entities from the patch onto
-								the base data set. Overwrite any entities that have matching
-								IDs.
-								<br />
-								<span className="font-bold">Direct merge is required.</span>
-							</p>
-							<input
-								type="checkbox"
-								disabled={true}
-								checked={mergeOptions.directMerge}
-								onChange={(e) => {
-									const simple = e.currentTarget.checked
-									setMergeOptions((m) => ({
-										...m,
-										directMerge: simple,
-									}))
-								}}
-							/>
-						</div>
-						<div className="p-2 border border-slate-950 flex gap-2">
-							<p>
-								<b>DE-DUPLICATE NODES:</b> Search for geographically identical
-								nodes in the two datasets and deduplicate them. Replaces
-								references in ways and relations.
-							</p>
-							<input
-								type="checkbox"
-								checked={mergeOptions.deduplicateNodes}
-								onChange={(e) => {
-									const deduplicateNodes = e.currentTarget.checked
-									setMergeOptions((m) => ({
-										...m,
-										deduplicateNodes,
-									}))
-								}}
-							/>
-						</div>
-						<div className="p-2 border border-slate-950 flex gap-2">
-							<p>
-								<b>ADD INTERSECTIONS:</b> Look for new ways that cross over
-								existing ways and determine if they are candidates for creating
-								intersection nodes by checking their tags.
-							</p>
-							<input
-								type="checkbox"
-								checked={mergeOptions.createIntersections}
-								onChange={(e) => {
-									const createIntersections = e.currentTarget.checked
-									setMergeOptions((m) => ({
-										...m,
-										createIntersections,
-									}))
-								}}
-							/>
-						</div>
 
 						<div className="flex gap-2 justify-between">
 							<Button className="flex-1/2" variant="outline" onClick={prevStep}>
@@ -269,151 +233,227 @@ export default function Merge() {
 										const results = await osmWorker.generateChangeset(
 											base.osm.id,
 											patch.osm.id,
-											mergeOptions,
+											{
+												directMerge: true,
+												deduplicateNodes: false,
+												createIntersections: false,
+											},
 										)
 										setChanges(results)
 										task.end("Changeset generated", "ready")
 									})
 								}}
 							>
-								Generate changeset <FileDiff />
+								Generate direct changes <FileDiff />
 							</Button>
 						</div>
-					</If>
+					</Step>
 
-					<If t={step === 3}>
-						{isTransitioning || changes == null ? (
-							<div className="flex flex-col gap-2">
-								<div className="flex items-center gap-1">
-									<Loader2Icon className="animate-spin size-4" />
-									<div className="font-bold">
-										GENERATING CHANGESET. PLEASE WAIT...
-									</div>
-								</div>
-								<div className="h-48 p-2 border inset-shadow-xs">
-									<LogContent />
-								</div>
-							</div>
-						) : (
-							<>
-								<div className="font-bold">3: REVIEW CHANGESET</div>
-								<div>
-									Changes have been generated and can be reviewed below. Once
-									the review is complete you can apply changes to generate a new
-									OSM file ready to be downloaded.
-								</div>
-								<div className="flex gap-2">
-									<Button
-										className="flex-1/2"
-										disabled={isTransitioning}
-										onClick={() => {
-											downloadJsonChanges()
-										}}
-									>
-										<DownloadIcon /> Download JSON changes
-									</Button>
-									<Button className="flex-1/2" disabled>
-										<DownloadIcon /> Download .osc changes
-									</Button>
-								</div>
-								{changes && <ChangesSummary changes={changes} />}
-							</>
+					<Step
+						step="review-changeset"
+						title="REVIEW CHANGESET"
+						isTransitioning={isTransitioning}
+					>
+						<div>
+							Changes have been generated from the previous step and can be
+							reviewed below. Once the review is complete you can apply changes
+							to the base OSM and move to the next step.
+						</div>
+						<div className="flex gap-2">
+							<Button
+								className="flex-1/2"
+								disabled={isTransitioning}
+								onClick={() => {
+									downloadJsonChanges()
+								}}
+							>
+								<DownloadIcon /> Download JSON changes
+							</Button>
+							<Button className="flex-1/2" disabled>
+								<DownloadIcon /> Download .osc changes
+							</Button>
+						</div>
+						{changes && (
+							<ChangesSummary>
+								{/* Changes List */}
+								<Details>
+									<DetailsSummary>CHANGES</DetailsSummary>
+									<DetailsContent>
+										<ChangesFilters />
+										<ChangesExpandableList />
+										<ChangesPagination />
+									</DetailsContent>
+								</Details>
+							</ChangesSummary>
 						)}
 
 						<div className="flex gap-2 justify-between">
-							<Button className="flex-1/2" variant="outline" onClick={prevStep}>
-								<ArrowLeft /> Back
-							</Button>
 							<Button
 								className="flex-1/2"
 								disabled={changes == null || isTransitioning}
 								onClick={() => {
 									if (!osmWorker) throw Error("No OSM worker")
 									nextStep()
-									const task = startTask("Applying changes to OSM", "info")
-									startTransition(async () => {
-										if (!changes) throw Error("No changes to apply")
-										if (!base.osm) throw Error("No base OSM")
-										const newOsm = await osmWorker.applyChanges(
-											`merged-${base.osm.id}`,
-										)
-										base.setOsm(null)
-										patch.setOsm(null)
-										merged.setOsm(Osm.from(newOsm))
-										task.end("Changes applied", "ready")
-									})
+									applyChanges()
 								}}
 							>
 								Apply changes <MergeIcon />
 							</Button>
 						</div>
-					</If>
+					</Step>
 
-					<If t={step === 4}>
-						{merged.osm == null ? (
-							<div className="flex items-center gap-1">
-								<Loader2Icon className="animate-spin size-4" />
-								<div className="font-bold">APPLYING CHANGES</div>
-							</div>
-						) : (
-							<>
-								<div className="font-bold">4: INSPECT OSM</div>
-								<div>
-									Changes have been applied and a new OSM dataset has been
-									created. It can be inspected here and downloaded as a new PBF.
-									Zoom in to select entities and see the changes.
+					<Step
+						step="deduplicate-nodes"
+						title="DE-DUPLICATE NODES"
+						isTransitioning={isTransitioning}
+					>
+						<div>
+							Search for geographically identical nodes in the two datasets and
+							de-duplicate them. Replaces references in ways and relations.
+						</div>
+
+						<div className="flex gap-2 justify-between">
+							<Button
+								className="flex-1/2"
+								variant="outline"
+								onClick={() => goToStep("inspect-osm")}
+							>
+								<SkipForwardIcon /> Skip
+							</Button>
+							<Button
+								className="flex-1/2"
+								onClick={() => {
+									nextStep()
+									const task = startTask("Generating changeset", "info")
+									startTransition(async () => {
+										if (!base.osm || !patch.osm || !osmWorker)
+											throw Error("Missing data to generate changes")
+										const results = await osmWorker.generateChangeset(
+											base.osm.id,
+											patch.osm.id,
+											{
+												directMerge: false,
+												deduplicateNodes: true,
+												createIntersections: false,
+											},
+										)
+										setChanges(results)
+										task.end("Changeset generated", "ready")
+									})
+								}}
+							>
+								De-duplicate nodes <FileDiff />
+							</Button>
+						</div>
+					</Step>
+
+					<Step
+						step="create-intersections"
+						title="CREATE INTERSECTIONS"
+						isTransitioning={isTransitioning}
+					>
+						<div>
+							Look for new ways that cross over existing ways and determine if
+							they are candidates for creating intersection nodes by checking
+							their tags.
+						</div>
+
+						<div className="flex gap-2 justify-between">
+							<Button
+								className="flex-1/2"
+								variant="outline"
+								onClick={() => goToStep("inspect-osm")}
+							>
+								<SkipForwardIcon /> Skip
+							</Button>
+							<Button
+								className="flex-1/2"
+								onClick={() => {
+									const task = startTask("Generating changeset", "info")
+									nextStep()
+									startTransition(async () => {
+										if (!base.osm || !patch.osm || !osmWorker)
+											throw Error("Missing data to generate changes")
+										const results = await osmWorker.generateChangeset(
+											base.osm.id,
+											patch.osm.id,
+											{
+												directMerge: false,
+												deduplicateNodes: false,
+												createIntersections: true,
+											},
+										)
+										setChanges(results)
+										task.end("Changeset generated", "ready")
+									})
+								}}
+							>
+								Create intersections <FileDiff />
+							</Button>
+						</div>
+					</Step>
+
+					<Step
+						step="inspect-osm"
+						title="INSPECT OSM"
+						isTransitioning={isTransitioning}
+					>
+						<div>
+							Changes have been applied and a new OSM dataset has been created.
+							It can be inspected here and downloaded as a new PBF. Zoom in to
+							select entities and see the changes.
+						</div>
+						<hr />
+						{base.osm && baseTileLayer.selectedEntity && (
+							<div>
+								<div className="px-1 flex justify-between">
+									<div className="font-bold">SELECTED ENTITY</div>
+									<Button
+										onClick={() => {
+											if (!base.osm || !baseTileLayer.selectedEntity) return
+											const bbox = base.osm?.getEntityBbox(
+												baseTileLayer.selectedEntity,
+											)
+											if (bbox)
+												map?.fitBounds(bbox, {
+													padding: 100,
+													maxDuration: 0,
+												})
+										}}
+										variant="ghost"
+										size="icon"
+										className="size-4"
+										title="Fit bounds to entity"
+									>
+										<MaximizeIcon />
+									</Button>
 								</div>
-								<hr />
-								{mergedSelectedEntity && (
-									<div>
-										<div className="px-1 flex justify-between">
-											<div className="font-bold">SELECTED ENTITY</div>
-											<Button
-												onClick={() => {
-													const bbox =
-														merged.osm?.getEntityBbox(mergedSelectedEntity)
-													if (bbox)
-														map?.fitBounds(bbox, {
-															padding: 100,
-															maxDuration: 0,
-														})
-												}}
-												variant="ghost"
-												size="icon"
-												className="size-4"
-												title="Fit bounds to entity"
-											>
-												<MaximizeIcon />
-											</Button>
-										</div>
-										<EntityDetails
-											entity={mergedSelectedEntity}
-											open={true}
-											osm={merged.osm}
-										/>
-									</div>
-								)}
-								<Button
-									onClick={() => {
-										if (!merged.osm) return // TODO shouldn't be necessary but TypeScript cries
-										downloadOsm(merged.osm)
-									}}
-									disabled={isTransitioning}
-								>
-									{isTransitioning ? (
-										<>
-											<Loader2Icon className="animate-spin size-4" /> Creating
-											PBF...
-										</>
-									) : (
-										<>
-											<DownloadIcon /> Download merged OSM PBF
-										</>
-									)}
-								</Button>
-							</>
+								<EntityDetails
+									entity={baseTileLayer.selectedEntity}
+									open={true}
+									osm={base.osm}
+								/>
+							</div>
 						)}
-					</If>
+						<Button
+							onClick={() => {
+								if (!base.osm) return // TODO shouldn't be necessary but TypeScript cries
+								downloadOsm(base.osm)
+							}}
+							disabled={isTransitioning}
+						>
+							{isTransitioning ? (
+								<>
+									<Loader2Icon className="animate-spin size-4" /> Creating
+									PBF...
+								</>
+							) : (
+								<>
+									<DownloadIcon /> Download merged OSM PBF
+								</>
+							)}
+						</Button>
+					</Step>
 				</div>
 			</Sidebar>
 			<MapContent>
@@ -421,15 +461,14 @@ export default function Merge() {
 					<DeckGlOverlay
 						layers={[
 							baseTileLayer.layer,
-							patchTileLayer.layer,
-							mergedTileLayer,
+							stepIndex > 0 ? null : patchTileLayer.layer,
 							selectedEntityLayer,
 						]}
 						getTooltip={(pickingInfo) => {
 							const sourceLayerId = pickingInfo.sourceLayer?.id
 							if (
-								mergedTileLayer &&
-								sourceLayerId?.startsWith(mergedTileLayer.id)
+								baseTileLayer.layer &&
+								sourceLayerId?.startsWith(baseTileLayer.layer.id)
 							) {
 								if (sourceLayerId.includes("nodes")) {
 									return {
@@ -453,167 +492,43 @@ export default function Merge() {
 	)
 }
 
+function Step({
+	step,
+	title,
+	isTransitioning,
+	children,
+}: {
+	step: (typeof STEPS)[number]
+	title: string
+	isTransitioning?: boolean
+	children: React.ReactNode
+}) {
+	const currentStep = useAtomValue(stepAtom)
+	const stepIndex = useAtomValue(stepIndexAtom)
+	if (step !== currentStep) return null
+	if (isTransitioning === true)
+		return (
+			<div className="flex flex-col gap-2">
+				<div className="flex items-center gap-1">
+					<Loader2Icon className="animate-spin size-4" />
+					<div className="font-bold">PLEASE WAIT...</div>
+				</div>
+				<div className="h-48 p-2 border inset-shadow-xs">
+					<LogContent />
+				</div>
+			</div>
+		)
+	return (
+		<>
+			<div className="font-bold">
+				{stepIndex + 1}: {title}
+			</div>
+			{children}
+		</>
+	)
+}
+
 function If({ children, t }: { children: React.ReactNode; t: boolean }) {
 	if (!t) return null
 	return <>{children}</>
-}
-
-const PAGE_SIZE = 5
-
-function ChangesSummary({
-	changes,
-	pageSize = PAGE_SIZE,
-}: { changes: OsmChanges; pageSize?: number }) {
-	const [currentPage, setCurrentPage] = useState(0)
-
-	// Get all changes for pagination
-	const allChanges: Array<OsmChange & { type: "node" | "way" | "relation" }> = [
-		...Object.values(changes.nodes).map((change) => ({
-			...change,
-			type: "node" as const,
-		})),
-		...Object.values(changes.ways).map((change) => ({
-			...change,
-			type: "way" as const,
-		})),
-		...Object.values(changes.relations).map((change) => ({
-			...change,
-			type: "relation" as const,
-		})),
-	]
-
-	const totalPages = Math.ceil(allChanges.length / pageSize)
-	const startIndex = currentPage * pageSize
-	const endIndex = startIndex + pageSize
-	const currentChanges = allChanges.slice(startIndex, endIndex)
-
-	const goToNextPage = () => {
-		if (currentPage < totalPages - 1) {
-			setCurrentPage(currentPage + 1)
-		}
-	}
-
-	const goToPrevPage = () => {
-		if (currentPage > 0) {
-			setCurrentPage(currentPage - 1)
-		}
-	}
-
-	const nodeChanges = Object.keys(changes.nodes).length
-	const wayChanges = Object.keys(changes.ways).length
-	const relationChanges = Object.keys(changes.relations).length
-	const totalChanges = nodeChanges + wayChanges + relationChanges
-
-	return (
-		<div className="flex flex-col gap-2">
-			<Details open={true}>
-				<DetailsSummary>CHANGES SUMMARY</DetailsSummary>
-				<DetailsContent>
-					<table>
-						<tbody>
-							<tr>
-								<td>node changes</td>
-								<td>{nodeChanges.toLocaleString()}</td>
-							</tr>
-							<tr>
-								<td>way changes</td>
-								<td>{wayChanges.toLocaleString()}</td>
-							</tr>
-							<tr>
-								<td>relation changes</td>
-								<td>{relationChanges.toLocaleString()}</td>
-							</tr>
-							<tr>
-								<td>total changes</td>
-								<td>{totalChanges.toLocaleString()}</td>
-							</tr>
-							<tr>
-								<td>deduplicated nodes</td>
-								<td>{changes.stats.deduplicatedNodes.toLocaleString()}</td>
-							</tr>
-							<tr>
-								<td>deduplicated nodes replaced</td>
-								<td>
-									{changes.stats.deduplicatedNodesReplaced.toLocaleString()}
-								</td>
-							</tr>
-							<tr>
-								<td>intersection points found</td>
-								<td>
-									{changes.stats.intersectionPointsFound.toLocaleString()}
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</DetailsContent>
-			</Details>
-
-			{/* Changes List */}
-			<Details>
-				<DetailsSummary>CHANGES PREVIEW</DetailsSummary>
-				<DetailsContent>
-					<div className="flex flex-col gap-2">
-						{currentChanges.map((change, i) => (
-							<ChangePreview
-								key={`${change.type}-${change.entity.id}`}
-								change={change}
-								entityType={change.type}
-								count={startIndex + i + 1}
-							/>
-						))}
-					</div>
-					{totalPages > 1 && (
-						<div className="flex items-center justify-between">
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={goToPrevPage}
-								disabled={currentPage === 0}
-							>
-								<ArrowLeft className="w-3 h-3 mr-1" />
-							</Button>
-							<span className="text-xs text-slate-500">
-								{(currentPage + 1).toLocaleString()} of{" "}
-								{totalPages.toLocaleString()}
-							</span>
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={goToNextPage}
-								disabled={currentPage === totalPages - 1}
-							>
-								<ArrowRight className="w-3 h-3 ml-1" />
-							</Button>
-						</div>
-					)}
-				</DetailsContent>
-			</Details>
-		</div>
-	)
-}
-
-function ChangePreview({
-	count,
-	change,
-	entityType,
-}: {
-	count: number
-	change: OsmChange
-	entityType: string
-}) {
-	const { changeType, entity } = change
-	const changeTypeColor = {
-		create: "text-green-600",
-		modify: "text-yellow-600",
-		delete: "text-red-600",
-	}[changeType]
-
-	return (
-		<div key={`${entityType}-${entity.id}`} className="flex flex-col">
-			<div className={`border-l pl-2 font-bold ${changeTypeColor}`}>
-				{count}. {changeType.toUpperCase()}
-			</div>
-			<EntityDetails entity={entity} open={false} />
-		</div>
-	)
 }

@@ -1,10 +1,10 @@
 import Pbf from "pbf"
 import { readBlob, readBlobHeader } from "./proto/fileformat"
 import {
-	readHeaderBlock,
-	readPrimitiveBlock,
 	type OsmPbfHeaderBlock,
 	type OsmPbfPrimitiveBlock,
+	readHeaderBlock,
+	readPrimitiveBlock,
 } from "./proto/osmformat"
 import { nativeDecompress, streamToAsyncIterator } from "./utils"
 

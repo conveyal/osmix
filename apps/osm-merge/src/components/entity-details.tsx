@@ -1,14 +1,14 @@
 import type { Osm, OsmEntity, OsmNode, OsmRelation, OsmWay } from "osm.ts"
-import { Details, DetailsContent, DetailsSummary } from "./details"
 import { isNode, isRelation, isWay } from "osm.ts/utils"
 import { Fragment } from "react/jsx-runtime"
+import { Details, DetailsContent, DetailsSummary } from "./details"
 
 const noop = (_: OsmNode) => undefined
 
 export default function EntityDetails({
 	open,
 	entity,
-	onSelect,
+	onSelect = noop,
 	osm,
 }: {
 	open?: boolean
@@ -21,12 +21,17 @@ export default function EntityDetails({
 		return (
 			<WayDetails way={entity} open={open}>
 				{osm && (
-					<NodeListDetails
-						nodes={entity.refs
-							.map((ref) => osm.nodes.getById(ref))
-							.filter((n) => n != null)}
-						onSelect={onSelect ?? noop}
-					/>
+					<Details open={open}>
+						<DetailsSummary>WAY NODES ({entity.refs.length})</DetailsSummary>
+						<DetailsContent>
+							<NodeListTable
+								nodes={entity.refs
+									.map((ref) => osm.nodes.getById(ref))
+									.filter((n) => n != null)}
+								onSelect={onSelect}
+							/>
+						</DetailsContent>
+					</Details>
 				)}
 			</WayDetails>
 		)
@@ -137,34 +142,43 @@ export function NodeListDetails({
 		<Details open>
 			<DetailsSummary>NODES ({nodes.length})</DetailsSummary>
 			<DetailsContent className="max-h-48 overflow-y-scroll">
-				<table className="table-auto">
-					<tbody>
-						{nodes.map((node, i) => (
-							<Fragment key={`${node.id}-${i}`}>
-								<tr
-									onClick={() => onSelect(node)}
-									onKeyDown={() => onSelect(node)}
-									className="cursor-pointer"
-								>
-									<td>{i + 1}</td>
-									<td>{node.id}</td>
-									<td>
-										{node.lon}, {node.lat}
-									</td>
-								</tr>
-								{node.tags &&
-									Object.entries(node.tags).map(([k, v]) => (
-										<tr key={`${node.id}-${k}`}>
-											<td />
-											<td>{k}</td>
-											<td>{String(v)}</td>
-										</tr>
-									))}
-							</Fragment>
-						))}
-					</tbody>
-				</table>
+				<NodeListTable nodes={nodes} onSelect={onSelect} />
 			</DetailsContent>
 		</Details>
+	)
+}
+
+function NodeListTable({
+	nodes,
+	onSelect,
+}: { nodes: OsmNode[]; onSelect: (node: OsmNode) => void }) {
+	return (
+		<table className="table-auto">
+			<tbody>
+				{nodes.map((node, i) => (
+					<Fragment key={`${node.id}-${i}`}>
+						<tr
+							onClick={() => onSelect(node)}
+							onKeyDown={() => onSelect(node)}
+							className="cursor-pointer"
+						>
+							<td>{i + 1}</td>
+							<td>{node.id}</td>
+							<td>
+								{node.lon}, {node.lat}
+							</td>
+						</tr>
+						{node.tags &&
+							Object.entries(node.tags).map(([k, v]) => (
+								<tr key={`${node.id}-${k}`}>
+									<td />
+									<td>{k}</td>
+									<td>{String(v)}</td>
+								</tr>
+							))}
+					</Fragment>
+				))}
+			</tbody>
+		</table>
 	)
 }

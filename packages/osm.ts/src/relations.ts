@@ -8,7 +8,12 @@ import {
 	ResizeableTypedArray,
 	type TypedArrayBuffer,
 } from "./typed-arrays"
-import type { OsmRelation, OsmRelationMember, OsmTags } from "./types"
+import type {
+	OsmEntityType,
+	OsmRelation,
+	OsmRelationMember,
+	OsmTags,
+} from "./types"
 
 const RELATION_MEMBER_TYPES = ["node", "way", "relation"] as const
 
@@ -114,7 +119,10 @@ export class Relations extends Entities<OsmRelation> {
 		}
 	}
 
-	getMembersByIndex(index: number) {
+	getMembersByIndex(
+		index: number,
+		relationMemberTypes = ["node", "way", "relation"],
+	) {
 		const start = this.memberStart.at(index)
 		const count = this.memberCount.at(index)
 		const members: OsmRelationMember[] = []
@@ -122,9 +130,33 @@ export class Relations extends Entities<OsmRelation> {
 			const ref = this.memberRefs.at(i)
 			const type = RELATION_MEMBER_TYPES[this.memberTypes.at(i)]
 			if (type === undefined) throw Error(`Member type not found: ${i}`)
+			if (!relationMemberTypes.includes(type)) continue
 			const role = this.stringTable.get(this.memberRoles.at(i))
 			members.push({ ref, type, role })
 		}
 		return members
+	}
+
+	includesMember(
+		index: number,
+		memberRef: number,
+		memberType: OsmEntityType,
+		memberRole?: string,
+	) {
+		const start = this.memberStart.array[index]
+		const count = this.memberCount.array[index]
+		for (let i = start; i < start + count; i++) {
+			const type = RELATION_MEMBER_TYPES[this.memberTypes.array[i]]
+			if (type !== memberType) continue
+			const ref = this.memberRefs.array[i]
+			if (ref !== memberRef) continue
+			if (
+				memberRole !== undefined &&
+				this.stringTable.get(this.memberRoles.array[i]) !== memberRole
+			)
+				continue
+			return true
+		}
+		return false
 	}
 }

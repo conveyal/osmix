@@ -1,14 +1,14 @@
+import { lineIntersect } from "@turf/turf"
 import { dequal } from "dequal/lite"
 import type {
 	LonLat,
+	OsmEntity,
 	OsmEntityType,
 	OsmNode,
 	OsmRelation,
-	OsmWay,
-	OsmEntity,
 	OsmTags,
+	OsmWay,
 } from "./types"
-import { lineIntersect } from "@turf/turf"
 
 function isTagsAndInfoEqual(a: OsmEntity, b: OsmEntity) {
 	return dequal(a.tags, b.tags) && dequal(a.info, b.info)
@@ -135,4 +135,57 @@ export function osmTagsToOscTags(tags: OsmTags): string {
 			return `<tag k="${key}" v="${value}" />`
 		})
 		.join("")
+}
+/**
+ * Remove duplicate refs back to back, but not when they are separated by other refs
+ * @param way
+ * @returns way with duplicate refs back to back removed
+ */
+export function removeDuplicateAdjacentOsmWayRefs(way: OsmWay) {
+	return {
+		...way,
+		refs: way.refs.filter((ref, index, array) => {
+			return ref !== array[index + 1]
+		}),
+	}
+}
+export function cleanCoords(coords: [number, number][]) {
+	return coords.filter((coord, index, array) => {
+		if (index === array.length - 1) return true
+		return coord[0] !== array[index + 1][0] || coord[1] !== array[index + 1][1]
+	})
+}
+const isHighway = (t: OsmTags) => t.highway != null
+const isFootish = (t: OsmTags) =>
+	["footway", "path", "cycleway", "bridleway", "steps"].includes(
+		String(t.highway),
+	)
+const isPolygonish = (t: OsmTags) => !!(t.building || t.landuse || t.natural)
+/**
+ * Determine if two ways should be connected based on their tags
+ */
+export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
+	const a = tagsA || {}
+	const b = tagsB || {}
+	if (isPolygonish(a) || isPolygonish(b)) return false
+
+	const isSeparated = !!(a.bridge || a.tunnel || b.bridge || b.tunnel)
+	const diffLayer = (a.layer ?? "0") !== (b.layer ?? "0")
+	if (isSeparated || diffLayer) return false
+
+	if (isHighway(a) && isHighway(b)) return true
+	if (isHighway(a) && isFootish(b)) return true
+	if (isHighway(b) && isFootish(a)) return true
+
+	return false
+}
+/**
+ * Determine if a way is a candidate for connecting to another way
+ */
+export function isWayIntersectionCandidate(way: OsmWay) {
+	return (
+		way.tags &&
+		(isHighway(way.tags) || isFootish(way.tags)) &&
+		!isPolygonish(way.tags)
+	)
 }

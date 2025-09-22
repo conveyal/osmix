@@ -1,4 +1,9 @@
 import KDBush from "kdbush"
+import { Entities, type EntitiesTransferables } from "./entities"
+import { type IdOrIndex, Ids } from "./ids"
+import type { OsmPbfDenseNodes, OsmPbfPrimitiveBlock } from "./pbf"
+import type StringTable from "./stringtable"
+import { Tags } from "./tags"
 import {
 	BufferConstructor,
 	CoordinateArrayType,
@@ -6,11 +11,6 @@ import {
 	type TypedArrayBuffer,
 } from "./typed-arrays"
 import type { GeoBbox2D, OsmNode, OsmTags } from "./types"
-import { Entities, type EntitiesTransferables } from "./entities"
-import type StringTable from "./stringtable"
-import type { OsmPbfDenseNodes, OsmPbfPrimitiveBlock } from "./pbf"
-import { Ids, type IdOrIndex } from "./ids"
-import { Tags } from "./tags"
 
 export interface NodesTransferables extends EntitiesTransferables {
 	lons: TypedArrayBuffer
@@ -160,8 +160,8 @@ export class Nodes extends Entities<OsmNode> {
 	}
 
 	getNodeLonLat(i: IdOrIndex): [number, number] {
-		const [index] = this.ids.idOrIndex(i)
-		return [this.lons.at(index), this.lats.at(index)]
+		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
+		return [this.lons.array[index], this.lats.array[index]]
 	}
 
 	getFullEntity(index: number, id: number, tags?: OsmTags): OsmNode {
@@ -192,44 +192,4 @@ export class Nodes extends Entities<OsmNode> {
 	withinRadius(x: number, y: number, radius: number): number[] {
 		return this.spatialIndex.within(x, y, radius)
 	}
-
-	findNeighborsWithin(node: OsmNode, radius = 0): OsmNode[] {
-		const nodeIndexes = this.spatialIndex.within(node.lon, node.lat, radius)
-		return this.getEntitiesByIndex(nodeIndexes).filter((n) => n.id !== node.id)
-	}
-
-	findOverlappingNodes(nodes: OsmNode[], radius = 0) {
-		return findOverlappingNodes(this, nodes, radius)
-	}
-}
-
-/**
- * Find nodes that are within a certain radius of each other.
- * @param index The index to search in.
- * @param nodes The nodes to search for.
- * @param radius The radius to search for. Defaults to 0, which means the nodes must be at the same location.
- * @returns A map of node IDs to sets of node IDs that are within the radius.
- */
-export function findOverlappingNodes(
-	index: Nodes,
-	nodes: OsmNode[],
-	radius = 0,
-) {
-	const overlapping = new Map<number, Set<number>>()
-	for (const node of nodes) {
-		const closeNodes = index.findNeighborsWithin(node, radius)
-		if (closeNodes.length === 0) continue
-		const overlappingNodes = new Set<number>()
-		for (const closeNode of closeNodes) {
-			if (overlapping.has(closeNode.id)) {
-				overlapping.get(closeNode.id)?.add(node.id)
-			} else {
-				overlappingNodes.add(closeNode.id)
-			}
-		}
-		if (overlappingNodes.size > 0) {
-			overlapping.set(node.id, overlappingNodes)
-		}
-	}
-	return overlapping
 }

@@ -14,7 +14,7 @@ export default class StringTable {
 	private enc = new TextEncoder()
 	private dec = new TextDecoder() // UTF-8
 
-	// Retrieval state
+	// Serializable state
 	private bytes: ResizeableTypedArray<Uint8Array>
 	private start: ResizeableTypedArray<Uint32Array>
 	private count: ResizeableTypedArray<Uint16Array>
@@ -22,14 +22,14 @@ export default class StringTable {
 	// Builder state
 	private stringToIndex = new Map<string, number>()
 
-	private isCompacted = false
+	// Retrieval state
+	private indexToString = new Map<number, string>()
 
 	static from({ bytes, start, count }: StringTableTransferables): StringTable {
 		const builder = new StringTable()
 		builder.bytes = ResizeableTypedArray.from(Uint8Array, bytes)
 		builder.start = ResizeableTypedArray.from(Uint32Array, start)
 		builder.count = ResizeableTypedArray.from(Uint16Array, count)
-		builder.isCompacted = true
 		return builder
 	}
 
@@ -78,11 +78,15 @@ export default class StringTable {
 	 * TextDecoder.decode() does not support SharedArrayBuffer, so we need to first copy to a normal ArrayBuffer before decoding.
 	 */
 	get(index: number): string {
+		const string = this.indexToString.get(index)
+		if (string) return string
 		const bytes = this.getBytes(index)
 		const tempBuffer = new ArrayBuffer(bytes.byteLength)
 		const tempBytes = new Uint8Array(tempBuffer)
 		tempBytes.set(bytes)
-		return this.dec.decode(tempBytes)
+		const decoded = this.dec.decode(tempBytes)
+		this.indexToString.set(index, decoded)
+		return decoded
 	}
 
 	getBytes(index: number): Uint8Array {
@@ -104,7 +108,6 @@ export default class StringTable {
 		this.count.compact()
 
 		this.stringToIndex.clear()
-		this.isCompacted = true
 	}
 
 	toOsmPbfStringTable(): OsmPbfStringTable {

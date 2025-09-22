@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { Button } from "./ui/button"
 import {
 	Dialog,
@@ -7,7 +8,6 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "./ui/dialog"
-import { useEffect, useState } from "react"
 
 export default function BrowserCheck() {
 	return (

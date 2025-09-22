@@ -23,8 +23,11 @@ export default function Status() {
 						)}
 					/>
 				)}
-				<div className="text-slate-950 no-underline">
-					[{formatTimestampMs(status.timestamp)}] {status.message}
+				<div
+					className="text-slate-950 no-underline"
+					title={formatTimestampMs(status.timestamp)}
+				>
+					{status.message}
 				</div>
 			</HoverCardTrigger>
 			<HoverCardContent className="max-h-96 overflow-y-scroll w-lg">

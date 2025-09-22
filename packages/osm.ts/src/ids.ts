@@ -14,6 +14,7 @@ export type IdsTransferables = {
 	sortedIds: TypedArrayBuffer
 	sortedIdPositionToIndex: TypedArrayBuffer
 	anchors: TypedArrayBuffer
+	idsAreSorted: boolean
 }
 
 /**
@@ -35,6 +36,7 @@ export class Ids {
 		sortedIds,
 		sortedIdPositionToIndex,
 		anchors,
+		idsAreSorted,
 	}: IdsTransferables) {
 		const idIndex = new Ids()
 		idIndex.ids = ResizeableTypedArray.from(IdArrayType, ids)
@@ -42,6 +44,7 @@ export class Ids {
 		idIndex.sortedIdPositionToIndex = new Uint32Array(sortedIdPositionToIndex)
 		idIndex.anchors = new Float64Array(anchors)
 		idIndex.indexBuilt = true
+		idIndex.idsAreSorted = idsAreSorted
 		return idIndex
 	}
 
@@ -51,6 +54,7 @@ export class Ids {
 			sortedIds: this.idsSorted.buffer,
 			sortedIdPositionToIndex: this.sortedIdPositionToIndex.buffer,
 			anchors: this.anchors.buffer,
+			idsAreSorted: this.idsAreSorted,
 		}
 	}
 
@@ -76,6 +80,10 @@ export class Ids {
 		return this.ids.at(index)
 	}
 
+	has(id: number): boolean {
+		return this.getIndexFromId(id) !== -1
+	}
+
 	/**
 	 * Build the index of IDs to positions.
 	 *
@@ -86,7 +94,7 @@ export class Ids {
 		if (this.indexBuilt) throw Error("ID index already build.")
 		this.ids.compact()
 		if (!this.idsAreSorted) {
-			console.error("IDs were not sorted. Sorting now...")
+			console.warn("IDs were not sorted. Sorting now...")
 			// Build the sorted index
 			this.idsSorted = new Float64Array(this.size)
 			this.sortedIdPositionToIndex = new Uint32Array(this.size)
@@ -111,6 +119,11 @@ export class Ids {
 		} else {
 			// Point to the same array
 			this.idsSorted = this.ids.array
+			// Create the sortedIdPositionToIndex array
+			this.sortedIdPositionToIndex = new Uint32Array(this.size)
+			for (let i = 0; i < this.size; i++) {
+				this.sortedIdPositionToIndex[i] = i
+			}
 		}
 
 		// Build anchors (every blockSize-th key)

@@ -1,6 +1,6 @@
-import { useAtomValue } from "jotai"
 import { logAtom } from "@/state/log"
 import { formatTimestampMs } from "@/utils"
+import { useAtomValue } from "jotai"
 
 export default function LogContent() {
 	const log = useAtomValue(logAtom)
@@ -10,8 +10,9 @@ export default function LogContent() {
 				<div
 					key={`${index}-${message.timestamp}`}
 					className="whitespace-nowrap"
+					title={formatTimestampMs(message.timestamp)}
 				>
-					[{formatTimestampMs(message.timestamp)}] {message.message}
+					[{(message.duration / 1_000).toFixed(3)}s] {message.message}
 				</div>
 			))}
 		</div>

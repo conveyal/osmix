@@ -7,7 +7,7 @@ import { OsmPbfWriter } from "../src/pbf/osm-pbf-writer"
 import type { OsmEntity } from "../src/types"
 import { isNode, isRelation, isWay } from "../src/utils"
 import { PBFs, type PbfFixture } from "./files"
-import { getFile, getFileReadStream, WriteableStreamArrayBuffer } from "./utils"
+import { WriteableStreamArrayBuffer, getFile, getFileReadStream } from "./utils"
 
 async function testReader(osm: OsmPbfReader, pbf: PbfFixture) {
 	assert.deepEqual(osm.header.bbox, pbf.bbox)

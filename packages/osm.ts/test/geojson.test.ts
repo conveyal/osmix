@@ -1,5 +1,5 @@
-import * as turf from "@turf/turf"
 import assert from "node:assert"
+import * as turf from "@turf/turf"
 import { describe, it } from "vitest"
 
 import { Osm } from "../src/osm"

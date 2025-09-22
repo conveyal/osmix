@@ -1,9 +1,9 @@
 import CenterInfo from "@/components/center-info"
 import ZoomInfo from "@/components/zoom-info"
+import { cn } from "@/lib/utils"
+import { NavLink } from "react-router"
 import BrowserCheck from "./browser-check"
 import Status from "./status"
-import { NavLink } from "react-router"
-import { cn } from "@/lib/utils"
 
 export default function Nav() {
 	return (
@@ -26,13 +26,21 @@ export default function Nav() {
 				>
 					Inspect
 				</NavLink>
+				<NavLink
+					className={({ isActive }) =>
+						cn("text-slate-950 py-4 px-2", isActive && "text-blue-600")
+					}
+					to="filter"
+				>
+					Filter
+				</NavLink>
 				{process.env.NODE_ENV === "development" && <BrowserCheck />}
 			</div>
 
 			<Status />
 
 			<div className="flex flex-row gap-4 items-center">
-				<div>
+				<div className=" whitespace-nowrap">
 					<CenterInfo />
 				</div>
 				<hr className="border-r h-4" />

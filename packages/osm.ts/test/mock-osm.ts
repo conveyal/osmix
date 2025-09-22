@@ -15,7 +15,7 @@ function addBaseNodes(osm: Osm) {
 	osm.nodes.addNode({
 		id: 1,
 		lat: YAKIM_LAT,
-		lon: YAKIM_LON + ONE_KM_LON, // approximately 1km east
+		lon: YAKIM_LON - ONE_KM_LON, // approximately 1km west
 	})
 }
 
@@ -53,19 +53,19 @@ export function createPatchOsm(): Osm {
 	// Add all nodes
 	addBaseNodes(osm)
 
-	const node1 = osm.nodes.getByIndex(0)
-	const node2 = osm.nodes.getByIndex(1)
-	if (!node1 || !node2) throw new Error("node not found")
+	const node0 = osm.nodes.getByIndex(0)
+	const node1 = osm.nodes.getByIndex(1)
+	if (!node0 || !node1) throw new Error("node not found")
 
-	// Add disconnected way
+	// Add way the connects with base way node 0 (will replace it)
 	osm.nodes.addNode({
-		...node1,
+		...node0,
 		id: 2,
 	})
 	osm.nodes.addNode({
-		...node2,
+		...node1,
 		id: 3,
-		lon: YAKIM_LON + ONE_KM_LON * 2, // ends 2km east of the center point
+		lon: YAKIM_LON + ONE_KM_LON, // ends 1km east of the center point
 	})
 
 	// Add nodes for disconnected way
@@ -94,15 +94,17 @@ export function createPatchOsm(): Osm {
 
 	osm.nodes.finish()
 
-	// Add base way with new tags
+	// Add same base way with new tags
 	osm.ways.addWay({
 		id: 1,
 		refs: [0, 1],
 		tags: {
 			highway: "primary",
+			version: "2",
 		},
 	})
 
+	// Add way that overlaps with base way node 1. Node should be de-duplicated.
 	osm.ways.addWay({
 		id: 2,
 		refs: [2, 3],
@@ -111,7 +113,7 @@ export function createPatchOsm(): Osm {
 		},
 	})
 
-	// Add way that crosses, and should generate an intersection
+	// Add way that crosses way 2, and should generate 1 intersection.
 	osm.ways.addWay({
 		id: 3,
 		refs: [4, 5],
@@ -120,7 +122,7 @@ export function createPatchOsm(): Osm {
 		},
 	})
 
-	// Add a way that crosses, but has a tag indicating it is an underpass and should be left alone
+	// Add a way that crosses way 2, but has a tag indicating it is an underpass and should be left alone
 	osm.ways.addWay({
 		id: 4,
 		refs: [6, 7],
