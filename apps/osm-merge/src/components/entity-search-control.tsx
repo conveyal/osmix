@@ -1,11 +1,11 @@
-import { mapAtom } from "@/state/map"
+import { useFlyToEntity } from "@/hooks/map"
 import { selectedEntityAtom } from "@/state/osm"
-import { useAtomValue, useSetAtom } from "jotai"
+import { useSetAtom } from "jotai"
 import type { Osm } from "osm.ts"
 import EntityLookup from "./entity-lookup"
 
 export default function EntitySearchControl({ osm }: { osm: Osm }) {
-	const map = useAtomValue(mapAtom)
+	const flyToEntity = useFlyToEntity()
 	const setSelectedEntity = useSetAtom(selectedEntityAtom)
 	return (
 		<div className="bg-background w-sm">
@@ -13,12 +13,8 @@ export default function EntitySearchControl({ osm }: { osm: Osm }) {
 				setSelectedEntity={(id) => {
 					const entity = osm.getById(id)
 					setSelectedEntity(entity)
-					if (map && entity) {
-						const bbox = osm.getEntityBbox(entity)
-						map.fitBounds(bbox, {
-							padding: 100,
-							maxDuration: 200,
-						})
+					if (entity) {
+						flyToEntity(osm, entity)
 					}
 					return entity
 				}}

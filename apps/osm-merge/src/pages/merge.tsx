@@ -6,7 +6,11 @@ import ChangesSummary, {
 	ChangesPagination,
 } from "@/components/osm-changes-summary"
 import useStartTaskLog from "@/hooks/log"
-import { usePickableOsmTileLayer, useSelectedEntityLayer } from "@/hooks/map"
+import {
+	useFlyToEntity,
+	usePickableOsmTileLayer,
+	useSelectedEntityLayer,
+} from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { changesAtom } from "@/state/changes"
@@ -58,8 +62,7 @@ export default function Merge() {
 	const [isTransitioning, startTransition] = useTransition()
 	const [changes, setChanges] = useAtom(changesAtom)
 	const startTask = useStartTaskLog()
-	const map = useAtomValue(mapAtom)
-
+	const flyToEntity = useFlyToEntity()
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const baseTileLayer = usePickableOsmTileLayer(base.osm)
 	const patchTileLayer = usePickableOsmTileLayer(patch.osm)
@@ -411,12 +414,7 @@ export default function Merge() {
 									<Button
 										onClick={() => {
 											if (!base.osm || !selectedEntity) return
-											const bbox = base.osm?.getEntityBbox(selectedEntity)
-											if (bbox)
-												map?.fitBounds(bbox, {
-													padding: 100,
-													maxDuration: 200,
-												})
+											flyToEntity(base.osm, selectedEntity)
 										}}
 										variant="ghost"
 										size="icon"

@@ -15,10 +15,11 @@ import {
 } from "@deck.gl/layers"
 import { bboxPolygon } from "@turf/turf"
 import { useAtomValue, useSetAtom } from "jotai"
-import type { GeoBbox2D, Osm } from "osm.ts"
-import { useEffect, useMemo } from "react"
+import type { GeoBbox2D, Osm, OsmEntity } from "osm.ts"
+import { useCallback, useEffect, useMemo } from "react"
 import useStartTaskLog from "./log"
 import { osmWorker } from "@/state/worker"
+import { isNode } from "osm.ts/utils"
 
 export function useFitBoundsOnChange(bbox?: GeoBbox2D) {
 	const map = useAtomValue(mapAtom)
@@ -30,6 +31,49 @@ export function useFitBoundsOnChange(bbox?: GeoBbox2D) {
 			maxDuration: 200,
 		})
 	}, [bbox, map])
+}
+
+export function useFlyToEntity() {
+	const map = useAtomValue(mapAtom)
+
+	return useCallback(
+		(osm: Osm, entity: OsmEntity) => {
+			if (!map) return
+			if (isNode(entity)) {
+				map.flyTo({
+					center: [entity.lon, entity.lat],
+					padding: 200,
+					maxDuration: 200,
+					zoom: 16,
+				})
+			} else {
+				const bbox = osm.getEntityBbox(entity)
+				map.fitBounds(bbox, {
+					padding: 100,
+					maxDuration: 200,
+				})
+			}
+		},
+		[map],
+	)
+}
+
+export function useFlyToOsmBounds() {
+	const map = useAtomValue(mapAtom)
+
+	return useCallback(
+		(osm: Osm) => {
+			if (!map) return
+			const bbox = osm.bbox()
+			if (bbox) {
+				map.fitBounds(bbox, {
+					padding: 100,
+					maxDuration: 200,
+				})
+			}
+		},
+		[map],
+	)
 }
 
 const EMPTY_BITMAP = new Uint8Array(BITMAP_TILE_SIZE * BITMAP_TILE_SIZE * 4)

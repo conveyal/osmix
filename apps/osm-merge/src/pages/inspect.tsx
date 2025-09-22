@@ -1,11 +1,15 @@
 import CustomControl from "@/components/custom-control"
 import EntitySearchControl from "@/components/entity-search-control"
 import ExtractList from "@/components/extract-list"
-import { usePickableOsmTileLayer, useSelectedEntityLayer } from "@/hooks/map"
+import {
+	useFlyToEntity,
+	useFlyToOsmBounds,
+	usePickableOsmTileLayer,
+	useSelectedEntityLayer,
+} from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
 import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
 import { addLogMessageAtom } from "@/state/log"
-import { mapAtom } from "@/state/map"
 import {
 	selectOsmEntityAtom,
 	selectedEntityAtom,
@@ -32,7 +36,6 @@ export default function InspectPage() {
 		() => searchParams.get("osmId") ?? "inspect",
 		[searchParams],
 	)
-	const map = useAtomValue(mapAtom)
 	const { osm, isLoading: isLoadingFile, file, setFile } = useOsmFile(osmId)
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const logMessage = useSetAtom(addLogMessageAtom)
@@ -60,6 +63,8 @@ export default function InspectPage() {
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const tileLayer = usePickableOsmTileLayer(osm)
 	const selectedEntityLayer = useSelectedEntityLayer()
+	const flyToEntity = useFlyToEntity()
+	const flyToOsmBounds = useFlyToOsmBounds()
 
 	return (
 		<Main>
@@ -80,14 +85,7 @@ export default function InspectPage() {
 								<div className="flex justify-between">
 									<div className="font-bold">OPENSTREETMAP PBF</div>
 									<Button
-										onClick={() => {
-											const bbox = osm.bbox()
-											if (bbox)
-												map?.fitBounds(bbox, {
-													padding: 100,
-													maxDuration: 200,
-												})
-										}}
+										onClick={() => flyToOsmBounds(osm)}
 										variant="ghost"
 										size="icon"
 										className="size-4"
@@ -108,12 +106,7 @@ export default function InspectPage() {
 										<div className="font-bold">SELECTED ENTITY</div>
 										<Button
 											onClick={() => {
-												const bbox = selectedOsm?.getEntityBbox(selectedEntity)
-												if (bbox)
-													map?.fitBounds(bbox, {
-														padding: 100,
-														maxDuration: 200,
-													})
+												flyToEntity(selectedOsm, selectedEntity)
 											}}
 											variant="ghost"
 											size="icon"

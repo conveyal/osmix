@@ -15,15 +15,18 @@ import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import { Button } from "@/components/ui/button"
 import useStartTaskLog from "@/hooks/log"
-import { usePickableOsmTileLayer, useSelectedEntityLayer } from "@/hooks/map"
+import {
+	useFlyToEntity,
+	useFlyToOsmBounds,
+	usePickableOsmTileLayer,
+	useSelectedEntityLayer,
+} from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
-import { useSubscribeOsmWorkerToLog } from "@/hooks/log"
 import { APPID } from "@/settings"
 import { changesAtom } from "@/state/changes"
-import { mapAtom } from "@/state/map"
 import { selectOsmEntityAtom } from "@/state/osm"
 import { bboxPolygon } from "@turf/turf"
-import { useAtom, useAtomValue, useSetAtom } from "jotai"
+import { useAtom, useSetAtom } from "jotai"
 import { Loader2Icon, MaximizeIcon } from "lucide-react"
 import { useEffect, useMemo, useTransition } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
@@ -36,7 +39,8 @@ export default function FilterPage() {
 		() => searchParams.get("osmId") ?? "inspect",
 		[searchParams],
 	)
-	const map = useAtomValue(mapAtom)
+	const flyToEntity = useFlyToEntity()
+	const flyToOsmBounds = useFlyToOsmBounds()
 	const {
 		osm,
 		isLoading: isLoadingFile,
@@ -82,14 +86,7 @@ export default function FilterPage() {
 								<div className="flex justify-between">
 									<div className="font-bold">OPENSTREETMAP PBF</div>
 									<Button
-										onClick={() => {
-											const bbox = osm.bbox()
-											if (bbox)
-												map?.fitBounds(bbox, {
-													padding: 100,
-													maxDuration: 200,
-												})
-										}}
+										onClick={() => flyToOsmBounds(osm)}
 										variant="ghost"
 										size="icon"
 										className="size-4"
@@ -132,11 +129,7 @@ export default function FilterPage() {
 											<ChangesList
 												setSelectedEntity={(entity) => {
 													selectEntity(osm, entity)
-													const bbox = osm.getEntityBbox(entity)
-													map?.fitBounds(bbox, {
-														padding: 100,
-														maxDuration: 200,
-													})
+													flyToEntity(osm, entity)
 												}}
 											/>
 											<ChangesPagination />

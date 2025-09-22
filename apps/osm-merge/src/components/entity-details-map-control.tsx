@@ -1,7 +1,7 @@
+import { useFlyToEntity } from "@/hooks/map"
 import { MIN_PICKABLE_ZOOM } from "@/settings"
-import { mapAtom } from "@/state/map"
 import { selectedEntityAtom } from "@/state/osm"
-import { useAtom, useAtomValue } from "jotai"
+import { useAtom } from "jotai"
 import { MaximizeIcon } from "lucide-react"
 import type { Osm } from "osm.ts"
 import EntityDetails from "./entity-details"
@@ -9,7 +9,7 @@ import { Button } from "./ui/button"
 
 export default function EntityMapControl({ osm }: { osm: Osm }) {
 	const [selectedEntity, setSelectedEntity] = useAtom(selectedEntityAtom)
-	const map = useAtomValue(mapAtom)
+	const flyToEntity = useFlyToEntity()
 	return (
 		<div className="flex flex-col gap-2 bg-background w-sm max-h-[50lvh] overflow-y-auto">
 			{selectedEntity == null ? (
@@ -22,12 +22,7 @@ export default function EntityMapControl({ osm }: { osm: Osm }) {
 						<div className="font-bold">SELECTED ENTITY</div>
 						<Button
 							onClick={() => {
-								const bbox = osm?.getEntityBbox(selectedEntity)
-								if (bbox)
-									map?.fitBounds(bbox, {
-										padding: 100,
-										maxDuration: 200,
-									})
+								flyToEntity(osm, selectedEntity)
 							}}
 							variant="ghost"
 							size="icon"
