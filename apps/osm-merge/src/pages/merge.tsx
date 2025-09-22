@@ -8,7 +8,6 @@ import ChangesSummary, {
 import useStartTaskLog from "@/hooks/log"
 import { usePickableOsmTileLayer, useSelectedEntityLayer } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
-import { useSubscribeOsmWorkerToLog } from "@/hooks/log"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { changesAtom } from "@/state/changes"
 import { mapAtom } from "@/state/map"
@@ -416,7 +415,7 @@ export default function Merge() {
 											if (bbox)
 												map?.fitBounds(bbox, {
 													padding: 100,
-													maxDuration: 0,
+													maxDuration: 200,
 												})
 										}}
 										variant="ghost"

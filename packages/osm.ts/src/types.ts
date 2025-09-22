@@ -78,8 +78,11 @@ export type OsmGeoJSONFeature = GeoJSON.Feature<
 	OsmGeoJSONProperties
 >
 
+// String that starts with `n`, `w`, or `r` followed by the ID
+export type OsmEntityRef = `n${number}` | `w${number}` | `r${number}`
+
 export type OsmChange<T extends IOsmEntity = OsmEntity> = {
 	changeType: "modify" | "create" | "delete"
 	entity: T
-	note?: string
+	refs?: OsmEntityRef[]
 }

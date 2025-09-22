@@ -4,6 +4,7 @@ import { Osm } from "./osm"
 import type {
 	OsmChange,
 	OsmEntity,
+	OsmEntityRef,
 	OsmEntityType,
 	OsmEntityTypeMap,
 	OsmNode,
@@ -137,11 +138,11 @@ export default class OsmChangeset {
 		}
 	}
 
-	delete(entity: OsmEntity, note?: string) {
+	delete(entity: OsmEntity, refs?: OsmEntityRef[]) {
 		this.changes(getEntityType(entity))[entity.id] = {
 			changeType: "delete",
 			entity,
-			note,
+			refs,
 		}
 	}
 
@@ -151,17 +152,17 @@ export default class OsmChangeset {
 		idPairs: IdPairs,
 	): number {
 		const nodeId = osm.nodes.ids.at(nodeIndex)
-		if (nodeId == null) return -1
+		if (nodeId == null) return 0
 
 		// Has this node already been deduplicated? (scheduled for deletion)
-		if (this.nodeChanges[nodeId]?.changeType === "delete") return -1
+		if (this.nodeChanges[nodeId]?.changeType === "delete") return 0
 
 		const ll = osm.nodes.getNodeLonLat({ index: nodeIndex })
 		const existingNodes = osm.nodes.withinRadius(ll[0], ll[1], 0)
 		const existingNodeIds = existingNodes
 			.map((index) => ({ id: this.osm.nodes.ids.at(index), index }))
 			.filter((n) => n.id !== nodeId && !idPairs.has(n.id, nodeId))
-		if (existingNodeIds.length === 0) return -1
+		if (existingNodeIds.length === 0) return 0
 
 		// Found a duplicate, load the full node
 		let deduplicatedNodesReplaced = 0
@@ -187,7 +188,7 @@ export default class OsmChangeset {
 				const wayRefs = osm.ways.getRefIds(wayIndex)
 				if (wayRefs.includes(existingNode.id)) {
 					// Do not de-duplicate when both nodes exist in the same way
-					if (wayRefs.includes(patchNode.id)) return -1
+					if (wayRefs.includes(patchNode.id)) return 0
 					const way = this.osm.ways.getByIndex(wayIndex)
 					candidateWays.push(way)
 				}
@@ -215,7 +216,7 @@ export default class OsmChangeset {
 							"node",
 						)
 					)
-						return -1
+						return 0
 					candidateRelations.push(this.osm.relations.getByIndex(relationIndex))
 				}
 			}
@@ -246,7 +247,7 @@ export default class OsmChangeset {
 
 			// Schedule node for deletion
 			this.stats.deduplicatedNodes++
-			this.delete(existingNode, `Replaced by node ${patchNode.id}`)
+			this.delete(existingNode, [`n${patchNode.id}`])
 		}
 
 		// Increment the total number of nodes replaced
@@ -297,7 +298,7 @@ export default class OsmChangeset {
 		// Delete this way
 		this.delete(
 			way,
-			`Replaced by way ${candidateDuplicateWays.map((way) => way.id).join(", ")}`,
+			candidateDuplicateWays.map((way) => `w${way.id}` as OsmEntityRef),
 		)
 		this.stats.deduplicatedWays++
 

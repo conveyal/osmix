@@ -24,7 +24,7 @@ import { mapAtom } from "@/state/map"
 import { selectOsmEntityAtom } from "@/state/osm"
 import { bboxPolygon } from "@turf/turf"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
-import { MaximizeIcon } from "lucide-react"
+import { Loader2Icon, MaximizeIcon } from "lucide-react"
 import { useEffect, useMemo, useTransition } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
 import { useSearchParams } from "react-router"
@@ -87,7 +87,7 @@ export default function FilterPage() {
 											if (bbox)
 												map?.fitBounds(bbox, {
 													padding: 100,
-													maxDuration: 0,
+													maxDuration: 200,
 												})
 										}}
 										variant="ghost"
@@ -111,12 +111,14 @@ export default function FilterPage() {
 										const changes = await osmWorker.dedupeNodesAndWays(osmId)
 										setDuplicateNodesAndWays(changes)
 										task.end(
-											`${changes?.stats.deduplicatedNodes.toLocaleString()} nodes and ${changes?.stats.deduplicatedWays.toLocaleString()} ways found`,
+											`Found ${changes?.stats.deduplicatedNodes.toLocaleString()} duplicate nodes and ${changes?.stats.deduplicatedWays.toLocaleString()} duplicate ways`,
 											"ready",
 										)
 									})
 								}}
+								disabled={isTransitioning}
 							>
+								{isTransitioning && <Loader2Icon className="animate-spin" />}
 								Find duplicate nodes and ways
 							</Button>
 
@@ -128,9 +130,14 @@ export default function FilterPage() {
 										<DetailsContent>
 											<ChangesFilters />
 											<ChangesList
-												setSelectedEntity={(entity) =>
+												setSelectedEntity={(entity) => {
 													selectEntity(osm, entity)
-												}
+													const bbox = osm.getEntityBbox(entity)
+													map?.fitBounds(bbox, {
+														padding: 100,
+														maxDuration: 200,
+													})
+												}}
 											/>
 											<ChangesPagination />
 										</DetailsContent>

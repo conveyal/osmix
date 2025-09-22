@@ -3,6 +3,7 @@ import {
 	DEFAULT_PAGE_SIZE,
 	changeTypeFilterAtom,
 	changesAtom,
+	changesSummaryAtom,
 	currentChangesAtom,
 	entityTypeFilterAtom,
 	pageAtom,
@@ -15,7 +16,7 @@ import { useHydrateAtoms } from "jotai/utils"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { type OsmChanges, type OsmEntity, getEntityType } from "osm.ts"
 import { Details, DetailsContent, DetailsSummary } from "./details"
-import EntityDetails, { EntityContent } from "./entity-details"
+import { EntityContent } from "./entity-details"
 import { Button } from "./ui/button"
 
 function HydrateAtoms({
@@ -47,60 +48,65 @@ export default function ChangesSummary({
 }: {
 	children: React.ReactNode
 }) {
-	const changes = useAtomValue(changesAtom)
-	if (!changes) return null
-
-	const nodeChanges = Object.keys(changes.nodes).length
-	const wayChanges = Object.keys(changes.ways).length
-	const relationChanges = Object.keys(changes.relations).length
-	const totalChanges = nodeChanges + wayChanges + relationChanges
+	const summary = useAtomValue(changesSummaryAtom)
+	if (!summary) return null
 
 	return (
 		<div className="flex flex-col gap-2">
 			<Details open={true}>
 				<DetailsSummary>CHANGES SUMMARY</DetailsSummary>
 				<DetailsContent>
-					<table>
-						<tbody>
-							<tr>
-								<td>node changes</td>
-								<td>{nodeChanges.toLocaleString()}</td>
-							</tr>
-							<tr>
-								<td>way changes</td>
-								<td>{wayChanges.toLocaleString()}</td>
-							</tr>
-							<tr>
-								<td>relation changes</td>
-								<td>{relationChanges.toLocaleString()}</td>
-							</tr>
-							<tr>
-								<td>total changes</td>
-								<td>{totalChanges.toLocaleString()}</td>
-							</tr>
-							<tr>
-								<td>deduplicated nodes</td>
-								<td>{changes.stats.deduplicatedNodes.toLocaleString()}</td>
-							</tr>
-							<tr>
-								<td>deduplicated nodes replaced</td>
-								<td>
-									{changes.stats.deduplicatedNodesReplaced.toLocaleString()}
-								</td>
-							</tr>
-							<tr>
-								<td>intersection points found</td>
-								<td>
-									{changes.stats.intersectionPointsFound.toLocaleString()}
-								</td>
-							</tr>
-						</tbody>
-					</table>
+					{summary.totalChanges === 0 ? (
+						<div className="py-1 px-2">NO CHANGES FOUND</div>
+					) : (
+						<ChangesSummaryTable />
+					)}
 
 					{children}
 				</DetailsContent>
 			</Details>
 		</div>
+	)
+}
+
+function ChangesSummaryTable() {
+	const changes = useAtomValue(changesAtom)
+	const summary = useAtomValue(changesSummaryAtom)
+	if (!summary || !changes) return null
+	return (
+		<table>
+			<tbody>
+				<tr>
+					<td>total changes</td>
+					<td>{summary.totalChanges.toLocaleString()}</td>
+				</tr>
+				<tr>
+					<td>node changes</td>
+					<td>{summary.nodeChanges.toLocaleString()}</td>
+				</tr>
+				<tr>
+					<td>way changes</td>
+					<td>{summary.wayChanges.toLocaleString()}</td>
+				</tr>
+				<tr>
+					<td>relation changes</td>
+					<td>{summary.relationChanges.toLocaleString()}</td>
+				</tr>
+
+				<tr>
+					<td>deduplicated nodes</td>
+					<td>{changes.stats.deduplicatedNodes.toLocaleString()}</td>
+				</tr>
+				<tr>
+					<td>deduplicated nodes replaced</td>
+					<td>{changes.stats.deduplicatedNodesReplaced.toLocaleString()}</td>
+				</tr>
+				<tr>
+					<td>intersection points found</td>
+					<td>{changes.stats.intersectionPointsFound.toLocaleString()}</td>
+				</tr>
+			</tbody>
+		</table>
 	)
 }
 
@@ -213,14 +219,14 @@ export function ChangesList({
 
 	return (
 		<div className="flex flex-col gap-1">
-			{currentChanges.map(({ changeType, entity, note }, i) => {
+			{currentChanges.map(({ changeType, entity, refs }, i) => {
 				const changeTypeColor = CHANGE_TYPE_COLOR[changeType]
 				const entityType = getEntityType(entity)
 				return (
 					<button
 						key={`${entityType}-${entity.id}`}
 						className={cn(
-							"border-l pl-2 font-bold cursor-pointer w-full text-left",
+							"border-l pl-2 font-bold cursor-pointer w-full text-left select-text",
 							changeTypeColor,
 						)}
 						onClick={() => setSelectedEntity(entity)}
@@ -228,7 +234,8 @@ export function ChangesList({
 						tabIndex={0}
 					>
 						{startIndex + i + 1}. {changeType.toUpperCase()}{" "}
-						{entityType.toUpperCase()} {entity.id} {note && `(${note})`}
+						{entityType.toUpperCase()} {entity.id}{" "}
+						{refs && `(${refs.join(", ")})`}
 					</button>
 				)
 			})}
@@ -242,17 +249,21 @@ export function ChangesExpandableList() {
 
 	return (
 		<div className="flex flex-col">
-			{currentChanges.map(({ changeType, entity, note }, i) => {
+			{currentChanges.map(({ changeType, entity, refs }, i) => {
 				const changeTypeColor = CHANGE_TYPE_COLOR[changeType]
 				const entityType = getEntityType(entity)
 				return (
 					<Details key={`${entityType}-${entity.id}`} open={false}>
-						<DetailsSummary className={cn(changeTypeColor)}>
+						<DetailsSummary
+							className={cn("flex flex-row justify-between", changeTypeColor)}
+						>
 							{startIndex + i + 1}. {changeType.toUpperCase()}{" "}
 							{entityType.toUpperCase()} {entity.id}
 						</DetailsSummary>
 						<DetailsContent>
-							{note && <div className="p-1 border-1">{note}</div>}
+							{refs && (
+								<div className="p-1 border-1">Related: {refs.join(", ")}</div>
+							)}
 							<EntityContent entity={entity} />
 						</DetailsContent>
 					</Details>
@@ -275,7 +286,6 @@ export function ChangesPagination() {
 			setCurrentPage(currentPage - 1)
 		}
 	}
-	if (totalPages <= 1) return null
 	return (
 		<div className="flex items-center justify-between">
 			<Button
@@ -293,7 +303,7 @@ export function ChangesPagination() {
 				variant="ghost"
 				size="sm"
 				onClick={goToNextPage}
-				disabled={currentPage === totalPages - 1}
+				disabled={currentPage >= totalPages - 1}
 			>
 				<ArrowRight className="w-3 h-3 ml-1" />
 			</Button>

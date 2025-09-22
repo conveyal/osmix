@@ -25,32 +25,6 @@ const osmWorker = {
 		if (!osm) throw Error(`Osm for ${oid} not loaded.`)
 		return osm.getById(eid)
 	},
-	subscribeToPerformanceObserver(
-		onEntry: (
-			entryType: string,
-			name: string,
-			startTime: number,
-			duration: number,
-			detail: unknown | undefined,
-			timeOrigin: number,
-		) => void,
-	) {
-		// Create once; batch each observer callback
-		const observer = new PerformanceObserver((list) => {
-			for (const entry of list.getEntries()) {
-				onEntry(
-					entry.entryType,
-					entry.name,
-					entry.startTime,
-					entry.duration,
-					"detail" in entry ? entry.detail : undefined,
-					performance.timeOrigin,
-				)
-			}
-		})
-
-		observer.observe({ entryTypes: ["mark", "measure"] })
-	},
 	async initFromPbfData(
 		id: string,
 		data: ArrayBuffer | ReadableStream<Uint8Array>,

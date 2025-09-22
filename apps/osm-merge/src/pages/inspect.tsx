@@ -85,7 +85,7 @@ export default function InspectPage() {
 											if (bbox)
 												map?.fitBounds(bbox, {
 													padding: 100,
-													maxDuration: 0,
+													maxDuration: 200,
 												})
 										}}
 										variant="ghost"
@@ -112,7 +112,7 @@ export default function InspectPage() {
 												if (bbox)
 													map?.fitBounds(bbox, {
 														padding: 100,
-														maxDuration: 0,
+														maxDuration: 200,
 													})
 											}}
 											variant="ghost"

@@ -17,7 +17,7 @@ export default function EntitySearchControl({ osm }: { osm: Osm }) {
 						const bbox = osm.getEntityBbox(entity)
 						map.fitBounds(bbox, {
 							padding: 100,
-							maxDuration: 0,
+							maxDuration: 200,
 						})
 					}
 					return entity

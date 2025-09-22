@@ -50,6 +50,20 @@ export const filteredChangesAtom = atom<OsmChange[]>((get) => {
 	return filteredChanges
 })
 
+export const changesSummaryAtom = atom((get) => {
+	const changes = get(changesAtom)
+	if (!changes) return null
+	const nodeChanges = Object.keys(changes.nodes).length
+	const wayChanges = Object.keys(changes.ways).length
+	const relationChanges = Object.keys(changes.relations).length
+	return {
+		totalChanges: nodeChanges + wayChanges + relationChanges,
+		nodeChanges,
+		wayChanges,
+		relationChanges,
+	}
+})
+
 export const totalPagesAtom = atom<number>((get) => {
 	const pageSize = get(pageSizeAtom)
 	const filteredChanges = get(filteredChangesAtom)

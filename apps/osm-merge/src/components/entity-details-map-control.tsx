@@ -26,7 +26,7 @@ export default function EntityMapControl({ osm }: { osm: Osm }) {
 								if (bbox)
 									map?.fitBounds(bbox, {
 										padding: 100,
-										maxDuration: 0,
+										maxDuration: 200,
 									})
 							}}
 							variant="ghost"
