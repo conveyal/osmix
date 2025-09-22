@@ -18,7 +18,7 @@ import { useAtomValue, useSetAtom } from "jotai"
 import type { GeoBbox2D, Osm } from "osm.ts"
 import { useEffect, useMemo } from "react"
 import useStartTaskLog from "./log"
-import { useOsmWorker } from "./osm"
+import { osmWorker } from "@/state/worker"
 
 export function useFitBoundsOnChange(bbox?: GeoBbox2D) {
 	const map = useAtomValue(mapAtom)
@@ -35,7 +35,6 @@ export function useFitBoundsOnChange(bbox?: GeoBbox2D) {
 const EMPTY_BITMAP = new Uint8Array(BITMAP_TILE_SIZE * BITMAP_TILE_SIZE * 4)
 
 export function useBitmapTileLayer(osm?: Osm | null) {
-	const osmWorker = useOsmWorker()
 	return useMemo(() => {
 		const bbox = osm?.bbox()
 		const osmId = osm?.id
@@ -86,12 +85,11 @@ export function useBitmapTileLayer(osm?: Osm | null) {
 				return layers
 			},
 		})
-	}, [osm, osmWorker])
+	}, [osm])
 }
 
 export function usePickableOsmTileLayer(osm?: Osm | null) {
 	const startTaskLog = useStartTaskLog()
-	const osmWorker = useOsmWorker()
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 
 	const layer = useMemo(() => {
@@ -271,7 +269,7 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 				return layers
 			},
 		})
-	}, [osm, osmWorker, selectEntity, startTaskLog])
+	}, [osm, selectEntity, startTaskLog])
 
 	return layer
 }

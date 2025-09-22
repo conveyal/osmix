@@ -1,26 +1,11 @@
-import { addLogMessageAtom } from "@/state/log"
 import { osmAtomFamily, osmFileAtomFamily } from "@/state/osm"
-import { osmWorkerAtom } from "@/state/worker"
+import { osmWorker } from "@/state/worker"
 import * as Comlink from "comlink"
-import { useAtom, useAtomValue, useSetAtom } from "jotai"
+import { useAtom, useAtomValue } from "jotai"
 import { Osm } from "osm.ts"
 import { useEffect, useMemo, useState } from "react"
 import useStartTaskLog from "./log"
 import { useFitBoundsOnChange } from "./map"
-
-export function useOsmWorker() {
-	const osmWorker = useAtomValue(osmWorkerAtom)
-	const logMessage = useSetAtom(addLogMessageAtom)
-
-	useEffect(() => {
-		if (osmWorker && logMessage) {
-			console.log("SUBSCRIBING TO LOG")
-			osmWorker.subscribeToLog(Comlink.proxy(logMessage))
-		}
-	}, [logMessage, osmWorker])
-
-	return osmWorker
-}
 
 export function useOsm(id: string) {
 	const osm = useAtomValue(osmAtomFamily(id))
@@ -31,7 +16,6 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 	const [file, setFile] = useAtom(osmFileAtomFamily(id))
 	const [osm, setOsm] = useAtom(osmAtomFamily(id))
 	const [isLoading, setIsLoading] = useState(false)
-	const osmWorker = useOsmWorker()
 	const startTaskLog = useStartTaskLog()
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 
@@ -52,7 +36,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 	}, [defaultFilePath, setFile, loadOnStart])
 
 	useEffect(() => {
-		if (!osmWorker || !file) return
+		if (!file) return
 		const taskLog = startTaskLog(`Processing file ${file.name}...`)
 		const stream = file.stream()
 		setOsm(null)
@@ -70,7 +54,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 			.finally(() => {
 				setIsLoading(false)
 			})
-	}, [file, id, osmWorker, setOsm, startTaskLog])
+	}, [file, id, setOsm, startTaskLog])
 
 	return { file, setFile, osm, setOsm, isLoading }
 }

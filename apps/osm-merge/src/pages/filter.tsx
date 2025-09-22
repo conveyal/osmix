@@ -16,7 +16,8 @@ import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import { Button } from "@/components/ui/button"
 import useStartTaskLog from "@/hooks/log"
 import { usePickableOsmTileLayer, useSelectedEntityLayer } from "@/hooks/map"
-import { useOsmFile, useOsmWorker } from "@/hooks/osm"
+import { useOsmFile } from "@/hooks/osm"
+import { useSubscribeOsmWorkerToLog } from "@/hooks/log"
 import { APPID } from "@/settings"
 import { changesAtom } from "@/state/changes"
 import { mapAtom } from "@/state/map"
@@ -27,6 +28,7 @@ import { MaximizeIcon } from "lucide-react"
 import { useEffect, useMemo, useTransition } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
 import { useSearchParams } from "react-router"
+import { osmWorker } from "@/state/worker"
 
 export default function FilterPage() {
 	const [searchParams] = useSearchParams()
@@ -43,7 +45,6 @@ export default function FilterPage() {
 		setOsm,
 	} = useOsmFile(osmId, "./pbfs/monaco.pbf")
 	const bbox = useMemo(() => osm?.bbox(), [osm])
-	const osmWorker = useOsmWorker()
 
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const tileLayer = usePickableOsmTileLayer(osm)
@@ -103,7 +104,6 @@ export default function FilterPage() {
 							<Button
 								onClick={() => {
 									startTransition(async () => {
-										if (!osmWorker) throw Error("No OSM worker")
 										const task = startTask(
 											"Finding duplicate nodes and ways",
 											"info",

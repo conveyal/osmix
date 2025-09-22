@@ -7,7 +7,8 @@ import ChangesSummary, {
 } from "@/components/osm-changes-summary"
 import useStartTaskLog from "@/hooks/log"
 import { usePickableOsmTileLayer, useSelectedEntityLayer } from "@/hooks/map"
-import { useOsmFile, useOsmWorker } from "@/hooks/osm"
+import { useOsmFile } from "@/hooks/osm"
+import { useSubscribeOsmWorkerToLog } from "@/hooks/log"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { changesAtom } from "@/state/changes"
 import { mapAtom } from "@/state/map"
@@ -33,6 +34,7 @@ import { Main, MapContent, Sidebar } from "../components/layout"
 import OsmInfoTable from "../components/osm-info-table"
 import OsmPbfFileInput from "../components/osm-pbf-file-input"
 import { Button } from "../components/ui/button"
+import { osmWorker } from "@/state/worker"
 
 const STEPS = [
 	"select-osm-pbf-files",
@@ -54,7 +56,6 @@ const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
 export default function Merge() {
 	const base = useOsmFile("base")
 	const patch = useOsmFile("patch")
-	const osmWorker = useOsmWorker()
 	const [isTransitioning, startTransition] = useTransition()
 	const [changes, setChanges] = useAtom(changesAtom)
 	const startTask = useStartTaskLog()
@@ -142,7 +143,6 @@ export default function Merge() {
 	}, [changes, startTask])
 
 	const applyChanges = useCallback(async () => {
-		if (!osmWorker) throw Error("No OSM worker")
 		const task = startTask("Applying changes to OSM", "info")
 		startTransition(async () => {
 			if (!changes) throw Error("No changes to apply")
@@ -151,7 +151,7 @@ export default function Merge() {
 			base.setOsm(Osm.from(newOsm))
 			task.end("Changes applied", "ready")
 		})
-	}, [changes, base.osm, base.setOsm, osmWorker, startTask])
+	}, [changes, base.osm, base.setOsm, startTask])
 
 	return (
 		<Main>

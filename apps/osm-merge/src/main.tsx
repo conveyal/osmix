@@ -5,8 +5,10 @@ import Nav from "./components/nav"
 import FilterPage from "./pages/filter"
 import InspectPage from "./pages/inspect"
 import MergePage from "./pages/merge"
+import { useSubscribeOsmWorkerToLog } from "./hooks/log"
 
 function RootLayout() {
+	useSubscribeOsmWorkerToLog()
 	return (
 		<div className="h-screen w-screen flex flex-col">
 			<Nav />
