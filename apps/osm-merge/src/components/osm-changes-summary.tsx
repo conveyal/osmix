@@ -16,7 +16,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react"
 import { type OsmChanges, type OsmEntity, getEntityType } from "osm.ts"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 import { Button } from "./ui/button"
-import EntityDetails from "./entity-details"
+import EntityDetails, { EntityContent } from "./entity-details"
 
 function HydrateAtoms({
 	changes,
@@ -241,7 +241,7 @@ export function ChangesExpandableList() {
 	const startIndex = useAtomValue(startIndexAtom)
 
 	return (
-		<div className="flex flex-col gap-1">
+		<div className="flex flex-col">
 			{currentChanges.map(({ changeType, entity, note }, i) => {
 				const changeTypeColor = CHANGE_TYPE_COLOR[changeType]
 				const entityType = getEntityType(entity)
@@ -252,8 +252,8 @@ export function ChangesExpandableList() {
 							{entityType.toUpperCase()} {entity.id}
 						</DetailsSummary>
 						<DetailsContent>
-							{note && <div>{note}</div>}
-							<EntityDetails entity={entity} />
+							{note && <div className="p-1 border-1">{note}</div>}
+							<EntityContent entity={entity} />
 						</DetailsContent>
 					</Details>
 				)

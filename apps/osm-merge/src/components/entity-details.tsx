@@ -39,26 +39,52 @@ export default function EntityDetails({
 		return <RelationDetails relation={entity} open={open} />
 }
 
+export function EntityContent({ entity }: { entity: OsmEntity }) {
+	if (isNode(entity)) return <NodeContent node={entity} />
+	if (isWay(entity)) return <WayContent way={entity} />
+	if (isRelation(entity)) return <RelationDetails relation={entity} />
+}
+
 export function NodeDetails({ node, open }: { node: OsmNode; open?: boolean }) {
 	return (
 		<Details open={open}>
 			<DetailsSummary className="font-bold">NODE {node.id}</DetailsSummary>
 			<DetailsContent>
-				<table className="w-full">
-					<tbody>
-						<tr>
-							<td>lon</td>
-							<td>{node.lon}</td>
-						</tr>
-						<tr>
-							<td>lat</td>
-							<td>{node.lat}</td>
-						</tr>
-						<TagList tags={node.tags} />
-					</tbody>
-				</table>
+				<NodeContent node={node} />
 			</DetailsContent>
 		</Details>
+	)
+}
+
+export function NodeContent({ node }: { node: OsmNode }) {
+	return (
+		<table className="w-full">
+			<tbody>
+				<tr>
+					<td>lon</td>
+					<td>{node.lon}</td>
+				</tr>
+				<tr>
+					<td>lat</td>
+					<td>{node.lat}</td>
+				</tr>
+				<TagList tags={node.tags} />
+			</tbody>
+		</table>
+	)
+}
+
+export function WayContent({ way }: { way: OsmWay }) {
+	return (
+		<table className="w-full">
+			<tbody>
+				<tr>
+					<td>refs</td>
+					<td>{way.refs.join(",")}</td>
+				</tr>
+				<TagList tags={way.tags} />
+			</tbody>
+		</table>
 	)
 }
 
@@ -68,25 +94,31 @@ export function WayDetails({
 	open,
 }: {
 	way: OsmWay
-	children: React.ReactNode
+	children?: React.ReactNode
 	open?: boolean
 }) {
 	return (
 		<Details open={open}>
 			<DetailsSummary>WAY {way.id}</DetailsSummary>
 			<DetailsContent>
-				<table className="w-full">
-					<tbody>
-						<tr>
-							<td>refs</td>
-							<td>{way.refs.join(",")}</td>
-						</tr>
-						<TagList tags={way.tags} />
-					</tbody>
-				</table>
+				<WayContent way={way} />
 				{children}
 			</DetailsContent>
 		</Details>
+	)
+}
+
+export function RelationContent({ relation }: { relation: OsmRelation }) {
+	return (
+		<table className="w-full">
+			<tbody>
+				<tr>
+					<td>members</td>
+					<td>{relation.members.join(",")}</td>
+				</tr>
+				<TagList tags={relation.tags} />
+			</tbody>
+		</table>
 	)
 }
 
@@ -98,22 +130,7 @@ export function RelationDetails({
 		<Details open={open}>
 			<DetailsSummary>RELATION {relation.id}</DetailsSummary>
 			<DetailsContent>
-				<table className="w-full">
-					<tbody>
-						<tr>
-							<td colSpan={2}>members</td>
-						</tr>
-						{relation.members.map((m) => (
-							<tr key={m.ref}>
-								<td>
-									{m.type}: {m.ref}
-								</td>
-								<td>{m.role}</td>
-							</tr>
-						))}
-						<TagList tags={relation.tags} />
-					</tbody>
-				</table>
+				<RelationContent relation={relation} />
 			</DetailsContent>
 		</Details>
 	)
