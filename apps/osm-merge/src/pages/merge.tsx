@@ -11,12 +11,8 @@ import { useOsmFile, useOsmWorker } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { changesAtom } from "@/state/changes"
 import { mapAtom } from "@/state/map"
-import {
-	selectOsmEntityAtom,
-	selectedEntityAtom,
-	selectedOsmAtom,
-} from "@/state/osm"
-import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
+import { selectedEntityAtom } from "@/state/osm"
+import { atom, useAtom, useAtomValue } from "jotai"
 import {
 	ArrowLeft,
 	ArrowRight,
@@ -64,9 +60,7 @@ export default function Merge() {
 	const startTask = useStartTaskLog()
 	const map = useAtomValue(mapAtom)
 
-	const selectedOsm = useAtomValue(selectedOsmAtom)
 	const selectedEntity = useAtomValue(selectedEntityAtom)
-	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const baseTileLayer = usePickableOsmTileLayer(base.osm)
 	const patchTileLayer = usePickableOsmTileLayer(patch.osm)
 	const selectedEntityLayer = useSelectedEntityLayer()
