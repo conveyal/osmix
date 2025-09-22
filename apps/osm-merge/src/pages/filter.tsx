@@ -20,8 +20,9 @@ import { useOsmFile, useOsmWorker } from "@/hooks/osm"
 import { APPID } from "@/settings"
 import { changesAtom } from "@/state/changes"
 import { mapAtom } from "@/state/map"
+import { selectOsmEntityAtom } from "@/state/osm"
 import { bboxPolygon } from "@turf/turf"
-import { useAtom, useAtomValue } from "jotai"
+import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { MaximizeIcon } from "lucide-react"
 import { useEffect, useMemo, useTransition } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
@@ -44,8 +45,9 @@ export default function FilterPage() {
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const osmWorker = useOsmWorker()
 
-	const { layer: tileLayer, setSelectedEntity } = usePickableOsmTileLayer(osm)
-	const selectedEntityLayer = useSelectedEntityLayer(osm)
+	const selectEntity = useSetAtom(selectOsmEntityAtom)
+	const tileLayer = usePickableOsmTileLayer(osm)
+	const selectedEntityLayer = useSelectedEntityLayer()
 
 	const [isTransitioning, startTransition] = useTransition()
 	const startTask = useStartTaskLog()
@@ -54,10 +56,10 @@ export default function FilterPage() {
 
 	useEffect(() => {
 		if (osm != null) {
-			setSelectedEntity(null)
+			selectEntity(null, null)
 			setDuplicateNodesAndWays(null)
 		}
-	}, [osm, setSelectedEntity, setDuplicateNodesAndWays])
+	}, [osm, selectEntity, setDuplicateNodesAndWays])
 
 	return (
 		<Main>
@@ -67,7 +69,7 @@ export default function FilterPage() {
 						isLoading={isLoadingFile}
 						file={file}
 						setFile={(file) => {
-							setSelectedEntity(null)
+							selectEntity(null, null)
 							setFile(file)
 							if (file == null) setOsm(null)
 						}}
@@ -125,7 +127,11 @@ export default function FilterPage() {
 										<DetailsSummary>CHANGES</DetailsSummary>
 										<DetailsContent>
 											<ChangesFilters />
-											<ChangesList setSelectedEntity={setSelectedEntity} />
+											<ChangesList
+												setSelectedEntity={(entity) =>
+													selectEntity(osm, entity)
+												}
+											/>
 											<ChangesPagination />
 										</DetailsContent>
 									</Details>

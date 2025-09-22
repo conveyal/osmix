@@ -1,4 +1,5 @@
-import { mapAtom, selectedEntityAtom } from "@/state/map"
+import { mapAtom } from "@/state/map"
+import { selectedEntityAtom } from "@/state/osm"
 import { useAtomValue, useSetAtom } from "jotai"
 import type { Osm } from "osm.ts"
 import EntityLookup from "./entity-lookup"

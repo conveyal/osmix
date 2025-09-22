@@ -14,6 +14,7 @@ export function useOsmWorker() {
 
 	useEffect(() => {
 		if (osmWorker && logMessage) {
+			console.log("SUBSCRIBING TO LOG")
 			osmWorker.subscribeToLog(Comlink.proxy(logMessage))
 		}
 	}, [logMessage, osmWorker])

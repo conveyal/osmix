@@ -1,10 +1,11 @@
 import { MIN_PICKABLE_ZOOM } from "@/settings"
-import { mapAtom, selectedEntityAtom } from "@/state/map"
+import { mapAtom } from "@/state/map"
+import { selectedEntityAtom } from "@/state/osm"
 import { useAtom, useAtomValue } from "jotai"
-import type { Osm } from "osm.ts"
-import { Button } from "./ui/button"
 import { MaximizeIcon } from "lucide-react"
+import type { Osm } from "osm.ts"
 import EntityDetails from "./entity-details"
+import { Button } from "./ui/button"
 
 export default function EntityMapControl({ osm }: { osm: Osm }) {
 	const [selectedEntity, setSelectedEntity] = useAtom(selectedEntityAtom)

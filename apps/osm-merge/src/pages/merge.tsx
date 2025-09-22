@@ -1,8 +1,8 @@
+import { Details, DetailsContent, DetailsSummary } from "@/components/details"
 import LogContent from "@/components/log"
 import ChangesSummary, {
 	ChangesExpandableList,
 	ChangesFilters,
-	ChangesList,
 	ChangesPagination,
 } from "@/components/osm-changes-summary"
 import useStartTaskLog from "@/hooks/log"
@@ -11,7 +11,12 @@ import { useOsmFile, useOsmWorker } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { changesAtom } from "@/state/changes"
 import { mapAtom } from "@/state/map"
-import { atom, useAtom, useAtomValue } from "jotai"
+import {
+	selectOsmEntityAtom,
+	selectedEntityAtom,
+	selectedOsmAtom,
+} from "@/state/osm"
+import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
 	ArrowLeft,
 	ArrowRight,
@@ -32,7 +37,6 @@ import { Main, MapContent, Sidebar } from "../components/layout"
 import OsmInfoTable from "../components/osm-info-table"
 import OsmPbfFileInput from "../components/osm-pbf-file-input"
 import { Button } from "../components/ui/button"
-import { Details, DetailsContent, DetailsSummary } from "@/components/details"
 
 const STEPS = [
 	"select-osm-pbf-files",
@@ -60,9 +64,12 @@ export default function Merge() {
 	const startTask = useStartTaskLog()
 	const map = useAtomValue(mapAtom)
 
+	const selectedOsm = useAtomValue(selectedOsmAtom)
+	const selectedEntity = useAtomValue(selectedEntityAtom)
+	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const baseTileLayer = usePickableOsmTileLayer(base.osm)
 	const patchTileLayer = usePickableOsmTileLayer(patch.osm)
-	const selectedEntityLayer = useSelectedEntityLayer(base.osm)
+	const selectedEntityLayer = useSelectedEntityLayer()
 
 	const [stepIndex, setStepIndex] = useAtom(stepIndexAtom)
 
@@ -76,12 +83,12 @@ export default function Merge() {
 				fetch(DEFAULT_BASE_PBF_URL)
 					.then((res) => res.blob())
 					.then((blob) => {
-						base.setFile(new File([blob], "seattle.osm.pbf"))
+						base.setFile(new File([blob], DEFAULT_BASE_PBF_URL))
 					}),
 				fetch(DEFAULT_PATCH_PBF_URL)
 					.then((res) => res.blob())
 					.then((blob) => {
-						patch.setFile(new File([blob], "seattle-osw.pbf"))
+						patch.setFile(new File([blob], DEFAULT_PATCH_PBF_URL))
 					}),
 			])
 		}
@@ -404,16 +411,14 @@ export default function Merge() {
 							select entities and see the changes.
 						</div>
 						<hr />
-						{base.osm && baseTileLayer.selectedEntity && (
+						{base.osm && selectedEntity && (
 							<div>
 								<div className="px-1 flex justify-between">
 									<div className="font-bold">SELECTED ENTITY</div>
 									<Button
 										onClick={() => {
-											if (!base.osm || !baseTileLayer.selectedEntity) return
-											const bbox = base.osm?.getEntityBbox(
-												baseTileLayer.selectedEntity,
-											)
+											if (!base.osm || !selectedEntity) return
+											const bbox = base.osm?.getEntityBbox(selectedEntity)
 											if (bbox)
 												map?.fitBounds(bbox, {
 													padding: 100,
@@ -429,7 +434,7 @@ export default function Merge() {
 									</Button>
 								</div>
 								<EntityDetails
-									entity={baseTileLayer.selectedEntity}
+									entity={selectedEntity}
 									open={true}
 									osm={base.osm}
 								/>
@@ -460,15 +465,15 @@ export default function Merge() {
 				<Basemap>
 					<DeckGlOverlay
 						layers={[
-							baseTileLayer.layer,
-							stepIndex > 0 ? null : patchTileLayer.layer,
+							baseTileLayer,
+							stepIndex > 0 ? null : patchTileLayer,
 							selectedEntityLayer,
 						]}
 						getTooltip={(pickingInfo) => {
 							const sourceLayerId = pickingInfo.sourceLayer?.id
 							if (
-								baseTileLayer.layer &&
-								sourceLayerId?.startsWith(baseTileLayer.layer.id)
+								baseTileLayer &&
+								sourceLayerId?.startsWith(baseTileLayer.id)
 							) {
 								if (sourceLayerId.includes("nodes")) {
 									return {

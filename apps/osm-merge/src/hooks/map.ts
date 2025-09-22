@@ -1,5 +1,10 @@
 import { APPID, BITMAP_TILE_SIZE, MIN_PICKABLE_ZOOM } from "@/settings"
-import { mapAtom, selectedEntityAtom } from "@/state/map"
+import { mapAtom } from "@/state/map"
+import {
+	selectOsmEntityAtom,
+	selectedEntityAtom,
+	selectedOsmAtom,
+} from "@/state/osm"
 import { COORDINATE_SYSTEM, type Layer as DeckGlLayer } from "@deck.gl/core"
 import { type GeoBoundingBox, TileLayer } from "@deck.gl/geo-layers"
 import {
@@ -9,7 +14,7 @@ import {
 	ScatterplotLayer,
 } from "@deck.gl/layers"
 import { bboxPolygon } from "@turf/turf"
-import { useAtom, useAtomValue } from "jotai"
+import { useAtomValue, useSetAtom } from "jotai"
 import type { GeoBbox2D, Osm } from "osm.ts"
 import { useEffect, useMemo } from "react"
 import useStartTaskLog from "./log"
@@ -87,8 +92,8 @@ export function useBitmapTileLayer(osm?: Osm | null) {
 export function usePickableOsmTileLayer(osm?: Osm | null) {
 	const startTaskLog = useStartTaskLog()
 	const osmWorker = useOsmWorker()
+	const selectEntity = useSetAtom(selectOsmEntityAtom)
 
-	const [selectedEntity, setSelectedEntity] = useAtom(selectedEntityAtom)
 	const layer = useMemo(() => {
 		const bbox = osm?.bbox()
 		const osmId = osm?.id
@@ -198,9 +203,9 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 								if (info.picked && data.ways) {
 									const wayId = data.ways.ids.at(info.index)
 									if (wayId !== undefined) {
-										setSelectedEntity(osm.ways.getById(wayId))
+										selectEntity(osm, osm.ways.getById(wayId))
 									} else {
-										setSelectedEntity(null)
+										selectEntity(null, null)
 									}
 									return true
 								}
@@ -231,9 +236,9 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 								if (info.picked) {
 									const nodeId = data.nodes.ids.at(info.index)
 									if (nodeId) {
-										setSelectedEntity(osm.nodes.getById(nodeId))
+										selectEntity(osm, osm.nodes.getById(nodeId))
 									} else {
-										setSelectedEntity(null)
+										selectEntity(null, null)
 									}
 									return true
 								}
@@ -266,22 +271,19 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 				return layers
 			},
 		})
-	}, [osm, osmWorker, setSelectedEntity, startTaskLog])
+	}, [osm, osmWorker, selectEntity, startTaskLog])
 
-	return {
-		layer,
-		setSelectedEntity,
-		selectedEntity,
-	}
+	return layer
 }
 
-export function useSelectedEntityLayer(osm?: Osm | null) {
+export function useSelectedEntityLayer() {
+	const selectedOsm = useAtomValue(selectedOsmAtom)
 	const selectedEntity = useAtomValue(selectedEntityAtom)
-	return useMemo(() => {
-		if (!osm || !selectedEntity) return null
-		const geojson = osm.getEntityGeoJson(selectedEntity)
+	const layer = useMemo(() => {
+		if (!selectedOsm || !selectedEntity) return null
+		const geojson = selectedOsm.getEntityGeoJson(selectedEntity)
 		return new GeoJsonLayer({
-			id: `${APPID}:${osm.id}:selected-entity`,
+			id: `${APPID}:${selectedOsm.id}:selected-entity`,
 			data: geojson,
 			getLineColor: [255, 0, 0, 255],
 			getLineWidth: 3,
@@ -291,5 +293,6 @@ export function useSelectedEntityLayer(osm?: Osm | null) {
 			lineWidthMaxPixels: 10,
 			filled: false,
 		})
-	}, [osm, selectedEntity])
+	}, [selectedEntity, selectedOsm])
+	return layer
 }

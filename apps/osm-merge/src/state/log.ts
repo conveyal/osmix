@@ -1,4 +1,5 @@
 import { atom } from "jotai"
+import { activeTasksAtom } from "./status"
 
 export type StatusType = "info" | "debug" | "ready" | "error"
 
@@ -51,3 +52,22 @@ export const currentStatusAtom = atom((get) => {
 	// don't show the debug logs in the status bar
 	return log.findLast((l) => l.type !== "debug") ?? INITIAL_STATUS
 })
+
+export const startTaskLogAtom = atom(
+	null,
+	(_, set, message: string, type: Status["type"] = "info") => {
+		const starTime = performance.now()
+		set(activeTasksAtom, (t) => t + 1)
+		set(addLogMessageAtom, message, type)
+		return {
+			update: (message: string, type: Status["type"] = "info") => {
+				set(addLogMessageAtom, message, type)
+			},
+			end: (message: string, type: Status["type"] = "info") => {
+				const durationMs = performance.now() - starTime
+				set(activeTasksAtom, (t) => t - 1)
+				set(addLogMessageAtom, message, type, durationMs)
+			},
+		}
+	},
+)

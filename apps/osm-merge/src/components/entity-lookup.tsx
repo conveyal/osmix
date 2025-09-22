@@ -1,7 +1,7 @@
+import { SearchIcon } from "lucide-react"
 import type { OsmEntity } from "osm.ts"
 import { useActionState } from "react"
 import { Button } from "./ui/button"
-import { SearchIcon } from "lucide-react"
 
 export default function EntityLookup({
 	setSelectedEntity,

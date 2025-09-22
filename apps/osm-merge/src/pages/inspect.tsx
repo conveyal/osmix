@@ -1,9 +1,16 @@
+import CustomControl from "@/components/custom-control"
+import EntitySearchControl from "@/components/entity-search-control"
 import ExtractList from "@/components/extract-list"
 import { usePickableOsmTileLayer, useSelectedEntityLayer } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
 import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
 import { addLogMessageAtom } from "@/state/log"
 import { mapAtom } from "@/state/map"
+import {
+	selectOsmEntityAtom,
+	selectedEntityAtom,
+	selectedOsmAtom,
+} from "@/state/osm"
 import { bboxPolygon } from "@turf/turf"
 import { useAtomValue, useSetAtom } from "jotai"
 import { MaximizeIcon } from "lucide-react"
@@ -18,8 +25,6 @@ import { Main, MapContent, Sidebar } from "../components/layout"
 import OsmInfoTable from "../components/osm-info-table"
 import OsmPbfFileInput from "../components/osm-pbf-file-input"
 import { Button } from "../components/ui/button"
-import CustomControl from "@/components/custom-control"
-import EntitySearchControl from "@/components/entity-search-control"
 
 export default function InspectPage() {
 	const [searchParams] = useSearchParams()
@@ -50,12 +55,11 @@ export default function InspectPage() {
 		}
 	}, [file, setFile])
 
-	const {
-		layer: tileLayer,
-		selectedEntity,
-		setSelectedEntity,
-	} = usePickableOsmTileLayer(osm)
-	const selectedEntityLayer = useSelectedEntityLayer(osm)
+	const selectedOsm = useAtomValue(selectedOsmAtom)
+	const selectedEntity = useAtomValue(selectedEntityAtom)
+	const selectEntity = useSetAtom(selectOsmEntityAtom)
+	const tileLayer = usePickableOsmTileLayer(osm)
+	const selectedEntityLayer = useSelectedEntityLayer()
 
 	return (
 		<Main>
@@ -65,7 +69,7 @@ export default function InspectPage() {
 						isLoading={isLoadingFile}
 						file={file}
 						setFile={(file) => {
-							setSelectedEntity(null)
+							selectEntity(null, null)
 							setFile(file)
 						}}
 					/>
@@ -94,7 +98,7 @@ export default function InspectPage() {
 								</div>
 								<OsmInfoTable file={file} osm={osm} />
 							</div>
-							{selectedEntity == null ? (
+							{selectedOsm == null || selectedEntity == null ? (
 								<div className="px-1 text-center font-bold">
 									SELECT ENTITY ON MAP (Z{MIN_PICKABLE_ZOOM} AND UP)
 								</div>
@@ -104,7 +108,7 @@ export default function InspectPage() {
 										<div className="font-bold">SELECTED ENTITY</div>
 										<Button
 											onClick={() => {
-												const bbox = osm?.getEntityBbox(selectedEntity)
+												const bbox = selectedOsm?.getEntityBbox(selectedEntity)
 												if (bbox)
 													map?.fitBounds(bbox, {
 														padding: 100,
@@ -121,8 +125,8 @@ export default function InspectPage() {
 									</div>
 									<EntityDetails
 										entity={selectedEntity}
-										osm={osm}
-										onSelect={setSelectedEntity}
+										osm={selectedOsm}
+										onSelect={(entity) => selectEntity(selectedOsm, entity)}
 									/>
 								</div>
 							)}

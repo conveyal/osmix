@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils"
 import {
-	changesAtom,
-	changeTypeFilterAtom,
-	currentChangesAtom,
 	DEFAULT_PAGE_SIZE,
+	changeTypeFilterAtom,
+	changesAtom,
+	currentChangesAtom,
 	entityTypeFilterAtom,
 	pageAtom,
 	pageSizeAtom,
@@ -15,8 +15,8 @@ import { useHydrateAtoms } from "jotai/utils"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { type OsmChanges, type OsmEntity, getEntityType } from "osm.ts"
 import { Details, DetailsContent, DetailsSummary } from "./details"
-import { Button } from "./ui/button"
 import EntityDetails, { EntityContent } from "./entity-details"
+import { Button } from "./ui/button"
 
 function HydrateAtoms({
 	changes,
