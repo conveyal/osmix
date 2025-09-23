@@ -128,7 +128,7 @@ export default function InspectPage() {
 					{osm && file ? (
 						<div className="flex flex-col gap-2">
 							<div className="flex flex-col">
-								<div className="flex justify-between">
+								<div className="flex items-center justify-between border-l border-r border-t pl-2">
 									<div className="font-bold">OPENSTREETMAP PBF</div>
 									<div className="flex gap-2">
 										<Button
@@ -136,7 +136,6 @@ export default function InspectPage() {
 											onClick={() => downloadOsm(osm)}
 											variant="ghost"
 											size="icon"
-											className="size-4"
 											title="Download OSM PBF"
 										>
 											<DownloadIcon />
@@ -146,7 +145,6 @@ export default function InspectPage() {
 											onClick={() => flyToOsmBounds(osm)}
 											variant="ghost"
 											size="icon"
-											className="size-4"
 											title="Fit bounds to file bbox"
 										>
 											<MaximizeIcon />
