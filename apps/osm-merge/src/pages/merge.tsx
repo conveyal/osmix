@@ -26,18 +26,17 @@ import { osmWorker } from "@/state/worker"
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
 	ArrowLeft,
-	ArrowRight,
+	ArrowRightIcon,
 	DownloadIcon,
 	FileDiff,
 	Loader2Icon,
 	MaximizeIcon,
 	MergeIcon,
-	SearchCode,
 	SkipForwardIcon,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { Osm, writeOsmToPbfStream, type OsmChanges } from "osm.ts"
-import { useCallback, useEffect, useRef, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useRef, useTransition } from "react"
 
 const STEPS = [
 	"select-osm-pbf-files",
@@ -64,7 +63,7 @@ export default function Merge() {
 	const patch = useOsmFile("patch")
 	const [isTransitioning, startTransition] = useTransition()
 	const [changes, setChanges] = useAtom(changesAtom)
-	const startTask = useStartTaskLog()
+	const startTaskLog = useStartTaskLog()
 	const flyToEntity = useFlyToEntity()
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
@@ -112,10 +111,22 @@ export default function Merge() {
 		[setStepIndex, selectEntity],
 	)
 
+	const startStepTask = useCallback(
+		(message: string, fn: () => Promise<string>) => {
+			nextStep()
+			const task = startTaskLog(message)
+			startTransition(async () => {
+				const endMessage = await fn()
+				task.end(endMessage)
+			})
+		},
+		[nextStep, startTaskLog],
+	)
+
 	const downloadJsonChanges = useCallback(async () => {
 		if (!changes) return
 		startTransition(async () => {
-			const task = startTask("Converting changeset to JSON", "info")
+			const task = startTaskLog("Converting changeset to JSON", "info")
 			const json = JSON.stringify(changes, null, 2)
 			const fileHandle = await showSaveFilePicker({
 				suggestedName: "osm-changes.json",
@@ -126,11 +137,11 @@ export default function Merge() {
 			stream.close()
 			task.end("Changeset converted to JSON", "ready")
 		})
-	}, [changes, startTask])
+	}, [changes, startTaskLog])
 
 	const applyChanges = useCallback(
 		async (changes: OsmChanges) => {
-			const task = startTask("Applying changes to OSM", "info")
+			const task = startTaskLog("Applying changes to OSM", "info")
 
 			const newOsm = Osm.from(
 				await osmWorker.applyChangesAndReplace(changes.osmId),
@@ -138,20 +149,17 @@ export default function Merge() {
 			task.end("Changes applied", "ready")
 			return newOsm
 		},
-		[startTask],
+		[startTaskLog],
 	)
 
-	const findDuplicateEntities = useCallback(
-		async (osmId: string) => {
-			const task = startTask("Finding duplicate nodes and ways")
-			const changes = await osmWorker.dedupeNodesAndWays(osmId)
-			task.end(
-				`Found ${changes?.stats.deduplicatedNodes.toLocaleString()} duplicate nodes and ${changes?.stats.deduplicatedWays.toLocaleString()} duplicate ways`,
-			)
-			return changes
-		},
-		[startTask],
-	)
+	const hasZeroChanges = useMemo(() => {
+		if (!changes) return true
+		return (
+			Object.keys(changes.nodes).length === 0 &&
+			Object.keys(changes.ways).length === 0 &&
+			Object.keys(changes.relations).length === 0
+		)
+	}, [changes])
 
 	return (
 		<Main>
@@ -193,20 +201,20 @@ export default function Merge() {
 						<Button
 							disabled={isTransitioning || !base.osm || !patch.osm}
 							onClick={() => {
-								startTransition(async () => {
-									if (!base.osm) return
-									const baseChanges = await findDuplicateEntities(base.osm.id)
-									setChanges(baseChanges)
-									nextStep()
-								})
+								startStepTask(
+									"Inspecting base OSM for duplicate entities",
+									async () => {
+										if (!base.osm) throw Error("Base OSM is not loaded")
+										const baseChanges = await osmWorker.dedupeNodesAndWays(
+											base.osm.id,
+										)
+										setChanges(baseChanges)
+										return `Found ${baseChanges?.stats.deduplicatedNodes.toLocaleString()} duplicate nodes and ${baseChanges?.stats.deduplicatedWays.toLocaleString()} duplicate ways`
+									},
+								)
 							}}
 						>
-							Inspect base OSM for duplicate entities{" "}
-							{isTransitioning ? (
-								<Loader2Icon className="animate-spin size-4" />
-							) : (
-								<SearchCode />
-							)}
+							Inspect base OSM for duplicate entities
 						</Button>
 					</Step>
 
@@ -227,20 +235,20 @@ export default function Merge() {
 						<Button
 							disabled={isTransitioning || !patch.osm}
 							onClick={() => {
-								startTransition(async () => {
-									if (!patch.osm) return
-									const patchChanges = await findDuplicateEntities(patch.osm.id)
-									setChanges(patchChanges)
-									nextStep()
-								})
+								startStepTask(
+									"Inspecting patch OSM for duplicate entities",
+									async () => {
+										if (!patch.osm) throw Error("Patch OSM is not loaded")
+										const patchChanges = await osmWorker.dedupeNodesAndWays(
+											patch.osm.id,
+										)
+										setChanges(patchChanges)
+										return `Found ${patchChanges?.stats.deduplicatedNodes.toLocaleString()} duplicate nodes and ${patchChanges?.stats.deduplicatedWays.toLocaleString()} duplicate ways`
+									},
+								)
 							}}
 						>
-							Inspect patch OSM for duplicate entities{" "}
-							{isTransitioning ? (
-								<Loader2Icon className="animate-spin size-4" />
-							) : (
-								<SearchCode />
-							)}
+							Inspect patch OSM for duplicate entities
 						</Button>
 					</Step>
 
@@ -251,8 +259,8 @@ export default function Merge() {
 						</div>
 
 						<div className="flex flex-col border-1">
-							<div className="flex flex-row justify-between">
-								<div className="font-bold">BASE OSM PBF</div>
+							<div className="flex flex-row justify-between items-center">
+								<div className="font-bold p-2">BASE OSM PBF</div>
 								{base.osm && <DownloadOsmButton osm={base.osm} />}
 							</div>
 							<OsmInfoTable
@@ -261,8 +269,11 @@ export default function Merge() {
 								file={base.file}
 							/>
 						</div>
-						<div>
-							<div className="font-bold">PATCH OSM PBF</div>
+						<div className="flex flex-col border-1">
+							<div className="flex flex-row justify-between items-center">
+								<div className="font-bold p-2">PATCH OSM PBF</div>
+								{patch.osm && <DownloadOsmButton osm={patch.osm} />}
+							</div>
 							<OsmInfoTable
 								defaultOpen={false}
 								osm={patch.osm}
@@ -277,9 +288,7 @@ export default function Merge() {
 							<Button
 								className="flex-1/2"
 								onClick={() => {
-									nextStep()
-									const task = startTask("Generating changeset", "info")
-									startTransition(async () => {
+									startStepTask("Generating changeset", async () => {
 										if (!base.osm || !patch.osm)
 											throw Error("Missing data to generate changes")
 										const results = await osmWorker.generateChangeset(
@@ -292,7 +301,7 @@ export default function Merge() {
 											},
 										)
 										setChanges(results)
-										task.end("Changeset generated", "ready")
+										return "Changeset generated"
 									})
 								}}
 							>
@@ -339,14 +348,16 @@ export default function Merge() {
 							</ChangesSummary>
 						)}
 
-						<div className="flex gap-2 justify-between">
+						{changes == null || hasZeroChanges ? (
+							<Button onClick={() => nextStep()} disabled={isTransitioning}>
+								No changes, go to next step <ArrowRightIcon />
+							</Button>
+						) : (
 							<Button
-								className="flex-1/2"
-								disabled={changes == null || isTransitioning}
+								disabled={isTransitioning}
 								onClick={() => {
-									startTransition(async () => {
-										if (!changes) return
-										nextStep()
+									startStepTask("Applying changes to OSM", async () => {
+										if (!changes) throw Error("Changes are not loaded")
 										const newOsm = await applyChanges(changes)
 										if (changes.osmId === base.osm?.id) {
 											base.setOsm(newOsm)
@@ -357,12 +368,13 @@ export default function Merge() {
 												"Changeset OSM ID does not match base or patch OSM ID",
 											)
 										}
+										return "Changes applied"
 									})
 								}}
 							>
 								Apply changes <MergeIcon />
 							</Button>
-						</div>
+						)}
 					</Step>
 
 					<Step
@@ -377,7 +389,7 @@ export default function Merge() {
 
 						<div className="flex flex-col border-1">
 							<div className="flex flex-row justify-between">
-								<div className="font-bold">CURRENT OSM PBF</div>
+								<div className="font-bold p-2">CURRENT OSM PBF</div>
 								{base.osm && <DownloadOsmButton osm={base.osm} />}
 							</div>
 							<OsmInfoTable
@@ -398,19 +410,14 @@ export default function Merge() {
 							<Button
 								className="flex-1/2"
 								onClick={() => {
-									nextStep()
-									const task = startTask(
-										"De-duplicating nodes and ways",
-										"info",
-									)
-									startTransition(async () => {
+									startStepTask("De-duplicating nodes and ways", async () => {
 										if (!base.osm || !patch.osm)
 											throw Error("Missing data to generate changes")
 										const results = await osmWorker.dedupeNodesAndWays(
 											base.osm.id,
 										)
 										setChanges(results)
-										task.end("Changeset generated", "ready")
+										return "Changeset generated"
 									})
 								}}
 							>
@@ -441,9 +448,7 @@ export default function Merge() {
 							<Button
 								className="flex-1/2"
 								onClick={() => {
-									const task = startTask("Generating changeset", "info")
-									nextStep()
-									startTransition(async () => {
+									startStepTask("Generating changeset", async () => {
 										if (!base.osm || !patch.osm)
 											throw Error("Missing data to generate changes")
 										const results = await osmWorker.generateChangeset(
@@ -456,7 +461,7 @@ export default function Merge() {
 											},
 										)
 										setChanges(results)
-										task.end("Changeset generated", "ready")
+										return "Changeset generated"
 									})
 								}}
 							>
@@ -475,35 +480,49 @@ export default function Merge() {
 							It can be inspected here and downloaded as a new PBF. Zoom in to
 							select entities and see the changes.
 						</div>
-						<hr />
-						{base.osm && selectedEntity && (
-							<div>
-								<div className="px-1 flex justify-between">
-									<div className="font-bold">SELECTED ENTITY</div>
-									<Button
-										onClick={() => {
-											if (!base.osm || !selectedEntity) return
-											flyToEntity(base.osm, selectedEntity)
-										}}
-										variant="ghost"
-										size="icon"
-										className="size-4"
-										title="Fit bounds to entity"
-									>
-										<MaximizeIcon />
-									</Button>
-								</div>
-								<EntityDetails
-									entity={selectedEntity}
-									open={true}
-									osm={base.osm}
-								/>
-							</div>
-						)}
+
 						{base.osm && (
-							<DownloadOsmButton osm={base.osm} size="lg" variant="default">
-								Download merged OSM PBF
-							</DownloadOsmButton>
+							<>
+								<div className="flex flex-col border-1">
+									<div className="flex justify-between items-center">
+										<div className="font-bold p-2">NEW OSM PBF</div>
+										<DownloadOsmButton osm={base.osm} />
+									</div>
+									<OsmInfoTable
+										defaultOpen={false}
+										osm={base.osm}
+										file={base.file}
+									/>
+								</div>
+
+								{selectedEntity && (
+									<div className="flex flex-col border-1">
+										<div className="flex justify-between items-center">
+											<div className="font-bold p-2">SELECTED ENTITY</div>
+											<Button
+												onClick={() => {
+													if (!base.osm || !selectedEntity) return
+													flyToEntity(base.osm, selectedEntity)
+												}}
+												variant="ghost"
+												size="icon"
+												title="Fit bounds to entity"
+											>
+												<MaximizeIcon />
+											</Button>
+										</div>
+										<EntityDetails
+											entity={selectedEntity}
+											open={true}
+											osm={base.osm}
+										/>
+									</div>
+								)}
+
+								<DownloadOsmButton osm={base.osm} size="lg" variant="default">
+									Download merged OSM PBF
+								</DownloadOsmButton>
+							</>
 						)}
 					</Step>
 				</div>
