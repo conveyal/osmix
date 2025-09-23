@@ -28,6 +28,7 @@ import {
 	ArrowLeft,
 	ArrowRightIcon,
 	DownloadIcon,
+	FastForwardIcon,
 	FileDiff,
 	Loader2Icon,
 	MaximizeIcon,
@@ -49,7 +50,7 @@ const STEPS = [
 	"review-changeset",
 	"create-intersections",
 	"review-changeset",
-	"inspect-osm",
+	"inspect-final-osm",
 ] as const
 
 const stepIndexAtom = atom<number>(0)
@@ -215,6 +216,57 @@ export default function Merge() {
 							}}
 						>
 							Inspect base OSM for duplicate entities
+						</Button>
+						<Button
+							disabled={isTransitioning || !base.osm || !patch.osm}
+							onClick={() => {
+								goToStep("inspect-final-osm")
+								const task = startTaskLog(
+									"Running all merge steps, please wait...",
+								)
+								startTransition(async () => {
+									if (!base.osm) throw Error("Base OSM is not loaded")
+									if (!patch.osm) throw Error("Patch OSM is not loaded")
+									task.update("Deduplicating nodes and ways in base OSM")
+									await osmWorker.dedupeNodesAndWays(base.osm.id)
+									await osmWorker.applyChangesAndReplace(base.osm.id)
+
+									task.update("Deduplicating nodes and ways in patch OSM")
+									await osmWorker.dedupeNodesAndWays(patch.osm.id)
+									await osmWorker.applyChangesAndReplace(patch.osm.id)
+
+									task.update(
+										"Generating direct changes from patch OSM to base OSM",
+									)
+									await osmWorker.generateChangeset(base.osm.id, patch.osm.id, {
+										directMerge: true,
+										deduplicateNodes: false,
+										createIntersections: false,
+									})
+									await osmWorker.applyChangesAndReplace(base.osm.id)
+
+									// TODO: add this step back when it is split from the direct merge
+									// await osmWorker.generateChangeset(base.osm.id, patch.osm.id, {
+									// 	directMerge: false,
+									//	deduplicateNodes: true,
+									//	createIntersections: false,
+									// })
+									// await osmWorker.applyChangesAndReplace(base.osm.id)
+
+									task.update("Creating intersections in base OSM")
+									await osmWorker.generateChangeset(base.osm.id, patch.osm.id, {
+										directMerge: false,
+										deduplicateNodes: false,
+										createIntersections: true,
+									})
+									await osmWorker.applyChangesAndReplace(base.osm.id)
+
+									task.end("All merge steps completed")
+								})
+							}}
+						>
+							Run all merge steps{" "}
+							{isTransitioning ? <Loader2Icon /> : <FastForwardIcon />}
 						</Button>
 					</Step>
 
@@ -477,7 +529,7 @@ export default function Merge() {
 					</Step>
 
 					<Step
-						step="inspect-osm"
+						step="inspect-final-osm"
 						title="INSPECT OSM"
 						isTransitioning={isTransitioning}
 					>
