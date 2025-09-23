@@ -282,11 +282,17 @@ export default function Merge() {
 						</div>
 
 						<div className="flex gap-2 justify-between">
-							<Button className="flex-1/2" variant="outline" onClick={prevStep}>
+							<Button
+								className="flex-1/2"
+								disabled={isTransitioning}
+								variant="outline"
+								onClick={prevStep}
+							>
 								<ArrowLeft /> Back
 							</Button>
 							<Button
 								className="flex-1/2"
+								disabled={isTransitioning}
 								onClick={() => {
 									startStepTask("Generating changeset", async () => {
 										if (!base.osm || !patch.osm)
