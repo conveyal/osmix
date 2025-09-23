@@ -38,6 +38,7 @@ export type OsmChangesStats = {
 }
 
 export type OsmChanges = {
+	osmId: string
 	nodes: Record<number, OsmChange<OsmEntityTypeMap["node"]>>
 	ways: Record<number, OsmChange<OsmEntityTypeMap["way"]>>
 	relations: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>
