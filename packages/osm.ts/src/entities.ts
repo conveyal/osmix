@@ -82,4 +82,12 @@ export abstract class Entities<T extends OsmEntity> {
 			return this.getFullEntity(index, id, this.tags.getTags(index))
 		return null
 	}
+
+	*sorted(): Generator<T> {
+		for (const id of this.ids.sorted) {
+			const index = this.ids.getIndexFromId(id)
+			if (index === -1) throw Error(`Entity not found at id ${id}`)
+			yield this.getFullEntity(index, id, this.tags.getTags(index))
+		}
+	}
 }

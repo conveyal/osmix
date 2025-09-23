@@ -179,4 +179,8 @@ export class Ids {
 		if ("id" in i) return [this.getIndexFromId(i.id), i.id]
 		return [i.index, this.at(i.index)]
 	}
+
+	get sorted() {
+		return this.idsSorted
+	}
 }

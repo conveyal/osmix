@@ -41,7 +41,7 @@ export function* generatePbfPrimitiveBlocks(
 	includeInfo = false,
 ): Generator<OsmPbfBlockBuilder> {
 	let block = new OsmPbfBlockBuilder({ includeInfo })
-	for (const node of osm.nodes) {
+	for (const node of osm.nodes.sorted()) {
 		if (block.isFull()) {
 			yield block
 			block = new OsmPbfBlockBuilder()
@@ -53,7 +53,7 @@ export function* generatePbfPrimitiveBlocks(
 	}
 
 	block = new OsmPbfBlockBuilder({ includeInfo })
-	for (const way of osm.ways) {
+	for (const way of osm.ways.sorted()) {
 		if (block.isFull()) {
 			yield block
 			block = new OsmPbfBlockBuilder()
@@ -65,7 +65,7 @@ export function* generatePbfPrimitiveBlocks(
 	}
 
 	block = new OsmPbfBlockBuilder({ includeInfo })
-	for (const relation of osm.relations) {
+	for (const relation of osm.relations.sorted()) {
 		if (block.isFull()) {
 			yield block
 			block = new OsmPbfBlockBuilder()
