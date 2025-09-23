@@ -14,7 +14,7 @@ import {
 import { Provider, useAtom, useAtomValue, useSetAtom } from "jotai"
 import { useHydrateAtoms } from "jotai/utils"
 import { ArrowLeft, ArrowRight } from "lucide-react"
-import { type OsmChanges, type OsmEntity, getEntityType } from "osm.ts"
+import { getEntityType, type OsmChanges, type OsmEntity } from "osm.ts"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 import { EntityContent } from "./entity-details"
 import { Button } from "./ui/button"
@@ -252,17 +252,19 @@ export function ChangesExpandableList() {
 			{currentChanges.map(({ changeType, entity, refs }, i) => {
 				const changeTypeColor = CHANGE_TYPE_COLOR[changeType]
 				const entityType = getEntityType(entity)
+				const summaryLabel = `${startIndex + i + 1}. ${changeType.toUpperCase()} ${entityType.toUpperCase()} ${entity.id}`
 				return (
 					<Details key={`${entityType}-${entity.id}`} open={false}>
-						<DetailsSummary
-							className={cn("flex flex-row justify-between", changeTypeColor)}
-						>
-							{startIndex + i + 1}. {changeType.toUpperCase()}{" "}
-							{entityType.toUpperCase()} {entity.id}
+						<DetailsSummary className={cn(changeTypeColor)}>
+							{summaryLabel}
 						</DetailsSummary>
+
 						<DetailsContent>
 							{refs && (
-								<div className="p-1 border-1">Related: {refs.join(", ")}</div>
+								<div className="p-1 border-1">
+									Related:{" "}
+									{refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")}
+								</div>
 							)}
 							<EntityContent entity={entity} />
 						</DetailsContent>

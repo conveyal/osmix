@@ -23,7 +23,7 @@ export function DetailsSummary({
 	children,
 }: { className?: ClassValue; children: ReactNode }) {
 	return (
-		<summary className={cn("font-bold py-1 px-2 cursor-pointer", className)}>
+		<summary className={cn("font-bold py-1 pl-2 cursor-pointer", className)}>
 			{children}
 		</summary>
 	)

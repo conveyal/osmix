@@ -15,7 +15,7 @@ const osmCache = new Map<string, Osm>()
 const changesetCache = new Map<string, OsmChangeset>()
 
 const osmWorker = {
-	log: (message: string, type: StatusType) =>
+	log: (message: string, type: StatusType = "info") =>
 		type === "error" ? console.error(message) : console.log(message),
 	subscribeToLog(fn: typeof this.log) {
 		this.log = fn
@@ -32,7 +32,7 @@ const osmWorker = {
 		// Clear previous OSM references making it available for garbage collection
 		osmCache.delete(id)
 		const measure = Performance.createMeasure("initializing PBF from data")
-		const osm = await Osm.fromPbfData(data, id, (m) => this.log(m, "info"))
+		const osm = await Osm.fromPbfData(data, id, (m) => this.log(m))
 		osmCache.set(id, osm)
 		measure()
 		return osm.transferables()
@@ -90,16 +90,22 @@ const osmWorker = {
 		const changeset = new OsmChangeset(osm)
 		changesetCache.set(id, changeset)
 		const logEverySecond = throttle(this.log, 1_000)
-		for (const _wayStats of changeset.deduplicateWays(osm)) {
+		let checkedWays = 0
+		let dedpulicatedWays = 0
+		for (const wayStats of changeset.deduplicateWays(osm)) {
+			checkedWays++
+			dedpulicatedWays += wayStats
 			logEverySecond(
-				`Deduplicating ways... ${_wayStats.toLocaleString()} ways deduplicated`,
-				"info",
+				`Deduplicating ways: ${checkedWays.toLocaleString()} ways checked, ${dedpulicatedWays.toLocaleString()} ways deduplicated`,
 			)
 		}
-		for (const _nodeStats of changeset.deduplicateNodes(osm)) {
+		let checkedNodes = 0
+		let dedpulicatedNodes = 0
+		for (const nodeStats of changeset.deduplicateNodes(osm)) {
+			checkedNodes++
+			dedpulicatedNodes += nodeStats
 			logEverySecond(
-				`Deduplicating nodes... ${_nodeStats.toLocaleString()} nodes deduplicated`,
-				"info",
+				`Deduplicating nodes: ${checkedNodes.toLocaleString()} nodes checked, ${dedpulicatedNodes.toLocaleString()} nodes deduplicated`,
 			)
 		}
 		return {
@@ -123,31 +129,30 @@ const osmWorker = {
 		const logEverySecond = throttle(this.log, 1_000)
 
 		if (options.directMerge) {
-			this.log("Generating direct changes...", "info")
+			this.log("Generating direct changes...")
 			changeset.generateDirectChanges(patchOsm)
 		}
-		/* if (options.deduplicateNodes) {
+		if (options.deduplicateNodes) {
 			let checkedNodes = 0
-			this.log("Deduplicating nodes...", "info")
-			for (let nodeIndex = 0; nodeIndex < patchOsm.nodes.size; nodeIndex++) {
+			this.log("Deduplicating nodes...")
+			for (const _nodeStats of changeset.deduplicateNodes(baseOsm)) {
 				checkedNodes++
-				changeset.deduplicateOverlappingNodes(nodeIndex, patchOsm)
 				logEverySecond(
 					`Node deduplication progress: ${checkedNodes.toLocaleString()} checked, ${changeset.stats.deduplicatedNodes.toLocaleString()} deduplicated, ${changeset.stats.deduplicatedNodesReplaced.toLocaleString()} replaced`,
-					"info",
 				)
 			}
-		} */
+		}
 		if (options.createIntersections) {
 			let checkedWays = 0
-			this.log("Creating intersections...", "info")
+			this.log("Creating intersections...")
+
+			// This will check if the osm dataset has the way before trying to create intersections for it.
 			for (const _wayStats of changeset.generateIntersectionsForWays(
 				patchOsm.ways,
 			)) {
 				checkedWays++
 				logEverySecond(
 					`Intersection creation progress: ${checkedWays.toLocaleString()} ways checked, ${changeset.stats.intersectionPointsFound.toLocaleString()} intersections created`,
-					"info",
 				)
 			}
 		}

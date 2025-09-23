@@ -79,10 +79,17 @@ export type OsmGeoJSONFeature = GeoJSON.Feature<
 >
 
 // String that starts with `n`, `w`, or `r` followed by the ID
-export type OsmEntityRef = `n${number}` | `w${number}` | `r${number}`
+export type OsmEntityRef = {
+	type: OsmEntityType
+	id: number
+	osmId: string
+}
 
 export type OsmChange<T extends IOsmEntity = OsmEntity> = {
 	changeType: "modify" | "create" | "delete"
 	entity: T
+	osmId: string // When merging datasets, we need to keep track of the entity's origin dataset.
+
+	// Used to lookup related entities, refs, and relations
 	refs?: OsmEntityRef[]
 }

@@ -101,10 +101,12 @@ export default class OsmChangeset {
 		return ++this.currentNodeId
 	}
 
-	create(entity: OsmEntity) {
+	create(entity: OsmEntity, osmId: string, refs?: OsmEntityRef[]) {
 		this.changes(getEntityType(entity))[entity.id] = {
 			changeType: "create",
 			entity,
+			osmId,
+			refs, // Refs can come from other datasets
 		}
 	}
 
@@ -135,6 +137,7 @@ export default class OsmChangeset {
 		changes[id] = {
 			changeType: change?.changeType ?? "modify",
 			entity: modify(existingEntity),
+			osmId: this.osm.id, // If we're modifying an entity, it must exist in the base OSM
 		}
 	}
 
@@ -143,6 +146,7 @@ export default class OsmChangeset {
 			changeType: "delete",
 			entity,
 			refs,
+			osmId: this.osm.id,
 		}
 	}
 
@@ -247,7 +251,9 @@ export default class OsmChangeset {
 
 			// Schedule node for deletion
 			this.stats.deduplicatedNodes++
-			this.delete(existingNode, [`n${patchNode.id}`])
+			this.delete(existingNode, [
+				{ type: "node", id: patchNode.id, osmId: osm.id },
+			])
 		}
 
 		// Increment the total number of nodes replaced
@@ -298,7 +304,11 @@ export default class OsmChangeset {
 		// Delete this way
 		this.delete(
 			way,
-			candidateDuplicateWays.map((way) => `w${way.id}` as OsmEntityRef),
+			candidateDuplicateWays.map((way) => ({
+				type: "way",
+				id: way.id,
+				osmId: osm.id,
+			})),
 		)
 		this.stats.deduplicatedWays++
 
@@ -445,7 +455,10 @@ export default class OsmChangeset {
 							crossing: "yes",
 						},
 					}
-					this.create(newIntersectionNode)
+					this.create(newIntersectionNode, this.osm.id, [
+						{ type: "way", id: way.id, osmId: this.osm.id },
+						{ type: "way", id: intersectingWay.id, osmId: this.osm.id },
+					])
 
 					// Splice into the existing ways
 					this.spliceNodeIntoWay(way, newIntersectionNode)
@@ -545,7 +558,7 @@ export default class OsmChangeset {
 				}
 
 				// Create the way
-				this.create(removeDuplicateAdjacentOsmWayRefs(way))
+				this.create(removeDuplicateAdjacentOsmWayRefs(way), patch.id)
 
 				// Check for duplicate ways
 				const closeWayIndexes = this.osm.ways.intersects(
@@ -571,7 +584,9 @@ export default class OsmChangeset {
 				// Already scheduled for deletion? Continue
 				if (this.wayChanges[duplicateWay.id]?.changeType === "delete") continue
 				// TODO: Should we merge the tags from this way?
-				this.delete(duplicateWay)
+				this.delete(duplicateWay, [
+					{ type: "way", id: way.id, osmId: patch.id },
+				])
 				this.stats.deduplicatedWays++
 			}
 		}
@@ -585,7 +600,7 @@ export default class OsmChangeset {
 					this.modify("node", node.id, (_existingNode) => node)
 				}
 			} else {
-				this.create(node)
+				this.create(node, patch.id)
 
 				// Check for duplicate nodes
 				const duplicateNodes = this.osm.nodes.withinRadius(
@@ -605,7 +620,9 @@ export default class OsmChangeset {
 					continue
 
 				// Schedule for deletion
-				this.delete(duplicateNode)
+				this.delete(duplicateNode, [
+					{ type: "node", id: node.id, osmId: patch.id },
+				])
 				this.stats.deduplicatedNodes++
 
 				// Find ways that contain the existing node
@@ -646,7 +663,7 @@ export default class OsmChangeset {
 					this.modify("relation", relation.id, (_existingRelation) => relation)
 				}
 			} else {
-				this.create(relation)
+				this.create(relation, patch.id)
 			}
 		}
 	}

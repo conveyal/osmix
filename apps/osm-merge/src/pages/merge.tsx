@@ -1,10 +1,17 @@
+import Basemap from "@/components/basemap"
+import DeckGlOverlay from "@/components/deckgl-overlay"
 import { Details, DetailsContent, DetailsSummary } from "@/components/details"
+import EntityDetails from "@/components/entity-details"
+import { Main, MapContent, Sidebar } from "@/components/layout"
 import LogContent from "@/components/log"
 import ChangesSummary, {
 	ChangesExpandableList,
 	ChangesFilters,
 	ChangesPagination,
 } from "@/components/osm-changes-summary"
+import OsmInfoTable from "@/components/osm-info-table"
+import OsmPbfFileInput from "@/components/osm-pbf-file-input"
+import { Button } from "@/components/ui/button"
 import useStartTaskLog from "@/hooks/log"
 import {
 	useFlyToEntity,
@@ -14,9 +21,9 @@ import {
 import { useOsmFile } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { changesAtom } from "@/state/changes"
-import { mapAtom } from "@/state/map"
-import { selectedEntityAtom } from "@/state/osm"
-import { atom, useAtom, useAtomValue } from "jotai"
+import { selectedEntityAtom, selectOsmEntityAtom } from "@/state/osm"
+import { osmWorker } from "@/state/worker"
+import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
 	ArrowLeft,
 	ArrowRight,
@@ -30,14 +37,6 @@ import {
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { Osm, writeOsmToPbfStream } from "osm.ts"
 import { useCallback, useEffect, useRef, useTransition } from "react"
-import Basemap from "../components/basemap"
-import DeckGlOverlay from "../components/deckgl-overlay"
-import EntityDetails from "../components/entity-details"
-import { Main, MapContent, Sidebar } from "../components/layout"
-import OsmInfoTable from "../components/osm-info-table"
-import OsmPbfFileInput from "../components/osm-pbf-file-input"
-import { Button } from "../components/ui/button"
-import { osmWorker } from "@/state/worker"
 
 const STEPS = [
 	"select-osm-pbf-files",
@@ -64,6 +63,7 @@ export default function Merge() {
 	const startTask = useStartTaskLog()
 	const flyToEntity = useFlyToEntity()
 	const selectedEntity = useAtomValue(selectedEntityAtom)
+	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const baseTileLayer = usePickableOsmTileLayer(base.osm)
 	const patchTileLayer = usePickableOsmTileLayer(patch.osm)
 	const selectedEntityLayer = useSelectedEntityLayer()
@@ -92,17 +92,20 @@ export default function Merge() {
 	}, [base.file, patch.file, base.setFile, patch.setFile])
 
 	const prevStep = useCallback(() => {
+		selectEntity(null, null)
 		setStepIndex((s) => s - 1)
-	}, [setStepIndex])
+	}, [setStepIndex, selectEntity])
 	const nextStep = useCallback(() => {
+		selectEntity(null, null)
 		setStepIndex((s) => s + 1)
-	}, [setStepIndex])
+	}, [setStepIndex, selectEntity])
 	const goToStep = useCallback(
 		(step: number | (typeof STEPS)[number]) => {
 			const stepIndex = typeof step === "number" ? step : STEPS.indexOf(step)
+			selectEntity(null, null)
 			setStepIndex(stepIndex)
 		},
-		[setStepIndex],
+		[setStepIndex, selectEntity],
 	)
 
 	const downloadOsm = useCallback(
@@ -231,7 +234,7 @@ export default function Merge() {
 									nextStep()
 									const task = startTask("Generating changeset", "info")
 									startTransition(async () => {
-										if (!base.osm || !patch.osm || !osmWorker)
+										if (!base.osm || !patch.osm)
 											throw Error("Missing data to generate changes")
 										const results = await osmWorker.generateChangeset(
 											base.osm.id,
@@ -276,7 +279,7 @@ export default function Merge() {
 								<DownloadIcon /> Download .osc changes
 							</Button>
 						</div>
-						{changes && (
+						{changes && base.osm && (
 							<ChangesSummary>
 								{/* Changes List */}
 								<Details>
@@ -295,7 +298,6 @@ export default function Merge() {
 								className="flex-1/2"
 								disabled={changes == null || isTransitioning}
 								onClick={() => {
-									if (!osmWorker) throw Error("No OSM worker")
 									nextStep()
 									applyChanges()
 								}}
@@ -327,18 +329,15 @@ export default function Merge() {
 								className="flex-1/2"
 								onClick={() => {
 									nextStep()
-									const task = startTask("Generating changeset", "info")
+									const task = startTask(
+										"De-duplicating nodes and ways",
+										"info",
+									)
 									startTransition(async () => {
-										if (!base.osm || !patch.osm || !osmWorker)
+										if (!base.osm || !patch.osm)
 											throw Error("Missing data to generate changes")
-										const results = await osmWorker.generateChangeset(
+										const results = await osmWorker.dedupeNodesAndWays(
 											base.osm.id,
-											patch.osm.id,
-											{
-												directMerge: false,
-												deduplicateNodes: true,
-												createIntersections: false,
-											},
 										)
 										setChanges(results)
 										task.end("Changeset generated", "ready")
@@ -375,7 +374,7 @@ export default function Merge() {
 									const task = startTask("Generating changeset", "info")
 									nextStep()
 									startTransition(async () => {
-										if (!base.osm || !patch.osm || !osmWorker)
+										if (!base.osm || !patch.osm)
 											throw Error("Missing data to generate changes")
 										const results = await osmWorker.generateChangeset(
 											base.osm.id,
