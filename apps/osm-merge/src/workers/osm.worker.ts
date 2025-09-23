@@ -84,7 +84,7 @@ const osmWorker = {
 			measure()
 		}
 	},
-	dedupeNodesAndWays(id: string) {
+	dedupeNodesAndWays(id: string): OsmChanges {
 		const osm = osmCache.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
 		const changeset = new OsmChangeset(osm)
@@ -109,6 +109,7 @@ const osmWorker = {
 			)
 		}
 		return {
+			osmId: id,
 			nodes: changeset.nodeChanges,
 			ways: changeset.wayChanges,
 			relations: changeset.relationChanges,
@@ -159,6 +160,7 @@ const osmWorker = {
 
 		changesetCache.set(baseOsmId, changeset)
 		return {
+			osmId: baseOsmId,
 			nodes: changeset.nodeChanges,
 			ways: changeset.wayChanges,
 			relations: changeset.relationChanges,
