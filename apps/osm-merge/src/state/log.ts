@@ -12,7 +12,7 @@ export type Status = {
 
 const INITIAL_STATUS: Status = {
 	type: "info",
-	message: "Initializing application...",
+	message: "Application ready",
 	duration: 0,
 	timestamp: Date.now(),
 }
