@@ -218,7 +218,7 @@ export function ChangesList({
 	const startIndex = useAtomValue(startIndexAtom)
 
 	return (
-		<div className="flex flex-col gap-1">
+		<div className="flex flex-col">
 			{currentChanges.map(({ changeType, entity, refs }, i) => {
 				const changeTypeColor = CHANGE_TYPE_COLOR[changeType]
 				const entityType = getEntityType(entity)
@@ -226,7 +226,7 @@ export function ChangesList({
 					<button
 						key={`${entityType}-${entity.id}`}
 						className={cn(
-							"border-l pl-2 font-bold cursor-pointer w-full text-left select-text",
+							"border-l pl-2 py-0.5 font-bold cursor-pointer w-full text-left select-text",
 							changeTypeColor,
 						)}
 						onClick={() => setSelectedEntity(entity)}
@@ -235,7 +235,8 @@ export function ChangesList({
 					>
 						{startIndex + i + 1}. {changeType.toUpperCase()}{" "}
 						{entityType.toUpperCase()} {entity.id}{" "}
-						{refs && `(${refs.join(", ")})`}
+						{refs &&
+							`(${refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")})`}
 					</button>
 				)
 			})}

@@ -27,11 +27,19 @@ import { changesAtom } from "@/state/changes"
 import { selectOsmEntityAtom } from "@/state/osm"
 import { bboxPolygon } from "@turf/turf"
 import { useAtom, useSetAtom } from "jotai"
-import { Loader2Icon, MaximizeIcon } from "lucide-react"
-import { useEffect, useMemo, useTransition } from "react"
+import {
+	DownloadIcon,
+	Loader2Icon,
+	MaximizeIcon,
+	MergeIcon,
+	SearchCode,
+} from "lucide-react"
+import { useCallback, useEffect, useMemo, useTransition } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
 import { useSearchParams } from "react-router"
 import { osmWorker } from "@/state/worker"
+import { Osm, writeOsmToPbfStream } from "osm.ts"
+import { showSaveFilePicker } from "native-file-system-adapter"
 
 export default function FilterPage() {
 	const [searchParams] = useSearchParams()
@@ -66,6 +74,43 @@ export default function FilterPage() {
 		}
 	}, [osm, selectEntity, setDuplicateNodesAndWays])
 
+	const downloadOsm = useCallback(
+		async (osm: Osm, name?: string) => {
+			startTransition(async () => {
+				const task = startTask("Generating OSM file to download")
+				const suggestedName =
+					name ?? (osm.id.endsWith(".pbf") ? osm.id : `${osm.id}.pbf`)
+				const fileHandle = await showSaveFilePicker({
+					suggestedName,
+					types: [
+						{
+							description: "OSM PBF",
+							accept: { "application/x-protobuf": [".pbf"] },
+						},
+					],
+				})
+				const stream = await fileHandle.createWritable()
+				await writeOsmToPbfStream(osm, stream)
+				task.end(`Created ${fileHandle.name} PBF for download`)
+			})
+		},
+		[startTask],
+	)
+
+	const applyChanges = useCallback(
+		async (osmId: string) => {
+			const task = startTask("Applying changes to OSM...")
+			startTransition(async () => {
+				const transferables = await osmWorker.applyChangesAndReplace(osmId)
+				task.update("Refreshing OSM index...")
+				const newOsm = Osm.from(transferables)
+				setOsm(newOsm)
+				task.end("Changes applied!")
+			})
+		},
+		[setOsm, startTask],
+	)
+
 	return (
 		<Main>
 			<Sidebar>
@@ -85,57 +130,88 @@ export default function FilterPage() {
 							<div className="flex flex-col">
 								<div className="flex justify-between">
 									<div className="font-bold">OPENSTREETMAP PBF</div>
-									<Button
-										onClick={() => flyToOsmBounds(osm)}
-										variant="ghost"
-										size="icon"
-										className="size-4"
-										title="Fit bounds to file bbox"
-									>
-										<MaximizeIcon />
-									</Button>
+									<div className="flex gap-2">
+										<Button
+											disabled={isTransitioning}
+											onClick={() => downloadOsm(osm)}
+											variant="ghost"
+											size="icon"
+											className="size-4"
+											title="Download OSM PBF"
+										>
+											<DownloadIcon />
+										</Button>
+										<Button
+											disabled={isTransitioning}
+											onClick={() => flyToOsmBounds(osm)}
+											variant="ghost"
+											size="icon"
+											className="size-4"
+											title="Fit bounds to file bbox"
+										>
+											<MaximizeIcon />
+										</Button>
+									</div>
 								</div>
-								<OsmInfoTable defaultOpen={false} file={file} osm={osm} />
+								<OsmInfoTable file={file} osm={osm} />
 							</div>
 
-							<Button
-								onClick={() => {
-									startTransition(async () => {
-										const task = startTask(
-											"Finding duplicate nodes and ways",
-											"info",
-										)
-										const changes = await osmWorker.dedupeNodesAndWays(osmId)
-										setDuplicateNodesAndWays(changes)
-										task.end(
-											`Found ${changes?.stats.deduplicatedNodes.toLocaleString()} duplicate nodes and ${changes?.stats.deduplicatedWays.toLocaleString()} duplicate ways`,
-											"ready",
-										)
-									})
-								}}
-								disabled={isTransitioning}
-							>
-								{isTransitioning && <Loader2Icon className="animate-spin" />}
-								Find duplicate nodes and ways
-							</Button>
+							{duplicateNodesAndWays == null ? (
+								<Button
+									onClick={() => {
+										startTransition(async () => {
+											const task = startTask(
+												"Finding duplicate nodes and ways",
+												"info",
+											)
+											const changes = await osmWorker.dedupeNodesAndWays(osmId)
+											setDuplicateNodesAndWays(changes)
+											task.end(
+												`Found ${changes?.stats.deduplicatedNodes.toLocaleString()} duplicate nodes and ${changes?.stats.deduplicatedWays.toLocaleString()} duplicate ways`,
+												"ready",
+											)
+										})
+									}}
+									disabled={isTransitioning}
+								>
+									{isTransitioning ? (
+										<Loader2Icon className="animate-spin" />
+									) : (
+										<SearchCode />
+									)}
+									Find duplicate nodes and ways
+								</Button>
+							) : (
+								<>
+									<ChangesSummary>
+										{/* Changes List */}
+										<Details>
+											<DetailsSummary>CHANGES</DetailsSummary>
+											<DetailsContent>
+												<ChangesFilters />
+												<ChangesList
+													setSelectedEntity={(entity) => {
+														selectEntity(osm, entity)
+														flyToEntity(osm, entity)
+													}}
+												/>
+												<ChangesPagination />
+											</DetailsContent>
+										</Details>
+									</ChangesSummary>
 
-							{duplicateNodesAndWays && (
-								<ChangesSummary>
-									{/* Changes List */}
-									<Details>
-										<DetailsSummary>CHANGES</DetailsSummary>
-										<DetailsContent>
-											<ChangesFilters />
-											<ChangesList
-												setSelectedEntity={(entity) => {
-													selectEntity(osm, entity)
-													flyToEntity(osm, entity)
-												}}
-											/>
-											<ChangesPagination />
-										</DetailsContent>
-									</Details>
-								</ChangesSummary>
+									<Button
+										onClick={() => applyChanges(osm.id)}
+										disabled={isTransitioning}
+									>
+										{isTransitioning ? (
+											<Loader2Icon className="animate-spin" />
+										) : (
+											<MergeIcon />
+										)}
+										Apply changes
+									</Button>
+								</>
 							)}
 						</div>
 					) : (

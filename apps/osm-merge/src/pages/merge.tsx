@@ -40,6 +40,7 @@ import { useCallback, useEffect, useRef, useTransition } from "react"
 
 const STEPS = [
 	"select-osm-pbf-files",
+	"deduplicate-self",
 	"direct-merge",
 	"review-changeset",
 	"deduplicate-nodes",
@@ -521,9 +522,4 @@ function Step({
 			{children}
 		</>
 	)
-}
-
-function If({ children, t }: { children: React.ReactNode; t: boolean }) {
-	if (!t) return null
-	return <>{children}</>
 }
