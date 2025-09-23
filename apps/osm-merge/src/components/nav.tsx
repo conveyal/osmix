@@ -26,14 +26,6 @@ export default function Nav() {
 				>
 					Inspect
 				</NavLink>
-				<NavLink
-					className={({ isActive }) =>
-						cn("text-slate-950 py-4 px-2", isActive && "text-blue-600")
-					}
-					to="filter"
-				>
-					Filter
-				</NavLink>
 				{process.env.NODE_ENV === "development" && <BrowserCheck />}
 			</div>
 

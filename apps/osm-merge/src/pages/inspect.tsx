@@ -1,6 +1,20 @@
+import Basemap from "@/components/basemap"
 import CustomControl from "@/components/custom-control"
+import DeckGlOverlay from "@/components/deckgl-overlay"
+import { Details, DetailsContent, DetailsSummary } from "@/components/details"
+import EntityDetailsMapControl from "@/components/entity-details-map-control"
 import EntitySearchControl from "@/components/entity-search-control"
 import ExtractList from "@/components/extract-list"
+import { Main, MapContent, Sidebar } from "@/components/layout"
+import ChangesSummary, {
+	ChangesFilters,
+	ChangesList,
+	ChangesPagination,
+} from "@/components/osm-changes-summary"
+import OsmInfoTable from "@/components/osm-info-table"
+import OsmPbfFileInput from "@/components/osm-pbf-file-input"
+import { Button } from "@/components/ui/button"
+import useStartTaskLog from "@/hooks/log"
 import {
 	useFlyToEntity,
 	useFlyToOsmBounds,
@@ -8,27 +22,24 @@ import {
 	useSelectedEntityLayer,
 } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
-import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
-import { addLogMessageAtom } from "@/state/log"
-import {
-	selectOsmEntityAtom,
-	selectedEntityAtom,
-	selectedOsmAtom,
-} from "@/state/osm"
+import { APPID } from "@/settings"
+import { changesAtom } from "@/state/changes"
+import { selectOsmEntityAtom } from "@/state/osm"
 import { bboxPolygon } from "@turf/turf"
-import { useAtomValue, useSetAtom } from "jotai"
-import { MaximizeIcon } from "lucide-react"
-import * as Performance from "osm.ts/performance"
-import { useEffect, useMemo } from "react"
+import { useAtom, useSetAtom } from "jotai"
+import {
+	DownloadIcon,
+	Loader2Icon,
+	MaximizeIcon,
+	MergeIcon,
+	SearchCode,
+} from "lucide-react"
+import { useCallback, useEffect, useMemo, useTransition } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
 import { useSearchParams } from "react-router"
-import Basemap from "../components/basemap"
-import DeckGlOverlay from "../components/deckgl-overlay"
-import EntityDetails from "../components/entity-details"
-import { Main, MapContent, Sidebar } from "../components/layout"
-import OsmInfoTable from "../components/osm-info-table"
-import OsmPbfFileInput from "../components/osm-pbf-file-input"
-import { Button } from "../components/ui/button"
+import { osmWorker } from "@/state/worker"
+import { Osm, writeOsmToPbfStream } from "osm.ts"
+import { showSaveFilePicker } from "native-file-system-adapter"
 
 export default function InspectPage() {
 	const [searchParams] = useSearchParams()
@@ -36,35 +47,69 @@ export default function InspectPage() {
 		() => searchParams.get("osmId") ?? "inspect",
 		[searchParams],
 	)
-	const { osm, isLoading: isLoadingFile, file, setFile } = useOsmFile(osmId)
+	const flyToEntity = useFlyToEntity()
+	const flyToOsmBounds = useFlyToOsmBounds()
+	const {
+		osm,
+		isLoading: isLoadingFile,
+		file,
+		setFile,
+		setOsm,
+	} = useOsmFile(osmId, "./pbfs/monaco.pbf")
 	const bbox = useMemo(() => osm?.bbox(), [osm])
-	const logMessage = useSetAtom(addLogMessageAtom)
 
-	// Set message to "Ready" when the application is ready
-	useEffect(() => {
-		logMessage("Ready", "ready")
-		Performance.mark("Ready")
-	}, [logMessage])
-
-	// Auto load default file for faster testing
-	useEffect(() => {
-		if (process.env.NODE_ENV !== "development") return
-		if (!file) {
-			fetch("./pbfs/monaco.pbf")
-				.then((res) => res.blob())
-				.then((blob) => {
-					setFile((file) => (file ? file : new File([blob], "monaco.pbf")))
-				})
-		}
-	}, [file, setFile])
-
-	const selectedOsm = useAtomValue(selectedOsmAtom)
-	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const tileLayer = usePickableOsmTileLayer(osm)
 	const selectedEntityLayer = useSelectedEntityLayer()
-	const flyToEntity = useFlyToEntity()
-	const flyToOsmBounds = useFlyToOsmBounds()
+
+	const [isTransitioning, startTransition] = useTransition()
+	const startTask = useStartTaskLog()
+
+	const [duplicateNodesAndWays, setDuplicateNodesAndWays] = useAtom(changesAtom)
+
+	useEffect(() => {
+		if (osm != null) {
+			selectEntity(null, null)
+			setDuplicateNodesAndWays(null)
+		}
+	}, [osm, selectEntity, setDuplicateNodesAndWays])
+
+	const downloadOsm = useCallback(
+		async (osm: Osm, name?: string) => {
+			startTransition(async () => {
+				const task = startTask("Generating OSM file to download")
+				const suggestedName =
+					name ?? (osm.id.endsWith(".pbf") ? osm.id : `${osm.id}.pbf`)
+				const fileHandle = await showSaveFilePicker({
+					suggestedName,
+					types: [
+						{
+							description: "OSM PBF",
+							accept: { "application/x-protobuf": [".pbf"] },
+						},
+					],
+				})
+				const stream = await fileHandle.createWritable()
+				await writeOsmToPbfStream(osm, stream)
+				task.end(`Created ${fileHandle.name} PBF for download`)
+			})
+		},
+		[startTask],
+	)
+
+	const applyChanges = useCallback(
+		async (osmId: string) => {
+			const task = startTask("Applying changes to OSM...")
+			startTransition(async () => {
+				const transferables = await osmWorker.applyChangesAndReplace(osmId)
+				task.update("Refreshing OSM index...")
+				const newOsm = Osm.from(transferables)
+				setOsm(newOsm)
+				task.end("Changes applied!")
+			})
+		},
+		[setOsm, startTask],
+	)
 
 	return (
 		<Main>
@@ -76,6 +121,7 @@ export default function InspectPage() {
 						setFile={(file) => {
 							selectEntity(null, null)
 							setFile(file)
+							if (file == null) setOsm(null)
 						}}
 					/>
 
@@ -84,44 +130,88 @@ export default function InspectPage() {
 							<div className="flex flex-col">
 								<div className="flex justify-between">
 									<div className="font-bold">OPENSTREETMAP PBF</div>
-									<Button
-										onClick={() => flyToOsmBounds(osm)}
-										variant="ghost"
-										size="icon"
-										className="size-4"
-										title="Fit bounds to file bbox"
-									>
-										<MaximizeIcon />
-									</Button>
-								</div>
-								<OsmInfoTable file={file} osm={osm} />
-							</div>
-							{selectedOsm == null || selectedEntity == null ? (
-								<div className="px-1 text-center font-bold">
-									SELECT ENTITY ON MAP (Z{MIN_PICKABLE_ZOOM} AND UP)
-								</div>
-							) : (
-								<div>
-									<div className="flex justify-between">
-										<div className="font-bold">SELECTED ENTITY</div>
+									<div className="flex gap-2">
 										<Button
-											onClick={() => {
-												flyToEntity(selectedOsm, selectedEntity)
-											}}
+											disabled={isTransitioning}
+											onClick={() => downloadOsm(osm)}
 											variant="ghost"
 											size="icon"
 											className="size-4"
-											title="Fit bounds to entity"
+											title="Download OSM PBF"
+										>
+											<DownloadIcon />
+										</Button>
+										<Button
+											disabled={isTransitioning}
+											onClick={() => flyToOsmBounds(osm)}
+											variant="ghost"
+											size="icon"
+											className="size-4"
+											title="Fit bounds to file bbox"
 										>
 											<MaximizeIcon />
 										</Button>
 									</div>
-									<EntityDetails
-										entity={selectedEntity}
-										osm={selectedOsm}
-										onSelect={(entity) => selectEntity(selectedOsm, entity)}
-									/>
 								</div>
+								<OsmInfoTable file={file} osm={osm} />
+							</div>
+
+							{duplicateNodesAndWays == null ? (
+								<Button
+									onClick={() => {
+										startTransition(async () => {
+											const task = startTask(
+												"Finding duplicate nodes and ways",
+												"info",
+											)
+											const changes = await osmWorker.dedupeNodesAndWays(osmId)
+											setDuplicateNodesAndWays(changes)
+											task.end(
+												`Found ${changes?.stats.deduplicatedNodes.toLocaleString()} duplicate nodes and ${changes?.stats.deduplicatedWays.toLocaleString()} duplicate ways`,
+												"ready",
+											)
+										})
+									}}
+									disabled={isTransitioning}
+								>
+									{isTransitioning ? (
+										<Loader2Icon className="animate-spin" />
+									) : (
+										<SearchCode />
+									)}
+									Find duplicate nodes and ways
+								</Button>
+							) : (
+								<>
+									<ChangesSummary>
+										{/* Changes List */}
+										<Details>
+											<DetailsSummary>CHANGES</DetailsSummary>
+											<DetailsContent>
+												<ChangesFilters />
+												<ChangesList
+													setSelectedEntity={(entity) => {
+														selectEntity(osm, entity)
+														flyToEntity(osm, entity)
+													}}
+												/>
+												<ChangesPagination />
+											</DetailsContent>
+										</Details>
+									</ChangesSummary>
+
+									<Button
+										onClick={() => applyChanges(osm.id)}
+										disabled={isTransitioning}
+									>
+										{isTransitioning ? (
+											<Loader2Icon className="animate-spin" />
+										) : (
+											<MergeIcon />
+										)}
+										Apply changes
+									</Button>
+								</>
 							)}
 						</div>
 					) : (
@@ -166,6 +256,11 @@ export default function InspectPage() {
 					{osm && (
 						<CustomControl position="top-left">
 							<EntitySearchControl osm={osm} />
+						</CustomControl>
+					)}
+					{osm && (
+						<CustomControl position="top-left">
+							<EntityDetailsMapControl osm={osm} />
 						</CustomControl>
 					)}
 				</Basemap>
