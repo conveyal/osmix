@@ -295,12 +295,13 @@ export function ChangesPagination() {
 				variant="ghost"
 				size="sm"
 				onClick={goToPrevPage}
-				disabled={currentPage === 0}
+				disabled={currentPage <= 0}
 			>
 				<ArrowLeft className="w-3 h-3 mr-1" />
 			</Button>
 			<span className="text-xs text-slate-500">
-				{(currentPage + 1).toLocaleString()} of {totalPages.toLocaleString()}
+				{(totalPages === 0 ? 0 : currentPage + 1).toLocaleString()} of{" "}
+				{totalPages.toLocaleString()}
 			</span>
 			<Button
 				variant="ghost"

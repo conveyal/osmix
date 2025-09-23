@@ -45,6 +45,7 @@ export default function OsmInfoTable({
 						</tr>
 						<tr>
 							<td className="font-bold">HEADER</td>
+							<td />
 						</tr>
 						<ObjectToTableRows object={osm.header} />
 					</tbody>

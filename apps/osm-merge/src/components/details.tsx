@@ -12,7 +12,7 @@ export function Details({
 	open?: boolean
 }) {
 	return (
-		<details open={open} className={cn("border-l border-b", className)}>
+		<details open={open} className={cn("border-1", className)}>
 			{children}
 		</details>
 	)
@@ -24,6 +24,7 @@ export function DetailsSummary({
 }: { className?: ClassValue; children: ReactNode }) {
 	return (
 		<summary className={cn("font-bold py-1 pl-2 cursor-pointer", className)}>
+			&nbsp;
 			{children}
 		</summary>
 	)
