@@ -36,10 +36,10 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 	}, [defaultFilePath, setFile, loadOnStart])
 
 	useEffect(() => {
+		setOsm(null)
 		if (!file) return
 		const taskLog = startTaskLog(`Processing file ${file.name}...`)
 		const stream = file.stream()
-		setOsm(null)
 		setIsLoading(true)
 		osmWorker
 			.initFromPbfData(id ?? file.name, Comlink.transfer(stream, [stream]))
