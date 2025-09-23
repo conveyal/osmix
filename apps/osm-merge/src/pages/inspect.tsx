@@ -111,6 +111,15 @@ export default function InspectPage() {
 		[setOsm, startTask],
 	)
 
+	const hasZeroChanges = useMemo(() => {
+		if (!duplicateNodesAndWays) return true
+		return (
+			Object.keys(duplicateNodesAndWays.nodes).length === 0 &&
+			Object.keys(duplicateNodesAndWays.ways).length === 0 &&
+			Object.keys(duplicateNodesAndWays.relations).length === 0
+		)
+	}, [duplicateNodesAndWays])
+
 	return (
 		<Main>
 			<Sidebar>
@@ -198,17 +207,19 @@ export default function InspectPage() {
 										</Details>
 									</ChangesSummary>
 
-									<Button
-										onClick={() => applyChanges(osm.id)}
-										disabled={isTransitioning}
-									>
-										{isTransitioning ? (
-											<Loader2Icon className="animate-spin" />
-										) : (
-											<MergeIcon />
-										)}
-										Apply changes
-									</Button>
+									{!hasZeroChanges && (
+										<Button
+											onClick={() => applyChanges(osm.id)}
+											disabled={isTransitioning}
+										>
+											{isTransitioning ? (
+												<Loader2Icon className="animate-spin" />
+											) : (
+												<MergeIcon />
+											)}
+											Apply changes
+										</Button>
+									)}
 								</>
 							)}
 						</div>
