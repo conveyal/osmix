@@ -461,7 +461,7 @@ export default function Merge() {
 							<Button
 								className="flex-1/2"
 								variant="outline"
-								onClick={() => goToStep("inspect-osm")}
+								onClick={() => goToStep("inspect-final-osm")}
 							>
 								<SkipForwardIcon /> Skip
 							</Button>
@@ -499,7 +499,7 @@ export default function Merge() {
 							<Button
 								className="flex-1/2"
 								variant="outline"
-								onClick={() => goToStep("inspect-osm")}
+								onClick={() => goToStep("inspect-final-osm")}
 							>
 								<SkipForwardIcon /> Skip
 							</Button>
