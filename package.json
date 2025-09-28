@@ -4,7 +4,10 @@
 	"packageManager": "bun@1.2.19",
 	"private": true,
 	"workspaces": {
-		"packages": ["apps/*", "packages/*"],
+		"packages": [
+			"apps/*",
+			"packages/*"
+		],
 		"catalog": {
 			"pbf": "4.0.1",
 			"typescript": "5.8.3",
@@ -16,14 +19,14 @@
 		}
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^1.9.4"
+		"@biomejs/biome": "2.0.6"
 	},
 	"scripts": {
 		"dev": "bun run --filter '*' dev",
 		"build": "bun run --filter '*' build",
 		"check": "biome check --fix .",
 		"format": "biome format --write .",
-		"lint": "biome lint --fix .",
+		"lint": "biome lint --write .",
 		"test": "bun run --filter '*' test",
 		"typecheck": "bun run --filter '*' typecheck"
 	}
