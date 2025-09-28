@@ -21,7 +21,10 @@ export function Details({
 export function DetailsSummary({
 	className,
 	children,
-}: { className?: ClassValue; children: ReactNode }) {
+}: {
+	className?: ClassValue
+	children: ReactNode
+}) {
 	return (
 		<summary className={cn("font-bold py-1 pl-2 cursor-pointer", className)}>
 			&nbsp;
@@ -33,6 +36,9 @@ export function DetailsSummary({
 export function DetailsContent({
 	className,
 	children,
-}: { className?: ClassValue; children: ReactNode }) {
+}: {
+	className?: ClassValue
+	children: ReactNode
+}) {
 	return <div className={cn("", className)}>{children}</div>
 }

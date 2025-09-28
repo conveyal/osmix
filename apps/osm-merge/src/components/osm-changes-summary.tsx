@@ -22,7 +22,10 @@ import { Button } from "./ui/button"
 function HydrateAtoms({
 	changes,
 	pageSize,
-}: { changes?: OsmChanges; pageSize?: number }) {
+}: {
+	changes?: OsmChanges
+	pageSize?: number
+}) {
 	useHydrateAtoms([
 		[changesAtom, changes ?? null],
 		[pageSizeAtom, pageSize ?? DEFAULT_PAGE_SIZE],
@@ -34,7 +37,11 @@ export function ChangesProvider({
 	changes,
 	children,
 	pageSize,
-}: { changes?: OsmChanges; children: React.ReactNode; pageSize?: number }) {
+}: {
+	changes?: OsmChanges
+	children: React.ReactNode
+	pageSize?: number
+}) {
 	return (
 		<Provider>
 			<HydrateAtoms changes={changes} pageSize={pageSize} />
@@ -213,7 +220,9 @@ const CHANGE_TYPE_COLOR = {
 
 export function ChangesList({
 	setSelectedEntity,
-}: { setSelectedEntity: (entity: OsmEntity) => void }) {
+}: {
+	setSelectedEntity: (entity: OsmEntity) => void
+}) {
 	const currentChanges = useAtomValue(currentChangesAtom)
 	const startIndex = useAtomValue(startIndexAtom)
 

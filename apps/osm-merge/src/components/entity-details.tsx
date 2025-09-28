@@ -125,7 +125,10 @@ export function RelationContent({ relation }: { relation: OsmRelation }) {
 export function RelationDetails({
 	relation,
 	open,
-}: { relation: OsmRelation; open?: boolean }) {
+}: {
+	relation: OsmRelation
+	open?: boolean
+}) {
 	return (
 		<Details open={open}>
 			<DetailsSummary>RELATION {relation.id}</DetailsSummary>
@@ -154,7 +157,10 @@ export function TagList({ tags }: { tags?: Record<string, unknown> }) {
 export function NodeListDetails({
 	nodes,
 	onSelect,
-}: { nodes: OsmNode[]; onSelect: (node: OsmNode) => void }) {
+}: {
+	nodes: OsmNode[]
+	onSelect: (node: OsmNode) => void
+}) {
 	return (
 		<Details open>
 			<DetailsSummary>NODES ({nodes.length})</DetailsSummary>
@@ -168,7 +174,10 @@ export function NodeListDetails({
 function NodeListTable({
 	nodes,
 	onSelect,
-}: { nodes: OsmNode[]; onSelect: (node: OsmNode) => void }) {
+}: {
+	nodes: OsmNode[]
+	onSelect: (node: OsmNode) => void
+}) {
 	return (
 		<table className="table-auto">
 			<tbody>
