@@ -37,7 +37,7 @@ describe("merge osm", () => {
 	it("should merge two real osm objects", async () => {
 		const osm1Name = "yakima-full.osm.pbf"
 		const osm2Name = "yakima.osw.pbf"
-		const osmMergedName = "yakima-merged.osm.pbf"
+		const _osmMergedName = "yakima-merged.osm.pbf"
 
 		const osm1Data = getFixtureFileReadStream(osm1Name)
 		let baseOsm = await createOsmIndexFromPbfData(osm1Data, osm1Name)

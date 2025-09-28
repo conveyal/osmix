@@ -129,7 +129,7 @@ function MaxArraySizes() {
 				while (true) {
 					try {
 						new array(maxSize)
-					} catch (error) {
+					} catch (_error) {
 						newSizes[array.name] = (maxSize - increment) / 1_000_000
 						break
 					}

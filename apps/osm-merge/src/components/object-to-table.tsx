@@ -9,7 +9,7 @@ export default function ObjectToTableRows({
 	return (
 		<>
 			{Object.entries(object)
-				.filter(([key, value]) => {
+				.filter(([_key, value]) => {
 					return typeof value !== "undefined"
 				})
 				.map(([key, value]) => {

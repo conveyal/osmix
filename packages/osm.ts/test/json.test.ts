@@ -13,7 +13,7 @@ import type { OsmEntity } from "../src/types"
 import { isNode, isRelation, isWay } from "../src/utils"
 
 describe("pbf json", () => {
-	describe.each(Object.entries(PBFs))("%s", async (name, pbf) => {
+	describe.each(Object.entries(PBFs))("%s", async (_name, pbf) => {
 		it("parse all entities", async () => {
 			const file = getFixtureFileReadStream(pbf.url)
 			const osm = await createOsmPbfReader(file)

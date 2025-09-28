@@ -9,7 +9,7 @@ import { OsmPbfBytesToBlocksTransformStream } from "../src/streaming"
 import { createOsmEntityCounter, testReader } from "./utils"
 
 describe("read", () => {
-	describe.each(Object.entries(PBFs))("%s", async (name, pbf) => {
+	describe.each(Object.entries(PBFs))("%s", async (_name, pbf) => {
 		beforeAll(() => getFixtureFile(pbf.url))
 
 		it("from stream", async () => {

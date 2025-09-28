@@ -25,7 +25,7 @@ export function objectToHtmlTableString(
 ) {
 	if (object == null) return ""
 	return Object.entries(object)
-		.filter(([key, value]) => {
+		.filter(([_key, value]) => {
 			return typeof value !== "undefined"
 		})
 		.map(([key, value]) => {

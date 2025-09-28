@@ -25,7 +25,7 @@ export async function getFixtureFile(url: string): Promise<Uint8Array> {
 	try {
 		const file = await readFile(filePath)
 		return new Uint8Array(file.buffer)
-	} catch (error) {
+	} catch (_error) {
 		const response = await fetch(url)
 		const buffer = await response.arrayBuffer()
 		const file = new Uint8Array(buffer)

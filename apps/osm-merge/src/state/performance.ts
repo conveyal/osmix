@@ -2,8 +2,8 @@ import { atom } from "jotai"
 
 export const performanceMeasurementsAtom = atom<PerformanceEntry[]>([])
 
-performanceMeasurementsAtom.onMount = (setAtom) => {
-	const observer = new PerformanceObserver((entries, observer) => {
+performanceMeasurementsAtom.onMount = (_setAtom) => {
+	const observer = new PerformanceObserver((entries, _observer) => {
 		for (const entry of entries.getEntries()) {
 			if (entry.entryType === "mark") {
 				console.log(`${entry.name}'s startTime: ${entry.startTime}`)
