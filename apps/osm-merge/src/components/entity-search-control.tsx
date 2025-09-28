@@ -1,7 +1,7 @@
-import { useFlyToEntity } from "@/hooks/map"
-import { selectedEntityAtom } from "@/state/osm"
 import { useSetAtom } from "jotai"
 import type { Osm } from "osm.ts"
+import { useFlyToEntity } from "@/hooks/map"
+import { selectedEntityAtom } from "@/state/osm"
 import EntityLookup from "./entity-lookup"
 
 export default function EntitySearchControl({ osm }: { osm: Osm }) {

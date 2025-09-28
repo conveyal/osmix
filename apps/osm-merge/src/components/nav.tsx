@@ -1,7 +1,7 @@
+import { NavLink } from "react-router"
 import CenterInfo from "@/components/center-info"
 import ZoomInfo from "@/components/zoom-info"
 import { cn } from "@/lib/utils"
-import { NavLink } from "react-router"
 import BrowserCheck from "./browser-check"
 import Status from "./status"
 

@@ -1,5 +1,5 @@
-import KDBush from "kdbush"
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
+import KDBush from "kdbush"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"
 import type StringTable from "./stringtable"

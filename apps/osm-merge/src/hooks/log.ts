@@ -1,9 +1,9 @@
-import { addLogMessageAtom, startTaskLogAtom } from "@/state/log"
-import { activeTasksAtom } from "@/state/status"
-import { osmWorker } from "@/state/worker"
 import * as Comlink from "comlink"
 import { useAtomValue, useSetAtom } from "jotai"
 import { useEffect, useRef } from "react"
+import { addLogMessageAtom, startTaskLogAtom } from "@/state/log"
+import { activeTasksAtom } from "@/state/status"
+import { osmWorker } from "@/state/worker"
 
 export default function useStartTaskLog() {
 	return useSetAtom(startTaskLogAtom)

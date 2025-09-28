@@ -1,9 +1,9 @@
+import { useAtomValue } from "jotai"
+import { Loader2Icon } from "lucide-react"
 import { useHasActiveTasks } from "@/hooks/log"
 import { cn } from "@/lib/utils"
 import { currentStatusAtom } from "@/state/log"
 import { formatTimestampMs } from "@/utils"
-import { useAtomValue } from "jotai"
-import { Loader2Icon } from "lucide-react"
 import LogContent from "./log"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card"
 

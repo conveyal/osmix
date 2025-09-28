@@ -1,9 +1,9 @@
-import { osmAtomFamily, osmFileAtomFamily } from "@/state/osm"
-import { osmWorker } from "@/state/worker"
 import * as Comlink from "comlink"
 import { useAtom, useAtomValue } from "jotai"
 import { Osm } from "osm.ts"
 import { useEffect, useMemo, useState } from "react"
+import { osmAtomFamily, osmFileAtomFamily } from "@/state/osm"
+import { osmWorker } from "@/state/worker"
 import useStartTaskLog from "./log"
 import { useFitBoundsOnChange } from "./map"
 

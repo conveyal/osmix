@@ -1,5 +1,5 @@
-import Flatbush from "flatbush"
 import type { OsmPbfWay } from "@osmix/pbf"
+import Flatbush from "flatbush"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"
 import type { Nodes } from "./nodes"

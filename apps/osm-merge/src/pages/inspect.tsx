@@ -1,3 +1,17 @@
+import { bboxPolygon } from "@turf/turf"
+import { useAtom, useSetAtom } from "jotai"
+import {
+	DownloadIcon,
+	Loader2Icon,
+	MaximizeIcon,
+	MergeIcon,
+	SearchCode,
+} from "lucide-react"
+import { showSaveFilePicker } from "native-file-system-adapter"
+import { Osm, writeOsmToPbfStream } from "osm.ts"
+import { useCallback, useEffect, useMemo, useTransition } from "react"
+import { Layer, Source } from "react-map-gl/maplibre"
+import { useSearchParams } from "react-router"
 import Basemap from "@/components/basemap"
 import CustomControl from "@/components/custom-control"
 import DeckGlOverlay from "@/components/deckgl-overlay"
@@ -26,20 +40,6 @@ import { APPID } from "@/settings"
 import { changesAtom } from "@/state/changes"
 import { selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
-import { bboxPolygon } from "@turf/turf"
-import { useAtom, useSetAtom } from "jotai"
-import {
-	DownloadIcon,
-	Loader2Icon,
-	MaximizeIcon,
-	MergeIcon,
-	SearchCode,
-} from "lucide-react"
-import { showSaveFilePicker } from "native-file-system-adapter"
-import { Osm, writeOsmToPbfStream } from "osm.ts"
-import { useCallback, useEffect, useMemo, useTransition } from "react"
-import { Layer, Source } from "react-map-gl/maplibre"
-import { useSearchParams } from "react-router"
 
 export default function InspectPage() {
 	const [searchParams] = useSearchParams()

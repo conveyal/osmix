@@ -1,12 +1,11 @@
-import { assert, describe, it } from "vitest"
-
-import { PBFs, getFixtureFileReadStream } from "@osmix/test-utils/fixtures"
 import {
 	createOsmDataBlob,
 	createOsmHeaderBlob,
 	createOsmPbfReader,
 } from "@osmix/pbf"
 import { testReader } from "@osmix/pbf/test/utils"
+import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures"
+import { assert, describe, it } from "vitest"
 import { OsmPbfBlockBuilder } from "../src/json/osm-pbf-block-builder"
 import { OsmPbfBlockParser } from "../src/json/osm-pbf-block-parser"
 import type { OsmEntity } from "../src/types"

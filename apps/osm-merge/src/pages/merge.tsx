@@ -1,3 +1,18 @@
+import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
+import {
+	ArrowLeft,
+	ArrowRightIcon,
+	DownloadIcon,
+	FastForwardIcon,
+	FileDiff,
+	Loader2Icon,
+	MaximizeIcon,
+	MergeIcon,
+	SkipForwardIcon,
+} from "lucide-react"
+import { showSaveFilePicker } from "native-file-system-adapter"
+import { Osm, type OsmChanges, writeOsmToPbfStream } from "osm.ts"
+import { useCallback, useEffect, useMemo, useRef, useTransition } from "react"
 import Basemap from "@/components/basemap"
 import DeckGlOverlay from "@/components/deckgl-overlay"
 import { Details, DetailsContent, DetailsSummary } from "@/components/details"
@@ -21,23 +36,8 @@ import {
 import { useOsmFile } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { changesAtom } from "@/state/changes"
-import { selectOsmEntityAtom, selectedEntityAtom } from "@/state/osm"
+import { selectedEntityAtom, selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
-import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
-import {
-	ArrowLeft,
-	ArrowRightIcon,
-	DownloadIcon,
-	FastForwardIcon,
-	FileDiff,
-	Loader2Icon,
-	MaximizeIcon,
-	MergeIcon,
-	SkipForwardIcon,
-} from "lucide-react"
-import { showSaveFilePicker } from "native-file-system-adapter"
-import { Osm, type OsmChanges, writeOsmToPbfStream } from "osm.ts"
-import { useCallback, useEffect, useMemo, useRef, useTransition } from "react"
 
 const STEPS = [
 	"select-osm-pbf-files",

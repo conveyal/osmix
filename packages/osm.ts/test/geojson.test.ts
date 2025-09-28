@@ -1,9 +1,9 @@
 import assert from "node:assert"
-import { PBFs, getFixtureFileReadStream } from "@osmix/test-utils/fixtures"
+import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures"
 import * as turf from "@turf/turf"
 import { describe, it } from "vitest"
-import { nodeToFeature, wayToFeature } from "../src/to-geojson"
 import { createOsmIndexFromPbfData } from "../src"
+import { nodeToFeature, wayToFeature } from "../src/to-geojson"
 
 describe("geojson", () => {
 	describe.each(Object.entries(PBFs))("%s", async (_, pbf) => {

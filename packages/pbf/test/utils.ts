@@ -1,10 +1,10 @@
 import type { PbfFixture } from "@osmix/test-utils/fixtures"
+import { assert } from "vitest"
 import type {
 	OsmPbfBlock,
 	OsmPbfGroup,
 	OsmPbfHeaderBlock,
 } from "../src/proto/osmformat"
-import { assert } from "vitest"
 
 export async function testReader(
 	osm: {

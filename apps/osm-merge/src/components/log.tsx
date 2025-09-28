@@ -1,6 +1,6 @@
+import { useAtomValue } from "jotai"
 import { logAtom } from "@/state/log"
 import { formatTimestampMs } from "@/utils"
-import { useAtomValue } from "jotai"
 
 export default function LogContent() {
 	const log = useAtomValue(logAtom)

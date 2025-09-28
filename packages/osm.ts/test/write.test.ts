@@ -1,7 +1,7 @@
 import {
-	PBFs,
 	getFixtureFile,
 	getFixtureFileReadStream,
+	PBFs,
 } from "@osmix/test-utils/fixtures"
 import { assert, beforeAll, describe, it } from "vitest"
 import { createOsmIndexFromPbfData } from "../src/osm-from-pbf"

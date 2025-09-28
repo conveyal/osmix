@@ -2,8 +2,8 @@ import Pbf from "pbf"
 import { HEADER_LENGTH_BYTES } from "./pbf-to-blocks"
 import {
 	type OsmPbfBlobHeader,
-	readBlobHeader,
 	readBlob,
+	readBlobHeader,
 } from "./proto/fileformat"
 
 /**

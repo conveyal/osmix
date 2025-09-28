@@ -1,16 +1,16 @@
-import type { StatusType } from "@/state/log"
 import { expose, transfer } from "comlink"
 import {
+	createOsmIndexFromPbfData,
 	type GeoBbox2D,
 	type Osm,
 	type OsmChanges,
 	OsmChangeset,
 	type OsmMergeOptions,
 	type TileIndex,
-	createOsmIndexFromPbfData,
 	throttle,
 } from "osm.ts"
 import * as Performance from "osm.ts/performance"
+import type { StatusType } from "@/state/log"
 
 const osmCache = new Map<string, Osm>()
 const changesetCache = new Map<string, OsmChangeset>()

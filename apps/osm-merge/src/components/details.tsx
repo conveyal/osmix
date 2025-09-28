@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils"
 import type { ClassValue } from "clsx"
 import type { ReactNode } from "react"
+import { cn } from "@/lib/utils"
 
 export function Details({
 	className,

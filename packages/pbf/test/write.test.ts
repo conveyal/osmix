@@ -1,20 +1,19 @@
-import { assert, describe, it } from "vitest"
 import { unlink } from "node:fs/promises"
-
 import {
-	PBFs,
 	getFixtureFile,
 	getFixtureFileReadStream,
 	getFixtureFileWriteStream,
 	getFixturePath,
+	PBFs,
 } from "@osmix/test-utils/fixtures"
-import { createOsmPbfReader } from "../src/pbf-to-blocks"
+import { assert, describe, it } from "vitest"
 import { createOsmDataBlob, createOsmHeaderBlob } from "../src/blocks-to-pbf"
-import { testReader } from "./utils"
+import { createOsmPbfReader } from "../src/pbf-to-blocks"
 import {
 	OsmBlocksToPbfBytesTransformStream,
 	OsmPbfBytesToBlocksTransformStream,
 } from "../src/streaming"
+import { testReader } from "./utils"
 
 describe("write", () => {
 	describe.each(Object.entries(PBFs))("%s", (name, pbf) => {

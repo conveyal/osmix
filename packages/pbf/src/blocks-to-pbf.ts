@@ -1,7 +1,7 @@
 import Pbf from "pbf"
 import { writeBlob, writeBlobHeader } from "./proto/fileformat"
-import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat"
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "./proto/osmformat"
+import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat"
 import { compress, concatUint8, uint32BE } from "./utils"
 
 // Recommended and maximum header and blob sizes as defined by the OSM PBF specification

@@ -1,7 +1,7 @@
-import { mapAtom } from "@/state/map"
 import { useAtomValue } from "jotai"
 import { MaximizeIcon } from "lucide-react"
 import type { GeoBbox2D } from "osm.ts"
+import { mapAtom } from "@/state/map"
 import { Button } from "./ui/button"
 
 export default function FitBounds({

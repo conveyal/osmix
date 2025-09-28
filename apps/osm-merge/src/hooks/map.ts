@@ -1,11 +1,3 @@
-import { APPID, BITMAP_TILE_SIZE, MIN_PICKABLE_ZOOM } from "@/settings"
-import { mapAtom } from "@/state/map"
-import {
-	selectOsmEntityAtom,
-	selectedEntityAtom,
-	selectedOsmAtom,
-} from "@/state/osm"
-import { osmWorker } from "@/state/worker"
 import { COORDINATE_SYSTEM, type Layer as DeckGlLayer } from "@deck.gl/core"
 import { type GeoBoundingBox, TileLayer } from "@deck.gl/geo-layers"
 import {
@@ -17,9 +9,17 @@ import {
 import { bboxPolygon } from "@turf/turf"
 import { useAtomValue, useSetAtom } from "jotai"
 import type { GeoBbox2D, Osm, OsmEntity } from "osm.ts"
-import { isNode } from "osm.ts/utils"
 import { getEntityGeoJson } from "osm.ts/geojson"
+import { isNode } from "osm.ts/utils"
 import { useCallback, useEffect, useMemo } from "react"
+import { APPID, BITMAP_TILE_SIZE, MIN_PICKABLE_ZOOM } from "@/settings"
+import { mapAtom } from "@/state/map"
+import {
+	selectedEntityAtom,
+	selectedOsmAtom,
+	selectOsmEntityAtom,
+} from "@/state/osm"
+import { osmWorker } from "@/state/worker"
 import useStartTaskLog from "./log"
 
 export function useFitBoundsOnChange(bbox?: GeoBbox2D) {

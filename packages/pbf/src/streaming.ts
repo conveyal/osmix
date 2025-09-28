@@ -1,13 +1,13 @@
 import Pbf from "pbf"
+import { createOsmDataBlob, createOsmHeaderBlob } from "./blocks-to-pbf"
 import { createOsmPbfBlobGenerator } from "./pbf-to-blobs"
 import {
-	readHeaderBlock,
-	readPrimitiveBlock,
 	type OsmPbfBlock,
 	type OsmPbfHeaderBlock,
+	readHeaderBlock,
+	readPrimitiveBlock,
 } from "./proto/osmformat"
 import { decompress } from "./utils"
-import { createOsmDataBlob, createOsmHeaderBlob } from "./blocks-to-pbf"
 
 /**
  * Transform PBF bytes to blocks. Assumes that the first block found is the header.
