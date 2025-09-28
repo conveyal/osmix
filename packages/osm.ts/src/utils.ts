@@ -1,6 +1,6 @@
-import { lineIntersect } from "@turf/turf"
 import { dequal } from "dequal/lite"
 import type {
+	GeoBbox2D,
 	LonLat,
 	OsmEntity,
 	OsmEntityType,
@@ -104,31 +104,6 @@ export function haversineDistance(node1: OsmNode, node2: OsmNode): number {
 	return R * c
 }
 
-export function wayIntersections(
-	way1: Float64Array,
-	way2: Float64Array,
-): LonLat[] {
-	const [line1, line2] = [way1, way2].map((way) => {
-		const coordinates: [number, number][] = []
-		for (let i = 0; i < way.length; i += 2) {
-			coordinates.push([way[i], way[i + 1]])
-		}
-		return {
-			type: "Feature",
-			geometry: {
-				type: "LineString",
-				coordinates,
-			},
-			properties: {},
-		} as GeoJSON.Feature<GeoJSON.LineString>
-	})
-	const intersectionPoints = lineIntersect(line1, line2)
-	return intersectionPoints.features.map((f) => ({
-		lon: f.geometry.coordinates[0],
-		lat: f.geometry.coordinates[1],
-	}))
-}
-
 export function osmTagsToOscTags(tags: OsmTags): string {
 	return Object.entries(tags)
 		.map(([key, value]) => {
@@ -188,4 +163,18 @@ export function isWayIntersectionCandidate(way: OsmWay) {
 		(isHighway(way.tags) || isFootish(way.tags)) &&
 		!isPolygonish(way.tags)
 	)
+}
+
+export function bboxFromLonLats(lonLats: LonLat[]): GeoBbox2D {
+	let minLon = Number.POSITIVE_INFINITY
+	let minLat = Number.POSITIVE_INFINITY
+	let maxLon = Number.NEGATIVE_INFINITY
+	let maxLat = Number.NEGATIVE_INFINITY
+	for (const lonLat of lonLats) {
+		if (lonLat.lon < minLon) minLon = lonLat.lon
+		if (lonLat.lat < minLat) minLat = lonLat.lat
+		if (lonLat.lon > maxLon) maxLon = lonLat.lon
+		if (lonLat.lat > maxLat) maxLat = lonLat.lat
+	}
+	return [minLon, minLat, maxLon, maxLat]
 }

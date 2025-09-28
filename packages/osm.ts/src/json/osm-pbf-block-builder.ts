@@ -1,29 +1,32 @@
-import { ENTITY_MEMBER_TYPES, MAX_ENTITIES_PER_BLOCK } from "./pbf/constants"
 import type {
+	OsmPbfBlock,
 	OsmPbfBlockSettings,
+	OsmPbfGroup,
 	OsmPbfInfo,
-	OsmPbfPrimitiveBlock,
-	OsmPbfPrimitiveGroup,
 	OsmPbfStringTable,
-} from "./pbf/proto/osmformat"
+} from "@osmix/pbf"
 import type {
+	OsmEntityType,
 	OsmInfoParsed,
 	OsmNode,
 	OsmRelation,
 	OsmTags,
 	OsmWay,
-} from "./types"
+} from "../types"
+
+const ENTITY_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
+const MAX_ENTITIES_PER_BLOCK = 8_000 // Setting used by osmosis
 
 /**
  * Build a primitive block from parsed OSM entities. Handles delta encoding, stringtable, and other PBF-specific encoding details.
  */
-export class OsmPbfBlockBuilder implements OsmPbfPrimitiveBlock {
+export class OsmPbfBlockBuilder implements OsmPbfBlock {
 	stringtable: OsmPbfStringTable = []
 	private stringToIndex = new Map<string, number>()
 	private encoder = new TextEncoder()
 
-	// Only one group is allowed in a block
-	primitivegroup: OsmPbfPrimitiveGroup[] = [
+	// For simplicity, only one group is allowed in a block
+	primitivegroup: OsmPbfGroup[] = [
 		{
 			dense: undefined,
 			nodes: [],
@@ -54,6 +57,9 @@ export class OsmPbfBlockBuilder implements OsmPbfPrimitiveBlock {
 		this.includeInfo = blockSettings.includeInfo ?? false
 		this.maxEntitiesPerBlock =
 			blockSettings.maxEntitiesPerBlock ?? MAX_ENTITIES_PER_BLOCK
+
+		// Initialize the string table with an empty string
+		this.getStringtableIndex("")
 	}
 
 	totalEntities() {

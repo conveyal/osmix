@@ -1,14 +1,8 @@
-import { bbox } from "@turf/turf"
+import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf"
 import { Nodes, type NodesTransferables } from "./nodes"
-import { createOsmIndexFromPbfData } from "./osm-from-pbf"
-import type {
-	OsmPbfHeaderBlock,
-	OsmPbfPrimitiveBlock,
-} from "./pbf/proto/osmformat"
 import { Bitmap } from "./raster"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
-import { nodeToFeature, relationToFeature, wayToFeature } from "./to-geojson"
 import { IdArrayType } from "./typed-arrays"
 import type {
 	GeoBbox2D,
@@ -18,10 +12,9 @@ import type {
 	OsmEntityTypeMap,
 	OsmNode,
 	OsmRelation,
-	OsmTags,
 	OsmWay,
 } from "./types"
-import { isNode, isRelation, isWay } from "./utils"
+import { bboxFromLonLats, isNode, isRelation, isWay } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
 export interface OsmTransferables {
@@ -41,7 +34,7 @@ export class Osm {
 	// Filename or ID of this OSM Entity index.
 	id: string
 	header: OsmPbfHeaderBlock
-	blocksGenerator: AsyncGenerator<OsmPbfPrimitiveBlock> | null = null
+	blocksGenerator: AsyncGenerator<OsmPbfBlock> | null = null
 
 	// Shared string lookup table for all nodes, ways, and relations
 	stringTable: StringTable = new StringTable()
@@ -70,18 +63,6 @@ export class Osm {
 		osm.parsingTimeMs = parsingTimeMs
 		osm.#finished = true
 		return osm
-	}
-
-	static async fromFile(file: File) {
-		return createOsmIndexFromPbfData(file.name, file.stream(), console.log)
-	}
-
-	static async fromPbfData(
-		data: ArrayBuffer | ReadableStream<Uint8Array>,
-		id = "unknown",
-		onProgess: (...args: string[]) => void = console.log,
-	) {
-		return createOsmIndexFromPbfData(id, data, onProgess)
 	}
 
 	constructor(id?: string, header?: OsmPbfHeaderBlock) {
@@ -268,30 +249,32 @@ export class Osm {
 
 	getEntityBbox(entity: OsmNode | OsmWay | OsmRelation): GeoBbox2D {
 		if (isNode(entity)) {
-			return bbox(nodeToFeature(entity)) as GeoBbox2D
+			const [lon, lat] = this.nodes.getNodeLonLat({ id: entity.id })
+			return [lon, lat, lon, lat] as GeoBbox2D
 		}
 		if (isWay(entity)) {
-			return bbox(wayToFeature(entity, this.nodes)) as GeoBbox2D
+			return this.ways.getBbox({ id: entity.id })
 		}
 		if (isRelation(entity)) {
-			return bbox(relationToFeature(entity, this.nodes)) as GeoBbox2D
+			const relation = this.relations.getById(entity.id)
+			if (!relation) throw Error("Relation not found")
+			const lls: LonLat[] = []
+			for (const member of relation.members) {
+				if (member.type === "node") {
+					const [lon, lat] = this.nodes.getNodeLonLat({ id: member.ref })
+					lls.push({ lon, lat })
+				} else if (member.type === "way") {
+					const wayIndex = this.ways.ids.getIndexFromId(member.ref)
+					if (wayIndex === -1) throw Error("Way not found")
+					const wayPositions = this.ways.getCoordinates(wayIndex, this.nodes)
+					for (const position of wayPositions) {
+						lls.push({ lon: position[0], lat: position[1] })
+					}
+				}
+			}
+			return bboxFromLonLats(lls)
 		}
-		throw new Error("Unknown entity type")
-	}
-
-	getEntityGeoJson(
-		entity: OsmNode | OsmWay | OsmRelation,
-	): GeoJSON.Feature<GeoJSON.Geometry, OsmTags> {
-		if (isNode(entity)) {
-			return nodeToFeature(entity)
-		}
-		if (isWay(entity)) {
-			return wayToFeature(entity, this.nodes)
-		}
-		if (isRelation(entity)) {
-			return relationToFeature(entity, this.nodes)
-		}
-		throw new Error("Unknown entity type")
+		throw Error("Unknown entity type")
 	}
 
 	createNode(lonLat: LonLat) {

@@ -2,11 +2,12 @@ import type { StatusType } from "@/state/log"
 import { expose, transfer } from "comlink"
 import {
 	type GeoBbox2D,
-	Osm,
+	type Osm,
 	type OsmChanges,
 	OsmChangeset,
 	type OsmMergeOptions,
 	type TileIndex,
+	createOsmIndexFromPbfData,
 	throttle,
 } from "osm.ts"
 import * as Performance from "osm.ts/performance"
@@ -25,14 +26,11 @@ const osmWorker = {
 		if (!osm) throw Error(`Osm for ${oid} not loaded.`)
 		return osm.getById(eid)
 	},
-	async initFromPbfData(
-		id: string,
-		data: ArrayBuffer | ReadableStream<Uint8Array>,
-	) {
+	async initFromPbfData(id: string, data: ReadableStream<Uint8Array>) {
 		// Clear previous OSM references making it available for garbage collection
 		osmCache.delete(id)
 		const measure = Performance.createMeasure("initializing PBF from data")
-		const osm = await Osm.fromPbfData(data, id, (m) => this.log(m))
+		const osm = await createOsmIndexFromPbfData(data, id, (m) => this.log(m))
 		osmCache.set(id, osm)
 		measure()
 		return osm.transferables()

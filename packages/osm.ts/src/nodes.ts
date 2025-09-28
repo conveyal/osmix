@@ -1,7 +1,7 @@
 import KDBush from "kdbush"
+import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"
-import type { OsmPbfDenseNodes, OsmPbfPrimitiveBlock } from "./pbf"
 import type StringTable from "./stringtable"
 import { Tags } from "./tags"
 import {
@@ -71,7 +71,7 @@ export class Nodes extends Entities<OsmNode> {
 
 	addDenseNodes(
 		dense: OsmPbfDenseNodes,
-		block: OsmPbfPrimitiveBlock,
+		block: OsmPbfBlock,
 		blockStringIndexMap: Map<number, number>,
 	) {
 		const lon_offset = block.lon_offset ?? 0
@@ -89,7 +89,6 @@ export class Nodes extends Entities<OsmNode> {
 
 		const getStringTableIndex = (keyIndex: number) => {
 			const key = dense.keys_vals[keyIndex]
-			if (!key) return
 			const index = blockStringIndexMap.get(key)
 			if (index === undefined) throw Error("Block string not found")
 			return index
@@ -100,10 +99,6 @@ export class Nodes extends Entities<OsmNode> {
 			const idSid = dense.id[i]
 			const latSid = dense.lat[i]
 			const lonSid = dense.lon[i]
-
-			if (idSid === undefined) throw Error("Dense node ID not found")
-			if (latSid === undefined) throw Error("Dense node lat not found")
-			if (lonSid === undefined) throw Error("Dense node lon not found")
 
 			delta.id += idSid
 			delta.lat += latSid

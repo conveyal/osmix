@@ -1,3 +1,51 @@
+import { createReadStream, createWriteStream } from "node:fs"
+import { readFile, writeFile } from "node:fs/promises"
+import { dirname, join, resolve } from "node:path"
+import { Readable, Writable } from "node:stream"
+import { fileURLToPath } from "node:url"
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const ROOT_DIR = resolve(__dirname, "../../")
+const FIXTURES_DIR = resolve(ROOT_DIR, "fixtures")
+
+export function getFixturePath(url: string) {
+	if (url.startsWith("http")) {
+		const fileName = url.split("/").pop()
+		if (!fileName) throw new Error("Invalid URL")
+		return join(FIXTURES_DIR, fileName)
+	}
+	return join(FIXTURES_DIR, url)
+}
+
+/**
+ * Get file from the cache folder or download it from the URL
+ */
+export async function getFixtureFile(url: string): Promise<Uint8Array> {
+	const filePath = getFixturePath(url)
+	try {
+		const file = await readFile(filePath)
+		return new Uint8Array(file.buffer)
+	} catch (error) {
+		const response = await fetch(url)
+		const buffer = await response.arrayBuffer()
+		const file = new Uint8Array(buffer)
+		await writeFile(filePath, file)
+		return file
+	}
+}
+
+export function getFixtureFileReadStream(url: string) {
+	return Readable.toWeb(
+		createReadStream(getFixturePath(url)),
+	) as ReadableStream<Uint8Array>
+}
+
+export function getFixtureFileWriteStream(url: string) {
+	return Writable.toWeb(
+		createWriteStream(getFixturePath(url)),
+	) as WritableStream<Uint8Array>
+}
+
 export type PbfFixture = {
 	url: string
 	bbox: {
@@ -19,7 +67,15 @@ export type PbfFixture = {
 	primitiveGroups: number
 }
 
-export const PBFs: Record<string, PbfFixture> = {
+/**
+ * List of PBFs and their metadata used for testing. Cached locally in the top level fixtures directory so they can
+ * be used across packages and apps.
+ *
+ * `monaco-250101.osm.pbf` is checked into the repository so it can be used in CI without causing repeated downloads.
+ *
+ * Below, we export a subset of the PBFs that we want to use for current tests.
+ */
+const AllPBFs: Record<string, PbfFixture> = {
 	monaco: {
 		url: "https://download.geofabrik.de/europe/monaco-250101.osm.pbf",
 		bbox: {
@@ -122,4 +178,8 @@ export const PBFs: Record<string, PbfFixture> = {
 	},
 }
 
-export const smallPBFs = [PBFs.monaco]
+/**
+ * A subset of the PBFs that we want to use for current tests. Do not check in changes to this list as it will cause CI to
+ * attempt to download PBFs that are not checked into the repository.
+ */
+export const PBFs = { monaco: AllPBFs.monaco }

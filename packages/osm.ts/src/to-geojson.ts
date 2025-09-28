@@ -1,12 +1,31 @@
 import type { Nodes } from "./nodes"
+import type { Osm } from "./osm"
 import type {
 	OsmGeoJSONProperties,
 	OsmNode,
 	OsmRelation,
+	OsmTags,
 	OsmWay,
 } from "./types"
+import { isNode, isRelation, isWay } from "./utils"
 import { wayIsArea } from "./way-is-area"
 import type { Ways } from "./ways"
+
+export function getEntityGeoJson(
+	entity: OsmNode | OsmWay | OsmRelation,
+	osm: Osm,
+): GeoJSON.Feature<GeoJSON.Geometry, OsmTags> {
+	if (isNode(entity)) {
+		return nodeToFeature(entity)
+	}
+	if (isWay(entity)) {
+		return wayToFeature(entity, osm.nodes)
+	}
+	if (isRelation(entity)) {
+		return relationToFeature(entity, osm.nodes)
+	}
+	throw new Error("Unknown entity type")
+}
 
 function includeNode(node: OsmNode) {
 	if (!node.tags || Object.keys(node.tags).length === 0) return false
@@ -117,16 +136,26 @@ export function wayToEditableGeoJson(
 export function relationToFeature(
 	relation: OsmRelation,
 	nodes: Nodes,
-): GeoJSON.Feature<GeoJSON.Polygon, OsmGeoJSONProperties> {
+): GeoJSON.Feature<
+	GeoJSON.GeometryCollection<
+		GeoJSON.Polygon | GeoJSON.Point | GeoJSON.LineString
+	>,
+	OsmGeoJSONProperties
+> {
 	return {
 		type: "Feature",
 		id: relation.id,
 		geometry: {
-			type: "Polygon",
-			coordinates: [
-				relation.members.map((member) =>
-					nodes.getNodeLonLat({ id: member.ref }),
-				),
+			type: "GeometryCollection",
+			geometries: [
+				{
+					type: "Polygon",
+					coordinates: [
+						relation.members.map((member) =>
+							nodes.getNodeLonLat({ id: member.ref }),
+						),
+					],
+				},
 			],
 		},
 		properties: relation.tags ?? {},

@@ -1,21 +1,20 @@
 import { type IdOrIndex, Ids, type IdsTransferables } from "./ids"
 import type StringTable from "./stringtable"
 import { Tags, type TagsTransferables } from "./tags"
-import type { OsmEntity, OsmTags } from "./types"
+import type { OsmEntity, OsmEntityType, OsmTags } from "./types"
 
 export interface EntitiesTransferables
 	extends IdsTransferables,
 		TagsTransferables {}
 
 export abstract class Entities<T extends OsmEntity> {
-	indexType: "node" | "way" | "relation"
-
+	indexType: OsmEntityType
 	stringTable: StringTable
 	ids: Ids
 	tags: Tags
 
 	constructor(
-		indexType: "node" | "way" | "relation",
+		indexType: OsmEntityType,
 		stringTable: StringTable,
 		ids?: Ids,
 		tags?: Tags,

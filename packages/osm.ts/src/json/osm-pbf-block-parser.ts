@@ -1,25 +1,36 @@
-import { ENTITY_MEMBER_TYPES } from "./pbf/constants"
 import type {
+	OsmPbfBlock,
 	OsmPbfDenseNodes,
+	OsmPbfGroup,
 	OsmPbfInfo,
 	OsmPbfNode,
-	OsmPbfPrimitiveBlock,
-	OsmPbfPrimitiveGroup,
 	OsmPbfRelation,
 	OsmPbfStringTable,
 	OsmPbfWay,
-} from "./pbf/proto/osmformat"
+} from "@osmix/pbf"
 import type {
+	OsmEntityType,
 	OsmInfoParsed,
 	OsmNode,
 	OsmRelation,
 	OsmRelationMember,
 	OsmWay,
-} from "./types"
+} from "../types"
 
 type ParseOptions = {
 	parseTags?: boolean
 	includeInfo?: boolean
+}
+
+const ENTITY_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
+
+function decodeStringTable(stringtable: OsmPbfStringTable) {
+	const decoded = new Map<number, string>()
+	const textDecoder = new TextDecoder()
+	for (let i = 0; i < stringtable.length; i++) {
+		decoded.set(i, textDecoder.decode(stringtable[i]))
+	}
+	return decoded
 }
 
 /**
@@ -29,15 +40,16 @@ type ParseOptions = {
  * - Info is parsed into a map of strings
  * - Delta encoding, offsets, and other PBF-specific encoding details are handled
  */
-export class OsmPbfBlockParser implements OsmPbfPrimitiveBlock {
+export class OsmPbfBlockParser implements OsmPbfBlock {
 	stringtable: OsmPbfStringTable
-	primitivegroup: OsmPbfPrimitiveGroup[] = []
-	textDecoder = new TextDecoder()
+	primitivegroup: OsmPbfGroup[] = []
 
-	date_granularity = 1_000
-	granularity = 1e7
-	lat_offset = 0
-	lon_offset = 0
+	private parsedStringTable = new Map<number, string>()
+
+	date_granularity: number
+	granularity: number
+	lat_offset: number
+	lon_offset: number
 
 	parseOptions: ParseOptions = {
 		// Include tags as indexes in table or as parsed objects
@@ -45,7 +57,7 @@ export class OsmPbfBlockParser implements OsmPbfPrimitiveBlock {
 		includeInfo: false,
 	}
 
-	constructor(block: OsmPbfPrimitiveBlock, options: ParseOptions = {}) {
+	constructor(block: OsmPbfBlock, options: ParseOptions = {}) {
 		this.date_granularity = block.date_granularity ?? 1_000
 		this.stringtable = block.stringtable
 		this.primitivegroup = block.primitivegroup
@@ -56,10 +68,7 @@ export class OsmPbfBlockParser implements OsmPbfPrimitiveBlock {
 			...this.parseOptions,
 			...options,
 		}
-	}
-
-	decodeString(index: number) {
-		return this.textDecoder.decode(this.stringtable[index])
+		this.parsedStringTable = decodeStringTable(this.stringtable)
 	}
 
 	/**
@@ -92,22 +101,21 @@ export class OsmPbfBlockParser implements OsmPbfPrimitiveBlock {
 					? undefined
 					: info.timestamp * this.date_granularity,
 			user:
-				info.user_sid === undefined
-					? undefined
-					: this.decodeString(info.user_sid),
+				info.user_sid === undefined ? undefined : this.getString(info.user_sid),
 		}
 	}
 
-	getString(keys: number[], index: number) {
-		const key = keys[index]
-		if (!key) return
-		return this.decodeString(key)
+	private getString(index: number) {
+		const string = this.parsedStringTable.get(index)
+		if (string === undefined)
+			throw Error(`String missing in block at index ${index}`)
+		return string
 	}
 
 	getTags(keys: number[], vals: number[]) {
 		return Object.fromEntries(
 			keys
-				.map((_, i) => [this.getString(keys, i), this.getString(vals, i)])
+				.map((_, i) => [this.getString(keys[i]), this.getString(vals[i])])
 				.filter(([key, val]) => key && val),
 		)
 	}
@@ -160,13 +168,11 @@ export class OsmPbfBlockParser implements OsmPbfPrimitiveBlock {
 			ref += memid
 
 			const memberType = r.types[i]
-			assertNonNull(memberType)
 			const type = ENTITY_MEMBER_TYPES[memberType]
-			assertNonNull(type)
 			return {
 				type,
 				ref,
-				role: this.getString(r.roles_sid, i),
+				role: this.getString(r.roles_sid[i]),
 			}
 		})
 
@@ -202,11 +208,9 @@ export class OsmPbfBlockParser implements OsmPbfPrimitiveBlock {
 			delta.id += idSid
 
 			const latSid = dense.lat[nodeIndex]
-			assertNonNull(latSid)
 			delta.lat += latSid
 
 			const lonSid = dense.lon[nodeIndex]
-			assertNonNull(lonSid)
 			delta.lon += lonSid
 
 			const node: OsmNode = {
@@ -218,8 +222,8 @@ export class OsmPbfBlockParser implements OsmPbfPrimitiveBlock {
 				if (parseTags) {
 					node.tags = {}
 					while (dense.keys_vals[keysValsIndex] !== 0) {
-						const key = this.getString(dense.keys_vals, keysValsIndex)
-						const val = this.getString(dense.keys_vals, keysValsIndex + 1)
+						const key = this.getString(dense.keys_vals[keysValsIndex])
+						const val = this.getString(dense.keys_vals[keysValsIndex + 1])
 						if (key && val) {
 							node.tags[key] = val
 						}
@@ -234,11 +238,6 @@ export class OsmPbfBlockParser implements OsmPbfPrimitiveBlock {
 				const iUid = dense.denseinfo.uid[nodeIndex]
 				const iUserSid = dense.denseinfo.user_sid[nodeIndex]
 				const iVersion = dense.denseinfo.version[nodeIndex]
-				assertNonNull(iTime)
-				assertNonNull(iChangeset)
-				assertNonNull(iUid)
-				assertNonNull(iUserSid)
-				assertNonNull(iVersion)
 
 				delta.timestamp += iTime
 				delta.changeset += iChangeset
@@ -257,11 +256,4 @@ export class OsmPbfBlockParser implements OsmPbfPrimitiveBlock {
 			return node
 		})
 	}
-}
-
-function assertNonNull(
-	o: unknown,
-	message?: string,
-): asserts o is NonNullable<typeof o> {
-	if (o == null) throw Error(message ?? "Expected non-null value")
 }

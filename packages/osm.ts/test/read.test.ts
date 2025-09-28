@@ -1,23 +1,23 @@
+import {
+	PBFs,
+	getFixtureFile,
+	getFixtureFileReadStream,
+} from "@osmix/test-utils/fixtures"
 import assert from "node:assert"
-import { describe, it } from "vitest"
-
-import { Osm } from "../src/osm"
-import { PBFs } from "./files"
-import { getFileReadStream } from "./utils"
+import { beforeAll, describe, it } from "vitest"
+import { createOsmIndexFromPbfData } from "../src/osm-from-pbf"
 
 describe("read", () => {
-	describe.each(Object.entries(PBFs))(
-		"%s",
-		{ timeout: 300_000 },
-		async (name, pbf) => {
-			it.runIf(pbf.nodes <= 40_000)("into OSM class", async () => {
-				const fileStream = await getFileReadStream(pbf.url)
-				const osm = await Osm.fromPbfData(fileStream)
-				assert.equal(osm.nodes.size, pbf.nodes)
-				assert.equal(osm.stringTable.length, pbf.uniqueStrings)
-				assert.deepEqual(osm.nodes.getByIndex(0), pbf.node0)
-				assert.equal(osm.ways.size, pbf.ways)
-			})
-		},
-	)
+	describe.each(Object.entries(PBFs))("%s", async (name, pbf) => {
+		beforeAll(() => getFixtureFile(pbf.url))
+
+		it("into OSM class", async () => {
+			const fileStream = getFixtureFileReadStream(pbf.url)
+			const osm = await createOsmIndexFromPbfData(fileStream, name)
+			assert.equal(osm.nodes.size, pbf.nodes)
+			assert.equal(osm.stringTable.length, pbf.uniqueStrings)
+			assert.deepEqual(osm.nodes.getByIndex(0), pbf.node0)
+			assert.equal(osm.ways.size, pbf.ways)
+		})
+	})
 })

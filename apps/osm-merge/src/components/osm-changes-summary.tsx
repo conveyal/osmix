@@ -14,7 +14,7 @@ import {
 import { Provider, useAtom, useAtomValue, useSetAtom } from "jotai"
 import { useHydrateAtoms } from "jotai/utils"
 import { ArrowLeft, ArrowRight } from "lucide-react"
-import { getEntityType, type OsmChanges, type OsmEntity } from "osm.ts"
+import { type OsmChanges, type OsmEntity, getEntityType } from "osm.ts"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 import { EntityContent } from "./entity-details"
 import { Button } from "./ui/button"

@@ -2,9 +2,9 @@ import { StrictMode, Suspense } from "react"
 import { createRoot } from "react-dom/client"
 import { BrowserRouter, Outlet, Route, Routes } from "react-router"
 import Nav from "./components/nav"
+import { useSubscribeOsmWorkerToLog } from "./hooks/log"
 import InspectPage from "./pages/inspect"
 import MergePage from "./pages/merge"
-import { useSubscribeOsmWorkerToLog } from "./hooks/log"
 
 function RootLayout() {
 	useSubscribeOsmWorkerToLog()

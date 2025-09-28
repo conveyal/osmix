@@ -5,6 +5,7 @@ import {
 	selectedEntityAtom,
 	selectedOsmAtom,
 } from "@/state/osm"
+import { osmWorker } from "@/state/worker"
 import { COORDINATE_SYSTEM, type Layer as DeckGlLayer } from "@deck.gl/core"
 import { type GeoBoundingBox, TileLayer } from "@deck.gl/geo-layers"
 import {
@@ -16,10 +17,10 @@ import {
 import { bboxPolygon } from "@turf/turf"
 import { useAtomValue, useSetAtom } from "jotai"
 import type { GeoBbox2D, Osm, OsmEntity } from "osm.ts"
+import { isNode } from "osm.ts/utils"
+import { getEntityGeoJson } from "osm.ts/geojson"
 import { useCallback, useEffect, useMemo } from "react"
 import useStartTaskLog from "./log"
-import { osmWorker } from "@/state/worker"
-import { isNode } from "osm.ts/utils"
 
 export function useFitBoundsOnChange(bbox?: GeoBbox2D) {
 	const map = useAtomValue(mapAtom)
@@ -323,7 +324,7 @@ export function useSelectedEntityLayer() {
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const layer = useMemo(() => {
 		if (!selectedOsm || !selectedEntity) return null
-		const geojson = selectedOsm.getEntityGeoJson(selectedEntity)
+		const geojson = getEntityGeoJson(selectedEntity, selectedOsm)
 		return new GeoJsonLayer({
 			id: `${APPID}:${selectedOsm.id}:selected-entity`,
 			data: geojson,

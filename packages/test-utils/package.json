@@ -1,0 +1,12 @@
+{
+	"name": "@osmix/test-utils",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"typecheck": "tsc --noEmit --isolatedDeclarations"
+	},
+	"devDependencies": {
+		"typescript": "catalog:",
+		"vitest": "^3.1.3"
+	}
+}

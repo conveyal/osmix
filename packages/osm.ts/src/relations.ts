@@ -1,6 +1,6 @@
+import type { OsmPbfRelation } from "@osmix/pbf"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { Ids } from "./ids"
-import type { OsmPbfRelation } from "./pbf/proto/osmformat"
 import type StringTable from "./stringtable"
 import { Tags } from "./tags"
 import {
@@ -15,7 +15,7 @@ import type {
 	OsmTags,
 } from "./types"
 
-const RELATION_MEMBER_TYPES = ["node", "way", "relation"] as const
+const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
 
 export interface RelationsTransferables extends EntitiesTransferables {
 	memberStart: TypedArrayBuffer
@@ -121,7 +121,7 @@ export class Relations extends Entities<OsmRelation> {
 
 	getMembersByIndex(
 		index: number,
-		relationMemberTypes = ["node", "way", "relation"],
+		relationMemberTypes = RELATION_MEMBER_TYPES,
 	) {
 		const start = this.memberStart.at(index)
 		const count = this.memberCount.at(index)

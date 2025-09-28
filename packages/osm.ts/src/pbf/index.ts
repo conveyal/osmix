@@ -1,6 +1,0 @@
-export { OsmPbfReader } from "./osm-pbf-reader"
-export { OsmPbfWriter, writePbfToStream } from "./osm-pbf-writer"
-export * from "./proto/osmformat"
-export * from "./proto/fileformat"
-export * from "../osm-pbf-block-parser"
-export * from "../osm-pbf-block-builder"

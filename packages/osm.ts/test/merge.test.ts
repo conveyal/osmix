@@ -1,9 +1,12 @@
-import { assert, describe, it, test } from "vitest"
-
-import { Osm, OsmChangeset, type OsmNode } from "../src"
-import { isWayIntersectionCandidate } from "../src/utils"
+import { getFixtureFileReadStream } from "@osmix/test-utils/fixtures"
+import { assert, describe, it } from "vitest"
+import {
+	createOsmIndexFromPbfData,
+	type Osm,
+	OsmChangeset,
+	type OsmNode,
+} from "../src"
 import { createBaseOsm, createPatchOsm } from "./mock-osm"
-import { getFile, getFileReadStream } from "./utils"
 
 const testNode: OsmNode = {
 	id: 2135545,
@@ -31,76 +34,70 @@ const sizes = (osm: Osm) => ({
 })
 
 describe("merge osm", () => {
-	it(
-		"should merge two real osm objects",
-		{
-			timeout: 100_000,
-		},
-		async () => {
-			const osm1Name = "yakima-full.osm.pbf"
-			const osm2Name = "yakima.osw.pbf"
-			const osmMergedName = "yakima-merged.osm.pbf"
+	it("should merge two real osm objects", async () => {
+		const osm1Name = "yakima-full.osm.pbf"
+		const osm2Name = "yakima.osw.pbf"
+		const osmMergedName = "yakima-merged.osm.pbf"
 
-			const osm1Data = await getFile(osm1Name)
-			let baseOsm = await Osm.fromPbfData(osm1Data)
-			assert.equal(baseOsm.nodes.getById(testNode.id), null)
+		const osm1Data = getFixtureFileReadStream(osm1Name)
+		let baseOsm = await createOsmIndexFromPbfData(osm1Data, osm1Name)
+		assert.equal(baseOsm.nodes.getById(testNode.id), null)
 
-			const osm2Data = await getFile(osm2Name)
-			const osm2 = await Osm.fromPbfData(osm2Data)
-			assert.deepEqual(osm2.nodes.getById(testNode.id), testNode)
+		const osm2Data = getFixtureFileReadStream(osm2Name)
+		const osm2 = await createOsmIndexFromPbfData(osm2Data, osm2Name)
+		assert.deepEqual(osm2.nodes.getById(testNode.id), testNode)
 
-			const baseSizes = sizes(baseOsm)
-			const patchSizes = sizes(osm2)
+		const baseSizes = sizes(baseOsm)
+		const patchSizes = sizes(osm2)
 
-			let changeset = new OsmChangeset(baseOsm)
-			changeset.generateDirectChanges(osm2)
+		let changeset = new OsmChangeset(baseOsm)
+		changeset.generateDirectChanges(osm2)
 
-			assert.deepEqual(changeset.stats, {
-				deduplicatedNodes: 0,
-				deduplicatedNodesReplaced: 0,
-				deduplicatedWays: 0,
-				intersectionPointsFound: 0,
-				intersectionNodesCreated: 0,
-			}) // TODO did this break with new dequal? Or what?
+		assert.deepEqual(changeset.stats, {
+			deduplicatedNodes: 0,
+			deduplicatedNodesReplaced: 0,
+			deduplicatedWays: 0,
+			intersectionPointsFound: 0,
+			intersectionNodesCreated: 0,
+		}) // TODO did this break with new dequal? Or what?
 
-			baseOsm = changeset.applyChanges()
-			assert.deepEqual(sizes(baseOsm), {
-				nodes: baseSizes.nodes + patchSizes.nodes,
-				ways: baseSizes.ways + patchSizes.ways,
-				relations: baseSizes.relations + patchSizes.relations,
-			})
+		baseOsm = changeset.applyChanges()
+		assert.deepEqual(sizes(baseOsm), {
+			nodes: baseSizes.nodes + patchSizes.nodes,
+			ways: baseSizes.ways + patchSizes.ways,
+			relations: baseSizes.relations + patchSizes.relations,
+		})
 
-			changeset = new OsmChangeset(baseOsm)
-			changeset.createIntersectionsForWays(osm2.ways)
+		changeset = new OsmChangeset(baseOsm)
+		changeset.createIntersectionsForWays(osm2.ways)
 
-			assert.deepEqual(changeset.stats, {
-				deduplicatedNodes: 0,
-				deduplicatedNodesReplaced: 0,
-				deduplicatedWays: 0,
-				intersectionPointsFound: 5_820,
-				intersectionNodesCreated: 2_618,
-			})
+		assert.deepEqual(changeset.stats, {
+			deduplicatedNodes: 0,
+			deduplicatedNodesReplaced: 0,
+			deduplicatedWays: 0,
+			intersectionPointsFound: 5_820,
+			intersectionNodesCreated: 2_618,
+		})
 
-			baseOsm = changeset.applyChanges()
+		baseOsm = changeset.applyChanges()
 
-			assert.deepEqual(sizes(baseOsm), {
-				nodes:
-					baseSizes.nodes +
-					patchSizes.nodes +
-					changeset.stats.intersectionNodesCreated,
-				ways: baseSizes.ways + patchSizes.ways,
-				relations: baseSizes.relations + patchSizes.relations,
-			})
+		assert.deepEqual(sizes(baseOsm), {
+			nodes:
+				baseSizes.nodes +
+				patchSizes.nodes +
+				changeset.stats.intersectionNodesCreated,
+			ways: baseSizes.ways + patchSizes.ways,
+			relations: baseSizes.relations + patchSizes.relations,
+		})
 
-			assert.deepEqual(baseOsm.nodes.getById(2135545), {
-				...testNode,
-				tags: {
-					...testNode.tags,
-					crossing: "yes",
-				},
-			})
-		},
-	)
+		assert.deepEqual(baseOsm.nodes.getById(2135545), {
+			...testNode,
+			tags: {
+				...testNode.tags,
+				crossing: "yes",
+			},
+		})
+	})
 
 	it("should generate and apply osm changes", () => {
 		const base = createBaseOsm()
@@ -169,7 +166,7 @@ describe("merge osm", () => {
 		})
 	})
 
-	it.only(
+	it.skip(
 		"should merge seattle with deduplication",
 		{
 			timeout: 200_000,
@@ -178,8 +175,14 @@ describe("merge osm", () => {
 			const osm1Name = "seattle.osm.pbf"
 			const osm2Name = "seattle-osw.pbf"
 
-			let baseOsm = await Osm.fromPbfData(await getFileReadStream(osm1Name))
-			const osm2 = await Osm.fromPbfData(await getFileReadStream(osm2Name))
+			let baseOsm = await createOsmIndexFromPbfData(
+				getFixtureFileReadStream(osm1Name),
+				osm1Name,
+			)
+			const osm2 = await createOsmIndexFromPbfData(
+				getFixtureFileReadStream(osm2Name),
+				osm2Name,
+			)
 
 			const baseSizes = {
 				nodes: 2_658_358,

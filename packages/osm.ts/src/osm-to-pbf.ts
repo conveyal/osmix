@@ -1,5 +1,10 @@
+import {
+	OsmBlocksToPbfBytesTransformStream,
+	type OsmPbfBlock,
+	type OsmPbfHeaderBlock,
+} from "@osmix/pbf"
+import { OsmPbfBlockBuilder } from "./json/osm-pbf-block-builder"
 import type { Osm } from "./osm"
-import { OsmPbfBlockBuilder, OsmPbfWriter } from "./pbf"
 
 /**
  * Write an OSM object to a PBF stream.
@@ -11,23 +16,49 @@ export async function writeOsmToPbfStream(
 	osm: Osm,
 	stream: WritableStream<Uint8Array>,
 ) {
-	const writer = new OsmPbfWriter(stream)
-	const [left, bottom, right, top] = osm.nodes.bbox
-	await writer.writeHeader({
-		...osm.header,
-		bbox: {
-			left,
-			bottom,
-			right,
-			top,
-		},
-		writingprogram: "@conveyal/osm.ts",
-		osmosis_replication_timestamp: Date.now(),
-	})
-	for (const block of generatePbfPrimitiveBlocks(osm)) {
-		await writer.writePrimitiveBlock(block)
+	return new OsmToBlocksReadableStream(osm)
+		.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
+		.pipeTo(stream)
+}
+
+/**
+ * Create a readable stream of OSM PBF blocks from an OSM object.
+ *
+ * @param osm - The OSM object to create a readable stream from.
+ * @returns A readable stream of OSM PBF blocks.
+ */
+export class OsmToBlocksReadableStream extends ReadableStream<
+	OsmPbfHeaderBlock | OsmPbfBlock
+> {
+	constructor(osm: Osm) {
+		let blocksGenerator: ReturnType<typeof generatePbfPrimitiveBlocks> | null =
+			null
+		super({
+			pull: async (controller) => {
+				if (blocksGenerator == null) {
+					const [left, bottom, right, top] = osm.nodes.bbox
+					controller.enqueue({
+						...osm.header,
+						bbox: {
+							left,
+							bottom,
+							right,
+							top,
+						},
+						writingprogram: "@conveyal/osm.ts",
+						osmosis_replication_timestamp: Date.now(),
+					})
+					blocksGenerator = generatePbfPrimitiveBlocks(osm)
+				}
+				const block = blocksGenerator.next()
+				if (block.done) {
+					controller.close()
+				} else {
+					controller.enqueue(block.value)
+				}
+			},
+		})
 	}
-	await writer.close()
 }
 
 /**

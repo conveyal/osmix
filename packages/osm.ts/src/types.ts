@@ -1,4 +1,4 @@
-import type { OsmPbfInfo } from "./pbf/proto/osmformat"
+import type { OsmPbfInfo } from "@osmix/pbf"
 
 export type OsmEntityType = "node" | "way" | "relation"
 

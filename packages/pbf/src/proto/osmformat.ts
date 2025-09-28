@@ -26,12 +26,12 @@ export interface OsmPbfBlockSettings {
 	date_granularity?: number
 }
 
-export interface OsmPbfPrimitiveBlock extends OsmPbfBlockSettings {
+export interface OsmPbfBlock extends OsmPbfBlockSettings {
 	stringtable: OsmPbfStringTable
-	primitivegroup: OsmPbfPrimitiveGroup[]
+	primitivegroup: OsmPbfGroup[]
 }
 
-export type OsmPbfPrimitiveGroup = {
+export type OsmPbfGroup = {
 	nodes: OsmPbfNode[]
 	dense?: OsmPbfDenseNodes
 	ways: OsmPbfWay[]
@@ -153,10 +153,7 @@ function writeHeaderBBox(obj: OsmPbfHeaderBBox, pbf: Pbf) {
 	if (obj.bottom) pbf.writeSVarintField(4, obj.bottom * 1e9)
 }
 
-export function readPrimitiveBlock(
-	pbf: Pbf,
-	end?: number,
-): OsmPbfPrimitiveBlock {
+export function readPrimitiveBlock(pbf: Pbf, end?: number): OsmPbfBlock {
 	return pbf.readFields(
 		readPrimitiveBlockField,
 		{
@@ -167,11 +164,7 @@ export function readPrimitiveBlock(
 	)
 }
 
-function readPrimitiveBlockField(
-	tag: number,
-	obj: OsmPbfPrimitiveBlock,
-	pbf: Pbf,
-) {
+function readPrimitiveBlockField(tag: number, obj: OsmPbfBlock, pbf: Pbf) {
 	if (tag === 1) {
 		obj.stringtable = readStringTable(pbf, pbf.readVarint() + pbf.pos)
 	} else if (tag === 2) {
@@ -184,7 +177,7 @@ function readPrimitiveBlockField(
 	else if (tag === 18) obj.date_granularity = pbf.readVarint(true) ?? 1000
 }
 
-export function writePrimitiveBlock(obj: OsmPbfPrimitiveBlock, pbf: Pbf) {
+export function writePrimitiveBlock(obj: OsmPbfBlock, pbf: Pbf) {
 	if (obj.stringtable) pbf.writeMessage(1, writeStringTable, obj.stringtable)
 	if (obj.primitivegroup) {
 		for (const item of obj.primitivegroup) {
@@ -202,18 +195,14 @@ export function writePrimitiveBlock(obj: OsmPbfPrimitiveBlock, pbf: Pbf) {
 	}
 }
 
-function readPrimitiveGroup(pbf: Pbf, end?: number): OsmPbfPrimitiveGroup {
+function readPrimitiveGroup(pbf: Pbf, end?: number): OsmPbfGroup {
 	return pbf.readFields(
 		readPrimitiveGroupField,
 		{ nodes: [], ways: [], relations: [] },
 		end,
 	)
 }
-function readPrimitiveGroupField(
-	tag: number,
-	obj: OsmPbfPrimitiveGroup,
-	pbf: Pbf,
-) {
+function readPrimitiveGroupField(tag: number, obj: OsmPbfGroup, pbf: Pbf) {
 	if (tag === 1) obj.nodes.push(readNode(pbf, pbf.readVarint() + pbf.pos))
 	else if (tag === 2) {
 		obj.dense = readDenseNodes(pbf, pbf.readVarint() + pbf.pos)
@@ -222,7 +211,7 @@ function readPrimitiveGroupField(
 		obj.relations.push(readRelation(pbf, pbf.readVarint() + pbf.pos))
 	}
 }
-function writePrimitiveGroup(obj: OsmPbfPrimitiveGroup, pbf: Pbf) {
+function writePrimitiveGroup(obj: OsmPbfGroup, pbf: Pbf) {
 	if (obj.nodes) {
 		for (const item of obj.nodes) pbf.writeMessage(1, writeNode, item)
 	}
