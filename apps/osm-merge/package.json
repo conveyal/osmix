@@ -10,12 +10,12 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
-		"@tailwindcss/vite": "^4.1.6",
+		"@tailwindcss/vite": "^4.1.13",
 		"@types/geojson": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "^19.1.4",
 		"@types/react-dom": "^19.1.5",
-		"@vitejs/plugin-react": "^4.4.1",
+		"@vitejs/plugin-react": "^5.0.4",
 		"tailwindcss": "^4.1.6",
 		"tw-animate-css": "^1.3.4",
 		"typescript": "catalog:",
