@@ -63,6 +63,8 @@ export type PbfFixture = {
 		lon: number
 		id: number
 	}
+	way0: number
+	relation0: number
 	uniqueStrings: number
 	primitiveGroups: number
 }
@@ -93,6 +95,8 @@ const AllPBFs: Record<string, PbfFixture> = {
 			lon: 7.4229093,
 			id: 21911883,
 		},
+		way0: 4097656,
+		relation0: 7385,
 		uniqueStrings: 6968,
 		primitiveGroups: 7,
 	},
@@ -113,6 +117,8 @@ const AllPBFs: Record<string, PbfFixture> = {
 			lon: 18.9656482,
 			id: 26860768,
 		},
+		way0: 123,
+		relation0: 123,
 		uniqueStrings: 55_071,
 		primitiveGroups: 532,
 	},
@@ -134,6 +140,8 @@ const AllPBFs: Record<string, PbfFixture> = {
 			lon: 17.021989,
 			id: 4_511_653,
 		},
+		way0: 123,
+		relation0: 123,
 		uniqueStrings: 269_315,
 	},
 	italy: {
@@ -154,6 +162,8 @@ const AllPBFs: Record<string, PbfFixture> = {
 			lon: 12.4534,
 			id: 1,
 		},
+		way0: 123,
+		relation0: 123,
 		uniqueStrings: 3190,
 	},
 	washington: {
@@ -173,6 +183,8 @@ const AllPBFs: Record<string, PbfFixture> = {
 			lon: -122.3196898,
 			id: 29445653,
 		},
+		way0: 123,
+		relation0: 123,
 		uniqueStrings: 598_993,
 		primitiveGroups: 34_901,
 	},

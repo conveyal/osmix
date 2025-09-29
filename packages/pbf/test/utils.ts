@@ -23,6 +23,8 @@ export async function testOsmPbfReader(
 	assert.equal(count.ways, pbf.ways)
 	assert.equal(count.relations, pbf.relations)
 	assert.equal(count.node0, pbf.node0.id)
+	assert.equal(count.way0, pbf.way0)
+	assert.equal(count.relation0, pbf.relation0)
 
 	return count
 }
