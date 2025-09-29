@@ -1,20 +1,23 @@
+import {
+	isNode,
+	isRelation,
+	isWay,
+	type LonLat,
+	type OsmEntity,
+	type OsmEntityType,
+	type OsmEntityTypeMap,
+	type OsmNode,
+	type OsmRelation,
+	type OsmWay,
+} from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf"
 import { Nodes, type NodesTransferables } from "./nodes"
 import { Bitmap } from "./raster"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { IdArrayType } from "./typed-arrays"
-import type {
-	GeoBbox2D,
-	LonLat,
-	OsmEntity,
-	OsmEntityType,
-	OsmEntityTypeMap,
-	OsmNode,
-	OsmRelation,
-	OsmWay,
-} from "./types"
-import { bboxFromLonLats, isNode, isRelation, isWay } from "./utils"
+import type { GeoBbox2D } from "./types"
+import { bboxFromLonLats } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
 export interface OsmTransferables {

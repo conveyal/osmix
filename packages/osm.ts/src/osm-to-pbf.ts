@@ -1,9 +1,9 @@
+import { OsmPbfBlockBuilder } from "@osmix/json"
 import {
 	OsmBlocksToPbfBytesTransformStream,
 	type OsmPbfBlock,
 	type OsmPbfHeaderBlock,
 } from "@osmix/pbf"
-import { OsmPbfBlockBuilder } from "./json/osm-pbf-block-builder"
 import type { Osm } from "./osm"
 
 /**

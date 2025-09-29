@@ -15,7 +15,7 @@ import type {
 	OsmRelation,
 	OsmRelationMember,
 	OsmWay,
-} from "../types"
+} from "./types"
 
 type ParseOptions = {
 	parseTags?: boolean

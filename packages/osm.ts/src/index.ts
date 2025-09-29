@@ -10,10 +10,5 @@ export { writeOsmToPbfStream } from "./osm-to-pbf"
 export type {
 	GeoBbox2D,
 	OsmChange,
-	OsmEntity,
-	OsmNode,
-	OsmRelation,
-	OsmWay,
-	TileIndex,
 } from "./types"
-export { getEntityType, throttle } from "./utils"
+export { throttle } from "./utils"

@@ -1,13 +1,15 @@
+import {
+	isNode,
+	isRelation,
+	isWay,
+	type OsmNode,
+	type OsmRelation,
+	type OsmTags,
+	type OsmWay,
+} from "@osmix/json"
 import type { Nodes } from "./nodes"
 import type { Osm } from "./osm"
-import type {
-	OsmGeoJSONProperties,
-	OsmNode,
-	OsmRelation,
-	OsmTags,
-	OsmWay,
-} from "./types"
-import { isNode, isRelation, isWay } from "./utils"
+import type { OsmGeoJSONProperties } from "./types"
 import { wayIsArea } from "./way-is-area"
 import type { Ways } from "./ways"
 

@@ -1,3 +1,9 @@
+import type {
+	OsmEntityType,
+	OsmRelation,
+	OsmRelationMember,
+	OsmTags,
+} from "@osmix/json"
 import type { OsmPbfRelation } from "@osmix/pbf"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { Ids } from "./ids"
@@ -8,12 +14,6 @@ import {
 	ResizeableTypedArray,
 	type TypedArrayBuffer,
 } from "./typed-arrays"
-import type {
-	OsmEntityType,
-	OsmRelation,
-	OsmRelationMember,
-	OsmTags,
-} from "./types"
 
 const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
 

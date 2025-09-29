@@ -1,0 +1,25 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/json",
+	"description": "Convert OSM PBF files to and from JSON.",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "./src/index.ts",
+	"sideEffects": false,
+	"scripts": {
+		"build": "vite build",
+		"bench": "vitest bench",
+		"test": "vitest",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@osmix/test-utils": "workspace:*",
+		"typescript": "catalog:",
+		"vite": "catalog:",
+		"vitest": "catalog:"
+	},
+	"dependencies": {
+		"@osmix/pbf": "workspace:*",
+		"dequal": "catalog:"
+	}
+}

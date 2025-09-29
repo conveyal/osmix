@@ -1,4 +1,4 @@
-import type { OsmTags } from "./types"
+import type { OsmTags } from "@osmix/json"
 
 /**
  * Tags that imply an area unless their value is exactly "no"

@@ -1,3 +1,4 @@
+import type { OsmNode, OsmTags } from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
 import KDBush from "kdbush"
 import { Entities, type EntitiesTransferables } from "./entities"
@@ -10,7 +11,7 @@ import {
 	ResizeableTypedArray,
 	type TypedArrayBuffer,
 } from "./typed-arrays"
-import type { GeoBbox2D, OsmNode, OsmTags } from "./types"
+import type { GeoBbox2D } from "./types"
 
 export interface NodesTransferables extends EntitiesTransferables {
 	lons: TypedArrayBuffer

@@ -1,10 +1,10 @@
+import type { OsmTags } from "@osmix/json"
 import type StringTable from "./stringtable"
 import {
 	IndexArrayType,
 	ResizeableTypedArray,
 	type TypedArrayBuffer,
 } from "./typed-arrays"
-import type { OsmTags } from "./types"
 
 export type TagsTransferables = {
 	tagStart: TypedArrayBuffer

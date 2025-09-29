@@ -1,21 +1,19 @@
-import type {
-	OsmPbfBlock,
-	OsmPbfBlockSettings,
-	OsmPbfGroup,
-	OsmPbfInfo,
-	OsmPbfStringTable,
+import {
+	MAX_ENTITIES_PER_BLOCK,
+	type OsmPbfBlock,
+	type OsmPbfBlockSettings,
+	type OsmPbfGroup,
+	type OsmPbfInfo,
+	type OsmPbfStringTable,
 } from "@osmix/pbf"
+import { OSM_ENTITY_TYPES } from "./constants"
 import type {
-	OsmEntityType,
 	OsmInfoParsed,
 	OsmNode,
 	OsmRelation,
 	OsmTags,
 	OsmWay,
-} from "../types"
-
-const ENTITY_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
-const MAX_ENTITIES_PER_BLOCK = 8_000 // Setting used by osmosis
+} from "./types"
 
 /**
  * Build a primitive block from parsed OSM entities. Handles delta encoding, stringtable, and other PBF-specific encoding details.
@@ -153,7 +151,7 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 			memids.push(member.ref - lastMemId)
 			lastMemId = member.ref
 			roles_sid.push(this.getStringtableIndex(member.role ?? ""))
-			types.push(ENTITY_MEMBER_TYPES.indexOf(member.type))
+			types.push(OSM_ENTITY_TYPES.indexOf(member.type))
 		}
 		this.group.relations.push({
 			id: relation.id,

@@ -2,15 +2,13 @@ import Pbf from "pbf"
 import { writeBlob, writeBlobHeader } from "./proto/fileformat"
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "./proto/osmformat"
 import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat"
+import {
+	MAX_BLOB_SIZE_BYTES,
+	MAX_HEADER_SIZE_BYTES,
+	RECOMMENDED_BLOB_SIZE_BYTES,
+	RECOMMENDED_HEADER_SIZE_BYTES,
+} from "./spec"
 import { compress, concatUint8, uint32BE } from "./utils"
-
-// Recommended and maximum header and blob sizes as defined by the OSM PBF specification
-// Header: 32 KiB and 64 KiB
-const RECOMMENDED_HEADER_SIZE_BYTES = 32 * 1024
-const MAX_HEADER_SIZE_BYTES = 64 * 1024
-// Blob: 16 MiB and 32 MiB
-const RECOMMENDED_BLOB_SIZE_BYTES = 16 * 1024 * 1024
-const MAX_BLOB_SIZE_BYTES = 32 * 1024 * 1024
 
 /**
  * Turn a OSM Block into a PBF Blob as bytes.

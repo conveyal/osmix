@@ -1,3 +1,4 @@
+import type { OsmTags, OsmWay } from "@osmix/json"
 import type { OsmPbfWay } from "@osmix/pbf"
 import Flatbush from "flatbush"
 import { Entities, type EntitiesTransferables } from "./entities"
@@ -12,7 +13,7 @@ import {
 	ResizeableTypedArray,
 	type TypedArrayBuffer,
 } from "./typed-arrays"
-import type { GeoBbox2D, OsmTags, OsmWay } from "./types"
+import type { GeoBbox2D } from "./types"
 
 export interface WaysTransferables extends EntitiesTransferables {
 	refStart: TypedArrayBuffer

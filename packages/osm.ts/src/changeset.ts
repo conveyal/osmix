@@ -1,21 +1,20 @@
-import { distance, lineIntersect } from "@turf/turf"
-import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
-import { Osm } from "./osm"
-import type {
-	OsmChange,
-	OsmEntity,
-	OsmEntityRef,
-	OsmEntityType,
-	OsmEntityTypeMap,
-	OsmNode,
-	OsmRelation,
-	OsmWay,
-} from "./types"
 import {
-	cleanCoords,
 	entityPropertiesEqual,
 	getEntityType,
 	isWayEqual,
+	type OsmEntity,
+	type OsmEntityType,
+	type OsmEntityTypeMap,
+	type OsmNode,
+	type OsmRelation,
+	type OsmWay,
+} from "@osmix/json"
+import { distance, lineIntersect } from "@turf/turf"
+import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
+import { Osm } from "./osm"
+import type { OsmChange, OsmEntityRef } from "./types"
+import {
+	cleanCoords,
 	isWayIntersectionCandidate,
 	osmTagsToOscTags,
 	removeDuplicateAdjacentOsmWayRefs,

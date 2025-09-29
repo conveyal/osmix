@@ -28,6 +28,8 @@
 		"@deck.gl/mapbox": "^9.1.11",
 		"@deck.gl/react": "^9.1.11",
 		"@fontsource-variable/roboto-mono": "^5.2.5",
+		"@osmix/json": "workspace:*",
+		"@osmix/pbf": "workspace:*",
 		"@radix-ui/react-collapsible": "^1.1.12",
 		"@radix-ui/react-dialog": "^1.1.14",
 		"@radix-ui/react-hover-card": "^1.1.15",

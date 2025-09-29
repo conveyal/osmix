@@ -1,7 +1,7 @@
+import type { OsmEntity, OsmEntityType, OsmTags } from "@osmix/json"
 import { type IdOrIndex, Ids, type IdsTransferables } from "./ids"
 import type StringTable from "./stringtable"
 import { Tags, type TagsTransferables } from "./tags"
-import type { OsmEntity, OsmEntityType, OsmTags } from "./types"
 
 export interface EntitiesTransferables
 	extends IdsTransferables,
