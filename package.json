@@ -1,7 +1,7 @@
 {
 	"$schema": "https://json.schemastore.org/package",
 	"name": "osm",
-	"packageManager": "bun@1.2.19",
+	"packageManager": "bun@1.2.23",
 	"private": true,
 	"workspaces": {
 		"packages": [
@@ -19,7 +19,7 @@
 		}
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.0.6"
+		"@biomejs/biome": "2.2.4"
 	},
 	"scripts": {
 		"dev": "bun run --filter '*' dev",
