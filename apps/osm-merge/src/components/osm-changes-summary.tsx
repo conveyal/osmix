@@ -1,7 +1,8 @@
+import { getEntityType, type OsmEntity } from "@osmix/json"
 import { Provider, useAtom, useAtomValue, useSetAtom } from "jotai"
 import { useHydrateAtoms } from "jotai/utils"
 import { ArrowLeft, ArrowRight } from "lucide-react"
-import { getEntityType, type OsmChanges, type OsmEntity } from "osm.ts"
+import type { OsmChanges } from "osm.ts"
 import { cn } from "@/lib/utils"
 import {
 	changesAtom,

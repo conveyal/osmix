@@ -1,5 +1,13 @@
-import type { Osm, OsmEntity, OsmNode, OsmRelation, OsmWay } from "osm.ts"
-import { isNode, isRelation, isWay } from "osm.ts/utils"
+import {
+	isNode,
+	isRelation,
+	isWay,
+	type OsmEntity,
+	type OsmNode,
+	type OsmRelation,
+	type OsmWay,
+} from "@osmix/json"
+import type { Osm } from "osm.ts"
 import { Fragment } from "react/jsx-runtime"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 
