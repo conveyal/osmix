@@ -1,5 +1,7 @@
 export * from "./constants"
+export * from "./json-to-pbf"
 export * from "./osm-pbf-block-builder"
 export * from "./osm-pbf-block-parser"
+export * from "./pbf-to-json"
 export * from "./types"
 export * from "./utils"

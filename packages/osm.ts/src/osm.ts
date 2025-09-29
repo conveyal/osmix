@@ -76,6 +76,18 @@ export class Osm {
 		this.id = id ?? "unknown"
 	}
 
+	*generateSortedEntities(): Generator<OsmEntity> {
+		for (const node of this.nodes.sorted()) {
+			yield node
+		}
+		for (const way of this.ways.sorted()) {
+			yield way
+		}
+		for (const relation of this.relations.sorted()) {
+			yield relation
+		}
+	}
+
 	buildSpatialIndexes() {
 		this.nodes.buildSpatialIndex()
 		this.ways.buildSpatialIndex(this.nodes)

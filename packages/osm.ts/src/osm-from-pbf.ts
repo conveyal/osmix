@@ -1,4 +1,7 @@
-import { createOsmPbfReader } from "@osmix/pbf"
+import {
+	OsmPbfBytesToBlocksTransformStream,
+	toAsyncGenerator,
+} from "@osmix/pbf"
 import { Osm } from "./osm"
 import { throttle } from "./utils"
 
@@ -10,19 +13,23 @@ import { throttle } from "./utils"
  * @returns The OSM index.
  */
 export async function createOsmIndexFromPbfData(
-	data: Uint8Array | ReadableStream<Uint8Array>,
+	data: ReadableStream<Uint8Array>,
 	id = "unknown",
 	onProgress: (...args: string[]) => void = console.log,
 ) {
 	const osm = new Osm(id)
-	const { header, blocks } = await createOsmPbfReader(data)
-	osm.header = header
-
+	const blocks = toAsyncGenerator(
+		data.pipeThrough(new OsmPbfBytesToBlocksTransformStream()),
+	)
 	const logEverySecond = throttle(onProgress, 1_000)
 
 	let entityCount = 0
 	let stage: "nodes" | "ways" | "relations" = "nodes"
 	for await (const block of blocks) {
+		if ("required_features" in block) {
+			osm.header = block
+			continue
+		}
 		const blockStringIndexMap = osm.stringTable.createBlockIndexMap(block)
 		for (const { nodes, ways, relations, dense } of block.primitivegroup) {
 			if (dense) {

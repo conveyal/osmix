@@ -6,7 +6,7 @@ import type {
 	OsmPbfHeaderBlock,
 } from "../src/proto/osmformat"
 
-export async function testReader(
+export async function testOsmPbfReader(
 	osm: {
 		header: OsmPbfHeaderBlock
 		blocks: AsyncGenerator<OsmPbfBlock>
@@ -22,6 +22,7 @@ export async function testReader(
 	assert.equal(count.nodes, pbf.nodes)
 	assert.equal(count.ways, pbf.ways)
 	assert.equal(count.relations, pbf.relations)
+	assert.equal(count.node0, pbf.node0.id)
 
 	return count
 }

@@ -71,3 +71,24 @@ export async function osmBlockToPbfBlobBytes(
 
 	return concatUint8(blobHeaderSize, blobHeader, blob)
 }
+
+/**
+ * Transform a stream of OSM blocks to a stream of PBF bytes. Header *must* be the first block.
+ */
+export class OsmBlocksToPbfBytesTransformStream extends TransformStream<
+	OsmPbfHeaderBlock | OsmPbfBlock,
+	Uint8Array
+> {
+	headerEnqueued = false
+	constructor() {
+		super({
+			transform: async (block, controller) => {
+				if ("primitivegroup" in block && !this.headerEnqueued) {
+					throw Error("Header first in ReadableStream of blocks.")
+				}
+				this.headerEnqueued = true
+				controller.enqueue(await osmBlockToPbfBlobBytes(block))
+			},
+		})
+	}
+}

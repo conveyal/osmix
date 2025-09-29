@@ -17,7 +17,7 @@ import type {
 	OsmWay,
 } from "./types"
 
-type ParseOptions = {
+export interface ParseOptions {
 	parseTags?: boolean
 	includeInfo?: boolean
 }

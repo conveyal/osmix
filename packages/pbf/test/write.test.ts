@@ -7,19 +7,21 @@ import {
 	PBFs,
 } from "@osmix/test-utils/fixtures"
 import { assert, describe, it } from "vitest"
-import { osmBlockToPbfBlobBytes } from "../src/blocks-to-pbf"
-import { createOsmPbfReader } from "../src/pbf-to-blocks"
 import {
 	OsmBlocksToPbfBytesTransformStream,
+	osmBlockToPbfBlobBytes,
+} from "../src/blocks-to-pbf"
+import {
 	OsmPbfBytesToBlocksTransformStream,
-} from "../src/streaming"
-import { testReader } from "./utils"
+	readOsmPbf,
+} from "../src/pbf-to-blocks"
+import { testOsmPbfReader } from "./utils"
 
 describe("write", () => {
 	describe.each(Object.entries(PBFs))("%s", (name, pbf) => {
 		it("to buffer", async () => {
 			const fileData = await getFixtureFile(pbf.url)
-			const osm = await createOsmPbfReader(fileData)
+			const osm = await readOsmPbf(fileData)
 
 			let node0: number | null = null
 			let way0: number | null = null
@@ -53,10 +55,10 @@ describe("write", () => {
 			// Re-parse the new PBF and test
 			assert.exists(data.buffer)
 			// TODO: assert.equal(stream.buffer.byteLength, fileData.byteLength)
-			const osm2 = await createOsmPbfReader(data)
+			const osm2 = await readOsmPbf(data)
 
 			assert.deepEqual(osm.header, osm2.header)
-			const entities = await testReader(osm2, pbf)
+			const entities = await testOsmPbfReader(osm2, pbf)
 			assert.equal(entities.node0, node0)
 			assert.equal(entities.way0, way0)
 			assert.equal(entities.relation0, relation0)
@@ -66,16 +68,17 @@ describe("write", () => {
 			const testFileName = `${name}-write-test.pbf`
 			const fileStream = getFixtureFileReadStream(pbf.url)
 
+			const fileWriteStream = getFixtureFileWriteStream(testFileName)
 			await fileStream
 				.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
 				.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
-				.pipeTo(getFixtureFileWriteStream(testFileName))
+				.pipeTo(fileWriteStream)
 
-			const testStream = getFixtureFileReadStream(pbf.url)
-			const testOsm = await createOsmPbfReader(testStream)
+			const testFileData = await getFixtureFile(pbf.url)
+			const testOsm = await readOsmPbf(testFileData)
 
 			assert.deepEqual(testOsm.header.bbox, pbf.bbox)
-			await testReader(testOsm, pbf)
+			await testOsmPbfReader(testOsm, pbf)
 
 			await unlink(getFixturePath(testFileName))
 		})

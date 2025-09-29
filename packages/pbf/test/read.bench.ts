@@ -4,19 +4,20 @@ import {
 	PBFs,
 } from "@osmix/test-utils/fixtures"
 import { assert, beforeAll, bench, describe } from "vitest"
-
-import { createOsmPbfReader } from "../src/pbf-to-blocks"
-import { OsmPbfBytesToBlocksTransformStream } from "../src/streaming"
-import { createOsmEntityCounter, testReader } from "./utils"
+import {
+	OsmPbfBytesToBlocksTransformStream,
+	readOsmPbf,
+} from "../src/pbf-to-blocks"
+import { createOsmEntityCounter, testOsmPbfReader } from "./utils"
 
 describe.each(Object.entries(PBFs))("%s", (_name, pbf) => {
 	beforeAll(() => getFixtureFile(pbf.url))
 
 	bench("parse with generators", async () => {
 		const file = await getFixtureFile(pbf.url)
-		const osm = await createOsmPbfReader(file)
+		const osm = await readOsmPbf(file)
 
-		await testReader(osm, pbf)
+		await testOsmPbfReader(osm, pbf)
 	})
 
 	bench("parse streaming", async () => {

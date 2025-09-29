@@ -24,23 +24,19 @@ describe("write", () => {
 			assert.exists(way1)
 			assert.exists(relation1)
 
-			// Write the PBF to an array buffer
-			let data = new Uint8Array(0)
-			await writeOsmToPbfStream(
-				osm,
-				new WritableStream({
-					write: (chunk) => {
-						const newData = new Uint8Array(data.length + chunk.length)
-						newData.set(data)
-						newData.set(chunk, data.length)
-						data = newData
-					},
-				}),
+			const transformStream = new TransformStream<Uint8Array, Uint8Array>()
+			const testOsmPromise = createOsmIndexFromPbfData(
+				transformStream.readable,
+				`${name}-reparsed`,
 			)
 
+			// Write the PBF to an array buffer
+			// let data = new Uint8Array(0)
+			await writeOsmToPbfStream(osm, transformStream.writable)
+
 			// Re-parse the new PBF
-			assert.exists(data.buffer)
-			const testOsm = await createOsmIndexFromPbfData(data, `${name}-reparsed`)
+			// assert.exists(data.buffer)
+			const testOsm = await testOsmPromise
 
 			// Compare the original parsed PBF and newly parsed/written/re-parsed PBF
 			assert.equal(osm.nodes.size, testOsm.nodes.size)
@@ -49,23 +45,23 @@ describe("write", () => {
 
 			if (node1) {
 				const testNode1 = testOsm.nodes.getById(node1.id)
-				assert.deepEqual(node1, testNode1)
-				assert.equal(node1.id, testNode1?.id)
-				assert.equal(node1.lon, testNode1?.lon)
-				assert.equal(node1.lat, testNode1?.lat)
-				assert.deepEqual(node1.tags, testNode1?.tags)
+				assert.deepEqual(testNode1, node1)
+				assert.equal(testNode1?.id, node1.id)
+				assert.equal(testNode1?.lon, node1.lon)
+				assert.equal(testNode1?.lat, node1.lat)
+				assert.deepEqual(testNode1?.tags, node1.tags)
 			}
 			if (way1) {
 				const testWay1 = testOsm.ways.getById(way1.id)
-				assert.equal(way1.id, testWay1?.id)
-				assert.deepEqual(way1.refs, testWay1?.refs)
-				assert.deepEqual(way1.tags, testWay1?.tags)
+				assert.equal(testWay1?.id, way1.id)
+				assert.deepEqual(testWay1?.refs, way1.refs)
+				assert.deepEqual(testWay1?.tags, way1.tags)
 			}
 			if (relation1) {
 				const testRelation1 = testOsm.relations.getById(relation1.id)
-				assert.equal(relation1.id, testRelation1?.id)
-				assert.deepEqual(relation1.members, testRelation1?.members)
-				assert.deepEqual(relation1.tags, testRelation1?.tags)
+				assert.equal(testRelation1?.id, relation1.id)
+				assert.deepEqual(testRelation1?.members, relation1.members)
+				assert.deepEqual(testRelation1?.tags, relation1.tags)
 			}
 		})
 	})

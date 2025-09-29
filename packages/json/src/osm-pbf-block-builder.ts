@@ -43,18 +43,18 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 	private maxEntitiesPerBlock: number
 
 	constructor(
-		blockSettings: OsmPbfBlockSettings & {
+		blockSettings?: OsmPbfBlockSettings & {
 			includeInfo?: boolean
 			maxEntitiesPerBlock?: number
-		} = {},
+		},
 	) {
-		this.date_granularity = blockSettings.date_granularity ?? 1_000
-		this.granularity = blockSettings.granularity ?? 1e7
-		this.lat_offset = blockSettings.lat_offset ?? 0
-		this.lon_offset = blockSettings.lon_offset ?? 0
-		this.includeInfo = blockSettings.includeInfo ?? false
+		this.date_granularity = blockSettings?.date_granularity ?? 1_000
+		this.granularity = blockSettings?.granularity ?? 1e7
+		this.lat_offset = blockSettings?.lat_offset ?? 0
+		this.lon_offset = blockSettings?.lon_offset ?? 0
+		this.includeInfo = blockSettings?.includeInfo ?? false
 		this.maxEntitiesPerBlock =
-			blockSettings.maxEntitiesPerBlock ?? MAX_ENTITIES_PER_BLOCK
+			blockSettings?.maxEntitiesPerBlock ?? MAX_ENTITIES_PER_BLOCK
 
 		// Initialize the string table with an empty string
 		this.getStringtableIndex("")

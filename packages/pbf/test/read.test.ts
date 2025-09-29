@@ -4,9 +4,11 @@ import {
 	PBFs,
 } from "@osmix/test-utils/fixtures"
 import { assert, beforeAll, describe, it } from "vitest"
-import { createOsmPbfReader } from "../src/pbf-to-blocks"
-import { OsmPbfBytesToBlocksTransformStream } from "../src/streaming"
-import { createOsmEntityCounter, testReader } from "./utils"
+import {
+	OsmPbfBytesToBlocksTransformStream,
+	readOsmPbf,
+} from "../src/pbf-to-blocks"
+import { createOsmEntityCounter, testOsmPbfReader } from "./utils"
 
 describe("read", () => {
 	describe.each(Object.entries(PBFs))("%s", async (_name, pbf) => {
@@ -36,8 +38,8 @@ describe("read", () => {
 
 		it("from buffer", async () => {
 			const fileData = await getFixtureFile(pbf.url)
-			const osm = await createOsmPbfReader(fileData)
-			await testReader(osm, pbf)
+			const osm = await readOsmPbf(fileData)
+			await testOsmPbfReader(osm, pbf)
 		})
 	})
 })
