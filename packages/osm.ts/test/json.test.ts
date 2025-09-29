@@ -1,8 +1,4 @@
-import {
-	createOsmDataBlob,
-	createOsmHeaderBlob,
-	createOsmPbfReader,
-} from "@osmix/pbf"
+import { createOsmPbfReader, osmBlockToPbfBlobBytes } from "@osmix/pbf"
 import { testReader } from "@osmix/pbf/test/utils"
 import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures"
 import { assert, describe, it } from "vitest"
@@ -39,13 +35,13 @@ describe("pbf json", () => {
 				newData.set(chunk, data.length)
 				data = newData
 			}
-			write(await createOsmHeaderBlob(osm.header))
+			write(await osmBlockToPbfBlobBytes(osm.header))
 			let blockBuilder = new OsmPbfBlockBuilder()
 
 			// Directly take entities from the parsed PBF and add them to the new PBF
 			const addEntity = async (entity: OsmEntity) => {
 				if (blockBuilder.isFull()) {
-					write(await createOsmDataBlob(blockBuilder))
+					write(await osmBlockToPbfBlobBytes(blockBuilder))
 					blockBuilder = new OsmPbfBlockBuilder()
 				}
 				if (isNode(entity)) {
@@ -53,14 +49,14 @@ describe("pbf json", () => {
 				} else if (isWay(entity)) {
 					if (blockBuilder.primitivegroup[0].dense != null) {
 						// Block builder has nodes, write it out and start a new block
-						write(await createOsmDataBlob(blockBuilder))
+						write(await osmBlockToPbfBlobBytes(blockBuilder))
 						blockBuilder = new OsmPbfBlockBuilder()
 					}
 					blockBuilder.addWay(entity)
 				} else if (isRelation(entity)) {
 					if (blockBuilder.primitivegroup[0].ways.length > 0) {
 						// Block builder has ways, write it out and start a new block
-						write(await createOsmDataBlob(blockBuilder))
+						write(await osmBlockToPbfBlobBytes(blockBuilder))
 						blockBuilder = new OsmPbfBlockBuilder()
 					}
 					blockBuilder.addRelation(entity)
@@ -75,7 +71,7 @@ describe("pbf json", () => {
 					}
 				}
 			}
-			write(await createOsmDataBlob(blockBuilder))
+			write(await osmBlockToPbfBlobBytes(blockBuilder))
 
 			// Re-parse the new PBF and test
 			const osm2 = await createOsmPbfReader(data)

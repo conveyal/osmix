@@ -13,37 +13,23 @@ const RECOMMENDED_BLOB_SIZE_BYTES = 16 * 1024 * 1024
 const MAX_BLOB_SIZE_BYTES = 32 * 1024 * 1024
 
 /**
- * Turn a header block into a blob of bytes.
- * @param headerBlock - The OSM PBF header block.
- * @returns The OsmPbfHeaderBlock as BlobHeader Length, BlobHeader, and Blob as bytes.
- */
-export function createOsmHeaderBlob(headerBlock: OsmPbfHeaderBlock) {
-	const pbf = new Pbf()
-	writeHeaderBlock(headerBlock, pbf)
-	return createBlob("OSMHeader", pbf)
-}
-
-/**
- * Turn a primitive block into a blob of bytes.
- * @param block - The OSM PBF primitive block.
- * @returns The OsmPbfBlock as BlobHeader Length, BlobHeader, and Blob as bytes.
- */
-export function createOsmDataBlob(block: OsmPbfBlock) {
-	const pbf = new Pbf()
-	writePrimitiveBlock(block, pbf)
-	return createBlob("OSMData", pbf)
-}
-
-/**
- * Turn a PBF object into a Blob.
+ * Turn a OSM Block into a PBF Blob as bytes.
  * @param type - The type of the blob.
  * @param contentPbf - The PBF content.
  * @returns The Blob as bytes.
  */
-export async function createBlob(
-	type: "OSMHeader" | "OSMData",
-	contentPbf: Pbf,
+export async function osmBlockToPbfBlobBytes(
+	block: OsmPbfBlock | OsmPbfHeaderBlock,
 ) {
+	const contentPbf = new Pbf()
+	let type: "OSMHeader" | "OSMData"
+	if ("primitivegroup" in block) {
+		type = "OSMData"
+		writePrimitiveBlock(block, contentPbf)
+	} else {
+		type = "OSMHeader"
+		writeHeaderBlock(block, contentPbf)
+	}
 	const contentData = contentPbf.finish()
 	const raw_size = contentData.length
 	const compressedBuffer = await compress(contentData)

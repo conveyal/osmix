@@ -4,11 +4,9 @@ A low level [OpenStreetMap PBF](https://wiki.openstreetmap.org/wiki/PBF_Format) 
 
 ## Background
 
-When searching through the existing OSM PBF parsing libraries I found they used out of date dependencies, lacked useable types, or made parsing decisions which affected the resulting data.
+When searching through the existing OSM PBF parsing libraries I found them lacking. They used out of date dependencies, lacked useable types, or made parsing decisions which affected the performance or resulting data structures.
 
-`@osmix/pbf` is designed to be a core, shared library useable by higher level libraries, CLIs, and tools that can make decisions on how to decompress and store the resulting data. 
-
-In common with existing parsers `@osmix/pbf` uses mapbox's [pbf](https://github.com/mapbox/pbf) library.
+`@osmix/pbf` is designed to be a core, shared library useable by higher level libraries, CLIs, converters, and other tools that can make their decisions on how to use the resulting data. 
 
 ## Usage
 

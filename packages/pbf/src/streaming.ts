@@ -1,5 +1,5 @@
 import Pbf from "pbf"
-import { createOsmDataBlob, createOsmHeaderBlob } from "./blocks-to-pbf"
+import { osmBlockToPbfBlobBytes } from "./blocks-to-pbf"
 import { createOsmPbfBlobGenerator } from "./pbf-to-blobs"
 import {
 	type OsmPbfBlock,
@@ -43,18 +43,15 @@ export class OsmBlocksToPbfBytesTransformStream extends TransformStream<
 	OsmPbfHeaderBlock | OsmPbfBlock,
 	Uint8Array
 > {
-	headerPiped = false
+	headerEnqueued = false
 	constructor() {
 		super({
 			transform: async (block, controller) => {
-				if ("primitivegroup" in block) {
-					if (!this.headerPiped)
-						throw Error("Header first in ReadableStream of blocks.")
-					controller.enqueue(await createOsmDataBlob(block))
-				} else {
-					this.headerPiped = true
-					controller.enqueue(await createOsmHeaderBlob(block))
+				if ("primitivegroup" in block && !this.headerEnqueued) {
+					throw Error("Header first in ReadableStream of blocks.")
 				}
+				this.headerEnqueued = true
+				controller.enqueue(await osmBlockToPbfBlobBytes(block))
 			},
 		})
 	}

@@ -7,7 +7,7 @@ import {
 	PBFs,
 } from "@osmix/test-utils/fixtures"
 import { assert, describe, it } from "vitest"
-import { createOsmDataBlob, createOsmHeaderBlob } from "../src/blocks-to-pbf"
+import { osmBlockToPbfBlobBytes } from "../src/blocks-to-pbf"
 import { createOsmPbfReader } from "../src/pbf-to-blocks"
 import {
 	OsmBlocksToPbfBytesTransformStream,
@@ -34,7 +34,7 @@ describe("write", () => {
 				data = newData
 			}
 
-			write(await createOsmHeaderBlob(osm.header))
+			write(await osmBlockToPbfBlobBytes(osm.header))
 			for await (const block of osm.blocks) {
 				for (const group of block.primitivegroup) {
 					if (node0 == null && group.dense != null) {
@@ -47,7 +47,7 @@ describe("write", () => {
 						relation0 = group.relations[0].id
 					}
 				}
-				write(await createOsmDataBlob(block))
+				write(await osmBlockToPbfBlobBytes(block))
 			}
 
 			// Re-parse the new PBF and test
