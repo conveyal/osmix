@@ -6,11 +6,11 @@ import {
 	PathLayer,
 	ScatterplotLayer,
 } from "@deck.gl/layers"
+import { isNode, type OsmEntity } from "@osmix/json"
 import { bboxPolygon } from "@turf/turf"
 import { useAtomValue, useSetAtom } from "jotai"
-import type { GeoBbox2D, Osm, OsmEntity } from "osm.ts"
+import type { GeoBbox2D, Osm } from "osm.ts"
 import { getEntityGeoJson } from "osm.ts/geojson"
-import { isNode } from "osm.ts/utils"
 import { useCallback, useEffect, useMemo } from "react"
 import { APPID, BITMAP_TILE_SIZE, MIN_PICKABLE_ZOOM } from "@/settings"
 import { mapAtom } from "@/state/map"

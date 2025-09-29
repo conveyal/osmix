@@ -27,7 +27,7 @@ export type OsmEntityRef = {
 	osmId: string
 }
 
-export type OsmChange<T extends OsmEntity> = {
+export type OsmChange<T extends OsmEntity = OsmEntity> = {
 	changeType: "modify" | "create" | "delete"
 	entity: T
 	osmId: string // When merging datasets, we need to keep track of the entity's origin dataset.
