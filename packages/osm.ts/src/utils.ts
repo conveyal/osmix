@@ -83,6 +83,7 @@ const isFootish = (t: OsmTags) =>
 		String(t.highway),
 	)
 const isPolygonish = (t: OsmTags) => !!(t.building || t.landuse || t.natural)
+
 /**
  * Determine if two ways should be connected based on their tags
  */
@@ -98,6 +99,7 @@ export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
 	if (isHighway(a) && isHighway(b)) return true
 	if (isHighway(a) && isFootish(b)) return true
 	if (isHighway(b) && isFootish(a)) return true
+	if (isFootish(a) && isFootish(b)) return true
 
 	return false
 }

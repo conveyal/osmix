@@ -200,6 +200,27 @@ export default function Merge() {
 								file={patch.file}
 							/>
 						</div>
+						<div className="flex flex-col gap-1">
+							<div className="font-bold">CLEAN INPUT OSM</div>
+							<p>
+								Selected OSM PBFs will First be inspected for duplicate entities
+								within each dataset. Later, we will search for duplicate
+								entities between the two datasets.
+							</p>
+							<p>
+								Duplicates are entities which either have the same ID or are
+								geographically identical. A best effort is made to select which
+								duplicate to keep. First, if there is a version number or
+								modification date, that takes precendence. If that is not
+								available, then the duplicate with the higher number of tags is
+								kept.
+							</p>
+							<p>
+								When a duplicate is found, a changeset is created with an entry
+								to remove the duplicate entity. That changeset can be reviewed
+								and applied on the next page.
+							</p>
+						</div>
 						<Button
 							disabled={isTransitioning || !base.osm || !patch.osm}
 							onClick={() => {
@@ -442,8 +463,8 @@ export default function Merge() {
 						isTransitioning={isTransitioning}
 					>
 						<div>
-							Search for geographically identical nodes in the two datasets and
-							de-duplicate them. Replaces references in ways and relations.
+							Search for geographically identical nodes between the two datasets
+							and de-duplicate them. Replaces references in ways and relations.
 						</div>
 
 						<div className="flex flex-col border-1">
@@ -490,10 +511,32 @@ export default function Merge() {
 						title="CREATE INTERSECTIONS"
 						isTransitioning={isTransitioning}
 					>
-						<div>
-							Look for new ways that cross over existing ways and determine if
-							they are candidates for creating intersection nodes by checking
-							their tags.
+						<div className="flex flex-col gap-1">
+							<p>
+								Look for new ways that cross over existing ways and determine if
+								they are candidates for creating intersection nodes by checking
+								their tags.
+							</p>
+							<p>
+								This process loops through all of the new ways and finds
+								possible candidates via a fast search for existing ways that are
+								geographically close. Only candidates with tags which allow the
+								ways to intersect are considered. Intersection candidates must
+								have a `highway` tag, be a line, have the same `layer` tag (if
+								they have one), and not be a bridge or a tunnel.
+							</p>
+							<p>
+								Next, we check each candidate way to find the real intersection
+								point with the new way. If the ways intersect, we check for
+								existing nodes at that point. If a node already exists, we
+								re-use it, prioritizing nodes from the new dataset. If no nodes
+								exist, we create a new node.
+							</p>
+							<p>
+								Next, we modify the ways to ensure they have the selected
+								intersection node in their refs list. These modifications and
+								changes are then reviewable on the following page.
+							</p>
 						</div>
 
 						<div className="flex gap-2 justify-between">
