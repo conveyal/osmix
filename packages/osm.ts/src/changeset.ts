@@ -23,7 +23,7 @@ import {
 } from "./utils"
 import type { Ways } from "./ways"
 
-export type OsmMergeOptions = {
+export interface OsmMergeOptions {
 	directMerge: boolean
 	deduplicateNodes: boolean
 	createIntersections: boolean

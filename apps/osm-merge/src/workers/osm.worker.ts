@@ -117,7 +117,8 @@ const osmWorker = {
 		baseOsmId: string,
 		patchOsmId: string,
 		options: OsmMergeOptions,
-	): OsmChanges {
+		returnChangeset = true,
+	): OsmChanges | null {
 		const patchOsm = osmCache.get(patchOsmId)
 		if (!patchOsm) throw Error(`Osm for ${patchOsmId} not loaded.`)
 		const baseOsm = osmCache.get(baseOsmId)
@@ -156,13 +157,16 @@ const osmWorker = {
 		}
 
 		changesetCache.set(baseOsmId, changeset)
-		return {
-			osmId: baseOsmId,
-			nodes: changeset.nodeChanges,
-			ways: changeset.wayChanges,
-			relations: changeset.relationChanges,
-			stats: changeset.stats,
+		if (returnChangeset) {
+			return {
+				osmId: baseOsmId,
+				nodes: changeset.nodeChanges,
+				ways: changeset.wayChanges,
+				relations: changeset.relationChanges,
+				stats: changeset.stats,
+			}
 		}
+		return null
 	},
 	applyChangesAndReplace(osmId: string) {
 		const changeset = changesetCache.get(osmId)

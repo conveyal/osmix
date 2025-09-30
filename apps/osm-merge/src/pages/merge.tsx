@@ -260,11 +260,16 @@ export default function Merge() {
 									task.update(
 										"Generating direct changes from patch OSM to base OSM",
 									)
-									await osmWorker.generateChangeset(base.osm.id, patch.osm.id, {
-										directMerge: true,
-										deduplicateNodes: false,
-										createIntersections: false,
-									})
+									await osmWorker.generateChangeset(
+										base.osm.id,
+										patch.osm.id,
+										{
+											directMerge: true,
+											deduplicateNodes: false,
+											createIntersections: false,
+										},
+										false,
+									)
 									await osmWorker.applyChangesAndReplace(base.osm.id)
 
 									// TODO: add this step back when it is split from the direct merge
@@ -276,11 +281,16 @@ export default function Merge() {
 									// await osmWorker.applyChangesAndReplace(base.osm.id)
 
 									task.update("Creating intersections in base OSM")
-									await osmWorker.generateChangeset(base.osm.id, patch.osm.id, {
-										directMerge: false,
-										deduplicateNodes: false,
-										createIntersections: true,
-									})
+									await osmWorker.generateChangeset(
+										base.osm.id,
+										patch.osm.id,
+										{
+											directMerge: false,
+											deduplicateNodes: false,
+											createIntersections: true,
+										},
+										false,
+									)
 									await osmWorker.applyChangesAndReplace(base.osm.id)
 
 									task.end("All merge steps completed")
