@@ -1,6 +1,7 @@
 import assert from "node:assert"
 import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures"
-import * as turf from "@turf/turf"
+import { featureOf, getCoords, getType } from "@turf/invariant"
+import { coordEach } from "@turf/meta"
 import { describe, it } from "vitest"
 import { createOsmIndexFromPbfData } from "../src"
 import { nodeToFeature, wayToFeature } from "../src/to-geojson"
@@ -18,7 +19,7 @@ describe("geojson", () => {
 			for (const node of osm.nodes) {
 				if (!node.tags || Object.keys(node.tags).length === 0) continue
 				const feature = nodeToFeature(node)
-				turf.featureOf(feature, "Point", "test")
+				featureOf(feature, "Point", "test")
 				assert.equal(feature.type, "Feature")
 				assert.ok(feature.id !== undefined && feature.id !== null)
 				assert.ok(
@@ -46,11 +47,11 @@ describe("geojson", () => {
 					`Duplicate feature id: ${feature.id}`,
 				)
 				seenWayIds.add(feature.id)
-				assert.ok(["LineString", "Polygon"].includes(turf.getType(feature)))
-				const coords = turf.getCoords(feature)
+				assert.ok(["LineString", "Polygon"].includes(getType(feature)))
+				const coords = getCoords(feature)
 				assert.ok(Array.isArray(coords))
 				assert.ok(coords.length > 0)
-				turf.coordEach(feature, (c) => {
+				coordEach(feature, (c) => {
 					assert.ok(Array.isArray(c))
 					assert.ok(c.length === 2)
 				})

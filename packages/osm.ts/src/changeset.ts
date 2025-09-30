@@ -9,7 +9,8 @@ import {
 	type OsmRelation,
 	type OsmWay,
 } from "@osmix/json"
-import { distance, lineIntersect } from "@turf/turf"
+import { distance } from "@turf/distance"
+import { lineIntersect } from "@turf/line-intersect"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
 import { Osm } from "./osm"
 import type { OsmChange, OsmEntityRef } from "./types"

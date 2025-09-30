@@ -20,12 +20,15 @@
 	},
 	"devDependencies": {
 		"@osmix/test-utils": "workspace:*",
+		"@turf/invariant": "7.2.0",
+		"@turf/meta": "7.2.0",
 		"@types/geojson": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	},
 	"dependencies": {
-		"@turf/turf": "catalog:",
+		"@turf/distance": "7.2.0",
+		"@turf/line-intersect": "7.2.0",
 		"dequal": "catalog:",
 		"flatbush": "^4.4.1",
 		"kdbush": "mourner/kdbush#16416cd",

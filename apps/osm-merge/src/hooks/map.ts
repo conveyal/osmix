@@ -7,7 +7,7 @@ import {
 	ScatterplotLayer,
 } from "@deck.gl/layers"
 import { isNode, type OsmEntity } from "@osmix/json"
-import { bboxPolygon } from "@turf/turf"
+import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtomValue, useSetAtom } from "jotai"
 import type { GeoBbox2D, Osm } from "osm.ts"
 import { getEntityGeoJson } from "osm.ts/geojson"

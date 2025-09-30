@@ -1,4 +1,4 @@
-import { bboxPolygon } from "@turf/turf"
+import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtom, useSetAtom } from "jotai"
 import {
 	DownloadIcon,
