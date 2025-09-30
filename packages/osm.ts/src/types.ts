@@ -13,6 +13,12 @@ export type GeoBbox2D = [
 
 export type Rgba = [number, number, number, number] | Uint8ClampedArray
 
+export interface TileIndex {
+	z: number
+	x: number
+	y: number
+}
+
 export interface OsmGeoJSONProperties extends OsmTags {}
 
 export type OsmGeoJSONFeature = GeoJSON.Feature<

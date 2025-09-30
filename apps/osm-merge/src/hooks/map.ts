@@ -1,18 +1,13 @@
-import { COORDINATE_SYSTEM, type Layer as DeckGlLayer } from "@deck.gl/core"
+import type { Layer as DeckGlLayer } from "@deck.gl/core"
 import { type GeoBoundingBox, TileLayer } from "@deck.gl/geo-layers"
-import {
-	BitmapLayer,
-	GeoJsonLayer,
-	PathLayer,
-	ScatterplotLayer,
-} from "@deck.gl/layers"
+import { GeoJsonLayer, PathLayer, ScatterplotLayer } from "@deck.gl/layers"
 import { isNode, type OsmEntity } from "@osmix/json"
 import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtomValue, useSetAtom } from "jotai"
 import type { GeoBbox2D, Osm } from "osm.ts"
 import { getEntityGeoJson } from "osm.ts/geojson"
 import { useCallback, useEffect, useMemo } from "react"
-import { APPID, BITMAP_TILE_SIZE, MIN_PICKABLE_ZOOM } from "@/settings"
+import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
 import { mapAtom } from "@/state/map"
 import {
 	selectedEntityAtom,
@@ -77,62 +72,6 @@ export function useFlyToOsmBounds() {
 	)
 }
 
-const EMPTY_BITMAP = new Uint8Array(BITMAP_TILE_SIZE * BITMAP_TILE_SIZE * 4)
-
-export function useBitmapTileLayer(osm?: Osm | null) {
-	return useMemo(() => {
-		const bbox = osm?.bbox()
-		const osmId = osm?.id
-		if (!osmWorker || !osm || !osmId || !bbox) return null
-		const idPrefix = `${APPID}:${osmId}:tiles`
-		return new TileLayer<Awaited<
-			ReturnType<typeof osmWorker.getTileBitmap>
-		> | null>({
-			id: idPrefix,
-			extent: bbox,
-			getTileData: async (tile) => {
-				const bbox = tile.bbox as GeoBoundingBox
-				const data = await osmWorker.getTileBitmap(
-					osmId,
-					[bbox.west, bbox.south, bbox.east, bbox.north],
-					tile.index,
-					BITMAP_TILE_SIZE,
-				)
-				return data
-			},
-			renderSubLayers: (props) => {
-				const { tile, data } = props
-				if (!data) return null
-				const { x, y, z } = tile.index
-				const tilePrefix = `${idPrefix}:${z}/${x}/${y}`
-				const layers: DeckGlLayer[] = []
-				const tileBbox = tile.bbox as GeoBoundingBox
-
-				if ("bitmap" in data) {
-					layers.push(
-						new BitmapLayer({
-							id: `${tilePrefix}:bitmap`,
-							_imageCoordinateSystem: COORDINATE_SYSTEM.LNGLAT,
-							bounds: [
-								tileBbox.west,
-								tileBbox.south,
-								tileBbox.east,
-								tileBbox.north,
-							],
-							image: {
-								data: data.bitmap ?? EMPTY_BITMAP,
-								width: BITMAP_TILE_SIZE,
-								height: BITMAP_TILE_SIZE,
-							},
-						}),
-					)
-				}
-				return layers
-			},
-		})
-	}, [osm])
-}
-
 export function usePickableOsmTileLayer(osm?: Osm | null) {
 	const startTaskLog = useStartTaskLog()
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
@@ -143,30 +82,12 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 		if (!osmWorker || !osm || !osmId || !bbox) return null
 		const idPrefix = `${APPID}:${osmId}:tiles`
 		return new TileLayer<Awaited<
-			| ReturnType<typeof osmWorker.getTileData>
-			| ReturnType<typeof osmWorker.getTileBitmap>
+			ReturnType<typeof osmWorker.getTileData>
 		> | null>({
 			id: idPrefix,
 			extent: bbox,
 			getTileData: async (tile) => {
-				if (tile.index.z < MIN_PICKABLE_ZOOM) {
-					const taskLog = startTaskLog(
-						`generating bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
-						"debug",
-					)
-					const bbox = tile.bbox as GeoBoundingBox
-					const data = await osmWorker.getTileBitmap(
-						osmId,
-						[bbox.west, bbox.south, bbox.east, bbox.north],
-						tile.index,
-						BITMAP_TILE_SIZE,
-					)
-					taskLog.end(
-						`bitmap for tile ${tile.index.z}/${tile.index.x}/${tile.index.y} generated`,
-						"debug",
-					)
-					return data
-				}
+				if (tile.index.z < MIN_PICKABLE_ZOOM) return null
 
 				// Show pickable data
 				const bbox = tile.bbox as GeoBoundingBox
@@ -197,30 +118,6 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 				const { x, y, z } = tile.index
 				const tilePrefix = `${idPrefix}:${z}/${x}/${y}`
 				const layers: DeckGlLayer[] = []
-				const tileBbox = tile.bbox as GeoBoundingBox
-
-				if ("bitmap" in data) {
-					layers.push(
-						new BitmapLayer({
-							id: `${tilePrefix}:bitmap`,
-							visible: z < MIN_PICKABLE_ZOOM,
-							_imageCoordinateSystem: COORDINATE_SYSTEM.LNGLAT,
-							bounds: [
-								tileBbox.west,
-								tileBbox.south,
-								tileBbox.east,
-								tileBbox.north,
-							],
-							image: {
-								data:
-									data.bitmap ??
-									new Uint8Array(BITMAP_TILE_SIZE * BITMAP_TILE_SIZE * 4),
-								width: BITMAP_TILE_SIZE,
-								height: BITMAP_TILE_SIZE,
-							},
-						}),
-					)
-				}
 
 				if ("ways" in data) {
 					layers.push(

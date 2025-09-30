@@ -13,12 +13,6 @@ export interface LonLat {
 	lat: number
 }
 
-export type TileIndex = {
-	z: number
-	x: number
-	y: number
-}
-
 export interface OsmInfoParsed extends OsmPbfInfo {
 	user?: string
 }

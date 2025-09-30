@@ -17,6 +17,7 @@
         "@deck.gl/mapbox": "9.1.14",
         "@deck.gl/react": "9.1.14",
         "@fontsource-variable/roboto-mono": "^5.2.5",
+        "@mapbox/sphericalmercator": "^2.0.1",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@radix-ui/react-collapsible": "^1.1.12",
@@ -69,6 +70,7 @@
       "name": "osm.ts",
       "version": "0.0.1",
       "dependencies": {
+        "@mapbox/sphericalmercator": "^2.0.1",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@turf/distance": "7.2.0",
@@ -76,6 +78,7 @@
         "dequal": "catalog:",
         "flatbush": "^4.4.1",
         "kdbush": "mourner/kdbush#16416cd",
+        "lineclip": "^2.0.0",
       },
       "devDependencies": {
         "@osmix/test-utils": "workspace:*",
@@ -323,6 +326,8 @@
     "@mapbox/martini": ["@mapbox/martini@0.2.0", "", {}, "sha512-7hFhtkb0KTLEls+TRw/rWayq5EeHtTaErgm/NskVoXmtgAQu/9D299aeyj6mzAR/6XUnYRp2lU+4IcrYRFjVsQ=="],
 
     "@mapbox/point-geometry": ["@mapbox/point-geometry@1.1.0", "", {}, "sha512-YGcBz1cg4ATXDCM/71L9xveh4dynfGmcLDqufR+nQQy3fKwsAZsWd/x4621/6uJaeB9mwOHE6hPeDgXz9uViUQ=="],
+
+    "@mapbox/sphericalmercator": ["@mapbox/sphericalmercator@2.0.1", "", {}, "sha512-k1vM33y0oGIgip01EqdrWEMZLsYj9fP3jH7PZmeSCsCuubTQGjyrOANGSsqh+JtyqydYfXk9VBUVcyabvNTYXg=="],
 
     "@mapbox/tiny-sdf": ["@mapbox/tiny-sdf@2.0.6", "", {}, "sha512-qMqa27TLw+ZQz5Jk+RcwZGH7BQf5G/TrutJhspsca/3SHwmgKQ1iq+d3Jxz5oysPVYTGP6aXxCo5Lk9Er6YBAA=="],
 
@@ -737,6 +742,8 @@
     "lightningcss-win32-arm64-msvc": ["lightningcss-win32-arm64-msvc@1.29.2", "", { "os": "win32", "cpu": "arm64" }, "sha512-nL7zRW6evGQqYVu/bKGK+zShyz8OVzsCotFgc7judbt6wnB2KbiKKJwBE4SGoDBQ1O94RjW4asrCjQL4i8Fhbw=="],
 
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.29.2", "", { "os": "win32", "cpu": "x64" }, "sha512-EdIUW3B2vLuHmv7urfzMI/h2fmlnOQBk1xlsDxkN1tCWKjNFjfLhGxYk8C8mzpSfr+A6jFFIi8fU6LbQGsRWjA=="],
+
+    "lineclip": ["lineclip@2.0.0", "", {}, "sha512-PosanfyLckGXZbCX+aWmfmHWWhVPnLf9iKcUefaSGGw2IBOef5XdBdyl175LEqRy/sEOZ2SEz/l7K5S93BZlYQ=="],
 
     "long": ["long@3.2.0", "", {}, "sha512-ZYvPPOMqUwPoDsbJaR10iQJYnMuZhRTvHYl62ErLIEX7RgFlziSBUUvrt3OVfc47QlHHpzPZYP17g3Fv7oeJkg=="],
 

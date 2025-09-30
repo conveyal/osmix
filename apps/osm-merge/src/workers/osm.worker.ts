@@ -10,6 +10,7 @@ import {
 	throttle,
 } from "osm.ts"
 import * as Performance from "osm.ts/performance"
+import { RASTER_TILE_IMAGE_TYPE, RASTER_TILE_SIZE } from "@/settings"
 import type { StatusType } from "@/state/log"
 
 const osmCache = new Map<string, Osm>()
@@ -35,23 +36,21 @@ const osmWorker = {
 		measure()
 		return osm.transferables()
 	},
-	async getTileBitmap(
-		id: string,
-		bbox: GeoBbox2D,
-		tileIndex: TileIndex,
-		tileSize = 512,
-	) {
+	async getTileImage(id: string, bbox: GeoBbox2D, tileIndex: TileIndex) {
 		const osm = osmCache.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
-		const measure = Performance.createMeasure(
-			`generating tile bitmap ${tileIndex.z}/${tileIndex.x}/${tileIndex.y}`,
+		const rgba = osm.getBitmapForBbox(bbox, tileIndex, RASTER_TILE_SIZE)
+		const canvas = new OffscreenCanvas(RASTER_TILE_SIZE, RASTER_TILE_SIZE)
+		const ctx = canvas.getContext("2d")
+		if (!ctx) throw Error("Failed to get context")
+		ctx.putImageData(
+			new ImageData(rgba, RASTER_TILE_SIZE, RASTER_TILE_SIZE),
+			0,
+			0,
 		)
-		try {
-			const bitmap = osm.getBitmapForBbox(bbox, tileSize)
-			return transfer({ bitmap }, [bitmap.buffer])
-		} finally {
-			measure()
-		}
+		const blob = await canvas.convertToBlob({ type: RASTER_TILE_IMAGE_TYPE })
+		const data = await blob.arrayBuffer()
+		return transfer({ data, contentType: RASTER_TILE_IMAGE_TYPE }, [data])
 	},
 	async getTileData(id: string, bbox: GeoBbox2D) {
 		const osm = osmCache.get(id)

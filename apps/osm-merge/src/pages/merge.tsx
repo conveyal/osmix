@@ -26,6 +26,7 @@ import ChangesSummary, {
 } from "@/components/osm-changes-summary"
 import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
+import OsmixRasterSource from "@/components/osmix-raster-source"
 import { Button } from "@/components/ui/button"
 import useStartTaskLog from "@/hooks/log"
 import {
@@ -615,6 +616,8 @@ export default function Merge() {
 							return null
 						}}
 					/>
+					{base.osm && <OsmixRasterSource osmId={base.osm.id} />}
+					{patch.osm && <OsmixRasterSource osmId={patch.osm.id} />}
 				</Basemap>
 			</MapContent>
 		</Main>

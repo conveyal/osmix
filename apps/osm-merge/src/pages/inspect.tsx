@@ -27,6 +27,7 @@ import ChangesSummary, {
 } from "@/components/osm-changes-summary"
 import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
+import OsmixRasterSource from "@/components/osmix-raster-source"
 import { Button } from "@/components/ui/button"
 import useStartTaskLog from "@/hooks/log"
 import {
@@ -262,6 +263,7 @@ export default function InspectPage() {
 							return null
 						}}
 					/>
+					{osm && <OsmixRasterSource osmId={osm.id} />}
 					{osm && (
 						<CustomControl position="top-left">
 							<EntitySearchControl osm={osm} />
