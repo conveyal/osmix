@@ -42,6 +42,12 @@ import { changesAtom } from "@/state/changes"
 import { selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
 
+const deckTooltipStyle: Partial<CSSStyleDeclaration> = {
+	backgroundColor: "white",
+	padding: "0",
+	color: "var(--slate-950)",
+}
+
 export default function InspectPage() {
 	const [searchParams] = useSearchParams()
 	const osmId = useMemo(
@@ -250,12 +256,14 @@ export default function InspectPage() {
 								if (sourceLayerId.includes("nodes")) {
 									return {
 										className: "deck-tooltip",
+										style: deckTooltipStyle,
 										html: `<h3 className="p-2">node</h3>`,
 									}
 								}
 								if (sourceLayerId.includes("ways")) {
 									return {
 										className: "deck-tooltip",
+										style: deckTooltipStyle,
 										html: `<h3 className="p-2">way</h3>`,
 									}
 								}

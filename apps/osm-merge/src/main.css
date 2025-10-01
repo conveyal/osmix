@@ -2,6 +2,7 @@
 @import "maplibre-gl/dist/maplibre-gl.css";
 @import "tw-animate-css";
 
+/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind custom variant needed for dark mode */
 @custom-variant dark (&:is(.dark *));
 
 /* roboto-mono-latin-wght-normal */
@@ -16,6 +17,7 @@
 		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind theme utilities require this directive */
 @theme inline {
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
@@ -200,10 +202,10 @@ table {
 }
 
 .deck-tooltip {
-	background-color: white !important;
-	padding: 0 !important;
+	background-color: white;
+	padding: 0;
 	max-width: 400px;
-	color: var(--slate-950) !important;
+	color: var(--slate-950);
 	font-variant-numeric: tabular-nums;
 	font-size: 12px;
 	font-family: "Roboto Mono Variable", monospace;
@@ -219,8 +221,7 @@ table {
 		font-size: 12px;
 	}
 	td {
-		@apply border-border;
-		@apply border;
+		border: 1px solid var(--color-border);
 	}
 	td:first-of-type {
 		border-left: none;
