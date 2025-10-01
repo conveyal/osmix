@@ -12,6 +12,9 @@
 	},
 	"linter": {
 		"rules": {
+			"correctness": {
+				"noUnusedImports": "error"
+			},
 			"style": {
 				"noParameterAssign": "error",
 				"useAsConstAssertion": "error",
