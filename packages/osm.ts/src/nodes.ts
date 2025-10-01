@@ -6,18 +6,17 @@ import { type IdOrIndex, Ids } from "./ids"
 import type StringTable from "./stringtable"
 import { Tags } from "./tags"
 import {
-	BufferConstructor,
 	CoordinateArrayType,
+	DefaultBufferConstructor,
 	ResizeableTypedArray,
-	type TypedArrayBuffer,
 } from "./typed-arrays"
 import type { GeoBbox2D } from "./types"
 
 export interface NodesTransferables extends EntitiesTransferables {
-	lons: TypedArrayBuffer
-	lats: TypedArrayBuffer
+	lons: ArrayBufferLike
+	lats: ArrayBufferLike
 	bbox: GeoBbox2D
-	spatialIndex: TypedArrayBuffer
+	spatialIndex: ArrayBufferLike
 }
 
 export class Nodes extends Entities<OsmNode> {
@@ -146,7 +145,7 @@ export class Nodes extends Entities<OsmNode> {
 			this.size,
 			128,
 			Float64Array,
-			BufferConstructor,
+			DefaultBufferConstructor,
 		)
 		for (let i = 0; i < this.size; i++) {
 			this.spatialIndex.add(this.lons.at(i), this.lats.at(i))

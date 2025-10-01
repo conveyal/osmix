@@ -8,7 +8,7 @@ declare module "kdbush" {
 		)
 
 		/** Serialized index data buffer */
-		data: ArrayBuffer | SharedArrayBuffer
+		data: ArrayBufferLike
 
 		/** Add a point before calling finish */
 		add(x: number, y: number): void
@@ -23,6 +23,6 @@ declare module "kdbush" {
 		within(x: number, y: number, radius: number): number[]
 
 		/** Reconstruct an index from a serialized buffer */
-		static from(data: ArrayBuffer | SharedArrayBuffer): KDBush
+		static from(data: ArrayBufferLike): KDBush
 	}
 }

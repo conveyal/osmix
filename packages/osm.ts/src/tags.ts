@@ -1,16 +1,12 @@
 import type { OsmTags } from "@osmix/json"
 import type StringTable from "./stringtable"
-import {
-	IndexArrayType,
-	ResizeableTypedArray,
-	type TypedArrayBuffer,
-} from "./typed-arrays"
+import { IndexArrayType, ResizeableTypedArray } from "./typed-arrays"
 
 export type TagsTransferables = {
-	tagStart: TypedArrayBuffer
-	tagCount: TypedArrayBuffer
-	tagKeys: TypedArrayBuffer
-	tagVals: TypedArrayBuffer
+	tagStart: ArrayBufferLike
+	tagCount: ArrayBufferLike
+	tagKeys: ArrayBufferLike
+	tagVals: ArrayBufferLike
 }
 
 export class Tags {

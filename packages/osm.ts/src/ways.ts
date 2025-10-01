@@ -7,20 +7,19 @@ import type { Nodes } from "./nodes"
 import type StringTable from "./stringtable"
 import { Tags } from "./tags"
 import {
-	BufferConstructor,
 	CoordinateArrayType,
+	DefaultBufferConstructor,
 	IdArrayType,
 	ResizeableTypedArray,
-	type TypedArrayBuffer,
 } from "./typed-arrays"
 import type { GeoBbox2D } from "./types"
 
 export interface WaysTransferables extends EntitiesTransferables {
-	refStart: TypedArrayBuffer
-	refCount: TypedArrayBuffer
-	refs: TypedArrayBuffer
-	bbox: TypedArrayBuffer
-	spatialIndex: TypedArrayBuffer
+	refStart: ArrayBufferLike
+	refCount: ArrayBufferLike
+	refs: ArrayBufferLike
+	bbox: ArrayBufferLike
+	spatialIndex: ArrayBufferLike
 }
 
 export class Ways extends Entities<OsmWay> {
@@ -113,7 +112,7 @@ export class Ways extends Entities<OsmWay> {
 			this.size,
 			128,
 			Float64Array,
-			BufferConstructor,
+			DefaultBufferConstructor,
 		)
 		for (let i = 0; i < this.size; i++) {
 			let minX = Number.POSITIVE_INFINITY

@@ -1,19 +1,18 @@
 import {
-	BufferConstructor,
+	DefaultBufferConstructor,
 	IdArrayType,
 	ResizeableTypedArray,
-	type TypedArrayBuffer,
 } from "./typed-arrays"
 
 export type IdOrIndex = { id: number } | { index: number }
 
 const BLOCK_SIZE = 256
 
-export type IdsTransferables = {
-	ids: TypedArrayBuffer
-	sortedIds: TypedArrayBuffer
-	sortedIdPositionToIndex: TypedArrayBuffer
-	anchors: TypedArrayBuffer
+export interface IdsTransferables {
+	ids: ArrayBufferLike
+	sortedIds: ArrayBufferLike
+	sortedIdPositionToIndex: ArrayBufferLike
+	anchors: ArrayBufferLike
 	idsAreSorted: boolean
 }
 
@@ -128,7 +127,9 @@ export class Ids {
 
 		// Build anchors (every blockSize-th key)
 		const aLen = Math.ceil(this.size / BLOCK_SIZE)
-		const sab = new BufferConstructor(aLen * Float64Array.BYTES_PER_ELEMENT)
+		const sab = new DefaultBufferConstructor(
+			aLen * Float64Array.BYTES_PER_ELEMENT,
+		)
 		this.anchors = new Float64Array(sab, 0, aLen)
 		for (let j = 0; j < aLen; j++) {
 			this.anchors[j] = this.idsSorted[Math.min(j * BLOCK_SIZE, this.size - 1)]

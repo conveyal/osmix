@@ -9,20 +9,16 @@ import { Entities, type EntitiesTransferables } from "./entities"
 import { Ids } from "./ids"
 import type StringTable from "./stringtable"
 import { Tags } from "./tags"
-import {
-	IdArrayType,
-	ResizeableTypedArray,
-	type TypedArrayBuffer,
-} from "./typed-arrays"
+import { IdArrayType, ResizeableTypedArray } from "./typed-arrays"
 
 const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
 
 export interface RelationsTransferables extends EntitiesTransferables {
-	memberStart: TypedArrayBuffer
-	memberCount: TypedArrayBuffer
-	memberRefs: TypedArrayBuffer
-	memberTypes: TypedArrayBuffer
-	memberRoles: TypedArrayBuffer
+	memberStart: ArrayBufferLike
+	memberCount: ArrayBufferLike
+	memberRefs: ArrayBufferLike
+	memberTypes: ArrayBufferLike
+	memberRoles: ArrayBufferLike
 }
 
 export class Relations extends Entities<OsmRelation> {
