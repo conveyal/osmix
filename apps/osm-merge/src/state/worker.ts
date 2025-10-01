@@ -1,4 +1,6 @@
+import { proxy } from "comlink"
 import { createOsmWorker } from "@/workers/osm"
+import { Log } from "./log"
 
 declare global {
 	interface Window {
@@ -7,5 +9,7 @@ declare global {
 }
 
 export const osmWorker = createOsmWorker()
+
+osmWorker.subscribeToLog(proxy(Log.addMessage))
 
 window.osmWorker = osmWorker

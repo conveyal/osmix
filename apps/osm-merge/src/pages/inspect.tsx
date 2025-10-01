@@ -29,7 +29,6 @@ import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
 import { Button } from "@/components/ui/button"
-import useStartTaskLog from "@/hooks/log"
 import {
 	useFlyToEntity,
 	useFlyToOsmBounds,
@@ -39,6 +38,7 @@ import {
 import { useOsmFile } from "@/hooks/osm"
 import { APPID } from "@/settings"
 import { changesAtom } from "@/state/changes"
+import { Log } from "@/state/log"
 import { selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
 
@@ -70,7 +70,6 @@ export default function InspectPage() {
 	const selectedEntityLayer = useSelectedEntityLayer()
 
 	const [isTransitioning, startTransition] = useTransition()
-	const startTask = useStartTaskLog()
 
 	const [duplicateNodesAndWays, setDuplicateNodesAndWays] = useAtom(changesAtom)
 
@@ -81,32 +80,29 @@ export default function InspectPage() {
 		}
 	}, [osm, selectEntity, setDuplicateNodesAndWays])
 
-	const downloadOsm = useCallback(
-		async (osm: Osm, name?: string) => {
-			startTransition(async () => {
-				const task = startTask("Generating OSM file to download")
-				const suggestedName =
-					name ?? (osm.id.endsWith(".pbf") ? osm.id : `${osm.id}.pbf`)
-				const fileHandle = await showSaveFilePicker({
-					suggestedName,
-					types: [
-						{
-							description: "OSM PBF",
-							accept: { "application/x-protobuf": [".pbf"] },
-						},
-					],
-				})
-				const stream = await fileHandle.createWritable()
-				await writeOsmToPbfStream(osm, stream)
-				task.end(`Created ${fileHandle.name} PBF for download`)
+	const downloadOsm = useCallback(async (osm: Osm, name?: string) => {
+		startTransition(async () => {
+			const task = Log.startTask("Generating OSM file to download")
+			const suggestedName =
+				name ?? (osm.id.endsWith(".pbf") ? osm.id : `${osm.id}.pbf`)
+			const fileHandle = await showSaveFilePicker({
+				suggestedName,
+				types: [
+					{
+						description: "OSM PBF",
+						accept: { "application/x-protobuf": [".pbf"] },
+					},
+				],
 			})
-		},
-		[startTask],
-	)
+			const stream = await fileHandle.createWritable()
+			await writeOsmToPbfStream(osm, stream)
+			task.end(`Created ${fileHandle.name} PBF for download`)
+		})
+	}, [])
 
 	const applyChanges = useCallback(
 		async (osmId: string) => {
-			const task = startTask("Applying changes to OSM...")
+			const task = Log.startTask("Applying changes to OSM...")
 			startTransition(async () => {
 				const transferables = await osmWorker.applyChangesAndReplace(osmId)
 				task.update("Refreshing OSM index...")
@@ -115,7 +111,7 @@ export default function InspectPage() {
 				task.end("Changes applied!")
 			})
 		},
-		[setOsm, startTask],
+		[setOsm],
 	)
 
 	const hasZeroChanges = useMemo(() => {
@@ -174,9 +170,8 @@ export default function InspectPage() {
 								<Button
 									onClick={() => {
 										startTransition(async () => {
-											const task = startTask(
+											const task = Log.startTask(
 												"Finding duplicate nodes and ways",
-												"info",
 											)
 											const changes = await osmWorker.dedupeNodesAndWays(osmId)
 											setDuplicateNodesAndWays(changes)

@@ -8,6 +8,7 @@ import type { GeoBbox2D, Osm } from "osm.ts"
 import { getEntityGeoJson } from "osm.ts/geojson"
 import { useCallback, useEffect, useMemo } from "react"
 import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
+import { Log } from "@/state/log"
 import { mapAtom } from "@/state/map"
 import {
 	selectedEntityAtom,
@@ -15,7 +16,6 @@ import {
 	selectOsmEntityAtom,
 } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
-import useStartTaskLog from "./log"
 
 export function useFitBoundsOnChange(bbox?: GeoBbox2D) {
 	const map = useAtomValue(mapAtom)
@@ -73,7 +73,6 @@ export function useFlyToOsmBounds() {
 }
 
 export function usePickableOsmTileLayer(osm?: Osm | null) {
-	const startTaskLog = useStartTaskLog()
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 
 	const layer = useMemo(() => {
@@ -91,7 +90,7 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 
 				// Show pickable data
 				const bbox = tile.bbox as GeoBoundingBox
-				const taskLog = startTaskLog(
+				const taskLog = Log.startTask(
 					`generating data for tile ${tile.index.z}/${tile.index.x}/${tile.index.y}`,
 					"debug",
 				)
@@ -211,7 +210,7 @@ export function usePickableOsmTileLayer(osm?: Osm | null) {
 				return layers
 			},
 		})
-	}, [osm, selectEntity, startTaskLog])
+	}, [osm, selectEntity])
 
 	return layer
 }

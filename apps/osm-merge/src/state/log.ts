@@ -1,6 +1,3 @@
-import { atom } from "jotai"
-import { activeTasksAtom } from "./status"
-
 export type StatusType = "info" | "debug" | "ready" | "error"
 
 export type Status = {
@@ -17,25 +14,37 @@ const INITIAL_STATUS: Status = {
 	timestamp: Date.now(),
 }
 
-export const logAtom = atom<Status[]>([INITIAL_STATUS])
+function createLog() {
+	const listeners = new Set<() => void>()
+	let log: Status[] = [INITIAL_STATUS]
+	let activeTasks = 0
+	let state = { activeTasks, log }
 
-export const addLogMessageAtom = atom(
-	null,
-	(
-		get,
-		set,
+	const emitChange = () => {
+		state = { activeTasks, log }
+		for (const listener of listeners) {
+			listener()
+		}
+	}
+	const subscribe = (fn: () => void) => {
+		listeners.add(fn)
+		return function unsubscribe() {
+			listeners.delete(fn)
+		}
+	}
+	const getSnapshot = () => state
+	const addMessage = (
 		message: string,
 		type: Status["type"] = "info",
 		durationMs?: number,
 	) => {
-		const log = get(logAtom)
 		const msSinceLastLog = Date.now() - log[log.length - 1].timestamp
 		if (type === "error") {
 			console.error(message)
 		} else {
 			console.log(`${type}:`, message)
 		}
-		set(logAtom, [
+		log = [
 			...log,
 			{
 				type,
@@ -43,31 +52,32 @@ export const addLogMessageAtom = atom(
 				duration: durationMs ?? msSinceLastLog,
 				timestamp: Date.now(),
 			},
-		])
-	},
-)
-
-export const currentStatusAtom = atom((get) => {
-	const log = get(logAtom)
-	// don't show the debug logs in the status bar
-	return log.findLast((l) => l.type !== "debug") ?? INITIAL_STATUS
-})
-
-export const startTaskLogAtom = atom(
-	null,
-	(_, set, message: string, type: Status["type"] = "info") => {
+		]
+		emitChange()
+	}
+	const startTask = (message: string, type: Status["type"] = "info") => {
+		activeTasks++
 		const starTime = performance.now()
-		set(activeTasksAtom, (t) => t + 1)
-		set(addLogMessageAtom, message, type)
+		addMessage(message, type)
 		return {
 			update: (message: string, type: Status["type"] = "info") => {
-				set(addLogMessageAtom, message, type)
+				addMessage(message, type)
 			},
 			end: (message: string, type: Status["type"] = "info") => {
+				activeTasks--
 				const durationMs = performance.now() - starTime
-				set(activeTasksAtom, (t) => t - 1)
-				set(addLogMessageAtom, message, type, durationMs)
+				addMessage(message, type, durationMs)
 			},
 		}
-	},
-)
+	}
+
+	return {
+		emitChange,
+		subscribe,
+		getSnapshot,
+		addMessage,
+		startTask,
+	}
+}
+
+export const Log = createLog()

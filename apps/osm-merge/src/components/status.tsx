@@ -1,19 +1,17 @@
-import { useAtomValue } from "jotai"
 import { Loader2Icon } from "lucide-react"
-import { useHasActiveTasks } from "@/hooks/log"
+import { useLog } from "@/hooks/log"
 import { cn } from "@/lib/utils"
-import { currentStatusAtom } from "@/state/log"
 import { formatTimestampMs } from "@/utils"
 import LogContent from "./log"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card"
 
 export default function Status() {
-	const isActive = useHasActiveTasks()
-	const status = useAtomValue(currentStatusAtom)
+	const { log, activeTasks } = useLog()
+	const status = log[log.length - 1]
 	return (
 		<HoverCard openDelay={0}>
 			<HoverCardTrigger className="flex flex-row gap-2 items-center no-underline">
-				{isActive ? (
+				{activeTasks > 0 ? (
 					<Loader2Icon className="animate-spin size-4" />
 				) : (
 					<div

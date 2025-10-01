@@ -2,9 +2,9 @@ import * as Comlink from "comlink"
 import { useAtom, useAtomValue } from "jotai"
 import { Osm } from "osm.ts"
 import { useEffect, useMemo, useState } from "react"
+import { Log } from "@/state/log"
 import { osmAtomFamily, osmFileAtomFamily } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
-import useStartTaskLog from "./log"
 import { useFitBoundsOnChange } from "./map"
 
 export function useOsm(id: string) {
@@ -16,7 +16,6 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 	const [file, setFile] = useAtom(osmFileAtomFamily(id))
 	const [osm, setOsm] = useAtom(osmAtomFamily(id))
 	const [isLoading, setIsLoading] = useState(false)
-	const startTaskLog = useStartTaskLog()
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 
 	useFitBoundsOnChange(bbox)
@@ -38,7 +37,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 	useEffect(() => {
 		setOsm(null)
 		if (!file) return
-		const taskLog = startTaskLog(`Processing file ${file.name}...`)
+		const taskLog = Log.startTask(`Processing file ${file.name}...`)
 		const stream = file.stream()
 		setIsLoading(true)
 		osmWorker
@@ -54,7 +53,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 			.finally(() => {
 				setIsLoading(false)
 			})
-	}, [file, id, setOsm, startTaskLog])
+	}, [file, id, setOsm])
 
 	return { file, setFile, osm, setOsm, isLoading }
 }

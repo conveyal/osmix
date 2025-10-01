@@ -28,7 +28,6 @@ import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
 import { Button } from "@/components/ui/button"
-import useStartTaskLog from "@/hooks/log"
 import {
 	useFlyToEntity,
 	usePickableOsmTileLayer,
@@ -37,6 +36,7 @@ import {
 import { useOsmFile } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { changesAtom } from "@/state/changes"
+import { Log } from "@/state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
 
@@ -71,7 +71,6 @@ export default function Merge() {
 	const patch = useOsmFile("patch")
 	const [isTransitioning, startTransition] = useTransition()
 	const [changes, setChanges] = useAtom(changesAtom)
-	const startTaskLog = useStartTaskLog()
 	const flyToEntity = useFlyToEntity()
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
@@ -122,19 +121,19 @@ export default function Merge() {
 	const startStepTask = useCallback(
 		(message: string, fn: () => Promise<string>) => {
 			nextStep()
-			const task = startTaskLog(message)
+			const task = Log.startTask(message)
 			startTransition(async () => {
 				const endMessage = await fn()
 				task.end(endMessage)
 			})
 		},
-		[nextStep, startTaskLog],
+		[nextStep],
 	)
 
 	const downloadJsonChanges = useCallback(async () => {
 		if (!changes) return
 		startTransition(async () => {
-			const task = startTaskLog("Converting changeset to JSON", "info")
+			const task = Log.startTask("Converting changeset to JSON")
 			const json = JSON.stringify(changes, null, 2)
 			const fileHandle = await showSaveFilePicker({
 				suggestedName: "osm-changes.json",
@@ -145,20 +144,17 @@ export default function Merge() {
 			stream.close()
 			task.end("Changeset converted to JSON", "ready")
 		})
-	}, [changes, startTaskLog])
+	}, [changes])
 
-	const applyChanges = useCallback(
-		async (changes: OsmChanges) => {
-			const task = startTaskLog("Applying changes to OSM", "info")
+	const applyChanges = useCallback(async (changes: OsmChanges) => {
+		const task = Log.startTask("Applying changes to OSM")
 
-			const newOsm = Osm.from(
-				await osmWorker.applyChangesAndReplace(changes.osmId),
-			)
-			task.end("Changes applied", "ready")
-			return newOsm
-		},
-		[startTaskLog],
-	)
+		const newOsm = Osm.from(
+			await osmWorker.applyChangesAndReplace(changes.osmId),
+		)
+		task.end("Changes applied", "ready")
+		return newOsm
+	}, [])
 
 	const hasZeroChanges = useMemo(() => {
 		if (!changes) return true
@@ -249,7 +245,7 @@ export default function Merge() {
 							disabled={isTransitioning || !base.osm || !patch.osm}
 							onClick={() => {
 								goToStep("inspect-final-osm")
-								const task = startTaskLog(
+								const task = Log.startTask(
 									"Running all merge steps, please wait...",
 								)
 								startTransition(async () => {
@@ -726,7 +722,6 @@ function DownloadOsmButton({
 	osm,
 	...props
 }: React.ComponentProps<typeof Button> & { osm: Osm }) {
-	const startTask = useStartTaskLog()
 	const [isTransitioning, startTransition] = useTransition()
 	return (
 		<Button
@@ -734,7 +729,7 @@ function DownloadOsmButton({
 			onClick={(e) => {
 				e.preventDefault()
 				startTransition(async () => {
-					const task = startTask("Generating OSM file to download", "info")
+					const task = Log.startTask("Generating OSM file to download", "info")
 					const suggestedName = osm.id.endsWith(".pbf")
 						? osm.id
 						: `${osm.id}.pbf`
