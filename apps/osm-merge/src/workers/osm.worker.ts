@@ -45,16 +45,25 @@ const osmWorker = {
 		const osm = osmCache.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
 
-		const rasterTile = new OsmixRasterTile(bbox, tileIndex, RASTER_TILE_SIZE)
-		rasterTile.drawWays(osm.ways, osm.nodes)
+		const rasterTile = new OsmixRasterTile(
+			osm,
+			bbox,
+			tileIndex,
+			RASTER_TILE_SIZE,
+		)
+		rasterTile.drawWays()
 		if (tileIndex.z >= MIN_NODE_ZOOM) {
-			rasterTile.drawNodes(osm.nodes)
+			rasterTile.drawNodes()
 		}
-		const canvas = new OffscreenCanvas(RASTER_TILE_SIZE, RASTER_TILE_SIZE)
+		const canvas = new OffscreenCanvas(rasterTile.tileSize, rasterTile.tileSize)
 		const ctx = canvas.getContext("2d")
 		if (!ctx) throw Error("Failed to get context")
 		ctx.putImageData(
-			new ImageData(rasterTile.data, RASTER_TILE_SIZE, RASTER_TILE_SIZE),
+			new ImageData(
+				rasterTile.imageData,
+				rasterTile.tileSize,
+				rasterTile.tileSize,
+			),
 			0,
 			0,
 		)

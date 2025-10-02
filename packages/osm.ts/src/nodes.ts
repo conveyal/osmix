@@ -181,10 +181,7 @@ export class Nodes extends Entities<OsmNode> {
 
 	// Spatial operations
 	withinBbox(bbox: GeoBbox2D): number[] {
-		console.time("NodeIndex.withinBbox")
-		const results = this.spatialIndex.range(bbox[0], bbox[1], bbox[2], bbox[3])
-		console.timeEnd("NodeIndex.withinBbox")
-		return results
+		return this.spatialIndex.range(bbox[0], bbox[1], bbox[2], bbox[3])
 	}
 
 	withinRadius(x: number, y: number, radius: number): number[] {

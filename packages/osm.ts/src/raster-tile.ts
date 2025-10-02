@@ -1,22 +1,28 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import { clipPolyline } from "lineclip"
-import type { Nodes } from "./nodes"
+import type { Osm } from "./osm"
 import type { GeoBbox2D, Rgba, TileIndex } from "./types"
-import type { Ways } from "./ways"
 
 const DEFAULT_COLOR: Rgba = [255, 255, 255, 255] // white
 
 export class OsmixRasterTile {
+	osm: Osm
 	bbox: GeoBbox2D
-	data: Uint8ClampedArray
+	imageData: Uint8ClampedArray
 	tileSize: number
 	tileIndex: TileIndex
 	merc: SphericalMercator
 
-	constructor(bbox: GeoBbox2D, tileIndex: TileIndex, tileSize: number) {
+	constructor(
+		osm: Osm,
+		bbox: GeoBbox2D,
+		tileIndex: TileIndex,
+		tileSize: number,
+	) {
+		this.osm = osm
 		this.bbox = bbox
 		this.tileSize = tileSize
-		this.data = new Uint8ClampedArray(tileSize * tileSize * 4)
+		this.imageData = new Uint8ClampedArray(tileSize * tileSize * 4)
 		this.tileIndex = tileIndex
 		this.merc = new SphericalMercator({ size: tileSize })
 	}
@@ -43,10 +49,10 @@ export class OsmixRasterTile {
 	setPixel(x: number, y: number, color: Rgba = DEFAULT_COLOR) {
 		if (x < 0 || x >= this.tileSize || y < 0 || y >= this.tileSize) return
 		const idx = (y * this.tileSize + x) * 4
-		this.data[idx] = color[0]
-		this.data[idx + 1] = color[1]
-		this.data[idx + 2] = color[2]
-		this.data[idx + 3] = color[3]
+		this.imageData[idx] = color[0]
+		this.imageData[idx + 1] = color[1]
+		this.imageData[idx + 2] = color[2]
+		this.imageData[idx + 3] = color[3]
 	}
 
 	drawLine(
@@ -66,10 +72,10 @@ export class OsmixRasterTile {
 
 		while (true) {
 			const idx = (y * this.tileSize + x) * 4
-			this.data[idx] = color[0]
-			this.data[idx + 1] = color[1]
-			this.data[idx + 2] = color[2]
-			this.data[idx + 3] = color[3]
+			this.imageData[idx] = color[0]
+			this.imageData[idx + 1] = color[1]
+			this.imageData[idx + 2] = color[2]
+			this.imageData[idx + 3] = color[3]
 			if (x === x1 && y === y1) break
 			const e2 = 2 * err
 			if (e2 > -dy) {
@@ -100,23 +106,26 @@ export class OsmixRasterTile {
 		}
 	}
 
-	drawWays(ways: Ways, nodes: Nodes) {
-		const wayCandidates = ways.intersects(this.bbox)
-		console.time("OsmixRasterTile.drawWays")
-		for (const wayIndex of wayCandidates) {
-			this.drawWay(ways.getCoordinates(wayIndex, nodes))
-		}
-		console.timeEnd("OsmixRasterTile.drawWays")
+	drawWays() {
+		const timer = `OsmixRasterTile.drawWays:${this.tileIndex.z}/${this.tileIndex.x}/${this.tileIndex.y}`
+		console.time(timer)
+		this.osm.ways.intersects(this.bbox, (wayIndex) => {
+			this.drawWay(this.osm.ways.getCoordinates(wayIndex, this.osm.nodes))
+			return false
+		})
+		console.timeEnd(timer)
 	}
 
-	drawNodes(nodes: Nodes) {
-		const nodeCandidates = nodes.withinBbox(this.bbox)
-		console.time("Osm.getBitmapForBbox.nodes")
+	drawNodes() {
+		const timer = `OsmixRasterTile.drawNodes:${this.tileIndex.z}/${this.tileIndex.x}/${this.tileIndex.y}`
+		console.time(timer)
+		const nodeCandidates = this.osm.nodes.withinBbox(this.bbox)
+
 		for (const nodeIndex of nodeCandidates) {
-			if (!nodes.tags.hasTags(nodeIndex)) continue
-			const [lon, lat] = nodes.getNodeLonLat({ index: nodeIndex })
+			if (!this.osm.nodes.tags.hasTags(nodeIndex)) continue
+			const [lon, lat] = this.osm.nodes.getNodeLonLat({ index: nodeIndex })
 			this.setLonLat(lon, lat, [255, 0, 0, 255])
 		}
-		console.timeEnd("Osm.getBitmapForBbox.nodes")
+		console.timeEnd(timer)
 	}
 }

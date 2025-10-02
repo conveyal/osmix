@@ -205,8 +205,14 @@ export class Ways extends Entities<OsmWay> {
 		return coords
 	}
 
-	intersects(bbox: GeoBbox2D): number[] {
-		return this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3])
+	intersects(bbox: GeoBbox2D, filterFn?: (index: number) => boolean): number[] {
+		return this.spatialIndex.search(
+			bbox[0],
+			bbox[1],
+			bbox[2],
+			bbox[3],
+			filterFn,
+		)
 	}
 
 	neighbors(

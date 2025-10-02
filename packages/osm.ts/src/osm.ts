@@ -12,11 +12,10 @@ import {
 } from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf"
 import { Nodes, type NodesTransferables } from "./nodes"
-import { OsmixRasterTile } from "./raster-tile"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { IdArrayType } from "./typed-arrays"
-import type { GeoBbox2D, TileIndex } from "./types"
+import type { GeoBbox2D } from "./types"
 import { bboxFromLonLats } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
@@ -210,30 +209,6 @@ export class Osm {
 			positions: wayPositionsArray,
 			startIndices: wayStartIndices,
 		}
-	}
-
-	getBitmapForBbox(bbox: GeoBbox2D, tileIndex: TileIndex, tileSize = 512) {
-		console.time("Osm.getBitmapForBbox")
-		const rasterTile = new OsmixRasterTile(bbox, tileIndex, tileSize)
-
-		const wayCandidates = this.ways.intersects(bbox)
-		console.time("Osm.getBitmapForBbox.ways")
-		for (const wayIndex of wayCandidates) {
-			rasterTile.drawWay(this.ways.getCoordinates(wayIndex, this.nodes))
-		}
-		console.timeEnd("Osm.getBitmapForBbox.ways")
-
-		const nodeCandidates = this.nodes.withinBbox(bbox)
-		console.time("Osm.getBitmapForBbox.nodes")
-		for (const nodeIndex of nodeCandidates) {
-			if (!this.nodes.tags.hasTags(nodeIndex)) continue
-			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
-			rasterTile.setLonLat(lon, lat, [255, 0, 0, 255])
-		}
-		console.timeEnd("Osm.getBitmapForBbox.nodes")
-
-		console.timeEnd("Osm.getBitmapForBbox")
-		return rasterTile.data
 	}
 
 	getEntityBbox(entity: OsmNode | OsmWay | OsmRelation): GeoBbox2D {
