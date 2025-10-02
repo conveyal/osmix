@@ -1,6 +1,6 @@
 import {
-	DefaultBufferConstructor,
-	IdArrayType,
+	BufferConstructor,
+	type BufferType,
 	ResizeableTypedArray,
 } from "./typed-arrays"
 
@@ -9,10 +9,10 @@ export type IdOrIndex = { id: number } | { index: number }
 const BLOCK_SIZE = 256
 
 export interface IdsTransferables {
-	ids: ArrayBufferLike
-	sortedIds: ArrayBufferLike
-	sortedIdPositionToIndex: ArrayBufferLike
-	anchors: ArrayBufferLike
+	ids: BufferType
+	sortedIds: BufferType
+	sortedIdPositionToIndex: BufferType
+	anchors: BufferType
 	idsAreSorted: boolean
 }
 
@@ -23,12 +23,12 @@ export interface IdsTransferables {
  * Maps max out at 2^32 IDs.
  */
 export class Ids {
-	private ids = new ResizeableTypedArray(IdArrayType)
+	private ids: ResizeableTypedArray<Float64Array>
 	private indexBuilt = false
 	private idsAreSorted = true
-	private idsSorted: Float64Array = new Float64Array(0)
-	private sortedIdPositionToIndex: Uint32Array = new Uint32Array(0)
-	private anchors: Float64Array = new Float64Array(0)
+	private idsSorted: Float64Array
+	private sortedIdPositionToIndex: Uint32Array
+	private anchors: Float64Array
 
 	static from({
 		ids,
@@ -38,13 +38,20 @@ export class Ids {
 		idsAreSorted,
 	}: IdsTransferables) {
 		const idIndex = new Ids()
-		idIndex.ids = ResizeableTypedArray.from(IdArrayType, ids)
+		idIndex.ids = ResizeableTypedArray.from(Float64Array, ids)
 		idIndex.idsSorted = new Float64Array(sortedIds)
 		idIndex.sortedIdPositionToIndex = new Uint32Array(sortedIdPositionToIndex)
 		idIndex.anchors = new Float64Array(anchors)
 		idIndex.indexBuilt = true
 		idIndex.idsAreSorted = idsAreSorted
 		return idIndex
+	}
+
+	constructor() {
+		this.ids = new ResizeableTypedArray(Float64Array)
+		this.idsSorted = new Float64Array(new BufferConstructor(0))
+		this.sortedIdPositionToIndex = new Uint32Array(new BufferConstructor(0))
+		this.anchors = new Float64Array(new BufferConstructor(0))
 	}
 
 	transferables(): IdsTransferables {
@@ -95,8 +102,14 @@ export class Ids {
 		if (!this.idsAreSorted) {
 			console.warn("IDs were not sorted. Sorting now...")
 			// Build the sorted index
-			this.idsSorted = new Float64Array(this.size)
-			this.sortedIdPositionToIndex = new Uint32Array(this.size)
+			const idsBuffer = new BufferConstructor(
+				this.size * Float64Array.BYTES_PER_ELEMENT,
+			)
+			const posBuffer = new BufferConstructor(
+				this.size * Uint32Array.BYTES_PER_ELEMENT,
+			)
+			this.idsSorted = new Float64Array(idsBuffer)
+			this.sortedIdPositionToIndex = new Uint32Array(posBuffer)
 
 			// Fill and sort with positions.
 			for (let i = 0; i < this.size; i++) {
@@ -119,7 +132,10 @@ export class Ids {
 			// Point to the same array
 			this.idsSorted = this.ids.array
 			// Create the sortedIdPositionToIndex array
-			this.sortedIdPositionToIndex = new Uint32Array(this.size)
+			const posBuffer = new BufferConstructor(
+				this.size * Uint32Array.BYTES_PER_ELEMENT,
+			)
+			this.sortedIdPositionToIndex = new Uint32Array(posBuffer)
 			for (let i = 0; i < this.size; i++) {
 				this.sortedIdPositionToIndex[i] = i
 			}
@@ -127,9 +143,7 @@ export class Ids {
 
 		// Build anchors (every blockSize-th key)
 		const aLen = Math.ceil(this.size / BLOCK_SIZE)
-		const sab = new DefaultBufferConstructor(
-			aLen * Float64Array.BYTES_PER_ELEMENT,
-		)
+		const sab = new BufferConstructor(aLen * Float64Array.BYTES_PER_ELEMENT)
 		this.anchors = new Float64Array(sab, 0, aLen)
 		for (let j = 0; j < aLen; j++) {
 			this.anchors[j] = this.idsSorted[Math.min(j * BLOCK_SIZE, this.size - 1)]

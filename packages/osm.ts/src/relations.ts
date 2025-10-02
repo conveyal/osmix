@@ -9,26 +9,30 @@ import { Entities, type EntitiesTransferables } from "./entities"
 import { Ids } from "./ids"
 import type StringTable from "./stringtable"
 import { Tags } from "./tags"
-import { IdArrayType, ResizeableTypedArray } from "./typed-arrays"
+import {
+	type BufferType,
+	IdArrayType,
+	ResizeableTypedArray,
+} from "./typed-arrays"
 
 const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
 
 export interface RelationsTransferables extends EntitiesTransferables {
-	memberStart: ArrayBufferLike
-	memberCount: ArrayBufferLike
-	memberRefs: ArrayBufferLike
-	memberTypes: ArrayBufferLike
-	memberRoles: ArrayBufferLike
+	memberStart: BufferType
+	memberCount: BufferType
+	memberRefs: BufferType
+	memberTypes: BufferType
+	memberRoles: BufferType
 }
 
 export class Relations extends Entities<OsmRelation> {
-	memberStart = new ResizeableTypedArray(Uint32Array)
-	memberCount = new ResizeableTypedArray(Uint16Array) // Maximum 65,535 members per relation
+	memberStart: ResizeableTypedArray<Uint32Array>
+	memberCount: ResizeableTypedArray<Uint16Array> // Maximum 65,535 members per relation
 
 	// Store the ID of the member because relations have other relations as members.
-	memberRefs = new ResizeableTypedArray(IdArrayType)
-	memberTypes = new ResizeableTypedArray(Uint8Array)
-	memberRoles = new ResizeableTypedArray(Uint32Array)
+	memberRefs: ResizeableTypedArray<Float64Array>
+	memberTypes: ResizeableTypedArray<Uint8Array>
+	memberRoles: ResizeableTypedArray<Uint32Array>
 
 	static from(stringTable: StringTable, rit: RelationsTransferables) {
 		const idIndex = Ids.from(rit)
@@ -44,6 +48,11 @@ export class Relations extends Entities<OsmRelation> {
 
 	constructor(stringTable: StringTable, idIndex?: Ids, tagIndex?: Tags) {
 		super("relation", stringTable, idIndex, tagIndex)
+		this.memberStart = new ResizeableTypedArray(Uint32Array)
+		this.memberCount = new ResizeableTypedArray(Uint16Array)
+		this.memberRefs = new ResizeableTypedArray(IdArrayType)
+		this.memberTypes = new ResizeableTypedArray(Uint8Array)
+		this.memberRoles = new ResizeableTypedArray(Uint32Array)
 	}
 
 	transferables(): RelationsTransferables {

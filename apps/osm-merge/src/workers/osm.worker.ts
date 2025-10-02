@@ -5,12 +5,17 @@ import {
 	type Osm,
 	type OsmChanges,
 	OsmChangeset,
+	OsmixRasterTile,
 	type OsmMergeOptions,
 	type TileIndex,
 	throttle,
 } from "osm.ts"
 import * as Performance from "osm.ts/performance"
-import { RASTER_TILE_IMAGE_TYPE, RASTER_TILE_SIZE } from "@/settings"
+import {
+	MIN_NODE_ZOOM,
+	RASTER_TILE_IMAGE_TYPE,
+	RASTER_TILE_SIZE,
+} from "@/settings"
 import type { StatusType } from "@/state/log"
 
 const osmCache = new Map<string, Osm>()
@@ -39,12 +44,17 @@ const osmWorker = {
 	async getTileImage(id: string, bbox: GeoBbox2D, tileIndex: TileIndex) {
 		const osm = osmCache.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
-		const rgba = osm.getBitmapForBbox(bbox, tileIndex, RASTER_TILE_SIZE)
+
+		const rasterTile = new OsmixRasterTile(bbox, tileIndex, RASTER_TILE_SIZE)
+		rasterTile.drawWays(osm.ways, osm.nodes)
+		if (tileIndex.z >= MIN_NODE_ZOOM) {
+			rasterTile.drawNodes(osm.nodes)
+		}
 		const canvas = new OffscreenCanvas(RASTER_TILE_SIZE, RASTER_TILE_SIZE)
 		const ctx = canvas.getContext("2d")
 		if (!ctx) throw Error("Failed to get context")
 		ctx.putImageData(
-			new ImageData(rgba, RASTER_TILE_SIZE, RASTER_TILE_SIZE),
+			new ImageData(rasterTile.data, RASTER_TILE_SIZE, RASTER_TILE_SIZE),
 			0,
 			0,
 		)

@@ -1,19 +1,13 @@
-type BufferConstructorType =
-	| SharedArrayBufferConstructor
-	| ArrayBufferConstructor
-
 /**
- * Use SharedArrayBuffer if the browser supports it and is cross-origin isolated,
- * otherwise fall back to ArrayBuffer.
+ * Use SharedArrayBuffer if the runtime supports it, otherwise fall back to ArrayBuffer.
  */
-export const DefaultBufferConstructor: BufferConstructorType =
-	typeof SharedArrayBuffer !== "undefined" &&
-	globalThis.crossOriginIsolated &&
-	globalThis.isSecureContext
-		? SharedArrayBuffer
-		: ArrayBuffer
+export const BufferConstructor =
+	typeof SharedArrayBuffer !== "undefined"
+		? (SharedArrayBuffer as SharedArrayBufferConstructor)
+		: (ArrayBuffer as ArrayBufferConstructor)
+export type BufferType = InstanceType<typeof BufferConstructor>
 
-type TypedArray<B extends ArrayBufferLike> =
+export type TypedArray<B extends BufferType = BufferType> =
 	| Int8Array<B>
 	| Uint8Array<B>
 	| Uint8ClampedArray<B>
@@ -24,11 +18,10 @@ type TypedArray<B extends ArrayBufferLike> =
 	| Float32Array<B>
 	| Float64Array<B>
 
-interface TypedArrayConstructor<
-	B extends ArrayBufferLike,
-	T extends TypedArray<B>,
+export interface TypedArrayConstructor<
+	T extends TypedArray<BufferType> = TypedArray<BufferType>,
 > {
-	new (buffer: B, byteOffet: number, length: number): T
+	new (buffer: BufferType): T
 	readonly BYTES_PER_ELEMENT: number
 }
 
@@ -48,74 +41,58 @@ export const CoordinateArrayType = Float64Array
  */
 export const IndexArrayType = Uint32Array
 
-export class ResizeableTypedArray<
-	BC extends new (
-		byteLength: number,
-	) => ABL,
-	ABL extends ArrayBufferLike,
-	TA extends TypedArray<ABL>,
-> implements RelativeIndexable<number>
-{
-	ArrayType: TypedArrayConstructor<ABL, TA>
-	BufferConstructor: BC
+/**
+ * Default max byte length for the buffer.
+ */
+export const DEFAULT_MAX_BYTE_LENGTH = 2 ** 30
 
+export class ResizeableTypedArray<TA extends TypedArray>
+	implements RelativeIndexable<number>
+{
+	ArrayType: TypedArrayConstructor<TA>
 	array: TA
 	items = 0
 
-	buffer: ABL
+	buffer: BufferType
 	bufferSize: number
 
-	static from<
-		BC extends new (
-			byteLength: number,
-		) => ABL,
-		ABL extends ArrayBufferLike,
-		TA extends TypedArray<ABL>,
-	>(
-		ArrayType: TypedArrayConstructor<ABL, TA>,
-		buffer: ABL,
-		bufferConstructor: BC = DefaultBufferConstructor as BC,
+	static from<TA extends TypedArray>(
+		ArrayType: TypedArrayConstructor<TA>,
+		buffer: BufferType,
 	) {
-		const length = buffer.byteLength / ArrayType.BYTES_PER_ELEMENT
-		const rta = new ResizeableTypedArray<BC, ABL, TA>(
-			ArrayType,
-			bufferConstructor,
-			length,
-		)
+		const rta = new ResizeableTypedArray<TA>(ArrayType)
 		rta.buffer = buffer
-		rta.array = new ArrayType(buffer, 0, length)
+		rta.array = new ArrayType(buffer)
 		rta.items = length
 		return rta
 	}
 
-	constructor(
-		ArrayType: TypedArrayConstructor<ABL, TA>,
-		bufferConstructor: BC = DefaultBufferConstructor as BC,
-		startingLength = 10_000,
-	) {
+	constructor(ArrayType: TypedArrayConstructor<TA>) {
 		this.ArrayType = ArrayType
-		this.BufferConstructor = bufferConstructor
-		this.bufferSize = startingLength * this.ArrayType.BYTES_PER_ELEMENT
-		this.buffer = new bufferConstructor(this.bufferSize)
-		this.array = new this.ArrayType(
-			this.buffer,
-			0,
-			this.bufferSize / this.ArrayType.BYTES_PER_ELEMENT,
-		)
+		this.bufferSize = DEFAULT_MAX_BYTE_LENGTH
+		this.buffer = new BufferConstructor(this.bufferSize, {
+			maxByteLength: DEFAULT_MAX_BYTE_LENGTH,
+		})
+		this.array = new this.ArrayType(this.buffer)
 	}
 
 	expandArray() {
-		this.bufferSize <<= 1
-		const sab = new this.BufferConstructor(this.bufferSize)
-		const newArray = new this.ArrayType(
-			sab,
-			0,
-			this.bufferSize / this.ArrayType.BYTES_PER_ELEMENT,
-		)
-		if (this.array) newArray.set(this.array)
-		this.array = newArray
-		this.buffer = sab
-		return newArray
+		this.bufferSize *= 2
+		if (this.bufferSize > this.buffer.maxByteLength) {
+			throw Error("Buffer is too large")
+		}
+
+		if (this.buffer instanceof SharedArrayBuffer) {
+			if (this.buffer.growable) {
+				this.buffer.grow(this.bufferSize)
+			}
+		} else if (this.buffer.resizable) {
+			this.buffer.resize(this.bufferSize)
+		} else {
+			throw Error("Buffer is not growable or resizable")
+		}
+
+		return this.array
 	}
 
 	/**
@@ -133,8 +110,8 @@ export class ResizeableTypedArray<
 		return result
 	}
 
-	slice(start: number, end: number): TA {
-		return this.array.slice(start, end) as TA
+	slice(start: number, end: number) {
+		return this.array.slice(start, end)
 	}
 
 	get length() {
@@ -149,17 +126,17 @@ export class ResizeableTypedArray<
 		return this.length - 1
 	}
 
-	pushMany(values: number[] | TA) {
+	pushMany(values: number[] | TypedArray) {
 		while (this.length + values.length > this.array.length) this.expandArray()
 		this.array.set(values, this.length)
 		this.items += values.length
 	}
 
 	compact() {
-		const buffer = new this.BufferConstructor(
+		const buffer = new BufferConstructor(
 			this.length * this.ArrayType.BYTES_PER_ELEMENT,
 		)
-		const newArray = new this.ArrayType(buffer, 0, this.length)
+		const newArray = new this.ArrayType(buffer)
 		newArray.set(this.array.subarray(0, this.length))
 		this.array = newArray
 		this.buffer = buffer

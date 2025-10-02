@@ -1,20 +1,20 @@
 import type { OsmTags } from "@osmix/json"
 import type StringTable from "./stringtable"
-import { IndexArrayType, ResizeableTypedArray } from "./typed-arrays"
+import { type BufferType, ResizeableTypedArray } from "./typed-arrays"
 
-export type TagsTransferables = {
-	tagStart: ArrayBufferLike
-	tagCount: ArrayBufferLike
-	tagKeys: ArrayBufferLike
-	tagVals: ArrayBufferLike
+export interface TagsTransferables {
+	tagStart: BufferType
+	tagCount: BufferType
+	tagKeys: BufferType
+	tagVals: BufferType
 }
 
 export class Tags {
 	private stringTable: StringTable
-	private tagStart = new ResizeableTypedArray(IndexArrayType)
-	private tagCount = new ResizeableTypedArray(Uint8Array) // Maximum 255 tags per entity
-	private tagKeys = new ResizeableTypedArray(IndexArrayType)
-	private tagVals = new ResizeableTypedArray(IndexArrayType)
+	private tagStart: ResizeableTypedArray<Uint32Array>
+	private tagCount: ResizeableTypedArray<Uint8Array>
+	private tagKeys: ResizeableTypedArray<Uint32Array>
+	private tagVals: ResizeableTypedArray<Uint32Array>
 
 	private indexBuilt = false
 
@@ -23,16 +23,20 @@ export class Tags {
 		{ tagStart, tagCount, tagKeys, tagVals }: TagsTransferables,
 	) {
 		const tagIndex = new Tags(stringTable)
-		tagIndex.tagStart = ResizeableTypedArray.from(IndexArrayType, tagStart)
+		tagIndex.tagStart = ResizeableTypedArray.from(Uint32Array, tagStart)
 		tagIndex.tagCount = ResizeableTypedArray.from(Uint8Array, tagCount)
-		tagIndex.tagKeys = ResizeableTypedArray.from(IndexArrayType, tagKeys)
-		tagIndex.tagVals = ResizeableTypedArray.from(IndexArrayType, tagVals)
+		tagIndex.tagKeys = ResizeableTypedArray.from(Uint32Array, tagKeys)
+		tagIndex.tagVals = ResizeableTypedArray.from(Uint32Array, tagVals)
 		tagIndex.indexBuilt = true
 		return tagIndex
 	}
 
 	constructor(stringTable: StringTable) {
 		this.stringTable = stringTable
+		this.tagStart = new ResizeableTypedArray(Uint32Array)
+		this.tagCount = new ResizeableTypedArray(Uint8Array)
+		this.tagKeys = new ResizeableTypedArray(Uint32Array)
+		this.tagVals = new ResizeableTypedArray(Uint32Array)
 	}
 
 	transferables() {

@@ -40,10 +40,10 @@ export class Osm {
 	blocksGenerator: AsyncGenerator<OsmPbfBlock> | null = null
 
 	// Shared string lookup table for all nodes, ways, and relations
-	stringTable: StringTable = new StringTable()
-	nodes: Nodes = new Nodes(this.stringTable)
-	ways: Ways = new Ways(this.stringTable)
-	relations: Relations = new Relations(this.stringTable)
+	stringTable: StringTable
+	nodes: Nodes
+	ways: Ways
+	relations: Relations
 
 	#finished = false
 	#startTime = performance.now()
@@ -74,6 +74,10 @@ export class Osm {
 			optional_features: [],
 		}
 		this.id = id ?? "unknown"
+		this.stringTable = new StringTable()
+		this.nodes = new Nodes(this.stringTable)
+		this.ways = new Ways(this.stringTable)
+		this.relations = new Relations(this.stringTable)
 	}
 
 	*generateSortedEntities(): Generator<OsmEntity> {

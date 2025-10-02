@@ -7,32 +7,33 @@ import type { Nodes } from "./nodes"
 import type StringTable from "./stringtable"
 import { Tags } from "./tags"
 import {
+	BufferConstructor,
+	type BufferType,
 	CoordinateArrayType,
-	DefaultBufferConstructor,
 	IdArrayType,
 	ResizeableTypedArray,
 } from "./typed-arrays"
 import type { GeoBbox2D } from "./types"
 
 export interface WaysTransferables extends EntitiesTransferables {
-	refStart: ArrayBufferLike
-	refCount: ArrayBufferLike
-	refs: ArrayBufferLike
-	bbox: ArrayBufferLike
-	spatialIndex: ArrayBufferLike
+	refStart: BufferType
+	refCount: BufferType
+	refs: BufferType
+	bbox: BufferType
+	spatialIndex: BufferType
 }
 
 export class Ways extends Entities<OsmWay> {
 	spatialIndex: Flatbush = new Flatbush(1)
 
-	refStart = new ResizeableTypedArray(Uint32Array)
-	refCount = new ResizeableTypedArray(Uint16Array) // Maximum 2,000 nodes per way
+	refStart: ResizeableTypedArray<Uint32Array>
+	refCount: ResizeableTypedArray<Uint16Array> // Maximum 2,000 nodes per way
 
 	// Node IDs
-	refs = new ResizeableTypedArray(IdArrayType)
+	refs: ResizeableTypedArray<Float64Array>
 
 	// Bounding box of the way in geographic coordinates
-	bbox = new ResizeableTypedArray(CoordinateArrayType)
+	bbox: ResizeableTypedArray<Float64Array>
 
 	static from(stringTable: StringTable, wits: WaysTransferables) {
 		const idIndex = Ids.from(wits)
@@ -48,6 +49,10 @@ export class Ways extends Entities<OsmWay> {
 
 	constructor(stringTable: StringTable, idIndex?: Ids, tagIndex?: Tags) {
 		super("way", stringTable, idIndex, tagIndex)
+		this.refStart = new ResizeableTypedArray(Uint32Array)
+		this.refCount = new ResizeableTypedArray(Uint16Array)
+		this.refs = new ResizeableTypedArray(IdArrayType)
+		this.bbox = new ResizeableTypedArray(CoordinateArrayType)
 	}
 
 	transferables(): WaysTransferables {
@@ -112,7 +117,7 @@ export class Ways extends Entities<OsmWay> {
 			this.size,
 			128,
 			Float64Array,
-			DefaultBufferConstructor,
+			BufferConstructor,
 		)
 		for (let i = 0; i < this.size; i++) {
 			let minX = Number.POSITIVE_INFINITY

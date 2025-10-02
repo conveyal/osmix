@@ -6,36 +6,37 @@ import { type IdOrIndex, Ids } from "./ids"
 import type StringTable from "./stringtable"
 import { Tags } from "./tags"
 import {
+	BufferConstructor,
+	type BufferType,
 	CoordinateArrayType,
-	DefaultBufferConstructor,
 	ResizeableTypedArray,
 } from "./typed-arrays"
 import type { GeoBbox2D } from "./types"
 
 export interface NodesTransferables extends EntitiesTransferables {
-	lons: ArrayBufferLike
-	lats: ArrayBufferLike
+	lons: BufferType
+	lats: BufferType
 	bbox: GeoBbox2D
-	spatialIndex: ArrayBufferLike
+	spatialIndex: BufferType
 }
 
 export class Nodes extends Entities<OsmNode> {
-	lons = new ResizeableTypedArray(CoordinateArrayType)
-	lats = new ResizeableTypedArray(CoordinateArrayType)
+	lons: ResizeableTypedArray<Float64Array>
+	lats: ResizeableTypedArray<Float64Array>
 	bbox: GeoBbox2D = [
 		Number.POSITIVE_INFINITY,
 		Number.POSITIVE_INFINITY,
 		Number.NEGATIVE_INFINITY,
 		Number.NEGATIVE_INFINITY,
 	]
-	spatialIndex: KDBush = new KDBush(0)
+	spatialIndex: KDBush = new KDBush(0, 128, Float64Array, BufferConstructor)
 
 	static from(stringTable: StringTable, nits: NodesTransferables) {
 		const idIndex = Ids.from(nits)
 		const tagIndex = Tags.from(stringTable, nits)
 		const nodeIndex = new Nodes(stringTable, idIndex, tagIndex)
-		nodeIndex.lons = ResizeableTypedArray.from(Float64Array, nits.lons)
-		nodeIndex.lats = ResizeableTypedArray.from(Float64Array, nits.lats)
+		nodeIndex.lons = ResizeableTypedArray.from(CoordinateArrayType, nits.lons)
+		nodeIndex.lats = ResizeableTypedArray.from(CoordinateArrayType, nits.lats)
 		nodeIndex.bbox = nits.bbox
 		nodeIndex.spatialIndex = KDBush.from(nits.spatialIndex)
 		return nodeIndex
@@ -43,6 +44,8 @@ export class Nodes extends Entities<OsmNode> {
 
 	constructor(stringTable: StringTable, idIndex?: Ids, tagIndex?: Tags) {
 		super("node", stringTable, idIndex, tagIndex)
+		this.lons = new ResizeableTypedArray(CoordinateArrayType)
+		this.lats = new ResizeableTypedArray(CoordinateArrayType)
 	}
 
 	transferables(): NodesTransferables {
@@ -145,7 +148,7 @@ export class Nodes extends Entities<OsmNode> {
 			this.size,
 			128,
 			Float64Array,
-			DefaultBufferConstructor,
+			BufferConstructor,
 		)
 		for (let i = 0; i < this.size; i++) {
 			this.spatialIndex.add(this.lons.at(i), this.lats.at(i))

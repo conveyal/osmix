@@ -1,14 +1,15 @@
 declare module "kdbush" {
+	import type { BufferConstructor, BufferType } from "../typed-arrays"
 	export default class KDBush {
 		constructor(
 			length: number,
-			nodeSize?: number,
-			ArrayType?: Float64ArrayConstructor,
-			BufferConstructor?: ArrayBufferConstructor | SharedArrayBufferConstructor,
+			nodeSize: number,
+			ArrayType: Float64ArrayConstructor,
+			BufferConstructor: BufferConstructor,
 		)
 
 		/** Serialized index data buffer */
-		data: ArrayBufferLike
+		data: BufferType
 
 		/** Add a point before calling finish */
 		add(x: number, y: number): void
@@ -23,6 +24,6 @@ declare module "kdbush" {
 		within(x: number, y: number, radius: number): number[]
 
 		/** Reconstruct an index from a serialized buffer */
-		static from(data: ArrayBufferLike): KDBush
+		static from(data: BufferType): KDBush
 	}
 }

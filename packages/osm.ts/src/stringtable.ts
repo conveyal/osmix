@@ -1,13 +1,10 @@
 import type { OsmPbfBlock, OsmPbfStringTable } from "@osmix/pbf"
-import {
-	type DefaultBufferConstructor,
-	ResizeableTypedArray,
-} from "./typed-arrays"
+import { type BufferType, ResizeableTypedArray } from "./typed-arrays"
 
-export type StringTableTransferables = {
-	bytes: ArrayBufferLike
-	start: ArrayBufferLike
-	count: ArrayBufferLike
+export interface StringTableTransferables {
+	bytes: BufferType
+	start: BufferType
+	count: BufferType
 }
 
 /**
@@ -18,21 +15,9 @@ export default class StringTable {
 	private dec = new TextDecoder() // UTF-8
 
 	// Serializable state
-	private bytes: ResizeableTypedArray<
-		typeof DefaultBufferConstructor,
-		ArrayBuffer | SharedArrayBuffer,
-		Uint8Array
-	>
-	private start: ResizeableTypedArray<
-		typeof DefaultBufferConstructor,
-		ArrayBuffer | SharedArrayBuffer,
-		Uint32Array
-	>
-	private count: ResizeableTypedArray<
-		typeof DefaultBufferConstructor,
-		ArrayBuffer | SharedArrayBuffer,
-		Uint16Array
-	>
+	private bytes: ResizeableTypedArray<Uint8Array>
+	private start: ResizeableTypedArray<Uint32Array>
+	private count: ResizeableTypedArray<Uint16Array>
 
 	// Builder state
 	private stringToIndex = new Map<string, number>()

@@ -110,8 +110,7 @@ const TypedArrays = [
 	Uint8Array,
 	Int8Array,
 ]
-const START_SIZE = 100_000_000
-const increment = 10_000_000
+const START_SIZE = 2 ** 24
 
 function MaxArraySizes() {
 	const [maxArraySizes, setMaxArraySizes] = useState(
@@ -128,12 +127,12 @@ function MaxArraySizes() {
 			for (const array of TypedArrays) {
 				while (true) {
 					try {
-						new array(maxSize)
+						new array(maxSize - 1)
 					} catch (_error) {
-						newSizes[array.name] = (maxSize - increment) / 1_000_000
+						newSizes[array.name] = maxSize / 2 / 1_000_000
 						break
 					}
-					maxSize += increment
+					maxSize *= 2
 				}
 			}
 			setMaxArraySizes(newSizes)

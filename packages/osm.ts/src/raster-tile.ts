@@ -1,6 +1,8 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import { clipPolyline } from "lineclip"
+import type { Nodes } from "./nodes"
 import type { GeoBbox2D, Rgba, TileIndex } from "./types"
+import type { Ways } from "./ways"
 
 const DEFAULT_COLOR: Rgba = [255, 255, 255, 255] // white
 
@@ -96,5 +98,25 @@ export class OsmixRasterTile {
 				prev = curr
 			}
 		}
+	}
+
+	drawWays(ways: Ways, nodes: Nodes) {
+		const wayCandidates = ways.intersects(this.bbox)
+		console.time("OsmixRasterTile.drawWays")
+		for (const wayIndex of wayCandidates) {
+			this.drawWay(ways.getCoordinates(wayIndex, nodes))
+		}
+		console.timeEnd("OsmixRasterTile.drawWays")
+	}
+
+	drawNodes(nodes: Nodes) {
+		const nodeCandidates = nodes.withinBbox(this.bbox)
+		console.time("Osm.getBitmapForBbox.nodes")
+		for (const nodeIndex of nodeCandidates) {
+			if (!nodes.tags.hasTags(nodeIndex)) continue
+			const [lon, lat] = nodes.getNodeLonLat({ index: nodeIndex })
+			this.setLonLat(lon, lat, [255, 0, 0, 255])
+		}
+		console.timeEnd("Osm.getBitmapForBbox.nodes")
 	}
 }
