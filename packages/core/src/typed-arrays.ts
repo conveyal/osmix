@@ -64,7 +64,7 @@ export class ResizeableTypedArray<TA extends TypedArray>
 		const rta = new ResizeableTypedArray<TA>(ArrayType)
 		rta.buffer = buffer
 		rta.array = new ArrayType(buffer)
-		rta.items = length
+		rta.items = rta.array.length
 		return rta
 	}
 
@@ -111,7 +111,7 @@ export class ResizeableTypedArray<TA extends TypedArray>
 		}
 		const result = this.array.at(index)
 		if (result === undefined || index >= this.length)
-			throw Error(`Index out of bounds: ${index}`)
+			throw Error(`Index out of bounds: ${index}. Length: ${this.length}`)
 		return result
 	}
 
