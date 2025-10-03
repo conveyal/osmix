@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { blocksToJsonEntities } from "../src/pbf-to-json"
 import { OsmPbfBlockBuilder } from "../src/osm-pbf-block-builder"
 import { OsmPbfBlockParser } from "../src/osm-pbf-block-parser"
+import { blocksToJsonEntities } from "../src/pbf-to-json"
 
 describe("OsmPbfBlockParser", () => {
 	it("parses primitive groups with tags and info", () => {

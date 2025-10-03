@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
 import {
-	nodeToFeature,
 	nodesToFeatures,
+	nodeToFeature,
 	relationToFeature,
+	waysToFeatures,
 	wayToEditableGeoJson,
 	wayToFeature,
-	waysToFeatures,
 } from "../src/geojson"
 import type { OsmNode, OsmRelation, OsmWay } from "../src/types"
 

@@ -42,9 +42,7 @@ describe("json-to-pbf", () => {
 
 	it("yields grouped blocks", async () => {
 		const blocks = await Array.fromAsync(
-			jsonEntitiesToBlocks(
-				entityGenerator([...nodes, way, relation]),
-			),
+			jsonEntitiesToBlocks(entityGenerator([...nodes, way, relation])),
 		)
 
 		expect(blocks).toHaveLength(3)

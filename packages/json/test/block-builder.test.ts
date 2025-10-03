@@ -57,12 +57,7 @@ describe("OsmPbfBlockBuilder", () => {
 		expect(dense?.denseinfo?.uid).toEqual([12, 8])
 		expect(dense?.denseinfo?.user_sid).toEqual([7, 1])
 		expect(dense?.denseinfo?.visible).toEqual([true, false])
-		expect(decodeStringtable(builder)).toEqual([
-			"",
-			"name",
-			"first",
-			"second",
-		])
+		expect(decodeStringtable(builder)).toEqual(["", "name", "first", "second"])
 	})
 
 	it("encodes ways and relations with delta members", () => {

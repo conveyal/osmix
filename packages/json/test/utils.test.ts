@@ -1,4 +1,10 @@
 import { describe, expect, it } from "vitest"
+import type {
+	OsmNode,
+	OsmRelation,
+	OsmRelationMember,
+	OsmWay,
+} from "../src/types"
 import {
 	entityPropertiesEqual,
 	getEntityType,
@@ -9,12 +15,6 @@ import {
 	isWay,
 	isWayEqual,
 } from "../src/utils"
-import type {
-	OsmNode,
-	OsmRelation,
-	OsmRelationMember,
-	OsmWay,
-} from "../src/types"
 
 describe("utils", () => {
 	const node: OsmNode = {
@@ -56,9 +56,7 @@ describe("utils", () => {
 		expect(
 			entityPropertiesEqual(node, { ...node, tags: { name: "changed" } }),
 		).toBe(false)
-		expect(
-			entityPropertiesEqual(way, { ...way, refs: [1, 2, 4] }),
-		).toBe(false)
+		expect(entityPropertiesEqual(way, { ...way, refs: [1, 2, 4] })).toBe(false)
 		expect(
 			entityPropertiesEqual(relation, {
 				...relation,

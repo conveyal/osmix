@@ -57,16 +57,10 @@ export async function createSamplePbfFileBytes() {
 
 export function isHeaderBlock(value: unknown): value is OsmPbfHeaderBlock {
 	return (
-		typeof value === "object" &&
-		value != null &&
-		"required_features" in value
+		typeof value === "object" && value != null && "required_features" in value
 	)
 }
 
 export function isPrimitiveBlock(value: unknown): value is OsmPbfBlock {
-	return (
-		typeof value === "object" &&
-		value != null &&
-		"primitivegroup" in value
-	)
+	return typeof value === "object" && value != null && "primitivegroup" in value
 }
