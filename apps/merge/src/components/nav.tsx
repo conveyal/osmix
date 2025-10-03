@@ -14,7 +14,7 @@ export default function Nav() {
 					className={({ isActive }) =>
 						cn("text-slate-950 py-4 px-2", isActive && "text-blue-600")
 					}
-					to="merge"
+					to="/"
 				>
 					Merge
 				</NavLink>
@@ -22,7 +22,7 @@ export default function Nav() {
 					className={({ isActive }) =>
 						cn("text-slate-950 py-4 px-2", isActive && "text-blue-600")
 					}
-					to="inspect"
+					to="/inspect"
 				>
 					Inspect
 				</NavLink>

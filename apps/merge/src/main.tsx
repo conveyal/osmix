@@ -24,8 +24,7 @@ createRoot(rootEl).render(
 		<BrowserRouter>
 			<Routes>
 				<Route path={"/"} element={<RootLayout />}>
-					<Route path="" element={<InspectPage />} />
-					<Route path="merge" element={<MergePage />} />
+					<Route path="" element={<MergePage />} />
 					<Route path="inspect" element={<InspectPage />} />
 				</Route>
 			</Routes>
