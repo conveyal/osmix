@@ -1,4 +1,4 @@
-import type { OsmEntity, OsmEntityType, OsmTags } from "@osmix/json"
+import type { OsmEntity, OsmEntityType } from "@osmix/json"
 
 /**
  * A bounding box in the format [minLon, minLat, maxLon, maxLat].
@@ -18,13 +18,6 @@ export interface TileIndex {
 	x: number
 	y: number
 }
-
-export interface OsmGeoJSONProperties extends OsmTags {}
-
-export type OsmGeoJSONFeature = GeoJSON.Feature<
-	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon,
-	OsmGeoJSONProperties
->
 
 // String that starts with `n`, `w`, or `r` followed by the ID
 export type OsmEntityRef = {
