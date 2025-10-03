@@ -53,7 +53,7 @@ export class ResizeableTypedArray<TA extends TypedArray>
 	array: TA
 	items = 0
 
-	private buffer: BufferType
+	buffer: BufferType
 	bufferSize: number
 	maxByteLength: number
 
@@ -78,7 +78,7 @@ export class ResizeableTypedArray<TA extends TypedArray>
 		this.array = new this.ArrayType(this.buffer)
 	}
 
-	private expandArray() {
+	expandArray() {
 		this.bufferSize *= 2
 		if (this.bufferSize > this.buffer.maxByteLength) {
 			this.maxByteLength *= 2
