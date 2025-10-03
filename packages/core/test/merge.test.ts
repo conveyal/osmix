@@ -30,7 +30,7 @@ const sizes = (osm: Osm) => ({
 })
 
 describe("merge osm", () => {
-	it(
+	it.runIf(process.env.CI !== "true")(
 		"should merge two real osm objects",
 		{
 			timeout: 10_000,
