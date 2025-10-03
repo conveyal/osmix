@@ -1,11 +1,11 @@
 import type { Layer as DeckGlLayer } from "@deck.gl/core"
 import { type GeoBoundingBox, TileLayer } from "@deck.gl/geo-layers"
 import { GeoJsonLayer, PathLayer, ScatterplotLayer } from "@deck.gl/layers"
-import type { GeoBbox2D, Osm } from "@osmix/core"
+import type { Osm } from "@osmix/core"
 import { isNode, type OsmEntity } from "@osmix/json"
 import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtomValue, useSetAtom } from "jotai"
-import { useCallback, useEffect, useMemo } from "react"
+import { useCallback, useMemo } from "react"
 import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
 import { Log } from "@/state/log"
 import { mapAtom } from "@/state/map"
@@ -15,18 +15,6 @@ import {
 	selectOsmEntityAtom,
 } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
-
-export function useFitBoundsOnChange(bbox?: GeoBbox2D) {
-	const map = useAtomValue(mapAtom)
-
-	useEffect(() => {
-		if (!map || !bbox) return
-		map.fitBounds(bbox, {
-			padding: 100,
-			maxDuration: 200,
-		})
-	}, [bbox, map])
-}
 
 export function useFlyToEntity() {
 	const map = useAtomValue(mapAtom)
