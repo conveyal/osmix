@@ -35,7 +35,7 @@ describe("pbf json", () => {
 			assert.equal(entityCount, pbf.nodes + pbf.ways + pbf.relations)
 		})
 
-		it.only("build from parsed entites", async () => {
+		it("build from parsed entites", async () => {
 			const file = getFixtureFileReadStream(pbf.url)
 
 			// Write the PBF to an array buffer
