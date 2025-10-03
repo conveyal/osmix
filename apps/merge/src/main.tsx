@@ -23,10 +23,7 @@ createRoot(rootEl).render(
 	<StrictMode>
 		<BrowserRouter>
 			<Routes>
-				<Route
-					path={process.env.NODE_ENV === "production" ? "/osm.ts" : "/"}
-					element={<RootLayout />}
-				>
+				<Route path={"/"} element={<RootLayout />}>
 					<Route path="" element={<InspectPage />} />
 					<Route path="merge" element={<MergePage />} />
 					<Route path="inspect" element={<InspectPage />} />
