@@ -1,5 +1,5 @@
+import type { OsmChange, OsmChanges } from "@osmix/core"
 import { atom } from "jotai"
-import type { OsmChange, OsmChanges } from "osm.ts"
 
 export const DEFAULT_PAGE_SIZE = 10
 

@@ -1,4 +1,4 @@
-# osm.ts
+# osmix
 Read, inspect, and write OpenStreetMap PBFs in the browser. 
 
 ## Library
@@ -15,6 +15,6 @@ Read, inspect, and write OpenStreetMap PBFs in the browser.
 ...
 
 ## Merge Tool 
-One [application](https://conveyal.github.io/osm.ts/merge) of the osm.ts library is a tool that enables merging two OSM PBF files.
+One [application](https://conveyal.github.io/osm.ts/merge) of the osmix library is a tool that enables merging two OSM PBF files.
 
 

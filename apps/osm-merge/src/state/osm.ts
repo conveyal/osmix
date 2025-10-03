@@ -1,7 +1,7 @@
+import type { Osm } from "@osmix/core"
 import type { OsmEntity } from "@osmix/json"
 import { atom } from "jotai"
 import { atomFamily } from "jotai/utils"
-import type { Osm } from "osm.ts"
 
 export const osmAtomFamily = atomFamily((_id: string) => atom<Osm | null>(null))
 export const osmFileAtomFamily = atomFamily((_id: string) =>

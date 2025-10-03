@@ -18,6 +18,7 @@
         "@deck.gl/react": "9.1.14",
         "@fontsource-variable/roboto-mono": "^5.2.5",
         "@mapbox/sphericalmercator": "^2.0.1",
+        "@osmix/core": "workspace:*",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@radix-ui/react-collapsible": "^1.1.12",
@@ -32,7 +33,6 @@
         "lucide-react": "^0.513.0",
         "maplibre-gl": "5.7.3",
         "native-file-system-adapter": "^3.0.1",
-        "osm.ts": "workspace:*",
         "react": "^19.1.0",
         "react-dom": "^19.1.0",
         "react-map-gl": "^8.0.4",
@@ -52,6 +52,29 @@
         "vite": "catalog:",
       },
     },
+    "packages/core": {
+      "name": "@osmix/core",
+      "version": "0.0.1",
+      "dependencies": {
+        "@mapbox/sphericalmercator": "^2.0.1",
+        "@osmix/json": "workspace:*",
+        "@osmix/pbf": "workspace:*",
+        "@turf/distance": "7.2.0",
+        "@turf/line-intersect": "7.2.0",
+        "dequal": "catalog:",
+        "flatbush": "^4.4.1",
+        "kdbush": "mourner/kdbush#16416cd",
+        "lineclip": "^2.0.0",
+      },
+      "devDependencies": {
+        "@osmix/test-utils": "workspace:*",
+        "@turf/invariant": "7.2.0",
+        "@turf/meta": "7.2.0",
+        "@types/geojson": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/json": {
       "name": "@osmix/json",
       "version": "0.0.1",
@@ -63,30 +86,6 @@
         "@osmix/test-utils": "workspace:*",
         "typescript": "catalog:",
         "vite": "catalog:",
-        "vitest": "catalog:",
-      },
-    },
-    "packages/osm.ts": {
-      "name": "osm.ts",
-      "version": "0.0.1",
-      "dependencies": {
-        "@mapbox/sphericalmercator": "^2.0.1",
-        "@osmix/json": "workspace:*",
-        "@osmix/pbf": "workspace:*",
-        "@turf/distance": "7.2.0",
-        "@turf/line-intersect": "7.2.0",
-        "dequal": "catalog:",
-        "flatbush": "^4.4.1",
-        "flatqueue": "^3.0.0",
-        "kdbush": "mourner/kdbush#16416cd",
-        "lineclip": "^2.0.0",
-      },
-      "devDependencies": {
-        "@osmix/test-utils": "workspace:*",
-        "@turf/invariant": "7.2.0",
-        "@turf/meta": "7.2.0",
-        "@types/geojson": "catalog:",
-        "typescript": "catalog:",
         "vitest": "catalog:",
       },
     },
@@ -355,6 +354,8 @@
     "@math.gl/types": ["@math.gl/types@4.1.0", "", {}, "sha512-clYZdHcmRvMzVK5fjeDkQlHUzXQSNdZ7s4xOqC3nJPgz4C/TZkUecTo9YS4PruZqtDda/ag4erndP0MIn40dGA=="],
 
     "@math.gl/web-mercator": ["@math.gl/web-mercator@4.1.0", "", { "dependencies": { "@math.gl/core": "4.1.0" } }, "sha512-HZo3vO5GCMkXJThxRJ5/QYUYRr3XumfT8CzNNCwoJfinxy5NtKUd7dusNTXn7yJ40UoB8FMIwkVwNlqaiRZZAw=="],
+
+    "@osmix/core": ["@osmix/core@workspace:packages/core"],
 
     "@osmix/json": ["@osmix/json@workspace:packages/json"],
 
@@ -658,7 +659,7 @@
 
     "flatbush": ["flatbush@4.4.1", "", { "dependencies": { "flatqueue": "^2.0.3" } }, "sha512-g3eA6ZF0viCV0UslH/mdUzCLcT7aGj0Fjk9MBxxNkbADSXqSHDZhthFBDFgo2umc6SVmSItNefTjWnfyo7DunA=="],
 
-    "flatqueue": ["flatqueue@3.0.0", "", {}, "sha512-y1deYaVt+lIc/d2uIcWDNd0CrdQTO5xoCjeFdhX0kSXvm2Acm0o+3bAOiYklTEoRyzwio3sv3/IiBZdusbAe2Q=="],
+    "flatqueue": ["flatqueue@2.0.3", "", {}, "sha512-RZCWZNkmxzUOh8jqEcEGZCycb3B8KAfpPwg3H//cURasunYxsg1eIvE+QDSjX+ZPHTIVfINfK1aLTrVKKO0i4g=="],
 
     "fsevents": ["fsevents@2.3.3", "", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
 
@@ -787,8 +788,6 @@
     "node-releases": ["node-releases@2.0.19", "", {}, "sha512-xxOWJsBKtzAq7DY0J+DTzuz58K8e7sJbdgwkbMWQe8UYB6ekmsQ45q0M/tJDsGaZmbC+l7n57UV8Hl5tHxO9uw=="],
 
     "osm-merge": ["osm-merge@workspace:apps/osm-merge"],
-
-    "osm.ts": ["osm.ts@workspace:packages/osm.ts"],
 
     "pako": ["pako@1.0.11", "", {}, "sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw=="],
 
@@ -1077,8 +1076,6 @@
     "chai/loupe": ["loupe@3.1.3", "", {}, "sha512-kkIp7XSkP78ZxJEsSxW3712C6teJVoeHHwgo9zJ380de7IYyJ2ISlxojcH2pC5OFLewESmnRi/+XCDIEEVyoug=="],
 
     "estree-walker/@types/estree": ["@types/estree@1.0.7", "", {}, "sha512-w28IoSUCJpidD/TGviZwwMJckNESJZXFu7NBZ5YJ4mEUnNraUn9Pm8HSZm/jDF1pDWYKspWE7oVphigUPRakIQ=="],
-
-    "flatbush/flatqueue": ["flatqueue@2.0.3", "", {}, "sha512-RZCWZNkmxzUOh8jqEcEGZCycb3B8KAfpPwg3H//cURasunYxsg1eIvE+QDSjX+ZPHTIVfINfK1aLTrVKKO0i4g=="],
 
     "lru-cache/yallist": ["yallist@3.1.1", "", {}, "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="],
 

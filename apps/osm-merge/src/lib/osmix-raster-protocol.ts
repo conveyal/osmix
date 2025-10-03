@@ -1,6 +1,6 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
+import type { TileIndex } from "@osmix/core"
 import maplibre from "maplibre-gl"
-import type { TileIndex } from "osm.ts"
 import { RASTER_PROTOCOL_NAME, RASTER_TILE_SIZE } from "@/settings"
 import { osmWorker } from "@/state/worker"
 

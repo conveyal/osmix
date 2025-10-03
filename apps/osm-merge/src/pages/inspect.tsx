@@ -1,3 +1,4 @@
+import { Osm, writeOsmToPbfStream } from "@osmix/core"
 import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtom, useSetAtom } from "jotai"
 import {
@@ -8,7 +9,6 @@ import {
 	SearchCode,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import { Osm, writeOsmToPbfStream } from "osm.ts"
 import { useCallback, useEffect, useMemo, useTransition } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
 import { useSearchParams } from "react-router"

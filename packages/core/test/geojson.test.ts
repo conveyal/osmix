@@ -1,8 +1,7 @@
-import assert from "node:assert"
 import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures"
 import { featureOf, getCoords, getType } from "@turf/invariant"
 import { coordEach } from "@turf/meta"
-import { describe, it } from "vitest"
+import { assert, describe, it } from "vitest"
 import { createOsmIndexFromPbfData } from "../src"
 import { nodeToFeature, wayToFeature } from "../src/to-geojson"
 

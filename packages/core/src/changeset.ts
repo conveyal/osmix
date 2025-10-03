@@ -737,7 +737,7 @@ export default class OsmChangeset {
 		}
 
 		return `
-			<osmChange version="0.6" generator="osm.ts">
+			<osmChange version="0.6" generator="@osmix/core">
 				<create>${create}</create>
 				<modify>${modify}</modify>
 				<delete>${del}</delete>

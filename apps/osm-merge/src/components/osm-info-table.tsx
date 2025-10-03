@@ -1,4 +1,4 @@
-import type { Osm } from "osm.ts"
+import type { Osm } from "@osmix/core"
 import { bytesSizeToHuman } from "@/utils"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 import ObjectToTableRows from "./object-to-table"

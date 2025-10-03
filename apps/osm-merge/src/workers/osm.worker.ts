@@ -1,4 +1,3 @@
-import { expose, transfer } from "comlink"
 import {
 	createOsmIndexFromPbfData,
 	type GeoBbox2D,
@@ -9,8 +8,8 @@ import {
 	type OsmMergeOptions,
 	type TileIndex,
 	throttle,
-} from "osm.ts"
-import * as Performance from "osm.ts/performance"
+} from "@osmix/core"
+import { expose, transfer } from "comlink"
 import {
 	MIN_NODE_ZOOM,
 	RASTER_TILE_IMAGE_TYPE,
@@ -35,10 +34,8 @@ const osmWorker = {
 	async initFromPbfData(id: string, data: ReadableStream<Uint8Array>) {
 		// Clear previous OSM references making it available for garbage collection
 		osmCache.delete(id)
-		const measure = Performance.createMeasure("initializing PBF from data")
 		const osm = await createOsmIndexFromPbfData(data, id, (m) => this.log(m))
 		osmCache.set(id, osm)
-		measure()
 		return osm.transferables()
 	},
 	async getTileImage(id: string, bbox: GeoBbox2D, tileIndex: TileIndex) {
@@ -74,9 +71,6 @@ const osmWorker = {
 	async getTileData(id: string, bbox: GeoBbox2D) {
 		const osm = osmCache.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
-		const measure = Performance.createMeasure(
-			`generating nodes and ways within bbox ${bbox.join(", ")}`,
-		)
 		try {
 			const nodeResults = osm.getNodesInBbox(bbox)
 			const wayResults = osm.getWaysInBbox(bbox)
@@ -96,8 +90,6 @@ const osmWorker = {
 		} catch (e) {
 			console.error(e)
 			throw e
-		} finally {
-			measure()
 		}
 	},
 	dedupeNodesAndWays(id: string): OsmChanges {

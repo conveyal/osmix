@@ -1,3 +1,4 @@
+import { Osm, type OsmChanges, writeOsmToPbfStream } from "@osmix/core"
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
 	ArrowLeft,
@@ -11,7 +12,6 @@ import {
 	SkipForwardIcon,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import { Osm, type OsmChanges, writeOsmToPbfStream } from "osm.ts"
 import { useCallback, useEffect, useMemo, useRef, useTransition } from "react"
 import Basemap from "@/components/basemap"
 import DeckGlOverlay from "@/components/deckgl-overlay"

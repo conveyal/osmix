@@ -1,4 +1,4 @@
-export const APPID = "osm.ts"
+export const APPID = "osmix"
 export const MIN_NODE_ZOOM = 10
 export const MIN_PICKABLE_ZOOM = 12
 export const DEFAULT_BASE_PBF_URL = "./pbfs/yakima-full.osm.pbf"

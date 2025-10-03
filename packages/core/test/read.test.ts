@@ -1,10 +1,9 @@
-import assert from "node:assert"
 import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
 } from "@osmix/test-utils/fixtures"
-import { beforeAll, describe, it } from "vitest"
+import { assert, beforeAll, describe, it } from "vitest"
 import { createOsmIndexFromPbfData } from "../src/osm-from-pbf"
 
 describe("read", () => {

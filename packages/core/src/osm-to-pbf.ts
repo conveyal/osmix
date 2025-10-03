@@ -42,7 +42,7 @@ export function createOsmEntityReadableStream(osm: Osm) {
 						right,
 						top,
 					},
-					writingprogram: "@conveyal/osm.ts",
+					writingprogram: "@osmix/core",
 					osmosis_replication_timestamp: Date.now(),
 				})
 				headerEnqueued = true

@@ -1,6 +1,6 @@
+import { Osm } from "@osmix/core"
 import * as Comlink from "comlink"
 import { useAtom, useAtomValue } from "jotai"
-import { Osm } from "osm.ts"
 import { useEffect, useMemo, useState } from "react"
 import { Log } from "@/state/log"
 import { osmAtomFamily, osmFileAtomFamily } from "@/state/osm"

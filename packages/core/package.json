@@ -1,18 +1,10 @@
 {
 	"$schema": "https://json.schemastore.org/package",
-	"name": "osm.ts",
+	"name": "@osmix/core",
 	"type": "module",
 	"version": "0.0.1",
 	"description": "An OSM PBF reader, writer, and merge tool written in TypeScript",
 	"main": "./src/index.ts",
-	"exports": {
-		".": "./src/index.ts",
-		"./changes": "./src/osm-change.ts",
-		"./geojson": "./src/to-geojson.ts",
-		"./pbf": "./src/pbf/index.ts",
-		"./utils": "./src/utils.ts",
-		"./performance": "./src/performance.ts"
-	},
 	"sideEffects": false,
 	"scripts": {
 		"test": "vitest",
