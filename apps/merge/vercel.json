@@ -24,5 +24,11 @@
 			"source": "/(.*)",
 			"destination": "/index.html"
 		}
+	],
+	"redirects": [
+		{
+			"source": "/",
+			"destination": "/merge"
+		}
 	]
 }
