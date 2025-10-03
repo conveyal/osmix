@@ -33,22 +33,22 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.2.19
+          bun-version: 1.2.23
       - name: Install dependencies
         run: bun install
       - name: Build
         run: bun run build
       - name: Copy PBFs to /dist/pbfs
-        run: cp -r ./fixtures/*.pbf ./apps/osm-merge/dist/pbfs
+        run: cp -r ./fixtures/*.pbf ./apps/merge/dist/pbfs
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Copy index.html to /dist/404.html
-        run: cp ./apps/osm-merge/dist/index.html ./apps/osm-merge/dist/404.html
+        run: cp ./apps/merge/dist/index.html ./apps/merge/dist/404.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload dist folder
-          path: './apps/osm-merge/dist'
+          path: './apps/merge/dist'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
