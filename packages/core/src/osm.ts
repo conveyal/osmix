@@ -3,6 +3,7 @@ import {
 	isRelation,
 	isWay,
 	type LonLat,
+	nodeToFeature,
 	type OsmEntity,
 	type OsmEntityType,
 	type OsmEntityTypeMap,
@@ -10,12 +11,13 @@ import {
 	type OsmRelation,
 	type OsmTags,
 	type OsmWay,
+	relationToFeature,
+	wayToFeature,
 } from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf"
 import { Nodes, type NodesTransferables } from "./nodes"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
-import { nodeToFeature, relationToFeature, wayToFeature } from "./to-geojson"
 import { IdArrayType } from "./typed-arrays"
 import type { GeoBbox2D } from "./types"
 import { bboxFromLonLats } from "./utils"

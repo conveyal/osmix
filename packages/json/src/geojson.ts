@@ -1,6 +1,13 @@
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/json"
-import type { OsmGeoJSONProperties } from "./types"
+import type { OsmTags } from "./types"
 import { wayIsArea } from "./way-is-area"
+
+export interface OsmGeoJSONProperties extends OsmTags {}
+
+export type OsmGeoJSONFeature = GeoJSON.Feature<
+	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon,
+	OsmGeoJSONProperties
+>
 
 function includeNode(node: OsmNode) {
 	if (!node.tags || Object.keys(node.tags).length === 0) return false
