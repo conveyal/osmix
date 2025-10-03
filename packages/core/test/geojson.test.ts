@@ -38,7 +38,9 @@ describe("geojson", () => {
 			const seenWayIds = new Set()
 			let wayFeatures = 0
 			for (const way of osm.ways) {
-				const feature = wayToFeature(way, osm.nodes)
+				const feature = wayToFeature(way, (id) =>
+					osm.nodes.getNodeLonLat({ id }),
+				)
 				assert.equal(feature.type, "Feature")
 				assert.ok(feature.id !== undefined && feature.id !== null)
 				assert.ok(

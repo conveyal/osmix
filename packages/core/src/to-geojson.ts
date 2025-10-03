@@ -1,40 +1,16 @@
-import {
-	isNode,
-	isRelation,
-	isWay,
-	type OsmNode,
-	type OsmRelation,
-	type OsmTags,
-	type OsmWay,
-} from "@osmix/json"
-import type { Nodes } from "./nodes"
-import type { Osm } from "./osm"
+import type { OsmNode, OsmRelation, OsmWay } from "@osmix/json"
 import type { OsmGeoJSONProperties } from "./types"
 import { wayIsArea } from "./way-is-area"
-import type { Ways } from "./ways"
-
-export function getEntityGeoJson(
-	entity: OsmNode | OsmWay | OsmRelation,
-	osm: Osm,
-): GeoJSON.Feature<GeoJSON.Geometry, OsmTags> {
-	if (isNode(entity)) {
-		return nodeToFeature(entity)
-	}
-	if (isWay(entity)) {
-		return wayToFeature(entity, osm.nodes)
-	}
-	if (isRelation(entity)) {
-		return relationToFeature(entity, osm.nodes)
-	}
-	throw new Error("Unknown entity type")
-}
 
 function includeNode(node: OsmNode) {
 	if (!node.tags || Object.keys(node.tags).length === 0) return false
 	return true
 }
 
-export function nodesToFeatures(nodes: Nodes, filter = includeNode) {
+export function nodesToFeatures(
+	nodes: Iterable<OsmNode>,
+	filter = includeNode,
+) {
 	const features: GeoJSON.Feature<GeoJSON.Point, OsmGeoJSONProperties>[] = []
 	for (const node of nodes) {
 		if (filter(node)) {
@@ -63,14 +39,18 @@ function includeWay(way: OsmWay) {
 	return true
 }
 
-export function waysToFeatures(ways: Ways, nodes: Nodes, filter = includeWay) {
+export function waysToFeatures(
+	ways: Iterable<OsmWay>,
+	refToPosition: (id: number) => [number, number],
+	filter = includeWay,
+) {
 	const features: GeoJSON.Feature<
 		GeoJSON.LineString | GeoJSON.Polygon,
 		OsmGeoJSONProperties
 	>[] = []
 	for (const way of ways) {
 		if (filter(way)) {
-			features.push(wayToFeature(way, nodes))
+			features.push(wayToFeature(way, refToPosition))
 		}
 	}
 	return features
@@ -78,7 +58,7 @@ export function waysToFeatures(ways: Ways, nodes: Nodes, filter = includeWay) {
 
 export function wayToFeature(
 	way: OsmWay,
-	nodes: Nodes,
+	refToPosition: (id: number) => [number, number],
 ): GeoJSON.Feature<GeoJSON.LineString | GeoJSON.Polygon, OsmGeoJSONProperties> {
 	return {
 		type: "Feature",
@@ -86,11 +66,11 @@ export function wayToFeature(
 		geometry: wayIsArea(way.refs, way.tags)
 			? {
 					type: "Polygon",
-					coordinates: [way.refs.map((r) => nodes.getNodeLonLat({ id: r }))],
+					coordinates: [way.refs.map((r) => refToPosition(r))],
 				}
 			: {
 					type: "LineString",
-					coordinates: way.refs.map((r) => nodes.getNodeLonLat({ id: r })),
+					coordinates: way.refs.map((r) => refToPosition(r)),
 				},
 		properties: way.tags ?? {},
 	}
@@ -113,17 +93,20 @@ export function wayToLineString(
 
 export function wayToEditableGeoJson(
 	way: OsmWay,
-	nodes: Nodes,
+	refToNode: (id: number) => OsmNode,
 ): GeoJSON.FeatureCollection<
 	GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.Point,
 	OsmGeoJSONProperties
 > {
 	const getNode = (r: number) => {
-		const n = nodes.getById(r)
+		const n = refToNode(r)
 		if (!n) throw new Error(`Node ${r} not found`)
 		return n
 	}
-	const wayFeature = wayToFeature(way, nodes)
+	const wayFeature = wayToFeature(way, (ref) => {
+		const node = refToNode(ref)
+		return [node.lon, node.lat]
+	})
 	const wayNodes = way.refs.map((id) => {
 		const node = getNode(id)
 		return nodeToFeature(node)
@@ -137,7 +120,7 @@ export function wayToEditableGeoJson(
 
 export function relationToFeature(
 	relation: OsmRelation,
-	nodes: Nodes,
+	refToPosition: (id: number) => [number, number],
 ): GeoJSON.Feature<
 	GeoJSON.GeometryCollection<
 		GeoJSON.Polygon | GeoJSON.Point | GeoJSON.LineString
@@ -153,9 +136,7 @@ export function relationToFeature(
 				{
 					type: "Polygon",
 					coordinates: [
-						relation.members.map((member) =>
-							nodes.getNodeLonLat({ id: member.ref }),
-						),
+						relation.members.map((member) => refToPosition(member.ref)),
 					],
 				},
 			],

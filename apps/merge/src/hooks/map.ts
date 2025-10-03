@@ -2,7 +2,6 @@ import type { Layer as DeckGlLayer } from "@deck.gl/core"
 import { type GeoBoundingBox, TileLayer } from "@deck.gl/geo-layers"
 import { GeoJsonLayer, PathLayer, ScatterplotLayer } from "@deck.gl/layers"
 import type { GeoBbox2D, Osm } from "@osmix/core"
-import { getEntityGeoJson } from "@osmix/core/src/to-geojson"
 import { isNode, type OsmEntity } from "@osmix/json"
 import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtomValue, useSetAtom } from "jotai"
@@ -218,7 +217,7 @@ export function useSelectedEntityLayer() {
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const layer = useMemo(() => {
 		if (!selectedOsm || !selectedEntity) return null
-		const geojson = getEntityGeoJson(selectedEntity, selectedOsm)
+		const geojson = selectedOsm.getEntityGeoJson(selectedEntity)
 		return new GeoJsonLayer({
 			id: `${APPID}:${selectedOsm.id}:selected-entity`,
 			data: geojson,

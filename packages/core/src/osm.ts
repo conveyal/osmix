@@ -8,12 +8,14 @@ import {
 	type OsmEntityTypeMap,
 	type OsmNode,
 	type OsmRelation,
+	type OsmTags,
 	type OsmWay,
 } from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf"
 import { Nodes, type NodesTransferables } from "./nodes"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
+import { nodeToFeature, relationToFeature, wayToFeature } from "./to-geojson"
 import { IdArrayType } from "./typed-arrays"
 import type { GeoBbox2D } from "./types"
 import { bboxFromLonLats } from "./utils"
@@ -262,5 +264,24 @@ export class Osm {
 
 	bbox(): GeoBbox2D | undefined {
 		return this.nodes.bbox ?? this.headerBbox()
+	}
+
+	getEntityGeoJson(
+		entity: OsmNode | OsmWay | OsmRelation,
+	): GeoJSON.Feature<GeoJSON.Geometry, OsmTags> {
+		if (isNode(entity)) {
+			return nodeToFeature(entity)
+		}
+		if (isWay(entity)) {
+			return wayToFeature(entity, (ref) =>
+				this.nodes.getNodeLonLat({ id: ref }),
+			)
+		}
+		if (isRelation(entity)) {
+			return relationToFeature(entity, (ref) =>
+				this.nodes.getNodeLonLat({ id: ref }),
+			)
+		}
+		throw new Error("Unknown entity type")
 	}
 }
