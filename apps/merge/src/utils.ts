@@ -71,3 +71,24 @@ export function bytesSizeToHuman(size?: number) {
 	if (size < GB) return `${(size / MB).toFixed(2)}MB`
 	return `${(size / GB).toFixed(2)}GB`
 }
+
+export function supportsReadableStreamTransfer(): boolean {
+	// Require the basics first
+	if (
+		typeof ReadableStream === "undefined" ||
+		typeof MessageChannel === "undefined"
+	)
+		return false
+
+	const { port1 } = new MessageChannel()
+	try {
+		const rs = new ReadableStream() // empty is fine for feature test
+		// If transferable streams are unsupported, this line throws a DataCloneError
+		port1.postMessage(rs, [rs as unknown as Transferable])
+		return true
+	} catch {
+		return false
+	} finally {
+		port1.close()
+	}
+}

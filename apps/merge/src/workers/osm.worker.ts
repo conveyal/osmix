@@ -31,7 +31,8 @@ const osmWorker = {
 		if (!osm) throw Error(`Osm for ${oid} not loaded.`)
 		return osm.getById(eid)
 	},
-	async initFromPbfData(id: string, data: ReadableStream<Uint8Array>) {
+	async initFromPbfData(id: string, data: ArrayBufferLike | ReadableStream) {
+		this.log(`Initializing OSM from PBF data for ${id}`)
 		// Clear previous OSM references making it available for garbage collection
 		osmCache.delete(id)
 		const osm = await createOsmIndexFromPbfData(data, id, (m) => this.log(m))

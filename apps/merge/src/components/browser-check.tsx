@@ -61,7 +61,7 @@ function DeviceMemory() {
 
 	useEffect(() => {
 		setMemory(
-			"deviceMemory" in navigator ? `${navigator.deviceMemory}GB` : "unknown",
+			"deviceMemory" in navigator ? `${navigator.deviceMemory}GiB` : "unknown",
 		)
 	}, [])
 

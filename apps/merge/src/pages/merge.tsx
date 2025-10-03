@@ -12,7 +12,7 @@ import {
 	SkipForwardIcon,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import { useCallback, useEffect, useMemo, useRef, useTransition } from "react"
+import { useCallback, useMemo, useTransition } from "react"
 import Basemap from "@/components/basemap"
 import DeckGlOverlay from "@/components/deckgl-overlay"
 import { Details, DetailsContent, DetailsSummary } from "@/components/details"
@@ -30,6 +30,7 @@ import OsmixRasterSource from "@/components/osmix-raster-source"
 import { Button } from "@/components/ui/button"
 import {
 	useFlyToEntity,
+	useFlyToOsmBounds,
 	usePickableOsmTileLayer,
 	useSelectedEntityLayer,
 } from "@/hooks/map"
@@ -67,11 +68,12 @@ const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
 })
 
 export default function Merge() {
-	const base = useOsmFile("base")
-	const patch = useOsmFile("patch")
+	const base = useOsmFile("base", DEFAULT_BASE_PBF_URL)
+	const patch = useOsmFile("patch", DEFAULT_PATCH_PBF_URL)
 	const [isTransitioning, startTransition] = useTransition()
 	const [changes, setChanges] = useAtom(changesAtom)
 	const flyToEntity = useFlyToEntity()
+	const flyToOsmBounds = useFlyToOsmBounds()
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const baseTileLayer = usePickableOsmTileLayer(base.osm)
@@ -79,27 +81,6 @@ export default function Merge() {
 	const selectedEntityLayer = useSelectedEntityLayer()
 
 	const [stepIndex, setStepIndex] = useAtom(stepIndexAtom)
-
-	// Auto load default files for faster testing
-	const isLoadingDefaultFilesRef = useRef(false)
-	useEffect(() => {
-		if (process.env.NODE_ENV !== "development") return
-		if (!base.file && !patch.file && !isLoadingDefaultFilesRef.current) {
-			isLoadingDefaultFilesRef.current = true
-			Promise.all([
-				fetch(DEFAULT_BASE_PBF_URL)
-					.then((res) => res.blob())
-					.then((blob) => {
-						base.setFile(new File([blob], DEFAULT_BASE_PBF_URL))
-					}),
-				fetch(DEFAULT_PATCH_PBF_URL)
-					.then((res) => res.blob())
-					.then((blob) => {
-						patch.setFile(new File([blob], DEFAULT_PATCH_PBF_URL))
-					}),
-			])
-		}
-	}, [base.file, patch.file, base.setFile, patch.setFile])
 
 	const prevStep = useCallback(() => {
 		selectEntity(null, null)
@@ -179,8 +160,10 @@ export default function Merge() {
 							<div className="font-bold p-2">BASE OSM PBF</div>
 							<OsmPbfFileInput
 								file={base.file}
-								isLoading={base.isLoading}
-								setFile={base.setFile}
+								setFile={async (file) => {
+									const osm = await base.loadOsmFile(file)
+									flyToOsmBounds(osm)
+								}}
 							/>
 							<OsmInfoTable
 								defaultOpen={false}
@@ -193,8 +176,10 @@ export default function Merge() {
 							<div className="font-bold p-2">PATCH OSM PBF</div>
 							<OsmPbfFileInput
 								file={patch.file}
-								isLoading={patch.isLoading}
-								setFile={patch.setFile}
+								setFile={async (file) => {
+									const osm = await patch.loadOsmFile(file)
+									flyToOsmBounds(osm)
+								}}
 							/>
 							<OsmInfoTable
 								defaultOpen={false}

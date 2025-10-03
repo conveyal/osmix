@@ -7,17 +7,28 @@ import {
 	readHeaderBlock,
 	readPrimitiveBlock,
 } from "./proto/osmformat"
-import { decompress } from "./utils"
+import { decompress, toAsyncGenerator } from "./utils"
 
 export const HEADER_LENGTH_BYTES = 4
 
 /**
  * Create an OSM PBF reader from binary data.
  */
-export async function readOsmPbf(data: Uint8Array) {
+export async function readOsmPbf(
+	data: ArrayBufferLike | ReadableStream<ArrayBufferLike>,
+) {
 	const generateBlobsFromChunk = createOsmPbfBlobGenerator()
-	const blobs = generateBlobsFromChunk(data)
-	const blocks = osmPbfBlobsToBlocksGenerator(blobs)
+	const blocks = osmPbfBlobsToBlocksGenerator(
+		(async function* () {
+			for await (const chunk of toAsyncGenerator(data)) {
+				for await (const blob of generateBlobsFromChunk(
+					new Uint8Array(chunk),
+				)) {
+					yield blob
+				}
+			}
+		})(),
+	)
 	const header = (await blocks.next()).value
 	if (header == null || !("required_features" in header)) {
 		throw Error("OSM PBF header block not found")
@@ -32,7 +43,7 @@ export async function readOsmPbf(data: Uint8Array) {
  * Transform a stream of PBF bytes to a stream of OSM blocks. Assumes that the first block is the header.
  */
 export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
-	Uint8Array,
+	ArrayBufferLike,
 	OsmPbfHeaderBlock | OsmPbfBlock
 > {
 	generateBlobsFromChunk = createOsmPbfBlobGenerator()
@@ -40,7 +51,9 @@ export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
 	constructor() {
 		super({
 			transform: async (bytesChunk, controller) => {
-				for await (const rawBlobs of this.generateBlobsFromChunk(bytesChunk)) {
+				for await (const rawBlobs of this.generateBlobsFromChunk(
+					new Uint8Array(bytesChunk),
+				)) {
 					const decompressed = await decompress(rawBlobs)
 					const pbf = new Pbf(decompressed)
 					if (this.header == null) {

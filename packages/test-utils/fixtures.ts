@@ -20,24 +20,23 @@ export function getFixturePath(url: string) {
 /**
  * Get file from the cache folder or download it from the URL
  */
-export async function getFixtureFile(url: string): Promise<Uint8Array> {
+export async function getFixtureFile(url: string): Promise<ArrayBufferLike> {
 	const filePath = getFixturePath(url)
 	try {
 		const file = await readFile(filePath)
-		return new Uint8Array(file.buffer)
+		return file.buffer
 	} catch (_error) {
 		const response = await fetch(url)
 		const buffer = await response.arrayBuffer()
-		const file = new Uint8Array(buffer)
-		await writeFile(filePath, file)
-		return file
+		await writeFile(filePath, new Uint8Array(buffer))
+		return buffer
 	}
 }
 
 export function getFixtureFileReadStream(url: string) {
 	return Readable.toWeb(
 		createReadStream(getFixturePath(url)),
-	) as ReadableStream<Uint8Array>
+	) as ReadableStream<ArrayBufferLike>
 }
 
 export function getFixtureFileWriteStream(url: string) {

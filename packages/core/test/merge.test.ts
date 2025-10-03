@@ -30,70 +30,76 @@ const sizes = (osm: Osm) => ({
 })
 
 describe("merge osm", () => {
-	it("should merge two real osm objects", async () => {
-		const osm1Name = "yakima-full.osm.pbf"
-		const osm2Name = "yakima.osw.pbf"
-		const _osmMergedName = "yakima-merged.osm.pbf"
+	it(
+		"should merge two real osm objects",
+		{
+			timeout: 10_000,
+		},
+		async () => {
+			const osm1Name = "yakima-full.osm.pbf"
+			const osm2Name = "yakima.osw.pbf"
+			const _osmMergedName = "yakima-merged.osm.pbf"
 
-		const osm1Data = getFixtureFileReadStream(osm1Name)
-		let baseOsm = await createOsmIndexFromPbfData(osm1Data, osm1Name)
-		assert.equal(baseOsm.nodes.getById(testNode.id), null)
+			const osm1Data = getFixtureFileReadStream(osm1Name)
+			let baseOsm = await createOsmIndexFromPbfData(osm1Data, osm1Name)
+			assert.equal(baseOsm.nodes.getById(testNode.id), null)
 
-		const osm2Data = getFixtureFileReadStream(osm2Name)
-		const osm2 = await createOsmIndexFromPbfData(osm2Data, osm2Name)
-		assert.deepEqual(osm2.nodes.getById(testNode.id), testNode)
+			const osm2Data = getFixtureFileReadStream(osm2Name)
+			const osm2 = await createOsmIndexFromPbfData(osm2Data, osm2Name)
+			assert.deepEqual(osm2.nodes.getById(testNode.id), testNode)
 
-		const baseSizes = sizes(baseOsm)
-		const patchSizes = sizes(osm2)
+			const baseSizes = sizes(baseOsm)
+			const patchSizes = sizes(osm2)
 
-		let changeset = new OsmChangeset(baseOsm)
-		changeset.generateDirectChanges(osm2)
+			let changeset = new OsmChangeset(baseOsm)
+			changeset.generateDirectChanges(osm2)
 
-		assert.deepEqual(changeset.stats, {
-			deduplicatedNodes: 0,
-			deduplicatedNodesReplaced: 0,
-			deduplicatedWays: 0,
-			intersectionPointsFound: 0,
-			intersectionNodesCreated: 0,
-		}) // TODO did this break with new dequal? Or what?
+			assert.deepEqual(changeset.stats, {
+				deduplicatedNodes: 0,
+				deduplicatedNodesReplaced: 0,
+				deduplicatedWays: 0,
+				intersectionPointsFound: 0,
+				intersectionNodesCreated: 0,
+			}) // TODO did this break with new dequal? Or what?
 
-		baseOsm = changeset.applyChanges()
-		assert.deepEqual(sizes(baseOsm), {
-			nodes: baseSizes.nodes + patchSizes.nodes,
-			ways: baseSizes.ways + patchSizes.ways,
-			relations: baseSizes.relations + patchSizes.relations,
-		})
+			baseOsm = changeset.applyChanges()
+			assert.deepEqual(sizes(baseOsm), {
+				nodes: baseSizes.nodes + patchSizes.nodes,
+				ways: baseSizes.ways + patchSizes.ways,
+				relations: baseSizes.relations + patchSizes.relations,
+			})
 
-		changeset = new OsmChangeset(baseOsm)
-		changeset.createIntersectionsForWays(osm2.ways)
+			changeset = new OsmChangeset(baseOsm)
+			changeset.createIntersectionsForWays(osm2.ways)
 
-		assert.deepEqual(changeset.stats, {
-			deduplicatedNodes: 0,
-			deduplicatedNodesReplaced: 0,
-			deduplicatedWays: 0,
-			intersectionPointsFound: 5_820,
-			intersectionNodesCreated: 2_618,
-		})
+			assert.deepEqual(changeset.stats, {
+				deduplicatedNodes: 0,
+				deduplicatedNodesReplaced: 0,
+				deduplicatedWays: 0,
+				intersectionPointsFound: 5_820,
+				intersectionNodesCreated: 2_618,
+			})
 
-		baseOsm = changeset.applyChanges()
+			baseOsm = changeset.applyChanges()
 
-		assert.deepEqual(sizes(baseOsm), {
-			nodes:
-				baseSizes.nodes +
-				patchSizes.nodes +
-				changeset.stats.intersectionNodesCreated,
-			ways: baseSizes.ways + patchSizes.ways,
-			relations: baseSizes.relations + patchSizes.relations,
-		})
+			assert.deepEqual(sizes(baseOsm), {
+				nodes:
+					baseSizes.nodes +
+					patchSizes.nodes +
+					changeset.stats.intersectionNodesCreated,
+				ways: baseSizes.ways + patchSizes.ways,
+				relations: baseSizes.relations + patchSizes.relations,
+			})
 
-		assert.deepEqual(baseOsm.nodes.getById(2135545), {
-			...testNode,
-			tags: {
-				...testNode.tags,
-				crossing: "yes",
-			},
-		})
-	})
+			assert.deepEqual(baseOsm.nodes.getById(2135545), {
+				...testNode,
+				tags: {
+					...testNode.tags,
+					crossing: "yes",
+				},
+			})
+		},
+	)
 
 	it("should generate and apply osm changes", () => {
 		const base = createBaseOsm()

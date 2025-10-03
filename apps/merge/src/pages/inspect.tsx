@@ -56,13 +56,10 @@ export default function InspectPage() {
 	)
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
-	const {
-		osm,
-		isLoading: isLoadingFile,
-		file,
-		setFile,
-		setOsm,
-	} = useOsmFile(osmId, "./pbfs/monaco.pbf")
+	const { osm, file, loadOsmFile, setOsm } = useOsmFile(
+		osmId,
+		"./pbfs/monaco.pbf",
+	)
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
@@ -128,12 +125,11 @@ export default function InspectPage() {
 			<Sidebar>
 				<div className="flex flex-col p-4 gap-4">
 					<OsmPbfFileInput
-						isLoading={isLoadingFile}
 						file={file}
-						setFile={(file) => {
+						setFile={async (file) => {
 							selectEntity(null, null)
-							setFile(file)
-							if (file == null) setOsm(null)
+							const osm = await loadOsmFile(file)
+							flyToOsmBounds(osm)
 						}}
 					/>
 

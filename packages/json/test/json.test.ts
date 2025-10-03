@@ -47,7 +47,8 @@ describe("pbf json", () => {
 				.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
 				.pipeTo(
 					new WritableStream({
-						write: (chunk) => {
+						write: (buffer) => {
+							const chunk = new Uint8Array(buffer)
 							const newData = new Uint8Array(data.length + chunk.length)
 							newData.set(data)
 							newData.set(chunk, data.length)
@@ -57,7 +58,7 @@ describe("pbf json", () => {
 				)
 
 			// Re-parse the new PBF and test
-			const osm2 = await readOsmPbf(data)
+			const osm2 = await readOsmPbf(data.buffer)
 			await testOsmPbfReader(osm2, pbf)
 		})
 	})

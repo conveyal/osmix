@@ -1,5 +1,5 @@
 import { FilesIcon, Loader2Icon, XIcon } from "lucide-react"
-import { useRef } from "react"
+import { useRef, useTransition } from "react"
 import { Button } from "./ui/button"
 
 function isOsmPbfFile(file: File | undefined): file is File {
@@ -10,50 +10,38 @@ function isOsmPbfFile(file: File | undefined): file is File {
 
 export default function OsmPbfFileInput({
 	disabled,
-	isLoading,
 	file,
 	setFile,
 }: {
 	disabled?: boolean
-	isLoading?: boolean
 	file: File | null
-	setFile: (file: File | null) => void
+	setFile: (file: File | null) => Promise<void>
 }) {
+	const [isTransitioning, startTransition] = useTransition()
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	return (
-		<label
-			className="flex"
-			onDragEnter={(e) => e.preventDefault()}
-			onDragOver={(e) => e.preventDefault()}
-			onDrop={(e) => {
-				e.preventDefault()
-				const file = e.dataTransfer.files[0]
-				if (isOsmPbfFile(file)) {
-					setFile(file)
-				}
-			}}
-		>
+		<label className="flex">
 			<input
-				disabled={disabled}
+				disabled={disabled || isTransitioning}
 				className="hidden"
 				type="file"
 				accept=".pbf"
 				onChange={(e) => {
 					const file = e.target.files?.[0]
 					if (isOsmPbfFile(file)) {
-						setFile(file)
+						startTransition(() => setFile(file))
 					}
 				}}
 				ref={fileInputRef}
 			/>
 			<Button
 				className="flex-1"
-				disabled={disabled || isLoading}
+				disabled={disabled || isTransitioning}
 				type="button"
 				onClick={() => fileInputRef.current?.click()}
 				variant="default"
 			>
-				{file && isLoading ? (
+				{file && isTransitioning ? (
 					<>
 						<Loader2Icon className="animate-spin" /> Loading {file.name}...
 					</>
@@ -65,8 +53,8 @@ export default function OsmPbfFileInput({
 				)}
 			</Button>
 			<Button
-				disabled={disabled || isLoading}
-				onClick={() => setFile(null)}
+				disabled={disabled || isTransitioning}
+				onClick={() => startTransition(() => setFile(null))}
 				title="Clear file"
 			>
 				<XIcon />

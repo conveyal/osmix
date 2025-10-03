@@ -6,7 +6,7 @@ import {
 import { OsmPbfBlockParser } from "./osm-pbf-block-parser"
 import type { OsmEntity } from "./types"
 
-export function osmPbfToJson(pbf: ReadableStream<Uint8Array>) {
+export function osmPbfToJson(pbf: ReadableStream<ArrayBufferLike>) {
 	return pbf
 		.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
 		.pipeThrough(new OsmBlocksToJsonTransformStream())

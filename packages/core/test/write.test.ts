@@ -24,7 +24,7 @@ describe("write", () => {
 			assert.exists(way1)
 			assert.exists(relation1)
 
-			const transformStream = new TransformStream<Uint8Array, Uint8Array>()
+			const transformStream = new TransformStream<Uint8Array, ArrayBufferLike>()
 			const testOsmPromise = createOsmIndexFromPbfData(
 				transformStream.readable,
 				`${name}-reparsed`,

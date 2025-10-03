@@ -58,15 +58,13 @@ export function useFlyToOsmBounds() {
 	const map = useAtomValue(mapAtom)
 
 	return useCallback(
-		(osm: Osm) => {
-			if (!map) return
-			const bbox = osm.bbox()
-			if (bbox) {
-				map.fitBounds(bbox, {
-					padding: 100,
-					maxDuration: 200,
-				})
-			}
+		(osm?: Osm) => {
+			const bbox = osm?.bbox()
+			if (!map || !bbox) return
+			map.fitBounds(bbox, {
+				padding: 100,
+				maxDuration: 200,
+			})
 		},
 		[map],
 	)

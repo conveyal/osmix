@@ -1,7 +1,10 @@
 /**
  * Convert a value or a stream to an async generator.
  */
-export async function* toAsyncGenerator<T>(v: T | ReadableStream<T>) {
+export async function* toAsyncGenerator<T>(
+	v: T | ReadableStream<T> | AsyncGenerator<T>,
+): AsyncGenerator<T> {
+	if (v == null) throw Error("Value is null")
 	if (v instanceof ReadableStream) {
 		const reader = v.getReader()
 		while (true) {
@@ -10,6 +13,11 @@ export async function* toAsyncGenerator<T>(v: T | ReadableStream<T>) {
 			yield value
 		}
 		reader.releaseLock()
+	} else if (
+		typeof v === "object" &&
+		(Symbol.asyncIterator in v || Symbol.iterator in v)
+	) {
+		return v
 	} else {
 		yield v
 	}
