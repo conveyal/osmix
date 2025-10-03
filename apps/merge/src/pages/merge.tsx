@@ -190,22 +190,19 @@ export default function Merge() {
 						<div className="flex flex-col gap-1">
 							<div className="font-bold">CLEAN INPUT OSM</div>
 							<p>
-								Selected OSM PBFs will First be inspected for duplicate entities
-								within each dataset. Later, we will search for duplicate
-								entities between the two datasets.
+								Each file is first scanned for duplicate entities inside the
+								same dataset. We then look for duplicates that appear in both
+								files.
 							</p>
 							<p>
-								Duplicates are entities which either have the same ID or are
-								geographically identical. A best effort is made to select which
-								duplicate to keep. First, if there is a version number or
-								modification date, that takes precendence. If that is not
-								available, then the duplicate with the higher number of tags is
-								kept.
+								Duplicates are features that share an ID or occupy the same
+								geometry. We prefer entities with newer version metadata; if that
+								information is missing we keep the feature with more tags.
 							</p>
 							<p>
-								When a duplicate is found, a changeset is created with an entry
-								to remove the duplicate entity. That changeset can be reviewed
-								and applied on the next page.
+								When a duplicate is detected we draft a changeset entry that
+								removes the extra copy. Review those proposals in the next step
+								before applying them.
 							</p>
 						</div>
 						<Button
@@ -291,8 +288,8 @@ export default function Merge() {
 
 					<Step step="inspect-patch-osm" title="INSPECT PATCH OSM">
 						<div>
-							Next step is to generate a changeset for the patch OSM PBF
-							removing any duplicate entities.
+							Generate a changeset that removes duplicate entities from the
+							patch file before it is merged into the base data.
 						</div>
 
 						<div className="flex flex-col border-1">
@@ -325,8 +322,8 @@ export default function Merge() {
 
 					<Step step="direct-merge" title="DIRECT MERGE">
 						<div>
-							Add all new entities from the patch onto the base data set.
-							Overwrite any entities that have matching IDs.
+							Add the patch entities to the base dataset and replace any base
+							features that share the same IDs.
 						</div>
 
 						<div className="flex flex-col border-1">
@@ -393,9 +390,8 @@ export default function Merge() {
 						isTransitioning={isTransitioning}
 					>
 						<div>
-							Changes have been generated from the previous step and can be
-							reviewed below. Once the review is complete you can apply changes
-							to the base OSM and move to the next step.
+							Review the proposed edits produced in the previous step. Apply the
+							changes to update the base OSM before moving forward.
 						</div>
 						<div className="flex gap-2">
 							<Button
@@ -460,8 +456,9 @@ export default function Merge() {
 						isTransitioning={isTransitioning}
 					>
 						<div>
-							Search for geographically identical nodes between the two datasets
-							and de-duplicate them. Replaces references in ways and relations.
+							Identify nodes that occupy the same location in both datasets and
+							merge them, updating any way or relation references that point to
+							those nodes.
 						</div>
 
 						<div className="flex flex-col border-1">
@@ -510,29 +507,24 @@ export default function Merge() {
 					>
 						<div className="flex flex-col gap-1">
 							<p>
-								Look for new ways that cross over existing ways and determine if
-								they are candidates for creating intersection nodes by checking
-								their tags.
+								Scan new ways for crossings with existing ways and flag the
+								segments that should share intersection nodes based on their tags.
 							</p>
 							<p>
-								This process loops through all of the new ways and finds
-								possible candidates via a fast search for existing ways that are
-								geographically close. Only candidates with tags which allow the
-								ways to intersect are considered. Intersection candidates must
-								have a `highway` tag, be a line, have the same `layer` tag (if
-								they have one), and not be a bridge or a tunnel.
+								We quickly search for nearby ways and keep only those whose tags
+								allow an intersection: both must be linear, share the same
+								`layer` value if present, include a `highway` tag, and avoid
+								bridge or tunnel tags.
 							</p>
 							<p>
-								Next, we check each candidate way to find the real intersection
-								point with the new way. If the ways intersect, we check for
-								existing nodes at that point. If a node already exists, we
-								re-use it, prioritizing nodes from the new dataset. If no nodes
-								exist, we create a new node.
+								For each candidate we locate the precise crossover point. Existing
+								nodes at that point are reused, favoring nodes introduced by the
+								patch; otherwise we create a new node.
 							</p>
 							<p>
-								Next, we modify the ways to ensure they have the selected
-								intersection node in their refs list. These modifications and
-								changes are then reviewable on the following page.
+								Finally, we update the way geometries so they reference the chosen
+								intersection node. You can review and apply those edits in the next
+								screen.
 							</p>
 						</div>
 
@@ -575,9 +567,9 @@ export default function Merge() {
 						isTransitioning={isTransitioning}
 					>
 						<div>
-							Changes have been applied and a new OSM dataset has been created.
-							It can be inspected here and downloaded as a new PBF. Zoom in to
-							select entities and see the changes.
+							Review the merged OSM dataset, explore the results on the map, and
+							download the new PBF when ready. Zoom in to inspect individual
+							entities and confirm the applied changes.
 						</div>
 
 						{base.osm && (
