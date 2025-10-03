@@ -25,13 +25,13 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Type check
-        run: bun run typecheck
+        run: node --run typecheck
 
       - name: Lint (Biome)
-        run: bun run lint . --reporter github
+        run: node --run lint . --reporter github
 
       - name: Biome checks
-        run: bun run check . --reporter github
+        run: node --run check . --reporter github
 
       - name: Run tests
-        run: bun run test
+        run: node --run test
