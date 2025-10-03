@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json.schemastore.org/package",
-	"name": "osm",
+	"name": "osmix",
 	"packageManager": "bun@1.2.23",
 	"private": true,
 	"workspaces": {
