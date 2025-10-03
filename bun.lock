@@ -7,8 +7,8 @@
         "@biomejs/biome": "2.2.4",
       },
     },
-    "apps/osm-merge": {
-      "name": "osm-merge",
+    "apps/merge": {
+      "name": "@osmix/merge",
       "version": "0.0.1",
       "dependencies": {
         "@deck.gl/core": "9.1.14",
@@ -358,6 +358,8 @@
     "@osmix/core": ["@osmix/core@workspace:packages/core"],
 
     "@osmix/json": ["@osmix/json@workspace:packages/json"],
+
+    "@osmix/merge": ["@osmix/merge@workspace:apps/merge"],
 
     "@osmix/pbf": ["@osmix/pbf@workspace:packages/pbf"],
 
@@ -786,8 +788,6 @@
     "node-domexception": ["node-domexception@1.0.0", "", {}, "sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ=="],
 
     "node-releases": ["node-releases@2.0.19", "", {}, "sha512-xxOWJsBKtzAq7DY0J+DTzuz58K8e7sJbdgwkbMWQe8UYB6ekmsQ45q0M/tJDsGaZmbC+l7n57UV8Hl5tHxO9uw=="],
-
-    "osm-merge": ["osm-merge@workspace:apps/osm-merge"],
 
     "pako": ["pako@1.0.11", "", {}, "sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw=="],
 
