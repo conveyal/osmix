@@ -3,7 +3,6 @@ import CenterInfo from "@/components/center-info"
 import ZoomInfo from "@/components/zoom-info"
 import { cn } from "@/lib/utils"
 import BrowserCheck from "./browser-check"
-import Status from "./status"
 
 export default function Nav() {
 	return (
@@ -28,8 +27,6 @@ export default function Nav() {
 				</NavLink>
 				<BrowserCheck />
 			</div>
-
-			<Status />
 
 			<div className="flex flex-row gap-4 items-center">
 				<div className=" whitespace-nowrap">

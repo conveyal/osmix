@@ -27,6 +27,7 @@ import ChangesSummary, {
 import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
+import SidebarLog from "@/components/sidebar-log"
 import { Button } from "@/components/ui/button"
 import {
 	useFlyToEntity,
@@ -149,7 +150,7 @@ export default function Merge() {
 	return (
 		<Main>
 			<Sidebar>
-				<div className="flex flex-col p-4 gap-4">
+				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
 					<Step step="select-osm-pbf-files" title="SELECT OSM PBF FILES">
 						<div>
 							Select two PBF files to merge. Note: entities from the patch file
@@ -196,8 +197,8 @@ export default function Merge() {
 							</p>
 							<p>
 								Duplicates are features that share an ID or occupy the same
-								geometry. We prefer entities with newer version metadata; if that
-								information is missing we keep the feature with more tags.
+								geometry. We prefer entities with newer version metadata; if
+								that information is missing we keep the feature with more tags.
 							</p>
 							<p>
 								When a duplicate is detected we draft a changeset entry that
@@ -508,7 +509,8 @@ export default function Merge() {
 						<div className="flex flex-col gap-1">
 							<p>
 								Scan new ways for crossings with existing ways and flag the
-								segments that should share intersection nodes based on their tags.
+								segments that should share intersection nodes based on their
+								tags.
 							</p>
 							<p>
 								We quickly search for nearby ways and keep only those whose tags
@@ -517,14 +519,14 @@ export default function Merge() {
 								bridge or tunnel tags.
 							</p>
 							<p>
-								For each candidate we locate the precise crossover point. Existing
-								nodes at that point are reused, favoring nodes introduced by the
-								patch; otherwise we create a new node.
+								For each candidate we locate the precise crossover point.
+								Existing nodes at that point are reused, favoring nodes
+								introduced by the patch; otherwise we create a new node.
 							</p>
 							<p>
-								Finally, we update the way geometries so they reference the chosen
-								intersection node. You can review and apply those edits in the next
-								screen.
+								Finally, we update the way geometries so they reference the
+								chosen intersection node. You can review and apply those edits
+								in the next screen.
 							</p>
 						</div>
 
@@ -617,6 +619,7 @@ export default function Merge() {
 						)}
 					</Step>
 				</div>
+				<SidebarLog />
 			</Sidebar>
 			<MapContent>
 				<Basemap>

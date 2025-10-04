@@ -28,6 +28,7 @@ import ChangesSummary, {
 import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
+import SidebarLog from "@/components/sidebar-log"
 import { Button } from "@/components/ui/button"
 import {
 	useFlyToEntity,
@@ -123,7 +124,7 @@ export default function InspectPage() {
 	return (
 		<Main>
 			<Sidebar>
-				<div className="flex flex-col p-4 gap-4">
+				<div className="flex flex-1 flex-col gap-4 overflow-y-auto">
 					<OsmPbfFileInput
 						file={file}
 						setFile={async (file) => {
@@ -227,6 +228,7 @@ export default function InspectPage() {
 						</div>
 					)}
 				</div>
+				<SidebarLog />
 			</Sidebar>
 			<MapContent>
 				<Basemap>
