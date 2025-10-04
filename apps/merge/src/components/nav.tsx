@@ -8,7 +8,7 @@ export default function Nav() {
 	return (
 		<div className="border-b flex flex-row justify-between items-center px-4 h-12">
 			<div className="flex flex-row gap-2 items-center">
-				<div className="font-bold pr-2">Osmix</div>
+				<div className="font-bold tracking-wide uppercase pr-2">Osmix</div>
 				<NavLink
 					className={({ isActive }) =>
 						cn("text-slate-950 py-4 px-2", isActive && "text-blue-600")

@@ -124,7 +124,7 @@ export default function InspectPage() {
 	return (
 		<Main>
 			<Sidebar>
-				<div className="flex flex-1 flex-col gap-4 overflow-y-auto">
+				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
 					<OsmPbfFileInput
 						file={file}
 						setFile={async (file) => {
@@ -138,7 +138,9 @@ export default function InspectPage() {
 						<div className="flex flex-col gap-2">
 							<div className="flex flex-col">
 								<div className="flex items-center justify-between border-l border-r border-t pl-2">
-									<div className="font-bold">OPENSTREETMAP PBF</div>
+									<div className="font-bold tracking-wide">
+										OPENSTREETMAP PBF
+									</div>
 									<div className="flex gap-2">
 										<Button
 											disabled={isTransitioning}
