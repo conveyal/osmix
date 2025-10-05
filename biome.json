@@ -12,6 +12,10 @@
 	},
 	"linter": {
 		"rules": {
+			"a11y": {
+				"useKeyWithClickEvents": "off",
+				"useSemanticElements": "off"
+			},
 			"correctness": {
 				"noUnusedImports": "error"
 			},

@@ -1,6 +1,8 @@
-import { FilesIcon, Loader2Icon, XIcon } from "lucide-react"
+import { FilesIcon, XIcon } from "lucide-react"
 import { useRef, useTransition } from "react"
 import { Button } from "./ui/button"
+import { ButtonGroup } from "./ui/button-group"
+import { Spinner } from "./ui/spinner"
 
 function isOsmPbfFile(file: File | undefined): file is File {
 	if (file == null) return false
@@ -10,17 +12,22 @@ function isOsmPbfFile(file: File | undefined): file is File {
 
 export default function OsmPbfFileInput({
 	disabled,
-	file,
 	setFile,
 }: {
 	disabled?: boolean
-	file: File | null
 	setFile: (file: File | null) => Promise<void>
 }) {
 	const [isTransitioning, startTransition] = useTransition()
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	return (
-		<label className="flex">
+		<ButtonGroup className="w-full">
+			<Button
+				className="flex-1"
+				disabled={disabled || isTransitioning}
+				onClick={() => fileInputRef.current?.click()}
+			>
+				{isTransitioning ? <Spinner /> : <FilesIcon />} Select new OSM PBF file
+			</Button>
 			<input
 				disabled={disabled || isTransitioning}
 				className="hidden"
@@ -28,6 +35,7 @@ export default function OsmPbfFileInput({
 				accept=".pbf"
 				onChange={(e) => {
 					const file = e.target.files?.[0]
+					setFile(null)
 					if (isOsmPbfFile(file)) {
 						startTransition(() => setFile(file))
 					}
@@ -35,30 +43,12 @@ export default function OsmPbfFileInput({
 				ref={fileInputRef}
 			/>
 			<Button
-				className="flex-1"
-				disabled={disabled || isTransitioning}
-				type="button"
-				onClick={() => fileInputRef.current?.click()}
-				variant="default"
-			>
-				{file && isTransitioning ? (
-					<>
-						<Loader2Icon className="animate-spin" /> Loading {file.name}...
-					</>
-				) : (
-					<>
-						<FilesIcon />
-						Select new OSM PBF file
-					</>
-				)}
-			</Button>
-			<Button
 				disabled={disabled || isTransitioning}
 				onClick={() => startTransition(() => setFile(null))}
 				title="Clear file"
 			>
 				<XIcon />
 			</Button>
-		</label>
+		</ButtonGroup>
 	)
 }

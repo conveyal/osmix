@@ -1,7 +1,12 @@
 import type { OsmEntity } from "@osmix/json"
 import { SearchIcon } from "lucide-react"
 import { useActionState } from "react"
-import { Button } from "./ui/button"
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupButton,
+	InputGroupInput,
+} from "./ui/input-group"
 
 export default function EntityLookup({
 	setSelectedEntity,
@@ -17,16 +22,19 @@ export default function EntityLookup({
 		null,
 	)
 	return (
-		<form action={formAction} className="flex flex-row border-1">
-			<input
-				type="text"
-				name="entityId"
-				placeholder={`Find entity by ID (prefix "n", "w", or "r")`}
-				className="w-full border-none pl-2"
-			/>
-			<Button type="submit" variant="ghost">
-				<SearchIcon />
-			</Button>
+		<form action={formAction}>
+			<InputGroup>
+				<InputGroupInput
+					type="text"
+					name="entityId"
+					placeholder={`Find entity by ID (prefix "n", "w", or "r")`}
+				/>
+				<InputGroupAddon align="inline-end">
+					<InputGroupButton type="submit" size="icon-sm">
+						<SearchIcon />
+					</InputGroupButton>
+				</InputGroupAddon>
+			</InputGroup>
 		</form>
 	)
 }

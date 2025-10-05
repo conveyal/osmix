@@ -1,13 +1,7 @@
 import { Osm, writeOsmToPbfStream } from "@osmix/core"
 import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtom, useSetAtom } from "jotai"
-import {
-	DownloadIcon,
-	Loader2Icon,
-	MaximizeIcon,
-	MergeIcon,
-	SearchCode,
-} from "lucide-react"
+import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useMemo, useTransition } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
@@ -30,6 +24,7 @@ import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
 import SidebarLog from "@/components/sidebar-log"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
 	useFlyToEntity,
 	useFlyToOsmBounds,
@@ -126,7 +121,6 @@ export default function InspectPage() {
 			<Sidebar>
 				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
 					<OsmPbfFileInput
-						file={file}
 						setFile={async (file) => {
 							selectEntity(null, null)
 							const osm = await loadOsmFile(file)
@@ -138,9 +132,7 @@ export default function InspectPage() {
 						<div className="flex flex-col gap-2">
 							<div className="flex flex-col">
 								<div className="flex items-center justify-between border-l border-r border-t pl-2">
-									<div className="font-bold tracking-wide">
-										OPENSTREETMAP PBF
-									</div>
+									<div className="font-bold">OPENSTREETMAP PBF</div>
 									<div className="flex gap-2">
 										<Button
 											disabled={isTransitioning}
@@ -182,11 +174,7 @@ export default function InspectPage() {
 									}}
 									disabled={isTransitioning}
 								>
-									{isTransitioning ? (
-										<Loader2Icon className="animate-spin" />
-									) : (
-										<SearchCode />
-									)}
+									{isTransitioning ? <Spinner /> : <SearchCode />}
 									Find duplicate nodes and ways
 								</Button>
 							) : (
@@ -213,11 +201,7 @@ export default function InspectPage() {
 											onClick={() => applyChanges(osm.id)}
 											disabled={isTransitioning}
 										>
-											{isTransitioning ? (
-												<Loader2Icon className="animate-spin" />
-											) : (
-												<MergeIcon />
-											)}
+											{isTransitioning ? <Spinner /> : <MergeIcon />}
 											Apply changes
 										</Button>
 									)}
@@ -252,14 +236,14 @@ export default function InspectPage() {
 									return {
 										className: "deck-tooltip",
 										style: deckTooltipStyle,
-										html: `<h3 className="p-2">node</h3>`,
+										html: `<div className="p-2">node</div>`,
 									}
 								}
 								if (sourceLayerId.includes("ways")) {
 									return {
 										className: "deck-tooltip",
 										style: deckTooltipStyle,
-										html: `<h3 className="p-2">way</h3>`,
+										html: `<div className="p-2">way</div>`,
 									}
 								}
 							}

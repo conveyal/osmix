@@ -1,16 +1,19 @@
-import { Loader2Icon } from "lucide-react"
 import { useLog } from "@/hooks/log"
 import { cn } from "@/lib/utils"
 import { formatTimestampMs } from "@/utils"
+import { Spinner } from "./ui/spinner"
 
 export default function Status() {
 	const { log, activeTasks } = useLog()
 	const status = log[log.length - 1]
 	if (!status) return null
 	return (
-		<div className="flex flex-row items-center gap-2" title={formatTimestampMs(status.timestamp)}>
+		<div
+			className="flex flex-row items-center gap-2"
+			title={formatTimestampMs(status.timestamp)}
+		>
 			{activeTasks > 0 ? (
-				<Loader2Icon className="size-4 animate-spin" />
+				<Spinner />
 			) : (
 				<div
 					className={cn(

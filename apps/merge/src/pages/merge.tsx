@@ -6,7 +6,6 @@ import {
 	DownloadIcon,
 	FastForwardIcon,
 	FileDiff,
-	Loader2Icon,
 	MaximizeIcon,
 	MergeIcon,
 	SkipForwardIcon,
@@ -18,7 +17,6 @@ import DeckGlOverlay from "@/components/deckgl-overlay"
 import { Details, DetailsContent, DetailsSummary } from "@/components/details"
 import EntityDetails from "@/components/entity-details"
 import { Main, MapContent, Sidebar } from "@/components/layout"
-import LogContent from "@/components/log"
 import ChangesSummary, {
 	ChangesExpandableList,
 	ChangesFilters,
@@ -29,6 +27,8 @@ import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
 import SidebarLog from "@/components/sidebar-log"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Spinner } from "@/components/ui/spinner"
 import {
 	useFlyToEntity,
 	useFlyToOsmBounds,
@@ -102,11 +102,11 @@ export default function Merge() {
 
 	const startStepTask = useCallback(
 		(message: string, fn: () => Promise<string>) => {
-			nextStep()
 			const task = Log.startTask(message)
 			startTransition(async () => {
 				const endMessage = await fn()
 				task.end(endMessage)
+				nextStep()
 			})
 		},
 		[nextStep],
@@ -152,15 +152,14 @@ export default function Merge() {
 			<Sidebar>
 				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
 					<Step step="select-osm-pbf-files" title="SELECT OSM PBF FILES">
-						<div>
+						<p>
 							Select two PBF files to merge. Note: entities from the patch file
 							are prioritized over matching entities in the base file.
-						</div>
+						</p>
 
 						<div className="flex flex-col border-1">
 							<div className="font-bold p-2">BASE OSM PBF</div>
 							<OsmPbfFileInput
-								file={base.file}
 								setFile={async (file) => {
 									const osm = await base.loadOsmFile(file)
 									flyToOsmBounds(osm)
@@ -176,7 +175,6 @@ export default function Merge() {
 						<div className="flex flex-col border-1">
 							<div className="font-bold p-2">PATCH OSM PBF</div>
 							<OsmPbfFileInput
-								file={patch.file}
 								setFile={async (file) => {
 									const osm = await patch.loadOsmFile(file)
 									flyToOsmBounds(osm)
@@ -188,24 +186,29 @@ export default function Merge() {
 								file={patch.file}
 							/>
 						</div>
-						<div className="flex flex-col gap-1">
-							<div className="font-bold">CLEAN INPUT OSM</div>
-							<p>
-								Each file is first scanned for duplicate entities inside the
-								same dataset. We then look for duplicates that appear in both
-								files.
-							</p>
-							<p>
-								Duplicates are features that share an ID or occupy the same
-								geometry. We prefer entities with newer version metadata; if
-								that information is missing we keep the feature with more tags.
-							</p>
-							<p>
-								When a duplicate is detected we draft a changeset entry that
-								removes the extra copy. Review those proposals in the next step
-								before applying them.
-							</p>
-						</div>
+						<Card>
+							<CardHeader>
+								<CardTitle>CLEAN INPUT OSM</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-2">
+								<p>
+									Each file is first scanned for duplicate entities inside the
+									same dataset. We then look for duplicates that appear in both
+									files.
+								</p>
+								<p>
+									Duplicates are features that share an ID or occupy the same
+									geometry. We prefer entities with newer version metadata; if
+									that information is missing we keep the feature with more
+									tags.
+								</p>
+								<p>
+									When a duplicate is detected we draft a changeset entry that
+									removes the extra copy. Review those proposals in the next
+									step before applying them.
+								</p>
+							</CardContent>
+						</Card>
 						<Button
 							disabled={isTransitioning || !base.osm || !patch.osm}
 							onClick={() => {
@@ -222,12 +225,12 @@ export default function Merge() {
 								)
 							}}
 						>
-							Inspect base OSM for duplicate entities
+							{isTransitioning && <Spinner />} Inspect base OSM for duplicate
+							entities
 						</Button>
 						<Button
 							disabled={isTransitioning || !base.osm || !patch.osm}
 							onClick={() => {
-								goToStep("inspect-final-osm")
 								const task = Log.startTask(
 									"Running all merge steps, please wait...",
 								)
@@ -279,19 +282,20 @@ export default function Merge() {
 									await osmWorker.applyChangesAndReplace(base.osm.id)
 
 									task.end("All merge steps completed")
+									goToStep("inspect-final-osm")
 								})
 							}}
 						>
-							Run all merge steps{" "}
-							{isTransitioning ? <Loader2Icon /> : <FastForwardIcon />}
+							{isTransitioning ? <Spinner /> : <FastForwardIcon />}
+							Run all merge steps
 						</Button>
 					</Step>
 
 					<Step step="inspect-patch-osm" title="INSPECT PATCH OSM">
-						<div>
+						<p>
 							Generate a changeset that removes duplicate entities from the
 							patch file before it is merged into the base data.
-						</div>
+						</p>
 
 						<div className="flex flex-col border-1">
 							<div className="font-bold p-2">PATCH OSM PBF</div>
@@ -317,15 +321,16 @@ export default function Merge() {
 								)
 							}}
 						>
-							Inspect patch OSM for duplicate entities
+							{isTransitioning && <Spinner />} Inspect patch OSM for duplicate
+							entities
 						</Button>
 					</Step>
 
 					<Step step="direct-merge" title="DIRECT MERGE">
-						<div>
+						<p>
 							Add the patch entities to the base dataset and replace any base
 							features that share the same IDs.
-						</div>
+						</p>
 
 						<div className="flex flex-col border-1">
 							<div className="flex flex-row justify-between items-center">
@@ -380,7 +385,8 @@ export default function Merge() {
 									})
 								}}
 							>
-								Generate direct changes <FileDiff />
+								{isTransitioning ? <Spinner /> : <FileDiff />} Generate direct
+								changes
 							</Button>
 						</div>
 					</Step>
@@ -390,10 +396,10 @@ export default function Merge() {
 						title="REVIEW CHANGESET"
 						isTransitioning={isTransitioning}
 					>
-						<div>
+						<p>
 							Review the proposed edits produced in the previous step. Apply the
 							changes to update the base OSM before moving forward.
-						</div>
+						</p>
 						<div className="flex gap-2">
 							<Button
 								className="flex-1/2"
@@ -424,7 +430,7 @@ export default function Merge() {
 
 						{changes == null || hasZeroChanges ? (
 							<Button onClick={() => nextStep()} disabled={isTransitioning}>
-								No changes, go to next step <ArrowRightIcon />
+								<ArrowRightIcon /> No changes, go to next step
 							</Button>
 						) : (
 							<Button
@@ -446,7 +452,7 @@ export default function Merge() {
 									})
 								}}
 							>
-								Apply changes <MergeIcon />
+								{isTransitioning ? <Spinner /> : <MergeIcon />} Apply changes
 							</Button>
 						)}
 					</Step>
@@ -456,11 +462,11 @@ export default function Merge() {
 						title="DE-DUPLICATE NODES"
 						isTransitioning={isTransitioning}
 					>
-						<div>
+						<p>
 							Identify nodes that occupy the same location in both datasets and
 							merge them, updating any way or relation references that point to
 							those nodes.
-						</div>
+						</p>
 
 						<div className="flex flex-col border-1">
 							<div className="flex flex-row justify-between">
@@ -496,7 +502,8 @@ export default function Merge() {
 									})
 								}}
 							>
-								De-duplicate nodes <FileDiff />
+								{isTransitioning ? <Spinner /> : <FileDiff />} De-duplicate
+								nodes
 							</Button>
 						</div>
 					</Step>
@@ -506,7 +513,7 @@ export default function Merge() {
 						title="CREATE INTERSECTIONS"
 						isTransitioning={isTransitioning}
 					>
-						<div className="flex flex-col gap-1">
+						<div className="flex flex-col space-y-2">
 							<p>
 								Scan new ways for crossings with existing ways and flag the
 								segments that should share intersection nodes based on their
@@ -558,7 +565,8 @@ export default function Merge() {
 									})
 								}}
 							>
-								Create intersections <FileDiff />
+								{isTransitioning ? <Spinner /> : <FileDiff />} Create
+								intersections
 							</Button>
 						</div>
 					</Step>
@@ -568,11 +576,11 @@ export default function Merge() {
 						title="INSPECT OSM"
 						isTransitioning={isTransitioning}
 					>
-						<div>
+						<p>
 							Review the merged OSM dataset, explore the results on the map, and
 							download the new PBF when ready. Zoom in to inspect individual
 							entities and confirm the applied changes.
-						</div>
+						</p>
 
 						{base.osm && (
 							<>
@@ -639,14 +647,14 @@ export default function Merge() {
 									return {
 										className: "deck-tooltip",
 										style: deckTooltipStyle,
-										html: `<h3 className="p-2">node</h3>`,
+										html: `<div className="p-2">node</div>`,
 									}
 								}
 								if (sourceLayerId.includes("ways")) {
 									return {
 										className: "deck-tooltip",
 										style: deckTooltipStyle,
-										html: `<h3 className="p-2">way</h3>`,
+										html: `<div className="p-2">way</div>`,
 									}
 								}
 							}
@@ -677,14 +685,9 @@ function Step({
 	if (step !== currentStep) return null
 	if (isTransitioning === true)
 		return (
-			<div className="flex flex-col gap-2">
-				<div className="flex items-center gap-1">
-					<Loader2Icon className="animate-spin size-4" />
-					<div className="font-bold">PLEASE WAIT...</div>
-				</div>
-				<div className="h-48 p-2 border inset-shadow-xs">
-					<LogContent />
-				</div>
+			<div className="flex items-center gap-1">
+				<Spinner />
+				<div className="font-bold">PLEASE WAIT...</div>
 			</div>
 		)
 	return (
@@ -732,11 +735,7 @@ function DownloadOsmButton({
 			variant="ghost"
 			{...props}
 		>
-			{isTransitioning ? (
-				<Loader2Icon className="animate-spin size-4" />
-			) : (
-				<DownloadIcon />
-			)}
+			{isTransitioning ? <Spinner /> : <DownloadIcon />}
 			{children}
 		</Button>
 	)

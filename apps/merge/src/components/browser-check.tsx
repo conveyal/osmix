@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { Button } from "./ui/button"
 import {
 	Dialog,
@@ -8,12 +8,13 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "./ui/dialog"
+import { Spinner } from "./ui/spinner"
 
 export default function BrowserCheck() {
 	return (
 		<Dialog>
 			<DialogTrigger asChild>
-				<Button size="xs" variant="link">
+				<Button size="sm" variant="link">
 					Check system
 				</Button>
 			</DialogTrigger>
@@ -117,9 +118,10 @@ function MaxArraySizes() {
 		Object.fromEntries(TypedArrays.map((array) => [array.name, 0])),
 	)
 	const [calculated, setCalculated] = useState(false)
+	const [, startTransition] = useTransition()
 
 	useEffect(() => {
-		setTimeout(() => {
+		startTransition(() => {
 			const newSizes = Object.fromEntries(
 				TypedArrays.map((array) => [array.name, 0]),
 			)
@@ -137,7 +139,7 @@ function MaxArraySizes() {
 			}
 			setMaxArraySizes(newSizes)
 			setCalculated(true)
-		}, 0)
+		})
 	}, [])
 
 	return (
@@ -159,7 +161,7 @@ function MaxArraySizes() {
 					</div>
 				</>
 			) : (
-				<div>Calculating...</div>
+				<Spinner />
 			)}
 		</div>
 	)

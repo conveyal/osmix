@@ -1,23 +1,23 @@
-import { Loader2Icon } from "lucide-react"
 import { useLog } from "@/hooks/log"
 import { cn } from "@/lib/utils"
 import { formatTimestampMs } from "@/utils"
 import LogContent from "./log"
+import { Spinner } from "./ui/spinner"
 
 export default function SidebarLog() {
 	const { activeTasks, log } = useLog()
 	const status = log[log.length - 1]
 	return (
 		<div className="border-t">
-			<div className="flex items-center justify-between px-4 py-2 border-b shadow-md">
-				<span className="font-bold uppercase tracking-wide">Activity Log</span>
+			<div className="flex items-center justify-between px-4 py-2 border-b shadow">
+				<span className="font-bold uppercase">Activity Log</span>
 				{status && (
 					<span
 						className="flex items-center gap-2"
 						title={formatTimestampMs(status.timestamp)}
 					>
 						{activeTasks > 0 ? (
-							<Loader2Icon className="size-4 animate-spin" />
+							<Spinner />
 						) : (
 							<span
 								className={cn(

@@ -5,7 +5,7 @@ import { formatTimestampMs } from "@/utils"
 export default function LogContent() {
 	const { log } = useLog()
 	return (
-		<div className="flex flex-col h-full overflow-x-auto overflow-y-auto text-xs gap-1">
+		<div className="flex flex-col h-full overflow-x-auto overflow-y-auto gap-1">
 			{log.toReversed().map((message, index) => (
 				<div
 					key={`${index}-${message.timestamp}`}
