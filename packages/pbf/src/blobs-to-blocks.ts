@@ -6,7 +6,9 @@ import { decompress } from "./utils"
  * Helper to turn a generator of compressed Blob data into a generator of decompressed and parsed header and primitive blocks.
  */
 export async function* osmPbfBlobsToBlocksGenerator(
-	blobs: AsyncGenerator<Uint8Array> | Generator<Uint8Array>,
+	blobs:
+		| AsyncGenerator<Uint8Array<ArrayBuffer>>
+		| Generator<Uint8Array<ArrayBuffer>>,
 ) {
 	let headerRead = false
 	for await (const blob of blobs) {

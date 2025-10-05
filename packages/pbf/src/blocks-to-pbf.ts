@@ -28,7 +28,7 @@ export async function osmBlockToPbfBlobBytes(
 		type = "OSMHeader"
 		writeHeaderBlock(block, contentPbf)
 	}
-	const contentData = contentPbf.finish()
+	const contentData = contentPbf.finish() as Uint8Array<ArrayBuffer>
 	const raw_size = contentData.length
 	const compressedBuffer = await compress(contentData)
 

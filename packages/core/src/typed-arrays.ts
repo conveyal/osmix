@@ -46,9 +46,7 @@ export const IndexArrayType = Uint32Array
  */
 export const DEFAULT_BUFFER_SIZE = 2 ** 20 // 1 MiB
 
-export class ResizeableTypedArray<TA extends TypedArray>
-	implements RelativeIndexable<number>
-{
+export class ResizeableTypedArray<TA extends TypedArray> {
 	ArrayType: TypedArrayConstructor<TA>
 	array: TA
 	items = 0
@@ -76,6 +74,10 @@ export class ResizeableTypedArray<TA extends TypedArray>
 			maxByteLength: this.maxByteLength,
 		})
 		this.array = new this.ArrayType(this.buffer)
+	}
+
+	[Symbol.iterator](): ArrayIterator<number> {
+		return this.array[Symbol.iterator]()
 	}
 
 	expandArray() {

@@ -17,7 +17,7 @@ describe("createOsmPbfBlobGenerator", () => {
 		const { header, primitiveBlock, fileBytes } =
 			await createSamplePbfFileBytes()
 		const generate = createOsmPbfBlobGenerator()
-		const yielded: Uint8Array[] = []
+		const yielded: Uint8Array<ArrayBuffer>[] = []
 
 		let offset = 0
 		const chunkSizes = [1, 9]

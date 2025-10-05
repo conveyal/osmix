@@ -45,7 +45,7 @@ export function createOsmPbfBlobGenerator() {
 				if (blob.zlib_data === undefined || blob.zlib_data.length === 0)
 					throw Error("Blob has no zlib data. Format is unsupported.")
 
-				yield blob.zlib_data
+				yield blob.zlib_data as Uint8Array<ArrayBuffer>
 
 				state = "header-length"
 				bytesNeeded = HEADER_LENGTH_BYTES

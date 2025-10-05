@@ -12,7 +12,7 @@ describe("osmPbfBlobsToBlocksGenerator", () => {
 		const { header, primitiveBlock, fileBytes } =
 			await createSamplePbfFileBytes()
 		const collectBlobs = createOsmPbfBlobGenerator()
-		const blobs: Uint8Array[] = []
+		const blobs: Uint8Array<ArrayBuffer>[] = []
 		for (const blob of collectBlobs(fileBytes)) blobs.push(blob)
 
 		const generator = osmPbfBlobsToBlocksGenerator(
