@@ -13,14 +13,16 @@ function isOsmPbfFile(file: File | undefined): file is File {
 export default function OsmPbfFileInput({
 	disabled,
 	setFile,
+	testId,
 }: {
 	disabled?: boolean
 	setFile: (file: File | null) => Promise<void>
+	testId?: string
 }) {
 	const [isTransitioning, startTransition] = useTransition()
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	return (
-		<ButtonGroup className="w-full">
+		<ButtonGroup className="w-full" data-testid={testId}>
 			<Button
 				className="flex-1"
 				disabled={disabled || isTransitioning}
@@ -33,6 +35,7 @@ export default function OsmPbfFileInput({
 				className="hidden"
 				type="file"
 				accept=".pbf"
+				data-testid={testId ? `${testId}-input` : undefined}
 				onChange={(e) => {
 					const file = e.target.files?.[0]
 					setFile(null)

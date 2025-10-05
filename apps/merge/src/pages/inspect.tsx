@@ -121,6 +121,7 @@ export default function InspectPage() {
 			<Sidebar>
 				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
 					<OsmPbfFileInput
+						testId="inspect-file"
 						setFile={async (file) => {
 							selectEntity(null, null)
 							const osm = await loadOsmFile(file)
