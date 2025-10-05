@@ -18,7 +18,7 @@ export default function EntityMapControl({ osm }: { osm: Osmix }) {
 				</div>
 			) : (
 				<div>
-					<div className="flex items-center justify-between px-2 pt-1">
+					<div className="flex items-center justify-between pl-2">
 						<div className="font-bold">SELECTED ENTITY</div>
 						<Button
 							onClick={() => {
@@ -26,7 +26,6 @@ export default function EntityMapControl({ osm }: { osm: Osmix }) {
 							}}
 							variant="ghost"
 							size="icon"
-							className="size-4"
 							title="Fit bounds to entity"
 						>
 							<MaximizeIcon />
