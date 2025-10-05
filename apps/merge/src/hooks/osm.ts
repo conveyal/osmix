@@ -1,4 +1,4 @@
-import { Osm } from "@osmix/core"
+import { Osmix } from "@osmix/core"
 import * as Comlink from "comlink"
 import { useAtom, useAtomValue } from "jotai"
 import { useCallback, useEffect, useState, useTransition } from "react"
@@ -14,7 +14,7 @@ export function useOsm(id: string) {
 }
 
 export function useOsmDefaultFile(
-	loadOsmFile: (file: File | null) => Promise<Osm | undefined>,
+	loadOsmFile: (file: File | null) => Promise<Osmix | undefined>,
 	defaultFilePath?: string,
 ) {
 	const [, startTransition] = useTransition()
@@ -59,7 +59,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 					id ?? file.name,
 					Comlink.transfer(data, [data]),
 				)
-				const osm = Osm.from(osmBuffers)
+				const osm = Osmix.from(osmBuffers)
 				setOsm(osm)
 				taskLog.end(`${file.name} fully loaded.`)
 				return osm
