@@ -1,4 +1,4 @@
-import { Osm, type OsmChanges, writeOsmToPbfStream } from "@osmix/core"
+import { type OsmChanges, Osmix, writeOsmToPbfStream } from "@osmix/core"
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
 	ArrowLeft,
@@ -131,7 +131,7 @@ export default function Merge() {
 	const applyChanges = useCallback(async (changes: OsmChanges) => {
 		const task = Log.startTask("Applying changes to OSM")
 
-		const newOsm = Osm.from(
+		const newOsm = Osmix.from(
 			await osmWorker.applyChangesAndReplace(changes.osmId),
 		)
 		task.end("Changes applied", "ready")
@@ -704,7 +704,7 @@ function DownloadOsmButton({
 	children,
 	osm,
 	...props
-}: React.ComponentProps<typeof Button> & { osm: Osm }) {
+}: React.ComponentProps<typeof Button> & { osm: Osmix }) {
 	const [isTransitioning, startTransition] = useTransition()
 	return (
 		<Button

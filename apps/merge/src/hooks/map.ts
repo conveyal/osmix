@@ -1,7 +1,7 @@
 import type { Layer as DeckGlLayer } from "@deck.gl/core"
 import { type GeoBoundingBox, TileLayer } from "@deck.gl/geo-layers"
 import { GeoJsonLayer, PathLayer, ScatterplotLayer } from "@deck.gl/layers"
-import type { Osm } from "@osmix/core"
+import type { Osmix } from "@osmix/core"
 import { isNode, type OsmEntity } from "@osmix/json"
 import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtomValue, useSetAtom } from "jotai"
@@ -20,7 +20,7 @@ export function useFlyToEntity() {
 	const map = useAtomValue(mapAtom)
 
 	return useCallback(
-		(osm: Osm, entity: OsmEntity) => {
+		(osm: Osmix, entity: OsmEntity) => {
 			if (!map) return
 			if (isNode(entity)) {
 				map.flyTo({
@@ -45,7 +45,7 @@ export function useFlyToOsmBounds() {
 	const map = useAtomValue(mapAtom)
 
 	return useCallback(
-		(osm?: Osm) => {
+		(osm?: Osmix) => {
 			const bbox = osm?.bbox()
 			if (!map || !bbox) return
 			map.fitBounds(bbox, {
@@ -57,7 +57,7 @@ export function useFlyToOsmBounds() {
 	)
 }
 
-export function usePickableOsmTileLayer(osm?: Osm | null) {
+export function usePickableOsmTileLayer(osm?: Osmix | null) {
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 
 	const layer = useMemo(() => {

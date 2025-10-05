@@ -12,7 +12,7 @@ import {
 import { distance } from "@turf/distance"
 import { lineIntersect } from "@turf/line-intersect"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
-import { Osm } from "./osm"
+import { Osmix } from "./osmix"
 import type { OsmChange, OsmEntityRef } from "./types"
 import {
 	cleanCoords,
@@ -53,7 +53,7 @@ export default class OsmChangeset {
 	wayChanges: Record<number, OsmChange<OsmEntityTypeMap["way"]>> = {}
 	relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]>> = {}
 
-	osm: Osm
+	osm: Osmix
 
 	// Next node ID
 	currentNodeId: number
@@ -66,7 +66,7 @@ export default class OsmChangeset {
 		intersectionNodesCreated: 0,
 	}
 
-	static fromJson(base: Osm, json: OsmChanges) {
+	static fromJson(base: Osmix, json: OsmChanges) {
 		const changeset = new OsmChangeset(base)
 		changeset.nodeChanges = json.nodes
 		changeset.wayChanges = json.ways
@@ -74,7 +74,7 @@ export default class OsmChangeset {
 		return changeset
 	}
 
-	constructor(base: Osm) {
+	constructor(base: Osmix) {
 		this.osm = base
 		this.currentNodeId = base.nodes.ids.at(-1)
 	}
@@ -153,7 +153,7 @@ export default class OsmChangeset {
 
 	deduplicateOverlappingNodes(
 		nodeIndex: number,
-		osm: Osm,
+		osm: Osmix,
 		idPairs: IdPairs,
 	): number {
 		const nodeId = osm.nodes.ids.at(nodeIndex)
@@ -265,7 +265,7 @@ export default class OsmChangeset {
 	/**
 	 * TODO: replace refs in relations with new way
 	 */
-	deduplicateWay(wayIndex: number, osm: Osm, dedupedIdPairs: IdPairs) {
+	deduplicateWay(wayIndex: number, osm: Osmix, dedupedIdPairs: IdPairs) {
 		const way = osm.ways.getByIndex(wayIndex)
 		const wayCoords = osm.ways.getCoordinates(wayIndex, osm.nodes)
 
@@ -316,7 +316,7 @@ export default class OsmChangeset {
 		return candidateDuplicateWays.length
 	}
 
-	*deduplicateWays(osm?: Osm) {
+	*deduplicateWays(osm?: Osmix) {
 		const dedupedIdPairs = new IdPairs()
 		for (let wayIndex = 0; wayIndex < (osm ?? this.osm).ways.size; wayIndex++) {
 			yield this.deduplicateWay(wayIndex, osm ?? this.osm, dedupedIdPairs)
@@ -506,7 +506,7 @@ export default class OsmChangeset {
 	 * - If I add ways first, then nodes, the node de-duplication may work better. I can de-duplicate the nodes in the changesets.
 	 * - Replace existing nodes in relations where appropriate.
 	 */
-	generateDirectChanges(patch: Osm) {
+	generateDirectChanges(patch: Osmix) {
 		// Reset the current node ID to the highest node ID in the base or patch
 		this.currentNodeId = Math.max(
 			this.osm.nodes.ids.at(-1),
@@ -669,7 +669,7 @@ export default class OsmChangeset {
 		}
 	}
 
-	*deduplicateNodes(osm?: Osm) {
+	*deduplicateNodes(osm?: Osmix) {
 		const dedupedIdPairs = new IdPairs()
 		for (
 			let nodeIndex = 0;
@@ -778,7 +778,7 @@ function waysIntersect(wayA: [number, number][], wayB: [number, number][]) {
  */
 export function applyChangesetToOsm(changeset: OsmChangeset, newId?: string) {
 	const baseOsm = changeset.osm
-	const osm = new Osm(newId ?? `${baseOsm.id}-merged`, baseOsm.header)
+	const osm = new Osmix(newId ?? `${baseOsm.id}-merged`, baseOsm.header)
 
 	const { nodeChanges, wayChanges, relationChanges } = changeset
 

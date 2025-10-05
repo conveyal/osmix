@@ -1,4 +1,4 @@
-import type { Osm } from "@osmix/core"
+import type { Osmix } from "@osmix/core"
 import { bytesSizeToHuman } from "@/utils"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 import ObjectToTableRows from "./object-to-table"
@@ -9,7 +9,7 @@ export default function OsmInfoTable({
 	file,
 }: {
 	defaultOpen?: boolean
-	osm: Osm | null
+	osm: Osmix | null
 	file: File | null
 }) {
 	if (!osm || !file) return null

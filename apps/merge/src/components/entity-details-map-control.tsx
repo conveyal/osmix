@@ -1,4 +1,4 @@
-import type { Osm } from "@osmix/core"
+import type { Osmix } from "@osmix/core"
 import { useAtom } from "jotai"
 import { MaximizeIcon } from "lucide-react"
 import { useFlyToEntity } from "@/hooks/map"
@@ -7,7 +7,7 @@ import { selectedEntityAtom } from "@/state/osm"
 import EntityDetails from "./entity-details"
 import { Button } from "./ui/button"
 
-export default function EntityMapControl({ osm }: { osm: Osm }) {
+export default function EntityMapControl({ osm }: { osm: Osmix }) {
 	const [selectedEntity, setSelectedEntity] = useAtom(selectedEntityAtom)
 	const flyToEntity = useFlyToEntity()
 	return (

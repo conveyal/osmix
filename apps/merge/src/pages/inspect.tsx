@@ -1,4 +1,4 @@
-import { Osm, writeOsmToPbfStream } from "@osmix/core"
+import { Osmix, writeOsmToPbfStream } from "@osmix/core"
 import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
@@ -73,7 +73,7 @@ export default function InspectPage() {
 		}
 	}, [osm, selectEntity, setDuplicateNodesAndWays])
 
-	const downloadOsm = useCallback(async (osm: Osm, name?: string) => {
+	const downloadOsm = useCallback(async (osm: Osmix, name?: string) => {
 		startTransition(async () => {
 			const task = Log.startTask("Generating OSM file to download")
 			const suggestedName =
@@ -99,7 +99,7 @@ export default function InspectPage() {
 			startTransition(async () => {
 				const transferables = await osmWorker.applyChangesAndReplace(osmId)
 				task.update("Refreshing OSM index...")
-				const newOsm = Osm.from(transferables)
+				const newOsm = Osmix.from(transferables)
 				setOsm(newOsm)
 				task.end("Changes applied!")
 			})

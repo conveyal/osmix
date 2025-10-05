@@ -1,20 +1,20 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import { clipPolyline } from "lineclip"
-import type { Osm } from "./osm"
+import type { Osmix } from "./osmix"
 import type { GeoBbox2D, Rgba, TileIndex } from "./types"
 
 const DEFAULT_COLOR: Rgba = [255, 255, 255, 255] // white
 
 export class OsmixRasterTile {
-	osm: Osm
+	osm: Osmix
 	bbox: GeoBbox2D
-	imageData: Uint8ClampedArray
+	imageData: Uint8ClampedArray<ArrayBuffer>
 	tileSize: number
 	tileIndex: TileIndex
 	merc: SphericalMercator
 
 	constructor(
-		osm: Osm,
+		osm: Osmix,
 		bbox: GeoBbox2D,
 		tileIndex: TileIndex,
 		tileSize: number,

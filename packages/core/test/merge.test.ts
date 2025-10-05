@@ -1,7 +1,7 @@
 import type { OsmNode } from "@osmix/json"
 import { getFixtureFileReadStream } from "@osmix/test-utils/fixtures"
 import { assert, describe, it } from "vitest"
-import { createOsmIndexFromPbfData, type Osm, OsmChangeset } from "../src"
+import { createOsmIndexFromPbfData, OsmChangeset, type Osmix } from "../src"
 import { createBaseOsm, createPatchOsm } from "./mock-osm"
 
 const testNode: OsmNode = {
@@ -23,7 +23,7 @@ const testNode: OsmNode = {
 	},
 }
 
-const sizes = (osm: Osm) => ({
+const sizes = (osm: Osmix) => ({
 	nodes: osm.nodes.size,
 	ways: osm.ways.size,
 	relations: osm.relations.size,

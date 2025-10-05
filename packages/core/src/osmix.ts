@@ -23,7 +23,7 @@ import type { GeoBbox2D } from "./types"
 import { bboxFromLonLats } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
-export interface OsmTransferables {
+export interface OsmixTransferables {
 	id: string
 	header: OsmPbfHeaderBlock
 	stringTable: StringTableTransferables
@@ -36,7 +36,7 @@ export interface OsmTransferables {
 /**
  * OSM Entity Index.
  */
-export class Osm {
+export class Osmix {
 	// Filename or ID of this OSM Entity index.
 	id: string
 	header: OsmPbfHeaderBlock
@@ -60,8 +60,8 @@ export class Osm {
 		ways,
 		relations,
 		parsingTimeMs,
-	}: OsmTransferables) {
-		const osm = new Osm(id, header)
+	}: OsmixTransferables) {
+		const osm = new Osmix(id, header)
 		osm.stringTable = StringTable.from(stringTable)
 		osm.nodes = Nodes.from(osm.stringTable, nodes)
 		osm.ways = Ways.from(osm.stringTable, ways)
@@ -114,7 +114,7 @@ export class Osm {
 		return this.#finished
 	}
 
-	transferables(): OsmTransferables {
+	transferables(): OsmixTransferables {
 		return {
 			id: this.id,
 			header: this.header,

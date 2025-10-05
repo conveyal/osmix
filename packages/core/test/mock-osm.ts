@@ -1,4 +1,4 @@
-import { Osm } from "../src/osm"
+import { Osmix } from "../src/osmix"
 
 const YAKIM_LAT = 46.60207
 const YAKIM_LON = -120.505898
@@ -6,7 +6,7 @@ const YAKIM_LON = -120.505898
 const ONE_KM_LON = 0.0131 // approximately
 const ONE_KM_LAT = 0.009
 
-function addBaseNodes(osm: Osm) {
+function addBaseNodes(osm: Osmix) {
 	osm.nodes.addNode({
 		id: 0,
 		lat: YAKIM_LAT,
@@ -19,7 +19,7 @@ function addBaseNodes(osm: Osm) {
 	})
 }
 
-function addBaseWays(osm: Osm) {
+function addBaseWays(osm: Osmix) {
 	osm.ways.addWay({
 		id: 1,
 		refs: [0, 1],
@@ -32,8 +32,8 @@ function addBaseWays(osm: Osm) {
 /**
  * Create a base OSM with one way and two nodes.
  */
-export function createBaseOsm(): Osm {
-	const base = new Osm()
+export function createBaseOsm(): Osmix {
+	const base = new Osmix()
 	addBaseNodes(base)
 	base.nodes.finish()
 	addBaseWays(base)
@@ -47,8 +47,8 @@ export function createBaseOsm(): Osm {
  * - A way that has an overlapping node with the first way, but does not share a node and so starts disconnected
  * - A way that crosses over the first way, but does not share a node and so starts disconnected
  */
-export function createPatchOsm(): Osm {
-	const osm = new Osm()
+export function createPatchOsm(): Osmix {
+	const osm = new Osmix()
 
 	// Add all nodes
 	addBaseNodes(osm)

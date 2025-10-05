@@ -1,3 +1,5 @@
+import { APPID } from "./settings"
+
 export function flattenValue(value: unknown): string {
 	if (typeof value === "string") {
 		return value
@@ -39,9 +41,9 @@ export function objectToHtmlTableString(
 }
 
 export function layerIdToName(id: string) {
-	if (id === "osm-tk:patch-geojson") return "Patch"
-	if (id === "osm-tk:base-geojson") return "Base"
-	if (id === "osm-tk:patch-way-geojson") return "Current Way"
+	if (id === `${APPID}:patch-geojson`) return "Patch"
+	if (id === `${APPID}:base-geojson`) return "Base"
+	if (id === `${APPID}:patch-way-geojson`) return "Current Way"
 	return id
 }
 

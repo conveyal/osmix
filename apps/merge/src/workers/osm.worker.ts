@@ -1,9 +1,9 @@
 import {
 	createOsmIndexFromPbfData,
 	type GeoBbox2D,
-	type Osm,
 	type OsmChanges,
 	OsmChangeset,
+	type Osmix,
 	OsmixRasterTile,
 	type OsmMergeOptions,
 	type TileIndex,
@@ -17,7 +17,7 @@ import {
 } from "@/settings"
 import type { StatusType } from "@/state/log"
 
-const osmCache = new Map<string, Osm>()
+const osmCache = new Map<string, Osmix>()
 const changesetCache = new Map<string, OsmChangeset>()
 
 const osmWorker = {

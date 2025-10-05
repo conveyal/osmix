@@ -3,7 +3,7 @@ import {
 	OsmBlocksToPbfBytesTransformStream,
 	type OsmPbfHeaderBlock,
 } from "@osmix/pbf"
-import type { Osm } from "./osm"
+import type { Osmix } from "./osmix"
 
 /**
  * Write an OSM object to a PBF stream.
@@ -12,7 +12,7 @@ import type { Osm } from "./osm"
  * @param stream - The stream to write the PBF to.
  */
 export async function writeOsmToPbfStream(
-	osm: Osm,
+	osm: Osmix,
 	stream: WritableStream<Uint8Array>,
 ) {
 	return createOsmEntityReadableStream(osm)
@@ -27,7 +27,7 @@ export async function writeOsmToPbfStream(
  * @param osm - The OSM object to create a readable stream from.
  * @returns A readable stream of OSM PBF blocks.
  */
-export function createOsmEntityReadableStream(osm: Osm) {
+export function createOsmEntityReadableStream(osm: Osmix) {
 	let headerEnqueued = false
 	const entityGenerator = osm.generateSortedEntities()
 	return new ReadableStream<OsmPbfHeaderBlock | OsmEntity>({

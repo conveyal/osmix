@@ -1,5 +1,5 @@
 import { readOsmPbf } from "@osmix/pbf"
-import { Osm } from "./osm"
+import { Osmix } from "./osmix"
 import { throttle } from "./utils"
 
 /**
@@ -15,7 +15,7 @@ export async function createOsmIndexFromPbfData(
 	onProgress: (...args: string[]) => void = console.log,
 ) {
 	const { header, blocks } = await readOsmPbf(data)
-	const osm = new Osm(id, header)
+	const osm = new Osmix(id, header)
 	const logEverySecond = throttle(onProgress, 1_000)
 
 	let entityCount = 0
