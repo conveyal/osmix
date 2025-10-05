@@ -1,6 +1,8 @@
 {
 	"$schema": "https://json.schemastore.org/tsconfig",
 	"compilerOptions": {
+		"composite": true,
+		"noEmit": true,
 		"target": "ES2023",
 		"lib": ["ES2023"],
 		"module": "ESNext",
@@ -10,7 +12,6 @@
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
 		"moduleDetection": "force",
-		"noEmit": true,
 
 		"strict": true,
 		"noUnusedLocals": true,

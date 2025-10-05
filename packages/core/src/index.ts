@@ -1,3 +1,6 @@
+/// <reference path="./types/kdbush.d.ts" />
+/// <reference path="./types/lineclip.d.ts" />
+
 export {
 	default as OsmChangeset,
 	type OsmChanges,

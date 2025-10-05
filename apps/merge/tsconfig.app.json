@@ -1,6 +1,8 @@
 {
 	"$schema": "https://json.schemastore.org/tsconfig",
 	"compilerOptions": {
+		"composite": true,
+		"noEmit": true,
 		"baseUrl": ".",
 		"paths": {
 			"@/*": ["./src/*"]
@@ -15,7 +17,6 @@
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
 		"moduleDetection": "force",
-		"noEmit": true,
 		"jsx": "react-jsx",
 
 		"strict": true,
