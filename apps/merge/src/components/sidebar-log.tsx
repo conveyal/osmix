@@ -29,7 +29,7 @@ export default function SidebarLog() {
 					</span>
 				)}
 			</div>
-			<div className="max-h-36 overflow-y-auto pl-2 pt-2 pb-4">
+			<div className="h-36 overflow-y-auto pl-2 pt-2 pb-4">
 				<LogContent />
 			</div>
 		</div>
