@@ -36,13 +36,13 @@ export async function getFixtureFile(url: string): Promise<ArrayBufferLike> {
 export function getFixtureFileReadStream(url: string) {
 	return Readable.toWeb(
 		createReadStream(getFixturePath(url)),
-	) as ReadableStream<ArrayBufferLike>
+	) as unknown as ReadableStream<ArrayBuffer>
 }
 
 export function getFixtureFileWriteStream(url: string) {
 	return Writable.toWeb(
 		createWriteStream(getFixturePath(url)),
-	) as WritableStream<Uint8Array>
+	) as unknown as WritableStream<Uint8Array>
 }
 
 export type PbfFixture = {
