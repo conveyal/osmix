@@ -138,13 +138,9 @@ export default function Merge() {
 
 	const applyChanges = useCallback(async () => {
 		if (!changesetStats) throw Error("Changeset stats are not loaded")
-		const task = Log.startTask("Applying changes to OSM")
-
-		const newOsm = Osmix.from(
+		return Osmix.from(
 			await osmWorker.applyChangesAndReplace(changesetStats.osmId),
 		)
-		task.end("Changes applied", "ready")
-		return newOsm
 	}, [changesetStats])
 
 	const hasZeroChanges = useMemo(() => {
