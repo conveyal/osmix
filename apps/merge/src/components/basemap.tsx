@@ -5,7 +5,7 @@ import {
 	ScaleControl,
 } from "react-map-gl/maplibre"
 
-import { mapAtom, mapCenterAtom, zoomAtom } from "@/state/map"
+import { mapAtom, mapBoundsAtom, mapCenterAtom, zoomAtom } from "@/state/map"
 
 const MAP_STYLE =
 	"https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
@@ -24,6 +24,7 @@ export default function Basemap({
 	zoom?: number
 }) {
 	const setCenter = useSetAtom(mapCenterAtom)
+	const setBounds = useSetAtom(mapBoundsAtom)
 	const setMap = useSetAtom(mapAtom)
 	const setZoom = useSetAtom(zoomAtom)
 	return (
@@ -37,13 +38,18 @@ export default function Basemap({
 			}}
 			onLoad={(e) => {
 				const map = e.target
+				setBounds(map.getBounds())
 				setCenter(map.getCenter())
 				setZoom(map.getZoom())
 			}}
 			onMove={(e) => {
+				setBounds(e.target.getBounds())
 				setCenter(e.target.getCenter())
 			}}
-			onZoom={(e) => setZoom(e.viewState.zoom)}
+			onZoom={(e) => {
+				setBounds(e.target.getBounds())
+				setZoom(e.viewState.zoom)
+			}}
 			onStyleData={(e) => {
 				// Hide roads in base map
 				const map = e.target
@@ -56,7 +62,9 @@ export default function Basemap({
 					}
 				}
 			}}
-			ref={setMap}
+			ref={(map) => {
+				if (map) setMap(map.getMap())
+			}}
 		>
 			<NavigationControl position="top-right" />
 			<ScaleControl position="bottom-left" unit="imperial" />
