@@ -132,7 +132,7 @@ export default function InspectPage() {
 					{osm && file ? (
 						<div className="flex flex-col gap-2">
 							<div className="flex flex-col">
-								<div className="flex items-center justify-between border-l border-r border-t pl-2">
+								<div className="flex items-center justify-between border-l border-r border-t pl-2 rounded-t">
 									<div className="font-bold">OPENSTREETMAP PBF</div>
 									<div className="flex gap-2">
 										<Button

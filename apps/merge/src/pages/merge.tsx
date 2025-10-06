@@ -157,7 +157,7 @@ export default function Merge() {
 							are prioritized over matching entities in the base file.
 						</p>
 
-						<div className="flex flex-col border-1">
+						<div className="flex flex-col border rounded shadow">
 							<div className="font-bold p-2">BASE OSM PBF</div>
 							<OsmPbfFileInput
 								testId="merge-base-file"
@@ -173,7 +173,7 @@ export default function Merge() {
 							/>
 						</div>
 
-						<div className="flex flex-col border-1">
+						<div className="flex flex-col border rounded shadow">
 							<div className="font-bold p-2">PATCH OSM PBF</div>
 							<OsmPbfFileInput
 								testId="merge-patch-file"

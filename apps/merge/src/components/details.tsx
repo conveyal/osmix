@@ -12,7 +12,7 @@ export function Details({
 	open?: boolean
 }) {
 	return (
-		<details open={open} className={cn("border-1", className)}>
+		<details open={open} className={cn("border", className)}>
 			{children}
 		</details>
 	)
