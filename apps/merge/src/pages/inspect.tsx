@@ -53,10 +53,7 @@ export default function InspectPage() {
 	)
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
-	const { osm, file, loadOsmFile, setOsm } = useOsmFile(
-		osmId,
-		"./pbfs/monaco.pbf",
-	)
+	const { osm, file, loadOsmFile, setOsm } = useOsmFile(osmId, "./monaco.pbf")
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const tileLayer = usePickableOsmTileLayer(osm)

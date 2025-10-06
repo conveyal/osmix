@@ -72,31 +72,31 @@ export type PbfFixture = {
  * List of PBFs and their metadata used for testing. Cached locally in the top level fixtures directory so they can
  * be used across packages and apps.
  *
- * `monaco-250101.osm.pbf` is checked into the repository so it can be used in CI without causing repeated downloads.
+ * `monaco.pbf` is checked into the repository so it can be used in CI without causing repeated downloads.
  *
  * Below, we export a subset of the PBFs that we want to use for current tests.
  */
 const AllPBFs: Record<string, PbfFixture> = {
 	monaco: {
-		url: "https://download.geofabrik.de/europe/monaco-250101.osm.pbf",
+		url: "monaco.pbf",
 		bbox: {
-			bottom: 43.483817,
-			top: 43.75293,
-			left: 7.408583,
-			right: 7.595671,
+			bottom: 43.7232244,
+			top: 43.7543687,
+			left: 7.4053929,
+			right: 7.4447259,
 		},
-		nodesWithTags: 3_654,
-		nodes: 38_995,
-		ways: 5_708,
-		relations: 308,
+		nodesWithTags: 1_254,
+		nodes: 14_286,
+		ways: 3_346,
+		relations: 46,
 		node0: {
 			lat: 43.7371175,
 			lon: 7.4229093,
 			id: 21911883,
 		},
 		way0: 4097656,
-		relation0: 7385,
-		uniqueStrings: 6968,
+		relation0: 3410831,
+		uniqueStrings: 1_060,
 		primitiveGroups: 7,
 	},
 	montenegro: {

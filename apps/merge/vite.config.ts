@@ -6,6 +6,7 @@ import { defineConfig } from "vite"
 export default defineConfig({
 	base: "/",
 	plugins: [react(), tailwindcss()],
+	publicDir: "../../fixtures",
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),

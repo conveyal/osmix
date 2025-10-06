@@ -7,17 +7,18 @@ export class ErrorBoundary extends React.Component<
 		children: React.ReactNode
 	},
 	{
-		hasError: boolean
+		error: Error | null
+		info: React.ErrorInfo | null
 	}
 > {
 	constructor(props: { fallback: React.ReactNode; children: React.ReactNode }) {
 		super(props)
-		this.state = { hasError: false }
+		this.state = { error: null, info: null }
 	}
 
-	static getDerivedStateFromError(_: Error) {
+	static getDerivedStateFromError(error: Error, info: React.ErrorInfo) {
 		// Update state so the next render will show the fallback UI.
-		return { hasError: true }
+		return { error, info }
 	}
 
 	componentDidCatch(error: Error, info: React.ErrorInfo) {
@@ -36,9 +37,13 @@ export class ErrorBoundary extends React.Component<
 	}
 
 	render() {
-		if (this.state.hasError) {
+		if (this.state.error) {
 			// You can render any custom fallback UI
-			return this.props.fallback
+			return (
+				<pre className="p-8 border-2 mx-auto mt-8 w-md rounded shadow text-red-600">
+					Error: {this.state.error.message}
+				</pre>
+			)
 		}
 
 		return this.props.children
