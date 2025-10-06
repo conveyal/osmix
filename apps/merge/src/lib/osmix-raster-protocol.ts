@@ -7,18 +7,21 @@ import { osmWorker } from "@/state/worker"
 export function addOsmixRasterProtocol() {
 	const merc = new SphericalMercator({ size: RASTER_TILE_SIZE })
 	maplibre.addProtocol(RASTER_PROTOCOL_NAME, async (req) => {
-		// @osmix/raster://<osmId>/<z>/<x>/<y>.png
-		const m = /^@osmix\/raster:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(
-			req.url,
-		)
+		// @osmix/raster://<osmId>/<tileSize>/<z>/<x>/<y>.png
+		const m =
+			/^@osmix\/raster:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(
+				req.url,
+			)
 		if (!m) throw new Error(`Bad ${RASTER_PROTOCOL_NAME} URL: ${req.url}`)
-		const [, osmId, zStr, xStr, yStr] = m
+		const [, osmId, sizeStr, zStr, xStr, yStr] = m
+		const tileSize = +sizeStr
 		const tileIndex: TileIndex = { z: +zStr, x: +xStr, y: +yStr }
 		const bbox = merc.bbox(tileIndex.x, tileIndex.y, tileIndex.z)
 		const { data, contentType } = await osmWorker.getTileImage(
 			osmId,
 			bbox,
 			tileIndex,
+			tileSize,
 		)
 		return {
 			data,

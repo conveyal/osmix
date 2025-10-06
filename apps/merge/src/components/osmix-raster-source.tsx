@@ -6,14 +6,20 @@ if (typeof window !== "undefined") {
 	addOsmixRasterProtocol()
 }
 
-export default function OsmixRasterSource({ osmId }: { osmId: string }) {
-	const id = `${APPID}:${osmId}:raster`
+export default function OsmixRasterSource({
+	osmId,
+	tileSize = RASTER_TILE_SIZE,
+}: {
+	osmId: string
+	tileSize?: number
+}) {
+	const id = `${APPID}:${osmId}:${tileSize}:raster`
 	return (
 		<Source
 			id={id}
 			type="raster"
-			tiles={[`@osmix/raster://${osmId}/{z}/{x}/{y}.png`]}
-			tileSize={RASTER_TILE_SIZE}
+			tiles={[`@osmix/raster://${osmId}/${tileSize}/{z}/{x}/{y}.png`]}
+			tileSize={tileSize / 2}
 		>
 			<Layer id={id} type="raster" source={id} maxzoom={MIN_PICKABLE_ZOOM} />
 		</Source>

@@ -40,11 +40,16 @@ export class OsmixWorker {
 		return osm.getById(eid)
 	}
 
-	async getTileImage(id: string, bbox: GeoBbox2D, tileIndex: TileIndex) {
+	async getTileImage(
+		id: string,
+		bbox: GeoBbox2D,
+		tileIndex: TileIndex,
+		tileSize = RASTER_TILE_SIZE,
+	) {
 		const osm = this.osmixes.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
 
-		const rasterTile = osm.createRasterTile(bbox, tileIndex, RASTER_TILE_SIZE)
+		const rasterTile = osm.createRasterTile(bbox, tileIndex, tileSize)
 		rasterTile.drawWays()
 		if (tileIndex.z >= MIN_NODE_ZOOM) {
 			rasterTile.drawNodes()
@@ -63,6 +68,7 @@ export class OsmixWorker {
 		)
 		const blob = await canvas.convertToBlob({ type: RASTER_TILE_IMAGE_TYPE })
 		const data = await blob.arrayBuffer()
+
 		return transfer({ data, contentType: RASTER_TILE_IMAGE_TYPE }, [data])
 	}
 
