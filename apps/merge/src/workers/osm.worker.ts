@@ -1,10 +1,8 @@
 import {
-	createOsmIndexFromPbfData,
 	type GeoBbox2D,
 	type OsmChanges,
-	OsmChangeset,
-	type Osmix,
-	OsmixRasterTile,
+	type OsmChangeset,
+	Osmix,
 	type OsmMergeOptions,
 	type TileIndex,
 	throttle,
@@ -17,38 +15,36 @@ import {
 } from "@/settings"
 import type { StatusType } from "@/state/log"
 
-const osmCache = new Map<string, Osmix>()
-const changesetCache = new Map<string, OsmChangeset>()
+export class OsmixWorker {
+	private osmixes = new Map<string, Osmix>()
+	private changesets = new Map<string, OsmChangeset>()
+	private logger = console.log
 
-const osmWorker = {
-	log: (message: string, type: StatusType = "info") =>
-		type === "error" ? console.error(message) : console.log(message),
-	subscribeToLog(fn: typeof this.log) {
-		this.log = fn
-	},
+	async fromPbf(id: string, data: ArrayBufferLike | ReadableStream) {
+		const osm = await Osmix.fromPbf(data, id, (m) => this.log(m))
+		this.osmixes.set(id, osm)
+		return osm.transferables()
+	}
+
+	log(message: string, type: StatusType = "info") {
+		type === "error" ? console.error(message) : console.log(message)
+	}
+
+	setLogger(logger: typeof this.logger) {
+		this.logger = logger
+	}
+
 	getEntity(oid: string, eid: string) {
-		const osm = osmCache.get(oid)
+		const osm = this.osmixes.get(oid)
 		if (!osm) throw Error(`Osm for ${oid} not loaded.`)
 		return osm.getById(eid)
-	},
-	async initFromPbfData(id: string, data: ArrayBufferLike | ReadableStream) {
-		this.log(`Initializing OSM from PBF data for ${id}`)
-		// Clear previous OSM references making it available for garbage collection
-		osmCache.delete(id)
-		const osm = await createOsmIndexFromPbfData(data, id, (m) => this.log(m))
-		osmCache.set(id, osm)
-		return osm.transferables()
-	},
+	}
+
 	async getTileImage(id: string, bbox: GeoBbox2D, tileIndex: TileIndex) {
-		const osm = osmCache.get(id)
+		const osm = this.osmixes.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
 
-		const rasterTile = new OsmixRasterTile(
-			osm,
-			bbox,
-			tileIndex,
-			RASTER_TILE_SIZE,
-		)
+		const rasterTile = osm.createRasterTile(bbox, tileIndex, RASTER_TILE_SIZE)
 		rasterTile.drawWays()
 		if (tileIndex.z >= MIN_NODE_ZOOM) {
 			rasterTile.drawNodes()
@@ -68,36 +64,33 @@ const osmWorker = {
 		const blob = await canvas.convertToBlob({ type: RASTER_TILE_IMAGE_TYPE })
 		const data = await blob.arrayBuffer()
 		return transfer({ data, contentType: RASTER_TILE_IMAGE_TYPE }, [data])
-	},
+	}
+
 	async getTileData(id: string, bbox: GeoBbox2D) {
-		const osm = osmCache.get(id)
+		const osm = this.osmixes.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
 		try {
-			const nodeResults = osm.getNodesInBbox(bbox)
-			const wayResults = osm.getWaysInBbox(bbox)
-			return transfer(
-				{
-					nodes: nodeResults,
-					ways: wayResults,
-				},
-				[
-					nodeResults.positions.buffer,
-					nodeResults.ids.buffer,
-					wayResults.positions.buffer,
-					wayResults.ids.buffer,
-					wayResults.startIndices.buffer,
-				],
-			)
+			const nodes = osm.getNodesInBbox(bbox)
+			const ways = osm.getWaysInBbox(bbox)
+			const buffers = [
+				nodes.positions.buffer,
+				nodes.ids.buffer,
+				ways.positions.buffer,
+				ways.ids.buffer,
+				ways.startIndices.buffer,
+			]
+			return transfer({ nodes, ways }, buffers)
 		} catch (e) {
 			console.error(e)
 			throw e
 		}
-	},
+	}
+
 	dedupeNodesAndWays(id: string): OsmChanges {
-		const osm = osmCache.get(id)
+		const osm = this.osmixes.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
-		const changeset = new OsmChangeset(osm)
-		changesetCache.set(id, changeset)
+		const changeset = osm.createChangeset()
+		this.changesets.set(id, changeset)
 		const logEverySecond = throttle(this.log, 1_000)
 		let checkedWays = 0
 		let dedpulicatedWays = 0
@@ -124,18 +117,19 @@ const osmWorker = {
 			relations: changeset.relationChanges,
 			stats: changeset.stats,
 		}
-	},
+	}
+
 	generateChangeset(
 		baseOsmId: string,
 		patchOsmId: string,
 		options: OsmMergeOptions,
 		returnChangeset = true,
 	): OsmChanges | null {
-		const patchOsm = osmCache.get(patchOsmId)
+		const patchOsm = this.osmixes.get(patchOsmId)
 		if (!patchOsm) throw Error(`Osm for ${patchOsmId} not loaded.`)
-		const baseOsm = osmCache.get(baseOsmId)
+		const baseOsm = this.osmixes.get(baseOsmId)
 		if (!baseOsm) throw Error(`Osm for ${baseOsmId} not loaded.`)
-		const changeset = new OsmChangeset(baseOsm)
+		const changeset = baseOsm.createChangeset()
 
 		const logEverySecond = throttle(this.log, 1_000)
 
@@ -168,28 +162,26 @@ const osmWorker = {
 			}
 		}
 
-		changesetCache.set(baseOsmId, changeset)
-		if (returnChangeset) {
-			return {
-				osmId: baseOsmId,
-				nodes: changeset.nodeChanges,
-				ways: changeset.wayChanges,
-				relations: changeset.relationChanges,
-				stats: changeset.stats,
-			}
+		this.changesets.set(baseOsmId, changeset)
+		if (!returnChangeset) return null
+
+		return {
+			osmId: baseOsmId,
+			nodes: changeset.nodeChanges,
+			ways: changeset.wayChanges,
+			relations: changeset.relationChanges,
+			stats: changeset.stats,
 		}
-		return null
-	},
+	}
+
 	applyChangesAndReplace(osmId: string) {
-		const changeset = changesetCache.get(osmId)
+		const changeset = this.changesets.get(osmId)
 		if (!changeset) throw Error("No active changeset")
 		const osm = changeset.applyChanges(osmId)
-		changesetCache.delete(osmId)
-		osmCache.set(osmId, osm)
+		this.changesets.delete(osmId)
+		this.osmixes.set(osmId, osm)
 		return osm.transferables()
-	},
+	}
 }
 
-export type OsmWorker = typeof osmWorker
-
-expose(osmWorker)
+expose(new OsmixWorker())

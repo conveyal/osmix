@@ -15,11 +15,14 @@ import {
 	wayToFeature,
 } from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf"
+import OsmChangeset from "./changeset"
 import { Nodes, type NodesTransferables } from "./nodes"
+import { createOsmIndexFromPbfData } from "./osm-from-pbf"
+import { OsmixRasterTile } from "./raster-tile"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { IdArrayType } from "./typed-arrays"
-import type { GeoBbox2D } from "./types"
+import type { GeoBbox2D, TileIndex } from "./types"
 import { bboxFromLonLats } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
@@ -71,6 +74,14 @@ export class Osmix {
 		return osm
 	}
 
+	static fromPbf(
+		data: ArrayBufferLike | ReadableStream,
+		id?: string,
+		onProgress?: (message: string) => void,
+	) {
+		return createOsmIndexFromPbfData(data, id, onProgress)
+	}
+
 	constructor(id?: string, header?: OsmPbfHeaderBlock) {
 		this.header = header ?? {
 			required_features: [],
@@ -98,6 +109,10 @@ export class Osmix {
 	buildSpatialIndexes() {
 		this.nodes.buildSpatialIndex()
 		this.ways.buildSpatialIndex(this.nodes)
+	}
+
+	createChangeset() {
+		return new OsmChangeset(this)
 	}
 
 	finish() {
@@ -154,6 +169,13 @@ export class Osmix {
 				)
 			}
 		}
+	}
+
+	/**
+	 * Creates an empty raster tile for the given bbox and tile index that is linked to this OSM index.
+	 */
+	createRasterTile(bbox: GeoBbox2D, tileIndex: TileIndex, tileSize: number) {
+		return new OsmixRasterTile(this, bbox, tileIndex, tileSize)
 	}
 
 	getNodesInBbox(bbox: GeoBbox2D) {

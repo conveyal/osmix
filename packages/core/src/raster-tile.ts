@@ -3,7 +3,8 @@ import { clipPolyline } from "lineclip"
 import type { Osmix } from "./osmix"
 import type { GeoBbox2D, Rgba, TileIndex } from "./types"
 
-const DEFAULT_COLOR: Rgba = [255, 255, 255, 255] // white
+const DEFAULT_WAY_COLOR: Rgba = [255, 255, 255, 255] // white
+const DEFAULT_NODE_COLOR: Rgba = [255, 0, 0, 255] // red
 
 export class OsmixRasterTile {
 	osm: Osmix
@@ -41,12 +42,12 @@ export class OsmixRasterTile {
 		]
 	}
 
-	setLonLat(lon: number, lat: number, color?: Rgba) {
+	setLonLat(lon: number, lat: number, color: Rgba) {
 		const [x, y] = this.lonLatToPixel(lon, lat)
 		this.setPixel(x, y, color)
 	}
 
-	setPixel(x: number, y: number, color: Rgba = DEFAULT_COLOR) {
+	setPixel(x: number, y: number, color: Rgba) {
 		if (x < 0 || x >= this.tileSize || y < 0 || y >= this.tileSize) return
 		const idx = (y * this.tileSize + x) * 4
 		this.imageData[idx] = color[0]
@@ -55,13 +56,7 @@ export class OsmixRasterTile {
 		this.imageData[idx + 3] = color[3]
 	}
 
-	drawLine(
-		x0: number,
-		y0: number,
-		x1: number,
-		y1: number,
-		color: Rgba = DEFAULT_COLOR,
-	) {
+	drawLine(x0: number, y0: number, x1: number, y1: number, color: Rgba) {
 		const dx = Math.abs(x1 - x0)
 		const dy = Math.abs(y1 - y0)
 		const sx = x0 < x1 ? 1 : -1
@@ -89,7 +84,7 @@ export class OsmixRasterTile {
 		}
 	}
 
-	drawWay(way: [number, number][]) {
+	drawWay(way: [number, number][], color: Rgba) {
 		const result = clipPolyline(way, this.bbox)
 		if (result && result.length > 0) {
 			const [clipped] = result
@@ -99,24 +94,27 @@ export class OsmixRasterTile {
 				const [x0, y0] = this.lonLatToPixel(prev[0], prev[1])
 				const [x1, y1] = this.lonLatToPixel(curr[0], curr[1])
 				if (x0 !== x1 || y0 !== y1) {
-					this.drawLine(x0, y0, x1, y1)
+					this.drawLine(x0, y0, x1, y1, color)
 				}
 				prev = curr
 			}
 		}
 	}
 
-	drawWays() {
+	drawWays(color: Rgba = DEFAULT_WAY_COLOR) {
 		const timer = `OsmixRasterTile.drawWays:${this.tileIndex.z}/${this.tileIndex.x}/${this.tileIndex.y}`
 		console.time(timer)
 		this.osm.ways.intersects(this.bbox, (wayIndex) => {
-			this.drawWay(this.osm.ways.getCoordinates(wayIndex, this.osm.nodes))
+			this.drawWay(
+				this.osm.ways.getCoordinates(wayIndex, this.osm.nodes),
+				color,
+			)
 			return false
 		})
 		console.timeEnd(timer)
 	}
 
-	drawNodes() {
+	drawNodes(color: Rgba = DEFAULT_NODE_COLOR) {
 		const timer = `OsmixRasterTile.drawNodes:${this.tileIndex.z}/${this.tileIndex.x}/${this.tileIndex.y}`
 		console.time(timer)
 		const nodeCandidates = this.osm.nodes.withinBbox(this.bbox)
@@ -124,7 +122,7 @@ export class OsmixRasterTile {
 		for (const nodeIndex of nodeCandidates) {
 			if (!this.osm.nodes.tags.hasTags(nodeIndex)) continue
 			const [lon, lat] = this.osm.nodes.getNodeLonLat({ index: nodeIndex })
-			this.setLonLat(lon, lat, [255, 0, 0, 255])
+			this.setLonLat(lon, lat, color)
 		}
 		console.timeEnd(timer)
 	}

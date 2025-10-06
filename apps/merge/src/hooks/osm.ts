@@ -55,7 +55,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				const data = supportsReadableStreamTransfer()
 					? file.stream()
 					: await file.arrayBuffer()
-				const osmBuffers = await osmWorker.initFromPbfData(
+				const osmBuffers = await osmWorker.fromPbf(
 					id ?? file.name,
 					Comlink.transfer(data, [data]),
 				)

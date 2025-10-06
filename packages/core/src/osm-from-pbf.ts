@@ -11,7 +11,7 @@ import { throttle } from "./utils"
  */
 export async function createOsmIndexFromPbfData(
 	data: ArrayBufferLike | ReadableStream<ArrayBufferLike>,
-	id = "unknown",
+	id?: string,
 	onProgress: (...args: string[]) => void = console.log,
 ) {
 	const { header, blocks } = await readOsmPbf(data)
