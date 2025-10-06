@@ -29,7 +29,12 @@ export interface OsmMergeOptions {
 	createIntersections: boolean
 }
 
-export type OsmChangesStats = {
+export type OsmChangesetStats = {
+	osmId: string
+	totalChanges: number
+	nodeChanges: number
+	wayChanges: number
+	relationChanges: number
 	deduplicatedNodes: number
 	deduplicatedNodesReplaced: number
 	deduplicatedWays: number
@@ -42,8 +47,10 @@ export type OsmChanges = {
 	nodes: Record<number, OsmChange<OsmEntityTypeMap["node"]>>
 	ways: Record<number, OsmChange<OsmEntityTypeMap["way"]>>
 	relations: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>
-	stats: OsmChangesStats
+	stats: OsmChangesetStats
 }
+
+export type OsmChangeTypes = "modify" | "create" | "delete"
 
 /**
  * Each step is optimized to minimize the retrieval of the full entity data.
@@ -58,13 +65,11 @@ export default class OsmChangeset {
 	// Next node ID
 	currentNodeId: number
 
-	stats: OsmChangesStats = {
-		deduplicatedNodes: 0,
-		deduplicatedNodesReplaced: 0,
-		deduplicatedWays: 0,
-		intersectionPointsFound: 0,
-		intersectionNodesCreated: 0,
-	}
+	deduplicatedNodes = 0
+	deduplicatedNodesReplaced = 0
+	deduplicatedWays = 0
+	intersectionPointsFound = 0
+	intersectionNodesCreated = 0
 
 	static fromJson(base: Osmix, json: OsmChanges) {
 		const changeset = new OsmChangeset(base)
@@ -77,6 +82,24 @@ export default class OsmChangeset {
 	constructor(base: Osmix) {
 		this.osm = base
 		this.currentNodeId = base.nodes.ids.at(-1)
+	}
+
+	get stats(): OsmChangesetStats {
+		const nodeChanges = Object.values(this.nodeChanges).length
+		const wayChanges = Object.values(this.wayChanges).length
+		const relationChanges = Object.values(this.relationChanges).length
+		return {
+			osmId: this.osm.id,
+			totalChanges: nodeChanges + wayChanges + relationChanges,
+			nodeChanges,
+			wayChanges,
+			relationChanges,
+			deduplicatedNodes: this.deduplicatedNodes,
+			deduplicatedNodesReplaced: this.deduplicatedNodesReplaced,
+			deduplicatedWays: this.deduplicatedWays,
+			intersectionPointsFound: this.intersectionPointsFound,
+			intersectionNodesCreated: this.intersectionNodesCreated,
+		}
 	}
 
 	changes<T extends OsmEntityType>(
@@ -251,14 +274,14 @@ export default class OsmChangeset {
 			}
 
 			// Schedule node for deletion
-			this.stats.deduplicatedNodes++
+			this.deduplicatedNodes++
 			this.delete(existingNode, [
 				{ type: "node", id: patchNode.id, osmId: osm.id },
 			])
 		}
 
 		// Increment the total number of nodes replaced
-		this.stats.deduplicatedNodesReplaced += deduplicatedNodesReplaced
+		this.deduplicatedNodesReplaced += deduplicatedNodesReplaced
 		return deduplicatedNodesReplaced
 	}
 
@@ -311,7 +334,7 @@ export default class OsmChangeset {
 				osmId: osm.id,
 			})),
 		)
-		this.stats.deduplicatedWays++
+		this.deduplicatedWays++
 
 		return candidateDuplicateWays.length
 	}
@@ -468,8 +491,8 @@ export default class OsmChangeset {
 			}
 		}
 
-		this.stats.intersectionPointsFound += intersectionsFound
-		this.stats.intersectionNodesCreated += intersectionsCreated
+		this.intersectionPointsFound += intersectionsFound
+		this.intersectionNodesCreated += intersectionsCreated
 
 		return {
 			intersectionsFound,
@@ -554,7 +577,7 @@ export default class OsmChangeset {
 					.filter((way) => way !== null)
 				// Newer version of this way exists, skip creating it
 				if (validPatchWays.length > 0) {
-					this.stats.deduplicatedWays++
+					this.deduplicatedWays++
 					continue
 				}
 
@@ -588,7 +611,7 @@ export default class OsmChangeset {
 				this.delete(duplicateWay, [
 					{ type: "way", id: way.id, osmId: patch.id },
 				])
-				this.stats.deduplicatedWays++
+				this.deduplicatedWays++
 			}
 		}
 
@@ -624,7 +647,7 @@ export default class OsmChangeset {
 				this.delete(duplicateNode, [
 					{ type: "node", id: node.id, osmId: patch.id },
 				])
-				this.stats.deduplicatedNodes++
+				this.deduplicatedNodes++
 
 				// Find ways that contain the existing node
 				const wayIndexes = this.osm.ways.neighbors(
@@ -640,7 +663,7 @@ export default class OsmChangeset {
 					const way = this.osm.ways.getByIndex(wayIndex)
 					if (!way.refs.includes(duplicateNode.id)) continue
 
-					this.stats.deduplicatedNodesReplaced++
+					this.deduplicatedNodesReplaced++
 					this.modify("way", way.id, (way) => ({
 						...way,
 						refs: way.refs.map((ref) =>

@@ -1,4 +1,4 @@
-import { type OsmChanges, Osmix, writeOsmToPbfStream } from "@osmix/core"
+import { Osmix, writeOsmToPbfStream } from "@osmix/core"
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
 	ArrowLeft,
@@ -37,10 +37,11 @@ import {
 } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
-import { changesAtom } from "@/state/changes"
+import { changesetStatsAtom } from "@/state/changes"
 import { Log } from "@/state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
+import { changeStatsSummary } from "@/utils"
 
 const deckTooltipStyle: Partial<CSSStyleDeclaration> = {
 	backgroundColor: "white",
@@ -72,7 +73,7 @@ export default function Merge() {
 	const base = useOsmFile("base", DEFAULT_BASE_PBF_URL)
 	const patch = useOsmFile("patch", DEFAULT_PATCH_PBF_URL)
 	const [isTransitioning, startTransition] = useTransition()
-	const [changes, setChanges] = useAtom(changesAtom)
+	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
 	const selectedEntity = useAtomValue(selectedEntityAtom)
@@ -113,8 +114,15 @@ export default function Merge() {
 	)
 
 	const downloadJsonChanges = useCallback(async () => {
-		if (!changes) return
+		if (!changesetStats) return
 		startTransition(async () => {
+			const changes = await osmWorker.getFilteredChangeset(
+				changesetStats.osmId,
+				0,
+				1_000_000,
+				["create", "modify", "delete"],
+				["node", "way", "relation"],
+			)
 			const task = Log.startTask("Converting changeset to JSON")
 			const json = JSON.stringify(changes, null, 2)
 			const fileHandle = await showSaveFilePicker({
@@ -126,26 +134,23 @@ export default function Merge() {
 			stream.close()
 			task.end("Changeset converted to JSON", "ready")
 		})
-	}, [changes])
+	}, [changesetStats])
 
-	const applyChanges = useCallback(async (changes: OsmChanges) => {
+	const applyChanges = useCallback(async () => {
+		if (!changesetStats) throw Error("Changeset stats are not loaded")
 		const task = Log.startTask("Applying changes to OSM")
 
 		const newOsm = Osmix.from(
-			await osmWorker.applyChangesAndReplace(changes.osmId),
+			await osmWorker.applyChangesAndReplace(changesetStats.osmId),
 		)
 		task.end("Changes applied", "ready")
 		return newOsm
-	}, [])
+	}, [changesetStats])
 
 	const hasZeroChanges = useMemo(() => {
-		if (!changes) return true
-		return (
-			Object.keys(changes.nodes).length === 0 &&
-			Object.keys(changes.ways).length === 0 &&
-			Object.keys(changes.relations).length === 0
-		)
-	}, [changes])
+		if (!changesetStats) return true
+		return changesetStats.totalChanges === 0
+	}, [changesetStats])
 
 	return (
 		<Main>
@@ -221,8 +226,8 @@ export default function Merge() {
 										const baseChanges = await osmWorker.dedupeNodesAndWays(
 											base.osm.id,
 										)
-										setChanges(baseChanges)
-										return `Found ${baseChanges?.stats.deduplicatedNodes.toLocaleString()} duplicate nodes and ${baseChanges?.stats.deduplicatedWays.toLocaleString()} duplicate ways`
+										setChangesetStats(baseChanges)
+										return changeStatsSummary(baseChanges)
 									},
 								)
 							}}
@@ -239,18 +244,27 @@ export default function Merge() {
 								startTransition(async () => {
 									if (!base.osm) throw Error("Base OSM is not loaded")
 									if (!patch.osm) throw Error("Patch OSM is not loaded")
+
 									task.update("Deduplicating nodes and ways in base OSM")
-									await osmWorker.dedupeNodesAndWays(base.osm.id)
+									const baseChanges = await osmWorker.dedupeNodesAndWays(
+										base.osm.id,
+									)
+									setChangesetStats(baseChanges)
+									task.update(changeStatsSummary(baseChanges))
 									await osmWorker.applyChangesAndReplace(base.osm.id)
 
 									task.update("Deduplicating nodes and ways in patch OSM")
-									await osmWorker.dedupeNodesAndWays(patch.osm.id)
+									const patchChanges = await osmWorker.dedupeNodesAndWays(
+										patch.osm.id,
+									)
+									setChangesetStats(patchChanges)
+									task.update(changeStatsSummary(patchChanges))
 									await osmWorker.applyChangesAndReplace(patch.osm.id)
 
 									task.update(
 										"Generating direct changes from patch OSM to base OSM",
 									)
-									await osmWorker.generateChangeset(
+									const directChanges = await osmWorker.generateChangeset(
 										base.osm.id,
 										patch.osm.id,
 										{
@@ -258,8 +272,9 @@ export default function Merge() {
 											deduplicateNodes: false,
 											createIntersections: false,
 										},
-										false,
 									)
+									setChangesetStats(directChanges)
+									task.update(changeStatsSummary(directChanges))
 									await osmWorker.applyChangesAndReplace(base.osm.id)
 
 									// TODO: add this step back when it is split from the direct merge
@@ -271,16 +286,18 @@ export default function Merge() {
 									// await osmWorker.applyChangesAndReplace(base.osm.id)
 
 									task.update("Creating intersections in base OSM")
-									await osmWorker.generateChangeset(
-										base.osm.id,
-										patch.osm.id,
-										{
-											directMerge: false,
-											deduplicateNodes: false,
-											createIntersections: true,
-										},
-										false,
-									)
+									const intersectionsChanges =
+										await osmWorker.generateChangeset(
+											base.osm.id,
+											patch.osm.id,
+											{
+												directMerge: false,
+												deduplicateNodes: false,
+												createIntersections: true,
+											},
+										)
+									setChangesetStats(intersectionsChanges)
+									task.update(changeStatsSummary(intersectionsChanges))
 									await osmWorker.applyChangesAndReplace(base.osm.id)
 
 									task.end("All merge steps completed")
@@ -317,8 +334,8 @@ export default function Merge() {
 										const patchChanges = await osmWorker.dedupeNodesAndWays(
 											patch.osm.id,
 										)
-										setChanges(patchChanges)
-										return `Found ${patchChanges?.stats.deduplicatedNodes.toLocaleString()} duplicate nodes and ${patchChanges?.stats.deduplicatedWays.toLocaleString()} duplicate ways`
+										setChangesetStats(patchChanges)
+										return changeStatsSummary(patchChanges)
 									},
 								)
 							}}
@@ -382,8 +399,8 @@ export default function Merge() {
 												createIntersections: false,
 											},
 										)
-										setChanges(results)
-										return "Changeset generated"
+										setChangesetStats(results)
+										return changeStatsSummary(results)
 									})
 								}}
 							>
@@ -416,7 +433,7 @@ export default function Merge() {
 								<DownloadIcon /> Download .osc changes
 							</Button>
 						</div>
-						{changes && base.osm && (
+						{changesetStats && base.osm && (
 							<ChangesSummary>
 								{/* Changes List */}
 								<Details>
@@ -430,7 +447,7 @@ export default function Merge() {
 							</ChangesSummary>
 						)}
 
-						{changes == null || hasZeroChanges ? (
+						{changesetStats == null || hasZeroChanges ? (
 							<Button onClick={() => nextStep()} disabled={isTransitioning}>
 								<ArrowRightIcon /> No changes, go to next step
 							</Button>
@@ -439,11 +456,11 @@ export default function Merge() {
 								disabled={isTransitioning}
 								onClick={() => {
 									startStepTask("Applying changes to OSM", async () => {
-										if (!changes) throw Error("Changes are not loaded")
-										const newOsm = await applyChanges(changes)
-										if (changes.osmId === base.osm?.id) {
+										if (!changesetStats) throw Error("Changes are not loaded")
+										const newOsm = await applyChanges()
+										if (changesetStats.osmId === base.osm?.id) {
 											base.setOsm(newOsm)
-										} else if (changes.osmId === patch.osm?.id) {
+										} else if (changesetStats.osmId === patch.osm?.id) {
 											patch.setOsm(newOsm)
 										} else {
 											throw Error(
@@ -499,8 +516,8 @@ export default function Merge() {
 										const results = await osmWorker.dedupeNodesAndWays(
 											base.osm.id,
 										)
-										setChanges(results)
-										return "Changeset generated"
+										setChangesetStats(results)
+										return changeStatsSummary(results)
 									})
 								}}
 							>
@@ -562,8 +579,8 @@ export default function Merge() {
 												createIntersections: true,
 											},
 										)
-										setChanges(results)
-										return "Changeset generated"
+										setChangesetStats(results)
+										return changeStatsSummary(results)
 									})
 								}}
 							>

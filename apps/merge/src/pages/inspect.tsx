@@ -3,7 +3,7 @@ import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import { useCallback, useEffect, useMemo, useTransition } from "react"
+import { useCallback, useMemo, useTransition } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
 import { useSearchParams } from "react-router"
 import Basemap from "@/components/basemap"
@@ -33,10 +33,11 @@ import {
 } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
 import { APPID } from "@/settings"
-import { changesAtom } from "@/state/changes"
+import { changesetStatsAtom } from "@/state/changes"
 import { Log } from "@/state/log"
 import { selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
+import { changeStatsSummary } from "@/utils"
 
 const deckTooltipStyle: Partial<CSSStyleDeclaration> = {
 	backgroundColor: "white",
@@ -57,21 +58,11 @@ export default function InspectPage() {
 		"./pbfs/monaco.pbf",
 	)
 	const bbox = useMemo(() => osm?.bbox(), [osm])
-
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const tileLayer = usePickableOsmTileLayer(osm)
 	const selectedEntityLayer = useSelectedEntityLayer()
-
 	const [isTransitioning, startTransition] = useTransition()
-
-	const [duplicateNodesAndWays, setDuplicateNodesAndWays] = useAtom(changesAtom)
-
-	useEffect(() => {
-		if (osm != null) {
-			selectEntity(null, null)
-			setDuplicateNodesAndWays(null)
-		}
-	}, [osm, selectEntity, setDuplicateNodesAndWays])
+	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 
 	const downloadOsm = useCallback(async (osm: Osmix, name?: string) => {
 		startTransition(async () => {
@@ -95,8 +86,8 @@ export default function InspectPage() {
 
 	const applyChanges = useCallback(
 		async (osmId: string) => {
-			const task = Log.startTask("Applying changes to OSM...")
 			startTransition(async () => {
+				const task = Log.startTask("Applying changes to OSM...")
 				const transferables = await osmWorker.applyChangesAndReplace(osmId)
 				task.update("Refreshing OSM index...")
 				const newOsm = Osmix.from(transferables)
@@ -108,13 +99,8 @@ export default function InspectPage() {
 	)
 
 	const hasZeroChanges = useMemo(() => {
-		if (!duplicateNodesAndWays) return true
-		return (
-			Object.keys(duplicateNodesAndWays.nodes).length === 0 &&
-			Object.keys(duplicateNodesAndWays.ways).length === 0 &&
-			Object.keys(duplicateNodesAndWays.relations).length === 0
-		)
-	}, [duplicateNodesAndWays])
+		return changesetStats == null || changesetStats.totalChanges === 0
+	}, [changesetStats])
 
 	return (
 		<Main>
@@ -124,6 +110,7 @@ export default function InspectPage() {
 						testId="inspect-file"
 						setFile={async (file) => {
 							selectEntity(null, null)
+							setChangesetStats(null)
 							const osm = await loadOsmFile(file)
 							flyToOsmBounds(osm)
 						}}
@@ -158,7 +145,7 @@ export default function InspectPage() {
 								<OsmInfoTable file={file} osm={osm} />
 							</div>
 
-							{duplicateNodesAndWays == null ? (
+							{changesetStats == null ? (
 								<Button
 									onClick={() => {
 										startTransition(async () => {
@@ -166,11 +153,8 @@ export default function InspectPage() {
 												"Finding duplicate nodes and ways",
 											)
 											const changes = await osmWorker.dedupeNodesAndWays(osmId)
-											setDuplicateNodesAndWays(changes)
-											task.end(
-												`Found ${changes?.stats.deduplicatedNodes.toLocaleString()} duplicate nodes and ${changes?.stats.deduplicatedWays.toLocaleString()} duplicate ways`,
-												"ready",
-											)
+											setChangesetStats(changes)
+											task.end(changeStatsSummary(changes))
 										})
 									}}
 									disabled={isTransitioning}

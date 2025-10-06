@@ -8,12 +8,7 @@ import { osmAtomFamily, osmFileAtomFamily } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
 import { supportsReadableStreamTransfer } from "@/utils"
 
-export function useOsm(id: string) {
-	const osm = useAtomValue(osmAtomFamily(id))
-	return osm
-}
-
-export function useOsmDefaultFile(
+function useOsmDefaultFile(
 	loadOsmFile: (file: File | null) => Promise<Osmix | undefined>,
 	defaultFilePath?: string,
 ) {

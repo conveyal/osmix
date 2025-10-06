@@ -1,6 +1,7 @@
 import { StrictMode, Suspense } from "react"
 import { createRoot } from "react-dom/client"
 import { BrowserRouter, Outlet, Route, Routes } from "react-router"
+import { ErrorBoundary } from "./components/error-boundary"
 import Nav from "./components/nav"
 import InspectPage from "./pages/inspect"
 import MergePage from "./pages/merge"
@@ -21,13 +22,15 @@ if (!rootEl) throw new Error("Root element not found")
 
 createRoot(rootEl).render(
 	<StrictMode>
-		<BrowserRouter>
-			<Routes>
-				<Route path={"/"} element={<RootLayout />}>
-					<Route path="" element={<MergePage />} />
-					<Route path="inspect" element={<InspectPage />} />
-				</Route>
-			</Routes>
-		</BrowserRouter>
+		<ErrorBoundary fallback={<div>Error</div>}>
+			<BrowserRouter>
+				<Routes>
+					<Route path={"/"} element={<RootLayout />}>
+						<Route path="" element={<MergePage />} />
+						<Route path="inspect" element={<InspectPage />} />
+					</Route>
+				</Routes>
+			</BrowserRouter>
+		</ErrorBoundary>
 	</StrictMode>,
 )

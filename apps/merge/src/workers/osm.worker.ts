@@ -1,12 +1,14 @@
 import {
 	type GeoBbox2D,
-	type OsmChanges,
+	type OsmChange,
 	type OsmChangeset,
+	type OsmChangeTypes,
 	Osmix,
 	type OsmMergeOptions,
 	type TileIndex,
 	throttle,
 } from "@osmix/core"
+import type { OsmEntityType } from "@osmix/json"
 import { expose, transfer } from "comlink"
 import {
 	MIN_NODE_ZOOM,
@@ -92,7 +94,7 @@ export class OsmixWorker {
 		}
 	}
 
-	dedupeNodesAndWays(id: string): OsmChanges {
+	dedupeNodesAndWays(id: string) {
 		const osm = this.osmixes.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
 		const changeset = osm.createChangeset()
@@ -116,21 +118,15 @@ export class OsmixWorker {
 				`Deduplicating nodes: ${checkedNodes.toLocaleString()} nodes checked, ${dedpulicatedNodes.toLocaleString()} nodes deduplicated`,
 			)
 		}
-		return {
-			osmId: id,
-			nodes: changeset.nodeChanges,
-			ways: changeset.wayChanges,
-			relations: changeset.relationChanges,
-			stats: changeset.stats,
-		}
+
+		return changeset.stats
 	}
 
 	generateChangeset(
 		baseOsmId: string,
 		patchOsmId: string,
 		options: OsmMergeOptions,
-		returnChangeset = true,
-	): OsmChanges | null {
+	) {
 		const patchOsm = this.osmixes.get(patchOsmId)
 		if (!patchOsm) throw Error(`Osm for ${patchOsmId} not loaded.`)
 		const baseOsm = this.osmixes.get(baseOsmId)
@@ -169,14 +165,48 @@ export class OsmixWorker {
 		}
 
 		this.changesets.set(baseOsmId, changeset)
-		if (!returnChangeset) return null
 
+		return changeset.stats
+	}
+
+	getFilteredChangeset(
+		osmId: string,
+		page: number,
+		pageSize: number,
+		changeTypes: OsmChangeTypes[],
+		entityTypes: OsmEntityType[],
+	) {
+		const changeset = this.changesets.get(osmId)
+		if (!changeset) throw Error("No active changeset")
+		const filteredChanges: OsmChange[] = []
+		if (entityTypes.includes("node")) {
+			for (const change of Object.values(changeset.nodeChanges)) {
+				if (changeTypes.includes(change.changeType)) {
+					filteredChanges.push(change)
+				}
+			}
+		}
+		if (entityTypes.includes("way")) {
+			for (const change of Object.values(changeset.wayChanges)) {
+				if (changeTypes.includes(change.changeType)) {
+					filteredChanges.push(change)
+				}
+			}
+		}
+		if (entityTypes.includes("relation")) {
+			for (const change of Object.values(changeset.relationChanges)) {
+				if (changeTypes.includes(change.changeType)) {
+					filteredChanges.push(change)
+				}
+			}
+		}
+		const changes = filteredChanges.slice(
+			page * pageSize,
+			(page + 1) * pageSize,
+		)
 		return {
-			osmId: baseOsmId,
-			nodes: changeset.nodeChanges,
-			ways: changeset.wayChanges,
-			relations: changeset.relationChanges,
-			stats: changeset.stats,
+			changes,
+			totalPages: Math.ceil(filteredChanges.length / pageSize),
 		}
 	}
 

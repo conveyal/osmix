@@ -1,4 +1,4 @@
-import { APPID } from "./settings"
+import type { OsmChangesetStats } from "@osmix/core"
 
 export function flattenValue(value: unknown): string {
 	if (typeof value === "string") {
@@ -22,6 +22,7 @@ export function flattenValue(value: unknown): string {
 	}
 	return ""
 }
+
 export function objectToHtmlTableString(
 	object?: Record<string, string | number | boolean | unknown>,
 ) {
@@ -38,13 +39,6 @@ export function objectToHtmlTableString(
 			return `<tr><td>${key}</td><td>${valueString}</td></tr>`
 		})
 		.join("")
-}
-
-export function layerIdToName(id: string) {
-	if (id === `${APPID}:patch-geojson`) return "Patch"
-	if (id === `${APPID}:base-geojson`) return "Base"
-	if (id === `${APPID}:patch-way-geojson`) return "Current Way"
-	return id
 }
 
 const formatMmSsMs = new Intl.DateTimeFormat("en-US", {
@@ -74,6 +68,9 @@ export function bytesSizeToHuman(size?: number) {
 	return `${(size / GB).toFixed(2)}GB`
 }
 
+/**
+ * Check if the browser supports transferable streams by trying to create an empty stream and sending it to a message channel.
+ */
 export function supportsReadableStreamTransfer(): boolean {
 	// Require the basics first
 	if (
@@ -93,4 +90,27 @@ export function supportsReadableStreamTransfer(): boolean {
 	} finally {
 		port1.close()
 	}
+}
+
+export function camelCaseToSentenceCase(str: string) {
+	return str.replace(/([A-Z])/g, " $1").trim()
+}
+
+/**
+ * Summarize the changeset stats with the most significant changes first.
+ */
+export function changeStatsSummary(stats: OsmChangesetStats) {
+	const numericStats = (Object.entries(stats) as [string, unknown][]) 
+		.filter(([, value]) => typeof value === "number" && value > 0) as [
+			string,
+			number,
+		][]
+	if (numericStats.length === 0) return "Changeset is empty."
+	const sortedNumericStats = [...numericStats]
+		.sort((a, b) => b[1] - a[1])
+		.map(
+			([key, value]) =>
+				` ${camelCaseToSentenceCase(key)}: ${value.toLocaleString()}`,
+		)
+	return `Draft changeset: ${sortedNumericStats.join(", ")}`
 }

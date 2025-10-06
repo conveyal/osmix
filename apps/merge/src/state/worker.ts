@@ -10,6 +10,6 @@ declare global {
 
 export const osmWorker = createOsmWorker()
 
-osmWorker.subscribeToLog(proxy(Log.addMessage))
+osmWorker.setLogger(proxy(Log.addMessage))
 
 window.osmWorker = osmWorker

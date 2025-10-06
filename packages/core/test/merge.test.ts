@@ -55,6 +55,11 @@ describe("merge osm", () => {
 			changeset.generateDirectChanges(osm2)
 
 			assert.deepEqual(changeset.stats, {
+				osmId: baseOsm.id,
+				totalChanges: 15_875,
+				nodeChanges: 11_643,
+				wayChanges: 4_232,
+				relationChanges: 0,
 				deduplicatedNodes: 0,
 				deduplicatedNodesReplaced: 0,
 				deduplicatedWays: 0,
@@ -73,6 +78,11 @@ describe("merge osm", () => {
 			changeset.createIntersectionsForWays(osm2.ways)
 
 			assert.deepEqual(changeset.stats, {
+				osmId: baseOsm.id,
+				totalChanges: 9_536,
+				nodeChanges: 4_967,
+				wayChanges: 4_569,
+				relationChanges: 0,
 				deduplicatedNodes: 0,
 				deduplicatedNodesReplaced: 0,
 				deduplicatedWays: 0,
@@ -119,6 +129,11 @@ describe("merge osm", () => {
 		let changeset = new OsmChangeset(base)
 		changeset.generateDirectChanges(patch)
 		assert.deepEqual(changeset.stats, {
+			osmId: base.id,
+			totalChanges: 11,
+			nodeChanges: 7,
+			wayChanges: 4,
+			relationChanges: 0,
 			deduplicatedNodes: 1,
 			deduplicatedNodesReplaced: 1,
 			deduplicatedWays: 0,
@@ -153,6 +168,11 @@ describe("merge osm", () => {
 		changeset.createIntersectionsForWays(patch.ways)
 
 		assert.deepEqual(changeset.stats, {
+			osmId: "unknown-merged",
+			totalChanges: 3,
+			nodeChanges: 1,
+			wayChanges: 2,
+			relationChanges: 0,
 			deduplicatedNodes: 0,
 			deduplicatedNodesReplaced: 0,
 			deduplicatedWays: 0,
@@ -209,6 +229,11 @@ describe("merge osm", () => {
 			console.timeEnd("generateDirectChanges")
 
 			assert.deepEqual(changeset.stats, {
+				osmId: baseOsm.id,
+				totalChanges: 0,
+				nodeChanges: 0,
+				wayChanges: 0,
+				relationChanges: 0,
 				deduplicatedNodes: 4_835,
 				deduplicatedNodesReplaced: 7_542,
 				deduplicatedWays: 1_282,
@@ -238,6 +263,11 @@ describe("merge osm", () => {
 			console.timeEnd("createIntersections")
 
 			assert.deepEqual(changeset.stats, {
+				osmId: baseOsm.id,
+				totalChanges: 0,
+				nodeChanges: 0,
+				wayChanges: 0,
+				relationChanges: 0,
 				deduplicatedNodes: 0,
 				deduplicatedNodesReplaced: 0,
 				deduplicatedWays: 0,

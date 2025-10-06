@@ -4,6 +4,8 @@
 export {
 	default as OsmChangeset,
 	type OsmChanges,
+	type OsmChangesetStats,
+	type OsmChangeTypes,
 	type OsmMergeOptions,
 } from "./changeset"
 export { Nodes as NodeIndex } from "./nodes"

@@ -63,7 +63,7 @@ export function usePickableOsmTileLayer(osm?: Osmix | null) {
 	const layer = useMemo(() => {
 		const bbox = osm?.bbox()
 		const osmId = osm?.id
-		if (!osmWorker || !osm || !osmId || !bbox) return null
+		if (!osm || !osmId || !bbox) return null
 		const idPrefix = `${APPID}:${osmId}:tiles`
 		return new TileLayer<Awaited<
 			ReturnType<typeof osmWorker.getTileData>

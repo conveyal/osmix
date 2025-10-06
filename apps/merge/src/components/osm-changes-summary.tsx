@@ -1,76 +1,34 @@
-import type { OsmChanges } from "@osmix/core"
 import { getEntityType, type OsmEntity } from "@osmix/json"
-import { Provider, useAtom, useAtomValue, useSetAtom } from "jotai"
-import { useHydrateAtoms } from "jotai/utils"
+import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { ArrowLeft, ArrowRight } from "lucide-react"
+import { Suspense, useTransition } from "react"
 import { cn } from "@/lib/utils"
 import {
 	changesAtom,
-	changesSummaryAtom,
+	changesetStatsAtom,
 	changeTypeFilterAtom,
-	currentChangesAtom,
-	DEFAULT_PAGE_SIZE,
 	entityTypeFilterAtom,
 	pageAtom,
-	pageSizeAtom,
 	startIndexAtom,
-	totalPagesAtom,
 } from "@/state/changes"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 import { EntityContent } from "./entity-details"
 import { Button } from "./ui/button"
-
-function HydrateAtoms({
-	changes,
-	pageSize,
-}: {
-	changes?: OsmChanges
-	pageSize?: number
-}) {
-	useHydrateAtoms([
-		[changesAtom, changes ?? null],
-		[pageSizeAtom, pageSize ?? DEFAULT_PAGE_SIZE],
-	])
-	return null
-}
-
-export function ChangesProvider({
-	changes,
-	children,
-	pageSize,
-}: {
-	changes?: OsmChanges
-	children: React.ReactNode
-	pageSize?: number
-}) {
-	return (
-		<Provider>
-			<HydrateAtoms changes={changes} pageSize={pageSize} />
-			{children}
-		</Provider>
-	)
-}
 
 export default function ChangesSummary({
 	children,
 }: {
 	children: React.ReactNode
 }) {
-	const summary = useAtomValue(changesSummaryAtom)
-	if (!summary) return null
-
 	return (
 		<div className="flex flex-col gap-2">
 			<Details open={true}>
 				<DetailsSummary>CHANGES SUMMARY</DetailsSummary>
 				<DetailsContent>
-					{summary.totalChanges === 0 ? (
-						<div className="py-1 px-2">NO CHANGES FOUND</div>
-					) : (
-						<ChangesSummaryTable />
-					)}
-
-					{children}
+					<ChangesSummaryTable />
+					<Suspense fallback={<div className="py-1 px-2">LOADING...</div>}>
+						{children}
+					</Suspense>
 				</DetailsContent>
 			</Details>
 		</div>
@@ -78,9 +36,9 @@ export default function ChangesSummary({
 }
 
 function ChangesSummaryTable() {
-	const changes = useAtomValue(changesAtom)
-	const summary = useAtomValue(changesSummaryAtom)
-	if (!summary || !changes) return null
+	const summary = useAtomValue(changesetStatsAtom)
+	if (!summary || summary.totalChanges === 0)
+		return <div className="py-1 px-2">NO CHANGES FOUND</div>
 	return (
 		<table>
 			<tbody>
@@ -103,15 +61,15 @@ function ChangesSummaryTable() {
 
 				<tr>
 					<td>deduplicated nodes</td>
-					<td>{changes.stats.deduplicatedNodes.toLocaleString()}</td>
+					<td>{summary.deduplicatedNodes.toLocaleString()}</td>
 				</tr>
 				<tr>
 					<td>deduplicated nodes replaced</td>
-					<td>{changes.stats.deduplicatedNodesReplaced.toLocaleString()}</td>
+					<td>{summary.deduplicatedNodesReplaced.toLocaleString()}</td>
 				</tr>
 				<tr>
 					<td>intersection points found</td>
-					<td>{changes.stats.intersectionPointsFound.toLocaleString()}</td>
+					<td>{summary.intersectionPointsFound.toLocaleString()}</td>
 				</tr>
 			</tbody>
 		</table>
@@ -122,18 +80,24 @@ export function ChangesFilters() {
 	const [changeTypeFilter, setChangeTypeFilter] = useAtom(changeTypeFilterAtom)
 	const [entityTypeFilter, setEntityTypeFilter] = useAtom(entityTypeFilterAtom)
 	const setPage = useSetAtom(pageAtom)
+	const [, startTransition] = useTransition()
 
 	return (
 		<div className="filters flex gap-3 pl-2 pb-2">
 			<label>
 				<input
 					type="checkbox"
-					checked={changeTypeFilter.create}
+					checked={changeTypeFilter.includes("create")}
 					onChange={(e) => {
-						setPage(0)
-						setChangeTypeFilter({
-							...changeTypeFilter,
-							create: e.target.checked,
+						startTransition(() => {
+							setPage(0)
+							if (e.target.checked) {
+								setChangeTypeFilter([...changeTypeFilter, "create"])
+							} else {
+								setChangeTypeFilter(
+									changeTypeFilter.filter((type) => type !== "create"),
+								)
+							}
 						})
 					}}
 				/>{" "}
@@ -142,12 +106,17 @@ export function ChangesFilters() {
 			<label>
 				<input
 					type="checkbox"
-					checked={changeTypeFilter.modify}
+					checked={changeTypeFilter.includes("modify")}
 					onChange={(e) => {
-						setPage(0)
-						setChangeTypeFilter({
-							...changeTypeFilter,
-							modify: e.target.checked,
+						startTransition(() => {
+							setPage(0)
+							if (e.target.checked) {
+								setChangeTypeFilter([...changeTypeFilter, "modify"])
+							} else {
+								setChangeTypeFilter(
+									changeTypeFilter.filter((type) => type !== "modify"),
+								)
+							}
 						})
 					}}
 				/>{" "}
@@ -156,12 +125,17 @@ export function ChangesFilters() {
 			<label>
 				<input
 					type="checkbox"
-					checked={changeTypeFilter.delete}
+					checked={changeTypeFilter.includes("delete")}
 					onChange={(e) => {
-						setPage(0)
-						setChangeTypeFilter({
-							...changeTypeFilter,
-							delete: e.target.checked,
+						startTransition(() => {
+							setPage(0)
+							if (e.target.checked) {
+								setChangeTypeFilter([...changeTypeFilter, "delete"])
+							} else {
+								setChangeTypeFilter(
+									changeTypeFilter.filter((type) => type !== "delete"),
+								)
+							}
 						})
 					}}
 				/>{" "}
@@ -170,12 +144,17 @@ export function ChangesFilters() {
 			<label>
 				<input
 					type="checkbox"
-					checked={entityTypeFilter.node}
+					checked={entityTypeFilter.includes("node")}
 					onChange={(e) => {
-						setPage(0)
-						setEntityTypeFilter({
-							...entityTypeFilter,
-							node: e.target.checked,
+						startTransition(() => {
+							setPage(0)
+							if (e.target.checked) {
+								setEntityTypeFilter([...entityTypeFilter, "node"])
+							} else {
+								setEntityTypeFilter(
+									entityTypeFilter.filter((type) => type !== "node"),
+								)
+							}
 						})
 					}}
 				/>{" "}
@@ -184,12 +163,17 @@ export function ChangesFilters() {
 			<label>
 				<input
 					type="checkbox"
-					checked={entityTypeFilter.way}
+					checked={entityTypeFilter.includes("way")}
 					onChange={(e) => {
-						setPage(0)
-						setEntityTypeFilter({
-							...entityTypeFilter,
-							way: e.target.checked,
+						startTransition(() => {
+							setPage(0)
+							if (e.target.checked) {
+								setEntityTypeFilter([...entityTypeFilter, "way"])
+							} else {
+								setEntityTypeFilter(
+									entityTypeFilter.filter((type) => type !== "way"),
+								)
+							}
 						})
 					}}
 				/>{" "}
@@ -198,12 +182,17 @@ export function ChangesFilters() {
 			<label>
 				<input
 					type="checkbox"
-					checked={entityTypeFilter.relation}
+					checked={entityTypeFilter.includes("relation")}
 					onChange={(e) => {
-						setPage(0)
-						setEntityTypeFilter({
-							...entityTypeFilter,
-							relation: e.target.checked,
+						startTransition(() => {
+							setPage(0)
+							if (e.target.checked) {
+								setEntityTypeFilter([...entityTypeFilter, "relation"])
+							} else {
+								setEntityTypeFilter(
+									entityTypeFilter.filter((type) => type !== "relation"),
+								)
+							}
 						})
 					}}
 				/>{" "}
@@ -224,12 +213,12 @@ export function ChangesList({
 }: {
 	setSelectedEntity: (entity: OsmEntity) => void
 }) {
-	const currentChanges = useAtomValue(currentChangesAtom)
+	const changes = useAtomValue(changesAtom)?.changes
 	const startIndex = useAtomValue(startIndexAtom)
 
 	return (
 		<div className="flex flex-col">
-			{currentChanges.map(({ changeType, entity, refs }, i) => {
+			{changes?.map(({ changeType, entity, refs }, i) => {
 				const changeTypeColor = CHANGE_TYPE_COLOR[changeType]
 				const entityType = getEntityType(entity)
 				return (
@@ -255,12 +244,12 @@ export function ChangesList({
 }
 
 export function ChangesExpandableList() {
-	const currentChanges = useAtomValue(currentChangesAtom)
+	const changes = useAtomValue(changesAtom)?.changes
 	const startIndex = useAtomValue(startIndexAtom)
 
 	return (
 		<div className="flex flex-col">
-			{currentChanges.map(({ changeType, entity, refs }, i) => {
+			{changes?.map(({ changeType, entity, refs }, i) => {
 				const changeTypeColor = CHANGE_TYPE_COLOR[changeType]
 				const entityType = getEntityType(entity)
 				const summaryLabel = `${startIndex + i + 1}. ${changeType.toUpperCase()} ${entityType.toUpperCase()} ${entity.id}`
@@ -288,16 +277,21 @@ export function ChangesExpandableList() {
 
 export function ChangesPagination() {
 	const [currentPage, setCurrentPage] = useAtom(pageAtom)
-	const totalPages = useAtomValue(totalPagesAtom)
+	const totalPages = useAtomValue(changesAtom)?.totalPages ?? 0
+	const [, startTransition] = useTransition()
 	const goToNextPage = () => {
-		if (currentPage < totalPages - 1) {
-			setCurrentPage(currentPage + 1)
-		}
+		startTransition(() => {
+			if (currentPage < totalPages - 1) {
+				setCurrentPage(currentPage + 1)
+			}
+		})
 	}
 	const goToPrevPage = () => {
-		if (currentPage > 0) {
-			setCurrentPage(currentPage - 1)
-		}
+		startTransition(() => {
+			if (currentPage > 0) {
+				setCurrentPage(currentPage - 1)
+			}
+		})
 	}
 	return (
 		<div className="flex items-center justify-between">
