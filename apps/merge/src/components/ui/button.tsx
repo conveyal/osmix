@@ -49,8 +49,6 @@ function Button({
 	}) {
 	const Comp = asChild ? Slot : "button"
 
-	console.log("Button.disabled", props.disabled)
-
 	return (
 		<Comp
 			data-slot="button"
