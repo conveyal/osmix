@@ -232,7 +232,7 @@ export class OsmixWorker {
 		)
 		return {
 			changes,
-			totalPages: Math.ceil(filteredChanges?.length ?? 0 / pageSize),
+			totalPages: Math.ceil((filteredChanges?.length ?? 0) / pageSize),
 		}
 	}
 
