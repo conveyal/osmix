@@ -10,6 +10,7 @@ import {
 } from "@osmix/core"
 import type { OsmEntityType } from "@osmix/json"
 import { expose, transfer } from "comlink"
+import { dequal } from "dequal/lite"
 import {
 	MIN_NODE_ZOOM,
 	RASTER_TILE_IMAGE_TYPE,
@@ -19,7 +20,12 @@ import type { StatusType } from "@/state/log"
 
 export class OsmixWorker {
 	private osmixes = new Map<string, Osmix>()
+
 	private changesets = new Map<string, OsmChangeset>()
+	private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"]
+	private entityTypes: OsmEntityType[] = ["node", "way", "relation"]
+	private filteredChanges = new Map<string, OsmChange[]>()
+
 	private log = (message: string, type?: StatusType) => {
 		type === "error" ? console.error(message) : console.log(message)
 	}
@@ -116,6 +122,7 @@ export class OsmixWorker {
 				`Deduplicating nodes: ${checkedNodes.toLocaleString()} nodes checked, ${dedpulicatedNodes.toLocaleString()} nodes deduplicated`,
 			)
 		}
+		this.sortChangeset(id, changeset)
 
 		return changeset.stats
 	}
@@ -163,48 +170,69 @@ export class OsmixWorker {
 		}
 
 		this.changesets.set(baseOsmId, changeset)
+		this.sortChangeset(baseOsmId, changeset)
 
 		return changeset.stats
 	}
 
-	getFilteredChangeset(
-		osmId: string,
-		page: number,
-		pageSize: number,
+	sortChangeset(osmId: string, changeset: OsmChangeset) {
+		const filteredChanges: OsmChange[] = []
+		if (this.entityTypes.includes("node")) {
+			for (const change of Object.values(changeset.nodeChanges)) {
+				if (this.changeTypes.includes(change.changeType)) {
+					filteredChanges.push(change)
+				}
+			}
+		}
+		if (this.entityTypes.includes("way")) {
+			for (const change of Object.values(changeset.wayChanges)) {
+				if (this.changeTypes.includes(change.changeType)) {
+					filteredChanges.push(change)
+				}
+			}
+		}
+		if (this.entityTypes.includes("relation")) {
+			for (const change of Object.values(changeset.relationChanges)) {
+				if (this.changeTypes.includes(change.changeType)) {
+					filteredChanges.push(change)
+				}
+			}
+		}
+		this.filteredChanges.set(osmId, filteredChanges)
+	}
+
+	sortChangesets() {
+		for (const [osmId, changeset] of this.changesets) {
+			this.sortChangeset(osmId, changeset)
+		}
+	}
+
+	setChangesetFilters(
 		changeTypes: OsmChangeTypes[],
 		entityTypes: OsmEntityType[],
 	) {
+		if (
+			dequal(this.changeTypes, changeTypes) &&
+			dequal(this.entityTypes, entityTypes)
+		) {
+			return
+		}
+		this.changeTypes = changeTypes
+		this.entityTypes = entityTypes
+		this.sortChangesets()
+	}
+
+	getChangesetPage(osmId: string, page: number, pageSize: number) {
 		const changeset = this.changesets.get(osmId)
 		if (!changeset) throw Error("No active changeset")
-		const filteredChanges: OsmChange[] = []
-		if (entityTypes.includes("node")) {
-			for (const change of Object.values(changeset.nodeChanges)) {
-				if (changeTypes.includes(change.changeType)) {
-					filteredChanges.push(change)
-				}
-			}
-		}
-		if (entityTypes.includes("way")) {
-			for (const change of Object.values(changeset.wayChanges)) {
-				if (changeTypes.includes(change.changeType)) {
-					filteredChanges.push(change)
-				}
-			}
-		}
-		if (entityTypes.includes("relation")) {
-			for (const change of Object.values(changeset.relationChanges)) {
-				if (changeTypes.includes(change.changeType)) {
-					filteredChanges.push(change)
-				}
-			}
-		}
-		const changes = filteredChanges.slice(
+		const filteredChanges = this.filteredChanges.get(osmId)
+		const changes = filteredChanges?.slice(
 			page * pageSize,
 			(page + 1) * pageSize,
 		)
 		return {
 			changes,
-			totalPages: Math.ceil(filteredChanges.length / pageSize),
+			totalPages: Math.ceil(filteredChanges?.length ?? 0 / pageSize),
 		}
 	}
 
@@ -213,6 +241,7 @@ export class OsmixWorker {
 		if (!changeset) throw Error("No active changeset")
 		const osm = changeset.applyChanges(osmId)
 		this.changesets.delete(osmId)
+		this.filteredChanges.delete(osmId)
 		this.osmixes.set(osmId, osm)
 		return osm.transferables()
 	}

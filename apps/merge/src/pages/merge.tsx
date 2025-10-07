@@ -113,21 +113,27 @@ export default function Merge() {
 
 	const downloadJsonChanges = async () => {
 		if (!changesetStats) return
-		const changes = await osmWorker.getFilteredChangeset(
-			changesetStats.osmId,
-			0,
-			1_000_000,
-			["create", "modify", "delete"],
-			["node", "way", "relation"],
-		)
-		const task = Log.startTask("Converting changeset to JSON")
-		const json = JSON.stringify(changes, null, 2)
 		const fileHandle = await showSaveFilePicker({
 			suggestedName: "osm-changes.json",
 		})
 		if (!fileHandle) return
 		const stream = await fileHandle.createWritable()
-		await stream.write(json)
+
+		const PAGE_SIZE = 100_000
+		const task = Log.startTask(
+			`Converting ${changesetStats.totalChanges} changes to JSON`,
+		)
+		let page = 0
+		let changesetPage: Awaited<ReturnType<typeof osmWorker.getChangesetPage>>
+		do {
+			changesetPage = await osmWorker.getChangesetPage(
+				changesetStats.osmId,
+				page++,
+				PAGE_SIZE,
+			)
+			const json = JSON.stringify(changesetPage.changes, null, 2)
+			await stream.write(json)
+		} while (changesetPage.changes && changesetPage.changes.length > 0)
 		stream.close()
 		task.end("Changeset converted to JSON", "ready")
 	}

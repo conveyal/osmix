@@ -29,12 +29,11 @@ export const changesAtom = atom(async (get) => {
 	const page = get(pageAtom)
 	const changeTypeFilter = get(changeTypeFilterAtom)
 	const entityTypeFilter = get(entityTypeFilterAtom)
-	const filteredChanges = await osmWorker.getFilteredChangeset(
+	await osmWorker.setChangesetFilters(changeTypeFilter, entityTypeFilter)
+	const filteredChanges = await osmWorker.getChangesetPage(
 		changeStats.osmId,
 		page,
 		pageSize,
-		changeTypeFilter,
-		entityTypeFilter,
 	)
 	return filteredChanges
 })
