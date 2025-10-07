@@ -164,6 +164,7 @@ export default function Merge() {
 							<div className="font-bold p-2">BASE OSM PBF</div>
 							<OsmPbfFileInput
 								testId="merge-base-file"
+								file={base.file}
 								setFile={async (file) => {
 									const osm = await base.loadOsmFile(file)
 									flyToOsmBounds(osm)
@@ -180,6 +181,7 @@ export default function Merge() {
 							<div className="font-bold p-2">PATCH OSM PBF</div>
 							<OsmPbfFileInput
 								testId="merge-patch-file"
+								file={patch.file}
 								setFile={async (file) => {
 									const osm = await patch.loadOsmFile(file)
 									flyToOsmBounds(osm)

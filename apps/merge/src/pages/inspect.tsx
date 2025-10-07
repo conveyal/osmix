@@ -81,6 +81,7 @@ export default function InspectPage() {
 				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
 					<OsmPbfFileInput
 						testId="inspect-file"
+						file={file}
 						setFile={async (file) => {
 							selectEntity(null, null)
 							setChangesetStats(null)
