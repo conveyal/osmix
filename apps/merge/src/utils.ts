@@ -93,7 +93,10 @@ export function supportsReadableStreamTransfer(): boolean {
 }
 
 export function camelCaseToSentenceCase(str: string) {
-	return str.replace(/([A-Z])/g, " $1").trim()
+	return str
+		.replace(/([A-Z])/g, " $1")
+		.trim()
+		.toLowerCase()
 }
 
 /**
