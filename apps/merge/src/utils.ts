@@ -100,11 +100,9 @@ export function camelCaseToSentenceCase(str: string) {
  * Summarize the changeset stats with the most significant changes first.
  */
 export function changeStatsSummary(stats: OsmChangesetStats) {
-	const numericStats = (Object.entries(stats) as [string, unknown][]) 
-		.filter(([, value]) => typeof value === "number" && value > 0) as [
-			string,
-			number,
-		][]
+	const numericStats = (Object.entries(stats) as [string, unknown][]).filter(
+		([, value]) => typeof value === "number" && value > 0,
+	) as [string, number][]
 	if (numericStats.length === 0) return "Changeset is empty."
 	const sortedNumericStats = [...numericStats]
 		.sort((a, b) => b[1] - a[1])

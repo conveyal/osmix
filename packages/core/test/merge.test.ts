@@ -1,5 +1,9 @@
+import { existsSync } from "node:fs"
 import type { OsmNode } from "@osmix/json"
-import { getFixtureFileReadStream } from "@osmix/test-utils/fixtures"
+import {
+	getFixtureFileReadStream,
+	getFixturePath,
+} from "@osmix/test-utils/fixtures"
 import { assert, describe, it } from "vitest"
 import { createOsmIndexFromPbfData, OsmChangeset, type Osmix } from "../src"
 import { createBaseOsm, createPatchOsm } from "./mock-osm"
@@ -30,7 +34,7 @@ const sizes = (osm: Osmix) => ({
 })
 
 describe("merge osm", () => {
-	it.runIf(process.env.CI !== "true")(
+	it.runIf(existsSync(getFixturePath("./yakima-full.osm.pbf")))(
 		"should merge two real osm objects",
 		{
 			timeout: 10_000,
