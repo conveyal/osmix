@@ -52,8 +52,10 @@ function showFileSelector() {
 
 	return new Promise<File | null>((resolve) => {
 		const focusListener = () => {
-			resolve(null)
-			removeListener()
+			setTimeout(() => {
+				resolve(null)
+				removeListener()
+			}, 300)
 		}
 		const removeListener = () =>
 			window.removeEventListener("focus", focusListener)
