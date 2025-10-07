@@ -68,6 +68,7 @@ export default function InspectPage() {
 		task.update("Refreshing OSM index...")
 		const newOsm = Osmix.from(transferables)
 		setOsm(newOsm)
+		setChangesetStats(null)
 		task.end("Changes applied!")
 	}
 

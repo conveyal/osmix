@@ -11,7 +11,7 @@ import {
 	SkipForwardIcon,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import ActionButton from "@/components/action-button"
 import Basemap from "@/components/basemap"
 import DeckGlOverlay from "@/components/deckgl-overlay"
@@ -140,9 +140,11 @@ export default function Merge() {
 
 	const applyChanges = async () => {
 		if (!changesetStats) throw Error("Changeset stats are not loaded")
-		return Osmix.from(
+		const osm = Osmix.from(
 			await osmWorker.applyChangesAndReplace(changesetStats.osmId),
 		)
+		setChangesetStats(null)
+		return osm
 	}
 
 	const hasZeroChanges = useMemo(() => {
@@ -318,7 +320,11 @@ export default function Merge() {
 											)
 										setChangesetStats(intersectionsChanges)
 										task.update(changeStatsSummary(intersectionsChanges))
-										await osmWorker.applyChangesAndReplace(base.osm.id)
+										const osm = Osmix.from(
+											await osmWorker.applyChangesAndReplace(base.osm.id),
+										)
+										setChangesetStats(null)
+										base.setOsm(osm)
 
 										task.end("All merge steps completed")
 										goToStep("inspect-final-osm")
