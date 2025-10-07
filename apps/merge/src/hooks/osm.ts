@@ -21,7 +21,7 @@ function useOsmDefaultFile(
 	useEffect(() => {
 		if (!loadOnStart || !defaultFilePath || map == null) return
 		setLoadOnStart(false)
-		console.error("LOADING DEFAULT FILE", defaultFilePath)
+		console.warn("LOADING DEFAULT FILE", defaultFilePath)
 		startTransition(async () => {
 			const response = await fetch(defaultFilePath)
 			const blob = await response.blob()
