@@ -20,20 +20,18 @@ import type { StatusType } from "@/state/log"
 export class OsmixWorker {
 	private osmixes = new Map<string, Osmix>()
 	private changesets = new Map<string, OsmChangeset>()
-	private logger = console.log
+	private log = (message: string, type?: StatusType) => {
+		type === "error" ? console.error(message) : console.log(message)
+	}
 
 	async fromPbf(id: string, data: ArrayBufferLike | ReadableStream) {
-		const osm = await Osmix.fromPbf(data, id, (m) => this.log(m))
+		const osm = await Osmix.fromPbf(data, id, this.log)
 		this.osmixes.set(id, osm)
 		return osm.transferables()
 	}
 
-	log(message: string, type: StatusType = "info") {
-		type === "error" ? console.error(message) : console.log(message)
-	}
-
-	setLogger(logger: typeof this.logger) {
-		this.logger = logger
+	setLogger(logger: typeof this.log) {
+		this.log = logger
 	}
 
 	getEntity(oid: string, eid: string) {
