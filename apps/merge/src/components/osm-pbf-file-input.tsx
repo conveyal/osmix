@@ -1,8 +1,7 @@
 import { FilesIcon, XIcon } from "lucide-react"
 import { useRef, useTransition } from "react"
-import { Button } from "./ui/button"
+import ActionButton from "./action-button"
 import { ButtonGroup } from "./ui/button-group"
-import { Spinner } from "./ui/spinner"
 
 function isOsmPbfFile(file: File | undefined): file is File {
 	if (file == null) return false
@@ -23,13 +22,14 @@ export default function OsmPbfFileInput({
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	return (
 		<ButtonGroup className="w-full" data-testid={testId}>
-			<Button
+			<ActionButton
 				className="flex-1"
-				disabled={disabled || isTransitioning}
-				onClick={() => fileInputRef.current?.click()}
+				disabled={disabled}
+				onAction={async () => fileInputRef.current?.click()}
+				icon={<FilesIcon />}
 			>
-				{isTransitioning ? <Spinner /> : <FilesIcon />} Select new OSM PBF file
-			</Button>
+				Select new OSM PBF file
+			</ActionButton>
 			<input
 				disabled={disabled || isTransitioning}
 				className="hidden"
@@ -45,13 +45,12 @@ export default function OsmPbfFileInput({
 				}}
 				ref={fileInputRef}
 			/>
-			<Button
+			<ActionButton
 				disabled={disabled || isTransitioning}
-				onClick={() => startTransition(() => setFile(null))}
+				onAction={async () => setFile(null)}
 				title="Clear file"
-			>
-				<XIcon />
-			</Button>
+				icon={<XIcon />}
+			/>
 		</ButtonGroup>
 	)
 }

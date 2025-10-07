@@ -1,6 +1,7 @@
-import { Osmix } from "@osmix/core"
+import { Osmix, writeOsmToPbfStream } from "@osmix/core"
 import * as Comlink from "comlink"
 import { useAtom, useAtomValue } from "jotai"
+import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useState, useTransition } from "react"
 import { Log } from "@/state/log"
 import { mapAtom } from "@/state/map"
@@ -67,8 +68,30 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 		[id, setFile, setOsm],
 	)
 
+	const downloadOsm = useCallback(
+		async (name?: string) => {
+			if (!osm) return
+			const task = Log.startTask("Generating OSM file to download")
+			const suggestedName =
+				name ?? (osm.id.endsWith(".pbf") ? osm.id : `${osm.id}.pbf`)
+			const fileHandle = await showSaveFilePicker({
+				suggestedName,
+				types: [
+					{
+						description: "OSM PBF",
+						accept: { "application/x-protobuf": [".pbf"] },
+					},
+				],
+			})
+			const stream = await fileHandle.createWritable()
+			await writeOsmToPbfStream(osm, stream)
+			task.end(`Created ${fileHandle.name} PBF for download`)
+		},
+		[osm],
+	)
+
 	// Load a default file in development mode
 	useOsmDefaultFile(loadOsmFile, defaultFilePath)
 
-	return { file, loadOsmFile, osm, setOsm }
+	return { downloadOsm, file, loadOsmFile, osm, setOsm }
 }

@@ -1,11 +1,11 @@
-import { Osmix, writeOsmToPbfStream } from "@osmix/core"
+import { Osmix } from "@osmix/core"
 import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
-import { showSaveFilePicker } from "native-file-system-adapter"
-import { useCallback, useMemo, useTransition } from "react"
+import { useMemo } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
 import { useSearchParams } from "react-router"
+import ActionButton from "@/components/action-button"
 import Basemap from "@/components/basemap"
 import CustomControl from "@/components/custom-control"
 import DeckGlOverlay from "@/components/deckgl-overlay"
@@ -23,8 +23,7 @@ import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
 import SidebarLog from "@/components/sidebar-log"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group"
 import {
 	useFlyToEntity,
 	useFlyToOsmBounds,
@@ -53,47 +52,24 @@ export default function InspectPage() {
 	)
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
-	const { osm, file, loadOsmFile, setOsm } = useOsmFile(osmId, "./monaco.pbf")
+	const { downloadOsm, osm, file, loadOsmFile, setOsm } = useOsmFile(
+		osmId,
+		"./monaco.pbf",
+	)
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const tileLayer = usePickableOsmTileLayer(osm)
 	const selectedEntityLayer = useSelectedEntityLayer()
-	const [isTransitioning, startTransition] = useTransition()
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 
-	const downloadOsm = useCallback(async (osm: Osmix, name?: string) => {
-		startTransition(async () => {
-			const task = Log.startTask("Generating OSM file to download")
-			const suggestedName =
-				name ?? (osm.id.endsWith(".pbf") ? osm.id : `${osm.id}.pbf`)
-			const fileHandle = await showSaveFilePicker({
-				suggestedName,
-				types: [
-					{
-						description: "OSM PBF",
-						accept: { "application/x-protobuf": [".pbf"] },
-					},
-				],
-			})
-			const stream = await fileHandle.createWritable()
-			await writeOsmToPbfStream(osm, stream)
-			task.end(`Created ${fileHandle.name} PBF for download`)
-		})
-	}, [])
-
-	const applyChanges = useCallback(
-		async (osmId: string) => {
-			startTransition(async () => {
-				const task = Log.startTask("Applying changes to OSM...")
-				const transferables = await osmWorker.applyChangesAndReplace(osmId)
-				task.update("Refreshing OSM index...")
-				const newOsm = Osmix.from(transferables)
-				setOsm(newOsm)
-				task.end("Changes applied!")
-			})
-		},
-		[setOsm],
-	)
+	const applyChanges = async (osmId: string) => {
+		const task = Log.startTask("Applying changes to OSM...")
+		const transferables = await osmWorker.applyChangesAndReplace(osmId)
+		task.update("Refreshing OSM index...")
+		const newOsm = Osmix.from(transferables)
+		setOsm(newOsm)
+		task.end("Changes applied!")
+	}
 
 	const hasZeroChanges = useMemo(() => {
 		return changesetStats == null || changesetStats.totalChanges === 0
@@ -118,47 +94,39 @@ export default function InspectPage() {
 							<div className="flex flex-col">
 								<div className="flex items-center justify-between border-l border-r border-t pl-2 rounded-t">
 									<div className="font-bold">OPENSTREETMAP PBF</div>
-									<div className="flex gap-2">
-										<Button
-											disabled={isTransitioning}
-											onClick={() => downloadOsm(osm)}
+									<ButtonGroup>
+										<ActionButton
+											onAction={downloadOsm}
 											variant="ghost"
-											size="icon"
+											icon={<DownloadIcon />}
 											title="Download OSM PBF"
-										>
-											<DownloadIcon />
-										</Button>
-										<Button
-											disabled={isTransitioning}
-											onClick={() => flyToOsmBounds(osm)}
+										/>
+										<ButtonGroupSeparator />
+										<ActionButton
+											onAction={async () => flyToOsmBounds(osm)}
 											variant="ghost"
-											size="icon"
+											icon={<MaximizeIcon />}
 											title="Fit bounds to file bbox"
-										>
-											<MaximizeIcon />
-										</Button>
-									</div>
+										/>
+									</ButtonGroup>
 								</div>
 								<OsmInfoTable file={file} osm={osm} />
 							</div>
 
 							{changesetStats == null ? (
-								<Button
-									onClick={() => {
-										startTransition(async () => {
-											const task = Log.startTask(
-												"Finding duplicate nodes and ways",
-											)
-											const changes = await osmWorker.dedupeNodesAndWays(osmId)
-											setChangesetStats(changes)
-											task.end(changeStatsSummary(changes))
-										})
+								<ActionButton
+									onAction={async () => {
+										const task = Log.startTask(
+											"Finding duplicate nodes and ways",
+										)
+										const changes = await osmWorker.dedupeNodesAndWays(osmId)
+										setChangesetStats(changes)
+										task.end(changeStatsSummary(changes))
 									}}
-									disabled={isTransitioning}
+									icon={<SearchCode />}
 								>
-									{isTransitioning ? <Spinner /> : <SearchCode />}
 									Find duplicate nodes and ways
-								</Button>
+								</ActionButton>
 							) : (
 								<>
 									<ChangesSummary>
@@ -179,13 +147,12 @@ export default function InspectPage() {
 									</ChangesSummary>
 
 									{!hasZeroChanges && (
-										<Button
-											onClick={() => applyChanges(osm.id)}
-											disabled={isTransitioning}
+										<ActionButton
+											onAction={() => applyChanges(osm.id)}
+											icon={<MergeIcon />}
 										>
-											{isTransitioning ? <Spinner /> : <MergeIcon />}
 											Apply changes
-										</Button>
+										</ActionButton>
 									)}
 								</>
 							)}
