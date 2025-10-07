@@ -150,7 +150,7 @@ export class OsmixWorker {
 			for (const _nodeStats of changeset.deduplicateNodes(baseOsm)) {
 				checkedNodes++
 				logEverySecond(
-					`Node deduplication progress: ${checkedNodes.toLocaleString()} checked, ${changeset.stats.deduplicatedNodes.toLocaleString()} deduplicated, ${changeset.stats.deduplicatedNodesReplaced.toLocaleString()} replaced`,
+					`Node deduplication progress: ${checkedNodes.toLocaleString()} checked`,
 				)
 			}
 		}
@@ -164,7 +164,7 @@ export class OsmixWorker {
 			)) {
 				checkedWays++
 				logEverySecond(
-					`Intersection creation progress: ${checkedWays.toLocaleString()} ways checked, ${changeset.stats.intersectionPointsFound.toLocaleString()} intersections created`,
+					`Intersection creation progress: ${checkedWays.toLocaleString()} ways checked`,
 				)
 			}
 		}
