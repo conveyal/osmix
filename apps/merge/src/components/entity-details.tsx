@@ -29,7 +29,7 @@ export default function EntityDetails({
 		return (
 			<WayDetails way={entity} open={open}>
 				{osm && (
-					<Details open={open}>
+					<Details open={false}>
 						<DetailsSummary>WAY NODES ({entity.refs.length})</DetailsSummary>
 						<DetailsContent>
 							<NodeListTable

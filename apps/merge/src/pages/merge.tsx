@@ -14,10 +14,12 @@ import { showSaveFilePicker } from "native-file-system-adapter"
 import { useMemo } from "react"
 import ActionButton from "@/components/action-button"
 import Basemap from "@/components/basemap"
+import CustomControl from "@/components/custom-control"
 import DeckGlOverlay from "@/components/deckgl-overlay"
 import { Details, DetailsContent, DetailsSummary } from "@/components/details"
 import EntityDetails from "@/components/entity-details"
 import { Main, MapContent, Sidebar } from "@/components/layout"
+import NominatimSearchControl from "@/components/nominatim-search-control"
 import ChangesSummary, {
 	ChangesExpandableList,
 	ChangesFilters,
@@ -714,6 +716,10 @@ export default function Merge() {
 					/>
 					{base.osm && <OsmixRasterSource osmId={base.osm.id} />}
 					{patch.osm && <OsmixRasterSource osmId={patch.osm.id} />}
+
+					<CustomControl position="top-left">
+						<NominatimSearchControl />
+					</CustomControl>
 				</Basemap>
 			</MapContent>
 		</Main>

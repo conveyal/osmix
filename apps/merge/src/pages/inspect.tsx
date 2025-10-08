@@ -14,6 +14,7 @@ import EntityDetailsMapControl from "@/components/entity-details-map-control"
 import EntitySearchControl from "@/components/entity-search-control"
 import ExtractList from "@/components/extract-list"
 import { Main, MapContent, Sidebar } from "@/components/layout"
+import NominatimSearchControl from "@/components/nominatim-search-control"
 import ChangesSummary, {
 	ChangesFilters,
 	ChangesList,
@@ -202,6 +203,11 @@ export default function InspectPage() {
 						}}
 					/>
 					{osm && <OsmixRasterSource osmId={osm.id} />}
+
+					<CustomControl position="top-left">
+						<NominatimSearchControl />
+					</CustomControl>
+
 					{osm && (
 						<CustomControl position="top-left">
 							<EntitySearchControl osm={osm} />

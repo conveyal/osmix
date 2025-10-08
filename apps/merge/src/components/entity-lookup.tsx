@@ -30,7 +30,7 @@ export default function EntityLookup({
 					placeholder={`Find entity by ID (prefix "n", "w", or "r")`}
 				/>
 				<InputGroupAddon align="inline-end">
-					<InputGroupButton type="submit" size="icon-sm">
+					<InputGroupButton type="submit" size="icon-sm" variant="ghost">
 						<SearchIcon />
 					</InputGroupButton>
 				</InputGroupAddon>
