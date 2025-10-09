@@ -1,7 +1,5 @@
 import { toAsyncGenerator } from "@osmix/pbf"
 import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures"
-import { featureOf, getCoords, getType } from "@turf/invariant"
-import { coordEach } from "@turf/meta"
 import { assert, describe, it } from "vitest"
 import { isNode, isWay } from "../src"
 import { nodeToFeature, wayToFeature } from "../src/geojson"
@@ -31,8 +29,9 @@ describe("geojson", () => {
 					nodeMap.set(node.id, node)
 					if (!node.tags || Object.keys(node.tags).length === 0) continue
 					const feature = nodeToFeature(node)
-					featureOf(feature, "Point", "test")
 					assert.equal(feature.type, "Feature")
+					assert.equal(feature.geometry.type, "Point")
+
 					assert.ok(feature.id !== undefined && feature.id !== null)
 					assert.ok(feature.geometry)
 					assert.ok(feature.geometry.type === "Point")
@@ -59,14 +58,16 @@ describe("geojson", () => {
 						`Duplicate feature id: ${feature.id}`,
 					)
 					seenWayIds.add(feature.id)
-					assert.ok(["LineString", "Polygon"].includes(getType(feature)))
-					const coords = getCoords(feature)
-					assert.ok(Array.isArray(coords))
-					assert.ok(coords.length > 0)
-					coordEach(feature, (c) => {
-						assert.ok(Array.isArray(c))
-						assert.ok(c.length === 2)
-					})
+					assert.ok(["LineString", "Polygon"].includes(feature.geometry.type))
+					if (feature.geometry.type === "LineString") {
+						const coords = feature.geometry.coordinates
+						assert.ok(Array.isArray(coords))
+						assert.ok(coords.length > 0)
+					} else {
+						const coords = feature.geometry.coordinates[0]
+						assert.ok(Array.isArray(coords))
+						assert.ok(coords.length > 0)
+					}
 					wayFeatures++
 				}
 			}

@@ -21,11 +21,10 @@
 		"@mapbox/sphericalmercator": "^2.0.1",
 		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
-		"@turf/distance": "7.2.0",
-		"@turf/line-intersect": "7.2.0",
 		"dequal": "catalog:",
 		"flatbush": "^4.4.1",
 		"kdbush": "mourner/kdbush#16416cd",
-		"lineclip": "^2.0.0"
+		"lineclip": "^2.0.0",
+		"sweepline-intersections": "^1.5.0"
 	}
 }

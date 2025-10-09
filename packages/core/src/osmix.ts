@@ -172,7 +172,10 @@ export class Osmix extends EventTarget {
 
 				if (ways.length > 0) {
 					// Nodes are finished, build their index.
-					if (this.ways.size === 0) this.nodes.buildIndex()
+					if (this.ways.size === 0) {
+						this.nodes.buildIndex()
+						entityCount = 0
+					}
 					entityCount += this.ways.addWays(
 						ways,
 						blockStringIndexMap,
@@ -190,7 +193,10 @@ export class Osmix extends EventTarget {
 				}
 
 				if (relations.length > 0) {
-					if (this.relations.size === 0) this.ways.buildIndex()
+					if (this.relations.size === 0) {
+						this.ways.buildIndex()
+						entityCount = 0
+					}
 					entityCount += this.relations.addRelations(
 						relations,
 						blockStringIndexMap,

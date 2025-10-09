@@ -9,13 +9,13 @@ import {
 	type OsmRelation,
 	type OsmWay,
 } from "@osmix/json"
-import { distance } from "@turf/distance"
-import { lineIntersect } from "@turf/line-intersect"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
+import sweeplineIntersections from "sweepline-intersections"
 import { Osmix } from "./osmix"
 import type { OsmChange, OsmEntityRef } from "./types"
 import {
 	cleanCoords,
+	haversineDistance,
 	isWayIntersectionCandidate,
 	osmTagsToOscTags,
 	removeDuplicateAdjacentOsmWayRefs,
@@ -356,7 +356,7 @@ export default class OsmChangeset {
 		let nearestNodeId = null
 		let nearestNodeRefIndex = -1
 		for (let i = 0; i < wayCoords.length; i++) {
-			const nodeDistance = distance(wayCoords[i], point, { units: "meters" })
+			const nodeDistance = haversineDistance(wayCoords[i], point)
 			if (
 				nodeDistance < nearestDistance &&
 				nodeDistance < MAX_DISTANCE_METERS
@@ -413,8 +413,7 @@ export default class OsmChangeset {
 				coordinates,
 				intersectingWayCoords,
 			)
-			for (const point of intersectingPoints.features) {
-				const pt = point.geometry.coordinates as [number, number]
+			for (const pt of intersectingPoints) {
 				intersectionsFound++
 
 				const intersectingWayNodeId = this.nearestNodeOnWay(
@@ -775,25 +774,46 @@ function getEntityVersion(entity: OsmEntity) {
 		: 0
 }
 
-function waysIntersect(wayA: [number, number][], wayB: [number, number][]) {
-	return lineIntersect(
+function waysIntersect(
+	wayA: [number, number][],
+	wayB: [number, number][],
+): [number, number][] {
+	const intersections = sweeplineIntersections(
 		{
-			type: "Feature",
-			geometry: {
-				type: "LineString",
-				coordinates: wayA,
-			},
-			properties: {},
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: wayA,
+					},
+					properties: {},
+				},
+				{
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: wayB,
+					},
+					properties: {},
+				},
+			],
 		},
-		{
-			type: "Feature",
-			geometry: {
-				type: "LineString",
-				coordinates: wayB,
-			},
-			properties: {},
-		},
+		true,
 	)
+
+	const uniqueFeatures: [number, number][] = []
+	const seen = new Set<string>()
+
+	for (const coordinates of intersections) {
+		const key = `${coordinates[0]}:${coordinates[1]}`
+		if (seen.has(key)) continue
+		seen.add(key)
+		uniqueFeatures.push(coordinates)
+	}
+
+	return uniqueFeatures
 }
 
 /**

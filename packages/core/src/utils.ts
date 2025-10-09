@@ -1,4 +1,4 @@
-import type { LonLat, OsmNode, OsmTags, OsmWay } from "@osmix/json"
+import type { LonLat, OsmTags, OsmWay } from "@osmix/json"
 import type { GeoBbox2D } from "./types"
 
 export function throttle<T extends unknown[]>(
@@ -16,34 +16,20 @@ export function throttle<T extends unknown[]>(
 }
 
 /**
- * Create a throttled console.log which prints at most once every `ms`.
- * @param ms - The minimum time between logs in milliseconds
- * @returns A function that can be called to log a value
+ * Calculate the haversine distance between two LonLat points.
+ * @param p1 - The first point
+ * @param p2 - The second point
+ * @returns The haversine distance in meters
  */
-export function logEvery(ms: number) {
-	const start = Date.now()
-	let prev = start // previously allowed timestamp
-	return (val: unknown) => {
-		const now = Date.now()
-		if (now >= prev + ms) {
-			console.error(`${(now - start) / 1000}s: ${val}`)
-			prev = now
-		}
-	}
-}
-
-/**
- * Calculate the haversine distance between two nodes.
- * @param node1 - The first node
- * @param node2 - The second node
- * @returns The haversine distance in kilometers
- */
-export function haversineDistance(node1: OsmNode, node2: OsmNode): number {
-	const R = 6371 // Earth's radius in kilometers
-	const dLat = (node2.lat - node1.lat) * (Math.PI / 180)
-	const dLon = (node2.lon - node1.lon) * (Math.PI / 180)
-	const lat1 = node1.lat * (Math.PI / 180)
-	const lat2 = node2.lat * (Math.PI / 180)
+export function haversineDistance(
+	p1: [number, number],
+	p2: [number, number],
+): number {
+	const R = 6371008.8 // Earth's radius in meters
+	const dLat = (p2[1] - p1[1]) * (Math.PI / 180)
+	const dLon = (p2[0] - p1[0]) * (Math.PI / 180)
+	const lat1 = p1[1] * (Math.PI / 180)
+	const lat2 = p2[1] * (Math.PI / 180)
 	const a =
 		Math.sin(dLat / 2) ** 2 +
 		Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2)
