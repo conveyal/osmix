@@ -20,6 +20,10 @@ export interface NodesTransferables extends EntitiesTransferables {
 	spatialIndex: BufferType
 }
 
+export interface AddNodeOptions {
+	filter?: (node: OsmNode) => boolean
+}
+
 export class Nodes extends Entities<OsmNode> {
 	lons: ResizeableTypedArray<Float64Array>
 	lats: ResizeableTypedArray<Float64Array>
@@ -76,7 +80,8 @@ export class Nodes extends Entities<OsmNode> {
 		dense: OsmPbfDenseNodes,
 		block: OsmPbfBlock,
 		blockStringIndexMap: Map<number, number>,
-	) {
+		filter?: (node: OsmNode) => boolean,
+	): number {
 		const lon_offset = block.lon_offset ?? 0
 		const lat_offset = block.lat_offset ?? 0
 		const granularity = block.granularity ?? 1e7
@@ -98,6 +103,7 @@ export class Nodes extends Entities<OsmNode> {
 		}
 
 		let keysValsIndex = 0
+		let added = 0
 		for (let i = 0; i < dense.id.length; i++) {
 			const idSid = dense.id[i]
 			const latSid = dense.lat[i]
@@ -125,6 +131,16 @@ export class Nodes extends Entities<OsmNode> {
 				keysValsIndex++
 			}
 
+			const shouldInclude = filter
+				? filter({
+						id: delta.id,
+						lon,
+						lat,
+						tags: this.tags.getTagsFromIndices(tagKeys, tagValues),
+					})
+				: true
+			if (!shouldInclude) continue
+
 			this.ids.add(delta.id)
 			this.lons.push(lon)
 			this.lats.push(lat)
@@ -134,7 +150,10 @@ export class Nodes extends Entities<OsmNode> {
 			if (lon > this.bbox[2]) this.bbox[2] = lon
 			if (lat > this.bbox[3]) this.bbox[3] = lat
 			this.tags.addTagKeysAndValues(tagKeys, tagValues)
+			added++
 		}
+
+		return added
 	}
 
 	finishEntityIndex() {

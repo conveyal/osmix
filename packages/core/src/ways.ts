@@ -78,18 +78,31 @@ export class Ways extends Entities<OsmWay> {
 	/**
 	 * Bulk add ways directly from a PBF PrimitiveBlock.
 	 */
-	addWays(ways: OsmPbfWay[], blockStringIndexMap: Map<number, number>) {
+	addWays(
+		ways: OsmPbfWay[],
+		blockStringIndexMap: Map<number, number>,
+		filter?: (way: OsmWay) => OsmWay | null,
+	) {
+		let added = 0
 		for (const way of ways) {
+			let prevRefId = 0
+			const refs = way.refs.map((refId) => {
+				prevRefId += refId
+				return prevRefId
+			})
+			const filteredWay = filter
+				? filter({
+						id: way.id,
+						refs,
+						tags: this.tags.getTagsFromIndices(way.keys, way.vals),
+					})
+				: null
+			if (filter && filteredWay === null) continue
+
 			this.ids.add(way.id)
-
-			let refId = 0
 			this.refStart.push(this.refs.length)
-			this.refCount.push(way.refs.length)
-
-			for (const refSid of way.refs) {
-				refId += refSid
-				this.refs.push(refId)
-			}
+			this.refCount.push(filteredWay?.refs.length ?? refs.length)
+			this.refs.pushMany(filteredWay?.refs ?? refs)
 
 			const tagKeys: number[] = way.keys.map((key) => {
 				const index = blockStringIndexMap.get(key)
@@ -102,7 +115,9 @@ export class Ways extends Entities<OsmWay> {
 				return index
 			})
 			this.tags.addTagKeysAndValues(tagKeys, tagValues)
+			added++
 		}
+		return added
 	}
 
 	finishEntityIndex() {

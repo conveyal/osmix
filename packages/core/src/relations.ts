@@ -82,30 +82,76 @@ export class Relations extends Entities<OsmRelation> {
 	addRelations(
 		relations: OsmPbfRelation[],
 		blockStringIndexMap: Map<number, number>,
-	) {
+		filter?: (relation: OsmRelation) => OsmRelation | null,
+	): number {
 		const blockToStringTable = (k: number) => {
 			const index = blockStringIndexMap.get(k)
 			if (index === undefined) throw Error("Tag key not found")
 			return index
 		}
 
+		let added = 0
 		for (const relation of relations) {
-			this.ids.add(relation.id)
-			this.memberStart.push(this.memberRefs.length)
-			this.memberCount.push(relation.memids.length)
+			const members: OsmRelationMember[] = []
+			const memberRefs: number[] = []
+			const memberTypes: number[] = []
+			const memberRoles: number[] = []
 
 			let refId = 0
 			for (let i = 0; i < relation.memids.length; i++) {
 				refId += relation.memids[i]
-				this.memberRefs.push(refId)
-				this.memberTypes.push(relation.types[i])
-				this.memberRoles.push(blockToStringTable(relation.roles_sid[i]))
+				const typeIndex = relation.types[i]
+				const type = RELATION_MEMBER_TYPES[typeIndex]
+				if (type === undefined) throw Error("Relation member type not found")
+				const roleIndex = blockToStringTable(relation.roles_sid[i])
+				if (filter) {
+					members.push({
+						type,
+						ref: refId,
+						role: this.stringTable.get(roleIndex),
+					})
+				}
+
+				memberRefs.push(refId)
+				memberTypes.push(typeIndex)
+				memberRoles.push(roleIndex)
 			}
 
 			const tagKeys: number[] = relation.keys.map(blockToStringTable)
 			const tagValues: number[] = relation.vals.map(blockToStringTable)
+
+			const filteredRelation = filter
+				? filter({
+						id: relation.id,
+						members,
+						tags: this.tags.getTagsFromIndices(tagKeys, tagValues),
+					})
+				: null
+			if (filter && filteredRelation === null) continue
+			added++
+
+			this.ids.add(relation.id)
+			this.memberStart.push(this.memberRefs.length)
+			this.memberCount.push(
+				filteredRelation?.members.length ?? memberRefs.length,
+			)
+			this.memberRefs.pushMany(
+				filteredRelation?.members.map((m) => m.ref) ?? memberRefs,
+			)
+			this.memberTypes.pushMany(
+				filteredRelation?.members.map((m) =>
+					RELATION_MEMBER_TYPES.indexOf(m.type),
+				) ?? memberTypes,
+			)
+			this.memberRoles.pushMany(
+				filteredRelation?.members.map((m) =>
+					this.stringTable.add(m.role ?? ""),
+				) ?? memberRoles,
+			)
+
 			this.tags.addTagKeysAndValues(tagKeys, tagValues)
 		}
+		return added
 	}
 
 	finishEntityIndex() {

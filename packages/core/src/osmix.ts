@@ -79,7 +79,60 @@ export class Osmix {
 		id?: string,
 		onProgress?: (message: string) => void,
 	) {
-		return createOsmIndexFromPbfData(data, id, onProgress)
+		return createOsmIndexFromPbfData(data, { id, onProgress })
+	}
+
+	static async extractFromPbf(
+		data: ArrayBufferLike | ReadableStream<ArrayBufferLike>,
+		bbox: GeoBbox2D,
+		id?: string,
+		onProgress?: (message: string) => void,
+	) {
+		const [minLon, minLat, maxLon, maxLat] = bbox
+		const osm = await createOsmIndexFromPbfData(data, {
+			id,
+			onProgress,
+			filterNode: (node) => {
+				return (
+					node.lon >= minLon &&
+					node.lon <= maxLon &&
+					node.lat >= minLat &&
+					node.lat <= maxLat
+				)
+			},
+			filterWay: (way, osm) => {
+				const refs = way.refs.filter((ref) => osm.nodes.ids.has(ref))
+				if (refs.length === 0) return null
+				return {
+					...way,
+					refs,
+				}
+			},
+			filterRelation: (relation, osm) => {
+				const members = relation.members.filter((member) => {
+					if (member.type === "node") return osm.nodes.ids.has(member.ref)
+					if (member.type === "way") return osm.ways.ids.has(member.ref)
+					return false
+				})
+				if (members.length === 0) return null
+				return {
+					...relation,
+					members,
+				}
+			},
+		})
+
+		osm.header = {
+			...osm.header,
+			bbox: {
+				left: minLon,
+				bottom: minLat,
+				right: maxLon,
+				top: maxLat,
+			},
+		}
+
+		return osm
 	}
 
 	constructor(id?: string, header?: OsmPbfHeaderBlock) {
@@ -113,6 +166,66 @@ export class Osmix {
 
 	createChangeset() {
 		return new OsmChangeset(this)
+	}
+
+	extract(bbox: GeoBbox2D, onProgress?: (message: string) => void) {
+		if (!this.#finished) this.finish()
+
+		const [minLon, minLat, maxLon, maxLat] = bbox
+		const report = onProgress ?? console.log
+
+		const extracted = new Osmix(this.id, {
+			...this.header,
+			bbox: {
+				left: minLon,
+				bottom: minLat,
+				right: maxLon,
+				top: maxLat,
+			},
+		})
+
+		report("Selecting nodes within bounding box...")
+		for (const node of this.nodes.sorted()) {
+			if (
+				node.lon >= minLon &&
+				node.lon <= maxLon &&
+				node.lat >= minLat &&
+				node.lat <= maxLat
+			) {
+				extracted.nodes.addNode(node)
+			}
+		}
+		extracted.nodes.finish()
+
+		report("Selecting ways within bounding box...")
+		for (const way of this.ways.sorted()) {
+			const refs = way.refs.filter((ref) => extracted.nodes.ids.has(ref))
+			if (refs.length > 0) {
+				extracted.ways.addWay({
+					...way,
+					refs,
+				})
+			}
+		}
+		extracted.ways.finish()
+
+		report("Selecting relations within bounding box...")
+		for (const relation of this.relations.sorted()) {
+			const members = relation.members.filter((m) => {
+				if (m.type === "node") return extracted.nodes.ids.has(m.ref)
+				if (m.type === "way") return extracted.ways.ids.has(m.ref)
+				return false
+			})
+			if (members.length > 0) {
+				extracted.relations.addRelation({
+					...relation,
+					members,
+				})
+			}
+		}
+
+		extracted.finish()
+		return extracted
 	}
 
 	finish() {

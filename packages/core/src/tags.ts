@@ -107,4 +107,12 @@ export class Tags {
 		}
 		return tags
 	}
+
+	getTagsFromIndices(keys: number[], values: number[]): OsmTags {
+		const tags: OsmTags = {}
+		for (let i = 0; i < keys.length; i++) {
+			tags[this.stringTable.get(keys[i])] = this.stringTable.get(values[i])
+		}
+		return tags
+	}
 }
