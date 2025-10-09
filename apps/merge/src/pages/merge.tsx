@@ -137,7 +137,7 @@ export default function Merge() {
 			await stream.write(json)
 		} while (changesetPage.changes && changesetPage.changes.length > 0)
 		stream.close()
-		task.end("Changeset converted to JSON", "ready")
+		task.end("Changeset converted to JSON")
 	}
 
 	const applyChanges = async () => {

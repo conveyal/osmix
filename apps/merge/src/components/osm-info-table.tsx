@@ -25,7 +25,7 @@ export default function OsmInfoTable({
 						</tr>
 						<tr>
 							<td>parse time</td>
-							<td>{(osm.parsingTimeMs / 1_000).toFixed(3)}s</td>
+							<td>{(osm.buildTimeMs / 1_000).toFixed(3)}s</td>
 						</tr>
 						<tr>
 							<td>nodes</td>
