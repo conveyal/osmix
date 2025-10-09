@@ -96,7 +96,7 @@ export class Ids {
 	 * If the IDs are not sorted, we need to sort them and build a new index.
 	 * If the IDs are sorted, we can use the existing index.
 	 */
-	finish() {
+	buildIndex() {
 		if (this.indexBuilt) throw Error("ID index already build.")
 		this.ids.compact()
 		if (!this.idsAreSorted) {

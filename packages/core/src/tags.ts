@@ -69,7 +69,7 @@ export class Tags {
 		this.tagVals.pushMany(values)
 	}
 
-	finish() {
+	buildIndex() {
 		this.tagStart.compact()
 		this.tagCount.compact()
 		this.tagKeys.compact()

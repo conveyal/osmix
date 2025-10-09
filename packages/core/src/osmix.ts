@@ -7,6 +7,7 @@ import {
 	type OsmEntity,
 	type OsmEntityType,
 	type OsmEntityTypeMap,
+	OsmJsonToBlocksTransformStream,
 	type OsmNode,
 	type OsmRelation,
 	type OsmTags,
@@ -14,16 +15,20 @@ import {
 	relationToFeature,
 	wayToFeature,
 } from "@osmix/json"
-import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf"
+import {
+	OsmBlocksToPbfBytesTransformStream,
+	type OsmPbfBlock,
+	type OsmPbfHeaderBlock,
+	readOsmPbf,
+} from "@osmix/pbf"
 import OsmChangeset from "./changeset"
 import { Nodes, type NodesTransferables } from "./nodes"
-import { createOsmIndexFromPbfData } from "./osm-from-pbf"
 import { OsmixRasterTile } from "./raster-tile"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { IdArrayType } from "./typed-arrays"
 import type { GeoBbox2D, TileIndex } from "./types"
-import { bboxFromLonLats } from "./utils"
+import { bboxFromLonLats, throttle } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
 export interface OsmixTransferables {
@@ -36,10 +41,28 @@ export interface OsmixTransferables {
 	parsingTimeMs: number
 }
 
+export interface OsmixReadOptions {
+	extractBbox: GeoBbox2D
+	filter<T extends OsmEntityType>(
+		type: T,
+		entity: OsmEntityTypeMap[T],
+		osmix: Osmix,
+	): boolean
+}
+
+export class OsmixLogEvent extends CustomEvent<{
+	message: string
+	type: "debug" | "info" | "warn" | "error"
+}> {
+	constructor(message: string, type: "debug" | "info" | "warn" | "error") {
+		super("log", { detail: { message, type } })
+	}
+}
+
 /**
  * OSM Entity Index.
  */
-export class Osmix {
+export class Osmix extends EventTarget {
 	// Filename or ID of this OSM Entity index.
 	id: string
 	header: OsmPbfHeaderBlock
@@ -51,9 +74,9 @@ export class Osmix {
 	ways: Ways
 	relations: Relations
 
-	#finished = false
+	#indexBuilt = false
 	#startTime = performance.now()
-	parsingTimeMs = 0
+	buildTimeMs = 0
 
 	static from({
 		id,
@@ -69,73 +92,19 @@ export class Osmix {
 		osm.nodes = Nodes.from(osm.stringTable, nodes)
 		osm.ways = Ways.from(osm.stringTable, ways)
 		osm.relations = Relations.from(osm.stringTable, relations)
-		osm.parsingTimeMs = parsingTimeMs
-		osm.#finished = true
+		osm.buildTimeMs = parsingTimeMs
+		osm.#indexBuilt = true
 		return osm
 	}
 
-	static fromPbf(
-		data: ArrayBufferLike | ReadableStream,
-		id?: string,
-		onProgress?: (message: string) => void,
-	) {
-		return createOsmIndexFromPbfData(data, { id, onProgress })
-	}
-
-	static async extractFromPbf(
-		data: ArrayBufferLike | ReadableStream<ArrayBufferLike>,
-		bbox: GeoBbox2D,
-		id?: string,
-		onProgress?: (message: string) => void,
-	) {
-		const [minLon, minLat, maxLon, maxLat] = bbox
-		const osm = await createOsmIndexFromPbfData(data, {
-			id,
-			onProgress,
-			filterNode: (node) => {
-				return (
-					node.lon >= minLon &&
-					node.lon <= maxLon &&
-					node.lat >= minLat &&
-					node.lat <= maxLat
-				)
-			},
-			filterWay: (way, osm) => {
-				const refs = way.refs.filter((ref) => osm.nodes.ids.has(ref))
-				if (refs.length === 0) return null
-				return {
-					...way,
-					refs,
-				}
-			},
-			filterRelation: (relation, osm) => {
-				const members = relation.members.filter((member) => {
-					if (member.type === "node") return osm.nodes.ids.has(member.ref)
-					if (member.type === "way") return osm.ways.ids.has(member.ref)
-					return false
-				})
-				if (members.length === 0) return null
-				return {
-					...relation,
-					members,
-				}
-			},
-		})
-
-		osm.header = {
-			...osm.header,
-			bbox: {
-				left: minLon,
-				bottom: minLat,
-				right: maxLon,
-				top: maxLat,
-			},
-		}
-
+	static async fromPbf(data: ArrayBufferLike | ReadableStream, id?: string) {
+		const osm = new Osmix(id)
+		await osm.readPbf(data)
 		return osm
 	}
 
 	constructor(id?: string, header?: OsmPbfHeaderBlock) {
+		super()
 		this.header = header ?? {
 			required_features: [],
 			optional_features: [],
@@ -145,6 +114,172 @@ export class Osmix {
 		this.nodes = new Nodes(this.stringTable)
 		this.ways = new Ways(this.stringTable)
 		this.relations = new Relations(this.stringTable)
+	}
+
+	log(message: string, level: "debug" | "info" | "warn" | "error" = "info") {
+		this.dispatchEvent(new OsmixLogEvent(message, level))
+	}
+
+	createThrottledLog(interval: number) {
+		return throttle(this.log.bind(this), interval)
+	}
+
+	async readPbf(
+		data: ArrayBufferLike | ReadableStream,
+		options: Partial<OsmixReadOptions> = {},
+	) {
+		if (this.#indexBuilt) throw Error("Osmix built. Create new instance.")
+		const { extractBbox } = options
+		const { header, blocks } = await readOsmPbf(data)
+		this.header = header
+		if (extractBbox) {
+			this.header.bbox = {
+				left: extractBbox[0],
+				bottom: extractBbox[1],
+				right: extractBbox[2],
+				top: extractBbox[3],
+			}
+		}
+		const logEverySecond = this.createThrottledLog(1_000)
+
+		let entityCount = 0
+		for await (const block of blocks) {
+			const blockStringIndexMap = this.stringTable.createBlockIndexMap(block)
+
+			for (const group of block.primitivegroup) {
+				const { nodes, ways, relations, dense } = group
+				if (nodes && nodes.length > 0) {
+					throw Error("Nodes must be dense!")
+				}
+
+				if (dense) {
+					entityCount += this.nodes.addDenseNodes(
+						dense,
+						block,
+						blockStringIndexMap,
+						extractBbox
+							? (node: OsmNode) => {
+									return (
+										node.lon >= extractBbox[0] &&
+										node.lon <= extractBbox[2] &&
+										node.lat >= extractBbox[1] &&
+										node.lat <= extractBbox[3]
+									)
+								}
+							: undefined,
+					)
+				}
+
+				if (ways.length > 0) {
+					// Nodes are finished, build their index.
+					if (this.ways.size === 0) this.nodes.buildIndex()
+					entityCount += this.ways.addWays(
+						ways,
+						blockStringIndexMap,
+						extractBbox
+							? (way: OsmWay) => {
+									const refs = way.refs.filter((ref) => this.nodes.ids.has(ref))
+									if (refs.length === 0) return null
+									return {
+										...way,
+										refs,
+									}
+								}
+							: undefined,
+					)
+				}
+
+				if (relations.length > 0) {
+					if (this.relations.size === 0) this.ways.buildIndex()
+					entityCount += this.relations.addRelations(
+						relations,
+						blockStringIndexMap,
+						extractBbox
+							? (relation: OsmRelation) => {
+									const members = relation.members.filter((member) => {
+										if (member.type === "node")
+											return this.nodes.ids.has(member.ref)
+										if (member.type === "way")
+											return this.ways.ids.has(member.ref)
+										return false
+									})
+									if (members.length === 0) return null
+									return {
+										...relation,
+										members,
+									}
+								}
+							: undefined,
+					)
+				}
+
+				logEverySecond(
+					`${entityCount.toLocaleString()} ${dense ? "nodes" : ways.length > 0 ? "ways" : "relations"} processed`,
+				)
+			}
+		}
+
+		this.log("Building remaining id and tag indexes...")
+		if (this.ways.size === 0 && this.relations.size === 0) {
+			this.nodes.buildIndex()
+		} else if (this.relations.size === 0) {
+			this.ways.buildIndex()
+		} else {
+			this.relations.buildIndex()
+		}
+
+		this.buildIndexes()
+		this.log(
+			`Added ${this.nodes.size.toLocaleString()} nodes, ${this.ways.size.toLocaleString()} ways, and ${this.relations.size.toLocaleString()} relations.`,
+		)
+	}
+
+	toEntityStream() {
+		let headerEnqueued = false
+		const entityGenerator = this.generateSortedEntities()
+		return new ReadableStream<OsmPbfHeaderBlock | OsmEntity>({
+			pull: async (controller) => {
+				if (!headerEnqueued) {
+					controller.enqueue({
+						...this.header,
+						writingprogram: "@osmix/core",
+						osmosis_replication_timestamp: Date.now(),
+					})
+					headerEnqueued = true
+				}
+				const block = entityGenerator.next()
+				if (block.done) {
+					controller.close()
+				} else {
+					controller.enqueue(block.value)
+				}
+			},
+		})
+	}
+
+	toPbfStream() {
+		return this.toEntityStream()
+			.pipeThrough(new OsmJsonToBlocksTransformStream())
+			.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
+	}
+
+	async toPbfBuffer() {
+		const chunks: Uint8Array[] = []
+		let byteLength = 0
+		const writable = new WritableStream<Uint8Array>({
+			write(chunk) {
+				chunks.push(chunk)
+				byteLength += chunk.byteLength
+			},
+		})
+		await this.toPbfStream().pipeTo(writable)
+		const combined = new Uint8Array(byteLength)
+		let offset = 0
+		for (const chunk of chunks) {
+			combined.set(chunk, offset)
+			offset += chunk.byteLength
+		}
+		return combined.buffer
 	}
 
 	*generateSortedEntities(): Generator<OsmEntity> {
@@ -169,7 +304,7 @@ export class Osmix {
 	}
 
 	extract(bbox: GeoBbox2D, onProgress?: (message: string) => void) {
-		if (!this.#finished) this.finish()
+		if (!this.#indexBuilt) this.buildIndexes()
 
 		const [minLon, minLat, maxLon, maxLat] = bbox
 		const report = onProgress ?? console.log
@@ -195,7 +330,7 @@ export class Osmix {
 				extracted.nodes.addNode(node)
 			}
 		}
-		extracted.nodes.finish()
+		extracted.nodes.buildIndex()
 
 		report("Selecting ways within bounding box...")
 		for (const way of this.ways.sorted()) {
@@ -207,7 +342,7 @@ export class Osmix {
 				})
 			}
 		}
-		extracted.ways.finish()
+		extracted.ways.buildIndex()
 
 		report("Selecting relations within bounding box...")
 		for (const relation of this.relations.sorted()) {
@@ -224,22 +359,24 @@ export class Osmix {
 			}
 		}
 
-		extracted.finish()
+		extracted.buildIndexes()
 		return extracted
 	}
 
-	finish() {
-		if (!this.nodes.isReady) this.nodes.finish()
-		if (!this.ways.isReady) this.ways.finish()
-		if (!this.relations.isReady) this.relations.finish()
-		this.buildSpatialIndexes()
-		this.stringTable.compact()
-		this.#finished = true
-		this.parsingTimeMs = performance.now() - this.#startTime
+	buildIndexes() {
+		if (!this.nodes.isReady) this.nodes.buildIndex()
+		if (!this.ways.isReady) this.ways.buildIndex()
+		if (!this.relations.isReady) this.relations.buildIndex()
+		this.log("Building spatial indexes for nodes and ways...")
+		this.nodes.buildSpatialIndex()
+		this.ways.buildSpatialIndex(this.nodes)
+		this.stringTable.buildIndex()
+		this.#indexBuilt = true
+		this.buildTimeMs = performance.now() - this.#startTime
 	}
 
-	isFinished() {
-		return this.#finished
+	isReady() {
+		return this.#indexBuilt
 	}
 
 	transferables(): OsmixTransferables {
@@ -250,7 +387,7 @@ export class Osmix {
 			nodes: this.nodes.transferables(),
 			ways: this.ways.transferables(),
 			relations: this.relations.transferables(),
-			parsingTimeMs: this.parsingTimeMs,
+			parsingTimeMs: this.buildTimeMs,
 		}
 	}
 
@@ -292,7 +429,7 @@ export class Osmix {
 	}
 
 	getNodesInBbox(bbox: GeoBbox2D) {
-		if (!this.#finished) throw new Error("Osm not finished")
+		if (!this.#indexBuilt) throw new Error("Osm not finished")
 		console.time("Osm.getNodesInBbox")
 		const nodeCandidates = this.nodes.withinBbox(bbox)
 		const nodePositions = new Float64Array(nodeCandidates.length * 2)

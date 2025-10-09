@@ -4,8 +4,7 @@ import {
 	PBFs,
 } from "@osmix/test-utils/fixtures"
 import { assert, beforeAll, describe, it } from "vitest"
-import { createOsmIndexFromPbfData } from "../src/osm-from-pbf"
-import { writeOsmToPbfStream } from "../src/osm-to-pbf"
+import { Osmix } from "../src/osmix"
 
 describe("write", () => {
 	describe.each(Object.entries(PBFs))("%s", async (name, pbf) => {
@@ -14,7 +13,8 @@ describe("write", () => {
 		it("write osm primitive blocks", async () => {
 			// Parse the original PBF
 			const fileStream = getFixtureFileReadStream(pbf.url)
-			const osm = await createOsmIndexFromPbfData(fileStream, name)
+			const osm = new Osmix(name)
+			await osm.readPbf(fileStream)
 
 			// Get the first node, way, and relation
 			const node1 = osm.nodes.getByIndex(0)
@@ -25,18 +25,16 @@ describe("write", () => {
 			assert.exists(relation1)
 
 			const transformStream = new TransformStream<Uint8Array, ArrayBufferLike>()
-			const testOsmPromise = createOsmIndexFromPbfData(
-				transformStream.readable,
-				`${name}-reparsed`,
-			)
+			const testOsm = new Osmix(`${name}-reparsed`)
+			const testOsmPromise = testOsm.readPbf(transformStream.readable)
 
 			// Write the PBF to an array buffer
 			// let data = new Uint8Array(0)
-			await writeOsmToPbfStream(osm, transformStream.writable)
+			await osm.toPbfStream().pipeTo(transformStream.writable)
 
 			// Re-parse the new PBF
 			// assert.exists(data.buffer)
-			const testOsm = await testOsmPromise
+			await testOsmPromise
 
 			// Compare the original parsed PBF and newly parsed/written/re-parsed PBF
 			assert.equal(osm.nodes.size, testOsm.nodes.size)

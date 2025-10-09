@@ -102,7 +102,7 @@ export default class StringTable {
 		return this.start.length
 	}
 
-	compact() {
+	buildIndex() {
 		this.bytes.compact()
 		this.start.compact()
 		this.count.compact()

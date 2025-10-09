@@ -13,6 +13,8 @@ export abstract class Entities<T extends OsmEntity> {
 	ids: Ids
 	tags: Tags
 
+	private indexBuilt = false
+
 	constructor(
 		indexType: OsmEntityType,
 		stringTable: StringTable,
@@ -26,20 +28,21 @@ export abstract class Entities<T extends OsmEntity> {
 	}
 
 	get isReady() {
-		return this.ids.isReady && this.tags.isReady
+		return this.ids.isReady && this.tags.isReady && this.indexBuilt
 	}
 
 	get size() {
 		return this.ids.size
 	}
 
-	abstract finishEntityIndex(): void
+	abstract buildEntityIndex(): void
 
-	finish() {
+	buildIndex() {
 		console.time(`${this.indexType}Index.finish`)
-		this.ids.finish()
-		this.tags.finish()
-		this.finishEntityIndex()
+		this.ids.buildIndex()
+		this.tags.buildIndex()
+		this.buildEntityIndex()
+		this.indexBuilt = true
 		console.timeEnd(`${this.indexType}Index.finish`)
 	}
 

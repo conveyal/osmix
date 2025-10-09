@@ -120,7 +120,7 @@ export class Ways extends Entities<OsmWay> {
 		return added
 	}
 
-	finishEntityIndex() {
+	buildEntityIndex() {
 		this.refStart.compact()
 		this.refCount.compact()
 		this.refs.compact()

@@ -1,5 +1,4 @@
 import { assert, describe, it } from "vitest"
-import { writeOsmToPbfStream } from "../src/osm-to-pbf"
 import { Osmix } from "../src/osmix"
 import type { GeoBbox2D } from "../src/types"
 
@@ -63,66 +62,47 @@ function buildSourceOsm() {
 		},
 	})
 
-	osm.finish()
+	osm.buildIndexes()
 	return osm
-}
-
-async function writeOsmToBuffer(osm: Osmix) {
-	const chunks: Uint8Array[] = []
-	const writable = new WritableStream<Uint8Array>({
-		write(chunk) {
-			chunks.push(chunk)
-		},
-	})
-	await writeOsmToPbfStream(osm, writable)
-	let byteLength = 0
-	for (const chunk of chunks) {
-		byteLength += chunk.byteLength
-	}
-	const combined = new Uint8Array(byteLength)
-	let offset = 0
-	for (const chunk of chunks) {
-		combined.set(chunk, offset)
-		offset += chunk.byteLength
-	}
-	return combined.buffer
 }
 
 describe("Osmix.extractFromPBf", () => {
 	it("extracts a simple subset from PBF input", async () => {
 		const source = buildSourceOsm()
 		const transform = new TransformStream<Uint8Array, ArrayBufferLike>()
-		const extractPromise = Osmix.extractFromPbf(transform.readable, TEST_BBOX)
-		await writeOsmToPbfStream(source, transform.writable)
-		const simple = await extractPromise
+		const extract = new Osmix("extract")
+		const extractPromise = extract.readPbf(transform.readable, {
+			extractBbox: TEST_BBOX,
+		})
+		await source.toPbfStream().pipeTo(transform.writable)
+		await extractPromise
 
-		assert.equal(simple.nodes.size, 2)
-		assert.isTrue(simple.nodes.ids.has(1))
-		assert.isTrue(simple.nodes.ids.has(3))
-		assert.isNotTrue(simple.nodes.ids.has(2))
-		assert.isNotTrue(simple.nodes.ids.has(4))
+		assert.equal(extract.nodes.size, 2)
+		assert.isTrue(extract.nodes.ids.has(1))
+		assert.isTrue(extract.nodes.ids.has(3))
+		assert.isNotTrue(extract.nodes.ids.has(2))
+		assert.isNotTrue(extract.nodes.ids.has(4))
 
-		const truncatedWay = simple.ways.getById(10)
+		const truncatedWay = extract.ways.getById(10)
 		assert.exists(truncatedWay)
 		assert.deepEqual(truncatedWay?.refs, [1])
 
-		assert.isTrue(simple.ways.ids.has(11))
-		assert.isTrue(simple.relations.ids.has(20))
+		assert.isTrue(extract.ways.ids.has(11))
+		assert.isTrue(extract.relations.ids.has(20))
 	})
 })
 
 describe("Streaming extract", () => {
 	it("matches two-step simple extraction", async () => {
 		const source = buildSourceOsm()
-		const buffer = await writeOsmToBuffer(source)
+		const buffer = await source.toPbfBuffer()
 
-		const streaming = await Osmix.extractFromPbf(
-			buffer.slice(0),
-			TEST_BBOX,
-			"one-step",
-		)
-		const full = await Osmix.fromPbf(buffer.slice(0), "two-steps")
-		const twoStep = full.extract(TEST_BBOX)
+		const streaming = new Osmix("streaming")
+		await streaming.readPbf(buffer.slice(0), { extractBbox: TEST_BBOX })
+
+		const twoStepOsmix = new Osmix("two-steps")
+		await twoStepOsmix.readPbf(buffer.slice(0))
+		const twoStep = twoStepOsmix.extract(TEST_BBOX)
 
 		assert.equal(streaming.nodes.size, twoStep.nodes.size)
 		assert.equal(streaming.ways.size, twoStep.ways.size)

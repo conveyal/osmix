@@ -874,7 +874,7 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newId?: string) {
 	}
 
 	// Everything should be added now, finish the osm
-	osm.finish()
+	osm.buildIndexes()
 
 	return osm
 }

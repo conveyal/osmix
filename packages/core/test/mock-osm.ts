@@ -35,9 +35,9 @@ function addBaseWays(osm: Osmix) {
 export function createBaseOsm(): Osmix {
 	const base = new Osmix()
 	addBaseNodes(base)
-	base.nodes.finish()
+	base.nodes.buildIndex()
 	addBaseWays(base)
-	base.finish()
+	base.buildIndexes()
 	return base
 }
 
@@ -92,7 +92,7 @@ export function createPatchOsm(): Osmix {
 		lon: YAKIM_LON + ONE_KM_LON / 2, // 500m east
 	})
 
-	osm.nodes.finish()
+	osm.nodes.buildIndex()
 
 	// Add same base way with new tags
 	osm.ways.addWay({
@@ -132,6 +132,6 @@ export function createPatchOsm(): Osmix {
 		},
 	})
 
-	osm.finish()
+	osm.buildIndexes()
 	return osm
 }

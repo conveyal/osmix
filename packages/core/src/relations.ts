@@ -154,7 +154,7 @@ export class Relations extends Entities<OsmRelation> {
 		return added
 	}
 
-	finishEntityIndex() {
+	buildEntityIndex() {
 		this.memberStart.compact()
 		this.memberCount.compact()
 		this.memberRefs.compact()

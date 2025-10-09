@@ -4,6 +4,7 @@ import {
 	type OsmChangeset,
 	type OsmChangeTypes,
 	Osmix,
+	type OsmixLogEvent,
 	type OsmMergeOptions,
 	type TileIndex,
 	throttle,
@@ -31,9 +32,18 @@ export class OsmixWorker {
 	}
 
 	async fromPbf(id: string, data: ArrayBufferLike | ReadableStream) {
-		const osm = await Osmix.fromPbf(data, id, this.log)
+		const osm = new Osmix(id)
+		this.subscribeToOsmixLog(osm)
+		await osm.readPbf(data)
 		this.osmixes.set(id, osm)
 		return osm.transferables()
+	}
+
+	subscribeToOsmixLog(osmix: Osmix) {
+		osmix.addEventListener("log", (e) => {
+			const ce = e as OsmixLogEvent
+			this.log(ce.detail.message, ce.detail.type)
+		})
 	}
 
 	setLogger(logger: typeof this.log) {
@@ -240,6 +250,7 @@ export class OsmixWorker {
 		const changeset = this.changesets.get(osmId)
 		if (!changeset) throw Error("No active changeset")
 		const osm = changeset.applyChanges(osmId)
+		this.subscribeToOsmixLog(osm)
 		this.changesets.delete(osmId)
 		this.filteredChanges.delete(osmId)
 		this.osmixes.set(osmId, osm)

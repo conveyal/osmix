@@ -1,4 +1,4 @@
-export type StatusType = "info" | "debug" | "ready" | "error"
+export type StatusType = "info" | "debug" | "warn" | "error"
 
 export type Status = {
 	type: StatusType
