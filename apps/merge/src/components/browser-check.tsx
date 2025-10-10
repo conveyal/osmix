@@ -1,4 +1,6 @@
+import { releaseProxy } from "comlink"
 import { useEffect, useState, useTransition } from "react"
+import { createBrowserCheckWorker } from "@/workers/browser-check.worker"
 import { Button } from "./ui/button"
 import {
 	Dialog,
@@ -111,34 +113,19 @@ const TypedArrays = [
 	Uint8Array,
 	Int8Array,
 ]
-const START_SIZE = 2 ** 24
+const START_SIZE_BYTES = 2 ** 24
 
 function MaxArraySizes() {
-	const [maxArraySizes, setMaxArraySizes] = useState(
-		Object.fromEntries(TypedArrays.map((array) => [array.name, 0])),
-	)
+	const [maxByteSize, setMaxByteSize] = useState(START_SIZE_BYTES)
 	const [calculated, setCalculated] = useState(false)
 	const [, startTransition] = useTransition()
 
 	useEffect(() => {
-		startTransition(() => {
-			const newSizes = Object.fromEntries(
-				TypedArrays.map((array) => [array.name, 0]),
-			)
-			let maxSize = START_SIZE
-			for (const array of TypedArrays) {
-				while (true) {
-					try {
-						new array(maxSize - 1)
-					} catch (_error) {
-						newSizes[array.name] = maxSize / 2 / 1_000_000
-						break
-					}
-					maxSize *= 2
-				}
-			}
-			setMaxArraySizes(newSizes)
+		startTransition(async () => {
+			const browserCheckWorker = createBrowserCheckWorker()
+			setMaxByteSize(await browserCheckWorker.getMaxArraySize())
 			setCalculated(true)
+			browserCheckWorker[releaseProxy]()
 		})
 	}, [])
 
@@ -146,20 +133,11 @@ function MaxArraySizes() {
 		<div>
 			<div className="font-bold">Max array sizes</div>
 			{calculated ? (
-				<>
-					<div>Int8Array: {maxArraySizes.Int8Array.toLocaleString()}M</div>
-					<div>Uint8Array: {maxArraySizes.Uint8Array.toLocaleString()}M</div>
-					<div>Int16Array: {maxArraySizes.Int16Array.toLocaleString()}M</div>
-					<div>Uint16Array: {maxArraySizes.Uint16Array.toLocaleString()}M</div>
-					<div>Int32Array: {maxArraySizes.Int32Array.toLocaleString()}M</div>
-					<div>Uint32Array: {maxArraySizes.Uint32Array.toLocaleString()}M</div>
-					<div>
-						Float32Array: {maxArraySizes.Float32Array.toLocaleString()}M
+				TypedArrays.map((a) => (
+					<div key={a.name}>
+						{a.name}: {(maxByteSize / a.BYTES_PER_ELEMENT).toLocaleString()}
 					</div>
-					<div>
-						Float64Array: {maxArraySizes.Float64Array.toLocaleString()}M
-					</div>
-				</>
+				))
 			) : (
 				<Spinner />
 			)}
