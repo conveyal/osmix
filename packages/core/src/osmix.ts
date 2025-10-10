@@ -50,13 +50,11 @@ export interface OsmixReadOptions {
 	): boolean
 }
 
-export class OsmixLogEvent extends CustomEvent<{
+export type LogLevel = "debug" | "info" | "warn" | "error"
+
+interface OsmixLogEvent {
 	message: string
-	type: "debug" | "info" | "warn" | "error"
-}> {
-	constructor(message: string, type: "debug" | "info" | "warn" | "error") {
-		super("log", { detail: { message, type } })
-	}
+	type?: LogLevel
 }
 
 /**
@@ -116,12 +114,53 @@ export class Osmix extends EventTarget {
 		this.relations = new Relations(this.stringTable)
 	}
 
-	log(message: string, level: "debug" | "info" | "warn" | "error" = "info") {
-		this.dispatchEvent(new OsmixLogEvent(message, level))
+	on(listener: (message: string, type?: LogLevel) => void) {
+		this.addEventListener("log", (ev) =>
+			listener(
+				(ev as CustomEvent<OsmixLogEvent>).detail.message,
+				(ev as CustomEvent<OsmixLogEvent>).detail.type,
+			),
+		)
+	}
+
+	log(message: string, level?: LogLevel) {
+		this.dispatchEvent(
+			new CustomEvent<OsmixLogEvent>("log", {
+				detail: { message, type: level },
+			}),
+		)
 	}
 
 	createThrottledLog(interval: number) {
 		return throttle(this.log.bind(this), interval)
+	}
+
+	buildIndexes() {
+		if (!this.nodes.isReady) this.nodes.buildIndex()
+		if (!this.ways.isReady) this.ways.buildIndex()
+		if (!this.relations.isReady) this.relations.buildIndex()
+		this.log("Building spatial indexes for nodes and ways...")
+		this.nodes.buildSpatialIndex()
+		this.ways.buildSpatialIndex(this.nodes)
+		this.stringTable.buildIndex()
+		this.#indexBuilt = true
+		this.buildTimeMs = performance.now() - this.#startTime
+	}
+
+	isReady() {
+		return this.#indexBuilt
+	}
+
+	transferables(): OsmixTransferables {
+		return {
+			id: this.id,
+			header: this.header,
+			stringTable: this.stringTable.transferables(),
+			nodes: this.nodes.transferables(),
+			ways: this.ways.transferables(),
+			relations: this.relations.transferables(),
+			parsingTimeMs: this.buildTimeMs,
+		}
 	}
 
 	async readPbf(
@@ -172,7 +211,7 @@ export class Osmix extends EventTarget {
 
 				if (ways.length > 0) {
 					// Nodes are finished, build their index.
-					if (this.ways.size === 0) {
+					if (!this.nodes.isReady) {
 						this.nodes.buildIndex()
 						entityCount = 0
 					}
@@ -193,7 +232,7 @@ export class Osmix extends EventTarget {
 				}
 
 				if (relations.length > 0) {
-					if (this.relations.size === 0) {
+					if (!this.ways.isReady) {
 						this.ways.buildIndex()
 						entityCount = 0
 					}
@@ -226,13 +265,6 @@ export class Osmix extends EventTarget {
 		}
 
 		this.log("Building remaining id and tag indexes...")
-		if (this.ways.size === 0 && this.relations.size === 0) {
-			this.nodes.buildIndex()
-		} else if (this.relations.size === 0) {
-			this.ways.buildIndex()
-		} else {
-			this.relations.buildIndex()
-		}
 
 		this.buildIndexes()
 		this.log(
@@ -309,12 +341,10 @@ export class Osmix extends EventTarget {
 		return new OsmChangeset(this)
 	}
 
-	extract(bbox: GeoBbox2D, onProgress?: (message: string) => void) {
+	extract(bbox: GeoBbox2D) {
 		if (!this.#indexBuilt) this.buildIndexes()
 
 		const [minLon, minLat, maxLon, maxLat] = bbox
-		const report = onProgress ?? console.log
-
 		const extracted = new Osmix(this.id, {
 			...this.header,
 			bbox: {
@@ -325,7 +355,8 @@ export class Osmix extends EventTarget {
 			},
 		})
 
-		report("Selecting nodes within bounding box...")
+		this.log("Selecting nodes within bounding box...")
+		this.buildSpatialIndexes()
 		for (const node of this.nodes.sorted()) {
 			if (
 				node.lon >= minLon &&
@@ -338,7 +369,7 @@ export class Osmix extends EventTarget {
 		}
 		extracted.nodes.buildIndex()
 
-		report("Selecting ways within bounding box...")
+		this.log("Selecting ways within bounding box...")
 		for (const way of this.ways.sorted()) {
 			const refs = way.refs.filter((ref) => extracted.nodes.ids.has(ref))
 			if (refs.length > 0) {
@@ -350,7 +381,7 @@ export class Osmix extends EventTarget {
 		}
 		extracted.ways.buildIndex()
 
-		report("Selecting relations within bounding box...")
+		this.log("Selecting relations within bounding box...")
 		for (const relation of this.relations.sorted()) {
 			const members = relation.members.filter((m) => {
 				if (m.type === "node") return extracted.nodes.ids.has(m.ref)
@@ -367,34 +398,6 @@ export class Osmix extends EventTarget {
 
 		extracted.buildIndexes()
 		return extracted
-	}
-
-	buildIndexes() {
-		if (!this.nodes.isReady) this.nodes.buildIndex()
-		if (!this.ways.isReady) this.ways.buildIndex()
-		if (!this.relations.isReady) this.relations.buildIndex()
-		this.log("Building spatial indexes for nodes and ways...")
-		this.nodes.buildSpatialIndex()
-		this.ways.buildSpatialIndex(this.nodes)
-		this.stringTable.buildIndex()
-		this.#indexBuilt = true
-		this.buildTimeMs = performance.now() - this.#startTime
-	}
-
-	isReady() {
-		return this.#indexBuilt
-	}
-
-	transferables(): OsmixTransferables {
-		return {
-			id: this.id,
-			header: this.header,
-			stringTable: this.stringTable.transferables(),
-			nodes: this.nodes.transferables(),
-			ways: this.ways.transferables(),
-			relations: this.relations.transferables(),
-			parsingTimeMs: this.buildTimeMs,
-		}
 	}
 
 	get<T extends OsmEntityType>(

@@ -4,7 +4,6 @@ import {
 	type OsmChangeset,
 	type OsmChangeTypes,
 	Osmix,
-	type OsmixLogEvent,
 	type OsmMergeOptions,
 	type TileIndex,
 	throttle,
@@ -40,10 +39,7 @@ export class OsmixWorker {
 	}
 
 	subscribeToOsmixLog(osmix: Osmix) {
-		osmix.addEventListener("log", (e) => {
-			const ce = e as OsmixLogEvent
-			this.log(ce.detail.message, ce.detail.type)
-		})
+		osmix.on((message, type) => this.log(message, type))
 	}
 
 	setLogger(logger: typeof this.log) {
