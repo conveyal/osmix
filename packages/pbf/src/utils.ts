@@ -1,9 +1,19 @@
+export type AsyncGeneratorValue<T> =
+	| T
+	| ReadableStream<T>
+	| AsyncGenerator<T>
+	| Promise<T>
+	| Promise<ReadableStream<T>>
+	| Promise<AsyncGenerator<T>>
+
 /**
  * Convert a value or a stream to an async generator.
  */
 export async function* toAsyncGenerator<T>(
-	v: T | ReadableStream<T> | AsyncGenerator<T>,
+	v: AsyncGeneratorValue<T>,
 ): AsyncGenerator<T> {
+	if (v instanceof Promise) return toAsyncGenerator(await v)
+
 	if (v == null) throw Error("Value is null")
 	if (v instanceof ReadableStream) {
 		const reader = v.getReader()

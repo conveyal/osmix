@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest"
-import {
-	nodesToFeatures,
-	nodeToFeature,
-	relationToFeature,
-	waysToFeatures,
-	wayToEditableGeoJson,
-	wayToFeature,
-} from "../src/geojson"
+import { nodeToFeature, relationToFeature, wayToFeature } from "../src/geojson"
 import type { OsmNode, OsmRelation, OsmWay } from "../src/types"
 
 describe("geojson helpers", () => {
@@ -21,41 +14,22 @@ describe("geojson helpers", () => {
 		return [node.lon, node.lat] as [number, number]
 	}
 
-	it("filters tagged node features", () => {
-		const features = nodesToFeatures(nodes)
-		expect(features).toHaveLength(1)
-		expect(features[0]).toEqual(nodeToFeature(nodes[0]))
+	it("converts node to GeoJSON Point", () => {
+		const feature = nodeToFeature(nodes[0])
+		expect(feature.type).toBe("Feature")
+		expect(feature.geometry.type).toBe("Point")
+		expect(feature.geometry.coordinates).toEqual([nodes[0].lon, nodes[0].lat])
+		expect(feature.properties).toEqual(nodes[0].tags)
 	})
 
-	it("creates polygon features for closed ways", () => {
+	it("creates polygon for closed ways", () => {
 		const way: OsmWay = {
 			id: 10,
 			refs: [1, 2, 1],
 			tags: { area: "yes" },
 		}
-		const features = waysToFeatures([way], refToPosition)
-		expect(features).toHaveLength(1)
-		expect(features[0].geometry?.type).toBe("Polygon")
-	})
-
-	it("returns editable collection with way and nodes", () => {
-		const way: OsmWay = {
-			id: 11,
-			refs: [1, 2, 1],
-			tags: { highway: "service" },
-		}
-		const collection = wayToEditableGeoJson(way, (id) => {
-			const node = nodeMap.get(id)
-			if (!node) throw new Error("Missing node")
-			return node
-		})
-		expect(collection.features).toHaveLength(4)
-		expect(collection.features[0]).toEqual(wayToFeature(way, refToPosition))
-	})
-
-	it("throws when editable way node missing", () => {
-		const way: OsmWay = { id: 12, refs: [1, 3], tags: {} }
-		expect(() => wayToEditableGeoJson(way, () => undefined as never)).toThrow()
+		const feature = wayToFeature(way, refToPosition)
+		expect(feature.geometry.type).toBe("Polygon")
 	})
 
 	it("builds relation geometry collection", () => {

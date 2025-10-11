@@ -139,7 +139,7 @@ test("extract a BBOX after reading a PBF", async () => {
 	}
 })
 
-test.only("extract from a large PBF", { timeout: 500_000 }, async () => {
+test.skip("extract from a large PBF", { timeout: 500_000 }, async () => {
 	const seattle = new Osmix()
 	seattle.on((message, type) => {
 		console.error(`[${type}] ${message}`)

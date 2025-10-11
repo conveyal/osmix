@@ -1,13 +1,11 @@
 # `@osmix/json`
 
 `@osmix/json` bridges the gap between OpenStreetMap's compact PBF format and ergonomic JSON
-representations. It powers the streaming editors inside `apps/merge` and the merge engine in
+representations. It powers the streaming editors inside `apps/merge` and parts of the merge engine in
 `@osmix/core` by letting us parse, inspect, transform, and re-encode OSM data without leaving the
-browser-friendly world of ECMAScript.
+browser-friendly world of JavaScript.
 
-This package embraces modern Web Streams and incremental
-serialization. You can connect network responses, worker threads, and transformation pipelines
-together without buffering entire files in memory.
+This package embraces modern Web Streams and incremental serialization. You can connect network responses, worker threads, and transformation pipelines together without buffering entire files in memory.
 
 ## When to use `@osmix/json`
 
@@ -24,7 +22,7 @@ conflation and merge operations, see `@osmix/core`.
 ## Design Notes
 
 - **Streaming first** – Every conversion primitive is available as a Web Stream transform, letting
-	you operate on gigabyte-scale datasets in browsers or Node without copying.
+	you operate on large-scale datasets in browsers or Node without copying.
 - **Compatible with modern runtimes** – The package ships pure ESM, targets modern runtimes, and has no
 	Node-specific dependencies beyond Web Streams.
 - **Info handling is opt-in** – Builders and parsers accept options to include metadata (`timestamp`,
@@ -35,9 +33,7 @@ conflation and merge operations, see `@osmix/core`.
 ## Installation
 
 ```bash
-bun add @osmix/json
-# or
-npm install @osmix/json
+npm i @osmix/json
 ```
 
 The package ships as pure TypeScript/ESM and depends on the sibling `@osmix/pbf` primitives for the
@@ -51,10 +47,9 @@ low-level Protocolbuffer handling.
 import { osmPbfToJson } from "@osmix/json"
 import { toAsyncGenerator } from "@osmix/pbf"
 
-const response = await fetch("/fixtures/andorra.osm.pbf")
-const stream = osmPbfToJson(response.body!)
+const response = await fetch("/fixtures/monaco.pbf")
 
-for await (const value of toAsyncGenerator(stream)) {
+for await (const value of toAsyncGenerator(osmPbfToJson(response.body))) {
 	if ("id" in value) {
 		// value is an OSM entity: node | way | relation
 		console.log(value.tags)
@@ -92,8 +87,7 @@ async function* entities() {
 	}
 }
 
-const pbfStream = osmJsonToPbf(header, entities())
-await pbfStream.pipeTo(
+await osmJsonToPbf(header, entities()).pipeTo(
 	new WritableStream({
 		write: (chunk) => {
 			// chunk is an ArrayBufferLike holding the encoded PBF data
@@ -107,18 +101,7 @@ or fed back into `@osmix/pbf` utilities. If you need finer control, pair
 `createOsmJsonReadableStream` with `OsmJsonToBlocksTransformStream` before handing off to
 `@osmix/pbf`'s `OsmBlocksToPbfBytesTransformStream`.
 
-### Convert OSM data to GeoJSON features
-
-```ts
-import { nodesToFeatures, waysToFeatures } from "@osmix/json"
-
-const nodeFeatures = nodesToFeatures(nodesIterable)
-const wayFeatures = waysToFeatures(waysIterable, (ref) => nodeLookup.get(ref)!)
-```
-
-The helpers respect `wayIsArea` so polygonal ways become `GeoJSON.Polygon` features automatically.
-You can provide your own filter predicates to drop untagged entities or to keep domain-specific
-features.
+Way conversion helpers respect `wayIsArea` so polygonal ways become `GeoJSON.Polygon` features automatically.
 
 ## API Overview
 
@@ -154,8 +137,7 @@ features.
 
 - `nodeToFeature`, `nodesToFeatures` – Convert nodes to `GeoJSON.Point` features, defaulting to
 	discarding untagged nodes.
-- `wayToFeature`, `waysToFeatures`, `wayToLineString`, `wayToEditableGeoJson` – Derive line or polygon
-	features and optionally inject member nodes.
+- `wayToFeature`, `waysToFeatures` – Derive line or polygon features and optionally inject member nodes.
 - `relationToFeature` – Represent relations as geometry collections using member coordinates.
 - `wayIsArea(refs, tags)` – Implements the OSM wiki heuristics for determining polygonality.
 

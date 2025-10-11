@@ -16,6 +16,7 @@ import {
 	wayToFeature,
 } from "@osmix/json"
 import {
+	type AsyncGeneratorValue,
 	OsmBlocksToPbfBytesTransformStream,
 	type OsmPbfBlock,
 	type OsmPbfHeaderBlock,
@@ -42,6 +43,7 @@ export interface OsmixTransferables {
 }
 
 export interface OsmixReadOptions {
+	id: string
 	extractBbox: GeoBbox2D
 	filter<T extends OsmEntityType>(
 		type: T,
@@ -95,9 +97,18 @@ export class Osmix extends EventTarget {
 		return osm
 	}
 
-	static async fromPbf(data: ArrayBufferLike | ReadableStream, id?: string) {
-		const osm = new Osmix(id)
-		await osm.readPbf(data)
+	/**
+	 * Easiest way to get started with Osmix. Reads a PBF file into an Osmix index. Logs progress to the console.
+	 */
+	static async fromPbf(
+		data: AsyncGeneratorValue<ArrayBufferLike>,
+		options: Partial<OsmixReadOptions> = {},
+	) {
+		const osm = new Osmix(options.id)
+		osm.on((message, type) => {
+			console.log(`[${type}] ${message}`)
+		})
+		await osm.readPbf(data, options)
 		return osm
 	}
 
@@ -164,7 +175,7 @@ export class Osmix extends EventTarget {
 	}
 
 	async readPbf(
-		data: ArrayBufferLike | ReadableStream,
+		data: AsyncGeneratorValue<ArrayBufferLike>,
 		options: Partial<OsmixReadOptions> = {},
 	) {
 		if (this.#indexBuilt) throw Error("Osmix built. Create new instance.")
@@ -270,66 +281,6 @@ export class Osmix extends EventTarget {
 		this.log(
 			`Added ${this.nodes.size.toLocaleString()} nodes, ${this.ways.size.toLocaleString()} ways, and ${this.relations.size.toLocaleString()} relations.`,
 		)
-	}
-
-	toEntityStream() {
-		let headerEnqueued = false
-		const entityGenerator = this.generateSortedEntities()
-		return new ReadableStream<OsmPbfHeaderBlock | OsmEntity>({
-			pull: async (controller) => {
-				if (!headerEnqueued) {
-					controller.enqueue({
-						...this.header,
-						writingprogram: "@osmix/core",
-						osmosis_replication_timestamp: Date.now(),
-					})
-					headerEnqueued = true
-				}
-				const block = entityGenerator.next()
-				if (block.done) {
-					controller.close()
-				} else {
-					controller.enqueue(block.value)
-				}
-			},
-		})
-	}
-
-	toPbfStream() {
-		return this.toEntityStream()
-			.pipeThrough(new OsmJsonToBlocksTransformStream())
-			.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
-	}
-
-	async toPbfBuffer() {
-		const chunks: Uint8Array[] = []
-		let byteLength = 0
-		const writable = new WritableStream<Uint8Array>({
-			write(chunk) {
-				chunks.push(chunk)
-				byteLength += chunk.byteLength
-			},
-		})
-		await this.toPbfStream().pipeTo(writable)
-		const combined = new Uint8Array(byteLength)
-		let offset = 0
-		for (const chunk of chunks) {
-			combined.set(chunk, offset)
-			offset += chunk.byteLength
-		}
-		return combined.buffer
-	}
-
-	*generateSortedEntities(): Generator<OsmEntity> {
-		for (const node of this.nodes.sorted()) {
-			yield node
-		}
-		for (const way of this.ways.sorted()) {
-			yield way
-		}
-		for (const relation of this.relations.sorted()) {
-			yield relation
-		}
 	}
 
 	buildSpatialIndexes() {
@@ -496,6 +447,25 @@ export class Osmix extends EventTarget {
 		}
 	}
 
+	getEntityGeoJson(
+		entity: OsmNode | OsmWay | OsmRelation,
+	): GeoJSON.Feature<GeoJSON.Geometry, OsmTags> {
+		if (isNode(entity)) {
+			return nodeToFeature(entity)
+		}
+		if (isWay(entity)) {
+			return wayToFeature(entity, (ref) =>
+				this.nodes.getNodeLonLat({ id: ref }),
+			)
+		}
+		if (isRelation(entity)) {
+			return relationToFeature(entity, (ref) =>
+				this.nodes.getNodeLonLat({ id: ref }),
+			)
+		}
+		throw new Error("Unknown entity type")
+	}
+
 	getEntityBbox(entity: OsmNode | OsmWay | OsmRelation): GeoBbox2D {
 		if (isNode(entity)) {
 			const [lon, lat] = this.nodes.getNodeLonLat({ id: entity.id })
@@ -526,45 +496,82 @@ export class Osmix extends EventTarget {
 		throw Error("Unknown entity type")
 	}
 
-	createNode(lonLat: LonLat) {
-		const maxNodeId = this.nodes.ids.at(-1) ?? 0
-		return this.nodes.addNode({
-			id: maxNodeId + 1,
-			...lonLat,
+	/**
+	 * Get the bounding box of all entities in the OSM index.
+	 */
+	bbox(): GeoBbox2D {
+		return this.nodes.bbox
+	}
+
+	/**
+	 * Create a generator that yields all entities in the OSM index, sorted by type and id.
+	 */
+	*allEntitiesSorted(): Generator<OsmEntity> {
+		for (const node of this.nodes.sorted()) {
+			yield node
+		}
+		for (const way of this.ways.sorted()) {
+			yield way
+		}
+		for (const relation of this.relations.sorted()) {
+			yield relation
+		}
+	}
+
+	/**
+	 * Convert the OSM index to a `ReadableStream<OsmPbfHeaderBlock | OsmEntity>`.
+	 */
+	toEntityStream() {
+		let headerEnqueued = false
+		const entityGenerator = this.allEntitiesSorted()
+		return new ReadableStream<OsmPbfHeaderBlock | OsmEntity>({
+			pull: async (controller) => {
+				if (!headerEnqueued) {
+					controller.enqueue({
+						...this.header,
+						writingprogram: "@osmix/core",
+						osmosis_replication_timestamp: Date.now(),
+					})
+					headerEnqueued = true
+				}
+				const block = entityGenerator.next()
+				if (block.done) {
+					controller.close()
+				} else {
+					controller.enqueue(block.value)
+				}
+			},
 		})
 	}
 
-	headerBbox(): GeoBbox2D | undefined {
-		if (this.header.bbox) {
-			return [
-				this.header.bbox.left,
-				this.header.bbox.bottom,
-				this.header.bbox.right,
-				this.header.bbox.top,
-			]
-		}
+	/**
+	 * Convert the OSM index to a `ReadableStream<Uint8Array>` of PBF bytes.
+	 */
+	toPbfStream() {
+		return this.toEntityStream()
+			.pipeThrough(new OsmJsonToBlocksTransformStream())
+			.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
 	}
 
-	bbox(): GeoBbox2D | undefined {
-		return this.nodes.bbox ?? this.headerBbox()
-	}
-
-	getEntityGeoJson(
-		entity: OsmNode | OsmWay | OsmRelation,
-	): GeoJSON.Feature<GeoJSON.Geometry, OsmTags> {
-		if (isNode(entity)) {
-			return nodeToFeature(entity)
+	/**
+	 * Convert the OSM index to an in memory PBF ArrayBuffer.
+	 */
+	async toPbfBuffer() {
+		const chunks: Uint8Array[] = []
+		let byteLength = 0
+		const writable = new WritableStream<Uint8Array>({
+			write(chunk) {
+				chunks.push(chunk)
+				byteLength += chunk.byteLength
+			},
+		})
+		await this.toPbfStream().pipeTo(writable)
+		const combined = new Uint8Array(byteLength)
+		let offset = 0
+		for (const chunk of chunks) {
+			combined.set(chunk, offset)
+			offset += chunk.byteLength
 		}
-		if (isWay(entity)) {
-			return wayToFeature(entity, (ref) =>
-				this.nodes.getNodeLonLat({ id: ref }),
-			)
-		}
-		if (isRelation(entity)) {
-			return relationToFeature(entity, (ref) =>
-				this.nodes.getNodeLonLat({ id: ref }),
-			)
-		}
-		throw new Error("Unknown entity type")
+		return combined.buffer
 	}
 }

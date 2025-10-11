@@ -24,7 +24,6 @@ describe("simple extract benchmark", () => {
 
 	bench("streaming extract during parse", async () => {
 		const data = buffer.slice(0)
-		const osmix = new Osmix("streaming")
-		await osmix.readPbf(data, { extractBbox: BBOX })
+		await Osmix.fromPbf(data, { extractBbox: BBOX })
 	})
 })

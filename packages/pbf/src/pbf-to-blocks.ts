@@ -7,16 +7,14 @@ import {
 	readHeaderBlock,
 	readPrimitiveBlock,
 } from "./proto/osmformat"
-import { decompress, toAsyncGenerator } from "./utils"
+import { type AsyncGeneratorValue, decompress, toAsyncGenerator } from "./utils"
 
 export const HEADER_LENGTH_BYTES = 4
 
 /**
  * Create an OSM PBF reader from binary data.
  */
-export async function readOsmPbf(
-	data: ArrayBufferLike | ReadableStream<ArrayBufferLike>,
-) {
+export async function readOsmPbf(data: AsyncGeneratorValue<ArrayBufferLike>) {
 	const generateBlobsFromChunk = createOsmPbfBlobGenerator()
 	const blocks = osmPbfBlobsToBlocksGenerator(
 		(async function* () {
