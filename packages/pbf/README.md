@@ -6,7 +6,7 @@ A low-level TypeScript toolkit for reading and writing [OpenStreetMap PBF](https
 
 - Existing JavaScript PBF readers either depend on outdated tooling, mutate data into framework-specific shapes, or ship without useful TypeScript declarations.
 - `@osmix/pbf` keeps the API surface close to the official OSM protobuf definition so downstream consumers can decide how they want to process, index, or re-shape the data.
-- The library embraces Web Streams and native compression APIs, enabling the same code paths to run inside browsers, Bun, and modern Node without extra dependencies.
+- The library embraces Web Streams and native compression APIs, enabling the same code paths to run inside browsers and modern Node without extra dependencies.
 
 ## Features
 
@@ -28,13 +28,13 @@ npm install @osmix/pbf
 
 ### Reading an entire file
 
+Works with `ArrayBuffer`s and `ReadableStream`s.
+
 ```ts
 import { readOsmPbf } from "@osmix/pbf"
 
-const source = await fetch("/fixtures/chicago.osm.pbf")
-const arrayBuffer = await source.arrayBuffer()
-
-const { header, blocks } = await readOsmPbf(arrayBuffer)
+const response = await fetch("/fixtures/moncao.pbf")
+const { header, blocks } = await readOsmPbf(response.body)
 console.log(header.required_features)
 
 for await (const block of blocks) {
@@ -46,14 +46,13 @@ for await (const block of blocks) {
 
 ### Streaming from network or disk
 
+Use a `TransformStream` instead of generators.
+
 ```ts
 import { OsmPbfBytesToBlocksTransformStream } from "@osmix/pbf"
 
-const response = await fetch("/fixtures/city.osm.pbf")
-const stream = response.body
-if (!stream) throw new Error("Response has no body stream")
-
-await stream
+const response = await fetch("/fixtures/moncao.pbf")
+await response.body
 	.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
 	.pipeTo(
 		new WritableStream({
@@ -79,8 +78,8 @@ import {
 	readOsmPbf,
 } from "@osmix/pbf"
 
-const source = await fetch("/fixtures/chicago.osm.pbf")
-const { header, blocks } = await readOsmPbf(await source.arrayBuffer())
+const response = await fetch("/fixtures/moncao.pbf")
+const { header, blocks } = await readOsmPbf(response.body)
 
 // Assemble the bytes in-memory
 const chunks: Uint8Array[] = [await osmBlockToPbfBlobBytes(header)]
@@ -103,8 +102,9 @@ const blockStream = new ReadableStream({
 		controller.close()
 	},
 })
-const pbfStream = blockStream.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
-await pbfStream.pipeTo(new WritableStream({ write: persistChunk }))
+await blockStream
+	.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
+	.pipeTo(new WritableStream({ write: persistChunk }))
 ```
 
 In the streaming example, `persistChunk` represents whatever logic you use to persist bytes (writing to the file system, uploading to S3, saving to IndexedDB, etc.). The only requirement is that it accepts `Uint8Array` chunks.
@@ -162,13 +162,13 @@ All types and read/write helpers generated from the official `.proto` files are 
 - `readHeaderBlock`, `writeHeaderBlock`, `readPrimitiveBlock`, `writePrimitiveBlock`
 - Type definitions such as `OsmPbfHeaderBlock`, `OsmPbfBlock`, `OsmPbfBlob`, `OsmPbfBlobHeader`, and entity-level message types (nodes, ways, relations, string tables, dense info, etc.)
 
-The generated code matches the schema shipped by the OSM project, so you can trust it to stay close to the wire format while benefiting from TypeScript type inference.
+The generated code matches the schema shipped by the OSM project, the types were merged in by hand.
 
 ## Environment notes
 
-- Streaming examples rely on the standard Web Streams API. In Node 22+ and Bun, the API is available globally; older runtimes are not supported.
-- Compression utilities depend on `CompressionStream` / `DecompressionStream`. Bun and modern browsers expose these natively. Node added support in v18 behind a flag and promoted it to stable in newer releases—enable it accordingly when targeting Node.
-- When feeding Node.js `Readable`/`Writable` streams into these helpers, use `stream/web` utilities (`Readable.toWeb`, `Writable.toWeb`) or another adapter so you interact with Web Streams.
+- Streaming examples rely on the standard Web Streams API. In Node 20+ the API is available globally; older runtimes are not supported.
+- Compression utilities depend on `CompressionStream` / `DecompressionStream`. Modern browsers and Node 20+ expose these natively.
+- When feeding Node's `Readable`/`Writable` streams into these helpers, use `stream/web` utilities (`Readable.toWeb`, `Writable.toWeb`) or another adapter so you interact with Web Streams.
 
 ## Related packages
 
