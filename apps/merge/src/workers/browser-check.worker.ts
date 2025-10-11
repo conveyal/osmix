@@ -16,10 +16,6 @@ const BrowserCheckWorker = {
 	},
 }
 
-export let browserCheckWorker: ReturnType<
-	typeof Comlink.wrap<typeof BrowserCheckWorker>
->
-
 const isWorker = "importScripts" in globalThis
 if (isWorker) {
 	Comlink.expose(BrowserCheckWorker)

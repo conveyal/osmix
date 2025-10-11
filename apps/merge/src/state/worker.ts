@@ -1,5 +1,5 @@
 import { proxy } from "comlink"
-import { createOsmWorker } from "@/workers/osm"
+import { createOsmWorker } from "@/workers/osm.worker"
 import { Log } from "./log"
 
 declare global {

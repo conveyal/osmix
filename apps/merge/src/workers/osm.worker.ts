@@ -9,7 +9,7 @@ import {
 	throttle,
 } from "@osmix/core"
 import type { OsmEntityType } from "@osmix/json"
-import { expose, transfer } from "comlink"
+import { expose, transfer, wrap } from "comlink"
 import { dequal } from "dequal/lite"
 import {
 	MIN_NODE_ZOOM,
@@ -254,4 +254,14 @@ export class OsmixWorker {
 	}
 }
 
-expose(new OsmixWorker())
+const isWorker = "importScripts" in globalThis
+if (isWorker) {
+	expose(new OsmixWorker())
+}
+
+export function createOsmWorker() {
+	const worker = new Worker(new URL("./osm.worker.ts", import.meta.url), {
+		type: "module",
+	})
+	return wrap<OsmixWorker>(worker)
+}
