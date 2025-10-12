@@ -22,7 +22,7 @@ import {
 	type OsmPbfHeaderBlock,
 	readOsmPbf,
 } from "@osmix/pbf"
-import OsmChangeset from "./changeset"
+import OsmChangeset, { type OsmMergeOptions } from "./changeset"
 import { Nodes, type NodesTransferables } from "./nodes"
 import { OsmixRasterTile } from "./raster-tile"
 import { Relations, type RelationsTransferables } from "./relations"
@@ -42,30 +42,30 @@ export interface OsmixTransferables {
 	parsingTimeMs: number
 }
 
-export interface OsmixReadOptions {
+export interface OsmixOptions {
 	id: string
 	extractBbox: GeoBbox2D
+	logger: (message: string, type?: LogLevel) => void
 	filter<T extends OsmEntityType>(
 		type: T,
 		entity: OsmEntityTypeMap[T],
 		osmix: Osmix,
 	): boolean
+	header: OsmPbfHeaderBlock
 }
 
 export type LogLevel = "debug" | "info" | "warn" | "error"
 
-interface OsmixLogEvent {
-	message: string
-	type?: LogLevel
-}
-
 /**
  * OSM Entity Index.
  */
-export class Osmix extends EventTarget {
+export class Osmix {
 	// Filename or ID of this OSM Entity index.
-	id: string
-	header: OsmPbfHeaderBlock
+	id = "unknown"
+	header: OsmPbfHeaderBlock = {
+		required_features: [],
+		optional_features: [],
+	}
 	blocksGenerator: AsyncGenerator<OsmPbfBlock> | null = null
 
 	// Shared string lookup table for all nodes, ways, and relations
@@ -73,6 +73,8 @@ export class Osmix extends EventTarget {
 	nodes: Nodes
 	ways: Ways
 	relations: Relations
+
+	log = (message: string, type?: LogLevel) => type === "error" ? console.error(message) : console.log(message)
 
 	#indexBuilt = false
 	#startTime = performance.now()
@@ -87,7 +89,7 @@ export class Osmix extends EventTarget {
 		relations,
 		parsingTimeMs,
 	}: OsmixTransferables) {
-		const osm = new Osmix(id, header)
+		const osm = new Osmix({ id, header })
 		osm.stringTable = StringTable.from(stringTable)
 		osm.nodes = Nodes.from(osm.stringTable, nodes)
 		osm.ways = Ways.from(osm.stringTable, ways)
@@ -102,48 +104,82 @@ export class Osmix extends EventTarget {
 	 */
 	static async fromPbf(
 		data: AsyncGeneratorValue<ArrayBufferLike>,
-		options: Partial<OsmixReadOptions> = {},
+		options: Partial<OsmixOptions> = {},
 	) {
-		const osm = new Osmix(options.id)
-		osm.on((message, type) => {
-			console.log(`[${type}] ${message}`)
-		})
+		const osm = new Osmix(options)
 		await osm.readPbf(data, options)
 		return osm
 	}
 
-	constructor(id?: string, header?: OsmPbfHeaderBlock) {
-		super()
-		this.header = header ?? {
-			required_features: [],
-			optional_features: [],
+	static async merge(base: Osmix, patch: Osmix, options: Partial<OsmMergeOptions> = {}) {
+		// De-duplicate nodes and ways in original datasets
+		base.log("Deduplicating ways in base OSM...")
+		let changeset = new OsmChangeset(base)
+		changeset.deduplicateWays(base.ways)
+		base = changeset.applyChanges()
+
+		changeset = new OsmChangeset(base)
+		changeset.deduplicateNodes(base.nodes)
+		base = changeset.applyChanges()
+
+		patch.log("Deduplicating ways in patch OSM...")
+		changeset = new OsmChangeset(patch)
+		changeset.deduplicateWays(patch.ways)
+		patch = changeset.applyChanges()
+
+		changeset = new OsmChangeset(patch)
+		changeset.deduplicateNodes(patch.nodes)
+		patch = changeset.applyChanges()
+
+		// Generate direct changes
+		if (options.directMerge) {
+			base.log("Generating direct changes from patch OSM to base OSM...")
+			changeset = new OsmChangeset(base)
+			changeset.generateDirectChanges(patch)
+			base = changeset.applyChanges()
 		}
-		this.id = id ?? "unknown"
+		
+		// De-duplicate nodes and ways in final dataset
+		if (options.deduplicateWays) {
+			base.log("Deduplicating ways in final dataset...")
+			changeset = new OsmChangeset(base)
+			changeset.deduplicateWays(patch.ways)
+			base = changeset.applyChanges()
+		}
+		if (options.deduplicateNodes) {
+			base.log("Deduplicating nodes in final dataset...")
+			changeset = new OsmChangeset(base)
+			changeset.deduplicateNodes(patch.nodes)
+			base = changeset.applyChanges()
+		}
+
+		// Create intersections 
+		if (options.createIntersections) {
+			base.log("Creating intersections in final dataset...")
+			changeset = new OsmChangeset(base)
+			changeset.createIntersectionsForWays(patch.ways)
+			base = changeset.applyChanges()
+		}
+
+		return base
+	}
+
+	constructor(options: Partial<OsmixOptions> = {}) {
+		if (options.header) this.header = options.header
+		if (options.id) this.id = options.id
+		if (options.logger) this.log = options.logger
 		this.stringTable = new StringTable()
 		this.nodes = new Nodes(this.stringTable)
 		this.ways = new Ways(this.stringTable)
 		this.relations = new Relations(this.stringTable)
 	}
 
-	on(listener: (message: string, type?: LogLevel) => void) {
-		this.addEventListener("log", (ev) =>
-			listener(
-				(ev as CustomEvent<OsmixLogEvent>).detail.message,
-				(ev as CustomEvent<OsmixLogEvent>).detail.type,
-			),
-		)
-	}
-
-	log(message: string, level?: LogLevel) {
-		this.dispatchEvent(
-			new CustomEvent<OsmixLogEvent>("log", {
-				detail: { message, type: level },
-			}),
-		)
+	setLogger(listener: (message: string, type?: LogLevel) => void) {
+		this.log = listener
 	}
 
 	createThrottledLog(interval: number) {
-		return throttle(this.log.bind(this), interval)
+		return throttle(this.log, interval)
 	}
 
 	buildIndexes() {
@@ -176,7 +212,7 @@ export class Osmix extends EventTarget {
 
 	async readPbf(
 		data: AsyncGeneratorValue<ArrayBufferLike>,
-		options: Partial<OsmixReadOptions> = {},
+		options: Partial<OsmixOptions> = {},
 	) {
 		if (this.#indexBuilt) throw Error("Osmix built. Create new instance.")
 		const { extractBbox } = options
@@ -296,7 +332,7 @@ export class Osmix extends EventTarget {
 		if (!this.#indexBuilt) this.buildIndexes()
 
 		const [minLon, minLat, maxLon, maxLat] = bbox
-		const extracted = new Osmix(this.id, {
+		const extracted = new Osmix({ id: this.id, header: {
 			...this.header,
 			bbox: {
 				left: minLon,
@@ -304,7 +340,7 @@ export class Osmix extends EventTarget {
 				right: maxLon,
 				top: maxLat,
 			},
-		})
+		}})
 
 		this.log("Selecting nodes within bounding box...")
 		this.buildSpatialIndexes()

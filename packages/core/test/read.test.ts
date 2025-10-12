@@ -12,8 +12,7 @@ describe("read", () => {
 
 		it("into OSM class", async () => {
 			const fileStream = getFixtureFileReadStream(pbf.url)
-			const osm = new Osmix(name)
-			await osm.readPbf(fileStream)
+			const osm = await Osmix.fromPbf(fileStream, { id: name })
 			assert.equal(osm.nodes.size, pbf.nodes)
 			assert.equal(osm.stringTable.length, pbf.uniqueStrings)
 			assert.deepEqual(osm.nodes.getByIndex(0), pbf.node0)

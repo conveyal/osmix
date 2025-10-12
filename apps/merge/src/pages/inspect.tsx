@@ -122,7 +122,14 @@ export default function InspectPage() {
 										const task = Log.startTask(
 											"Finding duplicate nodes and ways",
 										)
-										const changes = await osmWorker.dedupeNodesAndWays(osmId)
+										const changes = await osmWorker.generateChangeset(
+											osmId,
+											osmId,
+											{
+												deduplicateNodes: true,
+												deduplicateWays: true,
+											},
+										)
 										setChangesetStats(changes)
 										task.end(changeStatsSummary(changes))
 									}}

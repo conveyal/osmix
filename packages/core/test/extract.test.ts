@@ -7,7 +7,7 @@ const TEST_BBOX: GeoBbox2D = [-0.1, -0.1, 1, 1]
 const SEATTLE_BBOX: GeoBbox2D = [-122.463226, 47.469878, -122.180328, 47.82883]
 
 function buildSourceOsm() {
-	const osm = new Osmix("source")
+	const osm = new Osmix({id: "source"})
 	osm.nodes.addNode({
 		id: 1,
 		lat: 0,
@@ -71,7 +71,7 @@ function buildSourceOsm() {
 test("extract a BBOX while reading a PBF", async () => {
 	const source = buildSourceOsm()
 	const transform = new TransformStream<Uint8Array, ArrayBufferLike>()
-	const extract = new Osmix("extract")
+	const extract = new Osmix()
 	const extractPromise = extract.readPbf(transform.readable, {
 		extractBbox: TEST_BBOX,
 	})
@@ -96,10 +96,10 @@ test("extract a BBOX after reading a PBF", async () => {
 	const source = buildSourceOsm()
 	const buffer = await source.toPbfBuffer()
 
-	const streaming = new Osmix("streaming")
+	const streaming = new Osmix()
 	await streaming.readPbf(buffer.slice(0), { extractBbox: TEST_BBOX })
 
-	const twoStepOsmix = new Osmix("two-steps")
+	const twoStepOsmix = new Osmix()
 	await twoStepOsmix.readPbf(buffer.slice(0))
 	const twoStep = twoStepOsmix.extract(TEST_BBOX)
 
@@ -140,10 +140,7 @@ test("extract a BBOX after reading a PBF", async () => {
 })
 
 test.skip("extract from a large PBF", { timeout: 500_000 }, async () => {
-	const seattle = new Osmix()
-	seattle.on((message, type) => {
-		console.error(`[${type}] ${message}`)
-	})
+	const seattle = new Osmix({ logger: console.error })
 	await seattle.readPbf(getFixtureFileReadStream("usa.pbf"), {
 		extractBbox: SEATTLE_BBOX,
 	})

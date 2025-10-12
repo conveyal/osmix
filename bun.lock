@@ -30,6 +30,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "comlink": "^4.4.2",
+        "dequal": "catalog:",
         "jotai": "^2.15.0",
         "lucide-react": "^0.513.0",
         "maplibre-gl": "5.7.3",
@@ -70,6 +71,7 @@
       "devDependencies": {
         "@osmix/test-utils": "workspace:*",
         "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -83,6 +85,8 @@
       },
       "devDependencies": {
         "@osmix/test-utils": "workspace:*",
+        "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vite": "catalog:",
         "vitest": "catalog:",
@@ -96,6 +100,7 @@
       },
       "devDependencies": {
         "@osmix/test-utils": "workspace:*",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vite": "catalog:",
         "vitest": "catalog:",
@@ -104,6 +109,7 @@
     "packages/test-utils": {
       "name": "@osmix/test-utils",
       "devDependencies": {
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },

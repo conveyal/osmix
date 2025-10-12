@@ -1,5 +1,4 @@
-import type { OsmNode, OsmRelation, OsmWay } from "@osmix/json"
-import type { OsmTags } from "./types"
+import type { OsmTags, OsmNode, OsmRelation, OsmWay } from "./types"
 import { wayIsArea } from "./way-is-area"
 
 export type OsmGeoJSONFeature = GeoJSON.Feature<

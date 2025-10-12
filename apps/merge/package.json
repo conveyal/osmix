@@ -43,6 +43,7 @@
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"comlink": "^4.4.2",
+		"dequal": "catalog:",
 		"jotai": "^2.15.0",
 		"lucide-react": "^0.513.0",
 		"maplibre-gl": "5.7.3",

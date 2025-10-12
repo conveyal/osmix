@@ -13,6 +13,7 @@
 	},
 	"devDependencies": {
 		"@osmix/test-utils": "workspace:*",
+		"@types/node": "catalog:",
 		"typescript": "catalog:",
 		"vite": "catalog:",
 		"vitest": "catalog:"

@@ -29,21 +29,17 @@ export class OsmixWorker {
 	private log = (message: string, type?: StatusType) => {
 		type === "error" ? console.error(message) : console.log(message)
 	}
+	private logEverySecond = throttle(this.log, 1_000)
 
 	async fromPbf(id: string, data: ArrayBufferLike | ReadableStream) {
-		const osm = new Osmix(id)
-		this.subscribeToOsmixLog(osm)
-		await osm.readPbf(data)
+		const osm = await Osmix.fromPbf(data, { id, logger: this.log })
 		this.osmixes.set(id, osm)
 		return osm.transferables()
 	}
 
-	subscribeToOsmixLog(osmix: Osmix) {
-		osmix.on((message, type) => this.log(message, type))
-	}
-
 	setLogger(logger: typeof this.log) {
 		this.log = logger
+		this.logEverySecond = throttle(this.log, 1_000)
 	}
 
 	getEntity(oid: string, eid: string) {
@@ -104,80 +100,88 @@ export class OsmixWorker {
 		}
 	}
 
-	dedupeNodesAndWays(id: string) {
-		const osm = this.osmixes.get(id)
-		if (!osm) throw Error(`Osm for ${id} not loaded.`)
-		const changeset = osm.createChangeset()
-		this.changesets.set(id, changeset)
-		const logEverySecond = throttle(this.log, 1_000)
-		let checkedWays = 0
-		let dedpulicatedWays = 0
-		for (const wayStats of changeset.deduplicateWays(osm)) {
-			checkedWays++
-			dedpulicatedWays += wayStats
-			logEverySecond(
-				`Deduplicating ways: ${checkedWays.toLocaleString()} ways checked, ${dedpulicatedWays.toLocaleString()} ways deduplicated`,
-			)
-		}
-		let checkedNodes = 0
-		let dedpulicatedNodes = 0
-		for (const nodeStats of changeset.deduplicateNodes(osm)) {
-			checkedNodes++
-			dedpulicatedNodes += nodeStats
-			logEverySecond(
-				`Deduplicating nodes: ${checkedNodes.toLocaleString()} nodes checked, ${dedpulicatedNodes.toLocaleString()} nodes deduplicated`,
-			)
-		}
-		this.sortChangeset(id, changeset)
+	async merge(baseOsmId: string, patchOsmId: string, options: Partial<OsmMergeOptions> = {}) {
+		const baseOsm = this.osmixes.get(baseOsmId)
+		if (!baseOsm) throw Error(`Osm for ${baseOsmId} not loaded.`)
+		const patchOsm = this.osmixes.get(patchOsmId)
+		if (!patchOsm) throw Error(`Osm for ${patchOsmId} not loaded.`)
+		const mergedOsm = await Osmix.merge(baseOsm, patchOsm, options)
+		
+		// Replace the base OSM with the merged OSM
+		this.osmixes.set(baseOsmId, mergedOsm)
+		
+		// Delete the patch OSM
+		this.osmixes.delete(patchOsmId)
 
-		return changeset.stats
+		// Delete the changeset
+		this.changesets.delete(baseOsmId)
+		this.filteredChanges.delete(baseOsmId)
+
+		return mergedOsm.transferables()
 	}
 
 	generateChangeset(
 		baseOsmId: string,
 		patchOsmId: string,
-		options: OsmMergeOptions,
+		options: Partial<OsmMergeOptions> = {},
 	) {
 		const patchOsm = this.osmixes.get(patchOsmId)
 		if (!patchOsm) throw Error(`Osm for ${patchOsmId} not loaded.`)
 		const baseOsm = this.osmixes.get(baseOsmId)
 		if (!baseOsm) throw Error(`Osm for ${baseOsmId} not loaded.`)
-		const changeset = baseOsm.createChangeset()
 
-		const logEverySecond = throttle(this.log, 1_000)
+		const changeset = baseOsm.createChangeset()
+		this.changesets.set(baseOsmId, changeset)
 
 		if (options.directMerge) {
-			this.log("Generating direct changes...")
+			this.log(
+				`Generating direct changes from ${patchOsmId} to ${baseOsmId}...`,
+			)
 			changeset.generateDirectChanges(patchOsm)
 		}
-		if (options.deduplicateNodes) {
-			let checkedNodes = 0
-			this.log("Deduplicating nodes...")
-			for (const _nodeStats of changeset.deduplicateNodes(baseOsm)) {
-				checkedNodes++
-				logEverySecond(
-					`Node deduplication progress: ${checkedNodes.toLocaleString()} checked`,
+
+		if (options.deduplicateWays) {
+			let checkedWays = 0
+			let dedpulicatedWays = 0
+			this.log(`Deduplicating ways from ${patchOsmId}...`)
+			for (const wayStats of changeset.deduplicateWaysGenerator(patchOsm.ways)) {
+				checkedWays++
+				dedpulicatedWays += wayStats
+				this.logEverySecond(
+					`Deduplicating ways: ${checkedWays.toLocaleString()} ways checked, ${dedpulicatedWays.toLocaleString()} ways deduplicated`,
 				)
 			}
 		}
+
+		if (options.deduplicateNodes) {
+			let checkedNodes = 0
+			let dedpulicatedNodes = 0
+			this.log(`Deduplicating nodes from ${patchOsmId}...`)
+			for (const nodeStats of changeset.deduplicateNodesGenerator(patchOsm.nodes)) {
+				checkedNodes++
+				dedpulicatedNodes += nodeStats
+				this.logEverySecond(
+					`Node deduplication progress: ${checkedNodes.toLocaleString()} checked, ${dedpulicatedNodes.toLocaleString()} nodes deduplicated`,
+				)
+			}
+		}
+
 		if (options.createIntersections) {
 			let checkedWays = 0
-			this.log("Creating intersections...")
+			this.log(`Creating intersections from ${patchOsmId}...`)
 
 			// This will check if the osm dataset has the way before trying to create intersections for it.
-			for (const _wayStats of changeset.generateIntersectionsForWays(
+			for (const _wayStats of changeset.createIntersectionsForWaysGenerator(
 				patchOsm.ways,
 			)) {
 				checkedWays++
-				logEverySecond(
+				this.logEverySecond(
 					`Intersection creation progress: ${checkedWays.toLocaleString()} ways checked`,
 				)
 			}
 		}
 
-		this.changesets.set(baseOsmId, changeset)
 		this.sortChangeset(baseOsmId, changeset)
-
 		return changeset.stats
 	}
 
@@ -246,7 +250,6 @@ export class OsmixWorker {
 		const changeset = this.changesets.get(osmId)
 		if (!changeset) throw Error("No active changeset")
 		const osm = changeset.applyChanges(osmId)
-		this.subscribeToOsmixLog(osm)
 		this.changesets.delete(osmId)
 		this.filteredChanges.delete(osmId)
 		this.osmixes.set(osmId, osm)

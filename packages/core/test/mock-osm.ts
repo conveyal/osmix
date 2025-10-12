@@ -1,3 +1,4 @@
+import type { OsmNode } from "@osmix/json"
 import { Osmix } from "../src/osmix"
 
 const YAKIM_LAT = 46.60207
@@ -6,17 +7,22 @@ const YAKIM_LON = -120.505898
 const ONE_KM_LON = 0.0131 // approximately
 const ONE_KM_LAT = 0.009
 
+const node0: OsmNode = {
+	id: 0,
+	lat: YAKIM_LAT,
+	lon: YAKIM_LON,
+}
+
+const node1: OsmNode = {
+	id: 1,
+	lat: YAKIM_LAT,
+	lon: YAKIM_LON - ONE_KM_LON, // approximately 1km west
+}
+
+
 function addBaseNodes(osm: Osmix) {
-	osm.nodes.addNode({
-		id: 0,
-		lat: YAKIM_LAT,
-		lon: YAKIM_LON,
-	})
-	osm.nodes.addNode({
-		id: 1,
-		lat: YAKIM_LAT,
-		lon: YAKIM_LON - ONE_KM_LON, // approximately 1km west
-	})
+	osm.nodes.addNode(node0)
+	osm.nodes.addNode(node1)
 }
 
 function addBaseWays(osm: Osmix) {
@@ -50,17 +56,15 @@ export function createBaseOsm(): Osmix {
 export function createPatchOsm(): Osmix {
 	const osm = new Osmix()
 
-	// Add all nodes
 	addBaseNodes(osm)
-
-	const node0 = osm.nodes.getByIndex(0)
-	const node1 = osm.nodes.getByIndex(1)
-	if (!node0 || !node1) throw new Error("node not found")
 
 	// Add way the connects with base way node 0 (will replace it)
 	osm.nodes.addNode({
 		...node0,
 		id: 2,
+		tags: {
+			crossing: "yes",
+		}
 	})
 	osm.nodes.addNode({
 		...node1,

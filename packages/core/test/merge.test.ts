@@ -45,13 +45,11 @@ describe("merge osm", () => {
 			const _osmMergedName = "yakima-merged.osm.pbf"
 
 			const osm1Data = getFixtureFileReadStream(osm1Name)
-			let baseOsm = new Osmix(osm1Name)
-			await baseOsm.readPbf(osm1Data)
+			let baseOsm = await Osmix.fromPbf(osm1Data, { id: osm1Name })
 			assert.equal(baseOsm.nodes.getById(testNode.id), null)
 
 			const osm2Data = getFixtureFileReadStream(osm2Name)
-			const osm2 = new Osmix(osm2Name)
-			await osm2.readPbf(osm2Data)
+			const osm2 = await Osmix.fromPbf(osm2Data, { id: osm2Name })
 			assert.deepEqual(osm2.nodes.getById(testNode.id), testNode)
 
 			const baseSizes = sizes(baseOsm)
@@ -136,12 +134,12 @@ describe("merge osm", () => {
 		changeset.generateDirectChanges(patch)
 		assert.deepEqual(changeset.stats, {
 			osmId: base.id,
-			totalChanges: 11,
-			nodeChanges: 7,
+			totalChanges: 10,
+			nodeChanges: 6,
 			wayChanges: 4,
 			relationChanges: 0,
-			deduplicatedNodes: 1,
-			deduplicatedNodesReplaced: 1,
+			deduplicatedNodes: 0,
+			deduplicatedNodesReplaced: 0,
 			deduplicatedWays: 0,
 			intersectionPointsFound: 0,
 			intersectionNodesCreated: 0,
@@ -154,27 +152,42 @@ describe("merge osm", () => {
 			relations: base.relations.size + patch.relations.size,
 		})
 
+		assert.isTrue(directResult.nodes.ids.has(2))
 		assert.deepEqual(directResult.ways.getById(1), {
 			id: 1,
-			refs: [2, 1],
+			refs: [0, 1],
 			tags: {
 				highway: "primary",
 				version: "2",
 			},
 		})
 
-		assert.isNull(directResult.nodes.getById(0))
-		assert.deepEqual(directResult.nodes.getById(2), {
-			id: 2,
+		changeset = directResult.createChangeset()
+		changeset.deduplicateWays(patch.ways)
+		changeset.deduplicateNodes(patch.nodes)
+		const deduplicatedResult = changeset.applyChanges("deduplicated")
+
+		assert.isFalse(deduplicatedResult.nodes.ids.has(2))
+		assert.deepEqual(deduplicatedResult.ways.getById(1), {
+			id: 1,
+			refs: [0, 1],
+			tags: {
+				highway: "primary",
+				version: "2",
+			},
+		})
+
+		assert.deepEqual(deduplicatedResult.nodes.getById(0), {
+			id: 0,
 			lat: 46.60207,
 			lon: -120.505898,
 		})
 
-		changeset = directResult.createChangeset()
+		changeset = deduplicatedResult.createChangeset()
 		changeset.createIntersectionsForWays(patch.ways)
 
 		assert.deepEqual(changeset.stats, {
-			osmId: "unknown-merged",
+			osmId: "deduplicated",
 			totalChanges: 3,
 			nodeChanges: 1,
 			wayChanges: 2,
@@ -203,10 +216,8 @@ describe("merge osm", () => {
 			const osm1Name = "seattle.osm.pbf"
 			const osm2Name = "seattle-osw.pbf"
 
-			let baseOsm = new Osmix(osm1Name)
-			await baseOsm.readPbf(getFixtureFileReadStream(osm1Name))
-			const osm2 = new Osmix(osm2Name)
-			await osm2.readPbf(getFixtureFileReadStream(osm2Name))
+			let baseOsm = await Osmix.fromPbf(getFixtureFileReadStream(osm1Name), { id: osm1Name })
+			const osm2 = await Osmix.fromPbf(getFixtureFileReadStream(osm2Name), { id: osm2Name })
 
 			const baseSizes = {
 				nodes: 2_658_358,

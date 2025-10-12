@@ -228,8 +228,12 @@ export default function Merge() {
 											"Inspecting base OSM for duplicate entities",
 											async () => {
 												if (!base.osm) throw Error("Base OSM is not loaded")
-												const baseChanges = await osmWorker.dedupeNodesAndWays(
+												const baseChanges = await osmWorker.generateChangeset(
 													base.osm.id,
+													base.osm.id,
+													{
+														deduplicateNodes: true,
+													},
 												)
 												setChangesetStats(baseChanges)
 												return changeStatsSummary(baseChanges)
@@ -269,64 +273,19 @@ export default function Merge() {
 										if (!base.osm) throw Error("Base OSM is not loaded")
 										if (!patch.osm) throw Error("Patch OSM is not loaded")
 
-										task.update("Deduplicating nodes and ways in base OSM")
-										const baseChanges = await osmWorker.dedupeNodesAndWays(
-											base.osm.id,
-										)
-										setChangesetStats(baseChanges)
-										task.update(changeStatsSummary(baseChanges))
-										await osmWorker.applyChangesAndReplace(base.osm.id)
-
-										task.update("Deduplicating nodes and ways in patch OSM")
-										const patchChanges = await osmWorker.dedupeNodesAndWays(
-											patch.osm.id,
-										)
-										setChangesetStats(patchChanges)
-										task.update(changeStatsSummary(patchChanges))
-										await osmWorker.applyChangesAndReplace(patch.osm.id)
-
-										task.update(
-											"Generating direct changes from patch OSM to base OSM",
-										)
-										const directChanges = await osmWorker.generateChangeset(
-											base.osm.id,
-											patch.osm.id,
-											{
-												directMerge: true,
-												deduplicateNodes: false,
-												createIntersections: false,
-											},
-										)
-										setChangesetStats(directChanges)
-										task.update(changeStatsSummary(directChanges))
-										await osmWorker.applyChangesAndReplace(base.osm.id)
-
-										// TODO: add this step back when it is split from the direct merge
-										// await osmWorker.generateChangeset(base.osm.id, patch.osm.id, {
-										// 	directMerge: false,
-										//	deduplicateNodes: true,
-										//	createIntersections: false,
-										// })
-										// await osmWorker.applyChangesAndReplace(base.osm.id)
-
-										task.update("Creating intersections in base OSM")
-										const intersectionsChanges =
-											await osmWorker.generateChangeset(
-												base.osm.id,
-												patch.osm.id,
-												{
-													directMerge: false,
-													deduplicateNodes: false,
-													createIntersections: true,
-												},
-											)
-										setChangesetStats(intersectionsChanges)
-										task.update(changeStatsSummary(intersectionsChanges))
-										const osm = Osmix.from(
-											await osmWorker.applyChangesAndReplace(base.osm.id),
-										)
 										setChangesetStats(null)
+										const osm = Osmix.from(
+											await osmWorker.merge(base.osm.id, patch.osm.id,
+											{
+												deduplicateNodes: true,
+												deduplicateWays: true,
+												directMerge: true,
+												createIntersections: true,
+											},)
+										)
+										
 										base.setOsm(osm)
+										patch.setOsm(null)
 
 										task.end("All merge steps completed")
 										goToStep("inspect-final-osm")
@@ -359,8 +318,13 @@ export default function Merge() {
 									"Inspecting patch OSM for duplicate entities",
 									async () => {
 										if (!patch.osm) throw Error("Patch OSM is not loaded")
-										const patchChanges = await osmWorker.dedupeNodesAndWays(
+										const patchChanges = await osmWorker.generateChangeset(
 											patch.osm.id,
+											patch.osm.id,
+											{
+												deduplicateNodes: true,
+												deduplicateWays: true,
+											},
 										)
 										setChangesetStats(patchChanges)
 										return changeStatsSummary(patchChanges)
@@ -555,8 +519,13 @@ export default function Merge() {
 									startStepTask("De-duplicating nodes and ways", async () => {
 										if (!base.osm || !patch.osm)
 											throw Error("Missing data to generate changes")
-										const results = await osmWorker.dedupeNodesAndWays(
+										const results = await osmWorker.generateChangeset(
 											base.osm.id,
+											patch.osm.id,
+											{
+												deduplicateNodes: true,
+												deduplicateWays: true,
+											},
 										)
 										setChangesetStats(results)
 										return changeStatsSummary(results)
