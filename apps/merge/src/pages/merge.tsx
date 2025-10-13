@@ -21,6 +21,8 @@ import CustomControl from "@/components/custom-control"
 import DeckGlOverlay from "@/components/deckgl-overlay"
 import { Details, DetailsContent, DetailsSummary } from "@/components/details"
 import EntityDetails from "@/components/entity-details"
+import EntityDetailsMapControl from "@/components/entity-details-map-control"
+import EntitySearchControl from "@/components/entity-search-control"
 import { Main, MapContent, Sidebar } from "@/components/layout"
 import NominatimSearchControl from "@/components/nominatim-search-control"
 import ChangesSummary, {
@@ -723,6 +725,18 @@ export default function Merge() {
 					<CustomControl position="top-left">
 						<NominatimSearchControl />
 					</CustomControl>
+
+					{base.osm && (
+						<CustomControl position="top-left">
+							<EntitySearchControl osm={base.osm} />
+						</CustomControl>
+					)}
+
+					{base.osm && (
+						<CustomControl position="top-left">
+							<EntityDetailsMapControl osm={base.osm} />
+						</CustomControl>
+					)}
 				</Basemap>
 			</MapContent>
 		</Main>
