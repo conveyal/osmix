@@ -100,16 +100,20 @@ export class OsmixWorker {
 		}
 	}
 
-	async merge(baseOsmId: string, patchOsmId: string, options: Partial<OsmMergeOptions> = {}) {
+	async merge(
+		baseOsmId: string,
+		patchOsmId: string,
+		options: Partial<OsmMergeOptions> = {},
+	) {
 		const baseOsm = this.osmixes.get(baseOsmId)
 		if (!baseOsm) throw Error(`Osm for ${baseOsmId} not loaded.`)
 		const patchOsm = this.osmixes.get(patchOsmId)
 		if (!patchOsm) throw Error(`Osm for ${patchOsmId} not loaded.`)
 		const mergedOsm = await Osmix.merge(baseOsm, patchOsm, options)
-		
+
 		// Replace the base OSM with the merged OSM
 		this.osmixes.set(baseOsmId, mergedOsm)
-		
+
 		// Delete the patch OSM
 		this.osmixes.delete(patchOsmId)
 
@@ -144,7 +148,9 @@ export class OsmixWorker {
 			let checkedWays = 0
 			let dedpulicatedWays = 0
 			this.log(`Deduplicating ways from ${patchOsmId}...`)
-			for (const wayStats of changeset.deduplicateWaysGenerator(patchOsm.ways)) {
+			for (const wayStats of changeset.deduplicateWaysGenerator(
+				patchOsm.ways,
+			)) {
 				checkedWays++
 				dedpulicatedWays += wayStats
 				this.logEverySecond(

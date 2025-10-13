@@ -53,7 +53,9 @@ export async function decompress(
 ): Promise<Uint8Array> {
 	// Check if we're in Bun runtime - use Node.js zlib for proper OSM PBF zlib format support
 	if (isBun()) {
-		const { inflateSync, gunzipSync, inflateRawSync } = await import("node:zlib")
+		const { inflateSync, gunzipSync, inflateRawSync } = await import(
+			"node:zlib"
+		)
 		const bytes =
 			data instanceof Uint8Array
 				? data

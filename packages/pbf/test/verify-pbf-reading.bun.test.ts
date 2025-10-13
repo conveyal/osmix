@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { readOsmPbf } from "../src/pbf-to-blocks"
 import { getFixtureFile } from "@osmix/test-utils/fixtures"
+import { readOsmPbf } from "../src/pbf-to-blocks"
 
 describe("PBF Reading with Bun", () => {
 	test("can read an actual OSM PBF file", async () => {
 		// Load a real PBF fixture
-		const pbfData = await getFixtureFile('monaco.pbf')
+		const pbfData = await getFixtureFile("monaco.pbf")
 
 		// Try to read it
 		const result = await readOsmPbf(pbfData)
@@ -27,7 +27,7 @@ describe("PBF Reading with Bun", () => {
 	})
 
 	test("header contains expected OSM data", async () => {
-		const pbfData = await getFixtureFile('monaco.pbf')
+		const pbfData = await getFixtureFile("monaco.pbf")
 
 		const result = await readOsmPbf(pbfData)
 
@@ -36,4 +36,3 @@ describe("PBF Reading with Bun", () => {
 		expect(result.header.required_features.length).toBeGreaterThan(0)
 	})
 })
-

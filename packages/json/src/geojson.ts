@@ -1,4 +1,4 @@
-import type { OsmTags, OsmNode, OsmRelation, OsmWay } from "./types"
+import type { OsmNode, OsmRelation, OsmTags, OsmWay } from "./types"
 import { wayIsArea } from "./way-is-area"
 
 export type OsmGeoJSONFeature = GeoJSON.Feature<

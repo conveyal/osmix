@@ -19,7 +19,6 @@ const node1: OsmNode = {
 	lon: YAKIM_LON - ONE_KM_LON, // approximately 1km west
 }
 
-
 function addBaseNodes(osm: Osmix) {
 	osm.nodes.addNode(node0)
 	osm.nodes.addNode(node1)
@@ -64,7 +63,7 @@ export function createPatchOsm(): Osmix {
 		id: 2,
 		tags: {
 			crossing: "yes",
-		}
+		},
 	})
 	osm.nodes.addNode({
 		...node1,

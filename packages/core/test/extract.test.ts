@@ -7,7 +7,7 @@ const TEST_BBOX: GeoBbox2D = [-0.1, -0.1, 1, 1]
 const SEATTLE_BBOX: GeoBbox2D = [-122.463226, 47.469878, -122.180328, 47.82883]
 
 function buildSourceOsm() {
-	const osm = new Osmix({id: "source"})
+	const osm = new Osmix({ id: "source" })
 	osm.nodes.addNode({
 		id: 1,
 		lat: 0,

@@ -6,9 +6,9 @@ import {
 	type OsmEntityType,
 	type OsmEntityTypeMap,
 	type OsmNode,
-	type OsmWay
+	type OsmWay,
 } from "@osmix/json"
-import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
+import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
 import sweeplineIntersections from "sweepline-intersections"
 import type { Nodes } from "./nodes"
 import { Osmix } from "./osmix"
@@ -179,7 +179,7 @@ export default class OsmChangeset {
 	/**
 	 * Check nodes for duplicates and consolidate them within this OSM dataset.
 	 * All checked nodes must exist in the base OSM.
-	 * 
+	 *
 	 * The algorithm:
 	 * - Build a map of node IDs that should be replaced with other node IDs.
 	 *  	- Find all pairs of nodes at the same geographic location
@@ -213,10 +213,10 @@ export default class OsmChangeset {
 				// Determine which node to keep using version/tags logic (same as deduplicateWay)
 				const nodeVersion = getEntityVersion(node)
 				const existingNodeVersion = getEntityVersion(existingNode)
-				
+
 				let nodeToKeep: number = node.id
 				let nodeToDelete: number = existingNode.id
-				
+
 				// Check version - prefer higher version
 				if (existingNodeVersion > nodeVersion) {
 					// Existing node has higher version, keep existing node
@@ -225,7 +225,9 @@ export default class OsmChangeset {
 				} else if (nodeVersion === existingNodeVersion) {
 					// Same version, keep node with more tags (>= comparison to match deduplicateWay)
 					const nodeTagCount = Object.keys(node.tags ?? {}).length
-					const existingNodeTagCount = Object.keys(existingNode.tags ?? {}).length
+					const existingNodeTagCount = Object.keys(
+						existingNode.tags ?? {},
+					).length
 					if (existingNodeTagCount >= nodeTagCount) {
 						// Existing node has same or more tags, keep existing node
 						// If equal tags, use higher ID for normalization
@@ -274,7 +276,9 @@ export default class OsmChangeset {
 	 * Apply node replacements to all ways in the OSM dataset.
 	 * Returns the total number of node references replaced.
 	 */
-	private applyNodeReplacementsToWays(replacementMap: Map<number, number>): number {
+	private applyNodeReplacementsToWays(
+		replacementMap: Map<number, number>,
+	): number {
 		let replacedCount = 0
 
 		for (let wayIndex = 0; wayIndex < this.osm.ways.size; wayIndex++) {
@@ -291,11 +295,12 @@ export default class OsmChangeset {
 			})
 
 			if (hasReplacement) {
-				this.modify("way", way.id, (way) => removeDuplicateAdjacentWayRefs({
-					...way,
-					refs: newRefs,
-				}))
-				
+				this.modify("way", way.id, (way) =>
+					removeDuplicateAdjacentWayRefs({
+						...way,
+						refs: newRefs,
+					}),
+				)
 			}
 		}
 
@@ -307,10 +312,16 @@ export default class OsmChangeset {
 	 * Apply node replacements to all relations in the OSM dataset.
 	 * Returns the total number of node member references replaced.
 	 */
-	private applyNodeReplacementsToRelations(replacementMap: Map<number, number>): number {
+	private applyNodeReplacementsToRelations(
+		replacementMap: Map<number, number>,
+	): number {
 		let replacedCount = 0
 
-		for (let relationIndex = 0; relationIndex < this.osm.relations.size; relationIndex++) {
+		for (
+			let relationIndex = 0;
+			relationIndex < this.osm.relations.size;
+			relationIndex++
+		) {
 			const relation = this.osm.relations.getByIndex(relationIndex)
 			let hasReplacement = false
 			const newMembers = relation.members.map((member) => {
@@ -324,17 +335,18 @@ export default class OsmChangeset {
 			})
 
 			if (hasReplacement) {
-				this.modify("relation", relation.id, (relation) => removeDuplicateAdjacentRelationMembers({
-					...relation,
-					members: newMembers,
-				}))
+				this.modify("relation", relation.id, (relation) =>
+					removeDuplicateAdjacentRelationMembers({
+						...relation,
+						members: newMembers,
+					}),
+				)
 			}
 		}
 
 		this.deduplicatedNodesReplaced += replacedCount
 		return replacedCount
 	}
-
 
 	/**
 	 * De-duplicate the ways within this OSM changeset.
@@ -760,7 +772,11 @@ function waysIntersect(
  */
 export function applyChangesetToOsm(changeset: OsmChangeset, newId?: string) {
 	const baseOsm = changeset.osm
-	const osm = new Osmix({ id: newId ?? baseOsm.id, logger: baseOsm.log, header: baseOsm.header })
+	const osm = new Osmix({
+		id: newId ?? baseOsm.id,
+		logger: baseOsm.log,
+		header: baseOsm.header,
+	})
 
 	const { nodeChanges, wayChanges, relationChanges } = changeset
 

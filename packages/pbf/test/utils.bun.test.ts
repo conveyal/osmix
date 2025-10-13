@@ -120,7 +120,9 @@ describe("utils", () => {
 		const nodeCompressed = deflateSync(input)
 
 		// Decompress with our function
-		const decompressedWithOurs = await decompress(new Uint8Array(nodeCompressed))
+		const decompressedWithOurs = await decompress(
+			new Uint8Array(nodeCompressed),
+		)
 		expect(decompressedWithOurs).toEqual(input)
 	})
 })
@@ -129,7 +131,7 @@ describe("CompressionStream polyfill", () => {
 	test("compresses data using deflate format", async () => {
 		const input = new TextEncoder().encode("test compression stream")
 		const compressor = new CompressionStream("deflate")
-		
+
 		const writer = compressor.writable.getWriter()
 		writer.write(input)
 		writer.close()
@@ -154,7 +156,7 @@ describe("CompressionStream polyfill", () => {
 	test("compresses data using gzip format", async () => {
 		const input = new TextEncoder().encode("test gzip stream")
 		const compressor = new CompressionStream("gzip")
-		
+
 		const writer = compressor.writable.getWriter()
 		writer.write(input)
 		writer.close()
@@ -175,17 +177,17 @@ describe("CompressionStream polyfill", () => {
 	test("returns proper Uint8Array<ArrayBuffer> instances", async () => {
 		const input = new TextEncoder().encode("type safety check")
 		const compressor = new CompressionStream("deflate")
-		
+
 		const writer = compressor.writable.getWriter()
 		writer.write(input)
 		writer.close()
 
 		const reader = compressor.readable.getReader()
 		const { value } = await reader.read()
-		
+
 		expect(value).toBeDefined()
 		if (!value) throw new Error("No value read")
-		
+
 		// Verify it's a Uint8Array
 		expect(value).toBeInstanceOf(Uint8Array)
 		// Verify the buffer is an ArrayBuffer (not Buffer or SharedArrayBuffer)
@@ -197,7 +199,7 @@ describe("CompressionStream polyfill", () => {
 	test("handles multiple writes", async () => {
 		const compressor = new CompressionStream("deflate")
 		const writer = compressor.writable.getWriter()
-		
+
 		// Write multiple chunks
 		writer.write(new TextEncoder().encode("first "))
 		writer.write(new TextEncoder().encode("second "))
@@ -222,7 +224,7 @@ describe("DecompressionStream polyfill", () => {
 	test("decompresses deflate data", async () => {
 		const input = new TextEncoder().encode("test decompression stream")
 		const compressed = await compress(input, "deflate")
-		
+
 		const decompressor = new DecompressionStream("deflate")
 		const writer = decompressor.writable.getWriter()
 		writer.write(compressed)
@@ -243,7 +245,7 @@ describe("DecompressionStream polyfill", () => {
 	test("decompresses gzip data", async () => {
 		const input = new TextEncoder().encode("test gzip decompression")
 		const compressed = await compress(input, "gzip")
-		
+
 		const decompressor = new DecompressionStream("gzip")
 		const writer = decompressor.writable.getWriter()
 		writer.write(compressed)
@@ -264,7 +266,7 @@ describe("DecompressionStream polyfill", () => {
 	test("returns proper Uint8Array<ArrayBuffer> instances", async () => {
 		const input = new TextEncoder().encode("type safety check")
 		const compressed = await compress(input)
-		
+
 		const decompressor = new DecompressionStream("deflate")
 		const writer = decompressor.writable.getWriter()
 		writer.write(compressed)
@@ -272,10 +274,10 @@ describe("DecompressionStream polyfill", () => {
 
 		const reader = decompressor.readable.getReader()
 		const { value } = await reader.read()
-		
+
 		expect(value).toBeDefined()
 		if (!value) throw new Error("No value read")
-		
+
 		// Verify it's a Uint8Array
 		expect(value).toBeInstanceOf(Uint8Array)
 		// Verify the buffer is an ArrayBuffer (not Buffer or SharedArrayBuffer)
@@ -287,10 +289,10 @@ describe("DecompressionStream polyfill", () => {
 	test("handles chunked compressed data", async () => {
 		const input = new TextEncoder().encode("test chunked data")
 		const compressed = await compress(input)
-		
+
 		const decompressor = new DecompressionStream("deflate")
 		const writer = decompressor.writable.getWriter()
-		
+
 		// Write compressed data in chunks
 		const chunkSize = 5
 		for (let i = 0; i < compressed.length; i += chunkSize) {
@@ -313,7 +315,7 @@ describe("DecompressionStream polyfill", () => {
 
 	test("round-trip compression and decompression", async () => {
 		const input = new TextEncoder().encode("round trip test data")
-		
+
 		// Compress
 		const compressor = new CompressionStream("deflate")
 		const compressorWriter = compressor.writable.getWriter()
@@ -347,4 +349,3 @@ describe("DecompressionStream polyfill", () => {
 		expect(decompressed).toEqual(input)
 	})
 })
-

@@ -1,6 +1,6 @@
 import type { LonLat, OsmRelation, OsmTags, OsmWay } from "@osmix/json"
-import type { GeoBbox2D } from "./types"
 import type { OsmChangesetStats } from "./changeset"
+import type { GeoBbox2D } from "./types"
 
 export function throttle<T extends unknown[]>(
 	func: (...args: T) => void,

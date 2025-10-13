@@ -162,31 +162,31 @@ describe("merge osm", () => {
 			},
 		})
 
-	changeset = directResult.createChangeset()
-	changeset.deduplicateWays(patch.ways)
-	changeset.deduplicateNodes(patch.nodes)
-	const deduplicatedResult = changeset.applyChanges("deduplicated")
+		changeset = directResult.createChangeset()
+		changeset.deduplicateWays(patch.ways)
+		changeset.deduplicateNodes(patch.nodes)
+		const deduplicatedResult = changeset.applyChanges("deduplicated")
 
-	// Node 0 is deleted because node 2 has more tags (version/tags logic)
-	assert.isFalse(deduplicatedResult.nodes.ids.has(0))
-	assert.deepEqual(deduplicatedResult.ways.getById(1), {
-		id: 1,
-		refs: [2, 1], // Node 0 replaced with node 2
-		tags: {
-			highway: "primary",
-			version: "2",
-		},
-	})
+		// Node 0 is deleted because node 2 has more tags (version/tags logic)
+		assert.isFalse(deduplicatedResult.nodes.ids.has(0))
+		assert.deepEqual(deduplicatedResult.ways.getById(1), {
+			id: 1,
+			refs: [2, 1], // Node 0 replaced with node 2
+			tags: {
+				highway: "primary",
+				version: "2",
+			},
+		})
 
-	// Node 2 is kept because it has tags
-	assert.deepEqual(deduplicatedResult.nodes.getById(2), {
-		id: 2,
-		lat: 46.60207,
-		lon: -120.505898,
-		tags: {
-			crossing: "yes",
-		},
-	})
+		// Node 2 is kept because it has tags
+		assert.deepEqual(deduplicatedResult.nodes.getById(2), {
+			id: 2,
+			lat: 46.60207,
+			lon: -120.505898,
+			tags: {
+				crossing: "yes",
+			},
+		})
 
 		changeset = deduplicatedResult.createChangeset()
 		changeset.createIntersectionsForWays(patch.ways)
@@ -221,8 +221,12 @@ describe("merge osm", () => {
 			const osm1Name = "seattle.osm.pbf"
 			const osm2Name = "seattle-osw.pbf"
 
-			let baseOsm = await Osmix.fromPbf(getFixtureFileReadStream(osm1Name), { id: osm1Name })
-			const osm2 = await Osmix.fromPbf(getFixtureFileReadStream(osm2Name), { id: osm2Name })
+			let baseOsm = await Osmix.fromPbf(getFixtureFileReadStream(osm1Name), {
+				id: osm1Name,
+			})
+			const osm2 = await Osmix.fromPbf(getFixtureFileReadStream(osm2Name), {
+				id: osm2Name,
+			})
 
 			const baseSizes = {
 				nodes: 2_658_358,

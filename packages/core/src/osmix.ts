@@ -74,7 +74,8 @@ export class Osmix {
 	ways: Ways
 	relations: Relations
 
-	log = (message: string, type?: LogLevel) => type === "error" ? console.error(message) : console.log(message)
+	log = (message: string, type?: LogLevel) =>
+		type === "error" ? console.error(message) : console.log(message)
 
 	#indexBuilt = false
 	#startTime = performance.now()
@@ -111,67 +112,73 @@ export class Osmix {
 		return osm
 	}
 
-	static async merge(base: Osmix, patch: Osmix, options: Partial<OsmMergeOptions> = {}) {
+	static async merge(
+		base: Osmix,
+		patch: Osmix,
+		options: Partial<OsmMergeOptions> = {},
+	) {
 		// De-duplicate nodes and ways in original datasets
 		base.log("Deduplicating ways in base OSM...")
 		let changeset = new OsmChangeset(base)
 		changeset.deduplicateWays(base.ways)
 		base.log(changeStatsSummary(changeset.stats))
-		base = changeset.applyChanges()
+		let modifiedBase = changeset.applyChanges()
 
-		base.log("Deduplicating nodes in base OSM...")
-		changeset = new OsmChangeset(base)
-		changeset.deduplicateNodes(base.nodes)
-		base.log(changeStatsSummary(changeset.stats))
-		base = changeset.applyChanges()
+		modifiedBase.log("Deduplicating nodes in base OSM...")
+		changeset = new OsmChangeset(modifiedBase)
+		changeset.deduplicateNodes(modifiedBase.nodes)
+		modifiedBase.log(changeStatsSummary(changeset.stats))
+		modifiedBase = changeset.applyChanges()
 
 		patch.log("Deduplicating ways in patch OSM...")
 		changeset = new OsmChangeset(patch)
 		changeset.deduplicateWays(patch.ways)
 		patch.log(changeStatsSummary(changeset.stats))
-		patch = changeset.applyChanges()
+		let modifiedPatch = changeset.applyChanges()
 
-		patch.log("Deduplicating nodes in patch OSM...")
-		changeset = new OsmChangeset(patch)
-		changeset.deduplicateNodes(patch.nodes)
-		patch.log(changeStatsSummary(changeset.stats))
-		patch = changeset.applyChanges()
+		modifiedPatch.log("Deduplicating nodes in patch OSM...")
+		changeset = new OsmChangeset(modifiedPatch)
+		changeset.deduplicateNodes(modifiedPatch.nodes)
+		modifiedPatch.log(changeStatsSummary(changeset.stats))
+		modifiedPatch = changeset.applyChanges()
 
 		// Generate direct changes
 		if (options.directMerge) {
-			base.log("Generating direct changes from patch OSM to base OSM...")
-			changeset = new OsmChangeset(base)
-			changeset.generateDirectChanges(patch)
-			base.log(changeStatsSummary(changeset.stats))
-			base = changeset.applyChanges()
+			modifiedBase.log(
+				"Generating direct changes from patch OSM to base OSM...",
+			)
+			changeset = new OsmChangeset(modifiedBase)
+			changeset.generateDirectChanges(modifiedPatch)
+			modifiedBase.log(changeStatsSummary(changeset.stats))
+			modifiedBase = changeset.applyChanges()
 		}
-		
+
 		// De-duplicate nodes and ways in final dataset
 		if (options.deduplicateWays) {
-			base.log("Deduplicating ways in final dataset...")
-			changeset = new OsmChangeset(base)
-			changeset.deduplicateWays(patch.ways)
-			base.log(changeStatsSummary(changeset.stats))
-			base = changeset.applyChanges()
+			modifiedBase.log("Deduplicating ways in final dataset...")
+			changeset = new OsmChangeset(modifiedBase)
+			changeset.deduplicateWays(modifiedPatch.ways)
+			modifiedBase.log(changeStatsSummary(changeset.stats))
+			modifiedBase = changeset.applyChanges()
 		}
 		if (options.deduplicateNodes) {
-			base.log("Deduplicating nodes in final dataset...")
-			changeset = new OsmChangeset(base)
-			changeset.deduplicateNodes(patch.nodes)
-			base.log(changeStatsSummary(changeset.stats))
-			base = changeset.applyChanges()
+			modifiedBase.log("Deduplicating nodes in final dataset...")
+			changeset = new OsmChangeset(modifiedBase)
+			changeset.deduplicateNodes(modifiedPatch.nodes)
+			modifiedBase.log(changeStatsSummary(changeset.stats))
+			modifiedBase = changeset.applyChanges()
 		}
 
-		// Create intersections 
+		// Create intersections
 		if (options.createIntersections) {
-			base.log("Creating intersections in final dataset...")
-			changeset = new OsmChangeset(base)
-			changeset.createIntersectionsForWays(patch.ways)
-			base.log(changeStatsSummary(changeset.stats))
-			base = changeset.applyChanges()
+			modifiedBase.log("Creating intersections in final dataset...")
+			changeset = new OsmChangeset(modifiedBase)
+			changeset.createIntersectionsForWays(modifiedPatch.ways)
+			modifiedBase.log(changeStatsSummary(changeset.stats))
+			modifiedBase = changeset.applyChanges()
 		}
 
-		return base
+		return modifiedBase
 	}
 
 	constructor(options: Partial<OsmixOptions> = {}) {
@@ -311,7 +318,9 @@ export class Osmix {
 							: undefined,
 					)
 
-					logEverySecond(`${this.relations.size.toLocaleString()} relations added`)
+					logEverySecond(
+						`${this.relations.size.toLocaleString()} relations added`,
+					)
 				}
 			}
 		}
@@ -336,15 +345,18 @@ export class Osmix {
 		if (!this.#indexBuilt) this.buildIndexes()
 
 		const [minLon, minLat, maxLon, maxLat] = bbox
-		const extracted = new Osmix({ id: this.id, header: {
-			...this.header,
-			bbox: {
-				left: minLon,
-				bottom: minLat,
-				right: maxLon,
-				top: maxLat,
+		const extracted = new Osmix({
+			id: this.id,
+			header: {
+				...this.header,
+				bbox: {
+					left: minLon,
+					bottom: minLat,
+					right: maxLon,
+					top: maxLat,
+				},
 			},
-		}})
+		})
 
 		this.log("Selecting nodes within bounding box...")
 		this.buildSpatialIndexes()

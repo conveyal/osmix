@@ -14,7 +14,8 @@
 		"rules": {
 			"a11y": {
 				"useKeyWithClickEvents": "off",
-				"useSemanticElements": "off"
+				"useSemanticElements": "off",
+				"useValidAnchor": "off"
 			},
 			"correctness": {
 				"noUnusedImports": "error"
@@ -29,7 +30,8 @@
 				"noUnusedTemplateLiteral": "error",
 				"useNumberNamespace": "error",
 				"noInferrableTypes": "error",
-				"noUselessElse": "error"
+				"noUselessElse": "error",
+				"noNonNullAssertion": "off"
 			},
 			"suspicious": {
 				"noUnknownAtRules": "warn"

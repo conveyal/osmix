@@ -5,4 +5,3 @@ export default defineConfig({
 		exclude: ["**/node_modules/**", "**/*.bun.test.ts"],
 	},
 })
-

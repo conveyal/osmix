@@ -1,5 +1,3 @@
-import type { OsmChangesetStats } from "@osmix/core"
-
 export function flattenValue(value: unknown): string {
 	if (typeof value === "string") {
 		return value
