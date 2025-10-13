@@ -1,47 +1,33 @@
-# `@osmix/json`
+# @osmix/json
 
-`@osmix/json` bridges the gap between OpenStreetMap's compact PBF format and ergonomic JSON
-representations. It powers the streaming editors inside `apps/merge` and parts of the merge engine in
-`@osmix/core` by letting us parse, inspect, transform, and re-encode OSM data without leaving the
-browser-friendly world of JavaScript.
+@osmix/json turns OpenStreetMap PBF bytes into ergonomic JSON entities (and back again) for
+streaming editors, change workflows, and browser-based tooling. It builds on the low-level
+primitives in `@osmix/pbf` while staying friendly to modern runtimes (Node 20+, and
+modern browsers).
 
-This package embraces modern Web Streams and incremental serialization. You can connect network responses, worker threads, and transformation pipelines together without buffering entire files in memory.
+## Highlights
 
-## When to use `@osmix/json`
-
-Use this package when you need to:
-
-- Inspect or transform OSM data inside browsers, service workers, or edge runtimes.
-- Merge change sets by comparing entity payloads before writing back to PBF.
-- Generate GeoJSON overlays or editing layers from raw extracts.
-- Test encoding/decoding logic with small fixtures without shelling out to `osmium` or `osmosis`.
-
-If you only need raw block reading/writing, reach directly for `@osmix/pbf`. If you need high-level
-conflation and merge operations, see `@osmix/core`.
-
-## Design Notes
-
-- **Streaming first** – Every conversion primitive is available as a Web Stream transform, letting
-	you operate on large-scale datasets in browsers or Node without copying.
-- **Compatible with modern runtimes** – The package ships pure ESM, targets modern runtimes, and has no
-	Node-specific dependencies beyond Web Streams.
-- **Info handling is opt-in** – Builders and parsers accept options to include metadata (`timestamp`,
-	`uid`, etc.) only when you need it, keeping hot-path allocations low.
-- **GeoJSON opinions** – Tag-based heuristics follow the OSM `area` rules so downstream mapping tools
-	receive correct `Polygon`/`LineString` geometry by default.
+- Decode `.osm.pbf` streams into header metadata and strongly typed node/way/relation JSON.
+- Encode JSON entities back into spec-compliant PBF blobs without hand-rolling string tables
+  or delta encoding.
+- Compose Web Stream transforms to keep large datasets out of memory and re-use work across
+  workers or service boundaries.
+- Opt into metadata parsing or emission (`timestamp`, `uid`, etc.) only when you need it.
+- Convert entities to GeoJSON with `wayIsArea` heuristics that match the OSM wiki guidance.
 
 ## Installation
 
-```bash
-npm i @osmix/json
+```sh
+npm install @osmix/json
 ```
 
-The package ships as pure TypeScript/ESM and depends on the sibling `@osmix/pbf` primitives for the
-low-level Protocolbuffer handling.
+## Usage
 
-## Quick Start
+### Decode a PBF stream
 
-### Stream a `.osm.pbf` file to JSON entities
+`osmPbfToJson` accepts a Web `ReadableStream<ArrayBufferLike>` and yields the header followed
+by node/way/relation objects. Pair it with `toAsyncGenerator` from `@osmix/pbf` for ergonomic
+iteration.
 
 ```ts
 import { osmPbfToJson } from "@osmix/json"
@@ -49,32 +35,29 @@ import { toAsyncGenerator } from "@osmix/pbf"
 
 const response = await fetch("/fixtures/monaco.pbf")
 
-for await (const value of toAsyncGenerator(osmPbfToJson(response.body))) {
-	if ("id" in value) {
-		// value is an OSM entity: node | way | relation
-		console.log(value.tags)
-	} else {
-		// value is the header block with metadata and bounding box
-		console.log("dataset bounds", value.bbox)
+for await (const item of toAsyncGenerator(osmPbfToJson(response.body))) {
+	if ("id" in item) {
+		console.log(item.type, item.tags?.name)
+		continue
 	}
+
+	console.log("Bounds:", item.bbox)
 }
 ```
 
-### Emit JSON entities back to PBF bytes
+### Encode JSON entities back to PBF bytes
+
+`osmJsonToPbf` streams JSON entities into encoded blobs. The input generator should yield the
+header exactly once followed by sorted entities.
 
 ```ts
-import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import { osmJsonToPbf } from "@osmix/json"
+import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 
 const header: OsmPbfHeaderBlock = {
-	bbox: {
-		left: -77.05,
-		right: -77.0,
-		top: 38.92,
-		bottom: 38.88,
-	},
 	required_features: ["OsmSchema-V0.6"],
 	optional_features: [],
+	bbox: { left: -77.05, right: -77.0, top: 38.92, bottom: 38.88 },
 	writingprogram: "@osmix/json example",
 }
 
@@ -90,63 +73,71 @@ async function* entities() {
 await osmJsonToPbf(header, entities()).pipeTo(
 	new WritableStream({
 		write: (chunk) => {
-			// chunk is an ArrayBufferLike holding the encoded PBF data
+			// chunk is a Uint8Array containing PBF blob bytes
 		},
 	}),
 )
 ```
 
-The resulting readable stream yields raw `ArrayBuffer` chunks which can be written to disk, uploaded,
-or fed back into `@osmix/pbf` utilities. If you need finer control, pair
-`createOsmJsonReadableStream` with `OsmJsonToBlocksTransformStream` before handing off to
-`@osmix/pbf`'s `OsmBlocksToPbfBytesTransformStream`.
+### Parse blocks or emit GeoJSON directly
 
-Way conversion helpers respect `wayIsArea` so polygonal ways become `GeoJSON.Polygon` features automatically.
+If you already have parsed blocks, reach for `OsmPbfBlockParser` and friends. Toggle
+`includeInfo` to hydrate metadata, or use `wayToFeature` / `relationToFeature` helpers to
+produce GeoJSON.
 
-## API Overview
+```ts
+import { OsmPbfBlockParser, wayToFeature } from "@osmix/json"
 
-### Streams and transforms
+const parser = new OsmPbfBlockParser(block, { includeInfo: true })
+const [nodes] = parser // iterable groups
 
-- `osmPbfToJson(pbfStream)` – Chainable transform that consumes a readable stream of PBF bytes and
-	emits the header followed by `OsmEntity` objects.
-- `OsmBlocksToJsonTransformStream` – Converts decoded `OsmPbfBlock`s coming from
-	`@osmix/pbf` into JSON entities. Useful if you already have block-level access.
-- `blocksToJsonEntities(block)` – Synchronous generator for situations where you want to keep things
-	in-memory.
+const firstWay = parser.parseWay(block.primitivegroup[0].ways[0])
+const feature = wayToFeature(firstWay, (id) => nodeIndex.get(id)!)
+```
 
-### Building blocks from JSON
+## API overview
 
-- `createOsmJsonReadableStream(header, entities)` – Wrap an async generator of `OsmEntity`s in a
-	`ReadableStream`, inserting the header exactly once.
-- `OsmJsonToBlocksTransformStream` – Groups entities into `OsmPbfBlockBuilder` instances with the
-	correct node/way/relation ordering and size constraints.
-- `jsonEntitiesToBlocks(entities)` – Async generator alternative that yields block builders.
-- `osmJsonToPbf(header, entities)` – High-level pipeline that turns JSON entities straight into PBF
-	byte chunks via `OsmBlocksToPbfBytesTransformStream`.
-- `OsmPbfBlockBuilder` – Utility class that handles string tables, delta encoding, and optional info
-	records when building primitive blocks.
+- **Streaming converters**
+	- `osmPbfToJson(stream)` – Returns a `ReadableStream` of `OsmPbfHeaderBlock | OsmEntity`.
+	- `OsmBlocksToJsonTransformStream` – Turns decoded `OsmPbfBlock`s into entities.
+	- `blocksToJsonEntities(block)` – Synchronous generator for in-memory use.
+- **JSON → PBF builders**
+	- `createOsmJsonReadableStream(header, entities)` – Inserts the header once, then streams
+	  entities.
+	- `OsmJsonToBlocksTransformStream` – Groups entities into `OsmPbfBlockBuilder` instances
+	  with size checks.
+	- `jsonEntitiesToBlocks(entities)` – Async generator producing `OsmPbfBlockBuilder`s.
+	- `osmJsonToPbf(header, entities)` – High-level helper that pipes builders through
+	  `OsmBlocksToPbfBytesTransformStream`.
+	- `OsmPbfBlockBuilder` – Handles string tables, dense node delta encoding, and optional
+	  info records.
+- **Block parsing utilities**
+	- `OsmPbfBlockParser` – Decodes groups with configurable `ParseOptions` (tags + metadata).
+	- `parseNode`, `parseWay`, `parseRelation`, `parseDenseNodes` – Parser methods for targeted
+	  decoding.
+- **GeoJSON helpers**
+	- `nodeToFeature`, `wayToFeature`, `relationToFeature`, `nodesToFeatures`, `waysToFeatures`.
+	- `wayIsArea(refs, tags)` – Re-exports the wiki heuristics used by the GeoJSON helpers.
+- **Entity helpers and types**
+	- Type guards: `isNode`, `isWay`, `isRelation`.
+	- Equality helpers: `isNodeEqual`, `isWayEqual`, `isRelationEqual`, `entityPropertiesEqual`.
+	- Types: `OsmEntity`, `OsmNode`, `OsmWay`, `OsmRelation`, `OsmTags`, `OsmInfoParsed`, and
+	  `OSM_ENTITY_TYPES`.
 
-### Parsing PBF blocks
+## Environment and limitations
 
-- `OsmPbfBlockParser` – Re-hydrates primitive groups into rich objects. Supports optional info and
-	tag parsing via `ParseOptions`.
-- `parseNode`, `parseWay`, `parseRelation`, `parseDenseNodes` – Methods on the parser class if you
-	need finer control over decoding.
+- Relies on Web Streams, `TextEncoder`/`TextDecoder`, and other modern platform APIs; ensure your
+  runtime exposes them (Bun, Node 20+, current browsers).
+- `osmPbfToJson` expects zlib-compressed blobs as emitted by `@osmix/pbf`; other compression
+  formats are not yet supported.
+- JSON → PBF pipelines assume entities arrive sorted (nodes, then ways, then relations) so
+  block limits are respected.
 
-### GeoJSON utilities
+## Development
 
-- `nodeToFeature`, `nodesToFeatures` – Convert nodes to `GeoJSON.Point` features, defaulting to
-	discarding untagged nodes.
-- `wayToFeature`, `waysToFeatures` – Derive line or polygon features and optionally inject member nodes.
-- `relationToFeature` – Represent relations as geometry collections using member coordinates.
-- `wayIsArea(refs, tags)` – Implements the OSM wiki heuristics for determining polygonality.
+- `bun run test packages/json`
+- `bun run lint packages/json`
+- `bun run typecheck packages/json`
 
-### Entity helpers and types
-
-- `isNode`, `isWay`, `isRelation` – Type guards for discriminated unions.
-- `isNodeEqual`, `isWayEqual`, `isRelationEqual`, `entityPropertiesEqual` – Structural comparisons that
-	ignore entity ordering quirks.
-- `getEntityType(entity)` – Returns the entity type literal (`"node" | "way" | "relation"`).
-- `OsmEntity`, `OsmNode`, `OsmWay`, `OsmRelation`, `OsmTags` – Type definitions shared across the
-	workspace.
-- `OSM_ENTITY_TYPES` – Tuple of entity literals useful for iteration or validation.
+Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type
+coverage.
