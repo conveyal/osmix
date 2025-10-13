@@ -1,5 +1,6 @@
-import type { LonLat, OsmTags, OsmWay } from "@osmix/json"
+import type { LonLat, OsmRelation, OsmTags, OsmWay } from "@osmix/json"
 import type { GeoBbox2D } from "./types"
+import type { OsmChangesetStats } from "./changeset"
 
 export function throttle<T extends unknown[]>(
 	func: (...args: T) => void,
@@ -44,12 +45,13 @@ export function osmTagsToOscTags(tags: OsmTags): string {
 		})
 		.join("")
 }
+
 /**
  * Remove duplicate refs back to back, but not when they are separated by other refs
  * @param way
  * @returns way with duplicate refs back to back removed
  */
-export function removeDuplicateAdjacentOsmWayRefs(way: OsmWay) {
+export function removeDuplicateAdjacentWayRefs(way: OsmWay) {
 	return {
 		...way,
 		refs: way.refs.filter((ref, index, array) => {
@@ -57,6 +59,21 @@ export function removeDuplicateAdjacentOsmWayRefs(way: OsmWay) {
 		}),
 	}
 }
+
+/**
+ * Remove duplicate relation members back to back, but not when they are separated by other members
+ * @param relation
+ * @returns relation with duplicate members back to back removed
+ */
+export function removeDuplicateAdjacentRelationMembers(relation: OsmRelation) {
+	return {
+		...relation,
+		members: relation.members.filter((member, index, array) => {
+			return member.ref !== array[index + 1]?.ref
+		}),
+	}
+}
+
 export function cleanCoords(coords: [number, number][]) {
 	return coords.filter((coord, index, array) => {
 		if (index === array.length - 1) return true
@@ -89,6 +106,7 @@ export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
 
 	return false
 }
+
 /**
  * Determine if a way is a candidate for connecting to another way
  */
@@ -112,4 +130,28 @@ export function bboxFromLonLats(lonLats: LonLat[]): GeoBbox2D {
 		if (lonLat.lat > maxLat) maxLat = lonLat.lat
 	}
 	return [minLon, minLat, maxLon, maxLat]
+}
+
+export function camelCaseToSentenceCase(str: string) {
+	return str
+		.replace(/([A-Z])/g, " $1")
+		.trim()
+		.toLowerCase()
+}
+
+/**
+ * Summarize the changeset stats with the most significant changes first.
+ */
+export function changeStatsSummary(stats: OsmChangesetStats) {
+	const numericStats = (Object.entries(stats) as [string, unknown][]).filter(
+		([, value]) => typeof value === "number" && value > 0,
+	) as [string, number][]
+	if (numericStats.length === 0) return "Changeset is empty."
+	const sortedNumericStats = [...numericStats]
+		.sort((a, b) => b[1] - a[1])
+		.map(
+			([key, value]) =>
+				` ${camelCaseToSentenceCase(key)}: ${value.toLocaleString()}`,
+		)
+	return `Changeset summary: ${sortedNumericStats.join(", ")}`
 }

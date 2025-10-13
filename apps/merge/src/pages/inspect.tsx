@@ -1,4 +1,4 @@
-import { Osmix } from "@osmix/core"
+import { Osmix, changeStatsSummary } from "@osmix/core"
 import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
@@ -37,7 +37,6 @@ import { changesetStatsAtom } from "@/state/changes"
 import { Log } from "@/state/log"
 import { selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
-import { changeStatsSummary } from "@/utils"
 
 const deckTooltipStyle: Partial<CSSStyleDeclaration> = {
 	backgroundColor: "white",

@@ -7,8 +7,7 @@ export {
 	type OsmChangeTypes,
 	type OsmMergeOptions,
 } from "./changeset"
-export { Nodes as NodeIndex } from "./nodes"
 export { Osmix } from "./osmix"
 export { OsmixRasterTile } from "./raster-tile"
 export type * from "./types"
-export { throttle } from "./utils"
+export { changeStatsSummary, throttle } from "./utils"

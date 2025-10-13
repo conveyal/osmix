@@ -1,17 +1,3 @@
-import { Osmix } from "@osmix/core"
-import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
-import {
-	ArrowLeft,
-	ArrowRightIcon,
-	DownloadIcon,
-	FastForwardIcon,
-	FileDiff,
-	MaximizeIcon,
-	MergeIcon,
-	SkipForwardIcon,
-} from "lucide-react"
-import { showSaveFilePicker } from "native-file-system-adapter"
-import { useMemo } from "react"
 import ActionButton from "@/components/action-button"
 import Basemap from "@/components/basemap"
 import CustomControl from "@/components/custom-control"
@@ -51,7 +37,20 @@ import { changesetStatsAtom } from "@/state/changes"
 import { Log } from "@/state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
-import { changeStatsSummary } from "@/utils"
+import { changeStatsSummary, Osmix } from "@osmix/core"
+import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
+import {
+	ArrowLeft,
+	ArrowRightIcon,
+	DownloadIcon,
+	FastForwardIcon,
+	FileDiff,
+	MaximizeIcon,
+	MergeIcon,
+	SkipForwardIcon,
+} from "lucide-react"
+import { showSaveFilePicker } from "native-file-system-adapter"
+import { useMemo } from "react"
 
 const deckTooltipStyle: Partial<CSSStyleDeclaration> = {
 	backgroundColor: "white",

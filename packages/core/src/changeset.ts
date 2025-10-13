@@ -6,10 +6,9 @@ import {
 	type OsmEntityType,
 	type OsmEntityTypeMap,
 	type OsmNode,
-	type OsmRelation,
-	type OsmWay,
+	type OsmWay
 } from "@osmix/json"
-import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
+import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 import sweeplineIntersections from "sweepline-intersections"
 import type { Nodes } from "./nodes"
 import { Osmix } from "./osmix"
@@ -19,7 +18,8 @@ import {
 	haversineDistance,
 	isWayIntersectionCandidate,
 	osmTagsToOscTags,
-	removeDuplicateAdjacentOsmWayRefs,
+	removeDuplicateAdjacentRelationMembers,
+	removeDuplicateAdjacentWayRefs,
 	waysShouldConnect,
 } from "./utils"
 import type { Ways } from "./ways"
@@ -177,145 +177,164 @@ export default class OsmChangeset {
 	}
 
 	/**
-	 * Deduplicate a set of nodes within this OSM dataset.
+	 * Check nodes for duplicates and consolidate them within this OSM dataset.
+	 * All checked nodes must exist in the base OSM.
+	 * 
+	 * The algorithm:
+	 * - Build a map of node IDs that should be replaced with other node IDs.
+	 *  	- Find all pairs of nodes at the same geographic location
+	 *  	- For each pair, determine which node to keep based on version and tags
+	 *  	- Normalize replacements so lower IDs are always replaced with higher IDs
+	 * 		- Flatten chains (A→B, B→C becomes A→C, B→C)
+	 * 		- Schedule nodes for deletion
+	 * - Apply node replacements to ways
+	 * - Apply node replacements to relations
 	 */
-	*deduplicateNodesGenerator(nodes: Nodes) {
-		const dedupedIdPairs = new IdPairs()
+	deduplicateNodes(nodes: Nodes) {
+		const checkedIdPairs = new IdPairs()
+		const replacementMap = new Map<number, number>()
+
+		// Find overlapping nodes and determine which to keep
 		for (const node of nodes) {
 			if (!this.osm.nodes.ids.has(node.id)) continue
-			yield this.deduplicateOverlappingNodes(node, dedupedIdPairs)
-		}
-	}
+			if (this.nodeChanges[node.id]?.changeType === "delete") continue
 
-	deduplicateNodes(nodes: Nodes) {
-		for (const _ of this.deduplicateNodesGenerator(nodes));
+			const existingNodes = this.osm.nodes.withinRadius(node.lon, node.lat, 0)
+			const existingNodeIds = existingNodes
+				.map((index) => ({ id: this.osm.nodes.ids.at(index), index }))
+				.filter((n) => n.id !== node.id && !checkedIdPairs.has(n.id, node.id))
+
+			for (const { index: existingNodeIndex } of existingNodeIds) {
+				const existingNode = this.osm.nodes.getByIndex(existingNodeIndex)
+				if (existingNode == null) continue
+
+				checkedIdPairs.add(existingNode.id, node.id)
+
+				// Determine which node to keep using version/tags logic (same as deduplicateWay)
+				const nodeVersion = getEntityVersion(node)
+				const existingNodeVersion = getEntityVersion(existingNode)
+				
+				let nodeToKeep: number = node.id
+				let nodeToDelete: number = existingNode.id
+				
+				// Check version - prefer higher version
+				if (existingNodeVersion > nodeVersion) {
+					// Existing node has higher version, keep existing node
+					nodeToKeep = existingNode.id
+					nodeToDelete = node.id
+				} else if (nodeVersion === existingNodeVersion) {
+					// Same version, keep node with more tags (>= comparison to match deduplicateWay)
+					const nodeTagCount = Object.keys(node.tags ?? {}).length
+					const existingNodeTagCount = Object.keys(existingNode.tags ?? {}).length
+					if (existingNodeTagCount >= nodeTagCount) {
+						// Existing node has same or more tags, keep existing node
+						// If equal tags, use higher ID for normalization
+						if (existingNodeTagCount === nodeTagCount) {
+							nodeToKeep = Math.max(node.id, existingNode.id)
+							nodeToDelete = Math.min(node.id, existingNode.id)
+						} else {
+							nodeToKeep = existingNode.id
+							nodeToDelete = node.id
+						}
+					}
+				}
+
+				// Add to replacement map (deleted node -> kept node)
+				replacementMap.set(nodeToDelete, nodeToKeep)
+			}
+		}
+
+		// Flatten deletion chains
+		const flattenedMap = new Map<number, number>()
+		for (const [fromId, toId] of replacementMap.entries()) {
+			let finalId = toId
+			const visited = new Set<number>([fromId])
+			while (replacementMap.has(finalId) && !visited.has(finalId)) {
+				visited.add(finalId)
+				finalId = replacementMap.get(finalId)!
+			}
+			flattenedMap.set(fromId, finalId)
+
+			// Schedule nodes for deletion
+			const nodeToDelete = this.osm.nodes.getById(fromId)
+			if (nodeToDelete) {
+				this.deduplicatedNodes++
+				this.delete(nodeToDelete, [
+					{ type: "node", id: toId, osmId: this.osm.id },
+				])
+			}
+		}
+
+		this.applyNodeReplacementsToWays(flattenedMap)
+		this.applyNodeReplacementsToRelations(flattenedMap)
+		return flattenedMap
 	}
 
 	/**
-	 * De-duplicate a node within this OSM changeset by finding and consolidating nodes at the same geographic location.
-	 *
-	 * This function searches for existing nodes in the base OSM that occupy the exact same coordinates as the patch node.
-	 * When duplicates are found, it replaces all references to the existing node with the patch node in ways and relations,
-	 * then schedules the existing node for deletion.
-	 *
-	 * The algorithm:
-	 * 1. Checks if the patch node has already been deduplicated or scheduled for deletion
-	 * 2. Searches for existing nodes at the exact same coordinates (within radius 0)
-	 * 3. For each duplicate found:
-	 *    - Finds all ways containing the existing node and replaces references with the patch node
-	 *    - Finds all relations containing the existing node and replaces member references with the patch node
-	 *    - Schedules the existing node for deletion
-	 *    - Skips deduplication if both nodes exist in the same way or relation (to avoid creating invalid geometry)
-	 * 4. Returns the count of nodes that were replaced across all ways and relations
-	 *
-	 * @param patchNode - The node to deduplicate against existing nodes in the base OSM
-	 * @param checkedIdPairs - Tracking set to avoid processing the same node pairs multiple times
-	 * @returns The number of node references that were replaced in ways and relations
+	 * Apply node replacements to all ways in the OSM dataset.
+	 * Returns the total number of node references replaced.
 	 */
-	deduplicateOverlappingNodes(patchNode: OsmNode, checkedIdPairs: IdPairs): number {
-		const nodeId = patchNode.id
+	private applyNodeReplacementsToWays(replacementMap: Map<number, number>): number {
+		let replacedCount = 0
 
-		// Has this node already been deduplicated? (scheduled for deletion)
-		if (nodeId == null || this.nodeChanges[nodeId]?.changeType === "delete")
-			return 0
-
-		const ll = [patchNode.lon, patchNode.lat]
-		const existingNodes = this.osm.nodes.withinRadius(ll[0], ll[1], 0)
-		const existingNodeIds = existingNodes
-			.map((index) => ({ id: this.osm.nodes.ids.at(index), index }))
-			.filter((n) => n.id !== nodeId && !checkedIdPairs.has(n.id, nodeId))
-		if (existingNodeIds.length === 0) return 0
-
-		// Found a duplicate, load the full node
-		let deduplicatedNodesReplaced = 0
-		for (const { index: existingNodeIndex } of existingNodeIds) {
-			const existingNode = this.osm.nodes.getByIndex(existingNodeIndex)
-			if (existingNode == null) continue
-
-			// Add this pair to the deduped ID pairs
-			checkedIdPairs.add(existingNode.id, nodeId)
-
-			const neigborWayIndexes = this.osm.ways.neighbors(
-				patchNode.lon,
-				patchNode.lat,
-				20,
-				0,
-			)
-
-			// Find ways that contain the replaced node
-			const candidateWays: OsmWay[] = []
-			for (const wayIndex of neigborWayIndexes) {
-				const wayRefs = this.osm.ways.getRefIds(wayIndex)
-				if (wayRefs.includes(existingNode.id)) {
-					// Do not de-duplicate when both nodes exist in the same way
-					if (wayRefs.includes(patchNode.id)) return 0
-					const way = this.osm.ways.getByIndex(wayIndex)
-					candidateWays.push(way)
+		for (let wayIndex = 0; wayIndex < this.osm.ways.size; wayIndex++) {
+			const way = this.osm.ways.getByIndex(wayIndex)
+			let hasReplacement = false
+			const newRefs = way.refs.map((ref) => {
+				const replacement = replacementMap.get(ref)
+				if (replacement) {
+					hasReplacement = true
+					replacedCount++
+					return replacement
 				}
-			}
+				return ref
+			})
 
-			// Find relations that contain the replaced node
-			const candidateRelations: OsmRelation[] = []
-			for (
-				let relationIndex = 0;
-				relationIndex < this.osm.relations.ids.size;
-				relationIndex++
-			) {
-				if (
-					this.osm.relations.includesMember(
-						relationIndex,
-						existingNode.id,
-						"node",
-					)
-				) {
-					// Do not de-duplicate when both nodes exist in the same relation
-					if (
-						this.osm.relations.includesMember(
-							relationIndex,
-							patchNode.id,
-							"node",
-						)
-					)
-						return 0
-					candidateRelations.push(this.osm.relations.getByIndex(relationIndex))
-				}
-			}
-
-			// Modify ways that contain the replaced node
-			for (const way of candidateWays) {
-				deduplicatedNodesReplaced++
-				this.modify("way", way.id, (way) => ({
+			if (hasReplacement) {
+				this.modify("way", way.id, (way) => removeDuplicateAdjacentWayRefs({
 					...way,
-					refs: way.refs.map((ref) =>
-						ref === existingNode.id ? patchNode.id : ref,
-					),
+					refs: newRefs,
 				}))
+				
 			}
-
-			// Modify relations that contain the replaced node
-			for (const relation of candidateRelations) {
-				deduplicatedNodesReplaced++
-				this.modify("relation", relation.id, (relation) => ({
-					...relation,
-					members: relation.members.map((member) =>
-						member.ref === existingNode.id
-							? { ...member, ref: patchNode.id }
-							: member,
-					),
-				}))
-			}
-
-			// Schedule node for deletion
-			this.deduplicatedNodes++
-			this.delete(existingNode, [
-				{ type: "node", id: patchNode.id, osmId: this.osm.id },
-			])
 		}
 
-		// Increment the total number of nodes replaced
-		this.deduplicatedNodesReplaced += deduplicatedNodesReplaced
-		return deduplicatedNodesReplaced
+		this.deduplicatedNodesReplaced += replacedCount
+		return replacedCount
 	}
+
+	/**
+	 * Apply node replacements to all relations in the OSM dataset.
+	 * Returns the total number of node member references replaced.
+	 */
+	private applyNodeReplacementsToRelations(replacementMap: Map<number, number>): number {
+		let replacedCount = 0
+
+		for (let relationIndex = 0; relationIndex < this.osm.relations.size; relationIndex++) {
+			const relation = this.osm.relations.getByIndex(relationIndex)
+			let hasReplacement = false
+			const newMembers = relation.members.map((member) => {
+				const replacement = replacementMap.get(member.ref)
+				if (replacement) {
+					hasReplacement = true
+					replacedCount++
+					return { ...member, ref: replacement }
+				}
+				return member
+			})
+
+			if (hasReplacement) {
+				this.modify("relation", relation.id, (relation) => removeDuplicateAdjacentRelationMembers({
+					...relation,
+					members: newMembers,
+				}))
+			}
+		}
+
+		this.deduplicatedNodesReplaced += replacedCount
+		return replacedCount
+	}
+
 
 	/**
 	 * De-duplicate the ways within this OSM changeset.
@@ -604,12 +623,12 @@ export default class OsmChangeset {
 				if (existingWay && !entityPropertiesEqual(existingWay, way)) {
 					// Replace the existing entity with the patch entity
 					this.modify("way", way.id, (_existingWay) =>
-						removeDuplicateAdjacentOsmWayRefs(way),
+						removeDuplicateAdjacentWayRefs(way),
 					)
 				}
 			} else {
 				// Create the way
-				this.create(removeDuplicateAdjacentOsmWayRefs(way), patch.id)
+				this.create(removeDuplicateAdjacentWayRefs(way), patch.id)
 			}
 		}
 

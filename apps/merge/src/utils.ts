@@ -91,27 +91,3 @@ export function supportsReadableStreamTransfer(): boolean {
 		port1.close()
 	}
 }
-
-export function camelCaseToSentenceCase(str: string) {
-	return str
-		.replace(/([A-Z])/g, " $1")
-		.trim()
-		.toLowerCase()
-}
-
-/**
- * Summarize the changeset stats with the most significant changes first.
- */
-export function changeStatsSummary(stats: OsmChangesetStats) {
-	const numericStats = (Object.entries(stats) as [string, unknown][]).filter(
-		([, value]) => typeof value === "number" && value > 0,
-	) as [string, number][]
-	if (numericStats.length === 0) return "Changeset is empty."
-	const sortedNumericStats = [...numericStats]
-		.sort((a, b) => b[1] - a[1])
-		.map(
-			([key, value]) =>
-				` ${camelCaseToSentenceCase(key)}: ${value.toLocaleString()}`,
-		)
-	return `Draft changeset: ${sortedNumericStats.join(", ")}`
-}

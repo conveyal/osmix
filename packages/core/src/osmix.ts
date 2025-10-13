@@ -29,7 +29,7 @@ import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { IdArrayType } from "./typed-arrays"
 import type { GeoBbox2D, TileIndex } from "./types"
-import { bboxFromLonLats, throttle } from "./utils"
+import { bboxFromLonLats, changeStatsSummary, throttle } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
 export interface OsmixTransferables {
@@ -116,19 +116,25 @@ export class Osmix {
 		base.log("Deduplicating ways in base OSM...")
 		let changeset = new OsmChangeset(base)
 		changeset.deduplicateWays(base.ways)
+		base.log(changeStatsSummary(changeset.stats))
 		base = changeset.applyChanges()
 
+		base.log("Deduplicating nodes in base OSM...")
 		changeset = new OsmChangeset(base)
 		changeset.deduplicateNodes(base.nodes)
+		base.log(changeStatsSummary(changeset.stats))
 		base = changeset.applyChanges()
 
 		patch.log("Deduplicating ways in patch OSM...")
 		changeset = new OsmChangeset(patch)
 		changeset.deduplicateWays(patch.ways)
+		patch.log(changeStatsSummary(changeset.stats))
 		patch = changeset.applyChanges()
 
+		patch.log("Deduplicating nodes in patch OSM...")
 		changeset = new OsmChangeset(patch)
 		changeset.deduplicateNodes(patch.nodes)
+		patch.log(changeStatsSummary(changeset.stats))
 		patch = changeset.applyChanges()
 
 		// Generate direct changes
@@ -136,6 +142,7 @@ export class Osmix {
 			base.log("Generating direct changes from patch OSM to base OSM...")
 			changeset = new OsmChangeset(base)
 			changeset.generateDirectChanges(patch)
+			base.log(changeStatsSummary(changeset.stats))
 			base = changeset.applyChanges()
 		}
 		
@@ -144,12 +151,14 @@ export class Osmix {
 			base.log("Deduplicating ways in final dataset...")
 			changeset = new OsmChangeset(base)
 			changeset.deduplicateWays(patch.ways)
+			base.log(changeStatsSummary(changeset.stats))
 			base = changeset.applyChanges()
 		}
 		if (options.deduplicateNodes) {
 			base.log("Deduplicating nodes in final dataset...")
 			changeset = new OsmChangeset(base)
 			changeset.deduplicateNodes(patch.nodes)
+			base.log(changeStatsSummary(changeset.stats))
 			base = changeset.applyChanges()
 		}
 
@@ -158,6 +167,7 @@ export class Osmix {
 			base.log("Creating intersections in final dataset...")
 			changeset = new OsmChangeset(base)
 			changeset.createIntersectionsForWays(patch.ways)
+			base.log(changeStatsSummary(changeset.stats))
 			base = changeset.applyChanges()
 		}
 
@@ -228,7 +238,6 @@ export class Osmix {
 		}
 		const logEverySecond = this.createThrottledLog(1_000)
 
-		let entityCount = 0
 		for await (const block of blocks) {
 			const blockStringIndexMap = this.stringTable.createBlockIndexMap(block)
 
@@ -239,7 +248,7 @@ export class Osmix {
 				}
 
 				if (dense) {
-					entityCount += this.nodes.addDenseNodes(
+					this.nodes.addDenseNodes(
 						dense,
 						block,
 						blockStringIndexMap,
@@ -254,15 +263,14 @@ export class Osmix {
 								}
 							: undefined,
 					)
+
+					logEverySecond(`${this.nodes.size.toLocaleString()} nodes added`)
 				}
 
 				if (ways.length > 0) {
 					// Nodes are finished, build their index.
-					if (!this.nodes.isReady) {
-						this.nodes.buildIndex()
-						entityCount = 0
-					}
-					entityCount += this.ways.addWays(
+					if (!this.nodes.isReady) this.nodes.buildIndex()
+					this.ways.addWays(
 						ways,
 						blockStringIndexMap,
 						extractBbox
@@ -276,14 +284,13 @@ export class Osmix {
 								}
 							: undefined,
 					)
+
+					logEverySecond(`${this.ways.size.toLocaleString()} ways added`)
 				}
 
 				if (relations.length > 0) {
-					if (!this.ways.isReady) {
-						this.ways.buildIndex()
-						entityCount = 0
-					}
-					entityCount += this.relations.addRelations(
+					if (!this.ways.isReady) this.ways.buildIndex()
+					this.relations.addRelations(
 						relations,
 						blockStringIndexMap,
 						extractBbox
@@ -303,20 +310,17 @@ export class Osmix {
 								}
 							: undefined,
 					)
-				}
 
-				logEverySecond(
-					`${entityCount.toLocaleString()} ${dense ? "nodes" : ways.length > 0 ? "ways" : "relations"} processed`,
-				)
+					logEverySecond(`${this.relations.size.toLocaleString()} relations added`)
+				}
 			}
 		}
 
-		this.log("Building remaining id and tag indexes...")
-
-		this.buildIndexes()
 		this.log(
-			`Added ${this.nodes.size.toLocaleString()} nodes, ${this.ways.size.toLocaleString()} ways, and ${this.relations.size.toLocaleString()} relations.`,
+			`${this.nodes.size.toLocaleString()} nodes, ${this.ways.size.toLocaleString()} ways, and ${this.relations.size.toLocaleString()} relations added.`,
 		)
+		this.log("Building remaining id and tag indexes...")
+		this.buildIndexes()
 	}
 
 	buildSpatialIndexes() {

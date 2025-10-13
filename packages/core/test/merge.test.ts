@@ -162,26 +162,31 @@ describe("merge osm", () => {
 			},
 		})
 
-		changeset = directResult.createChangeset()
-		changeset.deduplicateWays(patch.ways)
-		changeset.deduplicateNodes(patch.nodes)
-		const deduplicatedResult = changeset.applyChanges("deduplicated")
+	changeset = directResult.createChangeset()
+	changeset.deduplicateWays(patch.ways)
+	changeset.deduplicateNodes(patch.nodes)
+	const deduplicatedResult = changeset.applyChanges("deduplicated")
 
-		assert.isFalse(deduplicatedResult.nodes.ids.has(2))
-		assert.deepEqual(deduplicatedResult.ways.getById(1), {
-			id: 1,
-			refs: [0, 1],
-			tags: {
-				highway: "primary",
-				version: "2",
-			},
-		})
+	// Node 0 is deleted because node 2 has more tags (version/tags logic)
+	assert.isFalse(deduplicatedResult.nodes.ids.has(0))
+	assert.deepEqual(deduplicatedResult.ways.getById(1), {
+		id: 1,
+		refs: [2, 1], // Node 0 replaced with node 2
+		tags: {
+			highway: "primary",
+			version: "2",
+		},
+	})
 
-		assert.deepEqual(deduplicatedResult.nodes.getById(0), {
-			id: 0,
-			lat: 46.60207,
-			lon: -120.505898,
-		})
+	// Node 2 is kept because it has tags
+	assert.deepEqual(deduplicatedResult.nodes.getById(2), {
+		id: 2,
+		lat: 46.60207,
+		lon: -120.505898,
+		tags: {
+			crossing: "yes",
+		},
+	})
 
 		changeset = deduplicatedResult.createChangeset()
 		changeset.createIntersectionsForWays(patch.ways)

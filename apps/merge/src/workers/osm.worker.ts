@@ -154,16 +154,11 @@ export class OsmixWorker {
 		}
 
 		if (options.deduplicateNodes) {
-			let checkedNodes = 0
-			let dedpulicatedNodes = 0
 			this.log(`Deduplicating nodes from ${patchOsmId}...`)
-			for (const nodeStats of changeset.deduplicateNodesGenerator(patchOsm.nodes)) {
-				checkedNodes++
-				dedpulicatedNodes += nodeStats
-				this.logEverySecond(
-					`Node deduplication progress: ${checkedNodes.toLocaleString()} checked, ${dedpulicatedNodes.toLocaleString()} nodes deduplicated`,
-				)
-			}
+			changeset.deduplicateNodes(patchOsm.nodes)
+			this.log(
+				`Node deduplication results: ${changeset.deduplicatedNodes} de-duplicated nodes, ${changeset.deduplicatedNodesReplaced} nodes replaced`,
+			)
 		}
 
 		if (options.createIntersections) {
