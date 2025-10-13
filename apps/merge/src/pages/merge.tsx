@@ -1,3 +1,20 @@
+import { changeStatsSummary, Osmix } from "@osmix/core"
+import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
+import {
+	ArrowLeft,
+	ArrowRightIcon,
+	CheckCircle,
+	ChevronRightIcon,
+	DownloadIcon,
+	FastForwardIcon,
+	FileDiff,
+	MaximizeIcon,
+	MergeIcon,
+	SearchCodeIcon,
+	SkipForwardIcon,
+} from "lucide-react"
+import { showSaveFilePicker } from "native-file-system-adapter"
+import { useMemo } from "react"
 import ActionButton from "@/components/action-button"
 import Basemap from "@/components/basemap"
 import CustomControl from "@/components/custom-control"
@@ -18,12 +35,13 @@ import SidebarLog from "@/components/sidebar-log"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group"
 import {
-	Card,
-	CardContent,
-	CardFooter,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card"
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemMedia,
+	ItemTitle,
+} from "@/components/ui/item"
 import { Spinner } from "@/components/ui/spinner"
 import {
 	useFlyToEntity,
@@ -37,20 +55,6 @@ import { changesetStatsAtom } from "@/state/changes"
 import { Log } from "@/state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
-import { changeStatsSummary, Osmix } from "@osmix/core"
-import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
-import {
-	ArrowLeft,
-	ArrowRightIcon,
-	DownloadIcon,
-	FastForwardIcon,
-	FileDiff,
-	MaximizeIcon,
-	MergeIcon,
-	SkipForwardIcon,
-} from "lucide-react"
-import { showSaveFilePicker } from "native-file-system-adapter"
-import { useMemo } from "react"
 
 const deckTooltipStyle: Partial<CSSStyleDeclaration> = {
 	backgroundColor: "white",
@@ -60,6 +64,7 @@ const deckTooltipStyle: Partial<CSSStyleDeclaration> = {
 
 const STEPS = [
 	"select-osm-pbf-files",
+	"inspect-base-osm",
 	"review-changeset",
 	"inspect-patch-osm",
 	"review-changeset",
@@ -157,11 +162,8 @@ export default function Merge() {
 		<Main>
 			<Sidebar>
 				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-					<Step step="select-osm-pbf-files" title="SELECT OSM PBF FILES">
-						<p>
-							Select two PBF files to merge. Note: entities from the patch file
-							are prioritized over matching entities in the base file.
-						</p>
+					<Step step="select-osm-pbf-files" title="SELECT PBF FILES">
+						<p>Select two PBF files to merge.</p>
 
 						<div className="flex flex-col border rounded shadow">
 							<div className="font-bold p-2">BASE OSM PBF</div>
@@ -196,104 +198,136 @@ export default function Merge() {
 								file={patch.file}
 							/>
 						</div>
-						<Card>
-							<CardHeader>
-								<CardTitle>CLEAN INPUT OSM</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-2">
-								<p>
-									Each file is first scanned for duplicate entities inside the
-									same dataset. We then look for duplicates that appear in both
-									files.
-								</p>
-								<p>
-									Duplicates are features that share an ID or occupy the same
-									geometry. We prefer entities with newer version metadata; if
-									that information is missing we keep the feature with more
-									tags.
-								</p>
-								<p>
-									When a duplicate is detected we draft a changeset entry that
-									removes the extra copy. Review those proposals in the next
-									step before applying them.
-								</p>
-							</CardContent>
-							<CardFooter>
-								<ActionButton
-									className="flex-1"
-									disabled={!base.osm || !patch.osm}
-									onAction={() =>
-										startStepTask(
-											"Inspecting base OSM for duplicate entities",
-											async () => {
-												if (!base.osm) throw Error("Base OSM is not loaded")
-												const baseChanges = await osmWorker.generateChangeset(
-													base.osm.id,
-													base.osm.id,
-													{
-														deduplicateNodes: true,
-													},
-												)
-												setChangesetStats(baseChanges)
-												return changeStatsSummary(baseChanges)
-											},
-										)
-									}
-								>
-									Clean base OSM
-								</ActionButton>
-							</CardFooter>
-						</Card>
-						<Card>
-							<CardHeader>
-								<CardTitle>RUN ALL MERGE STEPS</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-2 leading-relaxed">
-								<p>Run all merge steps without stopping for verification.</p>
-								<ol className="list-decimal list-inside">
-									<li>Deduplicate nodes and ways in base OSM</li>
-									<li>Deduplicate nodes and ways in patch OSM</li>
-									<li>Generate direct changes from patch OSM to base OSM</li>
-									<li>De-duplicated nodes and ways in merged OSM</li>
-									<li>
-										Create new intersections in merged data where ways cross
-									</li>
-								</ol>
-							</CardContent>
-							<CardFooter>
-								<ActionButton
-									className="flex-1"
-									disabled={!base.osm || !patch.osm}
-									icon={<FastForwardIcon />}
-									onAction={async () => {
-										const task = Log.startTask(
-											"Running all merge steps, please wait...",
-										)
-										if (!base.osm) throw Error("Base OSM is not loaded")
-										if (!patch.osm) throw Error("Patch OSM is not loaded")
 
-										setChangesetStats(null)
-										const osm = Osmix.from(
-											await osmWorker.merge(base.osm.id, patch.osm.id,
+						<div className="flex flex-col gap-2">
+							<div className="font-bold">MERGE STEPS</div>
+							<ol className="list-decimal list-inside">
+								<li>Deduplicate nodes and ways in base OSM</li>
+								<li>Deduplicate nodes and ways in patch OSM</li>
+								<li>Merge patch OSM onto base OSM.</li>
+								<li>Deduplicate nodes and ways in newly merged OSM</li>
+								<li>
+									Create new intersections in merged data where ways cross
+								</li>
+							</ol>
+							<p>
+								Note: entities from the patch file are prioritized over matching
+								entities in the base file.
+							</p>
+						</div>
+						<Item variant="outline" asChild>
+							<a
+								href="#"
+								onClick={(e) => {
+									e.preventDefault()
+									nextStep()
+								}}
+							>
+								<ItemMedia>
+									<CheckCircle />
+								</ItemMedia>
+								<ItemContent>
+									<ItemTitle>OPTION 1. VERIFY EACH STEP</ItemTitle>
+									<ItemDescription>
+										Verify changes before applying them.
+									</ItemDescription>
+								</ItemContent>
+								<ItemActions>
+									<ChevronRightIcon />
+								</ItemActions>
+							</a>
+						</Item>
+						<Item variant="outline" asChild>
+							<a
+								href="#"
+								onClick={async (e) => {
+									e.preventDefault()
+									const task = Log.startTask(
+										"Running all merge steps, please wait...",
+									)
+									if (!base.osm) throw Error("Base OSM is not loaded")
+									if (!patch.osm) throw Error("Patch OSM is not loaded")
+
+									setChangesetStats(null)
+									const osm = Osmix.from(
+										await osmWorker.merge(base.osm.id, patch.osm.id, {
+											deduplicateNodes: true,
+											deduplicateWays: true,
+											directMerge: true,
+											createIntersections: true,
+										}),
+									)
+
+									base.setOsm(osm)
+									patch.setOsm(null)
+
+									task.end("All merge steps completed")
+									goToStep("inspect-final-osm")
+								}}
+							>
+								<ItemMedia>
+									<FastForwardIcon />
+								</ItemMedia>
+								<ItemContent>
+									<ItemTitle>OPTION 2. RUN ALL MERGE STEPS</ItemTitle>
+									<ItemDescription>
+										Run without stopping for verification.
+									</ItemDescription>
+								</ItemContent>
+								<ItemActions>
+									<ChevronRightIcon />
+								</ItemActions>
+							</a>
+						</Item>
+					</Step>
+
+					<Step step="inspect-base-osm" title="INSPECT BASE OSM">
+						<p>
+							Each file is first scanned for duplicate entities inside the same
+							dataset. We then look for duplicates that appear in both files.
+						</p>
+						<p>
+							Duplicates are features that share an ID or occupy the same
+							geometry. We prefer entities with newer version metadata; if that
+							information is missing we keep the feature with more tags.
+						</p>
+						<p>
+							When a duplicate is detected we draft a changeset entry that
+							removes the extra copy. Review those proposals in the next step
+							before applying them.
+						</p>
+						<div className="flex flex-col border-1">
+							<div className="font-bold p-2">BASE OSM PBF</div>
+							<OsmInfoTable
+								defaultOpen={false}
+								osm={base.osm}
+								file={base.file}
+							/>
+						</div>
+						<ActionButton
+							disabled={!base.osm}
+							icon={<SearchCodeIcon />}
+							onAction={() =>
+								startStepTask(
+									"Inspecting base OSM for duplicate entities",
+									async () => {
+										if (!base.osm) throw Error("Base OSM is not loaded")
+										const changes = await osmWorker.generateChangeset(
+											base.osm.id,
+											base.osm.id,
 											{
 												deduplicateNodes: true,
 												deduplicateWays: true,
-												directMerge: true,
-												createIntersections: true,
-											},)
+											},
 										)
-										
-										base.setOsm(osm)
-										patch.setOsm(null)
-
-										task.end("All merge steps completed")
-										goToStep("inspect-final-osm")
-									}}
-								>
-									Run all merge steps
-								</ActionButton>
-							</CardFooter>
-						</Card>
+										setChangesetStats(changes)
+										return changeStatsSummary(changes)
+									},
+								)
+							}
+						>
+							Deduplicate base OSM
+						</ActionButton>
 					</Step>
 
 					<Step step="inspect-patch-osm" title="INSPECT PATCH OSM">
@@ -312,6 +346,7 @@ export default function Merge() {
 						</div>
 						<ActionButton
 							disabled={!patch.osm}
+							icon={<SearchCodeIcon />}
 							onAction={() =>
 								startStepTask(
 									"Inspecting patch OSM for duplicate entities",
@@ -331,7 +366,7 @@ export default function Merge() {
 								)
 							}
 						>
-							Clean patch OSM
+							Deduplicate patch OSM
 						</ActionButton>
 					</Step>
 

@@ -103,14 +103,6 @@
 		min-height: 100vh;
 		overscroll-behavior: none;
 	}
-	a {
-		color: var(--color-blue-600);
-		text-underline-offset: 4px;
-	}
-
-	a:hover {
-		text-decoration-line: underline;
-	}
 
 	:focus-visible {
 		outline-style: solid;
@@ -118,6 +110,17 @@
 
 	p {
 		line-height: var(--leading-relaxed);
+	}
+}
+
+nav {
+	a {
+		color: var(--color-blue-600);
+		text-underline-offset: 4px;
+	}
+
+	a:hover {
+		text-decoration-line: underline;
 	}
 }
 
