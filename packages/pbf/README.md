@@ -1,40 +1,42 @@
 # @osmix/pbf
 
-A low-level TypeScript toolkit for reading and writing [OpenStreetMap PBF](https://wiki.openstreetmap.org/wiki/PBF_Format) data. The package focuses on predictable data structures, modern runtimes (Bun, Node 22+, modern browsers), and composable primitives that can be plugged into higher-level OSM tooling.
+@osmix/pbf is a low-level TypeScript toolkit for reading and writing OpenStreetMap PBF
+data. It keeps the API surface close to the official protobuf schema, surfaces predictable
+types, and runs in Node 20+ and modern browsers through Web Streams and native
+compression primitives.
 
-## Background
+## Highlights
 
-- Existing JavaScript PBF readers either depend on outdated tooling, mutate data into framework-specific shapes, or ship without useful TypeScript declarations.
-- `@osmix/pbf` keeps the API surface close to the official OSM protobuf definition so downstream consumers can decide how they want to process, index, or re-shape the data.
-- The library embraces Web Streams and native compression APIs, enabling the same code paths to run inside browsers and modern Node without extra dependencies.
-
-## Features
-
-- Parse OSM headers and primitive blocks from an `ArrayBuffer`, async iterable, or `ReadableStream`.
-- Emit strongly-typed protobuf objects that mirror the upstream `osmformat.proto` and `fileformat.proto` definitions.
-- Convert parsed blocks back into PBF-compliant blobs, enforcing recommended and maximum blob sizes from the OSM spec.
-- Bridge between raw byte streams and OSM entities using TransformStreams for efficient streaming pipelines.
-- Provide utility helpers (compression, concatenation, big-endian encoding) tuned for the PBF binary format.
+- Parse headers and primitive blocks from `ArrayBufferLike`, async iterables, or Web
+  `ReadableStream`s.
+- Build streaming pipelines with `TransformStream` helpers instead of buffering entire files
+  in memory.
+- Serialize header and primitive blocks back to spec-compliant blobs with size guardrails
+  baked in.
+- Reuse generated protobuf types/readers so downstream tools can stay close to
+  `osmformat.proto`.
+- Utility helpers handle compression, concatenation, and big-endian encoding tuned for the
+  PBF format.
 
 ## Installation
 
 ```sh
-bun add @osmix/pbf
-# or
 npm install @osmix/pbf
 ```
 
-## Quickstart
+## Usage
 
-### Reading an entire file
+### Read an entire file
 
-Works with `ArrayBuffer`s and `ReadableStream`s.
+`readOsmPbf` accepts an `ArrayBufferLike`, async iterable, or Web `ReadableStream`. It
+returns the header block and an async generator of primitive blocks.
 
 ```ts
 import { readOsmPbf } from "@osmix/pbf"
 
 const response = await fetch("/fixtures/moncao.pbf")
 const { header, blocks } = await readOsmPbf(response.body)
+
 console.log(header.required_features)
 
 for await (const block of blocks) {
@@ -44,135 +46,105 @@ for await (const block of blocks) {
 }
 ```
 
-### Streaming from network or disk
+### Stream as you go
 
-Use a `TransformStream` instead of generators.
+Use the streaming helpers when you do not want to materialize the whole file.
 
 ```ts
 import { OsmPbfBytesToBlocksTransformStream } from "@osmix/pbf"
 
 const response = await fetch("/fixtures/moncao.pbf")
+
 await response.body
 	.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
 	.pipeTo(
 		new WritableStream({
 			write: (block) => {
 				if ("primitivegroup" in block) {
-					for (const group of block.primitivegroup) {
-						// handle nodes / ways / relations
-					}
-				} else {
-					console.log("Header bbox", block.bbox)
+					// Handle primitive data blocks.
+					return
 				}
+
+				console.log("Header bbox", block.bbox)
 			},
 		}),
 	)
 ```
 
-### Writing blocks back to an OSM PBF
+### Write blocks back to PBF
+
+Serialize individual blocks into blobs, or stream them directly to a writable target.
+
+#### Buffer the result
 
 ```ts
-import {
-	OsmBlocksToPbfBytesTransformStream,
-	osmBlockToPbfBlobBytes,
-	readOsmPbf,
-} from "@osmix/pbf"
+import { concatUint8, osmBlockToPbfBlobBytes, readOsmPbf } from "@osmix/pbf"
 
 const response = await fetch("/fixtures/moncao.pbf")
 const { header, blocks } = await readOsmPbf(response.body)
 
-// Assemble the bytes in-memory
 const chunks: Uint8Array[] = [await osmBlockToPbfBlobBytes(header)]
-for await (const block of blocks) {
-	chunks.push(await osmBlockToPbfBlobBytes(block))
-}
-const size = chunks.reduce((total, chunk) => total + chunk.length, 0)
-const fullFile = new Uint8Array(size)
-let offset = 0
-for (const chunk of chunks) {
-	fullFile.set(chunk, offset)
-	offset += chunk.length
-}
+for await (const block of blocks) chunks.push(await osmBlockToPbfBlobBytes(block))
 
-// Or stream the same data to any WritableStream destination
-const blockStream = new ReadableStream({
+const fullFile = concatUint8(...chunks)
+
+```
+
+#### Stream to a sink
+
+Generators returned by `readOsmPbf` are single-use.
+Re-open the source (or buffer the blocks) if you want to stream the same dataset again.
+
+```ts
+import { OsmBlocksToPbfBytesTransformStream, readOsmPbf } from "@osmix/pbf"
+
+const response = await fetch("/fixtures/moncao.pbf")
+const { header, blocks } = await readOsmPbf(response.body)
+
+const upstream = new ReadableStream({
 	async start(controller) {
 		controller.enqueue(header)
 		for await (const block of blocks) controller.enqueue(block)
 		controller.close()
 	},
 })
-await blockStream
+
+await upstream
 	.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
 	.pipeTo(new WritableStream({ write: persistChunk }))
 ```
 
-In the streaming example, `persistChunk` represents whatever logic you use to persist bytes (writing to the file system, uploading to S3, saving to IndexedDB, etc.). The only requirement is that it accepts `Uint8Array` chunks.
+`persistChunk` represents your storage layer (filesystem writes, uploads, IndexedDB, and so
+on). It receives `Uint8Array` pieces in the order they should be persisted.
 
-## API reference
+## API overview
 
-### High-level helpers
+- `readOsmPbf(data)` – Parses binary PBF data, returning `{ header, blocks }`. Throws if the
+  first block is not an OSM header.
+- `OsmPbfBytesToBlocksTransformStream` – Web `TransformStream` that emits the header once
+  and then primitive blocks as they become available.
+- `OsmBlocksToPbfBytesTransformStream` – Inverse transform that turns header/primitive
+  blocks into PBF byte blobs while enforcing size limits.
+- `createOsmPbfBlobGenerator()` – Returns a stateful generator for turning incoming bytes
+  into compressed blob payloads (`Uint8Array`s).
+- `osmPbfBlobsToBlocksGenerator(blobs)` – Accepts a (async) generator of compressed blobs
+  and yields parsed header and primitive blocks.
+- `osmBlockToPbfBlobBytes(block)` – Serializes a single header or primitive block into a
+  spec-compliant PBF blob (`Uint8Array`).
+- Utility exports: `toAsyncGenerator`, `compress`, `decompress`, `concatUint8`, `uint32BE`,
+  and the size constants from `spec.ts`.
+- Generated protobuf helpers: `readHeaderBlock`, `writeHeaderBlock`, `readPrimitiveBlock`,
+  `writePrimitiveBlock`, plus the associated TypeScript types (`OsmPbfBlock`,
+  `OsmPbfHeaderBlock`, `OsmPbfBlob`, and friends).
 
-- `readOsmPbf(data: ArrayBufferLike | ReadableStream<ArrayBufferLike>)`
-  - Consumes binary PBF data from a buffer, async generator, or readable stream.
-  - Returns `{ header, blocks }` where `header` is an `OsmPbfHeaderBlock` and `blocks` is an async generator of `OsmPbfBlock` objects.
-  - Throws if the first block cannot be parsed as the required OSM header.
+## Environment and limitations
 
-### Streaming primitives
-
-- `OsmPbfBytesToBlocksTransformStream`
-  - A `TransformStream<ArrayBufferLike, OsmPbfHeaderBlock | OsmPbfBlock>` that incrementally parses byte chunks, emitting the header first and primitive blocks afterwards.
-  - Internally uses `createOsmPbfBlobGenerator` and `decompress` to turn byte ranges into decompressed protobuf blocks.
-- `OsmBlocksToPbfBytesTransformStream`
-  - A `TransformStream<OsmPbfHeaderBlock | OsmPbfBlock, Uint8Array>` that serialises header and primitive blocks back to PBF byte blobs.
-  - Validates block sizes against spec recommendations and throws if the maximum size is exceeded.
-
-### Generator-level building blocks
-
-- `createOsmPbfBlobGenerator()`
-  - Produces a stateful generator function that ingests raw byte chunks and yields compressed blob bodies (`Uint8Array` instances containing zlib data).
-  - Useful when you need to inspect or cache raw blob payloads before decompression.
-- `osmPbfBlobsToBlocksGenerator(blobs)`
-  - Accepts a generator or async generator of compressed blob payloads.
-  - Decompresses each blob and yields the parsed header (`OsmPbfHeaderBlock`) followed by primitive blocks.
-- `osmBlockToPbfBlobBytes(block)`
-  - Serialises a single `OsmPbfHeaderBlock` or `OsmPbfBlock` into a PBF-compliant `Uint8Array` (blob header + blob body).
-  - Emits warnings when a blob exceeds the recommended size and throws when hard limits are breached.
-
-### Utilities
-
-- `toAsyncGenerator(value)` – Normalises a value, iterable, async iterable, or `ReadableStream` into an async generator.
-- `decompress(data, format?)` – Uses the platform `DecompressionStream` API to decompress blob contents (defaults to `"deflate"`).
-- `compress(data, format?)` – Counterpart to `decompress`, leveraging `CompressionStream` to create spec-compliant zlib payloads.
-- `concatUint8(...chunks)` – Concatenates `Uint8Array` segments, used when building PBF files in memory.
-- `uint32BE(value)` – Encodes a 32-bit unsigned integer in big-endian byte order. Utilised when prefixing blob headers with their length.
-
-### Spec helpers
-
-- `RECOMMENDED_HEADER_SIZE_BYTES`, `MAX_HEADER_SIZE_BYTES`
-- `RECOMMENDED_BLOB_SIZE_BYTES`, `MAX_BLOB_SIZE_BYTES`
-- `MAX_ENTITIES_PER_BLOCK`
-
-These constants are surfaced to help callers validate or tune batching strategies before serialising blocks.
-
-### Generated protobuf bindings
-
-All types and read/write helpers generated from the official `.proto` files are re-exported, including:
-
-- `readHeaderBlock`, `writeHeaderBlock`, `readPrimitiveBlock`, `writePrimitiveBlock`
-- Type definitions such as `OsmPbfHeaderBlock`, `OsmPbfBlock`, `OsmPbfBlob`, `OsmPbfBlobHeader`, and entity-level message types (nodes, ways, relations, string tables, dense info, etc.)
-
-The generated code matches the schema shipped by the OSM project, the types were merged in by hand.
-
-## Environment notes
-
-- Streaming examples rely on the standard Web Streams API. In Node 20+ the API is available globally; older runtimes are not supported.
-- Compression utilities depend on `CompressionStream` / `DecompressionStream`. Modern browsers and Node 20+ expose these natively.
-- When feeding Node's `Readable`/`Writable` streams into these helpers, use `stream/web` utilities (`Readable.toWeb`, `Writable.toWeb`) or another adapter so you interact with Web Streams.
-
-## Related packages
-
-This package powers higher-level merging and editing features in `@osmix/core` and the `apps/merge` UI. Keeping the PBF layer standalone lets other tools reuse the same fast parser without pulling in application-specific dependencies.
+- Requires runtimes with Web Streams + `CompressionStream` / `DecompressionStream`
+  support (modern browsers, Node 20+).
+- Only `zlib_data` blobs are supported today; files containing `raw` or `lzma` payloads
+  will throw.
+- When working with Node `Readable` / `Writable` streams, adapt them to Web Streams
+  (`stream/web`) before passing them to these helpers.
 
 ## Development
 
@@ -180,4 +152,5 @@ This package powers higher-level merging and editing features in `@osmix/core` a
 - `bun run lint packages/pbf`
 - `bun run typecheck packages/pbf`
 
-Run `bun run check` at the repo root before publishing to verify formatting, lint, and type coverage.
+Run `bun run check` at the repo root before publishing to ensure formatting, lint, and
+type coverage.
