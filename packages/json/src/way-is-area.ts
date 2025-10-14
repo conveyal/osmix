@@ -1,4 +1,4 @@
-import type { OsmTags } from "./types"
+import type { OsmWay } from "./types"
 
 /**
  * Tags that imply an area unless their value is exactly "no"
@@ -58,11 +58,12 @@ const EXCLUDED_VALUE_TAGS = {
  * https://wiki.openstreetmap.org/wiki/Key:area
  * https://wiki.openstreetmap.org/wiki/Overpass_turbo/Polygon_Features
  *
- * @param refs - The node references of the way.
- * @param tags - The tags of the way.
+ * @param way - The way to check.
  * @returns `true` if the way is an area, `false` otherwise.
  */
-export function wayIsArea(refs: number[], tags?: OsmTags): boolean {
+export function wayIsArea(way?: OsmWay): boolean {
+	if (!way) return false
+	const { refs, tags } = way
 	if (refs.length < 3) return false
 	if (refs[0] !== refs[refs.length - 1]) return false
 

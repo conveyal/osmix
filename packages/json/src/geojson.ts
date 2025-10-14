@@ -27,7 +27,7 @@ export function wayToFeature(
 	return {
 		type: "Feature",
 		id: way.id,
-		geometry: wayIsArea(way.refs, way.tags)
+		geometry: wayIsArea(way)
 			? {
 					type: "Polygon",
 					coordinates: [way.refs.map((r) => refToPosition(r))],
