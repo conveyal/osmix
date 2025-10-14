@@ -1,4 +1,5 @@
-import { changeStatsSummary, Osmix } from "@osmix/core"
+import { changeStatsSummary } from "@osmix/change"
+import { Osmix } from "@osmix/core"
 import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"

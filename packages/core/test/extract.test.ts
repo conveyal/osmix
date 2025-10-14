@@ -1,7 +1,7 @@
+import type { GeoBbox2D } from "@osmix/json"
 import { getFixtureFileReadStream } from "@osmix/test-utils/fixtures"
 import { assert, test } from "vitest"
 import { Osmix } from "../src/osmix"
-import type { GeoBbox2D } from "../src/types"
 
 const TEST_BBOX: GeoBbox2D = [-0.1, -0.1, 1, 1]
 const SEATTLE_BBOX: GeoBbox2D = [-122.463226, 47.469878, -122.180328, 47.82883]

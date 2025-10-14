@@ -1,11 +1,7 @@
 /// <reference path="./types/kdbush.d.ts" />
-export {
-	default as OsmChangeset,
-	type OsmChanges,
-	type OsmChangesetStats,
-	type OsmChangeTypes,
-	type OsmMergeOptions,
-} from "./changeset"
+
+export { Nodes } from "./nodes"
 export { Osmix } from "./osmix"
-export type * from "./types"
-export { changeStatsSummary, throttle } from "./utils"
+export { Relations } from "./relations"
+export { throttle } from "./utils"
+export { Ways } from "./ways"

@@ -1,3 +1,4 @@
+import { type Nodes, Osmix, type Ways } from "@osmix/core"
 import {
 	entityPropertiesEqual,
 	getEntityType,
@@ -10,9 +11,12 @@ import {
 } from "@osmix/json"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
 import sweeplineIntersections from "sweepline-intersections"
-import type { Nodes } from "./nodes"
-import { Osmix } from "./osmix"
-import type { OsmChange, OsmEntityRef } from "./types"
+import type {
+	OsmEntityRef,
+	OsmixChange,
+	OsmixChanges,
+	OsmixChangesetStats,
+} from "./types"
 import {
 	cleanCoords,
 	haversineDistance,
@@ -22,45 +26,15 @@ import {
 	removeDuplicateAdjacentWayRefs,
 	waysShouldConnect,
 } from "./utils"
-import type { Ways } from "./ways"
-
-export interface OsmMergeOptions {
-	directMerge: boolean
-	deduplicateNodes: boolean
-	deduplicateWays: boolean
-	createIntersections: boolean
-}
-
-export type OsmChangesetStats = {
-	osmId: string
-	totalChanges: number
-	nodeChanges: number
-	wayChanges: number
-	relationChanges: number
-	deduplicatedNodes: number
-	deduplicatedNodesReplaced: number
-	deduplicatedWays: number
-	intersectionPointsFound: number
-	intersectionNodesCreated: number
-}
-
-export type OsmChanges = {
-	osmId: string
-	nodes: Record<number, OsmChange<OsmEntityTypeMap["node"]>>
-	ways: Record<number, OsmChange<OsmEntityTypeMap["way"]>>
-	relations: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>
-	stats: OsmChangesetStats
-}
-
-export type OsmChangeTypes = "modify" | "create" | "delete"
 
 /**
  * Each step is optimized to minimize the retrieval of the full entity data.
  */
-export default class OsmChangeset {
-	nodeChanges: Record<number, OsmChange<OsmEntityTypeMap["node"]>> = {}
-	wayChanges: Record<number, OsmChange<OsmEntityTypeMap["way"]>> = {}
-	relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]>> = {}
+export class OsmixChangeset {
+	nodeChanges: Record<number, OsmixChange<OsmEntityTypeMap["node"]>> = {}
+	wayChanges: Record<number, OsmixChange<OsmEntityTypeMap["way"]>> = {}
+	relationChanges: Record<number, OsmixChange<OsmEntityTypeMap["relation"]>> =
+		{}
 
 	osm: Osmix
 
@@ -73,8 +47,8 @@ export default class OsmChangeset {
 	intersectionPointsFound = 0
 	intersectionNodesCreated = 0
 
-	static fromJson(base: Osmix, json: OsmChanges) {
-		const changeset = new OsmChangeset(base)
+	static fromJson(base: Osmix, json: OsmixChanges) {
+		const changeset = new OsmixChangeset(base)
 		changeset.nodeChanges = json.nodes
 		changeset.wayChanges = json.ways
 		changeset.relationChanges = json.relations
@@ -86,7 +60,7 @@ export default class OsmChangeset {
 		this.currentNodeId = base.nodes.ids.at(-1)
 	}
 
-	get stats(): OsmChangesetStats {
+	get stats(): OsmixChangesetStats {
 		const nodeChanges = Object.values(this.nodeChanges).length
 		const wayChanges = Object.values(this.wayChanges).length
 		const relationChanges = Object.values(this.relationChanges).length
@@ -106,19 +80,22 @@ export default class OsmChangeset {
 
 	changes<T extends OsmEntityType>(
 		type: T,
-	): Record<number, OsmChange<OsmEntityTypeMap[T]>> {
+	): Record<number, OsmixChange<OsmEntityTypeMap[T]>> {
 		switch (type) {
 			case "node":
 				return this.nodeChanges as Record<
 					number,
-					OsmChange<OsmEntityTypeMap[T]>
+					OsmixChange<OsmEntityTypeMap[T]>
 				>
 			case "way":
-				return this.wayChanges as Record<number, OsmChange<OsmEntityTypeMap[T]>>
+				return this.wayChanges as Record<
+					number,
+					OsmixChange<OsmEntityTypeMap[T]>
+				>
 			case "relation":
 				return this.relationChanges as Record<
 					number,
-					OsmChange<OsmEntityTypeMap[T]>
+					OsmixChange<OsmEntityTypeMap[T]>
 				>
 		}
 	}
@@ -770,7 +747,7 @@ function waysIntersect(
 /**
  * Apply a changeset to an Osm index, generating a new Osm index. Usually done on a changeset made from the base osm index.
  */
-export function applyChangesetToOsm(changeset: OsmChangeset, newId?: string) {
+export function applyChangesetToOsm(changeset: OsmixChangeset, newId?: string) {
 	const baseOsm = changeset.osm
 	const osm = new Osmix({
 		id: newId ?? baseOsm.id,

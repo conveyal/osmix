@@ -1,4 +1,5 @@
-import { changeStatsSummary, Osmix } from "@osmix/core"
+import { changeStatsSummary } from "@osmix/change"
+import { Osmix } from "@osmix/core"
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
 	ArrowLeft,

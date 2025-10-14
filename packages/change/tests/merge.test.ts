@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs"
+import { Osmix } from "@osmix/core"
+import { createBaseOsm, createPatchOsm } from "@osmix/core/test/mock-osm"
 import type { OsmNode } from "@osmix/json"
 import {
 	getFixtureFileReadStream,
 	getFixturePath,
 } from "@osmix/test-utils/fixtures"
 import { assert, describe, it } from "vitest"
-import { OsmChangeset, Osmix } from "../src"
-import { createBaseOsm, createPatchOsm } from "./mock-osm"
+import { OsmixChangeset } from "../src/changeset"
 
 const testNode: OsmNode = {
 	id: 2135545,
@@ -55,7 +56,7 @@ describe("merge osm", () => {
 			const baseSizes = sizes(baseOsm)
 			const patchSizes = sizes(osm2)
 
-			let changeset = new OsmChangeset(baseOsm)
+			let changeset = new OsmixChangeset(baseOsm)
 			changeset.generateDirectChanges(osm2)
 
 			assert.deepEqual(changeset.stats, {
@@ -78,7 +79,7 @@ describe("merge osm", () => {
 				relations: baseSizes.relations + patchSizes.relations,
 			})
 
-			changeset = new OsmChangeset(baseOsm)
+			changeset = new OsmixChangeset(baseOsm)
 			changeset.createIntersectionsForWays(osm2.ways)
 
 			assert.deepEqual(changeset.stats, {
@@ -130,7 +131,7 @@ describe("merge osm", () => {
 			relations: 0,
 		})
 
-		let changeset = base.createChangeset()
+		let changeset = new OsmixChangeset(base)
 		changeset.generateDirectChanges(patch)
 		assert.deepEqual(changeset.stats, {
 			osmId: base.id,
@@ -162,7 +163,7 @@ describe("merge osm", () => {
 			},
 		})
 
-		changeset = directResult.createChangeset()
+		changeset = new OsmixChangeset(directResult)
 		changeset.deduplicateWays(patch.ways)
 		changeset.deduplicateNodes(patch.nodes)
 		const deduplicatedResult = changeset.applyChanges("deduplicated")
@@ -188,7 +189,7 @@ describe("merge osm", () => {
 			},
 		})
 
-		changeset = deduplicatedResult.createChangeset()
+		changeset = new OsmixChangeset(deduplicatedResult)
 		changeset.createIntersectionsForWays(patch.ways)
 
 		assert.deepEqual(changeset.stats, {
@@ -244,7 +245,7 @@ describe("merge osm", () => {
 			assert.deepEqual(sizes(osm2), patchSizes)
 
 			// Direct merge
-			let changeset = baseOsm.createChangeset()
+			let changeset = new OsmixChangeset(baseOsm)
 			console.time("generateDirectChanges")
 			changeset.generateDirectChanges(osm2)
 			console.timeEnd("generateDirectChanges")
@@ -277,7 +278,7 @@ describe("merge osm", () => {
 			})
 
 			// Create intersections
-			changeset = baseOsm.createChangeset()
+			changeset = new OsmixChangeset(baseOsm)
 
 			console.time("createIntersections")
 			changeset.createIntersectionsForWays(osm2.ways)

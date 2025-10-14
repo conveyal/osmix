@@ -1,4 +1,4 @@
-import type { GeoBbox2D } from "@osmix/core"
+import type { GeoBbox2D } from "@osmix/json"
 import { useAtomValue } from "jotai"
 import { MaximizeIcon } from "lucide-react"
 import { mapAtom } from "@/state/map"

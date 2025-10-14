@@ -1,9 +1,9 @@
 {
 	"$schema": "https://json.schemastore.org/package",
-	"name": "@osmix/core",
+	"name": "@osmix/change",
 	"type": "module",
 	"version": "0.0.1",
-	"description": "An OSM PBF reader, writer, and merge tool written in TypeScript",
+	"description": "An OSM changeset generator and merger built on top of @osmix/core",
 	"main": "./src/index.ts",
 	"sideEffects": false,
 	"scripts": {
@@ -19,10 +19,10 @@
 		"vitest": "catalog:"
 	},
 	"dependencies": {
+		"@osmix/core": "workspace:*",
 		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
-		"flatbush": "^4.4.1",
-		"kdbush": "mourner/kdbush#16416cd",
+		"dequal": "catalog:",
 		"sweepline-intersections": "^1.5.0"
 	}
 }

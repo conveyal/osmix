@@ -1,7 +1,7 @@
+import type { GeoBbox2D } from "@osmix/json"
 import { getFixtureFile } from "@osmix/test-utils/fixtures"
 import { beforeAll, bench, describe } from "vitest"
 import { Osmix } from "../src/osmix"
-import type { GeoBbox2D } from "../src/types"
 
 const MONACO_BBOX: GeoBbox2D = [7.4053929, 43.7232244, 7.4447259, 43.7543687]
 // const SEATTLE_BBOX: GeoBbox2D = [-122.33, 47.48, -122.29, 47.52]

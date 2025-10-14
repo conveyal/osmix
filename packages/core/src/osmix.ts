@@ -23,12 +23,11 @@ import {
 	type OsmPbfHeaderBlock,
 	readOsmPbf,
 } from "@osmix/pbf"
-import OsmChangeset, { type OsmMergeOptions } from "./changeset"
 import { Nodes, type NodesTransferables } from "./nodes"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { IdArrayType } from "./typed-arrays"
-import { bboxFromLonLats, changeStatsSummary, throttle } from "./utils"
+import { bboxFromLonLats, throttle } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
 export interface OsmixTransferables {
@@ -109,75 +108,6 @@ export class Osmix {
 		const osm = new Osmix(options)
 		await osm.readPbf(data, options)
 		return osm
-	}
-
-	static async merge(
-		base: Osmix,
-		patch: Osmix,
-		options: Partial<OsmMergeOptions> = {},
-	) {
-		// De-duplicate nodes and ways in original datasets
-		base.log("Deduplicating ways in base OSM...")
-		let changeset = new OsmChangeset(base)
-		changeset.deduplicateWays(base.ways)
-		base.log(changeStatsSummary(changeset.stats))
-		let modifiedBase = changeset.applyChanges()
-
-		modifiedBase.log("Deduplicating nodes in base OSM...")
-		changeset = new OsmChangeset(modifiedBase)
-		changeset.deduplicateNodes(modifiedBase.nodes)
-		modifiedBase.log(changeStatsSummary(changeset.stats))
-		modifiedBase = changeset.applyChanges()
-
-		patch.log("Deduplicating ways in patch OSM...")
-		changeset = new OsmChangeset(patch)
-		changeset.deduplicateWays(patch.ways)
-		patch.log(changeStatsSummary(changeset.stats))
-		let modifiedPatch = changeset.applyChanges()
-
-		modifiedPatch.log("Deduplicating nodes in patch OSM...")
-		changeset = new OsmChangeset(modifiedPatch)
-		changeset.deduplicateNodes(modifiedPatch.nodes)
-		modifiedPatch.log(changeStatsSummary(changeset.stats))
-		modifiedPatch = changeset.applyChanges()
-
-		// Generate direct changes
-		if (options.directMerge) {
-			modifiedBase.log(
-				"Generating direct changes from patch OSM to base OSM...",
-			)
-			changeset = new OsmChangeset(modifiedBase)
-			changeset.generateDirectChanges(modifiedPatch)
-			modifiedBase.log(changeStatsSummary(changeset.stats))
-			modifiedBase = changeset.applyChanges()
-		}
-
-		// De-duplicate nodes and ways in final dataset
-		if (options.deduplicateWays) {
-			modifiedBase.log("Deduplicating ways in final dataset...")
-			changeset = new OsmChangeset(modifiedBase)
-			changeset.deduplicateWays(modifiedPatch.ways)
-			modifiedBase.log(changeStatsSummary(changeset.stats))
-			modifiedBase = changeset.applyChanges()
-		}
-		if (options.deduplicateNodes) {
-			modifiedBase.log("Deduplicating nodes in final dataset...")
-			changeset = new OsmChangeset(modifiedBase)
-			changeset.deduplicateNodes(modifiedPatch.nodes)
-			modifiedBase.log(changeStatsSummary(changeset.stats))
-			modifiedBase = changeset.applyChanges()
-		}
-
-		// Create intersections
-		if (options.createIntersections) {
-			modifiedBase.log("Creating intersections in final dataset...")
-			changeset = new OsmChangeset(modifiedBase)
-			changeset.createIntersectionsForWays(modifiedPatch.ways)
-			modifiedBase.log(changeStatsSummary(changeset.stats))
-			modifiedBase = changeset.applyChanges()
-		}
-
-		return modifiedBase
 	}
 
 	constructor(options: Partial<OsmixOptions> = {}) {
@@ -334,10 +264,6 @@ export class Osmix {
 	buildSpatialIndexes() {
 		this.nodes.buildSpatialIndex()
 		this.ways.buildSpatialIndex(this.nodes)
-	}
-
-	createChangeset() {
-		return new OsmChangeset(this)
 	}
 
 	extract(bbox: GeoBbox2D) {
