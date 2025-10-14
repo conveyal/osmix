@@ -1,4 +1,5 @@
 import type { OsmPbfInfo } from "@osmix/pbf"
+import type { Feature, LineString, MultiPolygon, Point, Polygon } from "geojson"
 
 export type OsmEntityType = "node" | "way" | "relation"
 
@@ -45,3 +46,14 @@ export interface OsmRelation extends IOsmEntity {
 }
 
 export type OsmEntity = OsmNode | OsmWay | OsmRelation
+
+export type OsmixGeoJsonProperties = {
+	id: number
+	type: OsmEntityType
+	tags?: OsmTags
+	info?: OsmInfoParsed
+}
+
+export type OsmixGeoJSONFeature<
+	T extends Point | LineString | Polygon | MultiPolygon,
+> = Feature<T, OsmixGeoJsonProperties>

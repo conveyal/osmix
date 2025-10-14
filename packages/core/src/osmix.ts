@@ -7,10 +7,10 @@ import {
 	type OsmEntity,
 	type OsmEntityType,
 	type OsmEntityTypeMap,
+	type OsmixGeoJSONFeature,
 	OsmJsonToBlocksTransformStream,
 	type OsmNode,
 	type OsmRelation,
-	type OsmTags,
 	type OsmWay,
 	relationToFeature,
 	wayToFeature,
@@ -501,7 +501,9 @@ export class Osmix {
 
 	getEntityGeoJson(
 		entity: OsmNode | OsmWay | OsmRelation,
-	): GeoJSON.Feature<GeoJSON.Geometry, OsmTags> {
+	): OsmixGeoJSONFeature<
+		GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.MultiPolygon
+	> {
 		if (isNode(entity)) {
 			return nodeToFeature(entity)
 		}

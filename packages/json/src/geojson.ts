@@ -1,32 +1,31 @@
-import type { OsmNode, OsmRelation, OsmTags, OsmWay } from "./types"
+import type { LineString, MultiPolygon, Point, Polygon } from "geojson"
+import type { OsmixGeoJSONFeature, OsmNode, OsmRelation, OsmWay } from "./types"
 import { wayIsArea } from "./way-is-area"
 
-export type OsmGeoJSONFeature = GeoJSON.Feature<
-	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon,
-	OsmTags
->
-
-export function nodeToFeature(
-	node: OsmNode,
-): GeoJSON.Feature<GeoJSON.Point, OsmTags> {
+export function nodeToFeature(node: OsmNode): OsmixGeoJSONFeature<Point> {
 	return {
 		type: "Feature",
-		id: node.id,
+		id: `node/${node.id}`,
 		geometry: {
 			type: "Point",
 			coordinates: [node.lon, node.lat],
 		},
-		properties: node.tags ?? {},
+		properties: {
+			id: node.id,
+			type: "node",
+			tags: node.tags,
+			info: node.info,
+		},
 	}
 }
 
 export function wayToFeature(
 	way: OsmWay,
 	refToPosition: (id: number) => [number, number],
-): GeoJSON.Feature<GeoJSON.LineString | GeoJSON.Polygon, OsmTags> {
+): OsmixGeoJSONFeature<LineString | Polygon> {
 	return {
 		type: "Feature",
-		id: way.id,
+		id: `way/${way.id}`,
 		geometry: wayIsArea(way)
 			? {
 					type: "Polygon",
@@ -36,33 +35,33 @@ export function wayToFeature(
 					type: "LineString",
 					coordinates: way.refs.map((r) => refToPosition(r)),
 				},
-		properties: way.tags ?? {},
+		properties: {
+			id: way.id,
+			type: "way",
+			tags: way.tags,
+			info: way.info,
+		},
 	}
 }
 
 export function relationToFeature(
 	relation: OsmRelation,
 	refToPosition: (id: number) => [number, number],
-): GeoJSON.Feature<
-	GeoJSON.GeometryCollection<
-		GeoJSON.Polygon | GeoJSON.Point | GeoJSON.LineString
-	>,
-	OsmTags
-> {
+): OsmixGeoJSONFeature<MultiPolygon> {
 	return {
 		type: "Feature",
-		id: relation.id,
+		id: `relation/${relation.id}`,
 		geometry: {
-			type: "GeometryCollection",
-			geometries: [
-				{
-					type: "Polygon",
-					coordinates: [
-						relation.members.map((member) => refToPosition(member.ref)),
-					],
-				},
+			type: "MultiPolygon",
+			coordinates: [
+				[relation.members.map((member) => refToPosition(member.ref))],
 			],
 		},
-		properties: relation.tags ?? {},
+		properties: {
+			id: relation.id,
+			type: "relation",
+			tags: relation.tags,
+			info: relation.info,
+		},
 	}
 }

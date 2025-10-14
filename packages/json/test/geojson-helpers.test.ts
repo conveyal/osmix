@@ -19,7 +19,12 @@ describe("geojson helpers", () => {
 		expect(feature.type).toBe("Feature")
 		expect(feature.geometry.type).toBe("Point")
 		expect(feature.geometry.coordinates).toEqual([nodes[0].lon, nodes[0].lat])
-		expect(feature.properties).toEqual(nodes[0].tags)
+		expect(feature.properties).toEqual({
+			id: nodes[0].id,
+			type: "node",
+			tags: nodes[0].tags,
+			info: nodes[0].info,
+		})
 	})
 
 	it("creates polygon for closed ways", () => {
@@ -43,9 +48,8 @@ describe("geojson helpers", () => {
 			tags: { type: "multipolygon" },
 		}
 		const feature = relationToFeature(relation, refToPosition)
-		expect(feature.geometry.type).toBe("GeometryCollection")
-		const polygon = feature.geometry.geometries[0]
-		expect(polygon.type).toBe("Polygon")
-		expect(polygon.coordinates[0]).toHaveLength(3)
+		expect(feature.geometry.type).toBe("MultiPolygon")
+		const polygon = feature.geometry
+		expect(polygon.coordinates[0][0]).toHaveLength(3)
 	})
 })
