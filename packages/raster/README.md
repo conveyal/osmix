@@ -1,10 +1,10 @@
 # @osmix/raster
 
-@osmix/raster turns OpenStreetMap geometries into lightweight raster tiles you can serve to MapLibre, Leaflet, or any viewer that can render PNG tiles. It ships a canvas-backed tile renderer plus a MapLibre protocol helper so you can generate imagery on demand in modern runtimes (Node 20+, Bun, browsers, and workers).
+@osmix/raster turns OpenStreetMap geometries into lightweight raster tiles you can serve to MapLibre, Leaflet, or any viewer that can render PNG tiles. It ships a canvas-backed tile renderer plus a MapLibre protocol helper so you can generate imagery on demand in modern runtimes (Node 20+, Bun, browsers, and workers) using datasets sourced from [`@osmix/core`](../core/README.md).
 
 ## Highlights
 
-- Paint nodes and ways into RGBA buffers with a tiny API (`setLonLat`, `drawWay`, `setPixel`).
+- Paint nodes and ways from `@osmix/core` datasets into RGBA buffers with a tiny API (`setLonLat`, `drawWay`, `setPixel`).
 - Automatically clip ways to the tile bounds before rasterization so edges stay clean.
 - Export tiles through `OffscreenCanvas` with configurable image encoders (PNG, WebP, etc.).
 - Register a custom `@osmix/raster://` protocol in MapLibre and stream tiles without a tile server.
@@ -73,6 +73,12 @@ maplibregl.addProtocol(
 - `OsmixRasterTile(bbox, tileIndex, tileSize?)` – Paint pixels for a single tile; exposes `setLonLat`, `setPixel`, `drawLine`, `drawWay`, `toCanvas`, and `toImageBuffer`.
 - Constants: `DEFAULT_TILE_SIZE`, `DEFAULT_RASTER_IMAGE_TYPE`, `DEFAULT_NODE_COLOR`, `DEFAULT_WAY_COLOR`.
 - `createOsmixRasterMaplibreProtocol(getTileImage, tileSize?)` – Returns the callback you can pass to `maplibregl.addProtocol`. It validates URLs, computes a WGS84 bbox, and forwards `tileIndex` + `tileSize`.
+
+## See also
+
+- [`@osmix/core`](../core/README.md) – Provides the indexed geometry and transferables you can paint into tiles.
+- [Osmix Merge app](../../apps/merge/README.md) – Uses the raster helpers in a worker to preview merge states.
+- [`@osmix/change`](../change/README.md) – Generates the deduplicated datasets you may wish to visualise.
 
 ## Environment and limitations
 

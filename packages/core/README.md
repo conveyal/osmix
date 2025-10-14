@@ -1,12 +1,13 @@
 # @osmix/core
 
-@osmix/core wraps the `Osmix` index: a typed-array OpenStreetMap engine that reads `.osm.pbf` streams, builds spatial indexes, and emits JSON, or PBFs without leaving modern JavaScript runtimes.
+@osmix/core wraps the `Osmix` index: a typed-array OpenStreetMap engine that reads `.osm.pbf` streams, builds spatial indexes, and emits JSON, PBF, or raster tiles without leaving modern JavaScript runtimes.
 
 ## Highlights
 
-- Ingest `.osm.pbf` sources into node, way, and relation stores backed by transferable typed arrays.
+- Ingest `.osm.pbf` sources into node, way, and relation stores backed by transferable typed arrays using readers from [`@osmix/pbf`](../pbf/README.md).
 - Run fast bounding-box searches with KDBush/Flatbush and convert matches straight to GeoJSON.
-- Trim extracts, write new PBF buffers, or stream entities to downstream tooling.
+- Trim extracts, write new PBF buffers, or stream entities to downstream tooling with [`@osmix/json`](../json/README.md) or [`@osmix/pbf`](../pbf/README.md).
+- Pair with [`@osmix/change`](../change/README.md) when you need deduplication, intersection, or merge pipelines.
 - Ship fully indexed datasets across workers via `transferables()` + `Osmix.from`.
 
 ## Installation
@@ -87,6 +88,27 @@ const pbfBuffer = await downtown.toPbfBuffer()
 
 `extract` returns a new, fully indexed `Osmix` instance with the header bbox updated.
 
+## Changesets and merging
+
+Change orchestration now lives in the dedicated [`@osmix/change`](../change/README.md) package. Install it alongside
+`@osmix/core` when you want to deduplicate entities, generate direct merges, or script intersection creation:
+
+```ts
+import { Osmix } from "@osmix/core"
+import { merge, OsmixChangeset } from "@osmix/change"
+import { readFile } from "node:fs/promises"
+
+const base = await Osmix.fromPbf(readFile("base.osm.pbf"))
+const patch = await Osmix.fromPbf(readFile("patch.osm.pbf"))
+
+const changeset = new OsmixChangeset(base)
+changeset.deduplicateWays(base.ways)
+
+const merged = await merge(base, patch, { directMerge: true })
+```
+
+Refer to the [`@osmix/change` README](../change/README.md) for the full API surface.
+
 ## Transfer between threads
 
 Typed arrays keep the index transferable.
@@ -119,6 +141,9 @@ self.addEventListener("message", ({ data }) => {
 
 - `Osmix` – ingest PBF sources, build indexes, query entities, extract subsets, and emit JSON/PBF.
 - `Nodes` / `Ways` / `Relations` – typed-array backed stores exposed for advanced workflows.
+- `OsmixRasterTile` – rasterise indexed data into tile-sized buffers with lon/lat helpers.
+- Utilities – `throttle`, plus the shared type definitions used across the package.
+- Changesets and merge helpers now live in [`@osmix/change`](../change/README.md).
 
 ## Environment and limitations
 

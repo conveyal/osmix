@@ -117,6 +117,12 @@ await upstream
 - Utility exports: `toAsyncGenerator`, `compress`, `decompress`, `concatUint8`, `uint32BE`, and the size constants from `spec.ts`. Compression helpers detect Bun and fall back to Node's zlib bindings for compatibility.
 - Generated protobuf helpers: `readHeaderBlock`, `writeHeaderBlock`, `readPrimitiveBlock`, `writePrimitiveBlock`, plus the associated TypeScript types (`OsmPbfBlock`, `OsmPbfHeaderBlock`, `OsmPbfBlob`, and friends).
 
+## See also
+
+- [`@osmix/json`](../json/README.md) – Converts parsed blocks into ergonomic JSON or GeoJSON entities.
+- [`@osmix/core`](../core/README.md) – Uses these readers/writers for ingest and export workflows.
+- [`@osmix/change`](../change/README.md) – Builds on `@osmix/core` to generate change pipelines.
+
 ## Environment and limitations
 
 - Requires runtimes with Web Streams + `CompressionStream` / `DecompressionStream` support (modern browsers, Node 20+).

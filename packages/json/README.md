@@ -1,6 +1,6 @@
 # @osmix/json
 
-@osmix/json turns OpenStreetMap PBF bytes into ergonomic JSON entities (and back again) for streaming editors, change workflows, and browser-based tooling. It builds on the low-level primitives in `@osmix/pbf` while staying friendly to modern runtimes (Node 20+, and modern browsers).
+@osmix/json turns OpenStreetMap PBF bytes into ergonomic JSON entities (and back again) for streaming editors, change workflows, and browser-based tooling. It builds on the low-level primitives in [`@osmix/pbf`](../pbf/README.md) while staying friendly to modern runtimes (Node 20+, and modern browsers).
 
 ## Highlights
 
@@ -20,7 +20,7 @@ npm install @osmix/json
 
 ### Decode a PBF stream
 
-`osmPbfToJson` accepts a Web `ReadableStream<ArrayBufferLike>` and yields the header followed by node/way/relation objects. Pair it with `toAsyncGenerator` from `@osmix/pbf` for ergonomic iteration.
+`osmPbfToJson` accepts a Web `ReadableStream<ArrayBufferLike>` and yields the header followed by node/way/relation objects. Pair it with `toAsyncGenerator` from [`@osmix/pbf`](../pbf/README.md) for ergonomic iteration.
 
 ```ts
 import { osmPbfToJson } from "@osmix/json"
@@ -107,6 +107,12 @@ const feature = wayToFeature(firstWay, (id) => nodeIndex.get(id)!)
 	- Type guards: `isNode`, `isWay`, `isRelation`.
 	- Equality helpers: `isNodeEqual`, `isWayEqual`, `isRelationEqual`, `entityPropertiesEqual`.
 	- Types: `OsmEntity`, `OsmNode`, `OsmWay`, `OsmRelation`, `OsmTags`, `OsmInfoParsed`, and `OSM_ENTITY_TYPES`.
+
+## See also
+
+- [`@osmix/pbf`](../pbf/README.md) – Source of the block readers and writers used here.
+- [`@osmix/core`](../core/README.md) – Typed-array index that consumes these JSON entities during ingest/export.
+- [`@osmix/change`](../change/README.md) – Builds on `@osmix/core` and `@osmix/json` for dedupe and merge workflows.
 
 ## Environment and limitations
 

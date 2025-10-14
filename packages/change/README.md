@@ -1,6 +1,6 @@
 # @osmix/change
 
-`@osmix/change` is the change-management companion to `@osmix/core`. It builds, inspects, and applies OpenStreetMap changesets on top of `Osmix` datasets, giving you tools to deduplicate entities, reconcile overlaps, generate stats, and orchestrate merge pipelines.
+`@osmix/change` is the change-management companion to [`@osmix/core`](../core/README.md). It builds, inspects, and applies OpenStreetMap changesets on top of `Osmix` datasets, giving you tools to deduplicate entities, reconcile overlaps, generate stats, and orchestrate merge pipelines.
 
 ## Highlights
 
@@ -16,7 +16,7 @@
 npm install @osmix/change
 ```
 
-You will typically install this alongside `@osmix/core`, which supplies the `Osmix` datasets the changes operate on.
+You will typically install this alongside [`@osmix/core`](../core/README.md), which supplies the `Osmix` datasets the changes operate on.
 
 ## Usage
 
@@ -59,7 +59,7 @@ const combined = await merge(base, patch, {
 })
 ```
 
-`merge` wraps a sequence of changesets that deduplicate each dataset, optionally create intersections, and (when `directMerge` is true) generate modifications that reconcile the patch into the base. Options are all optional and default to `false`, so you can enable only the stages you need.
+`merge` wraps a sequence of changesets that deduplicate each dataset, optionally create intersections, and (when `directMerge` is true) generate modifications that reconcile the patch into the base. All options default to `false`, so you can enable only the stages you need.
 
 ## API overview
 
@@ -68,6 +68,13 @@ const combined = await merge(base, patch, {
 - `changeStatsSummary(stats)` – Produces a human-readable summary string of the most significant stats.
 - Utility helpers – `haversineDistance`, `waysShouldConnect`, `isWayIntersectionCandidate`, `removeDuplicateAdjacentWayRefs`, `removeDuplicateAdjacentRelationMembers`, `osmTagsToOscTags`, `cleanCoords`, and supporting conversions.
 - Types – `OsmixMergeOptions`, `OsmixChanges`, `OsmixChange`, `OsmixChangesetStats`, `OsmEntityRef`, and convenience aliases for downstream tooling.
+
+## See also
+
+- [`@osmix/core`](../core/README.md) – Typed-array index powering the change operations.
+- [`@osmix/pbf`](../pbf/README.md) – Streaming helpers used to read and write `.osm.pbf` data.
+- [`@osmix/json`](../json/README.md) – JSON entity adapters that pair with change workflows.
+- [Osmix Merge app](../../apps/merge/README.md) – Browser UI built on top of the change pipeline.
 
 ## Environment and limitations
 
