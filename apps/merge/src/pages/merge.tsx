@@ -19,7 +19,6 @@ import { useMemo } from "react"
 import ActionButton from "@/components/action-button"
 import Basemap from "@/components/basemap"
 import CustomControl from "@/components/custom-control"
-import DeckGlOverlay from "@/components/deckgl-overlay"
 import { Details, DetailsContent, DetailsSummary } from "@/components/details"
 import EntityDetails from "@/components/entity-details"
 import EntityDetailsMapControl from "@/components/entity-details-map-control"
@@ -34,6 +33,7 @@ import ChangesSummary, {
 import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
+import OsmixVectorOverlay from "@/components/osmix-vector-overlay"
 import SelectedEntityLayer from "@/components/selected-entity-layer"
 import SidebarLog from "@/components/sidebar-log"
 import { Button } from "@/components/ui/button"
@@ -47,23 +47,13 @@ import {
 	ItemTitle,
 } from "@/components/ui/item"
 import { Spinner } from "@/components/ui/spinner"
-import {
-	useFlyToEntity,
-	useFlyToOsmBounds,
-	usePickableOsmTileLayer,
-} from "@/hooks/map"
+import { useFlyToEntity, useFlyToOsmBounds } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { changesetStatsAtom } from "@/state/changes"
 import { Log } from "@/state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
-
-const deckTooltipStyle: Partial<CSSStyleDeclaration> = {
-	backgroundColor: "white",
-	padding: "0",
-	color: "var(--slate-950)",
-}
 
 const STEPS = [
 	"select-osm-pbf-files",
@@ -94,9 +84,6 @@ export default function Merge() {
 	const flyToOsmBounds = useFlyToOsmBounds()
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
-	const baseTileLayer = usePickableOsmTileLayer(base.osm)
-	const patchTileLayer = usePickableOsmTileLayer(patch.osm)
-
 	const [stepIndex, setStepIndex] = useAtom(stepIndexAtom)
 
 	const prevStep = () => {
@@ -689,34 +676,12 @@ export default function Merge() {
 			</Sidebar>
 			<MapContent>
 				<Basemap>
-					<DeckGlOverlay
-						layers={[baseTileLayer, stepIndex > 0 ? null : patchTileLayer]}
-						getTooltip={(pickingInfo) => {
-							const sourceLayerId = pickingInfo.sourceLayer?.id
-							if (
-								baseTileLayer &&
-								sourceLayerId?.startsWith(baseTileLayer.id)
-							) {
-								if (sourceLayerId.includes("nodes")) {
-									return {
-										className: "deck-tooltip",
-										style: deckTooltipStyle,
-										html: `<div className="p-2">node</div>`,
-									}
-								}
-								if (sourceLayerId.includes("ways")) {
-									return {
-										className: "deck-tooltip",
-										style: deckTooltipStyle,
-										html: `<div className="p-2">way</div>`,
-									}
-								}
-							}
-							return null
-						}}
-					/>
 					{base.osm && <OsmixRasterSource osmId={base.osm.id} />}
 					{patch.osm && <OsmixRasterSource osmId={patch.osm.id} />}
+					{base.osm && <OsmixVectorOverlay osm={base.osm} />}
+					{stepIndex === 0 && patch.osm && (
+						<OsmixVectorOverlay osm={patch.osm} />
+					)}
 
 					<SelectedEntityLayer />
 

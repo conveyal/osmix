@@ -160,26 +160,40 @@ table {
 	}
 }
 
+.maplibregl-ctrl {
+	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
+	border-radius: var(--radius);
+}
+
 .maplibregl-ctrl button:not(:disabled):hover {
 	background-color: var(--color-accent);
 }
 
-.deck-tooltip {
-	background-color: white;
+.osmix-overlay-popup {
+	max-width: 320px;
+	pointer-events: none;
+	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
+	border-radius: var(--radius);
 	padding: 0;
-	max-width: 400px;
-	color: var(--slate-950);
-	font-variant-numeric: tabular-nums;
-	font-size: var(--text-xs);
-	font-family: var(--font-mono);
+}
 
-	td {
-		border: 1px solid var(--color-border);
-	}
-	td:first-of-type {
-		border-left: none;
-	}
-	td:last-of-type {
-		border-right: none;
-	}
+.osmix-overlay-popup .maplibregl-popup-content {
+	background-color: white;
+	border-radius: var(--radius);
+	color: var(--foreground);
+	font-family: var(--font-mono);
+	font-size: var(--text-xs);
+	font-weight: var(--font-weight-bold);
+	padding: 0;
+	pointer-events: none;
+}
+
+.osmix-overlay-popup .maplibregl-popup-tip {
+	display: none;
+}
+
+.osmix-overlay-tooltip {
+	padding: 0.25rem 0.5rem;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
 }

@@ -339,21 +339,17 @@ export class Osmix {
 	}
 
 	getById(eid: string): OsmEntity | null {
-		const id = Number(eid.slice(1))
-		switch (eid.charAt(0)) {
-			case "n":
+		const [type, sid] = eid.split("/")
+		const id = Number(sid)
+		switch (type) {
+			case "node":
 				return this.nodes.getById(id)
-			case "w":
+			case "way":
 				return this.ways.getById(id)
-			case "r":
+			case "relation":
 				return this.relations.getById(id)
 			default: {
-				const fid = Number(eid)
-				return (
-					this.nodes.getById(fid) ??
-					this.ways.getById(fid) ??
-					this.relations.getById(fid)
-				)
+				throw new Error(`Unknown entity type: ${type}`)
 			}
 		}
 	}
@@ -401,7 +397,6 @@ export class Osmix {
 			wayStartIndices[i + 1] = prevIndex + way.length / 2
 		})
 		console.timeEnd("Osm.getWaysInBbox.loop")
-
 		const wayPositionsArray = new Float64Array(size)
 		let pIndex = 0
 		for (const way of wayPositions) {

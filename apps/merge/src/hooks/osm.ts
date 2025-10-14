@@ -1,13 +1,13 @@
 import { Osmix } from "@osmix/core"
 import * as Comlink from "comlink"
-import { useAtom, useAtomValue } from "jotai"
+import { useAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useState, useTransition } from "react"
 import { Log } from "@/state/log"
-import { mapAtom } from "@/state/map"
 import { osmAtomFamily, osmFileAtomFamily } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
 import { supportsReadableStreamTransfer } from "@/utils"
+import { useMap } from "./map"
 
 function useOsmDefaultFile(
 	loadOsmFile: (file: File | null) => Promise<Osmix | undefined>,
@@ -17,7 +17,7 @@ function useOsmDefaultFile(
 	const [loadOnStart, setLoadOnStart] = useState(
 		process.env.NODE_ENV === "development",
 	)
-	const map = useAtomValue(mapAtom)
+	const map = useMap()
 	useEffect(() => {
 		if (!loadOnStart || !defaultFilePath || map == null) return
 		setLoadOnStart(false)

@@ -1,5 +1,6 @@
 import { StrictMode, Suspense } from "react"
 import { createRoot } from "react-dom/client"
+import { MapProvider } from "react-map-gl/maplibre"
 import { BrowserRouter, Outlet, Route, Routes } from "react-router"
 import { ErrorBoundary } from "./components/error-boundary"
 import Nav from "./components/nav"
@@ -8,12 +9,14 @@ import MergePage from "./pages/merge"
 
 function RootLayout() {
 	return (
-		<div className="h-screen w-screen flex flex-col">
-			<Nav />
-			<Suspense fallback={<div>Loading...</div>}>
-				<Outlet />
-			</Suspense>
-		</div>
+		<MapProvider>
+			<div className="h-screen w-screen flex flex-col">
+				<Nav />
+				<Suspense fallback={<div>Loading...</div>}>
+					<Outlet />
+				</Suspense>
+			</div>
+		</MapProvider>
 	)
 }
 

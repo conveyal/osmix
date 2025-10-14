@@ -1,0 +1,17 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/shared",
+	"type": "module",
+	"version": "0.0.1",
+	"description": "Shared utilities for Osmix",
+	"main": "./src/index.ts",
+	"sideEffects": false,
+	"scripts": {
+		"bench": "vitest bench",
+		"test": "vitest",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"lineclip": "^2.0.0"
+	}
+}

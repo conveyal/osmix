@@ -1,7 +1,6 @@
 import type { GeoBbox2D } from "@osmix/json"
-import { useAtomValue } from "jotai"
 import { MaximizeIcon } from "lucide-react"
-import { mapAtom } from "@/state/map"
+import { useMap } from "@/hooks/map"
 import { Button } from "./ui/button"
 
 export default function FitBounds({
@@ -11,7 +10,7 @@ export default function FitBounds({
 	bounds?: maplibregl.LngLatBoundsLike | GeoBbox2D
 	options?: maplibregl.FitBoundsOptions
 }) {
-	const map = useAtomValue(mapAtom)
+	const map = useMap()
 	return (
 		<Button
 			size="icon"

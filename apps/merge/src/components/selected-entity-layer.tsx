@@ -6,8 +6,8 @@ import {
 	type LineLayerSpecification,
 	Source,
 } from "react-map-gl/maplibre"
+import { useMap } from "@/hooks/map"
 import { APPID } from "@/settings"
-import { mapAtom } from "@/state/map"
 import { selectedEntityAtom, selectedOsmAtom } from "@/state/osm"
 
 const SOURCE_ID = `${APPID}:selected-entity`
@@ -16,19 +16,7 @@ const POINTS_ID = `${APPID}:selected-points`
 
 const linePaint: LineLayerSpecification["paint"] = {
 	"line-color": "red",
-	"line-width": [
-		"interpolate",
-		["linear"],
-		["zoom"],
-		5,
-		1,
-		10,
-		3,
-		14,
-		6,
-		18,
-		12,
-	],
+	"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 2, 18, 10],
 	"line-opacity": 1,
 }
 
@@ -39,27 +27,15 @@ const lineLayout: LineLayerSpecification["layout"] = {
 
 const circlePaint: CircleLayerSpecification["paint"] = {
 	"circle-color": "white",
-	"circle-radius": [
-		"interpolate",
-		["linear"],
-		["zoom"],
-		5,
-		0.5,
-		10,
-		1,
-		14,
-		2,
-		18,
-		6,
-	],
+	"circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 3, 18, 6],
 	"circle-stroke-color": "red",
-	"circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 10, 0.5, 18, 4],
+	"circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 2],
 }
 
 const circleLayout: CircleLayerSpecification["layout"] = {}
 
 export default function SelectedEntityLayer() {
-	const map = useAtomValue(mapAtom)
+	const map = useMap()
 	const selectedOsm = useAtomValue(selectedOsmAtom)
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const geojson: GeoJSON.GeoJSON = useMemo(() => {
@@ -69,18 +45,12 @@ export default function SelectedEntityLayer() {
 	}, [selectedEntity, selectedOsm])
 
 	useEffect(() => {
-		if (!map) return
+		if (!map || !selectedEntity) return
 		const ids = [LINE_ID, POINTS_ID]
-		const moveTop = () =>
-			ids.forEach((id) => {
-				if (map.getLayer(id)) map.moveLayer(id)
-			})
-		if (map.isStyleLoaded()) moveTop()
-		map.on("styledata", moveTop)
-		return () => {
-			map.off("styledata", moveTop)
-		}
-	}, [map])
+		ids.forEach((id) => {
+			if (map.getLayer(id)) map.moveLayer(id)
+		})
+	}, [map, selectedEntity])
 
 	return (
 		<Source id={SOURCE_ID} type="geojson" data={geojson}>

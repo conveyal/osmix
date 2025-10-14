@@ -1,6 +1,6 @@
 # Osmix Merge
 
-Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PBF datasets. It builds on [`@osmix/core`](../../packages/core/README.md) and [`@osmix/change`](../../packages/change/README.md) in a web worker, renders MapLibre + deck.gl overlays, and guides you through a multi-step merge workflow that stays entirely in the browser.
+Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PBF datasets. It builds on [`@osmix/core`](../../packages/core/README.md) and [`@osmix/change`](../../packages/change/README.md) in a web worker, renders MapLibre raster and vector overlays, and guides you through a multi-step merge workflow that stays entirely in the browser.
 
 ## Highlights
 
@@ -54,7 +54,7 @@ Tests load sample fixtures from `fixtures/monaco.pbf` and exercise both Merge an
 
 1. **Select OSM PBF files** – Upload base + patch files and review metadata. The files stay local thanks to the File System Access API.
 2. **Review changeset** – Each step runs an operation on the worker (`osm.worker.ts`) that uses `@osmix/core` and `@osmix/change` to generate or update an `OsmixChangeset`. Logs stream into the sidebar while progress indicators update the UI.
-3. **Inspect intermediary results** – Toggle Deck.gl layers to compare base/patch rasters, click features to see details, and jump the map to selected entities.
+3. **Inspect intermediary results** – Toggle MapLibre vector overlays to compare base/patch rasters, click features to see details, and jump the map to selected entities.
 4. **Apply actions** – Deduplicate nodes or ways, generate direct changes, create intersections, and download the resulting change list as JSON. Applying the final changes replaces the in-memory base dataset.
 
 The stepper resets selection state between actions, and you can jump backward or forward if you need to rerun a task.
@@ -67,8 +67,7 @@ The stepper resets selection state between actions, and you can jump backward or
 
 ## Map & rendering stack
 
-- **MapLibre** provides the background map (Carto dark matter style) and interaction controls.
-- **deck.gl** handles vector overlays for base, patch, and selected entities. Picking events drive the entity detail panel and “fly to” actions.
+- **MapLibre** provides the background map (Carto dark matter style), interaction controls, and pickable vector overlays for base, patch, and selected entities.
 - **Raster tiles** come from the worker’s `OsmixRasterTile` helper in [`@osmix/raster`](../../packages/raster/README.md), which draws ways and (at higher zoom levels) nodes onto an OffscreenCanvas before streaming the PNG bytes back to the UI thread.
 - Zoom and map center state is synchronised through Jotai atoms so components can react without prop drilling.
 

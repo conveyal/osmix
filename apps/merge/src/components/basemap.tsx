@@ -1,15 +1,14 @@
 import { useSetAtom } from "jotai"
-import { useCallback, useEffect } from "react"
+import { useCallback, useRef } from "react"
 import {
 	Map as MaplibreMap,
 	type MapStyleDataEvent,
 	NavigationControl,
 	ScaleControl,
-	useMap,
 	type ViewStateChangeEvent,
 } from "react-map-gl/maplibre"
 import { APPID } from "@/settings"
-import { mapAtom, mapBoundsAtom, mapCenterAtom, zoomAtom } from "@/state/map"
+import { mapBoundsAtom, mapCenterAtom, zoomAtom } from "@/state/map"
 
 const MAP_STYLE =
 	"https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
@@ -22,37 +21,15 @@ const initialViewState = {
 	zoom: MAP_ZOOM,
 }
 
-// Hide roads in base map
-const onStyleData = (e: MapStyleDataEvent) => {
-	const map = e.target
-	const style = map.getStyle()
-	const layers = style.layers
-	for (const layer of layers) {
-		if (layer.id.startsWith(APPID)) continue
-		if (layer.type === "line" || layer.type === "symbol") {
-			map.setLayoutProperty(layer.id, "visibility", "none")
-		}
-	}
-}
-
 const controlStyle: React.CSSProperties = {
 	borderRadius: "var(--radius)",
-}
-
-function SetMap() {
-	const mapCollection = useMap()
-	const setMap = useSetAtom(mapAtom)
-	useEffect(() => {
-		const map = mapCollection.current?.getMap()
-		if (map) setMap(map)
-	}, [mapCollection, setMap])
-	return null
 }
 
 export default function Basemap({ children }: { children?: React.ReactNode }) {
 	const setCenter = useSetAtom(mapCenterAtom)
 	const setBounds = useSetAtom(mapBoundsAtom)
 	const setZoom = useSetAtom(zoomAtom)
+	const hasHiddenLayersRef = useRef(false)
 
 	const onViewStateChange = useCallback(
 		(e: ViewStateChangeEvent) => {
@@ -63,6 +40,24 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 		[setBounds, setCenter, setZoom],
 	)
 
+	// Hide roads in base map - only run once on initial style load
+	const onStyleData = useCallback((e: MapStyleDataEvent) => {
+		if (hasHiddenLayersRef.current) return
+
+		const map = e.target
+		const style = map.getStyle()
+		if (!style?.layers) return
+
+		for (const layer of style.layers) {
+			if (layer.id.startsWith(APPID)) continue
+			if (layer.type === "line" || layer.type === "symbol") {
+				map.setLayoutProperty(layer.id, "visibility", "none")
+			}
+		}
+
+		hasHiddenLayersRef.current = true
+	}, [])
+
 	return (
 		<MaplibreMap
 			mapStyle={MAP_STYLE}
@@ -72,7 +67,6 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 			onZoom={onViewStateChange}
 			onStyleData={onStyleData}
 		>
-			<SetMap />
 			<NavigationControl
 				position="top-right"
 				style={controlStyle}

@@ -10,6 +10,8 @@
 		],
 		"catalog": {
 			"dequal": "^2.0.3",
+			"@mapbox/sphericalmercator": "^2.0.2",
+			"@mapbox/tilebelt": "^2.0.2",
 			"pbf": "^4.0.1",
 			"typescript": "^5.9.0",
 			"@types/geojson": "^7946.0.16",
@@ -20,7 +22,8 @@
 		}
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.2.4"
+		"@biomejs/biome": "^2.2.4",
+		"typescript": "catalog:"
 	},
 	"scripts": {
 		"dev": "bun run --filter '*' dev",

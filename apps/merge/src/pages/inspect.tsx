@@ -1,20 +1,18 @@
 import { changeStatsSummary } from "@osmix/change"
 import { Osmix } from "@osmix/core"
-import { bboxPolygon } from "@turf/bbox-polygon"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
 import { useMemo } from "react"
-import { Layer, Source } from "react-map-gl/maplibre"
 import { useSearchParams } from "react-router"
 import ActionButton from "@/components/action-button"
 import Basemap from "@/components/basemap"
 import CustomControl from "@/components/custom-control"
-import DeckGlOverlay from "@/components/deckgl-overlay"
 import { Details, DetailsContent, DetailsSummary } from "@/components/details"
 import EntityDetailsMapControl from "@/components/entity-details-map-control"
 import EntitySearchControl from "@/components/entity-search-control"
 import ExtractList from "@/components/extract-list"
 import { Main, MapContent, Sidebar } from "@/components/layout"
+import MapLayerControl from "@/components/map-layer-control"
 import NominatimSearchControl from "@/components/nominatim-search-control"
 import ChangesSummary, {
 	ChangesFilters,
@@ -24,26 +22,17 @@ import ChangesSummary, {
 import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
+import OsmixVectorOverlay from "@/components/osmix-vector-overlay"
 import SelectedEntityLayer from "@/components/selected-entity-layer"
 import SidebarLog from "@/components/sidebar-log"
+import TileBoundsLayer from "@/components/tile-bounds-layer"
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group"
-import {
-	useFlyToEntity,
-	useFlyToOsmBounds,
-	usePickableOsmTileLayer,
-} from "@/hooks/map"
+import { useFlyToEntity, useFlyToOsmBounds } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
-import { APPID } from "@/settings"
 import { changesetStatsAtom } from "@/state/changes"
 import { Log } from "@/state/log"
 import { selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
-
-const deckTooltipStyle: Partial<CSSStyleDeclaration> = {
-	backgroundColor: "white",
-	padding: "0",
-	color: "var(--slate-950)",
-}
 
 export default function InspectPage() {
 	const [searchParams] = useSearchParams()
@@ -57,9 +46,7 @@ export default function InspectPage() {
 		osmId,
 		"./monaco.pbf",
 	)
-	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
-	const tileLayer = usePickableOsmTileLayer(osm)
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 
 	const applyChanges = async (osmId: string) => {
@@ -176,46 +163,22 @@ export default function InspectPage() {
 			</Sidebar>
 			<MapContent>
 				<Basemap>
-					{bbox && (
-						<Source type="geojson" data={bboxPolygon(bbox)}>
-							<Layer
-								type="line"
-								paint={{ "line-color": "red", "line-width": 10 }}
-							/>
-						</Source>
-					)}
-					<DeckGlOverlay
-						layers={[tileLayer]}
-						pickingRadius={5}
-						getTooltip={(pickingInfo) => {
-							const sourceLayerId = pickingInfo.sourceLayer?.id
-							if (sourceLayerId?.startsWith(`${APPID}:${osmId}`)) {
-								if (sourceLayerId.includes("nodes")) {
-									return {
-										className: "deck-tooltip",
-										style: deckTooltipStyle,
-										html: `<div className="p-2">node</div>`,
-									}
-								}
-								if (sourceLayerId.includes("ways")) {
-									return {
-										className: "deck-tooltip",
-										style: deckTooltipStyle,
-										html: `<div className="p-2">way</div>`,
-									}
-								}
-							}
-							return null
-						}}
-						interleaved
-					/>
+					{osm && <OsmixVectorOverlay osm={osm} />}
 					{osm && <OsmixRasterSource osmId={osm.id} />}
+
+					{process.env.NODE_ENV === "development" && <TileBoundsLayer />}
 
 					<SelectedEntityLayer />
 
 					<CustomControl position="top-left">
 						<NominatimSearchControl />
 					</CustomControl>
+
+					{process.env.NODE_ENV === "development" && (
+						<CustomControl position="bottom-left">
+							<MapLayerControl />
+						</CustomControl>
+					)}
 
 					{osm && (
 						<CustomControl position="top-left">

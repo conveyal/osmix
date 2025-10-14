@@ -1,8 +1,6 @@
-/// <reference path="./types/lineclip.d.ts" />
-
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import type { GeoBbox2D } from "@osmix/json"
-import { clipPolyline } from "lineclip"
+import { clipPolyline } from "@osmix/shared/lineclip"
 
 export type Rgba = [number, number, number, number] | Uint8ClampedArray
 

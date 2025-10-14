@@ -1,3 +1,5 @@
+import { SphericalMercator } from "@mapbox/sphericalmercator"
+import { tileToBBOX } from "@mapbox/tilebelt"
 import {
 	merge,
 	type OsmChangeTypes,
@@ -6,15 +8,21 @@ import {
 	type OsmixMergeOptions,
 } from "@osmix/change"
 import { Osmix, throttle } from "@osmix/core"
+import {
+	type BinaryVtIndex,
+	createBinaryVtIndex,
+} from "@osmix/geojson-binary-vt"
 import type { GeoBbox2D, OsmEntityType } from "@osmix/json"
 import { OsmixRasterTile, type TileIndex } from "@osmix/raster"
 import { expose, transfer, wrap } from "comlink"
 import { dequal } from "dequal/lite"
-import { MIN_NODE_ZOOM, RASTER_TILE_SIZE } from "@/settings"
+import { RASTER_TILE_SIZE } from "@/settings"
 import type { StatusType } from "@/state/log"
 
 export class OsmixWorker {
 	private osmixes = new Map<string, Osmix>()
+	private vectorTileIndexes = new Map<string, BinaryVtIndex>()
+	private includeTileKey = process.env.NODE_ENV !== "production"
 
 	private changesets = new Map<string, OsmixChangeset>()
 	private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"]
@@ -26,9 +34,36 @@ export class OsmixWorker {
 	}
 	private logEverySecond = throttle(this.log, 1_000)
 
+	private getOrCreateVectorTileIndex(osmId: string) {
+		const existing = this.vectorTileIndexes.get(osmId)
+		if (existing) return existing
+		const osm = this.osmixes.get(osmId)
+		if (!osm) throw Error(`Osm for ${osmId} not loaded.`)
+
+		const index = createBinaryVtIndex(
+			async ({ bbox }) => ({
+				nodes: osm.getNodesInBbox(bbox),
+				ways: osm.getWaysInBbox(bbox),
+				bounds: bbox,
+				metadata: {},
+			}),
+			{
+				datasetId: osmId,
+				includeTileKey: this.includeTileKey,
+			},
+		)
+		this.vectorTileIndexes.set(osmId, index)
+		return index
+	}
+
+	private invalidateVectorTileIndex(osmId: string) {
+		this.vectorTileIndexes.delete(osmId)
+	}
+
 	async fromPbf(id: string, data: ArrayBufferLike | ReadableStream) {
 		const osm = await Osmix.fromPbf(data, { id, logger: this.log })
 		this.osmixes.set(id, osm)
+		this.invalidateVectorTileIndex(id)
 		return osm.transferables()
 	}
 
@@ -43,14 +78,43 @@ export class OsmixWorker {
 		return osm.getById(eid)
 	}
 
+	lonLatInBbox(lon: number, lat: number, bbox: GeoBbox2D) {
+		return lon >= bbox[0] && lon <= bbox[2] && lat >= bbox[1] && lat <= bbox[3]
+	}
+
+	/**
+	 * Check if the two bboxes intersect or are contained within each other.
+	 */
+	bboxContainsOrIntersects(bb1: GeoBbox2D, bb2: GeoBbox2D) {
+		const westIn =
+			(bb1[0] >= bb2[0] && bb1[0] <= bb2[2]) ||
+			(bb2[0] >= bb1[0] && bb2[0] <= bb1[2])
+		const eastIn =
+			(bb1[2] >= bb2[0] && bb1[2] <= bb2[2]) ||
+			(bb2[2] >= bb1[0] && bb2[2] <= bb1[2])
+		const northIn =
+			(bb1[1] >= bb2[1] && bb1[1] <= bb2[3]) ||
+			(bb2[1] >= bb1[1] && bb2[1] <= bb1[3])
+		const southIn =
+			(bb1[3] >= bb2[1] && bb1[3] <= bb2[3]) ||
+			(bb2[3] >= bb1[1] && bb2[3] <= bb1[3])
+		return (westIn || eastIn) && (northIn || southIn)
+	}
+
 	async getTileImage(
 		id: string,
-		bbox: GeoBbox2D,
 		tileIndex: TileIndex,
 		tileSize = RASTER_TILE_SIZE,
 	) {
 		const osm = this.osmixes.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
+		const bbox = tileToBBOX([
+			tileIndex.x,
+			tileIndex.y,
+			tileIndex.z,
+		]) as GeoBbox2D
+		if (!this.bboxContainsOrIntersects(bbox, osm.bbox()))
+			return new ArrayBuffer(0)
 
 		const rasterTile = new OsmixRasterTile(bbox, tileIndex, tileSize)
 		const timer = `OsmixRasterTile.drawWays:${tileIndex.z}/${tileIndex.x}/${tileIndex.y}`
@@ -61,40 +125,24 @@ export class OsmixWorker {
 		})
 		console.timeEnd(timer)
 
-		if (tileIndex.z >= MIN_NODE_ZOOM) {
-			const timer = `OsmixRasterTile.drawNodes:${tileIndex.z}/${tileIndex.x}/${tileIndex.y}`
-			console.time(timer)
-			const nodeCandidates = osm.nodes.withinBbox(bbox)
-
-			for (const nodeIndex of nodeCandidates) {
-				if (!osm.nodes.tags.hasTags(nodeIndex)) continue
-				rasterTile.setLonLat(osm.nodes.getNodeLonLat({ index: nodeIndex }))
-			}
-			console.timeEnd(timer)
-		}
-
 		const data = await rasterTile.toImageBuffer()
-		return transfer({ data }, [data])
+		return transfer(data, [data])
 	}
 
-	async getTileData(id: string, bbox: GeoBbox2D) {
+	async getVectorTile(id: string, tileIndex: TileIndex) {
 		const osm = this.osmixes.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
-		try {
-			const nodes = osm.getNodesInBbox(bbox)
-			const ways = osm.getWaysInBbox(bbox)
-			const buffers = [
-				nodes.positions.buffer,
-				nodes.ids.buffer,
-				ways.positions.buffer,
-				ways.ids.buffer,
-				ways.startIndices.buffer,
-			]
-			return transfer({ nodes, ways }, buffers)
-		} catch (e) {
-			console.error(e)
-			throw e
-		}
+
+		const merc = new SphericalMercator()
+		const bbox = merc.bbox(tileIndex.x, tileIndex.y, tileIndex.z)
+		if (!this.bboxContainsOrIntersects(bbox, osm.bbox()))
+			return new ArrayBuffer(0)
+
+		const index = this.getOrCreateVectorTileIndex(id)
+		const data = await index.getTile(tileIndex)
+		if (!data) return new ArrayBuffer(0)
+
+		return transfer(data, [data])
 	}
 
 	async merge(
@@ -110,9 +158,11 @@ export class OsmixWorker {
 
 		// Replace the base OSM with the merged OSM
 		this.osmixes.set(baseOsmId, mergedOsm)
+		this.invalidateVectorTileIndex(baseOsmId)
 
 		// Delete the patch OSM
 		this.osmixes.delete(patchOsmId)
+		this.invalidateVectorTileIndex(patchOsmId)
 
 		// Delete the changeset
 		this.changesets.delete(baseOsmId)
