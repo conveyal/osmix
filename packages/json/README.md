@@ -1,17 +1,12 @@
 # @osmix/json
 
-@osmix/json turns OpenStreetMap PBF bytes into ergonomic JSON entities (and back again) for
-streaming editors, change workflows, and browser-based tooling. It builds on the low-level
-primitives in `@osmix/pbf` while staying friendly to modern runtimes (Node 20+, and
-modern browsers).
+@osmix/json turns OpenStreetMap PBF bytes into ergonomic JSON entities (and back again) for streaming editors, change workflows, and browser-based tooling. It builds on the low-level primitives in `@osmix/pbf` while staying friendly to modern runtimes (Node 20+, and modern browsers).
 
 ## Highlights
 
 - Decode `.osm.pbf` streams into header metadata and strongly typed node/way/relation JSON.
-- Encode JSON entities back into spec-compliant PBF blobs without hand-rolling string tables
-  or delta encoding.
-- Compose Web Stream transforms to keep large datasets out of memory and re-use work across
-  workers or service boundaries.
+- Encode JSON entities back into spec-compliant PBF blobs without hand-rolling string tables or delta encoding.
+- Compose Web Stream transforms to keep large datasets out of memory and re-use work across workers or service boundaries.
 - Opt into metadata parsing or emission (`timestamp`, `uid`, etc.) only when you need it.
 - Convert entities to GeoJSON with `wayIsArea` heuristics that match the OSM wiki guidance.
 
@@ -25,9 +20,7 @@ npm install @osmix/json
 
 ### Decode a PBF stream
 
-`osmPbfToJson` accepts a Web `ReadableStream<ArrayBufferLike>` and yields the header followed
-by node/way/relation objects. Pair it with `toAsyncGenerator` from `@osmix/pbf` for ergonomic
-iteration.
+`osmPbfToJson` accepts a Web `ReadableStream<ArrayBufferLike>` and yields the header followed by node/way/relation objects. Pair it with `toAsyncGenerator` from `@osmix/pbf` for ergonomic iteration.
 
 ```ts
 import { osmPbfToJson } from "@osmix/json"
@@ -47,8 +40,7 @@ for await (const item of toAsyncGenerator(osmPbfToJson(response.body))) {
 
 ### Encode JSON entities back to PBF bytes
 
-`osmJsonToPbf` streams JSON entities into encoded blobs. The input generator should yield the
-header exactly once followed by sorted entities.
+`osmJsonToPbf` streams JSON entities into encoded blobs. The input generator should yield the header exactly once followed by sorted entities.
 
 ```ts
 import { osmJsonToPbf } from "@osmix/json"
@@ -81,9 +73,7 @@ await osmJsonToPbf(header, entities()).pipeTo(
 
 ### Parse blocks or emit GeoJSON directly
 
-If you already have parsed blocks, reach for `OsmPbfBlockParser` and friends. Toggle
-`includeInfo` to hydrate metadata, or use `wayToFeature` / `relationToFeature` helpers to
-produce GeoJSON.
+If you already have parsed blocks, reach for `OsmPbfBlockParser` and friends. Toggle `includeInfo` to hydrate metadata, or use `wayToFeature` / `relationToFeature` helpers to produce GeoJSON.
 
 ```ts
 import { OsmPbfBlockParser, wayToFeature } from "@osmix/json"
@@ -102,36 +92,27 @@ const feature = wayToFeature(firstWay, (id) => nodeIndex.get(id)!)
 	- `OsmBlocksToJsonTransformStream` – Turns decoded `OsmPbfBlock`s into entities.
 	- `blocksToJsonEntities(block)` – Synchronous generator for in-memory use.
 - **JSON → PBF builders**
-	- `createOsmJsonReadableStream(header, entities)` – Inserts the header once, then streams
-	  entities.
-	- `OsmJsonToBlocksTransformStream` – Groups entities into `OsmPbfBlockBuilder` instances
-	  with size checks.
+	- `createOsmJsonReadableStream(header, entities)` – Inserts the header once, then streams entities.
+	- `OsmJsonToBlocksTransformStream` – Groups entities into `OsmPbfBlockBuilder` instances with size checks.
 	- `jsonEntitiesToBlocks(entities)` – Async generator producing `OsmPbfBlockBuilder`s.
-	- `osmJsonToPbf(header, entities)` – High-level helper that pipes builders through
-	  `OsmBlocksToPbfBytesTransformStream`.
-	- `OsmPbfBlockBuilder` – Handles string tables, dense node delta encoding, and optional
-	  info records.
+	- `osmJsonToPbf(header, entities)` – High-level helper that pipes builders through `OsmBlocksToPbfBytesTransformStream`.
+	- `OsmPbfBlockBuilder` – Handles string tables, dense node delta encoding, and optional info records.
 - **Block parsing utilities**
 	- `OsmPbfBlockParser` – Decodes groups with configurable `ParseOptions` (tags + metadata).
-	- `parseNode`, `parseWay`, `parseRelation`, `parseDenseNodes` – Parser methods for targeted
-	  decoding.
+	- `parseNode`, `parseWay`, `parseRelation`, `parseDenseNodes` – Parser methods for targeted decoding.
 - **GeoJSON helpers**
 	- `nodeToFeature`, `wayToFeature`, `relationToFeature`, `nodesToFeatures`, `waysToFeatures`.
 	- `wayIsArea(refs, tags)` – Re-exports the wiki heuristics used by the GeoJSON helpers.
 - **Entity helpers and types**
 	- Type guards: `isNode`, `isWay`, `isRelation`.
 	- Equality helpers: `isNodeEqual`, `isWayEqual`, `isRelationEqual`, `entityPropertiesEqual`.
-	- Types: `OsmEntity`, `OsmNode`, `OsmWay`, `OsmRelation`, `OsmTags`, `OsmInfoParsed`, and
-	  `OSM_ENTITY_TYPES`.
+	- Types: `OsmEntity`, `OsmNode`, `OsmWay`, `OsmRelation`, `OsmTags`, `OsmInfoParsed`, and `OSM_ENTITY_TYPES`.
 
 ## Environment and limitations
 
-- Relies on Web Streams, `TextEncoder`/`TextDecoder`, and other modern platform APIs; ensure your
-  runtime exposes them (Bun, Node 20+, current browsers).
-- `osmPbfToJson` expects zlib-compressed blobs as emitted by `@osmix/pbf`; other compression
-  formats are not yet supported.
-- JSON → PBF pipelines assume entities arrive sorted (nodes, then ways, then relations) so
-  block limits are respected.
+- Relies on Web Streams, `TextEncoder`/`TextDecoder`, and other modern platform APIs; ensure your runtime exposes them (Bun, Node 20+, current browsers).
+- `osmPbfToJson` expects zlib-compressed blobs as emitted by `@osmix/pbf`; other compression formats are not yet supported.
+- JSON → PBF pipelines assume entities arrive sorted (nodes, then ways, then relations) so block limits are respected.
 
 ## Development
 
@@ -139,5 +120,4 @@ const feature = wayToFeature(firstWay, (id) => nodeIndex.get(id)!)
 - `bun run lint packages/json`
 - `bun run typecheck packages/json`
 
-Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type
-coverage.
+Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

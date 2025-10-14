@@ -1,19 +1,14 @@
 # @osmix/raster
 
-@osmix/raster turns OpenStreetMap geometries into lightweight raster tiles you can serve to
-MapLibre, Leaflet, or any viewer that can render PNG tiles. It ships a canvas-backed tile
-renderer plus a MapLibre protocol helper so you can generate imagery on demand in modern
-runtimes (Node 20+, Bun, browsers, and workers).
+@osmix/raster turns OpenStreetMap geometries into lightweight raster tiles you can serve to MapLibre, Leaflet, or any viewer that can render PNG tiles. It ships a canvas-backed tile renderer plus a MapLibre protocol helper so you can generate imagery on demand in modern runtimes (Node 20+, Bun, browsers, and workers).
 
 ## Highlights
 
 - Paint nodes and ways into RGBA buffers with a tiny API (`setLonLat`, `drawWay`, `setPixel`).
 - Automatically clip ways to the tile bounds before rasterization so edges stay clean.
 - Export tiles through `OffscreenCanvas` with configurable image encoders (PNG, WebP, etc.).
-- Register a custom `@osmix/raster://` protocol in MapLibre and stream tiles without a tile
-  server.
-- Built on Web APIs and `@mapbox/sphericalmercator` so you can run the same code in workers
-  or serverless handlers.
+- Register a custom `@osmix/raster://` protocol in MapLibre and stream tiles without a tile server.
+- Built on Web APIs and `@mapbox/sphericalmercator` so you can run the same code in workers or serverless handlers.
 
 ## Installation
 
@@ -25,8 +20,7 @@ npm install @osmix/raster
 
 ### Render a tile off the main thread
 
-Use `OsmixRasterTile` to paint nodes or ways into an RGBA buffer and encode it with the
-format of your choice.
+Use `OsmixRasterTile` to paint nodes or ways into an RGBA buffer and encode it with the format of your choice.
 
 ```ts
 import { OsmixRasterTile, DEFAULT_TILE_SIZE } from "@osmix/raster"
@@ -50,14 +44,11 @@ tile.drawWay(
 const pngBytes = await tile.toImageBuffer({ type: "image/png" })
 ```
 
-`setLonLat` + `drawWay` clamp to tile bounds, so you can safely pass geometries that extend
-outside the tile and only the visible portion will be drawn.
+`setLonLat` + `drawWay` clamp to tile bounds, so you can safely pass geometries that extend outside the tile and only the visible portion will be drawn.
 
 ### Plug into MapLibre with a custom protocol
 
-Generate tiles on demand by registering the bundled protocol factory. It parses URLs shaped
-like `@osmix/raster://<osmId>/<tileSize>/<z>/<x>/<y>.png` and hands you the derived tile
-metadata to render or fetch bytes however you like.
+Generate tiles on demand by registering the bundled protocol factory. It parses URLs shaped like `@osmix/raster://<osmId>/<tileSize>/<z>/<x>/<y>.png` and hands you the derived tile metadata to render or fetch bytes however you like.
 
 ```ts
 import maplibregl from "maplibre-gl"
@@ -79,23 +70,15 @@ maplibregl.addProtocol(
 
 ## API overview
 
-- `OsmixRasterTile(bbox, tileIndex, tileSize?)` – Paint pixels for a single tile; exposes
-  `setLonLat`, `setPixel`, `drawLine`, `drawWay`, `toCanvas`, and `toImageBuffer`.
-- Constants: `DEFAULT_TILE_SIZE`, `DEFAULT_RASTER_IMAGE_TYPE`, `DEFAULT_NODE_COLOR`,
-  `DEFAULT_WAY_COLOR`.
-- `createOsmixRasterMaplibreProtocol(getTileImage, tileSize?)` – Returns the callback you
-  can pass to `maplibregl.addProtocol`. It validates URLs, computes a WGS84 bbox, and
-  forwards `tileIndex` + `tileSize`.
+- `OsmixRasterTile(bbox, tileIndex, tileSize?)` – Paint pixels for a single tile; exposes `setLonLat`, `setPixel`, `drawLine`, `drawWay`, `toCanvas`, and `toImageBuffer`.
+- Constants: `DEFAULT_TILE_SIZE`, `DEFAULT_RASTER_IMAGE_TYPE`, `DEFAULT_NODE_COLOR`, `DEFAULT_WAY_COLOR`.
+- `createOsmixRasterMaplibreProtocol(getTileImage, tileSize?)` – Returns the callback you can pass to `maplibregl.addProtocol`. It validates URLs, computes a WGS84 bbox, and forwards `tileIndex` + `tileSize`.
 
 ## Environment and limitations
 
-- Requires runtimes with `OffscreenCanvas`, `ImageData`, `ImageEncoder` APIs, and
-  typed-array support. In Node/Bun, use recent versions (Node 20+, Bun 1.0+) which expose
-  these in workers.
-- The MapLibre protocol helper expects URLs that exactly match the documented template; it
-  throws on malformed paths.
-- Clipping uses the `lineclip` library and assumes geometries are provided in `[lon, lat]`
-  order.
+- Requires runtimes with `OffscreenCanvas`, `ImageData`, `ImageEncoder` APIs, and typed-array support. In Node/Bun, use recent versions (Node 20+, Bun 1.0+) which expose these in workers.
+- The MapLibre protocol helper expects URLs that exactly match the documented template; it throws on malformed paths.
+- Clipping uses the `lineclip` library and assumes geometries are provided in `[lon, lat]` order.
 
 ## Development
 
@@ -103,5 +86,4 @@ maplibregl.addProtocol(
 - `bun run lint packages/raster`
 - `bun run typecheck packages/raster`
 
-Run `bun run check` at the repo root before publishing to ensure formatting, lint, and
-type coverage.
+Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

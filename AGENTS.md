@@ -17,7 +17,7 @@
 
 ## Coding Style & Naming Conventions
 - TypeScript everywhere; prefer ES modules and explicit exports from package entrypoints.
-- Indent with tabs; keep lines under 100 characters when feasible.
+- Indent with tabs; keep lines under 100 characters when feasible. Do not restrict line width in Markdown / README.md
 - Stick to the `@osmix/<package>` naming convention for workspace modules.
 - Run `bun run check` (Biome combined check) before opening a PR to ensure formatting, lint, and organize-imports compliance.
 

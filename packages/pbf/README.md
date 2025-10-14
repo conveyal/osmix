@@ -1,22 +1,14 @@
 # @osmix/pbf
 
-@osmix/pbf is a low-level TypeScript toolkit for reading and writing OpenStreetMap PBF
-data. It keeps the API surface close to the official protobuf schema, surfaces predictable
-types, and runs in Node 20+ and modern browsers through Web Streams and native
-compression primitives.
+@osmix/pbf is a low-level TypeScript toolkit for reading and writing OpenStreetMap PBF data. It keeps the API surface close to the official protobuf schema, surfaces predictable types, and runs in Node 20+ and modern browsers through Web Streams and native compression primitives.
 
 ## Highlights
 
-- Parse headers and primitive blocks from `ArrayBufferLike`, async iterables, or Web
-  `ReadableStream`s.
-- Build streaming pipelines with `TransformStream` helpers instead of buffering entire files
-  in memory.
-- Serialize header and primitive blocks back to spec-compliant blobs with size guardrails
-  baked in.
-- Reuse generated protobuf types/readers so downstream tools can stay close to
-  `osmformat.proto`.
-- Utility helpers handle compression, concatenation, and big-endian encoding tuned for the
-  PBF format.
+- Parse headers and primitive blocks from `ArrayBufferLike`, async iterables, or Web `ReadableStream`s.
+- Build streaming pipelines with `TransformStream` helpers instead of buffering entire files in memory.
+- Serialize header and primitive blocks back to spec-compliant blobs with size guardrails baked in.
+- Reuse generated protobuf types/readers so downstream tools can stay close to `osmformat.proto`.
+- Utility helpers handle compression, concatenation, and big-endian encoding tuned for the PBF format.
 
 ## Installation
 
@@ -28,8 +20,7 @@ npm install @osmix/pbf
 
 ### Read an entire file
 
-`readOsmPbf` accepts an `ArrayBufferLike`, async iterable, or Web `ReadableStream`. It
-returns the header block and an async generator of primitive blocks.
+`readOsmPbf` accepts an `ArrayBufferLike`, async iterable, or Web `ReadableStream`. It returns the header block and an async generator of primitive blocks.
 
 ```ts
 import { readOsmPbf } from "@osmix/pbf"
@@ -92,8 +83,7 @@ const fullFile = concatUint8(...chunks)
 
 #### Stream to a sink
 
-Generators returned by `readOsmPbf` are single-use.
-Re-open the source (or buffer the blocks) if you want to stream the same dataset again.
+Generators returned by `readOsmPbf` are single-use. Re-open the source (or buffer the blocks) if you want to stream the same dataset again.
 
 ```ts
 import { OsmBlocksToPbfBytesTransformStream, readOsmPbf } from "@osmix/pbf"
@@ -114,38 +104,24 @@ await upstream
 	.pipeTo(new WritableStream({ write: persistChunk }))
 ```
 
-`persistChunk` represents your storage layer (filesystem writes, uploads, IndexedDB, and so
-on). It receives `Uint8Array` pieces in the order they should be persisted.
+`persistChunk` represents your storage layer (filesystem writes, uploads, IndexedDB, and so on). It receives `Uint8Array` pieces in the order they should be persisted.
 
 ## API overview
 
-- `readOsmPbf(data)` – Parses binary PBF data, returning `{ header, blocks }`. Throws if the
-  first block is not an OSM header.
-- `OsmPbfBytesToBlocksTransformStream` – Web `TransformStream` that emits the header once
-  and then primitive blocks as they become available.
-- `OsmBlocksToPbfBytesTransformStream` – Inverse transform that turns header/primitive
-  blocks into PBF byte blobs while enforcing size limits.
-- `createOsmPbfBlobGenerator()` – Returns a stateful generator that slices incoming bytes
-  into compressed blob payloads (`Uint8Array`s), emitting the header blob first.
-- `osmPbfBlobsToBlocksGenerator(blobs)` – Accepts a (async) generator of compressed blobs,
-  decompresses them, and yields the header followed by primitive blocks.
-- `osmBlockToPbfBlobBytes(block)` – Serializes a single header or primitive block,
-  returning the BlobHeader length prefix and blob bytes as one `Uint8Array`.
-- Utility exports: `toAsyncGenerator`, `compress`, `decompress`, `concatUint8`, `uint32BE`,
-  and the size constants from `spec.ts`. Compression helpers detect Bun and fall back to
-  Node's zlib bindings for compatibility.
-- Generated protobuf helpers: `readHeaderBlock`, `writeHeaderBlock`, `readPrimitiveBlock`,
-  `writePrimitiveBlock`, plus the associated TypeScript types (`OsmPbfBlock`,
-  `OsmPbfHeaderBlock`, `OsmPbfBlob`, and friends).
+- `readOsmPbf(data)` – Parses binary PBF data, returning `{ header, blocks }`. Throws if the first block is not an OSM header.
+- `OsmPbfBytesToBlocksTransformStream` – Web `TransformStream` that emits the header once and then primitive blocks as they become available.
+- `OsmBlocksToPbfBytesTransformStream` – Inverse transform that turns header/primitive blocks into PBF byte blobs while enforcing size limits.
+- `createOsmPbfBlobGenerator()` – Returns a stateful generator that slices incoming bytes into compressed blob payloads (`Uint8Array`s), emitting the header blob first.
+- `osmPbfBlobsToBlocksGenerator(blobs)` – Accepts a (async) generator of compressed blobs, decompresses them, and yields the header followed by primitive blocks.
+- `osmBlockToPbfBlobBytes(block)` – Serializes a single header or primitive block, returning the BlobHeader length prefix and blob bytes as one `Uint8Array`.
+- Utility exports: `toAsyncGenerator`, `compress`, `decompress`, `concatUint8`, `uint32BE`, and the size constants from `spec.ts`. Compression helpers detect Bun and fall back to Node's zlib bindings for compatibility.
+- Generated protobuf helpers: `readHeaderBlock`, `writeHeaderBlock`, `readPrimitiveBlock`, `writePrimitiveBlock`, plus the associated TypeScript types (`OsmPbfBlock`, `OsmPbfHeaderBlock`, `OsmPbfBlob`, and friends).
 
 ## Environment and limitations
 
-- Requires runtimes with Web Streams + `CompressionStream` / `DecompressionStream`
-  support (modern browsers, Node 20+).
-- Only `zlib_data` blobs are supported today; files containing `raw` or `lzma` payloads
-  will throw.
-- When working with Node `Readable` / `Writable` streams, adapt them to Web Streams
-  (`stream/web`) before passing them to these helpers.
+- Requires runtimes with Web Streams + `CompressionStream` / `DecompressionStream` support (modern browsers, Node 20+).
+- Only `zlib_data` blobs are supported today; files containing `raw` or `lzma` payloads will throw.
+- When working with Node `Readable` / `Writable` streams, adapt them to Web Streams (`stream/web`) before passing them to these helpers.
 
 ## Development
 
@@ -153,5 +129,4 @@ on). It receives `Uint8Array` pieces in the order they should be persisted.
 - `bun run lint packages/pbf`
 - `bun run typecheck packages/pbf`
 
-Run `bun run check` at the repo root before publishing to ensure formatting, lint, and
-type coverage.
+Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

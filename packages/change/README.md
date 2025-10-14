@@ -1,20 +1,14 @@
 # @osmix/change
 
-`@osmix/change` is the change-management companion to `@osmix/core`. It builds, inspects, and
-applies OpenStreetMap changesets on top of `Osmix` datasets, giving you tools to deduplicate
-entities, reconcile overlaps, generate stats, and orchestrate merge pipelines.
+`@osmix/change` is the change-management companion to `@osmix/core`. It builds, inspects, and applies OpenStreetMap changesets on top of `Osmix` datasets, giving you tools to deduplicate entities, reconcile overlaps, generate stats, and orchestrate merge pipelines.
 
 ## Highlights
 
-- Construct repeatable `OsmixChangeset`s that track creates, modifies, and deletes with origin
-  metadata and per-entity refs.
-- Deduplicate coincident nodes or overlapping ways, replace references, and optionally create
-  intersection points where geometry meets.
-- Generate summary stats and OSC-friendly XML fragments so downstream systems can audit each
-  change step.
+- Construct repeatable `OsmixChangeset`s that track creates, modifies, and deletes with origin metadata and per-entity refs.
+- Deduplicate coincident nodes or overlapping ways, replace references, and optionally create intersection points where geometry meets.
+- Generate summary stats and OSC-friendly XML fragments so downstream systems can audit each change step.
 - Run `merge(base, patch, options)` to execute the full dedupe/merge workflow with a single call.
-- Export lightweight utilities for measuring distances, pruning duplicate refs, and deciding
-  when ways should connect.
+- Export lightweight utilities for measuring distances, pruning duplicate refs, and deciding when ways should connect.
 
 ## Installation
 
@@ -22,8 +16,7 @@ entities, reconcile overlaps, generate stats, and orchestrate merge pipelines.
 npm install @osmix/change
 ```
 
-You will typically install this alongside `@osmix/core`, which supplies the `Osmix` datasets the
-changes operate on.
+You will typically install this alongside `@osmix/core`, which supplies the `Osmix` datasets the changes operate on.
 
 ## Usage
 
@@ -46,9 +39,7 @@ console.log(changeStatsSummary(changeset.stats))
 const merged = changeset.applyChanges()
 ```
 
-`OsmixChangeset` keeps track of creates/modifies/deletes per entity type. Call the helpers (`deduplicateNodes`,
-`deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, etc.) in whatever order your workflow
-requires, then `applyChanges()` to produce a new `Osmix` instance with the edits applied.
+`OsmixChangeset` keeps track of creates/modifies/deletes per entity type. Call the helpers (`deduplicateNodes`, `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, etc.) in whatever order your workflow requires, then `applyChanges()` to produce a new `Osmix` instance with the edits applied.
 
 ### Run the bundled merge pipeline
 
@@ -68,29 +59,20 @@ const combined = await merge(base, patch, {
 })
 ```
 
-`merge` wraps a sequence of changesets that deduplicate each dataset, optionally create intersections,
-and (when `directMerge` is true) generate modifications that reconcile the patch into the base.
-Options are all optional and default to `false`, so you can enable only the stages you need.
+`merge` wraps a sequence of changesets that deduplicate each dataset, optionally create intersections, and (when `directMerge` is true) generate modifications that reconcile the patch into the base. Options are all optional and default to `false`, so you can enable only the stages you need.
 
 ## API overview
 
-- `OsmixChangeset` – Collects creates/modifies/deletes, provides helpers (`deduplicateNodes`,
-  `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, `toJson`, `applyChanges`, …),
-  and exposes execution stats.
+- `OsmixChangeset` – Collects creates/modifies/deletes, provides helpers (`deduplicateNodes`, `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, `toJson`, `applyChanges`, …), and exposes execution stats.
 - `merge(base, patch, options)` – High-level merge orchestration built on `OsmixChangeset`.
 - `changeStatsSummary(stats)` – Produces a human-readable summary string of the most significant stats.
-- Utility helpers – `haversineDistance`, `waysShouldConnect`, `isWayIntersectionCandidate`,
-  `removeDuplicateAdjacentWayRefs`, `removeDuplicateAdjacentRelationMembers`, `osmTagsToOscTags`,
-  `cleanCoords`, and supporting conversions.
-- Types – `OsmixMergeOptions`, `OsmixChanges`, `OsmixChange`, `OsmixChangesetStats`, `OsmEntityRef`,
-  and convenience aliases for downstream tooling.
+- Utility helpers – `haversineDistance`, `waysShouldConnect`, `isWayIntersectionCandidate`, `removeDuplicateAdjacentWayRefs`, `removeDuplicateAdjacentRelationMembers`, `osmTagsToOscTags`, `cleanCoords`, and supporting conversions.
+- Types – `OsmixMergeOptions`, `OsmixChanges`, `OsmixChange`, `OsmixChangesetStats`, `OsmEntityRef`, and convenience aliases for downstream tooling.
 
 ## Environment and limitations
 
-- Requires runtimes compatible with `@osmix/core` (Node 20+, Bun, or modern browsers) since the
-  same typed-array data structures are used.
-- Deduplication helpers assume datasets store dense node blocks and rely on spatial indexes built
-  via `Osmix.buildIndexes()`.
+- Requires runtimes compatible with `@osmix/core` (Node 20+, Bun, or modern browsers) since the same typed-array data structures are used.
+- Deduplication helpers assume datasets store dense node blocks and rely on spatial indexes built via `Osmix.buildIndexes()`.
 - Intersections are generated only for highway/footway-style features; polygonal ways are ignored.
 
 ## Development

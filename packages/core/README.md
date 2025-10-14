@@ -32,8 +32,7 @@ console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
 
 ### Stream with progress and extraction
 
-Pass a logger or set one later to receive throttled progress messages. Provide `extractBbox`
-to keep only features intersecting the desired bounds while parsing.
+Pass a logger or set one later to receive throttled progress messages. Provide `extractBbox` to keep only features intersecting the desired bounds while parsing.
 
 ```ts
 import { Osmix } from "@osmix/core"
@@ -123,11 +122,9 @@ self.addEventListener("message", ({ data }) => {
 
 ## Environment and limitations
 
-- Requires runtimes with Web Streams, `TextEncoder`/`TextDecoder`, and zlib-compatible
-  `CompressionStream`/`DecompressionStream` support (Bun, Node 20+, modern browsers).
+- Requires runtimes with Web Streams, `TextEncoder`/`TextDecoder`, and zlib-compatible `CompressionStream`/`DecompressionStream` support (Bun, Node 20+, modern browsers).
 - `readPbf` expects dense-node blocks; PBFs that omit dense encodings are currently unsupported.
-- Filtering during ingest depends on node membership; emit nodes, then ways, then relations when
-  supplying custom entity generators.
+- Filtering during ingest depends on node membership; emit nodes, then ways, then relations when supplying custom entity generators.
 
 ## Development
 
@@ -135,5 +132,4 @@ self.addEventListener("message", ({ data }) => {
 - `bun run lint packages/core`
 - `bun run typecheck packages/core`
 
-Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type
-coverage.
+Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type coverage.
