@@ -1,15 +1,12 @@
 # @osmix/core
 
-@osmix/core wraps the `Osmix` index: a typed-array OpenStreetMap engine that reads `.osm.pbf`
-streams, builds spatial indexes, and emits JSON, PBF, or raster tiles without leaving modern
-JavaScript runtimes.
+@osmix/core wraps the `Osmix` index: a typed-array OpenStreetMap engine that reads `.osm.pbf` streams, builds spatial indexes, and emits JSON, or PBFs without leaving modern JavaScript runtimes.
 
 ## Highlights
 
 - Ingest `.osm.pbf` sources into node, way, and relation stores backed by transferable typed arrays.
 - Run fast bounding-box searches with KDBush/Flatbush and convert matches straight to GeoJSON.
 - Trim extracts, write new PBF buffers, or stream entities to downstream tooling.
-- Generate merge-friendly changesets that deduplicate nodes/ways and build intersections.
 - Ship fully indexed datasets across workers via `transferables()` + `Osmix.from`.
 
 ## Installation
@@ -91,36 +88,6 @@ const pbfBuffer = await downtown.toPbfBuffer()
 
 `extract` returns a new, fully indexed `Osmix` instance with the header bbox updated.
 
-## Changesets and merging
-
-Create targeted changes or run full merges:
-
-```ts
-import { changeStatsSummary } from "@osmix/core"
-
-const changeset = osmix.createChangeset()
-changeset.deduplicateNodes(osm.nodes)
-changeset.deduplicateWays(osm.ways)
-const merged = changeset.applyChanges()
-
-console.log(changeStatsSummary(changeset.stats))
-```
-
-High-level merges are available via `await Osmix.merge(base, patch, { directMerge: true })`,
-which orchestrates deduplication, optional intersection creation, and direct-change generation.
-
-## Raster tiles
-
-`createRasterTile(bbox, tileIndex, tileSize)` links a raster buffer to the index. Draw helpers
-render tagged nodes and clipped ways into an `Uint8ClampedArray`.
-
-```ts
-const tile = osm.createRasterTile(bbox, { z: 15, x: 5232, y: 10042 }, 256)
-tile.drawWays()
-tile.drawNodes()
-const imageData = tile.imageData
-```
-
 ## Transfer between threads
 
 Typed arrays keep the index transferable.
@@ -152,10 +119,7 @@ self.addEventListener("message", ({ data }) => {
 ## API overview
 
 - `Osmix` – ingest PBF sources, build indexes, query entities, extract subsets, and emit JSON/PBF.
-- `OsmChangeset` – deduplicate nodes/ways, generate direct merges, create OSC snippets, apply
-  edits to produce a new `Osmix` instance.
-- `OsmixRasterTile` – rasterise indexed data into tile-sized buffers with lon/lat helpers.
-- Utilities – `changeStatsSummary`, `throttle`, plus all shared type definitions from `types`.
+- `Nodes` / `Ways` / `Relations` – typed-array backed stores exposed for advanced workflows.
 
 ## Environment and limitations
 
