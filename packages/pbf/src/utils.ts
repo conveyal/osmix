@@ -39,8 +39,8 @@ export async function* toAsyncGenerator<T>(
 /**
  * Returns true when executing inside the Bun runtime.
  */
-function isBun(): boolean {
-	return typeof Bun !== "undefined"
+export function isBun(): boolean {
+	return "Bun" in globalThis
 }
 
 /**
