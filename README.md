@@ -1,7 +1,6 @@
 # Osmix
 
-Osmix is a TypeScript monorepo for reading, inspecting, and merging OpenStreetMap PBF data in modern runtimes and the browser. It combines a worker-driven merge UI with libraries that span low-level PBF parsing, JSON transforms, and efficient typed-array indexes designed for any JavaScript 
-environment.
+Osmix is a TypeScript monorepo which provides tools for reading, inspecting, and merging OpenStreetMap PBF data in modern runtimes and the browser. It combines a worker-driven merge UI with libraries that span low-level PBF parsing, JSON transforms, and efficient typed-array indexes designed for any JavaScript environment.
 
 ## Architecture highlights
 
