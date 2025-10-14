@@ -48,6 +48,7 @@
 - Indent with tabs; keep lines under 100 characters when feasible, and avoid manual Markdown line wrapping unless required.
 - Stick to the `@osmix/<package>` naming convention for workspace modules.
 - Always run `bun run format`, `bun run typecheck`, and `bun run test` before considering a task complete.
+- File names use `kebab-case`.
 
 ## Testing Guidelines
 - Use Vitest (`describe`/`it`) and helpers from `@osmix/test-utils` for deterministic expectations.
