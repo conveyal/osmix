@@ -24,13 +24,13 @@ import ChangesSummary, {
 import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
+import SelectedEntityLayer from "@/components/selected-entity-layer"
 import SidebarLog from "@/components/sidebar-log"
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group"
 import {
 	useFlyToEntity,
 	useFlyToOsmBounds,
 	usePickableOsmTileLayer,
-	useSelectedEntityLayer,
 } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
 import { APPID } from "@/settings"
@@ -60,7 +60,6 @@ export default function InspectPage() {
 	const bbox = useMemo(() => osm?.bbox(), [osm])
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const tileLayer = usePickableOsmTileLayer(osm)
-	const selectedEntityLayer = useSelectedEntityLayer()
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 
 	const applyChanges = async (osmId: string) => {
@@ -186,7 +185,7 @@ export default function InspectPage() {
 						</Source>
 					)}
 					<DeckGlOverlay
-						layers={[tileLayer, selectedEntityLayer]}
+						layers={[tileLayer]}
 						pickingRadius={5}
 						getTooltip={(pickingInfo) => {
 							const sourceLayerId = pickingInfo.sourceLayer?.id
@@ -208,8 +207,11 @@ export default function InspectPage() {
 							}
 							return null
 						}}
+						interleaved
 					/>
 					{osm && <OsmixRasterSource osmId={osm.id} />}
+
+					<SelectedEntityLayer />
 
 					<CustomControl position="top-left">
 						<NominatimSearchControl />

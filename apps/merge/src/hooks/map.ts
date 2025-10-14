@@ -9,11 +9,7 @@ import { useCallback, useMemo } from "react"
 import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
 import { Log } from "@/state/log"
 import { mapAtom } from "@/state/map"
-import {
-	selectedEntityAtom,
-	selectedOsmAtom,
-	selectOsmEntityAtom,
-} from "@/state/osm"
+import { selectOsmEntityAtom } from "@/state/osm"
 import { osmWorker } from "@/state/worker"
 
 export function useFlyToEntity() {
@@ -197,26 +193,5 @@ export function usePickableOsmTileLayer(osm?: Osmix | null) {
 		})
 	}, [osm, selectEntity])
 
-	return layer
-}
-
-export function useSelectedEntityLayer() {
-	const selectedOsm = useAtomValue(selectedOsmAtom)
-	const selectedEntity = useAtomValue(selectedEntityAtom)
-	const layer = useMemo(() => {
-		if (!selectedOsm || !selectedEntity) return null
-		const geojson = selectedOsm.getEntityGeoJson(selectedEntity)
-		return new GeoJsonLayer({
-			id: `${APPID}:${selectedOsm.id}:selected-entity`,
-			data: geojson,
-			getLineColor: [255, 0, 0, 255],
-			getLineWidth: 3,
-			pointRadiusMinPixels: 2,
-			pointRadiusMaxPixels: 10,
-			lineWidthMinPixels: 2,
-			lineWidthMaxPixels: 10,
-			filled: false,
-		})
-	}, [selectedEntity, selectedOsm])
 	return layer
 }

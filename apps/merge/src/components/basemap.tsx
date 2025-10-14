@@ -1,10 +1,14 @@
 import { useSetAtom } from "jotai"
+import { useCallback, useEffect } from "react"
 import {
 	Map as MaplibreMap,
+	type MapStyleDataEvent,
 	NavigationControl,
 	ScaleControl,
+	useMap,
+	type ViewStateChangeEvent,
 } from "react-map-gl/maplibre"
-
+import { APPID } from "@/settings"
 import { mapAtom, mapBoundsAtom, mapCenterAtom, zoomAtom } from "@/state/map"
 
 const MAP_STYLE =
@@ -12,62 +16,74 @@ const MAP_STYLE =
 const MAP_CENTER = [-120.5, 46.6] as const // Yakima, WA
 const MAP_ZOOM = 10
 
-export default function Basemap({
-	children,
-	longitude,
-	latitude,
-	zoom,
-}: {
-	children?: React.ReactNode
-	longitude?: number
-	latitude?: number
-	zoom?: number
-}) {
+const initialViewState = {
+	longitude: MAP_CENTER[0],
+	latitude: MAP_CENTER[1],
+	zoom: MAP_ZOOM,
+}
+
+// Hide roads in base map
+const onStyleData = (e: MapStyleDataEvent) => {
+	const map = e.target
+	const style = map.getStyle()
+	const layers = style.layers
+	for (const layer of layers) {
+		if (layer.id.startsWith(APPID)) continue
+		if (layer.type === "line" || layer.type === "symbol") {
+			map.setLayoutProperty(layer.id, "visibility", "none")
+		}
+	}
+}
+
+const controlStyle: React.CSSProperties = {
+	borderRadius: "var(--radius)",
+}
+
+function SetMap() {
+	const mapCollection = useMap()
+	const setMap = useSetAtom(mapAtom)
+	useEffect(() => {
+		const map = mapCollection.current?.getMap()
+		if (map) setMap(map)
+	}, [mapCollection, setMap])
+	return null
+}
+
+export default function Basemap({ children }: { children?: React.ReactNode }) {
 	const setCenter = useSetAtom(mapCenterAtom)
 	const setBounds = useSetAtom(mapBoundsAtom)
-	const setMap = useSetAtom(mapAtom)
 	const setZoom = useSetAtom(zoomAtom)
+
+	const onViewStateChange = useCallback(
+		(e: ViewStateChangeEvent) => {
+			setBounds(e.target.getBounds())
+			setCenter(e.target.getCenter())
+			setZoom(e.target.getZoom())
+		},
+		[setBounds, setCenter, setZoom],
+	)
+
 	return (
 		<MaplibreMap
 			mapStyle={MAP_STYLE}
 			reuseMaps={true}
-			initialViewState={{
-				longitude: longitude ?? MAP_CENTER[0],
-				latitude: latitude ?? MAP_CENTER[1],
-				zoom: zoom ?? MAP_ZOOM,
-			}}
-			onLoad={(e) => {
-				const map = e.target
-				setBounds(map.getBounds())
-				setCenter(map.getCenter())
-				setZoom(map.getZoom())
-			}}
-			onMove={(e) => {
-				setBounds(e.target.getBounds())
-				setCenter(e.target.getCenter())
-			}}
-			onZoom={(e) => {
-				setBounds(e.target.getBounds())
-				setZoom(e.viewState.zoom)
-			}}
-			onStyleData={(e) => {
-				// Hide roads in base map
-				const map = e.target
-				const style = map.getStyle()
-				const layers = style.layers
-				for (const layer of layers) {
-					if (layer.id.startsWith("osm-tk")) continue
-					if (layer.type === "line" || layer.type === "symbol") {
-						map.setLayoutProperty(layer.id, "visibility", "none")
-					}
-				}
-			}}
-			ref={(map) => {
-				if (map) setMap(map.getMap())
-			}}
+			initialViewState={initialViewState}
+			onMove={onViewStateChange}
+			onZoom={onViewStateChange}
+			onStyleData={onStyleData}
 		>
-			<NavigationControl position="top-right" />
-			<ScaleControl position="bottom-left" unit="imperial" />
+			<SetMap />
+			<NavigationControl
+				position="top-right"
+				style={controlStyle}
+				showCompass={false}
+				visualizePitch={false}
+			/>
+			<ScaleControl
+				style={controlStyle}
+				position="bottom-left"
+				unit="imperial"
+			/>
 
 			{children}
 		</MaplibreMap>

@@ -34,6 +34,7 @@ import ChangesSummary, {
 import OsmInfoTable from "@/components/osm-info-table"
 import OsmPbfFileInput from "@/components/osm-pbf-file-input"
 import OsmixRasterSource from "@/components/osmix-raster-source"
+import SelectedEntityLayer from "@/components/selected-entity-layer"
 import SidebarLog from "@/components/sidebar-log"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group"
@@ -50,7 +51,6 @@ import {
 	useFlyToEntity,
 	useFlyToOsmBounds,
 	usePickableOsmTileLayer,
-	useSelectedEntityLayer,
 } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
@@ -96,7 +96,6 @@ export default function Merge() {
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const baseTileLayer = usePickableOsmTileLayer(base.osm)
 	const patchTileLayer = usePickableOsmTileLayer(patch.osm)
-	const selectedEntityLayer = useSelectedEntityLayer()
 
 	const [stepIndex, setStepIndex] = useAtom(stepIndexAtom)
 
@@ -691,11 +690,7 @@ export default function Merge() {
 			<MapContent>
 				<Basemap>
 					<DeckGlOverlay
-						layers={[
-							baseTileLayer,
-							stepIndex > 0 ? null : patchTileLayer,
-							selectedEntityLayer,
-						]}
+						layers={[baseTileLayer, stepIndex > 0 ? null : patchTileLayer]}
 						getTooltip={(pickingInfo) => {
 							const sourceLayerId = pickingInfo.sourceLayer?.id
 							if (
@@ -722,6 +717,8 @@ export default function Merge() {
 					/>
 					{base.osm && <OsmixRasterSource osmId={base.osm.id} />}
 					{patch.osm && <OsmixRasterSource osmId={patch.osm.id} />}
+
+					<SelectedEntityLayer />
 
 					<CustomControl position="top-left">
 						<NominatimSearchControl />

@@ -10,7 +10,10 @@ import {
 	type TileIndex,
 } from "../src/raster-tile"
 
-function createTile(tileIndex: TileIndex = { z: 3, x: 4, y: 5 }, tileSize = 64) {
+function createTile(
+	tileIndex: TileIndex = { z: 3, x: 4, y: 5 },
+	tileSize = 64,
+) {
 	const merc = new SphericalMercator({ size: tileSize })
 	const bbox = merc.bbox(tileIndex.x, tileIndex.y, tileIndex.z) as GeoBbox2D
 	return {
@@ -37,20 +40,11 @@ describe("OsmixRasterTile", () => {
 		const tileIndex: TileIndex = { z: 2, x: 1, y: 1 }
 		const { tile, merc } = createTile(tileIndex, DEFAULT_TILE_SIZE)
 
-		const insideLonLat = lonLatForPixel(
-			merc,
-			tileIndex,
-			tile.tileSize,
-			32,
-			16,
-		)
+		const insideLonLat = lonLatForPixel(merc, tileIndex, tile.tileSize, 32, 16)
 		expect(tile.lonLatToPixel(insideLonLat)).toEqual([32, 16])
 
 		const outsideTopLeft = merc.ll(
-			[
-				tileIndex.x * tile.tileSize - 10,
-				tileIndex.y * tile.tileSize - 10,
-			],
+			[tileIndex.x * tile.tileSize - 10, tileIndex.y * tile.tileSize - 10],
 			tileIndex.z,
 		) as [number, number]
 		expect(tile.lonLatToPixel(outsideTopLeft)).toEqual([0, 0])
@@ -96,16 +90,19 @@ describe("OsmixRasterTile", () => {
 		const endPixel = [40, 36] as const
 
 		const way = [
-			lonLatForPixel(merc, tileIndex, tile.tileSize, startPixel[0], startPixel[1]),
+			lonLatForPixel(
+				merc,
+				tileIndex,
+				tile.tileSize,
+				startPixel[0],
+				startPixel[1],
+			),
 			lonLatForPixel(merc, tileIndex, tile.tileSize, endPixel[0], endPixel[1]),
 		]
 
 		// Prefix and suffix points outside the tile bounds to exercise clipping.
 		const outsidePrefix = merc.ll(
-			[
-				tileIndex.x * tile.tileSize - 20,
-				tileIndex.y * tile.tileSize - 20,
-			],
+			[tileIndex.x * tile.tileSize - 20, tileIndex.y * tile.tileSize - 20],
 			tileIndex.z,
 		) as [number, number]
 		const outsideSuffix = merc.ll(
@@ -178,7 +175,8 @@ describe("OsmixRasterTile", () => {
 				}
 			}
 
-			globalThis.OffscreenCanvas = MockOffscreenCanvas as unknown as typeof OffscreenCanvas
+			globalThis.OffscreenCanvas =
+				MockOffscreenCanvas as unknown as typeof OffscreenCanvas
 			globalThis.ImageData = MockImageData as unknown as typeof ImageData
 
 			const result = await tile.toImageBuffer()
