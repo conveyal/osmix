@@ -11,10 +11,10 @@ import {
 import { compress, concatUint8, uint32BE } from "./utils"
 
 /**
- * Turn a OSM Block into a PBF Blob as bytes.
- * @param type - The type of the blob.
- * @param contentPbf - The PBF content.
- * @returns The Blob as bytes.
+ * Serializes a header or primitive block into a spec-compliant compressed blob.
+ * Automatically sets the blob type, compresses the payload, and enforces size guardrails.
+ * @param block - Parsed header or primitive block to encode.
+ * @returns BlobHeader length prefix + Blob bytes as a single Uint8Array.
  */
 export async function osmBlockToPbfBlobBytes(
 	block: OsmPbfBlock | OsmPbfHeaderBlock,
@@ -73,7 +73,8 @@ export async function osmBlockToPbfBlobBytes(
 }
 
 /**
- * Transform a stream of OSM blocks to a stream of PBF bytes. Header *must* be the first block.
+ * Web `TransformStream` that converts OSM header/data blocks into PBF byte chunks.
+ * Throws if the header is not the first block and reuses `osmBlockToPbfBlobBytes` for encoding.
  */
 export class OsmBlocksToPbfBytesTransformStream extends TransformStream<
 	OsmPbfHeaderBlock | OsmPbfBlock,

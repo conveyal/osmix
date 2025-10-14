@@ -7,7 +7,7 @@ export type AsyncGeneratorValue<T> =
 	| Promise<AsyncGenerator<T>>
 
 /**
- * Convert a value or a stream to an async generator.
+ * Normalizes values, streams, and iterables into a unified async generator interface.
  */
 export async function* toAsyncGenerator<T>(
 	v: AsyncGeneratorValue<T>,
@@ -37,15 +37,15 @@ export async function* toAsyncGenerator<T>(
 }
 
 /**
- * Check if we're in Bun runtime.
+ * Returns true when executing inside the Bun runtime.
  */
 function isBun(): boolean {
 	return typeof Bun !== "undefined"
 }
 
 /**
- * Async decompress data via a decompression stream.
- * Detects Bun runtime and uses Node.js zlib module for compatibility with OSM PBF format.
+ * Decompresses binary data using runtime-native APIs.
+ * Falls back to Node zlib when running under Bun to match OSM PBF expectations.
  */
 export async function decompress(
 	data: BlobPart,
@@ -82,8 +82,8 @@ export async function decompress(
 }
 
 /**
- * Compress data using the native browser/runtime compression stream.
- * Detects Bun runtime and uses Node.js zlib module for compatibility with OSM PBF format.
+ * Compresses binary data using runtime-native APIs.
+ * Falls back to Node zlib when running under Bun to match OSM PBF expectations.
  */
 export async function compress(
 	data: BlobPart,
@@ -117,7 +117,7 @@ export async function compress(
 }
 
 /**
- * Concatenate Uint8Arrays.
+ * Concatenates multiple `Uint8Array` segments into a contiguous array.
  */
 export function concatUint8(...parts: Uint8Array[]): Uint8Array {
 	const total = parts.reduce((n, p) => n + p.length, 0)
@@ -131,7 +131,7 @@ export function concatUint8(...parts: Uint8Array[]): Uint8Array {
 }
 
 /**
- * Encode a 32-bit *big-endian* unsigned integer.
+ * Encodes a 32-bit big-endian unsigned integer as a four-byte buffer.
  */
 export function uint32BE(n: number): Uint8Array {
 	const out = new Uint8Array(4)

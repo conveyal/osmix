@@ -12,6 +12,9 @@ export type OsmPbfBlobHeader = {
 	datasize: number
 }
 
+/**
+ * Reads an `OsmPbfBlob` message from the current position in the Pbf reader.
+ */
 export function readBlob(pbf: Pbf, end?: number): OsmPbfBlob {
 	return pbf.readFields(
 		readBlobField,
@@ -21,6 +24,9 @@ export function readBlob(pbf: Pbf, end?: number): OsmPbfBlob {
 		end,
 	)
 }
+/**
+ * Dispatches individual Blob fields based on their protobuf tag.
+ */
 function readBlobField(tag: number, obj: OsmPbfBlob, pbf: Pbf) {
 	if (tag === 2) obj.raw_size = pbf.readVarint(true)
 	else if (tag === 1) {
@@ -29,12 +35,18 @@ function readBlobField(tag: number, obj: OsmPbfBlob, pbf: Pbf) {
 		obj.zlib_data = pbf.readBytes()
 	}
 }
+/**
+ * Writes an `OsmPbfBlob` message to the provided Pbf writer.
+ */
 export function writeBlob(obj: OsmPbfBlob, pbf: Pbf) {
 	if (obj.raw_size) pbf.writeVarintField(2, obj.raw_size)
 	if (obj.raw != null) pbf.writeBytesField(1, obj.raw)
 	if (obj.zlib_data != null) pbf.writeBytesField(3, obj.zlib_data)
 }
 
+/**
+ * Reads an `OsmPbfBlobHeader` from the current position in the Pbf reader.
+ */
 export function readBlobHeader(pbf: Pbf, end?: number): OsmPbfBlobHeader {
 	return pbf.readFields(
 		readBlobHeaderField,
@@ -42,10 +54,16 @@ export function readBlobHeader(pbf: Pbf, end?: number): OsmPbfBlobHeader {
 		end,
 	)
 }
+/**
+ * Dispatches individual BlobHeader fields based on their protobuf tag.
+ */
 function readBlobHeaderField(tag: number, obj: OsmPbfBlobHeader, pbf: Pbf) {
 	if (tag === 1) obj.type = pbf.readString() as OsmPbfBlobHeader["type"]
 	else if (tag === 3) obj.datasize = pbf.readVarint(true)
 }
+/**
+ * Writes an `OsmPbfBlobHeader` message to the provided Pbf writer.
+ */
 export function writeBlobHeader(obj: OsmPbfBlobHeader, pbf: Pbf) {
 	if (obj.type) pbf.writeStringField(1, obj.type)
 	if (obj.datasize) pbf.writeVarintField(3, obj.datasize)

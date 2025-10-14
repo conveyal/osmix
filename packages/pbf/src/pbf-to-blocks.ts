@@ -12,7 +12,8 @@ import { type AsyncGeneratorValue, decompress, toAsyncGenerator } from "./utils"
 export const HEADER_LENGTH_BYTES = 4
 
 /**
- * Create an OSM PBF reader from binary data.
+ * Parses OSM PBF bytes from buffers, streams, or generators into header + block iterators.
+ * Returns the decoded header and a lazy async generator of primitive blocks.
  */
 export async function readOsmPbf(data: AsyncGeneratorValue<ArrayBufferLike>) {
 	const generateBlobsFromChunk = createOsmPbfBlobGenerator()
@@ -38,7 +39,8 @@ export async function readOsmPbf(data: AsyncGeneratorValue<ArrayBufferLike>) {
 }
 
 /**
- * Transform a stream of PBF bytes to a stream of OSM blocks. Assumes that the first block is the header.
+ * Web `TransformStream` that turns raw PBF byte chunks into OSM header/data blocks.
+ * Assumes the first decoded blob carries the header and emits it before any primitive blocks.
  */
 export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
 	ArrayBufferLike,

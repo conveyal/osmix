@@ -125,14 +125,15 @@ on). It receives `Uint8Array` pieces in the order they should be persisted.
   and then primitive blocks as they become available.
 - `OsmBlocksToPbfBytesTransformStream` – Inverse transform that turns header/primitive
   blocks into PBF byte blobs while enforcing size limits.
-- `createOsmPbfBlobGenerator()` – Returns a stateful generator for turning incoming bytes
-  into compressed blob payloads (`Uint8Array`s).
-- `osmPbfBlobsToBlocksGenerator(blobs)` – Accepts a (async) generator of compressed blobs
-  and yields parsed header and primitive blocks.
-- `osmBlockToPbfBlobBytes(block)` – Serializes a single header or primitive block into a
-  spec-compliant PBF blob (`Uint8Array`).
+- `createOsmPbfBlobGenerator()` – Returns a stateful generator that slices incoming bytes
+  into compressed blob payloads (`Uint8Array`s), emitting the header blob first.
+- `osmPbfBlobsToBlocksGenerator(blobs)` – Accepts a (async) generator of compressed blobs,
+  decompresses them, and yields the header followed by primitive blocks.
+- `osmBlockToPbfBlobBytes(block)` – Serializes a single header or primitive block,
+  returning the BlobHeader length prefix and blob bytes as one `Uint8Array`.
 - Utility exports: `toAsyncGenerator`, `compress`, `decompress`, `concatUint8`, `uint32BE`,
-  and the size constants from `spec.ts`.
+  and the size constants from `spec.ts`. Compression helpers detect Bun and fall back to
+  Node's zlib bindings for compatibility.
 - Generated protobuf helpers: `readHeaderBlock`, `writeHeaderBlock`, `readPrimitiveBlock`,
   `writePrimitiveBlock`, plus the associated TypeScript types (`OsmPbfBlock`,
   `OsmPbfHeaderBlock`, `OsmPbfBlob`, and friends).

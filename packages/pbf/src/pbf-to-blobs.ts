@@ -7,19 +7,19 @@ import {
 } from "./proto/fileformat"
 
 /**
- * Create a generator that takes ArrayBuffer chunks and yields compressed OSM PBF Blobs. This tracks the state of the parser
- * and allows for incremental parsing of incoming data. The first value yielded is the file header. Subsequent values are
- * primitive blocks. This function is written to be used both with generators and streams.
- *
- * Leaves decompression and block parsing to the caller.
+ * Creates a stateful parser that slices incoming bytes into compressed OSM PBF blobs.
+ * Works with buffers, iterables, or streams and yields `Uint8Array` payloads ready to decompress.
+ * The first blob represents the file header; subsequent blobs hold primitive data.
  */
-
 export function createOsmPbfBlobGenerator() {
 	let pbf: Pbf = new Pbf(new Uint8Array(0))
 	let state: "header-length" | "header" | "blob" = "header-length"
 	let bytesNeeded: number = HEADER_LENGTH_BYTES
 	let blobHeader: OsmPbfBlobHeader | null = null
 
+	/**
+	 * Feed the parser with the next chunk of bytes and yield any complete compressed blobs.
+	 */
 	return function* nextChunk(chunk: Uint8Array) {
 		const currentBuffer: Uint8Array = pbf.buf.slice(pbf.pos)
 		const tmpBuffer = new Uint8Array(

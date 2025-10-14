@@ -3,7 +3,8 @@ import { readHeaderBlock, readPrimitiveBlock } from "./proto/osmformat"
 import { decompress } from "./utils"
 
 /**
- * Helper to turn a generator of compressed Blob data into a generator of decompressed and parsed header and primitive blocks.
+ * Decompresses raw OSM PBF blobs and yields typed header and primitive blocks.
+ * Expects the first blob to contain the file header and streams the rest as data blocks.
  */
 export async function* osmPbfBlobsToBlocksGenerator(
 	blobs:

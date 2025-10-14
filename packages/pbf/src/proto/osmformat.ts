@@ -88,6 +88,9 @@ export interface OsmPbfRelation extends OsmPbfPrimitive {
 	types: number[]
 }
 
+/**
+ * Reads an `OsmPbfHeaderBlock` message from the provided Pbf reader.
+ */
 export function readHeaderBlock(pbf: Pbf, end?: number): OsmPbfHeaderBlock {
 	return pbf.readFields(
 		readHeaderBlockField,
@@ -98,6 +101,9 @@ export function readHeaderBlock(pbf: Pbf, end?: number): OsmPbfHeaderBlock {
 		end,
 	)
 }
+/**
+ * Populates header block fields based on the protobuf tag encountered.
+ */
 function readHeaderBlockField(tag: number, obj: OsmPbfHeaderBlock, pbf: Pbf) {
 	if (tag === 1) obj.bbox = readHeaderBBox(pbf, pbf.readVarint() + pbf.pos)
 	else if (tag === 4) obj.required_features.push(pbf.readString())
@@ -109,6 +115,9 @@ function readHeaderBlockField(tag: number, obj: OsmPbfHeaderBlock, pbf: Pbf) {
 		obj.osmosis_replication_sequence_number = pbf.readVarint(true)
 	} else if (tag === 34) obj.osmosis_replication_base_url = pbf.readString()
 }
+/**
+ * Serializes an `OsmPbfHeaderBlock` message into the Pbf writer.
+ */
 export function writeHeaderBlock(obj: OsmPbfHeaderBlock, pbf: Pbf) {
 	if (obj.bbox) pbf.writeMessage(1, writeHeaderBBox, obj.bbox)
 	if (obj.required_features) {
@@ -130,6 +139,9 @@ export function writeHeaderBlock(obj: OsmPbfHeaderBlock, pbf: Pbf) {
 	}
 }
 
+/**
+ * Reads a header bounding box and converts nanodegrees to degrees.
+ */
 function readHeaderBBox(pbf: Pbf, end?: number): OsmPbfHeaderBBox {
 	return pbf.readFields(
 		readHeaderBBoxField,
@@ -138,7 +150,7 @@ function readHeaderBBox(pbf: Pbf, end?: number): OsmPbfHeaderBBox {
 	)
 }
 /**
- * Read values and convert from nanodegrees to degrees.
+ * Populates bounding box properties while converting from nanodegrees.
  */
 function readHeaderBBoxField(tag: number, obj: OsmPbfHeaderBBox, pbf: Pbf) {
 	if (tag === 1) obj.left = pbf.readSVarint() / 1e9
@@ -146,6 +158,9 @@ function readHeaderBBoxField(tag: number, obj: OsmPbfHeaderBBox, pbf: Pbf) {
 	else if (tag === 3) obj.top = pbf.readSVarint() / 1e9
 	else if (tag === 4) obj.bottom = pbf.readSVarint() / 1e9
 }
+/**
+ * Serializes a header bounding box, converting degrees back to nanodegrees.
+ */
 function writeHeaderBBox(obj: OsmPbfHeaderBBox, pbf: Pbf) {
 	if (obj.left) pbf.writeSVarintField(1, obj.left * 1e9)
 	if (obj.right) pbf.writeSVarintField(2, obj.right * 1e9)
@@ -153,6 +168,9 @@ function writeHeaderBBox(obj: OsmPbfHeaderBBox, pbf: Pbf) {
 	if (obj.bottom) pbf.writeSVarintField(4, obj.bottom * 1e9)
 }
 
+/**
+ * Reads a primitive block containing string tables and primitive groups.
+ */
 export function readPrimitiveBlock(pbf: Pbf, end?: number): OsmPbfBlock {
 	return pbf.readFields(
 		readPrimitiveBlockField,
@@ -164,6 +182,9 @@ export function readPrimitiveBlock(pbf: Pbf, end?: number): OsmPbfBlock {
 	)
 }
 
+/**
+ * Populates primitive block fields based on protobuf tags.
+ */
 function readPrimitiveBlockField(tag: number, obj: OsmPbfBlock, pbf: Pbf) {
 	if (tag === 1) {
 		obj.stringtable = readStringTable(pbf, pbf.readVarint() + pbf.pos)
@@ -177,6 +198,9 @@ function readPrimitiveBlockField(tag: number, obj: OsmPbfBlock, pbf: Pbf) {
 	else if (tag === 18) obj.date_granularity = pbf.readVarint(true) ?? 1000
 }
 
+/**
+ * Serializes a primitive block including its string table and primitive groups.
+ */
 export function writePrimitiveBlock(obj: OsmPbfBlock, pbf: Pbf) {
 	if (obj.stringtable) pbf.writeMessage(1, writeStringTable, obj.stringtable)
 	if (obj.primitivegroup) {
@@ -195,6 +219,9 @@ export function writePrimitiveBlock(obj: OsmPbfBlock, pbf: Pbf) {
 	}
 }
 
+/**
+ * Reads a primitive group with collections of primitives.
+ */
 function readPrimitiveGroup(pbf: Pbf, end?: number): OsmPbfGroup {
 	return pbf.readFields(
 		readPrimitiveGroupField,
@@ -202,6 +229,9 @@ function readPrimitiveGroup(pbf: Pbf, end?: number): OsmPbfGroup {
 		end,
 	)
 }
+/**
+ * Populates primitive group collections from protobuf data.
+ */
 function readPrimitiveGroupField(tag: number, obj: OsmPbfGroup, pbf: Pbf) {
 	if (tag === 1) obj.nodes.push(readNode(pbf, pbf.readVarint() + pbf.pos))
 	else if (tag === 2) {
@@ -211,6 +241,9 @@ function readPrimitiveGroupField(tag: number, obj: OsmPbfGroup, pbf: Pbf) {
 		obj.relations.push(readRelation(pbf, pbf.readVarint() + pbf.pos))
 	}
 }
+/**
+ * Serializes a primitive group to protobuf.
+ */
 function writePrimitiveGroup(obj: OsmPbfGroup, pbf: Pbf) {
 	if (obj.nodes) {
 		for (const item of obj.nodes) pbf.writeMessage(1, writeNode, item)
@@ -224,21 +257,36 @@ function writePrimitiveGroup(obj: OsmPbfGroup, pbf: Pbf) {
 	}
 }
 
+/**
+ * Reads the shared string table for a primitive block.
+ */
 function readStringTable(pbf: Pbf, end?: number): OsmPbfStringTable {
 	return pbf.readFields(readStringTableField, [], end)
 }
+/**
+ * Appends string table entries as they are encountered.
+ */
 function readStringTableField(tag: number, obj: Uint8Array[], pbf: Pbf) {
 	if (tag === 1) obj.push(pbf.readBytes())
 }
+/**
+ * Serializes string table entries.
+ */
 function writeStringTable(obj: OsmPbfStringTable, pbf: Pbf) {
 	if (obj) {
 		for (const item of obj) pbf.writeBytesField(1, item)
 	}
 }
 
+/**
+ * Reads metadata describing a single primitive.
+ */
 function readInfo(pbf: Pbf, end?: number): OsmPbfInfo {
 	return pbf.readFields(readInfoField, {}, end)
 }
+/**
+ * Populates primitive metadata fields.
+ */
 function readInfoField(tag: number, obj: OsmPbfInfo, pbf: Pbf) {
 	if (tag === 1) obj.version = pbf.readVarint(true)
 	else if (tag === 2) obj.timestamp = pbf.readVarint(true)
@@ -247,6 +295,9 @@ function readInfoField(tag: number, obj: OsmPbfInfo, pbf: Pbf) {
 	else if (tag === 5) obj.user_sid = pbf.readVarint()
 	else if (tag === 6) obj.visible = pbf.readBoolean()
 }
+/**
+ * Serializes primitive metadata fields.
+ */
 function writeInfo(obj: OsmPbfInfo, pbf: Pbf) {
 	if (obj.version != null && obj.version !== -1) {
 		pbf.writeVarintField(1, obj.version)
@@ -258,6 +309,9 @@ function writeInfo(obj: OsmPbfInfo, pbf: Pbf) {
 	if (obj.visible) pbf.writeBooleanField(6, obj.visible)
 }
 
+/**
+ * Reads dense node metadata collections.
+ */
 function readDenseInfo(pbf: Pbf, end?: number): OsmPbfDenseInfo {
 	return pbf.readFields(
 		readDenseInfoField,
@@ -272,6 +326,9 @@ function readDenseInfo(pbf: Pbf, end?: number): OsmPbfDenseInfo {
 		end,
 	)
 }
+/**
+ * Populates dense node metadata arrays from packed fields.
+ */
 function readDenseInfoField(tag: number, obj: OsmPbfDenseInfo, pbf: Pbf) {
 	if (tag === 1) pbf.readPackedVarint(obj.version, true)
 	else if (tag === 2) pbf.readPackedSVarint(obj.timestamp)
@@ -280,6 +337,9 @@ function readDenseInfoField(tag: number, obj: OsmPbfDenseInfo, pbf: Pbf) {
 	else if (tag === 5) pbf.readPackedSVarint(obj.user_sid)
 	else if (tag === 6) pbf.readPackedBoolean(obj.visible)
 }
+/**
+ * Serializes dense node metadata arrays.
+ */
 function writeDenseInfo(obj: OsmPbfDenseInfo, pbf: Pbf) {
 	if (obj.version) pbf.writePackedVarint(1, obj.version)
 	if (obj.timestamp) pbf.writePackedSVarint(2, obj.timestamp)
@@ -289,6 +349,9 @@ function writeDenseInfo(obj: OsmPbfDenseInfo, pbf: Pbf) {
 	if (obj.visible) pbf.writePackedBoolean(6, obj.visible)
 }
 
+/**
+ * Reads a node primitive from the protobuf stream.
+ */
 function readNode(pbf: Pbf, end?: number): OsmPbfNode {
 	return pbf.readFields(
 		readNodeField,
@@ -296,6 +359,9 @@ function readNode(pbf: Pbf, end?: number): OsmPbfNode {
 		end,
 	)
 }
+/**
+ * Populates node fields based on protobuf tags.
+ */
 function readNodeField(tag: number, obj: OsmPbfNode, pbf: Pbf) {
 	if (tag === 1) obj.id = pbf.readSVarint()
 	else if (tag === 2) pbf.readPackedVarint(obj.keys)
@@ -304,6 +370,9 @@ function readNodeField(tag: number, obj: OsmPbfNode, pbf: Pbf) {
 	else if (tag === 8) obj.lat = pbf.readSVarint()
 	else if (tag === 9) obj.lon = pbf.readSVarint()
 }
+/**
+ * Serializes a node primitive to protobuf.
+ */
 function writeNode(obj: OsmPbfNode, pbf: Pbf) {
 	if (obj.id) pbf.writeSVarintField(1, obj.id)
 	if (obj.keys) pbf.writePackedVarint(2, obj.keys)
@@ -313,6 +382,9 @@ function writeNode(obj: OsmPbfNode, pbf: Pbf) {
 	if (obj.lon) pbf.writeSVarintField(9, obj.lon)
 }
 
+/**
+ * Reads dense node collections from the protobuf stream.
+ */
 function readDenseNodes(pbf: Pbf, end?: number): OsmPbfDenseNodes {
 	return pbf.readFields(
 		readDenseNodesField,
@@ -320,6 +392,9 @@ function readDenseNodes(pbf: Pbf, end?: number): OsmPbfDenseNodes {
 		end,
 	)
 }
+/**
+ * Populates dense node arrays using packed encoding.
+ */
 function readDenseNodesField(tag: number, obj: OsmPbfDenseNodes, pbf: Pbf) {
 	if (tag === 1) pbf.readPackedSVarint(obj.id)
 	else if (tag === 5) {
@@ -328,6 +403,9 @@ function readDenseNodesField(tag: number, obj: OsmPbfDenseNodes, pbf: Pbf) {
 	else if (tag === 9) pbf.readPackedSVarint(obj.lon)
 	else if (tag === 10) pbf.readPackedVarint(obj.keys_vals, true)
 }
+/**
+ * Serializes dense node collections back to protobuf.
+ */
 function writeDenseNodes(obj: OsmPbfDenseNodes, pbf: Pbf) {
 	if (obj.id) pbf.writePackedSVarint(1, obj.id)
 	if (obj.denseinfo) pbf.writeMessage(5, writeDenseInfo, obj.denseinfo)
@@ -336,6 +414,9 @@ function writeDenseNodes(obj: OsmPbfDenseNodes, pbf: Pbf) {
 	if (obj.keys_vals) pbf.writePackedVarint(10, obj.keys_vals)
 }
 
+/**
+ * Reads a way primitive from the protobuf stream.
+ */
 function readWay(pbf: Pbf, end?: number): OsmPbfWay {
 	return pbf.readFields(
 		readWayField,
@@ -343,6 +424,9 @@ function readWay(pbf: Pbf, end?: number): OsmPbfWay {
 		end,
 	)
 }
+/**
+ * Populates way fields based on protobuf tags.
+ */
 function readWayField(tag: number, obj: OsmPbfWay, pbf: Pbf) {
 	if (tag === 1) obj.id = pbf.readVarint(true)
 	else if (tag === 2) pbf.readPackedVarint(obj.keys)
@@ -350,6 +434,9 @@ function readWayField(tag: number, obj: OsmPbfWay, pbf: Pbf) {
 	else if (tag === 4) obj.info = readInfo(pbf, pbf.readVarint() + pbf.pos)
 	else if (tag === 8) pbf.readPackedSVarint(obj.refs)
 }
+/**
+ * Serializes a way primitive to protobuf.
+ */
 function writeWay(obj: OsmPbfWay, pbf: Pbf) {
 	if (obj.id) pbf.writeVarintField(1, obj.id)
 	if (obj.keys) pbf.writePackedVarint(2, obj.keys)
@@ -358,6 +445,9 @@ function writeWay(obj: OsmPbfWay, pbf: Pbf) {
 	if (obj.refs) pbf.writePackedSVarint(8, obj.refs)
 }
 
+/**
+ * Reads a relation primitive from the protobuf stream.
+ */
 function readRelation(pbf: Pbf, end?: number): OsmPbfRelation {
 	return pbf.readFields(
 		readRelationField,
@@ -372,6 +462,9 @@ function readRelation(pbf: Pbf, end?: number): OsmPbfRelation {
 		end,
 	)
 }
+/**
+ * Populates relation fields based on protobuf tags.
+ */
 function readRelationField(tag: number, obj: OsmPbfRelation, pbf: Pbf) {
 	if (tag === 1) obj.id = pbf.readVarint(true)
 	else if (tag === 2) pbf.readPackedVarint(obj.keys)
@@ -381,6 +474,9 @@ function readRelationField(tag: number, obj: OsmPbfRelation, pbf: Pbf) {
 	else if (tag === 9) pbf.readPackedSVarint(obj.memids)
 	else if (tag === 10) pbf.readPackedVarint(obj.types)
 }
+/**
+ * Serializes a relation primitive to protobuf.
+ */
 function writeRelation(obj: OsmPbfRelation, pbf: Pbf) {
 	if (obj.id) pbf.writeVarintField(1, obj.id)
 	if (obj.keys) pbf.writePackedVarint(2, obj.keys)
