@@ -1,4 +1,5 @@
 import {
+	type GeoBbox2D,
 	isNode,
 	isRelation,
 	isWay,
@@ -24,11 +25,9 @@ import {
 } from "@osmix/pbf"
 import OsmChangeset, { type OsmMergeOptions } from "./changeset"
 import { Nodes, type NodesTransferables } from "./nodes"
-import { OsmixRasterTile } from "./raster-tile"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { IdArrayType } from "./typed-arrays"
-import type { GeoBbox2D, TileIndex } from "./types"
 import { bboxFromLonLats, changeStatsSummary, throttle } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
@@ -431,13 +430,6 @@ export class Osmix {
 				)
 			}
 		}
-	}
-
-	/**
-	 * Creates an empty raster tile for the given bbox and tile index that is linked to this OSM index.
-	 */
-	createRasterTile(bbox: GeoBbox2D, tileIndex: TileIndex, tileSize: number) {
-		return new OsmixRasterTile(this, bbox, tileIndex, tileSize)
 	}
 
 	getNodesInBbox(bbox: GeoBbox2D) {

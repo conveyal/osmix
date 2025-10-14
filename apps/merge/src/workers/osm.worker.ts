@@ -1,21 +1,16 @@
 import {
-	type GeoBbox2D,
 	type OsmChange,
 	type OsmChangeset,
 	type OsmChangeTypes,
 	Osmix,
 	type OsmMergeOptions,
-	type TileIndex,
 	throttle,
 } from "@osmix/core"
-import type { OsmEntityType } from "@osmix/json"
+import type { GeoBbox2D, OsmEntityType } from "@osmix/json"
+import { OsmixRasterTile, type TileIndex } from "@osmix/raster"
 import { expose, transfer, wrap } from "comlink"
 import { dequal } from "dequal/lite"
-import {
-	MIN_NODE_ZOOM,
-	RASTER_TILE_IMAGE_TYPE,
-	RASTER_TILE_SIZE,
-} from "@/settings"
+import { MIN_NODE_ZOOM, RASTER_TILE_SIZE } from "@/settings"
 import type { StatusType } from "@/state/log"
 
 export class OsmixWorker {
@@ -57,27 +52,29 @@ export class OsmixWorker {
 		const osm = this.osmixes.get(id)
 		if (!osm) throw Error(`Osm for ${id} not loaded.`)
 
-		const rasterTile = osm.createRasterTile(bbox, tileIndex, tileSize)
-		rasterTile.drawWays()
-		if (tileIndex.z >= MIN_NODE_ZOOM) {
-			rasterTile.drawNodes()
-		}
-		const canvas = new OffscreenCanvas(rasterTile.tileSize, rasterTile.tileSize)
-		const ctx = canvas.getContext("2d")
-		if (!ctx) throw Error("Failed to get context")
-		ctx.putImageData(
-			new ImageData(
-				rasterTile.imageData,
-				rasterTile.tileSize,
-				rasterTile.tileSize,
-			),
-			0,
-			0,
-		)
-		const blob = await canvas.convertToBlob({ type: RASTER_TILE_IMAGE_TYPE })
-		const data = await blob.arrayBuffer()
+		const rasterTile = new OsmixRasterTile(bbox, tileIndex, tileSize)
+		const timer = `OsmixRasterTile.drawWays:${tileIndex.z}/${tileIndex.x}/${tileIndex.y}`
+		console.time(timer)
+		osm.ways.intersects(bbox, (wayIndex) => {
+			rasterTile.drawWay(osm.ways.getCoordinates(wayIndex, osm.nodes))
+			return false
+		})
+		console.timeEnd(timer)
 
-		return transfer({ data, contentType: RASTER_TILE_IMAGE_TYPE }, [data])
+		if (tileIndex.z >= MIN_NODE_ZOOM) {
+			const timer = `OsmixRasterTile.drawNodes:${tileIndex.z}/${tileIndex.x}/${tileIndex.y}`
+			console.time(timer)
+			const nodeCandidates = osm.nodes.withinBbox(bbox)
+
+			for (const nodeIndex of nodeCandidates) {
+				if (!osm.nodes.tags.hasTags(nodeIndex)) continue
+				rasterTile.setLonLat(osm.nodes.getNodeLonLat({ index: nodeIndex }))
+			}
+			console.timeEnd(timer)
+		}
+
+		const data = await rasterTile.toImageBuffer()
+		return transfer({ data }, [data])
 	}
 
 	async getTileData(id: string, bbox: GeoBbox2D) {

@@ -21,6 +21,7 @@
         "@osmix/core": "workspace:*",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
+        "@osmix/raster": "workspace:*",
         "@radix-ui/react-collapsible": "^1.1.12",
         "@radix-ui/react-dialog": "^1.1.14",
         "@radix-ui/react-hover-card": "^1.1.15",
@@ -104,6 +105,25 @@
         "@types/node": "catalog:",
         "typescript": "catalog:",
         "vite": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/raster": {
+      "name": "@osmix/raster",
+      "version": "0.0.1",
+      "dependencies": {
+        "@mapbox/sphericalmercator": "^2.0.1",
+        "@osmix/json": "workspace:*",
+        "@osmix/pbf": "workspace:*",
+        "dequal": "catalog:",
+        "lineclip": "^2.0.0",
+      },
+      "devDependencies": {
+        "@osmix/test-utils": "workspace:*",
+        "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
+        "maplibre-gl": "^5.7.3",
+        "typescript": "catalog:",
         "vitest": "catalog:",
       },
     },
@@ -369,6 +389,8 @@
     "@osmix/merge": ["@osmix/merge@workspace:apps/merge"],
 
     "@osmix/pbf": ["@osmix/pbf@workspace:packages/pbf"],
+
+    "@osmix/raster": ["@osmix/raster@workspace:packages/raster"],
 
     "@osmix/test-utils": ["@osmix/test-utils@workspace:packages/test-utils"],
 

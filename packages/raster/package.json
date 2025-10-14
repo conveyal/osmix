@@ -1,9 +1,9 @@
 {
 	"$schema": "https://json.schemastore.org/package",
-	"name": "@osmix/core",
+	"name": "@osmix/raster",
 	"type": "module",
 	"version": "0.0.1",
-	"description": "An OSM PBF reader, writer, and merge tool written in TypeScript",
+	"description": "An OSM raster tile generator",
 	"main": "./src/index.ts",
 	"sideEffects": false,
 	"scripts": {
@@ -16,14 +16,14 @@
 		"@types/geojson": "catalog:",
 		"@types/node": "catalog:",
 		"typescript": "catalog:",
-		"vitest": "catalog:"
+		"vitest": "catalog:",
+		"maplibre-gl": "^5.7.3"
 	},
 	"dependencies": {
+		"@mapbox/sphericalmercator": "^2.0.1",
 		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"dequal": "catalog:",
-		"flatbush": "^4.4.1",
-		"kdbush": "mourner/kdbush#16416cd",
-		"sweepline-intersections": "^1.5.0"
+		"lineclip": "^2.0.0"
 	}
 }

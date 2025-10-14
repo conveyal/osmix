@@ -1,13 +1,23 @@
-import { SphericalMercator } from "@mapbox/sphericalmercator"
-import { clipPolyline } from "lineclip"
-import type { Osmix } from "./osmix"
-import type { GeoBbox2D, Rgba, TileIndex } from "./types"
+/// <reference path="./types/lineclip.d.ts" />
 
-const DEFAULT_WAY_COLOR: Rgba = [255, 255, 255, 255] // white
-const DEFAULT_NODE_COLOR: Rgba = [255, 0, 0, 255] // red
+import { SphericalMercator } from "@mapbox/sphericalmercator"
+import type { GeoBbox2D } from "@osmix/json"
+import { clipPolyline } from "lineclip"
+
+export type Rgba = [number, number, number, number] | Uint8ClampedArray
+
+export interface TileIndex {
+	z: number
+	x: number
+	y: number
+}
+
+export const DEFAULT_RASTER_IMAGE_TYPE = "image/png"
+export const DEFAULT_WAY_COLOR: Rgba = [255, 255, 255, 255] // white
+export const DEFAULT_NODE_COLOR: Rgba = [255, 0, 0, 255] // red
+export const DEFAULT_TILE_SIZE = 256
 
 export class OsmixRasterTile {
-	osm: Osmix
 	bbox: GeoBbox2D
 	imageData: Uint8ClampedArray<ArrayBuffer>
 	tileSize: number
@@ -15,12 +25,10 @@ export class OsmixRasterTile {
 	merc: SphericalMercator
 
 	constructor(
-		osm: Osmix,
 		bbox: GeoBbox2D,
 		tileIndex: TileIndex,
-		tileSize: number,
+		tileSize: number = DEFAULT_TILE_SIZE,
 	) {
-		this.osm = osm
 		this.bbox = bbox
 		this.tileSize = tileSize
 		this.imageData = new Uint8ClampedArray(tileSize * tileSize * 4)
@@ -28,8 +36,8 @@ export class OsmixRasterTile {
 		this.merc = new SphericalMercator({ size: tileSize })
 	}
 
-	lonLatToPixel(lon: number, lat: number) {
-		const merc = this.merc.px([lon, lat], this.tileIndex.z)
+	lonLatToPixel(ll: [number, number]): [number, number] {
+		const merc = this.merc.px(ll, this.tileIndex.z)
 
 		// Convert to local tile pixel
 		const x = Math.floor(merc[0]) - this.tileIndex.x * this.tileSize
@@ -42,21 +50,33 @@ export class OsmixRasterTile {
 		]
 	}
 
-	setLonLat(lon: number, lat: number, color: Rgba) {
-		const [x, y] = this.lonLatToPixel(lon, lat)
-		this.setPixel(x, y, color)
+	setLonLat([lon, lat]: [number, number], color: Rgba = DEFAULT_NODE_COLOR) {
+		const px = this.lonLatToPixel([lon, lat])
+		this.setPixel(px, color)
 	}
 
-	setPixel(x: number, y: number, color: Rgba) {
-		if (x < 0 || x >= this.tileSize || y < 0 || y >= this.tileSize) return
-		const idx = (y * this.tileSize + x) * 4
+	setPixel(px: [number, number], color: Rgba) {
+		if (
+			px[0] < 0 ||
+			px[0] >= this.tileSize ||
+			px[1] < 0 ||
+			px[1] >= this.tileSize
+		)
+			return
+		const idx = (px[1] * this.tileSize + px[0]) * 4
 		this.imageData[idx] = color[0]
 		this.imageData[idx + 1] = color[1]
 		this.imageData[idx + 2] = color[2]
 		this.imageData[idx + 3] = color[3]
 	}
 
-	drawLine(x0: number, y0: number, x1: number, y1: number, color: Rgba) {
+	drawLine(
+		x0: number,
+		y0: number,
+		x1: number,
+		y1: number,
+		color: Rgba = DEFAULT_WAY_COLOR,
+	) {
 		const dx = Math.abs(x1 - x0)
 		const dy = Math.abs(y1 - y0)
 		const sx = x0 < x1 ? 1 : -1
@@ -84,15 +104,15 @@ export class OsmixRasterTile {
 		}
 	}
 
-	drawWay(way: [number, number][], color: Rgba) {
+	drawWay(way: [number, number][], color: Rgba = DEFAULT_WAY_COLOR) {
 		const result = clipPolyline(way, this.bbox)
 		if (result && result.length > 0) {
 			const [clipped] = result
 			let prev = clipped[0]
 			for (let i = 1; i < clipped.length; i++) {
 				const curr = clipped[i]
-				const [x0, y0] = this.lonLatToPixel(prev[0], prev[1])
-				const [x1, y1] = this.lonLatToPixel(curr[0], curr[1])
+				const [x0, y0] = this.lonLatToPixel(prev)
+				const [x1, y1] = this.lonLatToPixel(curr)
 				if (x0 !== x1 || y0 !== y1) {
 					this.drawLine(x0, y0, x1, y1, color)
 				}
@@ -101,29 +121,22 @@ export class OsmixRasterTile {
 		}
 	}
 
-	drawWays(color: Rgba = DEFAULT_WAY_COLOR) {
-		const timer = `OsmixRasterTile.drawWays:${this.tileIndex.z}/${this.tileIndex.x}/${this.tileIndex.y}`
-		console.time(timer)
-		this.osm.ways.intersects(this.bbox, (wayIndex) => {
-			this.drawWay(
-				this.osm.ways.getCoordinates(wayIndex, this.osm.nodes),
-				color,
-			)
-			return false
-		})
-		console.timeEnd(timer)
+	toCanvas() {
+		const canvas = new OffscreenCanvas(this.tileSize, this.tileSize)
+		const ctx = canvas.getContext("2d")
+		if (!ctx) throw Error("Failed to get context")
+		ctx.putImageData(
+			new ImageData(this.imageData, this.tileSize, this.tileSize),
+			0,
+			0,
+		)
+		return canvas
 	}
 
-	drawNodes(color: Rgba = DEFAULT_NODE_COLOR) {
-		const timer = `OsmixRasterTile.drawNodes:${this.tileIndex.z}/${this.tileIndex.x}/${this.tileIndex.y}`
-		console.time(timer)
-		const nodeCandidates = this.osm.nodes.withinBbox(this.bbox)
-
-		for (const nodeIndex of nodeCandidates) {
-			if (!this.osm.nodes.tags.hasTags(nodeIndex)) continue
-			const [lon, lat] = this.osm.nodes.getNodeLonLat({ index: nodeIndex })
-			this.setLonLat(lon, lat, color)
-		}
-		console.timeEnd(timer)
+	toImageBuffer(
+		options: ImageEncodeOptions = { type: DEFAULT_RASTER_IMAGE_TYPE },
+	) {
+		const canvas = this.toCanvas()
+		return canvas.convertToBlob(options).then((blob) => blob.arrayBuffer())
 	}
 }
