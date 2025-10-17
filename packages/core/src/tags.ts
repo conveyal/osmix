@@ -81,8 +81,8 @@ export class Tags {
 		return this.indexBuilt
 	}
 
-	hasTags(index: number): boolean {
-		return (this.tagCount.at(index) ?? 0) > 0
+	cardinality(index: number): number {
+		return this.tagCount.at(index) ?? 0
 	}
 
 	getTags(index: number): OsmTags | undefined {

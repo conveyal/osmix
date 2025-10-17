@@ -22,6 +22,7 @@
 		"@osmix/core": "workspace:*",
 		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
+		"@osmix/shared": "workspace:*",
 		"dequal": "catalog:",
 		"sweepline-intersections": "^1.5.0"
 	}

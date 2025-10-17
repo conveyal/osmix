@@ -1,6 +1,6 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import type { GeoBbox2D } from "@osmix/json"
-import { clipPolyline } from "@osmix/shared/lineclip"
+import { clipPolyline } from "@osmix/shared"
 
 export type Rgba = [number, number, number, number] | Uint8ClampedArray
 
@@ -131,10 +131,11 @@ export class OsmixRasterTile {
 		return canvas
 	}
 
-	toImageBuffer(
+	async toImageBuffer(
 		options: ImageEncodeOptions = { type: DEFAULT_RASTER_IMAGE_TYPE },
 	) {
 		const canvas = this.toCanvas()
-		return canvas.convertToBlob(options).then((blob) => blob.arrayBuffer())
+		const blob = await canvas.convertToBlob(options)
+		return blob.arrayBuffer()
 	}
 }

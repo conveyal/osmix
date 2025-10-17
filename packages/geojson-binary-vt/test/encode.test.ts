@@ -23,11 +23,17 @@ const samplePayload: BinaryTilePayload = {
 		]),
 		startIndices: new Uint32Array([0, 3]),
 	},
+	bounds: [0, 0, 1, 1],
+	metadata: {
+		datasetId: DATASET,
+		tileIndex: TILE_INDEX,
+		includeTileKey: true,
+	},
 }
 
 const decodeTile = (data: Uint8Array) => {
 	const tile = new VectorTile(new Protobuf(Buffer.from(data)))
-	return tile.layers["osmix"]
+	return tile.layers
 }
 
 describe("encodeBinaryTile", () => {
@@ -38,24 +44,22 @@ describe("encodeBinaryTile", () => {
 			includeTileKey: true,
 		})
 
-		expect(result.stats.nodes).toBe(1)
-		expect(result.stats.ways).toBe(1)
 		expect(result.data.byteLength).toBeGreaterThan(0)
 
-		const layer = decodeTile(result.data)
-		expect(layer).toBeDefined()
-		expect(layer.length).toBe(2)
+		const layers = decodeTile(new Uint8Array(result.data))
+		expect(layers["osmix:nodes"]).toBeDefined()
+		expect(layers["osmix:nodes"].length).toBe(1)
+		expect(layers["osmix:ways"]).toBeDefined()
+		expect(layers["osmix:ways"].length).toBe(1)
 
-		const features = Array.from({ length: layer.length }, (_, i) =>
-			layer.feature(i),
-		)
+		const features = [
+			layers["osmix:nodes"].feature(0),
+			layers["osmix:ways"].feature(0),
+		]
 
-		const node = features.find(
-			(feature) => feature.properties.entityType === "node",
-		)
+		const node = features.find((feature) => feature.properties.type === "node")
 		expect(node?.id).toBe(123)
 		expect(node?.type).toBe(1)
-		expect(node?.properties.featureId).toBe("n123")
 		expect(node?.properties.tileKey).toBe(
 			`${DATASET}:${TILE_INDEX.z}:${TILE_INDEX.x}:${TILE_INDEX.y}`,
 		)
@@ -63,12 +67,9 @@ describe("encodeBinaryTile", () => {
 		expect(nodeGeom?.[0]?.[0]?.x).toBeTypeOf("number")
 		expect(nodeGeom?.[0]?.[0]?.y).toBeTypeOf("number")
 
-		const way = features.find(
-			(feature) => feature.properties.entityType === "way",
-		)
+		const way = features.find((feature) => feature.properties.type === "way")
 		expect(way?.id).toBe(456)
 		expect(way?.type).toBe(2)
-		expect(way?.properties.featureId).toBe("w456")
 		const wayGeom = way?.loadGeometry()
 		expect(wayGeom?.[0]?.length).toBeGreaterThanOrEqual(2)
 	})
@@ -89,24 +90,20 @@ describe("createBinaryVtIndex", () => {
 			},
 		)
 
-		const first = await index.getTile(TILE_INDEX.z, TILE_INDEX.x, TILE_INDEX.y)
-		expect(first).toBeInstanceOf(Uint8Array)
+		const first = await index.getTile(TILE_INDEX)
+		expect(first).toBeInstanceOf(ArrayBuffer)
 		expect(callCount).toBe(1)
 
-		const metadata = await index.getDebugMetadata(
-			TILE_INDEX.z,
-			TILE_INDEX.x,
-			TILE_INDEX.y,
-		)
-		expect(metadata?.stats.nodes).toBe(1)
+		const metadata = await index.getDebugMetadata(TILE_INDEX)
+		expect(metadata?.byteLength).toBeGreaterThan(0)
 		expect(callCount).toBe(1)
 
-		index.invalidate(TILE_INDEX.z, TILE_INDEX.x, TILE_INDEX.y)
-		await index.getTile(TILE_INDEX.z, TILE_INDEX.x, TILE_INDEX.y)
+		index.invalidate(TILE_INDEX)
+		await index.getTile(TILE_INDEX)
 		expect(callCount).toBe(2)
 
 		index.clearCache()
-		await index.getTile(TILE_INDEX.z, TILE_INDEX.x, TILE_INDEX.y)
+		await index.getTile(TILE_INDEX)
 		expect(callCount).toBe(3)
 	})
 })

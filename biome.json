@@ -18,7 +18,8 @@
 				"useValidAnchor": "off"
 			},
 			"correctness": {
-				"noUnusedImports": "error"
+				"noUnusedImports": "error",
+				"useUniqueElementIds": "off"
 			},
 			"style": {
 				"noParameterAssign": "error",

@@ -50,6 +50,10 @@ export interface OsmixOptions {
 		osmix: Osmix,
 	): boolean
 	header: OsmPbfHeaderBlock
+	buildSpatialIndexes: OsmEntityType[]
+
+	// Future options
+	// include: OsmEntityType[]
 }
 
 export type LogLevel = "debug" | "info" | "warn" | "error"
@@ -107,6 +111,16 @@ export class Osmix {
 	) {
 		const osm = new Osmix(options)
 		await osm.readPbf(data, options)
+
+		// By default, build all spatial indexes.
+		if (!Array.isArray(options.buildSpatialIndexes)) {
+			osm.buildSpatialIndexes()
+		} else if (options.buildSpatialIndexes.includes("node")) {
+			osm.nodes.buildSpatialIndex()
+		} else if (options.buildSpatialIndexes.includes("way")) {
+			osm.ways.buildSpatialIndex(osm.nodes)
+		}
+
 		return osm
 	}
 
@@ -132,9 +146,6 @@ export class Osmix {
 		if (!this.nodes.isReady) this.nodes.buildIndex()
 		if (!this.ways.isReady) this.ways.buildIndex()
 		if (!this.relations.isReady) this.relations.buildIndex()
-		this.log("Building spatial indexes for nodes and ways...")
-		this.nodes.buildSpatialIndex()
-		this.ways.buildSpatialIndex(this.nodes)
 		this.stringTable.buildIndex()
 		this.#indexBuilt = true
 		this.buildTimeMs = performance.now() - this.#startTime
@@ -354,7 +365,7 @@ export class Osmix {
 		}
 	}
 
-	getNodesInBbox(bbox: GeoBbox2D) {
+	getNodesInBbox(bbox: GeoBbox2D, allNodes = false) {
 		if (!this.#indexBuilt) throw new Error("Osm not finished")
 		console.time("Osm.getNodesInBbox")
 		const nodeCandidates = this.nodes.withinBbox(bbox)
@@ -363,7 +374,7 @@ export class Osmix {
 		for (let i = 0; i < nodeCandidates.length; i++) {
 			const nodeIndex = nodeCandidates[i]
 			// Skip nodes with no tags, likely just a way node
-			if (!this.nodes.tags.hasTags(nodeIndex)) continue
+			if (!allNodes && this.nodes.tags.cardinality(nodeIndex) === 0) continue
 
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
 			ids[i] = this.nodes.ids.at(nodeIndex)

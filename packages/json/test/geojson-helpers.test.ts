@@ -22,8 +22,8 @@ describe("geojson helpers", () => {
 		expect(feature.properties).toEqual({
 			id: nodes[0].id,
 			type: "node",
-			tags: nodes[0].tags,
-			info: nodes[0].info,
+			...nodes[0].tags,
+			...nodes[0].info,
 		})
 	})
 

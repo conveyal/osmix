@@ -5,7 +5,7 @@ import { wayIsArea } from "./way-is-area"
 export function nodeToFeature(node: OsmNode): OsmixGeoJSONFeature<Point> {
 	return {
 		type: "Feature",
-		id: `node/${node.id}`,
+		id: node.id,
 		geometry: {
 			type: "Point",
 			coordinates: [node.lon, node.lat],
@@ -13,8 +13,8 @@ export function nodeToFeature(node: OsmNode): OsmixGeoJSONFeature<Point> {
 		properties: {
 			id: node.id,
 			type: "node",
-			tags: node.tags,
-			info: node.info,
+			...node.info,
+			...node.tags,
 		},
 	}
 }
@@ -25,7 +25,7 @@ export function wayToFeature(
 ): OsmixGeoJSONFeature<LineString | Polygon> {
 	return {
 		type: "Feature",
-		id: `way/${way.id}`,
+		id: way.id,
 		geometry: wayIsArea(way)
 			? {
 					type: "Polygon",
@@ -38,8 +38,8 @@ export function wayToFeature(
 		properties: {
 			id: way.id,
 			type: "way",
-			tags: way.tags,
-			info: way.info,
+			...way.info,
+			...way.tags,
 		},
 	}
 }
@@ -50,7 +50,7 @@ export function relationToFeature(
 ): OsmixGeoJSONFeature<MultiPolygon> {
 	return {
 		type: "Feature",
-		id: `relation/${relation.id}`,
+		id: relation.id,
 		geometry: {
 			type: "MultiPolygon",
 			coordinates: [
@@ -60,8 +60,8 @@ export function relationToFeature(
 		properties: {
 			id: relation.id,
 			type: "relation",
-			tags: relation.tags,
-			info: relation.info,
+			...relation.info,
+			...relation.tags,
 		},
 	}
 }

@@ -5,7 +5,7 @@
 		"module": "ESNext",
 		"moduleDetection": "force",
 		"moduleResolution": "bundler",
-		"lib": ["ESNext"],
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
 		"strict": true,

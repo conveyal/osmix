@@ -9,6 +9,7 @@ import {
 	type OsmNode,
 	type OsmWay,
 } from "@osmix/json"
+import { haversineDistance } from "@osmix/shared"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
 import sweeplineIntersections from "sweepline-intersections"
 import type {
@@ -19,7 +20,6 @@ import type {
 } from "./types"
 import {
 	cleanCoords,
-	haversineDistance,
 	isWayIntersectionCandidate,
 	osmTagsToOscTags,
 	removeDuplicateAdjacentRelationMembers,
@@ -827,6 +827,9 @@ export function applyChangesetToOsm(changeset: OsmixChangeset, newId?: string) {
 
 	// Everything should be added now, finish the osm
 	osm.buildIndexes()
+
+	// Build spatial indexes
+	osm.buildSpatialIndexes()
 
 	return osm
 }

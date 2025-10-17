@@ -1,6 +1,6 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import type { OsmEntityType, OsmTags } from "@osmix/json"
-import { clipPolyline } from "@osmix/shared/lineclip"
+import { clipPolyline } from "@osmix/shared"
 import { fromVectorTileJs as encodeVectorTile } from "vt-pbf"
 import type {
 	BinaryTilePayload,
