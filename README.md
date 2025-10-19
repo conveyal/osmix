@@ -21,15 +21,21 @@ The workspace uses a single root `package.json` to coordinate shared scripts, de
 
 ## Workspace
 
+### Apps
+- [apps/merge](apps/merge/README.md) – Vite + React app that compares base and patch extracts, renders MapLibre raster and vector overlays, and guides multi-step merge workflows entirely in-browser.
+- [apps/bench](apps/bench/README.md) – Experimental benchmark UI that contrasts Osmix operations with DuckDB-wasm queries using shared fixtures.
+
+### Packages
 - [packages/core](packages/core/README.md) – Core `Osmix` engine for ingesting PBF streams, building spatial indexes, and emitting JSON, PBF, or raster tiles.
 - [packages/change](packages/change/README.md) – Change-management helpers that deduplicate entities, generate merge stats, and apply edits on top of `@osmix/core`.
-- [apps/merge](apps/merge/README.md) – Vite + React app that compares base and patch extracts, renders MapLibre raster and vector overlays, and guides multi-step merge workflows entirely in-browser.
-- [packages/json](packages/json/README.md) – easy to use streaming converters between PBF bytes and strongly typed JSON entities, plus GeoJSON helpers tuned to OSM conventions.
-- [packages/pbf](packages/pbf/README.md) – low-level toolkit that mirrors the official protobuf schema, offering streaming readers/writers, compression helpers, and generated type-safe codecs.
+- [packages/json](packages/json/README.md) – Easy-to-use streaming converters between PBF bytes and strongly typed JSON entities, plus GeoJSON helpers tuned to OSM conventions.
+- [packages/pbf](packages/pbf/README.md) – Low-level toolkit that mirrors the official protobuf schema, offering streaming readers/writers, compression helpers, and generated type-safe codecs.
 - [packages/raster](packages/raster/README.md) – Canvas-based raster tile renderer and MapLibre protocol built for `@osmix/core` datasets.
+- [packages/geojson-binary-vt](packages/geojson-binary-vt/README.md) – Encodes Osmix binary overlays directly into Mapbox Vector Tiles with caching helpers.
+- [packages/shared](packages/shared/README.md) – Small geometry utilities (`haversineDistance`, `clipPolyline`) shared across packages.
+- [packages/test-utils](packages/test-utils/README.md) – Shared Vitest fixtures and helpers used across packages.
 
 ### Development
-- `packages/test-utils` – shared Vitest fixtures and helpers used across packages.
 - `fixtures/` – gzipped sample extracts referenced by integration tests and the merge app.
 
 ## Resources

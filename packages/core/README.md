@@ -141,7 +141,7 @@ self.addEventListener("message", ({ data }) => {
 
 - `Osmix` – ingest PBF sources, build indexes, query entities, extract subsets, and emit JSON/PBF.
 - `Nodes` / `Ways` / `Relations` – typed-array backed stores exposed for advanced workflows.
-- `OsmixRasterTile` – rasterise indexed data into tile-sized buffers with lon/lat helpers.
+- `OsmixRasterTile` – rasterize indexed data into tile-sized buffers with lon/lat helpers.
 - Utilities – `throttle`, plus the shared type definitions used across the package.
 - Changesets and merge helpers now live in [`@osmix/change`](../change/README.md).
 

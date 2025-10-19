@@ -5,7 +5,7 @@ Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PB
 ## Highlights
 
 - Load “base” and “patch” `.osm.pbf` files, preview differences, and step through merge tasks (direct merge, node/way deduplication, intersection creation).
-- Visualise both datasets with raster previews produced on the worker thread plus interactive vector overlays for selected entities.
+- Visualize both datasets with raster previews produced on the worker thread plus interactive vector overlays for selected entities.
 - Inspect individual OSM files, find duplicate entities, and apply the generated changes back into the in-memory index.
 - Built-in Nominatim search, entity lookups, and task logging keep large merges manageable.
 
@@ -69,7 +69,6 @@ The stepper resets selection state between actions, and you can jump backward or
 
 - **MapLibre** provides the background map (Carto dark matter style), interaction controls, and pickable vector overlays for base, patch, and selected entities.
 - **Raster tiles** come from the worker’s `OsmixRasterTile` helper in [`@osmix/raster`](../../packages/raster/README.md), which draws ways and (at higher zoom levels) nodes onto an OffscreenCanvas before streaming the PNG bytes back to the UI thread.
-- Zoom and map center state is synchronised through Jotai atoms so components can react without prop drilling.
 
 ## Worker architecture
 

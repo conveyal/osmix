@@ -78,7 +78,7 @@ maplibregl.addProtocol(
 
 - [`@osmix/core`](../core/README.md) – Provides the indexed geometry and transferables you can paint into tiles.
 - [Osmix Merge app](../../apps/merge/README.md) – Uses the raster helpers in a worker to preview merge states.
-- [`@osmix/change`](../change/README.md) – Generates the deduplicated datasets you may wish to visualise.
+- [`@osmix/change`](../change/README.md) – Generates the deduplicated datasets you may wish to visualize.
 
 ## Environment and limitations
 

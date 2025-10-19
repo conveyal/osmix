@@ -25,7 +25,7 @@ npm install @osmix/pbf
 ```ts
 import { readOsmPbf } from "@osmix/pbf"
 
-const response = await fetch("/fixtures/moncao.pbf")
+const response = await fetch("/fixtures/monaco.pbf")
 const { header, blocks } = await readOsmPbf(response.body)
 
 console.log(header.required_features)
@@ -44,7 +44,7 @@ Use the streaming helpers when you do not want to materialize the whole file.
 ```ts
 import { OsmPbfBytesToBlocksTransformStream } from "@osmix/pbf"
 
-const response = await fetch("/fixtures/moncao.pbf")
+const response = await fetch("/fixtures/monaco.pbf")
 
 await response.body
 	.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
@@ -71,7 +71,7 @@ Serialize individual blocks into blobs, or stream them directly to a writable ta
 ```ts
 import { concatUint8, osmBlockToPbfBlobBytes, readOsmPbf } from "@osmix/pbf"
 
-const response = await fetch("/fixtures/moncao.pbf")
+const response = await fetch("/fixtures/monaco.pbf")
 const { header, blocks } = await readOsmPbf(response.body)
 
 const chunks: Uint8Array[] = [await osmBlockToPbfBlobBytes(header)]
@@ -88,7 +88,7 @@ Generators returned by `readOsmPbf` are single-use. Re-open the source (or buffe
 ```ts
 import { OsmBlocksToPbfBytesTransformStream, readOsmPbf } from "@osmix/pbf"
 
-const response = await fetch("/fixtures/moncao.pbf")
+const response = await fetch("/fixtures/monaco.pbf")
 const { header, blocks } = await readOsmPbf(response.body)
 
 const upstream = new ReadableStream({
