@@ -8,12 +8,9 @@ import {
 	type OsmixMergeOptions,
 } from "@osmix/change"
 import { Osmix, throttle } from "@osmix/core"
-import {
-	type BinaryVtIndex,
-	createBinaryVtIndex,
-} from "@osmix/geojson-binary-vt"
 import type { GeoBbox2D, OsmEntityType } from "@osmix/json"
 import { OsmixRasterTile, type TileIndex } from "@osmix/raster"
+import { type BinaryVtIndex, createBinaryVtIndex } from "@osmix/vt"
 import { expose, transfer, wrap } from "comlink"
 import { dequal } from "dequal/lite"
 import { RASTER_TILE_SIZE } from "@/settings"

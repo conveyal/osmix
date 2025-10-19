@@ -1,6 +1,6 @@
-# @osmix/geojson-binary-vt
+# @osmix/vt
 
-`@osmix/geojson-binary-vt` converts Osmix binary overlays (typed-array node and way payloads) into Mapbox Vector Tiles. It also ships a lightweight tile index with LRU caching so workers or web apps can request tiles on demand without re-projecting data for every request.
+`@osmix/vt` converts Osmix binary overlays (typed-array node and way payloads) into Mapbox Vector Tiles. It also ships a lightweight tile index with LRU caching so workers or web apps can request tiles on demand without re-projecting data for every request.
 
 ## Highlights
 
@@ -12,13 +12,13 @@
 ## Installation
 
 ```sh
-npm install @osmix/geojson-binary-vt
+npm install @osmix/vt
 ```
 
 ## Usage
 
 ```ts
-import { createBinaryVtIndex } from "@osmix/geojson-binary-vt"
+import { createBinaryVtIndex } from "@osmix/vt"
 
 const index = createBinaryVtIndex(async ({ bbox, tileIndex }) => {
 	const payload = osm.getBinaryTilePayload(bbox) // implement using @osmix/core helpers

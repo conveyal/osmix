@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json.schemastore.org/package",
-	"name": "@osmix/geojson-binary-vt",
+	"name": "@osmix/vt",
 	"type": "module",
 	"version": "0.0.1",
 	"description": "Encode Osmix binary overlay tiles directly into Mapbox Vector Tiles",

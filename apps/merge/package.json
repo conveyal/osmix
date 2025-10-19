@@ -27,7 +27,7 @@
 		"@fontsource-variable/roboto-mono": "^5.2.5",
 		"@osmix/change": "workspace:*",
 		"@osmix/core": "workspace:*",
-		"@osmix/geojson-binary-vt": "workspace:*",
+		"@osmix/vt": "workspace:*",
 		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/raster": "workspace:*",
