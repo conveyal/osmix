@@ -1,13 +1,6 @@
 # Osmix
 
-Osmix is a TypeScript monorepo which provides tools for reading, inspecting, and merging OpenStreetMap PBF data in modern runtimes and the browser. It combines a worker-driven merge UI with libraries that span low-level PBF parsing, JSON transforms, and efficient typed-array indexes designed for any JavaScript environment.
-
-## Architecture highlights
-
-- End-to-end merges work in the browser on country scale workloads thanks to worker-hosted `@osmix/core`, the change orchestration in `@osmix/change`, OffscreenCanvas rasterization, and the File System Access API.
-- Typed-array indexes, `transferables()`, and streaming transforms keep large datasets memory efficient across Web Workers, Bun, and Node 20+.
-- JSON and PBF layers interoperate: `@osmix/pbf` exposes spec-close block readers while `@osmix/json` upgrades them into ergonomic entities or GeoJSON.
-- Shared tooling relies on Bun `1.3.x`, Vite, React, MapLibre, and the Web Compression Streams API.
+Osmix is a collection of tools for reading, inspecting, and merging OpenStreetMap PBF data in modern JavaScript runtimes and the browser. The first application built with the tools is a worker-driven merge UI. Libraries span low-level PBF parsing, JSON transforms, and efficient typed-array indexes designed for any JavaScript environment.
 
 ## Getting started
 
@@ -26,17 +19,17 @@ The workspace uses a single root `package.json` to coordinate shared scripts, de
 - [apps/bench](apps/bench/README.md) – Experimental benchmark UI that contrasts Osmix operations with DuckDB-wasm queries using shared fixtures.
 
 ### Packages
-- [packages/core](packages/core/README.md) – Core `Osmix` engine for ingesting PBF streams, building spatial indexes, and emitting JSON, PBF, or raster tiles.
+- [packages/core](packages/core/README.md) – Core `Osmix` engine for ingesting PBF streams, building spatial indexes, and emitting JSON, PBF, or vector and raster tiles.
 - [packages/change](packages/change/README.md) – Change-management helpers that deduplicate entities, generate merge stats, and apply edits on top of `@osmix/core`.
 - [packages/json](packages/json/README.md) – Easy-to-use streaming converters between PBF bytes and strongly typed JSON entities, plus GeoJSON helpers tuned to OSM conventions.
 - [packages/pbf](packages/pbf/README.md) – Low-level toolkit that mirrors the official protobuf schema, offering streaming readers/writers, compression helpers, and generated type-safe codecs.
 - [packages/raster](packages/raster/README.md) – Canvas-based raster tile renderer and MapLibre protocol built for `@osmix/core` datasets.
-- [packages/geojson-binary-vt](packages/geojson-binary-vt/README.md) – Encodes Osmix binary overlays directly into Mapbox Vector Tiles with caching helpers.
+- [packages/vt](packages/vt/README.md) – Encodes Osmix binary overlays directly into Mapbox Vector Tiles with caching helpers.
 - [packages/shared](packages/shared/README.md) – Small geometry utilities (`haversineDistance`, `clipPolyline`) shared across packages.
 - [packages/test-utils](packages/test-utils/README.md) – Shared Vitest fixtures and helpers used across packages.
 
 ### Development
-- `fixtures/` – gzipped sample extracts referenced by integration tests and the merge app.
+- `fixtures/` – sample extracts referenced by integration tests and the merge app.
 
 ## Resources
 
