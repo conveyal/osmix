@@ -1,4 +1,4 @@
-import type { OsmRelation, OsmTags, OsmWay } from "@osmix/json"
+import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from "@osmix/json"
 import type { OsmixChangesetStats } from "./types"
 
 export function osmTagsToOscTags(tags: OsmTags): string {
@@ -40,15 +40,27 @@ export function removeDuplicateAdjacentRelationMembers(relation: OsmRelation) {
 export function cleanCoords(coords: [number, number][]) {
 	return coords.filter((coord, index, array) => {
 		if (index === array.length - 1) return true
-		return coord[0] !== array[index + 1][0] || coord[1] !== array[index + 1][1]
+		return (
+			coord[0] !== array[index + 1]?.[0] || coord[1] !== array[index + 1]?.[1]
+		)
 	})
 }
-const isHighway = (t: OsmTags) => t.highway != null
+
+export function entityHasTagValue(
+	entity: OsmEntity,
+	tag: string,
+	value: string,
+) {
+	return entity.tags?.[tag] === value
+}
+
+const isHighway = (t: OsmTags) => t["highway"] != null
 const isFootish = (t: OsmTags) =>
 	["footway", "path", "cycleway", "bridleway", "steps"].includes(
-		String(t.highway),
+		String(t["highway"]),
 	)
-const isPolygonish = (t: OsmTags) => !!(t.building || t.landuse || t.natural)
+const isPolygonish = (t: OsmTags) =>
+	!!(t["building"] || t["landuse"] || t["natural"])
 
 /**
  * Determine if two ways should be connected based on their tags
@@ -58,8 +70,13 @@ export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
 	const b = tagsB || {}
 	if (isPolygonish(a) || isPolygonish(b)) return false
 
-	const isSeparated = !!(a.bridge || a.tunnel || b.bridge || b.tunnel)
-	const diffLayer = (a.layer ?? "0") !== (b.layer ?? "0")
+	const isSeparated = !!(
+		a["bridge"] ||
+		a["tunnel"] ||
+		b["bridge"] ||
+		b["tunnel"]
+	)
+	const diffLayer = (a["layer"] ?? "0") !== (b["layer"] ?? "0")
 	if (isSeparated || diffLayer) return false
 
 	if (isHighway(a) && isHighway(b)) return true

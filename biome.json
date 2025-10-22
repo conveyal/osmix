@@ -17,6 +17,9 @@
 				"useSemanticElements": "off",
 				"useValidAnchor": "off"
 			},
+			"complexity": {
+				"useLiteralKeys": "off"
+			},
 			"correctness": {
 				"noUnusedImports": "error",
 				"useUniqueElementIds": "off"

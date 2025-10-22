@@ -7,6 +7,7 @@
 	"main": "./src/index.ts",
 	"sideEffects": false,
 	"scripts": {
+		"build": "tsc",
 		"test": "vitest",
 		"typecheck": "tsc --noEmit"
 	},
@@ -15,14 +16,14 @@
 		"@mapbox/tilebelt": "catalog:",
 		"@osmix/shared": "workspace:*",
 		"@osmix/json": "workspace:*",
+		"pbf": "catalog:",
 		"vt-pbf": "^3.1.3"
 	},
 	"devDependencies": {
 		"@mapbox/vector-tile": "^2.0.4",
+		"@osmix/tsconfig": "workspace:*",
 		"@osmix/test-utils": "workspace:*",
 		"@types/vt-pbf": "^3.0.4",
-		"pbf": "catalog:",
-		"@types/node": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	}

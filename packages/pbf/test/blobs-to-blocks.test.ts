@@ -40,11 +40,13 @@ describe("osmPbfBlobsToBlocksGenerator", () => {
 		}
 		assert.lengthOf(block.primitivegroup, primitiveBlock.primitivegroup.length)
 		const group = block.primitivegroup[0]
-		assert.exists(group.dense)
+		assert.exists(primitiveBlock.primitivegroup[0])
+		assert.exists(group?.dense)
+		assert.exists(group?.ways?.[0])
 		assert.lengthOf(group.ways, primitiveBlock.primitivegroup[0].ways.length)
 		assert.deepEqual(
 			group.ways[0].refs,
-			primitiveBlock.primitivegroup[0].ways[0].refs,
+			primitiveBlock.primitivegroup[0]?.ways?.[0]?.refs,
 		)
 
 		const final = await generator.next()

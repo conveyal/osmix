@@ -6,8 +6,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
+		"@osmix/tsconfig": "workspace:*",
 		"@types/node": "catalog:",
-		"typescript": "catalog:",
-		"vitest": "catalog:"
+		"typescript": "catalog:"
 	}
 }

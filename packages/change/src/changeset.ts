@@ -9,7 +9,7 @@ import {
 	type OsmNode,
 	type OsmWay,
 } from "@osmix/json"
-import { haversineDistance } from "@osmix/shared"
+import { haversineDistance } from "@osmix/shared/haversine-distance"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
 import sweeplineIntersections from "sweepline-intersections"
 import type {
@@ -20,6 +20,7 @@ import type {
 } from "./types"
 import {
 	cleanCoords,
+	entityHasTagValue,
 	isWayIntersectionCandidate,
 	osmTagsToOscTags,
 	removeDuplicateAdjacentRelationMembers,
@@ -405,8 +406,8 @@ export class OsmixChangeset {
 		let nearestDistance = Number.POSITIVE_INFINITY
 		let nearestNodeId = null
 		let nearestNodeRefIndex = -1
-		for (let i = 0; i < wayCoords.length; i++) {
-			const nodeDistance = haversineDistance(wayCoords[i], point)
+		wayCoords.forEach((wayCoord, i) => {
+			const nodeDistance = haversineDistance(wayCoord, point)
 			if (
 				nodeDistance < nearestDistance &&
 				nodeDistance < MAX_DISTANCE_METERS
@@ -415,7 +416,7 @@ export class OsmixChangeset {
 				nearestNodeId = way.refs[i]
 				nearestNodeRefIndex = i
 			}
-		}
+		})
 		return {
 			refIndex: nearestNodeRefIndex,
 			nodeId: nearestNodeId,
@@ -508,7 +509,7 @@ export class OsmixChangeset {
 						this.spliceNodeIntoWay(intersectingWay, wayNode)
 					}
 
-					if (wayNode.tags?.crossing !== "yes") {
+					if (!entityHasTagValue(wayNode, "crossing", "yes")) {
 						this.modify("node", wayNode.id, (node) => {
 							return {
 								...node,
@@ -526,7 +527,7 @@ export class OsmixChangeset {
 						)
 
 					this.spliceNodeIntoWay(way, intersectingWayNode)
-					if (intersectingWayNode.tags?.crossing !== "yes") {
+					if (!entityHasTagValue(intersectingWayNode, "crossing", "yes")) {
 						this.modify("node", intersectingWayNode.id, (node) => {
 							return {
 								...node,

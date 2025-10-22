@@ -1,3 +1,4 @@
+import { assertValue } from "@osmix/shared/assert"
 import {
 	BufferConstructor,
 	type BufferType,
@@ -119,15 +120,18 @@ export class Ids {
 
 			// Sort by id, carrying position; use native sort on chunks or a custom radix/merge for stability.
 			// For simplicity:
-			const tmp = Array.from({ length: this.size }, (_, i) => ({
-				id: this.idsSorted[i],
-				pos: this.sortedIdPositionToIndex[i],
-			}))
+			const tmp: { id: number; pos: number }[] = Array.from(
+				{ length: this.size },
+				(_, i) => ({
+					id: this.idsSorted[i] as number,
+					pos: this.sortedIdPositionToIndex[i] as number,
+				}),
+			)
 			tmp.sort((a, b) => a.id - b.id)
-			for (let i = 0; i < this.size; i++) {
-				this.idsSorted[i] = tmp[i].id
-				this.sortedIdPositionToIndex[i] = tmp[i].pos
-			}
+			tmp.forEach(({ id, pos }, i) => {
+				this.idsSorted[i] = id
+				this.sortedIdPositionToIndex[i] = pos
+			})
 		} else {
 			// Point to the same array
 			this.idsSorted = this.ids.array
@@ -146,7 +150,9 @@ export class Ids {
 		const sab = new BufferConstructor(aLen * Float64Array.BYTES_PER_ELEMENT)
 		this.anchors = new Float64Array(sab, 0, aLen)
 		for (let j = 0; j < aLen; j++) {
-			this.anchors[j] = this.idsSorted[Math.min(j * BLOCK_SIZE, this.size - 1)]
+			const id = this.idsSorted[Math.min(j * BLOCK_SIZE, this.size - 1)]
+			assertValue(id, "ID is undefined")
+			this.anchors[j] = id
 		}
 
 		this.indexBuilt = true
@@ -161,7 +167,9 @@ export class Ids {
 		let hi = this.anchors.length - 1
 		while (lo < hi) {
 			const mid = (lo + hi + 1) >>> 1
-			if (this.anchors[mid] <= id) lo = mid
+			const anchor = this.anchors[mid]
+			assertValue(anchor, "Anchor is undefined")
+			if (anchor <= id) lo = mid
 			else hi = mid - 1
 		}
 		const start = lo * BLOCK_SIZE
@@ -173,11 +181,12 @@ export class Ids {
 		while (l <= r) {
 			const m = (l + r) >>> 1
 			const v = this.idsSorted[m]
+			assertValue(v, "Value is undefined")
 			if (v === id) {
-				if (this.idsAreSorted) {
-					return m
-				}
-				return this.sortedIdPositionToIndex[m]
+				if (this.idsAreSorted) return m
+				const index = this.sortedIdPositionToIndex[m]
+				assertValue(index, "Position is undefined")
+				return index
 			}
 			if (v < id) l = m + 1
 			else r = m - 1

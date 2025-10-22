@@ -1,3 +1,4 @@
+import { assertValue } from "@osmix/shared/assert"
 import type { AddProtocolAction } from "maplibre-gl"
 import type { TileIndex } from "./raster-tile"
 
@@ -20,6 +21,12 @@ export function createOsmixRasterMaplibreProtocol(
 			)
 		if (!m) throw new Error(`Bad ${RASTER_PROTOCOL_NAME} URL: ${req.url}`)
 		const [, osmId, sizeStr, zStr, xStr, yStr] = m
+		assertValue(sizeStr, "Tile size is required in protocol URL")
+		assertValue(zStr, "Tile index z is required in protocol URL")
+		assertValue(xStr, "Tile index x is required in protocol URL")
+		assertValue(yStr, "Tile index y is required in protocol URL")
+		assertValue(osmId, "OSM ID is required in protocol URL")
+
 		const tileSize = +sizeStr
 		const tileIndex: TileIndex = { z: +zStr, x: +xStr, y: +yStr }
 		const data = await getTileImage(osmId, tileIndex, tileSize)

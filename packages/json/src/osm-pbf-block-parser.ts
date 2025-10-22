@@ -8,6 +8,7 @@ import type {
 	OsmPbfStringTable,
 	OsmPbfWay,
 } from "@osmix/pbf"
+import { assertValue } from "@osmix/shared/assert"
 import type {
 	OsmEntityType,
 	OsmInfoParsed,
@@ -105,10 +106,10 @@ export class OsmPbfBlockParser implements OsmPbfBlock {
 		}
 	}
 
-	private getString(index: number) {
+	private getString(index: number | undefined) {
+		assertValue(index, "String index is undefined")
 		const string = this.parsedStringTable.get(index)
-		if (string === undefined)
-			throw Error(`String missing in block at index ${index}`)
+		assertValue(string, `String missing in block at index ${index}`)
 		return string
 	}
 
@@ -168,7 +169,9 @@ export class OsmPbfBlockParser implements OsmPbfBlock {
 			ref += memid
 
 			const memberType = r.types[i]
+			assertValue(memberType, "Member type is undefined")
 			const type = ENTITY_MEMBER_TYPES[memberType]
+			assertValue(type, "Member type is undefined")
 			return {
 				type,
 				ref,
@@ -208,9 +211,11 @@ export class OsmPbfBlockParser implements OsmPbfBlock {
 			delta.id += idSid
 
 			const latSid = dense.lat[nodeIndex]
+			assertValue(latSid, "Latitude is undefined")
 			delta.lat += latSid
 
 			const lonSid = dense.lon[nodeIndex]
+			assertValue(lonSid, "Longitude is undefined")
 			delta.lon += lonSid
 
 			const node: OsmNode = {
@@ -234,9 +239,13 @@ export class OsmPbfBlockParser implements OsmPbfBlock {
 			}
 			if (includeInfo && dense.denseinfo) {
 				const iTime = dense.denseinfo.timestamp[nodeIndex]
+				assertValue(iTime, "Timestamp is undefined")
 				const iChangeset = dense.denseinfo.changeset[nodeIndex]
+				assertValue(iChangeset, "Changeset is undefined")
 				const iUid = dense.denseinfo.uid[nodeIndex]
+				assertValue(iUid, "UID is undefined")
 				const iUserSid = dense.denseinfo.user_sid[nodeIndex]
+				assertValue(iUserSid, "User SID is undefined")
 				const iVersion = dense.denseinfo.version[nodeIndex]
 
 				delta.timestamp += iTime

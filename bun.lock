@@ -25,7 +25,7 @@
         "react-map-gl": "^8.0.4",
       },
       "devDependencies": {
-        "@types/node": "catalog:",
+        "@osmix/tsconfig": "workspace:*",
         "@types/react": "^19.2.0",
         "@types/react-dom": "^19.2.0",
         "@vitejs/plugin-react": "^5.0.4",
@@ -69,10 +69,10 @@
         "tailwind-merge": "^3.3.0",
       },
       "devDependencies": {
+        "@osmix/tsconfig": "workspace:*",
         "@playwright/test": "^1.52.0",
         "@tailwindcss/vite": "4.1.14",
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "@types/react": "^19.2.0",
         "@types/react-dom": "^19.2.0",
         "@vitejs/plugin-react": "^5.0.4",
@@ -95,8 +95,8 @@
       },
       "devDependencies": {
         "@osmix/test-utils": "workspace:*",
+        "@osmix/tsconfig": "workspace:*",
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -107,14 +107,15 @@
       "dependencies": {
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
+        "@osmix/shared": "workspace:*",
         "flatbush": "^4.4.1",
         "kdbush": "mourner/kdbush#16416cd",
         "sweepline-intersections": "^1.5.0",
       },
       "devDependencies": {
         "@osmix/test-utils": "workspace:*",
+        "@osmix/tsconfig": "workspace:*",
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -124,12 +125,13 @@
       "version": "0.0.1",
       "dependencies": {
         "@osmix/pbf": "workspace:*",
+        "@osmix/shared": "workspace:*",
         "dequal": "catalog:",
       },
       "devDependencies": {
         "@osmix/test-utils": "workspace:*",
+        "@osmix/tsconfig": "workspace:*",
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vite": "catalog:",
         "vitest": "catalog:",
@@ -142,8 +144,9 @@
         "pbf": "catalog:",
       },
       "devDependencies": {
+        "@osmix/shared": "workspace:*",
         "@osmix/test-utils": "workspace:*",
-        "@types/node": "catalog:",
+        "@osmix/tsconfig": "workspace:*",
         "typescript": "catalog:",
         "vite": "catalog:",
         "vitest": "catalog:",
@@ -161,8 +164,8 @@
       },
       "devDependencies": {
         "@osmix/test-utils": "workspace:*",
+        "@osmix/tsconfig": "workspace:*",
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "maplibre-gl": "^5.7.3",
         "typescript": "catalog:",
         "vitest": "catalog:",
@@ -174,14 +177,22 @@
       "dependencies": {
         "lineclip": "^2.0.0",
       },
+      "devDependencies": {
+        "@osmix/tsconfig": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
     },
     "packages/test-utils": {
       "name": "@osmix/test-utils",
       "devDependencies": {
+        "@osmix/tsconfig": "workspace:*",
         "@types/node": "catalog:",
         "typescript": "catalog:",
-        "vitest": "catalog:",
       },
+    },
+    "packages/tsconfig": {
+      "name": "@osmix/tsconfig",
     },
     "packages/vt": {
       "name": "@osmix/vt",
@@ -191,14 +202,14 @@
         "@mapbox/tilebelt": "catalog:",
         "@osmix/json": "workspace:*",
         "@osmix/shared": "workspace:*",
+        "pbf": "catalog:",
         "vt-pbf": "^3.1.3",
       },
       "devDependencies": {
         "@mapbox/vector-tile": "^2.0.4",
         "@osmix/test-utils": "workspace:*",
-        "@types/node": "catalog:",
+        "@osmix/tsconfig": "workspace:*",
         "@types/vt-pbf": "^3.0.4",
-        "pbf": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -393,6 +404,8 @@
     "@osmix/shared": ["@osmix/shared@workspace:packages/shared"],
 
     "@osmix/test-utils": ["@osmix/test-utils@workspace:packages/test-utils"],
+
+    "@osmix/tsconfig": ["@osmix/tsconfig@workspace:packages/tsconfig"],
 
     "@osmix/vt": ["@osmix/vt@workspace:packages/vt"],
 

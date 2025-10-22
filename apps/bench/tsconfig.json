@@ -1,34 +1,8 @@
 {
-	"extends": "../../tsconfig.json",
+	"$schema": "https://json.schemastore.org/tsconfig",
+	"extends": "@osmix/tsconfig/app.json",
 	"compilerOptions": {
-		"types": ["vite/client", "@vitest/browser/matchers"],
-		"composite": true,
-		"tsBuildInfoFile": "./tsconfig.app.tsbuildinfo",
-		"target": "esnext",
-		"lib": ["ESNext", "DOM", "DOM.Iterable"],
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"allowImportingTsExtensions": true,
-		"resolveJsonModule": true,
-		"isolatedModules": true,
-		"moduleDetection": "force",
-		"noEmit": true,
-		"jsx": "react-jsx",
-		"paths": {
-			"@/*": ["./src/*"]
-		},
-
-		// Best practices
-		"strict": true,
-		"skipLibCheck": true,
-		"noFallthroughCasesInSwitch": true,
-		"erasableSyntaxOnly": true,
-
-		// Some stricter flags (disabled by default)
-		"noUnusedLocals": false,
-		"noUnusedParameters": false,
-		"noPropertyAccessFromIndexSignature": false,
-		"noUncheckedIndexedAccess": false
+		"types": ["vite/client"]
 	},
 	"include": ["src", "test/duckdb.test.ts"]
 }

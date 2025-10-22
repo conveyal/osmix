@@ -111,7 +111,11 @@ export class Tags {
 	getTagsFromIndices(keys: number[], values: number[]): OsmTags {
 		const tags: OsmTags = {}
 		for (let i = 0; i < keys.length; i++) {
-			tags[this.stringTable.get(keys[i])] = this.stringTable.get(values[i])
+			const keyIndex = keys[i]
+			const valIndex = values[i]
+			if (keyIndex === undefined || valIndex === undefined)
+				throw Error("Tag key or value not found")
+			tags[this.stringTable.get(keyIndex)] = this.stringTable.get(valIndex)
 		}
 		return tags
 	}

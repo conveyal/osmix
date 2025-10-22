@@ -168,8 +168,8 @@ export class Ways extends Entities<OsmWay> {
 	}
 
 	getRefIds(index: number) {
-		const start = this.refStart.array[index]
-		const count = this.refCount.array[index]
+		const start = this.refStart.at(index)
+		const count = this.refCount.at(index)
 		return this.refs.slice(start, start + count)
 	}
 
@@ -177,19 +177,19 @@ export class Ways extends Entities<OsmWay> {
 		const index =
 			"index" in idOrIndex ? idOrIndex.index : this.ids.idOrIndex(idOrIndex)[0]
 		return [
-			this.bbox.array[index * 4],
-			this.bbox.array[index * 4 + 1],
-			this.bbox.array[index * 4 + 2],
-			this.bbox.array[index * 4 + 3],
+			this.bbox.at(index * 4),
+			this.bbox.at(index * 4 + 1),
+			this.bbox.at(index * 4 + 2),
+			this.bbox.at(index * 4 + 3),
 		]
 	}
 
 	getLine(index: number, nodeIndex: Nodes) {
-		const count = this.refCount.array[index]
-		const start = this.refStart.array[index]
+		const count = this.refCount.at(index)
+		const start = this.refStart.at(index)
 		const line = new Float64Array(count * 2)
 		for (let i = 0; i < count; i++) {
-			const ref = this.refs.array[start + i]
+			const ref = this.refs.at(start + i)
 			const [lon, lat] = nodeIndex.getNodeLonLat({ id: ref })
 			line[i * 2] = lon
 			line[i * 2 + 1] = lat
@@ -198,11 +198,11 @@ export class Ways extends Entities<OsmWay> {
 	}
 
 	getCoordinates(index: number, nodeIndex: Nodes): [number, number][] {
-		const count = this.refCount.array[index]
-		const start = this.refStart.array[index]
+		const count = this.refCount.at(index)
+		const start = this.refStart.at(index)
 		const coords: [number, number][] = []
 		for (let refIndex = start; refIndex < start + count; refIndex++) {
-			const ref = this.refs.array[refIndex]
+			const ref = this.refs.at(refIndex)
 			const coord = nodeIndex.getNodeLonLat({ id: ref })
 			if (
 				coord === undefined ||

@@ -55,14 +55,6 @@ describe.runIf(isBun())("utils", () => {
 		expect(decompressed).toEqual(input)
 	})
 
-	test("compresses and decompresses data with gzip", async () => {
-		const input = new TextEncoder().encode("osmix with gzip compression")
-		const compressed = await compress(input, "gzip")
-		expect(compressed).not.toEqual(input)
-		const decompressed = await decompress(compressed, "gzip")
-		expect(decompressed).toEqual(input)
-	})
-
 	test("compresses and decompresses larger data", async () => {
 		const input = new TextEncoder().encode("a".repeat(1000))
 		const compressed = await compress(input)
@@ -78,16 +70,9 @@ describe.runIf(isBun())("utils", () => {
 		expect(decompressed).toEqual(input)
 	})
 
-	test("handles string input", async () => {
-		const input = "test string"
-		const compressed = await compress(input)
-		const decompressed = await decompress(compressed)
-		expect(new TextDecoder().decode(decompressed)).toBe(input)
-	})
-
 	test("uses Bun runtime with Node.js zlib compatibility", () => {
 		// This test verifies that Bun is available in the runtime
-		expect(typeof Bun).toBe("object")
+		expect(isBun()).toBe(true)
 	})
 
 	test("Node.js zlib methods work in Bun", async () => {
@@ -153,27 +138,6 @@ describe.skip("CompressionStream polyfill", () => {
 		expect(decompressed).toEqual(input)
 	})
 
-	test("compresses data using gzip format", async () => {
-		const input = new TextEncoder().encode("test gzip stream")
-		const compressor = new CompressionStream("gzip")
-
-		const writer = compressor.writable.getWriter()
-		writer.write(input)
-		writer.close()
-
-		const chunks: Uint8Array[] = []
-		const reader = compressor.readable.getReader()
-		while (true) {
-			const { done, value } = await reader.read()
-			if (done) break
-			chunks.push(value)
-		}
-
-		const compressed = concatUint8(...chunks)
-		const decompressed = await decompress(new Uint8Array(compressed), "gzip")
-		expect(decompressed).toEqual(input)
-	})
-
 	test("returns proper Uint8Array<ArrayBuffer> instances", async () => {
 		const input = new TextEncoder().encode("type safety check")
 		const compressor = new CompressionStream("deflate")
@@ -223,32 +187,11 @@ describe.skip("CompressionStream polyfill", () => {
 describe.skip("DecompressionStream polyfill", () => {
 	test("decompresses deflate data", async () => {
 		const input = new TextEncoder().encode("test decompression stream")
-		const compressed = await compress(input, "deflate")
+		const compressed = await compress(input)
 
 		const decompressor = new DecompressionStream("deflate")
 		const writer = decompressor.writable.getWriter()
-		writer.write(compressed)
-		writer.close()
-
-		const chunks: Uint8Array[] = []
-		const reader = decompressor.readable.getReader()
-		while (true) {
-			const { done, value } = await reader.read()
-			if (done) break
-			chunks.push(value)
-		}
-
-		const decompressed = concatUint8(...chunks)
-		expect(decompressed).toEqual(input)
-	})
-
-	test("decompresses gzip data", async () => {
-		const input = new TextEncoder().encode("test gzip decompression")
-		const compressed = await compress(input, "gzip")
-
-		const decompressor = new DecompressionStream("gzip")
-		const writer = decompressor.writable.getWriter()
-		writer.write(compressed)
+		writer.write(compressed as Uint8Array<ArrayBuffer>)
 		writer.close()
 
 		const chunks: Uint8Array[] = []
@@ -269,7 +212,7 @@ describe.skip("DecompressionStream polyfill", () => {
 
 		const decompressor = new DecompressionStream("deflate")
 		const writer = decompressor.writable.getWriter()
-		writer.write(compressed)
+		writer.write(compressed as Uint8Array<ArrayBuffer>)
 		writer.close()
 
 		const reader = decompressor.readable.getReader()

@@ -1,3 +1,5 @@
+import { transformBytes } from "@osmix/shared/transform-bytes"
+
 export type AsyncGeneratorValue<T> =
 	| T
 	| ReadableStream<T>
@@ -47,73 +49,30 @@ export function isBun(): boolean {
  * Decompresses binary data using runtime-native APIs.
  * Falls back to Node zlib when running under Bun to match OSM PBF expectations.
  */
-export async function decompress(
-	data: BlobPart,
-	format: CompressionFormat = "deflate",
-): Promise<Uint8Array> {
+export async function decompress(data: Uint8Array): Promise<Uint8Array> {
 	// Check if we're in Bun runtime - use Node.js zlib for proper OSM PBF zlib format support
 	if (isBun()) {
-		const { inflateSync, gunzipSync, inflateRawSync } = await import(
-			"node:zlib"
-		)
-		const bytes =
-			data instanceof Uint8Array
-				? data
-				: new Uint8Array(await new Blob([data]).arrayBuffer())
-
-		switch (format) {
-			case "deflate":
-				// OSM PBF uses zlib format (deflate with headers)
-				return new Uint8Array(inflateSync(bytes))
-			case "gzip":
-				return new Uint8Array(gunzipSync(bytes))
-			case "deflate-raw":
-				return new Uint8Array(inflateRawSync(bytes))
-			default:
-				throw new Error(`Unsupported compression format in Bun: ${format}`)
-		}
+		const { inflateSync } = await import("node:zlib")
+		return new Uint8Array(inflateSync(data))
 	}
 
 	// Fallback to standard Web API
-	const decompressedStream = new Blob([data])
-		.stream()
-		.pipeThrough(new DecompressionStream(format))
-	return new Response(decompressedStream).bytes()
+	return transformBytes(data, new DecompressionStream("deflate"))
 }
 
 /**
  * Compresses binary data using runtime-native APIs.
  * Falls back to Node zlib when running under Bun to match OSM PBF expectations.
  */
-export async function compress(
-	data: BlobPart,
-	format: CompressionFormat = "deflate",
-): Promise<Uint8Array<ArrayBuffer>> {
+export async function compress(data: Uint8Array): Promise<Uint8Array> {
 	// Check if we're in Bun runtime - use Node.js zlib for proper OSM PBF zlib format support
 	if (isBun()) {
-		const { deflateSync, gzipSync, deflateRawSync } = await import("node:zlib")
-		const bytes =
-			data instanceof Uint8Array
-				? data
-				: new Uint8Array(await new Blob([data]).arrayBuffer())
-
-		switch (format) {
-			case "deflate":
-				// OSM PBF uses zlib format (deflate with headers)
-				return new Uint8Array(deflateSync(bytes))
-			case "gzip":
-				return new Uint8Array(gzipSync(bytes))
-			case "deflate-raw":
-				return new Uint8Array(deflateRawSync(bytes))
-			default:
-				throw new Error(`Unsupported compression format in Bun: ${format}`)
-		}
+		const { deflateSync } = await import("node:zlib")
+		return new Uint8Array(deflateSync(data))
 	}
 
 	// Fallback to standard Web API
-	const stream = new CompressionStream(format)
-	const compressedStream = new Blob([data]).stream().pipeThrough(stream)
-	return new Response(compressedStream).bytes()
+	return transformBytes(data, new CompressionStream("deflate"))
 }
 
 /**

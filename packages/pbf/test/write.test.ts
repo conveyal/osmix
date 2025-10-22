@@ -39,13 +39,13 @@ describe("write", () => {
 			write(await osmBlockToPbfBlobBytes(osm.header))
 			for await (const block of osm.blocks) {
 				for (const group of block.primitivegroup) {
-					if (node0 == null && group.dense != null) {
+					if (node0 == null && group.dense?.id?.[0] != null) {
 						node0 = group.dense.id[0]
 					}
-					if (way0 == null && group.ways.length > 0) {
+					if (way0 == null && group.ways?.[0]?.id != null) {
 						way0 = group.ways[0].id
 					}
-					if (relation0 == null && group.relations.length > 0) {
+					if (relation0 == null && group.relations?.[0]?.id != null) {
 						relation0 = group.relations[0].id
 					}
 				}

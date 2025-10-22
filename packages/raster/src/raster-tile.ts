@@ -1,6 +1,6 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import type { GeoBbox2D } from "@osmix/json"
-import { clipPolyline } from "@osmix/shared"
+import { clipPolyline } from "@osmix/shared/lineclip"
 
 export type Rgba = [number, number, number, number] | Uint8ClampedArray
 
@@ -9,6 +9,14 @@ export interface TileIndex {
 	x: number
 	y: number
 }
+
+/**
+ * TODO remove spherical mercator dependency here pass in projection function instead
+ */
+export type LonLatToPixel = (
+	ll: [lon: number, lat: number],
+	zoom: number,
+) => [x: number, y: number]
 
 export const DEFAULT_RASTER_IMAGE_TYPE = "image/png"
 export const DEFAULT_WAY_COLOR: Rgba = [255, 255, 255, 255] // white
@@ -34,7 +42,7 @@ export class OsmixRasterTile {
 		this.merc = new SphericalMercator({ size: tileSize })
 	}
 
-	lonLatToPixel(ll: [number, number]): [number, number] {
+	lonLatToTilePixel(ll: [number, number]): [number, number] {
 		const merc = this.merc.px(ll, this.tileIndex.z)
 
 		// Convert to local tile pixel
@@ -49,7 +57,7 @@ export class OsmixRasterTile {
 	}
 
 	setLonLat([lon, lat]: [number, number], color: Rgba = DEFAULT_NODE_COLOR) {
-		const px = this.lonLatToPixel([lon, lat])
+		const px = this.lonLatToTilePixel([lon, lat])
 		this.setPixel(px, color)
 	}
 
@@ -103,39 +111,21 @@ export class OsmixRasterTile {
 	}
 
 	drawWay(way: [number, number][], color: Rgba = DEFAULT_WAY_COLOR) {
-		const result = clipPolyline(way, this.bbox)
-		if (result && result.length > 0) {
-			const [clipped] = result
-			let prev = clipped[0]
-			for (let i = 1; i < clipped.length; i++) {
-				const curr = clipped[i]
-				const [x0, y0] = this.lonLatToPixel(prev)
-				const [x1, y1] = this.lonLatToPixel(curr)
+		const [clipped] = clipPolyline(way, this.bbox)
+		if (clipped != null) {
+			let prev: [number, number] = clipped[0] as [number, number]
+			for (const curr of clipped) {
+				if (prev == null) {
+					prev = curr
+					return
+				}
+				const [x0, y0] = this.lonLatToTilePixel(prev)
+				const [x1, y1] = this.lonLatToTilePixel(curr)
 				if (x0 !== x1 || y0 !== y1) {
 					this.drawLine(x0, y0, x1, y1, color)
 				}
 				prev = curr
 			}
 		}
-	}
-
-	toCanvas() {
-		const canvas = new OffscreenCanvas(this.tileSize, this.tileSize)
-		const ctx = canvas.getContext("2d")
-		if (!ctx) throw Error("Failed to get context")
-		ctx.putImageData(
-			new ImageData(this.imageData, this.tileSize, this.tileSize),
-			0,
-			0,
-		)
-		return canvas
-	}
-
-	async toImageBuffer(
-		options: ImageEncodeOptions = { type: DEFAULT_RASTER_IMAGE_TYPE },
-	) {
-		const canvas = this.toCanvas()
-		const blob = await canvas.convertToBlob(options)
-		return blob.arrayBuffer()
 	}
 }

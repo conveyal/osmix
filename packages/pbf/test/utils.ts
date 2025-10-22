@@ -40,13 +40,13 @@ export function createOsmEntityCounter() {
 	}
 
 	const onGroup = (group: OsmPbfGroup) => {
-		if (count.node0 === -1 && group.dense != null) {
+		if (count.node0 === -1 && group.dense?.id?.[0] != null) {
 			count.node0 = group.dense.id[0]
 		}
-		if (count.way0 === -1 && group.ways.length > 0) {
+		if (count.way0 === -1 && group.ways?.[0]?.id != null) {
 			count.way0 = group.ways[0].id
 		}
-		if (count.relation0 === -1 && group.relations.length > 0) {
+		if (count.relation0 === -1 && group.relations?.[0]?.id != null) {
 			count.relation0 = group.relations[0].id
 		}
 

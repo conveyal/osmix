@@ -32,7 +32,7 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 			relations: [],
 		},
 	] as const
-	private group = this.primitivegroup[0]
+	readonly group: OsmPbfGroup = this.primitivegroup[0] as OsmPbfGroup
 
 	date_granularity: number
 	granularity: number

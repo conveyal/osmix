@@ -1,5 +1,5 @@
 import { assert, test } from "vitest"
-import { haversineDistance } from "./haversine-distance"
+import { haversineDistance } from "../src/haversine-distance"
 
 test("haversineDistance", () => {
 	const p1: [number, number] = [-75.343, 39.984]

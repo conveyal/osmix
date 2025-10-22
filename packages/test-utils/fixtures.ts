@@ -20,11 +20,11 @@ export function getFixturePath(url: string) {
 /**
  * Get file from the cache folder or download it from the URL
  */
-export async function getFixtureFile(url: string): Promise<ArrayBufferLike> {
+export async function getFixtureFile(url: string): Promise<ArrayBuffer> {
 	const filePath = getFixturePath(url)
 	try {
 		const file = await readFile(filePath)
-		return file.buffer
+		return file.buffer as ArrayBuffer
 	} catch (_error) {
 		const response = await fetch(url)
 		const buffer = await response.arrayBuffer()
@@ -76,29 +76,31 @@ export type PbfFixture = {
  *
  * Below, we export a subset of the PBFs that we want to use for current tests.
  */
-const AllPBFs: Record<string, PbfFixture> = {
-	monaco: {
-		url: "monaco.pbf",
-		bbox: {
-			bottom: 43.7232244,
-			top: 43.7543687,
-			left: 7.4053929,
-			right: 7.4447259,
-		},
-		nodesWithTags: 1_254,
-		nodes: 14_286,
-		ways: 3_346,
-		relations: 46,
-		node0: {
-			lat: 43.7371175,
-			lon: 7.4229093,
-			id: 21911883,
-		},
-		way0: 4097656,
-		relation0: 3410831,
-		uniqueStrings: 1_060,
-		primitiveGroups: 7,
+const monacoPbfFixture: PbfFixture = {
+	url: "monaco.pbf",
+	bbox: {
+		bottom: 43.7232244,
+		top: 43.7543687,
+		left: 7.4053929,
+		right: 7.4447259,
 	},
+	nodesWithTags: 1_254,
+	nodes: 14_286,
+	ways: 3_346,
+	relations: 46,
+	node0: {
+		lat: 43.7371175,
+		lon: 7.4229093,
+		id: 21911883,
+	},
+	way0: 4097656,
+	relation0: 3410831,
+	uniqueStrings: 1_060,
+	primitiveGroups: 7,
+}
+
+export const AllPBFs: Record<string, PbfFixture> = {
+	monaco: monacoPbfFixture,
 	montenegro: {
 		url: "https://download.geofabrik.de/europe/montenegro-250101.osm.pbf",
 		bbox: {
@@ -187,10 +189,10 @@ const AllPBFs: Record<string, PbfFixture> = {
 		uniqueStrings: 598_993,
 		primitiveGroups: 34_901,
 	},
-}
+} as const
 
 /**
  * A subset of the PBFs that we want to use for current tests. Do not check in changes to this list as it will cause CI to
  * attempt to download PBFs that are not checked into the repository.
  */
-export const PBFs = { monaco: AllPBFs.monaco }
+export const PBFs: Record<string, PbfFixture> = { monaco: monacoPbfFixture }

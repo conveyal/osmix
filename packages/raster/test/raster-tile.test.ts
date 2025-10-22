@@ -9,6 +9,7 @@ import {
 	OsmixRasterTile,
 	type TileIndex,
 } from "../src/raster-tile"
+import { rasterTileToImageBuffer } from "./to-image-buffer"
 
 function createTile(
 	tileIndex: TileIndex = { z: 3, x: 4, y: 5 },
@@ -41,13 +42,13 @@ describe("OsmixRasterTile", () => {
 		const { tile, merc } = createTile(tileIndex, DEFAULT_TILE_SIZE)
 
 		const insideLonLat = lonLatForPixel(merc, tileIndex, tile.tileSize, 32, 16)
-		expect(tile.lonLatToPixel(insideLonLat)).toEqual([32, 16])
+		expect(tile.lonLatToTilePixel(insideLonLat)).toEqual([32, 16])
 
 		const outsideTopLeft = merc.ll(
 			[tileIndex.x * tile.tileSize - 10, tileIndex.y * tile.tileSize - 10],
 			tileIndex.z,
 		) as [number, number]
-		expect(tile.lonLatToPixel(outsideTopLeft)).toEqual([0, 0])
+		expect(tile.lonLatToTilePixel(outsideTopLeft)).toEqual([0, 0])
 
 		const outsideBottomRight = merc.ll(
 			[
@@ -56,7 +57,7 @@ describe("OsmixRasterTile", () => {
 			],
 			tileIndex.z,
 		) as [number, number]
-		expect(tile.lonLatToPixel(outsideBottomRight)).toEqual([
+		expect(tile.lonLatToTilePixel(outsideBottomRight)).toEqual([
 			tile.tileSize - 1,
 			tile.tileSize - 1,
 		])
@@ -179,7 +180,7 @@ describe("OsmixRasterTile", () => {
 				MockOffscreenCanvas as unknown as typeof OffscreenCanvas
 			globalThis.ImageData = MockImageData as unknown as typeof ImageData
 
-			const result = await tile.toImageBuffer()
+			const result = await rasterTileToImageBuffer(tile)
 
 			expect(result).toBe(arrayBuffer)
 			expect(putImageData).toHaveBeenCalledTimes(1)

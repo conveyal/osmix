@@ -4,12 +4,20 @@
 	"type": "module",
 	"version": "0.0.1",
 	"description": "Shared utilities for Osmix",
-	"main": "./src/index.ts",
+	"exports": {
+		"./*": "./src/*.ts"
+	},
 	"sideEffects": false,
 	"scripts": {
+		"build": "tsc",
 		"bench": "vitest bench",
 		"test": "vitest",
 		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@osmix/tsconfig": "workspace:*",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
 	},
 	"dependencies": {
 		"lineclip": "^2.0.0"

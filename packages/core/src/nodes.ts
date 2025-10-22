@@ -1,5 +1,6 @@
 import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
+import { assertValue } from "@osmix/shared/assert"
 import KDBush from "kdbush"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"
@@ -96,8 +97,9 @@ export class Nodes extends Entities<OsmNode> {
 
 		const getStringTableIndex = (keyIndex: number) => {
 			const key = dense.keys_vals[keyIndex]
+			assertValue(key, "Block string key is undefined")
 			const index = blockStringIndexMap.get(key)
-			if (index === undefined) throw Error("Block string not found")
+			assertValue(index, "Block string not found")
 			return index
 		}
 
@@ -107,6 +109,9 @@ export class Nodes extends Entities<OsmNode> {
 			const idSid = dense.id[i]
 			const latSid = dense.lat[i]
 			const lonSid = dense.lon[i]
+			assertValue(idSid, "ID SID is undefined")
+			assertValue(latSid, "Latitude SID is undefined")
+			assertValue(lonSid, "Longitude SID is undefined")
 
 			delta.id += idSid
 			delta.lat += latSid
@@ -177,7 +182,7 @@ export class Nodes extends Entities<OsmNode> {
 
 	getNodeLonLat(i: IdOrIndex): [number, number] {
 		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
-		return [this.lons.array[index], this.lats.array[index]]
+		return [this.lons.at(index), this.lats.at(index)]
 	}
 
 	getFullEntity(index: number, id: number, tags?: OsmTags): OsmNode {

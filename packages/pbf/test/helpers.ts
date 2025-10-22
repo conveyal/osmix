@@ -40,7 +40,7 @@ export function createSamplePrimitiveBlock(): OsmPbfBlock {
 				relations: [],
 			},
 		],
-	}
+	} as const
 }
 
 export async function createSamplePbfFileBytes() {

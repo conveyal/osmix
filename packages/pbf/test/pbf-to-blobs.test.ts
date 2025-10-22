@@ -54,6 +54,8 @@ describe("createOsmPbfBlobGenerator", () => {
 			primitive.primitivegroup,
 			primitiveBlock.primitivegroup.length,
 		)
+		assert.exists(primitive.primitivegroup[0])
+		assert.exists(primitiveBlock.primitivegroup[0])
 		const dense = primitive.primitivegroup[0].dense
 		assert.exists(dense)
 		assert.deepEqual(dense?.id, primitiveBlock.primitivegroup[0].dense?.id)

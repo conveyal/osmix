@@ -5,6 +5,7 @@ import type {
 	OsmTags,
 } from "@osmix/json"
 import type { OsmPbfRelation } from "@osmix/pbf"
+import { assertValue } from "@osmix/shared/assert"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { Ids } from "./ids"
 import type StringTable from "./stringtable"
@@ -99,11 +100,18 @@ export class Relations extends Entities<OsmRelation> {
 
 			let refId = 0
 			for (let i = 0; i < relation.memids.length; i++) {
-				refId += relation.memids[i]
+				const memid = relation.memids[i]
+				const roleSid = relation.roles_sid[i]
 				const typeIndex = relation.types[i]
+				assertValue(memid, "Relation member ID is undefined")
+				assertValue(roleSid, "Relation member role SID is undefined")
+				assertValue(typeIndex, "Relation member type is undefined")
+
+				refId += memid
+				const roleIndex = blockToStringTable(roleSid)
 				const type = RELATION_MEMBER_TYPES[typeIndex]
-				if (type === undefined) throw Error("Relation member type not found")
-				const roleIndex = blockToStringTable(relation.roles_sid[i])
+				assertValue(type, "Relation member type not found")
+
 				if (filter) {
 					members.push({
 						type,
@@ -194,16 +202,16 @@ export class Relations extends Entities<OsmRelation> {
 		memberType: OsmEntityType,
 		memberRole?: string,
 	) {
-		const start = this.memberStart.array[index]
-		const count = this.memberCount.array[index]
+		const start = this.memberStart.at(index)
+		const count = this.memberCount.at(index)
 		for (let i = start; i < start + count; i++) {
-			const type = RELATION_MEMBER_TYPES[this.memberTypes.array[i]]
+			const type = RELATION_MEMBER_TYPES[this.memberTypes.at(i)]
 			if (type !== memberType) continue
-			const ref = this.memberRefs.array[i]
+			const ref = this.memberRefs.at(i)
 			if (ref !== memberRef) continue
 			if (
 				memberRole !== undefined &&
-				this.stringTable.get(this.memberRoles.array[i]) !== memberRole
+				this.stringTable.get(this.memberRoles.at(i)) !== memberRole
 			)
 				continue
 			return true

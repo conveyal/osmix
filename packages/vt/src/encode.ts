@@ -1,6 +1,6 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import type { OsmEntityType, OsmTags } from "@osmix/json"
-import { clipPolyline } from "@osmix/shared"
+import { clipPolyline } from "@osmix/shared/lineclip"
 import { fromVectorTileJs as encodeVectorTile } from "vt-pbf"
 import type {
 	BinaryTilePayload,
@@ -128,8 +128,12 @@ export function encodeBinaryTile(
 		const { ids, positions } = payload.nodes
 		for (let i = 0; i < ids.length; i++) {
 			const id = ids[i]
+			if (id === undefined) throw Error(`Invalid node id at index ${i}`)
 			const lon = positions[i * 2]
 			const lat = positions[i * 2 + 1]
+
+			if (lon === undefined || lat === undefined)
+				throw Error("Invalid longitude or latitude")
 
 			const [x, y] = projectLonLat(lon, lat)
 
@@ -168,14 +172,19 @@ export function encodeBinaryTile(
 
 		for (let i = 0; i < ids.length; i++) {
 			const id = ids[i]
+			if (id === undefined) throw Error(`Invalid way id at index ${i}`)
 			const start = startIndices[i]
 			const end = startIndices[i + 1]
+			if (end === undefined || start === undefined)
+				throw Error("Invalid start or end vertices")
 			if (end - start < 2) continue
 
 			const projectedPoints: [x: number, y: number][] = []
 			for (let p = start; p < end; p++) {
 				const lon = positions[p * 2]
 				const lat = positions[p * 2 + 1]
+				if (lon === undefined || lat === undefined)
+					throw Error("Invalid longitude or latitude")
 				projectedPoints.push(projectLonLat(lon, lat))
 			}
 

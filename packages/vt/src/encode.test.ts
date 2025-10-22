@@ -1,12 +1,9 @@
 import { VectorTile } from "@mapbox/vector-tile"
 import Protobuf from "pbf"
-import { describe, expect, it } from "vitest"
-import {
-	type BinaryTilePayload,
-	createBinaryVtIndex,
-	encodeBinaryTile,
-	type TileIndex,
-} from "../src/index"
+import { assert, describe, expect, it } from "vitest"
+import { encodeBinaryTile } from "./encode"
+import { createBinaryVtIndex } from "./index"
+import type { BinaryTilePayload, TileIndex } from "./types"
 
 const DATASET = "test-osm"
 const TILE_INDEX: TileIndex = { z: 14, x: 4823, y: 6160 }
@@ -47,9 +44,9 @@ describe("encodeBinaryTile", () => {
 		expect(result.data.byteLength).toBeGreaterThan(0)
 
 		const layers = decodeTile(new Uint8Array(result.data))
-		expect(layers["osmix:nodes"]).toBeDefined()
+		assert.isDefined(layers["osmix:nodes"])
 		expect(layers["osmix:nodes"].length).toBe(1)
-		expect(layers["osmix:ways"]).toBeDefined()
+		assert.isDefined(layers["osmix:ways"])
 		expect(layers["osmix:ways"].length).toBe(1)
 
 		const features = [
@@ -57,17 +54,19 @@ describe("encodeBinaryTile", () => {
 			layers["osmix:ways"].feature(0),
 		]
 
-		const node = features.find((feature) => feature.properties.type === "node")
+		const node = features.find(
+			(feature) => feature.properties["type"] === "node",
+		)
 		expect(node?.id).toBe(123)
 		expect(node?.type).toBe(1)
-		expect(node?.properties.tileKey).toBe(
+		expect(node?.properties["tileKey"]).toBe(
 			`${DATASET}:${TILE_INDEX.z}:${TILE_INDEX.x}:${TILE_INDEX.y}`,
 		)
 		const nodeGeom = node?.loadGeometry()
 		expect(nodeGeom?.[0]?.[0]?.x).toBeTypeOf("number")
 		expect(nodeGeom?.[0]?.[0]?.y).toBeTypeOf("number")
 
-		const way = features.find((feature) => feature.properties.type === "way")
+		const way = features.find((feature) => feature.properties["type"] === "way")
 		expect(way?.id).toBe(456)
 		expect(way?.type).toBe(2)
 		const wayGeom = way?.loadGeometry()

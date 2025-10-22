@@ -65,8 +65,8 @@ export class OsmJsonToBlocksTransformStream extends TransformStream<
 					} else if (isWay(entity)) {
 						// If our block already has nodes, start a new block
 						if (
-							this.block.primitivegroup[0].nodes.length > 0 ||
-							this.block.primitivegroup[0].dense != null
+							this.block.group.nodes.length > 0 ||
+							this.block.group.dense != null
 						) {
 							controller.enqueue(this.block)
 							this.block = new OsmPbfBlockBuilder()
@@ -75,9 +75,9 @@ export class OsmJsonToBlocksTransformStream extends TransformStream<
 					} else if (isRelation(entity)) {
 						// If our block already has nodes or ways, start a new block
 						if (
-							this.block.primitivegroup[0].nodes.length > 0 ||
-							this.block.primitivegroup[0].dense != null ||
-							this.block.primitivegroup[0].ways.length > 0
+							this.block.group.nodes.length > 0 ||
+							this.block.group.dense != null ||
+							this.block.group.ways.length > 0
 						) {
 							controller.enqueue(this.block)
 							this.block = new OsmPbfBlockBuilder()
@@ -116,10 +116,7 @@ export async function* jsonEntitiesToBlocks(
 			block.addDenseNode(entity)
 		} else if (isWay(entity)) {
 			// If our block already has nodes, start a new block
-			if (
-				block.primitivegroup[0].nodes.length > 0 ||
-				block.primitivegroup[0].dense != null
-			) {
+			if (block.group.nodes.length > 0 || block.group.dense != null) {
 				yield block
 				block = new OsmPbfBlockBuilder()
 			}
@@ -127,9 +124,9 @@ export async function* jsonEntitiesToBlocks(
 		} else if (isRelation(entity)) {
 			// If our block already has nodes or ways, start a new block
 			if (
-				block.primitivegroup[0].nodes.length > 0 ||
-				block.primitivegroup[0].dense != null ||
-				block.primitivegroup[0].ways.length > 0
+				block.group.nodes.length > 0 ||
+				block.group.dense != null ||
+				block.group.ways.length > 0
 			) {
 				yield block
 				block = new OsmPbfBlockBuilder()

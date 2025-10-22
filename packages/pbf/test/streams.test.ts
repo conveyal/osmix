@@ -52,6 +52,7 @@ describe("transform streams", () => {
 	it("parses streamed bytes back into header and primitive blocks", async () => {
 		const { header, primitiveBlock, fileBytes } =
 			await createSamplePbfFileBytes()
+		assert.exists(primitiveBlock.primitivegroup[0])
 		const blocks: unknown[] = []
 
 		const input = new ReadableStream({
@@ -82,8 +83,10 @@ describe("transform streams", () => {
 			assert.fail("Expected primitive block")
 		}
 		assert.lengthOf(block.primitivegroup, primitiveBlock.primitivegroup.length)
+		assert.exists(block.primitivegroup)
+		assert.exists(block.primitivegroup[0])
 		const dense = block.primitivegroup[0].dense
 		assert.exists(dense)
-		assert.deepEqual(dense?.id, primitiveBlock.primitivegroup[0].dense?.id)
+		assert.deepEqual(dense.id, primitiveBlock.primitivegroup[0].dense?.id)
 	})
 })

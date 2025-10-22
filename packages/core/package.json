@@ -7,20 +7,22 @@
 	"main": "./src/index.ts",
 	"sideEffects": false,
 	"scripts": {
+		"build": "tsc",
 		"bench": "vitest bench",
 		"test": "vitest",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
+		"@osmix/tsconfig": "workspace:*",
 		"@osmix/test-utils": "workspace:*",
 		"@types/geojson": "catalog:",
-		"@types/node": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	},
 	"dependencies": {
 		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
+		"@osmix/shared": "workspace:*",
 		"flatbush": "^4.4.1",
 		"kdbush": "mourner/kdbush#16416cd",
 		"sweepline-intersections": "^1.5.0"

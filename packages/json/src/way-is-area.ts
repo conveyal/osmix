@@ -71,7 +71,7 @@ export function wayIsArea(way?: OsmWay): boolean {
 	if (!tags) return true
 
 	// Explicit override
-	if ("area" in tags) return tags.area !== "no"
+	if ("area" in tags) return tags["area"] !== "no"
 
 	// Tags that count if value is NOT "no"
 	for (const key of IMPLIED_ANY_VALUE_BUT_NO) {

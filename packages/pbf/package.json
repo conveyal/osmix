@@ -8,12 +8,14 @@
 	"sideEffects": false,
 	"scripts": {
 		"bench": "vitest bench",
+		"build": "tsc",
 		"test": "vitest",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
+		"@osmix/shared": "workspace:*",
 		"@osmix/test-utils": "workspace:*",
-		"@types/node": "catalog:",
+		"@osmix/tsconfig": "workspace:*",
 		"typescript": "catalog:",
 		"vite": "catalog:",
 		"vitest": "catalog:"
