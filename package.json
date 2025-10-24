@@ -26,13 +26,13 @@
 		"typescript": "catalog:"
 	},
 	"scripts": {
-		"dev": "bun run --filter '*' dev",
-		"build": "bun run --filter '*' build",
+		"dev": "bun --filter '*' dev",
+		"build": "bun --filter '*' build",
 		"check": "biome check --write .",
 		"format": "biome format --write .",
 		"lint": "biome lint --write --unsafe .",
-		"test": "bun run --filter '*' test",
-		"typecheck": "bun run --filter '*' typecheck"
+		"test": "bun --filter '*' test --silent",
+		"typecheck": "bun --filter '*' typecheck"
 	},
 	"trustedDependencies": [
 		"@tailwindcss/oxide"

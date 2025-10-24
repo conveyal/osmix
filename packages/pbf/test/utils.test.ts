@@ -1,10 +1,10 @@
 import { assert, describe, expect, it } from "vitest"
 import {
-	compress,
 	concatUint8,
-	decompress,
 	toAsyncGenerator,
 	uint32BE,
+	webCompress,
+	webDecompress,
 } from "../src/utils"
 
 describe("utils", () => {
@@ -47,10 +47,10 @@ describe("utils", () => {
 	})
 
 	it("compresses and decompresses data", async () => {
-		const input = new TextEncoder().encode("osmix")
-		const compressed = await compress(input)
+		const input = new TextEncoder().encode("osmix") as Uint8Array<ArrayBuffer>
+		const compressed = await webCompress(input)
 		assert.notDeepEqual(compressed, input)
-		const decompressed = await decompress(compressed)
+		const decompressed = await webDecompress(compressed)
 		assert.deepEqual(decompressed, input)
 	})
 })

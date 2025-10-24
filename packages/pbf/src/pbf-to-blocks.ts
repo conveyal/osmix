@@ -7,7 +7,11 @@ import {
 	readHeaderBlock,
 	readPrimitiveBlock,
 } from "./proto/osmformat"
-import { type AsyncGeneratorValue, decompress, toAsyncGenerator } from "./utils"
+import {
+	type AsyncGeneratorValue,
+	toAsyncGenerator,
+	webDecompress,
+} from "./utils"
 
 export const HEADER_LENGTH_BYTES = 4
 
@@ -48,7 +52,11 @@ export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
 > {
 	generateBlobsFromChunk = createOsmPbfBlobGenerator()
 	header: OsmPbfHeaderBlock | null = null
-	constructor() {
+	constructor(
+		decompress: (
+			data: Uint8Array<ArrayBuffer>,
+		) => Promise<Uint8Array<ArrayBuffer>> = webDecompress,
+	) {
 		super({
 			transform: async (bytesChunk, controller) => {
 				for await (const rawBlobs of this.generateBlobsFromChunk(

@@ -1,5 +1,5 @@
 import type { GeoBbox2D } from "@osmix/json"
-import { createWorker } from "@/workers/osmix.worker"
+import { createWorker } from "../workers/osmix.worker"
 import type { BenchmarkResults, WorkerBenchmarkOptions } from "./types"
 
 export type RunEngineBenchmark = (

@@ -16,6 +16,7 @@
 		"@osmix/shared": "workspace:*",
 		"@osmix/test-utils": "workspace:*",
 		"@osmix/tsconfig": "workspace:*",
+		"@types/node": "catalog:",
 		"typescript": "catalog:",
 		"vite": "catalog:",
 		"vitest": "catalog:"

@@ -106,9 +106,11 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 	 * Handles negative numbers
 	 */
 	at(index: number): number {
-		const result = this.array.at(index)
-		if (result === undefined || index >= this.length)
+		if (index < -this.length || index >= this.length)
 			throw Error(`Index out of bounds: ${index}. Length: ${this.length}`)
+		if (index < 0) return this.at(this.length + index)
+		const result = this.array[index]
+		if (result === undefined) throw Error(`No value at index: ${index}`)
 		return result
 	}
 

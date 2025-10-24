@@ -14,9 +14,7 @@ function useOsmDefaultFile(
 	defaultFilePath?: string,
 ) {
 	const [, startTransition] = useTransition()
-	const [loadOnStart, setLoadOnStart] = useState(
-		process.env.NODE_ENV === "development",
-	)
+	const [loadOnStart, setLoadOnStart] = useState(import.meta.env.DEV)
 	const map = useMap()
 	useEffect(() => {
 		if (!loadOnStart || !defaultFilePath || map == null) return

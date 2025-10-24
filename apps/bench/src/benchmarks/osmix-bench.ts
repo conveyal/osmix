@@ -1,5 +1,5 @@
-import { calculateTestGeometriesFromBbox } from "@/utils"
-import { createWorker } from "@/workers/osmix.worker"
+import { calculateTestGeometriesFromBbox } from "../utils"
+import { createWorker } from "../workers/osmix.worker"
 import type {
 	BenchmarkMetric,
 	BenchmarkMetricType,

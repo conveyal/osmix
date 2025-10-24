@@ -49,6 +49,7 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { useFlyToEntity, useFlyToOsmBounds } from "@/hooks/map"
 import { useOsmFile } from "@/hooks/osm"
+import { cn } from "@/lib/utils"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
 import { changesetStatsAtom } from "@/state/changes"
 import { Log } from "@/state/log"
@@ -57,6 +58,7 @@ import { osmWorker } from "@/state/worker"
 
 const STEPS = [
 	"select-osm-pbf-files",
+	"run-all-steps",
 	"inspect-base-osm",
 	"review-changeset",
 	"inspect-patch-osm",
@@ -204,70 +206,85 @@ export default function Merge() {
 								entities in the base file.
 							</p>
 						</div>
-						<Item variant="outline" asChild>
-							<a
-								href="#"
-								onClick={(e) => {
-									e.preventDefault()
-									nextStep()
-								}}
-							>
-								<ItemMedia>
-									<CheckCircle />
-								</ItemMedia>
-								<ItemContent>
-									<ItemTitle>OPTION 1. VERIFY EACH STEP</ItemTitle>
-									<ItemDescription>
-										Verify changes before applying them.
-									</ItemDescription>
-								</ItemContent>
-								<ItemActions>
-									<ChevronRightIcon />
-								</ItemActions>
-							</a>
-						</Item>
-						<Item variant="outline" asChild>
-							<a
-								href="#"
-								onClick={async (e) => {
-									e.preventDefault()
-									const task = Log.startTask(
-										"Running all merge steps, please wait...",
-									)
-									if (!base.osm) throw Error("Base OSM is not loaded")
-									if (!patch.osm) throw Error("Patch OSM is not loaded")
+						<div
+							className={cn(
+								"flex flex-col gap-4",
+								!base.osm || !patch.osm ? "opacity-50 pointer-events-none" : "",
+							)}
+						>
+							<Item variant="outline" asChild>
+								<a
+									href="#"
+									onClick={(e) => {
+										e.preventDefault()
+										nextStep()
+									}}
+								>
+									<ItemMedia>
+										<CheckCircle />
+									</ItemMedia>
+									<ItemContent>
+										<ItemTitle>OPTION 1. VERIFY EACH STEP</ItemTitle>
+										<ItemDescription>
+											Verify changes before applying them.
+										</ItemDescription>
+									</ItemContent>
+									<ItemActions>
+										<ChevronRightIcon />
+									</ItemActions>
+								</a>
+							</Item>
+							<Item variant="outline" asChild>
+								<a
+									href="#"
+									onClick={async (e) => {
+										e.preventDefault()
+										goToStep("run-all-steps")
+										const task = Log.startTask(
+											"Running all merge steps, please wait...",
+										)
+										if (!base.osm) throw Error("Base OSM is not loaded")
+										if (!patch.osm) throw Error("Patch OSM is not loaded")
 
-									setChangesetStats(null)
-									const osm = Osmix.from(
-										await osmWorker.merge(base.osm.id, patch.osm.id, {
-											deduplicateNodes: true,
-											deduplicateWays: true,
-											directMerge: true,
-											createIntersections: true,
-										}),
-									)
+										setChangesetStats(null)
+										const osm = Osmix.from(
+											await osmWorker.merge(base.osm.id, patch.osm.id, {
+												deduplicateNodes: true,
+												deduplicateWays: true,
+												directMerge: true,
+												createIntersections: true,
+											}),
+										)
 
-									base.setOsm(osm)
-									patch.setOsm(null)
+										base.setOsm(osm)
+										patch.setOsm(null)
 
-									task.end("All merge steps completed")
-									goToStep("inspect-final-osm")
-								}}
-							>
-								<ItemMedia>
-									<FastForwardIcon />
-								</ItemMedia>
-								<ItemContent>
-									<ItemTitle>OPTION 2. RUN ALL MERGE STEPS</ItemTitle>
-									<ItemDescription>
-										Run without stopping for verification.
-									</ItemDescription>
-								</ItemContent>
-								<ItemActions>
-									<ChevronRightIcon />
-								</ItemActions>
-							</a>
-						</Item>
+										task.end("All merge steps completed")
+										goToStep("inspect-final-osm")
+									}}
+								>
+									<ItemMedia>
+										<FastForwardIcon />
+									</ItemMedia>
+									<ItemContent>
+										<ItemTitle>OPTION 2. RUN ALL MERGE STEPS</ItemTitle>
+										<ItemDescription>
+											Run without stopping for verification.
+										</ItemDescription>
+									</ItemContent>
+									<ItemActions>
+										<ChevronRightIcon />
+									</ItemActions>
+								</a>
+							</Item>
+						</div>
+					</Step>
+
+					<Step step="run-all-steps" title="RUNNING ALL MERGE STEPS">
+						<p>
+							Monitor the activity log below for progress. This may take a few
+							minutes to complete.
+						</p>
 					</Step>
 
 					<Step step="inspect-base-osm" title="INSPECT BASE OSM">

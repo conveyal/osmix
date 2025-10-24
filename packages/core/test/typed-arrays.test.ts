@@ -24,11 +24,23 @@ describe("typed array helpers", () => {
 			expect(arr.at(1)).toBe(2.5)
 		})
 
+		it("should push many values", () => {
+			const arr = new ResizeableTypedArray(Float64Array)
+
+			arr.pushMany([1.5, 2.5])
+
+			expect(arr.length).toBe(2)
+			expect(arr.at(0)).toBe(1.5)
+			expect(arr.at(1)).toBe(2.5)
+		})
+
 		it("at supports negative indices and guards bounds", () => {
 			const arr = new ResizeableTypedArray(Int16Array)
 
 			arr.pushMany([10, 20, 30])
 
+			expect(arr.length).toBe(3)
+			expect(Array.from(arr.slice(0, arr.length))).toEqual([10, 20, 30])
 			expect(arr.at(-1)).toBe(30)
 			expect(arr.at(-3)).toBe(10)
 			expect(() => arr.at(-4)).toThrow(/Index out of bounds/)

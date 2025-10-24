@@ -1,5 +1,5 @@
-import { calculateTestGeometriesFromBbox } from "@/utils"
-import { DuckDBBenchWorker } from "@/workers/duckdb.worker"
+import { calculateTestGeometriesFromBbox } from "../utils"
+import { DuckDBBenchWorker } from "../workers/duckdb.worker"
 import type {
 	BenchmarkMetric,
 	BenchmarkMetricType,

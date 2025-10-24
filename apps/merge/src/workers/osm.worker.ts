@@ -20,7 +20,7 @@ import type { StatusType } from "@/state/log"
 export class OsmixWorker {
 	private osmixes = new Map<string, Osmix>()
 	private vectorTileIndexes = new Map<string, BinaryVtIndex>()
-	private includeTileKey = process.env.NODE_ENV !== "production"
+	private includeTileKey = import.meta.env.DEV
 
 	private changesets = new Map<string, OsmixChangeset>()
 	private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"]

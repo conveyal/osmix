@@ -7,13 +7,7 @@
 		"declarationMap": true,
 		"noEmitOnError": true,
 
-		"lib": [
-			"ESNext",
-			"ESNext.AsyncIterable",
-			"ESNext.Array",
-			"ESNext.Intl",
-			"ESNext.Symbol"
-		],
+		"lib": ["ESNext"],
 		"target": "es2024",
 		"module": "preserve",
 		"moduleDetection": "force",

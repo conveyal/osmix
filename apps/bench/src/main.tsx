@@ -74,11 +74,7 @@ function App() {
 
 	// Auto-load default file in development
 	useEffect(() => {
-		if (
-			process.env.NODE_ENV === "development" &&
-			!selectedFile &&
-			!autoLoadAttemptedRef.current
-		) {
+		if (import.meta.env.DEV && !selectedFile && !autoLoadAttemptedRef.current) {
 			autoLoadAttemptedRef.current = true
 			fetch("/monaco.pbf")
 				.then((res) => res.blob())

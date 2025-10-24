@@ -8,7 +8,7 @@ import {
 	RECOMMENDED_BLOB_SIZE_BYTES,
 	RECOMMENDED_HEADER_SIZE_BYTES,
 } from "./spec"
-import { compress, concatUint8, uint32BE } from "./utils"
+import { concatUint8, uint32BE, webCompress } from "./utils"
 
 /**
  * Serializes a header or primitive block into a spec-compliant compressed blob.
@@ -18,6 +18,9 @@ import { compress, concatUint8, uint32BE } from "./utils"
  */
 export async function osmBlockToPbfBlobBytes(
 	block: OsmPbfBlock | OsmPbfHeaderBlock,
+	compress: (
+		data: Uint8Array<ArrayBuffer>,
+	) => Promise<Uint8Array<ArrayBuffer>> = webCompress,
 ) {
 	const contentPbf = new Pbf()
 	let type: "OSMHeader" | "OSMData"

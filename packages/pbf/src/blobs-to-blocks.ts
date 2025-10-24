@@ -1,6 +1,6 @@
 import Pbf from "pbf"
 import { readHeaderBlock, readPrimitiveBlock } from "./proto/osmformat"
-import { decompress } from "./utils"
+import { webDecompress } from "./utils"
 
 /**
  * Decompresses raw OSM PBF blobs and yields typed header and primitive blocks.
@@ -10,6 +10,9 @@ export async function* osmPbfBlobsToBlocksGenerator(
 	blobs:
 		| AsyncGenerator<Uint8Array<ArrayBuffer>>
 		| Generator<Uint8Array<ArrayBuffer>>,
+	decompress: (
+		data: Uint8Array<ArrayBuffer>,
+	) => Promise<Uint8Array<ArrayBuffer>> = webDecompress,
 ) {
 	let headerRead = false
 	for await (const blob of blobs) {

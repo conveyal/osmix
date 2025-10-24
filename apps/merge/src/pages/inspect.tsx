@@ -166,7 +166,7 @@ export default function InspectPage() {
 					{osm && <OsmixVectorOverlay osm={osm} />}
 					{osm && <OsmixRasterSource osmId={osm.id} />}
 
-					{process.env.NODE_ENV === "development" && <TileBoundsLayer />}
+					{import.meta.env.DEV && <TileBoundsLayer />}
 
 					<SelectedEntityLayer />
 
@@ -174,7 +174,7 @@ export default function InspectPage() {
 						<NominatimSearchControl />
 					</CustomControl>
 
-					{process.env.NODE_ENV === "development" && (
+					{import.meta.env.DEV && (
 						<CustomControl position="bottom-left">
 							<MapLayerControl />
 						</CustomControl>

@@ -23,8 +23,7 @@ const createProtocolHandler = (): AddProtocolAction => {
 		const data = await osmWorker.getVectorTile(osmId, tileIndex)
 		return {
 			data,
-			cacheControl:
-				process.env.NODE_ENV === "production" ? "force-cache" : "no-cache",
+			cacheControl: import.meta.env.DEV ? "no-cache" : "force-cache",
 			expires: new Date(Date.now() + 1000 * 60 * 60 * 24),
 		}
 	}

@@ -46,32 +46,20 @@ export function isBun(): boolean {
 }
 
 /**
- * Decompresses binary data using runtime-native APIs.
- * Falls back to Node zlib when running under Bun to match OSM PBF expectations.
+ * Web decompression stream
  */
-export async function decompress(data: Uint8Array): Promise<Uint8Array> {
-	// Check if we're in Bun runtime - use Node.js zlib for proper OSM PBF zlib format support
-	if (isBun()) {
-		const { inflateSync } = await import("node:zlib")
-		return new Uint8Array(inflateSync(data))
-	}
-
-	// Fallback to standard Web API
+export async function webDecompress(
+	data: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
 	return transformBytes(data, new DecompressionStream("deflate"))
 }
 
 /**
- * Compresses binary data using runtime-native APIs.
- * Falls back to Node zlib when running under Bun to match OSM PBF expectations.
+ * Web compression stream
  */
-export async function compress(data: Uint8Array): Promise<Uint8Array> {
-	// Check if we're in Bun runtime - use Node.js zlib for proper OSM PBF zlib format support
-	if (isBun()) {
-		const { deflateSync } = await import("node:zlib")
-		return new Uint8Array(deflateSync(data))
-	}
-
-	// Fallback to standard Web API
+export async function webCompress(
+	data: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
 	return transformBytes(data, new CompressionStream("deflate"))
 }
 
