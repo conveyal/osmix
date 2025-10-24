@@ -1,6 +1,6 @@
 # Osmix
 
-Osmix is a collection of tools for reading, inspecting, and merging OpenStreetMap PBF data in modern JavaScript runtimes and the browser. The first application built with the tools is a worker-driven merge UI. Libraries span low-level PBF parsing, JSON transforms, and efficient typed-array indexes designed for any JavaScript environment.
+Osmix is a collection of tools for reading, inspecting, and manipulating OpenStreetMap PBF data in modern JavaScript environments. The first applications built with the tools are a simple OSM PBF inspection tool and [a merge tool](https://merge.osmix.dev). The individual libraries span low-level PBF parsing, JSON transforms, and compact indexes designed for any JavaScript environment.
 
 ## Getting started
 
