@@ -1,6 +1,6 @@
-import { useLog } from "@/hooks/log"
-import { cn } from "@/lib/utils"
-import { formatTimestampMs } from "@/utils"
+import { useLog } from "../hooks/log"
+import { cn } from "../lib/utils"
+import { formatTimestampMs } from "../utils"
 import LogContent from "./log"
 import { Spinner } from "./ui/spinner"
 

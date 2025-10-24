@@ -16,28 +16,31 @@ import {
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useMemo } from "react"
-import ActionButton from "@/components/action-button"
-import Basemap from "@/components/basemap"
-import CustomControl from "@/components/custom-control"
-import { Details, DetailsContent, DetailsSummary } from "@/components/details"
-import EntityDetails from "@/components/entity-details"
-import EntityDetailsMapControl from "@/components/entity-details-map-control"
-import EntitySearchControl from "@/components/entity-search-control"
-import { Main, MapContent, Sidebar } from "@/components/layout"
-import NominatimSearchControl from "@/components/nominatim-search-control"
+import ActionButton from "../components/action-button"
+import Basemap from "../components/basemap"
+import CustomControl from "../components/custom-control"
+import { Details, DetailsContent, DetailsSummary } from "../components/details"
+import EntityDetails from "../components/entity-details"
+import EntityDetailsMapControl from "../components/entity-details-map-control"
+import EntitySearchControl from "../components/entity-search-control"
+import { Main, MapContent, Sidebar } from "../components/layout"
+import NominatimSearchControl from "../components/nominatim-search-control"
 import ChangesSummary, {
 	ChangesExpandableList,
 	ChangesFilters,
 	ChangesPagination,
-} from "@/components/osm-changes-summary"
-import OsmInfoTable from "@/components/osm-info-table"
-import OsmPbfFileInput from "@/components/osm-pbf-file-input"
-import OsmixRasterSource from "@/components/osmix-raster-source"
-import OsmixVectorOverlay from "@/components/osmix-vector-overlay"
-import SelectedEntityLayer from "@/components/selected-entity-layer"
-import SidebarLog from "@/components/sidebar-log"
-import { Button } from "@/components/ui/button"
-import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group"
+} from "../components/osm-changes-summary"
+import OsmInfoTable from "../components/osm-info-table"
+import OsmPbfFileInput from "../components/osm-pbf-file-input"
+import OsmixRasterSource from "../components/osmix-raster-source"
+import OsmixVectorOverlay from "../components/osmix-vector-overlay"
+import SelectedEntityLayer from "../components/selected-entity-layer"
+import SidebarLog from "../components/sidebar-log"
+import { Button } from "../components/ui/button"
+import {
+	ButtonGroup,
+	ButtonGroupSeparator,
+} from "../components/ui/button-group"
 import {
 	Item,
 	ItemActions,
@@ -45,16 +48,16 @@ import {
 	ItemDescription,
 	ItemMedia,
 	ItemTitle,
-} from "@/components/ui/item"
-import { Spinner } from "@/components/ui/spinner"
-import { useFlyToEntity, useFlyToOsmBounds } from "@/hooks/map"
-import { useOsmFile } from "@/hooks/osm"
-import { cn } from "@/lib/utils"
-import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "@/settings"
-import { changesetStatsAtom } from "@/state/changes"
-import { Log } from "@/state/log"
-import { selectedEntityAtom, selectOsmEntityAtom } from "@/state/osm"
-import { osmWorker } from "@/state/worker"
+} from "../components/ui/item"
+import { Spinner } from "../components/ui/spinner"
+import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
+import { useOsmFile } from "../hooks/osm"
+import { cn } from "../lib/utils"
+import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "../settings"
+import { changesetStatsAtom } from "../state/changes"
+import { Log } from "../state/log"
+import { selectedEntityAtom, selectOsmEntityAtom } from "../state/osm"
+import { osmWorker } from "../state/worker"
 
 const STEPS = [
 	"select-osm-pbf-files",

@@ -1,7 +1,7 @@
 import { ChevronDown, Eye, EyeOff, Layers } from "lucide-react"
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
-import { useMap } from "@/hooks/map"
-import { cn } from "@/lib/utils"
+import { useMap } from "../hooks/map"
+import { cn } from "../lib/utils"
 import {
 	Collapsible,
 	CollapsibleContent,

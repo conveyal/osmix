@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Log } from "@/state/log"
+import { Log } from "../state/log"
 
 export class ErrorBoundary extends React.Component<
 	{

@@ -1,6 +1,6 @@
 import type { AddProtocolAction } from "maplibre-gl"
 import maplibre from "maplibre-gl"
-import { osmWorker } from "@/state/worker"
+import { osmWorker } from "../state/worker"
 
 const VECTOR_PROTOCOL_NAME = "@osmix/vector"
 const VECTOR_URL_PATTERN =

@@ -1,6 +1,6 @@
-import { useLog } from "@/hooks/log"
-import { cn } from "@/lib/utils"
-import { formatTimestampMs } from "@/utils"
+import { useLog } from "../hooks/log"
+import { cn } from "../lib/utils"
+import { formatTimestampMs } from "../utils"
 import { Spinner } from "./ui/spinner"
 
 export default function Status() {

@@ -1,9 +1,9 @@
 import type { Osmix } from "@osmix/core"
 import { useAtom } from "jotai"
 import { MaximizeIcon } from "lucide-react"
-import { useFlyToEntity } from "@/hooks/map"
-import { MIN_PICKABLE_ZOOM } from "@/settings"
-import { selectedEntityAtom } from "@/state/osm"
+import { useFlyToEntity } from "../hooks/map"
+import { MIN_PICKABLE_ZOOM } from "../settings"
+import { selectedEntityAtom } from "../state/osm"
 import EntityDetails from "./entity-details"
 import { Button } from "./ui/button"
 

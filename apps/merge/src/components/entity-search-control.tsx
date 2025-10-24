@@ -1,7 +1,7 @@
 import type { Osmix } from "@osmix/core"
 import { useSetAtom } from "jotai"
-import { useFlyToEntity } from "@/hooks/map"
-import { selectedEntityAtom, selectedOsmAtom } from "@/state/osm"
+import { useFlyToEntity } from "../hooks/map"
+import { selectedEntityAtom, selectedOsmAtom } from "../state/osm"
 import EntityLookup from "./entity-lookup"
 
 export default function EntitySearchControl({ osm }: { osm: Osmix }) {

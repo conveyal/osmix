@@ -1,8 +1,8 @@
 import { NavLink } from "react-router"
-import CenterInfo from "@/components/center-info"
-import { Separator } from "@/components/ui/separator"
-import ZoomInfo from "@/components/zoom-info"
-import { cn } from "@/lib/utils"
+import CenterInfo from "../components/center-info"
+import { Separator } from "../components/ui/separator"
+import ZoomInfo from "../components/zoom-info"
+import { cn } from "../lib/utils"
 import BrowserCheck from "./browser-check"
 
 export default function Nav() {

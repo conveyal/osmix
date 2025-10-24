@@ -13,9 +13,9 @@ import { OsmixRasterTile, type TileIndex } from "@osmix/raster"
 import { type BinaryVtIndex, createBinaryVtIndex } from "@osmix/vt"
 import { expose, transfer, wrap } from "comlink"
 import { dequal } from "dequal/lite"
-import { rasterTileToImageBuffer } from "@/lib/raster-tile-to-image-buffer"
-import { RASTER_TILE_SIZE } from "@/settings"
-import type { StatusType } from "@/state/log"
+import { rasterTileToImageBuffer } from "../lib/raster-tile-to-image-buffer"
+import { RASTER_TILE_SIZE } from "../settings"
+import type { StatusType } from "../state/log"
 
 export class OsmixWorker {
 	private osmixes = new Map<string, Osmix>()

@@ -8,8 +8,8 @@ import type {
 } from "maplibre-gl"
 import { useEffect } from "react"
 import { Layer, Source } from "react-map-gl/maplibre"
-import { useMap } from "@/hooks/map"
-import { APPID } from "@/settings"
+import { useMap } from "../hooks/map"
+import { APPID } from "../settings"
 
 const EMPTY_COLLECTION: FeatureCollection = {
 	type: "FeatureCollection",

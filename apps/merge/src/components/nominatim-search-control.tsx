@@ -6,8 +6,8 @@ import {
 	InputGroupAddon,
 	InputGroupButton,
 	InputGroupInput,
-} from "@/components/ui/input-group"
-import { cn } from "@/lib/utils"
+} from "../components/ui/input-group"
+import { cn } from "../lib/utils"
 import { Spinner } from "./ui/spinner"
 
 type NominatimResult = {

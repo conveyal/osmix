@@ -3,7 +3,7 @@ import {
 	RASTER_PROTOCOL_NAME,
 } from "@osmix/raster"
 import maplibre from "maplibre-gl"
-import { osmWorker } from "@/state/worker"
+import { osmWorker } from "../state/worker"
 
 export function addOsmixRasterProtocol() {
 	maplibre.addProtocol(

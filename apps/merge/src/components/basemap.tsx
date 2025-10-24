@@ -7,8 +7,8 @@ import {
 	ScaleControl,
 	type ViewStateChangeEvent,
 } from "react-map-gl/maplibre"
-import { APPID } from "@/settings"
-import { mapBoundsAtom, mapCenterAtom, zoomAtom } from "@/state/map"
+import { APPID } from "../settings"
+import { mapBoundsAtom, mapCenterAtom, zoomAtom } from "../state/map"
 
 const MAP_STYLE =
 	"https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"

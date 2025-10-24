@@ -2,7 +2,7 @@ import { getEntityType, type OsmEntity } from "@osmix/json"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { Suspense, useTransition } from "react"
-import { cn } from "@/lib/utils"
+import { cn } from "../lib/utils"
 import {
 	changesAtom,
 	changesetStatsAtom,
@@ -10,7 +10,7 @@ import {
 	entityTypeFilterAtom,
 	pageAtom,
 	startIndexAtom,
-} from "@/state/changes"
+} from "../state/changes"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 import { EntityContent } from "./entity-details"
 import { Button } from "./ui/button"

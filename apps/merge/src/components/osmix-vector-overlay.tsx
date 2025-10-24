@@ -12,10 +12,10 @@ import {
 	type LineLayerSpecification,
 	Source,
 } from "react-map-gl/maplibre"
-import { useMap } from "@/hooks/map"
-import { addOsmixVectorProtocol } from "@/lib/osmix-vector-protocol"
-import { APPID, MIN_PICKABLE_ZOOM } from "@/settings"
-import { selectOsmEntityAtom } from "@/state/osm"
+import { useMap } from "../hooks/map"
+import { addOsmixVectorProtocol } from "../lib/osmix-vector-protocol"
+import { APPID, MIN_PICKABLE_ZOOM } from "../settings"
+import { selectOsmEntityAtom } from "../state/osm"
 
 const DEFAULT_TOOLTIP_CLASS = "osmix-overlay-tooltip"
 

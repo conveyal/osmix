@@ -1,6 +1,6 @@
 import { releaseProxy } from "comlink"
 import { useEffect, useState, useTransition } from "react"
-import { createBrowserCheckWorker } from "@/workers/browser-check.worker"
+import { createBrowserCheckWorker } from "../workers/browser-check.worker"
 import { Button } from "./ui/button"
 import {
 	Dialog,

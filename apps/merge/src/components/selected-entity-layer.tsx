@@ -6,9 +6,9 @@ import {
 	type LineLayerSpecification,
 	Source,
 } from "react-map-gl/maplibre"
-import { useMap } from "@/hooks/map"
-import { APPID } from "@/settings"
-import { selectedEntityAtom, selectedOsmAtom } from "@/state/osm"
+import { useMap } from "../hooks/map"
+import { APPID } from "../settings"
+import { selectedEntityAtom, selectedOsmAtom } from "../state/osm"
 
 const SOURCE_ID = `${APPID}:selected-entity`
 const LINE_ID = `${APPID}:selected-line`

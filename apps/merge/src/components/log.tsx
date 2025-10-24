@@ -1,6 +1,6 @@
-import { useLog } from "@/hooks/log"
-import { cn } from "@/lib/utils"
-import { formatTimestampMs } from "@/utils"
+import { useLog } from "../hooks/log"
+import { cn } from "../lib/utils"
+import { formatTimestampMs } from "../utils"
 
 export default function LogContent() {
 	const { log } = useLog()
