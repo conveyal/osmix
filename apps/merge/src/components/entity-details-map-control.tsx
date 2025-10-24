@@ -1,6 +1,6 @@
 import type { Osmix } from "@osmix/core"
 import { useAtom } from "jotai"
-import { MaximizeIcon } from "lucide-react"
+import { MaximizeIcon, XIcon } from "lucide-react"
 import { useFlyToEntity } from "../hooks/map"
 import { MIN_PICKABLE_ZOOM } from "../settings"
 import { selectedEntityAtom } from "../state/osm"
@@ -20,16 +20,28 @@ export default function EntityMapControl({ osm }: { osm: Osmix }) {
 				<div>
 					<div className="flex items-center justify-between pl-2">
 						<div className="font-bold">SELECTED ENTITY</div>
-						<Button
-							onClick={() => {
-								flyToEntity(osm, selectedEntity)
-							}}
-							variant="ghost"
-							size="icon"
-							title="Fit bounds to entity"
-						>
-							<MaximizeIcon />
-						</Button>
+						<div className="flex items-center">
+							<Button
+								onClick={() => {
+									setSelectedEntity(null)
+								}}
+								variant="ghost"
+								size="icon"
+								title="Clear selection"
+							>
+								<XIcon />
+							</Button>
+							<Button
+								onClick={() => {
+									flyToEntity(osm, selectedEntity)
+								}}
+								variant="ghost"
+								size="icon"
+								title="Fit bounds to entity"
+							>
+								<MaximizeIcon />
+							</Button>
+						</div>
 					</div>
 					<div className="overflow-x-auto">
 						<EntityDetails

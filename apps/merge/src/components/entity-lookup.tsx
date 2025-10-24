@@ -27,7 +27,7 @@ export default function EntityLookup({
 				<InputGroupInput
 					type="text"
 					name="entityId"
-					placeholder={`Find entity by ID (prefix "n", "w", or "r")`}
+					placeholder={`Find entity by ID (prefix "node/", "way/", or "relation/")`}
 				/>
 				<InputGroupAddon align="inline-end">
 					<InputGroupButton type="submit" size="icon-sm" variant="ghost">

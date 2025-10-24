@@ -360,7 +360,7 @@ export class Osmix {
 			case "relation":
 				return this.relations.getById(id)
 			default: {
-				throw new Error(`Unknown entity type: ${type}`)
+				return null
 			}
 		}
 	}
