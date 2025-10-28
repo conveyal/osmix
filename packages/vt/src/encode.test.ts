@@ -1,108 +1,103 @@
+import { SphericalMercator } from "@mapbox/sphericalmercator"
 import { VectorTile } from "@mapbox/vector-tile"
+import { Osmix } from "@osmix/core"
+import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import Protobuf from "pbf"
 import { assert, describe, expect, it } from "vitest"
-import { encodeBinaryTile } from "./encode"
-import { createBinaryVtIndex } from "./index"
-import type { BinaryTilePayload, TileIndex } from "./types"
+import { OsmixVtEncoder } from "./encode"
 
-const DATASET = "test-osm"
-const TILE_INDEX: TileIndex = { z: 14, x: 4823, y: 6160 }
+const osm = new Osmix()
+osm.nodes.addNode({
+	id: 1,
+	lat: 40,
+	lon: -74,
+	tags: {
+		name: "Test Node",
+	},
+})
 
-const samplePayload: BinaryTilePayload = {
-	nodes: {
-		ids: new Float64Array([123]),
-		positions: new Float64Array([-74.0002, 40.7128]),
-	},
-	ways: {
-		ids: new Float64Array([456]),
-		positions: new Float64Array([
-			-74.01, 40.72, -74.005, 40.715, -74.001, 40.7122,
-		]),
-		startIndices: new Uint32Array([0, 3]),
-	},
-	bounds: [0, 0, 1, 1],
-	metadata: {
-		datasetId: DATASET,
-		tileIndex: TILE_INDEX,
-		includeTileKey: true,
-	},
-}
+// Add nodes for way
+osm.nodes.addNode({
+	id: 2,
+	lat: 40.72,
+	lon: -74.01,
+})
 
-const decodeTile = (data: Uint8Array) => {
-	const tile = new VectorTile(new Protobuf(Buffer.from(data)))
+osm.nodes.addNode({
+	id: 3,
+	lat: 40.715,
+	lon: -74.005,
+})
+
+osm.nodes.addNode({
+	id: 4,
+	lat: 40.7122,
+	lon: -74.001,
+})
+
+osm.ways.addWay({
+	id: 5,
+	refs: [1, 2],
+})
+osm.buildIndexes()
+osm.buildSpatialIndexes()
+
+const WAY_LAYER_ID = `@osmix:${osm.id}:ways`
+const NODE_LAYER_ID = `@osmix:${osm.id}:nodes`
+
+function decodeTile(data: ArrayBuffer) {
+	const tile = new VectorTile(new Protobuf(data))
 	return tile.layers
 }
 
-describe("encodeBinaryTile", () => {
+const extent = 4096
+const merc = new SphericalMercator({ size: extent })
+function pointToTile(lon: number, lat: number, z: number): Tile {
+	const [px, py] = merc.px([lon, lat], z)
+	const x = Math.floor(px / extent)
+	const y = Math.floor(py / extent)
+	return [x, y, z]
+}
+function bboxToTile(bbox: GeoBbox2D, z = 8): Tile {
+	const [minX, minY, maxX, maxY] = bbox
+	const centerLon = (minX + maxX) / 2
+	const centerLat = (minY + maxY) / 2
+	return pointToTile(centerLon, centerLat, z)
+}
+
+describe("OsmixVtEncoder", () => {
 	it("encodes nodes and ways with expected metadata", () => {
-		const result = encodeBinaryTile(samplePayload, {
-			datasetId: DATASET,
-			tileIndex: TILE_INDEX,
-			includeTileKey: true,
-		})
+		const bbox = osm.bbox()
+		const tile = bboxToTile(bbox)
+		const encoder = new OsmixVtEncoder(osm)
+		const result = encoder.getTile(tile)
 
-		expect(result.data.byteLength).toBeGreaterThan(0)
+		expect(result.byteLength).toBeGreaterThan(0)
 
-		const layers = decodeTile(new Uint8Array(result.data))
-		assert.isDefined(layers["osmix:nodes"])
-		expect(layers["osmix:nodes"].length).toBe(1)
-		assert.isDefined(layers["osmix:ways"])
-		expect(layers["osmix:ways"].length).toBe(1)
+		const layers = decodeTile(result)
+		assert.isDefined(layers[NODE_LAYER_ID])
+		expect(layers[NODE_LAYER_ID].length).toBe(1)
+		assert.isDefined(layers[WAY_LAYER_ID])
+		expect(layers[WAY_LAYER_ID].length).toBe(1)
 
 		const features = [
-			layers["osmix:nodes"].feature(0),
-			layers["osmix:ways"].feature(0),
+			layers[NODE_LAYER_ID].feature(0),
+			layers[WAY_LAYER_ID].feature(0),
 		]
 
 		const node = features.find(
 			(feature) => feature.properties["type"] === "node",
 		)
-		expect(node?.id).toBe(123)
+		expect(node?.id).toBe(1)
 		expect(node?.type).toBe(1)
-		expect(node?.properties["tileKey"]).toBe(
-			`${DATASET}:${TILE_INDEX.z}:${TILE_INDEX.x}:${TILE_INDEX.y}`,
-		)
 		const nodeGeom = node?.loadGeometry()
 		expect(nodeGeom?.[0]?.[0]?.x).toBeTypeOf("number")
 		expect(nodeGeom?.[0]?.[0]?.y).toBeTypeOf("number")
 
 		const way = features.find((feature) => feature.properties["type"] === "way")
-		expect(way?.id).toBe(456)
+		expect(way?.id).toBe(5)
 		expect(way?.type).toBe(2)
 		const wayGeom = way?.loadGeometry()
 		expect(wayGeom?.[0]?.length).toBeGreaterThanOrEqual(2)
-	})
-})
-
-describe("createBinaryVtIndex", () => {
-	it("loads tiles via loader and caches results", async () => {
-		let callCount = 0
-		const index = createBinaryVtIndex(
-			async () => {
-				callCount++
-				return samplePayload
-			},
-			{
-				datasetId: DATASET,
-				includeTileKey: true,
-				maxCacheEntries: 2,
-			},
-		)
-
-		const first = await index.getTile(TILE_INDEX)
-		expect(first).toBeInstanceOf(ArrayBuffer)
-		expect(callCount).toBe(1)
-
-		const metadata = await index.getDebugMetadata(TILE_INDEX)
-		expect(metadata?.byteLength).toBeGreaterThan(0)
-		expect(callCount).toBe(1)
-
-		index.invalidate(TILE_INDEX)
-		await index.getTile(TILE_INDEX)
-		expect(callCount).toBe(2)
-
-		index.clearCache()
-		await index.getTile(TILE_INDEX)
-		expect(callCount).toBe(3)
 	})
 })

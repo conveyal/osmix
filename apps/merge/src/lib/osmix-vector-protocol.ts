@@ -1,3 +1,4 @@
+import type { Tile } from "@osmix/shared/types"
 import type { AddProtocolAction } from "maplibre-gl"
 import maplibre from "maplibre-gl"
 import { osmWorker } from "../state/worker"
@@ -11,20 +12,17 @@ let registered = false
 const createProtocolHandler = (): AddProtocolAction => {
 	return async (
 		req,
+		abortController,
 	): Promise<maplibregl.GetResourceResponse<ArrayBuffer | null>> => {
 		const match = VECTOR_URL_PATTERN.exec(req.url)
 		if (!match) throw new Error(`Bad @osmix/vector URL: ${req.url}`)
 		const [, osmId, zStr, xStr, yStr] = match
-		const tileIndex = {
-			z: +zStr,
-			x: +xStr,
-			y: +yStr,
-		}
+		const tileIndex: Tile = [+xStr, +yStr, +zStr]
 		const data = await osmWorker.getVectorTile(osmId, tileIndex)
+
 		return {
-			data,
-			cacheControl: import.meta.env.DEV ? "no-cache" : "force-cache",
-			expires: new Date(Date.now() + 1000 * 60 * 60 * 24),
+			data: abortController.signal.aborted ? null : data,
+			cacheControl: "no-cache",
 		}
 	}
 }

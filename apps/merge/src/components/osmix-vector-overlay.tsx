@@ -1,6 +1,7 @@
 import type { Osmix } from "@osmix/core"
 import { useSetAtom } from "jotai"
 import {
+	type FillLayerSpecification,
 	type FilterSpecification,
 	type MapLayerMouseEvent,
 	Popup,
@@ -46,6 +47,17 @@ const waysLayout: LineLayerSpecification["layout"] = {
 	"line-join": "round",
 }
 
+const wayPolygonsPaint: FillLayerSpecification["paint"] = {
+	"fill-color": "red",
+	"fill-opacity": 0.25,
+}
+
+const wayPolygonsOutlinePaint: LineLayerSpecification["paint"] = {
+	"line-color": "red",
+	"line-opacity": 0.5,
+	"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 1],
+}
+
 const nodesPaint: CircleLayerSpecification["paint"] = {
 	"circle-color": ["rgba", 255, 255, 255, 1],
 	"circle-opacity": 1,
@@ -60,7 +72,16 @@ const nodesPaint: CircleLayerSpecification["paint"] = {
 }
 
 const nodeFilter: FilterSpecification = ["==", ["get", "type"], "node"]
-const wayFilter: FilterSpecification = ["==", ["get", "type"], "way"]
+const wayLinesFilter: FilterSpecification = [
+	"==",
+	["geometry-type"],
+	"LineString",
+]
+const wayPolygonsFilter: FilterSpecification = [
+	"==",
+	["geometry-type"],
+	"Polygon",
+]
 
 export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 	const map = useMap()
@@ -70,20 +91,28 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 	const overlayId = `${APPID}:${osm?.id}:overlay`
 	const sourceId = `${overlayId}:source`
 	const waysLayerId = `${overlayId}:ways`
+	const wayPolygonsLayerId = `${waysLayerId}:polygons`
 	const nodesLayerId = `${overlayId}:nodes`
+	const sourceLayerPrefix = `@osmix:${osm.id}`
 
 	const clearHover = useCallback(() => {
 		if (map) {
 			map.getCanvas().style.setProperty("cursor", "")
 			const source = map.getSource(sourceId)
 			if (sourceId && source) {
-				map.removeFeatureState({ source: sourceId, sourceLayer: "osmix:ways" })
-				map.removeFeatureState({ source: sourceId, sourceLayer: "osmix:nodes" })
+				map.removeFeatureState({
+					source: sourceId,
+					sourceLayer: `${sourceLayerPrefix}:ways`,
+				})
+				map.removeFeatureState({
+					source: sourceId,
+					sourceLayer: `${sourceLayerPrefix}:nodes`,
+				})
 			}
 		}
 
 		popupRef.current?.remove()
-	}, [map, sourceId])
+	}, [map, sourceId, sourceLayerPrefix])
 
 	const handleClick = useCallback(
 		(event: MapLayerMouseEvent) => {
@@ -156,10 +185,15 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 		if (!map) return
 		let attached = false
 
-		const layerIds = [nodesLayerId, waysLayerId]
+		const layerIds = [nodesLayerId, waysLayerId, wayPolygonsLayerId]
 		const attachHandlers = () => {
 			if (attached) return
-			if (!map.getLayer(nodesLayerId) || !map.getLayer(waysLayerId)) return
+			if (
+				!map.getLayer(nodesLayerId) ||
+				!map.getLayer(waysLayerId) ||
+				!map.getLayer(wayPolygonsLayerId)
+			)
+				return
 			map.on("click", layerIds, handleClick)
 			map.on("mousemove", layerIds, handleMove)
 			map.on("mouseleave", layerIds, handleLeave)
@@ -187,6 +221,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 		map,
 		nodesLayerId,
 		waysLayerId,
+		wayPolygonsLayerId,
 	])
 
 	return (
@@ -194,32 +229,45 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 			id={sourceId}
 			type="vector"
 			tiles={[`@osmix/vector://${osm.id}/{z}/{x}/{y}.mvt`]}
+			bounds={osm.bbox()}
+			minzoom={MIN_PICKABLE_ZOOM}
 		>
 			<Layer
-				id={`${waysLayerId}:outline`}
-				filter={wayFilter}
+				id={wayPolygonsLayerId}
+				filter={wayPolygonsFilter}
+				type="fill"
+				{...{ "source-layer": `${sourceLayerPrefix}:ways` }}
+				paint={wayPolygonsPaint}
+			/>
+			<Layer
+				id={`${wayPolygonsLayerId}:outline`}
+				filter={wayPolygonsFilter}
 				type="line"
-				{...{ "source-layer": "osmix:ways" }}
+				{...{ "source-layer": `${sourceLayerPrefix}:ways` }}
+				paint={wayPolygonsOutlinePaint}
+			/>
+			<Layer
+				id={`${waysLayerId}:outline`}
+				filter={wayLinesFilter}
+				type="line"
+				{...{ "source-layer": `${sourceLayerPrefix}:ways` }}
 				layout={waysLayout}
 				paint={waysOutlinePaint}
-				minzoom={MIN_PICKABLE_ZOOM}
 			/>
 			<Layer
 				id={waysLayerId}
-				filter={wayFilter}
+				filter={wayLinesFilter}
 				type="line"
-				{...{ "source-layer": "osmix:ways" }}
+				{...{ "source-layer": `${sourceLayerPrefix}:ways` }}
 				layout={waysLayout}
 				paint={waysPaint}
-				minzoom={MIN_PICKABLE_ZOOM}
 			/>
 			<Layer
 				id={nodesLayerId}
 				filter={nodeFilter}
 				type="circle"
-				{...{ "source-layer": "osmix:nodes" }}
+				{...{ "source-layer": `${sourceLayerPrefix}:nodes` }}
 				paint={nodesPaint}
-				minzoom={MIN_PICKABLE_ZOOM}
 			/>
 		</Source>
 	)

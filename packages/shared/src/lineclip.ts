@@ -1,2 +1,2 @@
 /// <reference path="./lineclip.d.ts" />
-export { clipPolyline } from "lineclip"
+export { clipPolygon, clipPolyline } from "lineclip"

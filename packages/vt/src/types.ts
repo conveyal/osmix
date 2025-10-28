@@ -1,69 +1,30 @@
-export type GeoBbox2D = [number, number, number, number]
+import type { OsmEntityType, OsmTags } from "@osmix/json"
+import type { XY } from "@osmix/shared/types"
 
-export type TileIndex = {
-	x: number
-	y: number
-	z: number
-}
+export type VtSimpleFeatureGeometry = XY[][]
 
-export type BinaryNodeTile = {
-	ids: Float64Array
-	positions: Float64Array
-}
-
-export type BinaryWayTile = {
-	ids: Float64Array
-	positions: Float64Array
-	startIndices: Uint32Array
-}
-
-export type BinaryTilePayload = {
-	nodes: BinaryNodeTile | null
-	ways: BinaryWayTile | null
-	bounds: GeoBbox2D
-	metadata: Record<string, unknown>
-}
-
-export type EncodeTileOptions = {
-	datasetId: string
-	tileIndex: TileIndex
+export type VtSimpleFeatureProperties = {
+	sourceId?: string
+	type: OsmEntityType
 	tileKey?: string
-	layerPrefix?: string
-	extent?: number
-	buffer?: number
-	includeTileKey?: boolean
-	includeTags?: boolean
+} & OsmTags
+
+export type VtSimpleFeatureType = {
+	POINT: 1
+	LINE: 2
+	POLYGON: 3
 }
 
-export type EncodeTileResult = {
-	data: ArrayBuffer
-	tileKey: string
+export interface VtSimpleFeature {
+	id: number
+	type: VtSimpleFeatureType[keyof VtSimpleFeatureType]
+	properties: VtSimpleFeatureProperties
+	geometry: VtSimpleFeatureGeometry
+}
+
+export type VtPbfLayer = {
+	name: string
+	version: number
 	extent: number
-}
-
-export type TileDebugInfo = {
-	bbox: GeoBbox2D
-	tileKey: string
-	byteLength: number
-}
-
-export type BinaryTileLoader = (params: {
-	bbox: GeoBbox2D
-	tileIndex: TileIndex
-}) => Promise<BinaryTilePayload | null>
-
-export type BinaryVtIndexOptions = {
-	datasetId: string
-	layerPrefix?: string
-	extent?: number
-	buffer?: number
-	includeTileKey?: boolean
-	maxCacheEntries?: number
-}
-
-export interface BinaryVtIndex {
-	getTile(tileIndex: TileIndex): Promise<ArrayBuffer | null>
-	getDebugMetadata(tileIndex: TileIndex): Promise<TileDebugInfo | null>
-	invalidate(tileIndex: TileIndex): void
-	clearCache(): void
+	features: Generator<VtSimpleFeature>
 }

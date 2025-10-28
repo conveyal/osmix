@@ -1,22 +1,19 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import type { GeoBbox2D } from "@osmix/json"
+import type { Tile } from "@osmix/shared/types"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
 	DEFAULT_NODE_COLOR,
 	DEFAULT_RASTER_IMAGE_TYPE,
-	DEFAULT_TILE_SIZE,
+	DEFAULT_RASTER_TILE_SIZE,
 	DEFAULT_WAY_COLOR,
 	OsmixRasterTile,
-	type TileIndex,
 } from "../src/raster-tile"
 import { rasterTileToImageBuffer } from "./to-image-buffer"
 
-function createTile(
-	tileIndex: TileIndex = { z: 3, x: 4, y: 5 },
-	tileSize = 64,
-) {
+function createTile(tileIndex: Tile = [4, 5, 3], tileSize = 64) {
 	const merc = new SphericalMercator({ size: tileSize })
-	const bbox = merc.bbox(tileIndex.x, tileIndex.y, tileIndex.z) as GeoBbox2D
+	const bbox = merc.bbox(tileIndex[0], tileIndex[1], tileIndex[2]) as GeoBbox2D
 	return {
 		tile: new OsmixRasterTile(bbox, tileIndex, tileSize),
 		merc,
@@ -25,37 +22,33 @@ function createTile(
 
 function lonLatForPixel(
 	merc: SphericalMercator,
-	tileIndex: TileIndex,
+	tileIndex: Tile,
 	tileSize: number,
 	px: number,
 	py: number,
 ): [number, number] {
-	return merc.ll(
-		[tileIndex.x * tileSize + px, tileIndex.y * tileSize + py],
-		tileIndex.z,
-	) as [number, number]
+	const [x, y, z] = tileIndex
+	return merc.ll([x * tileSize + px, y * tileSize + py], z) as [number, number]
 }
 
 describe("OsmixRasterTile", () => {
 	it("projects lon/lat to tile-local pixels and clamps out-of-bounds values", () => {
-		const tileIndex: TileIndex = { z: 2, x: 1, y: 1 }
-		const { tile, merc } = createTile(tileIndex, DEFAULT_TILE_SIZE)
+		const tileIndex: Tile = [1, 1, 2]
+		const [tx, ty, tz] = tileIndex
+		const { tile, merc } = createTile(tileIndex, DEFAULT_RASTER_TILE_SIZE)
 
 		const insideLonLat = lonLatForPixel(merc, tileIndex, tile.tileSize, 32, 16)
 		expect(tile.lonLatToTilePixel(insideLonLat)).toEqual([32, 16])
 
 		const outsideTopLeft = merc.ll(
-			[tileIndex.x * tile.tileSize - 10, tileIndex.y * tile.tileSize - 10],
-			tileIndex.z,
+			[tx * tile.tileSize - 10, ty * tile.tileSize - 10],
+			tz,
 		) as [number, number]
 		expect(tile.lonLatToTilePixel(outsideTopLeft)).toEqual([0, 0])
 
 		const outsideBottomRight = merc.ll(
-			[
-				(tileIndex.x + 1) * tile.tileSize + 10,
-				(tileIndex.y + 1) * tile.tileSize + 10,
-			],
-			tileIndex.z,
+			[(tx + 1) * tile.tileSize + 10, (ty + 1) * tile.tileSize + 10],
+			tz,
 		) as [number, number]
 		expect(tile.lonLatToTilePixel(outsideBottomRight)).toEqual([
 			tile.tileSize - 1,
@@ -64,7 +57,7 @@ describe("OsmixRasterTile", () => {
 	})
 
 	it("sets point pixels using lon/lat coordinates", () => {
-		const tileIndex: TileIndex = { z: 4, x: 6, y: 7 }
+		const tileIndex: Tile = [6, 7, 4]
 		const { tile, merc } = createTile(tileIndex)
 		const nodePixel = [12, 20] as const
 		const nodeLonLat = lonLatForPixel(
@@ -84,7 +77,8 @@ describe("OsmixRasterTile", () => {
 	})
 
 	it("draws clipped ways using Bresenham line rendering", () => {
-		const tileIndex: TileIndex = { z: 5, x: 10, y: 11 }
+		const tileIndex: Tile = [10, 11, 5]
+		const [tx, ty, tz] = tileIndex
 		const { tile, merc } = createTile(tileIndex)
 
 		const startPixel = [5, 5] as const
@@ -103,15 +97,12 @@ describe("OsmixRasterTile", () => {
 
 		// Prefix and suffix points outside the tile bounds to exercise clipping.
 		const outsidePrefix = merc.ll(
-			[tileIndex.x * tile.tileSize - 20, tileIndex.y * tile.tileSize - 20],
-			tileIndex.z,
+			[tx * tile.tileSize - 20, ty * tile.tileSize - 20],
+			tz,
 		) as [number, number]
 		const outsideSuffix = merc.ll(
-			[
-				(tileIndex.x + 1) * tile.tileSize + 20,
-				(tileIndex.y + 1) * tile.tileSize + 20,
-			],
-			tileIndex.z,
+			[(tx + 1) * tile.tileSize + 20, (ty + 1) * tile.tileSize + 20],
+			tz,
 		) as [number, number]
 
 		tile.drawWay([outsidePrefix, ...way, outsideSuffix])

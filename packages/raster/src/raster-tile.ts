@@ -1,14 +1,7 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import type { GeoBbox2D } from "@osmix/json"
 import { clipPolyline } from "@osmix/shared/lineclip"
-
-export type Rgba = [number, number, number, number] | Uint8ClampedArray
-
-export interface TileIndex {
-	z: number
-	x: number
-	y: number
-}
+import type { LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
 
 /**
  * TODO remove spherical mercator dependency here pass in projection function instead
@@ -21,33 +14,33 @@ export type LonLatToPixel = (
 export const DEFAULT_RASTER_IMAGE_TYPE = "image/png"
 export const DEFAULT_WAY_COLOR: Rgba = [255, 255, 255, 255] // white
 export const DEFAULT_NODE_COLOR: Rgba = [255, 0, 0, 255] // red
-export const DEFAULT_TILE_SIZE = 256
+export const DEFAULT_RASTER_TILE_SIZE = 256
 
 export class OsmixRasterTile {
 	bbox: GeoBbox2D
 	imageData: Uint8ClampedArray<ArrayBuffer>
 	tileSize: number
-	tileIndex: TileIndex
+	tile: Tile
 	merc: SphericalMercator
 
 	constructor(
 		bbox: GeoBbox2D,
-		tileIndex: TileIndex,
-		tileSize: number = DEFAULT_TILE_SIZE,
+		tile: Tile,
+		tileSize: number = DEFAULT_RASTER_TILE_SIZE,
 	) {
 		this.bbox = bbox
 		this.tileSize = tileSize
 		this.imageData = new Uint8ClampedArray(tileSize * tileSize * 4)
-		this.tileIndex = tileIndex
+		this.tile = tile
 		this.merc = new SphericalMercator({ size: tileSize })
 	}
 
-	lonLatToTilePixel(ll: [number, number]): [number, number] {
-		const merc = this.merc.px(ll, this.tileIndex.z)
+	lonLatToTilePixel(ll: LonLat): XY {
+		const merc = this.merc.px(ll, this.tile[2])
 
 		// Convert to local tile pixel
-		const x = Math.floor(merc[0]) - this.tileIndex.x * this.tileSize
-		const y = Math.floor(merc[1]) - this.tileIndex.y * this.tileSize
+		const x = Math.floor(merc[0]) - this.tile[0] * this.tileSize
+		const y = Math.floor(merc[1]) - this.tile[1] * this.tileSize
 
 		// Clamp to tile bounds
 		return [
@@ -56,12 +49,12 @@ export class OsmixRasterTile {
 		]
 	}
 
-	setLonLat([lon, lat]: [number, number], color: Rgba = DEFAULT_NODE_COLOR) {
-		const px = this.lonLatToTilePixel([lon, lat])
+	setLonLat(ll: LonLat, color: Rgba = DEFAULT_NODE_COLOR) {
+		const px = this.lonLatToTilePixel(ll)
 		this.setPixel(px, color)
 	}
 
-	setPixel(px: [number, number], color: Rgba) {
+	setPixel(px: XY, color: Rgba) {
 		if (
 			px[0] < 0 ||
 			px[0] >= this.tileSize ||
@@ -76,20 +69,14 @@ export class OsmixRasterTile {
 		this.imageData[idx + 3] = color[3]
 	}
 
-	drawLine(
-		x0: number,
-		y0: number,
-		x1: number,
-		y1: number,
-		color: Rgba = DEFAULT_WAY_COLOR,
-	) {
-		const dx = Math.abs(x1 - x0)
-		const dy = Math.abs(y1 - y0)
-		const sx = x0 < x1 ? 1 : -1
-		const sy = y0 < y1 ? 1 : -1
+	drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_WAY_COLOR) {
+		const dx = Math.abs(px1[0] - px0[0])
+		const dy = Math.abs(px1[1] - px0[1])
+		const sx = px0[0] < px1[0] ? 1 : -1
+		const sy = px0[1] < px1[1] ? 1 : -1
 		let err = dx - dy
-		let x = x0
-		let y = y0
+		let x = px0[0]
+		let y = px0[1]
 
 		while (true) {
 			const idx = (y * this.tileSize + x) * 4
@@ -97,7 +84,7 @@ export class OsmixRasterTile {
 			this.imageData[idx + 1] = color[1]
 			this.imageData[idx + 2] = color[2]
 			this.imageData[idx + 3] = color[3]
-			if (x === x1 && y === y1) break
+			if (x === px1[0] && y === px1[1]) break
 			const e2 = 2 * err
 			if (e2 > -dy) {
 				err -= dy
@@ -110,19 +97,19 @@ export class OsmixRasterTile {
 		}
 	}
 
-	drawWay(way: [number, number][], color: Rgba = DEFAULT_WAY_COLOR) {
+	drawWay(way: LonLat[], color: Rgba = DEFAULT_WAY_COLOR) {
 		const [clipped] = clipPolyline(way, this.bbox)
 		if (clipped != null) {
-			let prev: [number, number] = clipped[0] as [number, number]
+			let prev: LonLat = clipped[0] as LonLat
 			for (const curr of clipped) {
 				if (prev == null) {
 					prev = curr
 					return
 				}
-				const [x0, y0] = this.lonLatToTilePixel(prev)
-				const [x1, y1] = this.lonLatToTilePixel(curr)
-				if (x0 !== x1 || y0 !== y1) {
-					this.drawLine(x0, y0, x1, y1, color)
+				const px0 = this.lonLatToTilePixel(prev)
+				const px1 = this.lonLatToTilePixel(curr)
+				if (px0[0] !== px1[0] || px0[1] !== px1[1]) {
+					this.drawLine(px0, px1, color)
 				}
 				prev = curr
 			}

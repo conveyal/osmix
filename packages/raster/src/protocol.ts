@@ -1,15 +1,20 @@
 import { assertValue } from "@osmix/shared/assert"
+import type { Tile } from "@osmix/shared/types"
 import type { AddProtocolAction } from "maplibre-gl"
-import type { TileIndex } from "./raster-tile"
 
 export const RASTER_PROTOCOL_NAME = "@osmix/raster"
 
 export type GetTileImage = (
 	osmId: string,
-	tileIndex: TileIndex,
+	tileIndex: Tile,
 	tileSize: number,
 ) => Promise<ArrayBuffer>
 
+/**
+ * Creates a MapLibre protocol action that handles requests for raster tiles. Caching should be handled by `getTileImage`.
+ * @param getTileImage - A function that returns the image data for a given tile.
+ * @returns A MapLibre protocol action that handles requests for raster tiles.
+ */
 export function createOsmixRasterMaplibreProtocol(
 	getTileImage: GetTileImage,
 ): AddProtocolAction {
@@ -28,12 +33,11 @@ export function createOsmixRasterMaplibreProtocol(
 		assertValue(osmId, "OSM ID is required in protocol URL")
 
 		const tileSize = +sizeStr
-		const tileIndex: TileIndex = { z: +zStr, x: +xStr, y: +yStr }
+		const tileIndex: Tile = [+xStr, +yStr, +zStr]
 		const data = await getTileImage(osmId, tileIndex, tileSize)
 		return {
 			data,
-			cacheControl: req.cache ?? "force-cache",
-			expires: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours
+			cacheControl: "no-store",
 		}
 	}
 }

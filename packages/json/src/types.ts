@@ -1,4 +1,5 @@
 import type { OsmPbfInfo } from "@osmix/pbf"
+import type { ILonLat } from "@osmix/shared/types"
 import type { Feature, LineString, MultiPolygon, Point, Polygon } from "geojson"
 
 export type OsmEntityType = "node" | "way" | "relation"
@@ -7,11 +8,6 @@ export interface OsmEntityTypeMap extends Record<OsmEntityType, IOsmEntity> {
 	node: OsmNode
 	way: OsmWay
 	relation: OsmRelation
-}
-
-export interface LonLat {
-	lon: number
-	lat: number
 }
 
 export interface OsmInfoParsed extends OsmPbfInfo {
@@ -28,7 +24,7 @@ export interface IOsmEntity {
 	tags?: OsmTags
 }
 
-export interface OsmNode extends IOsmEntity, LonLat {}
+export interface OsmNode extends IOsmEntity, ILonLat {}
 
 export interface OsmWay extends IOsmEntity {
 	// OSM IDs of the nodes that make up this way

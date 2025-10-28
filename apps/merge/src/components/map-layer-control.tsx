@@ -19,7 +19,7 @@ export default function MapLayerControl() {
 	const map = useMap()
 	const [layers, setLayers] = useState<LayerInfo[]>([])
 	const [searchQuery, setSearchQuery] = useState("")
-	const [isOpen, setIsOpen] = useState(true)
+	const [isOpen, setIsOpen] = useState(false)
 
 	// Fetch layers from the map
 	const refreshLayers = useCallback(() => {

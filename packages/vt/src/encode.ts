@@ -1,60 +1,31 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
-import type { OsmEntityType, OsmTags } from "@osmix/json"
-import { clipPolyline } from "@osmix/shared/lineclip"
-import { fromVectorTileJs as encodeVectorTile } from "vt-pbf"
+import type { Osmix } from "@osmix/core"
+import { wayIsArea } from "@osmix/json"
+import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
+import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
 import type {
-	BinaryTilePayload,
-	EncodeTileOptions,
-	EncodeTileResult,
+	VtSimpleFeature,
+	VtSimpleFeatureGeometry,
+	VtSimpleFeatureType,
 } from "./types"
-
-type Vec2 = {
-	x: number
-	y: number
-}
-
-type Geometry = Vec2[][]
+import writeVtPbf from "./write-vt-pbf"
 
 const DEFAULT_EXTENT = 4096
 const DEFAULT_BUFFER = 64
 
-type SimpleFeatureProperties = {
-	datasetId: string
-	type: OsmEntityType
-	tags?: OsmTags
-	tileKey?: string
-}
-
-class SimpleFeature {
-	id: number
-	type: 1 | 2 | 3
-	properties: SimpleFeatureProperties
-	private geometry: Geometry
-
-	constructor(
-		id: number,
-		type: 1 | 2 | 3,
-		properties: SimpleFeatureProperties,
-		geometry: Geometry,
-	) {
-		this.id = id
-		this.type = type
-		this.properties = properties
-		this.geometry = geometry
-	}
-
-	loadGeometry() {
-		return this.geometry
-	}
+const SF_TYPE: VtSimpleFeatureType = {
+	POINT: 1,
+	LINE: 2,
+	POLYGON: 3,
 }
 
 const clamp = (value: number, min: number, max: number) =>
 	Math.min(Math.max(value, min), max)
 
-const dedupePoints = (points: [x: number, y: number][]) => {
+function dedupePoints(points: XY[]): XY[] {
 	if (points.length < 2) return points
-	const result: [x: number, y: number][] = []
-	let lastPoint: [x: number, y: number] = [Number.NaN, Number.NaN]
+	const result: XY[] = []
+	let lastPoint: XY = [Number.NaN, Number.NaN]
 	for (const point of points) {
 		if (point[0] === lastPoint[0] && point[1] === lastPoint[1]) continue
 		result.push(point)
@@ -63,176 +34,212 @@ const dedupePoints = (points: [x: number, y: number][]) => {
 	return result
 }
 
-const clampAndRoundPoint = (
-	x: number,
-	y: number,
-	minX: number,
-	maxX: number,
-	minY: number,
-	maxY: number,
-): [x: number, y: number] => {
-	const clampedX = Math.round(clamp(x, minX, maxX))
-	const clampedY = Math.round(clamp(y, minY, maxY))
-	return [clampedX, clampedY]
-}
-
-/**
- * Convert the features into the type of input expected by the vector tile encoder.
- * See {@link https://github.com/mapbox/vt-pbf/blob/main/index.js}
- */
-function createVtPbfTileLayer(
-	layerName: string,
-	extent: number,
-	features: SimpleFeature[],
-) {
-	return {
-		name: layerName,
-		version: 2,
-		extent,
-		length: features.length,
-		feature: (index: number) => features[index],
+export function projectToTile(
+	tile: Tile,
+	extent = DEFAULT_EXTENT,
+): (ll: LonLat) => XY {
+	const sm = new SphericalMercator({ size: extent })
+	return (lonLat: LonLat): XY => {
+		const [px, py] = sm.px(lonLat, tile[2])
+		const x = px - extent * tile[0]
+		const y = py - extent * tile[1]
+		return [x, y]
 	}
 }
 
-export function encodeBinaryTile(
-	payload: BinaryTilePayload,
-	options: EncodeTileOptions,
-): EncodeTileResult {
-	const extent = options.extent ?? DEFAULT_EXTENT
-	const buffer = options.buffer ?? DEFAULT_BUFFER
-	const tile = options.tileIndex
-	const tileKey =
-		options.tileKey ?? `${options.datasetId}:${tile.z}:${tile.x}:${tile.y}`
-	const layerName = options.layerPrefix ?? "osmix"
+export class OsmixVtEncoder {
+	private readonly nodeLayerName: string
+	private readonly wayLayerName: string
+	private readonly osmix: Osmix
+	private readonly extent: number
+	private readonly extentBbox: [number, number, number, number]
 
-	const minCoord = -buffer
-	const maxCoord = extent + buffer
-	// TODO use bbox instead? This does not seem right...
-	const minX = minCoord
-	const maxX = maxCoord
-	const minY = minCoord
-	const maxY = maxCoord
-	const projector = new SphericalMercator({ size: extent })
+	constructor(osmix: Osmix, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER) {
+		this.osmix = osmix
 
-	const projectLonLat = (lon: number, lat: number): [x: number, y: number] => {
-		const [px, py] = projector.px([lon, lat], tile.z)
-		return [px - extent * tile.x, py - extent * tile.y]
+		const min = -buffer
+		const max = extent + buffer
+		this.extent = extent
+		this.extentBbox = [min, min, max, max]
+
+		const layerName = `@osmix:${osmix.id}`
+		this.nodeLayerName = `${layerName}:nodes`
+		this.wayLayerName = `${layerName}:ways`
 	}
 
-	const nodeFeatures: SimpleFeature[] = []
-	const nodeLayerName = `${layerName}:nodes`
-	const wayFeatures: SimpleFeature[] = []
-	const wayLayerName = `${layerName}:ways`
+	getTile(tile: Tile): ArrayBuffer {
+		const sm = new SphericalMercator({ size: this.extent })
+		// const proj = projectToTile(tile, this.extent)
+		const bbox = sm.bbox(tile[0], tile[1], tile[2]) as GeoBbox2D
+		return this.getTileForBbox(bbox, (lonLat: LonLat): XY => {
+			const [px, py] = sm.px(lonLat, tile[2])
+			const x = px - this.extent * tile[0]
+			const y = py - this.extent * tile[1]
+			return [x, y]
+		})
+	}
 
-	if (payload.nodes) {
-		const { ids, positions } = payload.nodes
-		for (let i = 0; i < ids.length; i++) {
-			const id = ids[i]
-			if (id === undefined) throw Error(`Invalid node id at index ${i}`)
-			const lon = positions[i * 2]
-			const lat = positions[i * 2 + 1]
+	getTileForBbox(bbox: GeoBbox2D, proj: (ll: LonLat) => XY): ArrayBuffer {
+		const layer = writeVtPbf([
+			{
+				name: this.wayLayerName,
+				version: 2,
+				extent: this.extent,
+				features: this.wayFeatures(bbox, proj),
+			},
+			{
+				name: this.nodeLayerName,
+				version: 2,
+				extent: this.extent,
+				features: this.nodeFeatures(bbox, proj),
+			},
+		])
+		return layer
+	}
 
-			if (lon === undefined || lat === undefined)
-				throw Error("Invalid longitude or latitude")
-
-			const [x, y] = projectLonLat(lon, lat)
-
-			const [clampedX, clampedY] = clampAndRoundPoint(
-				x,
-				y,
-				minCoord,
-				maxCoord,
-				minCoord,
-				maxCoord,
-			)
-
-			const geometry: Geometry = [
-				[
-					{
-						x: clampedX,
-						y: clampedY,
-					},
-				],
-			]
-			const properties: SimpleFeatureProperties = {
-				datasetId: options.datasetId,
-				type: "node",
+	*nodeFeatures(
+		bbox: GeoBbox2D,
+		proj: (ll: LonLat) => XY,
+	): Generator<VtSimpleFeature> {
+		const nodeIndexes = this.osmix.nodes.withinBbox(bbox)
+		for (let i = 0; i < nodeIndexes.length; i++) {
+			const nodeIndex = nodeIndexes[i]
+			if (nodeIndex === undefined) continue
+			const tags = this.osmix.nodes.tags.getTags(nodeIndex)
+			if (!tags || Object.keys(tags).length === 0) continue
+			const id = this.osmix.nodes.ids.at(nodeIndex)
+			const ll = this.osmix.nodes.getNodeLonLat({ index: nodeIndex })
+			yield {
+				id,
+				type: SF_TYPE.POINT,
+				properties: { type: "node", ...tags },
+				geometry: [[proj(ll)]],
 			}
-
-			if (options.includeTileKey) {
-				properties.tileKey = tileKey
-			}
-
-			nodeFeatures.push(new SimpleFeature(id, 1, properties, geometry))
 		}
 	}
 
-	if (payload.ways) {
-		const { ids, positions, startIndices } = payload.ways
-
-		for (let i = 0; i < ids.length; i++) {
-			const id = ids[i]
-			if (id === undefined) throw Error(`Invalid way id at index ${i}`)
-			const start = startIndices[i]
-			const end = startIndices[i + 1]
-			if (end === undefined || start === undefined)
-				throw Error("Invalid start or end vertices")
-			if (end - start < 2) continue
-
-			const projectedPoints: [x: number, y: number][] = []
-			for (let p = start; p < end; p++) {
-				const lon = positions[p * 2]
-				const lat = positions[p * 2 + 1]
-				if (lon === undefined || lat === undefined)
-					throw Error("Invalid longitude or latitude")
-				projectedPoints.push(projectLonLat(lon, lat))
+	*wayFeatures(
+		bbox: GeoBbox2D,
+		proj: (ll: LonLat) => XY,
+	): Generator<VtSimpleFeature> {
+		const wayIndexes = this.osmix.ways.intersects(bbox)
+		for (let i = 0; i < wayIndexes.length; i++) {
+			const wayIndex = wayIndexes[i]
+			if (wayIndex === undefined) continue
+			const id = this.osmix.ways.ids.at(wayIndex)
+			const tags = this.osmix.ways.tags.getTags(wayIndex)
+			const count = this.osmix.ways.refCount.at(wayIndex)
+			const start = this.osmix.ways.refStart.at(wayIndex)
+			const points: XY[] = new Array(count)
+			for (let i = 0; i < count; i++) {
+				const ref = this.osmix.ways.refs.at(start + i)
+				const ll = this.osmix.nodes.getNodeLonLat({ id: ref })
+				points[i] = proj(ll)
 			}
+			const isArea = wayIsArea({ id, refs: new Array(count).fill(0), tags })
+			const geometry: VtSimpleFeatureGeometry = []
+			if (isArea) {
+				// 1. clip polygon in tile coords
+				const clippedPoly = this.clipProjectedPolygon(points)
+				// clipProjectedPolygon currently returns XY[], not XY[][]
+				// i.e. assumes single ring. We'll treat it as one ring.
 
-			const clippedSegmentsRaw = clipPolyline(projectedPoints, [
-				minX,
-				minY,
-				maxX,
-				maxY,
-			])
+				// 2. round/clamp, dedupe, close, orient
+				const processedRing = this.processClippedPolygonRing(clippedPoly)
 
-			const tileSegments: Geometry = []
+				// TODO handle MultiPolygons with holes
 
-			for (const segment of clippedSegmentsRaw) {
-				const rounded = segment.map(([x, y]) =>
-					clampAndRoundPoint(x, y, minX, maxX, minY, maxY),
-				)
-				const deduped = dedupePoints(rounded)
-				if (deduped.length >= 2) {
-					tileSegments.push(deduped.map(([x, y]) => ({ x, y })))
+				if (processedRing.length > 0) {
+					geometry.push(processedRing)
+				}
+			} else {
+				const clippedSegmentsRaw = this.clipProjectedPolyline(points)
+				for (const segment of clippedSegmentsRaw) {
+					const rounded = segment.map((xy) => this.clampAndRoundPoint(xy))
+					const deduped = dedupePoints(rounded)
+					if (deduped.length >= 2) {
+						geometry.push(deduped)
+					}
 				}
 			}
-			if (tileSegments.length === 0) continue
-
-			const properties: SimpleFeatureProperties = {
-				datasetId: options.datasetId,
-				type: "way",
+			if (geometry.length === 0) continue
+			yield {
+				id,
+				type: isArea ? SF_TYPE.POLYGON : SF_TYPE.LINE,
+				properties: { type: "way", ...tags },
+				geometry,
 			}
-			if (options.includeTileKey) {
-				properties.tileKey = tileKey
-			}
-
-			wayFeatures.push(new SimpleFeature(id, 2, properties, tileSegments))
 		}
 	}
 
-	const bufferData = encodeVectorTile({
-		layers: {
-			[wayLayerName]: createVtPbfTileLayer(wayLayerName, extent, wayFeatures),
-			[nodeLayerName]: createVtPbfTileLayer(
-				nodeLayerName,
-				extent,
-				nodeFeatures,
-			),
-		},
-	} as unknown as Parameters<typeof encodeVectorTile>[0])
-	return {
-		data: bufferData.buffer as ArrayBuffer,
-		tileKey,
-		extent,
+	clipProjectedPolyline(points: XY[]): XY[][] {
+		return clipPolyline(points, this.extentBbox)
 	}
+
+	clipProjectedPolygon(points: XY[]): XY[] {
+		return clipPolygon(points, this.extentBbox)
+	}
+
+	processClippedPolygonRing(rawRing: XY[]): XY[] {
+		// 1. round & clamp EVERY point
+		const snapped = rawRing.map((xy) => this.clampAndRoundPoint(xy))
+
+		// 2. clean (dedupe + close + min length)
+		const cleaned = cleanRing(snapped)
+		if (cleaned.length === 0) return []
+
+		// 3. enforce clockwise for outer ring
+		const oriented = ensureClockwise(cleaned)
+
+		return oriented
+	}
+
+	clampAndRoundPoint(xy: XY): XY {
+		const clampedX = Math.round(
+			clamp(xy[0], this.extentBbox[0], this.extentBbox[2]),
+		)
+		const clampedY = Math.round(
+			clamp(xy[1], this.extentBbox[1], this.extentBbox[3]),
+		)
+		return [clampedX, clampedY] as XY
+	}
+}
+
+function closeRing(ring: XY[]): XY[] {
+	const first = ring[0]
+	const last = ring[ring.length - 1]
+	if (first === undefined || last === undefined) return ring
+	if (first[0] !== last[0] || first[1] !== last[1]) {
+		return [...ring, first]
+	}
+	return ring
+}
+
+// Signed area via shoelace formula.
+// Positive area => CCW, Negative => CW.
+function ringArea(ring: XY[]): number {
+	let sum = 0
+	for (let i = 0; i < ring.length - 1; i++) {
+		const [x1, y1] = ring[i]!
+		const [x2, y2] = ring[i + 1]!
+		sum += x1 * y2 - x2 * y1
+	}
+	return sum / 2
+}
+
+function ensureClockwise(ring: XY[]): XY[] {
+	return ringArea(ring) < 0 ? ring : [...ring].reverse()
+}
+function ensureCounterClockwise(ring: XY[]): XY[] {
+	return ringArea(ring) > 0 ? ring : [...ring].reverse()
+}
+
+// Remove consecutive duplicates *after* rounding
+function cleanRing(ring: XY[]): XY[] {
+	const deduped = dedupePoints(ring)
+	// After dedupe, we still must ensure closure, and a polygon
+	// ring needs at least 4 coords (A,B,C,A).
+	const closed = closeRing(deduped)
+	if (closed.length < 4) return []
+	return closed
 }

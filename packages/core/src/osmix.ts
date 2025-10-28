@@ -371,19 +371,24 @@ export class Osmix {
 		const nodeCandidates = this.nodes.withinBbox(bbox)
 		const nodePositions = new Float64Array(nodeCandidates.length * 2)
 		const ids = new IdArrayType(nodeCandidates.length)
+
+		let skipped = 0
 		nodeCandidates.forEach((nodeIndex, i) => {
 			// Skip nodes with no tags, likely just a way node
-			if (!allNodes && this.nodes.tags.cardinality(nodeIndex) === 0) return
+			if (!allNodes && this.nodes.tags.cardinality(nodeIndex) === 0) {
+				skipped++
+				return
+			}
 
 			const [lon, lat] = this.nodes.getNodeLonLat({ index: nodeIndex })
-			ids[i] = this.nodes.ids.at(nodeIndex)
-			nodePositions[i * 2] = lon
-			nodePositions[i * 2 + 1] = lat
+			ids[i - skipped] = this.nodes.ids.at(nodeIndex)
+			nodePositions[(i - skipped) * 2] = lon
+			nodePositions[(i - skipped) * 2 + 1] = lat
 		})
 		console.timeEnd("Osm.getNodesInBbox")
 		return {
-			ids,
-			positions: nodePositions,
+			ids: ids.subarray(0, nodeCandidates.length - skipped),
+			positions: nodePositions.slice(0, (nodeCandidates.length - skipped) * 2),
 		}
 	}
 

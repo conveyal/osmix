@@ -1,18 +1,19 @@
+import type { Tile } from "@osmix/shared/types"
 import type { RequestParameters } from "maplibre-gl"
 import { describe, expect, it, vi } from "vitest"
 import { createOsmixRasterMaplibreProtocol } from "../src/protocol"
-import { DEFAULT_TILE_SIZE, type TileIndex } from "../src/raster-tile"
+import { DEFAULT_RASTER_TILE_SIZE } from "../src/raster-tile"
 
 describe("createOsmixRasterMaplibreProtocol", () => {
 	it("parses raster URLs and forwards derived metadata to getTileImage", async () => {
 		const tileSize = 512
-		const tileIndex: TileIndex = { z: 3, x: 4, y: 5 }
+		const tileIndex: Tile = [4, 5, 3]
 		const expectedData = new ArrayBuffer(4)
 		const getTileImage = vi.fn().mockResolvedValue(expectedData)
 		const protocol = createOsmixRasterMaplibreProtocol(getTileImage)
 
 		const request: RequestParameters = {
-			url: `@osmix/raster://test-osm/${tileSize}/${tileIndex.z}/${tileIndex.x}/${tileIndex.y}.png`,
+			url: `@osmix/raster://test-osm/${tileSize}/${tileIndex[2]}/${tileIndex[0]}/${tileIndex[1]}.png`,
 			cache: "no-store",
 		}
 		const response = await protocol(request, new AbortController())
@@ -34,7 +35,7 @@ describe("createOsmixRasterMaplibreProtocol", () => {
 		const protocol = createOsmixRasterMaplibreProtocol(getTileImage)
 
 		const request: RequestParameters = {
-			url: `@osmix/raster://foo/${DEFAULT_TILE_SIZE}/9/1/2.png`,
+			url: `@osmix/raster://foo/${DEFAULT_RASTER_TILE_SIZE}/9/1/2.png`,
 		}
 		const response = await protocol(request, new AbortController())
 
@@ -42,14 +43,8 @@ describe("createOsmixRasterMaplibreProtocol", () => {
 		const [, , passedTileSize] = getTileImage.mock.calls[0] as Parameters<
 			typeof getTileImage
 		>
-		expect(passedTileSize).toBe(DEFAULT_TILE_SIZE)
-		expect(response.cacheControl).toBe("force-cache")
-		expect(response.expires).toBeDefined()
-		const now = Date.now()
-		if (response.expires == null) throw new Error("expires is null")
-		const expiresMs = new Date(response.expires).getTime() - now
-		expect(expiresMs).toBeGreaterThan(1000 * 60 * 60 * 23)
-		expect(expiresMs).toBeLessThan(1000 * 60 * 60 * 25)
+		expect(passedTileSize).toBe(DEFAULT_RASTER_TILE_SIZE)
+		expect(response.cacheControl).toBe("no-store")
 	})
 
 	it("throws when the URL does not match the expected format", async () => {
