@@ -1,4 +1,4 @@
-import type { GeoBbox2D, LonLat } from "@osmix/json"
+import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
 
 export function throttle<T extends unknown[]>(
 	func: (...args: T) => void,
@@ -19,11 +19,11 @@ export function bboxFromLonLats(lonLats: LonLat[]): GeoBbox2D {
 	let minLat = Number.POSITIVE_INFINITY
 	let maxLon = Number.NEGATIVE_INFINITY
 	let maxLat = Number.NEGATIVE_INFINITY
-	for (const lonLat of lonLats) {
-		if (lonLat.lon < minLon) minLon = lonLat.lon
-		if (lonLat.lat < minLat) minLat = lonLat.lat
-		if (lonLat.lon > maxLon) maxLon = lonLat.lon
-		if (lonLat.lat > maxLat) maxLat = lonLat.lat
+	for (const [lon, lat] of lonLats) {
+		if (lon < minLon) minLon = lon
+		if (lat < minLat) minLat = lat
+		if (lon > maxLon) maxLon = lon
+		if (lat > maxLat) maxLat = lat
 	}
 	return [minLon, minLat, maxLon, maxLat]
 }

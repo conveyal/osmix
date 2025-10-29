@@ -1,5 +1,6 @@
-import type { GeoBbox2D, OsmTags, OsmWay } from "@osmix/json"
+import type { OsmTags, OsmWay } from "@osmix/json"
 import type { OsmPbfWay } from "@osmix/pbf"
+import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
 import Flatbush from "flatbush"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"
@@ -197,7 +198,7 @@ export class Ways extends Entities<OsmWay> {
 		return line
 	}
 
-	getCoordinates(index: number, nodeIndex: Nodes): [number, number][] {
+	getCoordinates(index: number, nodeIndex: Nodes): LonLat[] {
 		const count = this.refCount.at(index)
 		const start = this.refStart.at(index)
 		const coords: [number, number][] = []

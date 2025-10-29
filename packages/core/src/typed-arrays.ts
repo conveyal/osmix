@@ -55,22 +55,33 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 	bufferSize: number
 	maxByteLength: number
 
+	BC: SharedArrayBufferConstructor | ArrayBufferConstructor
+
 	static from<TA extends TypedArray>(
 		ArrayType: TypedArrayConstructor<TA>,
 		buffer: BufferType,
 	) {
-		const rta = new ResizeableTypedArray<TA>(ArrayType)
+		const rta = new ResizeableTypedArray<TA>(
+			ArrayType,
+			buffer instanceof SharedArrayBuffer ? SharedArrayBuffer : ArrayBuffer,
+		)
 		rta.buffer = buffer
 		rta.array = new ArrayType(buffer)
 		rta.items = rta.array.length
 		return rta
 	}
 
-	constructor(ArrayType: TypedArrayConstructor<TA>) {
+	constructor(
+		ArrayType: TypedArrayConstructor<TA>,
+		BC:
+			| SharedArrayBufferConstructor
+			| ArrayBufferConstructor = BufferConstructor,
+	) {
 		this.ArrayType = ArrayType
 		this.bufferSize = DEFAULT_BUFFER_SIZE
 		this.maxByteLength = DEFAULT_BUFFER_SIZE * 2
-		this.buffer = new BufferConstructor(this.bufferSize, {
+		this.BC = BC
+		this.buffer = new BC(this.bufferSize, {
 			maxByteLength: this.maxByteLength,
 		})
 		this.array = new this.ArrayType(this.buffer)
@@ -84,7 +95,7 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 		this.bufferSize *= 2
 		if (this.bufferSize > this.buffer.maxByteLength) {
 			this.maxByteLength *= 2
-			const newBuffer = new BufferConstructor(this.bufferSize, {
+			const newBuffer = new this.BC(this.bufferSize, {
 				maxByteLength: this.maxByteLength,
 			})
 			const newArray = new this.ArrayType(newBuffer)

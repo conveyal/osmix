@@ -1,4 +1,4 @@
-import type { GeoBbox2D } from "@osmix/json"
+import type { GeoBbox2D } from "@osmix/shared/types"
 import {
 	StrictMode,
 	useCallback,

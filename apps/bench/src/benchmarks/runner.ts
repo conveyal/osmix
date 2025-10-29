@@ -1,4 +1,4 @@
-import type { GeoBbox2D } from "@osmix/json"
+import type { GeoBbox2D } from "@osmix/shared/types"
 import { createWorker } from "../workers/osmix.worker"
 import type { BenchmarkResults, WorkerBenchmarkOptions } from "./types"
 

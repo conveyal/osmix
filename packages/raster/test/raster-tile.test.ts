@@ -1,6 +1,5 @@
-import { SphericalMercator } from "@mapbox/sphericalmercator"
-import type { GeoBbox2D } from "@osmix/json"
-import type { Tile } from "@osmix/shared/types"
+import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
+import type { LonLat, Tile, XY } from "@osmix/shared/types"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
 	DEFAULT_NODE_COLOR,
@@ -11,17 +10,19 @@ import {
 } from "../src/raster-tile"
 import { rasterTileToImageBuffer } from "./to-image-buffer"
 
-function createTile(tileIndex: Tile = [4, 5, 3], tileSize = 64) {
-	const merc = new SphericalMercator({ size: tileSize })
-	const bbox = merc.bbox(tileIndex[0], tileIndex[1], tileIndex[2]) as GeoBbox2D
+function createTile(
+	tileIndex: Tile = [4, 5, 3],
+	tileSize = DEFAULT_RASTER_TILE_SIZE,
+) {
+	const merc = new SphericalMercatorTile({ size: tileSize })
 	return {
-		tile: new OsmixRasterTile(bbox, tileIndex, tileSize),
+		tile: new OsmixRasterTile(tileIndex, tileSize),
 		merc,
 	}
 }
 
 function lonLatForPixel(
-	merc: SphericalMercator,
+	merc: SphericalMercatorTile,
 	tileIndex: Tile,
 	tileSize: number,
 	px: number,
@@ -32,45 +33,22 @@ function lonLatForPixel(
 }
 
 describe("OsmixRasterTile", () => {
-	it("projects lon/lat to tile-local pixels and clamps out-of-bounds values", () => {
-		const tileIndex: Tile = [1, 1, 2]
-		const [tx, ty, tz] = tileIndex
-		const { tile, merc } = createTile(tileIndex, DEFAULT_RASTER_TILE_SIZE)
-
-		const insideLonLat = lonLatForPixel(merc, tileIndex, tile.tileSize, 32, 16)
-		expect(tile.lonLatToTilePixel(insideLonLat)).toEqual([32, 16])
-
-		const outsideTopLeft = merc.ll(
-			[tx * tile.tileSize - 10, ty * tile.tileSize - 10],
-			tz,
-		) as [number, number]
-		expect(tile.lonLatToTilePixel(outsideTopLeft)).toEqual([0, 0])
-
-		const outsideBottomRight = merc.ll(
-			[(tx + 1) * tile.tileSize + 10, (ty + 1) * tile.tileSize + 10],
-			tz,
-		) as [number, number]
-		expect(tile.lonLatToTilePixel(outsideBottomRight)).toEqual([
-			tile.tileSize - 1,
-			tile.tileSize - 1,
-		])
-	})
-
 	it("sets point pixels using lon/lat coordinates", () => {
 		const tileIndex: Tile = [6, 7, 4]
-		const { tile, merc } = createTile(tileIndex)
+		const tileSize = DEFAULT_RASTER_TILE_SIZE
+		const { tile, merc } = createTile(tileIndex, tileSize)
 		const nodePixel = [12, 20] as const
 		const nodeLonLat = lonLatForPixel(
 			merc,
 			tileIndex,
-			tile.tileSize,
+			tileSize,
 			nodePixel[0],
 			nodePixel[1],
 		)
 
 		tile.setLonLat(nodeLonLat)
 
-		const idx = (nodePixel[1] * tile.tileSize + nodePixel[0]) * 4
+		const idx = (nodePixel[1] * tileSize + nodePixel[0]) * 4
 		expect(Array.from(tile.imageData.slice(idx, idx + 4))).toEqual(
 			Array.from(DEFAULT_NODE_COLOR),
 		)
@@ -78,37 +56,32 @@ describe("OsmixRasterTile", () => {
 
 	it("draws clipped ways using Bresenham line rendering", () => {
 		const tileIndex: Tile = [10, 11, 5]
+		const tileSize = DEFAULT_RASTER_TILE_SIZE
 		const [tx, ty, tz] = tileIndex
 		const { tile, merc } = createTile(tileIndex)
 
-		const startPixel = [5, 5] as const
-		const endPixel = [40, 36] as const
+		const startPixel: XY = [5, 5]
+		const endPixel: XY = [40, 36]
 
 		const way = [
-			lonLatForPixel(
-				merc,
-				tileIndex,
-				tile.tileSize,
-				startPixel[0],
-				startPixel[1],
-			),
-			lonLatForPixel(merc, tileIndex, tile.tileSize, endPixel[0], endPixel[1]),
+			lonLatForPixel(merc, tileIndex, tileSize, startPixel[0], startPixel[1]),
+			lonLatForPixel(merc, tileIndex, tileSize, endPixel[0], endPixel[1]),
 		]
 
 		// Prefix and suffix points outside the tile bounds to exercise clipping.
-		const outsidePrefix = merc.ll(
-			[tx * tile.tileSize - 20, ty * tile.tileSize - 20],
+		const outsidePrefix: LonLat = merc.ll(
+			[tx * tileSize - 20, ty * tileSize - 20],
 			tz,
-		) as [number, number]
-		const outsideSuffix = merc.ll(
-			[(tx + 1) * tile.tileSize + 20, (ty + 1) * tile.tileSize + 20],
+		)
+		const outsideSuffix: LonLat = merc.ll(
+			[(tx + 1) * tileSize + 20, (ty + 1) * tileSize + 20],
 			tz,
-		) as [number, number]
+		)
 
 		tile.drawWay([outsidePrefix, ...way, outsideSuffix])
 
-		const startIdx = (startPixel[1] * tile.tileSize + startPixel[0]) * 4
-		const endIdx = (endPixel[1] * tile.tileSize + endPixel[0]) * 4
+		const startIdx = tile.getIndex(startPixel)
+		const endIdx = tile.getIndex(endPixel)
 		expect(Array.from(tile.imageData.slice(startIdx, startIdx + 4))).toEqual(
 			Array.from(DEFAULT_WAY_COLOR),
 		)

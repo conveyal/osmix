@@ -21,10 +21,6 @@
 		"maplibre-gl": "^5.7.3"
 	},
 	"dependencies": {
-		"@mapbox/sphericalmercator": "catalog:",
-		"@osmix/json": "workspace:*",
-		"@osmix/pbf": "workspace:*",
-		"@osmix/shared": "workspace:*",
-		"dequal": "catalog:"
+		"@osmix/shared": "workspace:*"
 	}
 }

@@ -1,7 +1,7 @@
-import { SphericalMercator } from "@mapbox/sphericalmercator"
 import type { Osmix } from "@osmix/core"
 import { wayIsArea } from "@osmix/json"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
+import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
 import type {
 	VtSimpleFeature,
@@ -38,13 +38,8 @@ export function projectToTile(
 	tile: Tile,
 	extent = DEFAULT_EXTENT,
 ): (ll: LonLat) => XY {
-	const sm = new SphericalMercator({ size: extent })
-	return (lonLat: LonLat): XY => {
-		const [px, py] = sm.px(lonLat, tile[2])
-		const x = px - extent * tile[0]
-		const y = py - extent * tile[1]
-		return [x, y]
-	}
+	const sm = new SphericalMercatorTile({ size: extent, tile })
+	return (lonLat) => sm.llToTilePx(lonLat)
 }
 
 export class OsmixVtEncoder {
@@ -68,15 +63,10 @@ export class OsmixVtEncoder {
 	}
 
 	getTile(tile: Tile): ArrayBuffer {
-		const sm = new SphericalMercator({ size: this.extent })
+		const sm = new SphericalMercatorTile({ size: this.extent, tile })
 		// const proj = projectToTile(tile, this.extent)
 		const bbox = sm.bbox(tile[0], tile[1], tile[2]) as GeoBbox2D
-		return this.getTileForBbox(bbox, (lonLat: LonLat): XY => {
-			const [px, py] = sm.px(lonLat, tile[2])
-			const x = px - this.extent * tile[0]
-			const y = py - this.extent * tile[1]
-			return [x, y]
-		})
+		return this.getTileForBbox(bbox, (ll) => sm.llToTilePx(ll))
 	}
 
 	getTileForBbox(bbox: GeoBbox2D, proj: (ll: LonLat) => XY): ArrayBuffer {
@@ -230,9 +220,14 @@ function ringArea(ring: XY[]): number {
 function ensureClockwise(ring: XY[]): XY[] {
 	return ringArea(ring) < 0 ? ring : [...ring].reverse()
 }
-function ensureCounterClockwise(ring: XY[]): XY[] {
+
+/**
+ * TODO handle MultiPolygons with holes
+ *
+function _ensureCounterClockwise(ring: XY[]): XY[] {
 	return ringArea(ring) > 0 ? ring : [...ring].reverse()
 }
+*/
 
 // Remove consecutive duplicates *after* rounding
 function cleanRing(ring: XY[]): XY[] {

@@ -7,9 +7,9 @@ import {
 	type OsmixMergeOptions,
 } from "@osmix/change"
 import { Osmix, throttle } from "@osmix/core"
-import type { GeoBbox2D, OsmEntityType } from "@osmix/json"
+import type { OsmEntityType } from "@osmix/json"
 import { OsmixRasterTile } from "@osmix/raster"
-import type { Tile } from "@osmix/shared/types"
+import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, transfer, wrap } from "comlink"
 import { dequal } from "dequal/lite"
@@ -78,7 +78,7 @@ export class OsmixWorker {
 		const bbox = sphericalMercator.bbox(tile[0], tile[1], tile[2]) as GeoBbox2D
 		if (!bboxContainsOrIntersects(bbox, osm.bbox())) return new ArrayBuffer(0)
 
-		const rasterTile = new OsmixRasterTile(bbox, tile, tileSize)
+		const rasterTile = new OsmixRasterTile(tile, tileSize)
 		const timer = `OsmixRasterTile.drawWays:${tile[2]}/${tile[0]}/${tile[1]}`
 		console.time(timer)
 		osm.ways.intersects(bbox, (wayIndex) => {

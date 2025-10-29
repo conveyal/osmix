@@ -53,14 +53,3 @@ export type OsmixGeoJsonProperties = {
 export type OsmixGeoJSONFeature<
 	T extends Point | LineString | Polygon | MultiPolygon,
 > = Feature<T, OsmixGeoJsonProperties>
-
-/**
- * A bounding box in the format [minLon, minLat, maxLon, maxLat].
- * GeoJSON.BBox allows for 3D bounding boxes, but we use tools that expect 2D bounding boxes.
- */
-export type GeoBbox2D = [
-	minLon: number,
-	minLat: number,
-	maxLon: number,
-	maxLat: number,
-]

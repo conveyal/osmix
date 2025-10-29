@@ -1,5 +1,5 @@
 import { pointToTile, tileToGeoJSON } from "@mapbox/tilebelt"
-import type { GeoBbox2D } from "@osmix/json"
+import type { GeoBbox2D } from "@osmix/shared/types"
 import type { Feature, FeatureCollection } from "geojson"
 import type {
 	GeoJSONSource,

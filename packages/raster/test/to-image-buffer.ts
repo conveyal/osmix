@@ -5,14 +5,11 @@
 import type { OsmixRasterTile } from "../src/raster-tile"
 
 export function rasterTileToCanvas(tile: OsmixRasterTile) {
-	const canvas = new OffscreenCanvas(tile.tileSize, tile.tileSize)
+	const { tileSize } = tile.proj
+	const canvas = new OffscreenCanvas(tileSize, tileSize)
 	const ctx = canvas.getContext("2d")
 	if (!ctx) throw Error("Failed to get context")
-	ctx.putImageData(
-		new ImageData(tile.imageData, tile.tileSize, tile.tileSize),
-		0,
-		0,
-	)
+	ctx.putImageData(new ImageData(tile.imageData, tileSize, tileSize), 0, 0)
 	return canvas
 }
 

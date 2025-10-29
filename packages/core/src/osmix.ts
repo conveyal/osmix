@@ -1,9 +1,7 @@
 import {
-	type GeoBbox2D,
 	isNode,
 	isRelation,
 	isWay,
-	type LonLat,
 	nodeToFeature,
 	type OsmEntity,
 	type OsmEntityType,
@@ -23,6 +21,7 @@ import {
 	type OsmPbfHeaderBlock,
 	readOsmPbf,
 } from "@osmix/pbf"
+import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
 import { Nodes, type NodesTransferables } from "./nodes"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
@@ -462,15 +461,13 @@ export class Osmix {
 			const lls: LonLat[] = []
 			for (const member of relation.members) {
 				if (member.type === "node") {
-					const [lon, lat] = this.nodes.getNodeLonLat({ id: member.ref })
-					lls.push({ lon, lat })
+					const ll = this.nodes.getNodeLonLat({ id: member.ref })
+					lls.push(ll)
 				} else if (member.type === "way") {
 					const wayIndex = this.ways.ids.getIndexFromId(member.ref)
 					if (wayIndex === -1) throw Error("Way not found")
 					const wayPositions = this.ways.getCoordinates(wayIndex, this.nodes)
-					for (const position of wayPositions) {
-						lls.push({ lon: position[0], lat: position[1] })
-					}
+					lls.push(...wayPositions)
 				}
 			}
 			return bboxFromLonLats(lls)

@@ -1,7 +1,8 @@
 import { Osmix } from "@osmix/core"
-import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/json"
+import type { OsmNode, OsmWay } from "@osmix/json"
 import { type OsmPbfHeaderBlock, readOsmPbf } from "@osmix/pbf"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
+import type { GeoBbox2D } from "@osmix/shared/types"
 import { expose, wrap } from "comlink"
 
 export class OsmixBenchWorker {

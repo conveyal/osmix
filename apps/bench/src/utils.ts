@@ -1,4 +1,4 @@
-import type { GeoBbox2D } from "@osmix/json"
+import type { GeoBbox2D } from "@osmix/shared/types"
 
 export function calculateTestGeometriesFromBbox(bbox: GeoBbox2D) {
 	// Calculate center and bboxes from the data
