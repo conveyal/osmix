@@ -10,6 +10,11 @@
 			"semicolons": "asNeeded"
 		}
 	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
 	"linter": {
 		"rules": {
 			"a11y": {
@@ -36,9 +41,6 @@
 				"noInferrableTypes": "error",
 				"noUselessElse": "error",
 				"noNonNullAssertion": "off"
-			},
-			"suspicious": {
-				"noUnknownAtRules": "warn"
 			}
 		}
 	}
