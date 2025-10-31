@@ -33,8 +33,6 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "tsc",
-		"bench": "vitest bench",
-		"test": "vitest",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
