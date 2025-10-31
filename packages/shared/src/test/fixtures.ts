@@ -20,29 +20,32 @@ export function getFixturePath(url: string) {
 /**
  * Get file from the cache folder or download it from the URL
  */
-export async function getFixtureFile(url: string): Promise<ArrayBuffer> {
+export async function getFixtureFile(
+	url: string,
+): Promise<Uint8Array<ArrayBufferLike>> {
 	const filePath = getFixturePath(url)
 	try {
 		const file = await readFile(filePath)
-		return file.buffer as ArrayBuffer
+		return new Uint8Array<ArrayBuffer>(file.buffer as ArrayBuffer)
 	} catch (_error) {
 		const response = await fetch(url)
 		const buffer = await response.arrayBuffer()
-		await writeFile(filePath, new Uint8Array(buffer))
-		return buffer
+		const data = new Uint8Array<ArrayBuffer>(buffer)
+		await writeFile(filePath, data)
+		return data
 	}
 }
 
 export function getFixtureFileReadStream(url: string) {
 	return Readable.toWeb(
 		createReadStream(getFixturePath(url)),
-	) as unknown as ReadableStream<ArrayBuffer>
+	) as unknown as ReadableStream<Uint8Array<ArrayBufferLike>>
 }
 
 export function getFixtureFileWriteStream(url: string) {
 	return Writable.toWeb(
 		createWriteStream(getFixturePath(url)),
-	) as unknown as WritableStream<Uint8Array>
+	) as unknown as WritableStream<Uint8Array<ArrayBufferLike>>
 }
 
 export type PbfFixture = {

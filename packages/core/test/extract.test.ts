@@ -70,7 +70,10 @@ function buildSourceOsm() {
 
 test("extract a BBOX while reading a PBF", async () => {
 	const source = buildSourceOsm()
-	const transform = new TransformStream<Uint8Array, ArrayBufferLike>()
+	const transform = new TransformStream<
+		Uint8Array<ArrayBufferLike>,
+		Uint8Array<ArrayBufferLike>
+	>()
 	const extract = new Osmix()
 	const extractPromise = extract.readPbf(transform.readable, {
 		extractBbox: TEST_BBOX,
@@ -97,10 +100,12 @@ test("extract a BBOX after reading a PBF", async () => {
 	const buffer = await source.toPbfBuffer()
 
 	const streaming = new Osmix()
-	await streaming.readPbf(buffer.slice(0), { extractBbox: TEST_BBOX })
+	await streaming.readPbf(new Uint8Array(buffer.slice(0)), {
+		extractBbox: TEST_BBOX,
+	})
 
 	const twoStepOsmix = new Osmix()
-	await twoStepOsmix.readPbf(buffer.slice(0))
+	await twoStepOsmix.readPbf(new Uint8Array(buffer.slice(0)))
 	const twoStep = twoStepOsmix.extract(TEST_BBOX)
 
 	assert.equal(streaming.nodes.size, twoStep.nodes.size)

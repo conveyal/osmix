@@ -5,7 +5,7 @@ import type { OsmNode } from "@osmix/json"
 import {
 	getFixtureFileReadStream,
 	getFixturePath,
-} from "@osmix/test-utils/fixtures"
+} from "@osmix/shared/test/fixtures"
 import { assert, describe, it } from "vitest"
 import { OsmixChangeset } from "../src/changeset"
 
@@ -43,7 +43,7 @@ describe("merge osm", () => {
 		async () => {
 			const osm1Name = "yakima-full.osm.pbf"
 			const osm2Name = "yakima.osw.pbf"
-			const _osmMergedName = "yakima-merged.osm.pbf"
+			// const _osmMergedName = "yakima-merged.osm.pbf"
 
 			const osm1Data = getFixtureFileReadStream(osm1Name)
 			let baseOsm = await Osmix.fromPbf(osm1Data, { id: osm1Name })

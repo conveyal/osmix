@@ -23,7 +23,10 @@ describe("write", () => {
 			assert.exists(way1)
 			assert.exists(relation1)
 
-			const transformStream = new TransformStream<Uint8Array, ArrayBufferLike>()
+			const transformStream = new TransformStream<
+				Uint8Array<ArrayBufferLike>,
+				Uint8Array<ArrayBufferLike>
+			>()
 			const testOsmPromise = Osmix.fromPbf(transformStream.readable, {
 				id: `${name}-reparsed`,
 			})

@@ -19,14 +19,14 @@ export const HEADER_LENGTH_BYTES = 4
  * Parses OSM PBF bytes from buffers, streams, or generators into header + block iterators.
  * Returns the decoded header and a lazy async generator of primitive blocks.
  */
-export async function readOsmPbf(data: AsyncGeneratorValue<ArrayBufferLike>) {
+export async function readOsmPbf(
+	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
+) {
 	const generateBlobsFromChunk = createOsmPbfBlobGenerator()
 	const blocks = osmPbfBlobsToBlocksGenerator(
 		(async function* () {
 			for await (const chunk of toAsyncGenerator(data)) {
-				for await (const blob of generateBlobsFromChunk(
-					new Uint8Array(chunk),
-				)) {
+				for await (const blob of generateBlobsFromChunk(chunk)) {
 					yield blob
 				}
 			}
@@ -47,7 +47,7 @@ export async function readOsmPbf(data: AsyncGeneratorValue<ArrayBufferLike>) {
  * Assumes the first decoded blob carries the header and emits it before any primitive blocks.
  */
 export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
-	ArrayBufferLike,
+	Uint8Array<ArrayBufferLike>,
 	OsmPbfHeaderBlock | OsmPbfBlock
 > {
 	generateBlobsFromChunk = createOsmPbfBlobGenerator()
@@ -59,9 +59,7 @@ export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
 	) {
 		super({
 			transform: async (bytesChunk, controller) => {
-				for await (const rawBlobs of this.generateBlobsFromChunk(
-					new Uint8Array(bytesChunk),
-				)) {
+				for await (const rawBlobs of this.generateBlobsFromChunk(bytesChunk)) {
 					const decompressed = await decompress(rawBlobs)
 					const pbf = new Pbf(decompressed)
 					if (this.header == null) {

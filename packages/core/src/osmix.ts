@@ -105,7 +105,7 @@ export class Osmix {
 	 * Easiest way to get started with Osmix. Reads a PBF file into an Osmix index. Logs progress to the console.
 	 */
 	static async fromPbf(
-		data: AsyncGeneratorValue<ArrayBufferLike>,
+		data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
 		options: Partial<OsmixOptions> = {},
 	) {
 		const osm = new Osmix(options)
@@ -167,7 +167,7 @@ export class Osmix {
 	}
 
 	async readPbf(
-		data: AsyncGeneratorValue<ArrayBufferLike>,
+		data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
 		options: Partial<OsmixOptions> = {},
 	) {
 		if (this.#indexBuilt) throw Error("Osmix built. Create new instance.")

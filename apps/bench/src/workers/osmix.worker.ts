@@ -10,7 +10,7 @@ export class OsmixBenchWorker {
 	private osm: Osmix | null = null
 
 	async loadFromPbf(data: ArrayBuffer): Promise<void> {
-		this.osm = await Osmix.fromPbf(data, {
+		this.osm = await Osmix.fromPbf(new Uint8Array(data), {
 			id: "benchmark",
 			logger: console.log,
 		})
@@ -22,7 +22,7 @@ export class OsmixBenchWorker {
 	}
 
 	async getHeader(data: ArrayBuffer): Promise<OsmPbfHeaderBlock> {
-		const { header } = await readOsmPbf(data)
+		const { header } = await readOsmPbf(new Uint8Array(data))
 		return header
 	}
 

@@ -58,7 +58,7 @@ describe("pbf json", () => {
 				)
 
 			// Re-parse the new PBF and test
-			const osm2 = await readOsmPbf(data.buffer)
+			const osm2 = await readOsmPbf(data)
 			await testOsmPbfReader(osm2, pbf)
 		})
 	})

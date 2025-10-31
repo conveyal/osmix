@@ -55,7 +55,7 @@ describe("write", () => {
 			// Re-parse the new PBF and test
 			assert.exists(data.buffer)
 			// TODO: assert.equal(stream.buffer.byteLength, fileData.byteLength)
-			const osm2 = await readOsmPbf(data.buffer)
+			const osm2 = await readOsmPbf(data)
 
 			assert.deepEqual(osm.header, osm2.header)
 			const entities = await testOsmPbfReader(osm2, pbf)

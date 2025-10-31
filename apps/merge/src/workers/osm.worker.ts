@@ -48,7 +48,10 @@ export class OsmixWorker {
 	}
 
 	async fromPbf(id: string, data: ArrayBufferLike | ReadableStream) {
-		const osm = await Osmix.fromPbf(data, { id, logger: this.log })
+		const osm = await Osmix.fromPbf(
+			data instanceof ReadableStream ? data : new Uint8Array(data),
+			{ id, logger: this.log },
+		)
 		this.osmixes.set(id, osm)
 
 		this.invalidateVectorTileIndex(id)

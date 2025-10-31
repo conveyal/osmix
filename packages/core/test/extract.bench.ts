@@ -9,7 +9,7 @@ const MONACO_BBOX: GeoBbox2D = [7.4053929, 43.7232244, 7.4447259, 43.7543687]
 const BBOX = MONACO_BBOX
 const PBF = "monaco.pbf"
 
-let buffer: ArrayBufferLike
+let buffer: Uint8Array<ArrayBufferLike>
 
 beforeAll(async () => {
 	buffer = await getFixtureFile(PBF)
