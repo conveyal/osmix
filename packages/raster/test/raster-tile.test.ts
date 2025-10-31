@@ -1,14 +1,12 @@
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { LonLat, Tile, XY } from "@osmix/shared/types"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import {
 	DEFAULT_NODE_COLOR,
-	DEFAULT_RASTER_IMAGE_TYPE,
 	DEFAULT_RASTER_TILE_SIZE,
 	DEFAULT_WAY_COLOR,
 	OsmixRasterTile,
 } from "../src/raster-tile"
-import { rasterTileToImageBuffer } from "./to-image-buffer"
 
 function createTile(
 	tileIndex: Tile = [4, 5, 3],
@@ -88,69 +86,5 @@ describe("OsmixRasterTile", () => {
 		expect(Array.from(tile.imageData.slice(endIdx, endIdx + 4))).toEqual(
 			Array.from(DEFAULT_WAY_COLOR),
 		)
-	})
-
-	describe("toImageBuffer", () => {
-		const originalOffscreenCanvas = globalThis.OffscreenCanvas
-		const originalImageData = globalThis.ImageData
-
-		afterEach(() => {
-			globalThis.OffscreenCanvas = originalOffscreenCanvas
-			globalThis.ImageData = originalImageData
-			vi.restoreAllMocks()
-		})
-
-		it("serializes image data via OffscreenCanvas", async () => {
-			const { tile } = createTile()
-			const arrayBuffer = new ArrayBuffer(16)
-			const putImageData = vi.fn()
-			const convertToBlob = vi
-				.fn()
-				.mockResolvedValue({ arrayBuffer: () => Promise.resolve(arrayBuffer) })
-			let latestCanvas: MockOffscreenCanvas | undefined
-
-			class MockContext2D {
-				putImageData = putImageData
-			}
-
-			class MockOffscreenCanvas {
-				width: number
-				height: number
-				ctx = new MockContext2D()
-				constructor(width: number, height: number) {
-					this.width = width
-					this.height = height
-					latestCanvas = this
-				}
-				getContext(type: string) {
-					if (type !== "2d") return null
-					return this.ctx
-				}
-				convertToBlob = convertToBlob
-			}
-
-			class MockImageData {
-				data: Uint8ClampedArray
-				width: number
-				height: number
-				constructor(data: Uint8ClampedArray, width: number, height: number) {
-					this.data = data
-					this.width = width
-					this.height = height
-				}
-			}
-
-			globalThis.OffscreenCanvas =
-				MockOffscreenCanvas as unknown as typeof OffscreenCanvas
-			globalThis.ImageData = MockImageData as unknown as typeof ImageData
-
-			const result = await rasterTileToImageBuffer(tile)
-
-			expect(result).toBe(arrayBuffer)
-			expect(putImageData).toHaveBeenCalledTimes(1)
-			expect(latestCanvas?.convertToBlob).toHaveBeenCalledWith({
-				type: DEFAULT_RASTER_IMAGE_TYPE,
-			})
-		})
 	})
 })

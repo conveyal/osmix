@@ -1,4 +1,4 @@
-import type { PbfFixture } from "@osmix/test-utils/fixtures"
+import type { PbfFixture } from "@osmix/shared/test/fixtures"
 import { assert } from "vitest"
 import type {
 	OsmPbfBlock,

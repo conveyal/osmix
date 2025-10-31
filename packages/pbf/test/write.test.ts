@@ -5,7 +5,7 @@ import {
 	getFixtureFileWriteStream,
 	getFixturePath,
 	PBFs,
-} from "@osmix/test-utils/fixtures"
+} from "@osmix/shared/test/fixtures"
 import { assert, describe, it } from "vitest"
 import {
 	OsmBlocksToPbfBytesTransformStream,

@@ -1,4 +1,9 @@
 {
 	"$schema": "https://json.schemastore.org/tsconfig",
-	"extends": "@osmix/tsconfig/base.json"
+	"extends": "./tsconfig/base.json",
+	"include": ["src", "test"],
+	"exclude": ["node_modules", "dist"],
+	"compilerOptions": {
+		"outDir": "./dist"
+	}
 }

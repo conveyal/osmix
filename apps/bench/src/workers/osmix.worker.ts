@@ -3,6 +3,7 @@ import type { OsmNode, OsmWay } from "@osmix/json"
 import { type OsmPbfHeaderBlock, readOsmPbf } from "@osmix/pbf"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type { GeoBbox2D } from "@osmix/shared/types"
+import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, wrap } from "comlink"
 
 export class OsmixBenchWorker {
@@ -27,7 +28,7 @@ export class OsmixBenchWorker {
 
 	async queryBbox(
 		bbox: GeoBbox2D,
-		_includeTags = false, // TODO: Implement this
+		includeTags = false,
 	): Promise<{
 		nodes: OsmNode[]
 		ways: OsmWay[]
@@ -44,14 +45,24 @@ export class OsmixBenchWorker {
 			const lon = nodeResults.positions[i * 2]
 			const lat = nodeResults.positions[i * 2 + 1]
 			if (lon === undefined || lat === undefined) continue
-			nodes.push({ id, lon, lat })
+			if (includeTags) {
+				const node = this.osm.nodes.getById(id)
+				nodes.push({ id, lon, lat, tags: node?.tags ?? undefined })
+			} else {
+				nodes.push({ id, lon, lat })
+			}
 		}
 
 		const ways: OsmWay[] = []
 		for (let i = 0; i < wayResults.ids.length; i++) {
 			const id = wayResults.ids[i]
 			if (!id) continue
-			ways.push({ id, refs: [] })
+			if (includeTags) {
+				const way = this.osm.ways.getById(id)
+				ways.push({ id, refs: way?.refs ?? [], tags: way?.tags ?? undefined })
+			} else {
+				ways.push({ id, refs: [] })
+			}
 		}
 
 		return { nodes, ways }
@@ -104,9 +115,17 @@ export class OsmixBenchWorker {
 	async generateVectorTile(bbox: GeoBbox2D): Promise<Uint8Array> {
 		if (!this.osm) throw new Error("OSM not loaded")
 
-		// For now, just return the raw data as a simple format
-		const result = this.osm.getNodesInBbox(bbox)
-		return new Uint8Array(result.positions.buffer)
+		// Encode a single-tile VT using bbox-projected coordinates
+		const encoder = new OsmixVtEncoder(this.osm)
+		const [minLon, minLat, maxLon, maxLat] = bbox
+		const extent = 4096
+		const proj = ([lon, lat]: [number, number]) => {
+			const x = ((lon - minLon) / (maxLon - minLon)) * extent
+			const y = ((maxLat - lat) / (maxLat - minLat)) * extent
+			return [x, y] as [number, number]
+		}
+		const pbf = encoder.getTileForBbox(bbox, proj)
+		return new Uint8Array(pbf)
 	}
 
 	async exportWaysGeoJSON(

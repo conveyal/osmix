@@ -5,7 +5,7 @@ import { Readable, Writable } from "node:stream"
 import { fileURLToPath } from "node:url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const ROOT_DIR = resolve(__dirname, "../../")
+const ROOT_DIR = resolve(__dirname, "../../../../")
 const FIXTURES_DIR = resolve(ROOT_DIR, "fixtures")
 
 export function getFixturePath(url: string) {

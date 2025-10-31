@@ -1,12 +1,11 @@
-import { describe, expect, it } from "vitest"
+import { assert, describe, expect, it } from "vitest"
 import { nodeToFeature, relationToFeature, wayToFeature } from "../src/geojson"
 import type { OsmNode, OsmRelation, OsmWay } from "../src/types"
 
 describe("geojson helpers", () => {
-	const nodes: OsmNode[] = [
-		{ id: 1, lat: 0, lon: 0, tags: { amenity: "cafe" } },
-		{ id: 2, lat: 1, lon: 1 },
-	]
+	const node0: OsmNode = { id: 1, lat: 0, lon: 0, tags: { amenity: "cafe" } }
+	const node1: OsmNode = { id: 2, lat: 1, lon: 1 }
+	const nodes: OsmNode[] = [node0, node1]
 	const nodeMap = new Map(nodes.map((n) => [n.id, n]))
 	const refToPosition = (id: number) => {
 		const node = nodeMap.get(id)
@@ -15,15 +14,15 @@ describe("geojson helpers", () => {
 	}
 
 	it("converts node to GeoJSON Point", () => {
-		const feature = nodeToFeature(nodes[0])
+		const feature = nodeToFeature(node0)
 		expect(feature.type).toBe("Feature")
 		expect(feature.geometry.type).toBe("Point")
-		expect(feature.geometry.coordinates).toEqual([nodes[0].lon, nodes[0].lat])
+		expect(feature.geometry.coordinates).toEqual([node0.lon, node0.lat])
 		expect(feature.properties).toEqual({
-			id: nodes[0].id,
+			id: node0.id,
 			type: "node",
-			...nodes[0].tags,
-			...nodes[0].info,
+			...node0.tags,
+			...node0.info,
 		})
 	})
 
@@ -50,6 +49,7 @@ describe("geojson helpers", () => {
 		const feature = relationToFeature(relation, refToPosition)
 		expect(feature.geometry.type).toBe("MultiPolygon")
 		const polygon = feature.geometry
+		assert.exists(polygon.coordinates?.[0])
 		expect(polygon.coordinates[0][0]).toHaveLength(3)
 	})
 })

@@ -129,6 +129,12 @@ await upstream
 - Only `zlib_data` blobs are supported today; files containing `raw` or `lzma` payloads will throw.
 - When working with Node `Readable` / `Writable` streams, adapt them to Web Streams (`stream/web`) before passing them to these helpers.
 
+### Memory usage guidance
+
+- Prefer streaming transforms (`OsmPbfBytesToBlocksTransformStream` → `OsmBlocksToPbfBytesTransformStream`) for large extracts to avoid materializing entire files.
+- Re-materializing full files (e.g., concatenating all blocks into one buffer) can require memory roughly proportional to input size plus transient compression buffers.
+- In browsers, keep an eye on available heap limits (2–4 GB typical). Use chunked persistence (IndexedDB, file streams) rather than holding all bytes in RAM.
+
 ## Development
 
 - `bun run test packages/pbf`

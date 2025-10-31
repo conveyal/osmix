@@ -12,7 +12,6 @@
 		"typecheck": "tsc --build --noEmit"
 	},
 	"devDependencies": {
-		"@osmix/tsconfig": "workspace:*",
 		"@types/react": "^19.2.0",
 		"@types/react-dom": "^19.2.0",
 		"@vitejs/plugin-react": "^5.0.4",
@@ -27,9 +26,10 @@
 		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/shared": "workspace:*",
+		"@osmix/vt": "workspace:*",
 		"apache-arrow": "^17.0.0",
 		"comlink": "^4.4.2",
-		"maplibre-gl": "^5.9.0",
+		"maplibre-gl": "catalog:",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
 		"react-map-gl": "^8.0.4"

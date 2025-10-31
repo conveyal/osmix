@@ -1,6 +1,6 @@
-import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
-import type { Tile } from "@osmix/shared/types"
 import { describe, expect, it } from "vitest"
+import SphericalMercatorTile from "./spherical-mercator"
+import type { Tile } from "./types"
 
 function lonLatForPixel(
 	merc: SphericalMercatorTile,

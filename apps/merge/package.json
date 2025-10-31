@@ -11,7 +11,6 @@
 		"typecheck": "tsc --build --noEmit"
 	},
 	"devDependencies": {
-		"@osmix/tsconfig": "workspace:*",
 		"@playwright/test": "^1.52.0",
 		"@tailwindcss/vite": "4.1.14",
 		"@types/geojson": "catalog:",
@@ -33,7 +32,7 @@
 		"@osmix/raster": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@mapbox/sphericalmercator": "catalog:",
-		"@mapbox/tilebelt": "catalog:",
+		"@mapbox/tilebelt": "^2.0.2",
 		"@radix-ui/react-collapsible": "^1.1.12",
 		"@radix-ui/react-dialog": "^1.1.14",
 		"@radix-ui/react-hover-card": "^1.1.15",
@@ -46,7 +45,7 @@
 		"dequal": "catalog:",
 		"jotai": "^2.15.0",
 		"lucide-react": "^0.513.0",
-		"maplibre-gl": "^5.9.0",
+		"maplibre-gl": "catalog:",
 		"native-file-system-adapter": "^3.0.1",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",

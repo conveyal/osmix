@@ -5,6 +5,31 @@
 	"version": "0.0.1",
 	"description": "Encode Osmix binary overlay tiles directly into Mapbox Vector Tiles",
 	"main": "./src/index.ts",
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"import": "./dist/index.js",
+				"types": "./dist/index.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
 	"sideEffects": false,
 	"scripts": {
 		"build": "tsc",
@@ -12,7 +37,6 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@mapbox/sphericalmercator": "catalog:",
 		"@osmix/shared": "workspace:*",
 		"@osmix/json": "workspace:*",
 		"pbf": "catalog:"
@@ -20,8 +44,6 @@
 	"devDependencies": {
 		"@mapbox/vector-tile": "^2.0.4",
 		"@osmix/core": "workspace:*",
-		"@osmix/tsconfig": "workspace:*",
-		"@osmix/test-utils": "workspace:*",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	}

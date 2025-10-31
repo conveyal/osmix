@@ -2,7 +2,7 @@ import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
-} from "@osmix/test-utils/fixtures"
+} from "@osmix/shared/test/fixtures"
 import { assert, beforeAll, describe, it } from "vitest"
 import {
 	OsmPbfBytesToBlocksTransformStream,

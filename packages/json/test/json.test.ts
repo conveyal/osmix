@@ -5,7 +5,7 @@ import {
 	readOsmPbf,
 } from "@osmix/pbf"
 import { testOsmPbfReader } from "@osmix/pbf/test/utils"
-import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures"
+import { getFixtureFileReadStream, PBFs } from "@osmix/shared/test/fixtures"
 import { assert, describe, it } from "vitest"
 import { OsmJsonToBlocksTransformStream } from "../src/json-to-pbf"
 import { OsmBlocksToJsonTransformStream } from "../src/pbf-to-json"

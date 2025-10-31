@@ -1,5 +1,5 @@
 import { createSampleHeader } from "@osmix/pbf/test/helpers"
-import { describe, expect, it } from "vitest"
+import { assert, describe, expect, it } from "vitest"
 import {
 	createOsmJsonReadableStream,
 	jsonEntitiesToBlocks,
@@ -48,15 +48,18 @@ describe("json-to-pbf", () => {
 		expect(blocks).toHaveLength(3)
 
 		const nodeBlock = blocks[0]
+		assert.exists(nodeBlock?.primitivegroup[0]?.dense)
 		expect(nodeBlock.primitivegroup[0].dense?.id).toHaveLength(2)
 		expect(nodeBlock.primitivegroup[0].ways).toHaveLength(0)
 		expect(nodeBlock.primitivegroup[0].relations).toHaveLength(0)
 
 		const wayBlock = blocks[1]
+		assert.exists(wayBlock?.primitivegroup[0])
 		expect(wayBlock.primitivegroup[0].ways).toHaveLength(1)
 		expect(wayBlock.primitivegroup[0].dense).toBeUndefined()
 
 		const relBlock = blocks[2]
+		assert.exists(relBlock?.primitivegroup[0])
 		expect(relBlock.primitivegroup[0].relations).toHaveLength(1)
 	})
 
@@ -90,6 +93,9 @@ describe("json-to-pbf", () => {
 		expect(outputs[0]).toBe(header)
 		const blockOutputs = outputs.slice(1) as OsmPbfBlockBuilder[]
 		expect(blockOutputs).toHaveLength(3)
+		assert.exists(blockOutputs[0]?.primitivegroup[0])
+		assert.exists(blockOutputs[1]?.primitivegroup[0])
+		assert.exists(blockOutputs[2]?.primitivegroup[0])
 		expect(blockOutputs[0].primitivegroup[0].dense?.id).toHaveLength(2)
 		expect(blockOutputs[1].primitivegroup[0].ways).toHaveLength(1)
 		expect(blockOutputs[2].primitivegroup[0].relations).toHaveLength(1)

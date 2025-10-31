@@ -5,6 +5,31 @@
 	"version": "0.0.1",
 	"type": "module",
 	"main": "./src/index.ts",
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"import": "./dist/index.js",
+				"types": "./dist/index.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
 	"sideEffects": false,
 	"scripts": {
 		"bench": "vitest bench",
@@ -14,11 +39,8 @@
 	},
 	"devDependencies": {
 		"@osmix/shared": "workspace:*",
-		"@osmix/test-utils": "workspace:*",
-		"@osmix/tsconfig": "workspace:*",
 		"@types/node": "catalog:",
 		"typescript": "catalog:",
-		"vite": "catalog:",
 		"vitest": "catalog:"
 	},
 	"dependencies": {

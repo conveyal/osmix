@@ -1,5 +1,5 @@
 import { toAsyncGenerator } from "@osmix/pbf"
-import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures"
+import { getFixtureFileReadStream, PBFs } from "@osmix/shared/test/fixtures"
 import { assert, describe, it } from "vitest"
 import { isNode, isWay } from "../src"
 import { nodeToFeature, wayToFeature } from "../src/geojson"

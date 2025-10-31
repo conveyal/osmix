@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { assert, describe, expect, it } from "vitest"
 import { OsmPbfBlockBuilder } from "../src/osm-pbf-block-builder"
 import { OsmPbfBlockParser } from "../src/osm-pbf-block-parser"
 import { blocksToJsonEntities } from "../src/pbf-to-json"
@@ -82,6 +82,7 @@ describe("OsmPbfBlockParser", () => {
 		})
 		const group = builder.primitivegroup[0]
 
+		assert.exists(group?.nodes[0])
 		const node = parser.parseNode(group.nodes[0], { includeInfo: true })
 		expect(node).toEqual({
 			id: 1,
@@ -118,6 +119,7 @@ describe("OsmPbfBlockParser", () => {
 			},
 		})
 
+		assert.exists(group?.ways[0])
 		const way = parser.parseWay(group.ways[0], { includeInfo: true })
 		expect(way).toEqual({
 			id: 3,
@@ -133,6 +135,7 @@ describe("OsmPbfBlockParser", () => {
 			},
 		})
 
+		assert.exists(group?.relations[0])
 		const relation = parser.parseRelation(group.relations[0], {
 			includeInfo: true,
 		})

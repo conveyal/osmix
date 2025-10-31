@@ -83,6 +83,7 @@ maplibregl.addProtocol(
 ## Environment and limitations
 
 - Requires runtimes with `OffscreenCanvas`, `ImageData`, `ImageEncoder` APIs, and typed-array support. In Node/Bun, use recent versions (Node 20+, Bun 1.0+) which expose these in workers.
+- Fallbacks: In environments without `ImageEncoder` (older Node), convert the `OffscreenCanvas` to a `Canvas` and use `canvas.toBuffer()` or `toDataURL()` shims. In browsers without `OffscreenCanvas` transfer support, render on the main thread or use `createImageBitmap` with careful memory management.
 - The MapLibre protocol helper expects URLs that exactly match the documented template; it throws on malformed paths.
 - Clipping uses the `lineclip` library and assumes geometries are provided in `[lon, lat]` order.
 

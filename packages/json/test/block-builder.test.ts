@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { assert, describe, expect, it } from "vitest"
 import { OsmPbfBlockBuilder } from "../src/osm-pbf-block-builder"
 
 const decoder = new TextDecoder()
@@ -45,6 +45,7 @@ describe("OsmPbfBlockBuilder", () => {
 			},
 		})
 
+		assert.exists(builder.primitivegroup?.[0]?.dense)
 		const dense = builder.primitivegroup[0].dense
 		expect(dense).toBeDefined()
 		expect(dense?.id).toEqual([5, 1])
@@ -101,11 +102,13 @@ describe("OsmPbfBlockBuilder", () => {
 		})
 
 		const group = builder.primitivegroup[0]
+		assert.exists(group?.ways[0])
 		expect(group.ways).toHaveLength(1)
 		expect(group.ways[0].refs).toEqual([10, 1, 4])
 		expect(group.ways[0].keys).toHaveLength(1)
 		expect(group.ways[0].vals).toHaveLength(1)
 		expect(group.relations).toHaveLength(1)
+		assert.exists(group?.relations[0])
 		expect(group.relations[0].memids).toEqual([8, 4])
 		expect(group.relations[0].roles_sid).toHaveLength(2)
 		expect(group.relations[0].types).toEqual([0, 1])

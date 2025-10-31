@@ -17,15 +17,15 @@
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
+        "@osmix/vt": "workspace:*",
         "apache-arrow": "^17.0.0",
         "comlink": "^4.4.2",
-        "maplibre-gl": "^5.9.0",
+        "maplibre-gl": "catalog:",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
         "react-map-gl": "^8.0.4",
       },
       "devDependencies": {
-        "@osmix/tsconfig": "workspace:*",
         "@types/react": "^19.2.0",
         "@types/react-dom": "^19.2.0",
         "@vitejs/plugin-react": "^5.0.4",
@@ -41,7 +41,7 @@
       "dependencies": {
         "@fontsource-variable/roboto-mono": "^5.2.5",
         "@mapbox/sphericalmercator": "catalog:",
-        "@mapbox/tilebelt": "catalog:",
+        "@mapbox/tilebelt": "^2.0.2",
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
         "@osmix/json": "workspace:*",
@@ -61,7 +61,7 @@
         "dequal": "catalog:",
         "jotai": "^2.15.0",
         "lucide-react": "^0.513.0",
-        "maplibre-gl": "^5.9.0",
+        "maplibre-gl": "catalog:",
         "native-file-system-adapter": "^3.0.1",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
@@ -70,7 +70,6 @@
         "tailwind-merge": "^3.3.0",
       },
       "devDependencies": {
-        "@osmix/tsconfig": "workspace:*",
         "@playwright/test": "^1.52.0",
         "@tailwindcss/vite": "4.1.14",
         "@types/geojson": "catalog:",
@@ -95,8 +94,6 @@
         "sweepline-intersections": "^1.5.0",
       },
       "devDependencies": {
-        "@osmix/test-utils": "workspace:*",
-        "@osmix/tsconfig": "workspace:*",
         "@types/geojson": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
@@ -114,8 +111,6 @@
         "sweepline-intersections": "^1.5.0",
       },
       "devDependencies": {
-        "@osmix/test-utils": "workspace:*",
-        "@osmix/tsconfig": "workspace:*",
         "@types/geojson": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
@@ -130,11 +125,8 @@
         "dequal": "catalog:",
       },
       "devDependencies": {
-        "@osmix/test-utils": "workspace:*",
-        "@osmix/tsconfig": "workspace:*",
         "@types/geojson": "catalog:",
         "typescript": "catalog:",
-        "vite": "catalog:",
         "vitest": "catalog:",
       },
     },
@@ -146,11 +138,8 @@
       },
       "devDependencies": {
         "@osmix/shared": "workspace:*",
-        "@osmix/test-utils": "workspace:*",
-        "@osmix/tsconfig": "workspace:*",
         "@types/node": "catalog:",
         "typescript": "catalog:",
-        "vite": "catalog:",
         "vitest": "catalog:",
       },
     },
@@ -161,10 +150,8 @@
         "@osmix/shared": "workspace:*",
       },
       "devDependencies": {
-        "@osmix/test-utils": "workspace:*",
-        "@osmix/tsconfig": "workspace:*",
         "@types/geojson": "catalog:",
-        "maplibre-gl": "^5.7.3",
+        "maplibre-gl": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -177,21 +164,9 @@
         "lineclip": "^2.0.0",
       },
       "devDependencies": {
-        "@osmix/tsconfig": "workspace:*",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
-    },
-    "packages/test-utils": {
-      "name": "@osmix/test-utils",
-      "devDependencies": {
-        "@osmix/tsconfig": "workspace:*",
-        "@types/node": "catalog:",
-        "typescript": "catalog:",
-      },
-    },
-    "packages/tsconfig": {
-      "name": "@osmix/tsconfig",
     },
     "packages/vt": {
       "name": "@osmix/vt",
@@ -205,8 +180,6 @@
       "devDependencies": {
         "@mapbox/vector-tile": "^2.0.4",
         "@osmix/core": "workspace:*",
-        "@osmix/test-utils": "workspace:*",
-        "@osmix/tsconfig": "workspace:*",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -217,11 +190,11 @@
   ],
   "catalog": {
     "@mapbox/sphericalmercator": "^2.0.2",
-    "@mapbox/tilebelt": "^2.0.2",
-    "@types/bun": "^1.3.0",
+    "@types/bun": "^1.3.1",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^24",
     "dequal": "^2.0.3",
+    "maplibre-gl": "^5.9.0",
     "pbf": "^4.0.1",
     "typescript": "^5.9.0",
     "vite": "^7.1.7",
@@ -399,10 +372,6 @@
     "@osmix/raster": ["@osmix/raster@workspace:packages/raster"],
 
     "@osmix/shared": ["@osmix/shared@workspace:packages/shared"],
-
-    "@osmix/test-utils": ["@osmix/test-utils@workspace:packages/test-utils"],
-
-    "@osmix/tsconfig": ["@osmix/tsconfig@workspace:packages/tsconfig"],
 
     "@osmix/vt": ["@osmix/vt@workspace:packages/vt"],
 

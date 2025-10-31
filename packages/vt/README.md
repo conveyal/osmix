@@ -80,9 +80,13 @@ For full map integration, serve tiles from a handler that calls `getTile([x,y,z]
 ## Environment and limitations
 
 - Designed for modern runtimes (Node 20+, Bun, browser workers). Uses typed arrays throughout.
-- Polygon handling currently assumes a single outer ring; holes/multi-polygons are TODO.
+- Polygon handling currently assumes a single outer ring; holes/multi-polygons (relations) are not encoded in v0.0.1.
 - Ways are clipped to tile bounds; nodes outside the tile are omitted.
 - Extent defaults to 4096; set a larger extent if you need higher precision.
+
+### Tags and metadata
+
+- Feature properties include the OSM tags available in the source dataset. Styling keys can be derived at ingestion time; for very large tag sets consider pre-filtering to a stable subset to keep tile size reasonable.
 
 ## See also
 

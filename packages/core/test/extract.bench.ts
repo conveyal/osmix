@@ -1,5 +1,5 @@
+import { getFixtureFile } from "@osmix/shared/test/fixtures"
 import type { GeoBbox2D } from "@osmix/shared/types"
-import { getFixtureFile } from "@osmix/test-utils/fixtures"
 import { beforeAll, bench, describe } from "vitest"
 import { Osmix } from "../src/osmix"
 

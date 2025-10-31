@@ -2,9 +2,9 @@
 	"$schema": "https://json.schemastore.org/tsconfig",
 	"display": "@osmix/tsconfig/base",
 	"compilerOptions": {
-		"outDir": "./dist",
 		"declaration": true,
 		"declarationMap": true,
+		"sourceMap": true,
 		"noEmitOnError": true,
 
 		"lib": ["ESNext"],

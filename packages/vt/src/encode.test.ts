@@ -1,6 +1,6 @@
-import { SphericalMercator } from "@mapbox/sphericalmercator"
 import { VectorTile } from "@mapbox/vector-tile"
 import { Osmix } from "@osmix/core"
+import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import Protobuf from "pbf"
 import { assert, describe, expect, it } from "vitest"
@@ -51,7 +51,8 @@ function decodeTile(data: ArrayBuffer) {
 }
 
 const extent = 4096
-const merc = new SphericalMercator({ size: extent })
+const merc = new SphericalMercatorTile({ size: extent })
+
 function pointToTile(lon: number, lat: number, z: number): Tile {
 	const [px, py] = merc.px([lon, lat], z)
 	const x = Math.floor(px / extent)

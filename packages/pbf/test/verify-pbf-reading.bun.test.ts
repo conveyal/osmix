@@ -1,4 +1,4 @@
-import { getFixtureFile } from "@osmix/test-utils/fixtures"
+import { getFixtureFile } from "@osmix/shared/test/fixtures"
 import { describe, expect, test } from "vitest"
 import { readOsmPbf } from "../src/pbf-to-blocks"
 import { isBun } from "../src/utils"

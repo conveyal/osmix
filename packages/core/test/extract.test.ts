@@ -1,5 +1,5 @@
+import { getFixtureFileReadStream } from "@osmix/shared/test/fixtures"
 import type { GeoBbox2D } from "@osmix/shared/types"
-import { getFixtureFileReadStream } from "@osmix/test-utils/fixtures"
 import { assert, test } from "vitest"
 import { Osmix } from "../src/osmix"
 
