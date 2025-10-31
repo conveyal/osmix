@@ -1,0 +1,54 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "osmix",
+	"type": "module",
+	"version": "0.0.0",
+	"description": "Full OSM toolkit for JavaScript and TypeScript",
+	"main": "./src/index.ts",
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"import": "./dist/index.js",
+				"types": "./dist/index.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
+	"sideEffects": false,
+	"scripts": {
+		"build": "tsc",
+		"bench": "vitest bench",
+		"test": "vitest",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/geojson": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"dependencies": {
+		"@osmix/core": "workspace:*",
+		"@osmix/json": "workspace:*",
+		"@osmix/pbf": "workspace:*",
+		"@osmix/raster": "workspace:*",
+		"@osmix/shared": "workspace:*",
+		"@osmix/vt": "workspace:*",
+		"@osmix/change": "workspace:*"
+	}
+}
