@@ -1,0 +1,21 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/vt-server",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "bun --hot server.ts",
+		"start": "bun server.ts",
+		"typecheck": "tsc --build --noEmit"
+	},
+	"dependencies": {
+		"@osmix/core": "workspace:*",
+		"@osmix/vt": "workspace:*",
+		"maplibre-gl": "catalog:"
+	},
+	"devDependencies": {
+		"@osmix/shared": "workspace:*",
+		"@types/bun": "catalog:",
+		"typescript": "catalog:"
+	}
+}

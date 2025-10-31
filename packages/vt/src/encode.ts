@@ -43,8 +43,8 @@ export function projectToTile(
 }
 
 export class OsmixVtEncoder {
-	private readonly nodeLayerName: string
-	private readonly wayLayerName: string
+	readonly nodeLayerName: string
+	readonly wayLayerName: string
 	private readonly osmix: Osmix
 	private readonly extent: number
 	private readonly extentBbox: [number, number, number, number]
@@ -64,7 +64,6 @@ export class OsmixVtEncoder {
 
 	getTile(tile: Tile): ArrayBuffer {
 		const sm = new SphericalMercatorTile({ size: this.extent, tile })
-		// const proj = projectToTile(tile, this.extent)
 		const bbox = sm.bbox(tile[0], tile[1], tile[2]) as GeoBbox2D
 		return this.getTileForBbox(bbox, (ll) => sm.llToTilePx(ll))
 	}

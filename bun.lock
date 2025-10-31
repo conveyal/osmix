@@ -86,6 +86,7 @@
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/vt": "workspace:*",
+        "maplibre-gl": "catalog:",
       },
       "devDependencies": {
         "@osmix/shared": "workspace:*",
