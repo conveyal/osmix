@@ -4,7 +4,7 @@ import { OsmixVtEncoder } from "@osmix/vt"
 import indexHtml from "./index.html"
 
 // Resolve the Monaco fixture path relative to the repo root
-const pbfUrl = new URL("../../fixtures/washington.osm.pbf", import.meta.url)
+const pbfUrl = new URL("../../fixtures/monaco.pbf", import.meta.url)
 let osm: Osmix | null = null
 let vt: OsmixVtEncoder | null = null
 let log: string[] = []
