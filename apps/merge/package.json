@@ -2,7 +2,6 @@
 	"$schema": "https://json.schemastore.org/package",
 	"name": "@osmix/merge",
 	"type": "module",
-	"version": "0.0.1",
 	"private": true,
 	"scripts": {
 		"build": "vite build",
