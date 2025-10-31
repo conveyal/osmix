@@ -2,6 +2,12 @@
 
 Use this document as the quick orientation for anyone touching the Osmix workspace. It highlights how the tooling fits together and which habits keep the project healthy.
 
+## Definition of Done (MUST pass)
+- `bun run typecheck` must pass with no errors.
+- `bun run lint` must pass with no violations. Use `bun run format` to auto-fix style issues, then re-run lint.
+- `bun run test` must pass and remain green across the workspace.
+- If a task introduces behavior, fixes a bug, or changes public APIs, add/extend tests accordingly.
+
 ## Architecture Overview
 - The entire merge workflow runs in-browser: Comlink workers host `@osmix/core`, `@osmix/change`, and `@osmix/raster` so the React UI stays responsive.
 - Typed arrays, string tables, and transferable buffers let large PBF extracts move between worker and main threads without expensive copies.
@@ -44,20 +50,46 @@ Use this document as the quick orientation for anyone touching the Osmix workspa
 - `bun run typecheck` runs `tsc --noEmit` for each package.
 - `bun run lint` runs Biome; `bun run format` rewrites style issues; `bun run check` runs the combined format/lint/organize pass.
 
-## Coding Style
+## Coding Style and Conventions
 - TypeScript everywhere; favor explicit exports from package entrypoints.
-- Indent with tabs in code. Keep TypeScript/CSS/code blocks under ~100 characters, but do not manually wrap Markdown prose. `no-prose-wrap`.
-- Stick to the `@osmix/<package>` naming pattern and `kebab-case` file names.
-- Before finishing work, run `bun run format`, `bun run typecheck`, and `bun run test`.
+- Indentation: use tabs in code. Keep TS/CSS/code blocks under ~100 characters. Do not manually wrap Markdown prose.
+- File names: `kebab-case`. Package names follow `@osmix/<package>`.
+- Imports: prefer explicit, named exports; avoid default exports for shared modules.
+- Organize imports and fix style via Biome (`bun run check` or `bun run format`).
 
-## Testing Guidelines
-- Use Vitest (`describe`/`it`) with helpers from `@osmix/test-utils`.
-- Name tests `<feature>.test.ts` and mirror the source directory layout.
-- Prefer small fixtures. Large PBFs belong in `fixtures/` and should stay gzipped (for example `monaco.pbf`).
-- Cover new entity transforms with serialization and round-trip parsing tests.
+### TypeScript guidelines
+- Naming: descriptive, full words. Functions are verbs; variables are nouns. Avoid 1–2 character names.
+- Types: annotate function signatures and public APIs. Avoid `any` and unsafe casts.
+- Control flow: use early returns; avoid deep nesting. Only use try/catch when you meaningfully handle exceptions.
+- Comments: write only non-obvious rationale, invariants, or caveats. Keep comments concise.
+- Formatting: match existing style; do not reformat unrelated code in edits.
 
-## Commit & PR Guidelines
-- Keep subjects concise and imperative (e.g. `Rename osm-merge -> @osmix/merge`).
-- Reference related issues and call out behavior changes or migrations in the body.
-- List verification commands and include UI screenshots or GIFs for `apps/merge` changes.
-- Coordinate cross-package updates by linking dependent PRs and noting workspace version bumps.
+### React (apps/merge)
+- Keep components pure and small. Derive UI state with Jotai atoms where appropriate.
+- Avoid expensive work on the main thread; move heavy processing to workers.
+- Use keys and memoization pragmatically; profile before optimizing.
+
+## Testing Requirements
+- Framework: Vitest with helpers from `@osmix/test-utils`.
+- Location: tests live alongside sources as `*.test.ts` mirroring directory layout.
+- Fixtures: prefer small fixtures. Large PBFs belong in `fixtures/` and stay gzipped (e.g., `monaco.pbf`).
+- Coverage targets: new logic should be covered by unit or integration tests where feasible, especially parsing, serialization, spatial queries, and merge workflows.
+
+### When to add tests
+- New features or public APIs.
+- Bug fixes (add a regression test).
+- Changes to entity transforms, serialization, or protocol parsing.
+- Performance-sensitive paths where behavior must remain stable.
+
+## PR Checklist
+- Code compiles and is formatted: `bun run format` then `bun run lint`.
+- Types are clean: `bun run typecheck`.
+- Tests are green: `bun run test` (include new tests when warranted).
+- Imports organized and unused code removed (Biome).
+- For `apps/merge` changes: include a brief note or screenshot/GIF if UI-visible.
+- Cross-package impacts noted; coordinate dependent PRs and version bumps when needed.
+
+## Commit Guidelines
+- Subject line: concise, imperative (e.g., `Add raster tile cache`).
+- Body: why and what changed, behavior changes or migrations, verification commands.
+- Reference related issues where applicable.
