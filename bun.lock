@@ -3,11 +3,9 @@
   "workspaces": {
     "": {
       "name": "osmix",
-      "dependencies": {
-        "@changesets/cli": "^2.29.7",
-      },
       "devDependencies": {
         "@biomejs/biome": "^2.3.2",
+        "@changesets/cli": "^2.29.7",
         "typescript": "catalog:",
       },
     },
@@ -124,6 +122,24 @@
         "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
         "dequal": "catalog:",
+      },
+      "devDependencies": {
+        "@types/geojson": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/osmix": {
+      "name": "osmix",
+      "version": "0.0.0",
+      "dependencies": {
+        "@osmix/change": "workspace:*",
+        "@osmix/core": "workspace:*",
+        "@osmix/json": "workspace:*",
+        "@osmix/pbf": "workspace:*",
+        "@osmix/raster": "workspace:*",
+        "@osmix/shared": "workspace:*",
+        "@osmix/vt": "workspace:*",
       },
       "devDependencies": {
         "@types/geojson": "catalog:",
@@ -880,6 +896,8 @@
     "node-domexception": ["node-domexception@1.0.0", "", {}, "sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ=="],
 
     "node-releases": ["node-releases@2.0.21", "", {}, "sha512-5b0pgg78U3hwXkCM8Z9b2FJdPZlr9Psr9V2gQPESdGHqbntyFJKFW4r5TeWGFzafGY3hzs1JC62VEQMbl1JFkw=="],
+
+    "osmix": ["osmix@workspace:packages/osmix"],
 
     "outdent": ["outdent@0.5.0", "", {}, "sha512-/jHxFIzoMXdqPzTaCpFzAAWhpkSjZPF4Vsn6jAfNpmbH/ymsmd7Qc6VE9BGn0L6YMj6uwpQLxCECpus4ukKS9Q=="],
 
