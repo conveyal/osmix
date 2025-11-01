@@ -1,6 +1,6 @@
 # Osmix
 
-Osmix is a collection of tools for reading, inspecting, and manipulating OpenStreetMap PBF data in modern JavaScript environments. The first applications built with the tools are a simple OSM PBF inspection tool and [a merge tool](https://merge.osmix.dev). The individual libraries span low-level PBF parsing, JSON transforms, and compact indexes designed for any JavaScript environment.
+Osmix is a collection of tools for reading, inspecting, and manipulating OpenStreetMap PBF data in modern JavaScript environments. The first applications built with the tools are a simple OSM PBF inspection tool and [a merge tool](https://merge.osmix.dev). The individual libraries span low-level PBF parsing, JSON transforms, and generating vector tiles for any JavaScript environment.
 
 ## Getting started
 
@@ -17,6 +17,7 @@ The workspace uses a single root `package.json` to coordinate shared scripts, de
 ### Apps
 - [apps/merge](apps/merge/README.md) – Vite + React app that compares base and patch extracts, renders MapLibre raster and vector overlays, and guides multi-step merge workflows entirely in-browser.
 - [apps/bench](apps/bench/README.md) – Experimental benchmark UI that contrasts Osmix operations with DuckDB-wasm queries using shared fixtures.
+- [apps/vt-server](apps/vt-server/README.md) - Example of using Osmix as a simple vector tile server.
 
 ### Packages
 - [packages/core](packages/core/README.md) – Core `Osmix` engine for ingesting PBF streams, building spatial indexes, and emitting JSON, PBF, or vector and raster tiles.
@@ -26,7 +27,6 @@ The workspace uses a single root `package.json` to coordinate shared scripts, de
 - [packages/raster](packages/raster/README.md) – Canvas-based raster tile renderer and MapLibre protocol built for `@osmix/core` datasets.
 - [packages/vt](packages/vt/README.md) – Encodes Osmix binary overlays directly into Mapbox Vector Tiles with caching helpers.
 - [packages/shared](packages/shared/README.md) – Small geometry utilities (`haversineDistance`, `clipPolyline`) shared across packages.
-- [packages/test-utils](packages/test-utils/README.md) – Shared Vitest fixtures and helpers used across packages.
 
 ### Development
 - `fixtures/` – sample extracts referenced by integration tests and the merge app.
