@@ -1,0 +1,16 @@
+name: CI Checks
+
+runs:
+  using: composite
+  steps:
+    - name: Type check
+      run: bun run typecheck
+
+    - name: Lint (Biome)
+      run: bun run lint . --reporter github
+
+    - name: Biome checks
+      run: bun run check . --reporter github
+
+    - name: Run tests
+      run: bun run test
