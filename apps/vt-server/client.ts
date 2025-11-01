@@ -1,78 +1,34 @@
-import maplibregl, {
-	type CircleLayerSpecification,
-	type ControlPosition,
-	type LineLayerSpecification,
-} from "maplibre-gl"
-
-declare global {
-	interface Window {
-		MAP: maplibregl.Map
-	}
-}
+import maplibregl, { type ControlPosition } from "maplibre-gl"
+import { nodesPaint, waysOutlinePaint, waysPaint } from "./map-style"
 
 const map = new maplibregl.Map({
 	container: "map",
 	style: "https://tiles.openfreemap.org/styles/positron",
 	zoom: 13,
 })
-window.MAP = map
 
+const $log = document.getElementById("log")! as HTMLDialogElement
 const $entity = addMapControl("entity", "bottom-left")
 const $info = addMapControl("info", "top-left")
 const $layerControl = addMapControl("layer-control", "top-right")
 $info.innerHTML = `
-            <header>OSMIX VT SERVER DEMO</header>
-			<p>This page is a demo showing a server parsing the OSM PBF and generating vector tiles on the fly.</p>
-			<p>See the code on <a href="https://github.com/conveyal/osmix" target="_blank">GitHub</a></p>
-			<hr />
-            <div id="meta">Loading...</div>
-            `
+    <header>OSMIX VT SERVER DEMO</header>
+	<p>This page is a demo showing a server parsing the OSM PBF and generating vector tiles on the fly.</p>
+	<p>See the code on <a href="https://github.com/conveyal/osmix" target="_blank">GitHub</a></p>
+	<hr />
+`
+const $meta = document.createElement("div")
+$meta.id = "meta"
+$meta.textContent = "Loading..."
+$info.append($meta)
 
-map.on("styledata", updateLayerControl)
+map.once("styledata", updateLayerControl)
 
 waitForServerReady()
 
-const waysOutlinePaint: LineLayerSpecification["paint"] = {
-	"line-color": "#99a1af",
-	"line-width": ["interpolate", ["linear"], ["zoom"], 12, 1, 14, 3, 18, 15],
-	"line-opacity": [
-		"case",
-		["boolean", ["feature-state", "hover"], false],
-		1,
-		0.5,
-	],
-}
-
-const waysPaint: LineLayerSpecification["paint"] = {
-	"line-color": [
-		"case",
-		["boolean", ["feature-state", "hover"], false],
-		"#ef4444",
-		"#3b82f6",
-	],
-	"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 2, 18, 10],
-	"line-opacity": [
-		"case",
-		["boolean", ["feature-state", "hover"], false],
-		1,
-		0.5,
-	],
-}
-
-const nodesPaint: CircleLayerSpecification["paint"] = {
-	"circle-color": "white",
-	"circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 3, 18, 6],
-	"circle-stroke-color": ["rgba", 0, 0, 0, 0.5],
-	"circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 2],
-	"circle-opacity": [
-		"case",
-		["boolean", ["feature-state", "hover"], false],
-		1,
-		0.5,
-	],
-}
-
-const $log = document.getElementById("log")! as HTMLDialogElement
+/**
+ * On initial load, the server needs to process the PBF in order to be ready to serve tiles.
+ */
 async function waitForServerReady() {
 	try {
 		const res = await fetch("/ready")
@@ -90,6 +46,9 @@ async function waitForServerReady() {
 	}
 }
 
+/**
+ * Once the server is ready, we can remove the dialog and show the OSM map.
+ */
 async function loadNewOsmMap() {
 	const res = await fetch("/meta.json")
 	const meta = await res.json()
@@ -97,15 +56,18 @@ async function loadNewOsmMap() {
 		padding: 100,
 		duration: 200,
 	})
-	document.getElementById("meta")!.innerHTML = `
-<table><tbody>
-<tr><td>pbf bbox</td><td>${meta.bbox.join(", ")}</td></tr>
-</tbody>
-</table>
+	$meta.innerHTML = `
+		<table>
+			<tbody>
+				<tr>
+					<td>pbf bbox</td>
+					<td>${meta.bbox.join(", ")}</td>
+				</tr>
+			</tbody>
+		</table>
     `
 
 	function addSourcesAndLayers() {
-		console.log("adding sources and layers")
 		const sourceId = "osmix"
 		const beforeId = map
 			.getLayersOrder()
@@ -190,7 +152,7 @@ async function loadNewOsmMap() {
 	if (map.isStyleLoaded()) {
 		addSourcesAndLayers()
 	} else {
-		map.on("load", addSourcesAndLayers)
+		map.once("load", addSourcesAndLayers)
 	}
 }
 
@@ -200,38 +162,45 @@ function featureToHtml(feature: {
 	geometry: GeoJSON.Geometry
 }) {
 	const propKeys = Object.keys(feature.properties).sort()
+	const rows = propKeys.map(
+		(key) => `
+		<tr>
+			<td>${key}</td>
+			<td>${feature.properties[key]}</td>
+		</tr>
+	`,
+	)
 	const html = `
-<header>${feature.properties.type}/${feature.id}</header>
-<hr />
-<table>
-<tbody>
-${propKeys.map((key) => `<tr><td>${key}</td><td>${feature.properties[key]}</td></tr>`).join("")}
-</tbody>
-</table>
+		<header>${feature.properties.type}/${feature.id}</header>
+		<hr />
+		<table>
+			<tbody>
+				${rows.join()}
+			</tbody>
+		</table>
     `
 	return html
 }
 
 function updateLayerControl() {
 	const layers = map.getLayersOrder().filter(([id]) => id != null)
+	const rows = layers.map(
+		(layer) => `
+		<label>
+			<input 
+				name="${layer}" 
+				type="checkbox" 
+				${map.getLayoutProperty(layer, "visibility") !== "none" ? "checked" : ""} 
+			/> ${layer}
+		</label>
+	`,
+	)
 	const html = `
-        <div>
-        <header>LAYERS</header>
-        <hr />
-        ${layers.map((layer) => `<label><input name="${layer}" type="checkbox" ${map.getLayoutProperty(layer, "visibility") !== "none" ? "checked" : ""} /> ${layer}</label>`).join("")}
-        </div>
-        `
+			<header>LAYERS</header>
+			<hr />
+			${rows.join("")}
+    `
 	$layerControl.innerHTML = html
-	$layerControl.querySelectorAll("input").forEach((input) => {
-		input.addEventListener("change", (e) => {
-			const target = e.target as HTMLInputElement
-			map.setLayoutProperty(
-				target.name,
-				"visibility",
-				target.checked ? "visible" : "none",
-			)
-		})
-	})
 }
 
 function addMapControl(id: string, placement: ControlPosition) {
@@ -249,3 +218,14 @@ function addMapControl(id: string, placement: ControlPosition) {
 	)
 	return $control
 }
+
+document.addEventListener("change", (e) => {
+	const target = e.target as HTMLInputElement
+	if (target.parentElement?.parentElement?.id === "layer-control") {
+		map.setLayoutProperty(
+			target.name,
+			"visibility",
+			target.checked ? "visible" : "none",
+		)
+	}
+})
