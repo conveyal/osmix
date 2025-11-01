@@ -34,6 +34,7 @@
 	"scripts": {
 		"build": "tsc",
 		"bench": "vitest bench",
+		"prepublishOnly": "tsc",
 		"test": "vitest",
 		"typecheck": "tsc --noEmit"
 	},

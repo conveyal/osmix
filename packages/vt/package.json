@@ -33,6 +33,7 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "tsc",
+		"prepublishOnly": "tsc",
 		"test": "vitest",
 		"typecheck": "tsc --noEmit"
 	},
