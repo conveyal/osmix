@@ -1,71 +1,58 @@
-import "./decompression-stream-polyfill" // Required for Bun
-import { Osmix } from "@osmix/core"
-import { OsmixVtEncoder } from "@osmix/vt"
+import os from "node:os"
+import type { Remote } from "comlink"
 import indexHtml from "./index.html"
+import { createOsmixWorker } from "./osmix.worker"
+import { createVtWorker, type VtWorker } from "./vt.worker"
 
-// Resolve the Monaco fixture path relative to the repo root
-const pbfUrl = new URL("../../fixtures/monaco.pbf", import.meta.url)
-let osm: Osmix | null = null
-let vt: OsmixVtEncoder | null = null
-let log: string[] = []
-let isReady = false
-
-async function loadPbf(pbf: ReadableStream<Uint8Array<ArrayBufferLike>>) {
-	isReady = false
-	osm = new Osmix()
-	vt = new OsmixVtEncoder(osm)
-	log = []
-
-	osm.setLogger((msg) => log.push(msg))
-	await osm.readPbf(pbf)
-	osm.buildSpatialIndexes()
-	isReady = true
+const Osmix = createOsmixWorker()
+const vts: Remote<VtWorker>[] = []
+for (let i = 0; i < os.cpus().length; i++) {
+	vts.push(createVtWorker())
 }
+let vtIndex = 0
+const getVt = () => vts[vtIndex++ % vts.length]
+
+// Print number of VT workers available
+console.log(`Number of VT workers available: ${vts.length}`)
 
 const server = Bun.serve({
 	port: process.env.PORT ? Number(process.env.PORT) : 3000,
+	idleTimeout: 255, // 5 minutes
 	development: true,
 	routes: {
 		"/": indexHtml,
 		"/index.html": indexHtml,
-		"/api/pbf	": {
-			POST: async (req) => {
-				const stream = req.body
-				if (stream == null) {
-					return Response.json({ error: "No body" }, { status: 400 })
-				}
-				loadPbf(stream)
-				return Response.json({ ready: false, log }, { status: 200 })
-			},
-		},
-		"/ready": () => {
-			return Response.json({ ready: isReady, log }, { status: 200 })
+		"/ready": async () => {
+			const ready = await Osmix.ready()
+			const log = await Osmix.getLog()
+			return Response.json({ ready, log }, { status: 200 })
 		},
 		"/meta.json": async () => {
-			if (osm?.header == null || vt == null) {
-				return new Response(null, { status: 202 })
-			}
-			const bbox = osm.bbox()
-			const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
-			return Response.json({
-				bbox,
-				center,
-				nodeLayerName: vt.nodeLayerName,
-				wayLayerName: vt.wayLayerName,
-			})
+			const metadata = await Osmix.getMetadata()
+			const vtMetadata = await getVt().getMetadata()
+			return Response.json({ ...metadata, ...vtMetadata }, { status: 200 })
 		},
 		"/tiles/:z/:x/:y": async (req) => {
-			if (!isReady || vt == null) {
-				return new Response(null, { status: 202 })
+			try {
+				console.time(req.url)
+				const tile = await getVt().getTile([
+					+req.params.x,
+					+req.params.y,
+					+req.params.z,
+				])
+				console.timeEnd(req.url)
+				return new Response(tile, {
+					headers: {
+						"content-type": "application/vnd.mapbox-vector-tile",
+					},
+				})
+			} catch (error) {
+				console.error(error)
+				return Response.json(
+					{ error: "Internal server error", message: (error as Error).message },
+					{ status: 500 },
+				)
 			}
-			console.time(req.url)
-			const tile = vt.getTile([+req.params.x, +req.params.y, +req.params.z])
-			console.timeEnd(req.url)
-			return new Response(tile, {
-				headers: {
-					"content-type": "application/vnd.mapbox-vector-tile",
-				},
-			})
 		},
 	},
 	fetch: async () => {
@@ -75,4 +62,13 @@ const server = Bun.serve({
 
 console.log(`Vector tile server running at http://localhost:${server.port}`)
 
-loadPbf(Bun.file(pbfUrl).stream())
+async function init() {
+	Bun.gc()
+	const transferables = await Osmix.init()
+	for (const vt of vts) {
+		await vt.init(transferables)
+	}
+	console.log("VTs initialized")
+}
+
+init()

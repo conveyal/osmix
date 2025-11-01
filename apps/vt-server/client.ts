@@ -1,5 +1,6 @@
 import maplibregl, {
 	type CircleLayerSpecification,
+	type ControlPosition,
 	type LineLayerSpecification,
 } from "maplibre-gl"
 
@@ -16,48 +17,18 @@ const map = new maplibregl.Map({
 })
 window.MAP = map
 
-map.addControl(
-	{
-		onAdd() {
-			const $entity = document.createElement("div")
-			$entity.id = "entity"
-			$entity.className = "map-control"
-			return $entity
-		},
-		onRemove() {
-			const $entity = document.getElementById("entity")
-			if ($entity) {
-				$entity.remove()
-			}
-		},
-	},
-	"bottom-left",
-)
-
-map.addControl(
-	{
-		onAdd() {
-			const $info = document.createElement("div")
-			$info.id = "info"
-			$info.className = "map-control"
-			$info.innerHTML = `
+const $entity = addMapControl("entity", "bottom-left")
+const $info = addMapControl("info", "top-left")
+const $layerControl = addMapControl("layer-control", "top-right")
+$info.innerHTML = `
             <header>OSMIX VT SERVER DEMO</header>
-            <hr />
+			<p>This page is a demo showing a server parsing the OSM PBF and generating vector tiles on the fly.</p>
+			<p>See the code on <a href="https://github.com/conveyal/osmix" target="_blank">GitHub</a></p>
+			<hr />
             <div id="meta">Loading...</div>
             `
-			return $info
-		},
-		onRemove() {
-			const $info = document.getElementById("info")
-			if ($info) {
-				$info.remove()
-			}
-		},
-	},
-	"top-left",
-)
 
-addLayerControl()
+map.on("styledata", updateLayerControl)
 
 waitForServerReady()
 
@@ -129,13 +100,12 @@ async function loadNewOsmMap() {
 	document.getElementById("meta")!.innerHTML = `
 <table><tbody>
 <tr><td>pbf bbox</td><td>${meta.bbox.join(", ")}</td></tr>
-<tr><td>node layer</td><td>${meta.nodeLayerName}</td></tr>
-<tr><td>way layer</td><td>${meta.wayLayerName}</td></tr>
 </tbody>
 </table>
     `
-	map.on("load", () => {
-		console.log("load complete, adding sources and layers")
+
+	function addSourcesAndLayers() {
+		console.log("adding sources and layers")
 		const sourceId = "osmix"
 		const beforeId = map
 			.getLayersOrder()
@@ -187,8 +157,6 @@ async function loadNewOsmMap() {
 		)
 
 		const canvas = map.getCanvas()
-		const $entity = document.getElementById("entity")
-		if (!$entity) return
 		map.on("mouseover", ["@osmix:ways", "@osmix:nodes"], (e) => {
 			canvas.style.cursor = "pointer"
 			const features = e.features
@@ -217,7 +185,13 @@ async function loadNewOsmMap() {
 		map.on("mouseout", ["@osmix:ways", "@osmix:nodes"], (e) => {
 			canvas.style.cursor = ""
 		})
-	})
+	}
+
+	if (map.isStyleLoaded()) {
+		addSourcesAndLayers()
+	} else {
+		map.on("load", addSourcesAndLayers)
+	}
 }
 
 function featureToHtml(feature: {
@@ -238,44 +212,40 @@ ${propKeys.map((key) => `<tr><td>${key}</td><td>${feature.properties[key]}</td><
 	return html
 }
 
-function addLayerControl() {
-	const $layerControl = document.createElement("div")
-	$layerControl.className = "map-control"
-
-	function updateLayerControl() {
-		const layers = map.getLayersOrder().filter(([id]) => id != null)
-		const html = `
+function updateLayerControl() {
+	const layers = map.getLayersOrder().filter(([id]) => id != null)
+	const html = `
         <div>
         <header>LAYERS</header>
         <hr />
         ${layers.map((layer) => `<label><input name="${layer}" type="checkbox" ${map.getLayoutProperty(layer, "visibility") !== "none" ? "checked" : ""} /> ${layer}</label>`).join("")}
         </div>
         `
-		$layerControl.innerHTML = html
-		$layerControl.querySelectorAll("input").forEach((input) => {
-			input.addEventListener("change", (e) => {
-				const target = e.target as HTMLInputElement
-				map.setLayoutProperty(
-					target.name,
-					"visibility",
-					target.checked ? "visible" : "none",
-				)
-			})
+	$layerControl.innerHTML = html
+	$layerControl.querySelectorAll("input").forEach((input) => {
+		input.addEventListener("change", (e) => {
+			const target = e.target as HTMLInputElement
+			map.setLayoutProperty(
+				target.name,
+				"visibility",
+				target.checked ? "visible" : "none",
+			)
 		})
-	}
+	})
+}
 
+function addMapControl(id: string, placement: ControlPosition) {
+	const $control = document.createElement("div")
+	$control.id = id
+	$control.className = "map-control"
 	map.addControl(
 		{
 			onAdd() {
-				map.on("styledata", updateLayerControl)
-				map.on("load", updateLayerControl)
-				updateLayerControl()
-				return $layerControl
+				return $control
 			},
-			onRemove() {
-				//
-			},
+			onRemove() {},
 		},
-		"top-right",
+		placement,
 	)
+	return $control
 }

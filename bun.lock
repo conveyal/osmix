@@ -86,6 +86,7 @@
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/vt": "workspace:*",
+        "comlink": "^4.4.2",
         "maplibre-gl": "catalog:",
       },
       "devDependencies": {
