@@ -1,3 +1,4 @@
+import type { OsmPbfBlock } from "@osmix/pbf"
 import { createSampleHeader } from "@osmix/pbf/test/helpers"
 import { assert, describe, expect, it } from "vitest"
 import {
@@ -41,10 +42,12 @@ describe("json-to-pbf", () => {
 	}
 
 	it("yields grouped blocks", async () => {
-		const blocks = await Array.fromAsync(
-			jsonEntitiesToBlocks(entityGenerator([...nodes, way, relation])),
-		)
-
+		const blocks: OsmPbfBlock[] = []
+		for await (const block of jsonEntitiesToBlocks(
+			entityGenerator([...nodes, way, relation]),
+		)) {
+			blocks.push(block)
+		}
 		expect(blocks).toHaveLength(3)
 
 		const nodeBlock = blocks[0]

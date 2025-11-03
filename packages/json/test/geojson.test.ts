@@ -14,9 +14,12 @@ describe("geojson", () => {
 			const header = (await osmGenerator.next()).value
 			assert.deepEqual(header.bbox, pbf.bbox)
 
-			const entities = await Array.fromAsync(
-				osmGenerator as AsyncGenerator<OsmEntity>,
-			)
+			const entities: OsmEntity[] = []
+			for await (const entity of osmGenerator) {
+				if ("id" in entity) {
+					entities.push(entity)
+				}
+			}
 
 			// Check that all features are valid GeoJSON and have unique IDs
 			const nodeMap = new Map<number, OsmNode>()
