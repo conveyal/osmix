@@ -2,7 +2,7 @@
 	"$schema": "https://json.schemastore.org/package",
 	"name": "osmix",
 	"type": "module",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "Full OSM toolkit for JavaScript and TypeScript",
 	"main": "./src/index.ts",
 	"publishConfig": {
