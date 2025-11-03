@@ -1,4 +1,3 @@
-import "./decompression-stream-polyfill"
 import { Osmix } from "@osmix/core"
 import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import * as Comlink from "comlink"

@@ -51,6 +51,16 @@ export function isBun(): boolean {
 export async function webDecompress(
 	data: Uint8Array<ArrayBuffer>,
 ): Promise<Uint8Array<ArrayBuffer>> {
+	if (isBun()) {
+		const { inflate } = await import("node:zlib")
+		const result = await new Promise<Uint8Array>((resolve, reject) => {
+			inflate(data, (error, result) => {
+				if (error) reject(error)
+				else resolve(new Uint8Array(result))
+			})
+		})
+		return result as unknown as Uint8Array<ArrayBuffer>
+	}
 	return transformBytes(data, new DecompressionStream("deflate"))
 }
 
@@ -60,6 +70,16 @@ export async function webDecompress(
 export async function webCompress(
 	data: Uint8Array<ArrayBuffer>,
 ): Promise<Uint8Array<ArrayBuffer>> {
+	if (isBun()) {
+		const { deflate } = await import("node:zlib")
+		const result = await new Promise<Uint8Array>((resolve, reject) => {
+			deflate(data, (error, result) => {
+				if (error) reject(error)
+				else resolve(new Uint8Array(result))
+			})
+		})
+		return result as unknown as Uint8Array<ArrayBuffer>
+	}
 	return transformBytes(data, new CompressionStream("deflate"))
 }
 

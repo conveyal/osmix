@@ -1,6 +1,5 @@
-import type { OsmixTransferables } from "@osmix/core/src/osmix"
-import "./decompression-stream-polyfill"
 import { Osmix } from "@osmix/core"
+import type { OsmixTransferables } from "@osmix/core/src/osmix"
 import type { Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import * as Comlink from "comlink"

@@ -1,37 +1,12 @@
 import { describe, expect, test } from "vitest"
-import { concatUint8, isBun, toAsyncGenerator, uint32BE } from "../src/utils"
-
-/**
- * Bun decompress.
- */
-async function bunDecompress(
-	data: Uint8Array<ArrayBuffer>,
-): Promise<Uint8Array<ArrayBuffer>> {
-	const { inflate } = await import("node:zlib")
-	const result = await new Promise<ArrayBuffer>((resolve, reject) => {
-		inflate(data, (error, result) => {
-			if (error) reject(error)
-			else resolve(result.buffer as ArrayBuffer)
-		})
-	})
-	return new Uint8Array(result)
-}
-
-/**
- * Bun compression.
- */
-export async function bunCompress(
-	data: Uint8Array<ArrayBuffer>,
-): Promise<Uint8Array<ArrayBuffer>> {
-	const { deflate } = await import("node:zlib")
-	const result = await new Promise<ArrayBuffer>((resolve, reject) => {
-		deflate(data, (error, result) => {
-			if (error) reject(error)
-			else resolve(result.buffer as ArrayBuffer)
-		})
-	})
-	return new Uint8Array(result)
-}
+import {
+	concatUint8,
+	isBun,
+	toAsyncGenerator,
+	uint32BE,
+	webCompress,
+	webDecompress,
+} from "../src/utils"
 
 describe.runIf(isBun())("utils", () => {
 	test("wraps values into an async generator", async () => {
@@ -72,31 +47,6 @@ describe.runIf(isBun())("utils", () => {
 		expect(uint32BE(0x01020304)).toEqual(Uint8Array.of(1, 2, 3, 4))
 	})
 
-	test("compresses and decompresses data with deflate", async () => {
-		const input = new TextEncoder().encode("osmix") as Uint8Array<ArrayBuffer>
-		const compressed = await bunCompress(input)
-		expect(compressed).not.toEqual(input)
-		const decompressed = await bunDecompress(compressed)
-		expect(decompressed).toEqual(input)
-	})
-
-	test("compresses and decompresses larger data", async () => {
-		const input = new TextEncoder().encode(
-			"a".repeat(1000),
-		) as Uint8Array<ArrayBuffer>
-		const compressed = await bunCompress(input)
-		expect(compressed.length).toBeLessThan(input.length)
-		const decompressed = await bunDecompress(compressed)
-		expect(decompressed).toEqual(input)
-	})
-
-	test("handles Uint8Array input", async () => {
-		const input = Uint8Array.of(1, 2, 3, 4, 5)
-		const compressed = await bunCompress(input)
-		const decompressed = await bunDecompress(compressed)
-		expect(decompressed).toEqual(input)
-	})
-
 	test("uses Bun runtime with Node.js zlib compatibility", () => {
 		// This test verifies that Bun is available in the runtime
 		expect(isBun()).toBe(true)
@@ -122,7 +72,7 @@ describe.runIf(isBun())("utils", () => {
 		) as Uint8Array<ArrayBuffer>
 
 		// Compress with our function
-		const ourCompressed = await bunCompress(input)
+		const ourCompressed = await webCompress(input)
 
 		// Decompress with Node.js zlib (what OSM PBF uses)
 		const decompressedWithNodeZlib = inflateSync(ourCompressed)
@@ -132,7 +82,7 @@ describe.runIf(isBun())("utils", () => {
 		const nodeCompressed = deflateSync(input)
 
 		// Decompress with our function
-		const decompressedWithOurs = await bunDecompress(
+		const decompressedWithOurs = await webDecompress(
 			new Uint8Array(nodeCompressed),
 		)
 		expect(decompressedWithOurs).toEqual(input)
@@ -161,7 +111,7 @@ describe.skip("CompressionStream polyfill", () => {
 		expect(compressed).not.toEqual(input)
 
 		// Verify it's valid deflate data by decompressing
-		const decompressed = await bunDecompress(new Uint8Array(compressed))
+		const decompressed = await webDecompress(new Uint8Array(compressed))
 		expect(decompressed).toEqual(input)
 	})
 
@@ -206,7 +156,7 @@ describe.skip("CompressionStream polyfill", () => {
 		}
 
 		const compressed = concatUint8(...chunks)
-		const decompressed = await bunDecompress(new Uint8Array(compressed))
+		const decompressed = await webDecompress(new Uint8Array(compressed))
 		expect(new TextDecoder().decode(decompressed)).toBe("first second third")
 	})
 })
@@ -216,7 +166,7 @@ describe.skip("DecompressionStream polyfill", () => {
 		const input = new TextEncoder().encode(
 			"test decompression stream",
 		) as Uint8Array<ArrayBuffer>
-		const compressed = await bunCompress(input)
+		const compressed = await webCompress(input)
 
 		const decompressor = new DecompressionStream("deflate")
 		const writer = decompressor.writable.getWriter()
@@ -239,7 +189,7 @@ describe.skip("DecompressionStream polyfill", () => {
 		const input = new TextEncoder().encode(
 			"type safety check",
 		) as Uint8Array<ArrayBuffer>
-		const compressed = await bunCompress(input)
+		const compressed = await webCompress(input)
 
 		const decompressor = new DecompressionStream("deflate")
 		const writer = decompressor.writable.getWriter()
@@ -264,7 +214,7 @@ describe.skip("DecompressionStream polyfill", () => {
 		const input = new TextEncoder().encode(
 			"test chunked data",
 		) as Uint8Array<ArrayBuffer>
-		const compressed = await bunCompress(input)
+		const compressed = await webCompress(input)
 
 		const decompressor = new DecompressionStream("deflate")
 		const writer = decompressor.writable.getWriter()
