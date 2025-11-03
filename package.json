@@ -34,7 +34,7 @@
 		"lint": "biome lint --write --unsafe .",
 		"test": "bun --filter '*' test --silent",
 		"typecheck": "bun --filter '*' typecheck",
-		"release": "bun changeset version && bun changeset publish"
+		"release": "changeset version && changeset publish"
 	},
 	"trustedDependencies": [
 		"@tailwindcss/oxide"
