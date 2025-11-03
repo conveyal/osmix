@@ -1,3 +1,5 @@
+import type { OsmPbfHeaderBlock } from "@osmix/pbf"
+import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
 import maplibregl, { type ControlPosition } from "maplibre-gl"
 import { nodesPaint, waysOutlinePaint, waysPaint } from "./map-style"
 
@@ -51,20 +53,38 @@ async function waitForServerReady() {
  */
 async function loadNewOsmMap() {
 	const res = await fetch("/meta.json")
-	const meta = await res.json()
+	const meta: {
+		bbox: GeoBbox2D
+		center: LonLat
+		filename: string
+		header: OsmPbfHeaderBlock
+		wayLayerName: string
+		nodeLayerName: string
+	} = await res.json()
 	map.fitBounds(meta.bbox, {
 		padding: 100,
 		duration: 200,
 	})
 	$meta.innerHTML = `
-		<table>
-			<tbody>
-				<tr>
-					<td>pbf bbox</td>
-					<td>${meta.bbox.join(", ")}</td>
-				</tr>
-			</tbody>
-		</table>
+		<dl>
+			<dt>filename</dt>
+			<dd>${meta.filename}</dd>
+
+			<dt>writingprogram</dt>
+			<dd>${meta.header.writingprogram}</dd>
+
+			<dt>required features</dt>
+			<dd>${meta.header.required_features.join(", ")}</dd>
+
+			<dt>optional features</dt>
+			<dd>${meta.header.optional_features.join(", ")}</dd>
+
+			<dt title="osmosis replication timestamp">timestamp</dt>
+			<dd>${new Date(meta.header.osmosis_replication_timestamp ?? 0).toISOString()}</dd>
+
+			<dt>bbox</dt>
+			<dd>${meta.bbox.join(", ")}</dd>
+		</dl>
     `
 
 	function addSourcesAndLayers() {
@@ -144,7 +164,7 @@ async function loadNewOsmMap() {
 				$entity.innerHTML = html
 			}
 		})
-		map.on("mouseout", ["@osmix:ways", "@osmix:nodes"], (e) => {
+		map.on("mouseout", ["@osmix:ways", "@osmix:nodes"], () => {
 			canvas.style.cursor = ""
 		})
 	}
@@ -175,7 +195,7 @@ function featureToHtml(feature: {
 		<hr />
 		<table>
 			<tbody>
-				${rows.join()}
+				${rows.join("")}
 			</tbody>
 		</table>
     `

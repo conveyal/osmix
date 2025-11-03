@@ -4,6 +4,11 @@ import indexHtml from "./index.html"
 import { createOsmixWorker } from "./osmix.worker"
 import { createVtWorker, type VtWorker } from "./vt.worker"
 
+const filename = "monaco.pbf"
+
+// Resolve the Monaco fixture path relative to the repo root
+const pbfUrl = new URL(`../../fixtures/${filename}`, import.meta.url)
+
 const Osmix = createOsmixWorker()
 const vts: Remote<VtWorker>[] = []
 for (let i = 0; i < os.cpus().length; i++) {
@@ -30,7 +35,10 @@ const server = Bun.serve({
 		"/meta.json": async () => {
 			const metadata = await Osmix.getMetadata()
 			const vtMetadata = await getVt().getMetadata()
-			return Response.json({ ...metadata, ...vtMetadata }, { status: 200 })
+			return Response.json(
+				{ filename, ...metadata, ...vtMetadata },
+				{ status: 200 },
+			)
 		},
 		"/tiles/:z/:x/:y": async (req) => {
 			try {
@@ -63,8 +71,7 @@ const server = Bun.serve({
 console.log(`Vector tile server running at http://localhost:${server.port}`)
 
 async function init() {
-	Bun.gc()
-	const transferables = await Osmix.init()
+	const transferables = await Osmix.init(pbfUrl.pathname)
 	for (const vt of vts) {
 		await vt.init(transferables)
 	}

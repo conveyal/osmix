@@ -1,9 +1,7 @@
 import "./decompression-stream-polyfill"
 import { Osmix } from "@osmix/core"
+import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import * as Comlink from "comlink"
-
-// Resolve the Monaco fixture path relative to the repo root
-const pbfUrl = new URL("../../fixtures/monaco.pbf", import.meta.url)
 
 export class OsmixWorker {
 	private isReady = false
@@ -26,8 +24,8 @@ export class OsmixWorker {
 		return this.log
 	}
 
-	async init() {
-		await this.osm.readPbf(Bun.file(pbfUrl).stream())
+	async init(fileUrl: string) {
+		await this.osm.readPbf(Bun.file(fileUrl).stream())
 		this.osm.buildSpatialIndexes()
 		this.isReady = true
 		return this.osm.transferables()
@@ -40,6 +38,7 @@ export class OsmixWorker {
 		return {
 			bbox,
 			center,
+			header: this.osm.header as OsmPbfHeaderBlock,
 		}
 	}
 }

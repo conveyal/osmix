@@ -16,6 +16,7 @@
 	},
 	"devDependencies": {
 		"@osmix/shared": "workspace:*",
+		"@osmix/pbf": "workspace:*",
 		"@types/bun": "catalog:",
 		"typescript": "catalog:"
 	}

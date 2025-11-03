@@ -89,3 +89,24 @@ td:nth-of-type(2):before {
 #entity:empty {
 	display: none;
 }
+
+dl {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	margin: 0;
+
+	dt {
+		font-weight: bold;
+		text-transform: uppercase;
+		margin-top: 0.5rem;
+	}
+
+	dt:first-of-type {
+		margin-top: 0;
+	}
+
+	dd {
+		margin-left: 0;
+	}
+}
