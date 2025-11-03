@@ -5,6 +5,9 @@
 		"clientKind": "git",
 		"useIgnoreFile": true
 	},
+	"formatter": {
+		"enabled": true
+	},
 	"javascript": {
 		"formatter": {
 			"semicolons": "asNeeded"

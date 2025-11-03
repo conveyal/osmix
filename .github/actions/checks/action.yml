@@ -4,13 +4,17 @@ runs:
   using: composite
   steps:
     - name: Type check
+      shell: bash
       run: bun run typecheck
 
     - name: Lint (Biome)
+      shell: bash
       run: bun run lint . --reporter github
 
     - name: Biome checks
+      shell: bash
       run: bun run check . --reporter github
 
     - name: Run tests
+      shell: bash
       run: bun run test
