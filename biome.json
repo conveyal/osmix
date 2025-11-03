@@ -44,6 +44,12 @@
 				"noInferrableTypes": "error",
 				"noUselessElse": "error",
 				"noNonNullAssertion": "off"
+			},
+			"suspicious": {
+				"noTsIgnore": {
+					"level": "warn",
+					"fix": "none"
+				}
 			}
 		}
 	}
