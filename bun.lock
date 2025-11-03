@@ -90,6 +90,7 @@
         "maplibre-gl": "catalog:",
       },
       "devDependencies": {
+        "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
         "@types/bun": "catalog:",
         "typescript": "catalog:",
