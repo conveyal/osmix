@@ -109,6 +109,7 @@
       },
       "devDependencies": {
         "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -126,6 +127,7 @@
       },
       "devDependencies": {
         "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -140,6 +142,7 @@
       },
       "devDependencies": {
         "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -158,6 +161,7 @@
       },
       "devDependencies": {
         "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -183,6 +187,7 @@
       },
       "devDependencies": {
         "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
         "maplibre-gl": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
@@ -196,6 +201,7 @@
         "lineclip": "^2.0.0",
       },
       "devDependencies": {
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -211,6 +217,7 @@
       "devDependencies": {
         "@mapbox/vector-tile": "^2.0.4",
         "@osmix/core": "workspace:*",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },

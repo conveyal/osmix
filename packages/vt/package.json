@@ -45,6 +45,7 @@
 	"devDependencies": {
 		"@mapbox/vector-tile": "^2.0.4",
 		"@osmix/core": "workspace:*",
+		"@types/node": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	}

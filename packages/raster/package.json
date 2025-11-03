@@ -40,9 +40,10 @@
 	},
 	"devDependencies": {
 		"@types/geojson": "catalog:",
+		"@types/node": "catalog:",
+		"maplibre-gl": "catalog:",
 		"typescript": "catalog:",
-		"vitest": "catalog:",
-		"maplibre-gl": "catalog:"
+		"vitest": "catalog:"
 	},
 	"dependencies": {
 		"@osmix/shared": "workspace:*"

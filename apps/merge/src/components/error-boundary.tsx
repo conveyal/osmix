@@ -21,7 +21,7 @@ export class ErrorBoundary extends React.Component<
 		return { error, info }
 	}
 
-	componentDidCatch(error: Error, info: React.ErrorInfo) {
+	override componentDidCatch(error: Error, info: React.ErrorInfo) {
 		Log.addMessage(error.message, "error")
 		console.error(
 			error,
@@ -36,7 +36,7 @@ export class ErrorBoundary extends React.Component<
 		)
 	}
 
-	render() {
+	override render() {
 		if (this.state.error) {
 			// You can render any custom fallback UI
 			return (
