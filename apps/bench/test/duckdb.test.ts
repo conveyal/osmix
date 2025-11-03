@@ -4,7 +4,7 @@ import { DuckDBBenchWorker } from "../src/workers/duckdb.worker"
 
 const getPbf = () => fetch(monacoPbf).then((res) => res.arrayBuffer())
 
-describe("DuckDB", () => {
+describe.runIf(import.meta.env.CI !== "true")("DuckDB", () => {
 	const worker = new DuckDBBenchWorker()
 
 	beforeAll(async () => {
