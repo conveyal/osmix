@@ -54,7 +54,9 @@ describe("write", () => {
 
 			// Re-parse the new PBF and test
 			assert.exists(data.buffer)
-			// TODO: assert.equal(stream.buffer.byteLength, fileData.byteLength)
+			// Note: We don't assert byte-level equality because the written PBF may have
+			// different compression, block ordering, or encoding than the original file.
+			// Semantic equivalence (verified by parsing and comparing entities) is more meaningful.
 			const osm2 = await readOsmPbf(data)
 
 			assert.deepEqual(osm.header, osm2.header)
