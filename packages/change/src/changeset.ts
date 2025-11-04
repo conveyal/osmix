@@ -342,7 +342,12 @@ export class OsmixChangeset {
 	}
 
 	/**
-	 * TODO: replace refs in relations with new way
+	 * Deduplicate a way by comparing it with existing ways in the OSM dataset.
+	 * When a duplicate way is found, the patch way is deleted and references point to the kept way.
+	 *
+	 * Note: When a way is deduplicated, relations that reference the deleted way are not
+	 * automatically updated to reference the kept way. This is a known limitation.
+	 * Relations should be processed separately after way deduplication if this behavior is needed.
 	 */
 	deduplicateWay(patchWay: OsmWay, dedupedIdPairs: IdPairs) {
 		const wayIndex = this.osm.ways.ids.getIndexFromId(patchWay.id)
@@ -424,8 +429,11 @@ export class OsmixChangeset {
 	}
 
 	/**
+	 * Generator that creates intersection nodes for ways that cross each other.
+	 * Yields statistics for each way processed, including intersection points found and nodes created.
 	 *
-	 * @param patch
+	 * @param ways - The ways to process for intersections
+	 * @yields Statistics object with `intersectionsFound` and `intersectionsCreated` counts
 	 */
 	*createIntersectionsForWaysGenerator(ways: Ways) {
 		const wayIdPairs = new IdPairs()
@@ -592,9 +600,12 @@ export class OsmixChangeset {
 	 * Create changes to merge nodes, ways, and relations from a patch OSM file into the base OSM.
 	 * - Check for duplicate nodes in the patch, replace the existing nodes where appropriate.
 	 * - Check for duplicate incoming ways, only add single instances of geometrically equal ways.
-	 * TODOS:
-	 * - If I add ways first, then nodes, the node de-duplication may work better. I can de-duplicate the nodes in the changesets.
-	 * - Replace existing nodes in relations where appropriate.
+	 *
+	 * Implementation notes:
+	 * - Ways are processed before nodes to improve node deduplication accuracy (see comment on line 633).
+	 * - Node replacements in relations are handled by `applyNodeReplacementsToRelations()` when
+	 *   deduplicating nodes, but relation member updates during direct merge are not automatically
+	 *   handled. Use `deduplicateNodes()` after `generateDirectChanges()` if relation updates are needed.
 	 */
 	generateDirectChanges(patch: Osmix) {
 		// Reset the current node ID to the highest node ID in the base or patch
@@ -655,7 +666,10 @@ export class OsmixChangeset {
 		return applyChangesetToOsm(this, newId)
 	}
 
-	// TODO: Finish this
+	/**
+	 * Generate OSC (OSM Change) XML format string from this changeset.
+	 * Returns an `<osmChange>` document containing create, modify, and delete sections.
+	 */
 	generateOscChanges() {
 		let create = ""
 		let modify = ""
@@ -681,6 +695,23 @@ export class OsmixChangeset {
 				modify += `<way id="${way.entity.id}">${tags}${nodes}</way>`
 			} else if (way.changeType === "delete") {
 				del += `<way id="${way.entity.id}" />`
+			}
+		}
+
+		for (const relation of Object.values(this.relationChanges)) {
+			const tags = relation.entity.tags ? osmTagsToOscTags(relation.entity.tags) : ""
+			const members = relation.entity.members
+				.map(
+					(member) =>
+						`<member type="${member.type}" ref="${member.ref}"${member.role ? ` role="${member.role}"` : ""} />`,
+				)
+				.join("")
+			if (relation.changeType === "create") {
+				create += `<relation id="${relation.entity.id}">${tags}${members}</relation>`
+			} else if (relation.changeType === "modify") {
+				modify += `<relation id="${relation.entity.id}">${tags}${members}</relation>`
+			} else if (relation.changeType === "delete") {
+				del += `<relation id="${relation.entity.id}" />`
 			}
 		}
 

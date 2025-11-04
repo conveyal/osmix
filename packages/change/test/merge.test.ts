@@ -70,7 +70,10 @@ describe("merge osm", () => {
 				deduplicatedWays: 0,
 				intersectionPointsFound: 0,
 				intersectionNodesCreated: 0,
-			}) // TODO did this break with new dequal? Or what?
+			})
+			// These expected values are based on the yakima fixture files. If they change,
+			// it may indicate a change in entity comparison logic (which uses dequal for
+			// deep equality checks) or a change in the merge algorithm itself.
 
 			baseOsm = changeset.applyChanges()
 			assert.deepEqual(sizes(baseOsm), {
