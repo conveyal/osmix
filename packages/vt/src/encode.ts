@@ -136,7 +136,8 @@ export class OsmixVtEncoder {
 				// 2. round/clamp, dedupe, close, orient
 				const processedRing = this.processClippedPolygonRing(clippedPoly)
 
-				// TODO handle MultiPolygons with holes
+				// Note: Currently only handles single outer ring polygons. MultiPolygons with holes
+				// and relations are not encoded. See package README for details.
 
 				if (processedRing.length > 0) {
 					geometry.push(processedRing)
@@ -220,13 +221,6 @@ function ensureClockwise(ring: XY[]): XY[] {
 	return ringArea(ring) < 0 ? ring : [...ring].reverse()
 }
 
-/**
- * TODO handle MultiPolygons with holes
- *
-function _ensureCounterClockwise(ring: XY[]): XY[] {
-	return ringArea(ring) > 0 ? ring : [...ring].reverse()
-}
-*/
 
 // Remove consecutive duplicates *after* rounding
 function cleanRing(ring: XY[]): XY[] {
