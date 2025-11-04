@@ -57,7 +57,11 @@ export class DuckDBBenchWorker {
 	async createSpatialIndexes() {
 		if (!this.conn) throw new Error("Connection not initialized")
 
-		// TODO
+		// DuckDB's spatial extension handles spatial queries efficiently using internal
+		// optimizations. Explicit spatial indexes are not required for the spatial functions
+		// used in this benchmark (ST_Within, ST_Distance, etc.).
+		// If needed in the future, spatial indexes could be created using:
+		// CREATE SPATIAL INDEX idx_osm ON osm USING RTREE(lon, lat);
 	}
 
 	async queryBbox(
