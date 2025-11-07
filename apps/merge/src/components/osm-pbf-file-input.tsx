@@ -2,10 +2,14 @@ import { FilesIcon, XIcon } from "lucide-react"
 import ActionButton from "./action-button"
 import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group"
 
-function isOsmPbfFile(file: File | null): file is File {
+function isOsmFile(file: File | null): file is File {
 	if (file == null) return false
-	if (!file.name.endsWith(".pbf")) return false
-	return true
+	const name = file.name.toLowerCase()
+	return (
+		name.endsWith(".pbf") ||
+		name.endsWith(".geojson") ||
+		name.endsWith(".json")
+	)
 }
 
 export default function OsmPbfFileInput({
@@ -26,13 +30,13 @@ export default function OsmPbfFileInput({
 				disabled={disabled}
 				onAction={async () => {
 					const selectedFile = await showFileSelector()
-					if (isOsmPbfFile(selectedFile)) {
+					if (isOsmFile(selectedFile)) {
 						await setFile(selectedFile)
 					}
 				}}
 				icon={<FilesIcon />}
 			>
-				Select new OSM PBF file
+				Select OSM PBF or GeoJSON file
 			</ActionButton>
 			<ButtonGroupSeparator />
 			<ActionButton
@@ -48,7 +52,7 @@ export default function OsmPbfFileInput({
 function showFileSelector() {
 	const input = document.createElement("input")
 	input.type = "file"
-	input.accept = ".pbf"
+	input.accept = ".pbf,.geojson,.json"
 
 	return new Promise<File | null>((resolve) => {
 		const focusListener = () => {

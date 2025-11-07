@@ -49,10 +49,22 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				const data = supportsReadableStreamTransfer()
 					? file.stream()
 					: await file.arrayBuffer()
-				const osmBuffers = await osmWorker.fromPbf(
-					id ?? file.name,
-					Comlink.transfer(data, [data]),
-				)
+
+				// Detect file type based on extension
+				const fileName = file.name.toLowerCase()
+				const isGeoJSON =
+					fileName.endsWith(".geojson") || fileName.endsWith(".json")
+
+				const osmBuffers = isGeoJSON
+					? await osmWorker.fromGeoJSON(
+							id ?? file.name,
+							Comlink.transfer(data, [data]),
+						)
+					: await osmWorker.fromPbf(
+							id ?? file.name,
+							Comlink.transfer(data, [data]),
+						)
+
 				const osm = Osmix.from(osmBuffers)
 				setOsm(osm)
 				taskLog.end(`${file.name} fully loaded.`)

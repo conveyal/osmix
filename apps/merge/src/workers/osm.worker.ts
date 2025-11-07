@@ -6,8 +6,9 @@ import {
 	OsmixChangeset,
 	type OsmixMergeOptions,
 } from "@osmix/change"
-import { Osmix, throttle } from "@osmix/core"
+import { fromGeoJSON, Osmix, throttle } from "@osmix/core"
 import type { OsmEntityType } from "@osmix/json"
+import type { FeatureCollection, LineString, Point } from "geojson"
 import { OsmixRasterTile } from "@osmix/raster"
 import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
@@ -52,6 +53,37 @@ export class OsmixWorker {
 			data instanceof ReadableStream ? data : new Uint8Array(data),
 			{ id, logger: this.log },
 		)
+		this.osmixes.set(id, osm)
+
+		this.invalidateVectorTileIndex(id)
+		this.getOrCreateVectorTileIndex(id)
+
+		return osm.transferables()
+	}
+
+	async fromGeoJSON(id: string, data: ArrayBufferLike | ReadableStream) {
+		// Read the data as text
+		let text: string
+		if (data instanceof ReadableStream) {
+			const reader = data.getReader()
+			const decoder = new TextDecoder()
+			let result = ""
+			while (true) {
+				const { done, value } = await reader.read()
+				if (done) break
+				result += decoder.decode(value, { stream: true })
+			}
+			text = result
+		} else {
+			const decoder = new TextDecoder()
+			text = decoder.decode(data)
+		}
+
+		// Parse JSON
+		const geojson = JSON.parse(text) as FeatureCollection<Point | LineString>
+
+		// Create Osmix from GeoJSON
+		const osm = fromGeoJSON(geojson, { id, logger: this.log })
 		this.osmixes.set(id, osm)
 
 		this.invalidateVectorTileIndex(id)
