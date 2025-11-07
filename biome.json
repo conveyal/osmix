@@ -47,7 +47,7 @@
 			},
 			"suspicious": {
 				"noTsIgnore": {
-					"level": "warn",
+					"level": "off",
 					"fix": "none"
 				}
 			}
