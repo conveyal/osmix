@@ -156,11 +156,11 @@ export default function Merge() {
 		<Main>
 			<Sidebar>
 				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-					<Step step="select-osm-pbf-files" title="SELECT PBF FILES">
-						<p>Select two PBF files to merge.</p>
+					<Step step="select-osm-pbf-files" title="SELECT OSM FILES">
+						<p>Select two OSM files (PBF or GeoJSON) to merge.</p>
 
 						<div className="flex flex-col border rounded shadow">
-							<div className="font-bold p-2">BASE OSM PBF</div>
+							<div className="font-bold p-2">BASE OSM</div>
 							<OsmPbfFileInput
 								testId="merge-base-file"
 								file={base.file}
@@ -177,7 +177,7 @@ export default function Merge() {
 						</div>
 
 						<div className="flex flex-col border rounded shadow">
-							<div className="font-bold p-2">PATCH OSM PBF</div>
+							<div className="font-bold p-2">PATCH OSM</div>
 							<OsmPbfFileInput
 								testId="merge-patch-file"
 								file={patch.file}
