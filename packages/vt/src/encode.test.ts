@@ -101,4 +101,133 @@ describe("OsmixVtEncoder", () => {
 		const wayGeom = way?.loadGeometry()
 		expect(wayGeom?.[0]?.length).toBeGreaterThanOrEqual(2)
 	})
+
+	it("encodes area ways as polygons with proper winding order", () => {
+		const testOsm = new Osmix()
+		// Create a closed way that should be treated as an area
+		testOsm.nodes.addNode({ id: 10, lat: 40.7, lon: -74.0 })
+		testOsm.nodes.addNode({ id: 11, lat: 40.71, lon: -74.0 })
+		testOsm.nodes.addNode({ id: 12, lat: 40.71, lon: -74.01 })
+		testOsm.nodes.addNode({ id: 13, lat: 40.7, lon: -74.01 })
+		testOsm.ways.addWay({
+			id: 20,
+			refs: [10, 11, 12, 13, 10], // Closed ring
+			tags: { building: "yes", area: "yes" },
+		})
+		testOsm.buildIndexes()
+		testOsm.buildSpatialIndexes()
+
+		const bbox = testOsm.bbox()
+		const tile = bboxToTile(bbox)
+		const encoder = new OsmixVtEncoder(testOsm)
+		const result = encoder.getTile(tile)
+
+		const layers = decodeTile(result)
+		const wayLayer = layers[`@osmix:${testOsm.id}:ways`]
+		expect(wayLayer.length).toBe(1)
+
+		const feature = wayLayer.feature(0)
+		expect(feature.type).toBe(3) // POLYGON type
+		expect(feature.properties["type"]).toBe("way")
+		expect(feature.properties["building"]).toBe("yes")
+
+		const geometry = feature.loadGeometry()
+		expect(geometry.length).toBeGreaterThan(0)
+		// Should have at least one ring (outer ring)
+		expect(geometry[0]?.length).toBeGreaterThanOrEqual(4) // At least 4 points for a polygon
+	})
+
+	it("handles multiple rings for polygons (infrastructure for holes)", () => {
+		const testOsm = new Osmix()
+		// Create an area way
+		testOsm.nodes.addNode({ id: 20, lat: 40.7, lon: -74.0 })
+		testOsm.nodes.addNode({ id: 21, lat: 40.71, lon: -74.0 })
+		testOsm.nodes.addNode({ id: 22, lat: 40.71, lon: -74.01 })
+		testOsm.nodes.addNode({ id: 23, lat: 40.7, lon: -74.01 })
+		testOsm.ways.addWay({
+			id: 30,
+			refs: [20, 21, 22, 23, 20],
+			tags: { building: "yes", area: "yes" },
+		})
+		testOsm.buildIndexes()
+		testOsm.buildSpatialIndexes()
+
+		const bbox = testOsm.bbox()
+		const tile = bboxToTile(bbox)
+		const encoder = new OsmixVtEncoder(testOsm)
+
+		// Test that clipProjectedPolygon returns array of rings
+		const proj = (ll: [number, number]) => {
+			const [px, py] = merc.px(ll, tile[2])
+			return [px - tile[0] * extent, py - tile[1] * extent] as [number, number]
+		}
+
+		const way = testOsm.ways.getById(30)
+		expect(way).toBeDefined()
+		const points = way!.refs.map((ref) => {
+			const node = testOsm.nodes.getById(ref)
+			return proj([node!.lon, node!.lat])
+		})
+
+		const clippedRings = encoder["clipProjectedPolygon"](points)
+		expect(Array.isArray(clippedRings)).toBe(true)
+		expect(clippedRings.length).toBeGreaterThan(0)
+		expect(Array.isArray(clippedRings[0])).toBe(true)
+	})
+
+	it("processes polygon rings with correct winding order (outer clockwise, inner counterclockwise)", () => {
+		const testOsm = new Osmix()
+		testOsm.nodes.addNode({ id: 30, lat: 40.7, lon: -74.0 })
+		testOsm.nodes.addNode({ id: 31, lat: 40.71, lon: -74.0 })
+		testOsm.nodes.addNode({ id: 32, lat: 40.71, lon: -74.01 })
+		testOsm.nodes.addNode({ id: 33, lat: 40.7, lon: -74.01 })
+		testOsm.ways.addWay({
+			id: 40,
+			refs: [30, 31, 32, 33, 30],
+			tags: { building: "yes", area: "yes" },
+		})
+		testOsm.buildIndexes()
+		testOsm.buildSpatialIndexes()
+
+		const bbox = testOsm.bbox()
+		const tile = bboxToTile(bbox)
+		const encoder = new OsmixVtEncoder(testOsm)
+
+		const proj = (ll: [number, number]) => {
+			const [px, py] = merc.px(ll, tile[2])
+			return [px - tile[0] * extent, py - tile[1] * extent] as [number, number]
+		}
+
+		const way = testOsm.ways.getById(40)
+		const points = way!.refs.map((ref) => {
+			const node = testOsm.nodes.getById(ref)
+			return proj([node!.lon, node!.lat])
+		})
+
+		const clippedRings = encoder["clipProjectedPolygon"](points)
+		const outerRing = clippedRings[0]
+		expect(outerRing).toBeDefined()
+
+		// Process as outer ring (should be clockwise)
+		const processedOuter = encoder["processClippedPolygonRing"](outerRing!, true)
+		expect(processedOuter.length).toBeGreaterThan(0)
+
+		// Process as inner ring (should be counterclockwise)
+		const processedInner = encoder["processClippedPolygonRing"](outerRing!, false)
+		expect(processedInner.length).toBeGreaterThan(0)
+
+		// Verify they have opposite winding (area should have opposite signs)
+		const outerArea = processedOuter.reduce((sum, p, i) => {
+			const next = processedOuter[(i + 1) % processedOuter.length]
+			return sum + (p[0] * next[1] - next[0] * p[1])
+		}, 0)
+		const innerArea = processedInner.reduce((sum, p, i) => {
+			const next = processedInner[(i + 1) % processedInner.length]
+			return sum + (p[0] * next[1] - next[0] * p[1])
+		}, 0)
+
+		// Outer should be clockwise (negative area), inner should be counterclockwise (positive area)
+		expect(outerArea).toBeLessThan(0)
+		expect(innerArea).toBeGreaterThan(0)
+	})
 })

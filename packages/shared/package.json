@@ -48,6 +48,7 @@
 		"vitest": "catalog:"
 	},
 	"dependencies": {
+		"@mapbox/geojson-rewind": "catalog:",
 		"@mapbox/sphericalmercator": "catalog:",
 		"lineclip": "^2.0.0"
 	}

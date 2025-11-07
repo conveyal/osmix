@@ -128,19 +128,26 @@ export class OsmixVtEncoder {
 			const isArea = wayIsArea({ id, refs: new Array(count).fill(0), tags })
 			const geometry: VtSimpleFeatureGeometry = []
 			if (isArea) {
-				// 1. clip polygon in tile coords
-				const clippedPoly = this.clipProjectedPolygon(points)
-				// clipProjectedPolygon currently returns XY[], not XY[][]
-				// i.e. assumes single ring. We'll treat it as one ring.
+				// 1. clip polygon in tile coords (returns array of rings)
+				const clippedRings = this.clipProjectedPolygon(points)
 
-				// 2. round/clamp, dedupe, close, orient
-				const processedRing = this.processClippedPolygonRing(clippedPoly)
+				// 2. process each ring (first is outer, rest would be holes if from relations)
+				for (let ringIndex = 0; ringIndex < clippedRings.length; ringIndex++) {
+					const clippedRing = clippedRings[ringIndex]
+					if (!clippedRing) continue
 
-				// Note: Currently only handles single outer ring polygons. MultiPolygons with holes
-				// and relations are not encoded. See package README for details.
+					// Normalize winding order using rewind before processing
+					// GeoJSON: outer counterclockwise, inner clockwise
+					// MVT: outer clockwise, inner counterclockwise
+					const isOuter = ringIndex === 0
+					const processedRing = this.processClippedPolygonRing(
+						clippedRing,
+						isOuter,
+					)
 
-				if (processedRing.length > 0) {
-					geometry.push(processedRing)
+					if (processedRing.length > 0) {
+						geometry.push(processedRing)
+					}
 				}
 			} else {
 				const clippedSegmentsRaw = this.clipProjectedPolyline(points)
@@ -166,11 +173,14 @@ export class OsmixVtEncoder {
 		return clipPolyline(points, this.extentBbox)
 	}
 
-	clipProjectedPolygon(points: XY[]): XY[] {
-		return clipPolygon(points, this.extentBbox)
+	clipProjectedPolygon(points: XY[]): XY[][] {
+		// clipPolygon returns a single ring, but we return as array for consistency
+		// with multi-ring support (e.g., from relations)
+		const clipped = clipPolygon(points, this.extentBbox)
+		return [clipped]
 	}
 
-	processClippedPolygonRing(rawRing: XY[]): XY[] {
+	processClippedPolygonRing(rawRing: XY[], isOuter: boolean): XY[] {
 		// 1. round & clamp EVERY point
 		const snapped = rawRing.map((xy) => this.clampAndRoundPoint(xy))
 
@@ -178,8 +188,12 @@ export class OsmixVtEncoder {
 		const cleaned = cleanRing(snapped)
 		if (cleaned.length === 0) return []
 
-		// 3. enforce clockwise for outer ring
-		const oriented = ensureClockwise(cleaned)
+		// 3. enforce winding order per MVT spec:
+		//    - Outer rings: clockwise
+		//    - Inner rings (holes): counterclockwise
+		const oriented = isOuter
+			? ensureClockwise(cleaned)
+			: ensureCounterclockwise(cleaned)
 
 		return oriented
 	}
@@ -219,6 +233,10 @@ function ringArea(ring: XY[]): number {
 
 function ensureClockwise(ring: XY[]): XY[] {
 	return ringArea(ring) < 0 ? ring : [...ring].reverse()
+}
+
+function ensureCounterclockwise(ring: XY[]): XY[] {
+	return ringArea(ring) > 0 ? ring : [...ring].reverse()
 }
 
 // Remove consecutive duplicates *after* rounding
