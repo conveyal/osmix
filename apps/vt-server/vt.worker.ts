@@ -40,11 +40,6 @@ export class VtWorker {
 		const relations = osm.relations.search(key, val)
 		return { nodes, ways, relations }
 	}
-
-	getStrings() {
-		if (!this.osm || !this.vt) throw Error("OSM not loaded")
-		return this.osm.stringTable.strings
-	}
 }
 
 if (!Bun.isMainThread) {

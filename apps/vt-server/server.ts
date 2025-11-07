@@ -62,10 +62,6 @@ const server = Bun.serve({
 				)
 			}
 		},
-		"/strings": async () => {
-			const strings = await getVt().getStrings()
-			return Response.json({ size: strings.length, strings }, { status: 200 })
-		},
 		"/search/:kv": async (req) => {
 			const { kv } = req.params
 			const [key, val] = kv.split("=", 2)
