@@ -27,6 +27,13 @@ export abstract class Entities<T extends OsmEntity> {
 		this.tags = tags ?? new Tags(stringTable)
 	}
 
+	transferables(): EntitiesTransferables {
+		return {
+			...this.ids.transferables(),
+			...this.tags.transferables(),
+		}
+	}
+
 	get isReady() {
 		return this.ids.isReady && this.tags.isReady && this.indexBuilt
 	}
@@ -47,6 +54,23 @@ export abstract class Entities<T extends OsmEntity> {
 	}
 
 	abstract getFullEntity(index: number, id: number, tags?: OsmTags): T
+
+	/**
+	 * Add an entity to the index. Tags can be provided as an array of keys and values, or as an object.
+	 */
+	addEntity(id: number, tags: number[], values: number[]): number
+	addEntity(id: number, tags: OsmTags): number
+	addEntity(id: number, tags: OsmTags | number[], values?: number[]): number {
+		const entityIndex = this.ids.add(id)
+		if (Array.isArray(tags)) {
+			if (values === undefined)
+				throw Error("Values are required when tags is an array")
+			this.tags.addTagKeysAndValues(entityIndex, tags, values)
+		} else {
+			this.tags.addTags(entityIndex, tags)
+		}
+		return entityIndex
+	}
 
 	get(idOrIndex: IdOrIndex): T | null {
 		const [index, id] = this.ids.idOrIndex(idOrIndex)
@@ -91,5 +115,14 @@ export abstract class Entities<T extends OsmEntity> {
 			if (index === -1) throw Error(`Entity not found at id ${id}`)
 			yield this.getFullEntity(index, id, this.tags.getTags(index))
 		}
+	}
+
+	search(key: string, val?: string): T[] {
+		const keyIndex = this.stringTable.find(key)
+		const entities = this.tags
+			.hasKey(keyIndex)
+			.map((index) => this.getByIndex(index))
+		if (val === undefined) return entities
+		return entities.filter((entity) => entity.tags?.[key] === val)
 	}
 }

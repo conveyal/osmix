@@ -141,6 +141,15 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 		return this.length - 1
 	}
 
+	set(index: number, value: number) {
+		if (index < 0) throw Error("Index out of bounds")
+		if (index >= this.length) {
+			while (index >= this.array.length) this.expandArray()
+			this.items = index + 1
+		}
+		this.array[index] = value
+	}
+
 	pushMany(values: number[] | TypedArray) {
 		while (this.length + values.length > this.array.length) this.expandArray()
 		this.array.set(values, this.length)

@@ -7,48 +7,99 @@ export interface TagsTransferables {
 	tagCount: BufferType
 	tagKeys: BufferType
 	tagVals: BufferType
+
+	keyEntities: BufferType
+	keyIndexStart: BufferType
+	keyIndexCount: BufferType
 }
 
 export class Tags {
 	private stringTable: StringTable
+
+	// Entity -> tag look up
 	private tagStart: ResizeableTypedArray<Uint32Array>
 	private tagCount: ResizeableTypedArray<Uint8Array>
 	private tagKeys: ResizeableTypedArray<Uint32Array>
 	private tagVals: ResizeableTypedArray<Uint32Array>
 
+	/**
+	 * Tag -> entity look up indexes for keys.
+	 */
+	private keyEntities: ResizeableTypedArray<Uint32Array>
+
+	/**
+	 * Look up string index -> start and count of entities with that string index.
+	 */
+	private keyIndexStart: ResizeableTypedArray<Uint32Array>
+	private keyIndexCount: ResizeableTypedArray<Uint32Array>
+
+	/**
+	 * Store look up indexes for entities by their string index. Is cleared after building the final index.
+	 */
+	private keyEntityIndexBuilder = new Map<number, number[]>()
+
 	private indexBuilt = false
 
 	static from(
 		stringTable: StringTable,
-		{ tagStart, tagCount, tagKeys, tagVals }: TagsTransferables,
+		{
+			tagStart,
+			tagCount,
+			tagKeys,
+			tagVals,
+			keyEntities,
+			keyIndexStart,
+			keyIndexCount,
+		}: TagsTransferables,
 	) {
-		const tagIndex = new Tags(stringTable)
-		tagIndex.tagStart = ResizeableTypedArray.from(Uint32Array, tagStart)
-		tagIndex.tagCount = ResizeableTypedArray.from(Uint8Array, tagCount)
-		tagIndex.tagKeys = ResizeableTypedArray.from(Uint32Array, tagKeys)
-		tagIndex.tagVals = ResizeableTypedArray.from(Uint32Array, tagVals)
+		const tagIndex = new Tags(
+			stringTable,
+			ResizeableTypedArray.from(Uint32Array, tagStart),
+			ResizeableTypedArray.from(Uint8Array, tagCount),
+			ResizeableTypedArray.from(Uint32Array, tagKeys),
+			ResizeableTypedArray.from(Uint32Array, tagVals),
+			ResizeableTypedArray.from(Uint32Array, keyEntities),
+			ResizeableTypedArray.from(Uint32Array, keyIndexStart),
+			ResizeableTypedArray.from(Uint32Array, keyIndexCount),
+		)
 		tagIndex.indexBuilt = true
 		return tagIndex
 	}
 
-	constructor(stringTable: StringTable) {
+	constructor(
+		stringTable: StringTable,
+		tagStart?: ResizeableTypedArray<Uint32Array>,
+		tagCount?: ResizeableTypedArray<Uint8Array>,
+		tagKeys?: ResizeableTypedArray<Uint32Array>,
+		tagVals?: ResizeableTypedArray<Uint32Array>,
+		keyEntities?: ResizeableTypedArray<Uint32Array>,
+		keyIndexStart?: ResizeableTypedArray<Uint32Array>,
+		keyIndexCount?: ResizeableTypedArray<Uint32Array>,
+	) {
 		this.stringTable = stringTable
-		this.tagStart = new ResizeableTypedArray(Uint32Array)
-		this.tagCount = new ResizeableTypedArray(Uint8Array)
-		this.tagKeys = new ResizeableTypedArray(Uint32Array)
-		this.tagVals = new ResizeableTypedArray(Uint32Array)
+		this.tagStart = tagStart ?? new ResizeableTypedArray(Uint32Array)
+		this.tagCount = tagCount ?? new ResizeableTypedArray(Uint8Array)
+		this.tagKeys = tagKeys ?? new ResizeableTypedArray(Uint32Array)
+		this.tagVals = tagVals ?? new ResizeableTypedArray(Uint32Array)
+
+		this.keyEntities = keyEntities ?? new ResizeableTypedArray(Uint32Array)
+		this.keyIndexStart = keyIndexStart ?? new ResizeableTypedArray(Uint32Array)
+		this.keyIndexCount = keyIndexCount ?? new ResizeableTypedArray(Uint32Array)
 	}
 
-	transferables() {
+	transferables(): TagsTransferables {
 		return {
 			tagStart: this.tagStart.array.buffer,
 			tagCount: this.tagCount.array.buffer,
 			tagKeys: this.tagKeys.array.buffer,
 			tagVals: this.tagVals.array.buffer,
+			keyEntities: this.keyEntities.array.buffer,
+			keyIndexStart: this.keyIndexStart.array.buffer,
+			keyIndexCount: this.keyIndexCount.array.buffer,
 		}
 	}
 
-	addTags(tags?: OsmTags) {
+	addTags(index: number, tags?: OsmTags): [number[], number[]] {
 		const tagKeys: number[] = []
 		const tagValues: number[] = []
 
@@ -59,14 +110,25 @@ export class Tags {
 			}
 		}
 
-		this.addTagKeysAndValues(tagKeys, tagValues)
+		this.addTagKeysAndValues(index, tagKeys, tagValues)
+
+		return [tagKeys, tagValues]
 	}
 
-	addTagKeysAndValues(keys: number[], values: number[]) {
-		this.tagStart.push(this.tagKeys.length)
-		this.tagCount.push(keys.length)
+	addTagKeysAndValues(index: number, keys: number[], values: number[]) {
+		this.tagStart.set(index, this.tagKeys.length)
+		this.tagCount.set(index, keys.length)
 		this.tagKeys.pushMany(keys)
 		this.tagVals.pushMany(values)
+
+		keys.forEach((key) => {
+			const keyEntities = this.keyEntityIndexBuilder.get(key)
+			if (keyEntities) {
+				keyEntities.push(index)
+			} else {
+				this.keyEntityIndexBuilder.set(key, [index])
+			}
+		})
 	}
 
 	buildIndex() {
@@ -74,6 +136,17 @@ export class Tags {
 		this.tagCount.compact()
 		this.tagKeys.compact()
 		this.tagVals.compact()
+
+		for (const [keyIndex, entityIndexes] of this.keyEntityIndexBuilder) {
+			this.keyIndexStart.set(keyIndex, this.keyEntities.length)
+			this.keyIndexCount.set(keyIndex, entityIndexes.length)
+			this.keyEntities.pushMany(entityIndexes)
+		}
+
+		this.keyIndexStart.compact()
+		this.keyIndexCount.compact()
+		this.keyEntityIndexBuilder.clear()
+
 		this.indexBuilt = true
 	}
 
@@ -118,5 +191,20 @@ export class Tags {
 			tags[this.stringTable.get(keyIndex)] = this.stringTable.get(valIndex)
 		}
 		return tags
+	}
+
+	hasKey(keyIndex: number): number[] {
+		if (keyIndex < 0) return []
+		const start = this.keyIndexStart.at(keyIndex) ?? 0
+		const count = this.keyIndexCount.at(keyIndex) ?? 0
+		return Array.from(this.keyEntities.array.subarray(start, start + count))
+	}
+
+	/**
+	 * Create a unique index for a key=value pair.
+	 */
+	kvToIndex(key: number, val: number) {
+		const width = this.stringTable.length
+		return key * width + val
 	}
 }

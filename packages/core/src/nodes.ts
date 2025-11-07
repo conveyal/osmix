@@ -53,20 +53,18 @@ export class Nodes extends Entities<OsmNode> {
 		this.lats = new ResizeableTypedArray(CoordinateArrayType)
 	}
 
-	transferables(): NodesTransferables {
+	override transferables(): NodesTransferables {
 		return {
+			...super.transferables(),
 			lons: this.lons.array.buffer,
 			lats: this.lats.array.buffer,
 			bbox: this.bbox,
 			spatialIndex: this.spatialIndex.data,
-			...this.ids.transferables(),
-			...this.tags.transferables(),
 		}
 	}
 
-	addNode(node: OsmNode) {
-		this.ids.add(node.id)
-		this.tags.addTags(node.tags)
+	addNode(node: OsmNode): number {
+		const nodeIndex = this.addEntity(node.id, node.tags ?? {})
 
 		this.lons.push(node.lon)
 		this.lats.push(node.lat)
@@ -75,6 +73,8 @@ export class Nodes extends Entities<OsmNode> {
 		if (node.lat < this.bbox[1]) this.bbox[1] = node.lat
 		if (node.lon > this.bbox[2]) this.bbox[2] = node.lon
 		if (node.lat > this.bbox[3]) this.bbox[3] = node.lat
+
+		return nodeIndex
 	}
 
 	addDenseNodes(
@@ -146,7 +146,7 @@ export class Nodes extends Entities<OsmNode> {
 				: true
 			if (!shouldInclude) continue
 
-			this.ids.add(delta.id)
+			this.addEntity(delta.id, tagKeys, tagValues)
 			this.lons.push(lon)
 			this.lats.push(lat)
 
@@ -154,7 +154,6 @@ export class Nodes extends Entities<OsmNode> {
 			if (lat < this.bbox[1]) this.bbox[1] = lat
 			if (lon > this.bbox[2]) this.bbox[2] = lon
 			if (lat > this.bbox[3]) this.bbox[3] = lat
-			this.tags.addTagKeysAndValues(tagKeys, tagValues)
 			added++
 		}
 

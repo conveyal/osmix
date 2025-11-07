@@ -142,10 +142,10 @@ export class Osmix {
 	}
 
 	buildIndexes() {
+		this.stringTable.buildIndex()
 		if (!this.nodes.isReady) this.nodes.buildIndex()
 		if (!this.ways.isReady) this.ways.buildIndex()
 		if (!this.relations.isReady) this.relations.buildIndex()
-		this.stringTable.buildIndex()
 		this.#indexBuilt = true
 		this.buildTimeMs = performance.now() - this.#startTime
 	}

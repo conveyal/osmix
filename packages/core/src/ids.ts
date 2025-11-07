@@ -38,21 +38,28 @@ export class Ids {
 		anchors,
 		idsAreSorted,
 	}: IdsTransferables) {
-		const idIndex = new Ids()
-		idIndex.ids = ResizeableTypedArray.from(Float64Array, ids)
-		idIndex.idsSorted = new Float64Array(sortedIds)
-		idIndex.sortedIdPositionToIndex = new Uint32Array(sortedIdPositionToIndex)
-		idIndex.anchors = new Float64Array(anchors)
+		const idIndex = new Ids(
+			ResizeableTypedArray.from(Float64Array, ids),
+			new Float64Array(sortedIds),
+			new Uint32Array(sortedIdPositionToIndex),
+			new Float64Array(anchors),
+		)
 		idIndex.indexBuilt = true
 		idIndex.idsAreSorted = idsAreSorted
 		return idIndex
 	}
 
-	constructor() {
-		this.ids = new ResizeableTypedArray(Float64Array)
-		this.idsSorted = new Float64Array(new BufferConstructor(0))
-		this.sortedIdPositionToIndex = new Uint32Array(new BufferConstructor(0))
-		this.anchors = new Float64Array(new BufferConstructor(0))
+	constructor(
+		ids?: ResizeableTypedArray<Float64Array>,
+		idsSorted?: Float64Array,
+		sortedIdPositionToIndex?: Uint32Array,
+		anchors?: Float64Array,
+	) {
+		this.ids = ids ?? new ResizeableTypedArray(Float64Array)
+		this.idsSorted = idsSorted ?? new Float64Array(new BufferConstructor(0))
+		this.sortedIdPositionToIndex =
+			sortedIdPositionToIndex ?? new Uint32Array(new BufferConstructor(0))
+		this.anchors = anchors ?? new Float64Array(new BufferConstructor(0))
 	}
 
 	transferables(): IdsTransferables {
@@ -77,10 +84,10 @@ export class Ids {
 		return this.idsAreSorted
 	}
 
-	add(id: number): void {
+	add(id: number): number {
 		if (this.indexBuilt) throw Error("ID index already built.")
 		if (this.ids.length > 0 && id < this.ids.at(-1)) this.idsAreSorted = false
-		this.ids.push(id)
+		return this.ids.push(id)
 	}
 
 	at(index: number): number {

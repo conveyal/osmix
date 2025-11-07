@@ -22,21 +22,29 @@ export default class StringTable {
 	// Builder state
 	private stringToIndex = new Map<string, number>()
 
+	// Lazy-built reverse index for lookups after transfer/hydration
+	private reverseIndexBuilt = false
+
 	// Retrieval state
 	private indexToString = new Map<number, string>()
 
 	static from({ bytes, start, count }: StringTableTransferables): StringTable {
-		const builder = new StringTable()
-		builder.bytes = ResizeableTypedArray.from(Uint8Array, bytes)
-		builder.start = ResizeableTypedArray.from(Uint32Array, start)
-		builder.count = ResizeableTypedArray.from(Uint16Array, count)
+		const builder = new StringTable(
+			ResizeableTypedArray.from(Uint8Array, bytes),
+			ResizeableTypedArray.from(Uint32Array, start),
+			ResizeableTypedArray.from(Uint16Array, count),
+		)
 		return builder
 	}
 
-	constructor() {
-		this.bytes = new ResizeableTypedArray(Uint8Array)
-		this.start = new ResizeableTypedArray(Uint32Array)
-		this.count = new ResizeableTypedArray(Uint16Array)
+	constructor(
+		bytes?: ResizeableTypedArray<Uint8Array>,
+		start?: ResizeableTypedArray<Uint32Array>,
+		count?: ResizeableTypedArray<Uint16Array>,
+	) {
+		this.bytes = bytes ?? new ResizeableTypedArray(Uint8Array)
+		this.start = start ?? new ResizeableTypedArray(Uint32Array)
+		this.count = count ?? new ResizeableTypedArray(Uint16Array)
 	}
 
 	transferables(): StringTableTransferables {
@@ -106,8 +114,7 @@ export default class StringTable {
 		this.bytes.compact()
 		this.start.compact()
 		this.count.compact()
-
-		this.stringToIndex.clear()
+		this.reverseIndexBuilt = true
 	}
 
 	toOsmPbfStringTable(): OsmPbfStringTable {
@@ -116,5 +123,22 @@ export default class StringTable {
 			stringTable.push(this.getBytes(i))
 		}
 		return stringTable
+	}
+
+	private ensureReverseIndex() {
+		if (this.reverseIndexBuilt) return
+		// Build string -> index map from existing decoded strings
+		// Decode once per entry; subsequent get() calls are cached via indexToString
+		for (let i = 0; i < this.length; i++) {
+			this.stringToIndex.set(this.get(i), i)
+		}
+		this.reverseIndexBuilt = true
+	}
+
+	find(str: string): number {
+		const existing = this.stringToIndex.get(str)
+		if (existing !== undefined) return existing
+		this.ensureReverseIndex()
+		return this.stringToIndex.get(str) ?? -1
 	}
 }

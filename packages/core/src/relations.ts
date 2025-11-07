@@ -56,21 +56,19 @@ export class Relations extends Entities<OsmRelation> {
 		this.memberRoles = new ResizeableTypedArray(Uint32Array)
 	}
 
-	transferables(): RelationsTransferables {
+	override transferables(): RelationsTransferables {
 		return {
+			...super.transferables(),
 			memberStart: this.memberStart.array.buffer,
 			memberCount: this.memberCount.array.buffer,
 			memberRefs: this.memberRefs.array.buffer,
 			memberTypes: this.memberTypes.array.buffer,
 			memberRoles: this.memberRoles.array.buffer,
-			...this.ids.transferables(),
-			...this.tags.transferables(),
 		}
 	}
 
 	addRelation(relation: OsmRelation) {
-		this.ids.add(relation.id)
-		this.tags.addTags(relation.tags)
+		const relationIndex = this.addEntity(relation.id, relation.tags ?? {})
 		this.memberStart.push(this.memberRefs.length)
 		this.memberCount.push(relation.members.length)
 		for (const member of relation.members) {
@@ -78,6 +76,7 @@ export class Relations extends Entities<OsmRelation> {
 			this.memberTypes.push(RELATION_MEMBER_TYPES.indexOf(member.type))
 			this.memberRoles.push(this.stringTable.add(member.role ?? ""))
 		}
+		return relationIndex
 	}
 
 	addRelations(
@@ -138,7 +137,7 @@ export class Relations extends Entities<OsmRelation> {
 			if (filter && filteredRelation === null) continue
 			added++
 
-			this.ids.add(relation.id)
+			this.addEntity(relation.id, tagKeys, tagValues)
 			this.memberStart.push(this.memberRefs.length)
 			this.memberCount.push(
 				filteredRelation?.members.length ?? memberRefs.length,
@@ -156,8 +155,6 @@ export class Relations extends Entities<OsmRelation> {
 					this.stringTable.add(m.role ?? ""),
 				) ?? memberRoles,
 			)
-
-			this.tags.addTagKeysAndValues(tagKeys, tagValues)
 		}
 		return added
 	}

@@ -55,24 +55,23 @@ export class Ways extends Entities<OsmWay> {
 		this.bbox = new ResizeableTypedArray(CoordinateArrayType)
 	}
 
-	transferables(): WaysTransferables {
+	override transferables(): WaysTransferables {
 		return {
+			...super.transferables(),
 			refStart: this.refStart.array.buffer,
 			refCount: this.refCount.array.buffer,
 			refs: this.refs.array.buffer,
 			bbox: this.bbox.array.buffer,
 			spatialIndex: this.spatialIndex.data,
-			...this.ids.transferables(),
-			...this.tags.transferables(),
 		}
 	}
 
 	addWay(way: OsmWay) {
-		this.ids.add(way.id)
-		this.tags.addTags(way.tags)
+		const wayIndex = this.addEntity(way.id, way.tags ?? {})
 		this.refStart.push(this.refs.length)
 		this.refCount.push(way.refs.length)
 		for (const ref of way.refs) this.refs.push(ref)
+		return wayIndex
 	}
 
 	/**
@@ -99,11 +98,6 @@ export class Ways extends Entities<OsmWay> {
 				: null
 			if (filter && filteredWay === null) continue
 
-			this.ids.add(way.id)
-			this.refStart.push(this.refs.length)
-			this.refCount.push(filteredWay?.refs.length ?? refs.length)
-			this.refs.pushMany(filteredWay?.refs ?? refs)
-
 			const tagKeys: number[] = way.keys.map((key) => {
 				const index = blockStringIndexMap.get(key)
 				if (index === undefined) throw Error("Tag key not found")
@@ -114,7 +108,11 @@ export class Ways extends Entities<OsmWay> {
 				if (index === undefined) throw Error("Tag value not found")
 				return index
 			})
-			this.tags.addTagKeysAndValues(tagKeys, tagValues)
+
+			this.addEntity(way.id, tagKeys, tagValues)
+			this.refStart.push(this.refs.length)
+			this.refCount.push(filteredWay?.refs.length ?? refs.length)
+			this.refs.pushMany(filteredWay?.refs ?? refs)
 			added++
 		}
 		return added
