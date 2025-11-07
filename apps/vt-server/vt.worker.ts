@@ -1,5 +1,6 @@
 import { Osmix } from "@osmix/core"
 import type { OsmixTransferables } from "@osmix/core/src/osmix"
+import type { OsmNode, OsmRelation, OsmWay } from "@osmix/json"
 import type { Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import * as Comlink from "comlink"
@@ -25,6 +26,24 @@ export class VtWorker {
 			nodeLayerName: this.vt.nodeLayerName,
 			wayLayerName: this.vt.wayLayerName,
 		}
+	}
+
+	search(
+		key: string,
+		val?: string,
+	): { nodes: OsmNode[]; ways: OsmWay[]; relations: OsmRelation[] } {
+		const osm = this.osm
+		if (!osm || !this.vt) throw Error("OSM not loaded")
+		console.log("searching for", key, val)
+		const nodes = osm.nodes.search(key, val)
+		const ways = osm.ways.search(key, val)
+		const relations = osm.relations.search(key, val)
+		return { nodes, ways, relations }
+	}
+
+	getStrings() {
+		if (!this.osm || !this.vt) throw Error("OSM not loaded")
+		return this.osm.stringTable.strings
 	}
 }
 

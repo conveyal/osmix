@@ -62,6 +62,26 @@ const server = Bun.serve({
 				)
 			}
 		},
+		"/strings": async () => {
+			const strings = await getVt().getStrings()
+			return Response.json({ size: strings.length, strings }, { status: 200 })
+		},
+		"/search/:kv": async (req) => {
+			const { kv } = req.params
+			const [key, val] = kv.split("=", 2)
+			console.log("searching for", key, val)
+			if (!key) {
+				return Response.json(
+					{
+						error: "Invalid key",
+						message: "Key is required",
+					},
+					{ status: 400 },
+				)
+			}
+			const results = await getVt().search(key, val)
+			return Response.json(results, { status: 200 })
+		},
 	},
 	fetch: async () => {
 		return new Response("Not found", { status: 404 })

@@ -1,3 +1,4 @@
+import type { OsmNode, OsmRelation, OsmWay } from "@osmix/json"
 import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
 import maplibregl, { type ControlPosition } from "maplibre-gl"
@@ -7,12 +8,14 @@ const map = new maplibregl.Map({
 	container: "map",
 	style: "https://tiles.openfreemap.org/styles/positron",
 	zoom: 13,
+	attributionControl: false,
 })
 
 const $log = document.getElementById("log")! as HTMLDialogElement
 const $entity = addMapControl("entity", "bottom-left")
 const $info = addMapControl("info", "top-left")
-const $layerControl = addMapControl("layer-control", "top-right")
+const $search = addMapControl("search", "top-right")
+const $layerControl = addMapControl("layer-control", "bottom-right")
 $info.innerHTML = `
     <header>OSMIX VT SERVER DEMO</header>
 	<p>This page is a demo showing a server parsing the OSM PBF and generating vector tiles on the fly.</p>
@@ -23,6 +26,35 @@ const $meta = document.createElement("div")
 $meta.id = "meta"
 $meta.textContent = "Loading..."
 $info.append($meta)
+
+$search.innerHTML = `
+	<input id="search" type="text" placeholder="Search" />
+	<div id="search-results"></div>
+`
+const $searchInput = document.getElementById("search")! as HTMLInputElement
+const $searchResults = document.getElementById(
+	"search-results",
+)! as HTMLDivElement
+$searchInput.addEventListener("input", async (e) => {
+	const value = (e.target as HTMLInputElement).value
+	const res = await fetch(`/search/${encodeURIComponent(value)}`)
+	const body = (await res.json()) as {
+		nodes: OsmNode[]
+		ways: OsmWay[]
+		relations: OsmRelation[]
+	}
+	$searchResults.innerHTML = `
+		<br />
+		<dl>
+			<dt>Nodes</dt>
+			<dd>${body.nodes.length}</dd>
+			<dt>Ways</dt>
+			<dd>${body.ways.length}</dd>
+			<dt>Relations</dt>
+			<dd>${body.relations.length}</dd>
+		</dl>
+	`
+})
 
 map.once("styledata", updateLayerControl)
 
