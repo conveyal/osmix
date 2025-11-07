@@ -119,6 +119,9 @@ export class OsmixWorker {
 		const timer = `OsmixRasterTile.drawWays:${tile[2]}/${tile[0]}/${tile[1]}`
 		console.time(timer)
 		osm.ways.intersects(bbox, (wayIndex) => {
+			// Skip ways without tags (they are likely only for relations)
+			const tags = osm.ways.tags.getTags(wayIndex)
+			if (!tags || Object.keys(tags).length === 0) return false
 			rasterTile.drawWay(osm.ways.getCoordinates(wayIndex, osm.nodes))
 			return false
 		})

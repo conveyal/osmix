@@ -117,6 +117,8 @@ export class OsmixVtEncoder {
 			if (wayIndex === undefined) continue
 			const id = this.osmix.ways.ids.at(wayIndex)
 			const tags = this.osmix.ways.tags.getTags(wayIndex)
+			// Skip ways without tags (they are likely only for relations)
+			if (!tags || Object.keys(tags).length === 0) continue
 			const count = this.osmix.ways.refCount.at(wayIndex)
 			const start = this.osmix.ways.refStart.at(wayIndex)
 			const points: XY[] = new Array(count)
