@@ -1,4 +1,10 @@
-import type { FeatureCollection, LineString, Point } from "geojson"
+import type {
+	FeatureCollection,
+	LineString,
+	MultiPolygon,
+	Point,
+	Polygon,
+} from "geojson"
 import { describe, expect, it } from "vitest"
 import { fromGeoJSON } from "../src/geojson"
 
@@ -454,5 +460,293 @@ describe("fromGeoJSON", () => {
 
 		const osmWithId = fromGeoJSON(geojson, { id: "custom-id" })
 		expect(osmWithId.id).toBe("custom-id")
+	})
+
+	it("should convert Polygon features to Ways with area tags", () => {
+		const geojson: FeatureCollection<Polygon> = {
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "Polygon",
+						coordinates: [
+							[
+								[-122.4194, 37.7749],
+								[-122.4094, 37.7749],
+								[-122.4094, 37.7849],
+								[-122.4194, 37.7849],
+								[-122.4194, 37.7749], // Closed ring
+							],
+						],
+					},
+					properties: {
+						building: "yes",
+						name: "Test Building",
+					},
+				},
+			],
+		}
+
+		const osm = fromGeoJSON(geojson)
+
+		expect(osm.nodes.size).toBe(4) // 4 unique nodes (last is duplicate)
+		expect(osm.ways.size).toBe(1)
+
+		const way = osm.ways.getById(1)
+		expect(way).toBeDefined()
+		expect(way?.tags?.["building"]).toBe("yes")
+		expect(way?.tags?.["name"]).toBe("Test Building")
+		expect(way?.tags?.["area"]).toBe("yes")
+		expect(way?.refs).toHaveLength(5) // 4 nodes + closing node
+		expect(way?.refs[0]).toBe(way?.refs[4]) // Ring is closed
+	})
+
+	it("should convert Polygon with holes to multiple Ways", () => {
+		const geojson: FeatureCollection<Polygon> = {
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "Polygon",
+						coordinates: [
+							// Outer ring
+							[
+								[-122.4194, 37.7749],
+								[-122.4094, 37.7749],
+								[-122.4094, 37.7849],
+								[-122.4194, 37.7849],
+								[-122.4194, 37.7749],
+							],
+							// Hole
+							[
+								[-122.4164, 37.7779],
+								[-122.4144, 37.7779],
+								[-122.4144, 37.7799],
+								[-122.4164, 37.7799],
+								[-122.4164, 37.7779],
+							],
+						],
+					},
+					properties: {
+						building: "yes",
+					},
+				},
+			],
+		}
+
+		const osm = fromGeoJSON(geojson)
+
+		// Should have outer ring way + hole way
+		expect(osm.ways.size).toBe(2)
+
+		const outerWay = osm.ways.getById(1)
+		expect(outerWay).toBeDefined()
+		expect(outerWay?.tags?.["area"]).toBe("yes")
+		expect(outerWay?.tags?.["building"]).toBe("yes")
+
+		const holeWay = osm.ways.getById(2)
+		expect(holeWay).toBeDefined()
+		expect(holeWay?.tags?.["area"]).toBe("yes")
+		expect(holeWay?.tags?.["building"]).toBe("yes")
+	})
+
+	it("should convert MultiPolygon features to multiple Ways", () => {
+		const geojson: FeatureCollection<MultiPolygon> = {
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "MultiPolygon",
+						coordinates: [
+							// First polygon
+							[
+								[
+									[-122.4194, 37.7749],
+									[-122.4094, 37.7749],
+									[-122.4094, 37.7849],
+									[-122.4194, 37.7849],
+									[-122.4194, 37.7749],
+								],
+							],
+							// Second polygon
+							[
+								[
+									[-122.3994, 37.7649],
+									[-122.3894, 37.7649],
+									[-122.3894, 37.7749],
+									[-122.3994, 37.7749],
+									[-122.3994, 37.7649],
+								],
+							],
+						],
+					},
+					properties: {
+						landuse: "residential",
+					},
+				},
+			],
+		}
+
+		const osm = fromGeoJSON(geojson)
+
+		// Should have 2 ways (one for each polygon)
+		expect(osm.ways.size).toBe(2)
+
+		const way1 = osm.ways.getById(1)
+		expect(way1).toBeDefined()
+		expect(way1?.tags?.["landuse"]).toBe("residential")
+		expect(way1?.tags?.["area"]).toBe("yes")
+
+		const way2 = osm.ways.getById(2)
+		expect(way2).toBeDefined()
+		expect(way2?.tags?.["landuse"]).toBe("residential")
+		expect(way2?.tags?.["area"]).toBe("yes")
+	})
+
+	it("should convert MultiPolygon with holes to multiple Ways", () => {
+		const geojson: FeatureCollection<MultiPolygon> = {
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "MultiPolygon",
+						coordinates: [
+							// First polygon with hole
+							[
+								// Outer ring
+								[
+									[-122.4194, 37.7749],
+									[-122.4094, 37.7749],
+									[-122.4094, 37.7849],
+									[-122.4194, 37.7849],
+									[-122.4194, 37.7749],
+								],
+								// Hole
+								[
+									[-122.4164, 37.7779],
+									[-122.4144, 37.7779],
+									[-122.4144, 37.7799],
+									[-122.4164, 37.7799],
+									[-122.4164, 37.7779],
+								],
+							],
+							// Second polygon (no holes)
+							[
+								[
+									[-122.3994, 37.7649],
+									[-122.3894, 37.7649],
+									[-122.3894, 37.7749],
+									[-122.3994, 37.7749],
+									[-122.3994, 37.7649],
+								],
+							],
+						],
+					},
+					properties: {
+						landuse: "residential",
+					},
+				},
+			],
+		}
+
+		const osm = fromGeoJSON(geojson)
+
+		// Should have 3 ways: outer ring of first polygon, hole of first polygon, second polygon
+		expect(osm.ways.size).toBe(3)
+
+		const outerWay = osm.ways.getById(1)
+		expect(outerWay).toBeDefined()
+		expect(outerWay?.tags?.["area"]).toBe("yes")
+
+		const holeWay = osm.ways.getById(2)
+		expect(holeWay).toBeDefined()
+		expect(holeWay?.tags?.["area"]).toBe("yes")
+
+		const secondPolyWay = osm.ways.getById(3)
+		expect(secondPolyWay).toBeDefined()
+		expect(secondPolyWay?.tags?.["area"]).toBe("yes")
+	})
+
+	it("should handle Polygon with unclosed ring by closing it", () => {
+		const geojson: FeatureCollection<Polygon> = {
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "Polygon",
+						coordinates: [
+							[
+								[-122.4194, 37.7749],
+								[-122.4094, 37.7749],
+								[-122.4094, 37.7849],
+								[-122.4194, 37.7849],
+								// Not closed - should be closed automatically
+							],
+						],
+					},
+					properties: {
+						building: "yes",
+					},
+				},
+			],
+		}
+
+		const osm = fromGeoJSON(geojson)
+
+		const way = osm.ways.getById(1)
+		expect(way).toBeDefined()
+		expect(way?.refs).toHaveLength(5) // 4 nodes + closing node
+		expect(way?.refs[0]).toBe(way?.refs[4]) // Ring is closed
+	})
+
+	it("should skip invalid Polygons with less than 3 coordinates", () => {
+		const geojson: FeatureCollection<Polygon> = {
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "Polygon",
+						coordinates: [
+							[
+								[-122.4194, 37.7749],
+								[-122.4094, 37.7749],
+								// Only 2 coordinates - invalid
+							],
+						],
+					},
+					properties: {},
+				},
+				{
+					type: "Feature",
+					geometry: {
+						type: "Polygon",
+						coordinates: [
+							[
+								[-122.4194, 37.7749],
+								[-122.4094, 37.7749],
+								[-122.4094, 37.7849],
+								[-122.4194, 37.7849],
+								[-122.4194, 37.7749],
+							],
+						],
+					},
+					properties: {
+						building: "yes",
+					},
+				},
+			],
+		}
+
+		const osm = fromGeoJSON(geojson)
+
+		// Should only have one way (the valid one)
+		expect(osm.ways.size).toBe(1)
+		expect(osm.ways.getById(1)?.tags?.["building"]).toBe("yes")
 	})
 })

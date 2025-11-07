@@ -68,7 +68,7 @@ export function wayIsArea(way?: OsmWay): boolean {
 	if (refs[0] !== refs[refs.length - 1]) return false
 
 	// End refs are equal, no tags, assume it is an area.
-	if (!tags) return true
+	if (!tags || Object.keys(tags).length === 0) return true
 
 	// Explicit override
 	if ("area" in tags) return tags["area"] !== "no"
