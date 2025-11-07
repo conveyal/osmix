@@ -221,7 +221,6 @@ function ensureClockwise(ring: XY[]): XY[] {
 	return ringArea(ring) < 0 ? ring : [...ring].reverse()
 }
 
-
 // Remove consecutive duplicates *after* rounding
 function cleanRing(ring: XY[]): XY[] {
 	const deduped = dedupePoints(ring)

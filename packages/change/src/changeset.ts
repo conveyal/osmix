@@ -699,7 +699,9 @@ export class OsmixChangeset {
 		}
 
 		for (const relation of Object.values(this.relationChanges)) {
-			const tags = relation.entity.tags ? osmTagsToOscTags(relation.entity.tags) : ""
+			const tags = relation.entity.tags
+				? osmTagsToOscTags(relation.entity.tags)
+				: ""
 			const members = relation.entity.members
 				.map(
 					(member) =>
