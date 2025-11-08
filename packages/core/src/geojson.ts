@@ -17,8 +17,8 @@ export function fromGeoJSON(
 	const osm = new Osmix(options)
 	if (!options.id) osm.id = "geojson"
 
-	let nextNodeId = 1
-	let nextWayId = 1
+	let nextNodeId = -1
+	let nextWayId = -1
 
 	// Process each feature
 	for (const feature of geojson.features) {
@@ -26,33 +26,28 @@ export function fromGeoJSON(
 		const featureId = extractFeatureId(feature.id)
 
 		if (feature.geometry.type === "Point") {
-			const coords = feature.geometry.coordinates
-			const lon = coords[0]
-			const lat = coords[1]
-			if (lon === undefined || lat === undefined) continue
+			const [lon, lat] = feature.geometry.coordinates
+			if (lon === undefined || lat === undefined)
+				throw Error("Invalid GeoJSON coordinates in Point.")
 
-			const nodeId = featureId ?? nextNodeId++
+			const nodeId = featureId ?? nextNodeId--
 			osm.nodes.addNode({
 				id: nodeId,
 				lon,
 				lat,
 				tags,
 			})
-			if (featureId && featureId >= nextNodeId) {
-				nextNodeId = featureId + 1
-			}
 		} else if (feature.geometry.type === "LineString") {
 			const coordinates = feature.geometry.coordinates
 			if (coordinates.length < 2) continue // Skip invalid LineStrings
 
 			// Create nodes for each coordinate
 			const nodeRefs: number[] = []
-			for (const coord of coordinates) {
-				const lon = coord[0]
-				const lat = coord[1]
-				if (lon === undefined || lat === undefined) continue
+			for (const [lon, lat] of coordinates) {
+				if (lon === undefined || lat === undefined)
+					throw Error("Invalid GeoJSON coordinates in LineString.")
 
-				const nodeId = nextNodeId++
+				const nodeId = nextNodeId--
 				osm.nodes.addNode({
 					id: nodeId,
 					lon,
@@ -65,15 +60,12 @@ export function fromGeoJSON(
 			if (nodeRefs.length < 2) continue
 
 			// Create the way
-			const wayId = featureId ?? nextWayId++
+			const wayId = featureId ?? nextWayId--
 			osm.ways.addWay({
 				id: wayId,
 				refs: nodeRefs,
 				tags,
 			})
-			if (featureId && wayId >= nextWayId) {
-				nextWayId = wayId + 1
-			}
 		}
 	}
 
