@@ -73,6 +73,8 @@ export class OsmixWorker {
 				if (done) break
 				result += decoder.decode(value, { stream: true })
 			}
+			// Flush any remaining bytes in the decoder's internal buffer
+			result += decoder.decode()
 			text = result
 		} else {
 			const decoder = new TextDecoder()
