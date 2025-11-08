@@ -61,6 +61,9 @@ export function fromGeoJSON(
 				nodeRefs.push(nodeId)
 			}
 
+			// Skip if we don't have at least 2 valid nodes (required for OSM ways)
+			if (nodeRefs.length < 2) continue
+
 			// Create the way
 			const wayId = featureId ?? nextWayId++
 			osm.ways.addWay({
