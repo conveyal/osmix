@@ -6,6 +6,7 @@ import type {
 } from "@osmix/json"
 import type { OsmPbfRelation } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
+import type { GeoBbox2D } from "@osmix/shared/types"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { Ids } from "./ids"
 import type StringTable from "./stringtable"
@@ -15,6 +16,7 @@ import {
 	IdArrayType,
 	ResizeableTypedArray,
 } from "./typed-arrays"
+import type { Ways } from "./ways"
 
 const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
 
@@ -214,5 +216,123 @@ export class Relations extends Entities<OsmRelation> {
 			return true
 		}
 		return false
+	}
+
+	/**
+	 * Get all way IDs that are members of relations.
+	 * Used to exclude these ways from individual rendering.
+	 *
+	 * TODO: Should this be stored in the relation index?
+	 */
+	getWayMemberIds(): Set<number> {
+		const wayIds = new Set<number>()
+		for (let i = 0; i < this.size; i++) {
+			const start = this.memberStart.at(i)
+			const count = this.memberCount.at(i)
+			for (let j = start; j < start + count; j++) {
+				const type = RELATION_MEMBER_TYPES[this.memberTypes.at(j)]
+				if (type === "way") {
+					const wayId = this.memberRefs.at(j)
+					if (wayId !== undefined) {
+						wayIds.add(wayId)
+					}
+				}
+			}
+		}
+		return wayIds
+	}
+
+	/**
+	 * Compute bounding box of a relation from its member ways.
+	 * Uses way spatial indexes - relations don't have their own spatial index.
+	 */
+	getRelationBbox(index: number, ways: Ways): GeoBbox2D | null {
+		const start = this.memberStart.at(index)
+		const count = this.memberCount.at(index)
+		let minLon = Number.POSITIVE_INFINITY
+		let minLat = Number.POSITIVE_INFINITY
+		let maxLon = Number.NEGATIVE_INFINITY
+		let maxLat = Number.NEGATIVE_INFINITY
+		let hasWay = false
+
+		for (let i = start; i < start + count; i++) {
+			const type = RELATION_MEMBER_TYPES[this.memberTypes.at(i)]
+			if (type !== "way") continue
+
+			const wayId = this.memberRefs.at(i)
+			if (wayId === undefined) continue
+
+			const wayIndex = ways.ids.getIndexFromId(wayId)
+			if (wayIndex === -1) continue
+
+			// Get way bbox - stored as [minX, minY, maxX, maxY] per way
+			const bboxOffset = wayIndex * 4
+			const wMinLon = ways.bbox.array[bboxOffset]
+			const wMinLat = ways.bbox.array[bboxOffset + 1]
+			const wMaxLon = ways.bbox.array[bboxOffset + 2]
+			const wMaxLat = ways.bbox.array[bboxOffset + 3]
+
+			if (
+				wMinLon !== undefined &&
+				wMinLat !== undefined &&
+				wMaxLon !== undefined &&
+				wMaxLat !== undefined &&
+				!Number.isNaN(wMinLon) &&
+				!Number.isNaN(wMinLat) &&
+				!Number.isNaN(wMaxLon) &&
+				!Number.isNaN(wMaxLat)
+			) {
+				minLon = Math.min(minLon, wMinLon)
+				minLat = Math.min(minLat, wMinLat)
+				maxLon = Math.max(maxLon, wMaxLon)
+				maxLat = Math.max(maxLat, wMaxLat)
+				hasWay = true
+			}
+		}
+
+		if (!hasWay) return null
+		return [minLon, minLat, maxLon, maxLat]
+	}
+
+	/**
+	 * Find relations that intersect a bounding box.
+	 * Uses way spatial indexes - relations don't have their own spatial index.
+	 * A relation intersects if any of its member ways intersect the bbox.
+	 */
+	intersects(
+		bbox: GeoBbox2D,
+		ways: Ways,
+		filterFn?: (index: number) => boolean,
+	): number[] {
+		// First, find all ways that intersect the bbox
+		const intersectingWayIndexes = ways.intersects(bbox)
+		const intersectingWayIds = new Set<number>()
+		for (const wayIndex of intersectingWayIndexes) {
+			const wayId = ways.ids.at(wayIndex)
+			if (wayId !== undefined) {
+				intersectingWayIds.add(wayId)
+			}
+		}
+
+		// Then, find relations that have any of these ways as members
+		const relationIndexes: number[] = []
+		for (let i = 0; i < this.size; i++) {
+			if (filterFn && !filterFn(i)) continue
+
+			const start = this.memberStart.at(i)
+			const count = this.memberCount.at(i)
+			for (let j = start; j < start + count; j++) {
+				const type = RELATION_MEMBER_TYPES[this.memberTypes.at(j)]
+				if (type === "way") {
+					const wayId = this.memberRefs.at(j)
+					if (wayId !== undefined && intersectingWayIds.has(wayId)) {
+						relationIndexes.push(i)
+						break // Found a matching way, no need to check more
+					}
+				}
+			}
+		}
+
+		return relationIndexes
 	}
 }

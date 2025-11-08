@@ -58,6 +58,17 @@ const wayPolygonsOutlinePaint: LineLayerSpecification["paint"] = {
 	"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 1],
 }
 
+const relationPolygonsPaint: FillLayerSpecification["paint"] = {
+	"fill-color": "blue",
+	"fill-opacity": 0.25,
+}
+
+const relationPolygonsOutlinePaint: LineLayerSpecification["paint"] = {
+	"line-color": "blue",
+	"line-opacity": 0.5,
+	"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 1],
+}
+
 const nodesPaint: CircleLayerSpecification["paint"] = {
 	"circle-color": ["rgba", 255, 255, 255, 1],
 	"circle-opacity": 1,
@@ -83,6 +94,8 @@ const wayPolygonsFilter: FilterSpecification = [
 	"Polygon",
 ]
 
+const relationFilter: FilterSpecification = ["==", ["get", "type"], "relation"]
+
 export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 	const map = useMap()
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
@@ -93,6 +106,8 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 	const waysLayerId = `${overlayId}:ways`
 	const wayPolygonsLayerId = `${waysLayerId}:polygons`
 	const nodesLayerId = `${overlayId}:nodes`
+	const relationsLayerId = `${overlayId}:relations`
+	const relationPolygonsLayerId = `${relationsLayerId}:polygons`
 	const sourceLayerPrefix = `@osmix:${osm.id}`
 
 	const clearHover = useCallback(() => {
@@ -107,6 +122,10 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 				map.removeFeatureState({
 					source: sourceId,
 					sourceLayer: `${sourceLayerPrefix}:nodes`,
+				})
+				map.removeFeatureState({
+					source: sourceId,
+					sourceLayer: `${sourceLayerPrefix}:relations`,
 				})
 			}
 		}
@@ -125,11 +144,13 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 				selectEntity(osm, osm.nodes.getById(feature.id))
 			} else if (feature.properties?.type === "way") {
 				selectEntity(osm, osm.ways.getById(feature.id))
+			} else if (feature.properties?.type === "relation") {
+				selectEntity(osm, osm.relations.getById(feature.id))
 			} else {
 				selectEntity(osm, null)
 			}
 		},
-		[osm, selectEntity, osm.nodes, osm.ways],
+		[osm, selectEntity, osm.nodes, osm.ways, osm.relations],
 	)
 
 	const handleMove = useCallback(
@@ -154,11 +175,10 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 				id: feature.id,
 			})
 			if (!fs.hover) {
+				const featureType = feature.properties?.type || "unknown"
 				popupRef
 					.current!.setLngLat(event.lngLat)
-					.setHTML(
-						tooltipTemplate({ id: feature.id, type: feature.properties?.type }),
-					)
+					.setHTML(tooltipTemplate({ id: feature.id, type: featureType }))
 					.addTo(map.getMap())
 				map.removeFeatureState({
 					source: feature.source,
@@ -185,13 +205,19 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 		if (!map) return
 		let attached = false
 
-		const layerIds = [nodesLayerId, waysLayerId, wayPolygonsLayerId]
+		const layerIds = [
+			nodesLayerId,
+			waysLayerId,
+			wayPolygonsLayerId,
+			relationPolygonsLayerId,
+		]
 		const attachHandlers = () => {
 			if (attached) return
 			if (
 				!map.getLayer(nodesLayerId) ||
 				!map.getLayer(waysLayerId) ||
-				!map.getLayer(wayPolygonsLayerId)
+				!map.getLayer(wayPolygonsLayerId) ||
+				!map.getLayer(relationPolygonsLayerId)
 			)
 				return
 			map.on("click", layerIds, handleClick)
@@ -222,6 +248,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 		nodesLayerId,
 		waysLayerId,
 		wayPolygonsLayerId,
+		relationPolygonsLayerId,
 	])
 
 	return (
@@ -232,6 +259,21 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 			bounds={osm.bbox()}
 			minzoom={MIN_PICKABLE_ZOOM}
 		>
+			{/* Polygon fills - rendered first (behind everything) */}
+			<Layer
+				id={relationPolygonsLayerId}
+				filter={relationFilter}
+				type="fill"
+				{...{ "source-layer": `${sourceLayerPrefix}:relations` }}
+				paint={relationPolygonsPaint}
+			/>
+			<Layer
+				id={`${relationPolygonsLayerId}:outline`}
+				filter={relationFilter}
+				type="line"
+				{...{ "source-layer": `${sourceLayerPrefix}:relations` }}
+				paint={relationPolygonsOutlinePaint}
+			/>
 			<Layer
 				id={wayPolygonsLayerId}
 				filter={wayPolygonsFilter}
@@ -246,6 +288,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 				{...{ "source-layer": `${sourceLayerPrefix}:ways` }}
 				paint={wayPolygonsOutlinePaint}
 			/>
+			{/* Way lines - rendered on top of polygon fills */}
 			<Layer
 				id={`${waysLayerId}:outline`}
 				filter={wayLinesFilter}
@@ -262,6 +305,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 				layout={waysLayout}
 				paint={waysPaint}
 			/>
+			{/* Nodes - rendered on top of lines */}
 			<Layer
 				id={nodesLayerId}
 				filter={nodeFilter}

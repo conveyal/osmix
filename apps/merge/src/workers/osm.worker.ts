@@ -8,8 +8,9 @@ import {
 } from "@osmix/change"
 import { fromGeoJSON, Osmix, throttle } from "@osmix/core"
 import type { OsmEntityType } from "@osmix/json"
+import { buildRelationRings, isMultipolygonRelation } from "@osmix/json"
 import { OsmixRasterTile } from "@osmix/raster"
-import type { GeoBbox2D, Tile } from "@osmix/shared/types"
+import type { GeoBbox2D, LonLat, Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, transfer, wrap } from "comlink"
 import { dequal } from "dequal/lite"
@@ -116,16 +117,46 @@ export class OsmixWorker {
 		if (!bboxContainsOrIntersects(bbox, osm.bbox())) return new ArrayBuffer(0)
 
 		const rasterTile = new OsmixRasterTile(tile, tileSize)
+
+		// Get way IDs that are part of relations (to exclude from individual rendering)
+		const relationWayIds = osm.relations.getWayMemberIds()
+
+		// Draw ways (excluding those that are part of relations)
 		const timer = `OsmixRasterTile.drawWays:${tile[2]}/${tile[0]}/${tile[1]}`
 		console.time(timer)
 		osm.ways.intersects(bbox, (wayIndex) => {
+			const wayId = osm.ways.ids.at(wayIndex)
+			// Skip ways that are part of relations (they will be rendered via relations)
+			if (wayId !== undefined && relationWayIds.has(wayId)) return false
 			// Skip ways without tags (they are likely only for relations)
-			const tags = osm.ways.tags.getTags(wayIndex)
-			if (!tags || Object.keys(tags).length === 0) return false
+			// const tags = osm.ways.tags.getTags(wayIndex)
+			// if (!tags || Object.keys(tags).length === 0) return false
 			rasterTile.drawWay(osm.ways.getCoordinates(wayIndex, osm.nodes))
 			return false
 		})
 		console.timeEnd(timer)
+
+		// Draw relations (multipolygon relations)
+		const relationTimer = `OsmixRasterTile.drawRelations:${tile[2]}/${tile[0]}/${tile[1]}`
+		console.time(relationTimer)
+		const relationIndexes = osm.relations.intersects(bbox, osm.ways)
+
+		for (const relIndex of relationIndexes) {
+			const relation = osm.relations.getByIndex(relIndex)
+			if (!isMultipolygonRelation(relation)) continue
+
+			const getWay = (wayId: number) => osm.ways.getById(wayId)
+			const getNodeCoordinates = (nodeId: number): LonLat | undefined => {
+				const ll = osm.nodes.getNodeLonLat({ id: nodeId })
+				return ll ? [ll[0], ll[1]] : undefined
+			}
+
+			const rings = buildRelationRings(relation, getWay, getNodeCoordinates)
+			if (rings.length > 0) {
+				rasterTile.drawRelation(rings)
+			}
+		}
+		console.timeEnd(relationTimer)
 
 		const data = await rasterTileToImageBuffer(rasterTile)
 		return transfer(data, [data])

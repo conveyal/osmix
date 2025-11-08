@@ -440,8 +440,10 @@ export class Osmix {
 			)
 		}
 		if (isRelation(entity)) {
-			return relationToFeature(entity, (ref) =>
-				this.nodes.getNodeLonLat({ id: ref }),
+			return relationToFeature(
+				entity,
+				(ref) => this.nodes.getNodeLonLat({ id: ref }),
+				(ref) => this.ways.getById(ref),
 			)
 		}
 		throw new Error("Unknown entity type")

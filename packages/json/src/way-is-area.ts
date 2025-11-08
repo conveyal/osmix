@@ -9,7 +9,7 @@ const IMPLIED_ANY_VALUE_BUT_NO = new Set([
 	"building",
 	"building:part",
 	"craft",
-	"golf",
+	// 	"golf", Seeing a lot of golf=cartpath which is not an area
 	"historic",
 	"indoor",
 	"landuse",
