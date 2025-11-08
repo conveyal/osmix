@@ -2,9 +2,9 @@ import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { LonLat, Tile, XY } from "@osmix/shared/types"
 import { describe, expect, it } from "vitest"
 import {
-	DEFAULT_NODE_COLOR,
+	DEFAULT_Line_COLOR,
+	DEFAULT_POINT_COLOR,
 	DEFAULT_RASTER_TILE_SIZE,
-	DEFAULT_WAY_COLOR,
 	OsmixRasterTile,
 } from "../src/raster-tile"
 
@@ -48,7 +48,7 @@ describe("OsmixRasterTile", () => {
 
 		const idx = (nodePixel[1] * tileSize + nodePixel[0]) * 4
 		expect(Array.from(tile.imageData.slice(idx, idx + 4))).toEqual(
-			Array.from(DEFAULT_NODE_COLOR),
+			Array.from(DEFAULT_POINT_COLOR),
 		)
 	})
 
@@ -81,10 +81,10 @@ describe("OsmixRasterTile", () => {
 		const startIdx = tile.getIndex(startPixel)
 		const endIdx = tile.getIndex(endPixel)
 		expect(Array.from(tile.imageData.slice(startIdx, startIdx + 4))).toEqual(
-			Array.from(DEFAULT_WAY_COLOR),
+			Array.from(DEFAULT_Line_COLOR),
 		)
 		expect(Array.from(tile.imageData.slice(endIdx, endIdx + 4))).toEqual(
-			Array.from(DEFAULT_WAY_COLOR),
+			Array.from(DEFAULT_Line_COLOR),
 		)
 	})
 
@@ -109,14 +109,14 @@ describe("OsmixRasterTile", () => {
 		// Check that pixels inside the polygon are filled
 		const centerIdx = tile.getIndex([20, 20])
 		expect(Array.from(tile.imageData.slice(centerIdx, centerIdx + 4))).toEqual(
-			Array.from(DEFAULT_WAY_COLOR),
+			Array.from(DEFAULT_Line_COLOR),
 		)
 
 		// Check that pixels outside are not filled (assuming initial state is transparent/black)
 		const outsideIdx = tile.getIndex([5, 5])
-		expect(Array.from(tile.imageData.slice(outsideIdx, outsideIdx + 4))).toEqual([
-			0, 0, 0, 0,
-		])
+		expect(
+			Array.from(tile.imageData.slice(outsideIdx, outsideIdx + 4)),
+		).toEqual([0, 0, 0, 0])
 	})
 
 	it("fills polygons with holes correctly", () => {
@@ -150,13 +150,13 @@ describe("OsmixRasterTile", () => {
 		const insideOuterIdx = tile.getIndex([15, 15])
 		expect(
 			Array.from(tile.imageData.slice(insideOuterIdx, insideOuterIdx + 4)),
-		).toEqual(Array.from(DEFAULT_WAY_COLOR))
+		).toEqual(Array.from(DEFAULT_Line_COLOR))
 
 		// Check that pixels inside the hole are NOT filled (even-odd rule)
 		const insideHoleIdx = tile.getIndex([30, 30])
-		expect(Array.from(tile.imageData.slice(insideHoleIdx, insideHoleIdx + 4))).toEqual(
-			[0, 0, 0, 0],
-		)
+		expect(
+			Array.from(tile.imageData.slice(insideHoleIdx, insideHoleIdx + 4)),
+		).toEqual([0, 0, 0, 0])
 	})
 
 	it("draws MultiPolygons correctly", () => {
@@ -192,14 +192,14 @@ describe("OsmixRasterTile", () => {
 
 		// Check that both polygons are filled
 		const firstPolyIdx = tile.getIndex([15, 15])
-		expect(Array.from(tile.imageData.slice(firstPolyIdx, firstPolyIdx + 4))).toEqual(
-			Array.from(DEFAULT_WAY_COLOR),
-		)
+		expect(
+			Array.from(tile.imageData.slice(firstPolyIdx, firstPolyIdx + 4)),
+		).toEqual(Array.from(DEFAULT_Line_COLOR))
 
 		const secondPolyIdx = tile.getIndex([35, 35])
-		expect(Array.from(tile.imageData.slice(secondPolyIdx, secondPolyIdx + 4))).toEqual(
-			Array.from(DEFAULT_WAY_COLOR),
-		)
+		expect(
+			Array.from(tile.imageData.slice(secondPolyIdx, secondPolyIdx + 4)),
+		).toEqual(Array.from(DEFAULT_Line_COLOR))
 	})
 
 	it("handles empty polygon rings gracefully", () => {
@@ -209,5 +209,115 @@ describe("OsmixRasterTile", () => {
 		// Should not throw
 		tile.drawPolygon([])
 		expect(tile.imageData.every((v) => v === 0)).toBe(true)
+	})
+
+	it("handles polygon with hole correctly (winding order)", () => {
+		const tileIndex: Tile = [10, 11, 5]
+		const tileSize = DEFAULT_RASTER_TILE_SIZE
+		const { tile, merc } = createTile(tileIndex, tileSize)
+
+		// Create outer square (counterclockwise for GeoJSON)
+		const outerRing: LonLat[] = [
+			lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
+			lonLatForPixel(merc, tileIndex, tileSize, 30, 10),
+			lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
+			lonLatForPixel(merc, tileIndex, tileSize, 10, 30),
+			lonLatForPixel(merc, tileIndex, tileSize, 10, 10), // closed
+		]
+
+		// Create inner square hole (clockwise for GeoJSON)
+		const innerRing: LonLat[] = [
+			lonLatForPixel(merc, tileIndex, tileSize, 15, 15),
+			lonLatForPixel(merc, tileIndex, tileSize, 15, 25),
+			lonLatForPixel(merc, tileIndex, tileSize, 25, 25),
+			lonLatForPixel(merc, tileIndex, tileSize, 25, 15),
+			lonLatForPixel(merc, tileIndex, tileSize, 15, 15), // closed
+		]
+
+		tile.drawPolygon([outerRing, innerRing])
+
+		// Check that pixels inside outer but outside inner are filled
+		// Point at [12, 12] is inside outer ring (10-30) but outside inner ring (15-25)
+		const insideOuter = tile.getIndex([12, 12])
+		expect(
+			Array.from(tile.imageData.slice(insideOuter, insideOuter + 4)),
+		).toEqual(Array.from(DEFAULT_Line_COLOR))
+
+		// Check that pixels inside inner (hole) are NOT filled
+		const insideHole = tile.getIndex([20, 20])
+		const holeColor = Array.from(
+			tile.imageData.slice(insideHole, insideHole + 4),
+		)
+		expect(holeColor[3]).toBe(0) // Alpha should be 0 (transparent)
+	})
+
+	it("handles multipolygon with multiple separate polygons", () => {
+		const tileIndex: Tile = [10, 11, 5]
+		const tileSize = DEFAULT_RASTER_TILE_SIZE
+		const { tile, merc } = createTile(tileIndex, tileSize)
+
+		// First polygon
+		const polygon1: LonLat[][] = [
+			[
+				lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
+				lonLatForPixel(merc, tileIndex, tileSize, 20, 10),
+				lonLatForPixel(merc, tileIndex, tileSize, 20, 20),
+				lonLatForPixel(merc, tileIndex, tileSize, 10, 20),
+				lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
+			],
+		]
+
+		// Second polygon (separate)
+		const polygon2: LonLat[][] = [
+			[
+				lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
+				lonLatForPixel(merc, tileIndex, tileSize, 40, 30),
+				lonLatForPixel(merc, tileIndex, tileSize, 40, 40),
+				lonLatForPixel(merc, tileIndex, tileSize, 30, 40),
+				lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
+			],
+		]
+
+		tile.drawMultiPolygon([polygon1, polygon2])
+
+		// Check first polygon is filled
+		const center1 = tile.getIndex([15, 15])
+		expect(Array.from(tile.imageData.slice(center1, center1 + 4))).toEqual(
+			Array.from(DEFAULT_Line_COLOR),
+		)
+
+		// Check second polygon is filled
+		const center2 = tile.getIndex([35, 35])
+		expect(Array.from(tile.imageData.slice(center2, center2 + 4))).toEqual(
+			Array.from(DEFAULT_Line_COLOR),
+		)
+
+		// Check area between polygons is NOT filled
+		const between = tile.getIndex([25, 25])
+		const betweenColor = Array.from(tile.imageData.slice(between, between + 4))
+		expect(betweenColor[3]).toBe(0) // Should be transparent
+	})
+
+	it("normalizes winding order using rewind", () => {
+		const tileIndex: Tile = [10, 11, 5]
+		const tileSize = DEFAULT_RASTER_TILE_SIZE
+		const { tile, merc } = createTile(tileIndex, tileSize)
+
+		// Create polygon with clockwise winding (should be normalized to counterclockwise)
+		const clockwiseRing: LonLat[] = [
+			lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
+			lonLatForPixel(merc, tileIndex, tileSize, 10, 30),
+			lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
+			lonLatForPixel(merc, tileIndex, tileSize, 30, 10),
+			lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
+		]
+
+		tile.drawPolygon([clockwiseRing])
+
+		// Should still fill correctly regardless of input winding
+		const center = tile.getIndex([20, 20])
+		expect(Array.from(tile.imageData.slice(center, center + 4))).toEqual(
+			Array.from(DEFAULT_Line_COLOR),
+		)
 	})
 })

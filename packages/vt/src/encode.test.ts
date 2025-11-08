@@ -3,7 +3,7 @@ import { Osmix } from "@osmix/core"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import Protobuf from "pbf"
-import { assert, describe, expect, it } from "vitest"
+import { describe, expect, it } from "vitest"
 import { OsmixVtEncoder } from "./encode"
 
 const osm = new Osmix()
@@ -38,6 +38,7 @@ osm.nodes.addNode({
 osm.ways.addWay({
 	id: 5,
 	refs: [1, 2],
+	tags: { highway: "primary" },
 })
 osm.buildIndexes()
 osm.buildSpatialIndexes()
@@ -76,15 +77,15 @@ describe("OsmixVtEncoder", () => {
 		expect(result.byteLength).toBeGreaterThan(0)
 
 		const layers = decodeTile(result)
-		assert.isDefined(layers[NODE_LAYER_ID])
-		expect(layers[NODE_LAYER_ID].length).toBe(1)
-		assert.isDefined(layers[WAY_LAYER_ID])
-		expect(layers[WAY_LAYER_ID].length).toBe(1)
+		expect(layers[NODE_LAYER_ID]).toBeDefined()
+		expect(layers[NODE_LAYER_ID]?.length).toBe(1)
+		expect(layers[WAY_LAYER_ID]).toBeDefined()
+		expect(layers[WAY_LAYER_ID]?.length).toBe(1)
 
-		const features = [
-			layers[NODE_LAYER_ID].feature(0),
-			layers[WAY_LAYER_ID].feature(0),
-		]
+		const nodeLayer = layers[NODE_LAYER_ID]
+		const wayLayer = layers[WAY_LAYER_ID]
+		if (!nodeLayer || !wayLayer) throw new Error("Layers not found")
+		const features = [nodeLayer.feature(0), wayLayer.feature(0)]
 
 		const node = features.find(
 			(feature) => feature.properties["type"] === "node",
@@ -124,9 +125,10 @@ describe("OsmixVtEncoder", () => {
 
 		const layers = decodeTile(result)
 		const wayLayer = layers[`@osmix:${testOsm.id}:ways`]
-		expect(wayLayer.length).toBe(1)
+		expect(wayLayer?.length).toBe(1)
 
-		const feature = wayLayer.feature(0)
+		const feature = wayLayer?.feature(0)
+		if (!feature) throw new Error("Feature not found")
 		expect(feature.type).toBe(3) // POLYGON type
 		expect(feature.properties["type"]).toBe("way")
 		expect(feature.properties["building"]).toBe("yes")
@@ -209,25 +211,164 @@ describe("OsmixVtEncoder", () => {
 		expect(outerRing).toBeDefined()
 
 		// Process as outer ring (should be clockwise)
-		const processedOuter = encoder["processClippedPolygonRing"](outerRing!, true)
+		const processedOuter = encoder["processClippedPolygonRing"](
+			outerRing!,
+			true,
+		)
 		expect(processedOuter.length).toBeGreaterThan(0)
 
 		// Process as inner ring (should be counterclockwise)
-		const processedInner = encoder["processClippedPolygonRing"](outerRing!, false)
+		const processedInner = encoder["processClippedPolygonRing"](
+			outerRing!,
+			false,
+		)
 		expect(processedInner.length).toBeGreaterThan(0)
 
 		// Verify they have opposite winding (area should have opposite signs)
 		const outerArea = processedOuter.reduce((sum, p, i) => {
 			const next = processedOuter[(i + 1) % processedOuter.length]
+			if (!next) return sum
 			return sum + (p[0] * next[1] - next[0] * p[1])
 		}, 0)
 		const innerArea = processedInner.reduce((sum, p, i) => {
 			const next = processedInner[(i + 1) % processedInner.length]
+			if (!next) return sum
 			return sum + (p[0] * next[1] - next[0] * p[1])
 		}, 0)
 
 		// Outer should be clockwise (negative area), inner should be counterclockwise (positive area)
 		expect(outerArea).toBeLessThan(0)
 		expect(innerArea).toBeGreaterThan(0)
+	})
+
+	it("encodes multipolygon relation with correct winding order", () => {
+		const testOsm = new Osmix()
+		// Create nodes for outer square
+		testOsm.nodes.addNode({ id: 1, lat: -1.0, lon: -1.0 })
+		testOsm.nodes.addNode({ id: 2, lat: -1.0, lon: 1.0 })
+		testOsm.nodes.addNode({ id: 3, lat: 1.0, lon: 1.0 })
+		testOsm.nodes.addNode({ id: 4, lat: 1.0, lon: -1.0 })
+		// Create nodes for inner triangle
+		testOsm.nodes.addNode({ id: 5, lat: -0.5, lon: 0.0 })
+		testOsm.nodes.addNode({ id: 6, lat: 0.5, lon: 0.0 })
+		testOsm.nodes.addNode({ id: 7, lat: 0.0, lon: 0.5 })
+
+		// Create outer way
+		testOsm.ways.addWay({
+			id: 10,
+			refs: [1, 2, 3, 4, 1],
+			tags: {},
+		})
+		// Create inner way
+		testOsm.ways.addWay({
+			id: 11,
+			refs: [5, 6, 7, 5],
+			tags: {},
+		})
+
+		// Create multipolygon relation
+		testOsm.relations.addRelation({
+			id: 20,
+			tags: { type: "multipolygon", name: "test" },
+			members: [
+				{ type: "way", ref: 10, role: "outer" },
+				{ type: "way", ref: 11, role: "inner" },
+			],
+		})
+
+		testOsm.buildIndexes()
+		testOsm.buildSpatialIndexes()
+
+		const bbox: GeoBbox2D = [-2, -2, 2, 2]
+		const tile = bboxToTile(bbox)
+		const encoder = new OsmixVtEncoder(testOsm)
+
+		const proj = (ll: [number, number]) => {
+			const [px, py] = merc.px(ll, tile[2])
+			return [px - tile[0] * extent, py - tile[1] * extent] as [number, number]
+		}
+
+		const features = Array.from(encoder.relationFeatures(bbox, proj))
+		expect(features.length).toBeGreaterThan(0)
+
+		const relationFeature = features[0]
+		expect(relationFeature).toBeDefined()
+		expect(relationFeature?.type).toBe(3) // POLYGON
+		expect(relationFeature?.properties.type).toBe("relation")
+
+		const geometry = relationFeature?.geometry
+		expect(geometry).toBeDefined()
+		expect(Array.isArray(geometry)).toBe(true)
+		if (geometry && Array.isArray(geometry) && geometry.length > 0) {
+			const outerRing = geometry[0]
+			expect(outerRing).toBeDefined()
+			if (outerRing && Array.isArray(outerRing) && outerRing.length > 0) {
+				// Verify outer ring is clockwise (negative signed area)
+				const outerArea = outerRing.reduce((sum, p, i) => {
+					const next = outerRing[(i + 1) % outerRing.length]
+					if (!next) return sum
+					return sum + (p[0] * next[1] - next[0] * p[1])
+				}, 0)
+				expect(outerArea).toBeLessThan(0) // Clockwise
+
+				// If there's an inner ring, verify it's counterclockwise
+				if (geometry.length > 1) {
+					const innerRing = geometry[1]
+					if (innerRing && Array.isArray(innerRing) && innerRing.length > 0) {
+						const innerArea = innerRing.reduce((sum, p, i) => {
+							const next = innerRing[(i + 1) % innerRing.length]
+							if (!next) return sum
+							return sum + (p[0] * next[1] - next[0] * p[1])
+						}, 0)
+						expect(innerArea).toBeGreaterThan(0) // Counterclockwise
+					}
+				}
+			}
+		}
+	})
+
+	it("encodes area way as polygon with correct winding order", () => {
+		const testOsm = new Osmix()
+		// Create a square polygon
+		testOsm.nodes.addNode({ id: 1, lat: 40.7, lon: -74.0 })
+		testOsm.nodes.addNode({ id: 2, lat: 40.71, lon: -74.0 })
+		testOsm.nodes.addNode({ id: 3, lat: 40.71, lon: -74.01 })
+		testOsm.nodes.addNode({ id: 4, lat: 40.7, lon: -74.01 })
+		testOsm.ways.addWay({
+			id: 10,
+			refs: [1, 2, 3, 4, 1],
+			tags: { area: "yes", building: "yes" },
+		})
+		testOsm.buildIndexes()
+		testOsm.buildSpatialIndexes()
+
+		const bbox = testOsm.bbox()
+		const tile = bboxToTile(bbox)
+		const encoder = new OsmixVtEncoder(testOsm)
+
+		const proj = (ll: [number, number]) => {
+			const [px, py] = merc.px(ll, tile[2])
+			return [px - tile[0] * extent, py - tile[1] * extent] as [number, number]
+		}
+
+		const features = Array.from(encoder.wayFeatures(bbox, proj))
+		const polygonFeature = features.find((f) => f.type === 3) // POLYGON
+		expect(polygonFeature).toBeDefined()
+
+		if (polygonFeature?.geometry) {
+			const geometry = polygonFeature.geometry
+			if (Array.isArray(geometry) && geometry.length > 0) {
+				const ring = geometry[0]
+				if (ring && Array.isArray(ring) && ring.length > 0) {
+					// Verify clockwise winding (negative area)
+					const area = ring.reduce((sum, p, i) => {
+						const next = ring[(i + 1) % ring.length]
+						if (!next) return sum
+						return sum + (p[0] * next[1] - next[0] * p[1])
+					}, 0)
+					expect(area).toBeLessThan(0) // Should be clockwise for MVT
+				}
+			}
+		}
 	})
 })

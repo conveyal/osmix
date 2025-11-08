@@ -4,8 +4,9 @@ import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
 
 export const DEFAULT_RASTER_IMAGE_TYPE = "image/png"
-export const DEFAULT_WAY_COLOR: Rgba = [255, 255, 255, 255] // white
-export const DEFAULT_NODE_COLOR: Rgba = [255, 0, 0, 255] // red
+export const DEFAULT_LINE_COLOR: Rgba = [255, 255, 255, 230] // semi-transparent white
+export const DEFAULT_POINT_COLOR: Rgba = [255, 0, 0, 255] // red
+export const DEFAULT_AREA_COLOR: Rgba = [0, 0, 255, 64] // low opacity blue
 export const DEFAULT_RASTER_TILE_SIZE = 256
 
 export class OsmixRasterTile {
@@ -21,7 +22,7 @@ export class OsmixRasterTile {
 		return (px[1] * this.proj.tileSize + px[0]) * 4
 	}
 
-	setLonLat(ll: LonLat, color: Rgba = DEFAULT_NODE_COLOR) {
+	setLonLat(ll: LonLat, color: Rgba = DEFAULT_POINT_COLOR) {
 		const px = this.proj.llToTilePx(ll)
 		this.setPixel(px, color)
 	}
@@ -35,7 +36,7 @@ export class OsmixRasterTile {
 		this.imageData[idx + 3] = color[3]
 	}
 
-	drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_WAY_COLOR) {
+	drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR) {
 		const dx = Math.abs(px1[0] - px0[0])
 		const dy = Math.abs(px1[1] - px0[1])
 		const sx = px0[0] < px1[0] ? 1 : -1
@@ -63,7 +64,7 @@ export class OsmixRasterTile {
 		}
 	}
 
-	drawWay(way: LonLat[], color: Rgba = DEFAULT_WAY_COLOR) {
+	drawWay(way: LonLat[], color: Rgba = DEFAULT_LINE_COLOR) {
 		const projectedWay = way.map((ll) => this.proj.llToTilePx(ll))
 		const [clipped] = clipPolyline(projectedWay, [
 			0,
@@ -93,7 +94,7 @@ export class OsmixRasterTile {
 	 * First ring is the outer boundary, subsequent rings are holes.
 	 * Uses even-odd winding rule for fill determination.
 	 */
-	drawPolygon(rings: LonLat[][], color: Rgba = DEFAULT_WAY_COLOR) {
+	drawPolygon(rings: LonLat[][], color: Rgba = DEFAULT_AREA_COLOR) {
 		if (rings.length === 0) return
 
 		// Normalize winding order using rewind (outer counterclockwise, inner clockwise)
@@ -126,11 +127,7 @@ export class OsmixRasterTile {
 				// Ensure ring is closed
 				const first = clipped[0]
 				const last = clipped[clipped.length - 1]
-				if (
-					first &&
-					last &&
-					(first[0] !== last[0] || first[1] !== last[1])
-				) {
+				if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
 					clipped.push([first[0], first[1]])
 				}
 				clippedRings.push(clipped.map((xy) => this.proj.clampAndRoundPx(xy)))
@@ -146,10 +143,18 @@ export class OsmixRasterTile {
 	/**
 	 * Draw a MultiPolygon (multiple polygons, each with optional holes).
 	 */
-	drawMultiPolygon(polygons: LonLat[][][], color: Rgba = DEFAULT_WAY_COLOR) {
+	drawMultiPolygon(polygons: LonLat[][][], color: Rgba = DEFAULT_AREA_COLOR) {
 		for (const polygon of polygons) {
 			this.drawPolygon(polygon, color)
 		}
+	}
+
+	/**
+	 * Draw a relation as polygon(s).
+	 * Takes an array of polygons (each polygon is an array of rings: [outer, ...inner]).
+	 */
+	drawRelation(polygons: LonLat[][][], color: Rgba = DEFAULT_AREA_COLOR) {
+		this.drawMultiPolygon(polygons, color)
 	}
 
 	/**

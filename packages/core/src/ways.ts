@@ -166,10 +166,10 @@ export class Ways extends Entities<OsmWay> {
 		}
 	}
 
-	getRefIds(index: number) {
+	getRefIds(index: number): number[] {
 		const start = this.refStart.at(index)
 		const count = this.refCount.at(index)
-		return this.refs.slice(start, start + count)
+		return Array.from(this.refs.slice(start, start + count))
 	}
 
 	getBbox(idOrIndex: IdOrIndex): GeoBbox2D {

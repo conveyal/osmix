@@ -8,10 +8,11 @@ import {
 	type OsmRelation,
 	type OsmWay,
 } from "@osmix/json"
+import type { ReactNode } from "react"
 import { Fragment } from "react/jsx-runtime"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 
-const noop = (_: OsmNode) => undefined
+const noop = (_: OsmEntity) => undefined
 
 export default function EntityDetails({
 	open,
@@ -21,7 +22,7 @@ export default function EntityDetails({
 }: {
 	open?: boolean
 	entity: OsmEntity
-	onSelect?: (node: OsmNode) => void
+	onSelect?: (entity: OsmEntity) => void
 	osm?: Osmix
 }) {
 	if (isNode(entity)) return <NodeDetails node={entity} open={open} />
@@ -44,7 +45,24 @@ export default function EntityDetails({
 			</WayDetails>
 		)
 	if (isRelation(entity))
-		return <RelationDetails relation={entity} open={open} />
+		return (
+			<RelationDetails relation={entity} open={open}>
+				{osm && (
+					<Details open={false}>
+						<DetailsSummary>
+							RELATION MEMBERS ({entity.members.length})
+						</DetailsSummary>
+						<DetailsContent>
+							<RelationMemberListTable
+								members={entity.members}
+								osm={osm}
+								onSelect={onSelect}
+							/>
+						</DetailsContent>
+					</Details>
+				)}
+			</RelationDetails>
+		)
 }
 
 export function EntityContent({ entity }: { entity: OsmEntity }) {
@@ -120,10 +138,6 @@ export function RelationContent({ relation }: { relation: OsmRelation }) {
 	return (
 		<table className="w-full">
 			<tbody>
-				<tr>
-					<td>members</td>
-					<td>{relation.members.join(",")}</td>
-				</tr>
 				<TagList tags={relation.tags} />
 			</tbody>
 		</table>
@@ -132,16 +146,21 @@ export function RelationContent({ relation }: { relation: OsmRelation }) {
 
 export function RelationDetails({
 	relation,
+	children,
 	open,
 }: {
 	relation: OsmRelation
+	children?: ReactNode
 	open?: boolean
 }) {
 	return (
 		<Details open={open}>
-			<DetailsSummary>RELATION {relation.id}</DetailsSummary>
+			<DetailsSummary className="font-bold">
+				RELATION {relation.id}
+			</DetailsSummary>
 			<DetailsContent>
 				<RelationContent relation={relation} />
+				{children}
 			</DetailsContent>
 		</Details>
 	)
@@ -212,6 +231,69 @@ function NodeListTable({
 							))}
 					</Fragment>
 				))}
+			</tbody>
+		</table>
+	)
+}
+
+function RelationMemberListTable({
+	members,
+	osm,
+	onSelect,
+}: {
+	members: OsmRelation["members"]
+	osm: Osmix
+	onSelect: (entity: OsmEntity) => void
+}) {
+	return (
+		<table className="table-auto">
+			<tbody>
+				{members.map((member, i) => {
+					let entity: OsmEntity | null = null
+					if (member.type === "node") {
+						entity = osm.nodes.getById(member.ref)
+					} else if (member.type === "way") {
+						entity = osm.ways.getById(member.ref)
+					} else if (member.type === "relation") {
+						entity = osm.relations.getById(member.ref)
+					}
+
+					return (
+						<Fragment key={`${member.type}-${member.ref}-${i}`}>
+							<tr
+								onClick={() => entity && onSelect(entity)}
+								onKeyDown={() => entity && onSelect(entity)}
+								className={entity ? "cursor-pointer" : ""}
+							>
+								<td>{i + 1}</td>
+								<td>{member.type}</td>
+								<td>{member.ref}</td>
+								<td>{member.role || ""}</td>
+								{member.type === "node" && entity && (
+									<td>
+										{(entity as OsmNode).lon}, {(entity as OsmNode).lat}
+									</td>
+								)}
+								{member.type === "way" && entity && (
+									<td>{(entity as OsmWay).refs.length} nodes</td>
+								)}
+								{member.type === "relation" && entity && (
+									<td>{(entity as OsmRelation).members.length} members</td>
+								)}
+								{!entity && <td className="text-gray-500">not found</td>}
+							</tr>
+							{entity?.tags &&
+								Object.entries(entity.tags).map(([k, v]) => (
+									<tr key={`${member.type}-${member.ref}-${k}`}>
+										<td />
+										<td />
+										<td>{k}</td>
+										<td colSpan={2}>{String(v)}</td>
+									</tr>
+								))}
+						</Fragment>
+					)
+				})}
 			</tbody>
 		</table>
 	)

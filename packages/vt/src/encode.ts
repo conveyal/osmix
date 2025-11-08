@@ -1,5 +1,9 @@
 import type { Osmix } from "@osmix/core"
-import { wayIsArea } from "@osmix/json"
+import {
+	buildRelationRings,
+	isMultipolygonRelation,
+	wayIsArea,
+} from "@osmix/json"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
@@ -45,6 +49,7 @@ export function projectToTile(
 export class OsmixVtEncoder {
 	readonly nodeLayerName: string
 	readonly wayLayerName: string
+	readonly relationLayerName: string
 	private readonly osmix: Osmix
 	private readonly extent: number
 	private readonly extentBbox: [number, number, number, number]
@@ -60,6 +65,7 @@ export class OsmixVtEncoder {
 		const layerName = `@osmix:${osmix.id}`
 		this.nodeLayerName = `${layerName}:nodes`
 		this.wayLayerName = `${layerName}:ways`
+		this.relationLayerName = `${layerName}:relations`
 	}
 
 	getTile(tile: Tile): ArrayBuffer {
@@ -69,12 +75,15 @@ export class OsmixVtEncoder {
 	}
 
 	getTileForBbox(bbox: GeoBbox2D, proj: (ll: LonLat) => XY): ArrayBuffer {
-		const layer = writeVtPbf([
+		// Get way IDs that are part of relations (to exclude from individual rendering)
+		const relationWayIds = this.osmix.relations.getWayMemberIds()
+
+		const layers = [
 			{
 				name: this.wayLayerName,
 				version: 2,
 				extent: this.extent,
-				features: this.wayFeatures(bbox, proj),
+				features: this.wayFeatures(bbox, proj, relationWayIds),
 			},
 			{
 				name: this.nodeLayerName,
@@ -82,8 +91,14 @@ export class OsmixVtEncoder {
 				extent: this.extent,
 				features: this.nodeFeatures(bbox, proj),
 			},
-		])
-		return layer
+			{
+				name: this.relationLayerName,
+				version: 2,
+				extent: this.extent,
+				features: this.relationFeatures(bbox, proj),
+			},
+		]
+		return writeVtPbf(layers)
 	}
 
 	*nodeFeatures(
@@ -101,7 +116,7 @@ export class OsmixVtEncoder {
 			yield {
 				id,
 				type: SF_TYPE.POINT,
-				properties: { type: "node", ...tags },
+				properties: { ...tags, type: "node" },
 				geometry: [[proj(ll)]],
 			}
 		}
@@ -110,12 +125,15 @@ export class OsmixVtEncoder {
 	*wayFeatures(
 		bbox: GeoBbox2D,
 		proj: (ll: LonLat) => XY,
+		relationWayIds?: Set<number>,
 	): Generator<VtSimpleFeature> {
 		const wayIndexes = this.osmix.ways.intersects(bbox)
 		for (let i = 0; i < wayIndexes.length; i++) {
 			const wayIndex = wayIndexes[i]
 			if (wayIndex === undefined) continue
 			const id = this.osmix.ways.ids.at(wayIndex)
+			// Skip ways that are part of relations (they will be rendered via relations)
+			if (id !== undefined && relationWayIds?.has(id)) continue
 			const tags = this.osmix.ways.tags.getTags(wayIndex)
 			// Skip ways without tags (they are likely only for relations)
 			if (!tags || Object.keys(tags).length === 0) continue
@@ -127,7 +145,11 @@ export class OsmixVtEncoder {
 				const ll = this.osmix.nodes.getNodeLonLat({ id: ref })
 				points[i] = proj(ll)
 			}
-			const isArea = wayIsArea({ id, refs: new Array(count).fill(0), tags })
+			const isArea = wayIsArea({
+				id,
+				refs: this.osmix.ways.getRefIds(wayIndex),
+				tags,
+			})
 			const geometry: VtSimpleFeatureGeometry = []
 			if (isArea) {
 				// 1. clip polygon in tile coords (returns array of rings)
@@ -165,7 +187,7 @@ export class OsmixVtEncoder {
 			yield {
 				id,
 				type: isArea ? SF_TYPE.POLYGON : SF_TYPE.LINE,
-				properties: { type: "way", ...tags },
+				properties: { ...tags, type: "way" },
 				geometry,
 			}
 		}
@@ -198,6 +220,68 @@ export class OsmixVtEncoder {
 			: ensureCounterclockwise(cleaned)
 
 		return oriented
+	}
+
+	*relationFeatures(
+		bbox: GeoBbox2D,
+		proj: (ll: LonLat) => XY,
+	): Generator<VtSimpleFeature> {
+		const relationIndexes = this.osmix.relations.intersects(
+			bbox,
+			this.osmix.ways,
+		)
+
+		for (const relIndex of relationIndexes) {
+			const relation = this.osmix.relations.getByIndex(relIndex)
+			if (!isMultipolygonRelation(relation)) continue
+
+			const id = this.osmix.relations.ids.at(relIndex)
+			const tags = this.osmix.relations.tags.getTags(relIndex)
+
+			const getWay = (wayId: number) => this.osmix.ways.getById(wayId)
+			const getNodeCoordinates = (nodeId: number): LonLat | undefined => {
+				const ll = this.osmix.nodes.getNodeLonLat({ id: nodeId })
+				return ll ? [ll[0], ll[1]] : undefined
+			}
+
+			const rings = buildRelationRings(relation, getWay, getNodeCoordinates)
+			if (rings.length === 0) continue
+
+			// Process each polygon in the relation
+			for (const polygon of rings) {
+				const geometry: VtSimpleFeatureGeometry = []
+
+				// Process outer ring and inner rings (holes)
+				for (let ringIndex = 0; ringIndex < polygon.length; ringIndex++) {
+					const ring = polygon[ringIndex]
+					if (!ring || ring.length < 3) continue
+
+					// Project ring to tile coordinates
+					const projectedRing: XY[] = ring.map((ll: LonLat) => proj(ll))
+
+					// Clip polygon ring
+					const clipped = clipPolygon(projectedRing, this.extentBbox)
+					if (clipped.length < 3) continue
+
+					// Process ring (round/clamp, dedupe, close, orient)
+					const isOuter = ringIndex === 0
+					const processedRing = this.processClippedPolygonRing(clipped, isOuter)
+
+					if (processedRing.length > 0) {
+						geometry.push(processedRing)
+					}
+				}
+
+				if (geometry.length === 0) continue
+
+				yield {
+					id: id ?? 0,
+					type: SF_TYPE.POLYGON,
+					properties: { ...tags, type: "relation" },
+					geometry,
+				}
+			}
+		}
 	}
 
 	clampAndRoundPoint(xy: XY): XY {
