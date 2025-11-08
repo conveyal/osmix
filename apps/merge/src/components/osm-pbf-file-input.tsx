@@ -6,9 +6,7 @@ function isOsmFile(file: File | null): file is File {
 	if (file == null) return false
 	const name = file.name.toLowerCase()
 	return (
-		name.endsWith(".pbf") ||
-		name.endsWith(".geojson") ||
-		name.endsWith(".json")
+		name.endsWith(".pbf") || name.endsWith(".geojson") || name.endsWith(".json")
 	)
 }
 

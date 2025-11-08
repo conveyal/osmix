@@ -220,7 +220,7 @@ describe("fromGeoJSON", () => {
 		expect(node?.tags?.["undefinedValue"]).toBeUndefined()
 	})
 
-	it("should reuse nodes when LineStrings share coordinates", () => {
+	it("should create separate nodes when LineStrings share coordinates", () => {
 		const geojson: FeatureCollection<LineString> = {
 			type: "FeatureCollection",
 			features: [
@@ -255,15 +255,18 @@ describe("fromGeoJSON", () => {
 
 		const osm = fromGeoJSON(geojson)
 
-		// Should have 3 unique nodes (not 4)
-		expect(osm.nodes.size).toBe(3)
+		// Should have 4 nodes (no deduplication)
+		expect(osm.nodes.size).toBe(4)
 		expect(osm.ways.size).toBe(2)
 
 		const way1 = osm.ways.getById(1)
 		const way2 = osm.ways.getById(2)
 
-		// Both ways should reference the same node at [-122.4094, 37.7849]
-		expect(way1?.refs[1]).toBe(way2?.refs[0])
+		// Each way should have its own nodes (no reuse)
+		expect(way1?.refs).toHaveLength(2)
+		expect(way2?.refs).toHaveLength(2)
+		// Nodes at the same coordinate are separate
+		expect(way1?.refs[1]).not.toBe(way2?.refs[0])
 	})
 
 	it("should skip invalid LineStrings with less than 2 coordinates", () => {
@@ -343,7 +346,8 @@ describe("fromGeoJSON", () => {
 
 		const osm = fromGeoJSON(geojson)
 
-		expect(osm.nodes.size).toBe(3) // 2 points + 1 shared node from LineString
+		// Should have 4 nodes (2 points + 2 nodes from LineString, no deduplication)
+		expect(osm.nodes.size).toBe(4)
 		expect(osm.ways.size).toBe(1)
 
 		const way = osm.ways.getById(1)

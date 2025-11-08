@@ -1,4 +1,4 @@
-import type { OsmNode, OsmTags } from "@osmix/json"
+import type { OsmTags } from "@osmix/json"
 import type { FeatureCollection, LineString, Point } from "geojson"
 import type { OsmixOptions } from "./osmix"
 import { Osmix } from "./osmix"
@@ -8,6 +8,7 @@ import { Osmix } from "./osmix"
  * Points are converted to Nodes, LineStrings are converted to Ways with Nodes.
  * Feature IDs are used if present, otherwise sequential IDs are generated.
  * All feature properties are converted to OSM tags.
+ * Note: No deduplication is performed during import; this should be handled separately.
  */
 export function fromGeoJSON(
 	geojson: FeatureCollection<Point | LineString>,
@@ -16,35 +17,8 @@ export function fromGeoJSON(
 	const osm = new Osmix(options)
 	if (!options.id) osm.id = "geojson"
 
-	// Map to track nodes by coordinate string for reuse
-	const nodeMap = new Map<string, number>()
-	// Set to track used node IDs (for checking duplicates)
-	const usedNodeIds = new Set<number>()
-	// Set to track used way IDs (for checking duplicates)
-	const usedWayIds = new Set<number>()
 	let nextNodeId = 1
 	let nextWayId = 1
-
-	// Helper to get or create a node for a coordinate
-	const getOrCreateNode = (lon: number, lat: number): number => {
-		const coordKey = `${lon},${lat}`
-		const existingNodeId = nodeMap.get(coordKey)
-		if (existingNodeId !== undefined) {
-			return existingNodeId
-		}
-
-		const nodeId = nextNodeId++
-		nodeMap.set(coordKey, nodeId)
-		usedNodeIds.add(nodeId)
-
-		const node: OsmNode = {
-			id: nodeId,
-			lon,
-			lat,
-		}
-		osm.nodes.addNode(node)
-		return nodeId
-	}
 
 	// Process each feature
 	for (const feature of geojson.features) {
@@ -56,68 +30,46 @@ export function fromGeoJSON(
 			const lon = coords[0]
 			const lat = coords[1]
 			if (lon === undefined || lat === undefined) continue
-			const coordKey = `${lon},${lat}`
 
-			if (featureId !== undefined) {
-				// Feature has an ID, check if node already exists
-				if (!usedNodeIds.has(featureId)) {
-					osm.nodes.addNode({
-						id: featureId,
-						lon,
-						lat,
-						tags,
-					})
-					nodeMap.set(coordKey, featureId)
-					usedNodeIds.add(featureId)
-					if (featureId >= nextNodeId) {
-						nextNodeId = featureId + 1
-					}
-				}
-			} else {
-				// No feature ID, check if node already exists at this coordinate
-				const existingNodeId = nodeMap.get(coordKey)
-				if (existingNodeId !== undefined) {
-					// Node already exists, skip (tags will be handled by merge deduplication)
-					continue
-				}
-
-				// Create new node with sequential ID
-				const nodeId = nextNodeId++
-				nodeMap.set(coordKey, nodeId)
-				usedNodeIds.add(nodeId)
-				osm.nodes.addNode({
-					id: nodeId,
-					lon,
-					lat,
-					tags,
-				})
+			const nodeId = featureId ?? nextNodeId++
+			osm.nodes.addNode({
+				id: nodeId,
+				lon,
+				lat,
+				tags,
+			})
+			if (featureId && featureId >= nextNodeId) {
+				nextNodeId = featureId + 1
 			}
 		} else if (feature.geometry.type === "LineString") {
 			const coordinates = feature.geometry.coordinates
 			if (coordinates.length < 2) continue // Skip invalid LineStrings
 
-			// Create or get nodes for each coordinate
+			// Create nodes for each coordinate
 			const nodeRefs: number[] = []
 			for (const coord of coordinates) {
 				const lon = coord[0]
 				const lat = coord[1]
 				if (lon === undefined || lat === undefined) continue
-				const nodeId = getOrCreateNode(lon, lat)
+
+				const nodeId = nextNodeId++
+				osm.nodes.addNode({
+					id: nodeId,
+					lon,
+					lat,
+				})
 				nodeRefs.push(nodeId)
 			}
 
 			// Create the way
 			const wayId = featureId ?? nextWayId++
-			if (!usedWayIds.has(wayId)) {
-				osm.ways.addWay({
-					id: wayId,
-					refs: nodeRefs,
-					tags,
-				})
-				usedWayIds.add(wayId)
-				if (featureId && wayId >= nextWayId) {
-					nextWayId = wayId + 1
-				}
+			osm.ways.addWay({
+				id: wayId,
+				refs: nodeRefs,
+				tags,
+			})
+			if (featureId && wayId >= nextWayId) {
+				nextWayId = wayId + 1
 			}
 		}
 	}
