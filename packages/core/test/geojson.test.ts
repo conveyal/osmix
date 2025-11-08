@@ -36,7 +36,7 @@ describe("fromGeoJSON", () => {
 		expect(osm.nodes.size).toBe(2)
 		expect(osm.ways.size).toBe(0)
 
-		const node1 = osm.nodes.getById(1)
+		const node1 = osm.nodes.getById(-1)
 		expect(node1).toBeDefined()
 		expect(node1?.lon).toBe(-122.4194)
 		expect(node1?.lat).toBe(37.7749)
@@ -44,7 +44,7 @@ describe("fromGeoJSON", () => {
 		// OSM tags are stored as strings, so numbers are converted
 		expect(node1?.tags?.["population"]).toBe("873965")
 
-		const node2 = osm.nodes.getById(2)
+		const node2 = osm.nodes.getById(-2)
 		expect(node2).toBeDefined()
 		expect(node2?.lon).toBe(-122.4094)
 		expect(node2?.lat).toBe(37.7849)
@@ -78,7 +78,7 @@ describe("fromGeoJSON", () => {
 		expect(osm.nodes.size).toBe(3)
 		expect(osm.ways.size).toBe(1)
 
-		const way = osm.ways.getById(1)
+		const way = osm.ways.getById(-1)
 		expect(way).toBeDefined()
 		expect(way?.refs).toHaveLength(3)
 		expect(way?.tags?.["highway"]).toBe("primary")
@@ -179,13 +179,13 @@ describe("fromGeoJSON", () => {
 		const osm = fromGeoJSON(geojson)
 
 		// Nodes should have sequential IDs starting from 1
-		expect(osm.nodes.getById(1)).toBeDefined()
-		expect(osm.nodes.getById(2)).toBeDefined()
-		expect(osm.nodes.getById(3)).toBeDefined()
-		expect(osm.nodes.getById(4)).toBeDefined()
+		expect(osm.nodes.getById(-1)).toBeDefined()
+		expect(osm.nodes.getById(-2)).toBeDefined()
+		expect(osm.nodes.getById(-3)).toBeDefined()
+		expect(osm.nodes.getById(-4)).toBeDefined()
 
 		// Way should have ID 1
-		expect(osm.ways.getById(1)).toBeDefined()
+		expect(osm.ways.getById(-1)).toBeDefined()
 	})
 
 	it("should convert all properties to OSM tags", () => {
@@ -211,7 +211,7 @@ describe("fromGeoJSON", () => {
 
 		const osm = fromGeoJSON(geojson)
 
-		const node = osm.nodes.getById(1)
+		const node = osm.nodes.getById(-1)
 		expect(node?.tags?.["name"]).toBe("Test")
 		// OSM tags are stored as strings, so numbers are converted
 		expect(node?.tags?.["population"]).toBe("1000")
@@ -259,8 +259,8 @@ describe("fromGeoJSON", () => {
 		expect(osm.nodes.size).toBe(4)
 		expect(osm.ways.size).toBe(2)
 
-		const way1 = osm.ways.getById(1)
-		const way2 = osm.ways.getById(2)
+		const way1 = osm.ways.getById(-1)
+		const way2 = osm.ways.getById(-2)
 
 		// Each way should have its own nodes (no reuse)
 		expect(way1?.refs).toHaveLength(2)
@@ -301,10 +301,10 @@ describe("fromGeoJSON", () => {
 
 		// Should only have one way (the valid one)
 		expect(osm.ways.size).toBe(1)
-		expect(osm.ways.getById(1)?.tags?.["highway"]).toBe("primary")
+		expect(osm.ways.getById(-1)?.tags?.["highway"]).toBe("primary")
 	})
 
-	it("should skip LineStrings with invalid coordinates that result in less than 2 valid nodes", () => {
+	it("should error on LineStrings with invalid coordinates that result in less than 2 valid nodes", () => {
 		const geojson: FeatureCollection<LineString> = {
 			type: "FeatureCollection",
 			features: [
@@ -337,15 +337,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = fromGeoJSON(geojson)
-
-		// Should only have one way (the valid one)
-		// The first LineString should be skipped because after filtering invalid coordinates,
-		// it only has 1 valid node, which is insufficient for an OSM way
-		expect(osm.ways.size).toBe(1)
-		expect(osm.ways.getById(1)?.tags?.["highway"]).toBe("secondary")
-		// Should have 3 nodes: 1 from the skipped LineString + 2 from the valid LineString
-		expect(osm.nodes.size).toBe(3)
+		expect(() => fromGeoJSON(geojson)).toThrow()
 	})
 
 	it("should handle mixed Point and LineString features", () => {
@@ -394,7 +386,7 @@ describe("fromGeoJSON", () => {
 		expect(osm.nodes.size).toBe(4)
 		expect(osm.ways.size).toBe(1)
 
-		const way = osm.ways.getById(1)
+		const way = osm.ways.getById(-1)
 		expect(way?.refs).toHaveLength(2)
 	})
 
@@ -437,7 +429,7 @@ describe("fromGeoJSON", () => {
 
 		const osm = fromGeoJSON(geojson)
 
-		const node = osm.nodes.getById(1)
+		const node = osm.nodes.getById(-1)
 		expect(node).toBeDefined()
 		expect(node?.tags).toBeUndefined()
 	})
