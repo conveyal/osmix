@@ -304,6 +304,50 @@ describe("fromGeoJSON", () => {
 		expect(osm.ways.getById(1)?.tags?.["highway"]).toBe("primary")
 	})
 
+	it("should skip LineStrings with invalid coordinates that result in less than 2 valid nodes", () => {
+		const geojson: FeatureCollection<LineString> = {
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: [
+							[-122.4194, 37.7749], // Valid coordinate
+							[undefined, undefined] as unknown as [number, number], // Invalid coordinate
+						],
+					},
+					properties: {
+						highway: "primary",
+					},
+				},
+				{
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: [
+							[-122.4194, 37.7749],
+							[-122.4094, 37.7849],
+						],
+					},
+					properties: {
+						highway: "secondary",
+					},
+				},
+			],
+		}
+
+		const osm = fromGeoJSON(geojson)
+
+		// Should only have one way (the valid one)
+		// The first LineString should be skipped because after filtering invalid coordinates,
+		// it only has 1 valid node, which is insufficient for an OSM way
+		expect(osm.ways.size).toBe(1)
+		expect(osm.ways.getById(1)?.tags?.["highway"]).toBe("secondary")
+		// Should have 3 nodes: 1 from the skipped LineString + 2 from the valid LineString
+		expect(osm.nodes.size).toBe(3)
+	})
+
 	it("should handle mixed Point and LineString features", () => {
 		const geojson: FeatureCollection<Point | LineString> = {
 			type: "FeatureCollection",
