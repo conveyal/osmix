@@ -1,4 +1,4 @@
-import type { OsmNode, OsmTags } from "@osmix/json"
+import type { OsmRelationMember, OsmTags } from "@osmix/json"
 import rewind from "@osmix/shared/geojson-rewind"
 import type {
 	FeatureCollection,
@@ -25,14 +25,11 @@ export function fromGeoJSON(
 	const osm = new Osmix(options)
 	if (!options.id) osm.id = "geojson"
 
-	// Map to track nodes by coordinate string for reuse
+	// Map to track nodes by coordinate string for reuse when creating ways and relations
 	const nodeMap = new Map<string, number>()
-	// Set to track used node IDs (for checking duplicates)
-	const usedNodeIds = new Set<number>()
-	// Set to track used way IDs (for checking duplicates)
-	const usedWayIds = new Set<number>()
-	let nextNodeId = 1
-	let nextWayId = 1
+	let nextNodeId = -1
+	let nextWayId = -1
+	let nextRelationId = -1
 
 	// Helper to get or create a node for a coordinate
 	const getOrCreateNode = (lon: number, lat: number): number => {
@@ -42,16 +39,13 @@ export function fromGeoJSON(
 			return existingNodeId
 		}
 
-		const nodeId = nextNodeId++
+		const nodeId = nextNodeId--
 		nodeMap.set(coordKey, nodeId)
-		usedNodeIds.add(nodeId)
-
-		const node: OsmNode = {
+		osm.nodes.addNode({
 			id: nodeId,
 			lon,
 			lat,
-		}
-		osm.nodes.addNode(node)
+		})
 		return nodeId
 	}
 
@@ -63,76 +57,45 @@ export function fromGeoJSON(
 		const featureId = extractFeatureId(normalizedFeature.id)
 
 		if (normalizedFeature.geometry.type === "Point") {
-			const coords = normalizedFeature.geometry.coordinates
-			const lon = coords[0]
-			const lat = coords[1]
-			if (lon === undefined || lat === undefined) continue
-			const coordKey = `${lon},${lat}`
+			const [lon, lat] = normalizedFeature.geometry.coordinates
+			if (lon === undefined || lat === undefined)
+				throw Error("Invalid GeoJSON coordinates in Point.")
 
-			if (featureId !== undefined) {
-				// Feature has an ID, check if node already exists
-				if (!usedNodeIds.has(featureId)) {
-					osm.nodes.addNode({
-						id: featureId,
-						lon,
-						lat,
-						tags,
-					})
-					nodeMap.set(coordKey, featureId)
-					usedNodeIds.add(featureId)
-					if (featureId >= nextNodeId) {
-						nextNodeId = featureId + 1
-					}
-				}
-			} else {
-				// No feature ID, check if node already exists at this coordinate
-				const existingNodeId = nodeMap.get(coordKey)
-				if (existingNodeId !== undefined) {
-					// Node already exists, skip (tags will be handled by merge deduplication)
-					continue
-				}
-
-				// Create new node with sequential ID
-				const nodeId = nextNodeId++
-				nodeMap.set(coordKey, nodeId)
-				usedNodeIds.add(nodeId)
-				osm.nodes.addNode({
-					id: nodeId,
-					lon,
-					lat,
-					tags,
-				})
-			}
+			const nodeId = featureId ?? nextNodeId--
+			osm.nodes.addNode({
+				id: nodeId,
+				lon,
+				lat,
+				tags,
+			})
+			nodeMap.set(`${lon},${lat}`, nodeId)
 		} else if (normalizedFeature.geometry.type === "LineString") {
 			const coordinates = normalizedFeature.geometry.coordinates
-			if (coordinates.length < 2) continue // Skip invalid LineStrings
+			if (coordinates.length < 2)
+				throw Error("Invalid GeoJSON coordinates in LineString.")
 
 			// Create or get nodes for each coordinate
 			const nodeRefs: number[] = []
-			for (const coord of coordinates) {
-				const lon = coord[0]
-				const lat = coord[1]
-				if (lon === undefined || lat === undefined) continue
+			for (const [lon, lat] of coordinates) {
+				if (lon === undefined || lat === undefined)
+					throw Error("Invalid GeoJSON coordinates in LineString.")
 				const nodeId = getOrCreateNode(lon, lat)
 				nodeRefs.push(nodeId)
 			}
 
 			// Create the way
-			const wayId = featureId ?? nextWayId++
-			if (!usedWayIds.has(wayId)) {
-				osm.ways.addWay({
-					id: wayId,
-					refs: nodeRefs,
-					tags,
-				})
-				usedWayIds.add(wayId)
-				if (featureId && wayId >= nextWayId) {
-					nextWayId = wayId + 1
-				}
-			}
+			const wayId = featureId ?? nextWayId--
+			osm.ways.addWay({
+				id: wayId,
+				refs: nodeRefs,
+				tags,
+			})
 		} else if (normalizedFeature.geometry.type === "Polygon") {
 			const coordinates = normalizedFeature.geometry.coordinates
 			if (coordinates.length === 0) continue
+
+			// If the polygon contains holes, create a relation
+			const createRelation = coordinates.length > 1
 
 			// First ring is outer boundary, subsequent rings are holes
 			const outerRing = coordinates[0]
@@ -140,77 +103,78 @@ export function fromGeoJSON(
 
 			// Create nodes for outer ring
 			const outerNodeRefs: number[] = []
-			for (const coord of outerRing) {
-				const lon = coord[0]
-				const lat = coord[1]
-				if (lon === undefined || lat === undefined) continue
+			for (const [lon, lat] of outerRing) {
+				if (lon === undefined || lat === undefined)
+					throw Error("Invalid GeoJSON coordinates in Polygon.")
 				const nodeId = getOrCreateNode(lon, lat)
 				outerNodeRefs.push(nodeId)
 			}
 
-			// Ensure the ring is closed (first and last node are the same)
-			if (outerNodeRefs.length > 0) {
-				const first = outerNodeRefs[0]
-				const last = outerNodeRefs[outerNodeRefs.length - 1]
-				if (first !== undefined && last !== undefined && first !== last) {
-					outerNodeRefs.push(first)
-				}
-			}
+			// Ensure the outer ring is closed (first and last node are the same)
+			if (outerNodeRefs[0] !== outerNodeRefs[outerNodeRefs.length - 1])
+				throw Error("Outer ring of Polygon is not closed.")
 
 			// Create way for outer ring with area tags
-			const outerWayId = featureId ?? nextWayId++
-			if (!usedWayIds.has(outerWayId)) {
-				const areaTags: OsmTags = { ...tags, area: "yes" }
-				osm.ways.addWay({
-					id: outerWayId,
-					refs: outerNodeRefs,
-					tags: areaTags,
-				})
-				usedWayIds.add(outerWayId)
-				if (featureId && outerWayId >= nextWayId) {
-					nextWayId = outerWayId + 1
-				}
-			}
+			const outerWayId = createRelation
+				? nextWayId--
+				: (featureId ?? nextWayId--)
+			osm.ways.addWay({
+				id: outerWayId,
+				refs: outerNodeRefs,
+				tags: createRelation ? { area: "yes" } : { area: "yes", ...tags },
+			})
 
 			// Create separate ways for holes
+			const holeWayIds: number[] = []
 			for (let i = 1; i < coordinates.length; i++) {
 				const holeRing = coordinates[i]
-				if (!holeRing || holeRing.length < 3) continue
+				if (!holeRing || holeRing.length < 3)
+					throw Error("Hole ring of Polygon has less than 3 coordinates.")
 
 				const holeNodeRefs: number[] = []
-				for (const coord of holeRing) {
-					const lon = coord[0]
-					const lat = coord[1]
-					if (lon === undefined || lat === undefined) continue
+				for (const [lon, lat] of holeRing) {
+					if (lon === undefined || lat === undefined)
+						throw Error("Invalid GeoJSON coordinates in Polygon.")
 					const nodeId = getOrCreateNode(lon, lat)
 					holeNodeRefs.push(nodeId)
 				}
 
 				// Ensure the ring is closed
-				if (holeNodeRefs.length > 0) {
-					const first = holeNodeRefs[0]
-					const last = holeNodeRefs[holeNodeRefs.length - 1]
-					if (first !== undefined && last !== undefined && first !== last) {
-						holeNodeRefs.push(first)
-					}
-				}
+				if (holeNodeRefs[0] !== holeNodeRefs[holeNodeRefs.length - 1])
+					throw Error("Hole ring of Polygon is not closed.")
 
 				// Create way for hole
-				const holeWayId = nextWayId++
-				if (!usedWayIds.has(holeWayId)) {
-					osm.ways.addWay({
-						id: holeWayId,
-						refs: holeNodeRefs,
-						tags: { ...tags, area: "yes" },
-					})
-					usedWayIds.add(holeWayId)
-				}
+				const holeWayId = nextWayId--
+				osm.ways.addWay({
+					id: holeWayId,
+					refs: holeNodeRefs,
+					tags: { area: "yes" },
+				})
+				holeWayIds.push(holeWayId)
+			}
+
+			if (createRelation) {
+				osm.relations.addRelation({
+					id: featureId ?? nextRelationId--,
+					members: [
+						{ type: "way", ref: outerWayId, role: "outer" },
+						...holeWayIds.map(
+							(id) =>
+								({ type: "way", ref: id, role: "inner" }) as OsmRelationMember,
+						),
+					],
+					tags: {
+						type: "multipolygon",
+						...tags,
+					},
+				})
 			}
 		} else if (normalizedFeature.geometry.type === "MultiPolygon") {
 			const coordinates = normalizedFeature.geometry.coordinates
 			if (coordinates.length === 0) continue
 
 			// Process each polygon in the MultiPolygon
+			const relationMembers: OsmRelationMember[] = []
 			for (const polygon of coordinates) {
 				if (polygon.length === 0) continue
 
@@ -219,69 +183,61 @@ export function fromGeoJSON(
 
 				// Create nodes for outer ring
 				const outerNodeRefs: number[] = []
-				for (const coord of outerRing) {
-					const lon = coord[0]
-					const lat = coord[1]
-					if (lon === undefined || lat === undefined) continue
+				for (const [lon, lat] of outerRing) {
+					if (lon === undefined || lat === undefined)
+						throw Error("Invalid GeoJSON coordinates in Polygon.")
 					const nodeId = getOrCreateNode(lon, lat)
 					outerNodeRefs.push(nodeId)
 				}
 
 				// Ensure the ring is closed
-				if (outerNodeRefs.length > 0) {
-					const first = outerNodeRefs[0]
-					const last = outerNodeRefs[outerNodeRefs.length - 1]
-					if (first !== undefined && last !== undefined && first !== last) {
-						outerNodeRefs.push(first)
-					}
-				}
+				if (outerNodeRefs[0] !== outerNodeRefs[outerNodeRefs.length - 1])
+					throw Error("Outer ring of Polygon is not closed.")
 
 				// Create way for outer ring
-				const outerWayId = nextWayId++
-				if (!usedWayIds.has(outerWayId)) {
-					const areaTags: OsmTags = { ...tags, area: "yes" }
-					osm.ways.addWay({
-						id: outerWayId,
-						refs: outerNodeRefs,
-						tags: areaTags,
-					})
-					usedWayIds.add(outerWayId)
-				}
+				const outerWayId = nextWayId--
+				osm.ways.addWay({
+					id: outerWayId,
+					refs: outerNodeRefs,
+					tags: { area: "yes" },
+				})
+				relationMembers.push({ type: "way", ref: outerWayId, role: "outer" })
 
 				// Create separate ways for holes in this polygon
 				for (let i = 1; i < polygon.length; i++) {
 					const holeRing = polygon[i]
-					if (!holeRing || holeRing.length < 3) continue
+					if (!holeRing || holeRing.length < 3)
+						throw Error("Hole ring of Polygon has less than 3 coordinates.")
 
 					const holeNodeRefs: number[] = []
-					for (const coord of holeRing) {
-						const lon = coord[0]
-						const lat = coord[1]
-						if (lon === undefined || lat === undefined) continue
+					for (const [lon, lat] of holeRing) {
+						if (lon === undefined || lat === undefined)
+							throw Error("Invalid GeoJSON coordinates in Polygon.")
 						const nodeId = getOrCreateNode(lon, lat)
 						holeNodeRefs.push(nodeId)
 					}
 
 					// Ensure the ring is closed
-					if (holeNodeRefs.length > 0) {
-						const first = holeNodeRefs[0]
-						const last = holeNodeRefs[holeNodeRefs.length - 1]
-						if (first !== undefined && last !== undefined && first !== last) {
-							holeNodeRefs.push(first)
-						}
-					}
+					if (holeNodeRefs[0] !== holeNodeRefs[holeNodeRefs.length - 1])
+						throw Error("Hole ring of Polygon is not closed.")
 
-					// Create way for hole
-					const holeWayId = nextWayId++
-					if (!usedWayIds.has(holeWayId)) {
-						osm.ways.addWay({
-							id: holeWayId,
-							refs: holeNodeRefs,
-							tags: { ...tags, area: "yes" },
-						})
-						usedWayIds.add(holeWayId)
-					}
+					const holeWayId = nextWayId--
+					osm.ways.addWay({
+						id: holeWayId,
+						refs: holeNodeRefs,
+						tags: { area: "yes" },
+					})
+
+					relationMembers.push({ type: "way", ref: holeWayId, role: "inner" })
 				}
+			}
+
+			if (relationMembers.length > 0) {
+				osm.relations.addRelation({
+					id: featureId ?? nextRelationId--,
+					members: relationMembers,
+					tags: { type: "multipolygon", ...tags },
+				})
 			}
 		}
 	}
@@ -319,8 +275,6 @@ function propertiesToTags(
 
 	const tags: OsmTags = {}
 	for (const [key, value] of Object.entries(properties)) {
-		// Skip geometry-related properties
-		if (key === "geometry" || key === "type") continue
 		// Convert value to string or number
 		if (typeof value === "string" || typeof value === "number") {
 			tags[key] = value
