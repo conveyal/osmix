@@ -1,4 +1,5 @@
 import type { Osmix } from "@osmix/core"
+import { decodeZigzag } from "@osmix/shared/zigzag"
 import { useSetAtom } from "jotai"
 import {
 	type FillLayerSpecification,
@@ -95,15 +96,6 @@ const wayPolygonsFilter: FilterSpecification = [
 ]
 
 const relationFilter: FilterSpecification = ["==", ["get", "type"], "relation"]
-
-/**
- * Decode zigzag-encoded ID back to original value. Zigzag encoding is used to convert negative IDs to positive numbers for unsigned varint
- * encoding in vector tiles. Uses arithmetic-based decoding to support the full safe integer range.
- */
-function decodeZigzag(encoded: number): number {
-	// Check if encoded is odd (negative) using bitwise, then use arithmetic
-	return (encoded & 1) === 1 ? -(encoded + 1) / 2 : encoded / 2
-}
 
 export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 	const map = useMap()
