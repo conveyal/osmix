@@ -1,5 +1,4 @@
 ---
-"@osmix/merge": patch
 "@osmix/core": patch
 ---
 
