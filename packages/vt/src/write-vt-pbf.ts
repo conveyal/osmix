@@ -53,7 +53,12 @@ function writeLayer(layer: VtPbfLayer, pbf: Pbf) {
 
 function writeFeature(ctx: VtLayerContext, pbf: Pbf) {
 	if (ctx.feature.id !== undefined) {
-		pbf.writeVarintField(1, ctx.feature.id)
+		const id = ctx.feature.id
+
+		// Use zigzag encoding for IDs to convert negative IDs to positive numbers
+		// that can be properly decoded. Uses arithmetic-based encoding to support
+		// the full safe integer range.
+		pbf.writeVarintField(1, zigzag(id))
 	}
 
 	pbf.writeMessage(2, writeProperties, ctx)
@@ -93,7 +98,21 @@ function command(cmd: number, length: number) {
 	return (length << 3) + (cmd & 0x7)
 }
 
-function zigzag(num: number) {
+/**
+ * Zigzag encode a number using arithmetic operations.
+ * This supports the full safe integer range (up to Number.MAX_SAFE_INTEGER).
+ * Formula: n < 0 ? -2*n - 1 : 2*n
+ */
+function zigzag(num: number): number {
+	return num < 0 ? -2 * num - 1 : 2 * num
+}
+
+/**
+ * Zigzag encode using bitwise operations (for geometry deltas only).
+ * This is faster but limited to 32-bit signed integers.
+ * Used for small coordinate deltas in geometry encoding.
+ */
+function zigzag32(num: number): number {
 	return (num << 1) ^ (num >> 31)
 }
 
@@ -116,8 +135,9 @@ function writeGeometry(feature: VtSimpleFeature, pbf: Pbf) {
 			}
 			const dx = xy[0] - x
 			const dy = xy[1] - y
-			pbf.writeVarint(zigzag(dx))
-			pbf.writeVarint(zigzag(dy))
+			// Use bitwise zigzag for geometry deltas (small values, 32-bit is sufficient)
+			pbf.writeVarint(zigzag32(dx))
+			pbf.writeVarint(zigzag32(dy))
 			x += dx
 			y += dy
 		})
