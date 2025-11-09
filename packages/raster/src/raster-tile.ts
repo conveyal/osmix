@@ -37,6 +37,7 @@ export class OsmixRasterTile {
 	}
 
 	drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR) {
+		const tileSize = this.proj.tileSize
 		const dx = Math.abs(px1[0] - px0[0])
 		const dy = Math.abs(px1[1] - px0[1])
 		const sx = px0[0] < px1[0] ? 1 : -1
@@ -46,11 +47,14 @@ export class OsmixRasterTile {
 		let y = px0[1]
 
 		while (true) {
-			const idx = this.getIndex([x, y])
-			this.imageData[idx] = color[0]
-			this.imageData[idx + 1] = color[1]
-			this.imageData[idx + 2] = color[2]
-			this.imageData[idx + 3] = color[3]
+			// Only draw pixels within tile bounds
+			if (x >= 0 && x < tileSize && y >= 0 && y < tileSize) {
+				const idx = this.getIndex([x, y])
+				this.imageData[idx] = color[0]
+				this.imageData[idx + 1] = color[1]
+				this.imageData[idx + 2] = color[2]
+				this.imageData[idx + 3] = color[3]
+			}
 			if (x === px1[0] && y === px1[1]) break
 			const e2 = 2 * err
 			if (e2 > -dy) {
@@ -226,10 +230,23 @@ export class OsmixRasterTile {
 			intersections.sort((a, b) => a - b)
 
 			// Fill between pairs (even-odd rule)
+			// Skip boundary pixels (x=0 and x=tileSize-1) to avoid edge artifacts
+			// when tiles are rendered side-by-side. This ensures adjacent tiles don't have
+			// overlapping pixels at their boundaries.
 			for (let i = 0; i < intersections.length - 1; i += 2) {
-				const x0 = Math.max(0, Math.min(tileSize - 1, intersections[i]!))
-				const x1 = Math.max(0, Math.min(tileSize - 1, intersections[i + 1]!))
+				const rawX0 = intersections[i]!
+				const rawX1 = intersections[i + 1]!
+
+				// Clamp intersections to tile bounds
+				const x0 = Math.max(0, Math.min(tileSize - 1, rawX0))
+				const x1 = Math.max(0, Math.min(tileSize - 1, rawX1))
+
+				// Fill the range, but skip boundary pixels
 				for (let x = x0; x <= x1; x++) {
+					// Skip boundary pixels to prevent edge artifacts
+					if (x === 0 || x === tileSize - 1) {
+						continue
+					}
 					this.setPixel([x, y], color)
 				}
 			}
