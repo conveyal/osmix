@@ -1,5 +1,14 @@
 # @osmix/json
 
+## 0.0.3
+
+### Patch Changes
+
+- b4a3ff2: Improve Relation handling and display
+- Updated dependencies [b4a3ff2]
+  - @osmix/shared@0.0.3
+  - @osmix/pbf@0.0.2
+
 ## 0.0.2
 
 ### Patch Changes
