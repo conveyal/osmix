@@ -371,4 +371,148 @@ describe("OsmixVtEncoder", () => {
 			}
 		}
 	})
+
+	it("encodes negative IDs correctly", () => {
+		// Zigzag decode function (inverse of zigzag encoding)
+		const decodeZigzag = (encoded: number): number => {
+			return (encoded >> 1) ^ -(encoded & 1)
+		}
+
+		const testOsm = new Osmix()
+		// Create nodes with negative IDs (like from GeoJSON import)
+		testOsm.nodes.addNode({
+			id: -1,
+			lat: 40.7,
+			lon: -74.0,
+			tags: { name: "Negative Node" },
+		})
+		testOsm.nodes.addNode({
+			id: -2,
+			lat: 40.71,
+			lon: -74.01,
+			tags: { name: "Another Negative Node" },
+		})
+		testOsm.ways.addWay({
+			id: -10,
+			refs: [-1, -2],
+			tags: { highway: "primary" },
+		})
+		testOsm.buildIndexes()
+		testOsm.buildSpatialIndexes()
+
+		const bbox = testOsm.bbox()
+		const tile = bboxToTile(bbox)
+		const encoder = new OsmixVtEncoder(testOsm)
+		const result = encoder.getTile(tile)
+
+		expect(result.byteLength).toBeGreaterThan(0)
+
+		const layers = decodeTile(result)
+		const nodeLayer = layers[NODE_LAYER_ID]
+		const wayLayer = layers[WAY_LAYER_ID]
+
+		expect(nodeLayer).toBeDefined()
+		expect(wayLayer).toBeDefined()
+
+		// Check that negative IDs are zigzag-encoded and can be decoded back
+		if (nodeLayer && nodeLayer.length > 0) {
+			const nodeFeature = nodeLayer.feature(0)
+			// IDs are zigzag-encoded, so decode them
+			if (nodeFeature.id !== undefined) {
+				const decodedId = decodeZigzag(nodeFeature.id)
+				expect(decodedId).toBe(-1)
+			}
+		}
+
+		if (wayLayer && wayLayer.length > 0) {
+			const wayFeature = wayLayer.feature(0)
+			// IDs are zigzag-encoded, so decode them
+			if (wayFeature.id !== undefined) {
+				const decodedId = decodeZigzag(wayFeature.id)
+				expect(decodedId).toBe(-10)
+			}
+		}
+	})
+
+	it("accepts IDs at the boundaries of safe integer range", () => {
+		const testOsm = new Osmix()
+		// Add nodes for ways to reference
+		testOsm.nodes.addNode({ id: 1, lat: 40.7, lon: -74.0 })
+		testOsm.nodes.addNode({ id: 2, lat: 40.71, lon: -74.01 })
+		// Test minimum valid ID (way)
+		testOsm.ways.addWay({
+			id: -Number.MAX_SAFE_INTEGER,
+			refs: [1, 2],
+			tags: { highway: "primary" },
+		})
+		// Test maximum valid ID (node with tags)
+		testOsm.nodes.addNode({
+			id: Number.MAX_SAFE_INTEGER,
+			lat: 40.72,
+			lon: -74.02,
+			tags: { name: "Max ID" },
+		})
+		testOsm.buildIndexes()
+		testOsm.buildSpatialIndexes()
+
+		const bbox = testOsm.bbox()
+		const tile = bboxToTile(bbox)
+		const encoder = new OsmixVtEncoder(testOsm)
+
+		// Should not throw - this verifies the IDs are within the valid range
+		const result = encoder.getTile(tile)
+		expect(result.byteLength).toBeGreaterThan(0)
+	})
+
+	it("encodes and decodes large negative IDs correctly", () => {
+		// Zigzag decode function (inverse of arithmetic zigzag encoding)
+		const decodeZigzag = (encoded: number): number => {
+			return (encoded & 1) === 1 ? -(encoded + 1) / 2 : encoded / 2
+		}
+
+		const testOsm = new Osmix()
+		// Test with a large negative ID (much larger than 32-bit range)
+		const largeNegativeId = -1000000000 // -1 billion
+		// Add a node for the way to reference
+		testOsm.nodes.addNode({ id: 1, lat: 40.71, lon: -74.01 })
+		testOsm.nodes.addNode({
+			id: largeNegativeId,
+			lat: 40.7,
+			lon: -74.0,
+			tags: { name: "Large Negative ID" },
+		})
+		// Add a dummy way so way spatial index can be built
+		testOsm.ways.addWay({
+			id: 100,
+			refs: [1],
+			tags: {},
+		})
+		testOsm.buildIndexes()
+		testOsm.buildSpatialIndexes()
+
+		const bbox = testOsm.bbox()
+		const tile = bboxToTile(bbox)
+		const encoder = new OsmixVtEncoder(testOsm)
+		const result = encoder.getTile(tile)
+
+		const layers = decodeTile(result)
+		const nodeLayer = layers[NODE_LAYER_ID]
+
+		expect(nodeLayer).toBeDefined()
+		if (nodeLayer && nodeLayer.length > 0) {
+			// Find the node with the large negative ID
+			let found = false
+			for (let i = 0; i < nodeLayer.length; i++) {
+				const nodeFeature = nodeLayer.feature(i)
+				if (nodeFeature.id !== undefined) {
+					const decodedId = decodeZigzag(nodeFeature.id)
+					if (decodedId === largeNegativeId) {
+						found = true
+						break
+					}
+				}
+			}
+			expect(found).toBe(true)
+		}
+	})
 })

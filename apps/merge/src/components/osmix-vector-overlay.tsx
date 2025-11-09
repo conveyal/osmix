@@ -96,6 +96,15 @@ const wayPolygonsFilter: FilterSpecification = [
 
 const relationFilter: FilterSpecification = ["==", ["get", "type"], "relation"]
 
+/**
+ * Decode zigzag-encoded ID back to original value. Zigzag encoding is used to convert negative IDs to positive numbers for unsigned varint
+ * encoding in vector tiles. Uses arithmetic-based decoding to support the full safe integer range.
+ */
+function decodeZigzag(encoded: number): number {
+	// Check if encoded is odd (negative) using bitwise, then use arithmetic
+	return (encoded & 1) === 1 ? -(encoded + 1) / 2 : encoded / 2
+}
+
 export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 	const map = useMap()
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
@@ -140,12 +149,14 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 				selectEntity(null, null)
 				return
 			}
+			// Decode zigzag-encoded ID if it was originally negative
+			const decodedId = decodeZigzag(feature.id)
 			if (feature.properties?.type === "node") {
-				selectEntity(osm, osm.nodes.getById(feature.id))
+				selectEntity(osm, osm.nodes.getById(decodedId))
 			} else if (feature.properties?.type === "way") {
-				selectEntity(osm, osm.ways.getById(feature.id))
+				selectEntity(osm, osm.ways.getById(decodedId))
 			} else if (feature.properties?.type === "relation") {
-				selectEntity(osm, osm.relations.getById(feature.id))
+				selectEntity(osm, osm.relations.getById(decodedId))
 			} else {
 				selectEntity(osm, null)
 			}
@@ -176,9 +187,11 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 			})
 			if (!fs.hover) {
 				const featureType = feature.properties?.type || "unknown"
+				// Decode zigzag-encoded ID if it was originally negative
+				const decodedId = decodeZigzag(feature.id)
 				popupRef
 					.current!.setLngLat(event.lngLat)
-					.setHTML(tooltipTemplate({ id: feature.id, type: featureType }))
+					.setHTML(tooltipTemplate({ id: decodedId, type: featureType }))
 					.addTo(map.getMap())
 				map.removeFeatureState({
 					source: feature.source,
