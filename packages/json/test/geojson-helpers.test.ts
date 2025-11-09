@@ -37,19 +37,24 @@ describe("geojson helpers", () => {
 	})
 
 	it("builds relation geometry collection", () => {
+		// Create a way that forms a closed ring
+		const way: OsmWay = {
+			id: 10,
+			refs: [1, 2, 1], // Closed way
+			tags: { area: "yes" },
+		}
+		const wayMap = new Map([[way.id, way]])
+		const getWay = (wayId: number) => wayMap.get(wayId) ?? null
+
 		const relation: OsmRelation = {
 			id: 20,
-			members: [
-				{ type: "node", ref: 1 },
-				{ type: "node", ref: 2 },
-				{ type: "node", ref: 1 },
-			],
+			members: [{ type: "way", ref: 10, role: "outer" }],
 			tags: { type: "multipolygon" },
 		}
-		const feature = relationToFeature(relation, refToPosition)
-		expect(feature.geometry.type).toBe("MultiPolygon")
+		const feature = relationToFeature(relation, refToPosition, getWay)
+		expect(feature.geometry.type).toBe("Polygon")
 		const polygon = feature.geometry
 		assert.exists(polygon.coordinates?.[0])
-		expect(polygon.coordinates[0][0]).toHaveLength(3)
+		expect(polygon.coordinates[0]).toHaveLength(3) // Should have 3 coordinates (closed ring)
 	})
 })

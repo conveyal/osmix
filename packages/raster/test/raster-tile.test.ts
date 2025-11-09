@@ -2,7 +2,8 @@ import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { LonLat, Tile, XY } from "@osmix/shared/types"
 import { describe, expect, it } from "vitest"
 import {
-	DEFAULT_Line_COLOR,
+	DEFAULT_AREA_COLOR,
+	DEFAULT_LINE_COLOR,
 	DEFAULT_POINT_COLOR,
 	DEFAULT_RASTER_TILE_SIZE,
 	OsmixRasterTile,
@@ -81,10 +82,10 @@ describe("OsmixRasterTile", () => {
 		const startIdx = tile.getIndex(startPixel)
 		const endIdx = tile.getIndex(endPixel)
 		expect(Array.from(tile.imageData.slice(startIdx, startIdx + 4))).toEqual(
-			Array.from(DEFAULT_Line_COLOR),
+			Array.from(DEFAULT_LINE_COLOR),
 		)
 		expect(Array.from(tile.imageData.slice(endIdx, endIdx + 4))).toEqual(
-			Array.from(DEFAULT_Line_COLOR),
+			Array.from(DEFAULT_LINE_COLOR),
 		)
 	})
 
@@ -109,7 +110,7 @@ describe("OsmixRasterTile", () => {
 		// Check that pixels inside the polygon are filled
 		const centerIdx = tile.getIndex([20, 20])
 		expect(Array.from(tile.imageData.slice(centerIdx, centerIdx + 4))).toEqual(
-			Array.from(DEFAULT_Line_COLOR),
+			Array.from(DEFAULT_AREA_COLOR),
 		)
 
 		// Check that pixels outside are not filled (assuming initial state is transparent/black)
@@ -150,7 +151,7 @@ describe("OsmixRasterTile", () => {
 		const insideOuterIdx = tile.getIndex([15, 15])
 		expect(
 			Array.from(tile.imageData.slice(insideOuterIdx, insideOuterIdx + 4)),
-		).toEqual(Array.from(DEFAULT_Line_COLOR))
+		).toEqual(Array.from(DEFAULT_AREA_COLOR))
 
 		// Check that pixels inside the hole are NOT filled (even-odd rule)
 		const insideHoleIdx = tile.getIndex([30, 30])
@@ -194,12 +195,12 @@ describe("OsmixRasterTile", () => {
 		const firstPolyIdx = tile.getIndex([15, 15])
 		expect(
 			Array.from(tile.imageData.slice(firstPolyIdx, firstPolyIdx + 4)),
-		).toEqual(Array.from(DEFAULT_Line_COLOR))
+		).toEqual(Array.from(DEFAULT_AREA_COLOR))
 
 		const secondPolyIdx = tile.getIndex([35, 35])
 		expect(
 			Array.from(tile.imageData.slice(secondPolyIdx, secondPolyIdx + 4)),
-		).toEqual(Array.from(DEFAULT_Line_COLOR))
+		).toEqual(Array.from(DEFAULT_AREA_COLOR))
 	})
 
 	it("handles empty polygon rings gracefully", () => {
@@ -241,7 +242,7 @@ describe("OsmixRasterTile", () => {
 		const insideOuter = tile.getIndex([12, 12])
 		expect(
 			Array.from(tile.imageData.slice(insideOuter, insideOuter + 4)),
-		).toEqual(Array.from(DEFAULT_Line_COLOR))
+		).toEqual(Array.from(DEFAULT_AREA_COLOR))
 
 		// Check that pixels inside inner (hole) are NOT filled
 		const insideHole = tile.getIndex([20, 20])
@@ -283,13 +284,13 @@ describe("OsmixRasterTile", () => {
 		// Check first polygon is filled
 		const center1 = tile.getIndex([15, 15])
 		expect(Array.from(tile.imageData.slice(center1, center1 + 4))).toEqual(
-			Array.from(DEFAULT_Line_COLOR),
+			Array.from(DEFAULT_AREA_COLOR),
 		)
 
 		// Check second polygon is filled
 		const center2 = tile.getIndex([35, 35])
 		expect(Array.from(tile.imageData.slice(center2, center2 + 4))).toEqual(
-			Array.from(DEFAULT_Line_COLOR),
+			Array.from(DEFAULT_AREA_COLOR),
 		)
 
 		// Check area between polygons is NOT filled
@@ -317,7 +318,7 @@ describe("OsmixRasterTile", () => {
 		// Should still fill correctly regardless of input winding
 		const center = tile.getIndex([20, 20])
 		expect(Array.from(tile.imageData.slice(center, center + 4))).toEqual(
-			Array.from(DEFAULT_Line_COLOR),
+			Array.from(DEFAULT_AREA_COLOR),
 		)
 	})
 })
