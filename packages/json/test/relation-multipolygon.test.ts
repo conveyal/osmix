@@ -97,22 +97,9 @@ describe("relation-multipolygon", () => {
 			const way2: OsmWay = { id: 2, refs: [2, 3] }
 			const way3: OsmWay = { id: 3, refs: [3, 1] }
 
-			const getWay = (id: number) => {
-				if (id === 1) return way1
-				if (id === 2) return way2
-				if (id === 3) return way3
-				return null
-			}
-
-			const members = [
-				{ type: "way" as const, ref: 1, role: "outer" },
-				{ type: "way" as const, ref: 2, role: "outer" },
-				{ type: "way" as const, ref: 3, role: "outer" },
-			]
-
-			const rings = connectWaysToRings(members, getWay)
+			const rings = connectWaysToRings([way1, way2, way3])
 			expect(rings).toHaveLength(1)
-			expect(rings[0]).toEqual([1, 2, 3])
+			expect(rings[0]).toEqual([way1, way2, way3])
 		})
 
 		it("handles ways that need to be reversed", () => {
@@ -120,18 +107,7 @@ describe("relation-multipolygon", () => {
 			const way1: OsmWay = { id: 1, refs: [1, 2] }
 			const way2: OsmWay = { id: 2, refs: [2, 3, 4] }
 
-			const getWay = (id: number) => {
-				if (id === 1) return way1
-				if (id === 2) return way2
-				return null
-			}
-
-			const members = [
-				{ type: "way" as const, ref: 1, role: "outer" },
-				{ type: "way" as const, ref: 2, role: "outer" },
-			]
-
-			const rings = connectWaysToRings(members, getWay)
+			const rings = connectWaysToRings([way1, way2])
 			// Should create a ring if ways connect and form a closed loop
 			// This test verifies basic connection logic
 			expect(rings.length).toBeGreaterThanOrEqual(0)
@@ -141,18 +117,7 @@ describe("relation-multipolygon", () => {
 			const way1: OsmWay = { id: 1, refs: [1, 2, 1] } // closed ring
 			const way2: OsmWay = { id: 2, refs: [3, 4, 3] } // separate closed ring
 
-			const getWay = (id: number) => {
-				if (id === 1) return way1
-				if (id === 2) return way2
-				return null
-			}
-
-			const members = [
-				{ type: "way" as const, ref: 1, role: "outer" },
-				{ type: "way" as const, ref: 2, role: "outer" },
-			]
-
-			const rings = connectWaysToRings(members, getWay)
+			const rings = connectWaysToRings([way1, way2])
 			expect(rings).toHaveLength(2)
 		})
 
@@ -160,18 +125,7 @@ describe("relation-multipolygon", () => {
 			const way1: OsmWay = { id: 1, refs: [1, 2, 3] } // not closed
 			const way2: OsmWay = { id: 2, refs: [4, 5, 4] } // closed
 
-			const getWay = (id: number) => {
-				if (id === 1) return way1
-				if (id === 2) return way2
-				return null
-			}
-
-			const members = [
-				{ type: "way" as const, ref: 1, role: "outer" },
-				{ type: "way" as const, ref: 2, role: "outer" },
-			]
-
-			const rings = connectWaysToRings(members, getWay)
+			const rings = connectWaysToRings([way1, way2])
 			// Only the closed ring should be included
 			expect(rings.length).toBeGreaterThanOrEqual(1)
 		})
