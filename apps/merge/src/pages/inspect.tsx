@@ -47,7 +47,7 @@ export default function InspectPage() {
 	const flyToOsmBounds = useFlyToOsmBounds()
 	const { downloadOsm, osm, file, loadOsmFile, setOsm } = useOsmFile(
 		osmId,
-		"./spokane.osm.pbf",
+		"./monaco.pbf",
 	)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
