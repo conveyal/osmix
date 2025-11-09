@@ -1,6 +1,7 @@
 import { VectorTile } from "@mapbox/vector-tile"
 import { Osmix } from "@osmix/core"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
+import { decodeZigzag } from "@osmix/shared/zigzag"
 import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import Protobuf from "pbf"
 import { describe, expect, it } from "vitest"
@@ -90,14 +91,22 @@ describe("OsmixVtEncoder", () => {
 		const node = features.find(
 			(feature) => feature.properties["type"] === "node",
 		)
-		expect(node?.id).toBe(1)
+		// IDs are zigzag-encoded, so decode them
+		if (node?.id !== undefined) {
+			const decodedId = decodeZigzag(node.id)
+			expect(decodedId).toBe(1)
+		}
 		expect(node?.type).toBe(1)
 		const nodeGeom = node?.loadGeometry()
 		expect(nodeGeom?.[0]?.[0]?.x).toBeTypeOf("number")
 		expect(nodeGeom?.[0]?.[0]?.y).toBeTypeOf("number")
 
 		const way = features.find((feature) => feature.properties["type"] === "way")
-		expect(way?.id).toBe(5)
+		// IDs are zigzag-encoded, so decode them
+		if (way?.id !== undefined) {
+			const decodedId = decodeZigzag(way.id)
+			expect(decodedId).toBe(5)
+		}
 		expect(way?.type).toBe(2)
 		const wayGeom = way?.loadGeometry()
 		expect(wayGeom?.[0]?.length).toBeGreaterThanOrEqual(2)
@@ -373,11 +382,6 @@ describe("OsmixVtEncoder", () => {
 	})
 
 	it("encodes negative IDs correctly", () => {
-		// Zigzag decode function (inverse of zigzag encoding)
-		const decodeZigzag = (encoded: number): number => {
-			return (encoded >> 1) ^ -(encoded & 1)
-		}
-
 		const testOsm = new Osmix()
 		// Create nodes with negative IDs (like from GeoJSON import)
 		testOsm.nodes.addNode({
@@ -465,11 +469,6 @@ describe("OsmixVtEncoder", () => {
 	})
 
 	it("encodes and decodes large negative IDs correctly", () => {
-		// Zigzag decode function (inverse of arithmetic zigzag encoding)
-		const decodeZigzag = (encoded: number): number => {
-			return (encoded & 1) === 1 ? -(encoded + 1) / 2 : encoded / 2
-		}
-
 		const testOsm = new Osmix()
 		// Test with a large negative ID (much larger than 32-bit range)
 		const largeNegativeId = -1000000000 // -1 billion

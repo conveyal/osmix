@@ -1,3 +1,4 @@
+import { zigzag, zigzag32 } from "@osmix/shared/zigzag"
 import Pbf from "pbf"
 import type { VtPbfLayer, VtSimpleFeature } from "./types"
 
@@ -96,24 +97,6 @@ function writeProperties(ctx: VtLayerContext, pbf: Pbf) {
 
 function command(cmd: number, length: number) {
 	return (length << 3) + (cmd & 0x7)
-}
-
-/**
- * Zigzag encode a number using arithmetic operations.
- * This supports the full safe integer range (up to Number.MAX_SAFE_INTEGER).
- * Formula: n < 0 ? -2*n - 1 : 2*n
- */
-function zigzag(num: number): number {
-	return num < 0 ? -2 * num - 1 : 2 * num
-}
-
-/**
- * Zigzag encode using bitwise operations (for geometry deltas only).
- * This is faster but limited to 32-bit signed integers.
- * Used for small coordinate deltas in geometry encoding.
- */
-function zigzag32(num: number): number {
-	return (num << 1) ^ (num >> 31)
 }
 
 function writeGeometry(feature: VtSimpleFeature, pbf: Pbf) {
