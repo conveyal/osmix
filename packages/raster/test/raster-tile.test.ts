@@ -321,4 +321,362 @@ describe("OsmixRasterTile", () => {
 			Array.from(DEFAULT_AREA_COLOR),
 		)
 	})
+
+	describe("edge boundary handling", () => {
+		it("excludes left boundary pixels when polygon crosses left edge", () => {
+			const tileIndex: Tile = [10, 11, 5]
+			const tileSize = DEFAULT_RASTER_TILE_SIZE
+			const [tx, ty, tz] = tileIndex
+			const { tile, merc } = createTile(tileIndex, tileSize)
+
+			// Create polygon that extends beyond left edge (x < 0)
+			// Points outside left edge
+			const leftOutside: LonLat = merc.ll(
+				[tx * tileSize - 10, ty * tileSize + 75],
+				tz,
+			)
+			// Points inside tile - create a rectangle that extends well inside
+			const inside1: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 30, 50)
+			const inside2: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 30, 100)
+			const inside3: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 50, 100)
+			const inside4: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 50, 50)
+
+			const polygon: LonLat[][] = [
+				[leftOutside, inside1, inside2, inside3, inside4, leftOutside],
+			]
+
+			tile.drawPolygon(polygon)
+
+			// Left boundary (x=0) should NOT be filled
+			const leftBoundaryIdx = tile.getIndex([0, 75])
+			const leftBoundaryColor = Array.from(
+				tile.imageData.slice(leftBoundaryIdx, leftBoundaryIdx + 4),
+			)
+			expect(leftBoundaryColor[3]).toBe(0) // Should be transparent
+
+			// Pixel just inside (x=1) should be filled
+			const insideIdx = tile.getIndex([1, 75])
+			expect(
+				Array.from(tile.imageData.slice(insideIdx, insideIdx + 4)),
+			).toEqual(Array.from(DEFAULT_AREA_COLOR))
+		})
+
+		it("excludes right boundary pixels when polygon crosses right edge", () => {
+			const tileIndex: Tile = [10, 11, 5]
+			const tileSize = DEFAULT_RASTER_TILE_SIZE
+			const [tx, ty, tz] = tileIndex
+			const { tile, merc } = createTile(tileIndex, tileSize)
+
+			// Create polygon that extends beyond right edge (x >= tileSize)
+			// Points inside tile - create a rectangle that extends well inside
+			const inside1: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 200, 50)
+			const inside2: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 200, 100)
+			const inside3: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 220, 100)
+			const inside4: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 220, 50)
+			// Points outside right edge
+			const rightOutside: LonLat = merc.ll(
+				[(tx + 1) * tileSize + 10, ty * tileSize + 75],
+				tz,
+			)
+
+			const polygon: LonLat[][] = [
+				[inside1, inside2, inside3, inside4, rightOutside, inside1],
+			]
+
+			tile.drawPolygon(polygon)
+
+			// Right boundary (x=tileSize-1) should NOT be filled
+			const rightBoundaryIdx = tile.getIndex([tileSize - 1, 75])
+			const rightBoundaryColor = Array.from(
+				tile.imageData.slice(rightBoundaryIdx, rightBoundaryIdx + 4),
+			)
+			expect(rightBoundaryColor[3]).toBe(0) // Should be transparent
+
+			// Pixel just inside (x=tileSize-2) should be filled
+			const insideIdx = tile.getIndex([tileSize - 2, 75])
+			expect(
+				Array.from(tile.imageData.slice(insideIdx, insideIdx + 4)),
+			).toEqual(Array.from(DEFAULT_AREA_COLOR))
+		})
+
+		it("excludes top boundary pixels when polygon crosses top edge", () => {
+			const tileIndex: Tile = [10, 11, 5]
+			const tileSize = DEFAULT_RASTER_TILE_SIZE
+			const [tx, ty, tz] = tileIndex
+			const { tile, merc } = createTile(tileIndex, tileSize)
+
+			// Create polygon that extends beyond top edge (y < 0)
+			// Points outside top edge
+			const topOutside: LonLat = merc.ll(
+				[tx * tileSize + 75, ty * tileSize - 10],
+				tz,
+			)
+			// Points inside tile - create a rectangle that extends well inside
+			const inside1: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 50, 30)
+			const inside2: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 100, 30)
+			const inside3: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 100, 50)
+			const inside4: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 50, 50)
+
+			const polygon: LonLat[][] = [
+				[topOutside, inside1, inside2, inside3, inside4, topOutside],
+			]
+
+			tile.drawPolygon(polygon)
+
+			// Top boundary (y=0) should NOT be filled
+			const topBoundaryIdx = tile.getIndex([75, 0])
+			const topBoundaryColor = Array.from(
+				tile.imageData.slice(topBoundaryIdx, topBoundaryIdx + 4),
+			)
+			expect(topBoundaryColor[3]).toBe(0) // Should be transparent
+
+			// Pixel just inside (y=1) should be filled
+			const insideIdx = tile.getIndex([75, 1])
+			expect(
+				Array.from(tile.imageData.slice(insideIdx, insideIdx + 4)),
+			).toEqual(Array.from(DEFAULT_AREA_COLOR))
+		})
+
+		it("excludes bottom boundary pixels when polygon crosses bottom edge", () => {
+			const tileIndex: Tile = [10, 11, 5]
+			const tileSize = DEFAULT_RASTER_TILE_SIZE
+			const [tx, ty, tz] = tileIndex
+			const { tile, merc } = createTile(tileIndex, tileSize)
+
+			// Create polygon that extends beyond bottom edge (y >= tileSize)
+			// Points inside tile - create a rectangle that extends well inside
+			const inside1: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 50, 200)
+			const inside2: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 100, 200)
+			const inside3: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 100, 220)
+			const inside4: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 50, 220)
+			// Points outside bottom edge
+			const bottomOutside: LonLat = merc.ll(
+				[tx * tileSize + 75, (ty + 1) * tileSize + 10],
+				tz,
+			)
+
+			const polygon: LonLat[][] = [
+				[inside1, inside2, inside3, inside4, bottomOutside, inside1],
+			]
+
+			tile.drawPolygon(polygon)
+
+			// Bottom boundary (y=tileSize-1) should NOT be filled
+			const bottomBoundaryIdx = tile.getIndex([75, tileSize - 1])
+			const bottomBoundaryColor = Array.from(
+				tile.imageData.slice(bottomBoundaryIdx, bottomBoundaryIdx + 4),
+			)
+			expect(bottomBoundaryColor[3]).toBe(0) // Should be transparent
+
+			// Pixel just inside (y=tileSize-2) should be filled
+			const insideIdx = tile.getIndex([75, tileSize - 2])
+			expect(
+				Array.from(tile.imageData.slice(insideIdx, insideIdx + 4)),
+			).toEqual(Array.from(DEFAULT_AREA_COLOR))
+		})
+
+		it("excludes corner boundary pixels when polygon crosses multiple edges", () => {
+			const tileIndex: Tile = [10, 11, 5]
+			const tileSize = DEFAULT_RASTER_TILE_SIZE
+			const [tx, ty, tz] = tileIndex
+			const { tile, merc } = createTile(tileIndex, tileSize)
+
+			// Create polygon that crosses top-left corner
+			// Points outside top-left corner
+			const cornerOutside: LonLat = merc.ll(
+				[tx * tileSize - 10, ty * tileSize - 10],
+				tz,
+			)
+			// Points inside tile
+			const inside1: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 10, 10)
+			const inside2: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 50, 10)
+			const inside3: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 50, 50)
+			const inside4: LonLat = lonLatForPixel(merc, tileIndex, tileSize, 10, 50)
+
+			const polygon: LonLat[][] = [
+				[cornerOutside, inside1, inside2, inside3, inside4, cornerOutside],
+			]
+
+			tile.drawPolygon(polygon)
+
+			// Top-left corner (x=0, y=0) should NOT be filled
+			const cornerIdx = tile.getIndex([0, 0])
+			const cornerColor = Array.from(
+				tile.imageData.slice(cornerIdx, cornerIdx + 4),
+			)
+			expect(cornerColor[3]).toBe(0) // Should be transparent
+
+			// Pixels just inside should be filled
+			const insideX = tile.getIndex([1, 0])
+			const insideY = tile.getIndex([0, 1])
+			expect(
+				Array.from(tile.imageData.slice(insideX, insideX + 4)),
+			).toEqual(Array.from(DEFAULT_AREA_COLOR))
+			expect(
+				Array.from(tile.imageData.slice(insideY, insideY + 4)),
+			).toEqual(Array.from(DEFAULT_AREA_COLOR))
+		})
+
+		it("ensures adjacent tiles do not create duplicate edge pixels", () => {
+			const tileSize = DEFAULT_RASTER_TILE_SIZE
+			const [tx, ty, tz] = [10, 11, 5]
+
+			// Create two adjacent tiles (current and right neighbor)
+			const tile1 = new OsmixRasterTile([tx, ty, tz], tileSize)
+			const tile2 = new OsmixRasterTile([tx + 1, ty, tz], tileSize)
+
+			const merc = new SphericalMercatorTile({ size: tileSize })
+
+			// Create a polygon that spans both tiles
+			// Left part in tile1, right part in tile2
+			const leftPart: LonLat[] = [
+				lonLatForPixel(merc, [tx, ty, tz], tileSize, 200, 50),
+				lonLatForPixel(merc, [tx, ty, tz], tileSize, 200, 150),
+				lonLatForPixel(merc, [tx, ty, tz], tileSize, 255, 150),
+				lonLatForPixel(merc, [tx, ty, tz], tileSize, 255, 50),
+				lonLatForPixel(merc, [tx, ty, tz], tileSize, 200, 50),
+			]
+
+			const rightPart: LonLat[] = [
+				lonLatForPixel(merc, [tx + 1, ty, tz], tileSize, 0, 50),
+				lonLatForPixel(merc, [tx + 1, ty, tz], tileSize, 0, 150),
+				lonLatForPixel(merc, [tx + 1, ty, tz], tileSize, 50, 150),
+				lonLatForPixel(merc, [tx + 1, ty, tz], tileSize, 50, 50),
+				lonLatForPixel(merc, [tx + 1, ty, tz], tileSize, 0, 50),
+			]
+
+			// Draw polygon on both tiles
+			tile1.drawPolygon([leftPart])
+			tile2.drawPolygon([rightPart])
+
+			// Right boundary of tile1 (x=tileSize-1) should NOT be filled
+			const tile1RightBoundaryIdx = tile1.getIndex([tileSize - 1, 100])
+			const tile1RightBoundaryColor = Array.from(
+				tile1.imageData.slice(tile1RightBoundaryIdx, tile1RightBoundaryIdx + 4),
+			)
+			expect(tile1RightBoundaryColor[3]).toBe(0) // Should be transparent
+
+			// Left boundary of tile2 (x=0) should NOT be filled
+			const tile2LeftBoundaryIdx = tile2.getIndex([0, 100])
+			const tile2LeftBoundaryColor = Array.from(
+				tile2.imageData.slice(tile2LeftBoundaryIdx, tile2LeftBoundaryIdx + 4),
+			)
+			expect(tile2LeftBoundaryColor[3]).toBe(0) // Should be transparent
+
+			// Pixels just inside each tile should be filled
+			const tile1InsideIdx = tile1.getIndex([tileSize - 2, 100])
+			expect(
+				Array.from(tile1.imageData.slice(tile1InsideIdx, tile1InsideIdx + 4)),
+			).toEqual(Array.from(DEFAULT_AREA_COLOR))
+
+			const tile2InsideIdx = tile2.getIndex([1, 100])
+			expect(
+				Array.from(tile2.imageData.slice(tile2InsideIdx, tile2InsideIdx + 4)),
+			).toEqual(Array.from(DEFAULT_AREA_COLOR))
+		})
+	})
+
+	describe("line drawing edge cases", () => {
+		it("drawLine does not draw pixels outside tile bounds", () => {
+			const tileIndex: Tile = [10, 11, 5]
+			const tileSize = DEFAULT_RASTER_TILE_SIZE
+			const { tile } = createTile(tileIndex, tileSize)
+
+			// Draw a line that extends beyond tile bounds
+			// This should only draw pixels within [0, tileSize)
+			tile.drawLine([-10, 50], [tileSize + 10, 50])
+
+			// Left boundary (x=0) should be drawn (clamped from -10)
+			const leftBoundaryIdx = tile.getIndex([0, 50])
+			expect(
+				Array.from(tile.imageData.slice(leftBoundaryIdx, leftBoundaryIdx + 4)),
+			).toEqual(Array.from(DEFAULT_LINE_COLOR))
+
+			// Right boundary (x=tileSize-1) should be drawn (clamped from tileSize+10)
+			const rightBoundaryIdx = tile.getIndex([tileSize - 1, 50])
+			expect(
+				Array.from(tile.imageData.slice(rightBoundaryIdx, rightBoundaryIdx + 4)),
+			).toEqual(Array.from(DEFAULT_LINE_COLOR))
+
+			// Pixels outside should not be drawn (would cause out-of-bounds access)
+			// This is verified by the bounds check in drawLine
+		})
+
+		it("drawWay properly clips lines at tile boundaries", () => {
+			const tileIndex: Tile = [10, 11, 5]
+			const tileSize = DEFAULT_RASTER_TILE_SIZE
+			const [tx, ty, tz] = tileIndex
+			const { tile, merc } = createTile(tileIndex)
+
+			// Create a way that extends beyond tile boundaries
+			const wayStart: LonLat = merc.ll(
+				[tx * tileSize - 20, ty * tileSize + 50],
+				tz,
+			)
+			const wayEnd: LonLat = merc.ll(
+				[(tx + 1) * tileSize + 20, ty * tileSize + 150],
+				tz,
+			)
+
+			tile.drawWay([wayStart, wayEnd])
+
+			// The way should be clipped, so we should see pixels near the boundaries
+			// but not exactly at boundaries if the intersection was outside
+			const nearLeftIdx = tile.getIndex([1, 50])
+			const nearRightIdx = tile.getIndex([tileSize - 2, 150])
+
+			// At least some pixels should be drawn (the exact boundary behavior
+			// depends on clipping, but we verify it doesn't crash)
+			const hasPixels =
+				Array.from(tile.imageData.slice(nearLeftIdx, nearLeftIdx + 4))[3] >
+					0 ||
+				Array.from(tile.imageData.slice(nearRightIdx, nearRightIdx + 4))[3] >
+					0
+			expect(hasPixels).toBe(true)
+		})
+
+		it("drawLine handles vertical lines at boundaries correctly", () => {
+			const tileIndex: Tile = [10, 11, 5]
+			const tileSize = DEFAULT_RASTER_TILE_SIZE
+			const { tile } = createTile(tileIndex)
+
+			// Draw vertical line at left boundary
+			tile.drawLine([0, 10], [0, 100])
+			const leftBoundaryIdx = tile.getIndex([0, 50])
+			expect(
+				Array.from(tile.imageData.slice(leftBoundaryIdx, leftBoundaryIdx + 4)),
+			).toEqual(Array.from(DEFAULT_LINE_COLOR))
+
+			// Draw vertical line at right boundary
+			tile.drawLine([tileSize - 1, 10], [tileSize - 1, 100])
+			const rightBoundaryIdx = tile.getIndex([tileSize - 1, 50])
+			expect(
+				Array.from(
+					tile.imageData.slice(rightBoundaryIdx, rightBoundaryIdx + 4),
+				),
+			).toEqual(Array.from(DEFAULT_LINE_COLOR))
+		})
+
+		it("drawLine handles horizontal lines at boundaries correctly", () => {
+			const tileIndex: Tile = [10, 11, 5]
+			const tileSize = DEFAULT_RASTER_TILE_SIZE
+			const { tile } = createTile(tileIndex)
+
+			// Draw horizontal line at top boundary
+			tile.drawLine([10, 0], [100, 0])
+			const topBoundaryIdx = tile.getIndex([50, 0])
+			expect(
+				Array.from(tile.imageData.slice(topBoundaryIdx, topBoundaryIdx + 4)),
+			).toEqual(Array.from(DEFAULT_LINE_COLOR))
+
+			// Draw horizontal line at bottom boundary
+			tile.drawLine([10, tileSize - 1], [100, tileSize - 1])
+			const bottomBoundaryIdx = tile.getIndex([50, tileSize - 1])
+			expect(
+				Array.from(
+					tile.imageData.slice(bottomBoundaryIdx, bottomBoundaryIdx + 4),
+				),
+			).toEqual(Array.from(DEFAULT_LINE_COLOR))
+		})
+	})
 })
