@@ -7,7 +7,7 @@
 		"bench": "vitest bench",
 		"build": "vite build",
 		"dev": "vite",
-		"test": "vitest",
+		"test:browser": "vitest",
 		"typecheck": "tsc --build --noEmit"
 	},
 	"devDependencies": {
