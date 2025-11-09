@@ -201,7 +201,13 @@ export class OsmixRasterTile {
 		}
 
 		// Scanline fill
+		// Skip top and bottom boundary rows (y=0 and y=tileSize-1) to avoid edge artifacts
 		for (let y = minY; y <= maxY; y++) {
+			// Skip boundary rows to prevent edge artifacts
+			if (y === 0 || y === tileSize - 1) {
+				continue
+			}
+
 			const intersections: number[] = []
 
 			// Find all x intersections at this y
