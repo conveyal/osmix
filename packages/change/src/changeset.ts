@@ -177,7 +177,11 @@ export class OsmixChangeset {
 			if (!this.osm.nodes.ids.has(node.id)) continue
 			if (this.nodeChanges[node.id]?.changeType === "delete") continue
 
-			const existingNodes = this.osm.nodes.withinRadius(node.lon, node.lat, 0)
+			const existingNodes = this.osm.nodes.findIndexesWithinRadius(
+				node.lon,
+				node.lat,
+				0,
+			)
 			const existingNodeIds = existingNodes
 				.map((index) => ({ id: this.osm.nodes.ids.at(index), index }))
 				.filter((n) => n.id !== node.id && !checkedIdPairs.has(n.id, node.id))

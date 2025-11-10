@@ -31,6 +31,7 @@
 		"dev": "bun --filter '*' dev",
 		"build": "bun --filter '*' build",
 		"check": "biome check --write .",
+		"clean": "rm -rf packages/*/dist apps/*/dist",
 		"format": "biome format --write .",
 		"lint": "biome lint --write --unsafe .",
 		"publish": "changeset publish",

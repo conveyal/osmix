@@ -203,11 +203,11 @@ export class Nodes extends Entities<OsmNode> {
 	}
 
 	// Spatial operations
-	withinBbox(bbox: GeoBbox2D): number[] {
+	findIndexesWithinBbox(bbox: GeoBbox2D): number[] {
 		return this.spatialIndex.range(bbox[0], bbox[1], bbox[2], bbox[3])
 	}
 
-	withinRadius(x: number, y: number, radius: number): number[] {
+	findIndexesWithinRadius(x: number, y: number, radius: number): number[] {
 		return this.spatialIndex.within(x, y, radius)
 	}
 }

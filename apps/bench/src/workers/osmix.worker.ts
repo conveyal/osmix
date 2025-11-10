@@ -76,7 +76,7 @@ export class OsmixBenchWorker {
 		if (!this.osm) throw new Error("OSM not loaded")
 
 		// Use withinRadius with a reasonable search radius
-		const candidates = this.osm.nodes.withinRadius(lon, lat, 0.1)
+		const candidates = this.osm.nodes.findIndexesWithinRadius(lon, lat, 0.1)
 
 		// Calculate distances and sort
 		const nodesWithDistance: Array<{

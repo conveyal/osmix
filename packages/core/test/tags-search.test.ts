@@ -30,7 +30,8 @@ describe("Tags.search on Nodes", () => {
 describe("Tags.search on Ways", () => {
 	it("finds by key and key+value", () => {
 		const st = new StringTable()
-		const ways = new Ways(st)
+		const nodes = new Nodes(st)
+		const ways = new Ways(st, nodes)
 		const way1: OsmWay = {
 			id: 10,
 			refs: [1, 2],

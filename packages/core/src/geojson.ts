@@ -251,14 +251,14 @@ export function fromGeoJSON(
 			osm.nodes.buildSpatialIndex()
 		}
 		if (osm.ways.size > 0) {
-			osm.ways.buildSpatialIndex(osm.nodes)
+			osm.ways.buildSpatialIndex()
 		}
 	} else {
 		if (options.buildSpatialIndexes.includes("node") && osm.nodes.size > 0) {
 			osm.nodes.buildSpatialIndex()
 		}
 		if (options.buildSpatialIndexes.includes("way") && osm.ways.size > 0) {
-			osm.ways.buildSpatialIndex(osm.nodes)
+			osm.ways.buildSpatialIndex()
 		}
 	}
 
