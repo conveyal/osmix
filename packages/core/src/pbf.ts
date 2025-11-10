@@ -125,7 +125,7 @@ export async function osmixFromPbf(
 	} else if (options.buildSpatialIndexes.includes("node")) {
 		osm.nodes.buildSpatialIndex()
 	} else if (options.buildSpatialIndexes.includes("way")) {
-		osm.ways.buildSpatialIndex(osm.nodes)
+		osm.ways.buildSpatialIndex()
 	}
 
 	return osm

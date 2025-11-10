@@ -86,7 +86,7 @@ export class Osmix {
 		const osm = new Osmix({ id, header })
 		osm.stringTable = StringTable.from(stringTable)
 		osm.nodes = Nodes.from(osm.stringTable, nodes)
-		osm.ways = Ways.from(osm.stringTable, ways)
+		osm.ways = Ways.from(osm.stringTable, osm.nodes, ways)
 		osm.relations = Relations.from(osm.stringTable, relations)
 		osm.buildTimeMs = parsingTimeMs
 		osm.#indexBuilt = true
@@ -99,7 +99,7 @@ export class Osmix {
 		if (options.logger) this.log = options.logger
 		this.stringTable = new StringTable()
 		this.nodes = new Nodes(this.stringTable)
-		this.ways = new Ways(this.stringTable)
+		this.ways = new Ways(this.stringTable, this.nodes)
 		this.relations = new Relations(this.stringTable)
 	}
 
@@ -130,7 +130,7 @@ export class Osmix {
 
 	buildSpatialIndexes() {
 		this.nodes.buildSpatialIndex()
-		this.ways.buildSpatialIndex(this.nodes)
+		this.ways.buildSpatialIndex()
 	}
 
 	get<T extends OsmEntityType>(
@@ -162,7 +162,7 @@ export class Osmix {
 	getNodesInBbox(bbox: GeoBbox2D, allNodes = false) {
 		if (!this.#indexBuilt) throw new Error("Osm not finished")
 		console.time("Osm.getNodesInBbox")
-		const nodeCandidates = this.nodes.withinBbox(bbox)
+		const nodeCandidates = this.nodes.findIndexesWithinBbox(bbox)
 		const nodePositions = new Float64Array(nodeCandidates.length * 2)
 		const ids = new IdArrayType(nodeCandidates.length)
 
@@ -198,7 +198,7 @@ export class Osmix {
 		let size = 0
 		wayCandidates.forEach((wayIndex, i) => {
 			ids[i] = this.ways.ids.at(wayIndex)
-			const way = this.ways.getLine(wayIndex, this.nodes)
+			const way = this.ways.getLine(wayIndex)
 			size += way.length
 			wayPositions.push(way)
 			const prevIndex = wayStartIndices[i]

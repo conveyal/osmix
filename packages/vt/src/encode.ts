@@ -105,7 +105,7 @@ export class OsmixVtEncoder {
 		bbox: GeoBbox2D,
 		proj: (ll: LonLat) => XY,
 	): Generator<VtSimpleFeature> {
-		const nodeIndexes = this.osmix.nodes.withinBbox(bbox)
+		const nodeIndexes = this.osmix.nodes.findIndexesWithinBbox(bbox)
 		for (let i = 0; i < nodeIndexes.length; i++) {
 			const nodeIndex = nodeIndexes[i]
 			if (nodeIndex === undefined) continue

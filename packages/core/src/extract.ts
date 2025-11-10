@@ -59,7 +59,7 @@ export function createExtract(
 	}
 
 	osm.log("Extracting nodes...")
-	for (const nodeIndex of osm.nodes.withinBbox(bbox)) {
+	for (const nodeIndex of osm.nodes.findIndexesWithinBbox(bbox)) {
 		const node = osm.nodes.getByIndex(nodeIndex)
 		extracted.nodes.addNode(node)
 		nodeIds.add(node.id)
