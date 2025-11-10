@@ -77,7 +77,7 @@ describe("OsmixRasterTile", () => {
 			tz,
 		)
 
-		tile.drawWay([outsidePrefix, ...way, outsideSuffix])
+		tile.drawLineString([outsidePrefix, ...way, outsideSuffix])
 
 		const startIdx = tile.getIndex(startPixel)
 		const endIdx = tile.getIndex(endPixel)
@@ -601,7 +601,7 @@ describe("OsmixRasterTile", () => {
 				tz,
 			)
 
-			tile.drawWay([wayStart, wayEnd])
+			tile.drawLineString([wayStart, wayEnd])
 
 			// The way should be clipped, so we should see pixels in the middle of the tile
 			// Check multiple points along the expected horizontal line
