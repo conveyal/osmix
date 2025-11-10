@@ -1,4 +1,4 @@
-import { Osmix } from "@osmix/core"
+import { Osmix, osmixToPbfStream } from "@osmix/core"
 import * as Comlink from "comlink"
 import { useAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
@@ -94,7 +94,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				],
 			})
 			const stream = await fileHandle.createWritable()
-			await osm.toPbfStream().pipeTo(stream)
+			await osmixToPbfStream(osm).pipeTo(stream)
 			task.end(`Created ${fileHandle.name} PBF for download`)
 		},
 		[osm],

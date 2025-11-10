@@ -7,26 +7,19 @@ import {
 	type OsmEntityType,
 	type OsmEntityTypeMap,
 	type OsmixGeoJSONFeature,
-	OsmJsonToBlocksTransformStream,
 	type OsmNode,
 	type OsmRelation,
 	type OsmWay,
 	relationToFeature,
 	wayToFeature,
 } from "@osmix/json"
-import {
-	type AsyncGeneratorValue,
-	OsmBlocksToPbfBytesTransformStream,
-	type OsmPbfBlock,
-	type OsmPbfHeaderBlock,
-	readOsmPbf,
-} from "@osmix/pbf"
+import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
 import { Nodes, type NodesTransferables } from "./nodes"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { IdArrayType } from "./typed-arrays"
-import { bboxFromLonLats, throttle } from "./utils"
+import { bboxFromLonLats } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
 export interface OsmixTransferables {
@@ -67,7 +60,6 @@ export class Osmix {
 		required_features: [],
 		optional_features: [],
 	}
-	blocksGenerator: AsyncGenerator<OsmPbfBlock> | null = null
 
 	// Shared string lookup table for all nodes, ways, and relations
 	stringTable: StringTable
@@ -101,28 +93,6 @@ export class Osmix {
 		return osm
 	}
 
-	/**
-	 * Easiest way to get started with Osmix. Reads a PBF file into an Osmix index. Logs progress to the console.
-	 */
-	static async fromPbf(
-		data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
-		options: Partial<OsmixOptions> = {},
-	) {
-		const osm = new Osmix(options)
-		await osm.readPbf(data, options)
-
-		// By default, build all spatial indexes.
-		if (!Array.isArray(options.buildSpatialIndexes)) {
-			osm.buildSpatialIndexes()
-		} else if (options.buildSpatialIndexes.includes("node")) {
-			osm.nodes.buildSpatialIndex()
-		} else if (options.buildSpatialIndexes.includes("way")) {
-			osm.ways.buildSpatialIndex(osm.nodes)
-		}
-
-		return osm
-	}
-
 	constructor(options: Partial<OsmixOptions> = {}) {
 		if (options.header) this.header = options.header
 		if (options.id) this.id = options.id
@@ -131,14 +101,6 @@ export class Osmix {
 		this.nodes = new Nodes(this.stringTable)
 		this.ways = new Ways(this.stringTable)
 		this.relations = new Relations(this.stringTable)
-	}
-
-	setLogger(listener: (message: string, type?: LogLevel) => void) {
-		this.log = listener
-	}
-
-	createThrottledLog(interval: number) {
-		return throttle(this.log, interval)
 	}
 
 	buildIndexes() {
@@ -166,176 +128,9 @@ export class Osmix {
 		}
 	}
 
-	async readPbf(
-		data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
-		options: Partial<OsmixOptions> = {},
-	) {
-		if (this.#indexBuilt) throw Error("Osmix built. Create new instance.")
-		const { extractBbox } = options
-		const { header, blocks } = await readOsmPbf(data)
-		this.header = header
-		if (extractBbox) {
-			this.header.bbox = {
-				left: extractBbox[0],
-				bottom: extractBbox[1],
-				right: extractBbox[2],
-				top: extractBbox[3],
-			}
-		}
-		const logEverySecond = this.createThrottledLog(1_000)
-
-		for await (const block of blocks) {
-			const blockStringIndexMap = this.stringTable.createBlockIndexMap(block)
-
-			for (const group of block.primitivegroup) {
-				const { nodes, ways, relations, dense } = group
-				if (nodes && nodes.length > 0) {
-					throw Error("Nodes must be dense!")
-				}
-
-				if (dense) {
-					this.nodes.addDenseNodes(
-						dense,
-						block,
-						blockStringIndexMap,
-						extractBbox
-							? (node: OsmNode) => {
-									return (
-										node.lon >= extractBbox[0] &&
-										node.lon <= extractBbox[2] &&
-										node.lat >= extractBbox[1] &&
-										node.lat <= extractBbox[3]
-									)
-								}
-							: undefined,
-					)
-
-					logEverySecond(`${this.nodes.size.toLocaleString()} nodes added`)
-				}
-
-				if (ways.length > 0) {
-					// Nodes are finished, build their index.
-					if (!this.nodes.isReady) this.nodes.buildIndex()
-					this.ways.addWays(
-						ways,
-						blockStringIndexMap,
-						extractBbox
-							? (way: OsmWay) => {
-									const refs = way.refs.filter((ref) => this.nodes.ids.has(ref))
-									if (refs.length === 0) return null
-									return {
-										...way,
-										refs,
-									}
-								}
-							: undefined,
-					)
-
-					logEverySecond(`${this.ways.size.toLocaleString()} ways added`)
-				}
-
-				if (relations.length > 0) {
-					if (!this.ways.isReady) this.ways.buildIndex()
-					this.relations.addRelations(
-						relations,
-						blockStringIndexMap,
-						extractBbox
-							? (relation: OsmRelation) => {
-									const members = relation.members.filter((member) => {
-										if (member.type === "node")
-											return this.nodes.ids.has(member.ref)
-										if (member.type === "way")
-											return this.ways.ids.has(member.ref)
-										return false
-									})
-									if (members.length === 0) return null
-									return {
-										...relation,
-										members,
-									}
-								}
-							: undefined,
-					)
-
-					logEverySecond(
-						`${this.relations.size.toLocaleString()} relations added`,
-					)
-				}
-			}
-		}
-
-		this.log(
-			`${this.nodes.size.toLocaleString()} nodes, ${this.ways.size.toLocaleString()} ways, and ${this.relations.size.toLocaleString()} relations added.`,
-		)
-		this.log("Building remaining id and tag indexes...")
-		this.buildIndexes()
-	}
-
 	buildSpatialIndexes() {
 		this.nodes.buildSpatialIndex()
 		this.ways.buildSpatialIndex(this.nodes)
-	}
-
-	extract(bbox: GeoBbox2D) {
-		if (!this.#indexBuilt) this.buildIndexes()
-
-		const [minLon, minLat, maxLon, maxLat] = bbox
-		const extracted = new Osmix({
-			id: this.id,
-			header: {
-				...this.header,
-				bbox: {
-					left: minLon,
-					bottom: minLat,
-					right: maxLon,
-					top: maxLat,
-				},
-			},
-		})
-
-		this.log("Selecting nodes within bounding box...")
-		this.buildSpatialIndexes()
-		for (const node of this.nodes.sorted()) {
-			if (
-				node.lon >= minLon &&
-				node.lon <= maxLon &&
-				node.lat >= minLat &&
-				node.lat <= maxLat
-			) {
-				extracted.nodes.addNode(node)
-			}
-		}
-		extracted.nodes.buildIndex()
-
-		this.log("Selecting ways within bounding box...")
-		for (const way of this.ways.sorted()) {
-			const refs = way.refs.filter((ref) => extracted.nodes.ids.has(ref))
-			if (refs.length > 0) {
-				extracted.ways.addWay({
-					...way,
-					refs,
-				})
-			}
-		}
-		extracted.ways.buildIndex()
-
-		this.log("Selecting relations within bounding box...")
-		for (const relation of this.relations.sorted()) {
-			const members = relation.members.filter((m) => {
-				if (m.type === "node") return extracted.nodes.ids.has(m.ref)
-				if (m.type === "way") return extracted.ways.ids.has(m.ref)
-				return false
-			})
-			if (members.length > 0) {
-				extracted.relations.addRelation({
-					...relation,
-					members,
-				})
-			}
-		}
-
-		extracted.buildIndexes()
-		return extracted
 	}
 
 	get<T extends OsmEntityType>(
@@ -497,62 +292,5 @@ export class Osmix {
 		for (const relation of this.relations.sorted()) {
 			yield relation
 		}
-	}
-
-	/**
-	 * Convert the OSM index to a `ReadableStream<OsmPbfHeaderBlock | OsmEntity>`.
-	 */
-	toEntityStream() {
-		let headerEnqueued = false
-		const entityGenerator = this.allEntitiesSorted()
-		return new ReadableStream<OsmPbfHeaderBlock | OsmEntity>({
-			pull: async (controller) => {
-				if (!headerEnqueued) {
-					controller.enqueue({
-						...this.header,
-						writingprogram: "@osmix/core",
-						osmosis_replication_timestamp: Date.now(),
-					})
-					headerEnqueued = true
-				}
-				const block = entityGenerator.next()
-				if (block.done) {
-					controller.close()
-				} else {
-					controller.enqueue(block.value)
-				}
-			},
-		})
-	}
-
-	/**
-	 * Convert the OSM index to a `ReadableStream<Uint8Array>` of PBF bytes.
-	 */
-	toPbfStream() {
-		return this.toEntityStream()
-			.pipeThrough(new OsmJsonToBlocksTransformStream())
-			.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
-	}
-
-	/**
-	 * Convert the OSM index to an in memory PBF ArrayBuffer.
-	 */
-	async toPbfBuffer() {
-		const chunks: Uint8Array[] = []
-		let byteLength = 0
-		const writable = new WritableStream<Uint8Array>({
-			write(chunk) {
-				chunks.push(chunk)
-				byteLength += chunk.byteLength
-			},
-		})
-		await this.toPbfStream().pipeTo(writable)
-		const combined = new Uint8Array(byteLength)
-		let offset = 0
-		for (const chunk of chunks) {
-			combined.set(chunk, offset)
-			offset += chunk.byteLength
-		}
-		return combined.buffer
 	}
 }
