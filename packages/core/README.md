@@ -21,29 +21,27 @@ npm install @osmix/core
 ### Load a PBF in one call
 
 ```ts
-import { Osmix } from "@osmix/core"
+import { osmixFromPbf } from "@osmix/core"
 import { readFile } from "node:fs/promises"
 
-const osm = await Osmix.fromPbf(readFile("example.osm.pbf"))
+const osm = await osmixFromPbf(readFile("example.osm.pbf"))
 
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
 ```
 
-`fromPbf` accepts `ArrayBufferLike`, async (iterable) chunks, or Web `ReadableStream` inputs.
+`osmixFromPbf` accepts `ArrayBufferLike`, async (iterable) chunks, or Web `ReadableStream` inputs.
 
 ### Stream with progress and extraction
 
 Pass a logger or set one later to receive throttled progress messages. Provide `extractBbox` to keep only features intersecting the desired bounds while parsing.
 
 ```ts
-import { Osmix } from "@osmix/core"
+import { osmixFromPbf } from "@osmix/core"
 import { createReadStream } from "node:fs"
 
-const osm = new Osmix({ id: "planet-seattle" })
-osm.setLogger((message) => console.log(message))
-
-await osm.readPbf(createReadStream("planet.osm.pbf"), {
+await osmixFromPbf(createReadStream("planet.osm.pbf"), {
 	extractBbox: [-122.5, 47.45, -122.2, 47.75],
+	logger: (msg) => console.log(msg)
 })
 ```
 
@@ -81,9 +79,9 @@ const { ids: wayIds, positions: wayCoords, startIndices } = osm.getWaysInBbox(bb
 ```ts
 const downtown = osm.extract([-122.35, 47.60, -122.32, 47.62])
 
-const entityStream = downtown.toEntityStream() // header + entities
-const pbfStream = downtown.toPbfStream() // Uint8Array chunks
-const pbfBuffer = await downtown.toPbfBuffer()
+const entityStream = osmixToReadableStream(downtown) // header + entities
+const pbfStream = osmixToPbfStream(downtown) // Uint8Array chunks
+const pbfBuffer = osmixToPbfBuffer(downtown)
 ```
 
 `extract` returns a new, fully indexed `Osmix` instance with the header bbox updated.
@@ -98,8 +96,8 @@ import { Osmix } from "@osmix/core"
 import { merge, OsmixChangeset } from "@osmix/change"
 import { readFile } from "node:fs/promises"
 
-const base = await Osmix.fromPbf(readFile("base.osm.pbf"))
-const patch = await Osmix.fromPbf(readFile("patch.osm.pbf"))
+const base = await osmixFromPbf(readFile("base.osm.pbf"))
+const patch = await osmixFromPbf(readFile("patch.osm.pbf"))
 
 const changeset = new OsmixChangeset(base)
 changeset.deduplicateWays(base.ways)
@@ -141,14 +139,11 @@ self.addEventListener("message", ({ data }) => {
 
 - `Osmix` – ingest PBF sources, build indexes, query entities, extract subsets, and emit JSON/PBF.
 - `Nodes` / `Ways` / `Relations` – typed-array backed stores exposed for advanced workflows.
-- `OsmixRasterTile` – rasterize indexed data into tile-sized buffers with lon/lat helpers.
-- Utilities – `throttle`, plus the shared type definitions used across the package.
-- Changesets and merge helpers now live in [`@osmix/change`](../change/README.md).
 
 ## Environment and limitations
 
 - Requires runtimes with Web Streams, `TextEncoder`/`TextDecoder`, and zlib-compatible `CompressionStream`/`DecompressionStream` support (Bun, Node 20+, modern browsers).
-- `readPbf` expects dense-node blocks; PBFs that omit dense encodings are currently unsupported.
+- `osmixFromPbf` expects dense-node blocks; PBFs that omit dense encodings are currently unsupported.
 - Filtering during ingest depends on node membership; emit nodes, then ways, then relations when supplying custom entity generators.
 
 ## Development

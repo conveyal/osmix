@@ -1,22 +1,17 @@
-import { Osmix } from "@osmix/core"
+import { type Osmix, osmixFromPbf } from "@osmix/core"
 import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import * as Comlink from "comlink"
 
 export class OsmixWorker {
-	private isReady = false
-
-	private osm: Osmix
+	private osm: Osmix | null = null
 	private log: string[] = []
 
 	constructor() {
-		this.osm = new Osmix()
 		this.log = ["Thinking..."]
-
-		this.osm.setLogger((msg) => this.log.push(msg))
 	}
 
 	ready() {
-		return this.isReady
+		return this.osm?.isReady() === true
 	}
 
 	getLog() {
@@ -24,14 +19,15 @@ export class OsmixWorker {
 	}
 
 	async init(fileUrl: string) {
-		await this.osm.readPbf(Bun.file(fileUrl).stream())
-		this.osm.buildSpatialIndexes()
-		this.isReady = true
+		this.osm = null
+		this.osm = await osmixFromPbf(Bun.file(fileUrl).stream(), {
+			logger: (msg) => this.log.push(msg),
+		})
 		return this.osm.transferables()
 	}
 
 	async getMetadata() {
-		if (!this.isReady) throw new Error("OSM not loaded")
+		if (!this.ready() || !this.osm) throw new Error("OSM not loaded")
 		const bbox = this.osm.bbox()
 		const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
 		return {

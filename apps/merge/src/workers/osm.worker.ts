@@ -6,7 +6,7 @@ import {
 	OsmixChangeset,
 	type OsmixMergeOptions,
 } from "@osmix/change"
-import { fromGeoJSON, Osmix, throttle } from "@osmix/core"
+import { fromGeoJSON, type Osmix, osmixFromPbf, throttle } from "@osmix/core"
 import type { OsmEntityType } from "@osmix/json"
 import {
 	buildRelationRings,
@@ -54,7 +54,7 @@ export class OsmixWorker {
 	}
 
 	async fromPbf(id: string, data: ArrayBufferLike | ReadableStream) {
-		const osm = await Osmix.fromPbf(
+		const osm = await osmixFromPbf(
 			data instanceof ReadableStream ? data : new Uint8Array(data),
 			{ id, logger: this.log },
 		)

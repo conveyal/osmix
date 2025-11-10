@@ -1,4 +1,4 @@
-import { Osmix } from "@osmix/core"
+import { type Osmix, osmixFromPbf } from "@osmix/core"
 import type { OsmNode, OsmWay } from "@osmix/json"
 import { type OsmPbfHeaderBlock, readOsmPbf } from "@osmix/pbf"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
@@ -10,7 +10,7 @@ export class OsmixBenchWorker {
 	private osm: Osmix | null = null
 
 	async loadFromPbf(data: ArrayBuffer): Promise<void> {
-		this.osm = await Osmix.fromPbf(new Uint8Array(data), {
+		this.osm = await osmixFromPbf(new Uint8Array(data), {
 			id: "benchmark",
 			logger: console.log,
 		})
