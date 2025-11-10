@@ -51,6 +51,7 @@ export class Nodes extends Entities<OsmNode> {
 			this.lons = RTA.from(CoordinateArrayType, transferables.lons)
 			this.lats = RTA.from(CoordinateArrayType, transferables.lats)
 			this.spatialIndex = KDBush.from(transferables.spatialIndex)
+			this.bbox = transferables.bbox
 			this.indexBuilt = true
 		} else {
 			super("node", new Ids(), new Tags(stringTable))
