@@ -13,7 +13,9 @@ export type LonLatToPixel = (ll: LonLat, zoom: number) => XY
 
 export type LonLatToTilePixel = (ll: LonLat, z: number, extent: number) => XY
 
-export type Rgba = [number, number, number, number] | Uint8ClampedArray
+export type Rgba =
+	| [r: number, g: number, b: number, a: number]
+	| Uint8ClampedArray
 
 /**
  * A bounding box in the format [minLon, minLat, maxLon, maxLat].

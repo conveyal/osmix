@@ -142,7 +142,7 @@ export class OsmixWorker {
 
 			const rings = buildRelationRings(relation, getWay, getNodeCoordinates)
 			if (rings.length > 0) {
-				rasterTile.drawRelation(rings)
+				rasterTile.drawMultiPolygon(rings)
 			}
 		}
 		console.timeEnd(relationTimer)
@@ -170,10 +170,10 @@ export class OsmixWorker {
 			},
 		)
 		for (const way of wayPolygons) {
-			rasterTile.drawPolygon([way.coords], [255, 0, 0, 128])
+			rasterTile.drawPolygon([way.coords], [255, 0, 0, 64])
 		}
 		for (const way of wayLines) {
-			rasterTile.drawWay(way.coords)
+			rasterTile.drawLineString(way.coords)
 		}
 		console.timeEnd(timer)
 

@@ -2,6 +2,7 @@ import rewind from "@osmix/shared/geojson-rewind"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
+import { compositeRGBA } from "./color"
 
 export const DEFAULT_RASTER_IMAGE_TYPE = "image/png"
 export const DEFAULT_LINE_COLOR: Rgba = [255, 255, 255, 230] // semi-transparent white
@@ -30,10 +31,21 @@ export class OsmixRasterTile {
 	setPixel(px: XY, color: Rgba) {
 		const clampedPx = this.proj.clampAndRoundPx(px)
 		const idx = this.getIndex(clampedPx)
-		this.imageData[idx] = color[0]
-		this.imageData[idx + 1] = color[1]
-		this.imageData[idx + 2] = color[2]
-		this.imageData[idx + 3] = color[3]
+		if (this.imageData[idx + 3] === 0) {
+			this.imageData[idx] = color[0]
+			this.imageData[idx + 1] = color[1]
+			this.imageData[idx + 2] = color[2]
+			this.imageData[idx + 3] = color[3]
+		} else {
+			const composite = compositeRGBA([
+				this.imageData.slice(idx, idx + 4),
+				color,
+			])
+			this.imageData[idx] = composite[0]
+			this.imageData[idx + 1] = composite[1]
+			this.imageData[idx + 2] = composite[2]
+			this.imageData[idx + 3] = composite[3]
+		}
 	}
 
 	drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR) {
@@ -68,9 +80,9 @@ export class OsmixRasterTile {
 		}
 	}
 
-	drawWay(way: LonLat[], color: Rgba = DEFAULT_LINE_COLOR) {
-		const projectedWay = way.map((ll) => this.proj.llToTilePx(ll))
-		const [clipped] = clipPolyline(projectedWay, [
+	drawLineString(coords: LonLat[], color: Rgba = DEFAULT_LINE_COLOR) {
+		const projectedCoords = coords.map((ll) => this.proj.llToTilePx(ll))
+		const [clipped] = clipPolyline(projectedCoords, [
 			0,
 			0,
 			this.proj.tileSize,
@@ -194,9 +206,9 @@ export class OsmixRasterTile {
 		let minY = tileSize
 		let maxY = 0
 		for (const ring of rings) {
-			for (const point of ring) {
-				if (point[1] < minY) minY = Math.max(0, point[1])
-				if (point[1] > maxY) maxY = Math.min(tileSize - 1, point[1])
+			for (const [, y] of ring) {
+				if (y < minY) minY = Math.max(0, y)
+				if (y > maxY) maxY = Math.min(tileSize - 1, y)
 			}
 		}
 
@@ -218,14 +230,14 @@ export class OsmixRasterTile {
 					if (!p0 || !p1) continue
 
 					// Check if edge crosses this scanline
-					const y0 = p0[1]
-					const y1 = p1[1]
+					const [x0, y0] = p0
+					const [x1, y1] = p1
 					if ((y0 <= y && y < y1) || (y1 <= y && y < y0)) {
 						// Calculate x intersection
-						const dx = p1[0] - p0[0]
-						const dy = p1[1] - p0[1]
+						const dx = x1 - x0
+						const dy = y1 - y0
 						if (dy !== 0) {
-							const x = p0[0] + ((y - y0) * dx) / dy
+							const x = x0 + ((y - y0) * dx) / dy
 							intersections.push(Math.round(x))
 						}
 					}
