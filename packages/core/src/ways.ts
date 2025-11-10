@@ -50,6 +50,7 @@ export class Ways extends Entities<OsmWay> {
 			this.refs = RTA.from(IdArrayType, transferables.refs)
 			this.bbox = RTA.from(CoordinateArrayType, transferables.bbox)
 			this.spatialIndex = Flatbush.from(transferables.spatialIndex)
+			this.indexBuilt = true
 		} else {
 			super("way", new Ids(), new Tags(stringTable))
 			this.refStart = new RTA(Uint32Array)

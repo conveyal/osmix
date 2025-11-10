@@ -62,6 +62,7 @@ export class Relations extends Entities<OsmRelation> {
 			this.memberRefs = RTA.from(IdArrayType, transferables.memberRefs)
 			this.memberTypes = RTA.from(Uint8Array, transferables.memberTypes)
 			this.memberRoles = RTA.from(Uint32Array, transferables.memberRoles)
+			this.indexBuilt = true
 		} else {
 			super("relation", new Ids(), new Tags(stringTable))
 			this.memberStart = new RTA(Uint32Array)

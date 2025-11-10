@@ -12,7 +12,7 @@ export abstract class Entities<T extends OsmEntity> {
 	ids: Ids
 	tags: Tags
 
-	private indexBuilt = false
+	protected indexBuilt = false
 
 	constructor(indexType: OsmEntityType, ids: Ids, tags: Tags) {
 		this.indexType = indexType
