@@ -1,7 +1,7 @@
 import rewind from "@osmix/shared/geojson-rewind"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
-import type { LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
+import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
 import { compositeRGBA } from "./color"
 
 export const DEFAULT_RASTER_IMAGE_TYPE = "image/png"
@@ -12,11 +12,19 @@ export const DEFAULT_RASTER_TILE_SIZE = 256
 
 export class OsmixRasterTile {
 	imageData: Uint8ClampedArray<ArrayBuffer>
+	tile: Tile
+	tileSize: number
 	proj: SphericalMercatorTile
 
 	constructor(tile: Tile, tileSize: number = DEFAULT_RASTER_TILE_SIZE) {
 		this.imageData = new Uint8ClampedArray(tileSize * tileSize * 4)
 		this.proj = new SphericalMercatorTile({ size: tileSize, tile })
+		this.tile = tile
+		this.tileSize = tileSize
+	}
+
+	bbox(): GeoBbox2D {
+		return this.proj.bbox(this.tile[0], this.tile[1], this.tile[2])
 	}
 
 	getIndex(px: XY) {
