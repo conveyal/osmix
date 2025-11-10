@@ -1,5 +1,17 @@
 # @osmix/change
 
+## 0.0.4
+
+### Patch Changes
+
+- 4303c40: Refactor core Osmix index to prepare for future work
+- Updated dependencies [572cbd8]
+- Updated dependencies [4303c40]
+  - @osmix/shared@0.0.4
+  - @osmix/core@0.0.4
+  - @osmix/json@0.0.4
+  - @osmix/pbf@0.0.2
+
 ## 0.0.3
 
 ### Patch Changes

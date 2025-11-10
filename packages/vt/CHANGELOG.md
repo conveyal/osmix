@@ -1,5 +1,13 @@
 # @osmix/vt
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [572cbd8]
+  - @osmix/shared@0.0.4
+  - @osmix/json@0.0.4
+
 ## 0.0.3
 
 ### Patch Changes
