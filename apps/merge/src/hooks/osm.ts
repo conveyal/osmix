@@ -65,7 +65,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 							Comlink.transfer(data, [data]),
 						)
 
-				const osm = Osmix.from(osmBuffers)
+				const osm = new Osmix(osmBuffers)
 				setOsm(osm)
 				taskLog.end(`${file.name} fully loaded.`)
 				return osm

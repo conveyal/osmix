@@ -1,7 +1,10 @@
 /// <reference path="./types/kdbush.d.ts" />
 
 export { createExtract } from "./extract"
-export { fromGeoJSON } from "./geojson"
+export {
+	fromGeoJSON,
+	osmixEntityToGeoJSONFeature,
+} from "./geojson"
 export { Nodes } from "./nodes"
 export { Osmix } from "./osmix"
 export * from "./pbf"

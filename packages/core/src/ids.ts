@@ -2,7 +2,7 @@ import { assertValue } from "@osmix/shared/assert"
 import {
 	BufferConstructor,
 	type BufferType,
-	ResizeableTypedArray,
+	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
 
 export type IdOrIndex = { id: number } | { index: number }
@@ -24,51 +24,28 @@ export interface IdsTransferables {
  * Maps max out at 2^32 IDs.
  */
 export class Ids {
-	private ids: ResizeableTypedArray<Float64Array>
+	private ids: RTA<Float64Array>
 	private indexBuilt = false
 	private idsAreSorted = true
 	private idsSorted: Float64Array
 	private sortedIdPositionToIndex: Uint32Array
 	private anchors: Float64Array
 
-	static from({
-		ids,
-		sortedIds,
-		sortedIdPositionToIndex,
-		anchors,
-		idsAreSorted,
-	}: IdsTransferables) {
-		const idIndex = new Ids(
-			ResizeableTypedArray.from(Float64Array, ids),
-			new Float64Array(sortedIds),
-			new Uint32Array(sortedIdPositionToIndex),
-			new Float64Array(anchors),
-		)
-		idIndex.indexBuilt = true
-		idIndex.idsAreSorted = idsAreSorted
-		return idIndex
-	}
-
-	constructor(
-		ids?: ResizeableTypedArray<Float64Array>,
-		idsSorted?: Float64Array,
-		sortedIdPositionToIndex?: Uint32Array,
-		anchors?: Float64Array,
-	) {
-		this.ids = ids ?? new ResizeableTypedArray(Float64Array)
-		this.idsSorted = idsSorted ?? new Float64Array(new BufferConstructor(0))
-		this.sortedIdPositionToIndex =
-			sortedIdPositionToIndex ?? new Uint32Array(new BufferConstructor(0))
-		this.anchors = anchors ?? new Float64Array(new BufferConstructor(0))
-	}
-
-	transferables(): IdsTransferables {
-		return {
-			ids: this.ids.array.buffer,
-			sortedIds: this.idsSorted.buffer,
-			sortedIdPositionToIndex: this.sortedIdPositionToIndex.buffer,
-			anchors: this.anchors.buffer,
-			idsAreSorted: this.idsAreSorted,
+	constructor(transferables?: IdsTransferables) {
+		if (transferables) {
+			this.ids = RTA.from(Float64Array, transferables.ids)
+			this.idsSorted = new Float64Array(transferables.sortedIds)
+			this.sortedIdPositionToIndex = new Uint32Array(
+				transferables.sortedIdPositionToIndex,
+			)
+			this.anchors = new Float64Array(transferables.anchors)
+			this.idsAreSorted = transferables.idsAreSorted
+			this.indexBuilt = true
+		} else {
+			this.ids = new RTA(Float64Array)
+			this.idsSorted = new Float64Array(new BufferConstructor(0))
+			this.sortedIdPositionToIndex = new Uint32Array(new BufferConstructor(0))
+			this.anchors = new Float64Array(new BufferConstructor(0))
 		}
 	}
 
@@ -76,7 +53,7 @@ export class Ids {
 		return this.ids.length
 	}
 
-	get isReady() {
+	isReady() {
 		return this.indexBuilt
 	}
 
@@ -213,5 +190,15 @@ export class Ids {
 
 	get sorted() {
 		return this.idsSorted
+	}
+
+	transferables(): IdsTransferables {
+		return {
+			ids: this.ids.array.buffer,
+			sortedIds: this.idsSorted.buffer,
+			sortedIdPositionToIndex: this.sortedIdPositionToIndex.buffer,
+			anchors: this.anchors.buffer,
+			idsAreSorted: this.idsAreSorted,
+		}
 	}
 }

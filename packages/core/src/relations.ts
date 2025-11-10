@@ -6,16 +6,18 @@ import type {
 } from "@osmix/json"
 import type { OsmPbfRelation } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
-import type { GeoBbox2D } from "@osmix/shared/types"
+import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
 import { Entities, type EntitiesTransferables } from "./entities"
-import { Ids } from "./ids"
+import { type IdOrIndex, Ids } from "./ids"
+import type { Nodes } from "./nodes"
 import type StringTable from "./stringtable"
 import { Tags } from "./tags"
 import {
 	type BufferType,
 	IdArrayType,
-	ResizeableTypedArray,
+	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
+import { bboxFromLonLats } from "./utils"
 import type { Ways } from "./ways"
 
 const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
@@ -29,44 +31,48 @@ export interface RelationsTransferables extends EntitiesTransferables {
 }
 
 export class Relations extends Entities<OsmRelation> {
-	memberStart: ResizeableTypedArray<Uint32Array>
-	memberCount: ResizeableTypedArray<Uint16Array> // Maximum 65,535 members per relation
+	stringTable: StringTable
+
+	memberStart: RTA<Uint32Array>
+	memberCount: RTA<Uint16Array> // Maximum 65,535 members per relation
 
 	// Store the ID of the member because relations have other relations as members.
-	memberRefs: ResizeableTypedArray<Float64Array>
-	memberTypes: ResizeableTypedArray<Uint8Array>
-	memberRoles: ResizeableTypedArray<Uint32Array>
+	memberRefs: RTA<Float64Array>
+	memberTypes: RTA<Uint8Array>
+	memberRoles: RTA<Uint32Array>
 
-	static from(stringTable: StringTable, rit: RelationsTransferables) {
-		const idIndex = Ids.from(rit)
-		const tagIndex = Tags.from(stringTable, rit)
-		const ri = new Relations(stringTable, idIndex, tagIndex)
-		ri.memberStart = ResizeableTypedArray.from(Uint32Array, rit.memberStart)
-		ri.memberCount = ResizeableTypedArray.from(Uint16Array, rit.memberCount)
-		ri.memberRefs = ResizeableTypedArray.from(IdArrayType, rit.memberRefs)
-		ri.memberTypes = ResizeableTypedArray.from(Uint8Array, rit.memberTypes)
-		ri.memberRoles = ResizeableTypedArray.from(Uint32Array, rit.memberRoles)
-		return ri
-	}
+	// Node and Way indexes
+	nodes: Nodes
+	ways: Ways
 
-	constructor(stringTable: StringTable, idIndex?: Ids, tagIndex?: Tags) {
-		super("relation", stringTable, idIndex, tagIndex)
-		this.memberStart = new ResizeableTypedArray(Uint32Array)
-		this.memberCount = new ResizeableTypedArray(Uint16Array)
-		this.memberRefs = new ResizeableTypedArray(IdArrayType)
-		this.memberTypes = new ResizeableTypedArray(Uint8Array)
-		this.memberRoles = new ResizeableTypedArray(Uint32Array)
-	}
-
-	override transferables(): RelationsTransferables {
-		return {
-			...super.transferables(),
-			memberStart: this.memberStart.array.buffer,
-			memberCount: this.memberCount.array.buffer,
-			memberRefs: this.memberRefs.array.buffer,
-			memberTypes: this.memberTypes.array.buffer,
-			memberRoles: this.memberRoles.array.buffer,
+	constructor(
+		stringTable: StringTable,
+		nodes: Nodes,
+		ways: Ways,
+		transferables?: RelationsTransferables,
+	) {
+		if (transferables) {
+			super(
+				"relation",
+				new Ids(transferables),
+				new Tags(stringTable, transferables),
+			)
+			this.memberStart = RTA.from(Uint32Array, transferables.memberStart)
+			this.memberCount = RTA.from(Uint16Array, transferables.memberCount)
+			this.memberRefs = RTA.from(IdArrayType, transferables.memberRefs)
+			this.memberTypes = RTA.from(Uint8Array, transferables.memberTypes)
+			this.memberRoles = RTA.from(Uint32Array, transferables.memberRoles)
+		} else {
+			super("relation", new Ids(), new Tags(stringTable))
+			this.memberStart = new RTA(Uint32Array)
+			this.memberCount = new RTA(Uint16Array)
+			this.memberRefs = new RTA(IdArrayType)
+			this.memberTypes = new RTA(Uint8Array)
+			this.memberRoles = new RTA(Uint32Array)
 		}
+		this.nodes = nodes
+		this.ways = ways
+		this.stringTable = stringTable
 	}
 
 	addRelation(relation: OsmRelation) {
@@ -169,6 +175,24 @@ export class Relations extends Entities<OsmRelation> {
 		this.memberRoles.compact()
 	}
 
+	getBbox(i: IdOrIndex): GeoBbox2D {
+		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
+		const relation = this.getFullEntity(index, this.ids.at(index))
+		const lls: LonLat[] = []
+		for (const member of relation.members) {
+			if (member.type === "node") {
+				const ll = this.nodes.getNodeLonLat({ id: member.ref })
+				lls.push(ll)
+			} else if (member.type === "way") {
+				const wayIndex = this.ways.ids.getIndexFromId(member.ref)
+				if (wayIndex === -1) throw Error("Way not found")
+				const wayPositions = this.ways.getCoordinates(wayIndex, this.nodes)
+				lls.push(...wayPositions)
+			}
+		}
+		return bboxFromLonLats(lls)
+	}
+
 	getFullEntity(index: number, id: number, tags?: OsmTags): OsmRelation {
 		return {
 			id,
@@ -243,72 +267,16 @@ export class Relations extends Entities<OsmRelation> {
 	}
 
 	/**
-	 * Compute bounding box of a relation from its member ways.
-	 * Uses way spatial indexes - relations don't have their own spatial index.
-	 */
-	getRelationBbox(index: number, ways: Ways): GeoBbox2D | null {
-		const start = this.memberStart.at(index)
-		const count = this.memberCount.at(index)
-		let minLon = Number.POSITIVE_INFINITY
-		let minLat = Number.POSITIVE_INFINITY
-		let maxLon = Number.NEGATIVE_INFINITY
-		let maxLat = Number.NEGATIVE_INFINITY
-		let hasWay = false
-
-		for (let i = start; i < start + count; i++) {
-			const type = RELATION_MEMBER_TYPES[this.memberTypes.at(i)]
-			if (type !== "way") continue
-
-			const wayId = this.memberRefs.at(i)
-			if (wayId === undefined) continue
-
-			const wayIndex = ways.ids.getIndexFromId(wayId)
-			if (wayIndex === -1) continue
-
-			// Get way bbox - stored as [minX, minY, maxX, maxY] per way
-			const bboxOffset = wayIndex * 4
-			const wMinLon = ways.bbox.array[bboxOffset]
-			const wMinLat = ways.bbox.array[bboxOffset + 1]
-			const wMaxLon = ways.bbox.array[bboxOffset + 2]
-			const wMaxLat = ways.bbox.array[bboxOffset + 3]
-
-			if (
-				wMinLon !== undefined &&
-				wMinLat !== undefined &&
-				wMaxLon !== undefined &&
-				wMaxLat !== undefined &&
-				!Number.isNaN(wMinLon) &&
-				!Number.isNaN(wMinLat) &&
-				!Number.isNaN(wMaxLon) &&
-				!Number.isNaN(wMaxLat)
-			) {
-				minLon = Math.min(minLon, wMinLon)
-				minLat = Math.min(minLat, wMinLat)
-				maxLon = Math.max(maxLon, wMaxLon)
-				maxLat = Math.max(maxLat, wMaxLat)
-				hasWay = true
-			}
-		}
-
-		if (!hasWay) return null
-		return [minLon, minLat, maxLon, maxLat]
-	}
-
-	/**
 	 * Find relations that intersect a bounding box.
 	 * Uses way spatial indexes - relations don't have their own spatial index.
 	 * A relation intersects if any of its member ways intersect the bbox.
 	 */
-	intersects(
-		bbox: GeoBbox2D,
-		ways: Ways,
-		filterFn?: (index: number) => boolean,
-	): number[] {
+	intersects(bbox: GeoBbox2D, filterFn?: (index: number) => boolean): number[] {
 		// First, find all ways that intersect the bbox
-		const intersectingWayIndexes = ways.intersects(bbox)
+		const intersectingWayIndexes = this.ways.intersects(bbox)
 		const intersectingWayIds = new Set<number>()
 		for (const wayIndex of intersectingWayIndexes) {
-			const wayId = ways.ids.at(wayIndex)
+			const wayId = this.ways.ids.at(wayIndex)
 			if (wayId !== undefined) {
 				intersectingWayIds.add(wayId)
 			}
@@ -334,5 +302,16 @@ export class Relations extends Entities<OsmRelation> {
 		}
 
 		return relationIndexes
+	}
+
+	override transferables(): RelationsTransferables {
+		return {
+			...super.transferables(),
+			memberStart: this.memberStart.array.buffer,
+			memberCount: this.memberCount.array.buffer,
+			memberRefs: this.memberRefs.array.buffer,
+			memberTypes: this.memberTypes.array.buffer,
+			memberRoles: this.memberRoles.array.buffer,
+		}
 	}
 }

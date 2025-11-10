@@ -10,7 +10,7 @@ export class VtWorker {
 	private vt: OsmixVtEncoder | null = null
 
 	async init(transferables: OsmixTransferables) {
-		this.osm = Osmix.from(transferables)
+		this.osm = new Osmix(transferables)
 		this.vt = new OsmixVtEncoder(this.osm)
 	}
 

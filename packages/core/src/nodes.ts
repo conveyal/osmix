@@ -1,4 +1,9 @@
-import type { OsmNode, OsmTags } from "@osmix/json"
+import {
+	nodeToFeature,
+	type OsmixGeoJSONFeature,
+	type OsmNode,
+	type OsmTags,
+} from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
 import type { GeoBbox2D } from "@osmix/shared/types"
@@ -11,7 +16,7 @@ import {
 	BufferConstructor,
 	type BufferType,
 	CoordinateArrayType,
-	ResizeableTypedArray,
+	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
 
 export interface NodesTransferables extends EntitiesTransferables {
@@ -26,8 +31,8 @@ export interface AddNodeOptions {
 }
 
 export class Nodes extends Entities<OsmNode> {
-	lons: ResizeableTypedArray<Float64Array>
-	lats: ResizeableTypedArray<Float64Array>
+	lons: RTA<Float64Array>
+	lats: RTA<Float64Array>
 	bbox: GeoBbox2D = [
 		Number.POSITIVE_INFINITY,
 		Number.POSITIVE_INFINITY,
@@ -36,30 +41,21 @@ export class Nodes extends Entities<OsmNode> {
 	]
 	spatialIndex: KDBush = new KDBush(0, 128, Float64Array, BufferConstructor)
 
-	static from(stringTable: StringTable, nits: NodesTransferables) {
-		const idIndex = Ids.from(nits)
-		const tagIndex = Tags.from(stringTable, nits)
-		const nodeIndex = new Nodes(stringTable, idIndex, tagIndex)
-		nodeIndex.lons = ResizeableTypedArray.from(CoordinateArrayType, nits.lons)
-		nodeIndex.lats = ResizeableTypedArray.from(CoordinateArrayType, nits.lats)
-		nodeIndex.bbox = nits.bbox
-		nodeIndex.spatialIndex = KDBush.from(nits.spatialIndex)
-		return nodeIndex
-	}
-
-	constructor(stringTable: StringTable, idIndex?: Ids, tagIndex?: Tags) {
-		super("node", stringTable, idIndex, tagIndex)
-		this.lons = new ResizeableTypedArray(CoordinateArrayType)
-		this.lats = new ResizeableTypedArray(CoordinateArrayType)
-	}
-
-	override transferables(): NodesTransferables {
-		return {
-			...super.transferables(),
-			lons: this.lons.array.buffer,
-			lats: this.lats.array.buffer,
-			bbox: this.bbox,
-			spatialIndex: this.spatialIndex.data,
+	constructor(stringTable: StringTable, transferables?: NodesTransferables) {
+		if (transferables) {
+			super(
+				"node",
+				new Ids(transferables),
+				new Tags(stringTable, transferables),
+			)
+			this.lons = RTA.from(CoordinateArrayType, transferables.lons)
+			this.lats = RTA.from(CoordinateArrayType, transferables.lats)
+			this.spatialIndex = KDBush.from(transferables.spatialIndex)
+		} else {
+			super("node", new Ids(), new Tags(stringTable))
+			this.lons = new RTA(CoordinateArrayType)
+			this.lats = new RTA(CoordinateArrayType)
+			this.spatialIndex = new KDBush(0, 128, Float64Array, BufferConstructor)
 		}
 	}
 
@@ -180,6 +176,13 @@ export class Nodes extends Entities<OsmNode> {
 		console.timeEnd("NodeIndex.buildSpatialIndex")
 	}
 
+	getBbox(i: IdOrIndex): GeoBbox2D {
+		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
+		const lon = this.lons.at(index)
+		const lat = this.lats.at(index)
+		return [lon, lat, lon, lat] as GeoBbox2D
+	}
+
 	getNodeLonLat(i: IdOrIndex): [number, number] {
 		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
 		return [this.lons.at(index), this.lats.at(index)]
@@ -202,6 +205,12 @@ export class Nodes extends Entities<OsmNode> {
 		}
 	}
 
+	toGeoJson(i: IdOrIndex): OsmixGeoJSONFeature<GeoJSON.Point> {
+		const [index, id] = this.ids.idOrIndex(i)
+		const node = this.getFullEntity(index, id)
+		return nodeToFeature(node)
+	}
+
 	// Spatial operations
 	findIndexesWithinBbox(bbox: GeoBbox2D): number[] {
 		return this.spatialIndex.range(bbox[0], bbox[1], bbox[2], bbox[3])
@@ -209,5 +218,52 @@ export class Nodes extends Entities<OsmNode> {
 
 	findIndexesWithinRadius(x: number, y: number, radius: number): number[] {
 		return this.spatialIndex.within(x, y, radius)
+	}
+
+	/**
+	 * Get nodes within a bounding box.
+	 * @param bbox - The bounding box to search within.
+	 * @param include - A function to filter nodes. If provided, only nodes for which the function returns true will be included.
+	 * @returns An object containing the IDs and positions of the nodes within the bounding box.
+	 */
+	withinBbox(
+		bbox: GeoBbox2D,
+		include?: (i: number) => boolean,
+	): {
+		ids: Float64Array
+		positions: Float64Array
+	} {
+		console.time("Nodes.withinBbox")
+		const nodeCandidates = this.findIndexesWithinBbox(bbox)
+		const nodePositions = new Float64Array(nodeCandidates.length * 2)
+		const ids = new Float64Array(nodeCandidates.length)
+
+		let skipped = 0
+		nodeCandidates.forEach((nodeIndex, i) => {
+			if (include && !include(nodeIndex)) {
+				skipped++
+				return
+			}
+
+			const [lon, lat] = this.getNodeLonLat({ index: nodeIndex })
+			ids[i - skipped] = this.ids.at(nodeIndex)
+			nodePositions[(i - skipped) * 2] = lon
+			nodePositions[(i - skipped) * 2 + 1] = lat
+		})
+		console.timeEnd("Nodes.withinBbox")
+		return {
+			ids: ids.subarray(0, nodeCandidates.length - skipped),
+			positions: nodePositions.slice(0, (nodeCandidates.length - skipped) * 2),
+		}
+	}
+
+	override transferables(): NodesTransferables {
+		return {
+			...super.transferables(),
+			lons: this.lons.array.buffer,
+			lats: this.lats.array.buffer,
+			bbox: this.bbox,
+			spatialIndex: this.spatialIndex.data,
+		}
 	}
 }

@@ -140,7 +140,7 @@ export default function Merge() {
 
 	const applyChanges = async () => {
 		if (!changesetStats) throw Error("Changeset stats are not loaded")
-		const osm = Osmix.from(
+		const osm = new Osmix(
 			await osmWorker.applyChangesAndReplace(changesetStats.osmId),
 		)
 		setChangesetStats(null)
@@ -250,7 +250,7 @@ export default function Merge() {
 										if (!patch.osm) throw Error("Patch OSM is not loaded")
 
 										setChangesetStats(null)
-										const osm = Osmix.from(
+										const osm = new Osmix(
 											await osmWorker.merge(base.osm.id, patch.osm.id, {
 												deduplicateNodes: true,
 												deduplicateWays: true,

@@ -226,10 +226,7 @@ export class OsmixVtEncoder {
 		bbox: GeoBbox2D,
 		proj: (ll: LonLat) => XY,
 	): Generator<VtSimpleFeature> {
-		const relationIndexes = this.osmix.relations.intersects(
-			bbox,
-			this.osmix.ways,
-		)
+		const relationIndexes = this.osmix.relations.intersects(bbox)
 
 		for (const relIndex of relationIndexes) {
 			const relation = this.osmix.relations.getByIndex(relIndex)

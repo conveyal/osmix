@@ -1,6 +1,6 @@
 import type { OsmTags } from "@osmix/json"
 import type StringTable from "./stringtable"
-import { type BufferType, ResizeableTypedArray } from "./typed-arrays"
+import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
 
 export interface TagsTransferables {
 	tagStart: BufferType
@@ -17,85 +17,48 @@ export class Tags {
 	private stringTable: StringTable
 
 	// Entity -> tag look up
-	private tagStart: ResizeableTypedArray<Uint32Array>
-	private tagCount: ResizeableTypedArray<Uint8Array>
-	private tagKeys: ResizeableTypedArray<Uint32Array>
-	private tagVals: ResizeableTypedArray<Uint32Array>
+	private tagStart: RTA<Uint32Array>
+	private tagCount: RTA<Uint8Array>
+	private tagKeys: RTA<Uint32Array>
+	private tagVals: RTA<Uint32Array>
 
 	/**
 	 * Tag -> entity look up indexes for keys.
 	 */
-	private keyEntities: ResizeableTypedArray<Uint32Array>
+	private keyEntities: RTA<Uint32Array>
 
 	/**
 	 * Look up string index -> start and count of entities with that string index.
 	 */
-	private keyIndexStart: ResizeableTypedArray<Uint32Array>
-	private keyIndexCount: ResizeableTypedArray<Uint32Array>
+	private keyIndexStart: RTA<Uint32Array>
+	private keyIndexCount: RTA<Uint32Array>
 
 	/**
-	 * Store look up indexes for entities by their string index. Is cleared after building the final index.
+	 * Store look up indexes for entities by their string index. Cleared after building the final index.
 	 */
 	private keyEntityIndexBuilder = new Map<number, number[]>()
 
 	private indexBuilt = false
 
-	static from(
-		stringTable: StringTable,
-		{
-			tagStart,
-			tagCount,
-			tagKeys,
-			tagVals,
-			keyEntities,
-			keyIndexStart,
-			keyIndexCount,
-		}: TagsTransferables,
-	) {
-		const tagIndex = new Tags(
-			stringTable,
-			ResizeableTypedArray.from(Uint32Array, tagStart),
-			ResizeableTypedArray.from(Uint8Array, tagCount),
-			ResizeableTypedArray.from(Uint32Array, tagKeys),
-			ResizeableTypedArray.from(Uint32Array, tagVals),
-			ResizeableTypedArray.from(Uint32Array, keyEntities),
-			ResizeableTypedArray.from(Uint32Array, keyIndexStart),
-			ResizeableTypedArray.from(Uint32Array, keyIndexCount),
-		)
-		tagIndex.indexBuilt = true
-		return tagIndex
-	}
-
-	constructor(
-		stringTable: StringTable,
-		tagStart?: ResizeableTypedArray<Uint32Array>,
-		tagCount?: ResizeableTypedArray<Uint8Array>,
-		tagKeys?: ResizeableTypedArray<Uint32Array>,
-		tagVals?: ResizeableTypedArray<Uint32Array>,
-		keyEntities?: ResizeableTypedArray<Uint32Array>,
-		keyIndexStart?: ResizeableTypedArray<Uint32Array>,
-		keyIndexCount?: ResizeableTypedArray<Uint32Array>,
-	) {
+	constructor(stringTable: StringTable, transferables?: TagsTransferables) {
 		this.stringTable = stringTable
-		this.tagStart = tagStart ?? new ResizeableTypedArray(Uint32Array)
-		this.tagCount = tagCount ?? new ResizeableTypedArray(Uint8Array)
-		this.tagKeys = tagKeys ?? new ResizeableTypedArray(Uint32Array)
-		this.tagVals = tagVals ?? new ResizeableTypedArray(Uint32Array)
-
-		this.keyEntities = keyEntities ?? new ResizeableTypedArray(Uint32Array)
-		this.keyIndexStart = keyIndexStart ?? new ResizeableTypedArray(Uint32Array)
-		this.keyIndexCount = keyIndexCount ?? new ResizeableTypedArray(Uint32Array)
-	}
-
-	transferables(): TagsTransferables {
-		return {
-			tagStart: this.tagStart.array.buffer,
-			tagCount: this.tagCount.array.buffer,
-			tagKeys: this.tagKeys.array.buffer,
-			tagVals: this.tagVals.array.buffer,
-			keyEntities: this.keyEntities.array.buffer,
-			keyIndexStart: this.keyIndexStart.array.buffer,
-			keyIndexCount: this.keyIndexCount.array.buffer,
+		if (transferables) {
+			this.tagStart = RTA.from(Uint32Array, transferables.tagStart)
+			this.tagCount = RTA.from(Uint8Array, transferables.tagCount)
+			this.tagKeys = RTA.from(Uint32Array, transferables.tagKeys)
+			this.tagVals = RTA.from(Uint32Array, transferables.tagVals)
+			this.keyEntities = RTA.from(Uint32Array, transferables.keyEntities)
+			this.keyIndexStart = RTA.from(Uint32Array, transferables.keyIndexStart)
+			this.keyIndexCount = RTA.from(Uint32Array, transferables.keyIndexCount)
+			this.indexBuilt = true
+		} else {
+			this.tagStart = new RTA(Uint32Array)
+			this.tagCount = new RTA(Uint8Array)
+			this.tagKeys = new RTA(Uint32Array)
+			this.tagVals = new RTA(Uint32Array)
+			this.keyEntities = new RTA(Uint32Array)
+			this.keyIndexStart = new RTA(Uint32Array)
+			this.keyIndexCount = new RTA(Uint32Array)
 		}
 	}
 
@@ -150,7 +113,7 @@ export class Tags {
 		this.indexBuilt = true
 	}
 
-	get isReady() {
+	isReady() {
 		return this.indexBuilt
 	}
 
@@ -193,6 +156,10 @@ export class Tags {
 		return tags
 	}
 
+	find(key: string): number {
+		return this.stringTable.find(key)
+	}
+
 	hasKey(keyIndex: number): number[] {
 		if (keyIndex < 0) return []
 		const start = this.keyIndexStart.at(keyIndex) ?? 0
@@ -206,5 +173,30 @@ export class Tags {
 	kvToIndex(key: number, val: number) {
 		const width = this.stringTable.length
 		return key * width + val
+	}
+
+	/**
+	 * Create transferable buffers and data from a Tags instance that can be sent across message channels and recreated
+	 * in other threads.
+	 */
+	transferables(): TagsTransferables {
+		return {
+			tagStart: this.tagStart.array.buffer,
+			tagCount: this.tagCount.array.buffer,
+			tagKeys: this.tagKeys.array.buffer,
+			tagVals: this.tagVals.array.buffer,
+			keyEntities: this.keyEntities.array.buffer,
+			keyIndexStart: this.keyIndexStart.array.buffer,
+			keyIndexCount: this.keyIndexCount.array.buffer,
+		}
+	}
+
+	static fromTransferables(
+		stringTable: StringTable,
+		transferables: TagsTransferables,
+	) {
+		const tagIndex = new Tags(stringTable, transferables)
+		tagIndex.indexBuilt = true
+		return tagIndex
 	}
 }

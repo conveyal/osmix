@@ -1,5 +1,11 @@
 import { type Osmix, osmixFromPbf } from "@osmix/core"
-import type { OsmNode, OsmWay } from "@osmix/json"
+import {
+	nodeToFeature,
+	type OsmixGeoJSONFeature,
+	type OsmNode,
+	type OsmWay,
+	wayToFeature,
+} from "@osmix/json"
 import { type OsmPbfHeaderBlock, readOsmPbf } from "@osmix/pbf"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type { GeoBbox2D } from "@osmix/shared/types"
@@ -35,37 +41,45 @@ export class OsmixBenchWorker {
 	}> {
 		if (!this.osm) throw new Error("OSM not loaded")
 
-		const nodeResults = this.osm.getNodesInBbox(bbox, true)
-		const wayResults = this.osm.getWaysInBbox(bbox)
+		const { nodes, ways } = this.osm
+		const nodesWithTags = nodes.withinBbox(
+			bbox,
+			(i) => nodes.tags.cardinality(i) > 0,
+		)
+		const wayResults = ways.withinBbox(bbox)
 
-		const nodes: OsmNode[] = []
-		for (let i = 0; i < nodeResults.ids.length; i++) {
-			const id = nodeResults.ids[i]
+		const nodesWithinBbox: OsmNode[] = []
+		for (let i = 0; i < nodesWithTags.ids.length; i++) {
+			const id = nodesWithTags.ids[i]
 			if (!id) continue
-			const lon = nodeResults.positions[i * 2]
-			const lat = nodeResults.positions[i * 2 + 1]
+			const lon = nodesWithTags.positions[i * 2]
+			const lat = nodesWithTags.positions[i * 2 + 1]
 			if (lon === undefined || lat === undefined) continue
 			if (includeTags) {
-				const node = this.osm.nodes.getById(id)
-				nodes.push({ id, lon, lat, tags: node?.tags ?? undefined })
+				const node = nodes.getById(id)
+				nodesWithinBbox.push({ id, lon, lat, tags: node?.tags ?? undefined })
 			} else {
-				nodes.push({ id, lon, lat })
+				nodesWithinBbox.push({ id, lon, lat })
 			}
 		}
 
-		const ways: OsmWay[] = []
+		const waysInBbox: OsmWay[] = []
 		for (let i = 0; i < wayResults.ids.length; i++) {
 			const id = wayResults.ids[i]
 			if (!id) continue
 			if (includeTags) {
-				const way = this.osm.ways.getById(id)
-				ways.push({ id, refs: way?.refs ?? [], tags: way?.tags ?? undefined })
+				const way = ways.getById(id)
+				waysInBbox.push({
+					id,
+					refs: way?.refs ?? [],
+					tags: way?.tags ?? undefined,
+				})
 			} else {
-				ways.push({ id, refs: [] })
+				waysInBbox.push({ id, refs: [] })
 			}
 		}
 
-		return { nodes, ways }
+		return { nodes: nodesWithinBbox, ways: waysInBbox }
 	}
 
 	async nearestNeighbor(
@@ -133,16 +147,21 @@ export class OsmixBenchWorker {
 	): Promise<GeoJSON.FeatureCollection> {
 		if (!this.osm) throw new Error("OSM not loaded")
 
-		const features: ReturnType<typeof this.osm.getEntityGeoJson>[] = []
+		const features: OsmixGeoJSONFeature<
+			GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon
+		>[] = []
 
-		for (const node of this.osm.nodes) {
+		const { nodes } = this.osm
+		for (const node of nodes) {
 			if (!node.tags || Object.keys(node.tags).length === 0) continue
-			features.push(this.osm.getEntityGeoJson(node))
+			features.push(nodeToFeature(node))
 		}
 
 		for (const way of this.osm.ways) {
 			if (features.length >= limit) break
-			features.push(this.osm.getEntityGeoJson(way))
+			features.push(
+				wayToFeature(way, (ref) => nodes.getNodeLonLat({ id: ref })),
+			)
 		}
 
 		return {

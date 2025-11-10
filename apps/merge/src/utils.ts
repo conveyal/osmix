@@ -1,3 +1,24 @@
+import type { Osmix } from "@osmix/core"
+import type { OsmEntity } from "@osmix/json"
+
+export function getOsmixEntityByStringId(
+	osmix: Osmix,
+	eid: string,
+): OsmEntity | null {
+	const [type, sid] = eid.split("/")
+	const id = Number(sid)
+	switch (type) {
+		case "node":
+			return osmix.nodes.get({ id })
+		case "way":
+			return osmix.ways.get({ id })
+		case "relation":
+			return osmix.relations.get({ id })
+		default:
+			return null
+	}
+}
+
 export function flattenValue(value: unknown): string {
 	if (typeof value === "string") {
 		return value

@@ -56,7 +56,7 @@ export default function InspectPage() {
 		const task = Log.startTask("Applying changes to OSM...")
 		const transferables = await osmWorker.applyChangesAndReplace(osmId)
 		task.update("Refreshing OSM index...")
-		const newOsm = Osmix.from(transferables)
+		const newOsm = new Osmix(transferables)
 		setOsm(newOsm)
 		setChangesetStats(null)
 		task.end("Changes applied!")

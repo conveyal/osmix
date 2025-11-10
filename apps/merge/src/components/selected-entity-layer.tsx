@@ -1,3 +1,4 @@
+import { osmixEntityToGeoJSONFeature } from "@osmix/core"
 import { useAtomValue } from "jotai"
 import { useEffect, useMemo } from "react"
 import {
@@ -41,7 +42,7 @@ export default function SelectedEntityLayer() {
 	const geojson: GeoJSON.GeoJSON = useMemo(() => {
 		if (!selectedOsm || !selectedEntity)
 			return { type: "FeatureCollection", features: [] }
-		return selectedOsm.getEntityGeoJson(selectedEntity)
+		return osmixEntityToGeoJSONFeature(selectedOsm, selectedEntity)
 	}, [selectedEntity, selectedOsm])
 
 	useEffect(() => {

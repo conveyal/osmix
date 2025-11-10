@@ -1,5 +1,7 @@
 import {
 	type OsmEntity,
+	type OsmEntityType,
+	type OsmEntityTypeMap,
 	OsmJsonToBlocksTransformStream,
 	type OsmNode,
 	type OsmRelation,
@@ -11,15 +13,30 @@ import {
 	type OsmPbfHeaderBlock,
 	readOsmPbf,
 } from "@osmix/pbf"
+import type { GeoBbox2D } from "@osmix/shared/types"
 import { Osmix, type OsmixOptions } from "./osmix"
 import { throttle } from "./utils"
+
+export interface OsmixFromPbfOptions extends OsmixOptions {
+	extractBbox: GeoBbox2D
+	logger: (message: string) => void
+	filter<T extends OsmEntityType>(
+		type: T,
+		entity: OsmEntityTypeMap[T],
+		osmix: Osmix,
+	): boolean
+	buildSpatialIndexes: OsmEntityType[]
+
+	// Future options
+	// include: OsmEntityType[]
+}
 
 /**
  * Read an OSM PBF file into an Osmix index.
  */
 export async function osmixFromPbf(
 	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
-	options: Partial<OsmixOptions> = {},
+	options: Partial<OsmixFromPbfOptions> = {},
 ): Promise<Osmix> {
 	const osm = new Osmix(options)
 	const { extractBbox } = options
@@ -67,7 +84,7 @@ export async function osmixFromPbf(
 
 			if (ways.length > 0) {
 				// Nodes are finished, build their index.
-				if (!osm.nodes.isReady) osm.nodes.buildIndex()
+				if (!osm.nodes.isReady()) osm.nodes.buildIndex()
 				osm.ways.addWays(
 					ways,
 					blockStringIndexMap,
@@ -87,7 +104,7 @@ export async function osmixFromPbf(
 			}
 
 			if (relations.length > 0) {
-				if (!osm.ways.isReady) osm.ways.buildIndex()
+				if (!osm.ways.isReady()) osm.ways.buildIndex()
 				osm.relations.addRelations(
 					relations,
 					blockStringIndexMap,
@@ -132,13 +149,28 @@ export async function osmixFromPbf(
 }
 
 /**
+ * Create a generator that yields all entities in the OSM index, sorted by type and id.
+ */
+function* getAllEntitiesSorted(osm: Osmix): Generator<OsmEntity> {
+	for (const node of osm.nodes.sorted()) {
+		yield node
+	}
+	for (const way of osm.ways.sorted()) {
+		yield way
+	}
+	for (const relation of osm.relations.sorted()) {
+		yield relation
+	}
+}
+
+/**
  * Convert the OSM index to a `ReadableStream<OsmPbfHeaderBlock | OsmEntity>`.
  */
 export function createReadableEntityStreamFromOsmix(
 	osm: Osmix,
 ): ReadableStream<OsmPbfHeaderBlock | OsmEntity> {
 	let headerEnqueued = false
-	const entityGenerator = osm.allEntitiesSorted()
+	const entityGenerator = getAllEntitiesSorted(osm)
 	return new ReadableStream<OsmPbfHeaderBlock | OsmEntity>({
 		pull: async (controller) => {
 			if (!headerEnqueued) {
