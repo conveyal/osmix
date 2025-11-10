@@ -35,10 +35,13 @@ export class Ways extends Entities<OsmWay> {
 	// Bounding box of the way in geographic coordinates
 	bbox: ResizeableTypedArray<Float64Array>
 
-	static from(stringTable: StringTable, wits: WaysTransferables) {
+	// Node reference index
+	nodes: Nodes
+
+	static from(stringTable: StringTable, nodes: Nodes, wits: WaysTransferables) {
 		const idIndex = Ids.from(wits)
 		const tagIndex = Tags.from(stringTable, wits)
-		const wayIndex = new Ways(stringTable, idIndex, tagIndex)
+		const wayIndex = new Ways(stringTable, nodes, idIndex, tagIndex)
 		wayIndex.refStart = ResizeableTypedArray.from(Uint32Array, wits.refStart)
 		wayIndex.refCount = ResizeableTypedArray.from(Uint16Array, wits.refCount)
 		wayIndex.refs = ResizeableTypedArray.from(IdArrayType, wits.refs)
@@ -47,8 +50,14 @@ export class Ways extends Entities<OsmWay> {
 		return wayIndex
 	}
 
-	constructor(stringTable: StringTable, idIndex?: Ids, tagIndex?: Tags) {
+	constructor(
+		stringTable: StringTable,
+		nodes: Nodes,
+		idIndex?: Ids,
+		tagIndex?: Tags,
+	) {
 		super("way", stringTable, idIndex, tagIndex)
+		this.nodes = nodes
 		this.refStart = new ResizeableTypedArray(Uint32Array)
 		this.refCount = new ResizeableTypedArray(Uint16Array)
 		this.refs = new ResizeableTypedArray(IdArrayType)
@@ -124,8 +133,9 @@ export class Ways extends Entities<OsmWay> {
 		this.refs.compact()
 	}
 
-	buildSpatialIndex(nodeIndex: Nodes) {
+	buildSpatialIndex() {
 		console.time("WayIndex.buildSpatialIndex")
+		if (this.nodes.isReady !== true) throw Error("Node index is not ready.")
 		this.spatialIndex = new Flatbush(
 			this.size,
 			128,
@@ -141,7 +151,7 @@ export class Ways extends Entities<OsmWay> {
 			const count = this.refCount.at(i)
 			for (let j = start; j < start + count; j++) {
 				const refId = this.refs.at(j)
-				const [lon, lat] = nodeIndex.getNodeLonLat({ id: refId })
+				const [lon, lat] = this.nodes.getNodeLonLat({ id: refId })
 				if (lon < minX) minX = lon
 				if (lon > maxX) maxX = lon
 				if (lat < minY) minY = lat
@@ -183,13 +193,13 @@ export class Ways extends Entities<OsmWay> {
 		]
 	}
 
-	getLine(index: number, nodeIndex: Nodes) {
+	getLine(index: number) {
 		const count = this.refCount.at(index)
 		const start = this.refStart.at(index)
 		const line = new Float64Array(count * 2)
 		for (let i = 0; i < count; i++) {
 			const ref = this.refs.at(start + i)
-			const [lon, lat] = nodeIndex.getNodeLonLat({ id: ref })
+			const [lon, lat] = this.nodes.getNodeLonLat({ id: ref })
 			line[i * 2] = lon
 			line[i * 2 + 1] = lat
 		}
@@ -202,7 +212,7 @@ export class Ways extends Entities<OsmWay> {
 		const coords: [number, number][] = []
 		for (let refIndex = start; refIndex < start + count; refIndex++) {
 			const ref = this.refs.at(refIndex)
-			const coord = nodeIndex.getNodeLonLat({ id: ref })
+			const coord = this.nodes.getNodeLonLat({ id: ref })
 			if (
 				coord === undefined ||
 				coord[0] === undefined ||
