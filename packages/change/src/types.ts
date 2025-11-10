@@ -23,6 +23,7 @@ export interface OsmixMergeOptions {
 	deduplicateNodes: boolean
 	deduplicateWays: boolean
 	createIntersections: boolean
+	logger: (message: string) => void
 }
 
 export type OsmixChangesetStats = {

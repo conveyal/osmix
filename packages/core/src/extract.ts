@@ -23,7 +23,7 @@ export function createExtract(
 ): Osmix {
 	if (!osm.isReady()) throw Error("Osmix is not ready for extraction.")
 
-	osm.log(
+	console.log(
 		`Creating extract ${osm.id} with strategy=${strategy} in bbox ${bbox.join(", ")}...`,
 	)
 	const [minLon, minLat, maxLon, maxLat] = bbox
@@ -58,14 +58,14 @@ export function createExtract(
 		wayIds.add(id)
 	}
 
-	osm.log("Extracting nodes...")
+	console.log("Extracting nodes...")
 	for (const nodeIndex of osm.nodes.findIndexesWithinBbox(bbox)) {
 		const node = osm.nodes.getByIndex(nodeIndex)
 		extracted.nodes.addNode(node)
 		nodeIds.add(node.id)
 	}
 
-	osm.log("Extracting ways...")
+	console.log("Extracting ways...")
 	for (const way of osm.ways.sorted()) {
 		if (way.refs.some((ref) => nodeIds.has(ref))) {
 			wayIds.add(way.id)
@@ -81,7 +81,7 @@ export function createExtract(
 		}
 	}
 
-	osm.log("Extracting relations...")
+	console.log("Extracting relations...")
 	for (const relation of osm.relations.sorted()) {
 		if (
 			relation.members.some((m) => {

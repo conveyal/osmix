@@ -60,16 +60,16 @@ osm.buildIndexes()
 
 - `osm.get("node", 123)` or `osm.getById("n123")` fetches specific entities.
 - `osm.nodes.sorted()` / `osm.ways.sorted()` iterate ids in ascending order.
-- `osm.getEntityGeoJson(entity)` returns a GeoJSON feature with coordinates resolved from the
+- `osmixEntityToGeoJSONFeature(osm, entity)` returns a GeoJSON feature with coordinates resolved from the
   indexed nodes.
 
 Spatial lookups emit compact typed arrays that can be transferred across Web Workers and used directly in `Deck.gl`:
 
 ```ts
 const bbox = [-122.34, 47.57, -122.30, 47.61]
-const { ids, positions } = osm.getNodesInBbox(bbox)
+const { ids, positions } = osm.nodes.withinBbox(bbox)
 
-const { ids: wayIds, positions: wayCoords, startIndices } = osm.getWaysInBbox(bbox)
+const { ids: wayIds, positions: wayCoords, startIndices } = osm.ways.withinBbox(bbox)
 ```
 
 `positions` stores `[lon, lat]` pairs; `startIndices` splits `wayCoords` into per-way sequences.
@@ -130,7 +130,7 @@ worker.postMessage(payload, { transfer: collect(payload) })
 import { Osmix } from "@osmix/core"
 
 self.addEventListener("message", ({ data }) => {
-	const osm = Osmix.from(data)
+	const osm = new Osmix(data)
 	// ready for queries immediately
 })
 ```

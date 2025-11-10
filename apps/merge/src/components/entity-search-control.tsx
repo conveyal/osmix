@@ -2,6 +2,7 @@ import type { Osmix } from "@osmix/core"
 import { useSetAtom } from "jotai"
 import { useFlyToEntity } from "../hooks/map"
 import { selectedEntityAtom, selectedOsmAtom } from "../state/osm"
+import { getOsmixEntityByStringId } from "../utils"
 import EntityLookup from "./entity-lookup"
 
 export default function EntitySearchControl({ osm }: { osm: Osmix }) {
@@ -12,7 +13,7 @@ export default function EntitySearchControl({ osm }: { osm: Osmix }) {
 		<div className="bg-background w-sm">
 			<EntityLookup
 				setSelectedEntity={(id) => {
-					const entity = osm.getById(id)
+					const entity = getOsmixEntityByStringId(osm, id)
 					setSelectedOsm(osm)
 					setSelectedEntity(entity)
 					if (entity) {

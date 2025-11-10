@@ -290,7 +290,9 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(geojson)).toThrow("Invalid GeoJSON coordinates in LineString.")
+		expect(() => fromGeoJSON(geojson)).toThrow(
+			"Invalid GeoJSON coordinates in LineString.",
+		)
 	})
 
 	it("should error on LineStrings with invalid coordinates that result in less than 2 valid nodes", () => {
@@ -402,8 +404,8 @@ describe("fromGeoJSON", () => {
 		const osm = fromGeoJSON(geojson)
 
 		expect(osm.isReady()).toBe(true)
-		expect(osm.nodes.isReady).toBe(true)
-		expect(osm.ways.isReady).toBe(true)
+		expect(osm.nodes.isReady()).toBe(true)
+		expect(osm.ways.isReady()).toBe(true)
 	})
 
 	it("should handle features without properties", () => {
@@ -727,7 +729,9 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(geojson)).toThrow("Outer ring of Polygon is not closed.")
+		expect(() => fromGeoJSON(geojson)).toThrow(
+			"Outer ring of Polygon is not closed.",
+		)
 	})
 
 	it("should skip invalid Polygons with less than 3 coordinates", () => {
@@ -847,7 +851,9 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(geojson)).toThrow("Hole ring of Polygon is not closed.")
+		expect(() => fromGeoJSON(geojson)).toThrow(
+			"Hole ring of Polygon is not closed.",
+		)
 	})
 
 	it("should error on unclosed MultiPolygon ring", () => {
@@ -877,6 +883,8 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(geojson)).toThrow("Outer ring of Polygon is not closed.")
+		expect(() => fromGeoJSON(geojson)).toThrow(
+			"Outer ring of Polygon is not closed.",
+		)
 	})
 })

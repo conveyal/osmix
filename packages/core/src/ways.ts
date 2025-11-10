@@ -12,7 +12,7 @@ import {
 	type BufferType,
 	CoordinateArrayType,
 	IdArrayType,
-	ResizeableTypedArray,
+	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
 
 export interface WaysTransferables extends EntitiesTransferables {
@@ -26,53 +26,38 @@ export interface WaysTransferables extends EntitiesTransferables {
 export class Ways extends Entities<OsmWay> {
 	spatialIndex: Flatbush = new Flatbush(1)
 
-	refStart: ResizeableTypedArray<Uint32Array>
-	refCount: ResizeableTypedArray<Uint16Array> // Maximum 2,000 nodes per way
+	refStart: RTA<Uint32Array>
+	refCount: RTA<Uint16Array> // Maximum 2,000 nodes per way
 
 	// Node IDs
-	refs: ResizeableTypedArray<Float64Array>
+	refs: RTA<Float64Array>
 
 	// Bounding box of the way in geographic coordinates
-	bbox: ResizeableTypedArray<Float64Array>
+	bbox: RTA<Float64Array>
 
 	// Node reference index
 	nodes: Nodes
 
-	static from(stringTable: StringTable, nodes: Nodes, wits: WaysTransferables) {
-		const idIndex = Ids.from(wits)
-		const tagIndex = Tags.from(stringTable, wits)
-		const wayIndex = new Ways(stringTable, nodes, idIndex, tagIndex)
-		wayIndex.refStart = ResizeableTypedArray.from(Uint32Array, wits.refStart)
-		wayIndex.refCount = ResizeableTypedArray.from(Uint16Array, wits.refCount)
-		wayIndex.refs = ResizeableTypedArray.from(IdArrayType, wits.refs)
-		wayIndex.bbox = ResizeableTypedArray.from(CoordinateArrayType, wits.bbox)
-		wayIndex.spatialIndex = Flatbush.from(wits.spatialIndex)
-		return wayIndex
-	}
-
 	constructor(
 		stringTable: StringTable,
 		nodes: Nodes,
-		idIndex?: Ids,
-		tagIndex?: Tags,
+		transferables?: WaysTransferables,
 	) {
-		super("way", stringTable, idIndex, tagIndex)
-		this.nodes = nodes
-		this.refStart = new ResizeableTypedArray(Uint32Array)
-		this.refCount = new ResizeableTypedArray(Uint16Array)
-		this.refs = new ResizeableTypedArray(IdArrayType)
-		this.bbox = new ResizeableTypedArray(CoordinateArrayType)
-	}
-
-	override transferables(): WaysTransferables {
-		return {
-			...super.transferables(),
-			refStart: this.refStart.array.buffer,
-			refCount: this.refCount.array.buffer,
-			refs: this.refs.array.buffer,
-			bbox: this.bbox.array.buffer,
-			spatialIndex: this.spatialIndex.data,
+		if (transferables) {
+			super("way", new Ids(transferables), new Tags(stringTable, transferables))
+			this.refStart = RTA.from(Uint32Array, transferables.refStart)
+			this.refCount = RTA.from(Uint16Array, transferables.refCount)
+			this.refs = RTA.from(IdArrayType, transferables.refs)
+			this.bbox = RTA.from(CoordinateArrayType, transferables.bbox)
+			this.spatialIndex = Flatbush.from(transferables.spatialIndex)
+		} else {
+			super("way", new Ids(), new Tags(stringTable))
+			this.refStart = new RTA(Uint32Array)
+			this.refCount = new RTA(Uint16Array)
+			this.refs = new RTA(IdArrayType)
+			this.bbox = new RTA(CoordinateArrayType)
 		}
+		this.nodes = nodes
 	}
 
 	addWay(way: OsmWay) {
@@ -135,7 +120,9 @@ export class Ways extends Entities<OsmWay> {
 
 	buildSpatialIndex() {
 		console.time("WayIndex.buildSpatialIndex")
-		if (this.nodes.isReady !== true) throw Error("Node index is not ready.")
+		if (!this.nodes.isReady()) throw Error("Node index is not ready.")
+		if (this.size === 0) return this.spatialIndex
+
 		this.spatialIndex = new Flatbush(
 			this.size,
 			128,
@@ -245,5 +232,58 @@ export class Ways extends Entities<OsmWay> {
 		maxDistance?: number,
 	): number[] {
 		return this.spatialIndex.neighbors(x, y, maxResults, maxDistance)
+	}
+
+	withinBbox(
+		bbox: GeoBbox2D,
+		include?: (index: number) => boolean,
+	): {
+		ids: Float64Array
+		positions: Float64Array
+		startIndices: Uint32Array
+	} {
+		console.time("Ways.withinBbox")
+		const wayCandidates = this.intersects(bbox, include)
+		const ids = new Float64Array(wayCandidates.length)
+		const wayPositions: Float64Array[] = []
+		const wayStartIndices = new Uint32Array(wayCandidates.length + 1)
+		wayStartIndices[0] = 0
+
+		console.time("Ways.withinBbox.loop")
+		let size = 0
+		wayCandidates.forEach((wayIndex, i) => {
+			ids[i] = this.ids.at(wayIndex)
+			const way = this.getLine(wayIndex)
+			size += way.length
+			wayPositions.push(way)
+			const prevIndex = wayStartIndices[i]
+			if (prevIndex === undefined) throw Error("Previous index is undefined")
+			wayStartIndices[i + 1] = prevIndex + way.length / 2
+		})
+		console.timeEnd("Ways.withinBbox.loop")
+		const wayPositionsArray = new Float64Array(size)
+		let pIndex = 0
+		for (const way of wayPositions) {
+			wayPositionsArray.set(way, pIndex)
+			pIndex += way.length
+		}
+
+		console.timeEnd("Ways.withinBbox")
+		return {
+			ids,
+			positions: wayPositionsArray,
+			startIndices: wayStartIndices,
+		}
+	}
+
+	override transferables(): WaysTransferables {
+		return {
+			...super.transferables(),
+			refStart: this.refStart.array.buffer,
+			refCount: this.refCount.array.buffer,
+			refs: this.refs.array.buffer,
+			bbox: this.bbox.array.buffer,
+			spatialIndex: this.spatialIndex.data,
+		}
 	}
 }

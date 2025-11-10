@@ -345,8 +345,7 @@ test("extract with complete_ways includes node members of relations", () => {
 })
 
 test.skip("extract from a large PBF", { timeout: 500_000 }, async () => {
-	const seattle = new Osmix({ logger: console.error })
-	await osmixFromPbf(getFixtureFileReadStream("usa.pbf"), {
+	const seattle = await osmixFromPbf(getFixtureFileReadStream("usa.pbf"), {
 		extractBbox: SEATTLE_BBOX,
 	})
 

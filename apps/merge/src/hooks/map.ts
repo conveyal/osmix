@@ -1,5 +1,5 @@
 import type { Osmix } from "@osmix/core"
-import { isNode, type OsmEntity } from "@osmix/json"
+import { isNode, isRelation, isWay, type OsmEntity } from "@osmix/json"
 import { useCallback } from "react"
 import { useMap as useMapCollection } from "react-map-gl/maplibre"
 
@@ -22,8 +22,14 @@ export function useFlyToEntity() {
 					maxDuration: 200,
 					zoom: 16,
 				})
-			} else {
-				const bbox = osm.getEntityBbox(entity)
+			} else if (isWay(entity)) {
+				const bbox = osm.ways.getBbox({ id: entity.id })
+				map.fitBounds(bbox, {
+					padding: 100,
+					maxDuration: 200,
+				})
+			} else if (isRelation(entity)) {
+				const bbox = osm.relations.getBbox({ id: entity.id })
 				map.fitBounds(bbox, {
 					padding: 100,
 					maxDuration: 200,

@@ -1,5 +1,5 @@
 import type { OsmPbfBlock, OsmPbfStringTable } from "@osmix/pbf"
-import { type BufferType, ResizeableTypedArray } from "./typed-arrays"
+import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
 
 export interface StringTableTransferables {
 	bytes: BufferType
@@ -15,9 +15,9 @@ export default class StringTable {
 	private dec = new TextDecoder() // UTF-8
 
 	// Serializable state
-	private bytes: ResizeableTypedArray<Uint8Array>
-	private start: ResizeableTypedArray<Uint32Array>
-	private count: ResizeableTypedArray<Uint16Array>
+	bytes: RTA<Uint8Array>
+	start: RTA<Uint32Array>
+	count: RTA<Uint16Array>
 
 	// Builder state
 	private stringToIndex = new Map<string, number>()
@@ -28,23 +28,16 @@ export default class StringTable {
 	// Retrieval state
 	private indexToString = new Map<number, string>()
 
-	static from({ bytes, start, count }: StringTableTransferables): StringTable {
-		const builder = new StringTable(
-			ResizeableTypedArray.from(Uint8Array, bytes),
-			ResizeableTypedArray.from(Uint32Array, start),
-			ResizeableTypedArray.from(Uint16Array, count),
-		)
-		return builder
-	}
-
-	constructor(
-		bytes?: ResizeableTypedArray<Uint8Array>,
-		start?: ResizeableTypedArray<Uint32Array>,
-		count?: ResizeableTypedArray<Uint16Array>,
-	) {
-		this.bytes = bytes ?? new ResizeableTypedArray(Uint8Array)
-		this.start = start ?? new ResizeableTypedArray(Uint32Array)
-		this.count = count ?? new ResizeableTypedArray(Uint16Array)
+	constructor(opts?: StringTableTransferables) {
+		this.bytes = opts?.bytes
+			? RTA.from(Uint8Array, opts.bytes)
+			: new RTA(Uint8Array)
+		this.start = opts?.start
+			? RTA.from(Uint32Array, opts.start)
+			: new RTA(Uint32Array)
+		this.count = opts?.count
+			? RTA.from(Uint16Array, opts.count)
+			: new RTA(Uint16Array)
 	}
 
 	transferables(): StringTableTransferables {

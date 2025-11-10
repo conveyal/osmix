@@ -1,4 +1,15 @@
-import type { OsmRelationMember, OsmTags } from "@osmix/json"
+import {
+	isNode,
+	isRelation,
+	isWay,
+	nodeToFeature,
+	type OsmEntity,
+	type OsmixGeoJSONFeature,
+	type OsmRelationMember,
+	type OsmTags,
+	relationToFeature,
+	wayToFeature,
+} from "@osmix/json"
 import rewind from "@osmix/shared/geojson-rewind"
 import type {
 	FeatureCollection,
@@ -9,6 +20,11 @@ import type {
 } from "geojson"
 import type { OsmixOptions } from "./osmix"
 import { Osmix } from "./osmix"
+import { throttle } from "./utils"
+
+interface OsmixCreateFromGeoJSONOptions extends OsmixOptions {
+	logger: (message: string) => void
+}
 
 /**
  * Convert a GeoJSON FeatureCollection into an Osmix instance.
@@ -20,10 +36,14 @@ import { Osmix } from "./osmix"
  */
 export function fromGeoJSON(
 	geojson: FeatureCollection<Point | LineString | Polygon | MultiPolygon>,
-	options: Partial<OsmixOptions> = {},
+	options: Partial<OsmixCreateFromGeoJSONOptions> = {},
 ): Osmix {
 	const osm = new Osmix(options)
 	if (!options.id) osm.id = "geojson"
+	const log = options.logger ?? ((...msg) => console.log(...msg))
+
+	log("Converting GeoJSON to Osmix...")
+	const logEverySecond = throttle(log, 1_000)
 
 	// Map to track nodes by coordinate string for reuse when creating ways and relations
 	const nodeMap = new Map<string, number>()
@@ -50,7 +70,9 @@ export function fromGeoJSON(
 	}
 
 	// Process each feature
+	let count = 0
 	for (const feature of geojson.features) {
+		logEverySecond(`Processed ${count++} features...`)
 		// Normalize winding order using rewind (outer rings counterclockwise, inner rings clockwise)
 		const normalizedFeature = rewind(feature, false)
 		const tags = propertiesToTags(normalizedFeature.properties)
@@ -242,25 +264,11 @@ export function fromGeoJSON(
 		}
 	}
 
+	log("Finished converting GeoJSON to Osmix, building indexes...")
+
 	// Build indexes
 	osm.buildIndexes()
-
-	// By default, build all spatial indexes (only if entities exist).
-	if (!Array.isArray(options.buildSpatialIndexes)) {
-		if (osm.nodes.size > 0) {
-			osm.nodes.buildSpatialIndex()
-		}
-		if (osm.ways.size > 0) {
-			osm.ways.buildSpatialIndex()
-		}
-	} else {
-		if (options.buildSpatialIndexes.includes("node") && osm.nodes.size > 0) {
-			osm.nodes.buildSpatialIndex()
-		}
-		if (options.buildSpatialIndexes.includes("way") && osm.ways.size > 0) {
-			osm.ways.buildSpatialIndex()
-		}
-	}
+	osm.buildSpatialIndexes()
 
 	return osm
 }
@@ -297,4 +305,29 @@ function extractFeatureId(
 		if (!Number.isNaN(numId)) return numId
 	}
 	return undefined
+}
+
+/**
+ * Helper to convert an Osmix entity to a GeoJSON feature.
+ */
+export function osmixEntityToGeoJSONFeature(
+	osmix: Osmix,
+	entity: OsmEntity,
+): OsmixGeoJSONFeature<
+	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.MultiPolygon
+> {
+	if (isNode(entity)) {
+		return nodeToFeature(entity)
+	}
+	if (isWay(entity)) {
+		return wayToFeature(entity, (ref) => osmix.nodes.getNodeLonLat({ id: ref }))
+	}
+	if (isRelation(entity)) {
+		return relationToFeature(
+			entity,
+			(ref) => osmix.nodes.getNodeLonLat({ id: ref }),
+			(ref) => osmix.ways.getById(ref),
+		)
+	}
+	throw new Error("Unknown entity type")
 }

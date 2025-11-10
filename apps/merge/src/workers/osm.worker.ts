@@ -54,6 +54,7 @@ export class OsmixWorker {
 	}
 
 	async fromPbf(id: string, data: ArrayBufferLike | ReadableStream) {
+		const startTime = performance.now()
 		const osm = await osmixFromPbf(
 			data instanceof ReadableStream ? data : new Uint8Array(data),
 			{ id, logger: this.log },
@@ -63,10 +64,13 @@ export class OsmixWorker {
 		this.invalidateVectorTileIndex(id)
 		this.getOrCreateVectorTileIndex(id)
 
+		const endTime = performance.now()
+		this.log(`${id} loaded in ${(endTime - startTime).toFixed(3)}ms`)
 		return osm.transferables()
 	}
 
 	async fromGeoJSON(id: string, data: ArrayBufferLike | ReadableStream) {
+		const startTime = performance.now()
 		// Read the data as text
 		let text: string
 		if (data instanceof ReadableStream) {
@@ -96,18 +100,14 @@ export class OsmixWorker {
 		this.invalidateVectorTileIndex(id)
 		this.getOrCreateVectorTileIndex(id)
 
+		const endTime = performance.now()
+		this.log(`${id} loaded in ${(endTime - startTime).toFixed(3)}ms`)
 		return osm.transferables()
 	}
 
 	setLogger(logger: typeof this.log) {
 		this.log = logger
 		this.logEverySecond = throttle(this.log, 1_000)
-	}
-
-	getEntity(oid: string, eid: string) {
-		const osm = this.osmixes.get(oid)
-		if (!osm) throw Error(`Osm for ${oid} not loaded.`)
-		return osm.getById(eid)
 	}
 
 	lonLatInBbox(lon: number, lat: number, bbox: GeoBbox2D) {
@@ -128,7 +128,7 @@ export class OsmixWorker {
 		// Draw relations (multipolygon relations)
 		const relationTimer = `OsmixRasterTile.drawRelations:${tile[2]}/${tile[0]}/${tile[1]}`
 		console.time(relationTimer)
-		const relationIndexes = osm.relations.intersects(bbox, osm.ways)
+		const relationIndexes = osm.relations.intersects(bbox)
 
 		for (const relIndex of relationIndexes) {
 			const relation = osm.relations.getByIndex(relIndex)

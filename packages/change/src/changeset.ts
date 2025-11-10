@@ -789,7 +789,6 @@ export function applyChangesetToOsm(changeset: OsmixChangeset, newId?: string) {
 	const baseOsm = changeset.osm
 	const osm = new Osmix({
 		id: newId ?? baseOsm.id,
-		logger: baseOsm.log,
 		header: baseOsm.header,
 	})
 

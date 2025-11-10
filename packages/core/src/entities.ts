@@ -1,7 +1,7 @@
 import type { OsmEntity, OsmEntityType, OsmTags } from "@osmix/json"
-import { type IdOrIndex, Ids, type IdsTransferables } from "./ids"
-import type StringTable from "./stringtable"
-import { Tags, type TagsTransferables } from "./tags"
+import type { GeoBbox2D } from "@osmix/shared/types"
+import type { IdOrIndex, Ids, IdsTransferables } from "./ids"
+import type { Tags, TagsTransferables } from "./tags"
 
 export interface EntitiesTransferables
 	extends IdsTransferables,
@@ -9,22 +9,15 @@ export interface EntitiesTransferables
 
 export abstract class Entities<T extends OsmEntity> {
 	indexType: OsmEntityType
-	stringTable: StringTable
 	ids: Ids
 	tags: Tags
 
 	private indexBuilt = false
 
-	constructor(
-		indexType: OsmEntityType,
-		stringTable: StringTable,
-		ids?: Ids,
-		tags?: Tags,
-	) {
-		this.stringTable = stringTable
+	constructor(indexType: OsmEntityType, ids: Ids, tags: Tags) {
 		this.indexType = indexType
-		this.ids = ids ?? new Ids()
-		this.tags = tags ?? new Tags(stringTable)
+		this.ids = ids
+		this.tags = tags
 	}
 
 	transferables(): EntitiesTransferables {
@@ -34,8 +27,8 @@ export abstract class Entities<T extends OsmEntity> {
 		}
 	}
 
-	get isReady() {
-		return this.ids.isReady && this.tags.isReady && this.indexBuilt
+	isReady() {
+		return this.ids.isReady() && this.tags.isReady() && this.indexBuilt
 	}
 
 	get size() {
@@ -45,13 +38,16 @@ export abstract class Entities<T extends OsmEntity> {
 	abstract buildEntityIndex(): void
 
 	buildIndex() {
-		console.time(`${this.indexType}Index.finish`)
+		if (this.indexBuilt) return
+		console.time(`${this.indexType}Index.buildIndex`)
 		this.ids.buildIndex()
 		this.tags.buildIndex()
 		this.buildEntityIndex()
 		this.indexBuilt = true
-		console.timeEnd(`${this.indexType}Index.finish`)
+		console.timeEnd(`${this.indexType}Index.buildIndex`)
 	}
+
+	abstract getBbox(idOrIndex: IdOrIndex): GeoBbox2D
 
 	abstract getFullEntity(index: number, id: number, tags?: OsmTags): T
 
@@ -118,7 +114,7 @@ export abstract class Entities<T extends OsmEntity> {
 	}
 
 	search(key: string, val?: string): T[] {
-		const keyIndex = this.stringTable.find(key)
+		const keyIndex = this.tags.find(key)
 		const entities = this.tags
 			.hasKey(keyIndex)
 			.map((index) => this.getByIndex(index))
