@@ -1,7 +1,4 @@
 ---
-"@osmix/bench": patch
-"@osmix/merge": patch
-"@osmix/vt-server": patch
 "@osmix/change": patch
 "@osmix/core": patch
 ---
