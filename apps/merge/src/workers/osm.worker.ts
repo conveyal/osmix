@@ -8,7 +8,11 @@ import {
 } from "@osmix/change"
 import { fromGeoJSON, Osmix, throttle } from "@osmix/core"
 import type { OsmEntityType } from "@osmix/json"
-import { buildRelationRings, isMultipolygonRelation } from "@osmix/json"
+import {
+	buildRelationRings,
+	isMultipolygonRelation,
+	wayIsArea,
+} from "@osmix/json"
 import { OsmixRasterTile } from "@osmix/raster"
 import type { GeoBbox2D, LonLat, Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
@@ -121,21 +125,6 @@ export class OsmixWorker {
 		// Get way IDs that are part of relations (to exclude from individual rendering)
 		const relationWayIds = osm.relations.getWayMemberIds()
 
-		// Draw ways (excluding those that are part of relations)
-		const timer = `OsmixRasterTile.drawWays:${tile[2]}/${tile[0]}/${tile[1]}`
-		console.time(timer)
-		osm.ways.intersects(bbox, (wayIndex) => {
-			const wayId = osm.ways.ids.at(wayIndex)
-			// Skip ways that are part of relations (they will be rendered via relations)
-			if (wayId !== undefined && relationWayIds.has(wayId)) return false
-			// Skip ways without tags (they are likely only for relations)
-			// const tags = osm.ways.tags.getTags(wayIndex)
-			// if (!tags || Object.keys(tags).length === 0) return false
-			rasterTile.drawWay(osm.ways.getCoordinates(wayIndex, osm.nodes))
-			return false
-		})
-		console.timeEnd(timer)
-
 		// Draw relations (multipolygon relations)
 		const relationTimer = `OsmixRasterTile.drawRelations:${tile[2]}/${tile[0]}/${tile[1]}`
 		console.time(relationTimer)
@@ -157,6 +146,36 @@ export class OsmixWorker {
 			}
 		}
 		console.timeEnd(relationTimer)
+
+		// Draw ways (excluding those that are part of relations)
+		const timer = `OsmixRasterTile.drawWays:${tile[2]}/${tile[0]}/${tile[1]}`
+		console.time(timer)
+		const wayIndexes = osm.ways.intersects(bbox, (wayIndex) => {
+			if (relationWayIds.has(osm.ways.ids.at(wayIndex))) return false
+			return true
+		})
+		const ways = wayIndexes.map((wayIndex) => ({
+			coords: osm.ways.getCoordinates(wayIndex, osm.nodes),
+			isArea: wayIsArea(osm.ways.getByIndex(wayIndex)),
+		}))
+		const { wayLines, wayPolygons } = ways.reduce(
+			(acc, way) => {
+				if (way.isArea) acc.wayPolygons.push(way)
+				else acc.wayLines.push(way)
+				return acc
+			},
+			{
+				wayLines: [] as { coords: LonLat[]; isArea: boolean }[],
+				wayPolygons: [] as { coords: LonLat[]; isArea: boolean }[],
+			},
+		)
+		for (const way of wayPolygons) {
+			rasterTile.drawPolygon([way.coords], [255, 0, 0, 128])
+		}
+		for (const way of wayLines) {
+			rasterTile.drawWay(way.coords)
+		}
+		console.timeEnd(timer)
 
 		const data = await rasterTileToImageBuffer(rasterTile)
 		return transfer(data, [data])
