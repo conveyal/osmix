@@ -136,13 +136,24 @@ export class OsmixChangeset {
 		const changeEntity = change
 			? (change.entity as OsmEntityTypeMap[T])
 			: undefined
-		const existingEntity = changeEntity ?? this.osm.get(type, id)
+		const existingEntity = changeEntity ?? this.getEntity(type, id)
 		if (existingEntity == null) throw Error("Entity not found")
 		changes[id] = {
 			changeType: change?.changeType ?? "modify",
 			entity: modify(existingEntity),
 			osmId: this.osm.id, // If we're modifying an entity, it must exist in the base OSM
 		}
+	}
+
+	getEntity<T extends OsmEntityType>(
+		type: T,
+		id: number,
+	): OsmEntityTypeMap[T] | undefined {
+		if (type === "node")
+			return this.osm.nodes.get({ id }) as OsmEntityTypeMap[T]
+		if (type === "way") return this.osm.ways.get({ id }) as OsmEntityTypeMap[T]
+		if (type === "relation")
+			return this.osm.relations.get({ id }) as OsmEntityTypeMap[T]
 	}
 
 	delete(entity: OsmEntity, refs?: OsmEntityRef[]) {

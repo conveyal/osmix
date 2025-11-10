@@ -1,4 +1,3 @@
-import type { OsmEntityType, OsmEntityTypeMap } from "@osmix/json"
 import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import type { GeoBbox2D } from "@osmix/shared/types"
 import { Nodes, type NodesTransferables } from "./nodes"
@@ -84,16 +83,6 @@ export class Osmix {
 	buildSpatialIndexes() {
 		this.nodes.buildSpatialIndex()
 		this.ways.buildSpatialIndex()
-	}
-
-	get<T extends OsmEntityType>(
-		type: T,
-		id: number,
-	): OsmEntityTypeMap[T] | undefined {
-		if (type === "node") return this.nodes.get({ id }) as OsmEntityTypeMap[T]
-		if (type === "way") return this.ways.get({ id }) as OsmEntityTypeMap[T]
-		if (type === "relation")
-			return this.relations.get({ id }) as OsmEntityTypeMap[T]
 	}
 
 	/**
