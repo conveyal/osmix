@@ -18,11 +18,10 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
-import type { OsmixOptions } from "./osmix"
-import { Osmix } from "./osmix"
+import type { Osmix, OsmixOptions } from "./osmix"
 import { throttle } from "./utils"
 
-interface OsmixCreateFromGeoJSONOptions extends OsmixOptions {
+export interface OsmixCreateFromGeoJSONOptions extends OsmixOptions {
 	logger: (message: string) => void
 }
 
@@ -35,11 +34,10 @@ interface OsmixCreateFromGeoJSONOptions extends OsmixOptions {
  * All feature properties are converted to OSM tags.
  */
 export function fromGeoJSON(
+	osm: Osmix,
 	geojson: FeatureCollection<Point | LineString | Polygon | MultiPolygon>,
 	options: Partial<OsmixCreateFromGeoJSONOptions> = {},
 ): Osmix {
-	const osm = new Osmix(options)
-	if (!options.id) osm.id = "geojson"
 	const log = options.logger ?? ((...msg) => console.log(...msg))
 
 	log("Converting GeoJSON to Osmix...")

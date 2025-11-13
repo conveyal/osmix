@@ -76,11 +76,12 @@ test("extract a BBOX while reading a PBF", async () => {
 		Uint8Array<ArrayBufferLike>,
 		Uint8Array<ArrayBufferLike>
 	>()
-	const extractPromise = osmixFromPbf(transform.readable, {
+	const extract = new Osmix()
+	const extractPromise = osmixFromPbf(extract, transform.readable, {
 		extractBbox: TEST_BBOX,
 	})
 	await osmixToPbfStream(source).pipeTo(transform.writable)
-	const extract = await extractPromise
+	await extractPromise
 
 	assert.equal(extract.nodes.size, 2)
 	assert.isTrue(extract.nodes.ids.has(1))
@@ -100,11 +101,13 @@ test("extract a BBOX after reading a PBF", async () => {
 	const source = buildSourceOsm()
 	const buffer = await osmixToPbfBuffer(source)
 
-	const streaming = await osmixFromPbf(new Uint8Array(buffer.slice(0)), {
+	const streaming = new Osmix()
+	await osmixFromPbf(streaming, new Uint8Array(buffer.slice(0)), {
 		extractBbox: TEST_BBOX,
 	})
 
-	const twoStepOsmix = await osmixFromPbf(new Uint8Array(buffer.slice(0)))
+	const twoStepOsmix = new Osmix()
+	await osmixFromPbf(twoStepOsmix, new Uint8Array(buffer.slice(0)))
 	const twoStep = createExtract(twoStepOsmix, TEST_BBOX, "simple")
 
 	assert.equal(streaming.nodes.size, twoStep.nodes.size)
@@ -345,7 +348,8 @@ test("extract with complete_ways includes node members of relations", () => {
 })
 
 test.skip("extract from a large PBF", { timeout: 500_000 }, async () => {
-	const seattle = await osmixFromPbf(getFixtureFileReadStream("usa.pbf"), {
+	const seattle = new Osmix()
+	await osmixFromPbf(seattle, getFixtureFileReadStream("usa.pbf"), {
 		extractBbox: SEATTLE_BBOX,
 	})
 

@@ -14,7 +14,7 @@ import {
 	readOsmPbf,
 } from "@osmix/pbf"
 import type { GeoBbox2D } from "@osmix/shared/types"
-import { Osmix, type OsmixOptions } from "./osmix"
+import type { Osmix, OsmixOptions } from "./osmix"
 import { throttle } from "./utils"
 
 export interface OsmixFromPbfOptions extends OsmixOptions {
@@ -35,10 +35,10 @@ export interface OsmixFromPbfOptions extends OsmixOptions {
  * Read an OSM PBF file into an Osmix index.
  */
 export async function osmixFromPbf(
+	osm: Osmix,
 	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
 	options: Partial<OsmixFromPbfOptions> = {},
 ): Promise<Osmix> {
-	const osm = new Osmix(options)
 	const { extractBbox } = options
 	const { header, blocks } = await readOsmPbf(data)
 	osm.header = header
