@@ -55,6 +55,14 @@ export class OsmixVtEncoder {
 	private readonly extent: number
 	private readonly extentBbox: [number, number, number, number]
 
+	static layerNames(id: string) {
+		return {
+			nodeLayerName: `@osmix:${id}:nodes`,
+			wayLayerName: `@osmix:${id}:ways`,
+			relationLayerName: `@osmix:${id}:relations`,
+		}
+	}
+
 	constructor(osmix: Osmix, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER) {
 		this.osmix = osmix
 
