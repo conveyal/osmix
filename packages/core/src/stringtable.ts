@@ -65,14 +65,18 @@ export default class StringTable {
 	 * Return a mapping of block index -> string table index
 	 */
 	createBlockIndexMap(block: OsmPbfBlock) {
-		const map = new Map<number, number>()
+		const index = new Uint32Array(block.stringtable.length)
 		for (let i = 0; i < block.stringtable.length; i++) {
 			const bytesString = block.stringtable[i]
 			const str = this.dec.decode(bytesString)
-			const index = this.add(str)
-			map.set(i, index)
+			const existingIndex = this.stringToIndex.get(str)
+			if (existingIndex !== undefined) {
+				index[i] = existingIndex
+				continue
+			}
+			index[i] = this.add(str)
 		}
-		return map
+		return index
 	}
 
 	/**

@@ -90,11 +90,11 @@ export class Relations extends Entities<OsmRelation> {
 
 	addRelations(
 		relations: OsmPbfRelation[],
-		blockStringIndexMap: Map<number, number>,
+		blockStringIndexMap: Uint32Array,
 		filter?: (relation: OsmRelation) => OsmRelation | null,
 	): number {
 		const blockToStringTable = (k: number) => {
-			const index = blockStringIndexMap.get(k)
+			const index = blockStringIndexMap[k]
 			if (index === undefined) throw Error("Tag key not found")
 			return index
 		}

@@ -74,7 +74,7 @@ export class Ways extends Entities<OsmWay> {
 	 */
 	addWays(
 		ways: OsmPbfWay[],
-		blockStringIndexMap: Map<number, number>,
+		blockStringIndexMap: Uint32Array,
 		filter?: (way: OsmWay) => OsmWay | null,
 	) {
 		let added = 0
@@ -94,12 +94,12 @@ export class Ways extends Entities<OsmWay> {
 			if (filter && filteredWay === null) continue
 
 			const tagKeys: number[] = way.keys.map((key) => {
-				const index = blockStringIndexMap.get(key)
+				const index = blockStringIndexMap[key]
 				if (index === undefined) throw Error("Tag key not found")
 				return index
 			})
 			const tagValues: number[] = way.vals.map((val) => {
-				const index = blockStringIndexMap.get(val)
+				const index = blockStringIndexMap[val]
 				if (index === undefined) throw Error("Tag value not found")
 				return index
 			})

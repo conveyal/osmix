@@ -78,7 +78,7 @@ export class Nodes extends Entities<OsmNode> {
 	addDenseNodes(
 		dense: OsmPbfDenseNodes,
 		block: OsmPbfBlock,
-		blockStringIndexMap: Map<number, number>,
+		blockStringIndexMap: Uint32Array,
 		filter?: (node: OsmNode) => boolean,
 	): number {
 		const lon_offset = block.lon_offset ?? 0
@@ -97,7 +97,7 @@ export class Nodes extends Entities<OsmNode> {
 		const getStringTableIndex = (keyIndex: number) => {
 			const key = dense.keys_vals[keyIndex]
 			assertValue(key, "Block string key is undefined")
-			const index = blockStringIndexMap.get(key)
+			const index = blockStringIndexMap[key]
 			assertValue(index, "Block string not found")
 			return index
 		}

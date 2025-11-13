@@ -1,5 +1,5 @@
 import type { OsmTags } from "@osmix/json"
-import type StringTable from "./stringtable"
+import StringTable from "./stringtable"
 import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
 
 export interface TagsTransferables {
@@ -14,7 +14,7 @@ export interface TagsTransferables {
 }
 
 export class Tags {
-	private stringTable: StringTable
+	private stringTable: StringTable = new StringTable()
 
 	// Entity -> tag look up
 	private tagStart: RTA<Uint32Array>
