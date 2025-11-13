@@ -17,7 +17,10 @@ export async function rasterTileToImageBuffer(
 	tile: OsmixRasterTile,
 	options: ImageEncodeOptions = { type: "image/png" },
 ) {
+	console.time("rasterTileToImageBuffer")
 	const canvas = rasterTileToCanvas(tile)
 	const blob = await canvas.convertToBlob(options)
-	return blob.arrayBuffer()
+	const data = await blob.arrayBuffer()
+	console.timeEnd("rasterTileToImageBuffer")
+	return data
 }
