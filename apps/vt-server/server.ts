@@ -1,24 +1,19 @@
 import os from "node:os"
-import type { Remote } from "comlink"
+import { OsmixVtEncoder } from "@osmix/vt"
+import { OsmixRemote } from "osmix"
 import indexHtml from "./index.html"
-import { createOsmixWorker } from "./osmix.worker"
-import { createVtWorker, type VtWorker } from "./vt.worker"
 
 const filename = "monaco.pbf"
 
 // Resolve the Monaco fixture path relative to the repo root
 const pbfUrl = new URL(`../../fixtures/${filename}`, import.meta.url)
 
-const Osmix = createOsmixWorker()
-const vts: Remote<VtWorker>[] = []
-for (let i = 0; i < os.cpus().length; i++) {
-	vts.push(createVtWorker())
-}
-let vtIndex = 0
-const getVt = () => vts[vtIndex++ % vts.length]
+const log: string[] = []
+const workerCount = os.cpus().length
+const Osmix = new OsmixRemote(workerCount, (message) => log.push(message))
 
 // Print number of VT workers available
-console.log(`Number of VT workers available: ${vts.length}`)
+console.log(`Number of VT workers available: ${workerCount}`)
 
 const server = Bun.serve({
 	port: process.env.PORT ? Number(process.env.PORT) : 3000,
@@ -28,22 +23,23 @@ const server = Bun.serve({
 		"/": indexHtml,
 		"/index.html": indexHtml,
 		"/ready": async () => {
-			const ready = await Osmix.ready()
-			const log = await Osmix.getLog()
+			const ready = await Osmix.isReady(filename)
 			return Response.json({ ready, log }, { status: 200 })
 		},
 		"/meta.json": async () => {
-			const metadata = await Osmix.getMetadata()
-			const vtMetadata = await getVt().getMetadata()
+			const osm = await Osmix.get(filename)
+			const bbox = osm.bbox()
+			const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
+			const vtMetadata = OsmixVtEncoder.layerNames(filename)
 			return Response.json(
-				{ filename, ...metadata, ...vtMetadata },
+				{ filename, bbox, center, header: osm.header, ...vtMetadata },
 				{ status: 200 },
 			)
 		},
 		"/tiles/:z/:x/:y": async (req) => {
 			try {
 				console.time(req.url)
-				const tile = await getVt().getTile([
+				const tile = await Osmix.getVectorTile(filename, [
 					+req.params.x,
 					+req.params.y,
 					+req.params.z,
@@ -75,7 +71,7 @@ const server = Bun.serve({
 					{ status: 400 },
 				)
 			}
-			const results = await getVt().search(key, val)
+			const results = await Osmix.search(filename, key, val)
 			return Response.json(results, { status: 200 })
 		},
 	},
@@ -87,11 +83,8 @@ const server = Bun.serve({
 console.log(`Vector tile server running at http://localhost:${server.port}`)
 
 async function init() {
-	const transferables = await Osmix.init(pbfUrl.pathname)
-	for (const vt of vts) {
-		await vt.init(transferables)
-	}
-	console.log("VTs initialized")
+	await Osmix.fromPbf(filename, Bun.file(pbfUrl.pathname).stream())
+	console.log("Osmix initialized")
 }
 
 init()

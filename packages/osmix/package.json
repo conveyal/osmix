@@ -34,21 +34,26 @@
 	"scripts": {
 		"build": "tsc",
 		"prepublishOnly": "tsc",
+		"test": "vitest",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@types/geojson": "catalog:",
 		"@types/node": "catalog:",
+		"@types/bun": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	},
 	"dependencies": {
+		"@osmix/change": "workspace:*",
 		"@osmix/core": "workspace:*",
 		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/raster": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@osmix/vt": "workspace:*",
-		"@osmix/change": "workspace:*"
+		"comlink": " ^4.4.2",
+		"dequal": "catalog:",
+		"web-worker": "^1.5.0"
 	}
 }
