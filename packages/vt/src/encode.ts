@@ -4,6 +4,7 @@ import {
 	isMultipolygonRelation,
 	wayIsArea,
 } from "@osmix/json"
+import { bboxContainsOrIntersects } from "@osmix/shared/bbox-intersects"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
@@ -71,6 +72,10 @@ export class OsmixVtEncoder {
 	getTile(tile: Tile): ArrayBuffer {
 		const sm = new SphericalMercatorTile({ size: this.extent, tile })
 		const bbox = sm.bbox(tile[0], tile[1], tile[2]) as GeoBbox2D
+		const osmBbox = this.osmix.bbox()
+		if (!bboxContainsOrIntersects(bbox, osmBbox)) {
+			return new ArrayBuffer(0)
+		}
 		return this.getTileForBbox(bbox, (ll) => sm.llToTilePx(ll))
 	}
 
