@@ -43,13 +43,13 @@ export interface OsmRelation extends IOsmEntity {
 
 export type OsmEntity = OsmNode | OsmWay | OsmRelation
 
-export type OsmixGeoJsonProperties = {
+export type OsmGeoJsonProperties = {
 	id: number
 	type: OsmEntityType
 	tags?: OsmTags
 	info?: OsmInfoParsed
 }
 
-export type OsmixGeoJSONFeature<
+export type OsmGeoJSONFeature<
 	T extends Point | LineString | Polygon | MultiPolygon,
-> = Feature<T, OsmixGeoJsonProperties>
+> = Feature<T, OsmGeoJsonProperties>

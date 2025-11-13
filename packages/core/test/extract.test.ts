@@ -1,14 +1,15 @@
 import { getFixtureFileReadStream } from "@osmix/shared/test/fixtures"
 import type { GeoBbox2D } from "@osmix/shared/types"
 import { assert, test } from "vitest"
-import { createExtract, Osmix } from "../src"
-import { osmixFromPbf, osmixToPbfBuffer, osmixToPbfStream } from "../src/pbf"
+import { createExtract } from "../src"
+import { Osm } from "../src/osm"
+import { osmFromPbf, osmToPbfBuffer, osmToPbfStream } from "../src/pbf"
 
 const TEST_BBOX: GeoBbox2D = [-0.1, -0.1, 1, 1]
 const SEATTLE_BBOX: GeoBbox2D = [-122.463226, 47.469878, -122.180328, 47.82883]
 
 function buildSourceOsm() {
-	const osm = new Osmix({ id: "source" })
+	const osm = new Osm({ id: "source" })
 	osm.nodes.addNode({
 		id: 1,
 		lat: 0,
@@ -76,11 +77,11 @@ test("extract a BBOX while reading a PBF", async () => {
 		Uint8Array<ArrayBufferLike>,
 		Uint8Array<ArrayBufferLike>
 	>()
-	const extract = new Osmix()
-	const extractPromise = osmixFromPbf(extract, transform.readable, {
+	const extract = new Osm()
+	const extractPromise = osmFromPbf(extract, transform.readable, {
 		extractBbox: TEST_BBOX,
 	})
-	await osmixToPbfStream(source).pipeTo(transform.writable)
+	await osmToPbfStream(source).pipeTo(transform.writable)
 	await extractPromise
 
 	assert.equal(extract.nodes.size, 2)
@@ -99,15 +100,15 @@ test("extract a BBOX while reading a PBF", async () => {
 
 test("extract a BBOX after reading a PBF", async () => {
 	const source = buildSourceOsm()
-	const buffer = await osmixToPbfBuffer(source)
+	const buffer = await osmToPbfBuffer(source)
 
-	const streaming = new Osmix()
-	await osmixFromPbf(streaming, new Uint8Array(buffer.slice(0)), {
+	const streaming = new Osm()
+	await osmFromPbf(streaming, new Uint8Array(buffer.slice(0)), {
 		extractBbox: TEST_BBOX,
 	})
 
-	const twoStepOsmix = new Osmix()
-	await osmixFromPbf(twoStepOsmix, new Uint8Array(buffer.slice(0)))
+	const twoStepOsmix = new Osm()
+	await osmFromPbf(twoStepOsmix, new Uint8Array(buffer.slice(0)))
 	const twoStep = createExtract(twoStepOsmix, TEST_BBOX, "simple")
 
 	assert.equal(streaming.nodes.size, twoStep.nodes.size)
@@ -243,7 +244,7 @@ test("extract strategies differ for ways crossing bbox", () => {
 })
 
 test("extract with complete_ways includes relation members outside bbox", () => {
-	const osm = new Osmix({ id: "test" })
+	const osm = new Osm({ id: "test" })
 	// Create nodes: some inside, some outside bbox
 	osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }) // inside
 	osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }) // outside
@@ -293,7 +294,7 @@ test("extract with complete_ways includes relation members outside bbox", () => 
 })
 
 test("extract with complete_ways includes node members of relations", () => {
-	const osm = new Osmix({ id: "test" })
+	const osm = new Osm({ id: "test" })
 	osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }) // inside
 	osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }) // outside
 	osm.nodes.addNode({ id: 3, lat: 0.5, lon: 0.5 }) // inside
@@ -348,8 +349,8 @@ test("extract with complete_ways includes node members of relations", () => {
 })
 
 test.skip("extract from a large PBF", { timeout: 500_000 }, async () => {
-	const seattle = new Osmix()
-	await osmixFromPbf(seattle, getFixtureFileReadStream("usa.pbf"), {
+	const seattle = new Osm()
+	await osmFromPbf(seattle, getFixtureFileReadStream("usa.pbf"), {
 		extractBbox: SEATTLE_BBOX,
 	})
 

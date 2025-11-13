@@ -3,11 +3,11 @@
 export { createExtract } from "./extract"
 export {
 	fromGeoJSON,
-	type OsmixCreateFromGeoJSONOptions,
-	osmixEntityToGeoJSONFeature,
+	type OsmCreateFromGeoJSONOptions,
+	osmEntityToGeoJSONFeature,
 } from "./geojson"
 export { Nodes } from "./nodes"
-export { Osmix, type OsmixTransferables } from "./osmix"
+export { Osm, type OsmTransferables } from "./osm"
 export * from "./pbf"
 export { Relations } from "./relations"
 export { throttle } from "./utils"

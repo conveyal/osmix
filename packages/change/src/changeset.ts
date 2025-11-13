@@ -1,4 +1,4 @@
-import { type Nodes, Osmix, type Ways } from "@osmix/core"
+import { type Nodes, Osm, type Ways } from "@osmix/core"
 import {
 	entityPropertiesEqual,
 	getEntityType,
@@ -13,10 +13,10 @@ import { haversineDistance } from "@osmix/shared/haversine-distance"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
 import sweeplineIntersections from "sweepline-intersections"
 import type {
+	OsmChange,
+	OsmChanges,
+	OsmChangesetStats,
 	OsmEntityRef,
-	OsmixChange,
-	OsmixChanges,
-	OsmixChangesetStats,
 } from "./types"
 import {
 	cleanCoords,
@@ -31,13 +31,12 @@ import {
 /**
  * Each step is optimized to minimize the retrieval of the full entity data.
  */
-export class OsmixChangeset {
-	nodeChanges: Record<number, OsmixChange<OsmEntityTypeMap["node"]>> = {}
-	wayChanges: Record<number, OsmixChange<OsmEntityTypeMap["way"]>> = {}
-	relationChanges: Record<number, OsmixChange<OsmEntityTypeMap["relation"]>> =
-		{}
+export class OsmChangeset {
+	nodeChanges: Record<number, OsmChange<OsmEntityTypeMap["node"]>> = {}
+	wayChanges: Record<number, OsmChange<OsmEntityTypeMap["way"]>> = {}
+	relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]>> = {}
 
-	osm: Osmix
+	osm: Osm
 
 	// Next node ID
 	currentNodeId: number
@@ -48,20 +47,20 @@ export class OsmixChangeset {
 	intersectionPointsFound = 0
 	intersectionNodesCreated = 0
 
-	static fromJson(base: Osmix, json: OsmixChanges) {
-		const changeset = new OsmixChangeset(base)
+	static fromJson(base: Osm, json: OsmChanges) {
+		const changeset = new OsmChangeset(base)
 		changeset.nodeChanges = json.nodes
 		changeset.wayChanges = json.ways
 		changeset.relationChanges = json.relations
 		return changeset
 	}
 
-	constructor(base: Osmix) {
+	constructor(base: Osm) {
 		this.osm = base
 		this.currentNodeId = base.nodes.ids.at(-1)
 	}
 
-	get stats(): OsmixChangesetStats {
+	get stats(): OsmChangesetStats {
 		const nodeChanges = Object.values(this.nodeChanges).length
 		const wayChanges = Object.values(this.wayChanges).length
 		const relationChanges = Object.values(this.relationChanges).length
@@ -81,22 +80,19 @@ export class OsmixChangeset {
 
 	changes<T extends OsmEntityType>(
 		type: T,
-	): Record<number, OsmixChange<OsmEntityTypeMap[T]>> {
+	): Record<number, OsmChange<OsmEntityTypeMap[T]>> {
 		switch (type) {
 			case "node":
 				return this.nodeChanges as Record<
 					number,
-					OsmixChange<OsmEntityTypeMap[T]>
+					OsmChange<OsmEntityTypeMap[T]>
 				>
 			case "way":
-				return this.wayChanges as Record<
-					number,
-					OsmixChange<OsmEntityTypeMap[T]>
-				>
+				return this.wayChanges as Record<number, OsmChange<OsmEntityTypeMap[T]>>
 			case "relation":
 				return this.relationChanges as Record<
 					number,
-					OsmixChange<OsmEntityTypeMap[T]>
+					OsmChange<OsmEntityTypeMap[T]>
 				>
 		}
 	}
@@ -622,7 +618,7 @@ export class OsmixChangeset {
 	 *   deduplicating nodes, but relation member updates during direct merge are not automatically
 	 *   handled. Use `deduplicateNodes()` after `generateDirectChanges()` if relation updates are needed.
 	 */
-	generateDirectChanges(patch: Osmix) {
+	generateDirectChanges(patch: Osm) {
 		// Reset the current node ID to the highest node ID in the base or patch
 		this.currentNodeId = Math.max(
 			this.osm.nodes.ids.at(-1),
@@ -796,9 +792,9 @@ function waysIntersect(
 /**
  * Apply a changeset to an Osm index, generating a new Osm index. Usually done on a changeset made from the base osm index.
  */
-export function applyChangesetToOsm(changeset: OsmixChangeset, newId?: string) {
+export function applyChangesetToOsm(changeset: OsmChangeset, newId?: string) {
 	const baseOsm = changeset.osm
-	const osm = new Osmix({
+	const osm = new Osm({
 		id: newId ?? baseOsm.id,
 		header: baseOsm.header,
 	})

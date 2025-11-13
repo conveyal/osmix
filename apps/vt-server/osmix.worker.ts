@@ -1,9 +1,9 @@
-import { type Osmix, osmixFromPbf } from "@osmix/core"
+import { Osm, osmFromPbf } from "@osmix/core"
 import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import * as Comlink from "comlink"
 
 export class OsmixWorker {
-	private osm: Osmix | null = null
+	private osm: Osm | null = null
 	private log: string[] = []
 
 	constructor() {
@@ -19,8 +19,8 @@ export class OsmixWorker {
 	}
 
 	async init(fileUrl: string) {
-		this.osm = null
-		this.osm = await osmixFromPbf(Bun.file(fileUrl).stream(), {
+		this.osm = new Osm()
+		await osmFromPbf(this.osm, Bun.file(fileUrl).stream(), {
 			logger: (msg) => this.log.push(msg),
 		})
 		return this.osm.transferables()

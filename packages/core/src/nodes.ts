@@ -1,6 +1,6 @@
 import {
 	nodeToFeature,
-	type OsmixGeoJSONFeature,
+	type OsmGeoJSONFeature,
 	type OsmNode,
 	type OsmTags,
 } from "@osmix/json"
@@ -207,7 +207,7 @@ export class Nodes extends Entities<OsmNode> {
 		}
 	}
 
-	toGeoJson(i: IdOrIndex): OsmixGeoJSONFeature<GeoJSON.Point> {
+	toGeoJson(i: IdOrIndex): OsmGeoJSONFeature<GeoJSON.Point> {
 		const [index, id] = this.ids.idOrIndex(i)
 		const node = this.getFullEntity(index, id)
 		return nodeToFeature(node)

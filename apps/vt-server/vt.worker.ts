@@ -1,16 +1,15 @@
-import { Osmix } from "@osmix/core"
-import type { OsmixTransferables } from "@osmix/core/src/osmix"
+import { Osm, type OsmTransferables } from "@osmix/core"
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/json"
 import type { Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import * as Comlink from "comlink"
 
 export class VtWorker {
-	private osm: Osmix | null = null
+	private osm: Osm | null = null
 	private vt: OsmixVtEncoder | null = null
 
-	async init(transferables: OsmixTransferables) {
-		this.osm = new Osmix(transferables)
+	async init(transferables: OsmTransferables) {
+		this.osm = new Osm(transferables)
 		this.vt = new OsmixVtEncoder(this.osm)
 	}
 

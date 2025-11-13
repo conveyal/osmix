@@ -5,10 +5,10 @@ import {
 	getWayMembersByRole,
 	isMultipolygonRelation,
 } from "./relation-multipolygon"
-import type { OsmixGeoJSONFeature, OsmNode, OsmRelation, OsmWay } from "./types"
+import type { OsmGeoJSONFeature, OsmNode, OsmRelation, OsmWay } from "./types"
 import { wayIsArea } from "./way-is-area"
 
-export function nodeToFeature(node: OsmNode): OsmixGeoJSONFeature<Point> {
+export function nodeToFeature(node: OsmNode): OsmGeoJSONFeature<Point> {
 	return {
 		type: "Feature",
 		id: node.id,
@@ -28,7 +28,7 @@ export function nodeToFeature(node: OsmNode): OsmixGeoJSONFeature<Point> {
 export function wayToFeature(
 	way: OsmWay,
 	refToPosition: (id: number) => [number, number],
-): OsmixGeoJSONFeature<LineString | Polygon> {
+): OsmGeoJSONFeature<LineString | Polygon> {
 	return {
 		type: "Feature",
 		id: way.id,
@@ -54,7 +54,7 @@ export function relationToFeature(
 	relation: OsmRelation,
 	refToPosition: (id: number) => [number, number],
 	getWay?: (wayId: number) => OsmWay | null,
-): OsmixGeoJSONFeature<Polygon | MultiPolygon> {
+): OsmGeoJSONFeature<Polygon | MultiPolygon> {
 	// Handle multipolygon relations
 	if (isMultipolygonRelation(relation) && getWay) {
 		const getNodeCoordinates = (nodeId: number): LonLat | undefined => {

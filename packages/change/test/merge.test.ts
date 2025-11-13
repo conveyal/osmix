@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs"
-import { type Osmix, osmixFromPbf } from "@osmix/core"
+import { Osm, osmFromPbf } from "@osmix/core"
 import { createBaseOsm, createPatchOsm } from "@osmix/core/test/mock-osm"
 import type { OsmNode } from "@osmix/json"
 import {
@@ -7,7 +7,7 @@ import {
 	getFixturePath,
 } from "@osmix/shared/test/fixtures"
 import { assert, describe, it } from "vitest"
-import { OsmixChangeset } from "../src/changeset"
+import { OsmChangeset } from "../src/changeset"
 
 const testNode: OsmNode = {
 	id: 2135545,
@@ -28,7 +28,7 @@ const testNode: OsmNode = {
 	},
 }
 
-const sizes = (osm: Osmix) => ({
+const sizes = (osm: Osm) => ({
 	nodes: osm.nodes.size,
 	ways: osm.ways.size,
 	relations: osm.relations.size,
@@ -46,17 +46,19 @@ describe("merge osm", () => {
 			// const _osmMergedName = "yakima-merged.osm.pbf"
 
 			const osm1Data = getFixtureFileReadStream(osm1Name)
-			let baseOsm = await osmixFromPbf(osm1Data, { id: osm1Name })
+			let baseOsm = new Osm()
+			await osmFromPbf(baseOsm, osm1Data, { id: osm1Name })
 			assert.equal(baseOsm.nodes.getById(testNode.id), null)
 
 			const osm2Data = getFixtureFileReadStream(osm2Name)
-			const osm2 = await osmixFromPbf(osm2Data, { id: osm2Name })
+			const osm2 = new Osm()
+			await osmFromPbf(osm2, osm2Data, { id: osm2Name })
 			assert.deepEqual(osm2.nodes.getById(testNode.id), testNode)
 
 			const baseSizes = sizes(baseOsm)
 			const patchSizes = sizes(osm2)
 
-			let changeset = new OsmixChangeset(baseOsm)
+			let changeset = new OsmChangeset(baseOsm)
 			changeset.generateDirectChanges(osm2)
 
 			assert.deepEqual(changeset.stats, {
@@ -82,7 +84,7 @@ describe("merge osm", () => {
 				relations: baseSizes.relations + patchSizes.relations,
 			})
 
-			changeset = new OsmixChangeset(baseOsm)
+			changeset = new OsmChangeset(baseOsm)
 			changeset.createIntersectionsForWays(osm2.ways)
 
 			assert.deepEqual(changeset.stats, {
@@ -134,7 +136,7 @@ describe("merge osm", () => {
 			relations: 0,
 		})
 
-		let changeset = new OsmixChangeset(base)
+		let changeset = new OsmChangeset(base)
 		changeset.generateDirectChanges(patch)
 		assert.deepEqual(changeset.stats, {
 			osmId: base.id,
@@ -166,7 +168,7 @@ describe("merge osm", () => {
 			},
 		})
 
-		changeset = new OsmixChangeset(directResult)
+		changeset = new OsmChangeset(directResult)
 		changeset.deduplicateWays(patch.ways)
 		changeset.deduplicateNodes(patch.nodes)
 		const deduplicatedResult = changeset.applyChanges("deduplicated")
@@ -192,7 +194,7 @@ describe("merge osm", () => {
 			},
 		})
 
-		changeset = new OsmixChangeset(deduplicatedResult)
+		changeset = new OsmChangeset(deduplicatedResult)
 		changeset.createIntersectionsForWays(patch.ways)
 
 		assert.deepEqual(changeset.stats, {
@@ -225,10 +227,12 @@ describe("merge osm", () => {
 			const osm1Name = "seattle.osm.pbf"
 			const osm2Name = "seattle-osw.pbf"
 
-			let baseOsm = await osmixFromPbf(getFixtureFileReadStream(osm1Name), {
+			let baseOsm = new Osm()
+			await osmFromPbf(baseOsm, getFixtureFileReadStream(osm1Name), {
 				id: osm1Name,
 			})
-			const osm2 = await osmixFromPbf(getFixtureFileReadStream(osm2Name), {
+			const osm2 = new Osm()
+			await osmFromPbf(osm2, getFixtureFileReadStream(osm2Name), {
 				id: osm2Name,
 			})
 
@@ -248,7 +252,7 @@ describe("merge osm", () => {
 			assert.deepEqual(sizes(osm2), patchSizes)
 
 			// Direct merge
-			let changeset = new OsmixChangeset(baseOsm)
+			let changeset = new OsmChangeset(baseOsm)
 			console.time("generateDirectChanges")
 			changeset.generateDirectChanges(osm2)
 			console.timeEnd("generateDirectChanges")
@@ -281,7 +285,7 @@ describe("merge osm", () => {
 			})
 
 			// Create intersections
-			changeset = new OsmixChangeset(baseOsm)
+			changeset = new OsmChangeset(baseOsm)
 
 			console.time("createIntersections")
 			changeset.createIntersectionsForWays(osm2.ways)

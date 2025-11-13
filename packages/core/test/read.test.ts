@@ -4,8 +4,8 @@ import {
 	PBFs,
 } from "@osmix/shared/test/fixtures"
 import { assert, beforeAll, describe, it } from "vitest"
-import { Osmix } from "../src"
-import { osmixFromPbf } from "../src/pbf"
+import { Osm } from "../src/osm"
+import { osmFromPbf } from "../src/pbf"
 
 describe("read", () => {
 	describe.each(Object.entries(PBFs))("%s", async (name, pbf) => {
@@ -13,8 +13,8 @@ describe("read", () => {
 
 		it("into OSM class", async () => {
 			const fileStream = getFixtureFileReadStream(pbf.url)
-			const osm = new Osmix({ id: name })
-			await osmixFromPbf(osm, fileStream)
+			const osm = new Osm({ id: name })
+			await osmFromPbf(osm, fileStream)
 			assert.equal(osm.nodes.size, pbf.nodes)
 			assert.equal(osm.stringTable.length, pbf.uniqueStrings)
 			assert.deepEqual(osm.nodes.getByIndex(0), pbf.node0)
