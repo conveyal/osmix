@@ -1,4 +1,4 @@
-import { createOsmFromPbf, type Osm } from "@osmix/core"
+import type { Osm } from "@osmix/core"
 import {
 	nodeToFeature,
 	type OsmGeoJSONFeature,
@@ -9,6 +9,7 @@ import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, wrap } from "comlink"
+import { createOsmFromPbf } from "osmix"
 
 export class OsmixBenchWorker {
 	private osm: Osm | null = null

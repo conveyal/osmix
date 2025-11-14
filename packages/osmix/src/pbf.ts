@@ -1,3 +1,4 @@
+import { Osm, type OsmOptions } from "@osmix/core/src/osm"
 import { OsmJsonToBlocksTransformStream } from "@osmix/json"
 import {
 	type AsyncGeneratorValue,
@@ -19,7 +20,6 @@ import type {
 	OsmRelation,
 	OsmWay,
 } from "@osmix/shared/types"
-import { Osm, type OsmOptions } from "./osm"
 
 export interface OsmFromPbfOptions extends OsmOptions {
 	extractBbox: GeoBbox2D

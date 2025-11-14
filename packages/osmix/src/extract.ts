@@ -1,5 +1,10 @@
+import { Osm } from "@osmix/core"
+import {
+	logProgress,
+	type ProgressEvent,
+	progressEvent,
+} from "@osmix/shared/progress"
 import type { GeoBbox2D } from "@osmix/shared/types"
-import { Osm } from "./osm"
 
 type ExtractStrategy = "simple" | "complete_ways"
 
@@ -20,11 +25,14 @@ export function createExtract(
 	osm: Osm,
 	bbox: GeoBbox2D,
 	strategy: ExtractStrategy = "complete_ways",
+	onProgress: (progress: ProgressEvent) => void = logProgress,
 ): Osm {
 	if (!osm.isReady()) throw Error("Osm is not ready for extraction.")
 
-	console.log(
-		`Creating extract ${osm.id} with strategy=${strategy} in bbox ${bbox.join(", ")}...`,
+	onProgress(
+		progressEvent(
+			`Creating extract ${osm.id} with strategy=${strategy} in bbox ${bbox.join(", ")}...`,
+		),
 	)
 	const [minLon, minLat, maxLon, maxLat] = bbox
 	const extracted = new Osm({
@@ -58,14 +66,14 @@ export function createExtract(
 		wayIds.add(id)
 	}
 
-	console.log("Extracting nodes...")
+	onProgress(progressEvent("Extracting nodes..."))
 	for (const nodeIndex of osm.nodes.findIndexesWithinBbox(bbox)) {
 		const node = osm.nodes.getByIndex(nodeIndex)
 		extracted.nodes.addNode(node)
 		nodeIds.add(node.id)
 	}
 
-	console.log("Extracting ways...")
+	onProgress(progressEvent("Extracting ways..."))
 	for (const way of osm.ways.sorted()) {
 		if (way.refs.some((ref) => nodeIds.has(ref))) {
 			wayIds.add(way.id)
@@ -81,7 +89,7 @@ export function createExtract(
 		}
 	}
 
-	console.log("Extracting relations...")
+	onProgress(progressEvent("Extracting relations..."))
 	for (const relation of osm.relations.sorted()) {
 		if (
 			relation.members.some((m) => {

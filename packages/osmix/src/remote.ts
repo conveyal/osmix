@@ -1,4 +1,4 @@
-import { Osm, type OsmFromPbfOptions, type OsmOptions } from "@osmix/core"
+import { Osm, type OsmOptions } from "@osmix/core"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type { Progress } from "@osmix/shared/progress"
 import { streamToBytes } from "@osmix/shared/stream-to-bytes"
@@ -6,6 +6,7 @@ import type { Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
 import type { IOsmix } from "./osmix"
 import type { OsmixWorker } from "./osmix.worker"
+import type { OsmFromPbfOptions } from "./pbf"
 import { transfer } from "./utils"
 
 type WrapNonPromiseInPromise<T> = T extends Promise<infer _U> ? T : Promise<T>

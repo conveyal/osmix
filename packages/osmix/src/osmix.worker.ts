@@ -1,14 +1,10 @@
-import {
-	Osm,
-	type OsmFromPbfOptions,
-	type OsmOptions,
-	type OsmTransferables,
-} from "@osmix/core"
+import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type { Progress, ProgressEvent } from "@osmix/shared/progress"
 import type { Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
 import { Osmix } from "./osmix"
+import type { OsmFromPbfOptions } from "./pbf"
 import { collectTransferables } from "./utils"
 
 /**

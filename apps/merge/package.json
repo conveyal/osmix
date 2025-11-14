@@ -47,6 +47,7 @@
 		"lucide-react": "^0.513.0",
 		"maplibre-gl": "catalog:",
 		"native-file-system-adapter": "^3.0.1",
+		"osmix": "workspace:*",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
 		"react-map-gl": "^8.0.4",

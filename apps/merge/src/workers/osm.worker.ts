@@ -6,7 +6,7 @@ import {
 	type OsmChangeTypes,
 	type OsmMergeOptions,
 } from "@osmix/change"
-import { createOsmFromPbf, type Osm, throttle } from "@osmix/core"
+import { type Osm, throttle } from "@osmix/core"
 import { createOsmFromGeoJSON } from "@osmix/geojson"
 import { buildRelationRings } from "@osmix/json"
 import { OsmixRasterTile } from "@osmix/raster"
@@ -22,6 +22,7 @@ import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, transfer, wrap } from "comlink"
 import { dequal } from "dequal/lite"
 import type { FeatureCollection, LineString, Point } from "geojson"
+import { createOsmFromPbf } from "osmix"
 import { rasterTileToImageBuffer } from "../lib/raster-tile-to-image-buffer"
 import { RASTER_TILE_SIZE } from "../settings"
 import type { StatusType } from "../state/log"

@@ -1,7 +1,8 @@
 import { getFixtureFile } from "@osmix/shared/test/fixtures"
 import type { GeoBbox2D } from "@osmix/shared/types"
 import { beforeAll, bench, describe } from "vitest"
-import { createExtract, createOsmFromPbf } from "../src"
+import { createExtract } from "../src/extract"
+import { createOsmFromPbf } from "../src/pbf"
 
 const MONACO_BBOX: GeoBbox2D = [7.4053929, 43.7232244, 7.4447259, 43.7543687]
 // const SEATTLE_BBOX: GeoBbox2D = [-122.33, 47.48, -122.29, 47.52]
