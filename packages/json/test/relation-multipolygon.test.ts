@@ -4,39 +4,9 @@ import {
 	buildRelationRings,
 	connectWaysToRings,
 	getWayMembersByRole,
-	isMultipolygonRelation,
 } from "../src/relation-multipolygon"
 
 describe("relation-multipolygon", () => {
-	describe("isMultipolygonRelation", () => {
-		it("identifies multipolygon relations", () => {
-			const relation: OsmRelation = {
-				id: 1,
-				tags: { type: "multipolygon" },
-				members: [],
-			}
-			expect(isMultipolygonRelation(relation)).toBe(true)
-		})
-
-		it("rejects non-multipolygon relations", () => {
-			const relation: OsmRelation = {
-				id: 1,
-				tags: { type: "route" },
-				members: [],
-			}
-			expect(isMultipolygonRelation(relation)).toBe(false)
-		})
-
-		it("rejects relations without type tag", () => {
-			const relation: OsmRelation = {
-				id: 1,
-				tags: { name: "test" },
-				members: [],
-			}
-			expect(isMultipolygonRelation(relation)).toBe(false)
-		})
-	})
-
 	describe("getWayMembersByRole", () => {
 		it("groups way members by outer and inner roles", () => {
 			const relation: OsmRelation = {

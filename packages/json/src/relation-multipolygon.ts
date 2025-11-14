@@ -6,13 +6,6 @@ import type {
 } from "@osmix/shared/types"
 
 /**
- * Check if a relation is a multipolygon relation.
- */
-export function isMultipolygonRelation(relation: OsmRelation): boolean {
-	return relation.tags?.["type"] === "multipolygon"
-}
-
-/**
  * Get way members from a relation, grouped by role (outer/inner).
  */
 export function getWayMembersByRole(relation: OsmRelation): {

@@ -8,6 +8,7 @@ import type {
 import {
 	entityPropertiesEqual,
 	getEntityType,
+	isMultipolygonRelation,
 	isNode,
 	isNodeEqual,
 	isRelation,
@@ -69,5 +70,34 @@ describe("utils", () => {
 		expect(getEntityType(node)).toBe("node")
 		expect(getEntityType(way)).toBe("way")
 		expect(getEntityType(relation)).toBe("relation")
+	})
+
+	describe("isMultipolygonRelation", () => {
+		it("identifies multipolygon relations", () => {
+			const relation: OsmRelation = {
+				id: 1,
+				tags: { type: "multipolygon" },
+				members: [],
+			}
+			expect(isMultipolygonRelation(relation)).toBe(true)
+		})
+
+		it("rejects non-multipolygon relations", () => {
+			const relation: OsmRelation = {
+				id: 1,
+				tags: { type: "route" },
+				members: [],
+			}
+			expect(isMultipolygonRelation(relation)).toBe(false)
+		})
+
+		it("rejects relations without type tag", () => {
+			const relation: OsmRelation = {
+				id: 1,
+				tags: { name: "test" },
+				members: [],
+			}
+			expect(isMultipolygonRelation(relation)).toBe(false)
+		})
 	})
 })

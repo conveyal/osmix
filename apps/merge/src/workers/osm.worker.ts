@@ -12,7 +12,7 @@ import {
 	type Osm,
 	throttle,
 } from "@osmix/core"
-import { buildRelationRings, isMultipolygonRelation } from "@osmix/json"
+import { buildRelationRings } from "@osmix/json"
 import { OsmixRasterTile } from "@osmix/raster"
 import type {
 	GeoBbox2D,
@@ -20,6 +20,7 @@ import type {
 	OsmEntityType,
 	Tile,
 } from "@osmix/shared/types"
+import { isMultipolygonRelation } from "@osmix/shared/utils"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, transfer, wrap } from "comlink"

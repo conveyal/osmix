@@ -1,7 +1,8 @@
 import type { Osm } from "@osmix/core"
-import { buildRelationRings, isMultipolygonRelation } from "@osmix/json"
+import { buildRelationRings } from "@osmix/json"
 import { DEFAULT_RASTER_TILE_SIZE, OsmixRasterTile } from "@osmix/raster"
 import type { LonLat, Tile } from "@osmix/shared/types"
+import { isMultipolygonRelation } from "@osmix/shared/utils"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 
 /**
