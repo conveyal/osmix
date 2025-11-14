@@ -24,6 +24,7 @@
 	"dependencies": {
 		"@fontsource-variable/roboto-mono": "^5.2.5",
 		"@osmix/change": "workspace:*",
+		"@osmix/geojson": "workspace:*",
 		"@osmix/core": "workspace:*",
 		"@osmix/vt": "workspace:*",
 		"@osmix/json": "workspace:*",

@@ -1,9 +1,4 @@
-import {
-	nodeToFeature,
-	type OsmGeoJSONFeature,
-	relationToFeature,
-	wayToFeature,
-} from "@osmix/json"
+import { Osm, type OsmOptions } from "@osmix/core"
 import rewind from "@osmix/shared/geojson-rewind"
 import {
 	logProgress,
@@ -19,7 +14,12 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
-import { Osm, type OsmOptions } from "./osm"
+import {
+	nodeToFeature,
+	relationToFeature,
+	wayToFeature,
+} from "./entity-to-feature"
+import type { OsmGeoJSONFeature } from "./types"
 
 /**
  * Create an Osm instance from a GeoJSON FeatureCollection.

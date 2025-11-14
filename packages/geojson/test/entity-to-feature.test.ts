@@ -1,6 +1,10 @@
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/shared/types"
 import { assert, describe, expect, it } from "vitest"
-import { nodeToFeature, relationToFeature, wayToFeature } from "../src/geojson"
+import {
+	nodeToFeature,
+	relationToFeature,
+	wayToFeature,
+} from "../src/entity-to-feature"
 
 describe("geojson helpers", () => {
 	const node0: OsmNode = { id: 1, lat: 0, lon: 0, tags: { amenity: "cafe" } }

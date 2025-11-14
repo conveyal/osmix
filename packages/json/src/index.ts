@@ -1,5 +1,4 @@
 export * from "./constants"
-export * from "./geojson"
 export * from "./json-to-pbf"
 export * from "./osm-pbf-block-builder"
 export * from "./osm-pbf-block-parser"

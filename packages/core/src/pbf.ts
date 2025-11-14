@@ -71,7 +71,9 @@ export async function* startCreateOsmFromPbf(
 
 	let blockIndex = 0
 	for await (const block of blocks) {
-		const blockStringIndexMap = osm.stringTable.createBlockIndexMap(block)
+		const blockStringIndexMap = osm.stringTable.createBlockIndexMap(
+			block.stringtable,
+		)
 
 		for (const group of block.primitivegroup) {
 			const { nodes, ways, relations, dense } = group

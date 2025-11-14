@@ -1,10 +1,11 @@
 {
 	"$schema": "https://json.schemastore.org/package",
-	"name": "osmix",
+	"name": "@osmix/geojson",
+	"description": "Convert OSM files to and from GeoJSON.",
+	"version": "0.0.1",
 	"type": "module",
-	"version": "0.0.3",
-	"description": "Full OSM toolkit for JavaScript and TypeScript",
 	"main": "./src/index.ts",
+	"types": "./src/index.ts",
 	"publishConfig": {
 		"access": "public",
 		"main": "./dist/index.js",
@@ -33,29 +34,21 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "tsc",
+		"bench": "vitest bench",
 		"prepublishOnly": "tsc",
-		"test": "bun test",
+		"test": "vitest",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@types/geojson": "catalog:",
 		"@types/node": "catalog:",
-		"@types/bun": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	},
 	"dependencies": {
-		"@osmix/change": "workspace:*",
 		"@osmix/core": "workspace:*",
-		"@osmix/geojson": "workspace:*",
-		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
-		"@osmix/raster": "workspace:*",
 		"@osmix/shared": "workspace:*",
-		"@osmix/vt": "workspace:*",
-		"@vitest/web-worker": "^4.0.8",
-		"comlink": " ^4.4.2",
-		"dequal": "catalog:",
-		"web-worker": "^1.5.0"
+		"dequal": "catalog:"
 	}
 }

@@ -1,4 +1,4 @@
-import { osmEntityToGeoJSONFeature } from "@osmix/core"
+import { osmEntityToGeoJSONFeature } from "@osmix/geojson"
 import { useAtomValue } from "jotai"
 import { useEffect, useMemo } from "react"
 import {

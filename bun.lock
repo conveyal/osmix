@@ -14,6 +14,7 @@
       "dependencies": {
         "@duckdb/duckdb-wasm": "^1.31.0",
         "@osmix/core": "workspace:*",
+        "@osmix/geojson": "workspace:*",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -43,6 +44,7 @@
         "@mapbox/tilebelt": "^2.0.2",
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
+        "@osmix/geojson": "workspace:*",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/raster": "workspace:*",
@@ -134,6 +136,22 @@
         "vitest": "catalog:",
       },
     },
+    "packages/geojson": {
+      "name": "@osmix/geojson",
+      "version": "0.0.1",
+      "dependencies": {
+        "@osmix/core": "workspace:*",
+        "@osmix/pbf": "workspace:*",
+        "@osmix/shared": "workspace:*",
+        "dequal": "catalog:",
+      },
+      "devDependencies": {
+        "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/json": {
       "name": "@osmix/json",
       "version": "0.0.3",
@@ -155,6 +173,7 @@
       "dependencies": {
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
+        "@osmix/geojson": "workspace:*",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/raster": "workspace:*",
@@ -455,6 +474,8 @@
     "@osmix/change": ["@osmix/change@workspace:packages/change"],
 
     "@osmix/core": ["@osmix/core@workspace:packages/core"],
+
+    "@osmix/geojson": ["@osmix/geojson@workspace:packages/geojson"],
 
     "@osmix/json": ["@osmix/json@workspace:packages/json"],
 

@@ -1,4 +1,3 @@
-import { nodeToFeature, type OsmGeoJSONFeature } from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
 import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/shared/types"
@@ -200,12 +199,6 @@ export class Nodes extends Entities<OsmNode> {
 			lat,
 			lon,
 		}
-	}
-
-	toGeoJson(i: IdOrIndex): OsmGeoJSONFeature<GeoJSON.Point> {
-		const [index, id] = this.ids.idOrIndex(i)
-		const node = this.getFullEntity(index, id)
-		return nodeToFeature(node)
 	}
 
 	// Spatial operations

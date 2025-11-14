@@ -5,7 +5,7 @@ import type { LineString, MultiPolygon, Point, Polygon } from "geojson"
 import {
 	buildRelationRings,
 	getWayMembersByRole,
-} from "./relation-multipolygon"
+} from "../../json/src/relation-multipolygon"
 import type { OsmGeoJSONFeature } from "./types"
 
 export function nodeToFeature(node: OsmNode): OsmGeoJSONFeature<Point> {

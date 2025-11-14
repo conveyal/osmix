@@ -3,7 +3,7 @@ import {
 	nodeToFeature,
 	type OsmGeoJSONFeature,
 	wayToFeature,
-} from "@osmix/json"
+} from "@osmix/geojson"
 import { type OsmPbfHeaderBlock, readOsmPbf } from "@osmix/pbf"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/shared/types"

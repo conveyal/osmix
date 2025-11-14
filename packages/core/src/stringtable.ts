@@ -1,4 +1,4 @@
-import type { OsmPbfBlock, OsmPbfStringTable } from "@osmix/pbf"
+import type { OsmPbfStringTable } from "@osmix/pbf"
 import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
 
 export interface StringTableTransferables {
@@ -64,10 +64,10 @@ export default class StringTable {
 	 * Decode all the strings in a primitive block and add them to the string table.
 	 * Return a mapping of block index -> string table index
 	 */
-	createBlockIndexMap(block: OsmPbfBlock) {
-		const index = new Uint32Array(block.stringtable.length)
-		for (let i = 0; i < block.stringtable.length; i++) {
-			const bytesString = block.stringtable[i]
+	createBlockIndexMap(blockStringtable: OsmPbfStringTable) {
+		const index = new Uint32Array(blockStringtable.length)
+		for (let i = 0; i < blockStringtable.length; i++) {
+			const bytesString = blockStringtable[i]
 			const str = this.dec.decode(bytesString)
 			const existingIndex = this.stringToIndex.get(str)
 			if (existingIndex !== undefined) {

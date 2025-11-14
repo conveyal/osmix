@@ -6,12 +6,8 @@ import {
 	type OsmChangeTypes,
 	type OsmMergeOptions,
 } from "@osmix/change"
-import {
-	createOsmFromGeoJSON,
-	createOsmFromPbf,
-	type Osm,
-	throttle,
-} from "@osmix/core"
+import { createOsmFromPbf, type Osm, throttle } from "@osmix/core"
+import { createOsmFromGeoJSON } from "@osmix/geojson"
 import { buildRelationRings } from "@osmix/json"
 import { OsmixRasterTile } from "@osmix/raster"
 import type {

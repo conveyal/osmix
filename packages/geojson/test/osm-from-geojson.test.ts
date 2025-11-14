@@ -6,7 +6,7 @@ import type {
 	Polygon,
 } from "geojson"
 import { describe, expect, it } from "vitest"
-import { createOsmFromGeoJSON } from "../src/geojson"
+import { createOsmFromGeoJSON } from "../src/osm-from-geojson"
 
 describe("fromGeoJSON", () => {
 	it("should convert Point features to Nodes", () => {
