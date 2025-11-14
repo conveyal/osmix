@@ -8,8 +8,8 @@ import {
 } from "@osmix/change"
 import { type Osm, throttle } from "@osmix/core"
 import { createOsmFromGeoJSON } from "@osmix/geojson"
-import { buildRelationRings } from "@osmix/json"
 import { OsmixRasterTile } from "@osmix/raster"
+import { buildRelationRings } from "@osmix/shared/relation-multipolygon"
 import type {
 	GeoBbox2D,
 	LonLat,

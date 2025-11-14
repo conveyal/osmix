@@ -1,9 +1,4 @@
-import type {
-	LonLat,
-	OsmRelation,
-	OsmRelationMember,
-	OsmWay,
-} from "@osmix/shared/types"
+import type { LonLat, OsmRelation, OsmRelationMember, OsmWay } from "./types"
 
 /**
  * Get way members from a relation, grouped by role (outer/inner).

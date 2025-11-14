@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import SphericalMercatorTile from "./spherical-mercator"
-import type { Tile } from "./types"
+import SphericalMercatorTile from "../src/spherical-mercator"
+import type { Tile } from "../src/types"
 
 function lonLatForPixel(
 	merc: SphericalMercatorTile,

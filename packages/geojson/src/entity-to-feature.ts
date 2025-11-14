@@ -1,11 +1,11 @@
+import {
+	buildRelationRings,
+	getWayMembersByRole,
+} from "@osmix/shared/relation-multipolygon"
 import type { LonLat, OsmNode, OsmRelation, OsmWay } from "@osmix/shared/types"
 import { isMultipolygonRelation } from "@osmix/shared/utils"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 import type { LineString, MultiPolygon, Point, Polygon } from "geojson"
-import {
-	buildRelationRings,
-	getWayMembersByRole,
-} from "../../json/src/relation-multipolygon"
 import type { OsmGeoJSONFeature } from "./types"
 
 export function nodeToFeature(node: OsmNode): OsmGeoJSONFeature<Point> {

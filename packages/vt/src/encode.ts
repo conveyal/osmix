@@ -1,7 +1,7 @@
 import type { Osm } from "@osmix/core"
-import { buildRelationRings } from "@osmix/json"
 import { bboxContainsOrIntersects } from "@osmix/shared/bbox-intersects"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
+import { buildRelationRings } from "@osmix/shared/relation-multipolygon"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
 import { isMultipolygonRelation } from "@osmix/shared/utils"
