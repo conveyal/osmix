@@ -13,13 +13,16 @@ import {
 	type OsmPbfHeaderBlock,
 	readOsmPbf,
 } from "@osmix/pbf"
+import {
+	logProgress,
+	type ProgressEvent,
+	progressEvent,
+} from "@osmix/shared/progress"
 import type { GeoBbox2D } from "@osmix/shared/types"
-import type { Osm, OsmOptions } from "./osm"
-import { throttle } from "./utils"
+import { Osm, type OsmOptions } from "./osm"
 
 export interface OsmFromPbfOptions extends OsmOptions {
 	extractBbox: GeoBbox2D
-	logger: (message: string) => void
 	filter<T extends OsmEntityType>(
 		type: T,
 		entity: OsmEntityTypeMap[T],
@@ -32,13 +35,28 @@ export interface OsmFromPbfOptions extends OsmOptions {
 }
 
 /**
- * Read an OSM PBF file into an Osm index.
+ * Create a new Osm index from a PBF stream or array buffer.
  */
-export async function osmFromPbf(
+export async function createOsmFromPbf(
+	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
+	options: Partial<OsmFromPbfOptions> = {},
+	onProgress: (progress: ProgressEvent) => void = logProgress,
+): Promise<Osm> {
+	const osm = new Osm(options)
+	for await (const update of startCreateOsmFromPbf(osm, data, options)) {
+		onProgress(update)
+	}
+	return osm
+}
+
+/**
+ * Parse raw PBF data into an Osm index.
+ */
+export async function* startCreateOsmFromPbf(
 	osm: Osm,
 	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
 	options: Partial<OsmFromPbfOptions> = {},
-): Promise<Osm> {
+): AsyncGenerator<ProgressEvent> {
 	const { extractBbox } = options
 	const { header, blocks } = await readOsmPbf(data)
 	osm.header = header
@@ -50,9 +68,8 @@ export async function osmFromPbf(
 			top: extractBbox[3],
 		}
 	}
-	const log = options.logger ?? ((...msg) => console.log(...msg))
-	const logEverySecond = throttle(log, 1_000)
 
+	let blockIndex = 0
 	for await (const block of blocks) {
 		const blockStringIndexMap = osm.stringTable.createBlockIndexMap(block)
 
@@ -78,8 +95,6 @@ export async function osmFromPbf(
 							}
 						: undefined,
 				)
-
-				logEverySecond(`${osm.nodes.size.toLocaleString()} nodes added`)
 			}
 
 			if (ways.length > 0) {
@@ -99,8 +114,6 @@ export async function osmFromPbf(
 							}
 						: undefined,
 				)
-
-				logEverySecond(`${osm.ways.size.toLocaleString()} ways added`)
 			}
 
 			if (relations.length > 0) {
@@ -124,16 +137,16 @@ export async function osmFromPbf(
 							}
 						: undefined,
 				)
-
-				logEverySecond(`${osm.relations.size.toLocaleString()} relations added`)
 			}
 		}
+
+		yield progressEvent(`Block ${++blockIndex} processed`)
 	}
 
-	log(
+	yield progressEvent(
 		`${osm.nodes.size.toLocaleString()} nodes, ${osm.ways.size.toLocaleString()} ways, and ${osm.relations.size.toLocaleString()} relations added.`,
 	)
-	log("Building remaining id and tag indexes...")
+	yield progressEvent("Building remaining id and tag indexes...")
 	osm.buildIndexes()
 
 	// By default, build all spatial indexes.
@@ -144,8 +157,6 @@ export async function osmFromPbf(
 	} else if (options.buildSpatialIndexes.includes("way")) {
 		osm.ways.buildSpatialIndex()
 	}
-
-	return osm
 }
 
 /**

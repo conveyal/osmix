@@ -1,24 +1,26 @@
 import {
 	Osm,
-	type OsmCreateFromGeoJSONOptions,
 	type OsmFromPbfOptions,
+	type OsmOptions,
 	type OsmTransferables,
 } from "@osmix/core"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
+import type { Progress, ProgressEvent } from "@osmix/shared/progress"
 import type { Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
 import { Osmix } from "./osmix"
-import { collectBuffers } from "./utils"
+import { collectTransferables } from "./utils"
 
 /**
  * Worker handler for a single Osmix instance.
  */
 export class OsmixWorker {
 	private osmix = new Osmix()
-	private log: string[] = []
 
-	constructor() {
-		console.error("INSIDE OSMIXWORKER CONSTRUCTOR")
+	addProgressListener(listener: (progress: Progress) => void) {
+		this.osmix.addEventListener("progress", (e: Event) =>
+			listener((e as ProgressEvent).detail),
+		)
 	}
 
 	async fromPbf({
@@ -30,19 +32,19 @@ export class OsmixWorker {
 		data: ArrayBufferLike | ReadableStream
 		options?: Partial<OsmFromPbfOptions>
 	}) {
-		console.error("INSIDE OSMIXWORKER")
-		const osm = await this.osmix.fromPbf(id, data, {
-			...options,
-			logger: (msg) => this.log.push(msg),
-		})
+		const osm = await this.osmix.fromPbf(id, data, options)
 		return osm.transferables()
 	}
 
-	async fromGeoJSON(
-		id: string,
-		data: ArrayBufferLike | ReadableStream,
-		options?: Partial<OsmCreateFromGeoJSONOptions>,
-	) {
+	async fromGeoJSON({
+		id,
+		data,
+		options,
+	}: {
+		id: string
+		data: ArrayBufferLike | ReadableStream
+		options?: Partial<OsmOptions>
+	}) {
 		const osm = await this.osmix.fromGeoJSON(id, data, options)
 		return osm.transferables()
 	}
@@ -53,7 +55,7 @@ export class OsmixWorker {
 
 	transfer(id: string) {
 		const transferables = this.osmix.get(id).transferables()
-		return Comlink.transfer(transferables, collectBuffers(transferables))
+		return Comlink.transfer(transferables, collectTransferables(transferables))
 	}
 
 	isReady(id: string): boolean {
@@ -89,4 +91,4 @@ export class OsmixWorker {
 	}
 }
 
-Comlink.expose(OsmixWorker)
+Comlink.expose(new OsmixWorker())

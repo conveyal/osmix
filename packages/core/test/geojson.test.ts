@@ -6,8 +6,7 @@ import type {
 	Polygon,
 } from "geojson"
 import { describe, expect, it } from "vitest"
-import { fromGeoJSON } from "../src/geojson"
-import { Osm } from "../src/osm"
+import { createOsmFromGeoJSON } from "../src/geojson"
 
 describe("fromGeoJSON", () => {
 	it("should convert Point features to Nodes", () => {
@@ -38,8 +37,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		expect(osm.nodes.size).toBe(2)
 		expect(osm.ways.size).toBe(0)
@@ -81,8 +79,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		expect(osm.nodes.size).toBe(3)
 		expect(osm.ways.size).toBe(1)
@@ -138,8 +135,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		// Point should use ID 100
 		const node = osm.nodes.getById(100)
@@ -186,8 +182,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		// Nodes should have sequential IDs starting from 1
 		expect(osm.nodes.getById(-1)).toBeDefined()
@@ -220,8 +215,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		const node = osm.nodes.getById(-1)
 		expect(node?.tags?.["name"]).toBe("Test")
@@ -265,8 +259,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		// Should have 3 nodes (shared coordinate is reused)
 		expect(osm.nodes.size).toBe(3)
@@ -297,8 +290,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		expect(() => fromGeoJSON(osm, geojson)).toThrow(
+		expect(() => createOsmFromGeoJSON(geojson)).toThrow(
 			"Invalid GeoJSON coordinates in LineString.",
 		)
 	})
@@ -336,8 +328,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		expect(() => fromGeoJSON(osm, geojson)).toThrow()
+		expect(() => createOsmFromGeoJSON(geojson)).toThrow()
 	})
 
 	it("should handle mixed Point and LineString features", () => {
@@ -380,8 +371,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		// Should have 3 nodes (point node is reused by LineString)
 		expect(osm.nodes.size).toBe(3)
@@ -411,8 +401,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		expect(osm.isReady()).toBe(true)
 		expect(osm.nodes.isReady()).toBe(true)
@@ -434,8 +423,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		const node = osm.nodes.getById(-1)
 		expect(node).toBeDefined()
@@ -468,8 +456,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		expect(osm.nodes.size).toBe(4) // 4 unique nodes (last is duplicate)
 		expect(osm.ways.size).toBe(1)
@@ -518,8 +505,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		// Should have outer ring way + hole way + relation
 		expect(osm.ways.size).toBe(2)
@@ -586,8 +572,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		// Should have 2 ways + 1 relation
 		expect(osm.ways.size).toBe(2)
@@ -663,8 +648,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		// Should have 3 ways + 1 relation
 		expect(osm.ways.size).toBe(3)
@@ -723,7 +707,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(new Osm(), geojson)).toThrow(
+		expect(() => createOsmFromGeoJSON(geojson)).toThrow(
 			"Outer ring of Polygon is not closed.",
 		)
 	})
@@ -767,8 +751,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		// Should only have one way (the valid one)
 		expect(osm.ways.size).toBe(1)
@@ -802,8 +785,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = new Osm()
-		fromGeoJSON(osm, geojson)
+		const osm = createOsmFromGeoJSON(geojson)
 
 		// Should still create the way successfully (rewind normalizes winding)
 		expect(osm.ways.size).toBe(1)
@@ -847,7 +829,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(new Osm(), geojson)).toThrow(
+		expect(() => createOsmFromGeoJSON(geojson)).toThrow(
 			"Hole ring of Polygon is not closed.",
 		)
 	})
@@ -879,7 +861,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(new Osm(), geojson)).toThrow(
+		expect(() => createOsmFromGeoJSON(geojson)).toThrow(
 			"Outer ring of Polygon is not closed.",
 		)
 	})

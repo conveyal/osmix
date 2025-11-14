@@ -1,4 +1,4 @@
-import type { Osmix } from "@osmix/core"
+import type { Osm } from "@osmix/core"
 import {
 	isNode,
 	isRelation,
@@ -23,7 +23,7 @@ export default function EntityDetails({
 	open?: boolean
 	entity: OsmEntity
 	onSelect?: (entity: OsmEntity) => void
-	osm?: Osmix
+	osm?: Osm
 }) {
 	if (isNode(entity)) return <NodeDetails node={entity} open={open} />
 	if (isWay(entity))
@@ -242,7 +242,7 @@ function RelationMemberListTable({
 	onSelect,
 }: {
 	members: OsmRelation["members"]
-	osm: Osmix
+	osm: Osm
 	onSelect: (entity: OsmEntity) => void
 }) {
 	return (

@@ -1,29 +1,29 @@
 import {
 	merge,
+	type OsmChange,
+	OsmChangeset,
 	type OsmChangeTypes,
-	type OsmixChange,
-	OsmixChangeset,
-	type OsmixMergeOptions,
+	type OsmMergeOptions,
 } from "@osmix/change"
-import { Osmix, type OsmixTransferables, throttle } from "@osmix/core"
+import { Osm, type OsmTransferables, throttle } from "@osmix/core"
 import type { OsmEntityType } from "@osmix/json"
 import * as Comlink from "comlink"
 import { dequal } from "dequal/lite"
 
 export class OsmixMergeWorker {
-	private osmixes: Record<string, Osmix> = {}
-	private changesets: Record<string, OsmixChangeset> = {}
+	private osmixes: Record<string, Osm> = {}
+	private changesets: Record<string, OsmChangeset> = {}
 	private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"]
 	private entityTypes: OsmEntityType[] = ["node", "way", "relation"]
-	private filteredChanges: Record<string, OsmixChange[]> = {}
+	private filteredChanges: Record<string, OsmChange[]> = {}
 	private log: (message: string) => void = console.log
 
-	async fromTransferables(transferables: OsmixTransferables) {
-		const osmix = new Osmix(transferables)
+	async fromTransferables(transferables: OsmTransferables) {
+		const osmix = new Osm(transferables)
 		this.set(transferables.id, osmix)
 	}
 
-	set(id: string, osmix: Osmix) {
+	set(id: string, osmix: Osm) {
 		this.osmixes[id] = osmix
 	}
 
@@ -34,7 +34,7 @@ export class OsmixMergeWorker {
 	async merge(
 		baseOsmId: string,
 		patchOsmId: string,
-		options: Partial<OsmixMergeOptions> = {},
+		options: Partial<OsmMergeOptions> = {},
 	) {
 		const baseOsm = this.osmixes[baseOsmId]
 		const patchOsm = this.osmixes[patchOsmId]
@@ -50,14 +50,14 @@ export class OsmixMergeWorker {
 	generateChangeset(
 		baseOsmId: string,
 		patchOsmId: string,
-		options: Partial<OsmixMergeOptions> = {},
+		options: Partial<OsmMergeOptions> = {},
 	) {
 		const patchOsm = this.osmixes[patchOsmId]
 		if (!patchOsm) throw Error(`Osm for ${patchOsmId} not loaded.`)
 		const baseOsm = this.osmixes[baseOsmId]
 		if (!baseOsm) throw Error(`Osm for ${baseOsmId} not loaded.`)
 
-		const changeset = new OsmixChangeset(baseOsm)
+		const changeset = new OsmChangeset(baseOsm)
 		this.changesets[baseOsmId] = changeset
 
 		if (options.directMerge) {
@@ -111,8 +111,8 @@ export class OsmixMergeWorker {
 		return changeset.stats
 	}
 
-	sortChangeset(osmId: string, changeset: OsmixChangeset) {
-		const filteredChanges: OsmixChange[] = []
+	sortChangeset(osmId: string, changeset: OsmChangeset) {
+		const filteredChanges: OsmChange[] = []
 		if (this.entityTypes.includes("node")) {
 			for (const change of Object.values(changeset.nodeChanges)) {
 				if (this.changeTypes.includes(change.changeType)) {

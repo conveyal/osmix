@@ -1,20 +1,29 @@
-/**
- * Collect all ArrayBufferLike values from a nested object. Usually to be transferred to or from a worker.
- */
-export function collectBuffers(value: unknown): ArrayBufferLike[] {
-	const buffers: ArrayBufferLike[] = []
+import * as Comlink from "comlink"
 
-	if (value instanceof ArrayBuffer) buffers.push(value)
-	else if (ArrayBuffer.isView(value)) buffers.push(value.buffer)
+export type Transferable = ArrayBufferLike | ReadableStream
+
+/**
+ * Collect all transferable values from a nested object. Usually to be transferred to or from a worker.
+ */
+export function collectTransferables(value: unknown): Transferable[] {
+	const transferables: Transferable[] = []
+
+	if (value instanceof ArrayBuffer) transferables.push(value)
+	else if (value instanceof ReadableStream) transferables.push(value)
+	else if (ArrayBuffer.isView(value)) transferables.push(value.buffer)
 	else if (Array.isArray(value)) {
 		for (const item of value) {
-			buffers.push(...collectBuffers(item))
+			transferables.push(...collectTransferables(item))
 		}
 	} else if (value && typeof value === "object") {
 		for (const item of Object.values(value)) {
-			buffers.push(...collectBuffers(item))
+			transferables.push(...collectTransferables(item))
 		}
 	}
 
-	return buffers
+	return transferables
+}
+
+export function transfer<T>(data: T) {
+	return Comlink.transfer(data, collectTransferables(data))
 }

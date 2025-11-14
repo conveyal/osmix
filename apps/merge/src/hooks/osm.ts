@@ -1,4 +1,4 @@
-import { Osmix, osmixToPbfStream } from "@osmix/core"
+import { Osm, osmToPbfStream } from "@osmix/core"
 import * as Comlink from "comlink"
 import { useAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
@@ -10,7 +10,7 @@ import { supportsReadableStreamTransfer } from "../utils"
 import { useMap } from "./map"
 
 function useOsmDefaultFile(
-	loadOsmFile: (file: File | null) => Promise<Osmix | undefined>,
+	loadOsmFile: (file: File | null) => Promise<Osm | undefined>,
 	defaultFilePath?: string,
 ) {
 	const [, startTransition] = useTransition()
@@ -65,7 +65,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 							Comlink.transfer(data, [data]),
 						)
 
-				const osm = new Osmix(osmBuffers)
+				const osm = new Osm(osmBuffers)
 				setOsm(osm)
 				taskLog.end(`${file.name} fully loaded.`)
 				return osm
@@ -94,7 +94,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				],
 			})
 			const stream = await fileHandle.createWritable()
-			await osmixToPbfStream(osm).pipeTo(stream)
+			await osmToPbfStream(osm).pipeTo(stream)
 			task.end(`Created ${fileHandle.name} PBF for download`)
 		},
 		[osm],

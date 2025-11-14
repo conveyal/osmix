@@ -11,6 +11,11 @@ import {
 	wayToFeature,
 } from "@osmix/json"
 import rewind from "@osmix/shared/geojson-rewind"
+import {
+	logProgress,
+	type ProgressEvent,
+	progressEvent,
+} from "@osmix/shared/progress"
 import type {
 	FeatureCollection,
 	LineString,
@@ -18,11 +23,21 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
-import type { Osm, OsmOptions } from "./osm"
-import { throttle } from "./utils"
+import { Osm, type OsmOptions } from "./osm"
 
-export interface OsmCreateFromGeoJSONOptions extends OsmOptions {
-	logger: (message: string) => void
+/**
+ * Create an Osm instance from a GeoJSON FeatureCollection.
+ */
+export function createOsmFromGeoJSON(
+	geojson: FeatureCollection<Point | LineString | Polygon | MultiPolygon>,
+	options: Partial<OsmOptions> = {},
+	onProgress: (progress: ProgressEvent) => void = logProgress,
+): Osm {
+	const osm = new Osm(options)
+	for (const update of startCreateOsmFromGeoJSON(osm, geojson)) {
+		onProgress(update)
+	}
+	return osm
 }
 
 /**
@@ -33,15 +48,11 @@ export interface OsmCreateFromGeoJSONOptions extends OsmOptions {
  * Feature IDs are used if present, otherwise sequential IDs are generated.
  * All feature properties are converted to OSM tags.
  */
-export function fromGeoJSON(
+export function* startCreateOsmFromGeoJSON(
 	osm: Osm,
 	geojson: FeatureCollection<Point | LineString | Polygon | MultiPolygon>,
-	options: Partial<OsmCreateFromGeoJSONOptions> = {},
-): Osm {
-	const log = options.logger ?? ((...msg) => console.log(...msg))
-
-	log("Converting GeoJSON to Osmix...")
-	const logEverySecond = throttle(log, 1_000)
+): Generator<ProgressEvent> {
+	yield progressEvent("Converting GeoJSON to Osmix...")
 
 	// Map to track nodes by coordinate string for reuse when creating ways and relations
 	const nodeMap = new Map<string, number>()
@@ -70,7 +81,6 @@ export function fromGeoJSON(
 	// Process each feature
 	let count = 0
 	for (const feature of geojson.features) {
-		logEverySecond(`Processed ${count++} features...`)
 		// Normalize winding order using rewind (outer rings counterclockwise, inner rings clockwise)
 		const normalizedFeature = rewind(feature, false)
 		const tags = propertiesToTags(normalizedFeature.properties)
@@ -260,15 +270,17 @@ export function fromGeoJSON(
 				})
 			}
 		}
+
+		yield progressEvent(`Processed ${count++} features...`)
 	}
 
-	log("Finished converting GeoJSON to Osmix, building indexes...")
+	yield progressEvent(
+		"Finished converting GeoJSON to Osmix, building indexes...",
+	)
 
 	// Build indexes
 	osm.buildIndexes()
 	osm.buildSpatialIndexes()
-
-	return osm
 }
 
 // Helper to convert properties to tags

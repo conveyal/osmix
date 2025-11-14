@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs"
-import { Osm, osmFromPbf } from "@osmix/core"
+import { createOsmFromPbf, type Osm } from "@osmix/core"
 import { createBaseOsm, createPatchOsm } from "@osmix/core/test/mock-osm"
 import type { OsmNode } from "@osmix/json"
 import {
@@ -46,13 +46,11 @@ describe("merge osm", () => {
 			// const _osmMergedName = "yakima-merged.osm.pbf"
 
 			const osm1Data = getFixtureFileReadStream(osm1Name)
-			let baseOsm = new Osm()
-			await osmFromPbf(baseOsm, osm1Data, { id: osm1Name })
+			let baseOsm = await createOsmFromPbf(osm1Data, { id: osm1Name })
 			assert.equal(baseOsm.nodes.getById(testNode.id), null)
 
 			const osm2Data = getFixtureFileReadStream(osm2Name)
-			const osm2 = new Osm()
-			await osmFromPbf(osm2, osm2Data, { id: osm2Name })
+			const osm2 = await createOsmFromPbf(osm2Data, { id: osm2Name })
 			assert.deepEqual(osm2.nodes.getById(testNode.id), testNode)
 
 			const baseSizes = sizes(baseOsm)
@@ -227,12 +225,10 @@ describe("merge osm", () => {
 			const osm1Name = "seattle.osm.pbf"
 			const osm2Name = "seattle-osw.pbf"
 
-			let baseOsm = new Osm()
-			await osmFromPbf(baseOsm, getFixtureFileReadStream(osm1Name), {
+			let baseOsm = await createOsmFromPbf(getFixtureFileReadStream(osm1Name), {
 				id: osm1Name,
 			})
-			const osm2 = new Osm()
-			await osmFromPbf(osm2, getFixtureFileReadStream(osm2Name), {
+			const osm2 = await createOsmFromPbf(getFixtureFileReadStream(osm2Name), {
 				id: osm2Name,
 			})
 

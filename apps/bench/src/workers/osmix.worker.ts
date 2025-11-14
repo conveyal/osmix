@@ -1,7 +1,7 @@
-import { type Osmix, osmixFromPbf } from "@osmix/core"
+import { createOsmFromPbf, type Osm } from "@osmix/core"
 import {
 	nodeToFeature,
-	type OsmixGeoJSONFeature,
+	type OsmGeoJSONFeature,
 	type OsmNode,
 	type OsmWay,
 	wayToFeature,
@@ -13,12 +13,11 @@ import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, wrap } from "comlink"
 
 export class OsmixBenchWorker {
-	private osm: Osmix | null = null
+	private osm: Osm | null = null
 
 	async loadFromPbf(data: ArrayBuffer): Promise<void> {
-		this.osm = await osmixFromPbf(new Uint8Array(data), {
+		this.osm = await createOsmFromPbf(new Uint8Array(data), {
 			id: "benchmark",
-			logger: console.log,
 		})
 	}
 
@@ -147,7 +146,7 @@ export class OsmixBenchWorker {
 	): Promise<GeoJSON.FeatureCollection> {
 		if (!this.osm) throw new Error("OSM not loaded")
 
-		const features: OsmixGeoJSONFeature<
+		const features: OsmGeoJSONFeature<
 			GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon
 		>[] = []
 

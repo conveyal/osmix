@@ -1,4 +1,4 @@
-import type { OsmChangeTypes, OsmixChangesetStats } from "@osmix/change"
+import type { OsmChangesetStats, OsmChangeTypes } from "@osmix/change"
 import type { OsmEntityType } from "@osmix/json"
 import { atom } from "jotai"
 import { osmWorker } from "./worker"
@@ -8,7 +8,7 @@ export const DEFAULT_PAGE_SIZE = 10
 /**
  * OSM Change Summary State, can use a Provider or set changesAtom directly.
  */
-export const changesetStatsAtom = atom<OsmixChangesetStats | null>(null)
+export const changesetStatsAtom = atom<OsmChangesetStats | null>(null)
 export const pageSizeAtom = atom<number>(DEFAULT_PAGE_SIZE)
 export const pageAtom = atom<number>(0)
 export const changeTypeFilterAtom = atom<OsmChangeTypes[]>([

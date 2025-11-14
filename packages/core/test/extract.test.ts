@@ -3,7 +3,7 @@ import type { GeoBbox2D } from "@osmix/shared/types"
 import { assert, test } from "vitest"
 import { createExtract } from "../src"
 import { Osm } from "../src/osm"
-import { osmFromPbf, osmToPbfBuffer, osmToPbfStream } from "../src/pbf"
+import { createOsmFromPbf, osmToPbfBuffer, osmToPbfStream } from "../src/pbf"
 
 const TEST_BBOX: GeoBbox2D = [-0.1, -0.1, 1, 1]
 const SEATTLE_BBOX: GeoBbox2D = [-122.463226, 47.469878, -122.180328, 47.82883]
@@ -77,12 +77,11 @@ test("extract a BBOX while reading a PBF", async () => {
 		Uint8Array<ArrayBufferLike>,
 		Uint8Array<ArrayBufferLike>
 	>()
-	const extract = new Osm()
-	const extractPromise = osmFromPbf(extract, transform.readable, {
+	const extractPromise = createOsmFromPbf(transform.readable, {
 		extractBbox: TEST_BBOX,
 	})
 	await osmToPbfStream(source).pipeTo(transform.writable)
-	await extractPromise
+	const extract = await extractPromise
 
 	assert.equal(extract.nodes.size, 2)
 	assert.isTrue(extract.nodes.ids.has(1))
@@ -102,13 +101,11 @@ test("extract a BBOX after reading a PBF", async () => {
 	const source = buildSourceOsm()
 	const buffer = await osmToPbfBuffer(source)
 
-	const streaming = new Osm()
-	await osmFromPbf(streaming, new Uint8Array(buffer.slice(0)), {
+	const streaming = await createOsmFromPbf(new Uint8Array(buffer.slice(0)), {
 		extractBbox: TEST_BBOX,
 	})
 
-	const twoStepOsmix = new Osm()
-	await osmFromPbf(twoStepOsmix, new Uint8Array(buffer.slice(0)))
+	const twoStepOsmix = await createOsmFromPbf(new Uint8Array(buffer.slice(0)))
 	const twoStep = createExtract(twoStepOsmix, TEST_BBOX, "simple")
 
 	assert.equal(streaming.nodes.size, twoStep.nodes.size)
@@ -349,8 +346,7 @@ test("extract with complete_ways includes node members of relations", () => {
 })
 
 test.skip("extract from a large PBF", { timeout: 500_000 }, async () => {
-	const seattle = new Osm()
-	await osmFromPbf(seattle, getFixtureFileReadStream("usa.pbf"), {
+	const seattle = await createOsmFromPbf(getFixtureFileReadStream("usa.pbf"), {
 		extractBbox: SEATTLE_BBOX,
 	})
 

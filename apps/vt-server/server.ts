@@ -10,7 +10,9 @@ const pbfUrl = new URL(`../../fixtures/${filename}`, import.meta.url)
 
 const log: string[] = []
 const workerCount = os.cpus().length
-const Osmix = new OsmixRemote(workerCount, (message) => log.push(message))
+const Osmix = await OsmixRemote.connect(workerCount, (event) =>
+	log.push(event.msg),
+)
 
 // Print number of VT workers available
 console.log(`Number of VT workers available: ${workerCount}`)

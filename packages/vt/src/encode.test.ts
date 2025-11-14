@@ -1,5 +1,5 @@
 import { VectorTile } from "@mapbox/vector-tile"
-import { Osmix } from "@osmix/core"
+import { Osm } from "@osmix/core"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import { decodeZigzag } from "@osmix/shared/zigzag"
@@ -7,7 +7,7 @@ import Protobuf from "pbf"
 import { describe, expect, it } from "vitest"
 import { OsmixVtEncoder } from "./encode"
 
-const osm = new Osmix()
+const osm = new Osm()
 osm.nodes.addNode({
 	id: 1,
 	lat: 40,
@@ -113,7 +113,7 @@ describe("OsmixVtEncoder", () => {
 	})
 
 	it("encodes area ways as polygons with proper winding order", () => {
-		const testOsm = new Osmix()
+		const testOsm = new Osm()
 		// Create a closed way that should be treated as an area
 		testOsm.nodes.addNode({ id: 10, lat: 40.7, lon: -74.0 })
 		testOsm.nodes.addNode({ id: 11, lat: 40.71, lon: -74.0 })
@@ -149,7 +149,7 @@ describe("OsmixVtEncoder", () => {
 	})
 
 	it("handles multiple rings for polygons (infrastructure for holes)", () => {
-		const testOsm = new Osmix()
+		const testOsm = new Osm()
 		// Create an area way
 		testOsm.nodes.addNode({ id: 20, lat: 40.7, lon: -74.0 })
 		testOsm.nodes.addNode({ id: 21, lat: 40.71, lon: -74.0 })
@@ -187,7 +187,7 @@ describe("OsmixVtEncoder", () => {
 	})
 
 	it("processes polygon rings with correct winding order (outer clockwise, inner counterclockwise)", () => {
-		const testOsm = new Osmix()
+		const testOsm = new Osm()
 		testOsm.nodes.addNode({ id: 30, lat: 40.7, lon: -74.0 })
 		testOsm.nodes.addNode({ id: 31, lat: 40.71, lon: -74.0 })
 		testOsm.nodes.addNode({ id: 32, lat: 40.71, lon: -74.01 })
@@ -251,7 +251,7 @@ describe("OsmixVtEncoder", () => {
 	})
 
 	it("encodes multipolygon relation with correct winding order", () => {
-		const testOsm = new Osmix()
+		const testOsm = new Osm()
 		// Create nodes for outer square
 		testOsm.nodes.addNode({ id: 1, lat: -1.0, lon: -1.0 })
 		testOsm.nodes.addNode({ id: 2, lat: -1.0, lon: 1.0 })
@@ -337,7 +337,7 @@ describe("OsmixVtEncoder", () => {
 	})
 
 	it("encodes area way as polygon with correct winding order", () => {
-		const testOsm = new Osmix()
+		const testOsm = new Osm()
 		// Create a square polygon
 		testOsm.nodes.addNode({ id: 1, lat: 40.7, lon: -74.0 })
 		testOsm.nodes.addNode({ id: 2, lat: 40.71, lon: -74.0 })
@@ -382,7 +382,7 @@ describe("OsmixVtEncoder", () => {
 	})
 
 	it("encodes negative IDs correctly", () => {
-		const testOsm = new Osmix()
+		const testOsm = new Osm()
 		// Create nodes with negative IDs (like from GeoJSON import)
 		testOsm.nodes.addNode({
 			id: -1,
@@ -439,7 +439,7 @@ describe("OsmixVtEncoder", () => {
 	})
 
 	it("accepts IDs at the boundaries of safe integer range", () => {
-		const testOsm = new Osmix()
+		const testOsm = new Osm()
 		// Add nodes for ways to reference
 		testOsm.nodes.addNode({ id: 1, lat: 40.7, lon: -74.0 })
 		testOsm.nodes.addNode({ id: 2, lat: 40.71, lon: -74.01 })
@@ -469,7 +469,7 @@ describe("OsmixVtEncoder", () => {
 	})
 
 	it("encodes and decodes large negative IDs correctly", () => {
-		const testOsm = new Osmix()
+		const testOsm = new Osm()
 		// Test with a large negative ID (much larger than 32-bit range)
 		const largeNegativeId = -1000000000 // -1 billion
 		// Add a node for the way to reference

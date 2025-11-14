@@ -1,12 +1,17 @@
 import { SphericalMercator } from "@mapbox/sphericalmercator"
 import {
 	merge,
+	type OsmChange,
+	OsmChangeset,
 	type OsmChangeTypes,
-	type OsmixChange,
-	OsmixChangeset,
-	type OsmixMergeOptions,
+	type OsmMergeOptions,
 } from "@osmix/change"
-import { fromGeoJSON, type Osmix, osmixFromPbf, throttle } from "@osmix/core"
+import {
+	createOsmFromGeoJSON,
+	createOsmFromPbf,
+	type Osm,
+	throttle,
+} from "@osmix/core"
 import type { OsmEntityType } from "@osmix/json"
 import {
 	buildRelationRings,
@@ -26,13 +31,13 @@ import type { StatusType } from "../state/log"
 const sphericalMercator = new SphericalMercator()
 
 export class OsmixWorker {
-	private osmixes = new Map<string, Osmix>()
+	private osmixes = new Map<string, Osm>()
 	private osmixVtEncoder = new Map<string, OsmixVtEncoder>()
 
-	private changesets = new Map<string, OsmixChangeset>()
+	private changesets = new Map<string, OsmChangeset>()
 	private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"]
 	private entityTypes: OsmEntityType[] = ["node", "way", "relation"]
-	private filteredChanges = new Map<string, OsmixChange[]>()
+	private filteredChanges = new Map<string, OsmChange[]>()
 
 	private log = (message: string, type?: StatusType) => {
 		type === "error" ? console.error(message) : console.log(message)
@@ -55,9 +60,10 @@ export class OsmixWorker {
 
 	async fromPbf(id: string, data: ArrayBufferLike | ReadableStream) {
 		const startTime = performance.now()
-		const osm = await osmixFromPbf(
+		const osm = await createOsmFromPbf(
 			data instanceof ReadableStream ? data : new Uint8Array(data),
-			{ id, logger: this.log },
+			{ id },
+			(e) => this.log(e.detail.msg),
 		)
 		this.osmixes.set(id, osm)
 
@@ -94,7 +100,9 @@ export class OsmixWorker {
 		const geojson = JSON.parse(text) as FeatureCollection<Point | LineString>
 
 		// Create Osmix from GeoJSON
-		const osm = fromGeoJSON(geojson, { id, logger: this.log })
+		const osm = createOsmFromGeoJSON(geojson, { id }, (e) =>
+			this.log(e.detail.msg),
+		)
 		this.osmixes.set(id, osm)
 
 		this.invalidateVectorTileIndex(id)
@@ -201,7 +209,7 @@ export class OsmixWorker {
 	async merge(
 		baseOsmId: string,
 		patchOsmId: string,
-		options: Partial<OsmixMergeOptions> = {},
+		options: Partial<OsmMergeOptions> = {},
 	) {
 		const baseOsm = this.osmixes.get(baseOsmId)
 		if (!baseOsm) throw Error(`Osm for ${baseOsmId} not loaded.`)
@@ -227,14 +235,14 @@ export class OsmixWorker {
 	generateChangeset(
 		baseOsmId: string,
 		patchOsmId: string,
-		options: Partial<OsmixMergeOptions> = {},
+		options: Partial<OsmMergeOptions> = {},
 	) {
 		const patchOsm = this.osmixes.get(patchOsmId)
 		if (!patchOsm) throw Error(`Osm for ${patchOsmId} not loaded.`)
 		const baseOsm = this.osmixes.get(baseOsmId)
 		if (!baseOsm) throw Error(`Osm for ${baseOsmId} not loaded.`)
 
-		const changeset = new OsmixChangeset(baseOsm)
+		const changeset = new OsmChangeset(baseOsm)
 		this.changesets.set(baseOsmId, changeset)
 
 		if (options.directMerge) {
@@ -286,8 +294,8 @@ export class OsmixWorker {
 		return changeset.stats
 	}
 
-	sortChangeset(osmId: string, changeset: OsmixChangeset) {
-		const filteredChanges: OsmixChange[] = []
+	sortChangeset(osmId: string, changeset: OsmChangeset) {
+		const filteredChanges: OsmChange[] = []
 		if (this.entityTypes.includes("node")) {
 			for (const change of Object.values(changeset.nodeChanges)) {
 				if (this.changeTypes.includes(change.changeType)) {

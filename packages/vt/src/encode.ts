@@ -1,4 +1,4 @@
-import type { Osmix } from "@osmix/core"
+import type { Osm } from "@osmix/core"
 import {
 	buildRelationRings,
 	isMultipolygonRelation,
@@ -51,7 +51,7 @@ export class OsmixVtEncoder {
 	readonly nodeLayerName: string
 	readonly wayLayerName: string
 	readonly relationLayerName: string
-	private readonly osmix: Osmix
+	private readonly osm: Osm
 	private readonly extent: number
 	private readonly extentBbox: [number, number, number, number]
 
@@ -63,15 +63,15 @@ export class OsmixVtEncoder {
 		}
 	}
 
-	constructor(osmix: Osmix, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER) {
-		this.osmix = osmix
+	constructor(osm: Osm, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER) {
+		this.osm = osm
 
 		const min = -buffer
 		const max = extent + buffer
 		this.extent = extent
 		this.extentBbox = [min, min, max, max]
 
-		const layerName = `@osmix:${osmix.id}`
+		const layerName = `@osmix:${osm.id}`
 		this.nodeLayerName = `${layerName}:nodes`
 		this.wayLayerName = `${layerName}:ways`
 		this.relationLayerName = `${layerName}:relations`
@@ -80,7 +80,7 @@ export class OsmixVtEncoder {
 	getTile(tile: Tile): ArrayBuffer {
 		const sm = new SphericalMercatorTile({ size: this.extent, tile })
 		const bbox = sm.bbox(tile[0], tile[1], tile[2]) as GeoBbox2D
-		const osmBbox = this.osmix.bbox()
+		const osmBbox = this.osm.bbox()
 		if (!bboxContainsOrIntersects(bbox, osmBbox)) {
 			return new ArrayBuffer(0)
 		}
@@ -89,7 +89,7 @@ export class OsmixVtEncoder {
 
 	getTileForBbox(bbox: GeoBbox2D, proj: (ll: LonLat) => XY): ArrayBuffer {
 		// Get way IDs that are part of relations (to exclude from individual rendering)
-		const relationWayIds = this.osmix.relations.getWayMemberIds()
+		const relationWayIds = this.osm.relations.getWayMemberIds()
 
 		const layers = [
 			{
@@ -118,14 +118,14 @@ export class OsmixVtEncoder {
 		bbox: GeoBbox2D,
 		proj: (ll: LonLat) => XY,
 	): Generator<VtSimpleFeature> {
-		const nodeIndexes = this.osmix.nodes.findIndexesWithinBbox(bbox)
+		const nodeIndexes = this.osm.nodes.findIndexesWithinBbox(bbox)
 		for (let i = 0; i < nodeIndexes.length; i++) {
 			const nodeIndex = nodeIndexes[i]
 			if (nodeIndex === undefined) continue
-			const tags = this.osmix.nodes.tags.getTags(nodeIndex)
+			const tags = this.osm.nodes.tags.getTags(nodeIndex)
 			if (!tags || Object.keys(tags).length === 0) continue
-			const id = this.osmix.nodes.ids.at(nodeIndex)
-			const ll = this.osmix.nodes.getNodeLonLat({ index: nodeIndex })
+			const id = this.osm.nodes.ids.at(nodeIndex)
+			const ll = this.osm.nodes.getNodeLonLat({ index: nodeIndex })
 			yield {
 				id,
 				type: SF_TYPE.POINT,
@@ -140,27 +140,27 @@ export class OsmixVtEncoder {
 		proj: (ll: LonLat) => XY,
 		relationWayIds?: Set<number>,
 	): Generator<VtSimpleFeature> {
-		const wayIndexes = this.osmix.ways.intersects(bbox)
+		const wayIndexes = this.osm.ways.intersects(bbox)
 		for (let i = 0; i < wayIndexes.length; i++) {
 			const wayIndex = wayIndexes[i]
 			if (wayIndex === undefined) continue
-			const id = this.osmix.ways.ids.at(wayIndex)
+			const id = this.osm.ways.ids.at(wayIndex)
 			// Skip ways that are part of relations (they will be rendered via relations)
 			if (id !== undefined && relationWayIds?.has(id)) continue
-			const tags = this.osmix.ways.tags.getTags(wayIndex)
+			const tags = this.osm.ways.tags.getTags(wayIndex)
 			// Skip ways without tags (they are likely only for relations)
 			if (!tags || Object.keys(tags).length === 0) continue
-			const count = this.osmix.ways.refCount.at(wayIndex)
-			const start = this.osmix.ways.refStart.at(wayIndex)
+			const count = this.osm.ways.refCount.at(wayIndex)
+			const start = this.osm.ways.refStart.at(wayIndex)
 			const points: XY[] = new Array(count)
 			for (let i = 0; i < count; i++) {
-				const ref = this.osmix.ways.refs.at(start + i)
-				const ll = this.osmix.nodes.getNodeLonLat({ id: ref })
+				const ref = this.osm.ways.refs.at(start + i)
+				const ll = this.osm.nodes.getNodeLonLat({ id: ref })
 				points[i] = proj(ll)
 			}
 			const isArea = wayIsArea({
 				id,
-				refs: this.osmix.ways.getRefIds(wayIndex),
+				refs: this.osm.ways.getRefIds(wayIndex),
 				tags,
 			})
 			const geometry: VtSimpleFeatureGeometry = []
@@ -239,18 +239,18 @@ export class OsmixVtEncoder {
 		bbox: GeoBbox2D,
 		proj: (ll: LonLat) => XY,
 	): Generator<VtSimpleFeature> {
-		const relationIndexes = this.osmix.relations.intersects(bbox)
+		const relationIndexes = this.osm.relations.intersects(bbox)
 
 		for (const relIndex of relationIndexes) {
-			const relation = this.osmix.relations.getByIndex(relIndex)
+			const relation = this.osm.relations.getByIndex(relIndex)
 			if (!isMultipolygonRelation(relation)) continue
 
-			const id = this.osmix.relations.ids.at(relIndex)
-			const tags = this.osmix.relations.tags.getTags(relIndex)
+			const id = this.osm.relations.ids.at(relIndex)
+			const tags = this.osm.relations.tags.getTags(relIndex)
 
-			const getWay = (wayId: number) => this.osmix.ways.getById(wayId)
+			const getWay = (wayId: number) => this.osm.ways.getById(wayId)
 			const getNodeCoordinates = (nodeId: number): LonLat | undefined => {
-				const ll = this.osmix.nodes.getNodeLonLat({ id: nodeId })
+				const ll = this.osm.nodes.getNodeLonLat({ id: nodeId })
 				return ll ? [ll[0], ll[1]] : undefined
 			}
 

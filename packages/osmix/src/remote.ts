@@ -1,14 +1,12 @@
-import {
-	Osm,
-	type OsmCreateFromGeoJSONOptions,
-	type OsmFromPbfOptions,
-} from "@osmix/core"
+import { Osm, type OsmFromPbfOptions, type OsmOptions } from "@osmix/core"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
+import type { Progress } from "@osmix/shared/progress"
 import { streamToBytes } from "@osmix/shared/stream-to-bytes"
 import type { Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
 import type { IOsmix } from "./osmix"
 import type { OsmixWorker } from "./osmix.worker"
+import { transfer } from "./utils"
 
 type WrapNonPromiseInPromise<T> = T extends Promise<infer _U> ? T : Promise<T>
 
@@ -23,23 +21,21 @@ type Promisify<T> = {
  */
 export class OsmixRemote implements Promisify<IOsmix> {
 	private workers: Comlink.Remote<OsmixWorker>[] = []
-	private logger: (message: string) => void = console.log
-	private workerCount = 1
 
-	static async connect() {
+	static async connect(
+		workerCount = 1,
+		onProgress?: (progress: Progress) => void,
+	) {
 		const remote = new OsmixRemote()
-		for (let i = 0; i < remote.workerCount; i++) {
-			remote.workers.push(await createOsmixWorker())
+		if (workerCount < 1) throw Error("Worker count must be at least 1")
+		for (let i = 0; i < workerCount; i++) {
+			const worker = await createOsmixWorker()
+			if (onProgress) {
+				await worker.addProgressListener(Comlink.proxy(onProgress))
+			}
+			remote.workers.push(worker)
 		}
 		return remote
-	}
-
-	constructor(
-		workerCount = 1,
-		logger: (message: string) => void = console.log,
-	) {
-		this.logger = logger
-		this.workerCount = workerCount
 	}
 
 	getWorker() {
@@ -54,9 +50,15 @@ export class OsmixRemote implements Promisify<IOsmix> {
 		data: ArrayBufferLike | ReadableStream,
 		options: Partial<OsmFromPbfOptions> = {},
 	) {
-		console.error("FROMPBF", id, data, options)
-		const transferables = await this.getWorker().fromPbf(
-			Comlink.transfer({ id, data }, [data]),
+		const dataBuffer =
+			data instanceof ReadableStream ? (await streamToBytes(data)).buffer : data
+		const workers = this.workers.slice()
+		const worker0 = workers.shift()!
+		const transferables = await worker0.fromPbf(
+			transfer({ id, data: dataBuffer, options }),
+		)
+		await Promise.all(
+			workers.map((worker) => worker.fromTransferables(transferables)),
 		)
 		return new Osm(transferables)
 	}
@@ -64,16 +66,22 @@ export class OsmixRemote implements Promisify<IOsmix> {
 	async fromGeoJSON(
 		id: string,
 		data: ArrayBufferLike | ReadableStream,
-		options: Partial<OsmCreateFromGeoJSONOptions> = {},
+		options: Partial<OsmOptions> = {},
 	) {
-		// Convert ReadableStream to ArrayBuffer for transfer
-		const transferData =
+		const dataBuffer =
 			data instanceof ReadableStream ? (await streamToBytes(data)).buffer : data
 
-		const transferables = await this.getWorker().fromGeoJSON(
-			id,
-			transferData,
-			options,
+		const workers = this.workers.slice()
+		const worker0 = workers.shift()!
+		const transferables = await worker0.fromGeoJSON(
+			transfer({
+				id,
+				data: dataBuffer,
+				options,
+			}),
+		)
+		await Promise.all(
+			workers.map((worker) => worker.fromTransferables(transferables)),
 		)
 		return new Osm(transferables)
 	}

@@ -1,9 +1,9 @@
 import {
-	fromGeoJSON,
 	Osm,
-	type OsmCreateFromGeoJSONOptions,
 	type OsmFromPbfOptions,
-	osmFromPbf,
+	type OsmOptions,
+	startCreateOsmFromGeoJSON,
+	startCreateOsmFromPbf,
 } from "@osmix/core"
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/json"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
@@ -20,7 +20,7 @@ export interface IOsmix {
 	fromGeoJSON(
 		id: string,
 		data: ArrayBufferLike | ReadableStream,
-		options: Partial<OsmCreateFromGeoJSONOptions>,
+		options: Partial<OsmOptions>,
 	): Promise<Osm>
 	isReady(id: string): boolean
 	get(id: string): Osm
@@ -35,7 +35,7 @@ export interface IOsmix {
 	): { nodes: OsmNode[]; ways: OsmWay[]; relations: OsmRelation[] }
 }
 
-export class Osmix implements IOsmix {
+export class Osmix extends EventTarget implements IOsmix {
 	private osm: Record<string, Osm> = {}
 	private vtEncoders: Record<string, OsmixVtEncoder> = {}
 
@@ -45,11 +45,13 @@ export class Osmix implements IOsmix {
 		options: Partial<OsmFromPbfOptions> = {},
 	): Promise<Osm> {
 		const osm = new Osm({ ...options, id })
-		await osmFromPbf(
+		for await (const update of startCreateOsmFromPbf(
 			osm,
 			data instanceof ReadableStream ? data : new Uint8Array(data),
 			options,
-		)
+		)) {
+			this.dispatchEvent(update)
+		}
 		this.osm[id] = osm
 		return osm
 	}
@@ -57,7 +59,7 @@ export class Osmix implements IOsmix {
 	async fromGeoJSON(
 		id: string,
 		data: ArrayBufferLike | ReadableStream,
-		options: Partial<OsmCreateFromGeoJSONOptions> = {},
+		options: Partial<OsmOptions> = {},
 	) {
 		// Read the data as text
 		let text: string
@@ -83,13 +85,16 @@ export class Osmix implements IOsmix {
 			GeoJSON.Point | GeoJSON.LineString
 		>
 		const osm = new Osm({ ...options, id })
-		fromGeoJSON(osm, geojson, options)
+		for (const update of startCreateOsmFromGeoJSON(osm, geojson)) {
+			this.dispatchEvent(update)
+		}
 		this.osm[id] = osm
 		return osm
 	}
 
 	isReady(id: string): boolean {
-		return this.get(id).isReady()
+		if (!this.osm[id]) return false
+		return this.osm[id].isReady()
 	}
 
 	get(id: string): Osm {

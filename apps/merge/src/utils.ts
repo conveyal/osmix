@@ -1,19 +1,19 @@
-import type { Osmix } from "@osmix/core"
+import type { Osm } from "@osmix/core"
 import type { OsmEntity } from "@osmix/json"
 
 export function getOsmixEntityByStringId(
-	osmix: Osmix,
+	osm: Osm,
 	eid: string,
 ): OsmEntity | null {
 	const [type, sid] = eid.split("/")
 	const id = Number(sid)
 	switch (type) {
 		case "node":
-			return osmix.nodes.get({ id })
+			return osm.nodes.get({ id })
 		case "way":
-			return osmix.ways.get({ id })
+			return osm.ways.get({ id })
 		case "relation":
-			return osmix.relations.get({ id })
+			return osm.relations.get({ id })
 		default:
 			return null
 	}
