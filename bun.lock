@@ -206,6 +206,7 @@
       "dependencies": {
         "@mapbox/geojson-rewind": "catalog:",
         "@mapbox/sphericalmercator": "catalog:",
+        "dequal": "catalog:",
         "lineclip": "^2.0.0",
       },
       "devDependencies": {
@@ -218,7 +219,6 @@
       "name": "@osmix/vt",
       "version": "0.0.3",
       "dependencies": {
-        "@osmix/json": "workspace:*",
         "@osmix/shared": "workspace:*",
         "pbf": "catalog:",
       },

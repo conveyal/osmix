@@ -1,11 +1,11 @@
 import type { Osm } from "@osmix/core"
-import { isNode, isRelation, isWay } from "@osmix/json"
 import type {
 	OsmEntity,
 	OsmNode,
 	OsmRelation,
 	OsmWay,
 } from "@osmix/shared/types"
+import { isNode, isRelation, isWay } from "@osmix/shared/utils"
 import type { ReactNode } from "react"
 import { Fragment } from "react/jsx-runtime"
 import { Details, DetailsContent, DetailsSummary } from "./details"

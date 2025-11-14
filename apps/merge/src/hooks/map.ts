@@ -1,6 +1,6 @@
 import type { Osm } from "@osmix/core"
-import { isNode, isRelation, isWay } from "@osmix/json"
 import type { OsmEntity } from "@osmix/shared/types"
+import { isNode, isRelation, isWay } from "@osmix/shared/utils"
 import { useCallback } from "react"
 import { useMap as useMapCollection } from "react-map-gl/maplibre"
 

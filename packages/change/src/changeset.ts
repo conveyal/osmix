@@ -1,5 +1,4 @@
 import { type Nodes, Osm, type Ways } from "@osmix/core"
-import { entityPropertiesEqual, getEntityType, isWayEqual } from "@osmix/json"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type {
 	OsmEntity,
@@ -8,6 +7,11 @@ import type {
 	OsmNode,
 	OsmWay,
 } from "@osmix/shared/types"
+import {
+	entityPropertiesEqual,
+	getEntityType,
+	isWayEqual,
+} from "@osmix/shared/utils"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
 import sweeplineIntersections from "sweepline-intersections"
 import type {

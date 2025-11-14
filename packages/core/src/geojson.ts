@@ -1,7 +1,4 @@
 import {
-	isNode,
-	isRelation,
-	isWay,
 	nodeToFeature,
 	type OsmGeoJSONFeature,
 	relationToFeature,
@@ -14,6 +11,7 @@ import {
 	progressEvent,
 } from "@osmix/shared/progress"
 import type { OsmEntity, OsmRelationMember, OsmTags } from "@osmix/shared/types"
+import { isNode, isRelation, isWay } from "@osmix/shared/utils"
 import type {
 	FeatureCollection,
 	LineString,
