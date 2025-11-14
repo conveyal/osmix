@@ -18,8 +18,7 @@ describe("OsmixComlinkTest", () => {
 		const fileStream = await Bun.file(
 			getFixturePath(monacoPbf.url),
 		).arrayBuffer()
-		const osm = await remote.fromPbf("monaco-remote", fileStream)
-		expect(osm.id).toBe("monaco-remote")
+		const osm = await remote.fromPbf(fileStream)
 		expect(osm.nodes.size).toBe(monacoPbf.nodes)
 	})
 })
@@ -41,13 +40,7 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const pbfData = await getFixtureFile(monacoPbf.url)
-				const osm = await remote.fromPbf(
-					"monaco-remote-array",
-					pbfData.buffer,
-					{},
-				)
-
-				expect(osm.id).toBe("monaco-remote-array")
+				const osm = await remote.fromPbf(pbfData.buffer)
 				expect(osm.nodes.size).toBe(monacoPbf.nodes)
 			},
 			workerTestTimeout,
@@ -78,9 +71,8 @@ describe("OsmixRemote", () => {
 
 				const jsonString = JSON.stringify(geojson)
 				const buffer = new TextEncoder().encode(jsonString).buffer
-				const osm = await remote.fromGeoJSON("geojson-remote", buffer, {})
+				const osm = await remote.fromGeoJSON(buffer)
 
-				expect(osm.id).toBe("geojson-remote")
 				expect(osm.nodes.size).toBe(1)
 				expect(osm.ways.size).toBe(0)
 			},
@@ -117,9 +109,8 @@ describe("OsmixRemote", () => {
 						controller.close()
 					},
 				})
-				const osm = await remote.fromGeoJSON("geojson-remote-stream", stream)
+				const osm = await remote.fromGeoJSON(stream)
 
-				expect(osm.id).toBe("geojson-remote-stream")
 				expect(osm.nodes.size).toBe(2)
 				expect(osm.ways.size).toBe(1)
 			},
@@ -135,7 +126,7 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const pbfData = await getFixtureFile(monacoPbf.url)
-				await remote.fromPbf("remote-get", pbfData.buffer, {})
+				await remote.fromPbf(pbfData.buffer, { id: "remote-get" })
 
 				const osm = await remote.get("remote-get")
 				expect(osm.id).toBe("remote-get")
@@ -153,7 +144,9 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const pbfData = await getFixtureFile(monacoPbf.url)
-				const osm = await remote.fromPbf("original-remote", pbfData.buffer, {})
+				const osm = await remote.fromPbf(pbfData.buffer, {
+					id: "original-remote",
+				})
 
 				await remote.set("manual-set-remote", osm)
 				const retrieved = await remote.get("manual-set-remote")
@@ -172,14 +165,12 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const pbfData = await getFixtureFile(monacoPbf.url)
-				await remote.fromPbf("to-delete-remote", pbfData.buffer, {})
+				const osm1 = await remote.fromPbf(pbfData.buffer)
 
-				const osm = await remote.get("to-delete-remote")
+				const osm = await remote.get(osm1)
 				expect(osm).toBeDefined()
 
-				await remote.delete("to-delete-remote")
-				// Note: get() will still work but may return empty data
-				// The actual behavior depends on worker implementation
+				await remote.delete(osm1.id)
 			},
 			workerTestTimeout,
 		)
@@ -193,9 +184,9 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const pbfData = await getFixtureFile(monacoPbf.url)
-				await remote.fromPbf("ready-remote", pbfData.buffer, {})
+				const osm = await remote.fromPbf(pbfData.buffer)
 
-				const isReady = await remote.isReady("ready-remote")
+				const isReady = await remote.isReady(osm)
 				expect(typeof isReady).toBe("boolean")
 			},
 			workerTestTimeout,
@@ -210,9 +201,9 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
-				await remote.fromPbf("search-remote", fileStream, {})
+				const osm = await remote.fromPbf(fileStream)
 
-				const result = await remote.search("search-remote", "name")
+				const result = await remote.search(osm, "name")
 				expect(result).toHaveProperty("nodes")
 				expect(result).toHaveProperty("ways")
 				expect(result).toHaveProperty("relations")
@@ -228,13 +219,9 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
-				await remote.fromPbf("search-kv-remote", fileStream, {})
+				const osm = await remote.fromPbf(fileStream)
 
-				const result = await remote.search(
-					"search-kv-remote",
-					"highway",
-					"residential",
-				)
+				const result = await remote.search(osm, "highway", "residential")
 				expect(result).toHaveProperty("nodes")
 				expect(result).toHaveProperty("ways")
 				expect(result).toHaveProperty("relations")
@@ -251,10 +238,10 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
-				await remote.fromPbf("vector-tile-remote", fileStream, {})
+				const osm = await remote.fromPbf(fileStream)
 
 				const tile: [number, number, number] = [7, 4, 3]
-				const tileData = await remote.getVectorTile("vector-tile-remote", tile)
+				const tileData = await remote.getVectorTile(osm, tile)
 
 				expect(tileData).toBeInstanceOf(ArrayBuffer)
 				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)
@@ -271,10 +258,10 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
-				await remote.fromPbf("raster-tile-remote", fileStream, {})
+				const osm = await remote.fromPbf(fileStream)
 
 				const tile: [number, number, number] = [7, 4, 3]
-				const tileData = await remote.getRasterTile("raster-tile-remote", tile)
+				const tileData = await remote.getRasterTile(osm, tile)
 
 				expect(tileData).toBeInstanceOf(ArrayBuffer)
 				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)
@@ -287,14 +274,10 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
-				await remote.fromPbf("raster-tile-custom-remote", fileStream, {})
+				const osm = await remote.fromPbf(fileStream)
 
 				const tile: [number, number, number] = [7, 4, 3]
-				const tileData = await remote.getRasterTile(
-					"raster-tile-custom-remote",
-					tile,
-					512,
-				)
+				const tileData = await remote.getRasterTile(osm, tile, 512)
 
 				expect(tileData).toBeInstanceOf(ArrayBuffer)
 				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)
@@ -311,9 +294,7 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect(1)
 				const pbfData = await getFixtureFile(monacoPbf.url)
-				const osm = await remote.fromPbf("single-worker", pbfData.buffer, {})
-
-				expect(osm.id).toBe("single-worker")
+				const osm = await remote.fromPbf(pbfData.buffer)
 				expect(osm.nodes.size).toBe(monacoPbf.nodes)
 			},
 			workerTestTimeout,
@@ -326,9 +307,15 @@ describe("OsmixRemote", () => {
 				const pbfData = await getFixtureFile(monacoPbf.url)
 
 				// Load multiple instances to test round-robin distribution
-				const osm1 = await remote.fromPbf("multi-worker-1", pbfData.buffer, {})
-				const osm2 = await remote.fromPbf("multi-worker-2", pbfData.buffer, {})
-				const osm3 = await remote.fromPbf("multi-worker-3", pbfData.buffer, {})
+				const osm1 = await remote.fromPbf(pbfData.buffer.slice(0), {
+					id: "multi-worker-1",
+				})
+				const osm2 = await remote.fromPbf(pbfData.buffer.slice(0), {
+					id: "multi-worker-2",
+				})
+				const osm3 = await remote.fromPbf(pbfData.buffer.slice(0), {
+					id: "multi-worker-3",
+				})
 
 				expect(osm1.id).toBe("multi-worker-1")
 				expect(osm2.id).toBe("multi-worker-2")

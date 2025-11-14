@@ -1,8 +1,9 @@
+import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmOptions } from "@osmix/core"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type { Progress } from "@osmix/shared/progress"
 import { streamToBytes } from "@osmix/shared/stream-to-bytes"
-import type { Tile } from "@osmix/shared/types"
+import type { OsmEntityType, Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
 import type { IOsmix } from "./osmix"
 import type { OsmixWorker } from "./osmix.worker"
@@ -19,9 +20,12 @@ type Promisify<T> = {
 
 /**
  * Manage data access across one or more workers while using the same API as a local Osmix instance.
+ *
+ * TODO make the returned Osm an OsmRemote Proxy that calls methods inside the remote worker.
  */
 export class OsmixRemote implements Promisify<IOsmix> {
 	private workers: Comlink.Remote<OsmixWorker>[] = []
+	private changesetWorker: Comlink.Remote<OsmixWorker> | null = null
 
 	static async connect(
 		workerCount = 1,
@@ -36,6 +40,7 @@ export class OsmixRemote implements Promisify<IOsmix> {
 			}
 			remote.workers.push(worker)
 		}
+		remote.changesetWorker = remote.workers[0]!
 		return remote
 	}
 
@@ -46,8 +51,12 @@ export class OsmixRemote implements Promisify<IOsmix> {
 		return nextWorker
 	}
 
+	getChangesetWorker() {
+		if (!this.changesetWorker) throw Error("No changeset worker available")
+		return this.changesetWorker
+	}
+
 	async fromPbf(
-		id: string,
 		data: ArrayBufferLike | ReadableStream,
 		options: Partial<OsmFromPbfOptions> = {},
 	) {
@@ -56,7 +65,7 @@ export class OsmixRemote implements Promisify<IOsmix> {
 		const workers = this.workers.slice()
 		const worker0 = workers.shift()!
 		const transferables = await worker0.fromPbf(
-			transfer({ id, data: dataBuffer, options }),
+			transfer({ data: dataBuffer, options }),
 		)
 		await Promise.all(
 			workers.map((worker) => worker.fromTransferables(transferables)),
@@ -65,7 +74,6 @@ export class OsmixRemote implements Promisify<IOsmix> {
 	}
 
 	async fromGeoJSON(
-		id: string,
 		data: ArrayBufferLike | ReadableStream,
 		options: Partial<OsmOptions> = {},
 	) {
@@ -76,7 +84,6 @@ export class OsmixRemote implements Promisify<IOsmix> {
 		const worker0 = workers.shift()!
 		const transferables = await worker0.fromGeoJSON(
 			transfer({
-				id,
 				data: dataBuffer,
 				options,
 			}),
@@ -87,12 +94,19 @@ export class OsmixRemote implements Promisify<IOsmix> {
 		return new Osm(transferables)
 	}
 
-	isReady(id: string) {
-		return this.getWorker().isReady(id)
+	getId(osmId: string | Osm) {
+		if (typeof osmId === "string") {
+			return osmId
+		}
+		return osmId.id
 	}
 
-	async get(id: string): Promise<Osm> {
-		const transferables = await this.getWorker().get(id)
+	isReady(osmId: string | Osm) {
+		return this.getWorker().isReady(this.getId(osmId))
+	}
+
+	async get(osmId: string | Osm): Promise<Osm> {
+		const transferables = await this.getWorker().get(this.getId(osmId))
 		return new Osm(transferables)
 	}
 
@@ -104,16 +118,66 @@ export class OsmixRemote implements Promisify<IOsmix> {
 		return this.getWorker().delete(id)
 	}
 
-	getVectorTile(id: string, tile: Tile) {
-		return this.getWorker().getVectorTile(id, tile)
+	getVectorTile(osmId: string | Osm, tile: Tile) {
+		return this.getWorker().getVectorTile(this.getId(osmId), tile)
 	}
 
-	getRasterTile(id: string, tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
-		return this.getWorker().getRasterTile(id, tile, tileSize)
+	getRasterTile(
+		osmId: string | Osm,
+		tile: Tile,
+		tileSize = DEFAULT_RASTER_TILE_SIZE,
+	) {
+		return this.getWorker().getRasterTile(this.getId(osmId), tile, tileSize)
 	}
 
-	search(id: string, key: string, val?: string) {
-		return this.getWorker().search(id, key, val)
+	search(osmId: string | Osm, key: string, val?: string) {
+		return this.getWorker().search(this.getId(osmId), key, val)
+	}
+
+	async merge(
+		baseOsmId: string | Osm,
+		patchOsmId: string | Osm,
+		options: Partial<OsmMergeOptions> = {},
+	) {
+		const transferables = await this.getWorker().merge(
+			this.getId(baseOsmId),
+			this.getId(patchOsmId),
+			options,
+		)
+		return new Osm(transferables)
+	}
+
+	async generateChangeset(
+		baseOsmId: string | Osm,
+		patchOsmId: string | Osm,
+		options: Partial<OsmMergeOptions> = {},
+	) {
+		return this.getChangesetWorker().generateChangeset(
+			this.getId(baseOsmId),
+			this.getId(patchOsmId),
+			options,
+		)
+	}
+
+	async applyChangesAndReplace(osmId: string | Osm) {
+		const transferables =
+			await this.getChangesetWorker().applyChangesAndReplace(this.getId(osmId))
+		return new Osm(transferables)
+	}
+
+	setChangesetFilters(
+		changeTypes: OsmChangeTypes[],
+		entityTypes: OsmEntityType[],
+	) {
+		this.getChangesetWorker().setChangesetFilters(changeTypes, entityTypes)
+	}
+
+	getChangesetPage(osmId: string | Osm, page: number, pageSize: number) {
+		return this.getChangesetWorker().getChangesetPage(
+			this.getId(osmId),
+			page,
+			pageSize,
+		)
 	}
 }
 

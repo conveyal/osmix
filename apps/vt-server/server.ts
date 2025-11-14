@@ -85,7 +85,7 @@ const server = Bun.serve({
 console.log(`Vector tile server running at http://localhost:${server.port}`)
 
 async function init() {
-	await Osmix.fromPbf(filename, Bun.file(pbfUrl.pathname).stream())
+	await Osmix.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
 	console.log("Osmix initialized")
 }
 

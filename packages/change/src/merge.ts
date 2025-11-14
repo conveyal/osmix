@@ -1,14 +1,23 @@
 import type { Osm } from "@osmix/core"
+import { type ProgressEvent, progressEvent } from "@osmix/shared/progress"
 import { OsmChangeset } from "./changeset"
 import type { OsmMergeOptions } from "./types"
 import { changeStatsSummary } from "./utils"
 
+/**
+ * Run a full merge pipeline on two OSM datasets.
+ * @param base - The base OSM dataset.
+ * @param patch - The patch OSM dataset.
+ * @param options - The merge options.
+ * @returns The merged OSM dataset.
+ */
 export async function merge(
 	base: Osm,
 	patch: Osm,
 	options: Partial<OsmMergeOptions> = {},
+	onProgress: (progress: ProgressEvent) => void = console.log,
 ) {
-	const log = options.logger ?? ((...msg) => console.log(...msg))
+	const log = (msg: string) => onProgress(progressEvent(msg))
 	// De-duplicate nodes and ways in original datasets
 	log("Deduplicating ways in base OSM...")
 	let changeset = new OsmChangeset(base)

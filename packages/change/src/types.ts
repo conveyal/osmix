@@ -27,7 +27,6 @@ export interface OsmMergeOptions {
 	deduplicateNodes: boolean
 	deduplicateWays: boolean
 	createIntersections: boolean
-	logger: (message: string) => void
 }
 
 export type OsmChangesetStats = {

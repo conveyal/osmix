@@ -5,7 +5,7 @@ import {
 } from "@osmix/shared/test/fixtures"
 import type { FeatureCollection, LineString, Point } from "geojson"
 import { beforeAll, describe, expect, it } from "vitest"
-import { Osmix } from "./osmix"
+import { Osmix } from "../src/osmix"
 
 const monacoPbf = PBFs["monaco"]!
 
@@ -16,9 +16,8 @@ describe("Osmix", () => {
 		it("should load from PBF fixture", async () => {
 			const osmix = new Osmix()
 			const fileStream = getFixtureFileReadStream(monacoPbf.url)
-			const osm = await osmix.fromPbf("monaco", fileStream)
+			const osm = await osmix.fromPbf(fileStream)
 
-			expect(osm.id).toBe("monaco")
 			expect(osm.nodes.size).toBe(monacoPbf.nodes)
 			expect(osm.ways.size).toBe(monacoPbf.ways)
 			expect(osm.relations.size).toBe(monacoPbf.relations)
@@ -28,9 +27,8 @@ describe("Osmix", () => {
 		it("should load from PBF ArrayBuffer", async () => {
 			const osmix = new Osmix()
 			const pbfData = await getFixtureFile(monacoPbf.url)
-			const osm = await osmix.fromPbf("monaco-array", pbfData.buffer)
+			const osm = await osmix.fromPbf(pbfData.buffer)
 
-			expect(osm.id).toBe("monaco-array")
 			expect(osm.nodes.size).toBe(monacoPbf.nodes)
 		})
 	})
@@ -67,9 +65,9 @@ describe("Osmix", () => {
 
 			const jsonString = JSON.stringify(geojson)
 			const buffer = new TextEncoder().encode(jsonString).buffer
-			const osm = await osmix.fromGeoJSON("geojson-points", buffer)
+			const osm = await osmix.fromGeoJSON(buffer)
 
-			expect(osm.id).toBe("geojson-points")
+			expect(osm.id).toBe(osm.id)
 			expect(osm.nodes.size).toBe(2)
 			expect(osm.ways.size).toBe(0)
 		})
@@ -104,9 +102,8 @@ describe("Osmix", () => {
 					controller.close()
 				},
 			})
-			const osm = await osmix.fromGeoJSON("geojson-linestring", stream)
+			const osm = await osmix.fromGeoJSON(stream)
 
-			expect(osm.id).toBe("geojson-linestring")
 			expect(osm.nodes.size).toBe(3)
 			expect(osm.ways.size).toBe(1)
 		})
@@ -116,10 +113,10 @@ describe("Osmix", () => {
 		it("should retrieve instance by ID", async () => {
 			const osmix = new Osmix()
 			const pbfData = await getFixtureFile(monacoPbf.url)
-			await osmix.fromPbf("test-get", pbfData.buffer)
+			const osm1 = await osmix.fromPbf(pbfData.buffer)
 
-			const osm = osmix.get("test-get")
-			expect(osm.id).toBe("test-get")
+			const osm = osmix.get(osm1)
+			expect(osm.id).toBe(osm1.id)
 			expect(osm.nodes.size).toBe(monacoPbf.nodes)
 		})
 
@@ -135,11 +132,11 @@ describe("Osmix", () => {
 		it("should manually set an instance", async () => {
 			const osmix = new Osmix()
 			const pbfData = await getFixtureFile(monacoPbf.url)
-			const osm = await osmix.fromPbf("original", pbfData.buffer)
+			const osm = await osmix.fromPbf(pbfData.buffer, { id: "original" })
 
 			osmix.set("manual-set", osm)
 			const retrieved = osmix.get("manual-set")
-			expect(retrieved.id).toBe("original")
+			expect(retrieved.id).toBe(osm.id)
 			expect(retrieved.nodes.size).toBe(monacoPbf.nodes)
 		})
 	})
@@ -148,10 +145,10 @@ describe("Osmix", () => {
 		it("should remove an instance", async () => {
 			const osmix = new Osmix()
 			const pbfData = await getFixtureFile(monacoPbf.url)
-			await osmix.fromPbf("to-delete", pbfData.buffer)
+			const osm = await osmix.fromPbf(pbfData.buffer, { id: "to-delete" })
 
-			expect(() => osmix.get("to-delete")).not.toThrow()
-			osmix.delete("to-delete")
+			expect(() => osmix.get(osm)).not.toThrow()
+			osmix.delete(osm)
 			expect(() => osmix.get("to-delete")).toThrow()
 		})
 	})
@@ -160,14 +157,14 @@ describe("Osmix", () => {
 		it("should check readiness status", async () => {
 			const osmix = new Osmix()
 			const pbfData = await getFixtureFile(monacoPbf.url)
-			await osmix.fromPbf("ready-test", pbfData.buffer)
+			const osm = await osmix.fromPbf(pbfData.buffer, { id: "ready-test" })
 
-			expect(osmix.isReady("ready-test")).toBe(true)
+			expect(osmix.isReady(osm.id)).toBe(true)
 		})
 
-		it("should throw error for non-existent ID", () => {
+		it("should be false for non-existent ID", () => {
 			const osmix = new Osmix()
-			expect(() => osmix.isReady("non-existent")).toThrow()
+			expect(osmix.isReady("non-existent")).toBe(false)
 		})
 	})
 
@@ -177,9 +174,9 @@ describe("Osmix", () => {
 		it("should search by key only", async () => {
 			const osmix = new Osmix()
 			const fileStream = getFixtureFileReadStream(monacoPbf.url)
-			await osmix.fromPbf("search-test", fileStream)
+			const osm = await osmix.fromPbf(fileStream, { id: "search-test" })
 
-			const result = osmix.search("search-test", "name")
+			const result = osmix.search(osm, "name")
 			expect(result).toHaveProperty("nodes")
 			expect(result).toHaveProperty("ways")
 			expect(result).toHaveProperty("relations")
@@ -191,9 +188,9 @@ describe("Osmix", () => {
 		it("should search by key and value", async () => {
 			const osmix = new Osmix()
 			const fileStream = getFixtureFileReadStream(monacoPbf.url)
-			await osmix.fromPbf("search-kv-test", fileStream)
+			const osm = await osmix.fromPbf(fileStream, { id: "search-kv-test" })
 
-			const result = osmix.search("search-kv-test", "highway", "residential")
+			const result = osmix.search(osm, "highway", "residential")
 			expect(result).toHaveProperty("nodes")
 			expect(result).toHaveProperty("ways")
 			expect(result).toHaveProperty("relations")
@@ -209,10 +206,10 @@ describe("Osmix", () => {
 		it("should generate vector tile for a tile coordinate", async () => {
 			const osmix = new Osmix()
 			const fileStream = getFixtureFileReadStream(monacoPbf.url)
-			await osmix.fromPbf("vector-tile-test", fileStream)
+			const osm = await osmix.fromPbf(fileStream, { id: "vector-tile-test" })
 
 			const tile: [number, number, number] = [7, 4, 3]
-			const tileData = osmix.getVectorTile("vector-tile-test", tile)
+			const tileData = osmix.getVectorTile(osm, tile)
 
 			expect(tileData).toBeInstanceOf(ArrayBuffer)
 			// Vector tiles may be empty if the tile doesn't contain data
@@ -226,10 +223,10 @@ describe("Osmix", () => {
 		it("should generate raster tile for a tile coordinate", async () => {
 			const osmix = new Osmix()
 			const fileStream = getFixtureFileReadStream(monacoPbf.url)
-			await osmix.fromPbf("raster-tile-test", fileStream)
+			const osm = await osmix.fromPbf(fileStream, { id: "raster-tile-test" })
 
 			const tile: [number, number, number] = [7, 4, 3]
-			const tileData = osmix.getRasterTile("raster-tile-test", tile)
+			const tileData = osmix.getRasterTile(osm, tile)
 
 			expect(tileData).toBeInstanceOf(ArrayBuffer)
 			expect(tileData.byteLength).toBeGreaterThan(0)
@@ -238,10 +235,12 @@ describe("Osmix", () => {
 		it("should generate raster tile with custom tile size", async () => {
 			const osmix = new Osmix()
 			const fileStream = getFixtureFileReadStream(monacoPbf.url)
-			await osmix.fromPbf("raster-tile-custom-test", fileStream)
+			const osm = await osmix.fromPbf(fileStream, {
+				id: "raster-tile-custom-test",
+			})
 
 			const tile: [number, number, number] = [7, 4, 3]
-			const tileData = osmix.getRasterTile("raster-tile-custom-test", tile, 512)
+			const tileData = osmix.getRasterTile(osm, tile, 512)
 
 			expect(tileData).toBeInstanceOf(ArrayBuffer)
 			expect(tileData.byteLength).toBeGreaterThan(0)
@@ -255,14 +254,14 @@ describe("Osmix", () => {
 			const osmix = new Osmix()
 			const pbfData = await getFixtureFile(monacoPbf.url)
 
-			await osmix.fromPbf("instance-1", pbfData.buffer)
-			await osmix.fromPbf("instance-2", pbfData.buffer)
+			const osm1 = await osmix.fromPbf(pbfData.buffer, { id: "instance-1" })
+			const osm2 = await osmix.fromPbf(pbfData.buffer, { id: "instance-2" })
 
-			const instance1 = osmix.get("instance-1")
-			const instance2 = osmix.get("instance-2")
+			const instance1 = osmix.get(osm1)
+			const instance2 = osmix.get(osm2)
 
-			expect(instance1.id).toBe("instance-1")
-			expect(instance2.id).toBe("instance-2")
+			expect(instance1.id).toBe(osm1.id)
+			expect(instance2.id).toBe(osm2.id)
 			expect(instance1.nodes.size).toBe(monacoPbf.nodes)
 			expect(instance2.nodes.size).toBe(monacoPbf.nodes)
 		})
@@ -271,9 +270,9 @@ describe("Osmix", () => {
 			const osmix = new Osmix()
 			const pbfData = await getFixtureFile(monacoPbf.url)
 
-			await osmix.fromPbf("keep-1", pbfData.buffer)
-			await osmix.fromPbf("delete-me", pbfData.buffer)
-			await osmix.fromPbf("keep-2", pbfData.buffer)
+			await osmix.fromPbf(pbfData.buffer, { id: "keep-1" })
+			await osmix.fromPbf(pbfData.buffer, { id: "delete-me" })
+			await osmix.fromPbf(pbfData.buffer, { id: "keep-2" })
 
 			expect(() => osmix.get("keep-1")).not.toThrow()
 			expect(() => osmix.get("delete-me")).not.toThrow()
