@@ -6,14 +6,14 @@ import {
 	type OsmPbfInfo,
 	type OsmPbfStringTable,
 } from "@osmix/pbf"
-import { OSM_ENTITY_TYPES } from "./constants"
 import type {
 	OsmInfoParsed,
 	OsmNode,
 	OsmRelation,
 	OsmTags,
 	OsmWay,
-} from "./types"
+} from "@osmix/shared/types"
+import { OSM_ENTITY_TYPES } from "./constants"
 
 /**
  * Build a primitive block from parsed OSM entities. Handles delta encoding, stringtable, and other PBF-specific encoding details.

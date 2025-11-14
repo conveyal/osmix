@@ -1,10 +1,10 @@
 import { toAsyncGenerator } from "@osmix/pbf"
 import { getFixtureFileReadStream, PBFs } from "@osmix/shared/test/fixtures"
+import type { OsmEntity, OsmNode } from "@osmix/shared/types"
 import { assert, describe, it } from "vitest"
 import { isNode, isWay } from "../src"
 import { nodeToFeature, wayToFeature } from "../src/geojson"
 import { osmPbfToJson } from "../src/pbf-to-json"
-import type { OsmEntity, OsmNode } from "../src/types"
 
 describe("geojson", () => {
 	describe.each(Object.entries(PBFs))("%s", async (_, pbf) => {

@@ -1,4 +1,9 @@
-import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from "@osmix/json"
+import type {
+	OsmEntity,
+	OsmRelation,
+	OsmTags,
+	OsmWay,
+} from "@osmix/shared/types"
 import type { OsmChangesetStats } from "./types"
 
 export function osmTagsToOscTags(tags: OsmTags): string {

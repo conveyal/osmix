@@ -1,5 +1,9 @@
-import type { LonLat } from "@osmix/shared/types"
-import type { OsmRelation, OsmRelationMember, OsmWay } from "./types"
+import type {
+	LonLat,
+	OsmRelation,
+	OsmRelationMember,
+	OsmWay,
+} from "@osmix/shared/types"
 
 /**
  * Check if a relation is a multipolygon relation.

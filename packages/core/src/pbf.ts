@@ -1,12 +1,4 @@
-import {
-	type OsmEntity,
-	type OsmEntityType,
-	type OsmEntityTypeMap,
-	OsmJsonToBlocksTransformStream,
-	type OsmNode,
-	type OsmRelation,
-	type OsmWay,
-} from "@osmix/json"
+import { OsmJsonToBlocksTransformStream } from "@osmix/json"
 import {
 	type AsyncGeneratorValue,
 	OsmBlocksToPbfBytesTransformStream,
@@ -18,7 +10,15 @@ import {
 	type ProgressEvent,
 	progressEvent,
 } from "@osmix/shared/progress"
-import type { GeoBbox2D } from "@osmix/shared/types"
+import type {
+	GeoBbox2D,
+	OsmEntity,
+	OsmEntityType,
+	OsmEntityTypeMap,
+	OsmNode,
+	OsmRelation,
+	OsmWay,
+} from "@osmix/shared/types"
 import { Osm, type OsmOptions } from "./osm"
 
 export interface OsmFromPbfOptions extends OsmOptions {

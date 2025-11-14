@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest"
 import type {
 	OsmNode,
 	OsmRelation,
 	OsmRelationMember,
 	OsmWay,
-} from "../src/types"
+} from "@osmix/shared/types"
+import { describe, expect, it } from "vitest"
 import {
 	entityPropertiesEqual,
 	getEntityType,

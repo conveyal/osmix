@@ -3,8 +3,8 @@ import {
 	type OsmPbfBlock,
 	type OsmPbfHeaderBlock,
 } from "@osmix/pbf"
+import type { OsmEntity } from "@osmix/shared/types"
 import { OsmPbfBlockBuilder } from "./osm-pbf-block-builder"
-import type { OsmEntity } from "./types"
 import { isNode, isRelation, isWay } from "./utils"
 
 /**

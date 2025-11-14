@@ -1,5 +1,9 @@
-import type { OsmEntity, OsmEntityType, OsmTags } from "@osmix/json"
-import type { GeoBbox2D } from "@osmix/shared/types"
+import type {
+	GeoBbox2D,
+	OsmEntity,
+	OsmEntityType,
+	OsmTags,
+} from "@osmix/shared/types"
 import type { IdOrIndex, Ids, IdsTransferables } from "./ids"
 import type { Tags, TagsTransferables } from "./tags"
 

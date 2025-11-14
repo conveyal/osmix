@@ -2,13 +2,11 @@ import { createOsmFromPbf, type Osm } from "@osmix/core"
 import {
 	nodeToFeature,
 	type OsmGeoJSONFeature,
-	type OsmNode,
-	type OsmWay,
 	wayToFeature,
 } from "@osmix/json"
 import { type OsmPbfHeaderBlock, readOsmPbf } from "@osmix/pbf"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
-import type { GeoBbox2D } from "@osmix/shared/types"
+import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, wrap } from "comlink"
 

@@ -6,7 +6,7 @@ import {
 	type OsmMergeOptions,
 } from "@osmix/change"
 import { Osm, type OsmTransferables, throttle } from "@osmix/core"
-import type { OsmEntityType } from "@osmix/json"
+import type { OsmEntityType } from "@osmix/shared/types"
 import * as Comlink from "comlink"
 import { dequal } from "dequal/lite"
 

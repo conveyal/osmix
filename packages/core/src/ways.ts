@@ -1,6 +1,5 @@
-import type { OsmTags, OsmWay } from "@osmix/json"
 import type { OsmPbfWay } from "@osmix/pbf"
-import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
+import type { GeoBbox2D, LonLat, OsmTags, OsmWay } from "@osmix/shared/types"
 import Flatbush from "flatbush"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"

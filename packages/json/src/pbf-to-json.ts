@@ -3,8 +3,8 @@ import {
 	OsmPbfBytesToBlocksTransformStream,
 	type OsmPbfHeaderBlock,
 } from "@osmix/pbf"
+import type { OsmEntity } from "@osmix/shared/types"
 import { OsmPbfBlockParser } from "./osm-pbf-block-parser"
-import type { OsmEntity } from "./types"
 
 export function osmPbfToJson(pbf: ReadableStream<Uint8Array<ArrayBufferLike>>) {
 	return pbf

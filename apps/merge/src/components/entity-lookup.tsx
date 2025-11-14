@@ -1,4 +1,4 @@
-import type { OsmEntity } from "@osmix/json"
+import type { OsmEntity } from "@osmix/shared/types"
 import { SearchIcon } from "lucide-react"
 import { useActionState } from "react"
 import {

@@ -1,4 +1,4 @@
-import type { OsmWay } from "./types"
+import type { OsmWay } from "@osmix/shared/types"
 
 /**
  * Tags that imply an area unless their value is exactly "no"

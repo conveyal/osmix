@@ -1,4 +1,8 @@
-import type { OsmEntity, OsmEntityType, OsmEntityTypeMap } from "@osmix/json"
+import type {
+	OsmEntity,
+	OsmEntityType,
+	OsmEntityTypeMap,
+} from "@osmix/shared/types"
 
 // String that starts with `n`, `w`, or `r` followed by the ID
 export type OsmEntityRef = {

@@ -1,5 +1,5 @@
 import type { Osm } from "@osmix/core"
-import type { OsmEntity } from "@osmix/json"
+import type { OsmEntity } from "@osmix/shared/types"
 import { atom } from "jotai"
 import { atomFamily } from "jotai/utils"
 

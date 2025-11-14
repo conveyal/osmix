@@ -5,9 +5,8 @@ import {
 	startCreateOsmFromGeoJSON,
 	startCreateOsmFromPbf,
 } from "@osmix/core"
-import type { OsmNode, OsmRelation, OsmWay } from "@osmix/json"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
-import type { Tile } from "@osmix/shared/types"
+import type { OsmNode, OsmRelation, OsmWay, Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import { drawRasterTile } from "./raster"
 

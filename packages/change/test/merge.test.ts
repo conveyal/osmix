@@ -1,11 +1,11 @@
 import { existsSync } from "node:fs"
 import { createOsmFromPbf, type Osm } from "@osmix/core"
 import { createBaseOsm, createPatchOsm } from "@osmix/core/test/mock-osm"
-import type { OsmNode } from "@osmix/json"
 import {
 	getFixtureFileReadStream,
 	getFixturePath,
 } from "@osmix/shared/test/fixtures"
+import type { OsmNode } from "@osmix/shared/types"
 import { assert, describe, it } from "vitest"
 import { OsmChangeset } from "../src/changeset"
 

@@ -12,14 +12,18 @@ import {
 	type Osm,
 	throttle,
 } from "@osmix/core"
-import type { OsmEntityType } from "@osmix/json"
 import {
 	buildRelationRings,
 	isMultipolygonRelation,
 	wayIsArea,
 } from "@osmix/json"
 import { OsmixRasterTile } from "@osmix/raster"
-import type { GeoBbox2D, LonLat, Tile } from "@osmix/shared/types"
+import type {
+	GeoBbox2D,
+	LonLat,
+	OsmEntityType,
+	Tile,
+} from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, transfer, wrap } from "comlink"
 import { dequal } from "dequal/lite"

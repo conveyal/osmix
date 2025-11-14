@@ -27,3 +27,54 @@ export type GeoBbox2D = [
 	maxLon: number,
 	maxLat: number,
 ]
+
+/**
+ * Shared OSM Types
+ */
+
+export type OsmEntityType = "node" | "way" | "relation"
+
+export interface OsmEntityTypeMap extends Record<OsmEntityType, IOsmEntity> {
+	node: OsmNode
+	way: OsmWay
+	relation: OsmRelation
+}
+
+export interface OsmInfoParsed {
+	version?: number
+	timestamp?: number
+	changeset?: number
+	uid?: number
+	user_sid?: number
+	visible?: boolean
+	user?: string
+}
+
+export interface OsmTags {
+	[key: string]: string | number
+}
+
+export interface IOsmEntity {
+	id: number
+	info?: OsmInfoParsed
+	tags?: OsmTags
+}
+
+export interface OsmNode extends IOsmEntity, ILonLat {}
+
+export interface OsmWay extends IOsmEntity {
+	// OSM IDs of the nodes that make up this way
+	refs: number[]
+}
+
+export interface OsmRelationMember {
+	type: OsmEntityType
+	ref: number
+	role?: string
+}
+
+export interface OsmRelation extends IOsmEntity {
+	members: OsmRelationMember[]
+}
+
+export type OsmEntity = OsmNode | OsmWay | OsmRelation

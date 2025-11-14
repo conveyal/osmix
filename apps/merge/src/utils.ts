@@ -1,5 +1,5 @@
 import type { Osm } from "@osmix/core"
-import type { OsmEntity } from "@osmix/json"
+import type { OsmEntity } from "@osmix/shared/types"
 
 export function getOsmixEntityByStringId(
 	osm: Osm,

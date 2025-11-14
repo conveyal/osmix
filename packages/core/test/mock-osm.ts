@@ -1,4 +1,4 @@
-import type { OsmNode } from "@osmix/json"
+import type { OsmNode } from "@osmix/shared/types"
 import { Osm } from "../src/osm"
 
 const YAKIM_LAT = 46.60207

@@ -1,5 +1,5 @@
 import type { OsmChangesetStats, OsmChangeTypes } from "@osmix/change"
-import type { OsmEntityType } from "@osmix/json"
+import type { OsmEntityType } from "@osmix/shared/types"
 import { atom } from "jotai"
 import { osmWorker } from "./worker"
 

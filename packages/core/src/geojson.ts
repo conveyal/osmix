@@ -3,10 +3,7 @@ import {
 	isRelation,
 	isWay,
 	nodeToFeature,
-	type OsmEntity,
 	type OsmGeoJSONFeature,
-	type OsmRelationMember,
-	type OsmTags,
 	relationToFeature,
 	wayToFeature,
 } from "@osmix/json"
@@ -16,6 +13,7 @@ import {
 	type ProgressEvent,
 	progressEvent,
 } from "@osmix/shared/progress"
+import type { OsmEntity, OsmRelationMember, OsmTags } from "@osmix/shared/types"
 import type {
 	FeatureCollection,
 	LineString,

@@ -1,5 +1,4 @@
-import type { OsmEntityType, OsmTags } from "@osmix/json"
-import type { XY } from "@osmix/shared/types"
+import type { OsmEntityType, OsmTags, XY } from "@osmix/shared/types"
 
 export type VtSimpleFeatureGeometry = XY[][]
 

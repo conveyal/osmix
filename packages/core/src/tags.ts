@@ -1,4 +1,4 @@
-import type { OsmTags } from "@osmix/json"
+import type { OsmTags } from "@osmix/shared/types"
 import StringTable from "./stringtable"
 import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
 

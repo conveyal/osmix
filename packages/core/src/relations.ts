@@ -1,12 +1,13 @@
+import type { OsmPbfRelation } from "@osmix/pbf"
+import { assertValue } from "@osmix/shared/assert"
 import type {
+	GeoBbox2D,
+	LonLat,
 	OsmEntityType,
 	OsmRelation,
 	OsmRelationMember,
 	OsmTags,
-} from "@osmix/json"
-import type { OsmPbfRelation } from "@osmix/pbf"
-import { assertValue } from "@osmix/shared/assert"
-import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
+} from "@osmix/shared/types"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"
 import type { Nodes } from "./nodes"

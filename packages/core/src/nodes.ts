@@ -1,12 +1,7 @@
-import {
-	nodeToFeature,
-	type OsmGeoJSONFeature,
-	type OsmNode,
-	type OsmTags,
-} from "@osmix/json"
+import { nodeToFeature, type OsmGeoJSONFeature } from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
-import type { GeoBbox2D } from "@osmix/shared/types"
+import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/shared/types"
 import KDBush from "kdbush"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"

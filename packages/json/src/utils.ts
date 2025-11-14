@@ -1,11 +1,11 @@
-import { dequal } from "dequal/lite"
 import type {
 	OsmEntity,
 	OsmEntityType,
 	OsmNode,
 	OsmRelation,
 	OsmWay,
-} from "./types"
+} from "@osmix/shared/types"
+import { dequal } from "dequal/lite"
 
 function isTagsAndInfoEqual(a: OsmEntity, b: OsmEntity) {
 	return dequal(a.tags, b.tags) && dequal(a.info, b.info)
