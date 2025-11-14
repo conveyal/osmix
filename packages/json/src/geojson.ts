@@ -1,4 +1,5 @@
 import type { LonLat, OsmNode, OsmRelation, OsmWay } from "@osmix/shared/types"
+import { wayIsArea } from "@osmix/shared/way-is-area"
 import type { LineString, MultiPolygon, Point, Polygon } from "geojson"
 import {
 	buildRelationRings,
@@ -6,7 +7,6 @@ import {
 	isMultipolygonRelation,
 } from "./relation-multipolygon"
 import type { OsmGeoJSONFeature } from "./types"
-import { wayIsArea } from "./way-is-area"
 
 export function nodeToFeature(node: OsmNode): OsmGeoJSONFeature<Point> {
 	return {
