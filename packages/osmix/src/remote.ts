@@ -1,6 +1,6 @@
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmOptions } from "@osmix/core"
-import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
+import { DEFAULT_RASTER_TILE_SIZE, OsmixRasterTile } from "@osmix/raster"
 import type { Progress } from "@osmix/shared/progress"
 import { streamToBytes } from "@osmix/shared/stream-to-bytes"
 import type { OsmEntityType, Tile } from "@osmix/shared/types"
@@ -140,12 +140,17 @@ export class OsmixRemote implements Promisify<IOsmix> {
 		return this.getWorker().getVectorTile(this.getId(osmId), tile)
 	}
 
-	getRasterTile(
+	async getRasterTile(
 		osmId: string | Osm,
 		tile: Tile,
 		tileSize = DEFAULT_RASTER_TILE_SIZE,
 	) {
-		return this.getWorker().getRasterTile(this.getId(osmId), tile, tileSize)
+		const imageData = await this.getWorker().getRasterTile(
+			this.getId(osmId),
+			tile,
+			tileSize,
+		)
+		return new OsmixRasterTile({ imageData, tile, tileSize })
 	}
 
 	search(osmId: string | Osm, key: string, val?: string) {

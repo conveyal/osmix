@@ -1,17 +1,36 @@
-import {
-	createOsmixRasterMaplibreProtocol,
-	RASTER_PROTOCOL_NAME,
-} from "@osmix/raster"
+import type { Tile } from "@osmix/shared/types"
 import maplibre from "maplibre-gl"
+import { RASTER_PROTOCOL_NAME } from "../settings"
 import { osmWorker } from "../state/worker"
 
+/**
+ * Creates a MapLibre protocol action that handles requests for raster tiles.
+ */
 export function addOsmixRasterProtocol() {
 	maplibre.addProtocol(
 		RASTER_PROTOCOL_NAME,
-		createOsmixRasterMaplibreProtocol(async (osmId, tileIndex, tileSize) => {
-			const buffer = await osmWorker.getRasterTile(osmId, tileIndex, tileSize)
-			return rasterTileToImageBuffer(new Uint8ClampedArray(buffer), tileSize)
-		}),
+		async (req): Promise<maplibregl.GetResourceResponse<ArrayBuffer>> => {
+			// @osmix/raster://<osmId>/<tileSize>/<z>/<x>/<y>.png
+			const m =
+				/^@osmix\/raster:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(
+					req.url,
+				)
+			if (!m) throw new Error(`Bad ${RASTER_PROTOCOL_NAME} URL: ${req.url}`)
+			const [, osmId, sizeStr, zStr, xStr, yStr] = m
+
+			const tileSize = +sizeStr
+			const tileIndex: Tile = [+xStr, +yStr, +zStr]
+			const rasterTile = await osmWorker.getRasterTile(
+				osmId,
+				tileIndex,
+				tileSize,
+			)
+			const data = await rasterTileToImageBuffer(rasterTile.imageData, tileSize)
+			return {
+				data,
+				cacheControl: "no-store",
+			}
+		},
 	)
 }
 
@@ -20,7 +39,8 @@ export function removeOsmixRasterProtocol() {
 }
 
 /**
- * Example of how to convert a raster tile to an image buffer using the OffscreenCanvas API.
+ * Converts an RGBA array to an image buffer using the OffscreenCanvas API.
+ * This is the standard browser-native approach and requires no external dependencies.
  */
 export async function rasterTileToImageBuffer(
 	imageData: Uint8ClampedArray<ArrayBuffer>,
@@ -29,9 +49,8 @@ export async function rasterTileToImageBuffer(
 ) {
 	const canvas = new OffscreenCanvas(tileSize, tileSize)
 	const ctx = canvas.getContext("2d")
-	if (!ctx) throw Error("Failed to get context")
+	if (!ctx) throw new Error("Failed to get 2d context from OffscreenCanvas")
 	ctx.putImageData(new ImageData(imageData, tileSize, tileSize), 0, 0)
 	const blob = await canvas.convertToBlob(options)
-	const data = await blob.arrayBuffer()
-	return data
+	return await blob.arrayBuffer()
 }

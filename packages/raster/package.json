@@ -39,9 +39,6 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
-		"@types/geojson": "catalog:",
-		"@types/node": "catalog:",
-		"maplibre-gl": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	},

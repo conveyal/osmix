@@ -228,8 +228,8 @@ describe("Osmix", () => {
 			const tile: [number, number, number] = [7, 4, 3]
 			const tileData = osmix.getRasterTile(osm, tile)
 
-			expect(tileData).toBeInstanceOf(ArrayBuffer)
-			expect(tileData.byteLength).toBeGreaterThan(0)
+			expect(tileData.imageData).toBeInstanceOf(Uint8ClampedArray)
+			expect(tileData.imageData.byteLength).toBeGreaterThan(0)
 		})
 
 		it("should generate raster tile with custom tile size", async () => {
@@ -242,8 +242,8 @@ describe("Osmix", () => {
 			const tile: [number, number, number] = [7, 4, 3]
 			const tileData = osmix.getRasterTile(osm, tile, 512)
 
-			expect(tileData).toBeInstanceOf(ArrayBuffer)
-			expect(tileData.byteLength).toBeGreaterThan(0)
+			expect(tileData.imageData).toBeInstanceOf(Uint8ClampedArray)
+			expect(tileData.imageData.byteLength).toBeGreaterThan(0)
 		})
 	})
 

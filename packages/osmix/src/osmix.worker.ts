@@ -91,9 +91,10 @@ export class OsmixWorker {
 	}
 
 	getRasterTile(id: string, tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
-		const data = this.osmix.getRasterTile(id, tile, tileSize)
-		if (!data || data.byteLength === 0) return new ArrayBuffer(0)
-		return Comlink.transfer(data, [data])
+		const rasterTile = this.osmix.getRasterTile(id, tile, tileSize)
+		const data = rasterTile.imageData
+		if (!data || data.byteLength === 0) return new Uint8ClampedArray(0)
+		return Comlink.transfer(data, [data.buffer])
 	}
 
 	search(id: string, key: string, val?: string) {

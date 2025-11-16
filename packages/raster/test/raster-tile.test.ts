@@ -15,7 +15,7 @@ function createTile(
 ) {
 	const merc = new SphericalMercatorTile({ size: tileSize })
 	return {
-		tile: new OsmixRasterTile(tileIndex, tileSize),
+		tile: new OsmixRasterTile({ tile: tileIndex, tileSize }),
 		merc,
 	}
 }
@@ -502,8 +502,8 @@ describe("OsmixRasterTile", () => {
 			const [tx, ty, tz] = [10, 11, 5]
 
 			// Create two adjacent tiles (current and right neighbor)
-			const tile1 = new OsmixRasterTile([tx, ty, tz], tileSize)
-			const tile2 = new OsmixRasterTile([tx + 1, ty, tz], tileSize)
+			const tile1 = new OsmixRasterTile({ tile: [tx, ty, tz], tileSize })
+			const tile2 = new OsmixRasterTile({ tile: [tx + 1, ty, tz], tileSize })
 
 			const merc = new SphericalMercatorTile({ size: tileSize })
 

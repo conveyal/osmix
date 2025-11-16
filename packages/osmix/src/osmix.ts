@@ -1,7 +1,7 @@
 import { Osm, type OsmOptions } from "@osmix/core"
 import { startCreateOsmFromGeoJSON } from "@osmix/geojson"
 import { readOsmPbf } from "@osmix/pbf"
-import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
+import { DEFAULT_RASTER_TILE_SIZE, type OsmixRasterTile } from "@osmix/raster"
 import { progressEvent } from "@osmix/shared/progress"
 import type { OsmNode, OsmRelation, OsmWay, Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
@@ -22,7 +22,11 @@ export interface IOsmix {
 	set(id: string, osm: Osm): void
 	delete(id: string): void
 	getVectorTile(osm: string | Osm, tile: Tile): ArrayBuffer
-	getRasterTile(osm: string | Osm, tile: Tile, tileSize: number): ArrayBuffer
+	getRasterTile(
+		osm: string | Osm,
+		tile: Tile,
+		tileSize?: number,
+	): OsmixRasterTile
 	search(
 		id: string,
 		key: string,

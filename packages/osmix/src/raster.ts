@@ -15,7 +15,7 @@ export function drawRasterTile(
 	tile: Tile,
 	tileSize = DEFAULT_RASTER_TILE_SIZE,
 ) {
-	const rasterTile = new OsmixRasterTile(tile, tileSize)
+	const rasterTile = new OsmixRasterTile({ tile, tileSize })
 	const bbox = rasterTile.bbox()
 
 	// Get way IDs that are part of relations (to exclude from individual rendering)
@@ -73,7 +73,5 @@ export function drawRasterTile(
 	}
 	console.timeEnd(timer)
 
-	const data = rasterTile.imageData
-	if (!data || data.byteLength === 0) return new ArrayBuffer(0)
-	return data.buffer
+	return rasterTile
 }

@@ -263,8 +263,8 @@ describe("OsmixRemote", () => {
 				const tile: [number, number, number] = [7, 4, 3]
 				const tileData = await remote.getRasterTile(osm, tile)
 
-				expect(tileData).toBeInstanceOf(ArrayBuffer)
-				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)
+				expect(tileData.imageData).toBeInstanceOf(Uint8ClampedArray)
+				expect(tileData.imageData.byteLength).toBeGreaterThanOrEqual(0)
 			},
 			workerTestTimeout,
 		)
@@ -279,8 +279,8 @@ describe("OsmixRemote", () => {
 				const tile: [number, number, number] = [7, 4, 3]
 				const tileData = await remote.getRasterTile(osm, tile, 512)
 
-				expect(tileData).toBeInstanceOf(ArrayBuffer)
-				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)
+				expect(tileData.imageData).toBeInstanceOf(Uint8ClampedArray)
+				expect(tileData.imageData.byteLength).toBeGreaterThanOrEqual(0)
 			},
 			workerTestTimeout,
 		)

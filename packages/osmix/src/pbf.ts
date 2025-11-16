@@ -69,7 +69,6 @@ export async function* startCreateOsmFromPbf(
 		}
 	}
 
-	let blockIndex = 0
 	for await (const block of blocks) {
 		const blockStringIndexMap = osm.stringTable.createBlockIndexMap(
 			block.stringtable,
@@ -141,8 +140,6 @@ export async function* startCreateOsmFromPbf(
 				)
 			}
 		}
-
-		yield progressEvent(`Block ${++blockIndex} processed`)
 	}
 
 	yield progressEvent(
