@@ -31,6 +31,12 @@ export class OsmixWorker {
 		)
 	}
 
+	readHeader(data: ArrayBufferLike | ReadableStream) {
+		return this.osmix.readHeader(
+			data instanceof ReadableStream ? data : new Uint8Array(data),
+		)
+	}
+
 	async fromPbf({
 		data,
 		options,

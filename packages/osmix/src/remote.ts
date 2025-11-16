@@ -8,7 +8,7 @@ import * as Comlink from "comlink"
 import type { IOsmix } from "./osmix"
 import type { OsmixWorker } from "./osmix.worker"
 import type { OsmFromPbfOptions } from "./pbf"
-import { transfer } from "./utils"
+import { supportsReadableStreamTransfer, transfer } from "./utils"
 
 type WrapNonPromiseInPromise<T> = T extends Promise<infer _U> ? T : Promise<T>
 
@@ -17,6 +17,8 @@ type Promisify<T> = {
 		? (...args: Parameters<T[K]>) => WrapNonPromiseInPromise<ReturnType<T[K]>>
 		: T[K]
 }
+
+const SUPPORTS_READABLE_STREAM_TRANSFER = supportsReadableStreamTransfer()
 
 /**
  * Manage data access across one or more workers while using the same API as a local Osmix instance.
@@ -56,16 +58,31 @@ export class OsmixRemote implements Promisify<IOsmix> {
 		return this.changesetWorker
 	}
 
+	async getTransferableData(
+		data: ArrayBufferLike | ReadableStream | Uint8Array | File,
+	) {
+		if (data instanceof ArrayBuffer) return data
+		if (data instanceof SharedArrayBuffer) return data
+		if (data instanceof Uint8Array) return data.buffer
+		if (data instanceof ReadableStream) {
+			if (SUPPORTS_READABLE_STREAM_TRANSFER) return data
+			return (await streamToBytes(data)).buffer
+		}
+		if (data instanceof File) {
+			if (SUPPORTS_READABLE_STREAM_TRANSFER) return data.stream()
+			return data.arrayBuffer()
+		}
+		throw Error("Invalid data")
+	}
+
 	async fromPbf(
-		data: ArrayBufferLike | ReadableStream,
+		data: ArrayBufferLike | ReadableStream | Uint8Array | File,
 		options: Partial<OsmFromPbfOptions> = {},
 	) {
-		const dataBuffer =
-			data instanceof ReadableStream ? (await streamToBytes(data)).buffer : data
 		const workers = this.workers.slice()
 		const worker0 = workers.shift()!
 		const transferables = await worker0.fromPbf(
-			transfer({ data: dataBuffer, options }),
+			transfer({ data: await this.getTransferableData(data), options }),
 		)
 		await Promise.all(
 			workers.map((worker) => worker.fromTransferables(transferables)),
@@ -74,17 +91,14 @@ export class OsmixRemote implements Promisify<IOsmix> {
 	}
 
 	async fromGeoJSON(
-		data: ArrayBufferLike | ReadableStream,
+		data: ArrayBufferLike | ReadableStream | Uint8Array | File,
 		options: Partial<OsmOptions> = {},
 	) {
-		const dataBuffer =
-			data instanceof ReadableStream ? (await streamToBytes(data)).buffer : data
-
 		const workers = this.workers.slice()
 		const worker0 = workers.shift()!
 		const transferables = await worker0.fromGeoJSON(
 			transfer({
-				data: dataBuffer,
+				data: await this.getTransferableData(data),
 				options,
 			}),
 		)
@@ -92,6 +106,10 @@ export class OsmixRemote implements Promisify<IOsmix> {
 			workers.map((worker) => worker.fromTransferables(transferables)),
 		)
 		return new Osm(transferables)
+	}
+
+	async readHeader(data: ArrayBuffer | ReadableStream | Uint8Array | File) {
+		return this.getWorker().readHeader(await this.getTransferableData(data))
 	}
 
 	getId(osmId: string | Osm) {

@@ -1,5 +1,4 @@
-import { Osm } from "@osmix/core"
-import * as Comlink from "comlink"
+import type { Osm } from "@osmix/core"
 import { useAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { osmToPbfStream } from "osmix"
@@ -7,7 +6,6 @@ import { useCallback, useEffect, useState, useTransition } from "react"
 import { Log } from "../state/log"
 import { osmAtomFamily, osmFileAtomFamily } from "../state/osm"
 import { osmWorker } from "../state/worker"
-import { supportsReadableStreamTransfer } from "../utils"
 import { useMap } from "./map"
 
 function useOsmDefaultFile(
@@ -47,26 +45,15 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 			if (file == null) return
 			const taskLog = Log.startTask(`Processing file ${file.name}...`)
 			try {
-				const data = supportsReadableStreamTransfer()
-					? file.stream()
-					: await file.arrayBuffer()
-
 				// Detect file type based on extension
 				const fileName = file.name.toLowerCase()
 				const isGeoJSON =
 					fileName.endsWith(".geojson") || fileName.endsWith(".json")
 
-				const osmBuffers = isGeoJSON
-					? await osmWorker.fromGeoJSON(
-							id ?? file.name,
-							Comlink.transfer(data, [data]),
-						)
-					: await osmWorker.fromPbf(
-							id ?? file.name,
-							Comlink.transfer(data, [data]),
-						)
+				const osm = isGeoJSON
+					? await osmWorker.fromGeoJSON(file, { id: id ?? file.name })
+					: await osmWorker.fromPbf(file, { id: id ?? file.name })
 
-				const osm = new Osm(osmBuffers)
 				setOsm(osm)
 				taskLog.end(`${file.name} fully loaded.`)
 				return osm

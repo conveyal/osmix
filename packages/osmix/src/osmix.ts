@@ -1,5 +1,6 @@
 import { Osm, type OsmOptions } from "@osmix/core"
 import { startCreateOsmFromGeoJSON } from "@osmix/geojson"
+import { readOsmPbf } from "@osmix/pbf"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import { progressEvent } from "@osmix/shared/progress"
 import type { OsmNode, OsmRelation, OsmWay, Tile } from "@osmix/shared/types"
@@ -35,6 +36,11 @@ export class Osmix extends EventTarget implements IOsmix {
 
 	log(message: string) {
 		this.dispatchEvent(progressEvent(message))
+	}
+
+	async readHeader(data: Parameters<typeof readOsmPbf>[0]) {
+		const { header } = await readOsmPbf(data)
+		return header
 	}
 
 	async fromPbf(

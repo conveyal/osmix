@@ -31,15 +31,14 @@ export class OsmixBenchWorker {
 	}
 
 	async queryBbox(
+		osm: Osm,
 		bbox: GeoBbox2D,
 		includeTags = false,
 	): Promise<{
 		nodes: OsmNode[]
 		ways: OsmWay[]
 	}> {
-		if (!this.osm) throw new Error("OSM not loaded")
-
-		const { nodes, ways } = this.osm
+		const { nodes, ways } = osm
 		const nodesWithTags = nodes.withinBbox(
 			bbox,
 			(i) => nodes.tags.cardinality(i) > 0,
@@ -81,14 +80,13 @@ export class OsmixBenchWorker {
 	}
 
 	async nearestNeighbor(
+		osm: Osm,
 		lon: number,
 		lat: number,
 		count: number,
 	): Promise<OsmNode[]> {
-		if (!this.osm) throw new Error("OSM not loaded")
-
 		// Use withinRadius with a reasonable search radius
-		const candidates = this.osm.nodes.findIndexesWithinRadius(lon, lat, 0.1)
+		const candidates = osm.nodes.findIndexesWithinRadius(lon, lat, 0.1)
 
 		// Calculate distances and sort
 		const nodesWithDistance: Array<{
@@ -100,8 +98,8 @@ export class OsmixBenchWorker {
 		}> = []
 
 		for (const nodeIndex of candidates) {
-			const id = this.osm.nodes.ids.at(nodeIndex)
-			const [nodeLon, nodeLat] = this.osm.nodes.getNodeLonLat({
+			const id = osm.nodes.ids.at(nodeIndex)
+			const [nodeLon, nodeLat] = osm.nodes.getNodeLonLat({
 				index: nodeIndex,
 			})
 			const distance = haversineDistance([lon, lat], [nodeLon, nodeLat])
