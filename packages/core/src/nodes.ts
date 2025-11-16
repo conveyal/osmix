@@ -1,12 +1,6 @@
-import {
-	nodeToFeature,
-	type OsmixGeoJSONFeature,
-	type OsmNode,
-	type OsmTags,
-} from "@osmix/json"
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
-import type { GeoBbox2D } from "@osmix/shared/types"
+import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/shared/types"
 import KDBush from "kdbush"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"
@@ -78,7 +72,7 @@ export class Nodes extends Entities<OsmNode> {
 	addDenseNodes(
 		dense: OsmPbfDenseNodes,
 		block: OsmPbfBlock,
-		blockStringIndexMap: Map<number, number>,
+		blockStringIndexMap: Uint32Array,
 		filter?: (node: OsmNode) => boolean,
 	): number {
 		const lon_offset = block.lon_offset ?? 0
@@ -97,7 +91,7 @@ export class Nodes extends Entities<OsmNode> {
 		const getStringTableIndex = (keyIndex: number) => {
 			const key = dense.keys_vals[keyIndex]
 			assertValue(key, "Block string key is undefined")
-			const index = blockStringIndexMap.get(key)
+			const index = blockStringIndexMap[key]
 			assertValue(index, "Block string not found")
 			return index
 		}
@@ -205,12 +199,6 @@ export class Nodes extends Entities<OsmNode> {
 			lat,
 			lon,
 		}
-	}
-
-	toGeoJson(i: IdOrIndex): OsmixGeoJSONFeature<GeoJSON.Point> {
-		const [index, id] = this.ids.idOrIndex(i)
-		const node = this.getFullEntity(index, id)
-		return nodeToFeature(node)
 	}
 
 	// Spatial operations

@@ -16,7 +16,7 @@ import type {
 	OsmRelation,
 	OsmRelationMember,
 	OsmWay,
-} from "./types"
+} from "@osmix/shared/types"
 
 export interface ParseOptions {
 	parseTags?: boolean

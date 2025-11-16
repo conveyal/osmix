@@ -50,6 +50,7 @@
 	"dependencies": {
 		"@mapbox/geojson-rewind": "catalog:",
 		"@mapbox/sphericalmercator": "catalog:",
+		"dequal": "catalog:",
 		"lineclip": "^2.0.0"
 	}
 }

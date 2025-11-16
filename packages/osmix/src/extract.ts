@@ -1,10 +1,15 @@
+import { Osm } from "@osmix/core"
+import {
+	logProgress,
+	type ProgressEvent,
+	progressEvent,
+} from "@osmix/shared/progress"
 import type { GeoBbox2D } from "@osmix/shared/types"
-import { Osmix } from "./osmix"
 
 type ExtractStrategy = "simple" | "complete_ways"
 
 /**
- * Create a geographic extract from an existing Osmix instance. Performs extraction by:
+ * Create a geographic extract from an existing Osm instance. Performs extraction by:
  *
  * Strategy "simple":
  * 1. Selecting all nodes inside the bbox
@@ -17,17 +22,20 @@ type ExtractStrategy = "simple" | "complete_ways"
  * 3. Selecting all relations with at least one member inside the bbox, adding relation members if missing.
  */
 export function createExtract(
-	osm: Osmix,
+	osm: Osm,
 	bbox: GeoBbox2D,
 	strategy: ExtractStrategy = "complete_ways",
-): Osmix {
-	if (!osm.isReady()) throw Error("Osmix is not ready for extraction.")
+	onProgress: (progress: ProgressEvent) => void = logProgress,
+): Osm {
+	if (!osm.isReady()) throw Error("Osm is not ready for extraction.")
 
-	console.log(
-		`Creating extract ${osm.id} with strategy=${strategy} in bbox ${bbox.join(", ")}...`,
+	onProgress(
+		progressEvent(
+			`Creating extract ${osm.id} with strategy=${strategy} in bbox ${bbox.join(", ")}...`,
+		),
 	)
 	const [minLon, minLat, maxLon, maxLat] = bbox
-	const extracted = new Osmix({
+	const extracted = new Osm({
 		id: osm.id,
 		header: {
 			...osm.header,
@@ -58,14 +66,14 @@ export function createExtract(
 		wayIds.add(id)
 	}
 
-	console.log("Extracting nodes...")
+	onProgress(progressEvent("Extracting nodes..."))
 	for (const nodeIndex of osm.nodes.findIndexesWithinBbox(bbox)) {
 		const node = osm.nodes.getByIndex(nodeIndex)
 		extracted.nodes.addNode(node)
 		nodeIds.add(node.id)
 	}
 
-	console.log("Extracting ways...")
+	onProgress(progressEvent("Extracting ways..."))
 	for (const way of osm.ways.sorted()) {
 		if (way.refs.some((ref) => nodeIds.has(ref))) {
 			wayIds.add(way.id)
@@ -81,7 +89,7 @@ export function createExtract(
 		}
 	}
 
-	console.log("Extracting relations...")
+	onProgress(progressEvent("Extracting relations..."))
 	for (const relation of osm.relations.sorted()) {
 		if (
 			relation.members.some((m) => {

@@ -1,29 +1,32 @@
-import {
-	type OsmEntity,
-	type OsmEntityType,
-	type OsmEntityTypeMap,
-	OsmJsonToBlocksTransformStream,
-	type OsmNode,
-	type OsmRelation,
-	type OsmWay,
-} from "@osmix/json"
+import { Osm, type OsmOptions } from "@osmix/core/src/osm"
+import { OsmJsonToBlocksTransformStream } from "@osmix/json"
 import {
 	type AsyncGeneratorValue,
 	OsmBlocksToPbfBytesTransformStream,
 	type OsmPbfHeaderBlock,
 	readOsmPbf,
 } from "@osmix/pbf"
-import type { GeoBbox2D } from "@osmix/shared/types"
-import { Osmix, type OsmixOptions } from "./osmix"
-import { throttle } from "./utils"
+import {
+	logProgress,
+	type ProgressEvent,
+	progressEvent,
+} from "@osmix/shared/progress"
+import type {
+	GeoBbox2D,
+	OsmEntity,
+	OsmEntityType,
+	OsmEntityTypeMap,
+	OsmNode,
+	OsmRelation,
+	OsmWay,
+} from "@osmix/shared/types"
 
-export interface OsmixFromPbfOptions extends OsmixOptions {
+export interface OsmFromPbfOptions extends OsmOptions {
 	extractBbox: GeoBbox2D
-	logger: (message: string) => void
 	filter<T extends OsmEntityType>(
 		type: T,
 		entity: OsmEntityTypeMap[T],
-		osmix: Osmix,
+		osmix: Osm,
 	): boolean
 	buildSpatialIndexes: OsmEntityType[]
 
@@ -32,13 +35,28 @@ export interface OsmixFromPbfOptions extends OsmixOptions {
 }
 
 /**
- * Read an OSM PBF file into an Osmix index.
+ * Create a new Osm index from a PBF stream or array buffer.
  */
-export async function osmixFromPbf(
+export async function createOsmFromPbf(
 	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
-	options: Partial<OsmixFromPbfOptions> = {},
-): Promise<Osmix> {
-	const osm = new Osmix(options)
+	options: Partial<OsmFromPbfOptions> = {},
+	onProgress: (progress: ProgressEvent) => void = logProgress,
+): Promise<Osm> {
+	const osm = new Osm(options)
+	for await (const update of startCreateOsmFromPbf(osm, data, options)) {
+		onProgress(update)
+	}
+	return osm
+}
+
+/**
+ * Parse raw PBF data into an Osm index.
+ */
+export async function* startCreateOsmFromPbf(
+	osm: Osm,
+	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
+	options: Partial<OsmFromPbfOptions> = {},
+): AsyncGenerator<ProgressEvent> {
 	const { extractBbox } = options
 	const { header, blocks } = await readOsmPbf(data)
 	osm.header = header
@@ -50,11 +68,11 @@ export async function osmixFromPbf(
 			top: extractBbox[3],
 		}
 	}
-	const log = options.logger ?? ((...msg) => console.log(...msg))
-	const logEverySecond = throttle(log, 1_000)
 
 	for await (const block of blocks) {
-		const blockStringIndexMap = osm.stringTable.createBlockIndexMap(block)
+		const blockStringIndexMap = osm.stringTable.createBlockIndexMap(
+			block.stringtable,
+		)
 
 		for (const group of block.primitivegroup) {
 			const { nodes, ways, relations, dense } = group
@@ -78,8 +96,6 @@ export async function osmixFromPbf(
 							}
 						: undefined,
 				)
-
-				logEverySecond(`${osm.nodes.size.toLocaleString()} nodes added`)
 			}
 
 			if (ways.length > 0) {
@@ -99,8 +115,6 @@ export async function osmixFromPbf(
 							}
 						: undefined,
 				)
-
-				logEverySecond(`${osm.ways.size.toLocaleString()} ways added`)
 			}
 
 			if (relations.length > 0) {
@@ -124,16 +138,14 @@ export async function osmixFromPbf(
 							}
 						: undefined,
 				)
-
-				logEverySecond(`${osm.relations.size.toLocaleString()} relations added`)
 			}
 		}
 	}
 
-	log(
+	yield progressEvent(
 		`${osm.nodes.size.toLocaleString()} nodes, ${osm.ways.size.toLocaleString()} ways, and ${osm.relations.size.toLocaleString()} relations added.`,
 	)
-	log("Building remaining id and tag indexes...")
+	yield progressEvent("Building remaining id and tag indexes...")
 	osm.buildIndexes()
 
 	// By default, build all spatial indexes.
@@ -144,14 +156,12 @@ export async function osmixFromPbf(
 	} else if (options.buildSpatialIndexes.includes("way")) {
 		osm.ways.buildSpatialIndex()
 	}
-
-	return osm
 }
 
 /**
  * Create a generator that yields all entities in the OSM index, sorted by type and id.
  */
-function* getAllEntitiesSorted(osm: Osmix): Generator<OsmEntity> {
+function* getAllEntitiesSorted(osm: Osm): Generator<OsmEntity> {
 	for (const node of osm.nodes.sorted()) {
 		yield node
 	}
@@ -166,8 +176,8 @@ function* getAllEntitiesSorted(osm: Osmix): Generator<OsmEntity> {
 /**
  * Convert the OSM index to a `ReadableStream<OsmPbfHeaderBlock | OsmEntity>`.
  */
-export function createReadableEntityStreamFromOsmix(
-	osm: Osmix,
+export function createReadableEntityStreamFromOsm(
+	osm: Osm,
 ): ReadableStream<OsmPbfHeaderBlock | OsmEntity> {
 	let headerEnqueued = false
 	const entityGenerator = getAllEntitiesSorted(osm)
@@ -194,8 +204,8 @@ export function createReadableEntityStreamFromOsmix(
 /**
  * Convert the OSM index to a `ReadableStream<Uint8Array>` of PBF bytes.
  */
-export function osmixToPbfStream(osm: Osmix): ReadableStream<Uint8Array> {
-	return createReadableEntityStreamFromOsmix(osm)
+export function osmToPbfStream(osm: Osm): ReadableStream<Uint8Array> {
+	return createReadableEntityStreamFromOsm(osm)
 		.pipeThrough(new OsmJsonToBlocksTransformStream())
 		.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
 }
@@ -203,7 +213,7 @@ export function osmixToPbfStream(osm: Osmix): ReadableStream<Uint8Array> {
 /**
  * Convert the OSM index to an in memory PBF ArrayBuffer.
  */
-export async function osmixToPbfBuffer(osm: Osmix): Promise<ArrayBuffer> {
+export async function osmToPbfBuffer(osm: Osm): Promise<ArrayBuffer> {
 	const chunks: Uint8Array[] = []
 	let byteLength = 0
 	const writable = new WritableStream<Uint8Array>({
@@ -212,7 +222,7 @@ export async function osmixToPbfBuffer(osm: Osmix): Promise<ArrayBuffer> {
 			byteLength += chunk.byteLength
 		},
 	})
-	await osmixToPbfStream(osm).pipeTo(writable)
+	await osmToPbfStream(osm).pipeTo(writable)
 	const combined = new Uint8Array(byteLength)
 	let offset = 0
 	for (const chunk of chunks) {

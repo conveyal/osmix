@@ -51,6 +51,40 @@ const pngBytes = await tile.toImageBuffer({ type: "image/png" })
 Generate tiles on demand by registering the bundled protocol factory. It parses URLs shaped like `@osmix/raster://<osmId>/<tileSize>/<z>/<x>/<y>.png` and hands you the derived tile metadata to render or fetch bytes however you like.
 
 ```ts
+/**
+ * Creates a MapLibre protocol action that handles requests for raster tiles. Caching should be handled by `getTileImage`.
+ * @param getTileImage - A function that returns the image data for a given tile.
+ * @returns A MapLibre protocol action that handles requests for raster tiles.
+ */
+export function createOsmixRasterMaplibreProtocol(
+	getTileImage: GetTileImage,
+): AddProtocolAction {
+	return async (req): Promise<maplibregl.GetResourceResponse<ArrayBuffer>> => {
+		// @osmix/raster://<osmId>/<tileSize>/<z>/<x>/<y>.png
+		const m =
+			/^@osmix\/raster:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(
+				req.url,
+			)
+		if (!m) throw new Error(`Bad ${RASTER_PROTOCOL_NAME} URL: ${req.url}`)
+		const [, osmId, sizeStr, zStr, xStr, yStr] = m
+		assertValue(sizeStr, "Tile size is required in protocol URL")
+		assertValue(zStr, "Tile index z is required in protocol URL")
+		assertValue(xStr, "Tile index x is required in protocol URL")
+		assertValue(yStr, "Tile index y is required in protocol URL")
+		assertValue(osmId, "OSM ID is required in protocol URL")
+
+		const tileSize = +sizeStr
+		const tileIndex: Tile = [+xStr, +yStr, +zStr]
+		const data = await getTileImage(osmId, tileIndex, tileSize)
+		return {
+			data,
+			cacheControl: "no-store",
+		}
+	}
+}
+```
+
+```ts
 import maplibregl from "maplibre-gl"
 import { createOsmixRasterMaplibreProtocol } from "@osmix/raster"
 

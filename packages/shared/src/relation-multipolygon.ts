@@ -1,12 +1,4 @@
-import type { LonLat } from "@osmix/shared/types"
-import type { OsmRelation, OsmRelationMember, OsmWay } from "./types"
-
-/**
- * Check if a relation is a multipolygon relation.
- */
-export function isMultipolygonRelation(relation: OsmRelation): boolean {
-	return relation.tags?.["type"] === "multipolygon"
-}
+import type { LonLat, OsmRelation, OsmRelationMember, OsmWay } from "./types"
 
 /**
  * Get way members from a relation, grouped by role (outer/inner).

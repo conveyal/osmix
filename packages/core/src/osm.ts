@@ -5,7 +5,7 @@ import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import { Ways, type WaysTransferables } from "./ways"
 
-export interface OsmixTransferables {
+export interface OsmTransferables {
 	id: string
 	header: OsmPbfHeaderBlock
 	stringTable: StringTableTransferables
@@ -14,7 +14,7 @@ export interface OsmixTransferables {
 	relations: RelationsTransferables
 }
 
-export interface OsmixOptions {
+export interface OsmOptions {
 	id: string
 	header: OsmPbfHeaderBlock
 }
@@ -22,7 +22,7 @@ export interface OsmixOptions {
 /**
  * OSM Entity Index.
  */
-export class Osmix {
+export class Osm {
 	// Filename or ID of this OSM Entity index.
 	id = "unknown"
 	header: OsmPbfHeaderBlock = {
@@ -38,7 +38,7 @@ export class Osmix {
 
 	private indexBuilt = false
 
-	constructor(opts?: Partial<OsmixOptions> | OsmixTransferables) {
+	constructor(opts?: Partial<OsmOptions> | OsmTransferables) {
 		this.id = opts?.id ?? "unknown"
 		this.header = opts?.header ?? {
 			required_features: [],
@@ -92,7 +92,7 @@ export class Osmix {
 		return this.nodes.bbox
 	}
 
-	transferables(): OsmixTransferables {
+	transferables(): OsmTransferables {
 		return {
 			id: this.id,
 			header: this.header,

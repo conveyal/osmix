@@ -1,5 +1,5 @@
 import { changeStatsSummary } from "@osmix/change"
-import { Osmix } from "@osmix/core"
+import { Osm } from "@osmix/core"
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
 	ArrowLeft,
@@ -140,7 +140,7 @@ export default function Merge() {
 
 	const applyChanges = async () => {
 		if (!changesetStats) throw Error("Changeset stats are not loaded")
-		const osm = new Osmix(
+		const osm = new Osm(
 			await osmWorker.applyChangesAndReplace(changesetStats.osmId),
 		)
 		setChangesetStats(null)
@@ -250,7 +250,7 @@ export default function Merge() {
 										if (!patch.osm) throw Error("Patch OSM is not loaded")
 
 										setChangesetStats(null)
-										const osm = new Osmix(
+										const osm = new Osm(
 											await osmWorker.merge(base.osm.id, patch.osm.id, {
 												deduplicateNodes: true,
 												deduplicateWays: true,

@@ -1,5 +1,10 @@
 import Pbf from "pbf"
-import { readHeaderBlock, readPrimitiveBlock } from "./proto/osmformat"
+import {
+	type OsmPbfBlock,
+	type OsmPbfHeaderBlock,
+	readHeaderBlock,
+	readPrimitiveBlock,
+} from "./proto/osmformat"
 import { webDecompress } from "./utils"
 
 /**
@@ -16,13 +21,39 @@ export async function* osmPbfBlobsToBlocksGenerator(
 ) {
 	let headerRead = false
 	for await (const blob of blobs) {
-		const decompressedBlob = await decompress(blob)
-		const pbf = new Pbf(decompressedBlob)
 		if (!headerRead) {
 			headerRead = true
-			yield readHeaderBlock(pbf)
+			yield readOsmHeaderBlock(blob, decompress)
 		} else {
-			yield readPrimitiveBlock(pbf)
+			yield readOsmPrimitiveBlock(blob, decompress)
 		}
 	}
+}
+
+/**
+ * Decompress and read the header block from a compressed blob.
+ */
+export async function readOsmHeaderBlock(
+	compressedBlob: Uint8Array<ArrayBuffer>,
+	decompress: (
+		data: Uint8Array<ArrayBuffer>,
+	) => Promise<Uint8Array<ArrayBuffer>> = webDecompress,
+): Promise<OsmPbfHeaderBlock> {
+	const decompressedBlob = await decompress(compressedBlob)
+	const pbf = new Pbf(decompressedBlob)
+	return readHeaderBlock(pbf)
+}
+
+/**
+ * Decompress and read the primitive block from a compressed blob.
+ */
+export async function readOsmPrimitiveBlock(
+	compressedBlob: Uint8Array<ArrayBuffer>,
+	decompress: (
+		data: Uint8Array<ArrayBuffer>,
+	) => Promise<Uint8Array<ArrayBuffer>> = webDecompress,
+): Promise<OsmPbfBlock> {
+	const decompressedBlob = await decompress(compressedBlob)
+	const pbf = new Pbf(decompressedBlob)
+	return readPrimitiveBlock(pbf)
 }

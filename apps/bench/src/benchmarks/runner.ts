@@ -1,5 +1,5 @@
 import type { GeoBbox2D } from "@osmix/shared/types"
-import { createWorker } from "../workers/osmix.worker"
+import { OsmixRemote } from "osmix"
 import type { BenchmarkResults, WorkerBenchmarkOptions } from "./types"
 
 export type RunEngineBenchmark = (
@@ -20,8 +20,8 @@ export async function runAllBenchmarks(
 
 	// Read file as ArrayBuffer
 	const fileData = await file.arrayBuffer()
-	const osmixWorker = createWorker()
-	const header = await osmixWorker.getHeader(fileData)
+	const osmixRemote = await OsmixRemote.connect(1)
+	const header = await osmixRemote.readHeader(fileData)
 	if (!header.bbox) throw new Error("Header bbox not found")
 
 	const bbox: GeoBbox2D = [

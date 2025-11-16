@@ -50,3 +50,10 @@ export function getEntityType(entity: OsmEntity): OsmEntityType {
 	if (isRelation(entity)) return "relation"
 	throw Error("Unknown entity type")
 }
+
+/**
+ * Check if a relation is a multipolygon relation.
+ */
+export function isMultipolygonRelation(relation: OsmRelation): boolean {
+	return relation.tags?.["type"] === "multipolygon"
+}

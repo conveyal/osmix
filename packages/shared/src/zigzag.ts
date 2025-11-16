@@ -30,4 +30,3 @@ export function decodeZigzag(encoded: number): number {
 	// Check if encoded is odd (negative) using bitwise, then use arithmetic
 	return (encoded & 1) === 1 ? -(encoded + 1) / 2 : encoded / 2
 }
-

@@ -1,4 +1,4 @@
-import type { Osmix } from "@osmix/core"
+import type { Osm } from "@osmix/core"
 import { decodeZigzag } from "@osmix/shared/zigzag"
 import { useSetAtom } from "jotai"
 import {
@@ -97,7 +97,7 @@ const wayPolygonsFilter: FilterSpecification = [
 
 const relationFilter: FilterSpecification = ["==", ["get", "type"], "relation"]
 
-export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
+export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
 	const map = useMap()
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const popupRef = useRef<Popup | null>(null)

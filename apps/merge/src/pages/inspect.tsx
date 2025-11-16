@@ -1,5 +1,5 @@
 import { changeStatsSummary } from "@osmix/change"
-import { Osmix } from "@osmix/core"
+import { Osm } from "@osmix/core"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
 import { useMemo } from "react"
@@ -56,7 +56,7 @@ export default function InspectPage() {
 		const task = Log.startTask("Applying changes to OSM...")
 		const transferables = await osmWorker.applyChangesAndReplace(osmId)
 		task.update("Refreshing OSM index...")
-		const newOsm = new Osmix(transferables)
+		const newOsm = new Osm(transferables)
 		setOsm(newOsm)
 		setChangesetStats(null)
 		task.end("Changes applied!")

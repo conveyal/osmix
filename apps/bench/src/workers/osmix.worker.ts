@@ -1,24 +1,22 @@
-import { type Osmix, osmixFromPbf } from "@osmix/core"
+import type { Osm } from "@osmix/core"
 import {
 	nodeToFeature,
-	type OsmixGeoJSONFeature,
-	type OsmNode,
-	type OsmWay,
+	type OsmGeoJSONFeature,
 	wayToFeature,
-} from "@osmix/json"
+} from "@osmix/geojson"
 import { type OsmPbfHeaderBlock, readOsmPbf } from "@osmix/pbf"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
-import type { GeoBbox2D } from "@osmix/shared/types"
+import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, wrap } from "comlink"
+import { createOsmFromPbf } from "osmix"
 
 export class OsmixBenchWorker {
-	private osm: Osmix | null = null
+	private osm: Osm | null = null
 
 	async loadFromPbf(data: ArrayBuffer): Promise<void> {
-		this.osm = await osmixFromPbf(new Uint8Array(data), {
+		this.osm = await createOsmFromPbf(new Uint8Array(data), {
 			id: "benchmark",
-			logger: console.log,
 		})
 	}
 
@@ -33,15 +31,14 @@ export class OsmixBenchWorker {
 	}
 
 	async queryBbox(
+		osm: Osm,
 		bbox: GeoBbox2D,
 		includeTags = false,
 	): Promise<{
 		nodes: OsmNode[]
 		ways: OsmWay[]
 	}> {
-		if (!this.osm) throw new Error("OSM not loaded")
-
-		const { nodes, ways } = this.osm
+		const { nodes, ways } = osm
 		const nodesWithTags = nodes.withinBbox(
 			bbox,
 			(i) => nodes.tags.cardinality(i) > 0,
@@ -83,14 +80,13 @@ export class OsmixBenchWorker {
 	}
 
 	async nearestNeighbor(
+		osm: Osm,
 		lon: number,
 		lat: number,
 		count: number,
 	): Promise<OsmNode[]> {
-		if (!this.osm) throw new Error("OSM not loaded")
-
 		// Use withinRadius with a reasonable search radius
-		const candidates = this.osm.nodes.findIndexesWithinRadius(lon, lat, 0.1)
+		const candidates = osm.nodes.findIndexesWithinRadius(lon, lat, 0.1)
 
 		// Calculate distances and sort
 		const nodesWithDistance: Array<{
@@ -102,8 +98,8 @@ export class OsmixBenchWorker {
 		}> = []
 
 		for (const nodeIndex of candidates) {
-			const id = this.osm.nodes.ids.at(nodeIndex)
-			const [nodeLon, nodeLat] = this.osm.nodes.getNodeLonLat({
+			const id = osm.nodes.ids.at(nodeIndex)
+			const [nodeLon, nodeLat] = osm.nodes.getNodeLonLat({
 				index: nodeIndex,
 			})
 			const distance = haversineDistance([lon, lat], [nodeLon, nodeLat])
@@ -147,7 +143,7 @@ export class OsmixBenchWorker {
 	): Promise<GeoJSON.FeatureCollection> {
 		if (!this.osm) throw new Error("OSM not loaded")
 
-		const features: OsmixGeoJSONFeature<
+		const features: OsmGeoJSONFeature<
 			GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon
 		>[] = []
 

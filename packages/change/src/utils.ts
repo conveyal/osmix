@@ -1,5 +1,10 @@
-import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from "@osmix/json"
-import type { OsmixChangesetStats } from "./types"
+import type {
+	OsmEntity,
+	OsmRelation,
+	OsmTags,
+	OsmWay,
+} from "@osmix/shared/types"
+import type { OsmChangesetStats } from "./types"
 
 export function osmTagsToOscTags(tags: OsmTags): string {
 	return Object.entries(tags)
@@ -108,7 +113,7 @@ export function camelCaseToSentenceCase(str: string) {
 /**
  * Summarize the changeset stats with the most significant changes first.
  */
-export function changeStatsSummary(stats: OsmixChangesetStats) {
+export function changeStatsSummary(stats: OsmChangesetStats) {
 	const numericStats = (Object.entries(stats) as [string, unknown][]).filter(
 		([, value]) => typeof value === "number" && value > 0,
 	) as [string, number][]

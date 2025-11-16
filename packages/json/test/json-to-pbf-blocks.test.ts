@@ -1,5 +1,6 @@
 import type { OsmPbfBlock } from "@osmix/pbf"
 import { createSampleHeader } from "@osmix/pbf/test/helpers"
+import type { OsmEntity } from "@osmix/shared/types"
 import { assert, describe, expect, it } from "vitest"
 import {
 	createOsmJsonReadableStream,
@@ -7,7 +8,6 @@ import {
 	OsmJsonToBlocksTransformStream,
 } from "../src/json-to-pbf"
 import type { OsmPbfBlockBuilder } from "../src/osm-pbf-block-builder"
-import type { OsmEntity } from "../src/types"
 
 async function* entityGenerator(entities: OsmEntity[]) {
 	for (const entity of entities) {

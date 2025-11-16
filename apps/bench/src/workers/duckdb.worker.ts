@@ -3,8 +3,7 @@ import eh_worker from "@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url"
 import mvp_worker from "@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url"
 import duckdb_wasm_eh from "@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url"
 import duckdb_wasm from "@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url"
-import type { OsmNode, OsmTags, OsmWay } from "@osmix/json"
-import type { GeoBbox2D } from "@osmix/shared/types"
+import type { GeoBbox2D, OsmNode, OsmTags, OsmWay } from "@osmix/shared/types"
 import type * as arrow from "apache-arrow"
 
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {

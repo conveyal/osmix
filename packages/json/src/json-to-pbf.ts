@@ -3,9 +3,9 @@ import {
 	type OsmPbfBlock,
 	type OsmPbfHeaderBlock,
 } from "@osmix/pbf"
+import type { OsmEntity } from "@osmix/shared/types"
+import { isNode, isRelation, isWay } from "@osmix/shared/utils"
 import { OsmPbfBlockBuilder } from "./osm-pbf-block-builder"
-import type { OsmEntity } from "./types"
-import { isNode, isRelation, isWay } from "./utils"
 
 /**
  * Convert a generator of OSM JSON entities to a generator of OSM PBF blocks. Entities should be grouped and sorted.

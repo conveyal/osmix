@@ -16,8 +16,16 @@ export class OsmixRasterTile {
 	tileSize: number
 	proj: SphericalMercatorTile
 
-	constructor(tile: Tile, tileSize: number = DEFAULT_RASTER_TILE_SIZE) {
-		this.imageData = new Uint8ClampedArray(tileSize * tileSize * 4)
+	constructor({
+		imageData,
+		tile,
+		tileSize = DEFAULT_RASTER_TILE_SIZE,
+	}: {
+		imageData?: Uint8ClampedArray<ArrayBuffer>
+		tile: Tile
+		tileSize: number
+	}) {
+		this.imageData = imageData ?? new Uint8ClampedArray(tileSize * tileSize * 4)
 		this.proj = new SphericalMercatorTile({ size: tileSize, tile })
 		this.tile = tile
 		this.tileSize = tileSize

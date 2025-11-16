@@ -1,19 +1,5 @@
 import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
 
-export function throttle<T extends unknown[]>(
-	func: (...args: T) => void,
-	timeFrame: number,
-) {
-	let lastTime = 0
-	return (...args: T) => {
-		const now = Date.now()
-		if (now - lastTime >= timeFrame) {
-			func(...args)
-			lastTime = now
-		}
-	}
-}
-
 export function bboxFromLonLats(lonLats: LonLat[]): GeoBbox2D {
 	let minLon = Number.POSITIVE_INFINITY
 	let minLat = Number.POSITIVE_INFINITY
