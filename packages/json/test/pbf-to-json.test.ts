@@ -20,7 +20,7 @@ describe("geojson", () => {
 				}
 			}
 
-			// Check that all features are valid GeoJSON and have unique IDs
+			// Check that all features are valid and have unique IDs
 			const nodeMap = new Map<number, OsmNode>()
 			let nodeFeatures = 0
 			const seenWayIds = new Set()

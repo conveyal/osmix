@@ -127,7 +127,6 @@
       },
       "devDependencies": {
         "@osmix/pbf": "workspace:*",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -143,7 +142,6 @@
       },
       "devDependencies": {
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -154,11 +152,8 @@
       "dependencies": {
         "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
-        "dequal": "catalog:",
       },
       "devDependencies": {
-        "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
