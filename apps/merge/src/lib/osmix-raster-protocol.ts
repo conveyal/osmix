@@ -25,7 +25,7 @@ export function addOsmixRasterProtocol() {
 				tileIndex,
 				tileSize,
 			)
-			const data = await rasterTileToImageBuffer(rasterTile.imageData, tileSize)
+			const data = await rasterTileToImageBuffer(rasterTile, tileSize)
 			return {
 				data,
 				cacheControl: "no-store",

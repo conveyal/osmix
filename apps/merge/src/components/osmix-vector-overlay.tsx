@@ -135,7 +135,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
 	}, [map, sourceId, sourceLayerPrefix])
 
 	const handleClick = useCallback(
-		(event: MapLayerMouseEvent) => {
+		async (event: MapLayerMouseEvent) => {
 			const feature = event.features?.[0]
 			if (!osm || !feature || typeof feature.id !== "number") {
 				selectEntity(null, null)

@@ -1,4 +1,4 @@
-import type { Osm } from "@osmix/core"
+import type { Osm, OsmInfo } from "@osmix/core"
 import type { OsmEntity } from "@osmix/shared/types"
 import { isNode, isRelation, isWay } from "@osmix/shared/utils"
 import { useCallback } from "react"
@@ -45,8 +45,8 @@ export function useFlyToOsmBounds() {
 	const map = useMap()
 
 	return useCallback(
-		(osm?: Osm) => {
-			const bbox = osm?.bbox()
+		(osmInfo?: OsmInfo) => {
+			const bbox = osmInfo?.bbox
 			if (!map || !bbox) return
 			map.fitBounds(bbox, {
 				padding: 100,

@@ -213,7 +213,7 @@ export function osmToPbfStream(osm: Osm): ReadableStream<Uint8Array> {
 /**
  * Convert the OSM index to an in memory PBF ArrayBuffer.
  */
-export async function osmToPbfBuffer(osm: Osm): Promise<ArrayBuffer> {
+export async function osmToPbfBuffer(osm: Osm): Promise<Uint8Array> {
 	const chunks: Uint8Array[] = []
 	let byteLength = 0
 	const writable = new WritableStream<Uint8Array>({
@@ -229,5 +229,5 @@ export async function osmToPbfBuffer(osm: Osm): Promise<ArrayBuffer> {
 		combined.set(chunk, offset)
 		offset += chunk.byteLength
 	}
-	return combined.buffer
+	return combined
 }

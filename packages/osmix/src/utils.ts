@@ -51,3 +51,7 @@ export function supportsReadableStreamTransfer(): boolean {
 		port1.close()
 	}
 }
+
+export const SUPPORTS_STREAM_TRANSFER = supportsReadableStreamTransfer()
+export const SUPPORTS_SHARED_ARRAY_BUFFER =
+	typeof SharedArrayBuffer !== "undefined"

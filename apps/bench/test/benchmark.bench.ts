@@ -6,7 +6,7 @@ import { DuckDBBenchWorker } from "../src/workers/duckdb.worker"
 const getPbf = () => fetch(monacoPbf).then((res) => res.arrayBuffer())
 
 describe.runIf(import.meta.env.CI !== "true")("Osmix vs DuckDB", async () => {
-	const osmixRemote = await OsmixRemote.connect(1)
+	const osmixRemote = await OsmixRemote.connect()
 	const duckdb = new DuckDBBenchWorker()
 	let pbf: ArrayBuffer
 

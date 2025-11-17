@@ -9,6 +9,7 @@ import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type { Progress, ProgressEvent } from "@osmix/shared/progress"
 import type { OsmEntityType, Tile } from "@osmix/shared/types"
+import { OsmixVtEncoder } from "@osmix/vt"
 import * as Comlink from "comlink"
 import { dequal } from "dequal/lite"
 import { Osmix } from "./osmix"
@@ -18,8 +19,10 @@ import { collectTransferables } from "./utils"
 /**
  * Worker handler for a single Osmix instance.
  */
-export class OsmixWorker {
+export class OsmixWorker extends EventTarget {
 	private osmix = new Osmix()
+	private osm: Record<string, Osm> = {}
+	private vtEncoders: Record<string, OsmixVtEncoder> = {}
 	private changesets: Record<string, OsmChangeset> = {}
 	private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"]
 	private entityTypes: OsmEntityType[] = ["node", "way", "relation"]
@@ -27,6 +30,9 @@ export class OsmixWorker {
 
 	addProgressListener(listener: (progress: Progress) => void) {
 		this.osmix.addEventListener("progress", (e: Event) =>
+			listener((e as ProgressEvent).detail),
+		)
+		this.addEventListener("progress", (e: Event) =>
 			listener((e as ProgressEvent).detail),
 		)
 	}
@@ -45,7 +51,23 @@ export class OsmixWorker {
 		options?: Partial<OsmFromPbfOptions>
 	}) {
 		const osm = await this.osmix.fromPbf(data, options)
-		return osm.transferables()
+		this.set(osm.id, osm)
+		return osm.info()
+	}
+
+	toPbfStream({
+		osmId,
+		writeableStream,
+	}: {
+		osmId: string
+		writeableStream: WritableStream<Uint8Array>
+	}) {
+		return this.osmix.toPbfStream(this.get(osmId)).pipeTo(writeableStream)
+	}
+
+	async toPbf(osmId: string) {
+		const data = await this.osmix.toPbf(this.get(osmId))
+		return Comlink.transfer(data, [data.buffer])
 	}
 
 	async fromGeoJSON({
@@ -56,49 +78,67 @@ export class OsmixWorker {
 		options?: Partial<OsmOptions>
 	}) {
 		const osm = await this.osmix.fromGeoJSON(data, options)
-		return osm.transferables()
+		this.set(osm.id, osm)
+		return osm.info()
 	}
 
-	fromTransferables(transferables: OsmTransferables) {
-		this.osmix.set(transferables.id, new Osm(transferables))
+	transferIn(transferables: OsmTransferables) {
+		this.set(transferables.id, new Osm(transferables))
 	}
 
-	transfer(id: string) {
-		const transferables = this.osmix.get(id).transferables()
+	transferOut(id: string) {
+		const transferables = this.get(id).transferables()
+		this.delete(id)
 		return Comlink.transfer(transferables, collectTransferables(transferables))
 	}
 
+	getOsmBuffers(id: string) {
+		return this.get(id).transferables()
+	}
+
+	has(id: string): boolean {
+		return this.osm[id] != null
+	}
+
 	isReady(id: string): boolean {
-		return this.osmix.isReady(id)
+		return this.osm[id]?.isReady() ?? false
 	}
 
-	get(id: string) {
-		return this.osmix.get(id).transferables()
+	private get(id: string) {
+		if (!this.osm[id]) throw Error(`OSM not found for id: ${id}`)
+		return this.osm[id]
 	}
 
-	set(id: string, transferables: OsmTransferables) {
-		this.osmix.set(id, new Osm(transferables))
+	private set(id: string, osm: Osm) {
+		this.osm[id] = osm
+		this.vtEncoders[id] = new OsmixVtEncoder(osm)
 	}
 
 	delete(id: string) {
-		this.osmix.delete(id)
+		delete this.osm[id]
+		delete this.vtEncoders[id]
+	}
+
+	getVtEncoder(id: string) {
+		if (this.vtEncoders[id]) return this.vtEncoders[id]
+		this.vtEncoders[id] = new OsmixVtEncoder(this.get(id))
+		return this.vtEncoders[id]
 	}
 
 	getVectorTile(id: string, tile: Tile) {
-		const data = this.osmix.getVectorTile(id, tile)
+		const data = this.getVtEncoder(id).getTile(tile)
 		if (!data || data.byteLength === 0) return new ArrayBuffer(0)
 		return Comlink.transfer(data, [data])
 	}
 
 	getRasterTile(id: string, tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
-		const rasterTile = this.osmix.getRasterTile(id, tile, tileSize)
-		const data = rasterTile.imageData
+		const data = this.osmix.getRasterTile(this.get(id), tile, tileSize)
 		if (!data || data.byteLength === 0) return new Uint8ClampedArray(0)
 		return Comlink.transfer(data, [data.buffer])
 	}
 
 	search(id: string, key: string, val?: string) {
-		return this.osmix.search(id, key, val)
+		return this.osmix.search(this.get(id), key, val)
 	}
 
 	async merge(
@@ -106,12 +146,12 @@ export class OsmixWorker {
 		patchOsmId: string,
 		options: Partial<OsmMergeOptions> = {},
 	) {
-		const baseOsm = this.osmix.get(baseOsmId)
-		const patchOsm = this.osmix.get(patchOsmId)
+		const baseOsm = this.get(baseOsmId)
+		const patchOsm = this.get(patchOsmId)
 		const mergedOsm = await merge(baseOsm, patchOsm, options)
-		this.osmix.set(baseOsmId, mergedOsm)
-		this.osmix.delete(patchOsmId)
-		return mergedOsm.transferables()
+		this.set(baseOsmId, mergedOsm)
+		this.delete(patchOsmId)
+		return mergedOsm.id
 	}
 
 	async generateChangeset(
@@ -119,8 +159,8 @@ export class OsmixWorker {
 		patchOsmId: string,
 		options: Partial<OsmMergeOptions> = {},
 	) {
-		const baseOsm = this.osmix.get(baseOsmId)
-		const patchOsm = this.osmix.get(patchOsmId)
+		const baseOsm = this.get(baseOsmId)
+		const patchOsm = this.get(patchOsmId)
 		const changeset = OsmChangeset.generateChangeset(
 			baseOsm,
 			patchOsm,
@@ -165,10 +205,10 @@ export class OsmixWorker {
 		const changeset = this.changesets[osmId]
 		if (!changeset) throw Error("No active changeset")
 		const newOsm = changeset.applyChanges(osmId)
-		this.osmix.set(osmId, newOsm)
+		this.set(osmId, newOsm)
 		delete this.changesets[osmId]
 		delete this.filteredChanges[osmId]
-		return newOsm.transferables()
+		return newOsm.id
 	}
 
 	private sortChangeset(osmId: string, changeset: OsmChangeset) {

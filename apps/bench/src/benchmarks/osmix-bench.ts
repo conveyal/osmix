@@ -38,21 +38,18 @@ export async function runOsmixBenchmarks(
 
 	// Init
 	const initBenchmark = startBenchmark("Initialize")
-	const osmix = await OsmixRemote.connect(1, (p) => onProgress(p.msg))
+	const osmix = await OsmixRemote.connect({
+		onProgress: (p) => onProgress(p.msg),
+	})
 	initBenchmark("Done")
 
 	// Load speed
 	onProgress("Osmix: Loading file...")
 	const loadBenchmark = startBenchmark("Load Speed")
-	const osm = await osmix.fromPbf(fileData)
+	const stats = await osmix.fromPbf(fileData)
+	const osm = await osmix.get(stats.id)
 
 	// Get bbox and stats from loaded data
-	const stats = {
-		nodes: osm.nodes.size,
-		ways: osm.ways.size,
-		relations: osm.relations.size,
-		bbox: osm.bbox(),
-	}
 	if (!stats) throw new Error("Failed to get Osmix stats")
 	loadBenchmark(
 		`${stats.nodes.toLocaleString()} nodes, ${stats.ways.toLocaleString()} ways, ${stats.relations.toLocaleString()} relations`,

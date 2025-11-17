@@ -109,65 +109,6 @@ describe("Osmix", () => {
 		})
 	})
 
-	describe("get", () => {
-		it("should retrieve instance by ID", async () => {
-			const osmix = new Osmix()
-			const pbfData = await getFixtureFile(monacoPbf.url)
-			const osm1 = await osmix.fromPbf(pbfData.buffer)
-
-			const osm = osmix.get(osm1)
-			expect(osm.id).toBe(osm1.id)
-			expect(osm.nodes.size).toBe(monacoPbf.nodes)
-		})
-
-		it("should throw error for non-existent ID", () => {
-			const osmix = new Osmix()
-			expect(() => osmix.get("non-existent")).toThrow(
-				"OSM not found for id: non-existent",
-			)
-		})
-	})
-
-	describe("set", () => {
-		it("should manually set an instance", async () => {
-			const osmix = new Osmix()
-			const pbfData = await getFixtureFile(monacoPbf.url)
-			const osm = await osmix.fromPbf(pbfData.buffer, { id: "original" })
-
-			osmix.set("manual-set", osm)
-			const retrieved = osmix.get("manual-set")
-			expect(retrieved.id).toBe(osm.id)
-			expect(retrieved.nodes.size).toBe(monacoPbf.nodes)
-		})
-	})
-
-	describe("delete", () => {
-		it("should remove an instance", async () => {
-			const osmix = new Osmix()
-			const pbfData = await getFixtureFile(monacoPbf.url)
-			const osm = await osmix.fromPbf(pbfData.buffer, { id: "to-delete" })
-
-			expect(() => osmix.get(osm)).not.toThrow()
-			osmix.delete(osm)
-			expect(() => osmix.get("to-delete")).toThrow()
-		})
-	})
-
-	describe("isReady", () => {
-		it("should check readiness status", async () => {
-			const osmix = new Osmix()
-			const pbfData = await getFixtureFile(monacoPbf.url)
-			const osm = await osmix.fromPbf(pbfData.buffer, { id: "ready-test" })
-
-			expect(osmix.isReady(osm.id)).toBe(true)
-		})
-
-		it("should be false for non-existent ID", () => {
-			const osmix = new Osmix()
-			expect(osmix.isReady("non-existent")).toBe(false)
-		})
-	})
-
 	describe("search", () => {
 		beforeAll(() => getFixtureFile(monacoPbf.url))
 
@@ -228,8 +169,8 @@ describe("Osmix", () => {
 			const tile: [number, number, number] = [7, 4, 3]
 			const tileData = osmix.getRasterTile(osm, tile)
 
-			expect(tileData.imageData).toBeInstanceOf(Uint8ClampedArray)
-			expect(tileData.imageData.byteLength).toBeGreaterThan(0)
+			expect(tileData).toBeInstanceOf(Uint8ClampedArray)
+			expect(tileData.byteLength).toBeGreaterThan(0)
 		})
 
 		it("should generate raster tile with custom tile size", async () => {
@@ -242,47 +183,8 @@ describe("Osmix", () => {
 			const tile: [number, number, number] = [7, 4, 3]
 			const tileData = osmix.getRasterTile(osm, tile, 512)
 
-			expect(tileData.imageData).toBeInstanceOf(Uint8ClampedArray)
-			expect(tileData.imageData.byteLength).toBeGreaterThan(0)
-		})
-	})
-
-	describe("multi-instance management", () => {
-		beforeAll(() => getFixtureFile(monacoPbf.url))
-
-		it("should store and retrieve multiple instances with different IDs", async () => {
-			const osmix = new Osmix()
-			const pbfData = await getFixtureFile(monacoPbf.url)
-
-			const osm1 = await osmix.fromPbf(pbfData.buffer, { id: "instance-1" })
-			const osm2 = await osmix.fromPbf(pbfData.buffer, { id: "instance-2" })
-
-			const instance1 = osmix.get(osm1)
-			const instance2 = osmix.get(osm2)
-
-			expect(instance1.id).toBe(osm1.id)
-			expect(instance2.id).toBe(osm2.id)
-			expect(instance1.nodes.size).toBe(monacoPbf.nodes)
-			expect(instance2.nodes.size).toBe(monacoPbf.nodes)
-		})
-
-		it("should delete one instance without affecting others", async () => {
-			const osmix = new Osmix()
-			const pbfData = await getFixtureFile(monacoPbf.url)
-
-			await osmix.fromPbf(pbfData.buffer, { id: "keep-1" })
-			await osmix.fromPbf(pbfData.buffer, { id: "delete-me" })
-			await osmix.fromPbf(pbfData.buffer, { id: "keep-2" })
-
-			expect(() => osmix.get("keep-1")).not.toThrow()
-			expect(() => osmix.get("delete-me")).not.toThrow()
-			expect(() => osmix.get("keep-2")).not.toThrow()
-
-			osmix.delete("delete-me")
-
-			expect(() => osmix.get("keep-1")).not.toThrow()
-			expect(() => osmix.get("delete-me")).toThrow()
-			expect(() => osmix.get("keep-2")).not.toThrow()
+			expect(tileData).toBeInstanceOf(Uint8ClampedArray)
+			expect(tileData.byteLength).toBeGreaterThan(0)
 		})
 	})
 })

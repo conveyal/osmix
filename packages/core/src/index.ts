@@ -1,6 +1,8 @@
 /// <reference path="./types/kdbush.d.ts" />
 
-export { Nodes } from "./nodes"
-export { Osm, type OsmOptions, type OsmTransferables } from "./osm"
-export { Relations } from "./relations"
-export { Ways } from "./ways"
+export * from "./nodes"
+export * from "./osm"
+export * from "./relations"
+export * from "./stringtable"
+export * from "./tags"
+export * from "./ways"

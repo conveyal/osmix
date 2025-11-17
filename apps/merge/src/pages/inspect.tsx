@@ -1,5 +1,4 @@
 import { changeStatsSummary } from "@osmix/change"
-import { Osm } from "@osmix/core"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
 import { useMemo } from "react"
@@ -45,7 +44,7 @@ export default function InspectPage() {
 	)
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
-	const { downloadOsm, osm, file, loadOsmFile, setOsm } = useOsmFile(
+	const { downloadOsm, osm, osmInfo, file, loadOsmFile, setOsm } = useOsmFile(
 		osmId,
 		"./monaco.pbf",
 	)
@@ -54,9 +53,9 @@ export default function InspectPage() {
 
 	const applyChanges = async (osmId: string) => {
 		const task = Log.startTask("Applying changes to OSM...")
-		const transferables = await osmWorker.applyChangesAndReplace(osmId)
+		const newOsmId = await osmWorker.applyChangesAndReplace(osmId)
 		task.update("Refreshing OSM index...")
-		const newOsm = new Osm(transferables)
+		const newOsm = await osmWorker.get(newOsmId)
 		setOsm(newOsm)
 		setChangesetStats(null)
 		task.end("Changes applied!")
@@ -76,12 +75,12 @@ export default function InspectPage() {
 						setFile={async (file) => {
 							selectEntity(null, null)
 							setChangesetStats(null)
-							const osm = await loadOsmFile(file)
-							flyToOsmBounds(osm)
+							const osmInfo = await loadOsmFile(file)
+							flyToOsmBounds(osmInfo)
 						}}
 					/>
 
-					{osm && file ? (
+					{osm && osmInfo && file ? (
 						<div className="flex flex-col gap-2">
 							<div className="flex flex-col">
 								<div className="flex items-center justify-between border-l border-r border-t pl-2 rounded-t">
@@ -95,7 +94,7 @@ export default function InspectPage() {
 										/>
 										<ButtonGroupSeparator />
 										<ActionButton
-											onAction={async () => flyToOsmBounds(osm)}
+											onAction={async () => flyToOsmBounds(osmInfo)}
 											variant="ghost"
 											icon={<MaximizeIcon />}
 											title="Fit bounds to file bbox"

@@ -14,6 +14,15 @@ export interface OsmTransferables {
 	relations: RelationsTransferables
 }
 
+export interface OsmInfo {
+	id: string
+	bbox: GeoBbox2D
+	header: OsmPbfHeaderBlock
+	nodes: number
+	ways: number
+	relations: number
+}
+
 export interface OsmOptions {
 	id: string
 	header: OsmPbfHeaderBlock
@@ -90,6 +99,17 @@ export class Osm {
 	 */
 	bbox(): GeoBbox2D {
 		return this.nodes.bbox
+	}
+
+	info(): OsmInfo {
+		return {
+			id: this.id,
+			bbox: this.bbox(),
+			header: this.header,
+			nodes: this.nodes.size,
+			ways: this.ways.size,
+			relations: this.relations.size,
+		}
 	}
 
 	transferables(): OsmTransferables {

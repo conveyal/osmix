@@ -20,7 +20,7 @@ export async function runAllBenchmarks(
 
 	// Read file as ArrayBuffer
 	const fileData = await file.arrayBuffer()
-	const osmixRemote = await OsmixRemote.connect(1)
+	const osmixRemote = await OsmixRemote.connect()
 	const header = await osmixRemote.readHeader(fileData)
 	if (!header.bbox) throw new Error("Header bbox not found")
 

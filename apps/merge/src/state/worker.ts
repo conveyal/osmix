@@ -7,9 +7,9 @@ declare global {
 	}
 }
 
-export const osmWorker = await OsmixRemote.connect(
-	navigator.hardwareConcurrency ?? 1,
-	(progress) => Log.addMessage(progress.msg),
-)
+export const osmWorker = await OsmixRemote.connect({
+	workerCount: navigator.hardwareConcurrency ?? 1,
+	onProgress: (progress) => Log.addMessage(progress.msg),
+})
 
 window.osmWorker = osmWorker
