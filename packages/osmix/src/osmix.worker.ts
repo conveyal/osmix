@@ -14,7 +14,7 @@ import * as Comlink from "comlink"
 import { dequal } from "dequal/lite"
 import { Osmix } from "./osmix"
 import type { OsmFromPbfOptions } from "./pbf"
-import { collectTransferables } from "./utils"
+import { transfer } from "./utils"
 
 /**
  * Worker handler for a single Osmix instance.
@@ -89,7 +89,7 @@ export class OsmixWorker extends EventTarget {
 	transferOut(id: string) {
 		const transferables = this.get(id).transferables()
 		this.delete(id)
-		return Comlink.transfer(transferables, collectTransferables(transferables))
+		return transfer(transferables)
 	}
 
 	getOsmBuffers(id: string) {

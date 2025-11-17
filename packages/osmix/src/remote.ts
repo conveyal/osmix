@@ -169,7 +169,7 @@ export class OsmixRemote {
 	}
 
 	transferIn(osm: Osm): Promise<void> {
-		return this.getWorker().transferIn(osm.transferables())
+		return this.getWorker().transferIn(transfer(osm.transferables()))
 	}
 
 	delete(osmId: OsmId): Promise<void> {
