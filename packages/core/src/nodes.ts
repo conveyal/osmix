@@ -25,15 +25,20 @@ export interface AddNodeOptions {
 }
 
 export class Nodes extends Entities<OsmNode> {
-	lons: RTA<Float64Array>
-	lats: RTA<Float64Array>
-	bbox: GeoBbox2D = [
+	private lons: RTA<Float64Array>
+	private lats: RTA<Float64Array>
+	private bbox: GeoBbox2D = [
 		Number.POSITIVE_INFINITY,
 		Number.POSITIVE_INFINITY,
 		Number.NEGATIVE_INFINITY,
 		Number.NEGATIVE_INFINITY,
 	]
-	spatialIndex: KDBush = new KDBush(0, 128, Float64Array, BufferConstructor)
+	private spatialIndex: KDBush = new KDBush(
+		0,
+		128,
+		Float64Array,
+		BufferConstructor,
+	)
 
 	constructor(stringTable: StringTable, transferables?: NodesTransferables) {
 		if (transferables) {
@@ -172,7 +177,11 @@ export class Nodes extends Entities<OsmNode> {
 		console.timeEnd("NodeIndex.buildSpatialIndex")
 	}
 
-	getBbox(i: IdOrIndex): GeoBbox2D {
+	getBbox(): GeoBbox2D {
+		return this.bbox
+	}
+
+	getNodeBbox(i: IdOrIndex): GeoBbox2D {
 		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
 		const lon = this.lons.at(index)
 		const lat = this.lats.at(index)

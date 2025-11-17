@@ -148,14 +148,9 @@ export class OsmixVtEncoder {
 			const tags = this.osm.ways.tags.getTags(wayIndex)
 			// Skip ways without tags (they are likely only for relations)
 			if (!tags || Object.keys(tags).length === 0) continue
-			const count = this.osm.ways.refCount.at(wayIndex)
-			const start = this.osm.ways.refStart.at(wayIndex)
-			const points: XY[] = new Array(count)
-			for (let i = 0; i < count; i++) {
-				const ref = this.osm.ways.refs.at(start + i)
-				const ll = this.osm.nodes.getNodeLonLat({ id: ref })
-				points[i] = proj(ll)
-			}
+			const wayLine = this.osm.ways.getCoordinates(wayIndex)
+			const points: XY[] = wayLine.map((ll) => proj(ll))
+
 			const isArea = wayIsArea({
 				id,
 				refs: this.osm.ways.getRefIds(wayIndex),

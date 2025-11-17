@@ -8,6 +8,10 @@ const VECTOR_URL_PATTERN =
 
 let registered = false
 
+export function osmixIdToTileUrl(osmId: string) {
+	return `${VECTOR_PROTOCOL_NAME}://${encodeURIComponent(osmId)}/{z}/{x}/{y}.mvt`
+}
+
 export function addOsmixVectorProtocol() {
 	if (registered) return
 	maplibre.addProtocol(
@@ -20,7 +24,10 @@ export function addOsmixVectorProtocol() {
 			if (!match) throw new Error(`Bad @osmix/vector URL: ${req.url}`)
 			const [, osmId, zStr, xStr, yStr] = match
 			const tileIndex: Tile = [+xStr, +yStr, +zStr]
-			const data = await osmWorker.getVectorTile(osmId, tileIndex)
+			const data = await osmWorker.getVectorTile(
+				decodeURIComponent(osmId),
+				tileIndex,
+			)
 
 			return {
 				data: abortController.signal.aborted ? null : data,

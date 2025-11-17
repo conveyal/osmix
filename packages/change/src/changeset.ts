@@ -425,11 +425,11 @@ export class OsmChangeset {
 	 */
 	deduplicateWay(patchWay: OsmWay, dedupedIdPairs: IdPairs) {
 		const wayIndex = this.osm.ways.ids.getIndexFromId(patchWay.id)
-		const wayCoords = this.osm.ways.getCoordinates(wayIndex, this.osm.nodes)
+		const wayCoords = this.osm.ways.getCoordinates(wayIndex)
 
 		// Look for duplicate ways in OSM index
 		const closeWayIndexes = this.osm.ways.intersects(
-			this.osm.ways.getBbox(patchWay),
+			this.osm.ways.getNodeBbox(patchWay),
 		)
 		const wayVersion = getEntityVersion(patchWay)
 		const wayTagCount = Object.keys(patchWay.tags ?? {}).length
@@ -446,7 +446,7 @@ export class OsmChangeset {
 				if (isWayEqual(patchWay, otherWay)) return otherWay
 
 				// Check geometry
-				const coords = this.osm.ways.getCoordinates(index, this.osm.nodes)
+				const coords = this.osm.ways.getCoordinates(index)
 				if (!dequal(wayCoords, coords)) return null
 
 				// Check version
@@ -532,13 +532,11 @@ export class OsmChangeset {
 		const wayIndex = this.osm.ways.ids.getIndexFromId(way.id)
 
 		// Check for intersecting ways. Since the way exists in the base OSM, there will always be at least one way.
-		const bbox = this.osm.ways.getBbox({ index: wayIndex })
+		const bbox = this.osm.ways.getNodeBbox({ index: wayIndex })
 		const intersectingWayIndexes = this.osm.ways.intersects(bbox)
 		if (intersectingWayIndexes.length <= 1) return // No candidates
 
-		const coordinates = cleanCoords(
-			this.osm.ways.getCoordinates(wayIndex, this.osm.nodes),
-		)
+		const coordinates = cleanCoords(this.osm.ways.getCoordinates(wayIndex))
 
 		for (const intersectingWayIndex of intersectingWayIndexes) {
 			const intersectingWayId = this.osm.ways.ids.at(intersectingWayIndex)
@@ -553,7 +551,7 @@ export class OsmChangeset {
 			if (!waysShouldConnect(way.tags, intersectingWay.tags)) continue
 
 			const intersectingWayCoords = cleanCoords(
-				this.osm.ways.getCoordinates(intersectingWayIndex, this.osm.nodes),
+				this.osm.ways.getCoordinates(intersectingWayIndex),
 			)
 
 			// Skip ways that are geometrically equal

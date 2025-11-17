@@ -114,6 +114,31 @@ export class OsmixWorker extends EventTarget {
 		this.vtEncoders[id] = new OsmixVtEncoder(osm)
 	}
 
+	callOsmViaProxy(osmId: string, path: string[], args: unknown[]) {
+		const osm = this.get(osmId)
+		if (!osm) throw new Error(`Unknown osmId: ${osmId}`)
+
+		let target: any = osm
+		for (let i = 0; i < path.length - 1; i++) {
+			const p = path[i]
+			if (!p) throw Error(`Path ${path.slice(0, i + 1).join(".")} is undefined`)
+			target = target[p as keyof Osm]
+			if (target == null)
+				throw Error(`Path ${path.slice(0, i + 1).join(".")} is undefined`)
+		}
+
+		const last = path[path.length - 1]
+		if (!last) throw Error(`Path ${path.join(".")} is undefined`)
+		const value = target[last as keyof Osm]
+		if (!value) throw Error(`Path ${path.join(".")} is undefined`)
+
+		if (typeof value === "function") return value.apply(target, args)
+		if (args.length > 0) throw Error(`Property ${String(last)} is not callable`)
+
+		// plain property access
+		return value
+	}
+
 	delete(id: string) {
 		delete this.osm[id]
 		delete this.vtEncoders[id]

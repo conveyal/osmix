@@ -23,19 +23,19 @@ export interface WaysTransferables extends EntitiesTransferables {
 }
 
 export class Ways extends Entities<OsmWay> {
-	spatialIndex: Flatbush = new Flatbush(1)
+	private spatialIndex: Flatbush = new Flatbush(1)
 
-	refStart: RTA<Uint32Array>
-	refCount: RTA<Uint16Array> // Maximum 2,000 nodes per way
+	private refStart: RTA<Uint32Array>
+	private refCount: RTA<Uint16Array> // Maximum 2,000 nodes per way
 
 	// Node IDs
-	refs: RTA<Float64Array>
+	private refs: RTA<Float64Array>
 
 	// Bounding box of the way in geographic coordinates
-	bbox: RTA<Float64Array>
+	private bbox: RTA<Float64Array>
 
 	// Node reference index
-	nodes: Nodes
+	private nodes: Nodes
 
 	constructor(
 		stringTable: StringTable,
@@ -169,7 +169,7 @@ export class Ways extends Entities<OsmWay> {
 		return Array.from(this.refs.slice(start, start + count))
 	}
 
-	getBbox(idOrIndex: IdOrIndex): GeoBbox2D {
+	getNodeBbox(idOrIndex: IdOrIndex): GeoBbox2D {
 		const index =
 			"index" in idOrIndex ? idOrIndex.index : this.ids.idOrIndex(idOrIndex)[0]
 		return [
@@ -193,7 +193,7 @@ export class Ways extends Entities<OsmWay> {
 		return line
 	}
 
-	getCoordinates(index: number, nodeIndex: Nodes): LonLat[] {
+	getCoordinates(index: number): LonLat[] {
 		const count = this.refCount.at(index)
 		const start = this.refStart.at(index)
 		const coords: [number, number][] = []
@@ -205,7 +205,7 @@ export class Ways extends Entities<OsmWay> {
 				coord[0] === undefined ||
 				coord[1] === undefined
 			) {
-				console.error("node index has ref", nodeIndex.ids.has(ref))
+				console.error("node index has ref", this.nodes.ids.has(ref))
 				throw Error(
 					`Invalid coordinate for way id ${this.ids.at(index)}, index ${index}, node ref ${ref}, ref index ${refIndex}`,
 				)

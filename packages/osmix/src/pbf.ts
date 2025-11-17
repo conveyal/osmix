@@ -42,24 +42,28 @@ export async function createOsmFromPbf(
 	options: Partial<OsmFromPbfOptions> = {},
 	onProgress: (progress: ProgressEvent) => void = logProgress,
 ): Promise<Osm> {
-	const osm = new Osm(options)
-	for await (const update of startCreateOsmFromPbf(osm, data, options)) {
+	const createOsm = startCreateOsmFromPbf(data, options)
+	for await (const update of createOsm) {
 		onProgress(update)
 	}
-	return osm
+	const result = await createOsm.next()
+	if (!result.done) throw Error("Failed to create Osm from PBF")
+	return result.value
 }
 
 /**
  * Parse raw PBF data into an Osm index.
  */
 export async function* startCreateOsmFromPbf(
-	osm: Osm,
 	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
 	options: Partial<OsmFromPbfOptions> = {},
-): AsyncGenerator<ProgressEvent> {
+): AsyncGenerator<ProgressEvent, Osm> {
 	const { extractBbox } = options
 	const { header, blocks } = await readOsmPbf(data)
-	osm.header = header
+	const osm = new Osm({
+		...options,
+		header,
+	})
 	if (extractBbox) {
 		osm.header.bbox = {
 			left: extractBbox[0],
@@ -156,6 +160,8 @@ export async function* startCreateOsmFromPbf(
 	} else if (options.buildSpatialIndexes.includes("way")) {
 		osm.ways.buildSpatialIndex()
 	}
+
+	return osm
 }
 
 /**

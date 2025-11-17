@@ -1,9 +1,10 @@
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
-import { Osm, type OsmOptions } from "@osmix/core"
+import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core"
+import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type { Progress } from "@osmix/shared/progress"
 import { streamToBytes } from "@osmix/shared/stream-to-bytes"
-import type { OsmEntityType, Tile } from "@osmix/shared/types"
+import type { GeoBbox2D, OsmEntityType, Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
 import type { OsmixWorker } from "./osmix.worker"
 import { type OsmFromPbfOptions, osmToPbfStream } from "./pbf"
@@ -15,6 +16,21 @@ import {
 } from "./utils"
 
 type OsmId = string | Osm
+
+type Remoteify<T> = T extends (...args: infer A) => infer R
+	? (...args: A) => Promise<Awaited<R>>
+	: T extends object
+		? {
+				[K in keyof T]: Remoteify<T[K]>
+			}
+		: Promise<T>
+
+export type RemoteOsm = Remoteify<Osm> & {
+	id: string
+	header: OsmPbfHeaderBlock
+	bbox: GeoBbox2D
+	stats: OsmInfo
+}
 
 export interface OsmixRemoteOptions {
 	workerCount?: number
@@ -56,6 +72,9 @@ export class OsmixRemote {
 		return nextWorker
 	}
 
+	/**
+	 * Changesets must always be handled by the same worker.
+	 */
 	private getChangesetWorker() {
 		if (!this.changesetWorker) throw Error("No changeset worker available")
 		return this.changesetWorker
@@ -169,6 +188,10 @@ export class OsmixRemote {
 		return new Osm(transferables)
 	}
 
+	getProxy(osmId: OsmId): RemoteOsm {
+		return this.createProxy(this.getId(osmId))
+	}
+
 	async transferOut(osmId: OsmId): Promise<Osm> {
 		const transferables = await this.getWorker().transferOut(this.getId(osmId))
 		await this.delete(osmId)
@@ -243,6 +266,44 @@ export class OsmixRemote {
 			page,
 			pageSize,
 		)
+	}
+
+	private createProxy(id: string): RemoteOsm {
+		const getWorker = () => this.getWorker()
+
+		const buildProxy = (path: string[]) =>
+			new Proxy(() => {}, {
+				get(_target, prop, _receiver) {
+					// This is the magic: `await osm.nodes.size`
+					// turns into fetching the `then` property on this proxy.
+					if (prop === "then") {
+						return (
+							resolve: (v: unknown) => void,
+							reject: (err: unknown) => void,
+						) => {
+							// callOsm will either invoke a method or return a plain property
+							getWorker().callOsmViaProxy(id, path, []).then(resolve, reject)
+						}
+					}
+
+					if (typeof prop === "symbol") {
+						return undefined
+					}
+
+					// Continue building the path: osm.nodes, osm.nodes.size, ...
+					return buildProxy([...path, String(prop)])
+				},
+
+				async apply(_target, _thisArg, argArray) {
+					if (path.length === 0) {
+						throw new Error("Cannot call the root proxy directly")
+					}
+					// Method call: osm.nodes.findIndexesWithinBbox(...)
+					return getWorker().callOsmViaProxy(id, path, argArray)
+				},
+			})
+
+		return buildProxy([]) as unknown as RemoteOsm
 	}
 }
 

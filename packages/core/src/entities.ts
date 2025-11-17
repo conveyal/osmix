@@ -51,7 +51,7 @@ export abstract class Entities<T extends OsmEntity> {
 		console.timeEnd(`${this.indexType}Index.buildIndex`)
 	}
 
-	abstract getBbox(idOrIndex: IdOrIndex): GeoBbox2D
+	abstract getNodeBbox(idOrIndex: IdOrIndex): GeoBbox2D
 
 	abstract getFullEntity(index: number, id: number, tags?: OsmTags): T
 

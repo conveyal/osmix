@@ -59,7 +59,7 @@ export class OsmixRasterEncoder {
 			return true
 		})
 		const ways = wayIndexes.map((wayIndex) => ({
-			coords: this.osm.ways.getCoordinates(wayIndex, this.osm.nodes),
+			coords: this.osm.ways.getCoordinates(wayIndex),
 			isArea: wayIsArea(this.osm.ways.getByIndex(wayIndex)),
 		}))
 		const { wayLines, wayPolygons } = ways.reduce(
@@ -127,7 +127,7 @@ export function drawRasterTile(osm: Osm, rasterTile: OsmixRasterTile) {
 		return true
 	})
 	const ways = wayIndexes.map((wayIndex) => ({
-		coords: osm.ways.getCoordinates(wayIndex, osm.nodes),
+		coords: osm.ways.getCoordinates(wayIndex),
 		isArea: wayIsArea(osm.ways.getByIndex(wayIndex)),
 	}))
 	const { wayLines, wayPolygons } = ways.reduce(

@@ -1,3 +1,4 @@
+import { Osm } from "@osmix/core"
 import {
 	getFixtureFile,
 	getFixtureFileReadStream,
@@ -19,7 +20,7 @@ describe("OsmixComlinkTest", () => {
 			getFixturePath(monacoPbf.url),
 		).arrayBuffer()
 		const osm = await remote.fromPbf(fileStream)
-		expect(osm.nodes).toBe(monacoPbf.nodes)
+		expect(osm.stats.nodes).toBe(monacoPbf.nodes)
 	})
 })
 
@@ -41,7 +42,7 @@ describe("OsmixRemote", () => {
 				const remote = await OsmixRemote.connect()
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osm = await remote.fromPbf(pbfData.buffer)
-				expect(osm.nodes).toBe(monacoPbf.nodes)
+				expect(osm.stats.nodes).toBe(monacoPbf.nodes)
 			},
 			workerTestTimeout,
 		)
@@ -73,8 +74,8 @@ describe("OsmixRemote", () => {
 				const buffer = new TextEncoder().encode(jsonString).buffer
 				const osm = await remote.fromGeoJSON(buffer)
 
-				expect(osm.nodes).toBe(1)
-				expect(osm.ways).toBe(0)
+				expect(osm.stats.nodes).toBe(1)
+				expect(osm.stats.ways).toBe(0)
 			},
 			workerTestTimeout,
 		)
@@ -111,11 +112,26 @@ describe("OsmixRemote", () => {
 				})
 				const osm = await remote.fromGeoJSON(stream)
 
-				expect(osm.nodes).toBe(2)
-				expect(osm.ways).toBe(1)
+				expect(osm.stats.nodes).toBe(2)
+				expect(osm.stats.ways).toBe(1)
 			},
 			workerTestTimeout,
 		)
+	})
+
+	describe("proxy", () => {
+		beforeAll(() => getFixtureFile(monacoPbf.url))
+
+		it("should proxy instance from worker", async () => {
+			const remote = await OsmixRemote.connect()
+			const pbfData = await getFixtureFile(monacoPbf.url)
+			const osmInfo = await remote.fromPbf(pbfData.buffer)
+			const osm = remote.getProxy(osmInfo.id)
+			expect(await osm.nodes.getBbox()).toEqual([
+				7.4053929, 43.7232244, 7.4447259, 43.7543687,
+			])
+			expect(await osm.nodes.size).toBe(monacoPbf.nodes)
+		})
 	})
 
 	describe("get", () => {
@@ -126,9 +142,11 @@ describe("OsmixRemote", () => {
 			async () => {
 				const remote = await OsmixRemote.connect()
 				const pbfData = await getFixtureFile(monacoPbf.url)
-				await remote.fromPbf(pbfData.buffer, { id: "remote-get" })
+				const osmInfo = await remote.fromPbf(pbfData.buffer, {
+					id: "remote-get",
+				})
+				const osm = await remote.get(osmInfo.id)
 
-				const osm = await remote.get("remote-get")
 				expect(osm.id).toBe("remote-get")
 				expect(osm.nodes.size).toBe(monacoPbf.nodes)
 			},
@@ -148,8 +166,9 @@ describe("OsmixRemote", () => {
 					id: "original-remote",
 				})
 				const osm = await remote.transferOut(osmInfo.id)
-				osm.id = "manual-set-remote"
-				await remote.transferIn(osm)
+				await remote.transferIn(
+					new Osm({ ...osm.transferables(), id: "manual-set-remote" }),
+				)
 				const retrieved = await remote.get("manual-set-remote")
 				expect(retrieved.id).toBe("manual-set-remote")
 				expect(retrieved.nodes.size).toBe(monacoPbf.nodes)
@@ -295,7 +314,7 @@ describe("OsmixRemote", () => {
 				const remote = await OsmixRemote.connect({ workerCount: 1 })
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osm = await remote.fromPbf(pbfData.buffer)
-				expect(osm.nodes).toBe(monacoPbf.nodes)
+				expect(osm.stats.nodes).toBe(monacoPbf.nodes)
 			},
 			workerTestTimeout,
 		)
@@ -320,9 +339,9 @@ describe("OsmixRemote", () => {
 				expect(osm1.id).toBe("multi-worker-1")
 				expect(osm2.id).toBe("multi-worker-2")
 				expect(osm3.id).toBe("multi-worker-3")
-				expect(osm1.nodes).toBe(monacoPbf.nodes)
-				expect(osm2.nodes).toBe(monacoPbf.nodes)
-				expect(osm3.nodes).toBe(monacoPbf.nodes)
+				expect(osm1.stats.nodes).toBe(monacoPbf.nodes)
+				expect(osm2.stats.nodes).toBe(monacoPbf.nodes)
+				expect(osm3.stats.nodes).toBe(monacoPbf.nodes)
 			},
 			workerTestTimeout,
 		)

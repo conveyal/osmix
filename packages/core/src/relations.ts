@@ -32,19 +32,19 @@ export interface RelationsTransferables extends EntitiesTransferables {
 }
 
 export class Relations extends Entities<OsmRelation> {
-	stringTable: StringTable
+	private stringTable: StringTable
 
-	memberStart: RTA<Uint32Array>
-	memberCount: RTA<Uint16Array> // Maximum 65,535 members per relation
+	private memberStart: RTA<Uint32Array>
+	private memberCount: RTA<Uint16Array> // Maximum 65,535 members per relation
 
 	// Store the ID of the member because relations have other relations as members.
-	memberRefs: RTA<Float64Array>
-	memberTypes: RTA<Uint8Array>
-	memberRoles: RTA<Uint32Array>
+	private memberRefs: RTA<Float64Array>
+	private memberTypes: RTA<Uint8Array>
+	private memberRoles: RTA<Uint32Array>
 
 	// Node and Way indexes
-	nodes: Nodes
-	ways: Ways
+	private nodes: Nodes
+	private ways: Ways
 
 	constructor(
 		stringTable: StringTable,
@@ -177,7 +177,7 @@ export class Relations extends Entities<OsmRelation> {
 		this.memberRoles.compact()
 	}
 
-	getBbox(i: IdOrIndex): GeoBbox2D {
+	getNodeBbox(i: IdOrIndex): GeoBbox2D {
 		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
 		const relation = this.getFullEntity(index, this.ids.at(index))
 		const lls: LonLat[] = []
@@ -188,7 +188,7 @@ export class Relations extends Entities<OsmRelation> {
 			} else if (member.type === "way") {
 				const wayIndex = this.ways.ids.getIndexFromId(member.ref)
 				if (wayIndex === -1) throw Error("Way not found")
-				const wayPositions = this.ways.getCoordinates(wayIndex, this.nodes)
+				const wayPositions = this.ways.getCoordinates(wayIndex)
 				lls.push(...wayPositions)
 			}
 		}

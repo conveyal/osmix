@@ -27,15 +27,16 @@ export class Osmix extends EventTarget {
 		data: ArrayBufferLike | ReadableStream,
 		options: Partial<OsmFromPbfOptions> = {},
 	): Promise<Osm> {
-		const osm = new Osm(options)
-		for await (const update of startCreateOsmFromPbf(
-			osm,
+		const createOsm = startCreateOsmFromPbf(
 			data instanceof ReadableStream ? data : new Uint8Array(data),
 			options,
-		)) {
+		)
+		for await (const update of createOsm) {
 			this.dispatchEvent(update)
 		}
-		return osm
+		const result = await createOsm.next()
+		if (!result.done) throw Error("Failed to create Osm from PBF")
+		return result.value
 	}
 
 	toPbfStream(osm: Osm): ReadableStream<Uint8Array> {

@@ -18,9 +18,11 @@ export interface OsmInfo {
 	id: string
 	bbox: GeoBbox2D
 	header: OsmPbfHeaderBlock
-	nodes: number
-	ways: number
-	relations: number
+	stats: {
+		nodes: number
+		ways: number
+		relations: number
+	}
 }
 
 export interface OsmOptions {
@@ -33,17 +35,14 @@ export interface OsmOptions {
  */
 export class Osm {
 	// Filename or ID of this OSM Entity index.
-	id = "unknown"
-	header: OsmPbfHeaderBlock = {
-		required_features: [],
-		optional_features: [],
-	}
+	readonly id: string
+	readonly header: OsmPbfHeaderBlock
 
 	// Shared string lookup table for all nodes, ways, and relations
-	stringTable: StringTable
-	nodes: Nodes
-	ways: Ways
-	relations: Relations
+	readonly stringTable: StringTable
+	readonly nodes: Nodes
+	readonly ways: Ways
+	readonly relations: Relations
 
 	private indexBuilt = false
 
@@ -98,7 +97,7 @@ export class Osm {
 	 * Get the bounding box of all entities in the OSM index.
 	 */
 	bbox(): GeoBbox2D {
-		return this.nodes.bbox
+		return this.nodes.getBbox()
 	}
 
 	info(): OsmInfo {
@@ -106,9 +105,11 @@ export class Osm {
 			id: this.id,
 			bbox: this.bbox(),
 			header: this.header,
-			nodes: this.nodes.size,
-			ways: this.ways.size,
-			relations: this.relations.size,
+			stats: {
+				nodes: this.nodes.size,
+				ways: this.ways.size,
+				relations: this.relations.size,
+			},
 		}
 	}
 

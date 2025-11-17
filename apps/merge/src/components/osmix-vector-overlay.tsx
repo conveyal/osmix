@@ -15,7 +15,10 @@ import {
 	Source,
 } from "react-map-gl/maplibre"
 import { useMap } from "../hooks/map"
-import { addOsmixVectorProtocol } from "../lib/osmix-vector-protocol"
+import {
+	addOsmixVectorProtocol,
+	osmixIdToTileUrl,
+} from "../lib/osmix-vector-protocol"
 import { APPID, MIN_PICKABLE_ZOOM } from "../settings"
 import { selectOsmEntityAtom } from "../state/osm"
 
@@ -260,7 +263,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
 		<Source
 			id={sourceId}
 			type="vector"
-			tiles={[`@osmix/vector://${osm.id}/{z}/{x}/{y}.mvt`]}
+			tiles={[osmixIdToTileUrl(osm.id)]}
 			bounds={osm.bbox()}
 			minzoom={MIN_PICKABLE_ZOOM}
 		>
