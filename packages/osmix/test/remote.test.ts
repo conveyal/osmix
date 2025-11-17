@@ -6,7 +6,7 @@ import {
 } from "@osmix/shared/test/fixtures"
 import type { FeatureCollection, LineString, Point } from "geojson"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
-import { OsmixRemote } from "./remote"
+import { OsmixRemote } from "../src/remote"
 
 const monacoPbf = PBFs["monaco"]!
 
