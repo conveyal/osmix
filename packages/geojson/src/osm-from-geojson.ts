@@ -5,8 +5,7 @@ import {
 	type ProgressEvent,
 	progressEvent,
 } from "@osmix/shared/progress"
-import type { OsmEntity, OsmRelationMember, OsmTags } from "@osmix/shared/types"
-import { isNode, isRelation, isWay } from "@osmix/shared/utils"
+import type { OsmRelationMember, OsmTags } from "@osmix/shared/types"
 import type {
 	FeatureCollection,
 	LineString,
@@ -14,12 +13,6 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
-import {
-	nodeToFeature,
-	relationToFeature,
-	wayToFeature,
-} from "./entity-to-feature"
-import type { OsmGeoJSONFeature } from "./types"
 
 /**
  * Create an Osm instance from a GeoJSON FeatureCollection.
@@ -311,29 +304,4 @@ function extractFeatureId(
 		if (!Number.isNaN(numId)) return numId
 	}
 	return undefined
-}
-
-/**
- * Helper to convert an Osmix entity to a GeoJSON feature.
- */
-export function osmEntityToGeoJSONFeature(
-	osm: Osm,
-	entity: OsmEntity,
-): OsmGeoJSONFeature<
-	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.MultiPolygon
-> {
-	if (isNode(entity)) {
-		return nodeToFeature(entity)
-	}
-	if (isWay(entity)) {
-		return wayToFeature(entity, (ref) => osm.nodes.getNodeLonLat({ id: ref }))
-	}
-	if (isRelation(entity)) {
-		return relationToFeature(
-			entity,
-			(ref) => osm.nodes.getNodeLonLat({ id: ref }),
-			(ref) => osm.ways.getById(ref),
-		)
-	}
-	throw new Error("Unknown entity type")
 }

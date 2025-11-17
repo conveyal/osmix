@@ -1,9 +1,21 @@
+import type { Osm } from "@osmix/core"
 import {
 	buildRelationRings,
 	getWayMembersByRole,
 } from "@osmix/shared/relation-multipolygon"
-import type { LonLat, OsmNode, OsmRelation, OsmWay } from "@osmix/shared/types"
-import { isMultipolygonRelation } from "@osmix/shared/utils"
+import type {
+	LonLat,
+	OsmEntity,
+	OsmNode,
+	OsmRelation,
+	OsmWay,
+} from "@osmix/shared/types"
+import {
+	isMultipolygonRelation,
+	isNode,
+	isRelation,
+	isWay,
+} from "@osmix/shared/utils"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 import type { LineString, MultiPolygon, Point, Polygon } from "geojson"
 import type { OsmGeoJSONFeature } from "./types"
@@ -140,4 +152,29 @@ export function relationToFeature(
 			...relation.tags,
 		},
 	}
+}
+
+/**
+ * Helper to convert an Osmix entity to a GeoJSON feature.
+ */
+export function osmEntityToGeoJSONFeature(
+	osm: Osm,
+	entity: OsmEntity,
+): OsmGeoJSONFeature<
+	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.MultiPolygon
+> {
+	if (isNode(entity)) {
+		return nodeToFeature(entity)
+	}
+	if (isWay(entity)) {
+		return wayToFeature(entity, (ref) => osm.nodes.getNodeLonLat({ id: ref }))
+	}
+	if (isRelation(entity)) {
+		return relationToFeature(
+			entity,
+			(ref) => osm.nodes.getNodeLonLat({ id: ref }),
+			(ref) => osm.ways.getById(ref),
+		)
+	}
+	throw new Error("Unknown entity type")
 }
