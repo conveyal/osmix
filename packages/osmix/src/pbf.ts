@@ -43,12 +43,11 @@ export async function createOsmFromPbf(
 	onProgress: (progress: ProgressEvent) => void = logProgress,
 ): Promise<Osm> {
 	const createOsm = startCreateOsmFromPbf(data, options)
-	for await (const update of createOsm) {
-		onProgress(update)
-	}
-	const result = await createOsm.next()
-	if (!result.done) throw Error("Failed to create Osm from PBF")
-	return result.value
+	do {
+		const { value, done } = await createOsm.next()
+		if (done) return value
+		onProgress(value)
+	} while (true)
 }
 
 /**

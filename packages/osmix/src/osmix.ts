@@ -6,10 +6,10 @@ import { progressEvent } from "@osmix/shared/progress"
 import type { OsmNode, OsmRelation, OsmWay, Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import {
+	createOsmFromPbf,
 	type OsmFromPbfOptions,
 	osmToPbfBuffer,
 	osmToPbfStream,
-	startCreateOsmFromPbf,
 } from "./pbf"
 import { drawRasterTile } from "./raster"
 
@@ -27,16 +27,11 @@ export class Osmix extends EventTarget {
 		data: ArrayBufferLike | ReadableStream,
 		options: Partial<OsmFromPbfOptions> = {},
 	): Promise<Osm> {
-		const createOsm = startCreateOsmFromPbf(
+		return createOsmFromPbf(
 			data instanceof ReadableStream ? data : new Uint8Array(data),
 			options,
+			(progress) => this.dispatchEvent(progress),
 		)
-		for await (const update of createOsm) {
-			this.dispatchEvent(update)
-		}
-		const result = await createOsm.next()
-		if (!result.done) throw Error("Failed to create Osm from PBF")
-		return result.value
 	}
 
 	toPbfStream(osm: Osm): ReadableStream<Uint8Array> {
