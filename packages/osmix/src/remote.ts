@@ -8,6 +8,7 @@ import * as Comlink from "comlink"
 import type { OsmixWorker } from "./osmix.worker"
 import { type OsmFromPbfOptions, osmToPbfStream } from "./pbf"
 import {
+	DEFAULT_WORKER_COUNT,
 	SUPPORTS_SHARED_ARRAY_BUFFER,
 	SUPPORTS_STREAM_TRANSFER,
 	transfer,
@@ -28,7 +29,7 @@ export class OsmixRemote {
 	private changesetWorker: Comlink.Remote<OsmixWorker> | null = null
 
 	static async connect({
-		workerCount = 1,
+		workerCount = DEFAULT_WORKER_COUNT,
 		onProgress,
 	}: OsmixRemoteOptions = {}) {
 		const remote = new OsmixRemote()
@@ -169,15 +170,23 @@ export class OsmixRemote {
 	}
 
 	async transferOut(osmId: OsmId): Promise<Osm> {
-		return new Osm(await this.getWorker().transferOut(this.getId(osmId)))
+		const transferables = await this.getWorker().transferOut(this.getId(osmId))
+		await this.delete(osmId)
+		return new Osm(transferables)
 	}
 
-	transferIn(osm: Osm): Promise<void> {
-		return this.getWorker().transferIn(transfer(osm.transferables()))
+	async transferIn(osm: Osm): Promise<void> {
+		await Promise.all(
+			this.workers.map((worker) =>
+				worker.transferIn(transfer(osm.transferables())),
+			),
+		)
 	}
 
-	delete(osmId: OsmId): Promise<void> {
-		return this.getWorker().delete(this.getId(osmId))
+	async delete(osmId: OsmId): Promise<void> {
+		await Promise.all(
+			this.workers.map((worker) => worker.delete(this.getId(osmId))),
+		)
 	}
 
 	getVectorTile(osmId: OsmId, tile: Tile) {

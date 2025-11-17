@@ -152,7 +152,7 @@ describe("OsmixRemote", () => {
 				await remote.transferIn(osm)
 				const retrieved = await remote.get("manual-set-remote")
 				expect(retrieved.id).toBe("manual-set-remote")
-				expect(retrieved.nodes).toBe(monacoPbf.nodes)
+				expect(retrieved.nodes.size).toBe(monacoPbf.nodes)
 				expect(await remote.has("original-remote")).toBe(false)
 			},
 			workerTestTimeout,
