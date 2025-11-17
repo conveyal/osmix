@@ -33,6 +33,10 @@ export class OsmixRemote {
 	}: OsmixRemoteOptions = {}) {
 		const remote = new OsmixRemote()
 		if (workerCount < 1) throw Error("Worker count must be at least 1")
+		if (workerCount > 1 && !SUPPORTS_SHARED_ARRAY_BUFFER)
+			throw Error(
+				"SharedArrayBuffer not supported, cannot use multiple workers.",
+			)
 		for (let i = 0; i < workerCount; i++) {
 			const worker = await createOsmixWorker()
 			if (onProgress) {
