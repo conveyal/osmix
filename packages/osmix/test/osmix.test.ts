@@ -1,10 +1,10 @@
+import { beforeAll, describe, expect, it } from "bun:test"
 import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
 } from "@osmix/shared/test/fixtures"
 import type { FeatureCollection, LineString, Point } from "geojson"
-import { beforeAll, describe, expect, it } from "vitest"
 import { Osmix } from "../src/osmix"
 
 const monacoPbf = PBFs["monaco"]!

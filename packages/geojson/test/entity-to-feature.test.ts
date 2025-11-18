@@ -1,5 +1,5 @@
+import { describe, expect, it } from "bun:test"
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/shared/types"
-import { assert, describe, expect, it } from "vitest"
 import {
 	nodeToFeature,
 	relationToFeature,
@@ -58,7 +58,7 @@ describe("geojson helpers", () => {
 		const feature = relationToFeature(relation, refToPosition, getWay)
 		expect(feature.geometry.type).toBe("Polygon")
 		const polygon = feature.geometry
-		assert.exists(polygon.coordinates?.[0])
+		expect(polygon.coordinates?.[0]).toBeDefined()
 		expect(polygon.coordinates[0]).toHaveLength(3) // Should have 3 coordinates (closed ring)
 	})
 })

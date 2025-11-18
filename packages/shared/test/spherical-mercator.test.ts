@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "bun:test"
 import SphericalMercatorTile from "../src/spherical-mercator"
 import type { Tile } from "../src/types"
 

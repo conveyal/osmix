@@ -1,6 +1,6 @@
+import { describe, expect, it } from "bun:test"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { LonLat, Tile, XY } from "@osmix/shared/types"
-import { describe, expect, it } from "vitest"
 import {
 	DEFAULT_AREA_COLOR,
 	DEFAULT_LINE_COLOR,

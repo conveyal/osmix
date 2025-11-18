@@ -1,3 +1,4 @@
+import { describe, expect, it } from "bun:test"
 import type {
 	FeatureCollection,
 	LineString,
@@ -5,7 +6,6 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
-import { describe, expect, it } from "vitest"
 import { createOsmFromGeoJSON } from "../src/osm-from-geojson"
 
 describe("fromGeoJSON", () => {

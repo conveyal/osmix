@@ -34,7 +34,7 @@
 	"scripts": {
 		"build": "tsc",
 		"prepublishOnly": "tsc",
-		"test": "vitest",
+		"test": "bun test",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
@@ -45,7 +45,6 @@
 	"devDependencies": {
 		"@mapbox/vector-tile": "^2.0.4",
 		"@osmix/core": "workspace:*",
-		"typescript": "catalog:",
-		"vitest": "catalog:"
+		"typescript": "catalog:"
 	}
 }

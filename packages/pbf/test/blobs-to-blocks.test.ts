@@ -1,4 +1,4 @@
-import { assert, describe, it } from "vitest"
+import { describe, expect, it } from "bun:test"
 import { osmPbfBlobsToBlocksGenerator } from "../src/blobs-to-blocks"
 import { createOsmPbfBlobGenerator } from "../src/pbf-to-blobs"
 import {
@@ -25,32 +25,38 @@ describe("osmPbfBlobsToBlocksGenerator", () => {
 		)
 
 		const { value: headerBlock, done } = await generator.next()
-		assert.isFalse(done)
+		expect(done).toBe(false)
 		if (!isHeaderBlock(headerBlock)) {
-			assert.fail("Expected header block")
+			throw new Error("Expected header block")
 		}
-		assert.deepEqual(headerBlock.bbox, header.bbox)
-		assert.deepEqual(headerBlock.required_features, header.required_features)
-		assert.deepEqual(headerBlock.optional_features, header.optional_features)
+		expect(headerBlock.bbox).toEqual(header.bbox)
+		expect(headerBlock.required_features).toEqual(header.required_features)
+		expect(headerBlock.optional_features).toEqual(header.optional_features)
 
 		const { value: block, done: blockDone } = await generator.next()
-		assert.isFalse(blockDone)
+		expect(blockDone).toBe(false)
 		if (!isPrimitiveBlock(block)) {
-			assert.fail("Expected primitive block")
+			throw new Error("Expected primitive block")
 		}
-		assert.lengthOf(block.primitivegroup, primitiveBlock.primitivegroup.length)
+		expect(block.primitivegroup).toHaveLength(
+			primitiveBlock.primitivegroup.length,
+		)
 		const group = block.primitivegroup[0]
-		assert.exists(primitiveBlock.primitivegroup[0])
-		assert.exists(group?.dense)
-		assert.exists(group?.ways?.[0])
-		assert.lengthOf(group.ways, primitiveBlock.primitivegroup[0].ways.length)
-		assert.deepEqual(
-			group.ways[0].refs,
+		expect(primitiveBlock.primitivegroup[0]).toBeDefined()
+		expect(group?.dense).toBeDefined()
+		expect(group?.ways?.[0]).toBeDefined()
+		if (!group) throw new Error("group is undefined")
+		if (!primitiveBlock.primitivegroup[0])
+			throw new Error("primitiveBlock.primitivegroup[0] is undefined")
+		expect(group.ways).toHaveLength(
+			primitiveBlock.primitivegroup[0].ways.length,
+		)
+		expect(group.ways[0]?.refs).toEqual(
 			primitiveBlock.primitivegroup[0]?.ways?.[0]?.refs,
 		)
 
 		const final = await generator.next()
-		assert.isTrue(final.done)
+		expect(final.done).toBe(true)
 	})
 
 	it("accepts synchronous generators", async () => {
@@ -64,10 +70,10 @@ describe("osmPbfBlobsToBlocksGenerator", () => {
 		)
 
 		const header = await generator.next()
-		assert.isFalse(header.done)
+		expect(header.done).toBe(false)
 		const block = await generator.next()
-		assert.isFalse(block.done)
+		expect(block.done).toBe(false)
 		const final = await generator.next()
-		assert.isTrue(final.done)
+		expect(final.done).toBe(true)
 	})
 })

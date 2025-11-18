@@ -1,7 +1,7 @@
+import { expect, test } from "bun:test"
 import { Osm } from "@osmix/core"
 import { getFixtureFileReadStream } from "@osmix/shared/test/fixtures"
 import type { GeoBbox2D } from "@osmix/shared/types"
-import { expect, test } from "vitest"
 import { createExtract } from "../src/extract"
 import { createOsmFromPbf, osmToPbfBuffer, osmToPbfStream } from "../src/pbf"
 
@@ -342,7 +342,7 @@ test("extract with complete_ways includes node members of relations", () => {
 	expect(simple.nodes.ids.has(2)).toBe(false)
 })
 
-test.skip("extract from a large PBF", { timeout: 500_000 }, async () => {
+test.skip("extract from a large PBF", async () => {
 	const seattle = await createOsmFromPbf(getFixtureFileReadStream("usa.pbf"), {
 		extractBbox: SEATTLE_BBOX,
 	})

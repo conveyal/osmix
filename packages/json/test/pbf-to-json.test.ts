@@ -1,8 +1,8 @@
+import { describe, expect, it } from "bun:test"
 import { toAsyncGenerator } from "@osmix/pbf"
 import { getFixtureFileReadStream, PBFs } from "@osmix/shared/test/fixtures"
 import type { OsmEntity, OsmNode } from "@osmix/shared/types"
 import { isNode, isWay } from "@osmix/shared/utils"
-import { assert, describe, it } from "vitest"
 import { osmPbfToJson } from "../src/pbf-to-json"
 
 describe("geojson", () => {
@@ -11,7 +11,7 @@ describe("geojson", () => {
 			const file = getFixtureFileReadStream(pbf.url)
 			const osmGenerator = toAsyncGenerator(osmPbfToJson(file))
 			const header = (await osmGenerator.next()).value
-			assert.deepEqual(header.bbox, pbf.bbox)
+			expect(header.bbox).toEqual(pbf.bbox)
 
 			const entities: OsmEntity[] = []
 			for await (const entity of osmGenerator) {
@@ -33,14 +33,14 @@ describe("geojson", () => {
 					nodeFeatures++
 				} else if (isWay(entity)) {
 					const way = entity
-					assert.ok(!seenWayIds.has(way.id), `Duplicate feature id: ${way.id}`)
+					expect(seenWayIds.has(way.id)).toBe(false)
 					seenWayIds.add(way.id)
 					wayFeatures++
 				}
 			}
 
-			assert.equal(wayFeatures, pbf.ways)
-			assert.equal(nodeFeatures, pbf.nodesWithTags)
+			expect(wayFeatures).toBe(pbf.ways)
+			expect(nodeFeatures).toBe(pbf.nodesWithTags)
 		})
 	})
 })

@@ -33,16 +33,15 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "tsc",
-		"bench": "vitest bench",
+		"bench": "bun test --bench",
 		"prepublishOnly": "tsc",
-		"test": "vitest",
+		"test": "bun test",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@osmix/pbf": "workspace:*",
 		"@types/bun": "catalog:",
-		"typescript": "catalog:",
-		"vitest": "catalog:"
+		"typescript": "catalog:"
 	},
 	"dependencies": {
 		"@osmix/shared": "workspace:*",

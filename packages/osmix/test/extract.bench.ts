@@ -1,6 +1,10 @@
+import { beforeAll, describe } from "bun:test"
 import { getFixtureFile } from "@osmix/shared/test/fixtures"
 import type { GeoBbox2D } from "@osmix/shared/types"
-import { beforeAll, bench, describe } from "vitest"
+
+// @ts-expect-error - bench is available at runtime but not in types
+const { bench } = globalThis as { bench: typeof import("bun:test").test }
+
 import { createExtract } from "../src/extract"
 import { createOsmFromPbf } from "../src/pbf"
 

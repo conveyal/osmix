@@ -1,7 +1,7 @@
+import { describe, expect, it } from "bun:test"
 import type { OsmPbfBlock } from "@osmix/pbf"
 import { createSampleHeader } from "@osmix/pbf/test/helpers"
 import type { OsmEntity } from "@osmix/shared/types"
-import { assert, describe, expect, it } from "vitest"
 import {
 	createOsmJsonReadableStream,
 	jsonEntitiesToBlocks,
@@ -51,18 +51,27 @@ describe("json-to-pbf", () => {
 		expect(blocks).toHaveLength(3)
 
 		const nodeBlock = blocks[0]
-		assert.exists(nodeBlock?.primitivegroup[0]?.dense)
+		expect(nodeBlock?.primitivegroup[0]?.dense).toBeDefined()
+		if (!nodeBlock) throw new Error("nodeBlock is undefined")
+		if (!nodeBlock.primitivegroup[0])
+			throw new Error("nodeBlock.primitivegroup[0] is undefined")
 		expect(nodeBlock.primitivegroup[0].dense?.id).toHaveLength(2)
 		expect(nodeBlock.primitivegroup[0].ways).toHaveLength(0)
 		expect(nodeBlock.primitivegroup[0].relations).toHaveLength(0)
 
 		const wayBlock = blocks[1]
-		assert.exists(wayBlock?.primitivegroup[0])
+		expect(wayBlock?.primitivegroup[0]).toBeDefined()
+		if (!wayBlock) throw new Error("wayBlock is undefined")
+		if (!wayBlock.primitivegroup[0])
+			throw new Error("wayBlock.primitivegroup[0] is undefined")
 		expect(wayBlock.primitivegroup[0].ways).toHaveLength(1)
 		expect(wayBlock.primitivegroup[0].dense).toBeUndefined()
 
 		const relBlock = blocks[2]
-		assert.exists(relBlock?.primitivegroup[0])
+		expect(relBlock?.primitivegroup[0]).toBeDefined()
+		if (!relBlock) throw new Error("relBlock is undefined")
+		if (!relBlock.primitivegroup[0])
+			throw new Error("relBlock.primitivegroup[0] is undefined")
 		expect(relBlock.primitivegroup[0].relations).toHaveLength(1)
 	})
 
@@ -96,9 +105,19 @@ describe("json-to-pbf", () => {
 		expect(outputs[0]).toBe(header)
 		const blockOutputs = outputs.slice(1) as OsmPbfBlockBuilder[]
 		expect(blockOutputs).toHaveLength(3)
-		assert.exists(blockOutputs[0]?.primitivegroup[0])
-		assert.exists(blockOutputs[1]?.primitivegroup[0])
-		assert.exists(blockOutputs[2]?.primitivegroup[0])
+		expect(blockOutputs[0]?.primitivegroup[0]).toBeDefined()
+		expect(blockOutputs[1]?.primitivegroup[0]).toBeDefined()
+		expect(blockOutputs[2]?.primitivegroup[0]).toBeDefined()
+		if (!blockOutputs[0] || !blockOutputs[1] || !blockOutputs[2]) {
+			throw new Error("blockOutputs are undefined")
+		}
+		if (
+			!blockOutputs[0].primitivegroup[0] ||
+			!blockOutputs[1].primitivegroup[0] ||
+			!blockOutputs[2].primitivegroup[0]
+		) {
+			throw new Error("blockOutputs primitivegroup[0] are undefined")
+		}
 		expect(blockOutputs[0].primitivegroup[0].dense?.id).toHaveLength(2)
 		expect(blockOutputs[1].primitivegroup[0].ways).toHaveLength(1)
 		expect(blockOutputs[2].primitivegroup[0].relations).toHaveLength(1)

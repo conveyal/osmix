@@ -1,5 +1,5 @@
+import { describe, expect, it } from "bun:test"
 import Pbf from "pbf"
-import { assert, describe, it } from "vitest"
 import { osmPbfBlobsToBlocksGenerator } from "../src/blobs-to-blocks"
 import { createOsmPbfBlobGenerator } from "../src/pbf-to-blobs"
 import { writeBlob, writeBlobHeader } from "../src/proto/fileformat"
@@ -30,7 +30,7 @@ describe("createOsmPbfBlobGenerator", () => {
 			for (const blob of generate(fileBytes.slice(offset))) yielded.push(blob)
 		}
 
-		assert.equal(yielded.length, 2)
+		expect(yielded.length).toBe(2)
 
 		const blocks = osmPbfBlobsToBlocksGenerator(
 			(async function* () {
@@ -38,29 +38,35 @@ describe("createOsmPbfBlobGenerator", () => {
 			})(),
 		)
 		const { value: headerBlock, done } = await blocks.next()
-		assert.isFalse(done)
+		expect(done).toBe(false)
 		if (!isHeaderBlock(headerBlock)) {
-			assert.fail("Expected first block to be a header")
+			throw new Error("Expected first block to be a header")
 		}
-		assert.deepEqual(headerBlock.bbox, header.bbox)
-		assert.deepEqual(headerBlock.required_features, header.required_features)
-		assert.deepEqual(headerBlock.optional_features, header.optional_features)
+		expect(headerBlock.bbox).toEqual(header.bbox)
+		expect(headerBlock.required_features).toEqual(header.required_features)
+		expect(headerBlock.optional_features).toEqual(header.optional_features)
 
 		const { value: primitive } = await blocks.next()
 		if (!isPrimitiveBlock(primitive)) {
-			assert.fail("Expected primitive block after header")
+			throw new Error("Expected primitive block after header")
 		}
-		assert.lengthOf(
-			primitive.primitivegroup,
+		expect(primitive.primitivegroup).toHaveLength(
 			primitiveBlock.primitivegroup.length,
 		)
-		assert.exists(primitive.primitivegroup[0])
-		assert.exists(primitiveBlock.primitivegroup[0])
+		expect(primitive.primitivegroup[0]).toBeDefined()
+		expect(primitiveBlock.primitivegroup[0]).toBeDefined()
+		if (!primitive.primitivegroup[0])
+			throw new Error("primitive.primitivegroup[0] is undefined")
+		if (!primitiveBlock.primitivegroup[0])
+			throw new Error("primitiveBlock.primitivegroup[0] is undefined")
 		const dense = primitive.primitivegroup[0].dense
-		assert.exists(dense)
-		assert.deepEqual(dense?.id, primitiveBlock.primitivegroup[0].dense?.id)
-		assert.deepEqual(dense?.lat, primitiveBlock.primitivegroup[0].dense?.lat)
-		assert.deepEqual(dense?.lon, primitiveBlock.primitivegroup[0].dense?.lon)
+		expect(dense).toBeDefined()
+		if (!dense) throw new Error("dense is undefined")
+		if (!primitiveBlock.primitivegroup[0]?.dense)
+			throw new Error("primitiveBlock.primitivegroup[0].dense is undefined")
+		expect(dense.id).toEqual(primitiveBlock.primitivegroup[0].dense.id)
+		expect(dense.lat).toEqual(primitiveBlock.primitivegroup[0].dense.lat)
+		expect(dense.lon).toEqual(primitiveBlock.primitivegroup[0].dense.lon)
 	})
 
 	it("throws when a blob omits zlib data", () => {
@@ -80,6 +86,6 @@ describe("createOsmPbfBlobGenerator", () => {
 		const chunk = concatUint8(uint32BE(blobHeader.byteLength), blobHeader, blob)
 		const generate = createOsmPbfBlobGenerator()
 		const iterator = generate(chunk)
-		assert.throws(() => iterator.next(), /Blob has no zlib data/)
+		expect(() => iterator.next()).toThrow(/Blob has no zlib data/)
 	})
 })

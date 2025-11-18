@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest"
+import { describe, expect, test } from "bun:test"
 import {
 	concatUint8,
 	isBun,
@@ -8,7 +8,7 @@ import {
 	webDecompress,
 } from "../src/utils"
 
-describe.runIf(isBun())("utils", () => {
+describe("utils", () => {
 	test("wraps values into an async generator", async () => {
 		const generator = toAsyncGenerator(3)
 		const first = await generator.next()
@@ -60,7 +60,7 @@ describe.runIf(isBun())("utils", () => {
 		expect(compressed).not.toEqual(input)
 
 		const decompressed = inflateSync(compressed)
-		expect(new Uint8Array(decompressed)).toEqual(input)
+		expect(new Uint8Array(decompressed)).toEqual(new Uint8Array(input))
 	})
 
 	test("compress/decompress are compatible with OSM PBF zlib format", async () => {
@@ -76,7 +76,9 @@ describe.runIf(isBun())("utils", () => {
 
 		// Decompress with Node.js zlib (what OSM PBF uses)
 		const decompressedWithNodeZlib = inflateSync(ourCompressed)
-		expect(new Uint8Array(decompressedWithNodeZlib)).toEqual(input)
+		expect(new Uint8Array(decompressedWithNodeZlib)).toEqual(
+			new Uint8Array(input),
+		)
 
 		// Compress with Node.js zlib
 		const nodeCompressed = deflateSync(input)
@@ -112,7 +114,7 @@ describe.skip("CompressionStream polyfill", () => {
 
 		// Verify it's valid deflate data by decompressing
 		const decompressed = await webDecompress(new Uint8Array(compressed))
-		expect(decompressed).toEqual(input)
+		expect(decompressed).toEqual(new Uint8Array(input))
 	})
 
 	test("returns proper Uint8Array<ArrayBuffer> instances", async () => {

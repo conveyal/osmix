@@ -1,9 +1,9 @@
+import { beforeAll, describe, expect, it } from "bun:test"
 import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
 } from "@osmix/shared/test/fixtures"
-import { assert, beforeAll, describe, it } from "vitest"
 import {
 	OsmPbfBytesToBlocksTransformStream,
 	readOsmPbf,
@@ -25,15 +25,15 @@ describe("read", () => {
 							if ("primitivegroup" in block) {
 								for (const group of block.primitivegroup) onGroup(group)
 							} else {
-								assert.deepEqual(block.bbox, pbf.bbox)
+								expect(block.bbox).toEqual(pbf.bbox)
 							}
 						},
 					}),
 				)
 
-			assert.equal(count.nodes, pbf.nodes)
-			assert.equal(count.ways, pbf.ways)
-			assert.equal(count.relations, pbf.relations)
+			expect(count.nodes).toBe(pbf.nodes)
+			expect(count.ways).toBe(pbf.ways)
+			expect(count.relations).toBe(pbf.relations)
 		})
 
 		it("from buffer", async () => {

@@ -1,10 +1,10 @@
+import { describe, expect, it } from "bun:test"
 import { VectorTile } from "@mapbox/vector-tile"
 import { Osm } from "@osmix/core"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import { decodeZigzag } from "@osmix/shared/zigzag"
 import Protobuf from "pbf"
-import { describe, expect, it } from "vitest"
 import { OsmixVtEncoder } from "./encode"
 
 const osm = new Osm()

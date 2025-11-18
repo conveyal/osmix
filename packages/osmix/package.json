@@ -34,14 +34,13 @@
 	"scripts": {
 		"build": "tsc",
 		"prepublishOnly": "tsc",
-		"test": "vitest",
+		"test": "bun test",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@types/bun": "catalog:",
 		"@types/geojson": "catalog:",
-		"typescript": "catalog:",
-		"vitest": "catalog:"
+		"typescript": "catalog:"
 	},
 	"dependencies": {
 		"@osmix/change": "workspace:*",
@@ -52,7 +51,6 @@
 		"@osmix/raster": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@osmix/vt": "workspace:*",
-		"@vitest/web-worker": "^4.0.8",
 		"comlink": " ^4.4.2",
 		"dequal": "catalog:",
 		"web-worker": "^1.5.0"

@@ -1,9 +1,9 @@
+import { beforeAll, describe, expect, it } from "bun:test"
 import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
 } from "@osmix/shared/test/fixtures"
-import { beforeAll, describe, expect, it } from "vitest"
 import { createOsmFromPbf } from "../src/pbf"
 
 describe("read", () => {

@@ -1,6 +1,6 @@
+import { describe, expect, it } from "bun:test"
 import type { Osm } from "@osmix/core"
 import { createBaseOsm, createPatchOsm } from "@osmix/core/test/mock-osm"
-import { assert, describe, it } from "vitest"
 import { OsmChangeset } from "../src/changeset"
 
 const sizes = (osm: Osm) => ({
@@ -14,12 +14,12 @@ describe("merge osm", () => {
 		const base = createBaseOsm()
 		const patch = createPatchOsm()
 
-		assert.deepEqual(sizes(base), {
+		expect(sizes(base)).toEqual({
 			nodes: 2,
 			ways: 1,
 			relations: 0,
 		})
-		assert.deepEqual(sizes(patch), {
+		expect(sizes(patch)).toEqual({
 			nodes: 8,
 			ways: 4,
 			relations: 0,
@@ -27,7 +27,7 @@ describe("merge osm", () => {
 
 		let changeset = new OsmChangeset(base)
 		changeset.generateDirectChanges(patch)
-		assert.deepEqual(changeset.stats, {
+		expect(changeset.stats).toEqual({
 			osmId: base.id,
 			totalChanges: 10,
 			nodeChanges: 6,
@@ -41,14 +41,14 @@ describe("merge osm", () => {
 		})
 
 		const directResult = changeset.applyChanges()
-		assert.deepEqual(sizes(directResult), {
+		expect(sizes(directResult)).toEqual({
 			nodes: patch.nodes.size - changeset.stats.deduplicatedNodes,
 			ways: patch.ways.size,
 			relations: base.relations.size + patch.relations.size,
 		})
 
-		assert.isTrue(directResult.nodes.ids.has(2))
-		assert.deepEqual(directResult.ways.getById(1), {
+		expect(directResult.nodes.ids.has(2)).toBe(true)
+		expect(directResult.ways.getById(1)).toEqual({
 			id: 1,
 			refs: [0, 1],
 			tags: {
@@ -63,8 +63,8 @@ describe("merge osm", () => {
 		const deduplicatedResult = changeset.applyChanges("deduplicated")
 
 		// Node 0 is deleted because node 2 has more tags (version/tags logic)
-		assert.isFalse(deduplicatedResult.nodes.ids.has(0))
-		assert.deepEqual(deduplicatedResult.ways.getById(1), {
+		expect(deduplicatedResult.nodes.ids.has(0)).toBe(false)
+		expect(deduplicatedResult.ways.getById(1)).toEqual({
 			id: 1,
 			refs: [2, 1], // Node 0 replaced with node 2
 			tags: {
@@ -74,7 +74,7 @@ describe("merge osm", () => {
 		})
 
 		// Node 2 is kept because it has tags
-		assert.deepEqual(deduplicatedResult.nodes.getById(2), {
+		expect(deduplicatedResult.nodes.getById(2)).toEqual({
 			id: 2,
 			lat: 46.60207,
 			lon: -120.505898,
@@ -86,7 +86,7 @@ describe("merge osm", () => {
 		changeset = new OsmChangeset(deduplicatedResult)
 		changeset.createIntersectionsForWays(patch.ways)
 
-		assert.deepEqual(changeset.stats, {
+		expect(changeset.stats).toEqual({
 			osmId: "deduplicated",
 			totalChanges: 3,
 			nodeChanges: 1,
@@ -100,7 +100,7 @@ describe("merge osm", () => {
 		})
 
 		const intersectionResult = changeset.applyChanges()
-		assert.deepEqual(sizes(intersectionResult), {
+		expect(sizes(intersectionResult)).toEqual({
 			nodes: patch.nodes.size + changeset.stats.intersectionNodesCreated - 1, // 1 node is de-duplicated
 			ways: patch.ways.size,
 			relations: base.relations.size + patch.relations.size,

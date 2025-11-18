@@ -1,3 +1,4 @@
+import { describe, expect, it } from "bun:test"
 import {
 	OsmBlocksToPbfBytesTransformStream,
 	OsmPbfBytesToBlocksTransformStream,
@@ -6,7 +7,6 @@ import {
 } from "@osmix/pbf"
 import { testOsmPbfReader } from "@osmix/pbf/test/utils"
 import { getFixtureFileReadStream, PBFs } from "@osmix/shared/test/fixtures"
-import { assert, describe, it } from "vitest"
 import { OsmJsonToBlocksTransformStream } from "../src/json-to-pbf"
 import { OsmBlocksToJsonTransformStream } from "../src/pbf-to-json"
 
@@ -31,8 +31,8 @@ describe("pbf json", () => {
 					}),
 				)
 
-			assert.deepEqual(header?.bbox, pbf.bbox)
-			assert.equal(entityCount, pbf.nodes + pbf.ways + pbf.relations)
+			expect(header?.bbox).toEqual(pbf.bbox)
+			expect(entityCount).toBe(pbf.nodes + pbf.ways + pbf.relations)
 		})
 
 		it("build from parsed entites", async () => {

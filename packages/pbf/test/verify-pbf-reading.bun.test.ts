@@ -1,9 +1,8 @@
+import { describe, expect, test } from "bun:test"
 import { getFixtureFile } from "@osmix/shared/test/fixtures"
-import { describe, expect, test } from "vitest"
 import { readOsmPbf } from "../src/pbf-to-blocks"
-import { isBun } from "../src/utils"
 
-describe.runIf(isBun())("PBF Reading with Bun", () => {
+describe("PBF Reading with Bun", () => {
 	test("can read an actual OSM PBF file", async () => {
 		// Load a real PBF fixture
 		const pbfData = await getFixtureFile("monaco.pbf")
