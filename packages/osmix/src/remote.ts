@@ -83,10 +83,10 @@ export class OsmixRemote {
 
 	private async populateOtherWorkers(
 		worker: Comlink.Remote<OsmixWorker>,
-		osmId: string,
+		osmId: OsmId,
 	) {
 		if (!SUPPORTS_SHARED_ARRAY_BUFFER) return
-		const transferables = await worker.getOsmBuffers(osmId)
+		const transferables = await worker.getOsmBuffers(this.getId(osmId))
 		await Promise.all(
 			this.workers.map((worker) => worker.transferIn(transferables)),
 		)
@@ -212,11 +212,14 @@ export class OsmixRemote {
 		patchOsmId: OsmId,
 		options: Partial<OsmMergeOptions> = {},
 	) {
-		const osmId = await this.getWorker().merge(
+		const worker0 = this.getWorker()
+		const osmId = await worker0.merge(
 			this.getId(baseOsmId),
 			this.getId(patchOsmId),
 			options,
 		)
+		await this.populateOtherWorkers(worker0, osmId)
+		await this.delete(patchOsmId)
 		return osmId
 	}
 
@@ -233,7 +236,9 @@ export class OsmixRemote {
 	}
 
 	async applyChangesAndReplace(osmId: OsmId) {
-		return this.getChangesetWorker().applyChangesAndReplace(this.getId(osmId))
+		const worker0 = this.getChangesetWorker()
+		await worker0.applyChangesAndReplace(this.getId(osmId))
+		await this.populateOtherWorkers(worker0, osmId)
 	}
 
 	setChangesetFilters(
