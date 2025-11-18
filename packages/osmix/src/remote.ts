@@ -97,11 +97,14 @@ export class OsmixRemote {
 		throw Error("Invalid data")
 	}
 
-	private async populateWorkers(osmId: string) {
+	private async populateOtherWorkers(
+		worker: Comlink.Remote<OsmixWorker>,
+		osmId: string,
+	) {
 		if (!SUPPORTS_SHARED_ARRAY_BUFFER) return
-		const osmBuffers = await this.getWorker().getOsmBuffers(osmId)
+		const transferables = await worker.getOsmBuffers(osmId)
 		await Promise.all(
-			this.workers.map((worker) => worker.transferIn(osmBuffers)),
+			this.workers.map((worker) => worker.transferIn(transferables)),
 		)
 	}
 
@@ -114,7 +117,7 @@ export class OsmixRemote {
 		const osmInfo = await worker0.fromPbf(
 			transfer({ data: await this.getTransferableData(data), options }),
 		)
-		await this.populateWorkers(osmInfo.id)
+		await this.populateOtherWorkers(worker0, osmInfo.id)
 		return osmInfo
 	}
 
@@ -149,7 +152,7 @@ export class OsmixRemote {
 				options,
 			}),
 		)
-		await this.populateWorkers(osmInfo.id)
+		await this.populateOtherWorkers(worker0, osmInfo.id)
 		return osmInfo
 	}
 
