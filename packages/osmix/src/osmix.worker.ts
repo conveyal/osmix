@@ -16,7 +16,8 @@ import type { OsmFromPbfOptions } from "./pbf"
 import { transfer } from "./utils"
 
 /**
- * Worker handler for a single Osmix instance.
+ * Worker handler for managing multiple Osmix instances within a Web Worker.
+ * Exposes Comlink-wrapped methods for off-thread OSM data operations.
  */
 export class OsmixWorker extends EventTarget {
 	private osm: Record<string, Osmix> = {}
@@ -27,18 +28,30 @@ export class OsmixWorker extends EventTarget {
 
 	private onProgress = (progress: ProgressEvent) => this.dispatchEvent(progress)
 
+	/**
+	 * Register a progress listener to receive updates during long-running operations.
+	 * Listener is proxied through Comlink for cross-thread communication.
+	 */
 	addProgressListener(listener: (progress: Progress) => void) {
 		this.addEventListener("progress", (e: Event) =>
 			listener((e as ProgressEvent).detail),
 		)
 	}
 
+	/**
+	 * Read only the header from PBF data without parsing entities.
+	 * Delegates to static Osmix.readHeader method.
+	 */
 	readHeader(data: ArrayBufferLike | ReadableStream) {
 		return Osmix.readHeader(
 			data instanceof ReadableStream ? data : new Uint8Array(data),
 		)
 	}
 
+	/**
+	 * Load an Osmix instance from PBF data and store it in this worker.
+	 * Returns OSM metadata including entity counts and bbox.
+	 */
 	async fromPbf({
 		data,
 		options,
@@ -51,6 +64,10 @@ export class OsmixWorker extends EventTarget {
 		return osm.info()
 	}
 
+	/**
+	 * Serialize an Osmix instance to PBF and pipe into the provided writable stream.
+	 * Stream is transferred from the main thread for zero-copy efficiency.
+	 */
 	toPbfStream({
 		osmId,
 		writeableStream,
@@ -61,11 +78,19 @@ export class OsmixWorker extends EventTarget {
 		return this.get(osmId).toPbfStream().pipeTo(writeableStream)
 	}
 
+	/**
+	 * Serialize an Osmix instance to a single PBF buffer.
+	 * Result is transferred back to the main thread.
+	 */
 	async toPbf(osmId: string) {
 		const data = await this.get(osmId).toPbf()
 		return Comlink.transfer(data, [data.buffer])
 	}
 
+	/**
+	 * Load an Osmix instance from GeoJSON data and store it in this worker.
+	 * Returns OSM metadata including entity counts and bbox.
+	 */
 	async fromGeoJSON({
 		data,
 		options,
@@ -78,53 +103,92 @@ export class OsmixWorker extends EventTarget {
 		return osm.info()
 	}
 
+	/**
+	 * Accept transferables from another worker or main thread and reconstruct an Osmix instance.
+	 * Used when SharedArrayBuffer is supported to share data across workers.
+	 */
 	transferIn(transferables: OsmTransferables) {
 		this.set(transferables.id, new Osmix(transferables))
 	}
 
+	/**
+	 * Transfer an Osmix instance out of this worker and remove it.
+	 * Transfers underlying buffers for efficient cross-thread movement.
+	 */
 	transferOut(id: string) {
 		const transferables = this.get(id).transferables()
 		this.delete(id)
 		return transfer(transferables)
 	}
 
+	/**
+	 * Get the raw transferable buffers for an Osmix instance without removing it.
+	 * Used to duplicate data across workers when SharedArrayBuffer is available.
+	 */
 	getOsmBuffers(id: string) {
 		return this.get(id).transferables()
 	}
 
+	/**
+	 * Check if an Osmix instance with the given ID exists in this worker.
+	 */
 	has(id: string): boolean {
 		return this.osm[id] != null
 	}
 
+	/**
+	 * Check if an Osmix instance has completed index building and is ready for queries.
+	 */
 	isReady(id: string): boolean {
 		return this.osm[id]?.isReady() ?? false
 	}
 
+	/**
+	 * Retrieve an Osmix instance by ID, throwing if not found.
+	 */
 	private get(id: string) {
 		if (!this.osm[id]) throw Error(`OSM not found for id: ${id}`)
 		return this.osm[id]
 	}
 
+	/**
+	 * Store an Osmix instance by ID, replacing any existing instance with the same ID.
+	 */
 	private set(id: string, osm: Osmix) {
 		this.osm[id] = osm
 	}
 
+	/**
+	 * Remove an Osmix instance from this worker, freeing its memory.
+	 */
 	delete(id: string) {
 		delete this.osm[id]
 	}
 
+	/**
+	 * Generate a Mapbox Vector Tile for the specified tile coordinates.
+	 * Returns transferred MVT data suitable for MapLibre rendering.
+	 */
 	getVectorTile(id: string, tile: Tile) {
 		const data = this.get(id).getVectorTile(tile)
 		if (!data || data.byteLength === 0) return new ArrayBuffer(0)
 		return Comlink.transfer(data, [data])
 	}
 
+	/**
+	 * Generate a raster tile as ImageData for the specified tile coordinates.
+	 * Returns transferred RGBA pixel data suitable for canvas rendering.
+	 */
 	getRasterTile(id: string, tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
 		const data = this.get(id).getRasterTile(tile, tileSize)
 		if (!data || data.byteLength === 0) return new Uint8ClampedArray(0)
 		return Comlink.transfer(data, [data.buffer])
 	}
 
+	/**
+	 * Search for OSM entities by tag key and optional value.
+	 * Returns matching nodes, ways, and relations.
+	 */
 	search(id: string, key: string, val?: string) {
 		return this.get(id).search(key, val)
 	}
@@ -146,6 +210,11 @@ export class OsmixWorker extends EventTarget {
 		return mergedOsm.id
 	}
 
+	/**
+	 * Generate a changeset comparing base and patch Osm instances.
+	 * Stores the changeset internally and returns stats (counts by change type).
+	 * Changeset is automatically sorted by the current filter settings.
+	 */
 	async generateChangeset(
 		baseOsmId: string,
 		patchOsmId: string,
@@ -161,6 +230,11 @@ export class OsmixWorker extends EventTarget {
 		return changeset.stats
 	}
 
+	/**
+	 * Update filter settings for changeset viewing.
+	 * Re-sorts all active changesets with the new filters.
+	 * Skips re-sorting if filters are identical to current settings.
+	 */
 	setChangesetFilters(
 		changeTypes: OsmChangeTypes[],
 		entityTypes: OsmEntityType[],
@@ -180,6 +254,10 @@ export class OsmixWorker extends EventTarget {
 		}
 	}
 
+	/**
+	 * Retrieve a paginated subset of the filtered changeset.
+	 * Returns changes for the specified page and the total number of pages.
+	 */
 	getChangesetPage(osmId: string, page: number, pageSize: number) {
 		const changeset = this.changesets[osmId]
 		if (!changeset) throw Error("No active changeset")
@@ -194,6 +272,10 @@ export class OsmixWorker extends EventTarget {
 		}
 	}
 
+	/**
+	 * Apply a changeset to the base Osm instance, replacing it with the merged result.
+	 * Deletes the changeset after application.
+	 */
 	applyChangesAndReplace(osmId: string) {
 		const changeset = this.changesets[osmId]
 		if (!changeset) throw Error("No active changeset")
@@ -204,6 +286,10 @@ export class OsmixWorker extends EventTarget {
 		return newOsm.id
 	}
 
+	/**
+	 * Filter and sort changeset entries by the current entity type and change type filters.
+	 * Updates the filteredChanges cache for efficient pagination.
+	 */
 	private sortChangeset(osmId: string, changeset: OsmChangeset) {
 		const filteredChanges: OsmChange[] = []
 		if (this.entityTypes.includes("node")) {

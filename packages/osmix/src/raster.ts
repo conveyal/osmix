@@ -6,9 +6,12 @@ import { isMultipolygonRelation } from "@osmix/shared/utils"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 
 /**
- * Draw an OSM dataset into a raster tile.
+ * Draw an OSM dataset into a raster tile using default rendering logic.
  *
- * If you need to change colors or change what is drawn you can use the `OsmixRasterTile` class directly.
+ * Renders multipolygon relations, way polygons (filled areas), and way lines onto the tile.
+ * Ways that are members of relations are excluded from individual rendering to avoid duplicates.
+ *
+ * For custom colors or rendering logic, use the OsmixRasterTile class directly.
  */
 export function drawRasterTile(osm: Osm, rasterTile: OsmixRasterTile) {
 	const tileKey = rasterTile.tile.join("/")

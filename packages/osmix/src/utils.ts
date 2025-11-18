@@ -3,7 +3,9 @@ import * as Comlink from "comlink"
 export type Transferables = ArrayBufferLike | ReadableStream
 
 /**
- * Collect all transferable values from a nested object. Usually to be transferred to or from a worker.
+ * Recursively collect all transferable values from a nested object.
+ * Searches for ArrayBuffers, TypedArray buffers, and ReadableStreams.
+ * Used to prepare data for zero-copy transfer to or from workers.
  */
 export function collectTransferables(value: unknown): Transferables[] {
 	const transferables: Transferables[] = []
@@ -24,12 +26,17 @@ export function collectTransferables(value: unknown): Transferables[] {
 	return transferables
 }
 
+/**
+ * Wrap data with Comlink.transfer, automatically collecting transferable buffers.
+ * Enables zero-copy message passing for typed arrays and streams.
+ */
 export function transfer<T>(data: T) {
 	return Comlink.transfer(data, collectTransferables(data))
 }
 
 /**
- * Check if the browser supports transferable streams by trying to create an empty stream and sending it to a message channel.
+ * Feature-detect whether the browser supports transferable ReadableStreams.
+ * Attempts to post a stream through a MessageChannel; throws DataCloneError if unsupported.
  */
 export function supportsReadableStreamTransfer(): boolean {
 	// Require the basics first
