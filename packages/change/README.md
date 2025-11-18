@@ -23,7 +23,7 @@ You will typically install this alongside [`@osmix/core`](../core/README.md), wh
 ### Build and apply a changeset
 
 ```ts
-import { Osmix } from "@osmix/core"
+import { Osmix } from "osmix"
 import { OsmixChangeset, changeStatsSummary } from "@osmix/change"
 
 const base = await Osmix.fromPbf(fetch("/data/base.osm.pbf").then((r) => r.arrayBuffer()))
@@ -44,7 +44,7 @@ const merged = changeset.applyChanges()
 ### Run the bundled merge pipeline
 
 ```ts
-import { Osmix } from "@osmix/core"
+import { Osmix } from "osmix"
 import { merge } from "@osmix/change"
 import { readFile } from "node:fs/promises"
 
@@ -64,9 +64,10 @@ const combined = await merge(base, patch, {
 ## API overview
 
 - `OsmixChangeset` – Collects creates/modifies/deletes, provides helpers (`deduplicateNodes`, `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, `toJson`, `applyChanges`, …), and exposes execution stats.
-- `merge(base, patch, options)` – High-level merge orchestration built on `OsmixChangeset`.
+- `generateChangeset(base, patch, options?, onProgress?)` – Runs the core pipeline and returns an `OsmixChangeset` without applying it, so you can inspect stats or serialize.
+- `merge(base, patch, options?, onProgress?)` – High-level merge orchestration built on `OsmixChangeset`.
 - `changeStatsSummary(stats)` – Produces a human-readable summary string of the most significant stats.
-- Utility helpers – `haversineDistance`, `waysShouldConnect`, `isWayIntersectionCandidate`, `removeDuplicateAdjacentWayRefs`, `removeDuplicateAdjacentRelationMembers`, `osmTagsToOscTags`, `cleanCoords`, and supporting conversions.
+- Utility helpers – `waysShouldConnect`, `isWayIntersectionCandidate`, `removeDuplicateAdjacentWayRefs`, `removeDuplicateAdjacentRelationMembers`, `osmTagsToOscTags`, `cleanCoords`, `entityHasTagValue`, `waysIntersect`, and supporting conversions.
 - Types – `OsmixMergeOptions`, `OsmixChanges`, `OsmixChange`, `OsmixChangesetStats`, `OsmEntityRef`, and convenience aliases for downstream tooling.
 
 ## See also

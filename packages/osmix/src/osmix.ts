@@ -24,11 +24,20 @@ import { drawRasterTile } from "./raster"
 export class Osmix extends Osm {
 	private vtEncoder = new OsmixVtEncoder(this)
 
+	/**
+	 * Read only the header block from PBF data without parsing entities.
+	 * Useful for previewing metadata before loading the entire dataset.
+	 */
 	static async readHeader(data: Parameters<typeof readOsmPbf>[0]) {
 		const { header } = await readOsmPbf(data)
 		return header
 	}
 
+	/**
+	 * Create a new Osmix instance from PBF-encoded OSM data.
+	 * Automatically handles both ArrayBufferLike and ReadableStream inputs.
+	 * Options support bbox extraction, entity filtering, and selective spatial index building.
+	 */
 	static async fromPbf(
 		data: ArrayBufferLike | ReadableStream,
 		options: Partial<OsmFromPbfOptions> = {},
@@ -42,6 +51,11 @@ export class Osmix extends Osm {
 		return new Osmix(osm.transferables())
 	}
 
+	/**
+	 * Create a new Osmix instance from GeoJSON data.
+	 * GeoJSON Features are converted into OSM nodes, ways, and relations.
+	 * Supports both FeatureCollections with Point and LineString geometries.
+	 */
 	static async fromGeoJSON(
 		data: ArrayBufferLike | ReadableStream,
 		options: Partial<OsmOptions> = {},
@@ -55,23 +69,46 @@ export class Osmix extends Osm {
 		return osm
 	}
 
+	/**
+	 * Serialize this Osmix instance to a streaming PBF format.
+	 * Returns a ReadableStream of Uint8Array chunks for efficient memory usage.
+	 * Entities are written sorted by type (nodes, ways, relations) and ID.
+	 */
 	toPbfStream(): ReadableStream<Uint8Array> {
 		return osmToPbfStream(this)
 	}
 
+	/**
+	 * Serialize this Osmix instance to a single PBF buffer in memory.
+	 * For large datasets, prefer toPbfStream to avoid memory pressure.
+	 */
 	async toPbf(): Promise<Uint8Array> {
 		return osmToPbfBuffer(this)
 	}
 
+	/**
+	 * Generate a Mapbox Vector Tile (MVT) for the specified tile coordinates.
+	 * Returns encoded MVT data suitable for MapLibre or Mapbox GL rendering.
+	 */
 	getVectorTile(tile: Tile) {
 		return this.vtEncoder.getTile(tile)
 	}
 
+	/**
+	 * Generate a raster tile as ImageData for the specified tile coordinates.
+	 * Draws OSM geometries (ways as lines/polygons, multipolygon relations) onto a canvas.
+	 * Returns the raw RGBA pixel data array.
+	 */
 	getRasterTile(tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
 		return drawRasterTile(this, new OsmixRasterTile({ tile, tileSize }))
 			.imageData
 	}
 
+	/**
+	 * Search all entity types (nodes, ways, relations) for matching tags.
+	 * If val is omitted, matches any entity with the specified key.
+	 * If val is provided, matches entities where key=val.
+	 */
 	search(
 		key: string,
 		val?: string,
@@ -82,6 +119,11 @@ export class Osmix extends Osm {
 		return { nodes, ways, relations }
 	}
 
+	/**
+	 * Create an OsmChangeset representing differences between this instance and another.
+	 * If other is provided, generates create/modify/delete changes for merging.
+	 * If other is omitted, returns an empty changeset for this instance.
+	 */
 	createChangeset(
 		other?: Osm,
 		options: Partial<OsmMergeOptions> = {},

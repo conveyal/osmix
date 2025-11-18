@@ -9,17 +9,20 @@ import type { GeoBbox2D } from "@osmix/shared/types"
 type ExtractStrategy = "simple" | "complete_ways"
 
 /**
- * Create a geographic extract from an existing Osm instance. Performs extraction by:
+ * Create a geographic extract from an existing Osm instance within a bounding box.
  *
  * Strategy "simple":
- * 1. Selecting all nodes inside the bbox
- * 2. Selecting all ways with at least one node inside the bbox, filter refs to only include nodes inside the bbox.
- * 3. Selecting all relations with at least one member inside the bbox, filter members to only include nodes and ways inside the bbox.
+ * 1. Selects all nodes inside the bbox.
+ * 2. Selects ways with at least one node inside the bbox, filtering refs to only include nodes inside the bbox.
+ * 3. Selects relations with at least one member inside the bbox, filtering members to only include nodes and ways inside the bbox.
  *
  * Strategy "complete_ways":
- * 1. Selecting all nodes inside the bbox
- * 2. Selecting all ways with at least one node inside the bbox, adding way nodes if missing.
- * 3. Selecting all relations with at least one member inside the bbox, adding relation members if missing.
+ * 1. Selects all nodes inside the bbox.
+ * 2. Selects ways with at least one node inside the bbox, adding missing way nodes from outside the bbox.
+ * 3. Selects relations with at least one member inside the bbox, adding missing relation members (nodes/ways) from outside the bbox.
+ *
+ * The "complete_ways" strategy preserves way and relation geometry integrity but includes entities outside the bbox.
+ * The "simple" strategy creates a strict spatial cut but may result in incomplete geometries.
  */
 export function createExtract(
 	osm: Osm,

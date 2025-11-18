@@ -35,7 +35,9 @@ export interface OsmFromPbfOptions extends OsmOptions {
 }
 
 /**
- * Create a new Osm index from a PBF stream or array buffer.
+ * Create a new Osm index from PBF data (stream or buffer).
+ * Parses all OSM entities, builds ID and tag indexes, and constructs spatial indexes.
+ * Supports optional bbox extraction and entity filtering during ingestion.
  */
 export async function createOsmFromPbf(
 	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
@@ -51,7 +53,9 @@ export async function createOsmFromPbf(
 }
 
 /**
- * Parse raw PBF data into an Osm index.
+ * Parse raw PBF data into an Osm index as an async generator.
+ * Yields progress events during parsing and index building.
+ * Returns the completed Osm instance when done.
  */
 export async function* startCreateOsmFromPbf(
 	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
@@ -164,7 +168,8 @@ export async function* startCreateOsmFromPbf(
 }
 
 /**
- * Create a generator that yields all entities in the OSM index, sorted by type and id.
+ * Create a generator that yields all entities in the OSM index, sorted by type and ID.
+ * Order: nodes first, then ways, then relations, each sorted by ID.
  */
 function* getAllEntitiesSorted(osm: Osm): Generator<OsmEntity> {
 	for (const node of osm.nodes.sorted()) {
@@ -179,7 +184,9 @@ function* getAllEntitiesSorted(osm: Osm): Generator<OsmEntity> {
 }
 
 /**
- * Convert the OSM index to a `ReadableStream<OsmPbfHeaderBlock | OsmEntity>`.
+ * Convert the OSM index to a ReadableStream of header and entity objects.
+ * Header is emitted first, followed by all entities in sorted order.
+ * Stream can be piped through transform streams for further processing.
  */
 export function createReadableEntityStreamFromOsm(
 	osm: Osm,
@@ -207,7 +214,9 @@ export function createReadableEntityStreamFromOsm(
 }
 
 /**
- * Convert the OSM index to a `ReadableStream<Uint8Array>` of PBF bytes.
+ * Convert the OSM index to a ReadableStream of PBF-encoded bytes.
+ * Entities are streamed, transformed into PBF blocks, and encoded on the fly.
+ * Suitable for piping to file or network streams.
  */
 export function osmToPbfStream(osm: Osm): ReadableStream<Uint8Array> {
 	return createReadableEntityStreamFromOsm(osm)
@@ -216,7 +225,9 @@ export function osmToPbfStream(osm: Osm): ReadableStream<Uint8Array> {
 }
 
 /**
- * Convert the OSM index to an in memory PBF ArrayBuffer.
+ * Convert the OSM index to a single in-memory PBF buffer.
+ * Collects all streamed chunks into a contiguous Uint8Array.
+ * For large datasets, prefer osmToPbfStream to avoid memory pressure.
  */
 export async function osmToPbfBuffer(osm: Osm): Promise<Uint8Array> {
 	const chunks: Uint8Array[] = []
