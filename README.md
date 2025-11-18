@@ -1,8 +1,53 @@
 # Osmix
 
-Osmix is a collection of tools for reading, inspecting, and manipulating OpenStreetMap PBF data in modern JavaScript environments. The first applications built with the tools are a simple OSM PBF inspection tool and [a merge tool](https://merge.osmix.dev). The individual libraries span low-level PBF parsing, JSON transforms, and generating vector tiles for any JavaScript environment.
+> An ecosystem of tools to work with OpenStreetMap data in TypeScript.
+
+## Introduction
+
+Welcome to Osmix, a powerful collection of tools for reading, inspecting, and manipulating OpenStreetMap PBF data in modern JavaScript environments. The first applications built with the tools are a simple OSM PBF inspection tool and [a merge tool](https://merge.osmix.dev). The individual libraries span low-level PBF parsing, JSON transforms, and generating vector tiles for any JavaScript environment.
 
 ## Getting started
+
+Install `osmix`
+
+```bash
+bun install osmix
+```
+
+Read a PBF.
+
+```ts
+import {Osmix} from 'osmix'
+
+const monacoPbf = Bun.file('./monaco.pbf')
+
+const osm = await Osmix.fromPbf(monacoPbf.stream())
+```
+
+Read a PBF off the main thread in a `Worker` thread.
+
+```ts
+import {OsmixRemote} from 'osmix'
+const Osmix = await OsmixRemote.connect()
+const osmInfo = await Osmix.fromPbf(monacoPbf.stream())
+
+```
+
+## Monorepo Structure
+
+| Package | Description | README |
+|--|--|--|
+| 'osmix' | Main library packaging all of the individual tools into an API. | [README](packages/osmix/README.md) |
+| `@osmix/core` | In-memory engine for ingesting PBF streams, building indexes, and emitting OSM data. | [README](packages/core/README.md) |
+| `@osmix/change` | Helpers for deduplication, merge stats, and applying changesets atop core data. | [README](packages/change/README.md) |
+| `@osmix/json` | Streaming transforms: convert OSM PBF bytes to strongly typed JSON and GeoJSON. | [README](packages/json/README.md) |
+| `@osmix/pbf` | Low-level library for OSM PBF protobuf parsing, compression, and code generation. | [README](packages/pbf/README.md) |
+| `@osmix/raster` | Renders canvased raster tiles and registers the custom MapLibre protocol for Osmix. | [README](packages/raster/README.md) |
+| `@osmix/vt` | Encodes overlays as Mapbox Vector Tiles (MVT) and provides caching helpers. | [README](packages/vt/README.md) |
+| `@osmix/shared` | Utility functions and geometry helpers used throughout all workspace packages. | [README](packages/shared/README.md) |
+
+
+## Development
 
 1. Install dependencies with `bun install`.
 2. Run all workspace apps in watch mode via `bun run dev`.
@@ -18,15 +63,6 @@ The workspace uses a single root `package.json` to coordinate shared scripts, de
 - [apps/merge](apps/merge/README.md) – Vite + React app that compares base and patch extracts, renders MapLibre raster and vector overlays, and guides multi-step merge workflows entirely in-browser.
 - [apps/bench](apps/bench/README.md) – Experimental benchmark UI that contrasts Osmix operations with DuckDB-wasm queries using shared fixtures.
 - [apps/vt-server](apps/vt-server/README.md) - Example of using Osmix as a simple vector tile server.
-
-### Packages
-- [packages/core](packages/core/README.md) – Core `Osmix` engine for ingesting PBF streams, building spatial indexes, and emitting JSON, PBF, or vector and raster tiles.
-- [packages/change](packages/change/README.md) – Change-management helpers that deduplicate entities, generate merge stats, and apply edits on top of `@osmix/core`.
-- [packages/json](packages/json/README.md) – Easy-to-use streaming converters between PBF bytes and strongly typed JSON entities, plus GeoJSON helpers tuned to OSM conventions.
-- [packages/pbf](packages/pbf/README.md) – Low-level toolkit that mirrors the official protobuf schema, offering streaming readers/writers, compression helpers, and generated type-safe codecs.
-- [packages/raster](packages/raster/README.md) – Canvas-based raster tile renderer and MapLibre protocol built for `@osmix/core` datasets.
-- [packages/vt](packages/vt/README.md) – Encodes Osmix binary overlays directly into Mapbox Vector Tiles with caching helpers.
-- [packages/shared](packages/shared/README.md) – Small geometry utilities (`haversineDistance`, `clipPolyline`) shared across packages.
 
 ### Development
 - `fixtures/` – sample extracts referenced by integration tests and the merge app.
