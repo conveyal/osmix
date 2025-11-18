@@ -141,7 +141,7 @@ export class OsmixWorker extends EventTarget {
 		const baseOsm = this.get(baseOsmId)
 		const patchOsm = this.get(patchOsmId)
 		const mergedOsm = await merge(baseOsm, patchOsm, options, this.onProgress)
-		this.set(baseOsmId, new Osmix(mergedOsm))
+		this.set(baseOsmId, new Osmix(mergedOsm.transferables()))
 		this.delete(patchOsmId)
 		return mergedOsm.id
 	}
