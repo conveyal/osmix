@@ -3,6 +3,13 @@ import maplibre from "maplibre-gl"
 import { RASTER_PROTOCOL_NAME } from "../settings"
 import { osmWorker } from "../state/worker"
 
+export const RASTER_URL_PATTERN =
+	/^@osmix\/raster:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\.png$/
+
+export function osmixIdToTileUrl(osmId: string, tileSize: number) {
+	return `${RASTER_PROTOCOL_NAME}://${encodeURIComponent(osmId)}/${tileSize}/{z}/{x}/{y}.png`
+}
+
 /**
  * Creates a MapLibre protocol action that handles requests for raster tiles.
  */
@@ -21,7 +28,7 @@ export function addOsmixRasterProtocol() {
 			const tileSize = +sizeStr
 			const tileIndex: Tile = [+xStr, +yStr, +zStr]
 			const rasterTile = await osmWorker.getRasterTile(
-				osmId,
+				decodeURIComponent(osmId),
 				tileIndex,
 				tileSize,
 			)

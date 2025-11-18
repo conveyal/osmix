@@ -1,5 +1,8 @@
 import { Layer, Source } from "react-map-gl/maplibre"
-import { addOsmixRasterProtocol } from "../lib/osmix-raster-protocol"
+import {
+	addOsmixRasterProtocol,
+	osmixIdToTileUrl,
+} from "../lib/osmix-raster-protocol"
 import { APPID, MIN_PICKABLE_ZOOM, RASTER_TILE_SIZE } from "../settings"
 
 if (typeof window !== "undefined") {
@@ -18,7 +21,7 @@ export default function OsmixRasterSource({
 		<Source
 			id={id}
 			type="raster"
-			tiles={[`@osmix/raster://${osmId}/${tileSize}/{z}/{x}/{y}.png`]}
+			tiles={[osmixIdToTileUrl(osmId, tileSize)]}
 			tileSize={tileSize / 2}
 		>
 			<Layer id={id} type="raster" source={id} maxzoom={MIN_PICKABLE_ZOOM} />
