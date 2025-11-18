@@ -1,5 +1,11 @@
 # @osmix/pbf
 
+## 0.0.3
+
+### Patch Changes
+
+- d001d9a: Refactor to align around new main external API
+
 ## 0.0.2
 
 ### Patch Changes

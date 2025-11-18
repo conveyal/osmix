@@ -1,5 +1,12 @@
 # @osmix/shared
 
+## 0.0.4
+
+### Patch Changes
+
+- 572cbd8: Raster tile updates
+- d001d9a: Refactor to align around new main external API
+
 ## 0.0.3
 
 ### Patch Changes

@@ -1,5 +1,23 @@
 # osmix
 
+## 0.0.4
+
+### Patch Changes
+
+- d001d9a: Refactor to align around new main external API
+- Updated dependencies [572cbd8]
+- Updated dependencies [d001d9a]
+- Updated dependencies [b2f14d3]
+- Updated dependencies [4303c40]
+  - @osmix/raster@0.0.4
+  - @osmix/shared@0.0.4
+  - @osmix/geojson@0.0.2
+  - @osmix/change@0.0.4
+  - @osmix/core@0.0.4
+  - @osmix/json@0.0.4
+  - @osmix/pbf@0.0.3
+  - @osmix/vt@0.0.4
+
 ## 0.0.3
 
 ### Patch Changes
