@@ -113,6 +113,7 @@
       },
       "devDependencies": {
         "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -127,6 +128,7 @@
       },
       "devDependencies": {
         "@osmix/pbf": "workspace:*",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -142,6 +144,7 @@
       },
       "devDependencies": {
         "@types/geojson": "catalog:",
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -154,6 +157,7 @@
         "@osmix/shared": "workspace:*",
       },
       "devDependencies": {
+        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -203,9 +207,6 @@
         "@osmix/shared": "workspace:*",
       },
       "devDependencies": {
-        "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
-        "maplibre-gl": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -230,6 +231,7 @@
       "version": "0.0.3",
       "dependencies": {
         "@osmix/shared": "workspace:*",
+        "@types/node": "catalog:",
         "pbf": "catalog:",
       },
       "devDependencies": {

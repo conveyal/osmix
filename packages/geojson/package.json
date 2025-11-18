@@ -41,6 +41,7 @@
 	},
 	"devDependencies": {
 		"@types/geojson": "catalog:",
+		"@types/node": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	},

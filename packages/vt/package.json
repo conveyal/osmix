@@ -39,6 +39,7 @@
 	},
 	"dependencies": {
 		"@osmix/shared": "workspace:*",
+		"@types/node": "catalog:",
 		"pbf": "catalog:"
 	},
 	"devDependencies": {
