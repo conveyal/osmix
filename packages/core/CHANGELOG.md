@@ -1,5 +1,15 @@
 # @osmix/core
 
+## 0.0.4
+
+### Patch Changes
+
+- d001d9a: Refactor to align around new main external API
+- 4303c40: Refactor core Osmix index to prepare for future work
+- Updated dependencies [572cbd8]
+- Updated dependencies [d001d9a]
+  - @osmix/shared@0.0.4
+
 ## 0.0.3
 
 ### Patch Changes

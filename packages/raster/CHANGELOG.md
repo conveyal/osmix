@@ -1,5 +1,16 @@
 # @osmix/raster
 
+## 0.0.4
+
+### Patch Changes
+
+- 572cbd8: Raster tile updates
+- d001d9a: Refactor to align around new main external API
+- b2f14d3: Fix vertical visual artifacts when rendering raster tiles
+- Updated dependencies [572cbd8]
+- Updated dependencies [d001d9a]
+  - @osmix/shared@0.0.4
+
 ## 0.0.3
 
 ### Patch Changes
