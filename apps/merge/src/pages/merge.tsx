@@ -139,10 +139,8 @@ export default function Merge() {
 
 	const applyChanges = async () => {
 		if (!changesetStats) throw Error("Changeset stats are not loaded")
-		const newOsmId = await osmWorker.applyChangesAndReplace(
-			changesetStats.osmId,
-		)
-		const osm = await osmWorker.get(newOsmId)
+		await osmWorker.applyChangesAndReplace(changesetStats.osmId)
+		const osm = await osmWorker.get(changesetStats.osmId)
 		setChangesetStats(null)
 		return osm
 	}

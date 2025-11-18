@@ -53,9 +53,9 @@ export default function InspectPage() {
 
 	const applyChanges = async (osmId: string) => {
 		const task = Log.startTask("Applying changes to OSM...")
-		const newOsmId = await osmWorker.applyChangesAndReplace(osmId)
+		await osmWorker.applyChangesAndReplace(osmId)
 		task.update("Refreshing OSM index...")
-		const newOsm = await osmWorker.get(newOsmId)
+		const newOsm = await osmWorker.get(osmId)
 		setOsm(newOsm)
 		setChangesetStats(null)
 		task.end("Changes applied!")
