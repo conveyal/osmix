@@ -38,8 +38,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@types/bun": "catalog:",
 		"@osmix/shared": "workspace:*",
-		"@types/node": "catalog:",
 		"pbf": "catalog:"
 	},
 	"devDependencies": {

@@ -43,7 +43,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
-		"@types/node": "catalog:",
+		"@types/bun": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	},

@@ -40,7 +40,7 @@
 	},
 	"devDependencies": {
 		"@osmix/shared": "workspace:*",
-		"@types/node": "catalog:",
+		"@types/bun": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	},

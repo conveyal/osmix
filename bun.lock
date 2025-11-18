@@ -7,7 +7,6 @@
         "@biomejs/biome": "^2.3.2",
         "@changesets/cli": "^2.29.7",
         "typescript": "catalog:",
-        "vitest": "catalog:",
       },
     },
     "apps/bench": {
@@ -113,8 +112,8 @@
         "sweepline-intersections": "^1.5.0",
       },
       "devDependencies": {
+        "@types/bun": "catalog:",
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -129,7 +128,7 @@
       },
       "devDependencies": {
         "@osmix/pbf": "workspace:*",
-        "@types/node": "catalog:",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -144,8 +143,8 @@
         "dequal": "catalog:",
       },
       "devDependencies": {
+        "@types/bun": "catalog:",
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -158,7 +157,7 @@
         "@osmix/shared": "workspace:*",
       },
       "devDependencies": {
-        "@types/node": "catalog:",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -181,8 +180,8 @@
         "web-worker": "^1.5.0",
       },
       "devDependencies": {
+        "@types/bun": "catalog:",
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -195,7 +194,7 @@
       },
       "devDependencies": {
         "@osmix/shared": "workspace:*",
-        "@types/node": "catalog:",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -221,7 +220,7 @@
         "lineclip": "^2.0.0",
       },
       "devDependencies": {
-        "@types/node": "catalog:",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -231,7 +230,7 @@
       "version": "0.0.3",
       "dependencies": {
         "@osmix/shared": "workspace:*",
-        "@types/node": "catalog:",
+        "@types/bun": "catalog:",
         "pbf": "catalog:",
       },
       "devDependencies": {

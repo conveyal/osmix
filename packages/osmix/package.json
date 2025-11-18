@@ -38,8 +38,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
+		"@types/bun": "catalog:",
 		"@types/geojson": "catalog:",
-		"@types/node": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	},
