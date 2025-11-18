@@ -1,8 +1,13 @@
+import {
+	generateChangeset,
+	OsmChangeset,
+	type OsmMergeOptions,
+} from "@osmix/change"
 import { Osm, type OsmOptions } from "@osmix/core"
 import { startCreateOsmFromGeoJSON } from "@osmix/geojson"
 import { readOsmPbf } from "@osmix/pbf"
 import { DEFAULT_RASTER_TILE_SIZE, OsmixRasterTile } from "@osmix/raster"
-import { progressEvent } from "@osmix/shared/progress"
+import { logProgress, type ProgressEvent } from "@osmix/shared/progress"
 import type { OsmNode, OsmRelation, OsmWay, Tile } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import {
@@ -13,69 +18,79 @@ import {
 } from "./pbf"
 import { drawRasterTile } from "./raster"
 
-export class Osmix extends EventTarget {
-	log(message: string) {
-		this.dispatchEvent(progressEvent(message))
-	}
+/**
+ * Extends the base Osm indexes and adds additional helper methods for working with Osm data.
+ */
+export class Osmix extends Osm {
+	private vtEncoder = new OsmixVtEncoder(this)
 
-	async readHeader(data: Parameters<typeof readOsmPbf>[0]) {
+	static async readHeader(data: Parameters<typeof readOsmPbf>[0]) {
 		const { header } = await readOsmPbf(data)
 		return header
 	}
 
-	async fromPbf(
+	static async fromPbf(
 		data: ArrayBufferLike | ReadableStream,
 		options: Partial<OsmFromPbfOptions> = {},
-	): Promise<Osm> {
-		return createOsmFromPbf(
+		onProgress: (progress: ProgressEvent) => void = logProgress,
+	): Promise<Osmix> {
+		const osm = await createOsmFromPbf(
 			data instanceof ReadableStream ? data : new Uint8Array(data),
 			options,
-			(progress) => this.dispatchEvent(progress),
+			onProgress,
 		)
+		return new Osmix(osm.transferables())
 	}
 
-	toPbfStream(osm: Osm): ReadableStream<Uint8Array> {
-		return osmToPbfStream(osm)
-	}
-
-	async toPbf(osm: Osm): Promise<Uint8Array> {
-		return osmToPbfBuffer(osm)
-	}
-
-	async fromGeoJSON(
+	static async fromGeoJSON(
 		data: ArrayBufferLike | ReadableStream,
 		options: Partial<OsmOptions> = {},
+		onProgress: (progress: ProgressEvent) => void = logProgress,
 	) {
 		const geojson = await readGeoJSON(data)
-		const osm = new Osm(options)
+		const osm = new Osmix(options)
 		for (const update of startCreateOsmFromGeoJSON(osm, geojson)) {
-			this.dispatchEvent(update)
+			onProgress(update)
 		}
 		return osm
 	}
 
-	createVtEncoder(osm: Osm) {
-		return new OsmixVtEncoder(osm)
+	toPbfStream(): ReadableStream<Uint8Array> {
+		return osmToPbfStream(this)
 	}
 
-	getVectorTile(osm: Osm, tile: Tile) {
-		return this.createVtEncoder(osm).getTile(tile)
+	async toPbf(): Promise<Uint8Array> {
+		return osmToPbfBuffer(this)
 	}
 
-	getRasterTile(osm: Osm, tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
-		return drawRasterTile(osm, new OsmixRasterTile({ tile, tileSize }))
+	getVectorTile(tile: Tile) {
+		return this.vtEncoder.getTile(tile)
+	}
+
+	getRasterTile(tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
+		return drawRasterTile(this, new OsmixRasterTile({ tile, tileSize }))
 			.imageData
 	}
 
 	search(
-		osm: Osm,
 		key: string,
 		val?: string,
 	): { nodes: OsmNode[]; ways: OsmWay[]; relations: OsmRelation[] } {
-		const nodes = osm.nodes.search(key, val)
-		const ways = osm.ways.search(key, val)
-		const relations = osm.relations.search(key, val)
+		const nodes = this.nodes.search(key, val)
+		const ways = this.ways.search(key, val)
+		const relations = this.relations.search(key, val)
 		return { nodes, ways, relations }
+	}
+
+	createChangeset(
+		other?: Osm,
+		options: Partial<OsmMergeOptions> = {},
+		onProgress: (progress: ProgressEvent) => void = logProgress,
+	) {
+		if (other) {
+			return generateChangeset(this, other, options, onProgress)
+		}
+		return new OsmChangeset(this)
 	}
 }
 

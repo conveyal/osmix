@@ -1,7 +1,5 @@
-import { type Nodes, Osm, type Ways } from "@osmix/core"
+import type { Nodes, Osm, Ways } from "@osmix/core"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
-import { type ProgressEvent, progressEvent } from "@osmix/shared/progress"
-import { throttle } from "@osmix/shared/throttle"
 import type {
 	OsmEntity,
 	OsmEntityType,
@@ -15,13 +13,12 @@ import {
 	isWayEqual,
 } from "@osmix/shared/utils"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
-import sweeplineIntersections from "sweepline-intersections"
+import { applyChangesetToOsm } from "./apply-changeset"
 import type {
 	OsmChange,
 	OsmChanges,
 	OsmChangesetStats,
 	OsmEntityRef,
-	OsmMergeOptions,
 } from "./types"
 import {
 	cleanCoords,
@@ -30,6 +27,7 @@ import {
 	osmTagsToOscTags,
 	removeDuplicateAdjacentRelationMembers,
 	removeDuplicateAdjacentWayRefs,
+	waysIntersect,
 	waysShouldConnect,
 } from "./utils"
 
@@ -57,64 +55,6 @@ export class OsmChangeset {
 		changeset.nodeChanges = json.nodes
 		changeset.wayChanges = json.ways
 		changeset.relationChanges = json.relations
-		return changeset
-	}
-
-	static generateChangeset(
-		base: Osm,
-		patch: Osm,
-		options: Partial<OsmMergeOptions> = {},
-		onProgress: (progress: ProgressEvent) => void = console.log,
-	) {
-		const patchId = patch.id
-		const baseId = base.id
-
-		const log = (msg: string) => onProgress(progressEvent(msg))
-
-		const changeset = new OsmChangeset(base)
-		const logEverySecond = throttle((msg: string) => log(msg), 1_000)
-
-		if (options.directMerge) {
-			log(`Generating direct changes from ${patchId} to ${baseId}...`)
-			changeset.generateDirectChanges(patch)
-		}
-
-		if (options.deduplicateWays) {
-			let checkedWays = 0
-			let dedpulicatedWays = 0
-			log(`Deduplicating ways from ${patchId}...`)
-			for (const wayStats of changeset.deduplicateWaysGenerator(patch.ways)) {
-				checkedWays++
-				dedpulicatedWays += wayStats
-				logEverySecond(
-					`Deduplicating ways: ${checkedWays.toLocaleString()} ways checked, ${dedpulicatedWays.toLocaleString()} ways deduplicated`,
-				)
-			}
-		}
-
-		if (options.deduplicateNodes) {
-			log(`Deduplicating nodes from ${patchId}...`)
-			changeset.deduplicateNodes(patch.nodes)
-			log(
-				`Node deduplication results: ${changeset.deduplicatedNodes} de-duplicated nodes, ${changeset.deduplicatedNodesReplaced} nodes replaced`,
-			)
-		}
-
-		if (options.createIntersections) {
-			let checkedWays = 0
-			log(`Creating intersections from ${patchId}...`)
-
-			// This will check if the osm dataset has the way before trying to create intersections for it.
-			for (const _wayStats of changeset.createIntersectionsForWaysGenerator(
-				patch.ways,
-			)) {
-				checkedWays++
-				logEverySecond(
-					`Intersection creation progress: ${checkedWays.toLocaleString()} ways checked`,
-				)
-			}
-		}
-
 		return changeset
 	}
 
@@ -803,140 +743,6 @@ function getEntityVersion(entity: OsmEntity) {
 	return entity.tags && "ext:osm_version" in entity.tags
 		? Number(entity.tags["ext:osm_version"])
 		: 0
-}
-
-/**
- * Check if the coordinates of two ways produce intersections.
- */
-function waysIntersect(
-	wayA: [number, number][],
-	wayB: [number, number][],
-): [number, number][] {
-	const intersections = sweeplineIntersections(
-		{
-			type: "FeatureCollection",
-			features: [
-				{
-					type: "Feature",
-					geometry: {
-						type: "LineString",
-						coordinates: wayA,
-					},
-					properties: {},
-				},
-				{
-					type: "Feature",
-					geometry: {
-						type: "LineString",
-						coordinates: wayB,
-					},
-					properties: {},
-				},
-			],
-		},
-		true,
-	)
-
-	const uniqueFeatures: [number, number][] = []
-	const seen = new Set<string>()
-
-	for (const coordinates of intersections) {
-		const key = `${coordinates[0]}:${coordinates[1]}`
-		if (seen.has(key)) continue
-		seen.add(key)
-		uniqueFeatures.push(coordinates)
-	}
-
-	return uniqueFeatures
-}
-
-/**
- * Apply a changeset to an Osm index, generating a new Osm index. Usually done on a changeset made from the base osm index.
- */
-export function applyChangesetToOsm(changeset: OsmChangeset, newId?: string) {
-	const baseOsm = changeset.osm
-	const osm = new Osm({
-		id: newId ?? baseOsm.id,
-		header: baseOsm.header,
-	})
-
-	const { nodeChanges, wayChanges, relationChanges } = changeset
-
-	// Add nodes from base, modifying and deleting as needed
-	for (const node of baseOsm.nodes) {
-		const change = nodeChanges[node.id]
-		if (change) {
-			// Remove the change from the changeset so we don't apply it twice
-			delete nodeChanges[node.id]
-			if (change.changeType === "delete") continue // Don't add deleted nodes
-			if (change.changeType === "create")
-				throw Error("Changeset contains create changes for existing entities")
-		}
-		osm.nodes.addNode(change?.entity ?? node)
-	}
-
-	// All remaining node changes should be create
-	// Add nodes from patch
-	for (const change of Object.values(nodeChanges)) {
-		if (change.changeType !== "create") {
-			throw Error("Changeset still contains node changes in incorrect stage.")
-		}
-		osm.nodes.addNode(change.entity)
-	}
-
-	// Add ways from base, modifying and deleting as needed
-	for (const way of baseOsm.ways) {
-		const change = wayChanges[way.id]
-		if (change) {
-			// Remove the change from the changeset so we don't apply it twice
-			delete wayChanges[way.id]
-			if (change.changeType === "delete") continue // Don't add deleted ways
-			if (change.changeType === "create") {
-				throw Error("Changeset contains create changes for existing entities")
-			}
-		}
-		// Remove duplicate refs back to back, but not when they are separated by other refs
-		osm.ways.addWay(change?.entity ?? way)
-	}
-
-	// All remaining way changes should be create
-	// Add ways from patch
-	for (const change of Object.values(wayChanges)) {
-		if (change.changeType !== "create")
-			throw Error("Changeset still contains way changes in incorrect stage.")
-		osm.ways.addWay(change.entity)
-	}
-
-	// Add relations from base, modifying and deleting as needed
-	for (const relation of baseOsm.relations) {
-		const change = relationChanges[relation.id]
-		if (change) {
-			// Remove the change from the changeset so we don't apply it twice
-			delete relationChanges[relation.id]
-			if (change.changeType === "delete") continue // Don't add deleted relations
-			if (change.changeType === "create") {
-				throw Error("Changeset contains create changes for existing entities")
-			}
-		}
-		osm.relations.addRelation(change?.entity ?? relation)
-	}
-
-	// Add relations from patch
-	for (const change of Object.values(relationChanges)) {
-		if (change.changeType !== "create")
-			throw Error(
-				"Changeset still contains relation changes in incorrect stage.",
-			)
-		osm.relations.addRelation(change.entity)
-	}
-
-	// Everything should be added now, finish the osm
-	osm.buildIndexes()
-
-	// Build spatial indexes
-	osm.buildSpatialIndexes()
-
-	return osm
 }
 
 class IdPairs {

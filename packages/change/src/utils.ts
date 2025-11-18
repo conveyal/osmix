@@ -4,6 +4,7 @@ import type {
 	OsmTags,
 	OsmWay,
 } from "@osmix/shared/types"
+import sweeplineIntersections from "sweepline-intersections"
 import type { OsmChangesetStats } from "./types"
 
 export function osmTagsToOscTags(tags: OsmTags): string {
@@ -125,4 +126,49 @@ export function changeStatsSummary(stats: OsmChangesetStats) {
 				` ${camelCaseToSentenceCase(key)}: ${value.toLocaleString()}`,
 		)
 	return `Changeset summary: ${sortedNumericStats.join(", ")}`
+}
+
+/**
+ * Check if the coordinates of two ways produce intersections.
+ */
+export function waysIntersect(
+	wayA: [number, number][],
+	wayB: [number, number][],
+): [number, number][] {
+	const intersections = sweeplineIntersections(
+		{
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: wayA,
+					},
+					properties: {},
+				},
+				{
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: wayB,
+					},
+					properties: {},
+				},
+			],
+		},
+		true,
+	)
+
+	const uniqueFeatures: [number, number][] = []
+	const seen = new Set<string>()
+
+	for (const coordinates of intersections) {
+		const key = `${coordinates[0]}:${coordinates[1]}`
+		if (seen.has(key)) continue
+		seen.add(key)
+		uniqueFeatures.push(coordinates)
+	}
+
+	return uniqueFeatures
 }

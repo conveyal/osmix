@@ -104,21 +104,6 @@ describe("OsmixRemote", () => {
 		)
 	})
 
-	describe("proxy", () => {
-		beforeAll(() => getFixtureFile(monacoPbf.url))
-
-		it("should proxy instance from worker", async () => {
-			const remote = await OsmixRemote.connect()
-			const pbfData = await getFixtureFile(monacoPbf.url)
-			const osmInfo = await remote.fromPbf(pbfData.buffer)
-			const osm = remote.getProxy(osmInfo.id)
-			expect(await osm.nodes.getBbox()).toEqual([
-				7.4053929, 43.7232244, 7.4447259, 43.7543687,
-			])
-			expect(await osm.nodes.size).toBe(monacoPbf.nodes)
-		})
-	})
-
 	describe("get", () => {
 		beforeAll(() => getFixtureFile(monacoPbf.url))
 
