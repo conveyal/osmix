@@ -33,21 +33,18 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "tsc",
-		"bench": "vitest bench",
+		"bench": "bun test --bench",
 		"prepublishOnly": "tsc",
-		"test": "vitest",
+		"test": "bun test",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
+		"@types/bun": "catalog:",
 		"@types/geojson": "catalog:",
-		"@types/node": "catalog:",
-		"typescript": "catalog:",
-		"vitest": "catalog:"
+		"typescript": "catalog:"
 	},
 	"dependencies": {
 		"@osmix/core": "workspace:*",
-		"@osmix/json": "workspace:*",
-		"@osmix/pbf": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"dequal": "catalog:",
 		"sweepline-intersections": "^1.5.0"

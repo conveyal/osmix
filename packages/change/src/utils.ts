@@ -1,5 +1,11 @@
-import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from "@osmix/json"
-import type { OsmixChangesetStats } from "./types"
+import type {
+	OsmEntity,
+	OsmRelation,
+	OsmTags,
+	OsmWay,
+} from "@osmix/shared/types"
+import sweeplineIntersections from "sweepline-intersections"
+import type { OsmChangesetStats } from "./types"
 
 export function osmTagsToOscTags(tags: OsmTags): string {
 	return Object.entries(tags)
@@ -108,7 +114,7 @@ export function camelCaseToSentenceCase(str: string) {
 /**
  * Summarize the changeset stats with the most significant changes first.
  */
-export function changeStatsSummary(stats: OsmixChangesetStats) {
+export function changeStatsSummary(stats: OsmChangesetStats) {
 	const numericStats = (Object.entries(stats) as [string, unknown][]).filter(
 		([, value]) => typeof value === "number" && value > 0,
 	) as [string, number][]
@@ -120,4 +126,49 @@ export function changeStatsSummary(stats: OsmixChangesetStats) {
 				` ${camelCaseToSentenceCase(key)}: ${value.toLocaleString()}`,
 		)
 	return `Changeset summary: ${sortedNumericStats.join(", ")}`
+}
+
+/**
+ * Check if the coordinates of two ways produce intersections.
+ */
+export function waysIntersect(
+	wayA: [number, number][],
+	wayB: [number, number][],
+): [number, number][] {
+	const intersections = sweeplineIntersections(
+		{
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: wayA,
+					},
+					properties: {},
+				},
+				{
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: wayB,
+					},
+					properties: {},
+				},
+			],
+		},
+		true,
+	)
+
+	const uniqueFeatures: [number, number][] = []
+	const seen = new Set<string>()
+
+	for (const coordinates of intersections) {
+		const key = `${coordinates[0]}:${coordinates[1]}`
+		if (seen.has(key)) continue
+		seen.add(key)
+		uniqueFeatures.push(coordinates)
+	}
+
+	return uniqueFeatures
 }

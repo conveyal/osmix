@@ -1,4 +1,5 @@
-import { getEntityType, type OsmEntity } from "@osmix/json"
+import type { OsmEntity } from "@osmix/shared/types"
+import { getEntityType } from "@osmix/shared/utils"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { Suspense, useTransition } from "react"

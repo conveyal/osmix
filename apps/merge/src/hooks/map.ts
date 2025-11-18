@@ -1,5 +1,6 @@
-import type { Osmix } from "@osmix/core"
-import { isNode, isRelation, isWay, type OsmEntity } from "@osmix/json"
+import type { Osm, OsmInfo } from "@osmix/core"
+import type { OsmEntity } from "@osmix/shared/types"
+import { isNode, isRelation, isWay } from "@osmix/shared/utils"
 import { useCallback } from "react"
 import { useMap as useMapCollection } from "react-map-gl/maplibre"
 
@@ -13,7 +14,7 @@ export function useFlyToEntity() {
 	const map = useMap()
 
 	return useCallback(
-		(osm: Osmix, entity: OsmEntity) => {
+		(osm: Osm, entity: OsmEntity) => {
 			if (!map) return
 			if (isNode(entity)) {
 				map.flyTo({
@@ -23,13 +24,13 @@ export function useFlyToEntity() {
 					zoom: 16,
 				})
 			} else if (isWay(entity)) {
-				const bbox = osm.ways.getBbox({ id: entity.id })
+				const bbox = osm.ways.getNodeBbox({ id: entity.id })
 				map.fitBounds(bbox, {
 					padding: 100,
 					maxDuration: 200,
 				})
 			} else if (isRelation(entity)) {
-				const bbox = osm.relations.getBbox({ id: entity.id })
+				const bbox = osm.relations.getNodeBbox({ id: entity.id })
 				map.fitBounds(bbox, {
 					padding: 100,
 					maxDuration: 200,
@@ -44,8 +45,8 @@ export function useFlyToOsmBounds() {
 	const map = useMap()
 
 	return useCallback(
-		(osm?: Osmix) => {
-			const bbox = osm?.bbox()
+		(osmInfo?: OsmInfo) => {
+			const bbox = osmInfo?.bbox
 			if (!map || !bbox) return
 			map.fitBounds(bbox, {
 				padding: 100,

@@ -1,5 +1,5 @@
-import type { OsmNode, OsmWay } from "@osmix/json"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "bun:test"
+import type { OsmNode, OsmWay } from "@osmix/shared/types"
 import { Nodes } from "../src/nodes"
 import StringTable from "../src/stringtable"
 import { Ways } from "../src/ways"

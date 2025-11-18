@@ -1,0 +1,126 @@
+import type { OsmPbfHeaderBlock } from "@osmix/pbf"
+import type { GeoBbox2D } from "@osmix/shared/types"
+import { Nodes, type NodesTransferables } from "./nodes"
+import { Relations, type RelationsTransferables } from "./relations"
+import StringTable, { type StringTableTransferables } from "./stringtable"
+import { Ways, type WaysTransferables } from "./ways"
+
+export interface OsmTransferables {
+	id: string
+	header: OsmPbfHeaderBlock
+	stringTable: StringTableTransferables
+	nodes: NodesTransferables
+	ways: WaysTransferables
+	relations: RelationsTransferables
+}
+
+export interface OsmInfo {
+	id: string
+	bbox: GeoBbox2D
+	header: OsmPbfHeaderBlock
+	stats: {
+		nodes: number
+		ways: number
+		relations: number
+	}
+}
+
+export interface OsmOptions {
+	id: string
+	header: OsmPbfHeaderBlock
+}
+
+/**
+ * OSM Entity Index.
+ */
+export class Osm {
+	// Filename or ID of this OSM Entity index.
+	readonly id: string
+	readonly header: OsmPbfHeaderBlock
+
+	// Shared string lookup table for all nodes, ways, and relations
+	readonly stringTable: StringTable
+	readonly nodes: Nodes
+	readonly ways: Ways
+	readonly relations: Relations
+
+	private indexBuilt = false
+
+	constructor(opts?: Partial<OsmOptions> | OsmTransferables) {
+		this.id = opts?.id ?? "unknown"
+		this.header = opts?.header ?? {
+			required_features: [],
+			optional_features: [],
+		}
+		if (opts && "stringTable" in opts) {
+			this.stringTable = new StringTable(opts.stringTable)
+			this.nodes = new Nodes(this.stringTable, opts.nodes)
+			this.ways = new Ways(this.stringTable, this.nodes, opts.ways)
+			this.relations = new Relations(
+				this.stringTable,
+				this.nodes,
+				this.ways,
+				opts.relations,
+			)
+			this.indexBuilt = true
+		} else {
+			this.stringTable = new StringTable()
+			this.nodes = new Nodes(this.stringTable)
+			this.ways = new Ways(this.stringTable, this.nodes)
+			this.relations = new Relations(this.stringTable, this.nodes, this.ways)
+		}
+	}
+
+	buildIndexes() {
+		this.stringTable.buildIndex()
+		this.nodes.buildIndex()
+		this.ways.buildIndex()
+		this.relations.buildIndex()
+		this.indexBuilt = true
+	}
+
+	isReady() {
+		return (
+			this.nodes.isReady() &&
+			this.ways.isReady() &&
+			this.relations.isReady() &&
+			this.indexBuilt
+		)
+	}
+
+	buildSpatialIndexes() {
+		this.nodes.buildSpatialIndex()
+		this.ways.buildSpatialIndex()
+	}
+
+	/**
+	 * Get the bounding box of all entities in the OSM index.
+	 */
+	bbox(): GeoBbox2D {
+		return this.nodes.getBbox()
+	}
+
+	info(): OsmInfo {
+		return {
+			id: this.id,
+			bbox: this.bbox(),
+			header: this.header,
+			stats: {
+				nodes: this.nodes.size,
+				ways: this.ways.size,
+				relations: this.relations.size,
+			},
+		}
+	}
+
+	transferables(): OsmTransferables {
+		return {
+			id: this.id,
+			header: this.header,
+			stringTable: this.stringTable.transferables(),
+			nodes: this.nodes.transferables(),
+			ways: this.ways.transferables(),
+			relations: this.relations.transferables(),
+		}
+	}
+}

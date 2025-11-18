@@ -16,10 +16,8 @@
 			"pbf": "^4.0.1",
 			"typescript": "^5.9.0",
 			"@types/geojson": "^7946.0.16",
-			"@types/node": "^24",
 			"@types/bun": "^1.3.1",
-			"vite": "^7.1.7",
-			"vitest": "^4.0.1"
+			"vite": "^7.1.7"
 		}
 	},
 	"devDependencies": {
@@ -31,11 +29,13 @@
 		"dev": "bun --filter '*' dev",
 		"build": "bun --filter '*' build",
 		"check": "biome check --write .",
-		"clean": "rm -rf packages/*/dist apps/*/dist",
+		"clean": "rm -rf packages/*/dist apps/*/dist node_modules packages/*/node_modules apps/*/node_modules",
 		"format": "biome format --write .",
 		"lint": "biome lint --write --unsafe .",
 		"publish": "changeset publish",
-		"test": "bun --filter '*' test --silent",
+		"test": "bun run test:packages && bun run test:apps && bun run typecheck && bun run lint && bun run check",
+		"test:apps": "bun --filter './apps/**' test --silent",
+		"test:packages": "bun --filter './packages/**' test --silent",
 		"typecheck": "bun --filter '*' typecheck",
 		"version": "changeset version"
 	},

@@ -1,15 +1,14 @@
-import { proxy } from "comlink"
-import { createOsmWorker } from "../workers/osm.worker"
+import { OsmixRemote } from "osmix"
 import { Log } from "./log"
 
 declare global {
 	interface Window {
-		osmWorker: ReturnType<typeof createOsmWorker>
+		osmWorker: OsmixRemote
 	}
 }
 
-export const osmWorker = createOsmWorker()
-
-osmWorker.setLogger(proxy(Log.addMessage))
+export const osmWorker = await OsmixRemote.connect({
+	onProgress: (progress) => Log.addMessage(progress.msg),
+})
 
 window.osmWorker = osmWorker

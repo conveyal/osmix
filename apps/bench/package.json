@@ -7,7 +7,7 @@
 		"bench": "vitest bench",
 		"build": "vite build",
 		"dev": "vite",
-		"test:browser": "vitest",
+		"test": "vitest",
 		"typecheck": "tsc --build --noEmit"
 	},
 	"devDependencies": {
@@ -17,15 +17,17 @@
 		"@vitest/browser-preview": "^4.0.1",
 		"typescript": "catalog:",
 		"vite": "catalog:",
-		"vitest": "catalog:"
+		"vitest": "^4.0.1"
 	},
 	"dependencies": {
 		"@duckdb/duckdb-wasm": "^1.31.0",
 		"@osmix/core": "workspace:*",
+		"@osmix/geojson": "workspace:*",
 		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@osmix/vt": "workspace:*",
+		"osmix": "workspace:*",
 		"apache-arrow": "^17.0.0",
 		"comlink": "^4.4.2",
 		"maplibre-gl": "catalog:",

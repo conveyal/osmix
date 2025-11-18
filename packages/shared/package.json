@@ -37,19 +37,19 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "tsc",
-		"bench": "vitest bench",
+		"bench": "bun test --bench",
 		"prepublishOnly": "tsc",
-		"test": "vitest",
+		"test": "bun test",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
-		"@types/node": "catalog:",
-		"typescript": "catalog:",
-		"vitest": "catalog:"
+		"@types/bun": "catalog:",
+		"typescript": "catalog:"
 	},
 	"dependencies": {
 		"@mapbox/geojson-rewind": "catalog:",
 		"@mapbox/sphericalmercator": "catalog:",
+		"dequal": "catalog:",
 		"lineclip": "^2.0.0"
 	}
 }

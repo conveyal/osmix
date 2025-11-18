@@ -9,6 +9,7 @@
 		"typecheck": "tsc --build --noEmit"
 	},
 	"dependencies": {
+		"osmix": "workspace:*",
 		"@osmix/core": "workspace:*",
 		"@osmix/vt": "workspace:*",
 		"comlink": "^4.4.2",

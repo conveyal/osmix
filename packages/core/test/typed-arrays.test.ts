@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "bun:test"
 import { BufferConstructor, ResizeableTypedArray } from "../src/typed-arrays"
 
 describe("typed array helpers", () => {
@@ -106,9 +106,8 @@ describe("typed array helpers", () => {
 			expect(Array.from(arr.slice(0, arr.length))).toEqual([1, 2, 3, 4, 5])
 		})
 
-		it.runIf(typeof SharedArrayBuffer !== "undefined")(
-			"grows shared buffers in place",
-			() => {
+		if (typeof SharedArrayBuffer !== "undefined") {
+			it("grows shared buffers in place", () => {
 				const backing = new SharedArrayBuffer(8, {
 					maxByteLength: 32,
 				})
@@ -129,7 +128,7 @@ describe("typed array helpers", () => {
 				expect(arr.array.length).toBe(16)
 				expect(arr.buffer.byteLength).toBe(16)
 				expect(Array.from(arr.slice(0, 9))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
-			},
-		)
+			})
+		}
 	})
 })

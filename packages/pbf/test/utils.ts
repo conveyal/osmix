@@ -1,5 +1,5 @@
+import { expect } from "bun:test"
 import type { PbfFixture } from "@osmix/shared/test/fixtures"
-import { assert } from "vitest"
 import type {
 	OsmPbfBlock,
 	OsmPbfGroup,
@@ -13,18 +13,18 @@ export async function testOsmPbfReader(
 	},
 	pbf: PbfFixture,
 ) {
-	assert.deepEqual(osm.header.bbox, pbf.bbox)
+	expect(osm.header.bbox).toEqual(pbf.bbox)
 
 	const { onGroup, count } = createOsmEntityCounter()
 	for await (const block of osm.blocks)
 		for (const group of block.primitivegroup) onGroup(group)
 
-	assert.equal(count.nodes, pbf.nodes)
-	assert.equal(count.ways, pbf.ways)
-	assert.equal(count.relations, pbf.relations)
-	assert.equal(count.node0, pbf.node0.id)
-	assert.equal(count.way0, pbf.way0)
-	assert.equal(count.relation0, pbf.relation0)
+	expect(count.nodes).toBe(pbf.nodes)
+	expect(count.ways).toBe(pbf.ways)
+	expect(count.relations).toBe(pbf.relations)
+	expect(count.node0).toBe(pbf.node0.id)
+	expect(count.way0).toBe(pbf.way0)
+	expect(count.relation0).toBe(pbf.relation0)
 
 	return count
 }

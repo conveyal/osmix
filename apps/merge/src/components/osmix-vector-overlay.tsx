@@ -1,4 +1,4 @@
-import type { Osmix } from "@osmix/core"
+import type { Osm } from "@osmix/core"
 import { decodeZigzag } from "@osmix/shared/zigzag"
 import { useSetAtom } from "jotai"
 import {
@@ -15,7 +15,10 @@ import {
 	Source,
 } from "react-map-gl/maplibre"
 import { useMap } from "../hooks/map"
-import { addOsmixVectorProtocol } from "../lib/osmix-vector-protocol"
+import {
+	addOsmixVectorProtocol,
+	osmixIdToTileUrl,
+} from "../lib/osmix-vector-protocol"
 import { APPID, MIN_PICKABLE_ZOOM } from "../settings"
 import { selectOsmEntityAtom } from "../state/osm"
 
@@ -97,7 +100,7 @@ const wayPolygonsFilter: FilterSpecification = [
 
 const relationFilter: FilterSpecification = ["==", ["get", "type"], "relation"]
 
-export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
+export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
 	const map = useMap()
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const popupRef = useRef<Popup | null>(null)
@@ -135,7 +138,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 	}, [map, sourceId, sourceLayerPrefix])
 
 	const handleClick = useCallback(
-		(event: MapLayerMouseEvent) => {
+		async (event: MapLayerMouseEvent) => {
 			const feature = event.features?.[0]
 			if (!osm || !feature || typeof feature.id !== "number") {
 				selectEntity(null, null)
@@ -260,7 +263,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osmix }) {
 		<Source
 			id={sourceId}
 			type="vector"
-			tiles={[`@osmix/vector://${osm.id}/{z}/{x}/{y}.mvt`]}
+			tiles={[osmixIdToTileUrl(osm.id)]}
 			bounds={osm.bbox()}
 			minzoom={MIN_PICKABLE_ZOOM}
 		>

@@ -29,6 +29,7 @@
 				"useLiteralKeys": "off"
 			},
 			"correctness": {
+				"noConstantCondition": "off",
 				"noUnusedImports": "error",
 				"useUniqueElementIds": "off"
 			},

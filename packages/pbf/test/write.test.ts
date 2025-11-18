@@ -1,3 +1,4 @@
+import { describe, expect, it } from "bun:test"
 import { unlink } from "node:fs/promises"
 import {
 	getFixtureFile,
@@ -6,7 +7,6 @@ import {
 	getFixturePath,
 	PBFs,
 } from "@osmix/shared/test/fixtures"
-import { assert, describe, it } from "vitest"
 import {
 	OsmBlocksToPbfBytesTransformStream,
 	osmBlockToPbfBlobBytes,
@@ -53,17 +53,20 @@ describe("write", () => {
 			}
 
 			// Re-parse the new PBF and test
-			assert.exists(data.buffer)
+			expect(data.buffer).toBeDefined()
 			// Note: We don't assert byte-level equality because the written PBF may have
 			// different compression, block ordering, or encoding than the original file.
 			// Semantic equivalence (verified by parsing and comparing entities) is more meaningful.
 			const osm2 = await readOsmPbf(data)
 
-			assert.deepEqual(osm.header, osm2.header)
+			expect(osm.header).toEqual(osm2.header)
 			const entities = await testOsmPbfReader(osm2, pbf)
-			assert.equal(entities.node0, node0)
-			assert.equal(entities.way0, way0)
-			assert.equal(entities.relation0, relation0)
+			if (node0 === null || way0 === null || relation0 === null) {
+				throw new Error("Expected node0, way0, and relation0 to be set")
+			}
+			expect(entities.node0).toBe(node0)
+			expect(entities.way0).toBe(way0)
+			expect(entities.relation0).toBe(relation0)
 		})
 
 		it("to file", async () => {
@@ -79,7 +82,7 @@ describe("write", () => {
 			const testFileData = await getFixtureFile(pbf.url)
 			const testOsm = await readOsmPbf(testFileData)
 
-			assert.deepEqual(testOsm.header.bbox, pbf.bbox)
+			expect(testOsm.header.bbox).toEqual(pbf.bbox)
 			await testOsmPbfReader(testOsm, pbf)
 
 			await unlink(getFixturePath(testFileName))

@@ -1,4 +1,4 @@
-import { assert, describe, expect, it } from "vitest"
+import { describe, expect, it } from "bun:test"
 import { OsmPbfBlockBuilder } from "../src/osm-pbf-block-builder"
 import { OsmPbfBlockParser } from "../src/osm-pbf-block-parser"
 import { blocksToJsonEntities } from "../src/pbf-to-json"
@@ -82,7 +82,9 @@ describe("OsmPbfBlockParser", () => {
 		})
 		const group = builder.primitivegroup[0]
 
-		assert.exists(group?.nodes[0])
+		expect(group?.nodes[0]).toBeDefined()
+		if (!group) throw new Error("group is undefined")
+		if (!group.nodes[0]) throw new Error("group.nodes[0] is undefined")
 		const node = parser.parseNode(group.nodes[0], { includeInfo: true })
 		expect(node).toEqual({
 			id: 1,
@@ -119,7 +121,8 @@ describe("OsmPbfBlockParser", () => {
 			},
 		})
 
-		assert.exists(group?.ways[0])
+		expect(group?.ways[0]).toBeDefined()
+		if (!group.ways[0]) throw new Error("group.ways[0] is undefined")
 		const way = parser.parseWay(group.ways[0], { includeInfo: true })
 		expect(way).toEqual({
 			id: 3,
@@ -135,7 +138,8 @@ describe("OsmPbfBlockParser", () => {
 			},
 		})
 
-		assert.exists(group?.relations[0])
+		expect(group?.relations[0]).toBeDefined()
+		if (!group.relations[0]) throw new Error("group.relations[0] is undefined")
 		const relation = parser.parseRelation(group.relations[0], {
 			includeInfo: true,
 		})

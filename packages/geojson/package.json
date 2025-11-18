@@ -1,0 +1,53 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/geojson",
+	"description": "Convert OSM files to and from GeoJSON.",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"import": "./dist/index.js",
+				"types": "./dist/index.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
+	"sideEffects": false,
+	"scripts": {
+		"build": "tsc",
+		"bench": "bun test --bench",
+		"prepublishOnly": "tsc",
+		"test": "bun test",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/bun": "catalog:",
+		"@types/geojson": "catalog:",
+		"typescript": "catalog:"
+	},
+	"dependencies": {
+		"@osmix/core": "workspace:*",
+		"@osmix/pbf": "workspace:*",
+		"@osmix/shared": "workspace:*",
+		"dequal": "catalog:"
+	}
+}

@@ -14,6 +14,7 @@
       "dependencies": {
         "@duckdb/duckdb-wasm": "^1.31.0",
         "@osmix/core": "workspace:*",
+        "@osmix/geojson": "workspace:*",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -21,6 +22,7 @@
         "apache-arrow": "^17.0.0",
         "comlink": "^4.4.2",
         "maplibre-gl": "catalog:",
+        "osmix": "workspace:*",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
         "react-map-gl": "^8.0.4",
@@ -32,7 +34,7 @@
         "@vitest/browser-preview": "^4.0.1",
         "typescript": "catalog:",
         "vite": "catalog:",
-        "vitest": "catalog:",
+        "vitest": "^4.0.1",
       },
     },
     "apps/merge": {
@@ -43,6 +45,7 @@
         "@mapbox/tilebelt": "^2.0.2",
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
+        "@osmix/geojson": "workspace:*",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/raster": "workspace:*",
@@ -62,6 +65,7 @@
         "lucide-react": "^0.513.0",
         "maplibre-gl": "catalog:",
         "native-file-system-adapter": "^3.0.1",
+        "osmix": "workspace:*",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
         "react-map-gl": "^8.0.4",
@@ -88,6 +92,7 @@
         "@osmix/vt": "workspace:*",
         "comlink": "^4.4.2",
         "maplibre-gl": "catalog:",
+        "osmix": "workspace:*",
       },
       "devDependencies": {
         "@osmix/json": "workspace:*",
@@ -102,35 +107,43 @@
       "version": "0.0.3",
       "dependencies": {
         "@osmix/core": "workspace:*",
-        "@osmix/json": "workspace:*",
-        "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
         "dequal": "catalog:",
         "sweepline-intersections": "^1.5.0",
       },
       "devDependencies": {
+        "@types/bun": "catalog:",
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
-        "vitest": "catalog:",
       },
     },
     "packages/core": {
       "name": "@osmix/core",
       "version": "0.0.3",
       "dependencies": {
-        "@osmix/json": "workspace:*",
-        "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
         "flatbush": "^4.4.1",
         "kdbush": "mourner/kdbush#16416cd",
-        "sweepline-intersections": "^1.5.0",
       },
       "devDependencies": {
-        "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
+        "@osmix/pbf": "workspace:*",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
-        "vitest": "catalog:",
+      },
+    },
+    "packages/geojson": {
+      "name": "@osmix/geojson",
+      "version": "0.0.1",
+      "dependencies": {
+        "@osmix/core": "workspace:*",
+        "@osmix/pbf": "workspace:*",
+        "@osmix/shared": "workspace:*",
+        "dequal": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@types/geojson": "catalog:",
+        "typescript": "catalog:",
       },
     },
     "packages/json": {
@@ -139,13 +152,10 @@
       "dependencies": {
         "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
-        "dequal": "catalog:",
       },
       "devDependencies": {
-        "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
-        "vitest": "catalog:",
       },
     },
     "packages/osmix": {
@@ -154,17 +164,20 @@
       "dependencies": {
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
+        "@osmix/geojson": "workspace:*",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/raster": "workspace:*",
         "@osmix/shared": "workspace:*",
         "@osmix/vt": "workspace:*",
+        "comlink": " ^4.4.2",
+        "dequal": "catalog:",
+        "web-worker": "^1.5.0",
       },
       "devDependencies": {
+        "@types/bun": "catalog:",
         "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
-        "vitest": "catalog:",
       },
     },
     "packages/pbf": {
@@ -175,9 +188,8 @@
       },
       "devDependencies": {
         "@osmix/shared": "workspace:*",
-        "@types/node": "catalog:",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
-        "vitest": "catalog:",
       },
     },
     "packages/raster": {
@@ -187,11 +199,8 @@
         "@osmix/shared": "workspace:*",
       },
       "devDependencies": {
-        "@types/geojson": "catalog:",
-        "@types/node": "catalog:",
-        "maplibre-gl": "catalog:",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
-        "vitest": "catalog:",
       },
     },
     "packages/shared": {
@@ -200,28 +209,26 @@
       "dependencies": {
         "@mapbox/geojson-rewind": "catalog:",
         "@mapbox/sphericalmercator": "catalog:",
+        "dequal": "catalog:",
         "lineclip": "^2.0.0",
       },
       "devDependencies": {
-        "@types/node": "catalog:",
+        "@types/bun": "catalog:",
         "typescript": "catalog:",
-        "vitest": "catalog:",
       },
     },
     "packages/vt": {
       "name": "@osmix/vt",
       "version": "0.0.3",
       "dependencies": {
-        "@osmix/json": "workspace:*",
         "@osmix/shared": "workspace:*",
+        "@types/bun": "catalog:",
         "pbf": "catalog:",
       },
       "devDependencies": {
         "@mapbox/vector-tile": "^2.0.4",
         "@osmix/core": "workspace:*",
-        "@types/node": "catalog:",
         "typescript": "catalog:",
-        "vitest": "catalog:",
       },
     },
   },
@@ -233,13 +240,11 @@
     "@mapbox/sphericalmercator": "^2.0.2",
     "@types/bun": "^1.3.1",
     "@types/geojson": "^7946.0.16",
-    "@types/node": "^24",
     "dequal": "^2.0.3",
     "maplibre-gl": "^5.9.0",
     "pbf": "^4.0.1",
     "typescript": "^5.9.0",
     "vite": "^7.1.7",
-    "vitest": "^4.0.1",
   },
   "packages": {
     "@babel/code-frame": ["@babel/code-frame@7.27.1", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.27.1", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-cjQ7ZlQ0Mv3b47hABuTevyTuYN4i+loJKGeV9flcCgIK37cCXRh+L1bd3iBHlynerhQ7BhCkn2BPbQUL+rGqFg=="],
@@ -449,6 +454,8 @@
     "@osmix/change": ["@osmix/change@workspace:packages/change"],
 
     "@osmix/core": ["@osmix/core@workspace:packages/core"],
+
+    "@osmix/geojson": ["@osmix/geojson@workspace:packages/geojson"],
 
     "@osmix/json": ["@osmix/json@workspace:packages/json"],
 
@@ -1121,6 +1128,8 @@
     "vitest": ["vitest@4.0.5", "", { "dependencies": { "@vitest/expect": "4.0.5", "@vitest/mocker": "4.0.5", "@vitest/pretty-format": "4.0.5", "@vitest/runner": "4.0.5", "@vitest/snapshot": "4.0.5", "@vitest/spy": "4.0.5", "@vitest/utils": "4.0.5", "debug": "^4.4.3", "es-module-lexer": "^1.7.0", "expect-type": "^1.2.2", "magic-string": "^0.30.19", "pathe": "^2.0.3", "picomatch": "^4.0.3", "std-env": "^3.9.0", "tinybench": "^2.9.0", "tinyexec": "^0.3.2", "tinyglobby": "^0.2.15", "tinyrainbow": "^3.0.3", "vite": "^6.0.0 || ^7.0.0", "why-is-node-running": "^2.3.0" }, "peerDependencies": { "@edge-runtime/vm": "*", "@types/debug": "^4.1.12", "@types/node": "^20.0.0 || ^22.0.0 || >=24.0.0", "@vitest/browser-playwright": "4.0.5", "@vitest/browser-preview": "4.0.5", "@vitest/browser-webdriverio": "4.0.5", "@vitest/ui": "4.0.5", "happy-dom": "*", "jsdom": "*" }, "optionalPeers": ["@edge-runtime/vm", "@types/debug", "@types/node", "@vitest/browser-playwright", "@vitest/browser-preview", "@vitest/browser-webdriverio", "@vitest/ui", "happy-dom", "jsdom"], "bin": { "vitest": "vitest.mjs" } }, "sha512-4H+J28MI5oeYgGg3h5BFSkQ1g/2GKK1IR8oorH3a6EQQbb7CwjbnyBjH4PGxw9/6vpwAPNzaeUMp4Js4WJmdXQ=="],
 
     "web-streams-polyfill": ["web-streams-polyfill@3.3.3", "", {}, "sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw=="],
+
+    "web-worker": ["web-worker@1.5.0", "", {}, "sha512-RiMReJrTAiA+mBjGONMnjVDP2u3p9R1vkcGz6gDIrOMT3oGuYwX2WRMYI9ipkphSuE5XKEhydbhNEJh4NY9mlw=="],
 
     "which": ["which@2.0.2", "", { "dependencies": { "isexe": "^2.0.0" }, "bin": { "node-which": "./bin/node-which" } }, "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA=="],
 

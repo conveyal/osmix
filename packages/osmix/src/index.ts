@@ -1,6 +1,10 @@
-export * from "@osmix/change"
-export * from "@osmix/core"
-export * from "@osmix/json"
-export * from "@osmix/pbf"
-export * from "@osmix/raster"
-export * from "@osmix/vt"
+import { Osmix } from "./osmix"
+
+export * from "./extract"
+export * from "./osmix"
+export * from "./pbf"
+export * from "./remote"
+export * from "./utils"
+
+const osmix = new Osmix()
+export default osmix

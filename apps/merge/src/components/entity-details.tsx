@@ -1,13 +1,11 @@
-import type { Osmix } from "@osmix/core"
-import {
-	isNode,
-	isRelation,
-	isWay,
-	type OsmEntity,
-	type OsmNode,
-	type OsmRelation,
-	type OsmWay,
-} from "@osmix/json"
+import type { Osm } from "@osmix/core"
+import type {
+	OsmEntity,
+	OsmNode,
+	OsmRelation,
+	OsmWay,
+} from "@osmix/shared/types"
+import { isNode, isRelation, isWay } from "@osmix/shared/utils"
 import type { ReactNode } from "react"
 import { Fragment } from "react/jsx-runtime"
 import { Details, DetailsContent, DetailsSummary } from "./details"
@@ -23,7 +21,7 @@ export default function EntityDetails({
 	open?: boolean
 	entity: OsmEntity
 	onSelect?: (entity: OsmEntity) => void
-	osm?: Osmix
+	osm?: Osm
 }) {
 	if (isNode(entity)) return <NodeDetails node={entity} open={open} />
 	if (isWay(entity))
@@ -242,7 +240,7 @@ function RelationMemberListTable({
 	onSelect,
 }: {
 	members: OsmRelation["members"]
-	osm: Osmix
+	osm: Osm
 	onSelect: (entity: OsmEntity) => void
 }) {
 	return (

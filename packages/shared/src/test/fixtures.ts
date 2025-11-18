@@ -1,7 +1,4 @@
-import { createReadStream, createWriteStream } from "node:fs"
-import { readFile, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
-import { Readable, Writable } from "node:stream"
 import { fileURLToPath } from "node:url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -25,27 +22,31 @@ export async function getFixtureFile(
 ): Promise<Uint8Array<ArrayBufferLike>> {
 	const filePath = getFixturePath(url)
 	try {
-		const file = await readFile(filePath)
-		return new Uint8Array<ArrayBuffer>(file.buffer as ArrayBuffer)
+		const file = await Bun.file(filePath).arrayBuffer()
+		return new Uint8Array<ArrayBuffer>(file)
 	} catch (_error) {
 		const response = await fetch(url)
 		const buffer = await response.arrayBuffer()
 		const data = new Uint8Array<ArrayBuffer>(buffer)
-		await writeFile(filePath, data)
+		await Bun.write(filePath, data)
 		return data
 	}
 }
 
 export function getFixtureFileReadStream(url: string) {
-	return Readable.toWeb(
-		createReadStream(getFixturePath(url)),
-	) as unknown as ReadableStream<Uint8Array<ArrayBufferLike>>
+	return Bun.file(getFixturePath(url)).stream()
 }
 
 export function getFixtureFileWriteStream(url: string) {
-	return Writable.toWeb(
-		createWriteStream(getFixturePath(url)),
-	) as unknown as WritableStream<Uint8Array<ArrayBufferLike>>
+	const incrementalWriter = Bun.file(getFixturePath(url)).writer()
+	return new WritableStream<Uint8Array<ArrayBufferLike>>({
+		write: (chunk: Uint8Array<ArrayBufferLike>) => {
+			incrementalWriter.write(chunk)
+		},
+		close: () => {
+			incrementalWriter.end()
+		},
+	})
 }
 
 export type PbfFixture = {

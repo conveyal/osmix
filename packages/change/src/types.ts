@@ -1,4 +1,8 @@
-import type { OsmEntity, OsmEntityType, OsmEntityTypeMap } from "@osmix/json"
+import type {
+	OsmEntity,
+	OsmEntityType,
+	OsmEntityTypeMap,
+} from "@osmix/shared/types"
 
 // String that starts with `n`, `w`, or `r` followed by the ID
 export type OsmEntityRef = {
@@ -9,7 +13,7 @@ export type OsmEntityRef = {
 
 export type OsmChangeTypes = "modify" | "create" | "delete"
 
-export type OsmixChange<T extends OsmEntity = OsmEntity> = {
+export type OsmChange<T extends OsmEntity = OsmEntity> = {
 	changeType: OsmChangeTypes
 	entity: T
 	osmId: string // When merging datasets, we need to keep track of the entity's origin dataset.
@@ -18,15 +22,14 @@ export type OsmixChange<T extends OsmEntity = OsmEntity> = {
 	refs?: OsmEntityRef[]
 }
 
-export interface OsmixMergeOptions {
+export interface OsmMergeOptions {
 	directMerge: boolean
 	deduplicateNodes: boolean
 	deduplicateWays: boolean
 	createIntersections: boolean
-	logger: (message: string) => void
 }
 
-export type OsmixChangesetStats = {
+export type OsmChangesetStats = {
 	osmId: string
 	totalChanges: number
 	nodeChanges: number
@@ -39,10 +42,10 @@ export type OsmixChangesetStats = {
 	intersectionNodesCreated: number
 }
 
-export type OsmixChanges = {
+export type OsmChanges = {
 	osmId: string
-	nodes: Record<number, OsmixChange<OsmEntityTypeMap["node"]>>
-	ways: Record<number, OsmixChange<OsmEntityTypeMap["way"]>>
-	relations: Record<number, OsmixChange<OsmEntityTypeMap["relation"]>>
-	stats: OsmixChangesetStats
+	nodes: Record<number, OsmChange<OsmEntityTypeMap["node"]>>
+	ways: Record<number, OsmChange<OsmEntityTypeMap["way"]>>
+	relations: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>
+	stats: OsmChangesetStats
 }

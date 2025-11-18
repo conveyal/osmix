@@ -33,23 +33,19 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "tsc",
-		"bench": "vitest bench",
+		"bench": "bun test --bench",
 		"prepublishOnly": "tsc",
-		"test": "vitest",
+		"test": "bun test",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
-		"@types/geojson": "catalog:",
-		"@types/node": "catalog:",
-		"typescript": "catalog:",
-		"vitest": "catalog:"
+		"@osmix/pbf": "workspace:*",
+		"@types/bun": "catalog:",
+		"typescript": "catalog:"
 	},
 	"dependencies": {
-		"@osmix/json": "workspace:*",
-		"@osmix/pbf": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"flatbush": "^4.4.1",
-		"kdbush": "mourner/kdbush#16416cd",
-		"sweepline-intersections": "^1.5.0"
+		"kdbush": "mourner/kdbush#16416cd"
 	}
 }

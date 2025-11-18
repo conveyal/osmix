@@ -1,19 +1,19 @@
-import type { Osmix } from "@osmix/core"
-import type { OsmEntity } from "@osmix/json"
+import type { Osm } from "@osmix/core"
+import type { OsmEntity } from "@osmix/shared/types"
 
 export function getOsmixEntityByStringId(
-	osmix: Osmix,
+	osm: Osm,
 	eid: string,
 ): OsmEntity | null {
 	const [type, sid] = eid.split("/")
 	const id = Number(sid)
 	switch (type) {
 		case "node":
-			return osmix.nodes.get({ id })
+			return osm.nodes.get({ id })
 		case "way":
-			return osmix.ways.get({ id })
+			return osm.ways.get({ id })
 		case "relation":
-			return osmix.relations.get({ id })
+			return osm.relations.get({ id })
 		default:
 			return null
 	}
@@ -85,28 +85,4 @@ export function bytesSizeToHuman(size?: number) {
 	if (size < MB) return `${(size / KB).toFixed(2)}KB`
 	if (size < GB) return `${(size / MB).toFixed(2)}MB`
 	return `${(size / GB).toFixed(2)}GB`
-}
-
-/**
- * Check if the browser supports transferable streams by trying to create an empty stream and sending it to a message channel.
- */
-export function supportsReadableStreamTransfer(): boolean {
-	// Require the basics first
-	if (
-		typeof ReadableStream === "undefined" ||
-		typeof MessageChannel === "undefined"
-	)
-		return false
-
-	const { port1 } = new MessageChannel()
-	try {
-		const rs = new ReadableStream() // empty is fine for feature test
-		// If transferable streams are unsupported, this line throws a DataCloneError
-		port1.postMessage(rs, [rs as unknown as Transferable])
-		return true
-	} catch {
-		return false
-	} finally {
-		port1.close()
-	}
 }

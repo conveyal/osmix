@@ -1,13 +1,8 @@
 /// <reference path="./types/kdbush.d.ts" />
 
-export { createExtract } from "./extract"
-export {
-	fromGeoJSON,
-	osmixEntityToGeoJSONFeature,
-} from "./geojson"
-export { Nodes } from "./nodes"
-export { Osmix } from "./osmix"
-export * from "./pbf"
-export { Relations } from "./relations"
-export { throttle } from "./utils"
-export { Ways } from "./ways"
+export * from "./nodes"
+export * from "./osm"
+export * from "./relations"
+export * from "./stringtable"
+export * from "./tags"
+export * from "./ways"
