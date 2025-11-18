@@ -35,7 +35,9 @@
 		"format": "biome format --write .",
 		"lint": "biome lint --write --unsafe .",
 		"publish": "changeset publish",
-		"test": "bun --filter '*' test --silent",
+		"test": "bun run test:packages && bun run test:apps && bun run typecheck && bun run lint && bun run check",
+		"test:apps": "bun --filter './apps/**' test --silent",
+		"test:packages": "bun --bun --filter './packages/**' test --silent",
 		"typecheck": "bun --filter '*' typecheck",
 		"version": "changeset version"
 	},

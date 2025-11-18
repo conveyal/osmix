@@ -15,6 +15,6 @@ runs:
       shell: bash
       run: bun run check . --reporter github
 
-    - name: Run tests
+    - name: Run package tests
       shell: bash
-      run: bun run test
+      run: bun run test:packages

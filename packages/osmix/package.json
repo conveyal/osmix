@@ -34,13 +34,12 @@
 	"scripts": {
 		"build": "tsc",
 		"prepublishOnly": "tsc",
-		"test": "bun test",
+		"test": "vitest",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@types/geojson": "catalog:",
 		"@types/node": "catalog:",
-		"@types/bun": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	},

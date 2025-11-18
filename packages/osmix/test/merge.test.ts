@@ -1,4 +1,3 @@
-import { describe, expect, it } from "bun:test"
 import { existsSync } from "node:fs"
 import { OsmChangeset } from "@osmix/change"
 import type { Osm } from "@osmix/core"
@@ -7,6 +6,7 @@ import {
 	getFixturePath,
 } from "@osmix/shared/test/fixtures"
 import type { OsmNode } from "@osmix/shared/types"
+import { describe, expect, it } from "vitest"
 import { createOsmFromPbf } from "../src/pbf"
 
 const testNode: OsmNode = {
@@ -35,7 +35,7 @@ const sizes = (osm: Osm) => ({
 })
 
 describe("merge osm", () => {
-	it.if(existsSync(getFixturePath("./yakima-full.osm.pbf")))(
+	it.runIf(existsSync(getFixturePath("./yakima-full.osm.pbf")))(
 		"should merge two real osm objects",
 		async () => {
 			const osm1Name = "yakima-full.osm.pbf"

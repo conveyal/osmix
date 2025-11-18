@@ -2,7 +2,6 @@ import { Osm } from "@osmix/core"
 import {
 	getFixtureFile,
 	getFixtureFileReadStream,
-	getFixturePath,
 	PBFs,
 } from "@osmix/shared/test/fixtures"
 import type { FeatureCollection, LineString, Point } from "geojson"
@@ -10,28 +9,14 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest"
 import { OsmixRemote } from "../src/remote"
 
 const monacoPbf = PBFs["monaco"]!
-
-describe("OsmixComlinkTest", () => {
-	beforeAll(() => getFixtureFile(monacoPbf.url))
-
-	it("should load from PBF fixture via worker", async () => {
-		const remote = await OsmixRemote.connect()
-		const fileStream = await Bun.file(
-			getFixturePath(monacoPbf.url),
-		).arrayBuffer()
-		const osm = await remote.fromPbf(fileStream)
-		expect(osm.stats.nodes).toBe(monacoPbf.nodes)
-	})
-})
+// Increase timeout for worker tests
+const workerTestTimeout = 30_000
 
 describe("OsmixRemote", () => {
 	afterEach(async () => {
 		// Clean up workers between tests
 		await new Promise((resolve) => setTimeout(resolve, 100))
 	})
-
-	// Increase timeout for worker tests
-	const workerTestTimeout = 30_000
 
 	describe("fromPbf", () => {
 		beforeAll(() => getFixtureFile(monacoPbf.url))
