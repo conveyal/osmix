@@ -13,7 +13,7 @@ npm install @osmix/vt
 ### Encode a single vector tile from an Osmix dataset
 
 ```ts
-import { Osmix } from "@osmix/core"
+import { Osmix } from "osmix"
 import { OsmixVtEncoder } from "@osmix/vt"
 
 // Load or build an Osmix dataset (indexed nodes/ways/relations)
@@ -25,8 +25,8 @@ const encoder = new OsmixVtEncoder(osm)
 // XYZ tile tuple: [x, y, z]
 const tile: [number, number, number] = [9372, 12535, 15]
 
-// Returns an ArrayBuffer containing an MVT PBF for two layers:
-// "@osmix:<id>:ways" and "@osmix:<id>:nodes"
+// Returns an ArrayBuffer containing up to three layers:
+// "@osmix:<id>:ways", "@osmix:<id>:nodes", "@osmix:<id>:relations"
 const pbfBuffer = encoder.getTile(tile)
 
 // Persist or send somewhere
@@ -62,16 +62,17 @@ For full map integration, serve tiles from a handler that calls `getTile([x,y,z]
 ## What gets encoded
 
 - Ways become LINE features; AREA-like ways (per `wayIsArea`) become POLYGON features.
+- Multipolygon relations render as POLYGON features in a dedicated layer so holes and shared ways stay intact.
 - Nodes with tags become POINT features. Untagged nodes are skipped.
-- Each feature includes properties `{ type: "node" | "way", ...tags }` and `id`.
-- Two layers are emitted per tile: `@osmix:<datasetId>:ways` and `@osmix:<datasetId>:nodes`.
+- Each feature includes properties `{ type: "node" | "way" | "relation", ...tags }` and `id`.
+- Three layers are emitted per tile: `@osmix:<datasetId>:ways`, `@osmix:<datasetId>:nodes`, and `@osmix:<datasetId>:relations` (empty layers are omitted automatically).
 
 ## API overview
 
-- `class OsmixVtEncoder(osmix: Osmix, extent=4096, buffer=64)`
+- `class OsmixVtEncoder(osm: Osm, extent=4096, buffer=64)`
   - `getTile(tile: [x, y, z]): ArrayBuffer` – Encodes a tile using internal bbox/projection.
   - `getTileForBbox(bbox, proj): ArrayBuffer` – Encode for a WGS84 bbox with a lon/lat → tile-pixel projector.
-  - Internals expose generators for `nodeFeatures` and `wayFeatures` if you need to post-process.
+  - Internals expose generators for `nodeFeatures`, `wayFeatures`, and `relationFeatures` if you need to post-process.
 - `projectToTile(tile: [x, y, z], extent=4096): (lonLat) => [x, y]` – Helper to build a projector matching the encoder.
 - Types (from `src/types.ts`):
   - `VtSimpleFeature` – `{ id, type, properties, geometry }`
@@ -80,7 +81,7 @@ For full map integration, serve tiles from a handler that calls `getTile([x,y,z]
 ## Environment and limitations
 
 - Designed for modern runtimes (Node 20+, Bun, browser workers). Uses typed arrays throughout.
-- Polygon handling currently assumes a single outer ring; holes/multi-polygons (relations) are not encoded in v0.0.1.
+- Multipolygon relations are supported, but other relation types are skipped.
 - Ways are clipped to tile bounds; nodes outside the tile are omitted.
 - Extent defaults to 4096; set a larger extent if you need higher precision.
 

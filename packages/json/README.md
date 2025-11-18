@@ -71,18 +71,19 @@ await osmJsonToPbf(header, entities()).pipeTo(
 )
 ```
 
-### Parse blocks or emit GeoJSON directly
+### Parse blocks or hand off to GeoJSON helpers
 
-If you already have parsed blocks, reach for `OsmPbfBlockParser` and friends. Toggle `includeInfo` to hydrate metadata, or use `wayToFeature` / `relationToFeature` helpers to produce GeoJSON.
+If you already have decoded blocks, reach for `OsmPbfBlockParser`. Toggle
+`includeInfo` to hydrate metadata, or pass the parsed entities to
+[`@osmix/geojson`](../geojson/README.md) when you need GeoJSON output.
 
 ```ts
-import { OsmPbfBlockParser, wayToFeature } from "@osmix/json"
+import { OsmPbfBlockParser } from "@osmix/json"
+import { wayToFeature } from "@osmix/geojson"
 
 const parser = new OsmPbfBlockParser(block, { includeInfo: true })
-const [nodes] = parser // iterable groups
-
 const firstWay = parser.parseWay(block.primitivegroup[0].ways[0])
-const feature = wayToFeature(firstWay, (id) => nodeIndex.get(id)!)
+const feature = wayToFeature(firstWay, (ref) => nodeIndex.get(ref)!)
 ```
 
 ## API overview
@@ -100,13 +101,12 @@ const feature = wayToFeature(firstWay, (id) => nodeIndex.get(id)!)
 - **Block parsing utilities**
 	- `OsmPbfBlockParser` – Decodes groups with configurable `ParseOptions` (tags + metadata).
 	- `parseNode`, `parseWay`, `parseRelation`, `parseDenseNodes` – Parser methods for targeted decoding.
-- **GeoJSON helpers**
-	- `nodeToFeature`, `wayToFeature`, `relationToFeature`, `nodesToFeatures`, `waysToFeatures`.
-	- `wayIsArea(refs, tags)` – Re-exports the wiki heuristics used by the GeoJSON helpers.
+- **Constants and types**
+	- `OSM_ENTITY_TYPES` – Stable ordering of entity kinds.
 - **Entity helpers and types**
 	- Type guards: `isNode`, `isWay`, `isRelation`.
 	- Equality helpers: `isNodeEqual`, `isWayEqual`, `isRelationEqual`, `entityPropertiesEqual`.
-	- Types: `OsmEntity`, `OsmNode`, `OsmWay`, `OsmRelation`, `OsmTags`, `OsmInfoParsed`, and `OSM_ENTITY_TYPES`.
+	- Types: `OsmEntity`, `OsmNode`, `OsmWay`, `OsmRelation`, `OsmTags`, `OsmInfoParsed`.
 
 ## See also
 

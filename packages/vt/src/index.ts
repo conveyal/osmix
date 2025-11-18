@@ -1,2 +1,2 @@
-export { OsmixVtEncoder } from "./encode"
+export { OsmixVtEncoder, projectToTile } from "./encode"
 export * from "./types"
