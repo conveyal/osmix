@@ -24,13 +24,13 @@ export function useFlyToEntity() {
 					zoom: 16,
 				})
 			} else if (isWay(entity)) {
-				const bbox = osm.ways.getNodeBbox({ id: entity.id })
+				const bbox = osm.ways.getEntityBbox({ id: entity.id })
 				map.fitBounds(bbox, {
 					padding: 100,
 					maxDuration: 200,
 				})
 			} else if (isRelation(entity)) {
-				const bbox = osm.relations.getNodeBbox({ id: entity.id })
+				const bbox = osm.relations.getEntityBbox({ id: entity.id })
 				map.fitBounds(bbox, {
 					padding: 100,
 					maxDuration: 200,

@@ -56,6 +56,9 @@ export class Relations extends Entities<OsmRelation> {
 	private nodes: Nodes
 	private ways: Ways
 
+	/**
+	 * Create a new Relations index.
+	 */
 	constructor(
 		stringTable: StringTable,
 		nodes: Nodes,
@@ -90,6 +93,9 @@ export class Relations extends Entities<OsmRelation> {
 		this.stringTable = stringTable
 	}
 
+	/**
+	 * Add a single relation to the index.
+	 */
 	addRelation(relation: OsmRelation) {
 		const relationIndex = this.addEntity(relation.id, relation.tags ?? {})
 		this.memberStart.push(this.memberRefs.length)
@@ -102,6 +108,9 @@ export class Relations extends Entities<OsmRelation> {
 		return relationIndex
 	}
 
+	/**
+	 * Bulk add relations directly from a PBF PrimitiveBlock.
+	 */
 	addRelations(
 		relations: OsmPbfRelation[],
 		blockStringIndexMap: Uint32Array,
@@ -182,6 +191,9 @@ export class Relations extends Entities<OsmRelation> {
 		return added
 	}
 
+	/**
+	 * Compact the internal arrays to free up memory.
+	 */
 	buildEntityIndex() {
 		this.memberStart.compact()
 		this.memberCount.compact()
@@ -191,11 +203,14 @@ export class Relations extends Entities<OsmRelation> {
 		this.bbox.compact()
 	}
 
+	/**
+	 * Build the spatial index for relations.
+	 */
 	buildSpatialIndex() {
-		console.time("RelationIndex.buildSpatialIndex")
 		if (!this.nodes.isReady()) throw Error("Node index is not ready.")
 		if (!this.ways.isReady()) throw Error("Way index is not ready.")
 		if (this.size === 0) return this.spatialIndex
+		console.time("RelationIndex.buildSpatialIndex")
 
 		this.spatialIndex = new Flatbush(
 			this.size,
@@ -233,7 +248,10 @@ export class Relations extends Entities<OsmRelation> {
 		return this.spatialIndex
 	}
 
-	getNodeBbox(i: IdOrIndex): GeoBbox2D {
+	/**
+	 * Get the bounding box of a relation.
+	 */
+	getEntityBbox(i: IdOrIndex): GeoBbox2D {
 		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
 		return [
 			this.bbox.at(index * 4),
@@ -243,6 +261,9 @@ export class Relations extends Entities<OsmRelation> {
 		]
 	}
 
+	/**
+	 * Get the full relation entity.
+	 */
 	getFullEntity(index: number, id: number, tags?: OsmTags): OsmRelation {
 		return {
 			id,
@@ -251,6 +272,9 @@ export class Relations extends Entities<OsmRelation> {
 		}
 	}
 
+	/**
+	 * Get the members of a relation.
+	 */
 	getMembersByIndex(
 		index: number,
 		relationMemberTypes = RELATION_MEMBER_TYPES,
@@ -269,6 +293,9 @@ export class Relations extends Entities<OsmRelation> {
 		return members
 	}
 
+	/**
+	 * Check if a relation includes a specific member.
+	 */
 	includesMember(
 		index: number,
 		memberRef: number,
@@ -320,6 +347,7 @@ export class Relations extends Entities<OsmRelation> {
 	 * Find relations that intersect a bounding box.
 	 */
 	intersects(bbox: GeoBbox2D, filterFn?: (index: number) => boolean): number[] {
+		if (this.size === 0) return []
 		return this.spatialIndex.search(
 			bbox[0],
 			bbox[1],
@@ -335,9 +363,13 @@ export class Relations extends Entities<OsmRelation> {
 		maxResults?: number,
 		maxDistance?: number,
 	): number[] {
+		if (this.size === 0) return []
 		return this.spatialIndex.neighbors(x, y, maxResults, maxDistance)
 	}
 
+	/**
+	 * Get transferable objects for passing to another thread.
+	 */
 	override transferables(): RelationsTransferables {
 		return {
 			...super.transferables(),

@@ -54,6 +54,9 @@ export class Nodes extends Entities<OsmNode> {
 		BufferConstructor,
 	)
 
+	/**
+	 * Create a new Nodes index.
+	 */
 	constructor(stringTable: StringTable, transferables?: NodesTransferables) {
 		if (transferables) {
 			super(
@@ -75,6 +78,9 @@ export class Nodes extends Entities<OsmNode> {
 		}
 	}
 
+	/**
+	 * Add a single node to the index.
+	 */
 	addNode(node: OsmNode): number {
 		const nodeIndex = this.addEntity(node.id, node.tags ?? {})
 
@@ -92,6 +98,9 @@ export class Nodes extends Entities<OsmNode> {
 		return nodeIndex
 	}
 
+	/**
+	 * Add dense nodes from a PBF block.
+	 */
 	addDenseNodes(
 		dense: OsmPbfDenseNodes,
 		block: OsmPbfBlock,
@@ -182,11 +191,17 @@ export class Nodes extends Entities<OsmNode> {
 		return added
 	}
 
+	/**
+	 * Compact the internal arrays to free up memory.
+	 */
 	buildEntityIndex() {
 		this.lons.compact()
 		this.lats.compact()
 	}
 
+	/**
+	 * Build the spatial index for nodes.
+	 */
 	buildSpatialIndex() {
 		console.time("NodeIndex.buildSpatialIndex")
 		this.spatialIndex = new KDBush(this.size, 64, Int32Array, BufferConstructor)
@@ -198,17 +213,26 @@ export class Nodes extends Entities<OsmNode> {
 		console.timeEnd("NodeIndex.buildSpatialIndex")
 	}
 
+	/**
+	 * Get the bounding box of all nodes.
+	 */
 	getBbox(): GeoBbox2D {
 		return this.bbox
 	}
 
-	getNodeBbox(i: IdOrIndex): GeoBbox2D {
+	/**
+	 * Get the bounding box of a specific node.
+	 */
+	getEntityBbox(i: IdOrIndex): GeoBbox2D {
 		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
 		const lon = microToDegrees(this.lons.at(index))
 		const lat = microToDegrees(this.lats.at(index))
 		return [lon, lat, lon, lat] as GeoBbox2D
 	}
 
+	/**
+	 * Get the longitude and latitude of a specific node.
+	 */
 	getNodeLonLat(i: IdOrIndex): [number, number] {
 		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
 		return [
@@ -217,6 +241,9 @@ export class Nodes extends Entities<OsmNode> {
 		]
 	}
 
+	/**
+	 * Get the full node entity.
+	 */
 	getFullEntity(index: number, id: number, tags?: OsmTags): OsmNode {
 		const [lon, lat] = this.getNodeLonLat({ index })
 		if (tags) {
@@ -235,6 +262,9 @@ export class Nodes extends Entities<OsmNode> {
 	}
 
 	// Spatial operations
+	/**
+	 * Find node indexes within a bounding box.
+	 */
 	findIndexesWithinBbox(bbox: GeoBbox2D): number[] {
 		// Convert bbox from degrees to microdegrees for spatial index query
 		const bboxMicro = bboxToMicroDegrees(bbox)
@@ -246,6 +276,9 @@ export class Nodes extends Entities<OsmNode> {
 		)
 	}
 
+	/**
+	 * Find node indexes within a radius of a point.
+	 */
 	findIndexesWithinRadius(x: number, y: number, radius: number): number[] {
 		// Convert coordinates and radius from degrees to microdegrees
 		const xMicro = toMicroDegrees(x)
@@ -292,6 +325,9 @@ export class Nodes extends Entities<OsmNode> {
 		}
 	}
 
+	/**
+	 * Get transferable objects for passing to another thread.
+	 */
 	override transferables(): NodesTransferables {
 		return {
 			...super.transferables(),
