@@ -67,8 +67,7 @@ export class Nodes extends Entities<OsmNode> {
 			this.lons = RTA.from(Int32Array, transferables.lons)
 			this.lats = RTA.from(Int32Array, transferables.lats)
 			this.spatialIndex = KDBush.from(transferables.spatialIndex)
-			// Convert bbox from degrees to microdegrees
-			this.bbox = bboxToMicroDegrees(transferables.bbox)
+			this.bbox = transferables.bbox
 			this.indexBuilt = true
 		} else {
 			super("node", new Ids(), new Tags(stringTable))
