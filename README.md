@@ -42,7 +42,7 @@ const relation = osm.relations.getById(345678)
 const bbox: [number, number, number, number] = [7.41, 43.72, 7.43, 43.74]
 const nodeResults = osm.nodes.withinBbox(bbox)
 const wayResults = osm.ways.withinBbox(bbox)
-console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways in Monaco harbor`)
+console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways`)
 
 // Write the PBF
 await Bun.write('./new-monaco.pbf', await osm.toPbf())

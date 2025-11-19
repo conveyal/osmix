@@ -26,8 +26,8 @@ You will typically install this alongside [`@osmix/core`](../core/README.md), wh
 import { Osmix } from "osmix"
 import { OsmixChangeset, changeStatsSummary } from "@osmix/change"
 
-const base = await Osmix.fromPbf(fetch("/data/base.osm.pbf").then((r) => r.arrayBuffer()))
-const patch = await Osmix.fromPbf(fetch("/data/patch.osm.pbf").then((r) => r.arrayBuffer()))
+const base = await Osmix.fromPbf(Bun.file('./monaco.pbf').stream())
+const patch = await Osmix.fromPbf(Bun.file('./monaco-changes.pbf').stream())
 
 const changeset = new OsmixChangeset(base)
 changeset.deduplicateNodes(base.nodes)
@@ -44,12 +44,7 @@ const merged = changeset.applyChanges()
 ### Run the bundled merge pipeline
 
 ```ts
-import { Osmix } from "osmix"
 import { merge } from "@osmix/change"
-import { readFile } from "node:fs/promises"
-
-const base = await Osmix.fromPbf(readFile("base.osm.pbf"))
-const patch = await Osmix.fromPbf(readFile("patch.osm.pbf"))
 
 const combined = await merge(base, patch, {
 	directMerge: true,
@@ -61,14 +56,9 @@ const combined = await merge(base, patch, {
 
 `merge` wraps a sequence of changesets that deduplicate each dataset, optionally create intersections, and (when `directMerge` is true) generate modifications that reconcile the patch into the base. All options default to `false`, so you can enable only the stages you need.
 
-## API overview
+## API
 
-- `OsmixChangeset` – Collects creates/modifies/deletes, provides helpers (`deduplicateNodes`, `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, `toJson`, `applyChanges`, …), and exposes execution stats.
-- `generateChangeset(base, patch, options?, onProgress?)` – Runs the core pipeline and returns an `OsmixChangeset` without applying it, so you can inspect stats or serialize.
-- `merge(base, patch, options?, onProgress?)` – High-level merge orchestration built on `OsmixChangeset`.
-- `changeStatsSummary(stats)` – Produces a human-readable summary string of the most significant stats.
-- Utility helpers – `waysShouldConnect`, `isWayIntersectionCandidate`, `removeDuplicateAdjacentWayRefs`, `removeDuplicateAdjacentRelationMembers`, `osmTagsToOscTags`, `cleanCoords`, `entityHasTagValue`, `waysIntersect`, and supporting conversions.
-- Types – `OsmixMergeOptions`, `OsmixChanges`, `OsmixChange`, `OsmixChangesetStats`, `OsmEntityRef`, and convenience aliases for downstream tooling.
+WIP
 
 ## See also
 

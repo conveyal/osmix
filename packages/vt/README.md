@@ -1,6 +1,6 @@
 # @osmix/vt
 
-`@osmix/vt` converts Osmix binary overlays (typed-array node and way payloads) into Mapbox Vector Tiles. It also ships a lightweight tile index with LRU caching so workers or web apps can request tiles on demand without re-projecting data for every request.
+`@osmix/vt` converts `@osmix/core` OSM into Mapbox Vector Tiles.
 
 ## Installation
 
@@ -10,14 +10,14 @@ bun install @osmix/vt
 
 ## Usage
 
-### Encode a single vector tile from an Osmix dataset
+### Encode a single vector tile from an Osm dataset
 
 ```ts
-import { Osmix } from "osmix"
+import { Osm } from "@osmix/core"
 import { OsmixVtEncoder } from "@osmix/vt"
 
-// Load or build an Osmix dataset (indexed nodes/ways/relations)
-const osm = await Osmix.fromPbf(fetch("/fixtures/monaco.pbf").then((r) => r.arrayBuffer()))
+// Load your Osm dataset
+const osm = await Osmix.fromPbf(Bun.file('./monaco.pbf').stream())
 
 // Create an encoder. Defaults: extent=4096, buffer=64px
 const encoder = new OsmixVtEncoder(osm)
@@ -28,36 +28,11 @@ const tile: [number, number, number] = [9372, 12535, 15]
 // Returns an ArrayBuffer containing up to three layers:
 // "@osmix:<id>:ways", "@osmix:<id>:nodes", "@osmix:<id>:relations"
 const pbfBuffer = encoder.getTile(tile)
-
-// Persist or send somewhere
-await Deno.writeFile("tile.mvt", new Uint8Array(pbfBuffer))
-```
-
-### Custom bounding box and projection
-
-If you already have a WGS84 bbox and a lon/lat → tile-pixel projection, you can render directly:
-
-```ts
-import { OsmixVtEncoder, projectToTile } from "@osmix/vt"
-
-const encoder = new OsmixVtEncoder(osm, 4096, 64)
-const bbox: [number, number, number, number] = [-73.99, 40.73, -73.98, 40.74]
-const proj = projectToTile([9372, 12535, 15], 4096)
-
-const pbf = encoder.getTileForBbox(bbox, proj)
 ```
 
 ### Displaying in a browser (manual Blob URL)
 
-Most viewers expect tile URLs. For quick inspection, you can create a Blob URL for a single tile:
-
-```ts
-const buf = encoder.getTile([9372, 12535, 15])
-const url = URL.createObjectURL(new Blob([buf], { type: "application/x-protobuf" }))
-// Use `url` anywhere a single MVT URL is accepted (debug tooling, downloads, etc.)
-```
-
-For full map integration, serve tiles from a handler that calls `getTile([x,y,z])` and returns the bytes. MapLibre/Mapbox GL can then point a `vector` source at `https://your-host/tiles/{z}/{x}/{y}.mvt`.
+Most viewers expect tile URLs. To see a Maplibre implementation in the [example merge app](/apps/merge/src/lib/osmix-vector-protocol.ts).
 
 ## What gets encoded
 
@@ -67,16 +42,9 @@ For full map integration, serve tiles from a handler that calls `getTile([x,y,z]
 - Each feature includes properties `{ type: "node" | "way" | "relation", ...tags }` and `id`.
 - Three layers are emitted per tile: `@osmix:<datasetId>:ways`, `@osmix:<datasetId>:nodes`, and `@osmix:<datasetId>:relations` (empty layers are omitted automatically).
 
-## API overview
+## API
 
-- `class OsmixVtEncoder(osm: Osm, extent=4096, buffer=64)`
-  - `getTile(tile: [x, y, z]): ArrayBuffer` – Encodes a tile using internal bbox/projection.
-  - `getTileForBbox(bbox, proj): ArrayBuffer` – Encode for a WGS84 bbox with a lon/lat → tile-pixel projector.
-  - Internals expose generators for `nodeFeatures`, `wayFeatures`, and `relationFeatures` if you need to post-process.
-- `projectToTile(tile: [x, y, z], extent=4096): (lonLat) => [x, y]` – Helper to build a projector matching the encoder.
-- Types (from `src/types.ts`):
-  - `VtSimpleFeature` – `{ id, type, properties, geometry }`
-  - `VtPbfLayer` – `{ name, version, extent, features }`
+Coming soon...
 
 ## Environment and limitations
 
@@ -92,5 +60,5 @@ For full map integration, serve tiles from a handler that calls `getTile([x,y,z]
 ## See also
 
 - `@osmix/core` – In-memory index used to source node/way geometry.
-- `@osmix/json` – Supplies `wayIsArea` heuristics and entity types used by the encoder.
+- `@osmix/shared` – Supplies `wayIsArea` heuristics and entity types used by the encoder.
 - `@osmix/raster` – If you prefer raster previews or a protocol helper for MapLibre.

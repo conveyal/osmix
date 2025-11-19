@@ -19,26 +19,6 @@ import the functions you need directly from `@osmix/shared/<module>`.
 bun install @osmix/shared
 ```
 
-## Usage
-
-```ts
-import { haversineDistance } from "@osmix/shared/haversine-distance"
-import { clipPolyline } from "@osmix/shared/lineclip"
-import { logProgress } from "@osmix/shared/progress"
-
-const meters = haversineDistance([-122.33, 47.61], [-122.30, 47.63])
-
-const segments = clipPolyline(
-	[
-		[-122.33, 47.61],
-		[-122.31, 47.62],
-	],
-	[-122.40, 47.50, -122.20, 47.70],
-)
-
-logProgress({ message: "Clipped segments", data: segments.length })
-```
-
 ## Frequently used modules
 
 | Module | Description |
