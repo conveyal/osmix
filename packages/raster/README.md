@@ -16,7 +16,7 @@ elements) entirely in JavaScript runtimes that expose `OffscreenCanvas`.
 ## Installation
 
 ```sh
-npm install @osmix/raster
+bun install @osmix/raster
 ```
 
 ## Usage

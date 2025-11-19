@@ -19,7 +19,7 @@ request raster/vector tiles with a single import.
 ## Installation
 
 ```sh
-npm install osmix
+bun install osmix
 ```
 
 ## Usage

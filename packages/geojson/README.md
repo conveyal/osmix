@@ -17,7 +17,7 @@ entities into GeoJSON Features (with all tags preserved) and can build a fresh
 ## Installation
 
 ```sh
-npm install @osmix/geojson
+bun install @osmix/geojson
 ```
 
 ## Usage

@@ -13,7 +13,7 @@
 ## Installation
 
 ```sh
-npm install @osmix/json
+bun install @osmix/json
 ```
 
 ## Usage

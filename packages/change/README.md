@@ -13,7 +13,7 @@
 ## Installation
 
 ```sh
-npm install @osmix/change
+bun install @osmix/change
 ```
 
 You will typically install this alongside [`@osmix/core`](../core/README.md), which supplies the `Osmix` datasets the changes operate on.

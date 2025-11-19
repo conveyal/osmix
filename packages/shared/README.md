@@ -16,7 +16,7 @@ import the functions you need directly from `@osmix/shared/<module>`.
 ## Installation
 
 ```sh
-npm install @osmix/shared
+bun install @osmix/shared
 ```
 
 ## Usage

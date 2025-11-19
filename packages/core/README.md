@@ -14,7 +14,7 @@
 ## Installation
 
 ```sh
-npm install @osmix/core
+bun install @osmix/core
 ```
 
 ## Usage

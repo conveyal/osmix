@@ -5,7 +5,7 @@
 ## Installation
 
 ```sh
-npm install @osmix/vt
+bun install @osmix/vt
 ```
 
 ## Usage

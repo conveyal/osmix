@@ -13,7 +13,7 @@
 ## Installation
 
 ```sh
-npm install @osmix/pbf
+bun install @osmix/pbf
 ```
 
 ## Usage
