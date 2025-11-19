@@ -22,13 +22,16 @@ Osmix is a collection of composable libraries for reading, querying, merging, an
 bun install osmix
 ```
 
-### Load and query OSM data
+### Examples
 
 ```ts
 import {Osmix} from 'osmix'
 
-// Load PBF from file or URL
-const osm = await Osmix.fromPbf(Bun.file('monaco.pbf').stream())
+// Get a PBF file
+const monacoPbf = await Bun.file('./monaco.pbf').arrayBuffer()
+
+// Load PBF
+const osm = await Osmix.fromPbf(monacoPbf)
 
 // Query entities by ID
 const node = osm.nodes.getById(123456)
@@ -39,81 +42,47 @@ const relation = osm.relations.getById(345678)
 const bbox: [number, number, number, number] = [7.41, 43.72, 7.43, 43.74]
 const nodeResults = osm.nodes.withinBbox(bbox)
 const wayResults = osm.ways.withinBbox(bbox)
-console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways in Monaco harbor`)
+console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways`)
+
+// Write the PBF
+await Bun.write('./new-monaco.pbf', await osm.toPbf())
+
+// Merge two OSM PBF files
+const monacoPatch = await Bun.file('./monaco-patch.pbf').arrayBuffer()
+const mergedOsm = await osm.merge(await Osmix.fromPbf(monacoPatch))
+
+// Extract a boundind box
+const extract = osmix.extract(bbox)
 ```
 
-### Merge two OSM extracts
-
-```ts
-import {Osmix} from 'osmix'
-import {merge} from '@osmix/change'
-
-const base = await Osmix.fromPbf(Bun.file('region-base.pbf').stream())
-const patch = await Osmix.fromPbf(Bun.file('region-updates.pbf').stream())
-
-// Merge patch into base, deduplicating entities
-const merged = await base.merge(patch)
-
-// Write merged result
-await Bun.write('region-merged.pbf', merged.toPbf())
-```
-
-### Extract a bounding box
-
-```ts
-import {Osmix} from 'osmix'
-import {createExtract} from 'osmix'
-
-const osm = await Osmix.fromPbf(Bun.file('washington.pbf').stream())
-
-// Extract downtown Seattle
-const bbox: [number, number, number, number] = [-122.34, 47.60, -122.32, 47.61]
-const extract = createExtract(osm, bbox)
-
-await Bun.write('seattle-downtown.pbf', await new Osmix(extract.transferables()).toPbf())
-```
-
-### Use in a Web Worker
+#### Use in a Web Worker
 
 ```ts
 // main.ts
 import {OsmixRemote} from 'osmix'
 
 const remote = await OsmixRemote.connect()
-const info = await remote.fromPbf(file.stream(), {id: 'dataset'})
+const osmInfo = await remote.fromPbf(monacoPbf)
 
-// All operations run off the main thread
-const tile = await remote.getVectorTile(info.id, [9372, 12535, 15])
-```
-
-### Convert to GeoJSON
-
-```ts
-import {Osmix} from 'osmix'
-import {osmEntityToGeoJSONFeature} from '@osmix/geojson'
-
-const osm = await Osmix.fromPbf(Bun.file('monaco.pbf').stream())
-const way = osm.ways.getById(123456)
-
-// Convert OSM entity to GeoJSON Feature
-if (way) {
-	const feature = osmEntityToGeoJSONFeature(osm, way)
-	console.log(feature.geometry.type) // 'LineString' or 'Polygon'
-}
+// Operations run off the main thread
+const tile = await remote.getVectorTile(osmInfo.id, [9372, 12535, 15])
 ```
 
 ## Monorepo Structure
 
-| Package | Description | README |
-|--|--|--|
-| 'osmix' | Main library packaging all of the individual tools into an API. | [README](packages/osmix/README.md) |
-| `@osmix/core` | In-memory engine for ingesting PBF streams, building indexes, and emitting OSM data. | [README](packages/core/README.md) |
-| `@osmix/change` | Helpers for deduplication, merge stats, and applying changesets atop core data. | [README](packages/change/README.md) |
-| `@osmix/json` | Streaming transforms: convert OSM PBF bytes to strongly typed JSON and GeoJSON. | [README](packages/json/README.md) |
-| `@osmix/pbf` | Low-level library for OSM PBF protobuf parsing, compression, and code generation. | [README](packages/pbf/README.md) |
-| `@osmix/raster` | Renders canvased raster tiles and registers the custom MapLibre protocol for Osmix. | [README](packages/raster/README.md) |
-| `@osmix/vt` | Encodes overlays as Mapbox Vector Tiles (MVT) and provides caching helpers. | [README](packages/vt/README.md) |
-| `@osmix/shared` | Utility functions and geometry helpers used throughout all workspace packages. | [README](packages/shared/README.md) |
+See each package's README for full API and description.
+
+| Package | Description |
+|--|--|
+| [`osmix`](packages/osmix/README.md) | Main library packaging all of the individual tools into an API. |
+| [`@osmix/core`](packages/core/README.md) | In-memory data structures for storing entities, building indexes, and emitting OSM data. |
+| [`@osmix/change`](packages/change/README.md) | Helpers for deduplication, merging, and applying changesets atop core data. |
+| [`@osmix/json`](packages/json/README.md) | Streaming transforms: convert OSM PBF bytes to strongly typed JSON. |
+| [`@osmix/geojson`](packages/geojson/README.md) | Convert OSM to and from GeoJSON. |
+| [`@osmix/pbf`](packages/pbf/README.md) | Low-level library for OSM PBF protobuf parsing and writing. |
+| [`@osmix/raster`](packages/raster/README.md) | Renders OSM entities as raster bitmaps. |
+| [`@osmix/vt`](packages/vt/README.md) | Encodes OSM entities as Mapbox Vector Tiles (MVT). |
+| [`@osmix/shared`](packages/shared/README.md) | Utility functions and geometry helpers used throughout all workspace packages. |
 
 
 ## Development
