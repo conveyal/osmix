@@ -5,7 +5,8 @@ import {
 } from "@osmix/change"
 import { Osm, type OsmOptions } from "@osmix/core"
 import { startCreateOsmFromGeoJSON } from "@osmix/geojson"
-import { readOsmPbf } from "@osmix/pbf"
+import { OsmBlocksToJsonTransformStream } from "@osmix/json"
+import { OsmPbfBytesToBlocksTransformStream, readOsmPbf } from "@osmix/pbf"
 import { DEFAULT_RASTER_TILE_SIZE, OsmixRasterTile } from "@osmix/raster"
 import { logProgress, type ProgressEvent } from "@osmix/shared/progress"
 import type {
@@ -74,6 +75,23 @@ export class Osmix extends Osm {
 			onProgress(update)
 		}
 		return osm
+	}
+
+	/**
+	 * Transform OSM PBF data into a stream of JSON entities.
+	 */
+	static transformOsmPbfToJson(data: ArrayBufferLike | ReadableStream) {
+		const dataStream =
+			data instanceof ReadableStream
+				? data
+				: new ReadableStream({
+						start: (controller) => {
+							controller.enqueue(new Uint8Array(data))
+						},
+					})
+		return dataStream
+			.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
+			.pipeThrough(new OsmBlocksToJsonTransformStream())
 	}
 
 	/**

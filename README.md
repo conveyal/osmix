@@ -40,6 +40,14 @@ const bbox: [number, number, number, number] = [7.41, 43.72, 7.43, 43.74]
 const nodeResults = osm.nodes.withinBbox(bbox)
 const wayResults = osm.ways.withinBbox(bbox)
 console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways in Monaco harbor`)
+
+// Stream parse an OSM PBF into easy to use entities
+for await (const entity of Osmix.transformOsmPbfToJson(Bun.file("./monaco.pbf").stream())) {
+	console.log(entity.id, entity.tags)
+	if (isNode()) {
+		console.log(entity.lon, entity.lat)
+	}
+}
 ```
 
 ### Merge two OSM extracts
