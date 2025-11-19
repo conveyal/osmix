@@ -6,7 +6,7 @@ import {
 } from "@osmix/shared/progress"
 import type { GeoBbox2D } from "@osmix/shared/types"
 
-type ExtractStrategy = "simple" | "complete_ways"
+export type ExtractStrategy = "simple" | "complete_ways"
 
 /**
  * Create a geographic extract from an existing Osm instance within a bounding box.

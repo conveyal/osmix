@@ -62,10 +62,10 @@ osm.buildSpatialIndexes()
 
 ### Query and iterate
 
-- `osm.get("node", 123)` or `osm.nodes.get({ id: 123 })` fetches specific
+- `osm.nodes.get({ id: 123 })` or `osm.nodes.getById(123)` fetches specific
   entities.
-- `osm.nodes.sorted()` / `osm.ways.sorted()` stream ids in ascending order.
-- `osm.nodes.findIndexesWithinBbox(bbox)` / `osm.ways.withinBbox(bbox)` emit
+- `osm.nodes.sorted()` / `osm.ways.sorted()` stream entities in ascending ID order.
+- `osm.nodes.withinBbox(bbox)` / `osm.ways.withinBbox(bbox)` emit
   typed arrays ready to transfer across workers.
 - Pair with [`@osmix/geojson`](../geojson/README.md) when you need GeoJSON
   features: `osmEntityToGeoJSONFeature(osm, entity)`.
