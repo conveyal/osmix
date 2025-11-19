@@ -70,6 +70,8 @@ const tile = await remote.getVectorTile(osmInfo.id, [9372, 12535, 15])
 
 ## Monorepo Structure
 
+See each package's README for full API and description.
+
 | Package | Description |
 |--|--|
 | [`osmix`](packages/osmix/README.md) | Main library packaging all of the individual tools into an API. |
