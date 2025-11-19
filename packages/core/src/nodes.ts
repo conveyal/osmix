@@ -1,5 +1,10 @@
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
+import {
+	bboxToMicroDegrees,
+	microToDegrees,
+	toMicroDegrees,
+} from "@osmix/shared/coordinates"
 import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/shared/types"
 import KDBush from "kdbush"
 import { Entities, type EntitiesTransferables } from "./entities"
@@ -9,7 +14,6 @@ import { Tags } from "./tags"
 import {
 	BufferConstructor,
 	type BufferType,
-	CoordinateArrayType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
 
@@ -25,18 +29,28 @@ export interface AddNodeOptions {
 }
 
 export class Nodes extends Entities<OsmNode> {
-	private lons: RTA<Float64Array>
-	private lats: RTA<Float64Array>
-	private bbox: GeoBbox2D = [
-		Number.POSITIVE_INFINITY,
-		Number.POSITIVE_INFINITY,
-		Number.NEGATIVE_INFINITY,
-		Number.NEGATIVE_INFINITY,
+	/**
+	 * Coordinates are stored as integer microdegrees (Int32Array).
+	 * Use OSM_COORD_SCALE (1e7) to convert between degrees and microdegrees.
+	 */
+	private lons: RTA<Int32Array>
+	private lats: RTA<Int32Array>
+	// Bbox stored in microdegrees internally
+	private bbox: [
+		minLon: number,
+		minLat: number,
+		maxLon: number,
+		maxLat: number,
+	] = [
+		Number.MAX_SAFE_INTEGER,
+		Number.MAX_SAFE_INTEGER,
+		Number.MIN_SAFE_INTEGER,
+		Number.MIN_SAFE_INTEGER,
 	]
 	private spatialIndex: KDBush = new KDBush(
 		0,
 		128,
-		Float64Array,
+		Int32Array,
 		BufferConstructor,
 	)
 
@@ -47,24 +61,28 @@ export class Nodes extends Entities<OsmNode> {
 				new Ids(transferables),
 				new Tags(stringTable, transferables),
 			)
-			this.lons = RTA.from(CoordinateArrayType, transferables.lons)
-			this.lats = RTA.from(CoordinateArrayType, transferables.lats)
+			this.lons = RTA.from(Int32Array, transferables.lons)
+			this.lats = RTA.from(Int32Array, transferables.lats)
 			this.spatialIndex = KDBush.from(transferables.spatialIndex)
-			this.bbox = transferables.bbox
+			// Convert bbox from degrees to microdegrees
+			this.bbox = bboxToMicroDegrees(transferables.bbox)
 			this.indexBuilt = true
 		} else {
 			super("node", new Ids(), new Tags(stringTable))
-			this.lons = new RTA(CoordinateArrayType)
-			this.lats = new RTA(CoordinateArrayType)
-			this.spatialIndex = new KDBush(0, 128, Float64Array, BufferConstructor)
+			this.lons = new RTA(Int32Array)
+			this.lats = new RTA(Int32Array)
+			this.spatialIndex = new KDBush(0, 128, Int32Array, BufferConstructor)
 		}
 	}
 
 	addNode(node: OsmNode): number {
 		const nodeIndex = this.addEntity(node.id, node.tags ?? {})
 
-		this.lons.push(node.lon)
-		this.lats.push(node.lat)
+		const lonMicro = toMicroDegrees(node.lon)
+		const latMicro = toMicroDegrees(node.lat)
+
+		this.lons.push(lonMicro)
+		this.lats.push(latMicro)
 
 		if (node.lon < this.bbox[0]) this.bbox[0] = node.lon
 		if (node.lat < this.bbox[1]) this.bbox[1] = node.lat
@@ -80,9 +98,11 @@ export class Nodes extends Entities<OsmNode> {
 		blockStringIndexMap: Uint32Array,
 		filter?: (node: OsmNode) => boolean,
 	): number {
+		// PBF block already has offsets and granularity converted to degrees
 		const lon_offset = block.lon_offset ?? 0
 		const lat_offset = block.lat_offset ?? 0
 		const granularity = block.granularity ?? 1e7
+
 		const delta = {
 			id: 0,
 			lat: 0,
@@ -115,8 +135,13 @@ export class Nodes extends Entities<OsmNode> {
 			delta.lat += latSid
 			delta.lon += lonSid
 
+			// Calculate degrees from PBF delta encoding
 			const lon = lon_offset + delta.lon / granularity
 			const lat = lat_offset + delta.lat / granularity
+
+			// Convert to microdegrees for storage
+			const lonMicro = toMicroDegrees(lon)
+			const latMicro = toMicroDegrees(lat)
 
 			const tagKeys: number[] = []
 			const tagValues: number[] = []
@@ -144,8 +169,8 @@ export class Nodes extends Entities<OsmNode> {
 			if (!shouldInclude) continue
 
 			this.addEntity(delta.id, tagKeys, tagValues)
-			this.lons.push(lon)
-			this.lats.push(lat)
+			this.lons.push(lonMicro)
+			this.lats.push(latMicro)
 
 			if (lon < this.bbox[0]) this.bbox[0] = lon
 			if (lat < this.bbox[1]) this.bbox[1] = lat
@@ -164,13 +189,9 @@ export class Nodes extends Entities<OsmNode> {
 
 	buildSpatialIndex() {
 		console.time("NodeIndex.buildSpatialIndex")
-		this.spatialIndex = new KDBush(
-			this.size,
-			128,
-			Float64Array,
-			BufferConstructor,
-		)
+		this.spatialIndex = new KDBush(this.size, 64, Int32Array, BufferConstructor)
 		for (let i = 0; i < this.size; i++) {
+			// Store microdegrees directly in spatial index
 			this.spatialIndex.add(this.lons.at(i), this.lats.at(i))
 		}
 		this.spatialIndex.finish()
@@ -183,14 +204,17 @@ export class Nodes extends Entities<OsmNode> {
 
 	getNodeBbox(i: IdOrIndex): GeoBbox2D {
 		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
-		const lon = this.lons.at(index)
-		const lat = this.lats.at(index)
+		const lon = microToDegrees(this.lons.at(index))
+		const lat = microToDegrees(this.lats.at(index))
 		return [lon, lat, lon, lat] as GeoBbox2D
 	}
 
 	getNodeLonLat(i: IdOrIndex): [number, number] {
 		const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0]
-		return [this.lons.at(index), this.lats.at(index)]
+		return [
+			microToDegrees(this.lons.at(index)),
+			microToDegrees(this.lats.at(index)),
+		]
 	}
 
 	getFullEntity(index: number, id: number, tags?: OsmTags): OsmNode {
@@ -212,11 +236,23 @@ export class Nodes extends Entities<OsmNode> {
 
 	// Spatial operations
 	findIndexesWithinBbox(bbox: GeoBbox2D): number[] {
-		return this.spatialIndex.range(bbox[0], bbox[1], bbox[2], bbox[3])
+		// Convert bbox from degrees to microdegrees for spatial index query
+		const bboxMicro = bboxToMicroDegrees(bbox)
+		return this.spatialIndex.range(
+			bboxMicro[0],
+			bboxMicro[1],
+			bboxMicro[2],
+			bboxMicro[3],
+		)
 	}
 
 	findIndexesWithinRadius(x: number, y: number, radius: number): number[] {
-		return this.spatialIndex.within(x, y, radius)
+		// Convert coordinates and radius from degrees to microdegrees
+		const xMicro = toMicroDegrees(x)
+		const yMicro = toMicroDegrees(y)
+		// Radius in degrees needs to be converted to microdegrees
+		const radiusMicro = toMicroDegrees(radius)
+		return this.spatialIndex.within(xMicro, yMicro, radiusMicro)
 	}
 
 	/**

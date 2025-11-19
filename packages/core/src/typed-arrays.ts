@@ -31,12 +31,6 @@ export interface TypedArrayConstructor<
 export const IdArrayType = Float64Array
 
 /**
- * When we are storing coordinates, we need to be able to store 64-bit floating point numbers.
- * However, for benchmarking it is handy to test 32-bit floating point numbers.
- */
-export const CoordinateArrayType = Float64Array
-
-/**
  * When we are storing indexes into other arrays, we never need an index to exceed 2^32.
  */
 export const IndexArrayType = Uint32Array

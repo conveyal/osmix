@@ -9,7 +9,6 @@ import { Tags } from "./tags"
 import {
 	BufferConstructor,
 	type BufferType,
-	CoordinateArrayType,
 	IdArrayType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
@@ -47,7 +46,7 @@ export class Ways extends Entities<OsmWay> {
 			this.refStart = RTA.from(Uint32Array, transferables.refStart)
 			this.refCount = RTA.from(Uint16Array, transferables.refCount)
 			this.refs = RTA.from(IdArrayType, transferables.refs)
-			this.bbox = RTA.from(CoordinateArrayType, transferables.bbox)
+			this.bbox = RTA.from(Float64Array, transferables.bbox)
 			this.spatialIndex = Flatbush.from(transferables.spatialIndex)
 			this.indexBuilt = true
 		} else {
@@ -55,7 +54,7 @@ export class Ways extends Entities<OsmWay> {
 			this.refStart = new RTA(Uint32Array)
 			this.refCount = new RTA(Uint16Array)
 			this.refs = new RTA(IdArrayType)
-			this.bbox = new RTA(CoordinateArrayType)
+			this.bbox = new RTA(Float64Array)
 		}
 		this.nodes = nodes
 	}
