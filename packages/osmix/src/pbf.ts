@@ -162,6 +162,8 @@ export async function* startCreateOsmFromPbf(
 		osm.nodes.buildSpatialIndex()
 	} else if (options.buildSpatialIndexes.includes("way")) {
 		osm.ways.buildSpatialIndex()
+	} else if (options.buildSpatialIndexes.includes("relation")) {
+		osm.relations.buildSpatialIndex()
 	}
 
 	return osm

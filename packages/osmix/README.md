@@ -28,12 +28,8 @@ npm install osmix
 
 ```ts
 import { Osmix } from "osmix"
-import { readFile } from "node:fs/promises"
 
-const osm = await Osmix.fromPbf(await readFile("monaco.osm.pbf"), {
-	id: "monaco",
-	extractBbox: [-73.99, 40.73, -73.97, 40.75], // optional while parsing
-})
+const osm = await Osmix.fromPbf(Bun.file("monaco.osm.pbf").stream())
 
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
 const tileBytes = await osm.getVectorTile([9372, 12535, 15])
@@ -49,8 +45,9 @@ const tileBytes = await osm.getVectorTile([9372, 12535, 15])
 import { Osmix } from "osmix"
 
 const file = await fetch("/fixtures/buildings.geojson").then((r) => r.arrayBuffer())
-const osm = await Osmix.fromGeoJSON(file, { id: "buildings" })
-await osm.toPbf()
+const osm = await Osmix.fromGeoJSON(file)
+const pbfBytes = await osm.toPbf()
+// Write to file: await Bun.write("buildings.osm.pbf", pbfBytes)
 ```
 
 `fromGeoJSON` reuses nodes when coordinates repeat, creates relations for
@@ -62,14 +59,12 @@ returning so the dataset is immediately queryable.
 ```ts
 import { OsmixRemote } from "osmix"
 
-const remote = await OsmixRemote.connect({ workerCount: 2 })
-const info = await remote.fromPbf(Bun.file("seattle.osm.pbf").stream(), {
-	id: "seattle",
+const remote = await OsmixRemote.connect()
+const info = await remote.fromPbf(Bun.file("./monaco.pbf").stream())
+const patchInfo = await remote.fromPbf(Bun.file("patch.osm.pbf").stream(), {
+	id: "patch",
 })
-
-await remote.merge(info.id, await remote.fromPbf(Bun.file("patch.osm.pbf").stream()), {
-	directMerge: true,
-})
+await remote.merge(info.id, patchInfo.id)
 const rasterTile = await remote.getRasterTile(info.id, [10561, 22891, 16])
 ```
 
@@ -82,45 +77,17 @@ const rasterTile = await remote.getRasterTile(info.id, [10561, 22891, 16])
 ### Extract, stream, and write back to PBF
 
 ```ts
-import { createExtract, osmToPbfStream } from "osmix"
+import { Osmix } from "osmix"
 
-const downtown = createExtract(osm, [-122.35, 47.60, -122.32, 47.62])
-await osmToPbfStream(downtown).pipeTo(fileWritableStream)
+const osm = await Osmix.fromPbf(Bun.file('./monaco.pbf').stream())
+const downtown = await osm.extract([-122.35, 47.60, -122.32, 47.62])
+await downtown.toPbfStream().pipeTo(fileWritableStream)
 ```
 
 `createExtract` can either clip ways/members to the bbox (`strategy: "simple"`)
 or include complete ways/relations. `osmToPbfStream` and `osmToPbfBuffer`
 reuse the streaming builders from `@osmix/json`/`@osmix/pbf`, so outputs stay
 spec-compliant without staging everything in memory.
-
-## API overview
-
-- `class Osmix extends Osm`
-	- `static fromPbf(data, options?, onProgress?)`
-	- `static fromGeoJSON(data, options?, onProgress?)`
-	- `static readHeader(data)`
-	- `toPbfStream()` / `toPbf()` – emit `.osm.pbf` bytes
-	- `getVectorTile(tile)` – returns an MVT ArrayBuffer using `@osmix/vt`
-	- `getRasterTile(tile, tileSize?)` – paints RGBA buffers via `@osmix/raster`
-	- `search(key, value?)` – tag search across nodes/ways/relations
-	- `createChangeset(other?, options?, onProgress?)` – wraps `@osmix/change`
-- Extract + encoding helpers (`extract.ts`, `pbf.ts`)
-	- `createExtract(osm, bbox, strategy?, onProgress?)`
-	- `createOsmFromPbf(data, options?, onProgress?)`
-	- `startCreateOsmFromPbf(data, options?)`
-	- `createReadableEntityStreamFromOsm(osm)`
-	- `osmToPbfStream(osm)` / `osmToPbfBuffer(osm)`
-- Worker orchestration (`remote.ts`)
-	- `class OsmixRemote`
-		- `static connect({ workerCount?, onProgress? })`
-		- `fromPbf`, `fromGeoJSON`, `merge`, `generateChangeset`, `getVectorTile`, …
-		- `transferIn`, `transferOut`, `delete`, `setChangesetFilters`, etc.
-	- `createOsmixWorker()` – spin up a single Comlink worker instance.
-- Transfer utilities (`utils.ts`)
-	- `collectTransferables(value)` / `transfer(value)`
-	- Feature detection constants: `SUPPORTS_STREAM_TRANSFER`,
-		`SUPPORTS_SHARED_ARRAY_BUFFER`, `DEFAULT_WORKER_COUNT`
-	- `supportsReadableStreamTransfer()`
 
 ## Environment and limitations
 

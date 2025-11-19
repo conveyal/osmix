@@ -30,20 +30,23 @@ import {Osmix} from 'osmix'
 // Load PBF from file or URL
 const osm = await Osmix.fromPbf(Bun.file('monaco.pbf').stream())
 
-// Query entities
-const node = osm.getNode(123456)
-const way = osm.getWay(789012)
-const relation = osm.getRelation(345678)
+// Query entities by ID
+const node = osm.nodes.getById(123456)
+const way = osm.ways.getById(789012)
+const relation = osm.relations.getById(345678)
 
 // Spatial queries with bounding box
-const entities = osm.queryBbox([7.41, 43.72, 7.43, 43.74])
-console.log(`Found ${entities.nodes.length} nodes in Monaco harbor`)
+const bbox: [number, number, number, number] = [7.41, 43.72, 7.43, 43.74]
+const nodeResults = osm.nodes.withinBbox(bbox)
+const wayResults = osm.ways.withinBbox(bbox)
+console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways in Monaco harbor`)
 ```
 
 ### Merge two OSM extracts
 
 ```ts
 import {Osmix} from 'osmix'
+import {merge} from '@osmix/change'
 
 const base = await Osmix.fromPbf(Bun.file('region-base.pbf').stream())
 const patch = await Osmix.fromPbf(Bun.file('region-updates.pbf').stream())
@@ -59,14 +62,15 @@ await Bun.write('region-merged.pbf', merged.toPbf())
 
 ```ts
 import {Osmix} from 'osmix'
+import {createExtract} from 'osmix'
 
 const osm = await Osmix.fromPbf(Bun.file('washington.pbf').stream())
 
 // Extract downtown Seattle
-const bbox = [-122.34, 47.60, -122.32, 47.61]
-const extract = osm.extract(bbox)
+const bbox: [number, number, number, number] = [-122.34, 47.60, -122.32, 47.61]
+const extract = createExtract(osm, bbox)
 
-await Bun.write('seattle-downtown.pbf', extract.toPbf())
+await Bun.write('seattle-downtown.pbf', await new Osmix(extract.transferables()).toPbf())
 ```
 
 ### Use in a Web Worker
@@ -75,25 +79,27 @@ await Bun.write('seattle-downtown.pbf', extract.toPbf())
 // main.ts
 import {OsmixRemote} from 'osmix'
 
-const Osmix = await OsmixRemote.connect()
-const osm = await Osmix.fromPbf(file.stream())
+const remote = await OsmixRemote.connect()
+const info = await remote.fromPbf(file.stream(), {id: 'dataset'})
 
 // All operations run off the main thread
-const entities = await osm.queryBbox([7.41, 43.72, 7.43, 43.74])
+const tile = await remote.getVectorTile(info.id, [9372, 12535, 15])
 ```
 
 ### Convert to GeoJSON
 
 ```ts
 import {Osmix} from 'osmix'
-import {entityToFeature} from 'osmix/geojson'
+import {osmEntityToGeoJSONFeature} from '@osmix/geojson'
 
 const osm = await Osmix.fromPbf(Bun.file('monaco.pbf').stream())
-const way = osm.getWay(123456)
+const way = osm.ways.getById(123456)
 
 // Convert OSM entity to GeoJSON Feature
-const feature = entityToFeature(way, osm)
-console.log(feature.geometry.type) // 'LineString' or 'Polygon'
+if (way) {
+	const feature = osmEntityToGeoJSONFeature(osm, way)
+	console.log(feature.geometry.type) // 'LineString' or 'Polygon'
+}
 ```
 
 ## Monorepo Structure

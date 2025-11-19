@@ -31,12 +31,6 @@ export interface TypedArrayConstructor<
 export const IdArrayType = Float64Array
 
 /**
- * When we are storing coordinates, we need to be able to store 64-bit floating point numbers.
- * However, for benchmarking it is handy to test 32-bit floating point numbers.
- */
-export const CoordinateArrayType = Float64Array
-
-/**
  * When we are storing indexes into other arrays, we never need an index to exceed 2^32.
  */
 export const IndexArrayType = Uint32Array
@@ -57,6 +51,9 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 
 	BC: SharedArrayBufferConstructor | ArrayBufferConstructor
 
+	/**
+	 * Create a ResizeableTypedArray from an existing buffer.
+	 */
 	static from<TA extends TypedArray>(
 		ArrayType: TypedArrayConstructor<TA>,
 		buffer: BufferType,
@@ -71,6 +68,9 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 		return rta
 	}
 
+	/**
+	 * Create a new ResizeableTypedArray.
+	 */
 	constructor(
 		ArrayType: TypedArrayConstructor<TA>,
 		BC:
@@ -87,10 +87,16 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 		this.array = new this.ArrayType(this.buffer)
 	}
 
+	/**
+	 * Iterate over the array values.
+	 */
 	[Symbol.iterator](): ArrayIterator<number> {
 		return this.array[Symbol.iterator]()
 	}
 
+	/**
+	 * Expand the underlying buffer when it's full.
+	 */
 	expandArray() {
 		this.bufferSize *= 2
 		if (this.bufferSize > this.buffer.maxByteLength) {
@@ -114,7 +120,7 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 	}
 
 	/**
-	 * Handles negative numbers
+	 * Get the value at an index. Handles negative indices.
 	 */
 	at(index: number): number {
 		if (index < -this.length || index >= this.length)
@@ -125,6 +131,9 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 		return result
 	}
 
+	/**
+	 * Get a slice of the array.
+	 */
 	slice(start: number, end: number) {
 		return this.array.slice(start, end)
 	}
@@ -133,6 +142,9 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 		return this.items
 	}
 
+	/**
+	 * Push a value to the end of the array.
+	 */
 	push(value: number): number {
 		if (this.length >= this.array.length) {
 			this.expandArray()
@@ -141,6 +153,9 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 		return this.length - 1
 	}
 
+	/**
+	 * Set a value at a specific index. Expands array if needed.
+	 */
 	set(index: number, value: number) {
 		if (index < 0) throw Error("Index out of bounds")
 		if (index >= this.length) {
@@ -150,12 +165,18 @@ export class ResizeableTypedArray<TA extends TypedArray> {
 		this.array[index] = value
 	}
 
+	/**
+	 * Push multiple values to the end of the array.
+	 */
 	pushMany(values: number[] | TypedArray) {
 		while (this.length + values.length > this.array.length) this.expandArray()
 		this.array.set(values, this.length)
 		this.items += values.length
 	}
 
+	/**
+	 * Resize the buffer to fit exactly the number of items.
+	 */
 	compact() {
 		if (this.buffer instanceof SharedArrayBuffer) {
 			this.buffer = this.buffer.slice(

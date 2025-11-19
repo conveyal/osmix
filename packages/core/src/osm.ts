@@ -46,6 +46,9 @@ export class Osm {
 
 	private indexBuilt = false
 
+	/**
+	 * Create a new OSM Entity index.
+	 */
 	constructor(opts?: Partial<OsmOptions> | OsmTransferables) {
 		this.id = opts?.id ?? "unknown"
 		this.header = opts?.header ?? {
@@ -71,6 +74,9 @@ export class Osm {
 		}
 	}
 
+	/**
+	 * Build the internal indexes for all entities.
+	 */
 	buildIndexes() {
 		this.stringTable.buildIndex()
 		this.nodes.buildIndex()
@@ -79,6 +85,9 @@ export class Osm {
 		this.indexBuilt = true
 	}
 
+	/**
+	 * Check if the index is built and ready for use.
+	 */
 	isReady() {
 		return (
 			this.nodes.isReady() &&
@@ -88,9 +97,13 @@ export class Osm {
 		)
 	}
 
+	/**
+	 * Build spatial indexes for all entities.
+	 */
 	buildSpatialIndexes() {
 		this.nodes.buildSpatialIndex()
 		this.ways.buildSpatialIndex()
+		this.relations.buildSpatialIndex()
 	}
 
 	/**
@@ -100,6 +113,9 @@ export class Osm {
 		return this.nodes.getBbox()
 	}
 
+	/**
+	 * Get information about the OSM index.
+	 */
 	info(): OsmInfo {
 		return {
 			id: this.id,
@@ -113,6 +129,9 @@ export class Osm {
 		}
 	}
 
+	/**
+	 * Get transferable objects for passing to another thread.
+	 */
 	transferables(): OsmTransferables {
 		return {
 			id: this.id,

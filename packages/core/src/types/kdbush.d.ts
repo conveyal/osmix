@@ -1,10 +1,14 @@
 declare module "kdbush" {
-	import type { BufferConstructor, BufferType } from "../typed-arrays"
+	import type {
+		BufferConstructor,
+		BufferType,
+		TypedArrayConstructor,
+	} from "../typed-arrays"
 	export default class KDBush {
 		constructor(
 			length: number,
 			nodeSize: number,
-			ArrayType: Float64ArrayConstructor,
+			ArrayType: TypedArrayConstructor,
 			BufferConstructor: BufferConstructor,
 		)
 

@@ -9,7 +9,6 @@ import { Tags } from "./tags"
 import {
 	BufferConstructor,
 	type BufferType,
-	CoordinateArrayType,
 	IdArrayType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
@@ -37,6 +36,9 @@ export class Ways extends Entities<OsmWay> {
 	// Node reference index
 	private nodes: Nodes
 
+	/**
+	 * Create a new Ways index.
+	 */
 	constructor(
 		stringTable: StringTable,
 		nodes: Nodes,
@@ -47,7 +49,7 @@ export class Ways extends Entities<OsmWay> {
 			this.refStart = RTA.from(Uint32Array, transferables.refStart)
 			this.refCount = RTA.from(Uint16Array, transferables.refCount)
 			this.refs = RTA.from(IdArrayType, transferables.refs)
-			this.bbox = RTA.from(CoordinateArrayType, transferables.bbox)
+			this.bbox = RTA.from(Float64Array, transferables.bbox)
 			this.spatialIndex = Flatbush.from(transferables.spatialIndex)
 			this.indexBuilt = true
 		} else {
@@ -55,11 +57,14 @@ export class Ways extends Entities<OsmWay> {
 			this.refStart = new RTA(Uint32Array)
 			this.refCount = new RTA(Uint16Array)
 			this.refs = new RTA(IdArrayType)
-			this.bbox = new RTA(CoordinateArrayType)
+			this.bbox = new RTA(Float64Array)
 		}
 		this.nodes = nodes
 	}
 
+	/**
+	 * Add a single way to the index.
+	 */
 	addWay(way: OsmWay) {
 		const wayIndex = this.addEntity(way.id, way.tags ?? {})
 		this.refStart.push(this.refs.length)
@@ -112,16 +117,22 @@ export class Ways extends Entities<OsmWay> {
 		return added
 	}
 
+	/**
+	 * Compact the internal arrays to free up memory.
+	 */
 	buildEntityIndex() {
 		this.refStart.compact()
 		this.refCount.compact()
 		this.refs.compact()
 	}
 
+	/**
+	 * Build the spatial index for ways.
+	 */
 	buildSpatialIndex() {
-		console.time("WayIndex.buildSpatialIndex")
 		if (!this.nodes.isReady()) throw Error("Node index is not ready.")
 		if (this.size === 0) return this.spatialIndex
+		console.time("WayIndex.buildSpatialIndex")
 
 		this.spatialIndex = new Flatbush(
 			this.size,
@@ -155,6 +166,9 @@ export class Ways extends Entities<OsmWay> {
 		return this.spatialIndex
 	}
 
+	/**
+	 * Get the full way entity.
+	 */
 	getFullEntity(index: number, id: number, tags?: OsmTags): OsmWay {
 		return {
 			id,
@@ -163,13 +177,19 @@ export class Ways extends Entities<OsmWay> {
 		}
 	}
 
+	/**
+	 * Get the node IDs referenced by a way.
+	 */
 	getRefIds(index: number): number[] {
 		const start = this.refStart.at(index)
 		const count = this.refCount.at(index)
 		return Array.from(this.refs.slice(start, start + count))
 	}
 
-	getNodeBbox(idOrIndex: IdOrIndex): GeoBbox2D {
+	/**
+	 * Get the bounding box of a way.
+	 */
+	getEntityBbox(idOrIndex: IdOrIndex): GeoBbox2D {
 		const index =
 			"index" in idOrIndex ? idOrIndex.index : this.ids.idOrIndex(idOrIndex)[0]
 		return [
@@ -180,6 +200,9 @@ export class Ways extends Entities<OsmWay> {
 		]
 	}
 
+	/**
+	 * Get the coordinates of a way as a flat array.
+	 */
 	getLine(index: number) {
 		const count = this.refCount.at(index)
 		const start = this.refStart.at(index)
@@ -193,6 +216,9 @@ export class Ways extends Entities<OsmWay> {
 		return line
 	}
 
+	/**
+	 * Get the coordinates of a way as an array of [lon, lat] pairs.
+	 */
 	getCoordinates(index: number): LonLat[] {
 		const count = this.refCount.at(index)
 		const start = this.refStart.at(index)
@@ -215,7 +241,11 @@ export class Ways extends Entities<OsmWay> {
 		return coords
 	}
 
+	/**
+	 * Find way indexes that intersect a bounding box.
+	 */
 	intersects(bbox: GeoBbox2D, filterFn?: (index: number) => boolean): number[] {
+		if (this.size === 0) return []
 		return this.spatialIndex.search(
 			bbox[0],
 			bbox[1],
@@ -225,15 +255,22 @@ export class Ways extends Entities<OsmWay> {
 		)
 	}
 
+	/**
+	 * Find way indexes near a point.
+	 */
 	neighbors(
 		x: number,
 		y: number,
 		maxResults?: number,
 		maxDistance?: number,
 	): number[] {
+		if (this.size === 0) return []
 		return this.spatialIndex.neighbors(x, y, maxResults, maxDistance)
 	}
 
+	/**
+	 * Get ways within a bounding box.
+	 */
 	withinBbox(
 		bbox: GeoBbox2D,
 		include?: (index: number) => boolean,
@@ -276,6 +313,9 @@ export class Ways extends Entities<OsmWay> {
 		}
 	}
 
+	/**
+	 * Get transferable objects for passing to another thread.
+	 */
 	override transferables(): WaysTransferables {
 		return {
 			...super.transferables(),

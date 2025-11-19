@@ -18,12 +18,18 @@ export abstract class Entities<T extends OsmEntity> {
 
 	protected indexBuilt = false
 
+	/**
+	 * Create a new Entities index.
+	 */
 	constructor(indexType: OsmEntityType, ids: Ids, tags: Tags) {
 		this.indexType = indexType
 		this.ids = ids
 		this.tags = tags
 	}
 
+	/**
+	 * Get transferable objects for passing to another thread.
+	 */
 	transferables(): EntitiesTransferables {
 		return {
 			...this.ids.transferables(),
@@ -31,6 +37,9 @@ export abstract class Entities<T extends OsmEntity> {
 		}
 	}
 
+	/**
+	 * Check if the index is built and ready for use.
+	 */
 	isReady() {
 		return this.ids.isReady() && this.tags.isReady() && this.indexBuilt
 	}
@@ -41,6 +50,9 @@ export abstract class Entities<T extends OsmEntity> {
 
 	abstract buildEntityIndex(): void
 
+	/**
+	 * Build the internal indexes for entities.
+	 */
 	buildIndex() {
 		if (this.indexBuilt) return
 		console.time(`${this.indexType}Index.buildIndex`)
@@ -51,7 +63,7 @@ export abstract class Entities<T extends OsmEntity> {
 		console.timeEnd(`${this.indexType}Index.buildIndex`)
 	}
 
-	abstract getNodeBbox(idOrIndex: IdOrIndex): GeoBbox2D
+	abstract getEntityBbox(idOrIndex: IdOrIndex): GeoBbox2D
 
 	abstract getFullEntity(index: number, id: number, tags?: OsmTags): T
 
@@ -72,12 +84,18 @@ export abstract class Entities<T extends OsmEntity> {
 		return entityIndex
 	}
 
+	/**
+	 * Get an entity by ID or index.
+	 */
 	get(idOrIndex: IdOrIndex): T | null {
 		const [index, id] = this.ids.idOrIndex(idOrIndex)
 		if (index === -1) return null
 		return this.getFullEntity(index, id, this.tags.getTags(index))
 	}
 
+	/**
+	 * Get an entity by index.
+	 */
 	getByIndex(index: number): T {
 		return this.getFullEntity(
 			index,
@@ -86,6 +104,9 @@ export abstract class Entities<T extends OsmEntity> {
 		)
 	}
 
+	/**
+	 * Get multiple entities by their indexes.
+	 */
 	getEntitiesByIndex(indexes: number[]): T[] {
 		const entities: T[] = []
 		for (const index of indexes) {
@@ -96,12 +117,18 @@ export abstract class Entities<T extends OsmEntity> {
 		return entities
 	}
 
+	/**
+	 * Iterate over all entities in the index.
+	 */
 	*[Symbol.iterator](): Generator<T> {
 		for (let i = 0; i < this.size; i++) {
 			yield this.getFullEntity(i, this.ids.at(i), this.tags.getTags(i))
 		}
 	}
 
+	/**
+	 * Get an entity by ID.
+	 */
 	getById(id: number): T | null {
 		const index = this.ids.getIndexFromId(id)
 		if (index !== -1)
@@ -109,6 +136,9 @@ export abstract class Entities<T extends OsmEntity> {
 		return null
 	}
 
+	/**
+	 * Iterate over entities sorted by ID.
+	 */
 	*sorted(): Generator<T> {
 		for (const id of this.ids.sorted) {
 			const index = this.ids.getIndexFromId(id)
@@ -117,6 +147,9 @@ export abstract class Entities<T extends OsmEntity> {
 		}
 	}
 
+	/**
+	 * Search for entities with a specific tag key and optional value.
+	 */
 	search(key: string, val?: string): T[] {
 		const keyIndex = this.tags.find(key)
 		const entities = this.tags

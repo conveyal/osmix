@@ -8,8 +8,15 @@ import { startCreateOsmFromGeoJSON } from "@osmix/geojson"
 import { readOsmPbf } from "@osmix/pbf"
 import { DEFAULT_RASTER_TILE_SIZE, OsmixRasterTile } from "@osmix/raster"
 import { logProgress, type ProgressEvent } from "@osmix/shared/progress"
-import type { OsmNode, OsmRelation, OsmWay, Tile } from "@osmix/shared/types"
+import type {
+	GeoBbox2D,
+	OsmNode,
+	OsmRelation,
+	OsmWay,
+	Tile,
+} from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
+import { createExtract, type ExtractStrategy } from "./extract"
 import {
 	createOsmFromPbf,
 	type OsmFromPbfOptions,
@@ -133,6 +140,21 @@ export class Osmix extends Osm {
 			return generateChangeset(this, other, options, onProgress)
 		}
 		return new OsmChangeset(this)
+	}
+
+	/**
+	 * Create a new Osmix instance from a bounding box.
+	 * The new instance will only contain the entities within the bounding box.
+	 * The strategy determines how to handle ways/relations that cross the bbox.
+	 * "simple" strategy clips ways/members to the bbox, "complete_ways" includes complete ways/relations.
+	 */
+	extract(
+		bbox: GeoBbox2D,
+		strategy: ExtractStrategy = "complete_ways",
+		onProgress: (progress: ProgressEvent) => void = logProgress,
+	) {
+		const osm = createExtract(this, bbox, strategy, onProgress)
+		return new Osmix(osm.transferables())
 	}
 }
 

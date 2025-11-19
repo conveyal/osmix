@@ -5,7 +5,8 @@
 ## Highlights
 
 - Ingest `.osm.pbf` sources into node, way, and relation stores backed by transferable typed arrays using readers from [`@osmix/pbf`](../pbf/README.md).
-- Run fast bounding-box searches with KDBush/Flatbush and convert matches straight to GeoJSON.
+- Coordinates stored as `Int32Array` microdegrees (1e-7 degree precision) for efficient memory usage; conversion to degrees happens at API boundaries.
+- Run fast bounding-box searches with KDBush/Flatbush (also using `Int32Array` microdegrees) and convert matches straight to GeoJSON.
 - Trim extracts, write new PBF buffers, or stream entities to downstream tooling with [`@osmix/json`](../json/README.md) or [`@osmix/pbf`](../pbf/README.md).
 - Pair with [`@osmix/change`](../change/README.md) when you need deduplication, intersection, or merge pipelines.
 - Ship fully indexed datasets across workers via `transferables()` + `new Osm(transferables)`.
@@ -61,10 +62,10 @@ osm.buildSpatialIndexes()
 
 ### Query and iterate
 
-- `osm.get("node", 123)` or `osm.nodes.get({ id: 123 })` fetches specific
+- `osm.nodes.get({ id: 123 })` or `osm.nodes.getById(123)` fetches specific
   entities.
-- `osm.nodes.sorted()` / `osm.ways.sorted()` stream ids in ascending order.
-- `osm.nodes.findIndexesWithinBbox(bbox)` / `osm.ways.withinBbox(bbox)` emit
+- `osm.nodes.sorted()` / `osm.ways.sorted()` stream entities in ascending ID order.
+- `osm.nodes.withinBbox(bbox)` / `osm.ways.withinBbox(bbox)` emit
   typed arrays ready to transfer across workers.
 - Pair with [`@osmix/geojson`](../geojson/README.md) when you need GeoJSON
   features: `osmEntityToGeoJSONFeature(osm, entity)`.

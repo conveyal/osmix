@@ -28,6 +28,9 @@ export default class StringTable {
 	// Retrieval state
 	private indexToString = new Map<number, string>()
 
+	/**
+	 * Create a new StringTable.
+	 */
 	constructor(opts?: StringTableTransferables) {
 		this.bytes = opts?.bytes
 			? RTA.from(Uint8Array, opts.bytes)
@@ -40,6 +43,9 @@ export default class StringTable {
 			: new RTA(Uint16Array)
 	}
 
+	/**
+	 * Get transferable objects for passing to another thread.
+	 */
 	transferables(): StringTableTransferables {
 		return {
 			bytes: this.bytes.array.buffer,
@@ -48,6 +54,9 @@ export default class StringTable {
 		}
 	}
 
+	/**
+	 * Add a string to the table and return its index.
+	 */
 	add(str: string): number {
 		const existingIndex = this.stringToIndex.get(str)
 		if (existingIndex !== undefined) return existingIndex
@@ -82,6 +91,9 @@ export default class StringTable {
 	/**
 	 * TextDecoder.decode() does not support SharedArrayBuffer, so we need to first copy to a normal ArrayBuffer before decoding.
 	 */
+	/**
+	 * Get a string by its index.
+	 */
 	get(index: number): string {
 		const string = this.indexToString.get(index)
 		if (string) return string
@@ -94,6 +106,9 @@ export default class StringTable {
 		return decoded
 	}
 
+	/**
+	 * Get the raw bytes of a string by its index.
+	 */
 	getBytes(index: number): Uint8Array {
 		if (index < 0 || index >= this.length)
 			throw Error(`String index out of range: ${index}`)
@@ -107,6 +122,9 @@ export default class StringTable {
 		return this.start.length
 	}
 
+	/**
+	 * Compact the internal arrays to free up memory.
+	 */
 	buildIndex() {
 		this.bytes.compact()
 		this.start.compact()
@@ -114,6 +132,9 @@ export default class StringTable {
 		this.reverseIndexBuilt = true
 	}
 
+	/**
+	 * Convert the string table to an OSM PBF string table.
+	 */
 	toOsmPbfStringTable(): OsmPbfStringTable {
 		const stringTable: OsmPbfStringTable = []
 		for (let i = 0; i < this.length; i++) {
@@ -122,6 +143,9 @@ export default class StringTable {
 		return stringTable
 	}
 
+	/**
+	 * Ensure the reverse index (string -> index) is built.
+	 */
 	private ensureReverseIndex() {
 		if (this.reverseIndexBuilt) return
 		// Build string -> index map from existing decoded strings
@@ -132,6 +156,9 @@ export default class StringTable {
 		this.reverseIndexBuilt = true
 	}
 
+	/**
+	 * Find the index of a string.
+	 */
 	find(str: string): number {
 		const existing = this.stringToIndex.get(str)
 		if (existing !== undefined) return existing

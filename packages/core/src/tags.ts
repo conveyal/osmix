@@ -40,6 +40,9 @@ export class Tags {
 
 	private indexBuilt = false
 
+	/**
+	 * Create a new Tags index.
+	 */
 	constructor(stringTable: StringTable, transferables?: TagsTransferables) {
 		this.stringTable = stringTable
 		if (transferables) {
@@ -62,6 +65,9 @@ export class Tags {
 		}
 	}
 
+	/**
+	 * Add tags to an entity.
+	 */
 	addTags(index: number, tags?: OsmTags): [number[], number[]] {
 		const tagKeys: number[] = []
 		const tagValues: number[] = []
@@ -78,6 +84,9 @@ export class Tags {
 		return [tagKeys, tagValues]
 	}
 
+	/**
+	 * Add tags to an entity using key and value indexes.
+	 */
 	addTagKeysAndValues(index: number, keys: number[], values: number[]) {
 		this.tagStart.set(index, this.tagKeys.length)
 		this.tagCount.set(index, keys.length)
@@ -94,6 +103,9 @@ export class Tags {
 		})
 	}
 
+	/**
+	 * Compact the internal arrays to free up memory.
+	 */
 	buildIndex() {
 		this.tagStart.compact()
 		this.tagCount.compact()
@@ -113,14 +125,23 @@ export class Tags {
 		this.indexBuilt = true
 	}
 
+	/**
+	 * Check if the index is built and ready for use.
+	 */
 	isReady() {
 		return this.indexBuilt
 	}
 
+	/**
+	 * Get the number of tags for an entity.
+	 */
 	cardinality(index: number): number {
 		return this.tagCount.at(index) ?? 0
 	}
 
+	/**
+	 * Get the tags for an entity.
+	 */
 	getTags(index: number): OsmTags | undefined {
 		const tagCount = this.tagCount.at(index) ?? 0
 		if (tagCount === 0) return
@@ -144,6 +165,9 @@ export class Tags {
 		return tags
 	}
 
+	/**
+	 * Get tags from key and value indexes.
+	 */
 	getTagsFromIndices(keys: number[], values: number[]): OsmTags {
 		const tags: OsmTags = {}
 		for (let i = 0; i < keys.length; i++) {
@@ -156,10 +180,16 @@ export class Tags {
 		return tags
 	}
 
+	/**
+	 * Find the index of a tag key.
+	 */
 	find(key: string): number {
 		return this.stringTable.find(key)
 	}
 
+	/**
+	 * Get all entity indexes that have a specific tag key.
+	 */
 	hasKey(keyIndex: number): number[] {
 		if (keyIndex < 0) return []
 		const start = this.keyIndexStart.at(keyIndex) ?? 0
@@ -176,8 +206,7 @@ export class Tags {
 	}
 
 	/**
-	 * Create transferable buffers and data from a Tags instance that can be sent across message channels and recreated
-	 * in other threads.
+	 * Get transferable objects for passing to another thread.
 	 */
 	transferables(): TagsTransferables {
 		return {
@@ -191,6 +220,9 @@ export class Tags {
 		}
 	}
 
+	/**
+	 * Reconstruct a Tags index from transferable objects.
+	 */
 	static fromTransferables(
 		stringTable: StringTable,
 		transferables: TagsTransferables,

@@ -369,7 +369,7 @@ export class OsmChangeset {
 
 		// Look for duplicate ways in OSM index
 		const closeWayIndexes = this.osm.ways.intersects(
-			this.osm.ways.getNodeBbox(patchWay),
+			this.osm.ways.getEntityBbox(patchWay),
 		)
 		const wayVersion = getEntityVersion(patchWay)
 		const wayTagCount = Object.keys(patchWay.tags ?? {}).length
@@ -472,7 +472,7 @@ export class OsmChangeset {
 		const wayIndex = this.osm.ways.ids.getIndexFromId(way.id)
 
 		// Check for intersecting ways. Since the way exists in the base OSM, there will always be at least one way.
-		const bbox = this.osm.ways.getNodeBbox({ index: wayIndex })
+		const bbox = this.osm.ways.getEntityBbox({ index: wayIndex })
 		const intersectingWayIndexes = this.osm.ways.intersects(bbox)
 		if (intersectingWayIndexes.length <= 1) return // No candidates
 
