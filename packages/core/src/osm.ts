@@ -91,6 +91,7 @@ export class Osm {
 	buildSpatialIndexes() {
 		this.nodes.buildSpatialIndex()
 		this.ways.buildSpatialIndex()
+		this.relations.buildSpatialIndex()
 	}
 
 	/**
