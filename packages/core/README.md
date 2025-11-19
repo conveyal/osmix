@@ -1,11 +1,10 @@
 # @osmix/core
 
-@osmix/core exposes the `Osm` index: a typed-array OpenStreetMap engine that reads `.osm.pbf` streams, builds spatial indexes, and emits JSON, PBF, or raster tiles without leaving modern JavaScript runtimes.
+@osmix/core exposes the `Osm` index which efficently stores OSM entities, creates spatial indexes, and handles spatial queries and tag searches.
 
 ## Highlights
 
-- Ingest `.osm.pbf` sources into node, way, and relation stores backed by transferable typed arrays using readers from [`@osmix/pbf`](../pbf/README.md).
-- Coordinates stored as `Int32Array` microdegrees (1e-7 degree precision) for efficient memory usage; conversion to degrees happens at API boundaries.
+
 - Run fast bounding-box searches with KDBush/Flatbush (also using `Int32Array` microdegrees) and convert matches straight to GeoJSON.
 - Trim extracts, write new PBF buffers, or stream entities to downstream tooling with [`@osmix/json`](../json/README.md) or [`@osmix/pbf`](../pbf/README.md).
 - Pair with [`@osmix/change`](../change/README.md) when you need deduplication, intersection, or merge pipelines.
@@ -14,7 +13,7 @@
 ## Installation
 
 ```sh
-npm install @osmix/core
+bun install @osmix/core
 ```
 
 ## Usage
@@ -22,23 +21,16 @@ npm install @osmix/core
 ### Load a PBF into an `Osm` index
 
 `@osmix/core` focuses on the in-memory data structure itself; higher-level
-ingest helpers live in the top-level `osmix` package. Use
-`createOsmFromPbf`/`startCreateOsmFromPbf` to parse `.osm.pbf` input and
+ingest helpers live in the top-level `osmix` package. If you don't need the other `Osmix` utilities, use
+`createOsmFromPbf` directly to parse `.osm.pbf` input and
 receive an `Osm` instance.
 
 ```ts
 import { createOsmFromPbf } from "osmix"
 
-const osm = await createOsmFromPbf(Bun.file("example.osm.pbf").stream(), {
-	id: "example",
-	extractBbox: [-122.5, 47.45, -122.2, 47.75],
-})
-
+const osm = await createOsmFromPbf(Bun.file("./monaco.pbf").stream())
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
 ```
-
-Need incremental status updates? Switch to `startCreateOsmFromPbf` and consume
-its `ProgressEvent`s before the final `Osm` value.
 
 ### Build fixtures directly
 
@@ -82,32 +74,14 @@ const { ids: wayIds, positions: wayCoords, startIndices } = osm.ways.withinBbox(
 per-way sequences that rendering layers (Deck.gl, WebGL instancing, etc.) can
 consume directly.
 
-### Extract and emit data
+## API
 
-Use the helpers from `osmix` when you want to clip datasets or write them back
-to `.osm.pbf`.
-
-```ts
-import { createExtract, osmToPbfStream } from "osmix"
-
-const downtown = createExtract(osm, [-122.35, 47.60, -122.32, 47.62])
-await osmToPbfStream(downtown).pipeTo(fileWritableStream)
-```
-
-`createExtract` keeps indexes intact and recomputes the header bbox. If you only
-need to ship datasets between workers, call `osm.transferables()` and post the
-result—every nested typed array is already laid out for structured cloning.
-
-## API overview
-
-- `Osm` – ingest PBF sources, build indexes, query entities, extract subsets, emit JSON/PBF, and transfer typed arrays.
-- `Nodes` / `Ways` / `Relations` – typed-array backed stores exposed for advanced workflows (direct coordinate access, bbox searches, ref rewrites).
+WIP
 
 ## Environment and limitations
 
 - Requires runtimes with Web Streams, `TextEncoder`/`TextDecoder`, and zlib-compatible `CompressionStream`/`DecompressionStream` support (Bun, Node 20+, modern browsers).
-- `createOsmFromPbf` (from `osmix`) expects dense-node blocks; PBFs that omit dense encodings are currently unsupported.
-- Filtering during ingest depends on node membership; emit nodes, then ways, then relations when supplying custom entity generators.
+- Coordinates stored as `Int32Array` microdegrees (1e-7 degree precision) for efficient memory usage; conversion to degrees happens at API boundaries.
 
 ## Development
 
