@@ -4,6 +4,7 @@ import {
 	getFixtureFileReadStream,
 	PBFs,
 } from "@osmix/shared/test/fixtures"
+import { isNode, isRelation, isWay } from "@osmix/shared/utils"
 import type { FeatureCollection, LineString, Point } from "geojson"
 import { Osmix } from "../src/osmix"
 
@@ -102,6 +103,76 @@ describe("Osmix", () => {
 
 			expect(osm.nodes.size).toBe(3)
 			expect(osm.ways.size).toBe(1)
+		})
+	})
+
+	describe("transformOsmPbfToJson", () => {
+		beforeAll(() => getFixtureFile(monacoPbf.url))
+
+		it("should transform PBF ReadableStream to JSON entities", async () => {
+			const fileStream = getFixtureFileReadStream(monacoPbf.url)
+			const entityStream = Osmix.transformOsmPbfToJson(fileStream)
+
+			let header: { bbox?: unknown } | undefined
+			let nodeCount = 0
+			let wayCount = 0
+			let relationCount = 0
+
+			await entityStream.pipeTo(
+				new WritableStream({
+					write: (entity) => {
+						if ("id" in entity) {
+							if (isNode(entity)) {
+								nodeCount++
+							} else if (isWay(entity)) {
+								wayCount++
+							} else if (isRelation(entity)) {
+								relationCount++
+							}
+						} else if ("bbox" in entity) {
+							header = entity
+						}
+					},
+				}),
+			)
+
+			expect(header?.bbox).toEqual(monacoPbf.bbox)
+			expect(nodeCount).toBe(monacoPbf.nodes)
+			expect(wayCount).toBe(monacoPbf.ways)
+			expect(relationCount).toBe(monacoPbf.relations)
+		})
+
+		it("should transform PBF ArrayBuffer to JSON entities", async () => {
+			const pbfData = await getFixtureFile(monacoPbf.url)
+			const entityStream = Osmix.transformOsmPbfToJson(pbfData.buffer)
+
+			let header: { bbox?: unknown } | undefined
+			let nodeCount = 0
+			let wayCount = 0
+			let relationCount = 0
+
+			await entityStream.pipeTo(
+				new WritableStream({
+					write: (entity) => {
+						if ("id" in entity) {
+							if (isNode(entity)) {
+								nodeCount++
+							} else if (isWay(entity)) {
+								wayCount++
+							} else if (isRelation(entity)) {
+								relationCount++
+							}
+						} else if ("bbox" in entity) {
+							header = entity
+						}
+					},
+				}),
+			)
+
+			expect(header?.bbox).toEqual(monacoPbf.bbox)
+			expect(nodeCount).toBe(monacoPbf.nodes)
+			expect(wayCount).toBe(monacoPbf.ways)
+			expect(relationCount).toBe(monacoPbf.relations)
 		})
 	})
 
