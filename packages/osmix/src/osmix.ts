@@ -87,6 +87,7 @@ export class Osmix extends Osm {
 				: new ReadableStream({
 						start: (controller) => {
 							controller.enqueue(new Uint8Array(data))
+							controller.close()
 						},
 					})
 		return dataStream
