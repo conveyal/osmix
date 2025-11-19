@@ -44,6 +44,14 @@ const nodeResults = osm.nodes.withinBbox(bbox)
 const wayResults = osm.ways.withinBbox(bbox)
 console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways`)
 
+// Stream parse an OSM PBF into easy to use entities
+for await (const entity of Osmix.transformOsmPbfToJson(Bun.file("./monaco.pbf").stream())) {
+	console.log(entity.id, entity.tags)
+	if (isNode()) {
+		console.log(entity.lon, entity.lat)
+	}
+}
+
 // Write the PBF
 await Bun.write('./new-monaco.pbf', await osm.toPbf())
 
@@ -51,7 +59,7 @@ await Bun.write('./new-monaco.pbf', await osm.toPbf())
 const monacoPatch = await Bun.file('./monaco-patch.pbf').arrayBuffer()
 const mergedOsm = await osm.merge(await Osmix.fromPbf(monacoPatch))
 
-// Extract a boundind box
+// Extract a bounding box
 const extract = osmix.extract(bbox)
 ```
 
