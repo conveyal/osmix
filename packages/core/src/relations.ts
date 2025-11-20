@@ -1,5 +1,15 @@
 import type { OsmPbfRelation } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
+import {
+	buildRelationLineStrings,
+	collectRelationPoints,
+	isAreaRelation,
+	isLineRelation,
+	isPointRelation,
+	isSuperRelation,
+	resolveRelationMembers,
+} from "@osmix/shared/relation-kind"
+import { buildRelationRings } from "@osmix/shared/relation-multipolygon"
 import type {
 	GeoBbox2D,
 	LonLat,
@@ -200,11 +210,11 @@ export class Relations extends Entities<OsmRelation> {
 		this.memberRefs.compact()
 		this.memberTypes.compact()
 		this.memberRoles.compact()
-		this.bbox.compact()
 	}
 
 	/**
 	 * Build the spatial index for relations.
+	 * Handles nested relations by resolving all descendant nodes and ways.
 	 */
 	buildSpatialIndex() {
 		if (!this.nodes.isReady()) throw Error("Node index is not ready.")
@@ -219,23 +229,7 @@ export class Relations extends Entities<OsmRelation> {
 			BufferConstructor,
 		)
 		for (let i = 0; i < this.size; i++) {
-			const lls: LonLat[] = []
-			const start = this.memberStart.at(i)
-			const count = this.memberCount.at(i)
-			for (let j = start; j < start + count; j++) {
-				const type = RELATION_MEMBER_TYPES[this.memberTypes.at(j)]
-				if (type === "node") {
-					const refId = this.memberRefs.at(j)
-					const ll = this.nodes.getNodeLonLat({ id: refId })
-					lls.push(ll)
-				} else if (type === "way") {
-					const wayId = this.memberRefs.at(j)
-					const wayIndex = this.ways.ids.getIndexFromId(wayId)
-					if (wayIndex === -1) continue
-					const wayPositions = this.ways.getCoordinates(wayIndex)
-					lls.push(...wayPositions)
-				}
-			}
+			const lls = this.collectRelationCoordinates(i)
 			const bbox = bboxFromLonLats(lls)
 			this.bbox.push(bbox[0])
 			this.bbox.push(bbox[1])
@@ -244,8 +238,45 @@ export class Relations extends Entities<OsmRelation> {
 			this.spatialIndex.add(bbox[0], bbox[1], bbox[2], bbox[3])
 		}
 		this.spatialIndex.finish()
+		this.bbox.compact()
 		console.timeEnd("RelationIndex.buildSpatialIndex")
 		return this.spatialIndex
+	}
+
+	/**
+	 * Collect all coordinates from a relation, including nested relations.
+	 * Used for building bounding boxes and spatial indexes.
+	 */
+	private collectRelationCoordinates(index: number): LonLat[] {
+		const lls: LonLat[] = []
+		const relation = this.getByIndex(index)
+
+		// Resolve nested relations to get all descendant nodes and ways
+		const resolved = resolveRelationMembers(
+			relation,
+			(relId) => {
+				const relIndex = this.ids.getIndexFromId(relId)
+				if (relIndex === -1) return null
+				return this.getByIndex(relIndex)
+			},
+			10, // max depth
+		)
+
+		// Collect coordinates from resolved nodes
+		for (const nodeId of resolved.nodes) {
+			const ll = this.nodes.getNodeLonLat({ id: nodeId })
+			if (ll) lls.push(ll)
+		}
+
+		// Collect coordinates from resolved ways
+		for (const wayId of resolved.ways) {
+			const wayIndex = this.ways.ids.getIndexFromId(wayId)
+			if (wayIndex === -1) continue
+			const wayPositions = this.ways.getCoordinates(wayIndex)
+			lls.push(...wayPositions)
+		}
+
+		return lls
 	}
 
 	/**
@@ -320,27 +351,80 @@ export class Relations extends Entities<OsmRelation> {
 	}
 
 	/**
-	 * Get all way IDs that are members of relations.
+	 * Get all way IDs that are members of relations, including nested relations.
 	 * Used to exclude these ways from individual rendering.
-	 *
-	 * TODO: Should this be stored in the relation index?
 	 */
 	getWayMemberIds(): Set<number> {
 		const wayIds = new Set<number>()
 		for (let i = 0; i < this.size; i++) {
-			const start = this.memberStart.at(i)
-			const count = this.memberCount.at(i)
-			for (let j = start; j < start + count; j++) {
-				const type = RELATION_MEMBER_TYPES[this.memberTypes.at(j)]
-				if (type === "way") {
-					const wayId = this.memberRefs.at(j)
-					if (wayId !== undefined) {
-						wayIds.add(wayId)
-					}
-				}
+			const relation = this.getByIndex(i)
+			const resolved = resolveRelationMembers(
+				relation,
+				(relId) => {
+					const relIndex = this.ids.getIndexFromId(relId)
+					if (relIndex === -1) return null
+					return this.getByIndex(relIndex)
+				},
+				10, // max depth
+			)
+			for (const wayId of resolved.ways) {
+				wayIds.add(wayId)
 			}
 		}
 		return wayIds
+	}
+
+	/**
+	 * Get relation geometry based on its kind.
+	 * Returns coordinates suitable for rendering based on relation type.
+	 * @param index - Relation index
+	 * @returns Object with geometry data based on relation kind
+	 */
+	getRelationGeometry(index: number): {
+		points?: LonLat[]
+		lineStrings?: LonLat[][]
+		rings?: LonLat[][][]
+	} {
+		const relation = this.getByIndex(index)
+		if (isAreaRelation(relation)) {
+			return {
+				rings: buildRelationRings(
+					relation,
+					(ref) => this.ways.getById(ref),
+					(id) => this.nodes.getNodeLonLat({ id }),
+				),
+			}
+		}
+
+		// Point relations
+		if (isPointRelation(relation)) {
+			return {
+				points: collectRelationPoints(relation, (id) =>
+					this.nodes.getNodeLonLat({ id }),
+				),
+			}
+		}
+
+		// Line relations
+		if (isLineRelation(relation)) {
+			return {
+				lineStrings: buildRelationLineStrings(
+					relation,
+					(ref) => this.ways.getById(ref),
+					(id) => this.nodes.getNodeLonLat({ id }),
+				),
+			}
+		}
+
+		// Super relations are handled by individual relation geometry methods
+		if (isSuperRelation(relation)) {
+			return {}
+		}
+
+		// Area relations are handled by buildRelationRings in shared/relation-multipolygon
+		// This method doesn't duplicate that logic
+
+		return {}
 	}
 
 	/**

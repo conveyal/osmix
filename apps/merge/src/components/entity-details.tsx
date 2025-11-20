@@ -1,4 +1,5 @@
 import type { Osm } from "@osmix/core"
+import { getRelationKindMetadata } from "@osmix/shared/relation-kind"
 import type {
 	OsmEntity,
 	OsmNode,
@@ -133,9 +134,30 @@ export function WayDetails({
 }
 
 export function RelationContent({ relation }: { relation: OsmRelation }) {
+	const kindMetadata = getRelationKindMetadata(relation)
+	const relationMemberCount = relation.members.filter(
+		(m) => m.type === "relation",
+	).length
+
 	return (
 		<table className="w-full">
 			<tbody>
+				<tr>
+					<td>kind</td>
+					<td>{kindMetadata.kind}</td>
+				</tr>
+				{kindMetadata.description && (
+					<tr>
+						<td>description</td>
+						<td>{kindMetadata.description}</td>
+					</tr>
+				)}
+				{relationMemberCount > 0 && (
+					<tr>
+						<td>nested relations</td>
+						<td>{relationMemberCount}</td>
+					</tr>
+				)}
 				<TagList tags={relation.tags} />
 			</tbody>
 		</table>

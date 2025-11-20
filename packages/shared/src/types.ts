@@ -78,3 +78,18 @@ export interface OsmRelation extends IOsmEntity {
 }
 
 export type OsmEntity = OsmNode | OsmWay | OsmRelation
+
+/**
+ * Semantic kinds of OSM relations based on their type tag and structure.
+ */
+export type RelationKind = "area" | "line" | "point" | "logic" | "super"
+
+/**
+ * Metadata about a relation kind, including expected roles and whether member order matters.
+ */
+export interface RelationKindMetadata {
+	kind: RelationKind
+	expectedRoles?: string[]
+	orderMatters: boolean
+	description: string
+}

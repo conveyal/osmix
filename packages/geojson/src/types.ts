@@ -1,5 +1,14 @@
 import type { OsmEntityType, OsmInfoParsed, OsmTags } from "@osmix/shared/types"
-import type { Feature, LineString, MultiPolygon, Point, Polygon } from "geojson"
+import type {
+	Feature,
+	GeometryCollection,
+	LineString,
+	MultiLineString,
+	MultiPoint,
+	MultiPolygon,
+	Point,
+	Polygon,
+} from "geojson"
 
 export type OsmGeoJSONProperties = {
 	id: number
@@ -9,5 +18,12 @@ export type OsmGeoJSONProperties = {
 }
 
 export type OsmGeoJSONFeature<
-	T extends Point | LineString | Polygon | MultiPolygon,
+	T extends
+		| Point
+		| LineString
+		| Polygon
+		| MultiPolygon
+		| MultiLineString
+		| MultiPoint
+		| GeometryCollection,
 > = Feature<T, OsmGeoJSONProperties>

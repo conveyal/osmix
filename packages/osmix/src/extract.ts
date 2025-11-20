@@ -4,9 +4,11 @@ import {
 	type ProgressEvent,
 	progressEvent,
 } from "@osmix/shared/progress"
-import type { GeoBbox2D } from "@osmix/shared/types"
+import { resolveRelationMembers } from "@osmix/shared/relation-kind"
+import type { GeoBbox2D, OsmRelation } from "@osmix/shared/types"
+import { isMultipolygonRelation } from "@osmix/shared/utils"
 
-export type ExtractStrategy = "simple" | "complete_ways"
+export type ExtractStrategy = "simple" | "complete_ways" | "smart"
 
 /**
  * Create a geographic extract from an existing Osm instance within a bounding box.
@@ -18,11 +20,18 @@ export type ExtractStrategy = "simple" | "complete_ways"
  *
  * Strategy "complete_ways":
  * 1. Selects all nodes inside the bbox.
- * 2. Selects ways with at least one node inside the bbox, adding missing way nodes from outside the bbox.
- * 3. Selects relations with at least one member inside the bbox, adding missing relation members (nodes/ways) from outside the bbox.
+ * 2. Selects ways with at least one node inside the bbox, adding missing way nodes from outside the bbox. All ways will be reference complete.
+ * 3. Selects relations with at least one member inside the bbox leaving out any members that are not inside the bbox. Relations are not reference complete.
  *
- * The "complete_ways" strategy preserves way and relation geometry integrity but includes entities outside the bbox.
+ * Strategy "smart":
+ * 1 & 2. Same as "complete_ways".
+ * 3. Selects relations with at least one member inside the bbox, adding missing relation members from outside the bbox. Relations are reference complete.
+ *
+ * The "complete_ways" strategy preserves way geometry integrity but includes entities outside the bbox.
  * The "simple" strategy creates a strict spatial cut but may result in incomplete geometries.
+ * Both strategies handle nested relations by resolving all descendant members.
+ *
+ * See https://osmcode.org/osmium-tool/manual.html#creating-geographic-extracts for more details.
  */
 export function createExtract(
 	osm: Osm,
@@ -53,6 +62,7 @@ export function createExtract(
 
 	const nodeIds = new Set<number>()
 	const wayIds = new Set<number>()
+	const relationIds = new Set<number>()
 	const addNodeIfMissing = (id: number) => {
 		if (nodeIds.has(id)) return
 		const node = osm.nodes.getById(id)
@@ -68,6 +78,19 @@ export function createExtract(
 		extracted.ways.addWay(way)
 		wayIds.add(id)
 	}
+	const addRelationIfMissing = (relation: OsmRelation): void => {
+		if (relationIds.has(relation.id)) return
+		relationIds.add(relation.id)
+		for (const member of relation.members) {
+			if (member.type === "node") addNodeIfMissing(member.ref)
+			if (member.type === "way") addWayIfMissing(member.ref)
+			if (member.type === "relation") {
+				const nestedRelation = osm.relations.getById(member.ref)
+				if (nestedRelation) addRelationIfMissing(nestedRelation)
+			}
+		}
+		extracted.relations.addRelation(relation)
+	}
 
 	onProgress(progressEvent("Extracting nodes..."))
 	for (const nodeIndex of osm.nodes.findIndexesWithinBbox(bbox)) {
@@ -80,7 +103,7 @@ export function createExtract(
 	for (const way of osm.ways.sorted()) {
 		if (way.refs.some((ref) => nodeIds.has(ref))) {
 			wayIds.add(way.id)
-			if (strategy === "complete_ways") {
+			if (strategy === "complete_ways" || strategy === "smart") {
 				for (const ref of way.refs) addNodeIfMissing(ref)
 				extracted.ways.addWay(way)
 			} else if (strategy === "simple") {
@@ -94,25 +117,42 @@ export function createExtract(
 
 	onProgress(progressEvent("Extracting relations..."))
 	for (const relation of osm.relations.sorted()) {
-		if (
-			relation.members.some((m) => {
-				if (m.type === "node") return nodeIds.has(m.ref)
-				if (m.type === "way") return wayIds.has(m.ref)
-				return false
-			})
-		) {
-			if (strategy === "complete_ways") {
-				for (const member of relation.members) {
-					if (member.type === "node") addNodeIfMissing(member.ref)
-					if (member.type === "way") addWayIfMissing(member.ref)
-				}
-				extracted.relations.addRelation(relation)
-			} else if (strategy === "simple") {
+		// Resolve nested relations to get all descendant nodes and ways
+		const resolved = resolveRelationMembers(
+			relation,
+			(relId) => osm.relations.getById(relId),
+			10, // max depth
+		)
+
+		// Check if relation has any members that intersect the bbox
+		const hasIntersectingMembers =
+			resolved.nodes.some((id) => nodeIds.has(id)) ||
+			resolved.ways.some((id) => wayIds.has(id))
+
+		if (hasIntersectingMembers) {
+			if (isMultipolygonRelation(relation) && strategy === "smart") {
+				// Add relation and recursively add direct members even if they're outside the bbox
+				addRelationIfMissing(relation)
+			} else {
+				// Otherwise, filter out members that are outside the bbox
 				extracted.relations.addRelation({
 					...relation,
 					members: relation.members.filter((m) => {
 						if (m.type === "node") return nodeIds.has(m.ref)
 						if (m.type === "way") return wayIds.has(m.ref)
+						if (m.type === "relation") {
+							const nestedRelation = osm.relations.getById(m.ref)
+							if (!nestedRelation) return false
+							// Include nested relation if it has intersecting members
+							const nestedResolved = resolveRelationMembers(
+								nestedRelation,
+								(relId) => osm.relations.getById(relId),
+							)
+							return (
+								nestedResolved.nodes.some((id) => nodeIds.has(id)) ||
+								nestedResolved.ways.some((id) => wayIds.has(id))
+							)
+						}
 						return false
 					}),
 				})

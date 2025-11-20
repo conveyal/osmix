@@ -57,8 +57,9 @@ describe("geojson helpers", () => {
 		}
 		const feature = relationToFeature(relation, refToPosition, getWay)
 		expect(feature.geometry.type).toBe("Polygon")
-		const polygon = feature.geometry
-		expect(polygon.coordinates?.[0]).toBeDefined()
-		expect(polygon.coordinates[0]).toHaveLength(3) // Should have 3 coordinates (closed ring)
+		if (feature.geometry.type === "Polygon") {
+			expect(feature.geometry.coordinates?.[0]).toBeDefined()
+			expect(feature.geometry.coordinates[0]).toHaveLength(3) // Should have 3 coordinates (closed ring)
+		}
 	})
 })
