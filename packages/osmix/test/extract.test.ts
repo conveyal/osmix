@@ -365,7 +365,7 @@ describe("extract", () => {
 		expect(simple.nodes.ids.has(2)).toBe(false)
 	})
 
-	test("smart strategy resolves nested relation members", () => {
+	test("smart strategy resolves multipolygon nested relation members", () => {
 		const osm = new Osm({ id: "nested" })
 		osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }) // inside
 		osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }) // outside
@@ -434,16 +434,74 @@ describe("extract", () => {
 			),
 		).toBe(false)
 		expect(
-			smartRelation300!.members.some((m) => m.type === "node" && m.ref === 4),
+			simpleRelation300!.members.some(
+				(m) => m.type === "relation" && m.ref === 200,
+			),
 		).toBe(true)
+		expect(
+			completeRelation300!.members.some(
+				(m) => m.type === "relation" && m.ref === 200,
+			),
+		).toBe(true)
+		expect(
+			smartRelation300!.members.some(
+				(m) => m.type === "relation" && m.ref === 200,
+			),
+		).toBe(true)
+		expect(
+			smartRelation300!.members.some((m) => m.type === "node" && m.ref === 4),
+		).toBe(false)
 
 		expect(smart.nodes.ids.has(2)).toBe(true)
 		expect(smart.nodes.ids.has(3)).toBe(true)
-		expect(smart.nodes.ids.has(4)).toBe(true)
+		expect(smart.nodes.ids.has(4)).toBe(false)
 		expect(simple.nodes.ids.has(3)).toBe(false)
 		expect(simple.nodes.ids.has(4)).toBe(false)
 		expect(complete.nodes.ids.has(3)).toBe(false)
 		expect(complete.nodes.ids.has(4)).toBe(false)
+	})
+
+	test("smart strategy does not extend non-multipolygon relations", () => {
+		const osm = new Osm({ id: "logic" })
+		osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }) // inside
+		osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }) // outside
+
+		osm.relations.addRelation({
+			id: 400,
+			members: [
+				{ type: "node", ref: 1, role: "stop" },
+				{ type: "node", ref: 2, role: "stop" },
+			],
+			tags: { type: "route" },
+		})
+
+		osm.buildIndexes()
+		osm.buildSpatialIndexes()
+
+		const simple = createExtract(osm, TEST_BBOX, "simple")
+		const complete = createExtract(osm, TEST_BBOX, "complete_ways")
+		const smart = createExtract(osm, TEST_BBOX, "smart")
+
+		const smartRelation = smart.relations.getById(400)
+		const simpleRelation = simple.relations.getById(400)
+		const completeRelation = complete.relations.getById(400)
+		expect(smartRelation).toBeDefined()
+		expect(simpleRelation).toBeDefined()
+		expect(completeRelation).toBeDefined()
+
+		expect(
+			smartRelation!.members.some((m) => m.type === "node" && m.ref === 2),
+		).toBe(false)
+		expect(
+			simpleRelation!.members.some((m) => m.type === "node" && m.ref === 2),
+		).toBe(false)
+		expect(
+			completeRelation!.members.some((m) => m.type === "node" && m.ref === 2),
+		).toBe(false)
+
+		expect(smart.nodes.ids.has(2)).toBe(false)
+		expect(simple.nodes.ids.has(2)).toBe(false)
+		expect(complete.nodes.ids.has(2)).toBe(false)
 	})
 
 	test.skip("extract from a large PBF", async () => {
