@@ -1,14 +1,19 @@
 import type { Osm } from "@osmix/core"
 import type { OsmixRasterTile } from "@osmix/raster"
-import { buildRelationRings } from "@osmix/shared/relation-multipolygon"
 import type { LonLat } from "@osmix/shared/types"
-import { isMultipolygonRelation } from "@osmix/shared/utils"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 
 /**
  * Draw an OSM dataset into a raster tile using default rendering logic.
  *
- * Renders multipolygon relations, way polygons (filled areas), and way lines onto the tile.
+ * Renders relations by kind:
+ * - Area relations (multipolygon, boundary): as filled polygons
+ * - Line relations (route, multilinestring): as line strings
+ * - Point relations (multipoint): as points
+ * - Logical relations (restriction, etc.): skipped
+ * - Super-relations: expanded to render child relation geometry
+ *
+ * Also renders way polygons (filled areas) and way lines onto the tile.
  * Ways that are members of relations are excluded from individual rendering to avoid duplicates.
  *
  * For custom colors or rendering logic, use the OsmixRasterTile class directly.
@@ -20,24 +25,31 @@ export function drawRasterTile(osm: Osm, rasterTile: OsmixRasterTile) {
 	// Get way IDs that are part of relations (to exclude from individual rendering)
 	const relationWayIds = osm.relations.getWayMemberIds()
 
-	// Draw relations (multipolygon relations)
+	// Draw relations by kind
 	const relationTimer = `OsmixRasterTile.drawRelations:${tileKey}`
 	console.time(relationTimer)
 	const relationIndexes = osm.relations.intersects(bbox)
 
 	for (const relIndex of relationIndexes) {
 		const relation = osm.relations.getByIndex(relIndex)
-		if (!isMultipolygonRelation(relation)) continue
+		if (!relation) continue
 
-		const getWay = (wayId: number) => osm.ways.getById(wayId)
-		const getNodeCoordinates = (nodeId: number): LonLat | undefined => {
-			const ll = osm.nodes.getNodeLonLat({ id: nodeId })
-			return ll ? [ll[0], ll[1]] : undefined
-		}
+		const geometry = osm.relations.getRelationGeometry(relIndex)
+		if (!geometry) continue
 
-		const rings = buildRelationRings(relation, getWay, getNodeCoordinates)
-		if (rings.length > 0) {
-			rasterTile.drawMultiPolygon(rings)
+		if (geometry.rings) {
+			// Area relations (multipolygon, boundary)
+			rasterTile.drawMultiPolygon(geometry.rings)
+		} else if (geometry.lineStrings) {
+			// Line relations (route, multilinestring)
+			for (const lineString of geometry.lineStrings) {
+				rasterTile.drawLineString(lineString)
+			}
+		} else if (geometry.points) {
+			// Point relations (multipoint)
+			for (const point of geometry.points) {
+				rasterTile.setLonLat(point)
+			}
 		}
 	}
 	console.timeEnd(relationTimer)

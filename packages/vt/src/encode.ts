@@ -1,10 +1,8 @@
 import type { Osm } from "@osmix/core"
 import { bboxContainsOrIntersects } from "@osmix/shared/bbox-intersects"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
-import { buildRelationRings } from "@osmix/shared/relation-multipolygon"
 import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
 import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
-import { isMultipolygonRelation } from "@osmix/shared/utils"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 import type {
 	VtSimpleFeature,
@@ -228,6 +226,9 @@ export class OsmixVtEncoder {
 		return oriented
 	}
 
+	/**
+	 * Super relations and logical relations are not directly rendered; they would need recursive expansion.
+	 */
 	*relationFeatures(
 		bbox: GeoBbox2D,
 		proj: (ll: LonLat) => XY,
@@ -236,50 +237,102 @@ export class OsmixVtEncoder {
 
 		for (const relIndex of relationIndexes) {
 			const relation = this.osm.relations.getByIndex(relIndex)
-			if (!isMultipolygonRelation(relation)) continue
+			const relationGeometry = this.osm.relations.getRelationGeometry(relIndex)
+			if (
+				!relation ||
+				(!relationGeometry.lineStrings &&
+					!relationGeometry.rings &&
+					!relationGeometry.points)
+			)
+				continue
 
 			const id = this.osm.relations.ids.at(relIndex)
 			const tags = this.osm.relations.tags.getTags(relIndex)
 
-			const getWay = (wayId: number) => this.osm.ways.getById(wayId)
-			const getNodeCoordinates = (nodeId: number): LonLat | undefined => {
-				const ll = this.osm.nodes.getNodeLonLat({ id: nodeId })
-				return ll ? [ll[0], ll[1]] : undefined
-			}
+			if (relationGeometry.rings) {
+				// Area relations (multipolygon, boundary)
+				const { rings } = relationGeometry
+				if (rings.length === 0) continue
 
-			const rings = buildRelationRings(relation, getWay, getNodeCoordinates)
-			if (rings.length === 0) continue
+				// Process each polygon in the relation
+				for (const polygon of rings) {
+					const geometry: VtSimpleFeatureGeometry = []
 
-			// Process each polygon in the relation
-			for (const polygon of rings) {
-				const geometry: VtSimpleFeatureGeometry = []
+					// Process outer ring and inner rings (holes)
+					for (let ringIndex = 0; ringIndex < polygon.length; ringIndex++) {
+						const ring = polygon[ringIndex]
+						if (!ring || ring.length < 3) continue
 
-				// Process outer ring and inner rings (holes)
-				for (let ringIndex = 0; ringIndex < polygon.length; ringIndex++) {
-					const ring = polygon[ringIndex]
-					if (!ring || ring.length < 3) continue
+						// Project ring to tile coordinates
+						const projectedRing: XY[] = ring.map((ll: LonLat) => proj(ll))
 
-					// Project ring to tile coordinates
-					const projectedRing: XY[] = ring.map((ll: LonLat) => proj(ll))
+						// Clip polygon ring
+						const clipped = clipPolygon(projectedRing, this.extentBbox)
+						if (clipped.length < 3) continue
 
-					// Clip polygon ring
-					const clipped = clipPolygon(projectedRing, this.extentBbox)
-					if (clipped.length < 3) continue
+						// Process ring (round/clamp, dedupe, close, orient)
+						const isOuter = ringIndex === 0
+						const processedRing = this.processClippedPolygonRing(
+							clipped,
+							isOuter,
+						)
 
-					// Process ring (round/clamp, dedupe, close, orient)
-					const isOuter = ringIndex === 0
-					const processedRing = this.processClippedPolygonRing(clipped, isOuter)
-
-					if (processedRing.length > 0) {
-						geometry.push(processedRing)
+						if (processedRing.length > 0) {
+							geometry.push(processedRing)
+						}
 					}
+
+					if (geometry.length === 0) continue
+
+					yield {
+						id: id ?? 0,
+						type: SF_TYPE.POLYGON,
+						properties: { ...tags, type: "relation" },
+						geometry,
+					}
+				}
+			} else if (relationGeometry.lineStrings) {
+				// Line relations (route, multilinestring)
+				const { lineStrings } = relationGeometry
+				if (lineStrings.length === 0) continue
+
+				for (const lineString of lineStrings) {
+					const geometry: VtSimpleFeatureGeometry = []
+					const points: XY[] = lineString.map((ll) => proj(ll))
+					const clippedSegmentsRaw = this.clipProjectedPolyline(points)
+					for (const segment of clippedSegmentsRaw) {
+						const rounded = segment.map((xy) => this.clampAndRoundPoint(xy))
+						const deduped = dedupePoints(rounded)
+						if (deduped.length >= 2) {
+							geometry.push(deduped)
+						}
+					}
+					if (geometry.length === 0) continue
+
+					yield {
+						id: id ?? 0,
+						type: SF_TYPE.LINE,
+						properties: { ...tags, type: "relation" },
+						geometry,
+					}
+				}
+			} else if (relationGeometry.points) {
+				// Point relations (multipoint)
+				const { points } = relationGeometry
+				if (points.length === 0) continue
+
+				const geometry: VtSimpleFeatureGeometry = []
+				for (const point of points) {
+					const projected = proj(point)
+					const clamped = this.clampAndRoundPoint(projected)
+					geometry.push([clamped])
 				}
 
 				if (geometry.length === 0) continue
 
 				yield {
 					id: id ?? 0,
-					type: SF_TYPE.POLYGON,
+					type: SF_TYPE.POINT,
 					properties: { ...tags, type: "relation" },
 					geometry,
 				}

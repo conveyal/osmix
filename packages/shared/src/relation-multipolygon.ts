@@ -136,6 +136,9 @@ export function connectWaysToRings(wayMembers: OsmWay[]): OsmWay[][] {
 /**
  * Build polygon rings from way members of a relation.
  * Returns an array where each element is an array of coordinate rings (outer + inner).
+ *
+ * Based on OSM multipolygon relation specification:
+ * https://wiki.openstreetmap.org/wiki/Relation:multipolygon
  */
 export function buildRelationRings(
 	relation: OsmRelation,
