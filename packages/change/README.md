@@ -24,7 +24,7 @@ You will typically install this alongside [`@osmix/core`](../core/README.md), wh
 
 ```ts
 import { Osmix } from "osmix"
-import { OsmixChangeset, changeStatsSummary } from "@osmix/change"
+import { OsmixChangeset, changeStatsSummary, applyChangesToOsm } from "@osmix/change"
 
 const base = await Osmix.fromPbf(Bun.file('./monaco.pbf').stream())
 const patch = await Osmix.fromPbf(Bun.file('./monaco-changes.pbf').stream())
@@ -36,10 +36,10 @@ changeset.generateDirectChanges(patch)
 
 console.log(changeStatsSummary(changeset.stats))
 
-const merged = changeset.applyChanges()
+const merged = applyChangesToOsm(changeset)
 ```
 
-`OsmixChangeset` keeps track of creates/modifies/deletes per entity type. Call the helpers (`deduplicateNodes`, `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, etc.) in whatever order your workflow requires, then `applyChanges()` to produce a new `Osmix` instance with the edits applied.
+`OsmixChangeset` keeps track of creates/modifies/deletes per entity type. Call the helpers (`deduplicateNodes`, `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, etc.) in whatever order your workflow requires, then use `applyChangesToOsm()` to produce a new `Osm` instance with the edits applied.
 
 ### Run the bundled merge pipeline
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import type { Osm } from "@osmix/core"
 import { createBaseOsm, createPatchOsm } from "@osmix/core/test/mock-osm"
+import { applyChangesetToOsm } from "../src/apply-changeset"
 import { OsmChangeset } from "../src/changeset"
 
 const sizes = (osm: Osm) => ({
@@ -40,7 +41,7 @@ describe("merge osm", () => {
 			intersectionNodesCreated: 0,
 		})
 
-		const directResult = changeset.applyChanges()
+		const directResult = applyChangesetToOsm(changeset)
 		expect(sizes(directResult)).toEqual({
 			nodes: patch.nodes.size - changeset.stats.deduplicatedNodes,
 			ways: patch.ways.size,
@@ -60,7 +61,7 @@ describe("merge osm", () => {
 		changeset = new OsmChangeset(directResult)
 		changeset.deduplicateWays(patch.ways)
 		changeset.deduplicateNodes(patch.nodes)
-		const deduplicatedResult = changeset.applyChanges("deduplicated")
+		const deduplicatedResult = applyChangesetToOsm(changeset, "deduplicated")
 
 		// Node 0 is deleted because node 2 has more tags (version/tags logic)
 		expect(deduplicatedResult.nodes.ids.has(0)).toBe(false)
@@ -99,7 +100,7 @@ describe("merge osm", () => {
 			intersectionNodesCreated: 1,
 		})
 
-		const intersectionResult = changeset.applyChanges()
+		const intersectionResult = applyChangesetToOsm(changeset)
 		expect(sizes(intersectionResult)).toEqual({
 			nodes: patch.nodes.size + changeset.stats.intersectionNodesCreated - 1, // 1 node is de-duplicated
 			ways: patch.ways.size,

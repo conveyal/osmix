@@ -1,5 +1,6 @@
 import type { Osm } from "@osmix/core"
 import { type ProgressEvent, progressEvent } from "@osmix/shared/progress"
+import { applyChangesetToOsm } from "./apply-changeset"
 import { OsmChangeset } from "./changeset"
 import type { OsmMergeOptions } from "./types"
 import { changeStatsSummary } from "./utils"
@@ -23,25 +24,25 @@ export async function merge(
 	let changeset = new OsmChangeset(base)
 	changeset.deduplicateWays(base.ways)
 	log(changeStatsSummary(changeset.stats))
-	let modifiedBase = changeset.applyChanges()
+	let modifiedBase = applyChangesetToOsm(changeset)
 
 	log("Deduplicating nodes in base OSM...")
 	changeset = new OsmChangeset(modifiedBase)
 	changeset.deduplicateNodes(modifiedBase.nodes)
 	log(changeStatsSummary(changeset.stats))
-	modifiedBase = changeset.applyChanges()
+	modifiedBase = applyChangesetToOsm(changeset)
 
 	log("Deduplicating ways in patch OSM...")
 	changeset = new OsmChangeset(patch)
 	changeset.deduplicateWays(patch.ways)
 	log(changeStatsSummary(changeset.stats))
-	let modifiedPatch = changeset.applyChanges()
+	let modifiedPatch = applyChangesetToOsm(changeset)
 
 	log("Deduplicating nodes in patch OSM...")
 	changeset = new OsmChangeset(modifiedPatch)
 	changeset.deduplicateNodes(modifiedPatch.nodes)
 	log(changeStatsSummary(changeset.stats))
-	modifiedPatch = changeset.applyChanges()
+	modifiedPatch = applyChangesetToOsm(changeset)
 
 	// Generate direct changes
 	if (options.directMerge) {
@@ -49,7 +50,7 @@ export async function merge(
 		changeset = new OsmChangeset(modifiedBase)
 		changeset.generateDirectChanges(modifiedPatch)
 		log(changeStatsSummary(changeset.stats))
-		modifiedBase = changeset.applyChanges()
+		modifiedBase = applyChangesetToOsm(changeset)
 	}
 
 	// De-duplicate nodes and ways in final dataset
@@ -58,14 +59,14 @@ export async function merge(
 		changeset = new OsmChangeset(modifiedBase)
 		changeset.deduplicateWays(modifiedPatch.ways)
 		log(changeStatsSummary(changeset.stats))
-		modifiedBase = changeset.applyChanges()
+		modifiedBase = applyChangesetToOsm(changeset)
 	}
 	if (options.deduplicateNodes) {
 		log("Deduplicating nodes in final dataset...")
 		changeset = new OsmChangeset(modifiedBase)
 		changeset.deduplicateNodes(modifiedPatch.nodes)
 		log(changeStatsSummary(changeset.stats))
-		modifiedBase = changeset.applyChanges()
+		modifiedBase = applyChangesetToOsm(changeset)
 	}
 
 	// Create intersections
@@ -74,7 +75,7 @@ export async function merge(
 		changeset = new OsmChangeset(modifiedBase)
 		changeset.createIntersectionsForWays(modifiedPatch.ways)
 		log(changeStatsSummary(changeset.stats))
-		modifiedBase = changeset.applyChanges()
+		modifiedBase = applyChangesetToOsm(changeset)
 	}
 
 	return modifiedBase

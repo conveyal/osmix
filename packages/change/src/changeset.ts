@@ -1,5 +1,4 @@
 import type { Nodes, Osm, Ways } from "@osmix/core"
-import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type {
 	OsmEntity,
 	OsmEntityType,
@@ -13,7 +12,6 @@ import {
 	isWayEqual,
 } from "@osmix/shared/utils"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
-import { applyChangesetToOsm } from "./apply-changeset"
 import type {
 	OsmChange,
 	OsmChanges,
@@ -23,8 +21,9 @@ import type {
 import {
 	cleanCoords,
 	entityHasTagValue,
+	getEntityVersion,
 	isWayIntersectionCandidate,
-	osmTagsToOscTags,
+	nearestNodeOnWay,
 	removeDuplicateAdjacentRelationMembers,
 	removeDuplicateAdjacentWayRefs,
 	waysIntersect,
@@ -416,32 +415,6 @@ export class OsmChangeset {
 		return candidateDuplicateWays.length
 	}
 
-	nearestNodeOnWay(
-		way: OsmWay,
-		wayCoords: [number, number][],
-		point: [number, number],
-		MAX_DISTANCE_METERS = 1,
-	) {
-		let nearestDistance = Number.POSITIVE_INFINITY
-		let nearestNodeId = null
-		let nearestNodeRefIndex = -1
-		wayCoords.forEach((wayCoord, i) => {
-			const nodeDistance = haversineDistance(wayCoord, point)
-			if (
-				nodeDistance < nearestDistance &&
-				nodeDistance < MAX_DISTANCE_METERS
-			) {
-				nearestDistance = nodeDistance
-				nearestNodeId = way.refs[i]
-				nearestNodeRefIndex = i
-			}
-		})
-		return {
-			refIndex: nearestNodeRefIndex,
-			nodeId: nearestNodeId,
-		}
-	}
-
 	/**
 	 * Generator that creates intersection nodes for ways that cross each other.
 	 * Yields statistics for each way processed, including intersection points found and nodes created.
@@ -504,12 +477,12 @@ export class OsmChangeset {
 			for (const pt of intersectingPoints) {
 				intersectionsFound++
 
-				const intersectingWayNodeId = this.nearestNodeOnWay(
+				const intersectingWayNodeId = nearestNodeOnWay(
 					intersectingWay,
 					intersectingWayCoords,
 					pt,
 				).nodeId
-				const wayNodeId = this.nearestNodeOnWay(way, coordinates, pt).nodeId
+				const wayNodeId = nearestNodeOnWay(way, coordinates, pt).nodeId
 
 				// Prefer the incoming way node, then the intersecting way node, then a new node.
 				if (wayNodeId) {
@@ -595,7 +568,7 @@ export class OsmChangeset {
 			const coords = way.refs.map((ref) =>
 				this.osm.nodes.getNodeLonLat({ id: ref }),
 			)
-			const { refIndex } = this.nearestNodeOnWay(
+			const { refIndex } = nearestNodeOnWay(
 				way,
 				coords,
 				[node.lon, node.lat],
@@ -673,76 +646,6 @@ export class OsmChangeset {
 			}
 		}
 	}
-
-	applyChanges(newId?: string) {
-		return applyChangesetToOsm(this, newId)
-	}
-
-	/**
-	 * Generate OSC (OSM Change) XML format string from this changeset.
-	 * Returns an `<osmChange>` document containing create, modify, and delete sections.
-	 */
-	generateOscChanges() {
-		let create = ""
-		let modify = ""
-		let del = ""
-
-		for (const node of Object.values(this.nodeChanges)) {
-			const tags = node.entity.tags ? osmTagsToOscTags(node.entity.tags) : ""
-			if (node.changeType === "create") {
-				create += `<node id="${node.entity.id}" lon="${node.entity.lon}" lat="${node.entity.lat}">${tags}</node>`
-			} else if (node.changeType === "modify") {
-				modify += `<node id="${node.entity.id}" lon="${node.entity.lon}" lat="${node.entity.lat}">${tags}</node>`
-			} else if (node.changeType === "delete") {
-				del += `<node id="${node.entity.id}" />`
-			}
-		}
-
-		for (const way of Object.values(this.wayChanges)) {
-			const tags = way.entity.tags ? osmTagsToOscTags(way.entity.tags) : ""
-			const nodes = way.entity.refs.map((ref) => `<nd id="${ref}" />`).join("")
-			if (way.changeType === "create") {
-				create += `<way id="${way.entity.id}">${tags}${nodes}</way>`
-			} else if (way.changeType === "modify") {
-				modify += `<way id="${way.entity.id}">${tags}${nodes}</way>`
-			} else if (way.changeType === "delete") {
-				del += `<way id="${way.entity.id}" />`
-			}
-		}
-
-		for (const relation of Object.values(this.relationChanges)) {
-			const tags = relation.entity.tags
-				? osmTagsToOscTags(relation.entity.tags)
-				: ""
-			const members = relation.entity.members
-				.map(
-					(member) =>
-						`<member type="${member.type}" ref="${member.ref}"${member.role ? ` role="${member.role}"` : ""} />`,
-				)
-				.join("")
-			if (relation.changeType === "create") {
-				create += `<relation id="${relation.entity.id}">${tags}${members}</relation>`
-			} else if (relation.changeType === "modify") {
-				modify += `<relation id="${relation.entity.id}">${tags}${members}</relation>`
-			} else if (relation.changeType === "delete") {
-				del += `<relation id="${relation.entity.id}" />`
-			}
-		}
-
-		return `
-			<osmChange version="0.6" generator="@osmix/core">
-				<create>${create}</create>
-				<modify>${modify}</modify>
-				<delete>${del}</delete>
-			</osmChange>
-		`
-	}
-}
-
-function getEntityVersion(entity: OsmEntity) {
-	return entity.tags && "ext:osm_version" in entity.tags
-		? Number(entity.tags["ext:osm_version"])
-		: 0
 }
 
 class IdPairs {
