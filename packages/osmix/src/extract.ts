@@ -88,7 +88,7 @@ export function createExtract(
 	for (const way of osm.ways.sorted()) {
 		if (way.refs.some((ref) => nodeIds.has(ref))) {
 			wayIds.add(way.id)
-			if (strategy === "complete_ways") {
+			if (strategy === "complete_ways" || strategy === "smart") {
 				for (const ref of way.refs) addNodeIfMissing(ref)
 				extracted.ways.addWay(way)
 			} else if (strategy === "simple") {

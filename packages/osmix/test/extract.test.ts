@@ -237,18 +237,20 @@ test("extract strategies differ for ways crossing bbox", () => {
 	expect(completeWay10!.refs).toEqual([1, 2])
 })
 
-test("extract with complete_ways includes relation members outside bbox", () => {
+test("smart strategy keeps relation members reference complete", () => {
 	const osm = new Osm({ id: "test" })
 	// Create nodes: some inside, some outside bbox
 	osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }) // inside
 	osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }) // outside
 	osm.nodes.addNode({ id: 3, lat: 0.5, lon: 0.5 }) // inside
 	osm.nodes.addNode({ id: 4, lat: 0.5, lon: 1.5 }) // outside
+	osm.nodes.addNode({ id: 5, lat: 0.5, lon: 2.5 }) // outside, only used by way 20
+	osm.nodes.addNode({ id: 6, lat: 0.6, lon: 2.6 }) // outside, only used by way 20
 
 	// Create way 10 with nodes inside and outside
 	osm.ways.addWay({ id: 10, refs: [1, 2] })
-	// Create way 20 completely outside bbox
-	osm.ways.addWay({ id: 20, refs: [2, 4] })
+	// Create way 20 completely outside bbox (no shared nodes with inside ways)
+	osm.ways.addWay({ id: 20, refs: [5, 6] })
 
 	// Create relation with way 10 (crosses bbox) and way 20 (outside bbox)
 	osm.relations.addRelation({
@@ -265,29 +267,36 @@ test("extract with complete_ways includes relation members outside bbox", () => 
 
 	const simple = createExtract(osm, TEST_BBOX, "simple")
 	const complete = createExtract(osm, TEST_BBOX, "complete_ways")
+	const smart = createExtract(osm, TEST_BBOX, "smart")
 
 	// Simple strategy: relation should only include way 10 (way 20 is outside)
 	const simpleRelation = simple.relations.getById(30)
 	expect(simpleRelation).toBeDefined()
 	expect(simpleRelation!.members.length).toBe(1)
-	const simpleMember = simpleRelation!.members[0]
-	expect(simpleMember).toBeDefined()
-	expect(simpleMember!.ref).toBe(10)
+	expect(simpleRelation!.members[0]?.ref).toBe(10)
 
-	// Complete strategy: relation should include both ways
+	// Complete strategy preserves way integrity but keeps relation members inside bbox
 	const completeRelation = complete.relations.getById(30)
 	expect(completeRelation).toBeDefined()
-	expect(completeRelation!.members.length).toBe(2)
-	expect(completeRelation!.members.some((m) => m.ref === 10)).toBe(true)
-	expect(completeRelation!.members.some((m) => m.ref === 20)).toBe(true)
+	expect(completeRelation!.members.length).toBe(1)
+	expect(completeRelation!.members[0]?.ref).toBe(10)
 
-	// Complete strategy should also include way 20 and its nodes
-	expect(complete.ways.ids.has(20)).toBe(true)
-	expect(complete.nodes.ids.has(2)).toBe(true)
-	expect(complete.nodes.ids.has(4)).toBe(true)
+	// Smart strategy includes all relation members (reference complete)
+	const smartRelation = smart.relations.getById(30)
+	expect(smartRelation).toBeDefined()
+	expect(smartRelation!.members.length).toBe(2)
+	expect(smartRelation!.members.some((m) => m.ref === 10)).toBe(true)
+	expect(smartRelation!.members.some((m) => m.ref === 20)).toBe(true)
+
+	// Only smart strategy should include outside way 20 and its nodes
+	expect(simple.ways.ids.has(20)).toBe(false)
+	expect(complete.ways.ids.has(20)).toBe(false)
+	expect(smart.ways.ids.has(20)).toBe(true)
+	expect(smart.nodes.ids.has(5)).toBe(true)
+	expect(smart.nodes.ids.has(6)).toBe(true)
 })
 
-test("extract with complete_ways includes node members of relations", () => {
+test("smart strategy retains node members of relations", () => {
 	const osm = new Osm({ id: "test" })
 	osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }) // inside
 	osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }) // outside
@@ -311,6 +320,7 @@ test("extract with complete_ways includes node members of relations", () => {
 
 	const simple = createExtract(osm, TEST_BBOX, "simple")
 	const complete = createExtract(osm, TEST_BBOX, "complete_ways")
+	const smart = createExtract(osm, TEST_BBOX, "smart")
 
 	// Simple strategy: relation should only include node 1 and way 10
 	const simpleRelation = simple.relations.getById(20)
@@ -323,23 +333,112 @@ test("extract with complete_ways includes node members of relations", () => {
 		simpleRelation!.members.some((m) => m.type === "way" && m.ref === 10),
 	).toBe(true)
 
-	// Complete strategy: relation should include all members (node 1, node 2, way 10)
+	// Complete strategy behaves like simple for relation members (no outside nodes)
 	const completeRelation = complete.relations.getById(20)
 	expect(completeRelation).toBeDefined()
-	expect(completeRelation!.members.length).toBe(3)
+	expect(completeRelation!.members.length).toBe(2)
 	expect(
 		completeRelation!.members.some((m) => m.type === "node" && m.ref === 1),
-	).toBe(true)
-	expect(
-		completeRelation!.members.some((m) => m.type === "node" && m.ref === 2),
 	).toBe(true)
 	expect(
 		completeRelation!.members.some((m) => m.type === "way" && m.ref === 10),
 	).toBe(true)
 
-	// Complete strategy should also include node 2
-	expect(complete.nodes.ids.has(2)).toBe(true)
+	// Smart strategy keeps relations reference complete (includes node 2)
+	const smartRelation = smart.relations.getById(20)
+	expect(smartRelation).toBeDefined()
+	expect(smartRelation!.members.length).toBe(3)
+	expect(
+		smartRelation!.members.some((m) => m.type === "node" && m.ref === 1),
+	).toBe(true)
+	expect(
+		smartRelation!.members.some((m) => m.type === "node" && m.ref === 2),
+	).toBe(true)
+	expect(
+		smartRelation!.members.some((m) => m.type === "way" && m.ref === 10),
+	).toBe(true)
+
+	// Only smart strategy should include node 2
+	expect(smart.nodes.ids.has(2)).toBe(true)
+	expect(complete.nodes.ids.has(2)).toBe(false)
 	expect(simple.nodes.ids.has(2)).toBe(false)
+})
+
+test("smart strategy resolves nested relation members", () => {
+	const osm = new Osm({ id: "nested" })
+	osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }) // inside
+	osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }) // outside
+	osm.nodes.addNode({ id: 3, lat: 0.2, lon: 2.2 }) // outside node member
+	osm.nodes.addNode({ id: 4, lat: 0.3, lon: 2.3 }) // outside nested node member
+
+	osm.ways.addWay({ id: 10, refs: [1, 2] })
+
+	osm.relations.addRelation({
+		id: 200,
+		members: [
+			{ type: "way", ref: 10, role: "outer" },
+			{ type: "node", ref: 3, role: "label" },
+		],
+		tags: { type: "multipolygon" },
+	})
+
+	osm.relations.addRelation({
+		id: 300,
+		members: [
+			{ type: "relation", ref: 200, role: "part" },
+			{ type: "node", ref: 4, role: "label" },
+		],
+		tags: { type: "site" },
+	})
+
+	osm.buildIndexes()
+	osm.buildSpatialIndexes()
+
+	const simple = createExtract(osm, TEST_BBOX, "simple")
+	const complete = createExtract(osm, TEST_BBOX, "complete_ways")
+	const smart = createExtract(osm, TEST_BBOX, "smart")
+
+	const simpleRelation200 = simple.relations.getById(200)
+	const completeRelation200 = complete.relations.getById(200)
+	const smartRelation200 = smart.relations.getById(200)
+	expect(simpleRelation200).toBeDefined()
+	expect(completeRelation200).toBeDefined()
+	expect(smartRelation200).toBeDefined()
+
+	expect(
+		simpleRelation200!.members.some((m) => m.type === "node" && m.ref === 3),
+	).toBe(false)
+	expect(
+		completeRelation200!.members.some((m) => m.type === "node" && m.ref === 3),
+	).toBe(false)
+	expect(
+		smartRelation200!.members.some((m) => m.type === "node" && m.ref === 3),
+	).toBe(true)
+
+	const simpleRelation300 = simple.relations.getById(300)
+	const completeRelation300 = complete.relations.getById(300)
+	const smartRelation300 = smart.relations.getById(300)
+	expect(simpleRelation300).toBeDefined()
+	expect(completeRelation300).toBeDefined()
+	expect(smartRelation300).toBeDefined()
+
+	expect(
+		simpleRelation300!.members.some((m) => m.type === "node" && m.ref === 4),
+	).toBe(false)
+	expect(
+		completeRelation300!.members.some((m) => m.type === "node" && m.ref === 4),
+	).toBe(false)
+	expect(
+		smartRelation300!.members.some((m) => m.type === "node" && m.ref === 4),
+	).toBe(true)
+
+	expect(smart.nodes.ids.has(2)).toBe(true)
+	expect(smart.nodes.ids.has(3)).toBe(true)
+	expect(smart.nodes.ids.has(4)).toBe(true)
+	expect(simple.nodes.ids.has(3)).toBe(false)
+	expect(simple.nodes.ids.has(4)).toBe(false)
+	expect(complete.nodes.ids.has(3)).toBe(false)
+	expect(complete.nodes.ids.has(4)).toBe(false)
 })
 
 test.skip("extract from a large PBF", async () => {
