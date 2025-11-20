@@ -1,3 +1,4 @@
+import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type {
 	OsmEntity,
 	OsmRelation,
@@ -171,4 +172,39 @@ export function waysIntersect(
 	}
 
 	return uniqueFeatures
+}
+
+/**
+ * Find the nearest Node ref on a way to a given point.
+ */
+export function nearestNodeOnWay(
+	way: OsmWay,
+	wayCoords: [number, number][],
+	point: [number, number],
+	MAX_DISTANCE_METERS = 1,
+) {
+	let nearestDistance = Number.POSITIVE_INFINITY
+	let nearestNodeId = null
+	let nearestNodeRefIndex = -1
+	wayCoords.forEach((wayCoord, i) => {
+		const nodeDistance = haversineDistance(wayCoord, point)
+		if (nodeDistance < nearestDistance && nodeDistance < MAX_DISTANCE_METERS) {
+			nearestDistance = nodeDistance
+			nearestNodeId = way.refs[i]
+			nearestNodeRefIndex = i
+		}
+	})
+	return {
+		refIndex: nearestNodeRefIndex,
+		nodeId: nearestNodeId,
+	}
+}
+
+/**
+ * Get the version of an entity.
+ */
+export function getEntityVersion(entity: OsmEntity) {
+	return entity.tags && "ext:osm_version" in entity.tags
+		? Number(entity.tags["ext:osm_version"])
+		: 0
 }

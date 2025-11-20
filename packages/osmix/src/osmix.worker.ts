@@ -1,4 +1,5 @@
 import {
+	applyChangesetToOsm,
 	merge,
 	type OsmChange,
 	type OsmChangeset,
@@ -279,7 +280,7 @@ export class OsmixWorker extends EventTarget {
 	applyChangesAndReplace(osmId: string) {
 		const changeset = this.changesets[osmId]
 		if (!changeset) throw Error("No active changeset")
-		const newOsm = changeset.applyChanges(osmId)
+		const newOsm = applyChangesetToOsm(changeset)
 		this.set(osmId, new Osmix(newOsm))
 		delete this.changesets[osmId]
 		delete this.filteredChanges[osmId]

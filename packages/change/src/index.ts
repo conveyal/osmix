@@ -1,5 +1,7 @@
+export * from "./apply-changeset"
 export * from "./changeset"
 export * from "./generate-changeset"
 export * from "./merge"
+export * from "./osc"
 export * from "./types"
 export * from "./utils"

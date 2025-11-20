@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { OsmChangeset } from "@osmix/change"
+import { applyChangesetToOsm } from "@osmix/change/src/apply-changeset"
 import type { Osm } from "@osmix/core"
 import {
 	getFixtureFileReadStream,
@@ -74,7 +75,7 @@ describe("merge osm", async () => {
 			// it may indicate a change in entity comparison logic (which uses dequal for
 			// deep equality checks) or a change in the merge algorithm itself.
 
-			baseOsm = changeset.applyChanges()
+			baseOsm = applyChangesetToOsm(changeset)
 			expect(sizes(baseOsm)).toEqual({
 				nodes: baseSizes.nodes + patchSizes.nodes,
 				ways: baseSizes.ways + patchSizes.ways,
@@ -97,7 +98,7 @@ describe("merge osm", async () => {
 				intersectionNodesCreated: 2_618,
 			})
 
-			baseOsm = changeset.applyChanges()
+			baseOsm = applyChangesetToOsm(changeset)
 
 			expect(sizes(baseOsm)).toEqual({
 				nodes:
@@ -147,9 +148,7 @@ describe("merge osm", async () => {
 
 		// Direct merge
 		let changeset = new OsmChangeset(baseOsm)
-		console.time("generateDirectChanges")
 		changeset.generateDirectChanges(osm2)
-		console.timeEnd("generateDirectChanges")
 
 		expect(changeset.stats).toEqual({
 			osmId: baseOsm.id,
@@ -164,9 +163,7 @@ describe("merge osm", async () => {
 			intersectionNodesCreated: 0,
 		})
 
-		console.time("applyChanges")
-		baseOsm = changeset.applyChanges()
-		console.timeEnd("applyChanges")
+		baseOsm = applyChangesetToOsm(changeset)
 
 		const totalNodes =
 			baseSizes.nodes + patchSizes.nodes - changeset.stats.deduplicatedNodes
@@ -180,10 +177,7 @@ describe("merge osm", async () => {
 
 		// Create intersections
 		changeset = new OsmChangeset(baseOsm)
-
-		console.time("createIntersections")
 		changeset.createIntersectionsForWays(osm2.ways)
-		console.timeEnd("createIntersections")
 
 		expect(changeset.stats).toEqual({
 			osmId: baseOsm.id,
@@ -198,7 +192,7 @@ describe("merge osm", async () => {
 			intersectionNodesCreated: 243_795,
 		})
 
-		baseOsm = changeset.applyChanges()
+		baseOsm = applyChangesetToOsm(changeset)
 		expect(sizes(baseOsm)).toEqual({
 			nodes: totalNodes + changeset.stats.intersectionNodesCreated,
 			ways: totalWays,
