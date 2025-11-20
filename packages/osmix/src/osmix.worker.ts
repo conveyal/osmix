@@ -1,11 +1,11 @@
 import {
+	applyChangesetToOsm,
 	merge,
 	type OsmChange,
 	type OsmChangeset,
 	type OsmChangeTypes,
 	type OsmMergeOptions,
 } from "@osmix/change"
-import { applyChangesetToOsm } from "@osmix/change/src/apply-changeset"
 import type { OsmOptions, OsmTransferables } from "@osmix/core"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type { Progress, ProgressEvent } from "@osmix/shared/progress"
