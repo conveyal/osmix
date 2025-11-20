@@ -5,7 +5,8 @@ import {
 	progressEvent,
 } from "@osmix/shared/progress"
 import { resolveRelationMembers } from "@osmix/shared/relation-kind"
-import type { GeoBbox2D } from "@osmix/shared/types"
+import type { GeoBbox2D, OsmRelation } from "@osmix/shared/types"
+import { isMultipolygonRelation } from "@osmix/shared/utils"
 
 export type ExtractStrategy = "simple" | "complete_ways" | "smart"
 
@@ -61,6 +62,7 @@ export function createExtract(
 
 	const nodeIds = new Set<number>()
 	const wayIds = new Set<number>()
+	const relationIds = new Set<number>()
 	const addNodeIfMissing = (id: number) => {
 		if (nodeIds.has(id)) return
 		const node = osm.nodes.getById(id)
@@ -75,6 +77,19 @@ export function createExtract(
 		for (const ref of way.refs) addNodeIfMissing(ref)
 		extracted.ways.addWay(way)
 		wayIds.add(id)
+	}
+	const addRelationIfMissing = (relation: OsmRelation): void => {
+		if (relationIds.has(relation.id)) return
+		relationIds.add(relation.id)
+		for (const member of relation.members) {
+			if (member.type === "node") addNodeIfMissing(member.ref)
+			if (member.type === "way") addWayIfMissing(member.ref)
+			if (member.type === "relation") {
+				const nestedRelation = osm.relations.getById(member.ref)
+				if (nestedRelation) addRelationIfMissing(nestedRelation)
+			}
+		}
+		extracted.relations.addRelation(relation)
 	}
 
 	onProgress(progressEvent("Extracting nodes..."))
@@ -115,7 +130,11 @@ export function createExtract(
 			resolved.ways.some((id) => wayIds.has(id))
 
 		if (hasIntersectingMembers) {
-			if (strategy === "simple" || strategy === "complete_ways") {
+			if (isMultipolygonRelation(relation) && strategy === "smart") {
+				// Add relation and recursively add direct members even if they're outside the bbox
+				addRelationIfMissing(relation)
+			} else {
+				// Otherwise, filter out members that are outside the bbox
 				extracted.relations.addRelation({
 					...relation,
 					members: relation.members.filter((m) => {
@@ -137,37 +156,6 @@ export function createExtract(
 						return false
 					}),
 				})
-			} else if (strategy === "smart") {
-				// Add all resolved nodes and ways
-				for (const nodeId of resolved.nodes) {
-					addNodeIfMissing(nodeId)
-				}
-				for (const wayId of resolved.ways) {
-					addWayIfMissing(wayId)
-				}
-				// Recursively add direct members
-				for (const member of relation.members) {
-					if (member.type === "node") addNodeIfMissing(member.ref)
-					if (member.type === "way") addWayIfMissing(member.ref)
-					if (member.type === "relation") {
-						// Recursively add nested relation members
-						const nestedRelation = osm.relations.getById(member.ref)
-						if (nestedRelation) {
-							const nestedResolved = resolveRelationMembers(
-								nestedRelation,
-								(relId) => osm.relations.getById(relId),
-								10,
-							)
-							for (const nodeId of nestedResolved.nodes) {
-								addNodeIfMissing(nodeId)
-							}
-							for (const wayId of nestedResolved.ways) {
-								addWayIfMissing(wayId)
-							}
-						}
-					}
-				}
-				extracted.relations.addRelation(relation)
 			}
 		}
 	}
