@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test"
+import { pointToTile } from "@mapbox/tilebelt"
 import { VectorTile } from "@mapbox/vector-tile"
 import { Osm } from "@osmix/core"
-import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
+import { llToTilePx } from "@osmix/shared/tile"
 import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import { decodeZigzag } from "@osmix/shared/zigzag"
 import Protobuf from "pbf"
@@ -53,14 +54,7 @@ function decodeTile(data: ArrayBuffer) {
 }
 
 const extent = 4096
-const merc = new SphericalMercatorTile({ size: extent })
 
-function pointToTile(lon: number, lat: number, z: number): Tile {
-	const [px, py] = merc.px([lon, lat], z)
-	const x = Math.floor(px / extent)
-	const y = Math.floor(py / extent)
-	return [x, y, z]
-}
 function bboxToTile(bbox: GeoBbox2D, z = 8): Tile {
 	const [minX, minY, maxX, maxY] = bbox
 	const centerLon = (minX + maxX) / 2
@@ -168,16 +162,11 @@ describe("OsmixVtEncoder", () => {
 		const encoder = new OsmixVtEncoder(testOsm)
 
 		// Test that clipProjectedPolygon returns array of rings
-		const proj = (ll: [number, number]) => {
-			const [px, py] = merc.px(ll, tile[2])
-			return [px - tile[0] * extent, py - tile[1] * extent] as [number, number]
-		}
-
 		const way = testOsm.ways.getById(30)
 		expect(way).toBeDefined()
 		const points = way!.refs.map((ref) => {
 			const node = testOsm.nodes.getById(ref)
-			return proj([node!.lon, node!.lat])
+			return llToTilePx([node!.lon, node!.lat], tile, extent)
 		})
 
 		const clippedRings = encoder["clipProjectedPolygon"](points)
@@ -204,15 +193,10 @@ describe("OsmixVtEncoder", () => {
 		const tile = bboxToTile(bbox)
 		const encoder = new OsmixVtEncoder(testOsm)
 
-		const proj = (ll: [number, number]) => {
-			const [px, py] = merc.px(ll, tile[2])
-			return [px - tile[0] * extent, py - tile[1] * extent] as [number, number]
-		}
-
 		const way = testOsm.ways.getById(40)
 		const points = way!.refs.map((ref) => {
 			const node = testOsm.nodes.getById(ref)
-			return proj([node!.lon, node!.lat])
+			return llToTilePx([node!.lon, node!.lat], tile, extent)
 		})
 
 		const clippedRings = encoder["clipProjectedPolygon"](points)
@@ -292,12 +276,9 @@ describe("OsmixVtEncoder", () => {
 		const tile = bboxToTile(bbox)
 		const encoder = new OsmixVtEncoder(testOsm)
 
-		const proj = (ll: [number, number]) => {
-			const [px, py] = merc.px(ll, tile[2])
-			return [px - tile[0] * extent, py - tile[1] * extent] as [number, number]
-		}
-
-		const features = Array.from(encoder.relationFeatures(bbox, proj))
+		const features = Array.from(
+			encoder.relationFeatures(bbox, (ll) => llToTilePx(ll, tile, extent)),
+		)
 		expect(features.length).toBeGreaterThan(0)
 
 		const relationFeature = features[0]
@@ -355,12 +336,9 @@ describe("OsmixVtEncoder", () => {
 		const tile = bboxToTile(bbox)
 		const encoder = new OsmixVtEncoder(testOsm)
 
-		const proj = (ll: [number, number]) => {
-			const [px, py] = merc.px(ll, tile[2])
-			return [px - tile[0] * extent, py - tile[1] * extent] as [number, number]
-		}
-
-		const features = Array.from(encoder.wayFeatures(bbox, proj))
+		const features = Array.from(
+			encoder.wayFeatures(bbox, (ll) => llToTilePx(ll, tile, extent)),
+		)
 		const polygonFeature = features.find((f) => f.type === 3) // POLYGON
 		expect(polygonFeature).toBeDefined()
 

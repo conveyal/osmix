@@ -29,6 +29,16 @@ export type GeoBbox2D = [
 ]
 
 /**
+ * A pixel bounding box in the format [minX, minY, maxX, maxY]. Note: minY is north. maxY is south.
+ */
+export type TilePxBbox = [
+	minX: number,
+	minY: number,
+	maxX: number,
+	maxY: number,
+]
+
+/**
  * Shared OSM Types
  */
 

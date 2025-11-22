@@ -28,8 +28,8 @@ bun install @osmix/shared
 | `@osmix/shared/haversine-distance` | Great-circle distance (meters) for lon/lat pairs. |
 | `@osmix/shared/lineclip` | Typed wrapper around `lineclip` for polylines/polygons. |
 | `@osmix/shared/relation-multipolygon` | Builds multipolygon rings from relation members. |
-| `@osmix/shared/spherical-mercator` | Web-mercator projections geared toward XYZ tiles. |
 | `@osmix/shared/throttle` | Worker-safe throttling for logging/progress updates. |
+| `@osmix/shared/tile` | Utilities for working with tile coordinates. |
 | `@osmix/shared/progress` | Shared `ProgressEvent` helpers + `logProgress`. |
 | `@osmix/shared/way-is-area` | Implements the OSM wiki “is area” heuristics. |
 | `@osmix/shared/zigzag` | Protobuf-style zigzag encoding helpers. |

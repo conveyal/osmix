@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
-import type { LonLat, Tile, XY } from "@osmix/shared/types"
+import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
 import {
 	DEFAULT_AREA_COLOR,
 	DEFAULT_LINE_COLOR,
@@ -9,41 +8,13 @@ import {
 	OsmixRasterTile,
 } from "../src/raster-tile"
 
-function createTile(
-	tileIndex: Tile = [4, 5, 3],
-	tileSize = DEFAULT_RASTER_TILE_SIZE,
-) {
-	const merc = new SphericalMercatorTile({ size: tileSize })
-	return {
-		tile: new OsmixRasterTile({ tile: tileIndex, tileSize }),
-		merc,
-	}
-}
-
-function lonLatForPixel(
-	merc: SphericalMercatorTile,
-	tileIndex: Tile,
-	tileSize: number,
-	px: number,
-	py: number,
-): [number, number] {
-	const [x, y, z] = tileIndex
-	return merc.ll([x * tileSize + px, y * tileSize + py], z) as [number, number]
-}
-
 describe("OsmixRasterTile", () => {
 	it("sets point pixels using lon/lat coordinates", () => {
 		const tileIndex: Tile = [6, 7, 4]
 		const tileSize = DEFAULT_RASTER_TILE_SIZE
-		const { tile, merc } = createTile(tileIndex, tileSize)
-		const nodePixel = [12, 20] as const
-		const nodeLonLat = lonLatForPixel(
-			merc,
-			tileIndex,
-			tileSize,
-			nodePixel[0],
-			nodePixel[1],
-		)
+		const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+		const nodePixel: XY = [12, 20]
+		const nodeLonLat = tile.tilePxToLonLat(nodePixel)
 
 		tile.setLonLat(nodeLonLat)
 
@@ -56,26 +27,17 @@ describe("OsmixRasterTile", () => {
 	it("draws clipped ways using Bresenham line rendering", () => {
 		const tileIndex: Tile = [10, 11, 5]
 		const tileSize = DEFAULT_RASTER_TILE_SIZE
-		const [tx, ty, tz] = tileIndex
-		const { tile, merc } = createTile(tileIndex)
+		const [tx, ty] = tileIndex
+		const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 		const startPixel: XY = [5, 5]
 		const endPixel: XY = [40, 36]
 
-		const way = [
-			lonLatForPixel(merc, tileIndex, tileSize, startPixel[0], startPixel[1]),
-			lonLatForPixel(merc, tileIndex, tileSize, endPixel[0], endPixel[1]),
-		]
+		const way = [tile.tilePxToLonLat(startPixel), tile.tilePxToLonLat(endPixel)]
 
 		// Prefix and suffix points outside the tile bounds to exercise clipping.
-		const outsidePrefix: LonLat = merc.ll(
-			[tx * tileSize - 20, ty * tileSize - 20],
-			tz,
-		)
-		const outsideSuffix: LonLat = merc.ll(
-			[(tx + 1) * tileSize + 20, (ty + 1) * tileSize + 20],
-			tz,
-		)
+		const outsidePrefix: LonLat = tile.tilePxToLonLat([tx - 20, ty - 20])
+		const outsideSuffix: LonLat = tile.tilePxToLonLat([tx + 20, ty + 20])
 
 		tile.drawLineString([outsidePrefix, ...way, outsideSuffix])
 
@@ -92,16 +54,16 @@ describe("OsmixRasterTile", () => {
 	it("fills polygons using scanline algorithm", () => {
 		const tileIndex: Tile = [10, 11, 5]
 		const tileSize = DEFAULT_RASTER_TILE_SIZE
-		const { tile, merc } = createTile(tileIndex, tileSize)
+		const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 		// Create a simple square polygon
 		const polygon: LonLat[][] = [
 			[
-				lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
-				lonLatForPixel(merc, tileIndex, tileSize, 30, 10),
-				lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
-				lonLatForPixel(merc, tileIndex, tileSize, 10, 30),
-				lonLatForPixel(merc, tileIndex, tileSize, 10, 10), // Closed
+				tile.tilePxToLonLat([10, 10]),
+				tile.tilePxToLonLat([30, 10]),
+				tile.tilePxToLonLat([30, 30]),
+				tile.tilePxToLonLat([10, 30]),
+				tile.tilePxToLonLat([10, 10]), // Closed
 			],
 		]
 
@@ -123,25 +85,25 @@ describe("OsmixRasterTile", () => {
 	it("fills polygons with holes correctly", () => {
 		const tileIndex: Tile = [10, 11, 5]
 		const tileSize = DEFAULT_RASTER_TILE_SIZE
-		const { tile, merc } = createTile(tileIndex, tileSize)
+		const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 		// Create a polygon with a hole
 		const polygon: LonLat[][] = [
 			// Outer ring
 			[
-				lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
-				lonLatForPixel(merc, tileIndex, tileSize, 50, 10),
-				lonLatForPixel(merc, tileIndex, tileSize, 50, 50),
-				lonLatForPixel(merc, tileIndex, tileSize, 10, 50),
-				lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
+				tile.tilePxToLonLat([10, 10]),
+				tile.tilePxToLonLat([50, 10]),
+				tile.tilePxToLonLat([50, 50]),
+				tile.tilePxToLonLat([10, 50]),
+				tile.tilePxToLonLat([10, 10]),
 			],
 			// Hole
 			[
-				lonLatForPixel(merc, tileIndex, tileSize, 25, 25),
-				lonLatForPixel(merc, tileIndex, tileSize, 35, 25),
-				lonLatForPixel(merc, tileIndex, tileSize, 35, 35),
-				lonLatForPixel(merc, tileIndex, tileSize, 25, 35),
-				lonLatForPixel(merc, tileIndex, tileSize, 25, 25),
+				tile.tilePxToLonLat([25, 25]),
+				tile.tilePxToLonLat([35, 25]),
+				tile.tilePxToLonLat([35, 35]),
+				tile.tilePxToLonLat([25, 35]),
+				tile.tilePxToLonLat([25, 25]),
 			],
 		]
 
@@ -163,28 +125,28 @@ describe("OsmixRasterTile", () => {
 	it("draws MultiPolygons correctly", () => {
 		const tileIndex: Tile = [10, 11, 5]
 		const tileSize = DEFAULT_RASTER_TILE_SIZE
-		const { tile, merc } = createTile(tileIndex, tileSize)
+		const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 		// Create a MultiPolygon with two separate polygons
 		const multiPolygon: LonLat[][][] = [
 			// First polygon
 			[
 				[
-					lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
-					lonLatForPixel(merc, tileIndex, tileSize, 20, 10),
-					lonLatForPixel(merc, tileIndex, tileSize, 20, 20),
-					lonLatForPixel(merc, tileIndex, tileSize, 10, 20),
-					lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
+					tile.tilePxToLonLat([10, 10]),
+					tile.tilePxToLonLat([20, 10]),
+					tile.tilePxToLonLat([20, 20]),
+					tile.tilePxToLonLat([10, 20]),
+					tile.tilePxToLonLat([10, 10]),
 				],
 			],
 			// Second polygon
 			[
 				[
-					lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
-					lonLatForPixel(merc, tileIndex, tileSize, 40, 30),
-					lonLatForPixel(merc, tileIndex, tileSize, 40, 40),
-					lonLatForPixel(merc, tileIndex, tileSize, 30, 40),
-					lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
+					tile.tilePxToLonLat([30, 30]),
+					tile.tilePxToLonLat([40, 30]),
+					tile.tilePxToLonLat([40, 40]),
+					tile.tilePxToLonLat([30, 40]),
+					tile.tilePxToLonLat([30, 30]),
 				],
 			],
 		]
@@ -205,8 +167,10 @@ describe("OsmixRasterTile", () => {
 
 	it("handles empty polygon rings gracefully", () => {
 		const tileIndex: Tile = [10, 11, 5]
-		const { tile } = createTile(tileIndex)
-
+		const tile = new OsmixRasterTile({
+			tile: tileIndex,
+			tileSize: DEFAULT_RASTER_TILE_SIZE,
+		})
 		// Should not throw
 		tile.drawPolygon([])
 		expect(tile.imageData.every((v) => v === 0)).toBe(true)
@@ -215,24 +179,24 @@ describe("OsmixRasterTile", () => {
 	it("handles polygon with hole correctly (winding order)", () => {
 		const tileIndex: Tile = [10, 11, 5]
 		const tileSize = DEFAULT_RASTER_TILE_SIZE
-		const { tile, merc } = createTile(tileIndex, tileSize)
+		const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 		// Create outer square (counterclockwise for GeoJSON)
 		const outerRing: LonLat[] = [
-			lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
-			lonLatForPixel(merc, tileIndex, tileSize, 30, 10),
-			lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
-			lonLatForPixel(merc, tileIndex, tileSize, 10, 30),
-			lonLatForPixel(merc, tileIndex, tileSize, 10, 10), // closed
+			tile.tilePxToLonLat([10, 10]),
+			tile.tilePxToLonLat([30, 10]),
+			tile.tilePxToLonLat([30, 30]),
+			tile.tilePxToLonLat([10, 30]),
+			tile.tilePxToLonLat([10, 10]), // closed
 		]
 
 		// Create inner square hole (clockwise for GeoJSON)
 		const innerRing: LonLat[] = [
-			lonLatForPixel(merc, tileIndex, tileSize, 15, 15),
-			lonLatForPixel(merc, tileIndex, tileSize, 15, 25),
-			lonLatForPixel(merc, tileIndex, tileSize, 25, 25),
-			lonLatForPixel(merc, tileIndex, tileSize, 25, 15),
-			lonLatForPixel(merc, tileIndex, tileSize, 15, 15), // closed
+			tile.tilePxToLonLat([15, 15]),
+			tile.tilePxToLonLat([15, 25]),
+			tile.tilePxToLonLat([25, 25]),
+			tile.tilePxToLonLat([25, 15]),
+			tile.tilePxToLonLat([15, 15]), // closed
 		]
 
 		tile.drawPolygon([outerRing, innerRing])
@@ -255,27 +219,27 @@ describe("OsmixRasterTile", () => {
 	it("handles multipolygon with multiple separate polygons", () => {
 		const tileIndex: Tile = [10, 11, 5]
 		const tileSize = DEFAULT_RASTER_TILE_SIZE
-		const { tile, merc } = createTile(tileIndex, tileSize)
+		const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 		// First polygon
 		const polygon1: LonLat[][] = [
 			[
-				lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
-				lonLatForPixel(merc, tileIndex, tileSize, 20, 10),
-				lonLatForPixel(merc, tileIndex, tileSize, 20, 20),
-				lonLatForPixel(merc, tileIndex, tileSize, 10, 20),
-				lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
+				tile.tilePxToLonLat([10, 10]),
+				tile.tilePxToLonLat([20, 10]),
+				tile.tilePxToLonLat([20, 20]),
+				tile.tilePxToLonLat([10, 20]),
+				tile.tilePxToLonLat([10, 10]),
 			],
 		]
 
 		// Second polygon (separate)
 		const polygon2: LonLat[][] = [
 			[
-				lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
-				lonLatForPixel(merc, tileIndex, tileSize, 40, 30),
-				lonLatForPixel(merc, tileIndex, tileSize, 40, 40),
-				lonLatForPixel(merc, tileIndex, tileSize, 30, 40),
-				lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
+				tile.tilePxToLonLat([30, 30]),
+				tile.tilePxToLonLat([40, 30]),
+				tile.tilePxToLonLat([40, 40]),
+				tile.tilePxToLonLat([30, 40]),
+				tile.tilePxToLonLat([30, 30]),
 			],
 		]
 
@@ -302,15 +266,15 @@ describe("OsmixRasterTile", () => {
 	it("normalizes winding order using rewind", () => {
 		const tileIndex: Tile = [10, 11, 5]
 		const tileSize = DEFAULT_RASTER_TILE_SIZE
-		const { tile, merc } = createTile(tileIndex, tileSize)
+		const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 		// Create polygon with clockwise winding (should be normalized to counterclockwise)
 		const clockwiseRing: LonLat[] = [
-			lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
-			lonLatForPixel(merc, tileIndex, tileSize, 10, 30),
-			lonLatForPixel(merc, tileIndex, tileSize, 30, 30),
-			lonLatForPixel(merc, tileIndex, tileSize, 30, 10),
-			lonLatForPixel(merc, tileIndex, tileSize, 10, 10),
+			tile.tilePxToLonLat([10, 10]),
+			tile.tilePxToLonLat([10, 30]),
+			tile.tilePxToLonLat([30, 30]),
+			tile.tilePxToLonLat([30, 10]),
+			tile.tilePxToLonLat([10, 10]),
 		]
 
 		tile.drawPolygon([clockwiseRing])
@@ -326,18 +290,17 @@ describe("OsmixRasterTile", () => {
 		it("excludes left boundary pixels when polygon crosses left edge", () => {
 			const tileIndex: Tile = [10, 11, 5]
 			const tileSize = DEFAULT_RASTER_TILE_SIZE
-			const [tx, ty, tz] = tileIndex
-			const { tile, merc } = createTile(tileIndex, tileSize)
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 			// Create polygon that extends beyond left edge (x < 0)
 			// Create a large rectangle that extends from outside left edge well inside
 			const polygon: LonLat[][] = [
 				[
-					merc.ll([tx * tileSize - 20, ty * tileSize + 50], tz),
-					merc.ll([tx * tileSize - 20, ty * tileSize + 100], tz),
-					lonLatForPixel(merc, tileIndex, tileSize, 100, 100),
-					lonLatForPixel(merc, tileIndex, tileSize, 100, 50),
-					merc.ll([tx * tileSize - 20, ty * tileSize + 50], tz),
+					tile.tilePxToLonLat([-20, 50]),
+					tile.tilePxToLonLat([-20, 100]),
+					tile.tilePxToLonLat([100, 100]),
+					tile.tilePxToLonLat([100, 50]),
+					tile.tilePxToLonLat([-20, 50]),
 				],
 			]
 
@@ -360,18 +323,17 @@ describe("OsmixRasterTile", () => {
 		it("excludes right boundary pixels when polygon crosses right edge", () => {
 			const tileIndex: Tile = [10, 11, 5]
 			const tileSize = DEFAULT_RASTER_TILE_SIZE
-			const [tx, ty, tz] = tileIndex
-			const { tile, merc } = createTile(tileIndex, tileSize)
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 			// Create polygon that extends beyond right edge (x >= tileSize)
 			// Create a large rectangle that extends from inside well to outside right edge
 			const polygon: LonLat[][] = [
 				[
-					lonLatForPixel(merc, tileIndex, tileSize, 150, 50),
-					lonLatForPixel(merc, tileIndex, tileSize, 150, 100),
-					merc.ll([(tx + 1) * tileSize + 20, ty * tileSize + 100], tz),
-					merc.ll([(tx + 1) * tileSize + 20, ty * tileSize + 50], tz),
-					lonLatForPixel(merc, tileIndex, tileSize, 150, 50),
+					tile.tilePxToLonLat([150, 50]),
+					tile.tilePxToLonLat([150, 100]),
+					tile.tilePxToLonLat([tileSize * 2, 100]),
+					tile.tilePxToLonLat([tileSize * 2, 50]),
+					tile.tilePxToLonLat([150, 50]),
 				],
 			]
 
@@ -394,18 +356,17 @@ describe("OsmixRasterTile", () => {
 		it("excludes top boundary pixels when polygon crosses top edge", () => {
 			const tileIndex: Tile = [10, 11, 5]
 			const tileSize = DEFAULT_RASTER_TILE_SIZE
-			const [tx, ty, tz] = tileIndex
-			const { tile, merc } = createTile(tileIndex, tileSize)
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 			// Create polygon that extends beyond top edge (y < 0)
 			// Create a large rectangle that extends from outside top edge well inside
 			const polygon: LonLat[][] = [
 				[
-					merc.ll([tx * tileSize + 50, ty * tileSize - 20], tz),
-					lonLatForPixel(merc, tileIndex, tileSize, 50, 100),
-					lonLatForPixel(merc, tileIndex, tileSize, 100, 100),
-					merc.ll([tx * tileSize + 100, ty * tileSize - 20], tz),
-					merc.ll([tx * tileSize + 50, ty * tileSize - 20], tz),
+					tile.tilePxToLonLat([50, -20]),
+					tile.tilePxToLonLat([50, 100]),
+					tile.tilePxToLonLat([100, 100]),
+					tile.tilePxToLonLat([100, -20]),
+					tile.tilePxToLonLat([50, -20]),
 				],
 			]
 
@@ -428,18 +389,17 @@ describe("OsmixRasterTile", () => {
 		it("excludes bottom boundary pixels when polygon crosses bottom edge", () => {
 			const tileIndex: Tile = [10, 11, 5]
 			const tileSize = DEFAULT_RASTER_TILE_SIZE
-			const [tx, ty, tz] = tileIndex
-			const { tile, merc } = createTile(tileIndex, tileSize)
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 			// Create polygon that extends beyond bottom edge (y >= tileSize)
 			// Create a large rectangle that extends from inside well to outside bottom edge
 			const polygon: LonLat[][] = [
 				[
-					lonLatForPixel(merc, tileIndex, tileSize, 50, 150),
-					lonLatForPixel(merc, tileIndex, tileSize, 100, 150),
-					merc.ll([tx * tileSize + 100, (ty + 1) * tileSize + 20], tz),
-					merc.ll([tx * tileSize + 50, (ty + 1) * tileSize + 20], tz),
-					lonLatForPixel(merc, tileIndex, tileSize, 50, 150),
+					tile.tilePxToLonLat([50, 150]),
+					tile.tilePxToLonLat([100, 150]),
+					tile.tilePxToLonLat([100, tileSize * 2]),
+					tile.tilePxToLonLat([50, tileSize * 2]),
+					tile.tilePxToLonLat([50, 150]),
 				],
 			]
 
@@ -462,18 +422,17 @@ describe("OsmixRasterTile", () => {
 		it("excludes corner boundary pixels when polygon crosses multiple edges", () => {
 			const tileIndex: Tile = [10, 11, 5]
 			const tileSize = DEFAULT_RASTER_TILE_SIZE
-			const [tx, ty, tz] = tileIndex
-			const { tile, merc } = createTile(tileIndex, tileSize)
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 			// Create polygon that crosses top-left corner
 			// Create a large rectangle that extends from outside top-left corner well inside
 			const polygon: LonLat[][] = [
 				[
-					merc.ll([tx * tileSize - 20, ty * tileSize - 20], tz),
-					merc.ll([tx * tileSize - 20, ty * tileSize + 50], tz),
-					lonLatForPixel(merc, tileIndex, tileSize, 50, 50),
-					lonLatForPixel(merc, tileIndex, tileSize, 50, 1),
-					merc.ll([tx * tileSize - 20, ty * tileSize - 20], tz),
+					tile.tilePxToLonLat([-20, -20]),
+					tile.tilePxToLonLat([-20, 50]),
+					tile.tilePxToLonLat([50, 50]),
+					tile.tilePxToLonLat([50, 1]),
+					tile.tilePxToLonLat([-20, -20]),
 				],
 			]
 
@@ -504,25 +463,22 @@ describe("OsmixRasterTile", () => {
 			// Create two adjacent tiles (current and right neighbor)
 			const tile1 = new OsmixRasterTile({ tile: [tx, ty, tz], tileSize })
 			const tile2 = new OsmixRasterTile({ tile: [tx + 1, ty, tz], tileSize })
-
-			const merc = new SphericalMercatorTile({ size: tileSize })
-
 			// Create a polygon that spans both tiles
 			// Left part in tile1, right part in tile2
 			const leftPart: LonLat[] = [
-				lonLatForPixel(merc, [tx, ty, tz], tileSize, 200, 50),
-				lonLatForPixel(merc, [tx, ty, tz], tileSize, 200, 150),
-				lonLatForPixel(merc, [tx, ty, tz], tileSize, 255, 150),
-				lonLatForPixel(merc, [tx, ty, tz], tileSize, 255, 50),
-				lonLatForPixel(merc, [tx, ty, tz], tileSize, 200, 50),
+				tile1.tilePxToLonLat([200, 50]),
+				tile1.tilePxToLonLat([200, 150]),
+				tile1.tilePxToLonLat([255, 150]),
+				tile1.tilePxToLonLat([255, 50]),
+				tile1.tilePxToLonLat([200, 50]),
 			]
 
 			const rightPart: LonLat[] = [
-				lonLatForPixel(merc, [tx + 1, ty, tz], tileSize, 0, 50),
-				lonLatForPixel(merc, [tx + 1, ty, tz], tileSize, 0, 150),
-				lonLatForPixel(merc, [tx + 1, ty, tz], tileSize, 50, 150),
-				lonLatForPixel(merc, [tx + 1, ty, tz], tileSize, 50, 50),
-				lonLatForPixel(merc, [tx + 1, ty, tz], tileSize, 0, 50),
+				tile2.tilePxToLonLat([0, 50]),
+				tile2.tilePxToLonLat([0, 150]),
+				tile2.tilePxToLonLat([50, 150]),
+				tile2.tilePxToLonLat([50, 50]),
+				tile2.tilePxToLonLat([0, 50]),
 			]
 
 			// Draw polygon on both tiles
@@ -560,7 +516,7 @@ describe("OsmixRasterTile", () => {
 		it("drawLine does not draw pixels outside tile bounds", () => {
 			const tileIndex: Tile = [10, 11, 5]
 			const tileSize = DEFAULT_RASTER_TILE_SIZE
-			const { tile } = createTile(tileIndex, tileSize)
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 			// Draw a line that extends beyond tile bounds
 			// This should only draw pixels within [0, tileSize)
@@ -587,19 +543,12 @@ describe("OsmixRasterTile", () => {
 		it("drawWay properly clips lines at tile boundaries", () => {
 			const tileIndex: Tile = [10, 11, 5]
 			const tileSize = DEFAULT_RASTER_TILE_SIZE
-			const [tx, ty, tz] = tileIndex
-			const { tile, merc } = createTile(tileIndex)
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 			// Create a way that extends beyond tile boundaries
 			// Use a way that crosses the tile horizontally to ensure it's visible
-			const wayStart: LonLat = merc.ll(
-				[tx * tileSize - 20, ty * tileSize + 128],
-				tz,
-			)
-			const wayEnd: LonLat = merc.ll(
-				[(tx + 1) * tileSize + 20, ty * tileSize + 128],
-				tz,
-			)
+			const wayStart: LonLat = tile.tilePxToLonLat([-20, 128])
+			const wayEnd: LonLat = tile.tilePxToLonLat([tileSize * 2, 128])
 
 			tile.drawLineString([wayStart, wayEnd])
 
@@ -621,7 +570,7 @@ describe("OsmixRasterTile", () => {
 		it("drawLine handles vertical lines at boundaries correctly", () => {
 			const tileIndex: Tile = [10, 11, 5]
 			const tileSize = DEFAULT_RASTER_TILE_SIZE
-			const { tile } = createTile(tileIndex)
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 			// Draw vertical line at left boundary
 			tile.drawLine([0, 10], [0, 100])
@@ -643,7 +592,7 @@ describe("OsmixRasterTile", () => {
 		it("drawLine handles horizontal lines at boundaries correctly", () => {
 			const tileIndex: Tile = [10, 11, 5]
 			const tileSize = DEFAULT_RASTER_TILE_SIZE
-			const { tile } = createTile(tileIndex)
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
 			// Draw horizontal line at top boundary
 			tile.drawLine([10, 0], [100, 0])
@@ -662,4 +611,207 @@ describe("OsmixRasterTile", () => {
 			).toEqual(Array.from(DEFAULT_LINE_COLOR))
 		})
 	})
+
+	const tiles: Tile[] = [
+		[4265, 2897, 13.5],
+		[1066, 746, 11],
+	]
+	describe.each(tiles)(
+		"subpixel entity rendering tile %p/%p/%p",
+		(...tileIndex) => {
+			const tileSize = 4 // Easier to debug math with a smaller tile
+
+			it("draws entities that fit in a single pixel", () => {
+				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+				const tileBbox = tile.bbox()
+				const centerLon = (tileBbox[0] + tileBbox[2]) / 2
+				const centerLat = (tileBbox[1] + tileBbox[3]) / 2
+
+				// Create a tiny bbox (much smaller than a pixel)
+				const centerPx = tile.llToTilePx([centerLon, centerLat])
+				const offsetMin = tile.tilePxToLonLat([
+					centerPx[0] - 0.25,
+					centerPx[1] + 0.25,
+				])
+				const offsetMax = tile.tilePxToLonLat([
+					centerPx[0] + 0.25,
+					centerPx[1] - 0.25,
+				])
+				const bbox: GeoBbox2D = [
+					offsetMin[0],
+					offsetMin[1],
+					offsetMax[0],
+					offsetMax[1],
+				]
+
+				const color: Rgba = [255, 0, 0, 255]
+				const drawn = tile.drawSubpixelEntity(bbox, color)
+
+				expect(drawn).toBe(true)
+
+				// Find which pixel was drawn (should be near center)
+				// The exact pixel depends on projection, but we can check that something was drawn
+				let foundPixel = false
+				for (let y = 0; y < tileSize; y++) {
+					for (let x = 0; x < tileSize; x++) {
+						const idx = tile.getIndex([x, y])
+						if (tile.imageData[idx + 3]! > 0) {
+							foundPixel = true
+							const pixelColor = Array.from(tile.imageData.slice(idx, idx + 4))
+							expect(pixelColor[0]).toBe(255) // Red
+							expect(pixelColor[1]).toBe(0)
+							expect(pixelColor[2]).toBe(0)
+							// Alpha should be scaled by coverage (at least 1, less than 255)
+							expect(pixelColor[3]).toBeGreaterThanOrEqual(1)
+							expect(pixelColor[3]).toBeLessThanOrEqual(255)
+							break
+						}
+					}
+					if (foundPixel) break
+				}
+				expect(foundPixel).toBe(true)
+			})
+
+			it("returns false for entities that span multiple pixels", () => {
+				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+
+				// Create a bbox that spans multiple pixels
+				const minLl = tile.tilePxToLonLat([10, 10])
+				const maxLl = tile.tilePxToLonLat([50, 50])
+				const bbox: GeoBbox2D = [minLl[0], minLl[1], maxLl[0], maxLl[1]]
+
+				const color: Rgba = [255, 0, 0, 255]
+				const drawn = tile.drawSubpixelEntity(bbox, color)
+
+				expect(drawn).toBe(false)
+			})
+
+			it("scales alpha by coverage ratio for subpixel entities", () => {
+				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+
+				// Create a bbox that covers a small portion of a pixel
+				// Use the tile's bbox and create a tiny subpixel area
+				const tileBbox = tile.bbox()
+				const centerLon = (tileBbox[0] + tileBbox[2]) / 2
+				const centerLat = (tileBbox[1] + tileBbox[3]) / 2
+
+				// Create a very small bbox (smaller coverage = lower alpha)
+				// Use a smaller offset to get less coverage
+				const tinyOffset = 0.0005 // Half the size of the previous test
+				const smallBbox: GeoBbox2D = [
+					centerLon - tinyOffset,
+					centerLat - tinyOffset,
+					centerLon + tinyOffset,
+					centerLat + tinyOffset,
+				]
+
+				const fullAlphaColor: Rgba = [255, 0, 0, 255]
+				const drawn = tile.drawSubpixelEntity(smallBbox, fullAlphaColor)
+
+				expect(drawn).toBe(true)
+
+				// Find which pixel was drawn and check that alpha was scaled
+				let foundPixel = false
+				for (let y = 0; y < tileSize; y++) {
+					for (let x = 0; x < tileSize; x++) {
+						const idx = tile.getIndex([x, y])
+						if (tile.imageData[idx + 3]! > 0) {
+							foundPixel = true
+							const pixelColor = Array.from(tile.imageData.slice(idx, idx + 4))
+							// Alpha should be less than 255 due to coverage scaling
+							// but at least 1 for visibility
+							expect(pixelColor[3]).toBeLessThan(255)
+							expect(pixelColor[3]).toBeGreaterThanOrEqual(1)
+							break
+						}
+					}
+					if (foundPixel) break
+				}
+				expect(foundPixel).toBe(true)
+			})
+
+			it("handles bboxes outside tile bounds", () => {
+				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+
+				// Create a bbox that's completely outside the tile
+				// Use coordinates that are far enough outside that even after projection
+				// they remain outside the tile bounds
+				// Get the tile's geographic bbox
+				const tileBbox = tile.bbox()
+				// Create a bbox that's completely to the west of the tile
+				const outsideBbox: GeoBbox2D = [
+					tileBbox[0] - 1.0, // Well to the west
+					tileBbox[1] - 1.0, // Well to the south
+					tileBbox[0] - 0.5, // Still to the west
+					tileBbox[1] - 0.5, // Still to the south
+				]
+
+				const color: Rgba = [255, 0, 0, 255]
+				const drawn = tile.drawSubpixelEntity(outsideBbox, color)
+
+				expect(drawn).toBe(false)
+			})
+
+			it("uses horizontal extent when height collapses to zero", () => {
+				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+
+				const tileBbox = tile.bbox()
+				const centerLon = (tileBbox[0] + tileBbox[2]) / 2
+				const centerLat = (tileBbox[1] + tileBbox[3]) / 2
+
+				const lonDelta = ((tileBbox[2] - tileBbox[0]) / tileSize) * 0.2
+				const bbox: GeoBbox2D = [
+					centerLon,
+					centerLat,
+					centerLon + lonDelta,
+					centerLat, // zero height
+				]
+
+				const minPx = tile.llToTilePx([bbox[0], bbox[1]])
+				const basePixel: XY = [Math.floor(minPx[0]), Math.floor(minPx[1])]
+
+				const color: Rgba = [50, 50, 50, 200]
+				const drawn = tile.drawSubpixelEntity(bbox, color)
+				expect(drawn).toBe(true)
+
+				const idx = tile.getIndex(basePixel)
+				const alpha = tile.imageData[idx + 3]!
+				expect(alpha).toBeGreaterThan(1)
+				expect(alpha).toBeLessThan(color[3]!)
+			})
+
+			it("uses vertical extent when width collapses to zero", () => {
+				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+
+				const tileBbox = tile.bbox()
+				const centerLon = (tileBbox[0] + tileBbox[2]) / 2
+				const centerLat = (tileBbox[1] + tileBbox[3]) / 2
+				const centerPixel = tile.llToTilePx([centerLon, centerLat])
+
+				const centerOffset = tile.tilePxToLonLat([
+					centerPixel[0] + 0.5,
+					centerPixel[1],
+				])
+
+				const bbox: GeoBbox2D = [
+					centerLon,
+					centerLat,
+					centerOffset[0], // zero width
+					centerOffset[1],
+				]
+
+				const minPx = tile.llToTilePx([bbox[0], bbox[1]])
+				const basePixel: XY = [Math.floor(minPx[0]), Math.floor(minPx[1])]
+
+				const color: Rgba = [200, 100, 50, 180]
+				const drawn = tile.drawSubpixelEntity(bbox, color)
+				expect(drawn).toBe(true)
+
+				const idx = tile.getIndex(basePixel)
+				const alpha = tile.imageData[idx + 3]!
+				expect(alpha).toBeGreaterThan(1)
+				expect(alpha).toBeLessThan(color[3]!)
+			})
+		},
+	)
 })

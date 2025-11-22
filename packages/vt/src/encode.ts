@@ -1,7 +1,7 @@
 import type { Osm } from "@osmix/core"
 import { bboxContainsOrIntersects } from "@osmix/shared/bbox-intersects"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
-import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
+import { llToTilePx, tileToBbox } from "@osmix/shared/tile"
 import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 import type {
@@ -39,8 +39,7 @@ export function projectToTile(
 	tile: Tile,
 	extent = DEFAULT_EXTENT,
 ): (ll: LonLat) => XY {
-	const sm = new SphericalMercatorTile({ size: extent, tile })
-	return (lonLat) => sm.llToTilePx(lonLat)
+	return (lonLat) => llToTilePx(lonLat, tile, extent)
 }
 
 export class OsmixVtEncoder {
@@ -74,13 +73,12 @@ export class OsmixVtEncoder {
 	}
 
 	getTile(tile: Tile): ArrayBuffer {
-		const sm = new SphericalMercatorTile({ size: this.extent, tile })
-		const bbox = sm.bbox(tile[0], tile[1], tile[2]) as GeoBbox2D
+		const bbox = tileToBbox(tile)
 		const osmBbox = this.osm.bbox()
 		if (!bboxContainsOrIntersects(bbox, osmBbox)) {
 			return new ArrayBuffer(0)
 		}
-		return this.getTileForBbox(bbox, (ll) => sm.llToTilePx(ll))
+		return this.getTileForBbox(bbox, (ll) => llToTilePx(ll, tile, this.extent))
 	}
 
 	getTileForBbox(bbox: GeoBbox2D, proj: (ll: LonLat) => XY): ArrayBuffer {

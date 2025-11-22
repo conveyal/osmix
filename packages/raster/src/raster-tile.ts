@@ -1,6 +1,12 @@
 import rewind from "@osmix/shared/geojson-rewind"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
-import SphericalMercatorTile from "@osmix/shared/spherical-mercator"
+import {
+	bboxToTilePx,
+	clampAndRoundPx,
+	llToTilePx,
+	tilePxToLonLat,
+	tileToBbox,
+} from "@osmix/shared/tile"
 import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
 import { compositeRGBA } from "./color"
 
@@ -14,7 +20,10 @@ export class OsmixRasterTile {
 	imageData: Uint8ClampedArray<ArrayBuffer>
 	tile: Tile
 	tileSize: number
-	proj: SphericalMercatorTile
+
+	// Minimum pixel coverage for subpixel entities
+	// This is used to avoid drawing entities that are too small to be visible
+	minPixelCoverage: number
 
 	constructor({
 		imageData,
@@ -26,26 +35,87 @@ export class OsmixRasterTile {
 		tileSize: number
 	}) {
 		this.imageData = imageData ?? new Uint8ClampedArray(tileSize * tileSize * 4)
-		this.proj = new SphericalMercatorTile({ size: tileSize, tile })
 		this.tile = tile
 		this.tileSize = tileSize
+		this.minPixelCoverage = 1 / tileSize
 	}
 
 	bbox(): GeoBbox2D {
-		return this.proj.bbox(this.tile[0], this.tile[1], this.tile[2])
+		return tileToBbox(this.tile)
+	}
+
+	llToTilePx(ll: LonLat): XY {
+		return llToTilePx(ll, this.tile, this.tileSize)
+	}
+
+	tilePxToLonLat(px: XY): LonLat {
+		return tilePxToLonLat(px, this.tile, this.tileSize)
+	}
+
+	clampAndRoundPx(px: XY): XY {
+		return clampAndRoundPx(px, this.tileSize)
+	}
+
+	/**
+	 * Project a geographic bounding box to tile pixel space and check if it fits in a single pixel.
+	 * Returns the pixel coordinates and coverage ratio if it fits, null otherwise.
+	 */
+	private projectBboxToPixelSpace(bbox: GeoBbox2D) {
+		// Swap min and max lat to get the correct y pixel bounds
+		const [minX, minY, maxX, maxY] = bboxToTilePx(
+			bbox,
+			this.tile,
+			this.tileSize,
+		)
+
+		// Check if the bbox fits entirely within a single pixel
+		// Use original unclamped dimensions to check if it's subpixel
+		const width = Math.abs(maxX - minX)
+		const height = Math.abs(maxY - minY)
+
+		// Must be strictly less than 1 pixel in both dimensions
+		if (width >= 1 || height >= 1) return null
+
+		const clampedMin = this.clampAndRoundPx([minX, minY])
+		const clampedMax = this.clampAndRoundPx([maxX, maxY])
+
+		// For each pixel from min to max, calculate the coverage ration
+		const pixels: { px: XY; coverage: number }[] = []
+		for (let y = clampedMin[1]; y <= clampedMax[1]; y++) {
+			for (let x = clampedMin[0]; x <= clampedMax[0]; x++) {
+				// Intersection bbox between entity bbox and pixel bbox
+				const iMinX = Math.max(minX, x)
+				const iMinY = Math.max(minY, y)
+				const iMaxX = Math.min(maxX, x + 1)
+				const iMaxY = Math.min(maxY, y + 1)
+
+				// Width/height of intersection (clamped to 0 if no overlap)
+				const iWidth = Math.max(0, iMaxX - iMinX)
+				const iHeight = Math.max(0, iMaxY - iMinY)
+				const coverage = iWidth * iHeight
+
+				// Handle degenerate cases where the intersection is too small to be visible
+				pixels.push({
+					px: [x, y],
+					coverage: Math.max(coverage, this.minPixelCoverage),
+				})
+			}
+		}
+
+		return pixels
 	}
 
 	getIndex(px: XY) {
-		return (px[1] * this.proj.tileSize + px[0]) * 4
+		return (px[1] * this.tileSize + px[0]) * 4
 	}
 
 	setLonLat(ll: LonLat, color: Rgba = DEFAULT_POINT_COLOR) {
-		const px = this.proj.llToTilePx(ll)
+		const px = this.llToTilePx(ll)
 		this.setPixel(px, color)
 	}
 
 	setPixel(px: XY, color: Rgba) {
-		const clampedPx = this.proj.clampAndRoundPx(px)
+		const clampedPx = this.clampAndRoundPx(px)
 		const idx = this.getIndex(clampedPx)
 		if (this.imageData[idx + 3] === 0) {
 			this.imageData[idx] = color[0]
@@ -64,8 +134,26 @@ export class OsmixRasterTile {
 		}
 	}
 
+	/**
+	 * Draw an entity whose bounding box fits entirely within a single pixel.
+	 * Returns true if the entity was drawn as a single pixel, false if it spans multiple pixels.
+	 * The alpha channel is scaled by the coverage ratio (percentage of pixel covered by the bbox).
+	 */
+	drawSubpixelEntity(bbox: GeoBbox2D, color: Rgba): boolean {
+		const result = this.projectBboxToPixelSpace(bbox)
+		if (result == null) return false
+
+		for (const { px, coverage } of result) {
+			// Scale alpha by coverage ratio, ensuring at least 1 for visibility
+			const scaledAlpha = Math.max(1, Math.round(color[3] * coverage))
+			const scaledColor: Rgba = [color[0], color[1], color[2], scaledAlpha]
+			this.setPixel(px, scaledColor)
+		}
+		return true
+	}
+
 	drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR) {
-		const tileSize = this.proj.tileSize
+		const tileSize = this.tileSize
 		const dx = Math.abs(px1[0] - px0[0])
 		const dy = Math.abs(px1[1] - px0[1])
 		const sx = px0[0] < px1[0] ? 1 : -1
@@ -97,12 +185,12 @@ export class OsmixRasterTile {
 	}
 
 	drawLineString(coords: LonLat[], color: Rgba = DEFAULT_LINE_COLOR) {
-		const projectedCoords = coords.map((ll) => this.proj.llToTilePx(ll))
+		const projectedCoords = coords.map((ll) => this.llToTilePx(ll))
 		const [clipped] = clipPolyline(projectedCoords, [
 			0,
 			0,
-			this.proj.tileSize,
-			this.proj.tileSize,
+			this.tileSize,
+			this.tileSize,
 		])
 		if (clipped != null) {
 			let prev: XY = clipped[0] as XY
@@ -111,8 +199,8 @@ export class OsmixRasterTile {
 					prev = curr
 					return
 				}
-				const px0 = this.proj.clampAndRoundPx(prev)
-				const px1 = this.proj.clampAndRoundPx(curr)
+				const px0 = this.clampAndRoundPx(prev)
+				const px1 = this.clampAndRoundPx(curr)
 				if (px0[0] !== px1[0] || px0[1] !== px1[1]) {
 					this.drawLine(px0, px1, color)
 				}
@@ -148,12 +236,12 @@ export class OsmixRasterTile {
 		const tileBbox: [number, number, number, number] = [
 			0,
 			0,
-			this.proj.tileSize,
-			this.proj.tileSize,
+			this.tileSize,
+			this.tileSize,
 		]
 		const clippedRings: XY[][] = []
 		for (const ring of normalizedRings) {
-			const projected = ring.map((ll) => this.proj.llToTilePx(ll))
+			const projected = ring.map((ll) => this.llToTilePx(ll))
 			const clipped = clipPolygon(projected, tileBbox)
 			if (clipped.length >= 3) {
 				// Ensure ring is closed
@@ -162,7 +250,7 @@ export class OsmixRasterTile {
 				if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
 					clipped.push([first[0], first[1]])
 				}
-				clippedRings.push(clipped.map((xy) => this.proj.clampAndRoundPx(xy)))
+				clippedRings.push(clipped.map((xy) => this.clampAndRoundPx(xy)))
 			}
 		}
 
@@ -194,7 +282,7 @@ export class OsmixRasterTile {
 	 * Handles holes correctly by toggling fill state on each edge crossing.
 	 */
 	private fillPolygonScanline(rings: XY[][], color: Rgba) {
-		const tileSize = this.proj.tileSize
+		const tileSize = this.tileSize
 		const outerRing = rings[0]
 		if (!outerRing || outerRing.length < 3) return
 
