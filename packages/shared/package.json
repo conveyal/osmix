@@ -48,7 +48,7 @@
 	},
 	"dependencies": {
 		"@mapbox/geojson-rewind": "catalog:",
-		"@mapbox/sphericalmercator": "catalog:",
+		"@mapbox/tilebelt": "^2.0.2",
 		"dequal": "catalog:",
 		"lineclip": "^2.0.0"
 	}

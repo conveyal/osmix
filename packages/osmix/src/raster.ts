@@ -1,6 +1,10 @@
 import type { Osm } from "@osmix/core"
-import type { OsmixRasterTile } from "@osmix/raster"
-import type { LonLat } from "@osmix/shared/types"
+import {
+	DEFAULT_AREA_COLOR,
+	DEFAULT_LINE_COLOR,
+	type OsmixRasterTile,
+} from "@osmix/raster"
+import type { Rgba } from "@osmix/shared/types"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 
 /**
@@ -31,8 +35,10 @@ export function drawRasterTile(osm: Osm, rasterTile: OsmixRasterTile) {
 	const relationIndexes = osm.relations.intersects(bbox)
 
 	for (const relIndex of relationIndexes) {
-		const relation = osm.relations.getByIndex(relIndex)
-		if (!relation) continue
+		// Try fast path: check if relation bbox fits in a single pixel
+		const relationBbox = osm.relations.getEntityBbox({ index: relIndex })
+		if (rasterTile.drawSubpixelEntity(relationBbox, DEFAULT_AREA_COLOR))
+			continue
 
 		const geometry = osm.relations.getRelationGeometry(relIndex)
 		if (!geometry) continue
@@ -57,31 +63,47 @@ export function drawRasterTile(osm: Osm, rasterTile: OsmixRasterTile) {
 	// Draw ways (excluding those that are part of relations)
 	const timer = `OsmixRasterTile.drawWays:${tileKey}`
 	console.time(timer)
-	const wayIndexes = osm.ways.intersects(bbox, (wayIndex) => {
+	osm.ways.intersects(bbox, (wayIndex) => {
 		if (relationWayIds.has(osm.ways.ids.at(wayIndex))) return false
-		return true
+		const way = osm.ways.getByIndex(wayIndex)
+
+		// Try fast path: check if way bbox fits in a single pixel
+		const wayBbox = osm.ways.getEntityBbox({ index: wayIndex })
+		const isArea = wayIsArea(way)
+		const wayColor: Rgba = isArea ? [255, 0, 0, 64] : DEFAULT_LINE_COLOR
+
+		// Try fast path for way
+		if (rasterTile.drawSubpixelEntity(wayBbox, wayColor)) return false
+
+		// Fall back to full geometry rendering
+		const coords = osm.ways.getCoordinates(wayIndex)
+		if (isArea) {
+			rasterTile.drawPolygon([coords], [255, 0, 0, 64])
+		} else {
+			rasterTile.drawLineString(coords)
+		}
+		return false
 	})
-	const ways = wayIndexes.map((wayIndex) => ({
-		coords: osm.ways.getCoordinates(wayIndex),
-		isArea: wayIsArea(osm.ways.getByIndex(wayIndex)),
-	}))
-	const { wayLines, wayPolygons } = ways.reduce(
-		(acc, way) => {
-			if (way.isArea) acc.wayPolygons.push(way)
-			else acc.wayLines.push(way)
-			return acc
-		},
-		{
-			wayLines: [] as { coords: LonLat[]; isArea: boolean }[],
-			wayPolygons: [] as { coords: LonLat[]; isArea: boolean }[],
-		},
-	)
-	for (const way of wayPolygons) {
-		rasterTile.drawPolygon([way.coords], [255, 0, 0, 64])
-	}
-	for (const way of wayLines) {
-		rasterTile.drawLineString(way.coords)
-	}
+
+	/* for (const wayIndex of wayIndexes) {
+		const way = osm.ways.getByIndex(wayIndex)
+
+		// Try fast path: check if way bbox fits in a single pixel
+		const wayBbox = osm.ways.getEntityBbox({ index: wayIndex })
+		const isArea = wayIsArea(way)
+		const wayColor: Rgba = isArea ? [255, 0, 0, 64] : DEFAULT_LINE_COLOR
+
+		// Try fast path for way
+		if (rasterTile.drawSubpixelEntity(wayBbox, wayColor)) continue
+
+		// Fall back to full geometry rendering
+		const coords = osm.ways.getCoordinates(wayIndex)
+		if (isArea) {
+			rasterTile.drawPolygon([coords], [255, 0, 0, 64])
+		} else {
+			rasterTile.drawLineString(coords)
+		}
+	}*/
 	console.timeEnd(timer)
 
 	return rasterTile

@@ -30,7 +30,7 @@ const computeVisibleTiles = (
 				type: "Feature",
 				geometry: tileToGeoJSON([x, y, zoom]),
 				properties: {
-					tileKey: `${zoom}/${x}/${y}`,
+					tileKey: `${x}/${y}/${zoom}`,
 				},
 			})
 		}

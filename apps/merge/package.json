@@ -31,7 +31,6 @@
 		"@osmix/pbf": "workspace:*",
 		"@osmix/raster": "workspace:*",
 		"@osmix/shared": "workspace:*",
-		"@mapbox/sphericalmercator": "catalog:",
 		"@mapbox/tilebelt": "^2.0.2",
 		"@radix-ui/react-collapsible": "^1.1.12",
 		"@radix-ui/react-dialog": "^1.1.14",
