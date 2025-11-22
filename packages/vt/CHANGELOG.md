@@ -1,5 +1,16 @@
 # @osmix/vt
 
+## 0.0.5
+
+### Patch Changes
+
+- bb629cf: Simplify raster drawing when geometry is smaller than a pixel
+- edbb26b: Handle more Relation types
+- Updated dependencies [bb629cf]
+- Updated dependencies [edbb26b]
+- Updated dependencies [69a36bd]
+  - @osmix/shared@0.0.5
+
 ## 0.0.4
 
 ### Patch Changes
