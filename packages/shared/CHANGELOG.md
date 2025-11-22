@@ -1,5 +1,13 @@
 # @osmix/shared
 
+## 0.0.5
+
+### Patch Changes
+
+- bb629cf: Simplify raster drawing when geometry is smaller than a pixel
+- edbb26b: Handle more Relation types
+- 69a36bd: Switch Nodes coordinate storage to Int32Array
+
 ## 0.0.4
 
 ### Patch Changes
