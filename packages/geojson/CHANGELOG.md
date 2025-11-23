@@ -1,5 +1,18 @@
 # @osmix/geojson
 
+## 0.0.3
+
+### Patch Changes
+
+- edbb26b: Handle more Relation types
+- Updated dependencies [bb629cf]
+- Updated dependencies [a33a280]
+- Updated dependencies [edbb26b]
+- Updated dependencies [69a36bd]
+  - @osmix/shared@0.0.5
+  - @osmix/core@0.0.5
+  - @osmix/pbf@0.0.3
+
 ## 0.0.2
 
 ### Patch Changes
