@@ -466,4 +466,30 @@ export class Relations extends Entities<OsmRelation> {
 			spatialIndex: this.spatialIndex.data,
 		}
 	}
+
+	/**
+	 * Get the approximate memory requirements for a given number of relations in bytes.
+	 */
+	static getBytesRequired(count: number) {
+		if (count === 0) return 0
+		// Approximate members per relation
+		let numNodes = count
+		let n = count
+		while (n !== 1) {
+			n = Math.ceil(n / 128)
+			numNodes += n
+		}
+		const indexBytes = (numNodes < 16384 ? 2 : 4) * numNodes
+		const boxesBytes = numNodes * 4 * Float64Array.BYTES_PER_ELEMENT
+		const spatialIndexBytes = 8 + indexBytes + boxesBytes
+
+		return (
+			Ids.getBytesRequired(count) +
+			Tags.getBytesRequired(count) +
+			count * Uint32Array.BYTES_PER_ELEMENT + // memberStart
+			count * Uint16Array.BYTES_PER_ELEMENT + // memberCount
+			count * 4 * Float64Array.BYTES_PER_ELEMENT + // bbox
+			spatialIndexBytes
+		)
+	}
 }

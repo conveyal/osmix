@@ -201,4 +201,17 @@ export class Ids {
 			idsAreSorted: this.idsAreSorted,
 		}
 	}
+
+	/**
+	 * Get the approximate memory requirements for a given number of IDs in bytes.
+	 */
+	static getBytesRequired(count: number) {
+		if (count === 0) return 0
+		return (
+			count * Float64Array.BYTES_PER_ELEMENT + // ids
+			count * Float64Array.BYTES_PER_ELEMENT + // sortedIds
+			count * Uint32Array.BYTES_PER_ELEMENT + // sortedIdPositionToIndex
+			Math.ceil(count / BLOCK_SIZE) * Float64Array.BYTES_PER_ELEMENT // anchors
+		)
+	}
 }
