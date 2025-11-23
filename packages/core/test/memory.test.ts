@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "bun:test"
 import { Nodes, Relations, Ways } from "../src"
 
 export function getOsmCoreMemoryRequirements(
