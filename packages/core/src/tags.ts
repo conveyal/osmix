@@ -221,6 +221,16 @@ export class Tags {
 	}
 
 	/**
+	 * Get the approximate memory requirements for a given number of tags in bytes.
+	 */
+	static getBytesRequired(count: number) {
+		return (
+			count * Uint32Array.BYTES_PER_ELEMENT + // tagStart
+			count * Uint8Array.BYTES_PER_ELEMENT // tagCount
+		)
+	}
+
+	/**
 	 * Reconstruct a Tags index from transferable objects.
 	 */
 	static fromTransferables(

@@ -16,6 +16,10 @@ export const DEFAULT_POINT_COLOR: Rgba = [255, 0, 0, 255] // red
 export const DEFAULT_AREA_COLOR: Rgba = [0, 0, 255, 64] // low opacity blue
 export const DEFAULT_RASTER_TILE_SIZE = 256
 
+/**
+ * Construct a an image for a single XYZ tile. The image is a 2D array of RGBA pixels.
+ * Helper methods are provided to draw lines, polygons, and points onto the image.
+ */
 export class OsmixRasterTile {
 	imageData: Uint8ClampedArray<ArrayBuffer>
 	tile: Tile

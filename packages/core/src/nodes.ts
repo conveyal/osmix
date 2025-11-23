@@ -336,4 +336,23 @@ export class Nodes extends Entities<OsmNode> {
 			spatialIndex: this.spatialIndex.data,
 		}
 	}
+
+	/**
+	 * Get the approximate memory requirements for a given number of nodes in bytes.
+	 */
+	static getBytesRequired(count: number) {
+		if (count === 0) return 0
+		const indexBytes = (count < 65536 ? 2 : 4) * count
+		const coordsBytes = count * 2 * Int32Array.BYTES_PER_ELEMENT
+		const padding = (8 - (indexBytes % 8)) % 8
+		const spatialIndexBytes = 8 + indexBytes + coordsBytes + padding
+
+		return (
+			Ids.getBytesRequired(count) +
+			Tags.getBytesRequired(count) +
+			count * Int32Array.BYTES_PER_ELEMENT + // lons
+			count * Int32Array.BYTES_PER_ELEMENT + // lats
+			spatialIndexBytes
+		)
+	}
 }
