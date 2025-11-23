@@ -1,5 +1,18 @@
 # @osmix/change
 
+## 0.0.5
+
+### Patch Changes
+
+- 345b716: Move functionality outside of the Changeset
+- 69a36bd: Switch Nodes coordinate storage to Int32Array
+- Updated dependencies [bb629cf]
+- Updated dependencies [a33a280]
+- Updated dependencies [edbb26b]
+- Updated dependencies [69a36bd]
+  - @osmix/shared@0.0.5
+  - @osmix/core@0.0.5
+
 ## 0.0.4
 
 ### Patch Changes
