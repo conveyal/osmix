@@ -22,6 +22,8 @@ import OsmInfoTable from "../components/osm-info-table"
 import OsmPbfFileInput from "../components/osm-pbf-file-input"
 import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
+import RouteControl from "../components/route-control"
+import RouteLayer from "../components/route-layer"
 import SelectedEntityLayer from "../components/selected-entity-layer"
 import SidebarLog from "../components/sidebar-log"
 import TileBoundsLayer from "../components/tile-bounds-layer"
@@ -171,6 +173,7 @@ export default function InspectPage() {
 					{import.meta.env.DEV && <TileBoundsLayer />}
 
 					<SelectedEntityLayer />
+					<RouteLayer />
 
 					<CustomControl position="top-left">
 						<NominatimSearchControl />
@@ -190,6 +193,11 @@ export default function InspectPage() {
 					{osm && (
 						<CustomControl position="top-left">
 							<EntityDetailsMapControl osm={osm} />
+						</CustomControl>
+					)}
+					{osm && (
+						<CustomControl position="top-left">
+							<RouteControl osm={osm} />
 						</CustomControl>
 					)}
 				</Basemap>

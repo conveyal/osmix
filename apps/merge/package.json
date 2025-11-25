@@ -30,6 +30,7 @@
 		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/raster": "workspace:*",
+		"@osmix/router": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@mapbox/tilebelt": "^2.0.2",
 		"@radix-ui/react-collapsible": "^1.1.12",
