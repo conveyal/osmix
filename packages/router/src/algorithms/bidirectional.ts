@@ -114,6 +114,10 @@ export const bidirectional: RoutingAlgorithmFn = (
 	forward.unshift({ nodeIndex: start, cost: 0 })
 
 	// Build backward path: meet -> end (reverse direction)
+	// bDist represents distance FROM end TO node, so it decreases as we approach end.
+	// Correct cost = forward cost to meet + (backward dist at meet - backward dist at curr)
+	const meetForwardCost = fDist.get(meetNode)!
+	const meetBackwardCost = bDist.get(meetNode)!
 	curr = meetNode
 	while (curr !== undefined && curr !== end) {
 		const seg = bPrev.get(curr)
@@ -124,7 +128,7 @@ export const bidirectional: RoutingAlgorithmFn = (
 				nodeIndex: curr,
 				wayIndex: seg.wayIndex,
 				previousNodeIndex: seg.nodeIndex,
-				cost: fDist.get(meetNode)! + (bDist.get(curr) ?? 0),
+				cost: meetForwardCost + meetBackwardCost - (bDist.get(curr) ?? 0),
 			})
 		}
 	}
