@@ -104,12 +104,17 @@ export function calculateRouteStats(
 	let totalDistance = 0
 	let totalTime = 0
 
-	// First pass: collect per-way stats and build ordered list with node info
+	// First pass: build ordered list of edge traversals with per-edge stats
 	// Store the START node of each edge (previousNodeIndex) so we can correctly
 	// identify where way transitions occur (the turn point is where the previous
 	// way ends and the new way begins)
-	const wayStats = new Map<number, { distance: number; time: number }>()
-	const waySequence: { wayIndex: number; transitionNodeIndex: number }[] = []
+	interface EdgeTraversal {
+		wayIndex: number
+		transitionNodeIndex: number
+		distance: number
+		time: number
+	}
+	const edgeSequence: EdgeTraversal[] = []
 
 	for (const seg of path) {
 		if (seg.wayIndex !== undefined && seg.previousNodeIndex !== undefined) {
@@ -122,55 +127,45 @@ export function calculateRouteStats(
 				totalDistance += edge.distance
 				totalTime += edge.time
 
-				// Track this way appearance with the transition node (start of this edge)
-				// This is where the previous way ends and this way begins
-				waySequence.push({
+				// Track this edge with its transition node and stats
+				edgeSequence.push({
 					wayIndex: seg.wayIndex,
 					transitionNodeIndex: seg.previousNodeIndex,
+					distance: edge.distance,
+					time: edge.time,
 				})
-
-				// Accumulate per-way stats
-				const existing = wayStats.get(seg.wayIndex)
-				if (existing) {
-					existing.distance += edge.distance
-					existing.time += edge.time
-				} else {
-					wayStats.set(seg.wayIndex, {
-						distance: edge.distance,
-						time: edge.time,
-					})
-				}
 			}
 		}
 	}
 
 	// Second pass: build segments, merging consecutive same-name ways
 	// Track turn points where the display name changes
+	// Note: We process EVERY edge in order, allowing routes like A→B→A to work correctly
 	const waySegments: WaySegment[] = []
 	const turnPoints: LonLat[] = []
 	let currentSegment: WaySegment | null = null
 	let currentDisplayName: string | null = null
-	const processedWayIndexes = new Set<number>()
 
-	for (const { wayIndex, transitionNodeIndex } of waySequence) {
-		// Skip if we've already processed this way index in a previous segment
-		if (processedWayIndexes.has(wayIndex)) continue
-		processedWayIndexes.add(wayIndex)
-
+	for (const {
+		wayIndex,
+		transitionNodeIndex,
+		distance,
+		time,
+	} of edgeSequence) {
 		const wayId = osm.ways.ids.at(wayIndex)
 		const tags = osm.ways.tags.getTags(wayIndex)
 		const name = (tags?.["name"] as string) ?? ""
 		const highway = (tags?.["highway"] as string) ?? ""
 		const displayName = getDisplayName(tags)
-		const stats = wayStats.get(wayIndex)
-
-		if (!stats) continue
 
 		if (currentSegment && currentDisplayName === displayName) {
-			// Merge with current segment (same name)
-			currentSegment.wayIds.push(wayId)
-			currentSegment.distance += stats.distance
-			currentSegment.time += stats.time
+			// Merge with current segment (same name) - add this edge's stats
+			// Only add wayId if not already in the list (same way, consecutive edges)
+			if (!currentSegment.wayIds.includes(wayId)) {
+				currentSegment.wayIds.push(wayId)
+			}
+			currentSegment.distance += distance
+			currentSegment.time += time
 		} else {
 			// Name changed - record turn point and start new segment
 			if (currentSegment) {
@@ -186,8 +181,8 @@ export function calculateRouteStats(
 				wayIds: [wayId],
 				name,
 				highway,
-				distance: stats.distance,
-				time: stats.time,
+				distance,
+				time,
 			}
 			currentDisplayName = displayName
 		}
