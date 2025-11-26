@@ -1,11 +1,8 @@
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
-import {
-	bboxToMicroDegrees,
-	microToDegrees,
-	toMicroDegrees,
-} from "@osmix/shared/coordinates"
+import { microToDegrees, toMicroDegrees } from "@osmix/shared/coordinates"
 import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/shared/types"
+import { around as geoAround } from "geokdbush"
 import KDBush from "kdbush"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"
@@ -47,10 +44,11 @@ export class Nodes extends Entities<OsmNode> {
 		Number.MIN_SAFE_INTEGER,
 		Number.MIN_SAFE_INTEGER,
 	]
+	// Spatial index stores coordinates in degrees (Float64Array) for geokdbush compatibility
 	private spatialIndex: KDBush = new KDBush(
 		0,
 		128,
-		Int32Array,
+		Float64Array,
 		BufferConstructor,
 	)
 
@@ -73,7 +71,8 @@ export class Nodes extends Entities<OsmNode> {
 			super("node", new Ids(), new Tags(stringTable))
 			this.lons = new RTA(Int32Array)
 			this.lats = new RTA(Int32Array)
-			this.spatialIndex = new KDBush(0, 128, Int32Array, BufferConstructor)
+			// Spatial index uses Float64Array with degrees for geokdbush compatibility
+			this.spatialIndex = new KDBush(0, 128, Float64Array, BufferConstructor)
 		}
 	}
 
@@ -200,13 +199,22 @@ export class Nodes extends Entities<OsmNode> {
 
 	/**
 	 * Build the spatial index for nodes.
+	 * Spatial index stores degrees (Float64Array) for geokdbush compatibility.
 	 */
 	buildSpatialIndex() {
 		console.time("NodeIndex.buildSpatialIndex")
-		this.spatialIndex = new KDBush(this.size, 64, Int32Array, BufferConstructor)
+		// Use Float64Array with degrees for geokdbush geographic queries
+		this.spatialIndex = new KDBush(
+			this.size,
+			64,
+			Float64Array,
+			BufferConstructor,
+		)
 		for (let i = 0; i < this.size; i++) {
-			// Store microdegrees directly in spatial index
-			this.spatialIndex.add(this.lons.at(i), this.lats.at(i))
+			// Convert microdegrees to degrees for spatial index
+			const lon = microToDegrees(this.lons.at(i))
+			const lat = microToDegrees(this.lats.at(i))
+			this.spatialIndex.add(lon, lat)
 		}
 		this.spatialIndex.finish()
 		console.timeEnd("NodeIndex.buildSpatialIndex")
@@ -265,26 +273,25 @@ export class Nodes extends Entities<OsmNode> {
 	 * Find node indexes within a bounding box.
 	 */
 	findIndexesWithinBbox(bbox: GeoBbox2D): number[] {
-		// Convert bbox from degrees to microdegrees for spatial index query
-		const bboxMicro = bboxToMicroDegrees(bbox)
-		return this.spatialIndex.range(
-			bboxMicro[0],
-			bboxMicro[1],
-			bboxMicro[2],
-			bboxMicro[3],
-		)
+		// Spatial index stores degrees, so query with degrees directly
+		return this.spatialIndex.range(bbox[0], bbox[1], bbox[2], bbox[3])
 	}
 
 	/**
 	 * Find node indexes within a radius of a point.
+	 * Uses geokdbush for proper great-circle distance calculations.
+	 * @param lon - Longitude in degrees.
+	 * @param lat - Latitude in degrees.
+	 * @param radiusKm - Radius in kilometers.
+	 * @returns Array of node indexes within the radius.
 	 */
-	findIndexesWithinRadius(x: number, y: number, radius: number): number[] {
-		// Convert coordinates and radius from degrees to microdegrees
-		const xMicro = toMicroDegrees(x)
-		const yMicro = toMicroDegrees(y)
-		// Radius in degrees needs to be converted to microdegrees
-		const radiusMicro = toMicroDegrees(radius)
-		return this.spatialIndex.within(xMicro, yMicro, radiusMicro)
+	findIndexesWithinRadius(
+		lon: number,
+		lat: number,
+		radiusKm: number,
+	): number[] {
+		// Use geokdbush for proper geographic distance calculations
+		return geoAround(this.spatialIndex, lon, lat, Number.POSITIVE_INFINITY, radiusKm)
 	}
 
 	/**
@@ -343,15 +350,16 @@ export class Nodes extends Entities<OsmNode> {
 	static getBytesRequired(count: number) {
 		if (count === 0) return 0
 		const indexBytes = (count < 65536 ? 2 : 4) * count
-		const coordsBytes = count * 2 * Int32Array.BYTES_PER_ELEMENT
+		// Spatial index stores coordinates in degrees (Float64Array)
+		const coordsBytes = count * 2 * Float64Array.BYTES_PER_ELEMENT
 		const padding = (8 - (indexBytes % 8)) % 8
 		const spatialIndexBytes = 8 + indexBytes + coordsBytes + padding
 
 		return (
 			Ids.getBytesRequired(count) +
 			Tags.getBytesRequired(count) +
-			count * Int32Array.BYTES_PER_ELEMENT + // lons
-			count * Int32Array.BYTES_PER_ELEMENT + // lats
+			count * Int32Array.BYTES_PER_ELEMENT + // lons (stored in microdegrees)
+			count * Int32Array.BYTES_PER_ELEMENT + // lats (stored in microdegrees)
 			spatialIndexBytes
 		)
 	}
