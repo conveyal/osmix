@@ -234,6 +234,22 @@
         "typescript": "catalog:",
       },
     },
+    "packages/shortbread": {
+      "name": "@osmix/shortbread",
+      "version": "0.0.1",
+      "dependencies": {
+        "@osmix/core": "workspace:*",
+        "@osmix/shared": "workspace:*",
+        "@osmix/vt": "workspace:*",
+      },
+      "devDependencies": {
+        "@mapbox/tilebelt": "^2.0.2",
+        "@mapbox/vector-tile": "^2.0.4",
+        "@types/bun": "catalog:",
+        "pbf": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/vt": {
       "name": "@osmix/vt",
       "version": "0.0.5",
@@ -483,6 +499,8 @@
     "@osmix/router": ["@osmix/router@workspace:packages/router"],
 
     "@osmix/shared": ["@osmix/shared@workspace:packages/shared"],
+
+    "@osmix/shortbread": ["@osmix/shortbread@workspace:packages/shortbread"],
 
     "@osmix/vt": ["@osmix/vt@workspace:packages/vt"],
 

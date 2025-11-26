@@ -1,0 +1,52 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/shortbread",
+	"type": "module",
+	"version": "0.0.1",
+	"description": "Shortbread schema vector tile encoder for Osmix",
+	"main": "./src/index.ts",
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"import": "./dist/index.js",
+				"types": "./dist/index.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
+	"sideEffects": false,
+	"scripts": {
+		"build": "tsc",
+		"prepublishOnly": "tsc",
+		"test": "bun test",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@osmix/core": "workspace:*",
+		"@osmix/shared": "workspace:*",
+		"@osmix/vt": "workspace:*"
+	},
+	"devDependencies": {
+		"@mapbox/tilebelt": "^2.0.2",
+		"@mapbox/vector-tile": "^2.0.4",
+		"@types/bun": "catalog:",
+		"pbf": "catalog:",
+		"typescript": "catalog:"
+	}
+}
