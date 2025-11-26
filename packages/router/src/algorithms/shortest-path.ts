@@ -3,6 +3,12 @@ import { BinaryHeap } from "../binary-heap"
 import type { GraphEdge, PathSegment, RoutingAlgorithmFn } from "../types"
 
 /**
+ * Maximum speed (m/s) for time-based heuristic.
+ * Uses 130 km/h (~36.1 m/s) to ensure admissibility on all road types.
+ */
+const MAX_SPEED_MS = (130 * 1000) / 3600
+
+/**
  * A* shortest path algorithm with configurable heuristic.
  *
  * When heuristic returns 0 for all nodes, this is equivalent to Dijkstra's algorithm.
@@ -103,6 +109,10 @@ export const dijkstra: RoutingAlgorithmFn = (graph, start, end, getWeight) => {
 /**
  * A* algorithm - uses heuristic to guide search toward destination.
  * Typically faster than Dijkstra for point-to-point queries.
+ *
+ * The heuristic is adapted based on the metric:
+ * - distance: haversine distance in meters
+ * - time: haversine distance / max speed (lower bound on travel time in seconds)
  */
 export const astar: RoutingAlgorithmFn = (
 	graph,
@@ -110,17 +120,20 @@ export const astar: RoutingAlgorithmFn = (
 	end,
 	getWeight,
 	getCoord,
+	metric,
 ) => {
 	if (!getCoord) return null
 
 	const endCoord = getCoord(end)
 	if (!endCoord) return null
 
-	// Haversine heuristic: straight-line distance in meters
+	// Haversine heuristic scaled by metric
+	// For time: divide by max speed to get admissible time estimate
 	const heuristic = (nodeIndex: number): number => {
 		const coord = getCoord(nodeIndex)
 		if (!coord) return 0
-		return haversineDistance(endCoord, coord)
+		const distance = haversineDistance(endCoord, coord)
+		return metric === "time" ? distance / MAX_SPEED_MS : distance
 	}
 
 	return shortestPath(graph, start, end, getWeight, heuristic)

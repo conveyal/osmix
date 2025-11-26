@@ -55,6 +55,7 @@ export class Router {
 			toNodeIndex,
 			(edge) => (metric === "distance" ? edge.distance : edge.time),
 			(nodeIndex) => this.osm.nodes.getNodeLonLat({ index: nodeIndex }),
+			metric,
 		)
 	}
 

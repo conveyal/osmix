@@ -75,4 +75,5 @@ export type RoutingAlgorithmFn = (
 	endNodeIndex: number,
 	getEdgeWeight: (edge: GraphEdge) => number,
 	getNodeCoord?: (nodeIndex: number) => LonLat | undefined,
+	metric?: RoutingMetric,
 ) => PathSegment[] | null
