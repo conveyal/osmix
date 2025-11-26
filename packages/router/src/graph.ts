@@ -79,16 +79,19 @@ export function buildGraph(
 				})
 			}
 
-			// If nodes have been seen in other ways, add to intersection list
+			// Track routable nodes and intersections (nodes appearing in multiple ways)
 			if (routable.has(nodeIndex)) intersections.add(nodeIndex)
 			else routable.add(nodeIndex)
+
+			if (routable.has(targetNodeIndex)) intersections.add(targetNodeIndex)
+			else routable.add(targetNodeIndex)
 		}
 	}
 
 	return {
 		edges,
 		intersections,
-		isRouteable: (nodeIndex) => edges.has(nodeIndex),
+		isRouteable: (nodeIndex) => routable.has(nodeIndex),
 		isIntersection: (nodeIndex) => intersections.has(nodeIndex),
 		getEdges: (nodeIndex) => edges.get(nodeIndex) ?? [],
 	}
