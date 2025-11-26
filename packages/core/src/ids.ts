@@ -1,3 +1,12 @@
+/**
+ * ID storage and lookup for OSM entities.
+ *
+ * Uses a two-level binary search (anchor array + block search) to map 64-bit OSM IDs
+ * to internal array indices. Balances memory usage with O(log n) lookup speed.
+ *
+ * @module
+ */
+
 import { assertValue } from "@osmix/shared/assert"
 import {
 	BufferConstructor,
@@ -5,32 +14,58 @@ import {
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
 
+/**
+ * Union type for looking up entities by either OSM ID or internal array index.
+ */
 export type IdOrIndex = { id: number } | { index: number }
 
+/**
+ * Number of IDs per anchor block for the two-level binary search.
+ * Smaller values increase anchor array size but speed up block-level search;
+ * larger values reduce anchor overhead but slow the final search.
+ */
 const BLOCK_SIZE = 256
 
+/**
+ * Serializable state for worker transfer.
+ */
 export interface IdsTransferables {
+	/** Entity IDs in insertion order. */
 	ids: BufferType
+	/** Sorted IDs for binary search (aliases `ids` if already sorted). */
 	sortedIds: BufferType
+	/** Maps sorted position → original insertion index. */
 	sortedIdPositionToIndex: BufferType
+	/** Anchor array: every BLOCK_SIZE-th sorted ID. */
 	anchors: BufferType
+	/** True if IDs were inserted in ascending order. */
 	idsAreSorted: boolean
 }
 
 /**
- * Efficiently store and lookup IDs.
+ * Efficiently store and lookup OSM entity IDs.
  *
- * This is used to store IDs in a sorted array and then use binary search to find the index of an ID.
- * Maps max out at 2^32 IDs.
+ * Stores 64-bit IDs in a Float64Array and maintains a sorted index for O(log n) lookups.
+ * Max capacity: ~2^32 entities.
  */
 export class Ids {
+	/** All IDs in insertion order */
 	private ids: RTA<Float64Array>
+	/** Whether buildIndex() has been called */
 	private indexBuilt = false
+	/** True if IDs were added in ascending order (allows index optimization) */
 	private idsAreSorted = true
+	/** Sorted view of IDs for binary search */
 	private idsSorted: Float64Array
+	/** Maps position in sorted array → original insertion index */
 	private sortedIdPositionToIndex: Uint32Array
+	/** Anchor array for two-level binary search: every BLOCK_SIZE-th sorted ID */
 	private anchors: Float64Array
 
+	/**
+	 * Create a new Ids index.
+	 * @param transferables - Optional serialized state to reconstruct from.
+	 */
 	constructor(transferables?: IdsTransferables) {
 		if (transferables) {
 			this.ids = RTA.from(Float64Array, transferables.ids)
@@ -49,28 +84,47 @@ export class Ids {
 		}
 	}
 
+	/** Number of IDs stored in this index. */
 	get size() {
 		return this.ids.length
 	}
 
+	/** Returns true if buildIndex() has been called and lookups are enabled. */
 	isReady() {
 		return this.indexBuilt
 	}
 
+	/** Returns true if IDs were inserted in ascending order. */
 	isSorted() {
 		return this.idsAreSorted
 	}
 
+	/**
+	 * Add an ID to the index.
+	 * @param id - The OSM entity ID to add.
+	 * @returns The internal array index where this ID was stored.
+	 * @throws If the index has already been built.
+	 */
 	add(id: number): number {
 		if (this.indexBuilt) throw Error("ID index already built.")
 		if (this.ids.length > 0 && id < this.ids.at(-1)) this.idsAreSorted = false
 		return this.ids.push(id)
 	}
 
+	/**
+	 * Get the ID at a specific internal index.
+	 * @param index - The internal array index.
+	 * @returns The OSM entity ID at that index.
+	 */
 	at(index: number): number {
 		return this.ids.at(index)
 	}
 
+	/**
+	 * Check if an ID exists in this index.
+	 * @param id - The OSM entity ID to check.
+	 * @returns True if the ID exists in this index.
+	 */
 	has(id: number): boolean {
 		return this.getIndexFromId(id) !== -1
 	}
@@ -142,7 +196,13 @@ export class Ids {
 		this.indexBuilt = true
 	}
 
-	// Lookup id → index
+	/**
+	 * Look up the internal array index for an OSM entity ID.
+	 *
+	 * @param id - The OSM entity ID to look up.
+	 * @returns The internal array index, or -1 if not found.
+	 * @throws If the index has not been built.
+	 */
 	getIndexFromId(id: number): number {
 		if (!this.indexBuilt) throw Error("IdIndex not built.")
 
@@ -188,10 +248,15 @@ export class Ids {
 		return [i.index, this.at(i.index)]
 	}
 
+	/** Returns the sorted array of IDs for iteration. */
 	get sorted() {
 		return this.idsSorted
 	}
 
+	/**
+	 * Get transferable buffers for passing to another thread.
+	 * @returns Serializable representation of this index.
+	 */
 	transferables(): IdsTransferables {
 		return {
 			ids: this.ids.array.buffer,

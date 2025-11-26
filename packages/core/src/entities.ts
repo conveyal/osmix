@@ -1,3 +1,12 @@
+/**
+ * Base class for OSM entity collections.
+ *
+ * Provides common ID and tag storage, streaming iteration, and sorted access.
+ * Subclasses implement entity-specific storage and spatial indexing.
+ *
+ * @module
+ */
+
 import type {
 	GeoBbox2D,
 	OsmEntity,
@@ -7,19 +16,38 @@ import type {
 import type { IdOrIndex, Ids, IdsTransferables } from "./ids"
 import type { Tags, TagsTransferables } from "./tags"
 
+/**
+ * Serializable representation of an Entities collection for worker transfer.
+ * Combines ID and tag transferables; subclasses add entity-specific data.
+ */
 export interface EntitiesTransferables
 	extends IdsTransferables,
 		TagsTransferables {}
 
+/**
+ * Abstract base for typed entity collections.
+ *
+ * Lifecycle:
+ * 1. **Ingest**: `addEntity()` (no lookups).
+ * 2. **Finalize**: `buildIndex()`.
+ * 3. **Query**: Lookups and iteration enabled.
+ */
 export abstract class Entities<T extends OsmEntity> {
+	/** The type of entity stored in this collection ("node", "way", or "relation"). */
 	indexType: OsmEntityType
+	/** ID storage and lookup */
 	ids: Ids
+	/** Tag storage and search */
 	tags: Tags
 
+	/** Whether buildIndex() has been called */
 	protected indexBuilt = false
 
 	/**
-	 * Create a new Entities index.
+	 * Create a new Entities collection.
+	 * @param indexType - The entity type ("node", "way", or "relation").
+	 * @param ids - The ID storage instance.
+	 * @param tags - The tag storage instance.
 	 */
 	constructor(indexType: OsmEntityType, ids: Ids, tags: Tags) {
 		this.indexType = indexType
@@ -44,14 +72,21 @@ export abstract class Entities<T extends OsmEntity> {
 		return this.ids.isReady() && this.tags.isReady() && this.indexBuilt
 	}
 
+	/** Number of entities in this collection. */
 	get size() {
 		return this.ids.size
 	}
 
+	/**
+	 * Compact entity-specific typed arrays.
+	 * Called by `buildIndex()` after ID and tag indexes are built.
+	 * @abstract
+	 */
 	abstract buildEntityIndex(): void
 
 	/**
-	 * Build the internal indexes for entities.
+	 * Finalize indexes.
+	 * Must be called after adding entities and before querying.
 	 */
 	buildIndex() {
 		if (this.indexBuilt) return
@@ -63,8 +98,22 @@ export abstract class Entities<T extends OsmEntity> {
 		console.timeEnd(`${this.indexType}Index.buildIndex`)
 	}
 
+	/**
+	 * Get the bounding box of an entity.
+	 * @param idOrIndex - Entity identifier (by ID or internal index).
+	 * @returns Geographic bounding box [minLon, minLat, maxLon, maxLat].
+	 * @abstract
+	 */
 	abstract getEntityBbox(idOrIndex: IdOrIndex): GeoBbox2D
 
+	/**
+	 * Reconstruct a full entity object from index data.
+	 * @param index - Internal array index.
+	 * @param id - OSM entity ID.
+	 * @param tags - Optional pre-fetched tags.
+	 * @returns The complete entity object.
+	 * @abstract
+	 */
 	abstract getFullEntity(index: number, id: number, tags?: OsmTags): T
 
 	/**
