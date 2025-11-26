@@ -105,8 +105,11 @@ export function calculateRouteStats(
 	let totalTime = 0
 
 	// First pass: collect per-way stats and build ordered list with node info
+	// Store the START node of each edge (previousNodeIndex) so we can correctly
+	// identify where way transitions occur (the turn point is where the previous
+	// way ends and the new way begins)
 	const wayStats = new Map<number, { distance: number; time: number }>()
-	const waySequence: { wayIndex: number; nodeIndex: number }[] = []
+	const waySequence: { wayIndex: number; transitionNodeIndex: number }[] = []
 
 	for (const seg of path) {
 		if (seg.wayIndex !== undefined && seg.previousNodeIndex !== undefined) {
@@ -119,8 +122,12 @@ export function calculateRouteStats(
 				totalDistance += edge.distance
 				totalTime += edge.time
 
-				// Track this way appearance in order with the node where it starts
-				waySequence.push({ wayIndex: seg.wayIndex, nodeIndex: seg.nodeIndex })
+				// Track this way appearance with the transition node (start of this edge)
+				// This is where the previous way ends and this way begins
+				waySequence.push({
+					wayIndex: seg.wayIndex,
+					transitionNodeIndex: seg.previousNodeIndex,
+				})
 
 				// Accumulate per-way stats
 				const existing = wayStats.get(seg.wayIndex)
@@ -145,7 +152,7 @@ export function calculateRouteStats(
 	let currentDisplayName: string | null = null
 	const processedWayIndexes = new Set<number>()
 
-	for (const { wayIndex, nodeIndex } of waySequence) {
+	for (const { wayIndex, transitionNodeIndex } of waySequence) {
 		// Skip if we've already processed this way index in a previous segment
 		if (processedWayIndexes.has(wayIndex)) continue
 		processedWayIndexes.add(wayIndex)
@@ -168,8 +175,9 @@ export function calculateRouteStats(
 			// Name changed - record turn point and start new segment
 			if (currentSegment) {
 				waySegments.push(currentSegment)
-				// Add turn point at this node (where name changes)
-				const coord = osm.nodes.getNodeLonLat({ index: nodeIndex })
+				// Add turn point at the transition node (where previous way ends
+				// and new way begins - this is the correct location for the turn)
+				const coord = osm.nodes.getNodeLonLat({ index: transitionNodeIndex })
 				if (coord) {
 					turnPoints.push(coord)
 				}
