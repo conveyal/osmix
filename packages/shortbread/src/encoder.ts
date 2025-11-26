@@ -10,12 +10,12 @@ import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
 import { llToTilePx, tileToBbox } from "@osmix/shared/tile"
 import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
 import { wayIsArea } from "@osmix/shared/way-is-area"
-import type {
-	VtSimpleFeature,
-	VtSimpleFeatureGeometry,
-	VtSimpleFeatureType,
-} from "../types"
-import writeVtPbf from "../write-vt-pbf"
+import {
+	writeVtPbf,
+	type VtSimpleFeature,
+	type VtSimpleFeatureGeometry,
+	type VtSimpleFeatureType,
+} from "@osmix/vt"
 import { matchTags, SHORTBREAD_LAYERS } from "./layers"
 import type { ShortbreadLayerName, ShortbreadProperties } from "./types"
 

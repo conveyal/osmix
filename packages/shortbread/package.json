@@ -1,9 +1,9 @@
 {
 	"$schema": "https://json.schemastore.org/package",
-	"name": "@osmix/vt",
+	"name": "@osmix/shortbread",
 	"type": "module",
-	"version": "0.0.5",
-	"description": "Encode Osmix binary overlay tiles directly into Mapbox Vector Tiles",
+	"version": "0.0.1",
+	"description": "Shortbread schema vector tile encoder for Osmix",
 	"main": "./src/index.ts",
 	"publishConfig": {
 		"access": "public",
@@ -38,14 +38,15 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@types/bun": "catalog:",
+		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
-		"pbf": "catalog:"
+		"@osmix/vt": "workspace:*"
 	},
 	"devDependencies": {
 		"@mapbox/tilebelt": "^2.0.2",
 		"@mapbox/vector-tile": "^2.0.4",
-		"@osmix/core": "workspace:*",
+		"@types/bun": "catalog:",
+		"pbf": "catalog:",
 		"typescript": "catalog:"
 	}
 }

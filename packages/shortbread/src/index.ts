@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { ShortbreadVtEncoder } from "@osmix/vt/shortbread"
+ * import { ShortbreadVtEncoder } from "@osmix/shortbread"
  *
  * const encoder = new ShortbreadVtEncoder(osm)
  * const tile = encoder.getTile([z, x, y])

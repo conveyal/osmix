@@ -104,7 +104,7 @@
     },
     "packages/change": {
       "name": "@osmix/change",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -119,7 +119,7 @@
     },
     "packages/core": {
       "name": "@osmix/core",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/shared": "workspace:*",
         "flatbush": "^4.4.1",
@@ -133,7 +133,7 @@
     },
     "packages/geojson": {
       "name": "@osmix/geojson",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/pbf": "workspace:*",
@@ -148,7 +148,7 @@
     },
     "packages/json": {
       "name": "@osmix/json",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -160,7 +160,7 @@
     },
     "packages/osmix": {
       "name": "osmix",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
@@ -194,7 +194,7 @@
     },
     "packages/raster": {
       "name": "@osmix/raster",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/shared": "workspace:*",
       },
@@ -205,7 +205,7 @@
     },
     "packages/shared": {
       "name": "@osmix/shared",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@mapbox/geojson-rewind": "catalog:",
         "@mapbox/tilebelt": "^2.0.2",
@@ -217,9 +217,25 @@
         "typescript": "catalog:",
       },
     },
+    "packages/shortbread": {
+      "name": "@osmix/shortbread",
+      "version": "0.0.1",
+      "dependencies": {
+        "@osmix/core": "workspace:*",
+        "@osmix/shared": "workspace:*",
+        "@osmix/vt": "workspace:*",
+      },
+      "devDependencies": {
+        "@mapbox/tilebelt": "^2.0.2",
+        "@mapbox/vector-tile": "^2.0.4",
+        "@types/bun": "catalog:",
+        "pbf": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/vt": {
       "name": "@osmix/vt",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/shared": "workspace:*",
         "@types/bun": "catalog:",
@@ -464,6 +480,8 @@
     "@osmix/raster": ["@osmix/raster@workspace:packages/raster"],
 
     "@osmix/shared": ["@osmix/shared@workspace:packages/shared"],
+
+    "@osmix/shortbread": ["@osmix/shortbread@workspace:packages/shortbread"],
 
     "@osmix/vt": ["@osmix/vt@workspace:packages/vt"],
 
