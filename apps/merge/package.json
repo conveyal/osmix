@@ -32,15 +32,9 @@
 		"@osmix/raster": "workspace:*",
 		"@osmix/router": "workspace:*",
 		"@osmix/shared": "workspace:*",
+		"@osmix/ui": "workspace:*",
 		"@mapbox/tilebelt": "^2.0.2",
-		"@radix-ui/react-collapsible": "^1.1.12",
-		"@radix-ui/react-dialog": "^1.1.14",
-		"@radix-ui/react-hover-card": "^1.1.15",
-		"@radix-ui/react-separator": "^1.1.7",
-		"@radix-ui/react-slot": "^1.2.3",
 		"@turf/bbox-polygon": "7.2.0",
-		"class-variance-authority": "^0.7.1",
-		"clsx": "^2.1.1",
 		"comlink": "^4.4.2",
 		"dequal": "catalog:",
 		"jotai": "^2.15.0",
@@ -50,8 +44,6 @@
 		"osmix": "workspace:*",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
-		"react-map-gl": "^8.0.4",
-		"react-router": "^7.7.1",
-		"tailwind-merge": "^3.3.0"
+		"react-map-gl": "^8.0.4"
 	}
 }

@@ -1,8 +1,8 @@
 import { changeStatsSummary } from "@osmix/change"
+import { ButtonGroup, ButtonGroupSeparator } from "@osmix/ui"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
 import { useMemo } from "react"
-import { useSearchParams } from "react-router"
 import ActionButton from "../components/action-button"
 import Basemap from "../components/basemap"
 import CustomControl from "../components/custom-control"
@@ -27,10 +27,6 @@ import RouteLayer from "../components/route-layer"
 import SelectedEntityLayer from "../components/selected-entity-layer"
 import SidebarLog from "../components/sidebar-log"
 import TileBoundsLayer from "../components/tile-bounds-layer"
-import {
-	ButtonGroup,
-	ButtonGroupSeparator,
-} from "../components/ui/button-group"
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
 import { changesetStatsAtom } from "../state/changes"
@@ -38,17 +34,16 @@ import { Log } from "../state/log"
 import { selectOsmEntityAtom } from "../state/osm"
 import { osmWorker } from "../state/worker"
 
+const DEFAULT_OSM_ID = "inspect"
+const DEFAULT_PBF_URL = "./monaco.pbf"
+
 export default function InspectPage() {
-	const [searchParams] = useSearchParams()
-	const osmId = useMemo(
-		() => searchParams.get("osmId") ?? "inspect",
-		[searchParams],
-	)
+	const osmId = DEFAULT_OSM_ID
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
 	const { downloadOsm, osm, osmInfo, file, loadOsmFile, setOsm } = useOsmFile(
 		osmId,
-		"./monaco.pbf",
+		DEFAULT_PBF_URL,
 	)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)

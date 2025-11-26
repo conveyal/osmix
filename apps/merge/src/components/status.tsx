@@ -1,7 +1,6 @@
+import { cn, Spinner } from "@osmix/ui"
 import { useLog } from "../hooks/log"
-import { cn } from "../lib/utils"
 import { formatTimestampMs } from "../utils"
-import { Spinner } from "./ui/spinner"
 
 export default function Status() {
 	const { log, activeTasks } = useLog()

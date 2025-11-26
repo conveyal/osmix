@@ -1,7 +1,7 @@
 import type { GeoBbox2D } from "@osmix/shared/types"
+import { Button } from "@osmix/ui"
 import { MaximizeIcon } from "lucide-react"
 import { useMap } from "../hooks/map"
-import { Button } from "./ui/button"
 
 export default function FitBounds({
 	bounds,

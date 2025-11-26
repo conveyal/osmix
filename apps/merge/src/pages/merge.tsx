@@ -1,4 +1,17 @@
 import { changeStatsSummary } from "@osmix/change"
+import {
+	Button,
+	ButtonGroup,
+	ButtonGroupSeparator,
+	cn,
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemMedia,
+	ItemTitle,
+	Spinner,
+} from "@osmix/ui"
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
 	ArrowLeft,
@@ -35,23 +48,8 @@ import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
 import SelectedEntityLayer from "../components/selected-entity-layer"
 import SidebarLog from "../components/sidebar-log"
-import { Button } from "../components/ui/button"
-import {
-	ButtonGroup,
-	ButtonGroupSeparator,
-} from "../components/ui/button-group"
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemMedia,
-	ItemTitle,
-} from "../components/ui/item"
-import { Spinner } from "../components/ui/spinner"
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
-import { cn } from "../lib/utils"
 import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
 import { Log } from "../state/log"

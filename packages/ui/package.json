@@ -1,0 +1,66 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/ui",
+	"type": "module",
+	"version": "0.0.1",
+	"description": "Shared UI components for Osmix apps",
+	"main": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./*": "./src/*.ts",
+		"./components/*": "./src/components/*.tsx",
+		"./lib/*": "./src/lib/*.ts"
+	},
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"import": "./dist/index.js",
+				"types": "./dist/index.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
+	"sideEffects": false,
+	"scripts": {
+		"build": "tsc",
+		"prepublishOnly": "tsc",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/bun": "catalog:",
+		"@types/react": "^19.2.0",
+		"@types/react-dom": "^19.2.0",
+		"typescript": "catalog:"
+	},
+	"dependencies": {
+		"@radix-ui/react-collapsible": "^1.1.12",
+		"@radix-ui/react-dialog": "^1.1.14",
+		"@radix-ui/react-hover-card": "^1.1.15",
+		"@radix-ui/react-separator": "^1.1.7",
+		"@radix-ui/react-slot": "^1.2.3",
+		"class-variance-authority": "^0.7.1",
+		"clsx": "^2.1.1",
+		"lucide-react": "^0.513.0",
+		"tailwind-merge": "^3.3.0"
+	},
+	"peerDependencies": {
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	}
+}

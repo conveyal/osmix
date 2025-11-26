@@ -225,13 +225,16 @@ export class OsmixRasterTile {
 		const normalizedRings = rings.map((ring) => {
 			const feature = {
 				type: "Feature" as const,
+				properties: null,
 				geometry: {
 					type: "Polygon" as const,
 					coordinates: [ring],
 				},
 			}
 			const rewound = rewind(feature, false)
-			const firstRing = rewound.geometry.coordinates[0]
+			const geom = rewound.geometry
+			if (geom.type !== "Polygon") return ring
+			const firstRing = geom.coordinates[0] as LonLat[] | undefined
 			if (!firstRing) return ring
 			return firstRing
 		})
