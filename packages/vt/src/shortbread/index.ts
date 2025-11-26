@@ -1,13 +1,24 @@
-export { OsmixVtEncoder, projectToTile } from "./encode"
-export * from "./types"
+/**
+ * Shortbread Vector Tile Schema
+ *
+ * This module provides a Shortbread-compliant vector tile encoder.
+ * Based on https://shortbread-tiles.org/schema/1.0/
+ *
+ * @example
+ * ```typescript
+ * import { ShortbreadVtEncoder } from "@osmix/vt/shortbread"
+ *
+ * const encoder = new ShortbreadVtEncoder(osm)
+ * const tile = encoder.getTile([z, x, y])
+ * ```
+ */
 
-// Shortbread schema exports
-export { ShortbreadVtEncoder } from "./shortbread/encoder"
+export { ShortbreadVtEncoder } from "./encoder"
 export {
 	getLayersForGeometryType,
 	matchTags,
 	SHORTBREAD_LAYERS,
-} from "./shortbread/layers"
+} from "./layers"
 export type {
 	AddressProperties,
 	AerialwayKind,
@@ -42,4 +53,4 @@ export type {
 	WaterLineKind,
 	WaterLineProperties,
 	WaterProperties,
-} from "./shortbread/types"
+} from "./types"

@@ -5,6 +5,10 @@
 	"version": "0.0.5",
 	"description": "Encode Osmix binary overlay tiles directly into Mapbox Vector Tiles",
 	"main": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./shortbread": "./src/shortbread/index.ts"
+	},
 	"publishConfig": {
 		"access": "public",
 		"main": "./dist/index.js",
@@ -13,6 +17,10 @@
 			".": {
 				"import": "./dist/index.js",
 				"types": "./dist/index.d.ts"
+			},
+			"./shortbread": {
+				"import": "./dist/shortbread/index.js",
+				"types": "./dist/shortbread/index.d.ts"
 			}
 		},
 		"files": [
