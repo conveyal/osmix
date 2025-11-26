@@ -1,5 +1,14 @@
+/**
+ * Utility functions for @osmix/core.
+ * @module
+ */
+
 import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
 
+/**
+ * Compute the bounding box of a set of coordinates.
+ * Returns `[minLon, minLat, maxLon, maxLat]`.
+ */
 export function bboxFromLonLats(lonLats: LonLat[]): GeoBbox2D {
 	let minLon = Number.POSITIVE_INFINITY
 	let minLat = Number.POSITIVE_INFINITY

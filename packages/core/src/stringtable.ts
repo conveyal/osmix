@@ -1,31 +1,56 @@
+/**
+ * Deduplicated UTF-8 string storage.
+ *
+ * Strings are stored in a flat buffer and referenced by index.
+ * Supports fast deduplication (string→index) and lazy reconstruction (index→string).
+ *
+ * @module
+ */
+
 import type { OsmPbfStringTable } from "@osmix/pbf"
 import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
 
+/**
+ * Serializable state for worker transfer.
+ */
 export interface StringTableTransferables {
+	/** Concatenated UTF-8 bytes. */
 	bytes: BufferType
+	/** Maps string index → byte offset. */
 	start: BufferType
+	/** Maps string index → byte length. */
 	count: BufferType
 }
 
 /**
- * StringTable that can be used to store and retrieve strings as bytes.
+ * Append-only deduplicated string table.
+ *
+ * Limits: Max string length 65,535 bytes.
+ * Rebuilds reverse index lazily after transfer.
  */
 export default class StringTable {
+	/** UTF-8 encoder for string→bytes conversion */
 	private enc = new TextEncoder()
+	/** UTF-8 decoder for bytes→string conversion */
 	private dec = new TextDecoder() // UTF-8
 
-	// Serializable state
+	// ─── Serializable State ────────────────────────────────────────────────────
+	/** Concatenated UTF-8 bytes of all strings */
 	bytes: RTA<Uint8Array>
+	/** Maps string index → byte offset in bytes array */
 	start: RTA<Uint32Array>
+	/** Maps string index → byte length */
 	count: RTA<Uint16Array>
 
-	// Builder state
+	// ─── Builder State (string → index) ────────────────────────────────────────
+	/** Forward lookup: string → index (populated during add) */
 	private stringToIndex = new Map<string, number>()
 
-	// Lazy-built reverse index for lookups after transfer/hydration
+	/** Whether the reverse index has been built (lazy after transfer) */
 	private reverseIndexBuilt = false
 
-	// Retrieval state
+	// ─── Retrieval Cache (index → string) ──────────────────────────────────────
+	/** Cache of decoded strings to avoid repeated UTF-8 decoding */
 	private indexToString = new Map<number, string>()
 
 	/**
@@ -89,10 +114,8 @@ export default class StringTable {
 	}
 
 	/**
-	 * TextDecoder.decode() does not support SharedArrayBuffer, so we need to first copy to a normal ArrayBuffer before decoding.
-	 */
-	/**
 	 * Get a string by its index.
+	 * Caches results to avoid repeated UTF-8 decoding.
 	 */
 	get(index: number): string {
 		const string = this.indexToString.get(index)
@@ -107,23 +130,27 @@ export default class StringTable {
 	}
 
 	/**
-	 * Get the raw bytes of a string by its index.
+	 * Get the raw UTF-8 bytes of a string.
+	 * Returns a subarray view (not a copy).
 	 */
 	getBytes(index: number): Uint8Array {
 		if (index < 0 || index >= this.length)
 			throw Error(`String index out of range: ${index}`)
 		const start = this.start.at(index)
 		const count = this.count.at(index)
-		// Important: subarray creates a *view*, not a copy; TextDecoder cannot read from it directly.
 		return this.bytes.array.subarray(start, start + count)
 	}
 
+	/** Number of strings in the table. */
 	get length() {
 		return this.start.length
 	}
 
 	/**
-	 * Compact the internal arrays to free up memory.
+	 * Finalize the string table by compacting internal arrays.
+	 *
+	 * This releases unused buffer capacity and marks the reverse index as built
+	 * (since all strings were added before this call).
 	 */
 	buildIndex() {
 		this.bytes.compact()
@@ -144,12 +171,12 @@ export default class StringTable {
 	}
 
 	/**
-	 * Ensure the reverse index (string -> index) is built.
+	 * Lazily build the reverse index (string → index).
+	 * Decodes all strings once to populate the lookup map.
 	 */
 	private ensureReverseIndex() {
 		if (this.reverseIndexBuilt) return
-		// Build string -> index map from existing decoded strings
-		// Decode once per entry; subsequent get() calls are cached via indexToString
+		// Decode all strings and populate the forward lookup map
 		for (let i = 0; i < this.length; i++) {
 			this.stringToIndex.set(this.get(i), i)
 		}

@@ -1,43 +1,77 @@
+/**
+ * Tag storage and lookup.
+ *
+ * Stores key=value pairs using string table indices. Supports:
+ * 1. **Entity → Tags**: Retrieve tags for a given entity.
+ * 2. **Key → Entities**: Find entities with a specific tag key.
+ *
+ * @module
+ */
+
 import type { OsmTags } from "@osmix/shared/types"
 import StringTable from "./stringtable"
 import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
 
+/**
+ * Serializable state for worker transfer.
+ */
 export interface TagsTransferables {
+	/** Maps entity index → start position in tagKeys/tagVals. */
 	tagStart: BufferType
+	/** Maps entity index → number of tags. */
 	tagCount: BufferType
+	/** Flattened tag key indices. */
 	tagKeys: BufferType
+	/** Flattened tag value indices. */
 	tagVals: BufferType
 
+	/** Flattened entity indices for reverse key lookup. */
 	keyEntities: BufferType
+	/** Maps key index → start position in keyEntities. */
 	keyIndexStart: BufferType
+	/** Maps key index → count of entities with that key. */
 	keyIndexCount: BufferType
 }
 
+/**
+ * Bidirectional tag storage.
+ *
+ * Limits: Max 255 tags per entity.
+ * Note: String indices reference a shared `StringTable`.
+ */
 export class Tags {
+	/** Reference to the shared string table for key/value storage */
 	private stringTable: StringTable = new StringTable()
 
-	// Entity -> tag look up
+	// ─── Entity → Tag Lookup ───────────────────────────────────────────────────
+	/** Maps entity index → start position in tagKeys/tagVals */
 	private tagStart: RTA<Uint32Array>
+	/** Maps entity index → number of tags (max 255) */
 	private tagCount: RTA<Uint8Array>
+	/** All tag key string indices, concatenated */
 	private tagKeys: RTA<Uint32Array>
+	/** All tag value string indices, concatenated (parallel to tagKeys) */
 	private tagVals: RTA<Uint32Array>
 
+	// ─── Key → Entity Reverse Lookup ───────────────────────────────────────────
 	/**
-	 * Tag -> entity look up indexes for keys.
+	 * Flattened array of entity indices that have each tag key.
+	 * Indexed via keyIndexStart and keyIndexCount.
 	 */
 	private keyEntities: RTA<Uint32Array>
 
-	/**
-	 * Look up string index -> start and count of entities with that string index.
-	 */
+	/** Maps key string index → start position in keyEntities */
 	private keyIndexStart: RTA<Uint32Array>
+	/** Maps key string index → count of entities with that key */
 	private keyIndexCount: RTA<Uint32Array>
 
 	/**
-	 * Store look up indexes for entities by their string index. Cleared after building the final index.
+	 * Temporary map used during ingestion to collect entity indices per key.
+	 * Converted to flat arrays during buildIndex() and then cleared.
 	 */
 	private keyEntityIndexBuilder = new Map<number, number[]>()
 
+	/** Whether buildIndex() has been called */
 	private indexBuilt = false
 
 	/**
@@ -104,7 +138,10 @@ export class Tags {
 	}
 
 	/**
-	 * Compact the internal arrays to free up memory.
+	 * Finalize the tag index.
+	 *
+	 * Compacts arrays and builds the reverse key→entity index.
+	 * Must be called before `hasKey()`.
 	 */
 	buildIndex() {
 		this.tagStart.compact()
@@ -112,6 +149,7 @@ export class Tags {
 		this.tagKeys.compact()
 		this.tagVals.compact()
 
+		// Convert the builder map to flat arrays for the reverse index
 		for (const [keyIndex, entityIndexes] of this.keyEntityIndexBuilder) {
 			this.keyIndexStart.set(keyIndex, this.keyEntities.length)
 			this.keyIndexCount.set(keyIndex, entityIndexes.length)
@@ -198,7 +236,8 @@ export class Tags {
 	}
 
 	/**
-	 * Create a unique index for a key=value pair.
+	 * Create a unique composite index for a key=value pair.
+	 * Uses row-major indexing: `key * width + val`.
 	 */
 	kvToIndex(key: number, val: number) {
 		const width = this.stringTable.length
