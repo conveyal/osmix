@@ -6,9 +6,9 @@
 
 import type { OsmTags } from "@osmix/shared/types"
 import type {
+	AddressProperties,
 	AerialwayKind,
 	AerialwayProperties,
-	AddressProperties,
 	BoundaryKind,
 	BoundaryProperties,
 	BridgeProperties,

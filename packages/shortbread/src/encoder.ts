@@ -11,10 +11,10 @@ import { llToTilePx, tileToBbox } from "@osmix/shared/tile"
 import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 import {
-	writeVtPbf,
 	type VtSimpleFeature,
 	type VtSimpleFeatureGeometry,
 	type VtSimpleFeatureType,
+	writeVtPbf,
 } from "@osmix/vt"
 import { matchTags, SHORTBREAD_LAYERS } from "./layers"
 import type { ShortbreadLayerName, ShortbreadProperties } from "./types"

@@ -46,33 +46,4 @@ The encoder generates the following Shortbread-compliant layers:
 
 ## API
 
-### `ShortbreadVtEncoder`
-
-```typescript
-class ShortbreadVtEncoder {
-  constructor(osm: Osm, extent?: number, buffer?: number)
-  
-  // Get all layer names
-  static get layerNames(): ShortbreadLayerName[]
-  
-  // Generate tile for tile coordinates
-  getTile(tile: Tile): ArrayBuffer
-  
-  // Generate tile for bounding box
-  getTileForBbox(bbox: GeoBbox2D, proj: (ll: LonLat) => XY): ArrayBuffer
-}
-```
-
-### Layer Matching
-
-```typescript
-import { matchTags, SHORTBREAD_LAYERS } from "@osmix/shortbread"
-
-// Match OSM tags to a Shortbread layer
-const match = matchTags({ highway: "primary" }, "LineString")
-// { layer: { name: "streets", ... }, properties: { kind: "primary", ... } }
-```
-
-## License
-
-MIT
+WIP
