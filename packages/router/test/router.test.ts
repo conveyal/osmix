@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test"
 import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/test/fixtures"
 import { createOsmFromPbf } from "osmix"
-import { buildRoutingGraph, findNearestNodeOnGraph } from "../src"
+import { buildGraph, findNearestNodeOnGraph } from "../src"
 import { Router } from "../src/router"
 
 /**
@@ -69,17 +69,14 @@ function createTestOsm(): Osm {
 describe("Router", () => {
 	it("should create a router with default config", () => {
 		const osm = createTestOsm()
-		const router = new Router(osm, buildRoutingGraph(osm))
+		const router = new Router(osm, buildGraph(osm))
 
 		expect(router).toBeDefined()
 	})
 
 	it("should create a router with custom highway filter", () => {
 		const osm = createTestOsm()
-		const graph = buildRoutingGraph(
-			osm,
-			(tags) => tags?.["highway"] === "primary",
-		)
+		const graph = buildGraph(osm, (tags) => tags?.["highway"] === "primary")
 		const router = new Router(osm, graph)
 
 		expect(router).toBeDefined()
@@ -87,7 +84,7 @@ describe("Router", () => {
 
 	it("should find a route between two nearby nodes", () => {
 		const osm = createTestOsm()
-		const graph = buildRoutingGraph(osm)
+		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
 		// Snap coordinates to nodes
@@ -106,7 +103,7 @@ describe("Router", () => {
 
 	it("should return path segments with node and way info", () => {
 		const osm = createTestOsm()
-		const graph = buildRoutingGraph(osm)
+		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
 		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
@@ -138,7 +135,7 @@ describe("Router", () => {
 		osm.nodes.buildSpatialIndex()
 		osm.buildIndexes()
 
-		const graph = buildRoutingGraph(osm)
+		const graph = buildGraph(osm)
 
 		// Can't snap because no routable ways
 		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
@@ -151,10 +148,7 @@ describe("Router", () => {
 	it("should filter ways based on highway filter", () => {
 		const osm = createTestOsm()
 		// Only include primary highways
-		const graph = buildRoutingGraph(
-			osm,
-			(tags) => tags?.["highway"] === "primary",
-		)
+		const graph = buildGraph(osm, (tags) => tags?.["highway"] === "primary")
 		const router = new Router(osm, graph)
 
 		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
@@ -172,7 +166,7 @@ describe("Router", () => {
 
 	it("should handle same start and end node", () => {
 		const osm = createTestOsm()
-		const graph = buildRoutingGraph(osm)
+		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
 		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
@@ -186,7 +180,7 @@ describe("Router", () => {
 
 	it("should use different algorithms", () => {
 		const osm = createTestOsm()
-		const graph = buildRoutingGraph(osm)
+		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
 		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
@@ -214,7 +208,7 @@ describe("Router", () => {
 
 	it("should support distance and time metrics", () => {
 		const osm = createTestOsm()
-		const graph = buildRoutingGraph(osm)
+		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
 		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
@@ -243,19 +237,29 @@ describe("Router with Monaco PBF", () => {
 	})
 
 	it("should create a router from Monaco OSM data", () => {
-		const graph = buildRoutingGraph(monacoOsm)
+		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 		expect(router).toBeDefined()
 		expect(graph.edges.size).toBe(7_073)
 	})
 
 	it("should find routes between points in Monaco", () => {
-		const graph = buildRoutingGraph(monacoOsm)
+		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 
-		// Monaco bbox: [7.4053929, 43.7232244, 7.4447259, 43.7543687]
-		const from = findNearestNodeOnGraph(monacoOsm, graph, [7.42, 43.73], 500)
-		const to = findNearestNodeOnGraph(monacoOsm, graph, [7.43, 43.74], 500)
+		// Use coordinates known to have routeable nodes nearby
+		const from = findNearestNodeOnGraph(
+			monacoOsm,
+			graph,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = findNearestNodeOnGraph(
+			monacoOsm,
+			graph,
+			[7.4259193, 43.7377731],
+			500,
+		)
 
 		expect(from).not.toBeNull()
 		expect(to).not.toBeNull()
@@ -280,11 +284,21 @@ describe("Router with Monaco PBF", () => {
 	})
 
 	it("should return routes with valid way indexes from Monaco", () => {
-		const graph = buildRoutingGraph(monacoOsm)
+		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 
-		const from = findNearestNodeOnGraph(monacoOsm, graph, [7.415, 43.73], 500)
-		const to = findNearestNodeOnGraph(monacoOsm, graph, [7.425, 43.735], 500)
+		const from = findNearestNodeOnGraph(
+			monacoOsm,
+			graph,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = findNearestNodeOnGraph(
+			monacoOsm,
+			graph,
+			[7.4259193, 43.7377731],
+			500,
+		)
 
 		const path = router.route(from!.nodeIndex, to!.nodeIndex)
 
@@ -300,11 +314,21 @@ describe("Router with Monaco PBF", () => {
 	})
 
 	it("should find routes using different algorithms in Monaco", () => {
-		const graph = buildRoutingGraph(monacoOsm)
+		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 
-		const from = findNearestNodeOnGraph(monacoOsm, graph, [7.42, 43.73], 500)
-		const to = findNearestNodeOnGraph(monacoOsm, graph, [7.43, 43.74], 500)
+		const from = findNearestNodeOnGraph(
+			monacoOsm,
+			graph,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = findNearestNodeOnGraph(
+			monacoOsm,
+			graph,
+			[7.4259193, 43.7377731],
+			500,
+		)
 
 		const dijkstraPath = router.route(from!.nodeIndex, to!.nodeIndex, {
 			algorithm: "dijkstra",
@@ -329,11 +353,21 @@ describe("Router with Monaco PBF", () => {
 	})
 
 	it("should handle time-based routing in Monaco", () => {
-		const graph = buildRoutingGraph(monacoOsm)
+		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 
-		const from = findNearestNodeOnGraph(monacoOsm, graph, [7.42, 43.73], 500)
-		const to = findNearestNodeOnGraph(monacoOsm, graph, [7.43, 43.74], 500)
+		const from = findNearestNodeOnGraph(
+			monacoOsm,
+			graph,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = findNearestNodeOnGraph(
+			monacoOsm,
+			graph,
+			[7.4259193, 43.7377731],
+			500,
+		)
 
 		const path = router.route(from!.nodeIndex, to!.nodeIndex, {
 			metric: "time",
@@ -344,7 +378,7 @@ describe("Router with Monaco PBF", () => {
 	})
 
 	it("should return null when snap fails", () => {
-		const graph = buildRoutingGraph(monacoOsm)
+		const graph = buildGraph(monacoOsm)
 
 		// Point far outside Monaco
 		const farPoint = findNearestNodeOnGraph(monacoOsm, graph, [10.0, 50.0], 100)

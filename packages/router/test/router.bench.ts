@@ -2,7 +2,7 @@ import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/test/fixtures"
 import { bench, group, run } from "mitata"
 import { createOsmFromPbf } from "osmix"
-import { buildRoutingGraph, findNearestNodeOnGraph } from "../src"
+import { buildGraph, findNearestNodeOnGraph } from "../src"
 import { Router } from "../src/router"
 
 /**
@@ -91,14 +91,14 @@ const pbfData = await getFixtureFile(monacoPbf.url)
 const monacoOsm = await createOsmFromPbf(pbfData, {
 	buildSpatialIndexes: ["node", "way"],
 })
-const monacoGraph = buildRoutingGraph(monacoOsm)
+const monacoGraph = buildGraph(monacoOsm)
 const monacoRouter = new Router(monacoOsm, monacoGraph)
 
 // Create synthetic grid
 const GRID_SIZE = 50
 const GRID_SPACING = 0.001
 const gridOsm = createSyntheticGrid(GRID_SIZE, GRID_SPACING)
-const gridGraph = buildRoutingGraph(gridOsm)
+const gridGraph = buildGraph(gridOsm)
 const gridRouter = new Router(gridOsm, gridGraph)
 
 // Pre-snap coordinates to node indexes for benchmarking
@@ -248,11 +248,11 @@ group("Grid 50x50 - Long Path (corner to corner)", () => {
 
 group("Router Initialization", () => {
 	bench("Monaco OSM (14k nodes, 3k ways)", () => {
-		new Router(monacoOsm, buildRoutingGraph(monacoOsm))
+		new Router(monacoOsm, buildGraph(monacoOsm))
 	})
 
 	bench("Grid 50x50 (2.5k nodes)", () => {
-		new Router(gridOsm, buildRoutingGraph(gridOsm))
+		new Router(gridOsm, buildGraph(gridOsm))
 	})
 })
 

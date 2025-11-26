@@ -42,6 +42,15 @@ const VEHICLE_HIGHWAYS = new Set([
 	"service",
 ])
 
+/** Footways included in default pedestrian routing. */
+const FOOT_HIGHWAYS = new Set([
+	"footway",
+	"path",
+	"cycleway",
+	"bridleway",
+	"steps",
+])
+
 /** Parse maxspeed tag to km/h. Handles "50", "50 km/h", "30 mph". */
 export function parseMaxSpeed(
 	value: string | number | undefined,
@@ -97,4 +106,10 @@ export function calculateTime(
 export function defaultHighwayFilter(tags?: OsmTags): boolean {
 	if (!tags?.["highway"]) return false
 	return VEHICLE_HIGHWAYS.has(String(tags["highway"]))
+}
+
+/** Default pedestrian filter */
+export function defaultPedestrianFilter(tags?: OsmTags): boolean {
+	if (!tags?.["highway"]) return false
+	return FOOT_HIGHWAYS.has(String(tags["highway"]))
 }

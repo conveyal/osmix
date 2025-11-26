@@ -15,14 +15,14 @@ import {
 } from "./utils"
 
 /**
- * Routing graph built from OSM ways and nodes.
+ * Graph built from OSM ways and nodes.
  *
  * Construction by collecting routable ways and track which nodes they contain, then
  * creating bidirectional edges between consecutive nodes (respecting one-way).
  *
  * Edges store pre-computed distance and time for fast weight lookups.
  */
-export function buildRoutingGraph(
+export function buildGraph(
 	osm: Osm,
 	filter: HighwayFilter = defaultHighwayFilter,
 	defaultSpeeds: DefaultSpeeds = DEFAULT_SPEEDS,
@@ -101,13 +101,9 @@ export function findNearestNodeOnGraph(
 	osm: Osm,
 	graph: RoutingGraph,
 	point: LonLat,
-	maxMeters: number,
+	maxKm: number,
 ) {
-	const nearby = osm.nodes.findIndexesWithinRadius(
-		point[0],
-		point[1],
-		maxMeters / 111000, // Convert meters to approximate degrees
-	)
+	const nearby = osm.nodes.findIndexesWithinRadius(point[0], point[1], maxKm)
 
 	let best: {
 		nodeIndex: number
@@ -120,8 +116,8 @@ export function findNearestNodeOnGraph(
 		if (!graph.isRouteable(nodeIndex)) continue
 
 		const nodeCoord = osm.nodes.getNodeLonLat({ index: nodeIndex })
-		const dist = haversineDistance(point, nodeCoord)
-		if (dist < bestDist && dist <= maxMeters) {
+		const dist = haversineDistance(point, nodeCoord) / 1000
+		if (dist < bestDist && dist <= maxKm) {
 			bestDist = dist
 			best = { nodeIndex, coordinates: nodeCoord, distance: dist }
 		}

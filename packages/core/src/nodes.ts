@@ -291,7 +291,13 @@ export class Nodes extends Entities<OsmNode> {
 		radiusKm: number,
 	): number[] {
 		// Use geokdbush for proper geographic distance calculations
-		return geoAround(this.spatialIndex, lon, lat, Number.POSITIVE_INFINITY, radiusKm)
+		return geoAround(
+			this.spatialIndex,
+			lon,
+			lat,
+			Number.POSITIVE_INFINITY,
+			radiusKm,
+		)
 	}
 
 	/**

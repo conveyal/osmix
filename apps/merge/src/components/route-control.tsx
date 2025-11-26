@@ -1,9 +1,5 @@
 import type { Osm } from "@osmix/core"
-import {
-	buildRoutingGraph,
-	findNearestNodeOnGraph,
-	Router,
-} from "@osmix/router"
+import { buildGraph, findNearestNodeOnGraph, Router } from "@osmix/router"
 import type { LonLat } from "@osmix/shared/types"
 import { useAtom, useSetAtom } from "jotai"
 import { NavigationIcon, XIcon } from "lucide-react"
@@ -19,8 +15,8 @@ import {
 } from "../state/routing"
 import { Button } from "./ui/button"
 
-/** Maximum distance (meters) to snap click point to nearest node. */
-const SNAP_RADIUS_METERS = 1000
+/** Maximum distance (km) to snap click point to nearest node. */
+const SNAP_RADIUS_KM = 1
 
 /** Format distance in meters to human readable string. */
 function formatDistance(meters: number): string {
@@ -55,7 +51,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 	// Build or retrieve cached routing graph
 	const graph = useMemo(() => {
 		if (graphCache?.osmId === osm.id) return graphCache.graph
-		const newGraph = buildRoutingGraph(osm)
+		const newGraph = buildGraph(osm)
 		setGraphCache({ osmId: osm.id, graph: newGraph })
 		return newGraph
 	}, [osm, graphCache, setGraphCache])
@@ -64,12 +60,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 	const handleMapClick = useCallback(
 		(event: MapLayerMouseEvent) => {
 			const point: LonLat = [event.lngLat.lng, event.lngLat.lat]
-			const snapped = findNearestNodeOnGraph(
-				osm,
-				graph,
-				point,
-				SNAP_RADIUS_METERS,
-			)
+			const snapped = findNearestNodeOnGraph(osm, graph, point, SNAP_RADIUS_KM)
 
 			if (!snapped) {
 				// No routable node nearby - show feedback
