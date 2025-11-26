@@ -186,10 +186,11 @@ export class OsmChangeset {
 			if (!this.osm.nodes.ids.has(node.id)) continue
 			if (this.nodeChanges[node.id]?.changeType === "delete") continue
 
+			// Use a tiny radius (1 meter = 0.001 km) to find nodes at effectively the same location
 			const existingNodes = this.osm.nodes.findIndexesWithinRadius(
 				node.lon,
 				node.lat,
-				0,
+				0.001,
 			)
 			const existingNodeIds = existingNodes
 				.map((index) => ({ id: this.osm.nodes.ids.at(index), index }))

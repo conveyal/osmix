@@ -158,8 +158,8 @@ function nearestNeighbor(
 	lat: number,
 	count: number,
 ): OsmNode[] {
-	// Use withinRadius with a reasonable search radius
-	const candidates = osm.nodes.findIndexesWithinRadius(lon, lat, 0.1)
+	// Use withinRadius with a reasonable search radius (11 km ≈ 0.1 degrees)
+	const candidates = osm.nodes.findIndexesWithinRadius(lon, lat, 11)
 
 	// Calculate distances and sort
 	const nodesWithDistance: Array<{

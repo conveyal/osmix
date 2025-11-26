@@ -1,6 +1,7 @@
 import type { OsmPbfWay } from "@osmix/pbf"
 import type { GeoBbox2D, LonLat, OsmTags, OsmWay } from "@osmix/shared/types"
 import Flatbush from "flatbush"
+import { around as geoAround } from "geoflatbush"
 import { Entities, type EntitiesTransferables } from "./entities"
 import { type IdOrIndex, Ids } from "./ids"
 import type { Nodes } from "./nodes"
@@ -256,16 +257,22 @@ export class Ways extends Entities<OsmWay> {
 	}
 
 	/**
-	 * Find way indexes near a point.
+	 * Find way indexes near a point using great-circle distance.
+	 * @param lon - Longitude in degrees.
+	 * @param lat - Latitude in degrees.
+	 * @param maxResults - Maximum number of results to return.
+	 * @param maxDistanceKm - Maximum distance in kilometers.
+	 * @returns Array of way indexes sorted by distance.
 	 */
 	neighbors(
-		x: number,
-		y: number,
+		lon: number,
+		lat: number,
 		maxResults?: number,
-		maxDistance?: number,
+		maxDistanceKm?: number,
 	): number[] {
 		if (this.size === 0) return []
-		return this.spatialIndex.neighbors(x, y, maxResults, maxDistance)
+		// Use geoflatbush for proper geographic distance calculations
+		return geoAround(this.spatialIndex, lon, lat, maxResults, maxDistanceKm)
 	}
 
 	/**

@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "osmix",
@@ -103,7 +104,7 @@
     },
     "packages/change": {
       "name": "@osmix/change",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -118,10 +119,12 @@
     },
     "packages/core": {
       "name": "@osmix/core",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/shared": "workspace:*",
         "flatbush": "^4.4.1",
+        "geoflatbush": "^2.0.0",
+        "geokdbush": "^2.0.1",
         "kdbush": "mourner/kdbush#16416cd",
       },
       "devDependencies": {
@@ -132,7 +135,7 @@
     },
     "packages/geojson": {
       "name": "@osmix/geojson",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/pbf": "workspace:*",
@@ -147,7 +150,7 @@
     },
     "packages/json": {
       "name": "@osmix/json",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -159,7 +162,7 @@
     },
     "packages/osmix": {
       "name": "osmix",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
@@ -193,7 +196,7 @@
     },
     "packages/raster": {
       "name": "@osmix/raster",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/shared": "workspace:*",
       },
@@ -204,7 +207,7 @@
     },
     "packages/shared": {
       "name": "@osmix/shared",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@mapbox/geojson-rewind": "catalog:",
         "@mapbox/tilebelt": "^2.0.2",
@@ -218,7 +221,7 @@
     },
     "packages/vt": {
       "name": "@osmix/vt",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@osmix/shared": "workspace:*",
         "@types/bun": "catalog:",
@@ -804,7 +807,11 @@
 
     "gensync": ["gensync@1.0.0-beta.2", "", {}, "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="],
 
+    "geoflatbush": ["geoflatbush@2.0.0", "", {}, "sha512-YdK82L0RXD4nQpcYAp7kuJw9xxCdYRN6RsQRuJ47Ut/fyBvP6jRU2hLBvPaDo9ayBFIgLURLlI9ZVkUvMeZHfA=="],
+
     "geojson-vt": ["geojson-vt@4.0.2", "", {}, "sha512-AV9ROqlNqoZEIJGfm1ncNjEXfkz2hdFlZf0qkVfmkwdKa8vj7H16YUOT81rJw1rdFhyEDlN2Tds91p/glzbl5A=="],
+
+    "geokdbush": ["geokdbush@2.0.1", "", { "dependencies": { "tinyqueue": "^2.0.3" } }, "sha512-0M8so1Qx6+jJ1xpirpCNrgUsWAzIcQ3LrLmh0KJPBYI3gH7vy70nY5zEEjSp9Tn0nBt6Q2Fh922oL08lfib4Zg=="],
 
     "get-nonce": ["get-nonce@1.0.1", "", {}, "sha512-FJhYRoDaiatfEkUK8HKlicmu/3SGFD51q3itKDGoSTysQJBnfOcxU5GxnhE1E6soB76MbT0MBtnKJuXyAx+96Q=="],
 
@@ -1171,6 +1178,8 @@
     "command-line-usage/array-back": ["array-back@6.2.2", "", {}, "sha512-gUAZ7HPyb4SJczXAMUXMGAvI976JoK3qEx9v1FTmeYuJj0IBiaKttG1ydtGKdkfqWkIkouke7nG8ufGy77+Cvw=="],
 
     "command-line-usage/typical": ["typical@7.3.0", "", {}, "sha512-ya4mg/30vm+DOWfBg4YK3j2WD6TWtRkCbasOJr40CseYENzCUby/7rIvXA99JGsQHeNxLbnXdyLLxKSv3tauFw=="],
+
+    "geokdbush/tinyqueue": ["tinyqueue@2.0.3", "", {}, "sha512-ppJZNDuKGgxzkHihX8v9v9G5f+18gzaTfrukGrq6ueg0lmH4nqVnA2IPG0AEH3jKEk2GRJCUhDoqpoiw3PHLBA=="],
 
     "lru-cache/yallist": ["yallist@3.1.1", "", {}, "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="],
 
