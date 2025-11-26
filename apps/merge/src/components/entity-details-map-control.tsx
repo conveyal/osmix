@@ -11,7 +11,7 @@ export default function EntityMapControl({ osm }: { osm: Osm }) {
 	const [selectedEntity, setSelectedEntity] = useAtom(selectedEntityAtom)
 	const flyToEntity = useFlyToEntity()
 	return (
-		<div className="flex flex-col gap-2 bg-background w-sm max-h-[50lvh] overflow-y-auto">
+		<div className="flex flex-col gap-2 bg-background w-sm max-h-[50lvh] overflow-y-auto shadow rounded-sm">
 			{selectedEntity == null ? (
 				<div className="px-1 text-center font-bold py-1">
 					SEARCH OR SELECT ENTITY ON MAP (Z{MIN_PICKABLE_ZOOM} AND UP)

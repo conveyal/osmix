@@ -49,6 +49,7 @@
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/raster": "workspace:*",
+        "@osmix/router": "workspace:*",
         "@osmix/shared": "workspace:*",
         "@osmix/vt": "workspace:*",
         "@radix-ui/react-collapsible": "^1.1.12",
@@ -202,6 +203,20 @@
       },
       "devDependencies": {
         "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/router": {
+      "name": "@osmix/router",
+      "version": "0.0.1",
+      "dependencies": {
+        "@osmix/core": "workspace:*",
+        "@osmix/shared": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "mitata": "^1.0.34",
+        "osmix": "workspace:*",
         "typescript": "catalog:",
       },
     },
@@ -464,6 +479,8 @@
     "@osmix/pbf": ["@osmix/pbf@workspace:packages/pbf"],
 
     "@osmix/raster": ["@osmix/raster@workspace:packages/raster"],
+
+    "@osmix/router": ["@osmix/router@workspace:packages/router"],
 
     "@osmix/shared": ["@osmix/shared@workspace:packages/shared"],
 
@@ -922,6 +939,8 @@
     "minipass": ["minipass@7.1.2", "", {}, "sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw=="],
 
     "minizlib": ["minizlib@3.1.0", "", { "dependencies": { "minipass": "^7.1.2" } }, "sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw=="],
+
+    "mitata": ["mitata@1.0.34", "", {}, "sha512-Mc3zrtNBKIMeHSCQ0XqRLo1vbdIx1wvFV9c8NJAiyho6AjNfMY8bVhbS12bwciUdd1t4rj8099CH3N3NFahaUA=="],
 
     "mri": ["mri@1.2.0", "", {}, "sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA=="],
 
