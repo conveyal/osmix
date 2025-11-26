@@ -90,6 +90,7 @@ interface ClassifiedFeature {
 	id: number
 	layer: ShortbreadLayerName
 	type: VtSimpleFeatureType[keyof VtSimpleFeatureType]
+	entityType: "node" | "way" | "relation"
 	properties: ShortbreadProperties
 	geometry: VtSimpleFeatureGeometry
 }
@@ -200,8 +201,10 @@ export class ShortbreadVtEncoder {
 	): Generator<VtSimpleFeature> {
 		for (const feature of features) {
 			// Filter out undefined properties to ensure valid VT encoding
-			// The base type requires 'type' property; booleans are converted to 0/1 for compatibility
-			const cleanProperties: VtSimpleFeature["properties"] = { type: "node" }
+			// Set the type property to the actual OSM entity type (node/way/relation)
+			const cleanProperties: VtSimpleFeature["properties"] = {
+				type: feature.entityType,
+			}
 			for (const [key, value] of Object.entries(feature.properties)) {
 				if (value !== undefined) {
 					// Convert booleans to 0/1 for OsmTags compatibility
@@ -245,6 +248,7 @@ export class ShortbreadVtEncoder {
 				id,
 				layer: match.layer.name,
 				type: SF_TYPE.POINT,
+				entityType: "node",
 				properties: match.properties,
 				geometry: [[proj(ll)]],
 			}
@@ -316,6 +320,7 @@ export class ShortbreadVtEncoder {
 				id,
 				layer: match.layer.name,
 				type: isArea ? SF_TYPE.POLYGON : SF_TYPE.LINE,
+				entityType: "way",
 				properties: match.properties,
 				geometry,
 			}
@@ -381,6 +386,7 @@ export class ShortbreadVtEncoder {
 						id: id ?? 0,
 						layer: match.layer.name,
 						type: SF_TYPE.POLYGON,
+						entityType: "relation",
 						properties: match.properties,
 						geometry,
 					}
@@ -412,6 +418,7 @@ export class ShortbreadVtEncoder {
 						id: id ?? 0,
 						layer: match.layer.name,
 						type: SF_TYPE.LINE,
+						entityType: "relation",
 						properties: match.properties,
 						geometry,
 					}
@@ -437,6 +444,7 @@ export class ShortbreadVtEncoder {
 					id: id ?? 0,
 					layer: match.layer.name,
 					type: SF_TYPE.POINT,
+					entityType: "relation",
 					properties: match.properties,
 					geometry,
 				}

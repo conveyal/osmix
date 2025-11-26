@@ -472,4 +472,80 @@ describe("ShortbreadVtEncoder", () => {
 		const feature = layers["ferries"]?.feature(0)
 		expect(feature?.properties["kind"]).toBe("ferry")
 	})
+
+	it("sets correct entity type for nodes, ways, and relations", () => {
+		const osm = new Osm()
+
+		// Add a node (POI)
+		osm.nodes.addNode({
+			id: 1,
+			lat: 40.7,
+			lon: -74.0,
+			tags: { amenity: "restaurant", name: "Node Restaurant" },
+		})
+
+		// Add nodes for way
+		osm.nodes.addNode({ id: 2, lat: 40.71, lon: -74.0 })
+		osm.nodes.addNode({ id: 3, lat: 40.71, lon: -74.01 })
+		osm.nodes.addNode({ id: 4, lat: 40.7, lon: -74.01 })
+
+		// Add a way (building)
+		osm.ways.addWay({
+			id: 10,
+			refs: [2, 3, 4, 2],
+			tags: { building: "yes", name: "Way Building" },
+		})
+
+		// Add nodes for relation
+		osm.nodes.addNode({ id: 5, lat: 40.72, lon: -74.0 })
+		osm.nodes.addNode({ id: 6, lat: 40.72, lon: -74.01 })
+		osm.nodes.addNode({ id: 7, lat: 40.73, lon: -74.01 })
+		osm.nodes.addNode({ id: 8, lat: 40.73, lon: -74.0 })
+
+		// Add a way for the relation
+		osm.ways.addWay({
+			id: 20,
+			refs: [5, 6, 7, 8, 5],
+			tags: {},
+		})
+
+		// Add a relation (multipolygon water)
+		osm.relations.addRelation({
+			id: 100,
+			tags: {
+				type: "multipolygon",
+				natural: "water",
+				water: "lake",
+				name: "Relation Lake",
+			},
+			members: [{ type: "way", ref: 20, role: "outer" }],
+		})
+
+		osm.buildIndexes()
+		osm.buildSpatialIndexes()
+
+		const bbox = osm.bbox()
+		const tile = bboxToTile(bbox)
+		const encoder = new ShortbreadVtEncoder(osm)
+		const result = encoder.getTile(tile)
+
+		expect(result.byteLength).toBeGreaterThan(0)
+
+		const layers = decodeTile(result)
+
+		// Check node entity type
+		const poiFeature = layers["pois"]?.feature(0)
+		expect(poiFeature?.properties["type"]).toBe("node")
+		expect(poiFeature?.properties["name"]).toBe("Node Restaurant")
+
+		// Check way entity type
+		const buildingFeature = layers["buildings"]?.feature(0)
+		expect(buildingFeature?.properties["type"]).toBe("way")
+		expect(buildingFeature?.properties["name"]).toBe("Way Building")
+
+		// Check relation entity type
+		const waterFeature = layers["water"]?.feature(0)
+		expect(waterFeature?.properties["type"]).toBe("relation")
+		expect(waterFeature?.properties["name"]).toBe("Relation Lake")
+	})
 })
