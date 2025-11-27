@@ -146,16 +146,18 @@ export class OsmixWorker extends EventTarget {
 
 	/**
 	 * Retrieve an Osmix instance by ID, throwing if not found.
+	 * Protected to allow subclasses to access stored Osmix instances.
 	 */
-	private get(id: string) {
+	protected get(id: string) {
 		if (!this.osm[id]) throw Error(`OSM not found for id: ${id}`)
 		return this.osm[id]
 	}
 
 	/**
 	 * Store an Osmix instance by ID, replacing any existing instance with the same ID.
+	 * Protected to allow subclasses to manage Osmix instances.
 	 */
-	private set(id: string, osm: Osmix) {
+	protected set(id: string, osm: Osmix) {
 		this.osm[id] = osm
 	}
 
@@ -318,4 +320,26 @@ export class OsmixWorker extends EventTarget {
 	}
 }
 
-Comlink.expose(new OsmixWorker())
+/**
+ * Expose a worker instance via Comlink.
+ * Use this helper when creating custom worker entry points.
+ *
+ * @example
+ * // my-custom.worker.ts
+ * import { OsmixWorker, exposeWorker } from "osmix/worker"
+ *
+ * class MyCustomWorker extends OsmixWorker {
+ *   myCustomMethod(id: string) {
+ *     const osm = this.get(id)
+ *     // ... custom logic
+ *   }
+ * }
+ *
+ * exposeWorker(new MyCustomWorker())
+ */
+export function exposeWorker<T extends OsmixWorker>(worker: T) {
+	Comlink.expose(worker)
+}
+
+// Default worker entry point - expose a standard OsmixWorker instance
+exposeWorker(new OsmixWorker())

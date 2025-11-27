@@ -19,33 +19,65 @@ type OsmId = string | Osm
 export interface OsmixRemoteOptions {
 	workerCount?: number
 	onProgress?: (progress: Progress) => void
+	/**
+	 * Custom worker URL for extended OsmixWorker implementations.
+	 * When provided, workers will be created from this URL instead of the default.
+	 *
+	 * @example
+	 * // Use a custom worker with extended functionality
+	 * const remote = await OsmixRemote.connect({
+	 *   workerUrl: new URL("./my-custom.worker.ts", import.meta.url)
+	 * })
+	 */
+	workerUrl?: URL
 }
 
 /**
  * Manage data access across one or more workers while using the same API as a local Osmix instance.
  * Coordinates work distribution and synchronizes data across multiple workers using SharedArrayBuffer.
+ *
+ * The generic type parameter T allows typing custom worker implementations:
+ * @example
+ * class MyWorker extends OsmixWorker {
+ *   myMethod(id: string) { ... }
+ * }
+ * const remote = await OsmixRemote.connect<MyWorker>({
+ *   workerUrl: new URL("./my.worker.ts", import.meta.url)
+ * })
+ * // remote.getWorker() returns Comlink.Remote<MyWorker>
  */
-export class OsmixRemote {
-	private workers: Comlink.Remote<OsmixWorker>[] = []
-	private changesetWorker: Comlink.Remote<OsmixWorker> | null = null
+export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
+	private workers: Comlink.Remote<T>[] = []
+	private changesetWorker: Comlink.Remote<T> | null = null
 
 	/**
 	 * Create a new OsmixRemote instance and initialize worker pool.
 	 * Multiple workers are only supported when SharedArrayBuffer is available.
 	 * Each worker receives the same progress listener proxy if provided.
+	 *
+	 * @example
+	 * // Default usage
+	 * const remote = await OsmixRemote.connect()
+	 *
+	 * @example
+	 * // With custom worker for extended functionality
+	 * const remote = await OsmixRemote.connect({
+	 *   workerUrl: new URL("./shortbread.worker.ts", import.meta.url)
+	 * })
 	 */
-	static async connect({
+	static async connect<T extends OsmixWorker = OsmixWorker>({
 		workerCount = DEFAULT_WORKER_COUNT,
 		onProgress,
-	}: OsmixRemoteOptions = {}) {
-		const remote = new OsmixRemote()
+		workerUrl,
+	}: OsmixRemoteOptions = {}): Promise<OsmixRemote<T>> {
+		const remote = new OsmixRemote<T>()
 		if (workerCount < 1) throw Error("Worker count must be at least 1")
 		if (workerCount > 1 && !SUPPORTS_SHARED_ARRAY_BUFFER)
 			throw Error(
 				"SharedArrayBuffer not supported, cannot use multiple workers.",
 			)
 		for (let i = 0; i < workerCount; i++) {
-			const worker = await createOsmixWorker()
+			const worker = await createOsmixWorker<T>(workerUrl)
 			if (onProgress) {
 				await worker.addProgressListener(Comlink.proxy(onProgress))
 			}
@@ -58,12 +90,30 @@ export class OsmixRemote {
 	/**
 	 * Select the next available worker in a round-robin fashion.
 	 * Cycles workers to balance load across the pool.
+	 * @private
 	 */
-	private getWorker() {
+	private nextWorker() {
 		const nextWorker = this.workers.shift()
 		if (!nextWorker) throw Error("No worker available")
 		this.workers.push(nextWorker)
 		return nextWorker
+	}
+
+	/**
+	 * Get a worker proxy for calling custom methods on extended workers.
+	 * Returns the next worker in the pool using round-robin selection.
+	 *
+	 * @example
+	 * class ShortbreadWorker extends OsmixWorker {
+	 *   getShortbreadVectorTile(id: string, tile: Tile) { ... }
+	 * }
+	 * const remote = await OsmixRemote.connect<ShortbreadWorker>({
+	 *   workerUrl: new URL("./shortbread.worker.ts", import.meta.url)
+	 * })
+	 * const tile = await remote.getWorker().getShortbreadVectorTile(osmId, tile)
+	 */
+	getWorker(): Comlink.Remote<T> {
+		return this.nextWorker()
 	}
 
 	/**
@@ -134,7 +184,7 @@ export class OsmixRemote {
 	 */
 	toPbfStream(osmId: OsmId, writeableStream: WritableStream<Uint8Array>) {
 		if (!SUPPORTS_STREAM_TRANSFER) throw Error("Stream transfer not supported")
-		return this.getWorker().toPbfStream(
+		return this.nextWorker().toPbfStream(
 			Comlink.transfer({ osmId: this.getId(osmId), writeableStream }, [
 				writeableStream,
 			]),
@@ -146,7 +196,7 @@ export class OsmixRemote {
 	 * Returns the buffer transferred from the worker.
 	 */
 	toPbfData(osmId: OsmId) {
-		return this.getWorker().toPbf(this.getId(osmId))
+		return this.nextWorker().toPbf(this.getId(osmId))
 	}
 
 	/**
@@ -197,7 +247,7 @@ export class OsmixRemote {
 	 * Useful for previewing metadata before committing to a full load.
 	 */
 	async readHeader(data: ArrayBuffer | ReadableStream | Uint8Array | File) {
-		return this.getWorker().readHeader(await this.getTransferableData(data))
+		return this.nextWorker().readHeader(await this.getTransferableData(data))
 	}
 
 	/**
@@ -215,14 +265,14 @@ export class OsmixRemote {
 	 * Check if an Osmix instance has completed index building and is ready for queries.
 	 */
 	isReady(osmId: OsmId) {
-		return this.getWorker().isReady(this.getId(osmId))
+		return this.nextWorker().isReady(this.getId(osmId))
 	}
 
 	/**
 	 * Check if an Osmix instance exists in any worker.
 	 */
 	has(osmId: OsmId) {
-		return this.getWorker().has(this.getId(osmId))
+		return this.nextWorker().has(this.getId(osmId))
 	}
 
 	/**
@@ -230,7 +280,7 @@ export class OsmixRemote {
 	 * Useful for direct access when worker overhead is unnecessary.
 	 */
 	async get(osmId: OsmId): Promise<Osm> {
-		const transferables = await this.getWorker().getOsmBuffers(
+		const transferables = await this.nextWorker().getOsmBuffers(
 			this.getId(osmId),
 		)
 		return new Osm(transferables)
@@ -241,7 +291,7 @@ export class OsmixRemote {
 	 * Useful for final cleanup or moving data out of worker context.
 	 */
 	async transferOut(osmId: OsmId): Promise<Osm> {
-		const transferables = await this.getWorker().transferOut(this.getId(osmId))
+		const transferables = await this.nextWorker().transferOut(this.getId(osmId))
 		await this.delete(osmId)
 		return new Osm(transferables)
 	}
@@ -272,7 +322,7 @@ export class OsmixRemote {
 	 * Delegates to an available worker for off-thread rendering.
 	 */
 	getVectorTile(osmId: OsmId, tile: Tile) {
-		return this.getWorker().getVectorTile(this.getId(osmId), tile)
+		return this.nextWorker().getVectorTile(this.getId(osmId), tile)
 	}
 
 	/**
@@ -280,7 +330,7 @@ export class OsmixRemote {
 	 * Delegates to an available worker for off-thread rendering.
 	 */
 	getRasterTile(osmId: OsmId, tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
-		return this.getWorker().getRasterTile(this.getId(osmId), tile, tileSize)
+		return this.nextWorker().getRasterTile(this.getId(osmId), tile, tileSize)
 	}
 
 	/**
@@ -288,7 +338,7 @@ export class OsmixRemote {
 	 * Delegates to an available worker for off-thread search.
 	 */
 	search(osmId: OsmId, key: string, val?: string) {
-		return this.getWorker().search(this.getId(osmId), key, val)
+		return this.nextWorker().search(this.getId(osmId), key, val)
 	}
 
 	/**
@@ -301,7 +351,7 @@ export class OsmixRemote {
 		patchOsmId: OsmId,
 		options: Partial<OsmMergeOptions> = {},
 	) {
-		const worker0 = this.getWorker()
+		const worker0 = this.nextWorker()
 		const osmId = await worker0.merge(
 			this.getId(baseOsmId),
 			this.getId(patchOsmId),
@@ -364,15 +414,27 @@ export class OsmixRemote {
 /**
  * Create a single OsmixWorker instance wrapped with Comlink.
  * Spawns a new Web Worker and returns a proxy for cross-thread RPC.
+ *
+ * @param workerUrl - Optional URL to a custom worker file. If not provided,
+ *                    uses the default OsmixWorker.
+ *
+ * @example
+ * // Default worker
+ * const worker = await createOsmixWorker()
+ *
+ * @example
+ * // Custom worker
+ * const worker = await createOsmixWorker<MyCustomWorker>(
+ *   new URL("./my-custom.worker.ts", import.meta.url)
+ * )
  */
-export async function createOsmixWorker(): Promise<
-	Comlink.Remote<OsmixWorker>
-> {
+export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
+	workerUrl?: URL,
+): Promise<Comlink.Remote<T>> {
 	if (typeof Worker === "undefined") {
 		throw Error("Worker not supported")
 	}
-	const worker = new Worker(new URL("./osmix.worker.ts", import.meta.url), {
-		type: "module",
-	})
-	return Comlink.wrap<OsmixWorker>(worker)
+	const url = workerUrl ?? new URL("./osmix.worker.ts", import.meta.url)
+	const worker = new Worker(url, { type: "module" })
+	return Comlink.wrap<T>(worker)
 }

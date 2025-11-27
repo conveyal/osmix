@@ -5,6 +5,10 @@
 	"version": "0.0.5",
 	"description": "Full OSM toolkit for JavaScript and TypeScript",
 	"main": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./worker": "./src/osmix.worker.ts"
+	},
 	"publishConfig": {
 		"access": "public",
 		"main": "./dist/index.js",
@@ -13,6 +17,10 @@
 			".": {
 				"import": "./dist/index.js",
 				"types": "./dist/index.d.ts"
+			},
+			"./worker": {
+				"import": "./dist/osmix.worker.js",
+				"types": "./dist/osmix.worker.d.ts"
 			}
 		},
 		"files": [
