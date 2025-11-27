@@ -1,0 +1,208 @@
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+:root {
+	--color-primary: #2563eb;
+	--color-primary-light: #dbeafe;
+	--color-text: #1e293b;
+	--color-text-muted: #64748b;
+	--color-bg: rgba(255, 255, 255, 0.95);
+	--color-border: #e2e8f0;
+	--font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+	--shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body,
+#map {
+	height: 100%;
+	margin: 0;
+	font-family: var(--font-mono);
+	color: var(--color-text);
+	font-size: 14px;
+}
+
+header {
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	font-size: 12px;
+	color: var(--color-primary);
+}
+
+hr {
+	border: none;
+	border-top: 1px solid var(--color-border);
+	margin: 0.75rem 0;
+}
+
+.map-control {
+	background: var(--color-bg);
+	padding: 1rem;
+	border-radius: 8px;
+	box-shadow: var(--shadow);
+	max-width: 320px;
+	max-height: 50vh;
+	overflow-x: auto;
+	overflow-y: auto;
+	margin: 1rem;
+	pointer-events: all;
+	backdrop-filter: blur(8px);
+
+	label {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.25rem 0;
+		cursor: pointer;
+		font-size: 12px;
+	}
+
+	label:hover {
+		color: var(--color-primary);
+	}
+
+	input[type="checkbox"] {
+		accent-color: var(--color-primary);
+	}
+}
+
+#entity {
+	header {
+		margin-bottom: 0.25rem;
+		margin-top: 1rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--color-border);
+	}
+
+	header:first-of-type {
+		margin-top: 0;
+		border-top: none;
+		padding-top: 0;
+	}
+}
+
+#entity:empty {
+	display: none;
+}
+
+dialog {
+	background: var(--color-bg);
+	padding: 1.5rem;
+	border-radius: 12px;
+	box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+	border: 1px solid var(--color-border);
+	max-width: 60%;
+	max-height: 40vh;
+	overflow-y: auto;
+}
+
+dialog::backdrop {
+	background: rgba(0, 0, 0, 0.4);
+	backdrop-filter: blur(4px);
+}
+
+pre {
+	padding: 0;
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+td {
+	padding: 0.25rem 0;
+	padding-left: 1rem;
+	white-space: nowrap;
+	font-size: 12px;
+}
+
+td:first-of-type {
+	font-weight: 600;
+	padding-left: 0;
+	color: var(--color-text-muted);
+}
+
+td:nth-of-type(2):before {
+	content: "= ";
+	color: var(--color-text-muted);
+}
+
+dl {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 0.25rem 1rem;
+	margin: 0;
+	font-size: 12px;
+}
+
+dt {
+	font-weight: 600;
+	text-transform: uppercase;
+	color: var(--color-text-muted);
+	font-size: 11px;
+}
+
+dd {
+	margin: 0;
+}
+
+input[type="text"] {
+	font-size: 14px;
+	font-family: var(--font-mono);
+	display: block;
+	width: 100%;
+	padding: 0.75rem;
+	border: 1px solid var(--color-border);
+	border-radius: 6px;
+	background: white;
+	transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input[type="text"]:focus {
+	outline: none;
+	border-color: var(--color-primary);
+	box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.layer-group {
+	margin-top: 0.75rem;
+}
+
+.layer-group-title {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--color-text-muted);
+	margin-bottom: 0.25rem;
+	font-weight: 600;
+}
+
+/* Maplibre overrides */
+.maplibregl-ctrl-group {
+	border-radius: 8px;
+	box-shadow: var(--shadow);
+}
+
+.maplibregl-ctrl-group button {
+	border-radius: 0;
+}
+
+.maplibregl-ctrl-group button:first-child {
+	border-radius: 8px 8px 0 0;
+}
+
+.maplibregl-ctrl-group button:last-child {
+	border-radius: 0 0 8px 8px;
+}
+
+.maplibregl-ctrl-group button:only-child {
+	border-radius: 8px;
+}

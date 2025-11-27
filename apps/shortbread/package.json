@@ -1,0 +1,24 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/shortbread-server",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "bun --hot server.ts",
+		"start": "bun server.ts",
+		"typecheck": "tsc --build --noEmit"
+	},
+	"dependencies": {
+		"osmix": "workspace:*",
+		"@osmix/core": "workspace:*",
+		"@osmix/shortbread": "workspace:*",
+		"comlink": "^4.4.2",
+		"maplibre-gl": "catalog:"
+	},
+	"devDependencies": {
+		"@osmix/shared": "workspace:*",
+		"@osmix/pbf": "workspace:*",
+		"@types/bun": "catalog:",
+		"typescript": "catalog:"
+	}
+}

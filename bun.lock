@@ -86,6 +86,22 @@
         "vite": "catalog:",
       },
     },
+    "apps/shortbread": {
+      "name": "@osmix/shortbread-server",
+      "dependencies": {
+        "@osmix/core": "workspace:*",
+        "@osmix/shortbread": "workspace:*",
+        "comlink": "^4.4.2",
+        "maplibre-gl": "catalog:",
+        "osmix": "workspace:*",
+      },
+      "devDependencies": {
+        "@osmix/pbf": "workspace:*",
+        "@osmix/shared": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "apps/vt-server": {
       "name": "@osmix/vt-server",
       "dependencies": {
@@ -501,6 +517,8 @@
     "@osmix/shared": ["@osmix/shared@workspace:packages/shared"],
 
     "@osmix/shortbread": ["@osmix/shortbread@workspace:packages/shortbread"],
+
+    "@osmix/shortbread-server": ["@osmix/shortbread-server@workspace:apps/shortbread"],
 
     "@osmix/vt": ["@osmix/vt@workspace:packages/vt"],
 
