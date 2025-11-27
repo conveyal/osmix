@@ -5,12 +5,12 @@
  * functionality (ShortbreadVtEncoder) in a Bun server.
  */
 import os from "node:os"
-import { ShortbreadVtEncoder } from "@osmix/shortbread"
 import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
+import { ShortbreadVtEncoder } from "@osmix/shortbread"
 import type { StyleSpecification } from "maplibre-gl"
 import { OsmixRemote } from "osmix"
-import type { ShortbreadWorker } from "./shortbread.worker"
 import indexHtml from "./index.html"
+import type { ShortbreadWorker } from "./shortbread.worker"
 
 const filename = "monaco.pbf"
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001
@@ -222,7 +222,15 @@ function createShortbreadStyle(
 				minzoom: 13,
 				paint: {
 					"fill-color": "#d4c8bc",
-					"fill-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0.3, 16, 0.7],
+					"fill-opacity": [
+						"interpolate",
+						["linear"],
+						["zoom"],
+						13,
+						0.3,
+						16,
+						0.7,
+					],
 				},
 			},
 			{
@@ -261,9 +269,25 @@ function createShortbreadStyle(
 						["linear"],
 						["zoom"],
 						10,
-						["match", ["get", "kind"], ["motorway", "trunk"], 3, ["primary", "secondary"], 2, 1],
+						[
+							"match",
+							["get", "kind"],
+							["motorway", "trunk"],
+							3,
+							["primary", "secondary"],
+							2,
+							1,
+						],
 						18,
-						["match", ["get", "kind"], ["motorway", "trunk"], 24, ["primary", "secondary"], 18, 12],
+						[
+							"match",
+							["get", "kind"],
+							["motorway", "trunk"],
+							24,
+							["primary", "secondary"],
+							18,
+							12,
+						],
 					],
 				},
 			},
@@ -299,9 +323,25 @@ function createShortbreadStyle(
 						["linear"],
 						["zoom"],
 						10,
-						["match", ["get", "kind"], ["motorway", "trunk"], 2, ["primary", "secondary"], 1.5, 0.5],
+						[
+							"match",
+							["get", "kind"],
+							["motorway", "trunk"],
+							2,
+							["primary", "secondary"],
+							1.5,
+							0.5,
+						],
 						18,
-						["match", ["get", "kind"], ["motorway", "trunk"], 20, ["primary", "secondary"], 14, 8],
+						[
+							"match",
+							["get", "kind"],
+							["motorway", "trunk"],
+							20,
+							["primary", "secondary"],
+							14,
+							8,
+						],
 					],
 				},
 			},

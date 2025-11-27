@@ -48,7 +48,11 @@
 			"type": "fill",
 			"source": "shortbread",
 			"source-layer": "land",
-			"filter": ["in", ["get", "kind"], ["literal", ["grass", "meadow", "park", "recreation_ground"]]],
+			"filter": [
+				"in",
+				["get", "kind"],
+				["literal", ["grass", "meadow", "park", "recreation_ground"]]
+			],
 			"paint": {
 				"fill-color": "#d8f0d0",
 				"fill-opacity": 0.5
@@ -70,7 +74,11 @@
 			"type": "fill",
 			"source": "shortbread",
 			"source-layer": "land",
-			"filter": ["in", ["get", "kind"], ["literal", ["commercial", "retail", "industrial"]]],
+			"filter": [
+				"in",
+				["get", "kind"],
+				["literal", ["commercial", "retail", "industrial"]]
+			],
 			"paint": {
 				"fill-color": "#f0e8dc",
 				"fill-opacity": 0.4
@@ -144,9 +152,25 @@
 					["linear"],
 					["zoom"],
 					10,
-					["match", ["get", "kind"], ["motorway", "trunk"], 3, ["primary", "secondary"], 2, 1],
+					[
+						"match",
+						["get", "kind"],
+						["motorway", "trunk"],
+						3,
+						["primary", "secondary"],
+						2,
+						1
+					],
 					18,
-					["match", ["get", "kind"], ["motorway", "trunk"], 24, ["primary", "secondary"], 18, 12]
+					[
+						"match",
+						["get", "kind"],
+						["motorway", "trunk"],
+						24,
+						["primary", "secondary"],
+						18,
+						12
+					]
 				]
 			}
 		},
@@ -184,9 +208,25 @@
 					["linear"],
 					["zoom"],
 					10,
-					["match", ["get", "kind"], ["motorway", "trunk"], 2, ["primary", "secondary"], 1.5, 0.5],
+					[
+						"match",
+						["get", "kind"],
+						["motorway", "trunk"],
+						2,
+						["primary", "secondary"],
+						1.5,
+						0.5
+					],
 					18,
-					["match", ["get", "kind"], ["motorway", "trunk"], 20, ["primary", "secondary"], 14, 8]
+					[
+						"match",
+						["get", "kind"],
+						["motorway", "trunk"],
+						20,
+						["primary", "secondary"],
+						14,
+						8
+					]
 				]
 			}
 		},
@@ -334,7 +374,11 @@
 			"type": "symbol",
 			"source": "shortbread",
 			"source-layer": "places",
-			"filter": ["in", ["get", "kind"], ["literal", ["village", "suburb", "neighbourhood"]]],
+			"filter": [
+				"in",
+				["get", "kind"],
+				["literal", ["village", "suburb", "neighbourhood"]]
+			],
 			"minzoom": 10,
 			"layout": {
 				"text-field": ["get", "name"],

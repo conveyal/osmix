@@ -6,7 +6,10 @@
  */
 import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
-import maplibregl, { type ControlPosition, type MapGeoJSONFeature } from "maplibre-gl"
+import maplibregl, {
+	type ControlPosition,
+	type MapGeoJSONFeature,
+} from "maplibre-gl"
 
 const $log = document.getElementById("log")! as HTMLDialogElement
 

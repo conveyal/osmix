@@ -4,10 +4,11 @@
  * This demonstrates how to extend OsmixWorker with custom functionality
  * by subclassing and adding new methods.
  */
-import { ShortbreadVtEncoder } from "@osmix/shortbread"
+
 import type { Tile } from "@osmix/shared/types"
+import { ShortbreadVtEncoder } from "@osmix/shortbread"
 import * as Comlink from "comlink"
-import { OsmixWorker, exposeWorker } from "osmix/worker"
+import { exposeWorker, OsmixWorker } from "osmix/worker"
 
 /**
  * Extended worker class that adds Shortbread vector tile generation.
