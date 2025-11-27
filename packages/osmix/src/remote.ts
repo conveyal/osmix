@@ -5,7 +5,6 @@ import type { Progress } from "@osmix/shared/progress"
 import { streamToBytes } from "@osmix/shared/stream-to-bytes"
 import type { OsmEntityType, Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
-import type { OsmixWorker } from "./osmix.worker"
 import { type OsmFromPbfOptions, osmToPbfStream } from "./pbf"
 import {
 	DEFAULT_WORKER_COUNT,
@@ -13,6 +12,7 @@ import {
 	SUPPORTS_STREAM_TRANSFER,
 	transfer,
 } from "./utils"
+import type { OsmixWorker } from "./worker-utils"
 
 type OsmId = string | Osm
 
