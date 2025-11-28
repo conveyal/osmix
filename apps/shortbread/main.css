@@ -1,0 +1,207 @@
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+:root {
+	--color-primary: #3b82f6;
+	--color-primary-light: #dbeafe;
+	--color-bp: rgba(from var(--color-primary) r g b / 0.05);
+	--color-text: #1e293b;
+	--color-text-muted: rgba(from var(--color-text) r g b / 0.6);
+	--color-bg: rgba(255, 255, 255, 0.75);
+	--color-border: #e2e8f0;
+	--font-mono:
+		ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+	--shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+	font-family: var(--font-mono);
+	color: var(--color-text);
+	background-image:
+		linear-gradient(var(--color-bp) 2px, transparent 2px),
+		linear-gradient(90deg, var(--color-bp) 2px, transparent 1px),
+		linear-gradient(var(--color-bp) 1px, transparent 1px),
+		linear-gradient(90deg, var(--color-bp) 1px, transparent 1px);
+	background-size:
+		100px 100px,
+		100px 100px,
+		20px 20px,
+		20px 20px;
+	background-position:
+		-2px -2px,
+		-2px -2px,
+		-1px -1px,
+		-1px -1px;
+}
+
+#map {
+	height: 100%;
+	font-family: var(--font-mono);
+}
+
+header {
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: -0.025em;
+	color: var(--color-primary);
+}
+
+hr {
+	border: none;
+	border-top: 1px solid var(--color-border);
+	margin: 0.75rem 0;
+}
+
+.map-control {
+	background: var(--color-bg);
+	backdrop-filter: blur(4px);
+	padding: 1rem;
+	border-radius: 4px;
+	box-shadow: rgba(0, 0, 0, 0.1) 0px 0px 0px 2px;
+	max-width: 320px;
+	max-height: 50vh;
+	overflow-x: auto;
+	overflow-y: auto;
+	margin: 10px;
+	pointer-events: all;
+
+	label {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.25rem 0;
+		cursor: pointer;
+		font-size: 12px;
+	}
+
+	label:hover {
+		color: var(--color-primary);
+	}
+
+	input[type="checkbox"] {
+		accent-color: var(--color-primary);
+	}
+}
+
+#entity {
+	header {
+		margin-bottom: 0.25rem;
+		margin-top: 1rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid var(--color-border);
+	}
+
+	header:first-of-type {
+		margin-top: 0;
+		border-top: none;
+		padding-top: 0;
+	}
+}
+
+#entity:empty {
+	display: none;
+}
+
+dialog {
+	background: var(--color-bg);
+	padding: 2rem;
+	border-radius: 4px;
+	box-shadow:
+		rgba(0, 0, 0, 0.1) 0px 0px 0px 2px,
+		0 25px 50px -12px rgb(0 0 0 / 0.25);
+	border: 1px solid var(--color-border);
+	max-width: 60%;
+
+	@media screen and (max-width: 768px) {
+		max-width: 95%;
+	}
+}
+
+dialog::backdrop {
+	background: rgba(0, 0, 0, 0.4);
+	backdrop-filter: blur(2px);
+}
+
+pre {
+	padding: 0.5rem;
+	background-color: rgba(from var(--color-bg) r g b / 0.5);
+	border-radius: 4px;
+	border: 1px solid var(--color-border);
+	overflow-x: scroll;
+	overflow-y: scroll;
+	max-height: 8rem;
+	line-height: 1.6;
+}
+
+button {
+	width: 100%;
+	padding: 0.25rem;
+	font-family: var(--font-mono);
+	text-transform: uppercase;
+	font-weight: 700;
+}
+
+dl {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 0.25rem 0.75rem;
+	margin: 0;
+}
+
+dt {
+	font-weight: 600;
+	text-transform: uppercase;
+	color: var(--color-text-muted);
+}
+
+dd {
+	margin: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	user-select: all;
+
+	&:hover {
+		white-space: normal;
+	}
+
+	&:before {
+		content: "= ";
+		color: var(--color-text-muted);
+		margin-right: 0.25rem;
+	}
+}
+
+.layer-group {
+	margin-top: 0.75rem;
+}
+
+.layer-group-title {
+	text-transform: uppercase;
+	letter-spacing: -0.025em;
+	color: var(--color-text-muted);
+	margin-bottom: 0.25rem;
+	font-weight: 600;
+}
+
+.maplibregl-ctrl-group button {
+	border-radius: 0;
+}
+
+.maplibregl-ctrl-group button:first-child {
+	border-radius: 8px 8px 0 0;
+}
+
+.maplibregl-ctrl-group button:last-child {
+	border-radius: 0 0 8px 8px;
+}
+
+.maplibregl-ctrl-group button:only-child {
+	border-radius: 8px;
+}

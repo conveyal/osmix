@@ -3,12 +3,16 @@
  */
 export type Progress = {
 	msg: string
+	timestamp: number
 }
 
 export interface ProgressEvent extends CustomEvent<Progress> {}
 
 export function progress(msg: string): Progress {
-	return { msg }
+	return {
+		msg,
+		timestamp: Date.now(),
+	}
 }
 
 export function progressEvent(msg: string): ProgressEvent {

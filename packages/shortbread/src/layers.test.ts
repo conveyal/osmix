@@ -505,33 +505,34 @@ describe("Shortbread Layer Matchers", () => {
 	describe("matchTags", () => {
 		it("matches point geometry to POI layer", () => {
 			const result = matchTags({ amenity: "restaurant" }, "Point")
-			expect(result?.layer.name).toBe("pois")
-			expect(result?.properties.kind).toBe("restaurant")
+			expect(result[0]?.layer.name).toBe("pois")
+			expect(result[0]?.properties.kind).toBe("restaurant")
 		})
 
 		it("matches point geometry to places layer", () => {
 			const result = matchTags({ place: "city" }, "Point")
-			expect(result?.layer.name).toBe("places")
+			expect(result[0]?.layer.name).toBe("places")
 		})
 
-		it("matches line geometry to streets layer", () => {
+		it("matches line geometry to streets layer and street_labels layer", () => {
 			const result = matchTags({ highway: "primary" }, "LineString")
-			expect(result?.layer.name).toBe("streets")
+			expect(result[0]?.layer.name).toBe("streets")
+			expect(result[1]?.layer.name).toBe("street_labels")
 		})
 
 		it("matches polygon geometry to buildings layer", () => {
 			const result = matchTags({ building: "yes" }, "Polygon")
-			expect(result?.layer.name).toBe("buildings")
+			expect(result[0]?.layer.name).toBe("buildings")
 		})
 
 		it("matches polygon geometry to water layer", () => {
 			const result = matchTags({ natural: "water" }, "Polygon")
-			expect(result?.layer.name).toBe("water")
+			expect(result[0]?.layer.name).toBe("water")
 		})
 
-		it("returns null when no layer matches", () => {
+		it("returns empty array when no layer matches", () => {
 			const result = matchTags({ unknown: "tag" }, "Point")
-			expect(result).toBeNull()
+			expect(result).toBeArrayOfSize(0)
 		})
 	})
 })

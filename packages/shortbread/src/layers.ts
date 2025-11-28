@@ -920,7 +920,7 @@ export function getLayersForGeometryType(
 
 /**
  * Match tags against all applicable layers for a geometry type
- * Returns the first matching layer's properties, or null if no match
+ * Returns the all matching layer's properties, or null if no match
  */
 export function matchTags(
 	tags: OsmTags,
@@ -928,15 +928,19 @@ export function matchTags(
 ): {
 	layer: ShortbreadLayerDefinition
 	properties: ShortbreadProperties
-} | null {
+}[] {
 	const layers = getLayersForGeometryType(geometryType)
+	const matches: {
+		layer: ShortbreadLayerDefinition
+		properties: ShortbreadProperties
+	}[] = []
 	for (const layer of layers) {
 		const properties = layer.match(tags)
 		if (properties) {
-			return { layer, properties }
+			matches.push({ layer, properties })
 		}
 	}
-	return null
+	return matches
 }
 
 // Export individual matchers for testing

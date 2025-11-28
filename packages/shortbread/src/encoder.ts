@@ -90,7 +90,6 @@ interface ClassifiedFeature {
 	id: number
 	layer: ShortbreadLayerName
 	type: VtSimpleFeatureType[keyof VtSimpleFeatureType]
-	entityType: "node" | "way" | "relation"
 	properties: ShortbreadProperties
 	geometry: VtSimpleFeatureGeometry
 }
@@ -202,9 +201,7 @@ export class ShortbreadVtEncoder {
 		for (const feature of features) {
 			// Filter out undefined properties to ensure valid VT encoding
 			// Set the type property to the actual OSM entity type (node/way/relation)
-			const cleanProperties: VtSimpleFeature["properties"] = {
-				type: feature.entityType,
-			}
+			const cleanProperties: VtSimpleFeature["properties"] = {}
 			for (const [key, value] of Object.entries(feature.properties)) {
 				if (value !== undefined) {
 					// Convert booleans to 0/1 for OsmTags compatibility
@@ -234,23 +231,24 @@ export class ShortbreadVtEncoder {
 		const nodeIndexes = this.osm.nodes.findIndexesWithinBbox(bbox)
 
 		for (const nodeIndex of nodeIndexes) {
-			if (nodeIndex === undefined) continue
 			const tags = this.osm.nodes.tags.getTags(nodeIndex)
 			if (!tags || Object.keys(tags).length === 0) continue
 
-			const match = matchTags(tags, "Point")
-			if (!match) continue
+			const matches = matchTags(tags, "Point")
+			if (matches.length === 0) continue
 
 			const id = this.osm.nodes.ids.at(nodeIndex)
 			const ll = this.osm.nodes.getNodeLonLat({ index: nodeIndex })
 
-			yield {
-				id,
-				layer: match.layer.name,
-				type: SF_TYPE.POINT,
-				entityType: "node",
-				properties: match.properties,
-				geometry: [[proj(ll)]],
+			const projected = proj(ll)
+			for (const match of matches) {
+				yield {
+					id,
+					layer: match.layer.name,
+					type: SF_TYPE.POINT,
+					properties: match.properties,
+					geometry: [[projected]],
+				}
 			}
 		}
 	}
@@ -266,7 +264,6 @@ export class ShortbreadVtEncoder {
 		const wayIndexes = this.osm.ways.intersects(bbox)
 
 		for (const wayIndex of wayIndexes) {
-			if (wayIndex === undefined) continue
 			const id = this.osm.ways.ids.at(wayIndex)
 			// Skip ways that are part of relations
 			if (id !== undefined && relationWayIds?.has(id)) continue
@@ -284,8 +281,8 @@ export class ShortbreadVtEncoder {
 			})
 
 			const geometryType = isArea ? "Polygon" : "LineString"
-			const match = matchTags(tags, geometryType)
-			if (!match) continue
+			const matches = matchTags(tags, geometryType)
+			if (matches.length === 0) continue
 
 			const geometry: VtSimpleFeatureGeometry = []
 
@@ -316,13 +313,14 @@ export class ShortbreadVtEncoder {
 
 			if (geometry.length === 0) continue
 
-			yield {
-				id,
-				layer: match.layer.name,
-				type: isArea ? SF_TYPE.POLYGON : SF_TYPE.LINE,
-				entityType: "way",
-				properties: match.properties,
-				geometry,
+			for (const match of matches) {
+				yield {
+					id,
+					layer: match.layer.name,
+					type: isArea ? SF_TYPE.POLYGON : SF_TYPE.LINE,
+					properties: match.properties,
+					geometry,
+				}
 			}
 		}
 	}
@@ -341,20 +339,17 @@ export class ShortbreadVtEncoder {
 			const relationGeometry = this.osm.relations.getRelationGeometry(relIndex)
 			if (
 				!relation ||
+				!relation.tags ||
 				(!relationGeometry.lineStrings &&
 					!relationGeometry.rings &&
 					!relationGeometry.points)
 			)
 				continue
 
-			const id = this.osm.relations.ids.at(relIndex)
-			const tags = this.osm.relations.tags.getTags(relIndex)
-			if (!tags) continue
-
 			if (relationGeometry.rings) {
 				// Area relations (multipolygon, boundary)
-				const match = matchTags(tags, "Polygon")
-				if (!match) continue
+				const matches = matchTags(relation.tags, "Polygon")
+				if (matches.length === 0) continue
 
 				const { rings } = relationGeometry
 				if (rings.length === 0) continue
@@ -382,19 +377,20 @@ export class ShortbreadVtEncoder {
 
 					if (geometry.length === 0) continue
 
-					yield {
-						id: id ?? 0,
-						layer: match.layer.name,
-						type: SF_TYPE.POLYGON,
-						entityType: "relation",
-						properties: match.properties,
-						geometry,
+					for (const match of matches) {
+						yield {
+							id: relation.id,
+							layer: match.layer.name,
+							type: SF_TYPE.POLYGON,
+							properties: match.properties,
+							geometry,
+						}
 					}
 				}
 			} else if (relationGeometry.lineStrings) {
 				// Line relations (route, multilinestring)
-				const match = matchTags(tags, "LineString")
-				if (!match) continue
+				const matches = matchTags(relation.tags, "LineString")
+				if (!matches) continue
 
 				const { lineStrings } = relationGeometry
 				if (lineStrings.length === 0) continue
@@ -414,19 +410,20 @@ export class ShortbreadVtEncoder {
 
 					if (geometry.length === 0) continue
 
-					yield {
-						id: id ?? 0,
-						layer: match.layer.name,
-						type: SF_TYPE.LINE,
-						entityType: "relation",
-						properties: match.properties,
-						geometry,
+					for (const match of matches) {
+						yield {
+							id: relation.id,
+							layer: match.layer.name,
+							type: SF_TYPE.LINE,
+							properties: match.properties,
+							geometry,
+						}
 					}
 				}
 			} else if (relationGeometry.points) {
 				// Point relations
-				const match = matchTags(tags, "Point")
-				if (!match) continue
+				const matches = matchTags(relation.tags, "Point")
+				if (!matches) continue
 
 				const { points } = relationGeometry
 				if (points.length === 0) continue
@@ -440,13 +437,14 @@ export class ShortbreadVtEncoder {
 
 				if (geometry.length === 0) continue
 
-				yield {
-					id: id ?? 0,
-					layer: match.layer.name,
-					type: SF_TYPE.POINT,
-					entityType: "relation",
-					properties: match.properties,
-					geometry,
+				for (const match of matches) {
+					yield {
+						id: relation.id,
+						layer: match.layer.name,
+						type: SF_TYPE.POINT,
+						properties: match.properties,
+						geometry,
+					}
 				}
 			}
 		}
