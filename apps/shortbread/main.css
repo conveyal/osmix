@@ -18,13 +18,11 @@
 }
 
 html,
-body,
-#map {
+body {
 	height: 100%;
 	margin: 0;
 	font-family: var(--font-mono);
 	color: var(--color-text);
-	background-color: #ffffff;
 	background-image:
 		linear-gradient(var(--color-bp) 2px, transparent 2px),
 		linear-gradient(90deg, var(--color-bp) 2px, transparent 1px),
@@ -40,6 +38,11 @@ body,
 		-2px -2px,
 		-1px -1px,
 		-1px -1px;
+}
+
+#map {
+	height: 100%;
+	font-family: var(--font-mono);
 }
 
 header {
@@ -65,7 +68,7 @@ hr {
 	max-height: 50vh;
 	overflow-x: auto;
 	overflow-y: auto;
-	margin: 1rem;
+	margin: 10px;
 	pointer-events: all;
 
 	label {
@@ -107,48 +110,41 @@ hr {
 
 dialog {
 	background: var(--color-bg);
-	padding: 1.5rem;
-	border-radius: 12px;
-	box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+	padding: 2rem;
+	border-radius: 4px;
+	box-shadow:
+		rgba(0, 0, 0, 0.1) 0px 0px 0px 2px,
+		0 25px 50px -12px rgb(0 0 0 / 0.25);
 	border: 1px solid var(--color-border);
 	max-width: 60%;
-	max-height: 40vh;
-	overflow-y: auto;
+
+	@media screen and (max-width: 768px) {
+		max-width: 95%;
+	}
 }
 
 dialog::backdrop {
 	background: rgba(0, 0, 0, 0.4);
-	backdrop-filter: blur(4px);
+	backdrop-filter: blur(2px);
 }
 
 pre {
-	padding: 0;
-	margin: 0;
-	font-size: 12px;
+	padding: 0.5rem;
+	background-color: rgba(from var(--color-bg) r g b / 0.5);
+	border-radius: 4px;
+	border: 1px solid var(--color-border);
+	overflow-x: scroll;
+	overflow-y: scroll;
+	max-height: 8rem;
 	line-height: 1.6;
 }
 
-table {
+button {
 	width: 100%;
-	border-collapse: collapse;
-}
-
-td {
-	padding: 0.25rem 0;
-	padding-left: 1rem;
-	white-space: nowrap;
-	font-size: 12px;
-}
-
-td:first-of-type {
-	font-weight: 600;
-	padding-left: 0;
-	color: var(--color-text-muted);
-}
-
-td:nth-of-type(2):before {
-	content: "= ";
-	color: var(--color-text-muted);
+	padding: 0.25rem;
+	font-family: var(--font-mono);
+	text-transform: uppercase;
+	font-weight: 700;
 }
 
 dl {

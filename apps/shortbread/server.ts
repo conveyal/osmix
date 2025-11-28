@@ -6,6 +6,7 @@
  */
 
 import os from "node:os"
+import type { Progress } from "@osmix/shared/progress"
 import { ShortbreadVtEncoder } from "@osmix/shortbread"
 import * as Versatiles from "@versatiles/style"
 import type { StyleSpecification } from "maplibre-gl"
@@ -13,23 +14,23 @@ import { OsmixRemote } from "osmix"
 import indexHtml from "./index.html"
 import type { ShortbreadWorker } from "./shortbread.worker"
 
-const filename = "monaco.pbf"
+let filename = "monaco.pbf"
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001
 
 // Resolve the Monaco fixture path relative to the repo root
 const pbfUrl = new URL(`../../fixtures/${filename}`, import.meta.url)
 
-const log: string[] = []
+let log: Progress[] = []
 const workerCount = os.cpus().length
 
 // Connect with the custom ShortbreadWorker using the workerUrl option
 const Osmix = await OsmixRemote.connect<ShortbreadWorker>({
 	workerCount,
 	workerUrl: new URL("./shortbread.worker.ts", import.meta.url),
-	onProgress: (event) => log.push(event.msg),
+	onProgress: (event) => log.push(event),
 })
 
-console.log(`Number of Shortbread VT workers available: ${workerCount}`)
+console.log(`Number of workers available: ${workerCount}`)
 
 const server = Bun.serve({
 	port: PORT,
@@ -38,6 +39,44 @@ const server = Bun.serve({
 	routes: {
 		"/": indexHtml,
 		"/index.html": indexHtml,
+		"/remove": async () => {
+			await Osmix.delete(filename)
+			// Clear the log
+			log = []
+			return Response.json({ status: "Removed" }, { status: 200 })
+		},
+		"/pbf": {
+			async POST(req) {
+				try {
+					const id = req.headers.get("x-filename") ?? "new.pbf"
+					const data = req.body
+					if (!data) {
+						return Response.json(
+							{ error: "No file data provided" },
+							{ status: 400 },
+						)
+					}
+					// Set the new current filename
+					filename = id
+					await Osmix.fromPbf(data, { id })
+					return Response.json(
+						{
+							status: `Loading ${id}...`,
+						},
+						{ status: 200 },
+					)
+				} catch (error) {
+					console.error(error)
+					return Response.json(
+						{
+							error: "Internal server error",
+							message: (error as Error).message,
+						},
+						{ status: 500 },
+					)
+				}
+			},
+		},
 		"/ready": async () => {
 			const ready = await Osmix.isReady(filename)
 			return Response.json({ ready, log }, { status: 200 })
@@ -70,13 +109,62 @@ const server = Bun.serve({
 					tintColor: "#3b82f6",
 				},
 			})
+			// Remove the background layer
 			style.layers = style.layers.filter((layer) => layer.id !== "background")
+
+			// Remove opacity stops for line layers
+			style.layers.forEach((layer) => {
+				if (!layer.paint) return
+				if (layer.minzoom) layer.minzoom -= 2
+				if (layer.type === "line") {
+					// Always show line layers
+					delete layer.minzoom
+
+					if (
+						"line-opacity" in layer.paint &&
+						typeof layer.paint["line-opacity"] === "object"
+					) {
+						layer.paint["line-opacity"] = 1
+					}
+					if (
+						"line-width" in layer.paint &&
+						typeof layer.paint["line-width"] === "object" &&
+						"stops" in layer.paint["line-width"] &&
+						layer.paint["line-width"].stops[0][1] < 1
+					) {
+						layer.paint["line-width"].stops[0][1] = 1
+					}
+				}
+				if (layer.type === "fill") {
+					// Always show fill layers
+					delete layer.minzoom
+					if (
+						"fill-opacity" in layer.paint &&
+						typeof layer.paint["fill-opacity"] === "object" &&
+						"stops" in layer.paint["fill-opacity"] &&
+						layer.paint["fill-opacity"].stops[0][1] < 1
+					) {
+						layer.paint["fill-opacity"].stops[0][1] = 1
+					}
+				}
+				if (
+					"icon-opacity" in layer.paint &&
+					typeof layer.paint["icon-opacity"] === "object"
+				) {
+					layer.paint["icon-opacity"] = 1
+				}
+				if (
+					"text-opacity" in layer.paint &&
+					typeof layer.paint["text-opacity"] === "object"
+				) {
+					layer.paint["text-opacity"] = 1
+				}
+			})
 			return Response.json(style, { status: 200 })
 		},
 		"/tiles/:z/:x/:y": async (req) => {
 			try {
 				console.time(req.url)
-				req.signal
 				// Use the extended worker method via getWorker()
 				const tile = await Osmix.getWorker().getShortbreadTile(filename, [
 					+req.params.x,
@@ -98,21 +186,8 @@ const server = Bun.serve({
 				)
 			}
 		},
-		"/search/:kv": async (req) => {
-			const { kv } = req.params
-			const [key, val] = kv.split("=", 2)
-			console.log("searching for", key, val)
-			if (!key) {
-				return Response.json(
-					{ error: "Invalid key", message: "Key is required" },
-					{ status: 400 },
-				)
-			}
-			const results = await Osmix.search(filename, key, val)
-			return Response.json(results, { status: 200 })
-		},
 	},
-	fetch: async () => {
+	fetch: async (_req) => {
 		return new Response("Not found", { status: 404 })
 	},
 })

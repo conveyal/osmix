@@ -11,7 +11,86 @@ import maplibregl, {
 	type MapGeoJSONFeature,
 } from "maplibre-gl"
 
-const $log = document.getElementById("log")! as HTMLDialogElement
+let map: maplibregl.Map | null = null
+
+function createLog() {
+	document.getElementById("log")?.remove()
+	const $log = document.createElement("dialog")
+	$log.id = "log"
+	$log.innerHTML = `
+		<header>OSMMIX SERVER DEMO</header>
+		<hr />
+		<pre>Loading...</pre>
+		<button type="button" disabled>View OSM Tiles</button>
+	`
+	const $closeLog = $log.querySelector("button")! as HTMLButtonElement
+	$closeLog.addEventListener("click", () => $log.close())
+	document.body.append($log)
+	$log.showModal()
+	return $log
+}
+let $log = createLog()
+
+/**
+ * Attach a drop handler to the entire body that POSTs the file to the server
+ * and reloads the map.
+ */
+window.addEventListener("dragover", handleDragOver)
+window.addEventListener("dragleave", clearDragShadow)
+
+function handleDragOver(e: DragEvent) {
+	if (!e.dataTransfer) return
+	const fileItems = [...e.dataTransfer.items].filter(
+		(item) => item.kind === "file",
+	)
+	if (fileItems.length > 0) {
+		e.preventDefault()
+		if (fileItems.length === 1) {
+			document.body.style.boxShadow =
+				"inset 0 0 1px 4px rgba(from #3b82f6 r g b / 0.5)"
+		} else {
+			document.body.style.boxShadow =
+				"inset 0 0 1px 4px rgba(from #ef4444 r g b / 0.5)"
+		}
+	}
+}
+
+function clearDragShadow() {
+	document.body.style.boxShadow = "none"
+}
+
+window.addEventListener("drop", async (e) => {
+	e.preventDefault()
+	e.stopPropagation()
+	clearDragShadow()
+	const file = e.dataTransfer?.files[0]
+	if (file) {
+		if (file.name.endsWith(".pbf")) {
+			map?.remove()
+			$log = createLog()
+			const removeRes = await fetch("/remove")
+			if (!removeRes.ok) {
+				alert("Error removing current OSM data. Please try again.")
+				return
+			}
+			waitForServerReady()
+			const res = await fetch("/pbf", {
+				method: "POST",
+				body: file,
+				headers: {
+					"x-filename": file.name,
+				},
+			})
+			if (!res.ok) {
+				alert("Error loading PBF file. Please try again.")
+				return
+			}
+		} else {
+			alert("Only PBF files are supported. Please try again.")
+			return
+		}
+	}
+})
 
 // Wait for server to be ready before loading the map
 waitForServerReady()
@@ -20,16 +99,24 @@ async function waitForServerReady() {
 	try {
 		const res = await fetch("/ready")
 		const body = await res.json()
+		let prevTimestamp = 0
+		$log.querySelector("pre")!.textContent = body.log
+			.map((l) => {
+				if (prevTimestamp === 0) {
+					prevTimestamp = l.timestamp
+					return `[START] ${l.msg}`
+				}
+				const duration = l.timestamp - prevTimestamp
+				prevTimestamp = l.timestamp
+				return `[${(duration / 1_000).toFixed(3)}s] ${l.msg}`
+			})
+			.reverse()
+			.join("\n")
 		if (body.ready) {
-			$log.remove()
 			await loadMap()
+			$log.querySelector("button")!.disabled = false
+			$log.close()
 		} else {
-			if (!$log.open) $log.showModal()
-			$log.innerHTML = `
-				<header>Loading OSM Data...</header>
-				<hr />
-				<pre>${body.log.reverse().join("\n")}</pre>
-			`
 			setTimeout(waitForServerReady, 1_000)
 		}
 	} catch (error) {
@@ -63,7 +150,7 @@ async function loadMap() {
 		east + width * buffer,
 		north + height * buffer,
 	]
-	const map = new maplibregl.Map({
+	map = new maplibregl.Map({
 		container: "map",
 		style: "/style.json",
 		zoom: 13,
@@ -75,6 +162,7 @@ async function loadMap() {
 	const $entity = addMapControl(map, "entity", "bottom-left")
 	const $info = addMapControl(map, "info", "top-left")
 	const $layerControl = addMapControl(map, "layer-control", "bottom-right")
+	const $mapInfoControl = addMapControl(map, "map-info-control", "top-left")
 
 	// Info panel
 	$info.innerHTML = `
@@ -101,13 +189,31 @@ async function loadMap() {
 
 	// Fit to bounds when style loads
 	map.once("load", () => {
-		map.fitBounds(meta.bbox, { padding: 50, duration: 500 })
-		updateLayerControl(map, $layerControl)
-		setupInteraction(map, $entity)
+		map?.fitBounds(meta.bbox, { padding: 50, duration: 500 })
+		updateLayerControl(map!, $layerControl)
+		setupInteraction(map!, $entity)
 	})
 
 	// Navigation controls
 	map.addControl(new maplibregl.NavigationControl(), "top-right")
+
+	const updateMapInfo = () => {
+		const zoom = map?.getZoom()
+		const center = map?.getCenter()
+		if (!zoom || !center) return
+		$mapInfoControl.innerHTML = `
+			<dl>
+				<dt>Zoom</dt>
+				<dd>${zoom.toFixed(3)}</dd>
+				<dt>Center</dt>
+				<dd>${center.lng.toLocaleString()}, ${center.lat.toLocaleString()}</dd>
+			</dl>
+		`
+	}
+
+	// Handle map changes
+	map.on("zoom", updateMapInfo)
+	map.on("move", updateMapInfo)
 }
 
 function setupInteraction(map: maplibregl.Map, $entity: HTMLElement) {
@@ -134,6 +240,7 @@ function setupInteraction(map: maplibregl.Map, $entity: HTMLElement) {
 }
 
 function featureToHtml(feature: MapGeoJSONFeature) {
+	console.log(feature)
 	const props = feature.properties || {}
 	const propKeys = Object.keys(props).sort()
 	const rows = propKeys.map(
