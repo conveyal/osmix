@@ -321,22 +321,29 @@ export class OsmixWorker extends EventTarget {
 }
 
 /**
- * Expose a worker instance via Comlink.
- * Use this helper when creating custom worker entry points.
+ * Create a single OsmixWorker instance wrapped with Comlink.
+ * Spawns a new Web Worker and returns a proxy for cross-thread RPC.
+ *
+ * @param workerUrl - Optional URL to a custom worker file. If not provided,
+ *                    uses the default OsmixWorker.
  *
  * @example
- * // my-custom.worker.ts
- * import { OsmixWorker, exposeWorker } from "osmix/worker"
+ * // Default worker
+ * const worker = await createOsmixWorker()
  *
- * class MyCustomWorker extends OsmixWorker {
- *   myCustomMethod(id: string) {
- *     const osm = this.get(id)
- *     // ... custom logic
- *   }
- * }
- *
- * exposeWorker(new MyCustomWorker())
+ * @example
+ * // Custom worker
+ * const worker = await createOsmixWorker<MyCustomWorker>(
+ *   new URL("./my-custom.worker.ts", import.meta.url)
+ * )
  */
-export function exposeWorker<T extends OsmixWorker>(worker: T) {
-	Comlink.expose(worker)
+export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
+	workerUrl?: URL,
+): Promise<Comlink.Remote<T>> {
+	if (typeof Worker === "undefined") {
+		throw Error("Worker not supported")
+	}
+	const url = workerUrl ?? new URL("./osmix.worker.ts", import.meta.url)
+	const worker = new Worker(url, { type: "module" })
+	return Comlink.wrap<T>(worker)
 }

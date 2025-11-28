@@ -1,4 +1,5 @@
 import * as Comlink from "comlink"
+import type { OsmixWorker } from "./worker"
 
 export type Transferables = ArrayBufferLike | ReadableStream
 
@@ -71,3 +72,24 @@ export const SUPPORTS_SHARED_ARRAY_BUFFER =
 export const DEFAULT_WORKER_COUNT = SUPPORTS_SHARED_ARRAY_BUFFER
 	? (navigator.hardwareConcurrency ?? 1)
 	: 1
+
+/**
+ * Expose a worker instance via Comlink.
+ * Use this helper when creating custom worker entry points.
+ *
+ * @example
+ * // my-custom.worker.ts
+ * import { OsmixWorker, exposeWorker } from "osmix/worker"
+ *
+ * class MyCustomWorker extends OsmixWorker {
+ *   myCustomMethod(id: string) {
+ *     const osm = this.get(id)
+ *     // ... custom logic
+ *   }
+ * }
+ *
+ * exposeWorker(new MyCustomWorker())
+ */
+export function exposeWorker<T extends OsmixWorker>(worker: T) {
+	Comlink.expose(worker)
+}

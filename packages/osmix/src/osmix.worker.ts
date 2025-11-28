@@ -10,7 +10,7 @@
  *
  * @example
  * // Custom worker - import from worker-utils to avoid side effects
- * import { OsmixWorker, exposeWorker } from "osmix/worker-utils"
+ * import { OsmixWorker, exposeWorker } from "osmix/worker"
  *
  * class MyWorker extends OsmixWorker {
  *   myMethod() { ... }
@@ -18,10 +18,7 @@
  * exposeWorker(new MyWorker())
  */
 
-// Re-export utilities for backwards compatibility with "osmix/worker" imports
-export { exposeWorker, OsmixWorker } from "./worker-utils"
-
-// Default worker entry point - expose a standard OsmixWorker instance
-import { exposeWorker, OsmixWorker } from "./worker-utils"
+import { exposeWorker } from "./utils"
+import { OsmixWorker } from "./worker"
 
 exposeWorker(new OsmixWorker())

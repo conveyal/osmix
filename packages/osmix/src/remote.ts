@@ -12,7 +12,7 @@ import {
 	SUPPORTS_STREAM_TRANSFER,
 	transfer,
 } from "./utils"
-import type { OsmixWorker } from "./worker-utils"
+import { createOsmixWorker, type OsmixWorker } from "./worker"
 
 type OsmId = string | Osm
 
@@ -264,8 +264,18 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	/**
 	 * Check if an Osmix instance has completed index building and is ready for queries.
 	 */
-	isReady(osmId: OsmId) {
-		return this.workers.every((worker) => worker.isReady(this.getId(osmId)))
+	async isReady(osmId: OsmId) {
+		try {
+			await Promise.all(
+				this.workers.map(async (worker) => {
+					const isReady = await worker.isReady(this.getId(osmId))
+					if (!isReady) throw Error("Osmix instance is not ready")
+				}),
+			)
+		} catch {
+			return false
+		}
+		return true
 	}
 
 	/**
@@ -409,32 +419,4 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			pageSize,
 		)
 	}
-}
-
-/**
- * Create a single OsmixWorker instance wrapped with Comlink.
- * Spawns a new Web Worker and returns a proxy for cross-thread RPC.
- *
- * @param workerUrl - Optional URL to a custom worker file. If not provided,
- *                    uses the default OsmixWorker.
- *
- * @example
- * // Default worker
- * const worker = await createOsmixWorker()
- *
- * @example
- * // Custom worker
- * const worker = await createOsmixWorker<MyCustomWorker>(
- *   new URL("./my-custom.worker.ts", import.meta.url)
- * )
- */
-export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
-	workerUrl?: URL,
-): Promise<Comlink.Remote<T>> {
-	if (typeof Worker === "undefined") {
-		throw Error("Worker not supported")
-	}
-	const url = workerUrl ?? new URL("./osmix.worker.ts", import.meta.url)
-	const worker = new Worker(url, { type: "module" })
-	return Comlink.wrap<T>(worker)
 }

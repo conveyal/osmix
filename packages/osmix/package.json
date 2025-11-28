@@ -7,7 +7,7 @@
 	"main": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts",
-		"./worker": "./src/worker-utils.ts"
+		"./worker": "./src/worker.ts"
 	},
 	"publishConfig": {
 		"access": "public",
@@ -19,8 +19,8 @@
 				"types": "./dist/index.d.ts"
 			},
 			"./worker": {
-				"import": "./dist/worker-utils.js",
-				"types": "./dist/worker-utils.d.ts"
+				"import": "./dist/worker.js",
+				"types": "./dist/worker.d.ts"
 			}
 		},
 		"files": [

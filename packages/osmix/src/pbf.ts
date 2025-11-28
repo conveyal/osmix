@@ -76,6 +76,7 @@ export async function* startCreateOsmFromPbf(
 		}
 	}
 
+	let blockCount = 0
 	for await (const block of blocks) {
 		const blockStringIndexMap = osm.stringTable.createBlockIndexMap(
 			block.stringtable,
@@ -83,9 +84,7 @@ export async function* startCreateOsmFromPbf(
 
 		for (const group of block.primitivegroup) {
 			const { nodes, ways, relations, dense } = group
-			if (nodes && nodes.length > 0) {
-				throw Error("Nodes must be dense!")
-			}
+			if (nodes && nodes.length > 0) throw Error("Nodes must be dense!")
 
 			if (dense) {
 				osm.nodes.addDenseNodes(
@@ -147,24 +146,35 @@ export async function* startCreateOsmFromPbf(
 				)
 			}
 		}
+
+		blockCount++
+		yield progressEvent(
+			`Processed ${blockCount} blocks, ${osm.nodes.size.toLocaleString()} nodes, ${osm.ways.size.toLocaleString()} ways, and ${osm.relations.size.toLocaleString()} relations added.`,
+		)
 	}
 
 	yield progressEvent(
 		`${osm.nodes.size.toLocaleString()} nodes, ${osm.ways.size.toLocaleString()} ways, and ${osm.relations.size.toLocaleString()} relations added.`,
 	)
-	yield progressEvent("Building remaining id and tag indexes...")
+	yield progressEvent("Building ID and tag indexes...")
 	osm.buildIndexes()
 
 	// By default, build all spatial indexes.
 	if (!Array.isArray(options.buildSpatialIndexes)) {
+		yield progressEvent("Building all spatial indexes...")
 		osm.buildSpatialIndexes()
 	} else if (options.buildSpatialIndexes.includes("node")) {
+		yield progressEvent("Building node spatial index...")
 		osm.nodes.buildSpatialIndex()
 	} else if (options.buildSpatialIndexes.includes("way")) {
+		yield progressEvent("Building way spatial index...")
 		osm.ways.buildSpatialIndex()
 	} else if (options.buildSpatialIndexes.includes("relation")) {
+		yield progressEvent("Building relation spatial index...")
 		osm.relations.buildSpatialIndex()
 	}
+
+	yield progressEvent(`Finished loading ${osm.id} PBF data into Osmix.`)
 
 	return osm
 }
