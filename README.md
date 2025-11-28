@@ -91,6 +91,7 @@ See each package's README for full API and description.
 | [`@osmix/raster`](packages/raster/README.md) | Renders OSM entities as raster bitmaps. |
 | [`@osmix/vt`](packages/vt/README.md) | Encodes OSM entities as Mapbox Vector Tiles (MVT). |
 | [`@osmix/shared`](packages/shared/README.md) | Utility functions and geometry helpers used throughout all workspace packages. |
+| [`@osmix/router`](packages/router/README.md) | Experimental, naive router. WIP. |
 
 
 ## Development
@@ -127,6 +128,5 @@ bun run check
 
 - [OpenStreetMap PBF format](https://wiki.openstreetmap.org/wiki/PBF_Format)
 - [Bun](https://bun.sh/) workspace documentation
-- [Vite](https://vitejs.dev/) build tooling
 - [MapLibre GL JS](https://maplibre.org/projects/maplibre-gl-js/)
 - [Web Compression Streams API](https://developer.mozilla.org/docs/Web/API/Compression_Streams_API)

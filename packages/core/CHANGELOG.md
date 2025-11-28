@@ -1,5 +1,14 @@
 # @osmix/core
 
+## 0.0.6
+
+### Patch Changes
+
+- 3846a0c: Integrate geographic spatial indexing libraries
+- cdab4db: Add router
+- Updated dependencies [0cd8a2e]
+  - @osmix/shared@0.0.6
+
 ## 0.0.5
 
 ### Patch Changes
