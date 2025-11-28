@@ -223,14 +223,17 @@ export class OsmixRasterTile {
 
 		// Normalize winding order using rewind (outer counterclockwise, inner clockwise)
 		const normalizedRings = rings.map((ring) => {
-			const feature = {
-				type: "Feature" as const,
-				geometry: {
-					type: "Polygon" as const,
-					coordinates: [ring],
+			const rewound = rewind(
+				{
+					type: "Feature",
+					geometry: {
+						type: "Polygon",
+						coordinates: [ring],
+					},
+					properties: {},
 				},
-			}
-			const rewound = rewind(feature, false)
+				false,
+			)
 			const firstRing = rewound.geometry.coordinates[0]
 			if (!firstRing) return ring
 			return firstRing
