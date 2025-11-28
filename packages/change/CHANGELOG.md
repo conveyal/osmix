@@ -1,5 +1,16 @@
 # @osmix/change
 
+## 0.0.6
+
+### Patch Changes
+
+- 3846a0c: Integrate geographic spatial indexing libraries
+- Updated dependencies [3846a0c]
+- Updated dependencies [0cd8a2e]
+- Updated dependencies [cdab4db]
+  - @osmix/core@0.0.6
+  - @osmix/shared@0.0.6
+
 ## 0.0.5
 
 ### Patch Changes

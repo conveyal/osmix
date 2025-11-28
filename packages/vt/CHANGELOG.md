@@ -1,5 +1,14 @@
 # @osmix/vt
 
+## 0.0.6
+
+### Patch Changes
+
+- 2c03b6c: Add shortbread vector tile generation option
+- 0cd8a2e: Explore patterns for extending Osmix worker
+- Updated dependencies [0cd8a2e]
+  - @osmix/shared@0.0.6
+
 ## 0.0.5
 
 ### Patch Changes

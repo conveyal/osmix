@@ -1,5 +1,11 @@
 # @osmix/shared
 
+## 0.0.6
+
+### Patch Changes
+
+- 0cd8a2e: Explore patterns for extending Osmix worker
+
 ## 0.0.5
 
 ### Patch Changes
