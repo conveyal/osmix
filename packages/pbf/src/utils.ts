@@ -39,29 +39,11 @@ export async function* toAsyncGenerator<T>(
 }
 
 /**
- * Returns true when executing inside the Bun runtime.
- */
-export function isBun(): boolean {
-	return "Bun" in globalThis
-}
-
-/**
  * Web decompression stream
  */
 export async function webDecompress(
 	data: Uint8Array<ArrayBuffer>,
 ): Promise<Uint8Array<ArrayBuffer>> {
-	if (isBun()) {
-		// @ts-ignore Only used in Bun runtime.
-		const { inflate } = await import("node:zlib")
-		const result = await new Promise<Uint8Array>((resolve, reject) => {
-			inflate(data, (error: unknown, result: Uint8Array) => {
-				if (error) reject(error)
-				else resolve(new Uint8Array(result))
-			})
-		})
-		return result as unknown as Uint8Array<ArrayBuffer>
-	}
 	return transformBytes(data, new DecompressionStream("deflate"))
 }
 
@@ -71,17 +53,6 @@ export async function webDecompress(
 export async function webCompress(
 	data: Uint8Array<ArrayBuffer>,
 ): Promise<Uint8Array<ArrayBuffer>> {
-	if (isBun()) {
-		// @ts-ignore Only used in Bun runtime.
-		const { deflate } = await import("node:zlib")
-		const result = await new Promise<Uint8Array>((resolve, reject) => {
-			deflate(data, (error: unknown, result: Uint8Array) => {
-				if (error) reject(error)
-				else resolve(new Uint8Array(result))
-			})
-		})
-		return result as unknown as Uint8Array<ArrayBuffer>
-	}
 	return transformBytes(data, new CompressionStream("deflate"))
 }
 
