@@ -284,7 +284,6 @@ describe("OsmixVtEncoder", () => {
 		const relationFeature = features[0]
 		expect(relationFeature).toBeDefined()
 		expect(relationFeature?.type).toBe(3) // POLYGON
-		expect(relationFeature?.properties.type).toBe("relation")
 
 		const geometry = relationFeature?.geometry
 		expect(geometry).toBeDefined()

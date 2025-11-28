@@ -535,17 +535,14 @@ describe("ShortbreadVtEncoder", () => {
 
 		// Check node entity type
 		const poiFeature = layers["pois"]?.feature(0)
-		expect(poiFeature?.properties["type"]).toBe("node")
 		expect(poiFeature?.properties["name"]).toBe("Node Restaurant")
 
 		// Check way entity type
 		const buildingFeature = layers["buildings"]?.feature(0)
-		expect(buildingFeature?.properties["type"]).toBe("way")
 		expect(buildingFeature?.properties["name"]).toBe("Way Building")
 
 		// Check relation entity type
 		const waterFeature = layers["water"]?.feature(0)
-		expect(waterFeature?.properties["type"]).toBe("relation")
 		expect(waterFeature?.properties["name"]).toBe("Relation Lake")
 	})
 })

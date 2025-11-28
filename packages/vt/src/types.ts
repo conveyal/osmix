@@ -1,10 +1,9 @@
-import type { OsmEntityType, OsmTags, XY } from "@osmix/shared/types"
+import type { OsmTags, XY } from "@osmix/shared/types"
 
 export type VtSimpleFeatureGeometry = XY[][]
 
 export type VtSimpleFeatureProperties = {
 	sourceId?: string
-	type: OsmEntityType
 	tileKey?: string
 } & OsmTags
 
