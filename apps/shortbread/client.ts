@@ -46,13 +46,28 @@ async function loadMap() {
 		filename: string
 		header: OsmPbfHeaderBlock
 		layerNames: string[]
+		nodes: number
+		ways: number
+		relations: number
 	} = await metaRes.json()
 
 	// Create map with the server-generated Shortbread style
+	// Use maxBounds with 10% buffer to prevent zooming/panning too far outside the data area
+	const [west, south, east, north] = meta.bbox
+	const width = east - west
+	const height = north - south
+	const buffer = 2
+	const maxBounds: GeoBbox2D = [
+		west - width * buffer,
+		south - height * buffer,
+		east + width * buffer,
+		north + height * buffer,
+	]
 	const map = new maplibregl.Map({
 		container: "map",
 		style: "/style.json",
 		zoom: 13,
+		maxBounds,
 		attributionControl: false,
 	})
 
@@ -71,10 +86,16 @@ async function loadMap() {
 		<dl>
 			<dt>File</dt>
 			<dd>${meta.filename}</dd>
+			<dt>Nodes</dt>
+			<dd>${meta.nodes.toLocaleString()}</dd>
+			<dt>Ways</dt>
+			<dd>${meta.ways.toLocaleString()}</dd>
+			<dt>Relations</dt>
+			<dd>${meta.relations.toLocaleString()}</dd>
 			<dt>Layers</dt>
 			<dd>${meta.layerNames.length}</dd>
 			<dt>BBox</dt>
-			<dd style="font-size: 10px;">${meta.bbox.map((n) => n.toFixed(4)).join(", ")}</dd>
+			<dd>${meta.bbox.map((n) => n.toFixed(4)).join(", ")}</dd>
 		</dl>
 	`
 
@@ -90,18 +111,13 @@ async function loadMap() {
 }
 
 function setupInteraction(map: maplibregl.Map, $entity: HTMLElement) {
-	const interactiveLayers = [
-		"streets",
-		"buildings",
-		"water",
-		"land-forest",
-		"land-grass",
-		"sites",
-		"pois",
-	]
 	const canvas = map.getCanvas()
+	const layers = map.getLayersOrder().filter((id) => {
+		if (id.endsWith(":outline")) return false
+		return true
+	})
 
-	map.on("mousemove", interactiveLayers, (e) => {
+	map.on("mousemove", layers, (e) => {
 		canvas.style.cursor = "pointer"
 		const features = e.features
 		if (features && features.length > 0) {
@@ -112,7 +128,7 @@ function setupInteraction(map: maplibregl.Map, $entity: HTMLElement) {
 		}
 	})
 
-	map.on("mouseleave", interactiveLayers, () => {
+	map.on("mouseleave", layers, () => {
 		canvas.style.cursor = ""
 	})
 }
@@ -122,17 +138,15 @@ function featureToHtml(feature: MapGeoJSONFeature) {
 	const propKeys = Object.keys(props).sort()
 	const rows = propKeys.map(
 		(key) => `
-		<tr>
-			<td>${key}</td>
-			<td>${props[key]}</td>
-		</tr>
+			<dt>${key}</dt>
+			<dd>${props[key]}</dd>
 	`,
 	)
 	return `
 		<header>${feature.layer.id} (${feature.geometry.type})</header>
-		<table>
-			<tbody>${rows.join("")}</tbody>
-		</table>
+		<dl>
+			${rows.join("")}
+		</dl>
 	`
 }
 

@@ -9,11 +9,12 @@
 		"typecheck": "tsc --build --noEmit"
 	},
 	"dependencies": {
-		"osmix": "workspace:*",
 		"@osmix/core": "workspace:*",
 		"@osmix/shortbread": "workspace:*",
+		"@versatiles/style": "^5.8.0",
 		"comlink": "^4.4.2",
-		"maplibre-gl": "catalog:"
+		"maplibre-gl": "catalog:",
+		"osmix": "workspace:*"
 	},
 	"devDependencies": {
 		"@osmix/shared": "workspace:*",

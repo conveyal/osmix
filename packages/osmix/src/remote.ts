@@ -265,7 +265,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	 * Check if an Osmix instance has completed index building and is ready for queries.
 	 */
 	isReady(osmId: OsmId) {
-		return this.nextWorker().isReady(this.getId(osmId))
+		return this.workers.every((worker) => worker.isReady(this.getId(osmId)))
 	}
 
 	/**
