@@ -2,23 +2,24 @@
  * Default OsmixWorker entry point.
  *
  * This file serves as the default worker entry point that exposes a standard OsmixWorker.
- * For custom workers, import from "osmix/worker-utils" instead to avoid the side effect.
+ * For custom workers, import from "osmix/worker" instead to avoid the side effect.
  *
  * @example
  * // Using the default worker (via OsmixRemote with no workerUrl)
  * const remote = await OsmixRemote.connect()
  *
  * @example
- * // Custom worker - import from worker-utils to avoid side effects
- * import { OsmixWorker, exposeWorker } from "osmix/worker"
+ * // Custom worker - import from worker to avoid side effects
+ * import { OsmixWorker } from "osmix/worker"
+ * import { expose } from "comlink"
  *
  * class MyWorker extends OsmixWorker {
  *   myMethod() { ... }
  * }
- * exposeWorker(new MyWorker())
+ * expose(new MyWorker())
  */
 
-import { exposeWorker } from "./utils"
+import { expose } from "comlink"
 import { OsmixWorker } from "./worker"
 
-exposeWorker(new OsmixWorker())
+expose(new OsmixWorker())
