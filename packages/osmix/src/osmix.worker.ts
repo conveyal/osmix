@@ -2,7 +2,7 @@
  * Default OsmixWorker entry point.
  *
  * This file serves as the default worker entry point that exposes a standard OsmixWorker.
- * For custom workers, import from "osmix/worker" instead to avoid the side effect.
+ * For custom workers, import {OsmixWorker} from "osmix" instead to avoid the side effect.
  *
  * @example
  * // Using the default worker (via OsmixRemote with no workerUrl)
@@ -10,7 +10,7 @@
  *
  * @example
  * // Custom worker - import from worker to avoid side effects
- * import { OsmixWorker } from "osmix/worker"
+ * import { OsmixWorker } from "osmix"
  * import { expose } from "comlink"
  *
  * class MyWorker extends OsmixWorker {

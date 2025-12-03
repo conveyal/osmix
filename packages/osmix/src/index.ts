@@ -5,6 +5,7 @@ export * from "./osmix"
 export * from "./pbf"
 export * from "./remote"
 export * from "./utils"
+export * from "./worker"
 
 const osmix = new Osmix()
 export default osmix
