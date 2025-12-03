@@ -17,10 +17,6 @@
 			".": {
 				"import": "./dist/index.js",
 				"types": "./dist/index.d.ts"
-			},
-			"./worker": {
-				"import": "./dist/worker.js",
-				"types": "./dist/worker.d.ts"
 			}
 		},
 		"files": [

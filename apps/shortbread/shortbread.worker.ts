@@ -8,7 +8,7 @@
 import type { Tile } from "@osmix/shared/types"
 import { ShortbreadVtEncoder } from "@osmix/shortbread"
 import * as Comlink from "comlink"
-import { OsmixWorker } from "osmix/worker"
+import { OsmixWorker } from "osmix"
 
 /**
  * Extended worker class that adds Shortbread vector tile generation.
