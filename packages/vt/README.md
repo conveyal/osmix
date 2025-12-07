@@ -44,7 +44,25 @@ Most viewers expect tile URLs. To see a Maplibre implementation in the [example 
 
 ## API
 
-Coming soon...
+### `OsmixVtEncoder`
+
+The main class for encoding vector tiles.
+
+```ts
+constructor(osm: Osm, extent = 4096, buffer = 64)
+```
+
+- `osm`: The `@osmix/core` dataset to encode.
+- `extent`: Tile extent (default 4096). Higher values offer more precision.
+- `buffer`: Buffer around the tile in extent units (default 64).
+
+#### `getTile(tile: [x, y, z]): ArrayBuffer`
+
+Encodes a single tile identified by its XYZ coordinates. Returns a PBF `ArrayBuffer`.
+
+#### `getTileForBbox(bbox: [w, s, e, n], proj: (ll) => [x, y]): ArrayBuffer`
+
+Lower-level method to encode a specific bounding box with a custom projection function. Useful if you are projecting to non-Mercator tiles or need custom bounds.
 
 ## Environment and limitations
 
