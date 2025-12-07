@@ -3,7 +3,7 @@ import { Osm } from "@osmix/core"
 import { getFixtureFileReadStream } from "@osmix/shared/test/fixtures"
 import type { GeoBbox2D } from "@osmix/shared/types"
 import { createExtract } from "../src/extract"
-import { createOsmFromPbf, osmToPbfBuffer, osmToPbfStream } from "../src/pbf"
+import { fromPbf, toPbfBuffer, toPbfStream } from "../src/pbf"
 
 const TEST_BBOX: GeoBbox2D = [-0.1, -0.1, 1, 1]
 const SEATTLE_BBOX: GeoBbox2D = [-122.463226, 47.469878, -122.180328, 47.82883]
@@ -78,10 +78,10 @@ describe("extract", () => {
 			Uint8Array<ArrayBufferLike>,
 			Uint8Array<ArrayBufferLike>
 		>()
-		const extractPromise = createOsmFromPbf(transform.readable, {
+		const extractPromise = fromPbf(transform.readable, {
 			extractBbox: TEST_BBOX,
 		})
-		await osmToPbfStream(source).pipeTo(transform.writable)
+		await toPbfStream(source).pipeTo(transform.writable)
 		const extract = await extractPromise
 
 		expect(extract.nodes.size).toBe(2)
@@ -100,13 +100,13 @@ describe("extract", () => {
 
 	test("extract a BBOX after reading a PBF", async () => {
 		const source = buildSourceOsm()
-		const buffer = await osmToPbfBuffer(source)
+		const buffer = await toPbfBuffer(source)
 
-		const streaming = await createOsmFromPbf(new Uint8Array(buffer.slice(0)), {
+		const streaming = await fromPbf(new Uint8Array(buffer.slice(0)), {
 			extractBbox: TEST_BBOX,
 		})
 
-		const twoStepOsmix = await createOsmFromPbf(new Uint8Array(buffer.slice(0)))
+		const twoStepOsmix = await fromPbf(new Uint8Array(buffer.slice(0)))
 		const twoStep = createExtract(twoStepOsmix, TEST_BBOX, "simple")
 
 		expect(streaming.nodes.size).toBe(twoStep.nodes.size)
@@ -505,12 +505,9 @@ describe("extract", () => {
 	})
 
 	test.skip("extract from a large PBF", async () => {
-		const seattle = await createOsmFromPbf(
-			getFixtureFileReadStream("usa.pbf"),
-			{
-				extractBbox: SEATTLE_BBOX,
-			},
-		)
+		const seattle = await fromPbf(getFixtureFileReadStream("usa.pbf"), {
+			extractBbox: SEATTLE_BBOX,
+		})
 
 		expect({
 			nodes: seattle.nodes.size,

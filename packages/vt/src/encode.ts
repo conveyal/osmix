@@ -1,3 +1,13 @@
+/**
+ * Vector tile encoding for OSM data.
+ *
+ * The OsmixVtEncoder class converts Osmix datasets into Mapbox Vector Tiles,
+ * handling geometry projection, clipping, area detection, and proper
+ * MVT encoding for nodes, ways, and relations.
+ *
+ * @module
+ */
+
 import type { Osm } from "@osmix/core"
 import { bboxContainsOrIntersects } from "@osmix/shared/bbox-intersects"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
@@ -11,7 +21,9 @@ import type {
 } from "./types"
 import writeVtPbf from "./write-vt-pbf"
 
+/** Default tile extent (coordinate resolution). */
 const DEFAULT_EXTENT = 4096
+/** Default buffer around tile in extent units. */
 const DEFAULT_BUFFER = 64
 
 const SF_TYPE: VtSimpleFeatureType = {
@@ -35,6 +47,11 @@ function dedupePoints(points: XY[]): XY[] {
 	return result
 }
 
+/**
+ * Returns a projection function that converts [lon, lat] to [x, y] pixel coordinates
+ * relative to the given tile. The extent determines the resolution of the tile
+ * (e.g. 4096 means coordinates range from 0 to 4096).
+ */
 export function projectToTile(
 	tile: Tile,
 	extent = DEFAULT_EXTENT,
@@ -42,6 +59,9 @@ export function projectToTile(
 	return (lonLat) => llToTilePx(lonLat, tile, extent)
 }
 
+/**
+ * Encode an Osm instance into a Mapbox Vector Tile PBF.
+ */
 export class OsmixVtEncoder {
 	readonly nodeLayerName: string
 	readonly wayLayerName: string
@@ -72,6 +92,10 @@ export class OsmixVtEncoder {
 		this.relationLayerName = `${layerName}:relations`
 	}
 
+	/**
+	 * Get a vector tile PBF for a specific tile coordinate.
+	 * Returns an empty buffer if the tile does not intersect with the OSM dataset.
+	 */
 	getTile(tile: Tile): ArrayBuffer {
 		const bbox = tileToBbox(tile)
 		const osmBbox = this.osm.bbox()
@@ -81,6 +105,11 @@ export class OsmixVtEncoder {
 		return this.getTileForBbox(bbox, (ll) => llToTilePx(ll, tile, this.extent))
 	}
 
+	/**
+	 * Get a vector tile PBF for a specific geographic bounding box.
+	 * @param bbox The bounding box to include features from.
+	 * @param proj A function to project [lon, lat] to [x, y] within the tile extent.
+	 */
 	getTileForBbox(bbox: GeoBbox2D, proj: (ll: LonLat) => XY): ArrayBuffer {
 		// Get way IDs that are part of relations (to exclude from individual rendering)
 		const relationWayIds = this.osm.relations.getWayMemberIds()
@@ -349,6 +378,10 @@ export class OsmixVtEncoder {
 	}
 }
 
+/**
+ * Ensures the ring is closed (first and last points are identical).
+ * If not, appends the first point to the end.
+ */
 function closeRing(ring: XY[]): XY[] {
 	const first = ring[0]
 	const last = ring[ring.length - 1]
@@ -359,8 +392,10 @@ function closeRing(ring: XY[]): XY[] {
 	return ring
 }
 
-// Signed area via shoelace formula.
-// Positive area => CCW, Negative => CW.
+/**
+ * Signed area via shoelace formula.
+ * Positive area => CCW, Negative => CW.
+ */
 function ringArea(ring: XY[]): number {
 	let sum = 0
 	for (let i = 0; i < ring.length - 1; i++) {
@@ -379,7 +414,10 @@ function ensureCounterclockwise(ring: XY[]): XY[] {
 	return ringArea(ring) > 0 ? ring : [...ring].reverse()
 }
 
-// Remove consecutive duplicates *after* rounding
+/**
+ * Clean a polygon ring by removing consecutive duplicates, ensuring it's closed,
+ * and checking that it has at least 4 coordinates (3 unique points).
+ */
 function cleanRing(ring: XY[]): XY[] {
 	const deduped = dedupePoints(ring)
 	// After dedupe, we still must ensure closure, and a polygon

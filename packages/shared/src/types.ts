@@ -1,9 +1,23 @@
+/**
+ * Shared type definitions used across all Osmix packages.
+ *
+ * Includes geographic primitives (LonLat, Bbox), tile coordinates,
+ * and core OSM entity types (Node, Way, Relation).
+ *
+ * @module
+ */
+
+/** Geographic coordinate as [longitude, latitude] tuple. */
 export type LonLat = [lon: number, lat: number]
+/** 2D pixel or cartesian coordinate as [x, y] tuple. */
 export type XY = [x: number, y: number]
+
+/** Geographic coordinate as object with lon/lat properties. */
 export interface ILonLat {
 	lon: number
 	lat: number
 }
+/** XYZ tile coordinate as [x, y, z] tuple. */
 export type Tile = [x: number, y: number, z: number]
 
 /**
@@ -44,12 +58,6 @@ export type TilePxBbox = [
 
 export type OsmEntityType = "node" | "way" | "relation"
 
-export interface OsmEntityTypeMap extends Record<OsmEntityType, IOsmEntity> {
-	node: OsmNode
-	way: OsmWay
-	relation: OsmRelation
-}
-
 export interface OsmInfoParsed {
 	version?: number
 	timestamp?: number
@@ -64,7 +72,7 @@ export interface OsmTags {
 	[key: string]: string | number
 }
 
-export interface IOsmEntity {
+interface IOsmEntity {
 	id: number
 	info?: OsmInfoParsed
 	tags?: OsmTags
@@ -88,6 +96,12 @@ export interface OsmRelation extends IOsmEntity {
 }
 
 export type OsmEntity = OsmNode | OsmWay | OsmRelation
+
+export interface OsmEntityTypeMap extends Record<OsmEntityType, IOsmEntity> {
+	node: OsmNode
+	way: OsmWay
+	relation: OsmRelation
+}
 
 /**
  * Semantic kinds of OSM relations based on their type tag and structure.

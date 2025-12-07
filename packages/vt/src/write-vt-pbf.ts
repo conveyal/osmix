@@ -1,7 +1,20 @@
+/**
+ * Vector tile PBF writer.
+ *
+ * Encodes vector tile layers and features into the Mapbox Vector Tile
+ * binary format (PBF/protobuf). Handles key/value deduplication,
+ * geometry encoding with delta compression, and proper command sequences.
+ *
+ * @see https://github.com/mapbox/vector-tile-spec
+ *
+ * @module
+ */
+
 import { zigzag, zigzag32 } from "@osmix/shared/zigzag"
 import Pbf from "pbf"
 import type { VtPbfLayer, VtSimpleFeature } from "./types"
 
+/** Internal context for encoding a layer's features. */
 type VtLayerContext = {
 	feature: VtSimpleFeature
 	keys: string[]
@@ -11,7 +24,10 @@ type VtLayerContext = {
 }
 
 /**
- * Write Vector Tile Layers to a PBF buffer
+ * Write vector tile layers to a PBF buffer.
+ *
+ * @param layers - Array of layers to encode.
+ * @returns ArrayBuffer containing the encoded vector tile.
  */
 export default function writeVtPbf(layers: VtPbfLayer[]) {
 	const pbf = new Pbf()

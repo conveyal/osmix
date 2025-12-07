@@ -1,3 +1,12 @@
+/**
+ * Shortest path algorithms (Dijkstra and A*).
+ *
+ * Both algorithms guarantee optimal paths. A* uses a heuristic to guide
+ * the search toward the destination, making it faster for most queries.
+ *
+ * @module
+ */
+
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import { BinaryHeap } from "../binary-heap"
 import type { GraphEdge, PathSegment, RoutingAlgorithmFn } from "../types"

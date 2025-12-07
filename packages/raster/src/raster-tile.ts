@@ -1,3 +1,13 @@
+/**
+ * Raster tile rendering for XYZ tiles.
+ *
+ * The OsmixRasterTile class creates and manages pixel buffers for individual
+ * map tiles, providing methods to draw geographic geometries (points, lines,
+ * polygons) into the buffer with automatic projection and clipping.
+ *
+ * @module
+ */
+
 import rewind from "@osmix/shared/geojson-rewind"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
 import {
@@ -10,6 +20,7 @@ import {
 import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
 import { compositeRGBA } from "./color"
 
+/** Default image type for exported tiles. */
 export const DEFAULT_RASTER_IMAGE_TYPE = "image/png"
 export const DEFAULT_LINE_COLOR: Rgba = [255, 255, 255, 230] // semi-transparent white
 export const DEFAULT_POINT_COLOR: Rgba = [255, 0, 0, 255] // red
@@ -19,6 +30,14 @@ export const DEFAULT_RASTER_TILE_SIZE = 256
 /**
  * Construct a an image for a single XYZ tile. The image is a 2D array of RGBA pixels.
  * Helper methods are provided to draw lines, polygons, and points onto the image.
+ *
+ * Coordinate systems:
+ * - "lon/lat" (or ll): Geographic WGS84 coordinates [longitude, latitude].
+ * - "tile pixels" (or px): 2D cartesian coordinates relative to the tile's top-left corner.
+ *   - [0, 0] is top-left.
+ *   - [tileSize, tileSize] is bottom-right.
+ *
+ * This class handles the projection and clipping of geographic geometry into the tile's pixel space.
  */
 export class OsmixRasterTile {
 	imageData: Uint8ClampedArray<ArrayBuffer>
@@ -83,7 +102,7 @@ export class OsmixRasterTile {
 		const clampedMin = this.clampAndRoundPx([minX, minY])
 		const clampedMax = this.clampAndRoundPx([maxX, maxY])
 
-		// For each pixel from min to max, calculate the coverage ration
+		// For each pixel from min to max, calculate the coverage ratio
 		const pixels: { px: XY; coverage: number }[] = []
 		for (let y = clampedMin[1]; y <= clampedMax[1]; y++) {
 			for (let x = clampedMin[0]; x <= clampedMax[0]; x++) {
@@ -113,12 +132,16 @@ export class OsmixRasterTile {
 		return (px[1] * this.tileSize + px[0]) * 4
 	}
 
-	setLonLat(ll: LonLat, color: Rgba = DEFAULT_POINT_COLOR) {
+	drawPoint(ll: LonLat, color: Rgba = DEFAULT_POINT_COLOR) {
 		const px = this.llToTilePx(ll)
-		this.setPixel(px, color)
+		this.drawPixel(px, color)
 	}
 
-	setPixel(px: XY, color: Rgba) {
+	/**
+	 * Draw a color at a pixel. If the pixel is transparent, the color is drawn.
+	 * Otherwise, the color is blended with the existing color.
+	 */
+	drawPixel(px: XY, color: Rgba) {
 		const clampedPx = this.clampAndRoundPx(px)
 		const idx = this.getIndex(clampedPx)
 		if (this.imageData[idx + 3] === 0) {
@@ -151,11 +174,15 @@ export class OsmixRasterTile {
 			// Scale alpha by coverage ratio, ensuring at least 1 for visibility
 			const scaledAlpha = Math.max(1, Math.round(color[3] * coverage))
 			const scaledColor: Rgba = [color[0], color[1], color[2], scaledAlpha]
-			this.setPixel(px, scaledColor)
+			this.drawPixel(px, scaledColor)
 		}
 		return true
 	}
 
+	/**
+	 * Draw a line between two pixels.
+	 * Uses Bresenham's line algorithm.
+	 */
 	drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR) {
 		const tileSize = this.tileSize
 		const dx = Math.abs(px1[0] - px0[0])
@@ -169,11 +196,7 @@ export class OsmixRasterTile {
 		while (true) {
 			// Only draw pixels within tile bounds
 			if (x >= 0 && x < tileSize && y >= 0 && y < tileSize) {
-				const idx = this.getIndex([x, y])
-				this.imageData[idx] = color[0]
-				this.imageData[idx + 1] = color[1]
-				this.imageData[idx + 2] = color[2]
-				this.imageData[idx + 3] = color[3]
+				this.drawPixel([x, y], color)
 			}
 			if (x === px1[0] && y === px1[1]) break
 			const e2 = 2 * err
@@ -188,6 +211,9 @@ export class OsmixRasterTile {
 		}
 	}
 
+	/**
+	 * Split a line string into a series of line segments and draw each segment.
+	 */
 	drawLineString(coords: LonLat[], color: Rgba = DEFAULT_LINE_COLOR) {
 		const projectedCoords = coords.map((ll) => this.llToTilePx(ll))
 		const [clipped] = clipPolyline(projectedCoords, [
@@ -220,6 +246,17 @@ export class OsmixRasterTile {
 	 */
 	drawPolygon(rings: LonLat[][], color: Rgba = DEFAULT_AREA_COLOR) {
 		if (rings.length === 0) return
+		const bbox = rings[0]?.[0]
+		// Optimization: if the polygon is tiny (fits in a single pixel),
+		// render it as a single pixel with alpha scaling instead of full rasterization.
+		if (
+			rings.length === 1 &&
+			rings[0]?.length === 5 && // Rectangular bbox
+			bbox
+		) {
+			// We can't easily guess the bbox from just the ring here without iterating,
+			// so we skip the subpixel optimization for now to keep this robust.
+		}
 
 		// Normalize winding order using rewind (outer counterclockwise, inner clockwise)
 		const normalizedRings = rings.map((ring) => {
@@ -376,7 +413,7 @@ export class OsmixRasterTile {
 					if (x === 0 || x === tileSize - 1) {
 						continue
 					}
-					this.setPixel([x, y], color)
+					this.drawPixel([x, y], color)
 				}
 			}
 		}

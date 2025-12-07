@@ -1,3 +1,12 @@
+/**
+ * PBF block parser utilities.
+ *
+ * Parses raw OSM PBF primitive blocks into typed JSON entities with decoded
+ * string tables, resolved coordinates, and expanded delta encoding.
+ *
+ * @module
+ */
+
 import type {
 	OsmPbfBlock,
 	OsmPbfDenseNodes,
@@ -18,13 +27,23 @@ import type {
 	OsmWay,
 } from "@osmix/shared/types"
 
+/**
+ * Options for controlling entity parsing behavior.
+ */
 export interface ParseOptions {
+	/** Whether to decode tags from string table (default: true). */
 	parseTags?: boolean
+	/** Whether to include entity metadata like version, timestamp (default: false). */
 	includeInfo?: boolean
 }
 
 const ENTITY_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
 
+/**
+ * Decode a PBF string table into a Map for fast lookups.
+ * @param stringtable - Array of UTF-8 encoded byte arrays.
+ * @returns Map from index to decoded string.
+ */
 function decodeStringTable(stringtable: OsmPbfStringTable) {
 	const decoded = new Map<number, string>()
 	const textDecoder = new TextDecoder()
@@ -35,11 +54,36 @@ function decodeStringTable(stringtable: OsmPbfStringTable) {
 }
 
 /**
- * Parse a primitive block into usable entities.
- * - Dense nodes are parsed into a list of nodes
- * - Tag keys and values are parsed into a map of strings
- * - Info is parsed into a map of strings
- * - Delta encoding, offsets, and other PBF-specific encoding details are handled
+ * Parse a PBF primitive block into JSON entities.
+ *
+ * Handles all PBF-specific decoding:
+ * - **String table**: Resolves tag keys/values and role strings.
+ * - **Delta encoding**: Expands IDs, coordinates, and member refs.
+ * - **Dense nodes**: Parses compact dense node format.
+ * - **Granularity**: Converts integer nanodegrees to floating-point coords.
+ *
+ * Implements `OsmPbfBlock` interface and is iterable over entity groups.
+ *
+ * @example
+ * ```ts
+ * import { OsmPbfBlockParser } from "@osmix/json"
+ *
+ * const parser = new OsmPbfBlockParser(primitiveBlock)
+ *
+ * // Iterate over groups
+ * for (const group of parser.primitivegroup) {
+ *   if (group.dense) {
+ *     for (const node of parser.parseDenseNodes(group.dense)) {
+ *       console.log(node.id, node.lon, node.lat)
+ *     }
+ *   }
+ * }
+ *
+ * // Or use the iterator interface
+ * for (const entities of parser) {
+ *   console.log(entities.length, "entities in group")
+ * }
+ * ```
  */
 export class OsmPbfBlockParser implements OsmPbfBlock {
 	stringtable: OsmPbfStringTable
@@ -94,6 +138,11 @@ export class OsmPbfBlockParser implements OsmPbfBlock {
 		}
 	}
 
+	/**
+	 * Convert PBF info to parsed format with resolved user string.
+	 * @param info - Raw PBF info object.
+	 * @returns Parsed info with timestamp in milliseconds and user string.
+	 */
 	fillInfo(info: OsmPbfInfo): OsmInfoParsed {
 		return {
 			...info,
@@ -113,6 +162,12 @@ export class OsmPbfBlockParser implements OsmPbfBlock {
 		return string
 	}
 
+	/**
+	 * Resolve tag indices to key-value pairs.
+	 * @param keys - Array of string table indices for keys.
+	 * @param vals - Array of string table indices for values.
+	 * @returns Object mapping tag keys to values.
+	 */
 	getTags(keys: number[], vals: number[]) {
 		return Object.fromEntries(
 			keys
@@ -121,6 +176,12 @@ export class OsmPbfBlockParser implements OsmPbfBlock {
 		)
 	}
 
+	/**
+	 * Parse a standard (non-dense) node.
+	 * @param n - Raw PBF node structure.
+	 * @param options - Parsing options.
+	 * @returns Parsed node with coordinates in degrees.
+	 */
 	parseNode(
 		n: OsmPbfNode,
 		{ parseTags = true, includeInfo = false }: ParseOptions = {},
@@ -139,6 +200,12 @@ export class OsmPbfBlockParser implements OsmPbfBlock {
 		return node
 	}
 
+	/**
+	 * Parse a way with expanded node refs.
+	 * @param w - Raw PBF way structure with delta-encoded refs.
+	 * @param options - Parsing options.
+	 * @returns Parsed way with absolute node IDs.
+	 */
 	parseWay(
 		w: OsmPbfWay,
 		{ parseTags = true, includeInfo = false }: ParseOptions = {},
@@ -160,6 +227,12 @@ export class OsmPbfBlockParser implements OsmPbfBlock {
 		return way
 	}
 
+	/**
+	 * Parse a relation with expanded member refs.
+	 * @param r - Raw PBF relation structure with delta-encoded member IDs.
+	 * @param options - Parsing options.
+	 * @returns Parsed relation with typed members and roles.
+	 */
 	parseRelation(
 		r: OsmPbfRelation,
 		{ parseTags = true, includeInfo = false }: ParseOptions = {},
@@ -192,6 +265,16 @@ export class OsmPbfBlockParser implements OsmPbfBlock {
 		return relation
 	}
 
+	/**
+	 * Parse dense nodes into an array of node objects.
+	 *
+	 * Dense nodes use delta encoding for IDs, coordinates, and info fields.
+	 * Tags are stored as a flat array with 0-delimiters between nodes.
+	 *
+	 * @param dense - Dense nodes structure from the primitive group.
+	 * @param options - Parsing options.
+	 * @returns Array of parsed nodes with absolute coordinates.
+	 */
 	parseDenseNodes(
 		dense: OsmPbfDenseNodes,
 		{ parseTags = true, includeInfo = false }: ParseOptions = {},

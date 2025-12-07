@@ -1,3 +1,12 @@
+/**
+ * OSM entity to GeoJSON Feature conversion.
+ *
+ * Converts OSM nodes, ways, and relations into GeoJSON Features with
+ * appropriate geometry types and preserved properties.
+ *
+ * @module
+ */
+
 import type { Osm } from "@osmix/core"
 import {
 	buildRelationLineStrings,
@@ -29,6 +38,18 @@ import type {
 } from "geojson"
 import type { OsmGeoJSONFeature } from "./types"
 
+/**
+ * Convert an OSM node to a GeoJSON Point feature.
+ *
+ * @param node - OSM node with id, lon, lat, and optional tags.
+ * @returns GeoJSON Point Feature with OSM properties.
+ *
+ * @example
+ * ```ts
+ * const feature = nodeToFeature({ id: 1, lon: -122.4, lat: 47.6, tags: { name: "Seattle" } })
+ * // { type: "Feature", geometry: { type: "Point", coordinates: [-122.4, 47.6] }, ... }
+ * ```
+ */
 export function nodeToFeature(node: OsmNode): OsmGeoJSONFeature<Point> {
 	return {
 		type: "Feature",
@@ -46,6 +67,21 @@ export function nodeToFeature(node: OsmNode): OsmGeoJSONFeature<Point> {
 	}
 }
 
+/**
+ * Convert an OSM way to a GeoJSON LineString or Polygon feature.
+ *
+ * Geometry type is determined by the `wayIsArea` helper, which checks for
+ * area-indicating tags (building, landuse, etc.) and ring closure.
+ *
+ * @param way - OSM way with id, refs, and optional tags.
+ * @param refToPosition - Function to resolve node ID to [lon, lat] coordinates.
+ * @returns GeoJSON LineString or Polygon Feature with OSM properties.
+ *
+ * @example
+ * ```ts
+ * const feature = wayToFeature(way, (ref) => osm.nodes.getNodeLonLat({ id: ref }))
+ * ```
+ */
 export function wayToFeature(
 	way: OsmWay,
 	refToPosition: (id: number) => [number, number],
@@ -71,6 +107,29 @@ export function wayToFeature(
 	}
 }
 
+/**
+ * Convert an OSM relation to a GeoJSON feature.
+ *
+ * Geometry type is determined by relation type and tags:
+ * - **Multipolygon/boundary**: MultiPolygon or Polygon
+ * - **Route/multilinestring**: MultiLineString or LineString
+ * - **Site/collection**: MultiPoint or Point
+ * - **Other**: GeometryCollection (empty for logical relations)
+ *
+ * @param relation - OSM relation with id, members, and optional tags.
+ * @param refToPosition - Function to resolve node ID to [lon, lat] coordinates.
+ * @param getWay - Optional function to resolve way ID to OsmWay (required for polygons/lines).
+ * @returns GeoJSON Feature with appropriate geometry type.
+ *
+ * @example
+ * ```ts
+ * const feature = relationToFeature(
+ *   relation,
+ *   (ref) => osm.nodes.getNodeLonLat({ id: ref }),
+ *   (ref) => osm.ways.getById(ref)
+ * )
+ * ```
+ */
 export function relationToFeature(
 	relation: OsmRelation,
 	refToPosition: (id: number) => [number, number],
@@ -321,7 +380,23 @@ export function relationToFeature(
 }
 
 /**
- * Helper to convert an Osmix entity to a GeoJSON feature.
+ * Convert any OSM entity to a GeoJSON feature using an Osm index.
+ *
+ * Convenience function that handles entity type detection and coordinate
+ * resolution automatically using the provided Osm index.
+ *
+ * @param osm - Osm index for coordinate lookups.
+ * @param entity - Any OSM entity (node, way, or relation).
+ * @returns GeoJSON Feature with appropriate geometry.
+ * @throws If entity type is unknown.
+ *
+ * @example
+ * ```ts
+ * for (const way of osm.ways) {
+ *   const feature = osmEntityToGeoJSONFeature(osm, way)
+ *   features.push(feature)
+ * }
+ * ```
  */
 export function osmEntityToGeoJSONFeature(
 	osm: Osm,

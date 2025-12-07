@@ -4,7 +4,7 @@ import {
 	getFixtureFileReadStream,
 	PBFs,
 } from "@osmix/shared/test/fixtures"
-import { createOsmFromPbf, osmToPbfStream } from "../src/pbf"
+import { fromPbf, toPbfStream } from "../src/pbf"
 
 describe("write", () => {
 	describe.each(Object.entries(PBFs))("%s", async (name, pbf) => {
@@ -13,7 +13,7 @@ describe("write", () => {
 		it("write osm primitive blocks", async () => {
 			// Parse the original PBF
 			const fileStream = getFixtureFileReadStream(pbf.url)
-			const osm = await createOsmFromPbf(fileStream)
+			const osm = await fromPbf(fileStream)
 
 			// Get the first node, way, and relation
 			const node1 = osm.nodes.getByIndex(0)
@@ -27,13 +27,13 @@ describe("write", () => {
 				Uint8Array<ArrayBufferLike>,
 				Uint8Array<ArrayBufferLike>
 			>()
-			const testOsmPromise = createOsmFromPbf(transformStream.readable, {
+			const testOsmPromise = fromPbf(transformStream.readable, {
 				id: `${name}-reparsed`,
 			})
 
 			// Write the PBF to an array buffer
 			// let data = new Uint8Array(0)
-			await osmToPbfStream(osm).pipeTo(transformStream.writable)
+			await toPbfStream(osm).pipeTo(transformStream.writable)
 
 			// Re-parse the new PBF
 			// expect(data.buffer).toBeDefined()

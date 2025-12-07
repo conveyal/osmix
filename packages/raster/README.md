@@ -1,9 +1,8 @@
 # @osmix/raster
 
-`@osmix/raster` paints OSM entities into RGBA buffers sized for XYZ
+`@osmix/raster` paints entities into RGBA buffers sized for XYZ
 tiles. It ships a single `OsmixRasterTile` class plus compositing helpers, so
-you can render vector overlays into PNG/WebP tiles (or inline `<canvas>`
-elements) entirely in JavaScript runtimes that expose `OffscreenCanvas`.
+you can render vector overlays into PNG/WebP tiles.
 
 ## Highlights
 
@@ -30,7 +29,7 @@ const tile = new OsmixRasterTile({
 	tile: [9372, 12535, 15]
 })
 
-tile.setLonLat([-73.989, 40.733])
+tile.drawPoint([-73.989, 40.733])
 tile.drawLineString(
 	[
 		[-73.9892, 40.7326],
@@ -54,7 +53,39 @@ See the [example merge app](/apps/merge/src/lib/osmix-raster-protocol.ts) for ho
 
 ## API
 
-WIP
+### `OsmixRasterTile`
+
+Creates a 2D pixel buffer for a given tile coordinate.
+
+```ts
+constructor({ tile, tileSize = 256, imageData? })
+```
+
+- `tile`: XYZ tuple `[x, y, z]`.
+- `tileSize`: Size in pixels (default 256).
+- `imageData`: Optional existing `Uint8ClampedArray` to paint into.
+
+#### Drawing methods
+
+- `drawPoint(ll: [lon, lat], color?)`: Draw a single point.
+- `drawLineString(coords: [lon, lat][], color?)`: Draw a polyline.
+- `drawPolygon(rings: [lon, lat][][], color?)`: Draw a filled polygon.
+- `drawRelation(polygons: [lon, lat][][][], color?)`: Draw a multipolygon relation.
+
+Colors are RGBA tuples `[r, g, b, a]` (0-255). Defaults are provided.
+
+#### Coordinate utilities
+
+- `llToTilePx(ll)`: Convert `[lon, lat]` to tile pixel `[x, y]`.
+- `tilePxToLonLat(px)`: Convert tile pixel `[x, y]` to `[lon, lat]`.
+- `bbox()`: Get the tile's geographic bounding box.
+
+## Related Packages
+
+- [`@osmix/core`](../core/README.md) – In-memory OSM index that provides entities to render.
+- [`@osmix/shared`](../shared/README.md) – Tile utilities and coordinate helpers used internally.
+- [`@osmix/vt`](../vt/README.md) – Alternative vector tile output if you need MVT instead of raster.
+- [`osmix`](../osmix/README.md) – High-level API with `getRasterTile()` helper.
 
 ## Environment and limitations
 

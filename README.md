@@ -7,31 +7,30 @@
 Osmix is a collection of composable libraries for reading, querying, merging, and transforming OpenStreetMap PBF data in browsers and Node.js. Built on streaming APIs and Web Workers, Osmix handles large extracts efficiently with spatial indexing, vector tile generation, and in-browser merge workflows.
 
 **Key Features:**
-- 🚀 Streaming PBF parsing with minimal memory overhead
-- 🗺️ Spatial queries via R-tree indexes
-- 🔀 Merge and deduplicate OSM extracts
-- 🌐 Cross-platform – ESM-native, runs in Node.js, Bun, Deno, and browsers
-- 🎨 Generate raster and vector tiles
-- 🧵 Worker-based processing for responsive UIs
+- Streaming PBF parsing with minimal memory overhead
+- Spatial queries via R-tree indexes (KDBush, Flatbush)
+- Merge and deduplicate OSM extracts
+- Cross-platform – ESM-native, runs in Node.js, Bun, Deno, and browsers
+- Generate raster and vector tiles
+- Worker-based processing for responsive UIs
 
 **Try it:** [merge.osmix.dev](https://merge.osmix.dev)
 
 ## Quick Start
 
 ```bash
-bun install osmix
+bun add osmix
 ```
 
 ### Examples
 
 ```ts
-import {Osmix} from 'osmix'
+import { fromPbf, toPbfBuffer, transformOsmPbfToJson, merge } from "osmix"
+import { toAsyncGenerator } from "@osmix/pbf"
+import { isNode } from "@osmix/shared/utils"
 
-// Get a PBF file
-const monacoPbf = await Bun.file('./monaco.pbf').arrayBuffer()
-
-// Load PBF
-const osm = await Osmix.fromPbf(monacoPbf)
+// Load a PBF file
+const osm = await fromPbf(Bun.file('./monaco.pbf').stream())
 
 // Query entities by ID
 const node = osm.nodes.getById(123456)
@@ -44,33 +43,33 @@ const nodeResults = osm.nodes.withinBbox(bbox)
 const wayResults = osm.ways.withinBbox(bbox)
 console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways`)
 
-// Stream parse an OSM PBF into easy to use entities
-for await (const entity of Osmix.transformOsmPbfToJson(Bun.file("./monaco.pbf").stream())) {
-	console.log(entity.id, entity.tags)
-	if (isNode()) {
-		console.log(entity.lon, entity.lat)
+// Stream parse a PBF into JSON entities
+const stream = transformOsmPbfToJson(Bun.file("./monaco.pbf").stream())
+for await (const entity of toAsyncGenerator(stream)) {
+	if ("id" in entity) {
+		console.log(entity.id, entity.tags)
+		if (isNode(entity)) {
+			console.log(entity.lon, entity.lat)
+		}
 	}
 }
 
 // Write the PBF
-await Bun.write('./new-monaco.pbf', await osm.toPbf())
+await Bun.write('./new-monaco.pbf', await toPbfBuffer(osm))
 
 // Merge two OSM PBF files
-const monacoPatch = await Bun.file('./monaco-patch.pbf').arrayBuffer()
-const mergedOsm = await osm.merge(await Osmix.fromPbf(monacoPatch))
-
-// Extract a bounding box
-const extract = osmix.extract(bbox)
+const patchOsm = await fromPbf(Bun.file('./monaco-patch.pbf').stream())
+const mergedOsm = merge(osm, patchOsm)
 ```
 
-#### Use in a Web Worker
+### Use in a Web Worker
 
 ```ts
-// main.ts
-import {OsmixRemote} from 'osmix'
+import { createRemote } from "osmix"
 
-const remote = await OsmixRemote.connect()
-const osmInfo = await remote.fromPbf(monacoPbf)
+// main.ts
+const remote = await createRemote()
+const osmInfo = await remote.fromPbf(monacoPbf) // Remote returns an info object
 
 // Operations run off the main thread
 const tile = await remote.getVectorTile(osmInfo.id, [9372, 12535, 15])
@@ -81,17 +80,17 @@ const tile = await remote.getVectorTile(osmInfo.id, [9372, 12535, 15])
 See each package's README for full API and description.
 
 | Package | Description |
-|--|--|
-| [`osmix`](packages/osmix/README.md) | Main library packaging all of the individual tools into an API. |
-| [`@osmix/core`](packages/core/README.md) | In-memory data structures for storing entities, building indexes, and emitting OSM data. |
-| [`@osmix/change`](packages/change/README.md) | Helpers for deduplication, merging, and applying changesets atop core data. |
-| [`@osmix/json`](packages/json/README.md) | Streaming transforms: convert OSM PBF bytes to strongly typed JSON. |
-| [`@osmix/geojson`](packages/geojson/README.md) | Convert OSM to and from GeoJSON. |
-| [`@osmix/pbf`](packages/pbf/README.md) | Low-level library for OSM PBF protobuf parsing and writing. |
-| [`@osmix/raster`](packages/raster/README.md) | Renders OSM entities as raster bitmaps. |
-| [`@osmix/vt`](packages/vt/README.md) | Encodes OSM entities as Mapbox Vector Tiles (MVT). |
-| [`@osmix/shared`](packages/shared/README.md) | Utility functions and geometry helpers used throughout all workspace packages. |
-| [`@osmix/router`](packages/router/README.md) | Experimental, naive router. WIP. |
+|---------|-------------|
+| [`osmix`](packages/osmix/README.md) | Main library packaging all tools into a unified API. |
+| [`@osmix/core`](packages/core/README.md) | In-memory data structures for storing entities, building indexes, and spatial queries. |
+| [`@osmix/pbf`](packages/pbf/README.md) | Low-level PBF protobuf parsing and writing. |
+| [`@osmix/json`](packages/json/README.md) | Streaming transforms: PBF bytes ↔ typed JSON entities. |
+| [`@osmix/geojson`](packages/geojson/README.md) | Convert OSM entities to/from GeoJSON. |
+| [`@osmix/change`](packages/change/README.md) | Deduplication, merging, and changeset workflows. |
+| [`@osmix/raster`](packages/raster/README.md) | Render OSM entities as raster bitmaps. |
+| [`@osmix/vt`](packages/vt/README.md) | Encode OSM entities as Mapbox Vector Tiles (MVT). |
+| [`@osmix/shared`](packages/shared/README.md) | Utility functions and geometry helpers. |
+| [`@osmix/router`](packages/router/README.md) | Experimental routing. WIP. |
 
 
 ## Development

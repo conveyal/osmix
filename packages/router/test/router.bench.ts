@@ -1,7 +1,7 @@
 import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/test/fixtures"
 import { bench, group, run } from "mitata"
-import { createOsmFromPbf } from "osmix"
+import { fromPbf } from "osmix"
 import { buildGraph, findNearestNodeOnGraph } from "../src"
 import { Router } from "../src/router"
 
@@ -88,7 +88,7 @@ console.log("Setting up benchmark data...")
 // Load Monaco PBF
 const monacoPbf = PBFs["monaco"]!
 const pbfData = await getFixtureFile(monacoPbf.url)
-const monacoOsm = await createOsmFromPbf(pbfData, {
+const monacoOsm = await fromPbf(pbfData, {
 	buildSpatialIndexes: ["node", "way"],
 })
 const monacoGraph = buildGraph(monacoOsm)

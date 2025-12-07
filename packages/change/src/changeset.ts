@@ -1,3 +1,13 @@
+/**
+ * OSM changeset tracking and manipulation.
+ *
+ * The OsmChangeset class tracks creates, modifies, and deletes for nodes, ways,
+ * and relations. It provides methods for deduplication, intersection creation,
+ * and direct merging of OSM datasets.
+ *
+ * @module
+ */
+
 import type { Nodes, Osm, Ways } from "@osmix/core"
 import type {
 	OsmEntity,
@@ -31,7 +41,10 @@ import {
 } from "./utils"
 
 /**
- * Each step is optimized to minimize the retrieval of the full entity data.
+ * Tracks changes to an OSM dataset and provides utilities for deduplication and merging.
+ *
+ * The changeset maintains a record of creates, modifies, and deletes for nodes, ways,
+ * and relations. It is optimized to minimize full entity retrieval until necessary.
  */
 export class OsmChangeset {
 	nodeChanges: Record<number, OsmChange<OsmEntityTypeMap["node"]>> = {}
@@ -40,7 +53,7 @@ export class OsmChangeset {
 
 	osm: Osm
 
-	// Next node ID
+	// Next node ID tracker for generating new IDs during intersection creation
 	currentNodeId: number
 
 	deduplicatedNodes = 0
@@ -108,13 +121,13 @@ export class OsmChangeset {
 			changeType: "create",
 			entity,
 			osmId,
-			refs, // Refs can come from other datasets
+			refs, // Refs can come from other datasets, useful for tracking provenance
 		}
 	}
 
 	/**
-	 * Add or update an `OsmChange` for a given entity. There must be an existing entity in the base OSM, otherwise a `create` change
-	 * should have been used instead.
+	 * Add or update an `OsmChange` for a given entity.
+	 * Requires the entity to exist in the base OSM dataset (or have a previous 'create' change).
 	 */
 	modify<T extends OsmEntityType>(
 		type: T,
@@ -165,17 +178,18 @@ export class OsmChangeset {
 
 	/**
 	 * Check nodes for duplicates and consolidate them within this OSM dataset.
-	 * All checked nodes must exist in the base OSM.
+	 * This process helps merge disparate datasets that share common geometry.
 	 *
 	 * The algorithm:
-	 * - Build a map of node IDs that should be replaced with other node IDs.
-	 *  	- Find all pairs of nodes at the same geographic location
-	 *  	- For each pair, determine which node to keep based on version and tags
-	 *  	- Normalize replacements so lower IDs are always replaced with higher IDs
-	 * 		- Flatten chains (A→B, B→C becomes A→C, B→C)
-	 * 		- Schedule nodes for deletion
-	 * - Apply node replacements to ways
-	 * - Apply node replacements to relations
+	 * 1. Find all pairs of nodes at the same geographic location (within a tiny radius).
+	 * 2. For each pair, determine which node to keep:
+	 *    - Prefer higher version number.
+	 *    - If versions are equal, prefer the node with more tags.
+	 *    - If tags are equal, prefer the higher ID (deterministic tie-breaker).
+	 * 3. Build a replacement map (deleted ID -> kept ID).
+	 * 4. Flatten chains (e.g., if A->B and B->C, then A->C).
+	 * 5. Schedule duplicate nodes for deletion.
+	 * 6. Update all ways and relations to reference the kept nodes.
 	 */
 	deduplicateNodes(nodes: Nodes) {
 		const checkedIdPairs = new IdPairs()
@@ -359,6 +373,11 @@ export class OsmChangeset {
 	 * Deduplicate a way by comparing it with existing ways in the OSM dataset.
 	 * When a duplicate way is found, the patch way is deleted and references point to the kept way.
 	 *
+	 * Duplication criteria:
+	 * - Geometrically identical (same coordinates).
+	 * - Properties (except ID) must be roughly compatible.
+	 * - Keeps the way with the higher version or more tags.
+	 *
 	 * Note: When a way is deduplicated, relations that reference the deleted way are not
 	 * automatically updated to reference the kept way. This is a known limitation.
 	 * Relations should be processed separately after way deduplication if this behavior is needed.
@@ -437,7 +456,11 @@ export class OsmChangeset {
 	}
 
 	/**
-	 * Way must exist in the base OSM. Add it first, if merging.
+	 * Create intersections for a single way.
+	 * - Finds other ways that intersect the given way's bounding box.
+	 * - Checks if they should connect (e.g. both are highways/paths, not tunnels/bridges).
+	 * - Calculates intersection points.
+	 * - Inserts existing nodes or creates new intersection nodes at the crossing points.
 	 */
 	createIntersectionsForWay(way: OsmWay, wayIdPairs: IdPairs) {
 		let intersectionsFound = 0

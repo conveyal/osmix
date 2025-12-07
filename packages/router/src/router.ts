@@ -1,3 +1,12 @@
+/**
+ * High-level router API.
+ *
+ * Wraps the routing graph and algorithms to provide a convenient interface
+ * for finding routes and building result objects with coordinates.
+ *
+ * @module
+ */
+
 import type { Osm } from "@osmix/core"
 import type { LonLat } from "@osmix/shared/types"
 import { routingAlgorithms } from "./algorithms"
@@ -12,7 +21,18 @@ import type {
  * Router for finding paths through OSM road networks.
  *
  * Uses pathfinding algorithms (Dijkstra, A*, or bidirectional) to find
- * routes between node indexes. Caller handles coordinate snapping.
+ * routes between node indexes. Use `findNearestNodeOnGraph()` to snap
+ * arbitrary coordinates to routable nodes before calling `route()`.
+ *
+ * @example
+ * ```ts
+ * const router = new Router(osm, graph, { algorithm: "astar" })
+ * const path = router.route(startNodeIndex, endNodeIndex)
+ * if (path) {
+ *   const result = router.buildResult(path)
+ *   console.log(result.coordinates)
+ * }
+ * ```
  */
 export class Router {
 	readonly graph: RoutingGraph

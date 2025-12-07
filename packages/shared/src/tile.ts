@@ -1,3 +1,13 @@
+/**
+ * XYZ tile coordinate utilities.
+ *
+ * Provides conversions between geographic coordinates (lon/lat) and
+ * tile pixel coordinates for XYZ tiled map systems. Supports various
+ * tile sizes and zoom levels.
+ *
+ * @module
+ */
+
 import { pointToTileFraction } from "@mapbox/tilebelt"
 import type { GeoBbox2D, LonLat, Tile, TilePxBbox, XY } from "./types"
 
@@ -12,6 +22,10 @@ function tile2lat(y: number, z: number): number {
 	return RADIANS_TO_DEGREES * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)))
 }
 
+/**
+ * Get the geographic bounding box of a tile.
+ * Returns [west, south, east, north].
+ */
 export function tileToBbox(tile: Tile): GeoBbox2D {
 	const [tx, ty, tz] = tile
 	const n = tile2lat(ty, tz)
@@ -34,6 +48,10 @@ export function bboxToTilePx(
 	return [minX, minY, maxX, maxY]
 }
 
+/**
+ * Convert a geographic coordinate to tile pixel coordinates.
+ * Returns [x, y] in pixels relative to the top-left of the tile.
+ */
 export function llToTilePx(ll: LonLat, tile: Tile, tileSize = 256): XY {
 	const [tx, ty, tz] = tile
 	const tf = pointToTileFraction(ll[0], ll[1], tz)
@@ -42,6 +60,9 @@ export function llToTilePx(ll: LonLat, tile: Tile, tileSize = 256): XY {
 	return [x, y]
 }
 
+/**
+ * Convert tile pixel coordinates to geographic coordinates.
+ */
 export function tilePxToLonLat(px: XY, tile: Tile, tileSize = 256): LonLat {
 	const [tx, ty, tz] = tile
 	const lon = tile2lon(px[0] / tileSize + tx, tz)

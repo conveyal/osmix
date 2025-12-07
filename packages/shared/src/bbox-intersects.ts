@@ -1,7 +1,17 @@
+/**
+ * Bounding box intersection and containment utilities.
+ *
+ * Provides functions for checking spatial relationships between
+ * geographic bounding boxes (west, south, east, north format).
+ *
+ * @module
+ */
+
 import type { GeoBbox2D } from "./types"
 
 /**
- * Check if the two bboxes intersect or are contained within each other.
+ * Check if two bounding boxes intersect or contain each other.
+ * Handles both partial overlaps and complete containment.
  */
 export function bboxContainsOrIntersects(bb1: GeoBbox2D, bb2: GeoBbox2D) {
 	const westIn =

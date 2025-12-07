@@ -6,7 +6,7 @@ import {
 	PBFs,
 } from "@osmix/shared/test/fixtures"
 import type { FeatureCollection, LineString, Point } from "geojson"
-import { OsmixRemote } from "../src/remote"
+import { createRemote } from "../src/remote"
 
 const monacoPbf = PBFs["monaco"]!
 // Increase timeout for worker tests
@@ -24,7 +24,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should load from PBF ArrayBuffer via worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osm = await remote.fromPbf(pbfData.buffer)
 				expect(osm.stats.nodes).toBe(monacoPbf.nodes)
@@ -37,7 +37,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should load from GeoJSON via worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const geojson: FeatureCollection<Point> = {
 					type: "FeatureCollection",
 					features: [
@@ -68,7 +68,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should load from GeoJSON ReadableStream via worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const geojson: FeatureCollection<LineString> = {
 					type: "FeatureCollection",
 					features: [
@@ -110,7 +110,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should retrieve instance from worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osmInfo = await remote.fromPbf(pbfData.buffer, {
 					id: "remote-get",
@@ -130,7 +130,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should set instance in worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osmInfo = await remote.fromPbf(pbfData.buffer, {
 					id: "original-remote",
@@ -154,7 +154,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should remove instance from worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osm1 = await remote.fromPbf(pbfData.buffer)
 
@@ -172,7 +172,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should check readiness via worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osm = await remote.fromPbf(pbfData.buffer)
 
@@ -188,7 +188,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should search via worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
 				const osm = await remote.fromPbf(fileStream)
 
@@ -206,7 +206,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should search by key and value via worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
 				const osm = await remote.fromPbf(fileStream)
 
@@ -225,7 +225,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should generate vector tile via worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
 				const osm = await remote.fromPbf(fileStream)
 
@@ -245,7 +245,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should generate raster tile via worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
 				const osm = await remote.fromPbf(fileStream)
 
@@ -261,7 +261,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should generate raster tile with custom tile size via worker",
 			async () => {
-				const remote = await OsmixRemote.connect()
+				const remote = await createRemote()
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
 				const osm = await remote.fromPbf(fileStream)
 
@@ -281,7 +281,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should work with single worker",
 			async () => {
-				const remote = await OsmixRemote.connect({ workerCount: 1 })
+				const remote = await createRemote({ workerCount: 1 })
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osm = await remote.fromPbf(pbfData.buffer)
 				expect(osm.stats.nodes).toBe(monacoPbf.nodes)
@@ -292,7 +292,7 @@ describe("OsmixRemote", () => {
 		it(
 			"should work with multiple workers",
 			async () => {
-				const remote = await OsmixRemote.connect({ workerCount: 3 })
+				const remote = await createRemote({ workerCount: 3 })
 				const pbfData = await getFixtureFile(monacoPbf.url)
 
 				// Load multiple instances to test round-robin distribution

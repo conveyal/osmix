@@ -44,7 +44,25 @@ Most viewers expect tile URLs. To see a Maplibre implementation in the [example 
 
 ## API
 
-Coming soon...
+### `OsmixVtEncoder`
+
+The main class for encoding vector tiles.
+
+```ts
+constructor(osm: Osm, extent = 4096, buffer = 64)
+```
+
+- `osm`: The `@osmix/core` dataset to encode.
+- `extent`: Tile extent (default 4096). Higher values offer more precision.
+- `buffer`: Buffer around the tile in extent units (default 64).
+
+#### `getTile(tile: [x, y, z]): ArrayBuffer`
+
+Encodes a single tile identified by its XYZ coordinates. Returns a PBF `ArrayBuffer`.
+
+#### `getTileForBbox(bbox: [w, s, e, n], proj: (ll) => [x, y]): ArrayBuffer`
+
+Lower-level method to encode a specific bounding box with a custom projection function. Useful if you are projecting to non-Mercator tiles or need custom bounds.
 
 ## Environment and limitations
 
@@ -57,8 +75,17 @@ Coming soon...
 
 - Feature properties include the OSM tags available in the source dataset. Styling keys can be derived at ingestion time; for very large tag sets consider pre-filtering to a stable subset to keep tile size reasonable.
 
-## See also
+## Related Packages
 
-- `@osmix/core` – In-memory index used to source node/way geometry.
-- `@osmix/shared` – Supplies `wayIsArea` heuristics and entity types used by the encoder.
-- `@osmix/raster` – If you prefer raster previews or a protocol helper for MapLibre.
+- [`@osmix/core`](../core/README.md) – In-memory index used to source node/way geometry.
+- [`@osmix/shared`](../shared/README.md) – Supplies `wayIsArea` heuristics and entity types.
+- [`@osmix/raster`](../raster/README.md) – Raster tile rendering if you prefer PNG/WebP output.
+- [`osmix`](../osmix/README.md) – High-level API with `getVectorTile()` helper.
+
+## Development
+
+- `bun run test packages/vt`
+- `bun run lint packages/vt`
+- `bun run typecheck packages/vt`
+
+Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

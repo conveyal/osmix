@@ -1,3 +1,12 @@
+/**
+ * Geographic extraction from OSM indexes.
+ *
+ * Creates subsets of OSM data within bounding boxes using various strategies
+ * that control how ways and relations at the boundary are handled.
+ *
+ * @module
+ */
+
 import { Osm } from "@osmix/core"
 import {
 	logProgress,
@@ -8,6 +17,12 @@ import { resolveRelationMembers } from "@osmix/shared/relation-kind"
 import type { GeoBbox2D, OsmRelation } from "@osmix/shared/types"
 import { isMultipolygonRelation } from "@osmix/shared/utils"
 
+/**
+ * Strategy for handling entities at extract boundaries.
+ * - `"simple"`: Strict spatial cut, may have incomplete geometries.
+ * - `"complete_ways"`: Preserves complete way geometry, adds nodes outside bbox.
+ * - `"smart"`: Like complete_ways, plus fully resolves multipolygon relations.
+ */
 export type ExtractStrategy = "simple" | "complete_ways" | "smart"
 
 /**

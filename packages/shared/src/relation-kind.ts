@@ -1,3 +1,13 @@
+/**
+ * Relation kind detection and geometry building.
+ *
+ * Determines the semantic type of OSM relations (area, line, point, logic, super)
+ * based on their type tag and member structure. Also provides utilities for
+ * building geometries from relation members.
+ *
+ * @module
+ */
+
 import type {
 	LonLat,
 	OsmRelation,

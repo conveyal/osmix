@@ -1,3 +1,12 @@
+/**
+ * Blob-to-block conversion utilities.
+ *
+ * Handles decompression and protobuf decoding of raw OSM PBF blobs into
+ * typed header and primitive block structures.
+ *
+ * @module
+ */
+
 import Pbf from "pbf"
 import {
 	type OsmPbfBlock,
@@ -8,8 +17,31 @@ import {
 import { webDecompress } from "./utils"
 
 /**
- * Decompresses raw OSM PBF blobs and yields typed header and primitive blocks.
- * Expects the first blob to contain the file header and streams the rest as data blocks.
+ * Decompress and decode a stream of raw PBF blobs into typed blocks.
+ *
+ * This async generator handles the transition from compressed bytes to parsed
+ * protobuf structures. The first blob is always decoded as a header block;
+ * subsequent blobs are decoded as primitive blocks containing OSM entities.
+ *
+ * @param blobs - Async or sync generator yielding compressed blob payloads.
+ * @param decompress - Optional decompression function (defaults to Web Streams zlib).
+ * @yields Header block first, then primitive blocks.
+ *
+ * @example
+ * ```ts
+ * import { osmPbfBlobsToBlocksGenerator, createOsmPbfBlobGenerator } from "@osmix/pbf"
+ *
+ * const generateBlobs = createOsmPbfBlobGenerator()
+ * const blobsGen = (async function* () {
+ *   for await (const chunk of stream) {
+ *     yield* generateBlobs(chunk)
+ *   }
+ * })()
+ *
+ * for await (const block of osmPbfBlobsToBlocksGenerator(blobsGen)) {
+ *   // First iteration yields header, rest yield primitive blocks
+ * }
+ * ```
  */
 export async function* osmPbfBlobsToBlocksGenerator(
 	blobs:
@@ -31,7 +63,11 @@ export async function* osmPbfBlobsToBlocksGenerator(
 }
 
 /**
- * Decompress and read the header block from a compressed blob.
+ * Decompress and parse a header block from a compressed blob.
+ *
+ * @param compressedBlob - Zlib-compressed protobuf header blob.
+ * @param decompress - Optional decompression function.
+ * @returns Parsed header block with required/optional features and bbox.
  */
 export async function readOsmHeaderBlock(
 	compressedBlob: Uint8Array<ArrayBuffer>,
@@ -45,7 +81,11 @@ export async function readOsmHeaderBlock(
 }
 
 /**
- * Decompress and read the primitive block from a compressed blob.
+ * Decompress and parse a primitive block from a compressed blob.
+ *
+ * @param compressedBlob - Zlib-compressed protobuf primitive blob.
+ * @param decompress - Optional decompression function.
+ * @returns Parsed primitive block with string table and primitive groups.
  */
 export async function readOsmPrimitiveBlock(
 	compressedBlob: Uint8Array<ArrayBuffer>,

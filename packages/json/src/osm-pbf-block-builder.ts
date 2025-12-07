@@ -1,3 +1,12 @@
+/**
+ * PBF block builder utilities.
+ *
+ * Constructs spec-compliant OSM PBF primitive blocks from JSON entities,
+ * handling delta encoding, string table management, and block size limits.
+ *
+ * @module
+ */
+
 import {
 	MAX_ENTITIES_PER_BLOCK,
 	type OsmPbfBlock,
@@ -16,7 +25,29 @@ import type {
 import { OSM_ENTITY_TYPES } from "./constants"
 
 /**
- * Build a primitive block from parsed OSM entities. Handles delta encoding, stringtable, and other PBF-specific encoding details.
+ * Build PBF primitive blocks from JSON entities.
+ *
+ * Accumulates nodes, ways, and relations into a single primitive block,
+ * handling all PBF-specific encoding:
+ * - **String table**: Deduplicates tag keys/values and role strings.
+ * - **Delta encoding**: Encodes IDs, coordinates, and member refs as deltas.
+ * - **Dense nodes**: Uses compact dense node format for efficient storage.
+ * - **Granularity**: Converts floating-point coords to integer nanodegrees.
+ *
+ * @example
+ * ```ts
+ * import { OsmPbfBlockBuilder } from "@osmix/json"
+ *
+ * const builder = new OsmPbfBlockBuilder()
+ *
+ * builder.addDenseNode({ id: 1, lon: -122.4, lat: 47.6, tags: { name: "Seattle" } })
+ * builder.addWay({ id: 10, refs: [1, 2, 3], tags: { highway: "primary" } })
+ *
+ * if (builder.isFull()) {
+ *   const block = builder // OsmPbfBlock interface
+ *   // Serialize with osmBlockToPbfBlobBytes(block)
+ * }
+ * ```
  */
 export class OsmPbfBlockBuilder implements OsmPbfBlock {
 	stringtable: OsmPbfStringTable = []
@@ -60,6 +91,9 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 		this.getStringtableIndex("")
 	}
 
+	/**
+	 * Get the total number of entities in this block.
+	 */
 	totalEntities() {
 		return (
 			this.group.nodes.length +
@@ -69,14 +103,25 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 		)
 	}
 
+	/**
+	 * Check if the block has no entities.
+	 */
 	isEmpty() {
 		return this.totalEntities() === 0
 	}
 
+	/**
+	 * Check if the block has reached the maximum entity limit.
+	 */
 	isFull() {
 		return this.totalEntities() >= this.maxEntitiesPerBlock
 	}
 
+	/**
+	 * Get or create a string table index for the given string.
+	 * @param key - String to add to the table.
+	 * @returns Index of the string in the table.
+	 */
 	getStringtableIndex(key: string): number {
 		const existingIndex = this.stringToIndex.get(key)
 		if (existingIndex !== undefined) return existingIndex
@@ -87,6 +132,11 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 		return index
 	}
 
+	/**
+	 * Convert tags to string table indices.
+	 * @param tags - Tag key-value pairs.
+	 * @returns Object with `keys` and `vals` arrays of indices.
+	 */
 	addTags(tags: OsmTags) {
 		const keys = []
 		const vals = []
@@ -97,6 +147,11 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 		return { keys, vals }
 	}
 
+	/**
+	 * Convert parsed info to PBF info format.
+	 * @param info - Parsed entity metadata.
+	 * @returns PBF-encoded info object.
+	 */
 	addInfo(info: OsmInfoParsed): OsmPbfInfo {
 		return {
 			...info,
@@ -105,6 +160,10 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 		}
 	}
 
+	/**
+	 * Add a node using the standard (non-dense) format.
+	 * @param node - Node to add with id, lon, lat, and optional tags.
+	 */
 	addNode(node: OsmNode) {
 		const tags = this.addTags(node.tags ?? {})
 		const info = this.includeInfo ? this.addInfo(node.info ?? {}) : undefined
@@ -118,6 +177,10 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 		})
 	}
 
+	/**
+	 * Add a way to the block.
+	 * @param way - Way with id, refs (node IDs), and optional tags.
+	 */
 	addWay(way: OsmWay) {
 		const tags = this.addTags(way.tags ?? {})
 		const info = this.includeInfo ? this.addInfo(way.info ?? {}) : undefined
@@ -136,6 +199,10 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 		})
 	}
 
+	/**
+	 * Add a relation to the block.
+	 * @param relation - Relation with id, members, and optional tags.
+	 */
 	addRelation(relation: OsmRelation) {
 		const tags = this.addTags(relation.tags ?? {})
 		const info = this.includeInfo
@@ -195,6 +262,14 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 		return this.group.dense
 	}
 
+	/**
+	 * Add a node using the dense node format.
+	 *
+	 * Dense nodes are more space-efficient than standard nodes, using delta
+	 * encoding for IDs and coordinates. Preferred for large node sets.
+	 *
+	 * @param node - Node with id, lon, lat, and optional tags/info.
+	 */
 	addDenseNode(node: OsmNode) {
 		const { id, lat, lon, keys_vals, denseinfo } = this.group.dense
 			? this.group.dense

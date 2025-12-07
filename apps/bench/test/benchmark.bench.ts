@@ -1,4 +1,4 @@
-import { OsmixRemote } from "osmix"
+import * as Osmix from "osmix"
 import { beforeAll, bench, describe } from "vitest"
 import monacoPbf from "../../../fixtures/monaco.pbf?url"
 import { DuckDBBenchWorker } from "../src/workers/duckdb.worker"
@@ -6,7 +6,7 @@ import { DuckDBBenchWorker } from "../src/workers/duckdb.worker"
 const getPbf = () => fetch(monacoPbf).then((res) => res.arrayBuffer())
 
 describe.runIf(import.meta.env.CI !== "true")("Osmix vs DuckDB", async () => {
-	const osmixRemote = await OsmixRemote.connect()
+	const osmixRemote = await Osmix.createRemote()
 	const duckdb = new DuckDBBenchWorker()
 	let pbf: ArrayBuffer
 

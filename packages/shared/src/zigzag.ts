@@ -1,4 +1,14 @@
 /**
+ * Zigzag encoding/decoding for protobuf-style varints.
+ *
+ * Zigzag encoding converts signed integers to unsigned by interleaving
+ * negative and positive values: 0, -1, 1, -2, 2, ... This allows efficient
+ * varint encoding of small negative numbers.
+ *
+ * @module
+ */
+
+/**
  * Zigzag encode a number using arithmetic operations.
  * This supports the full safe integer range (up to Number.MAX_SAFE_INTEGER).
  * Formula: n < 0 ? -2*n - 1 : 2*n

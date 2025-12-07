@@ -1,27 +1,57 @@
+/**
+ * Web Worker implementation for OSM operations.
+ *
+ * OsmixWorker runs inside a Web Worker and manages multiple Osm instances.
+ * It exposes methods via Comlink for cross-thread RPC from OsmixRemote.
+ *
+ * Can be extended to add custom functionality:
+ * @example
+ * ```ts
+ * class MyWorker extends OsmixWorker {
+ *   myCustomMethod(osmId: string) {
+ *     const osm = this.get(osmId)
+ *     // ... custom logic
+ *   }
+ * }
+ * ```
+ *
+ * @module
+ */
+
 import {
 	applyChangesetToOsm,
+	generateChangeset,
 	merge,
 	type OsmChange,
 	type OsmChangeset,
 	type OsmChangeTypes,
 	type OsmMergeOptions,
 } from "@osmix/change"
-import type { OsmOptions, OsmTransferables } from "@osmix/core"
+import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core"
+import { fromGeoJSON } from "@osmix/geojson"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type { Progress, ProgressEvent } from "@osmix/shared/progress"
 import type { OsmEntityType, Tile } from "@osmix/shared/types"
+import { OsmixVtEncoder } from "@osmix/vt"
 import * as Comlink from "comlink"
 import { dequal } from "dequal/lite"
-import { Osmix } from "./osmix"
-import type { OsmFromPbfOptions } from "./pbf"
+import {
+	fromPbf,
+	type OsmFromPbfOptions,
+	readOsmPbfHeader,
+	toPbfBuffer,
+	toPbfStream,
+} from "./pbf"
+import { drawToRasterTile } from "./raster"
 import { transfer } from "./utils"
 
 /**
- * Worker handler for managing multiple Osmix instances within a Web Worker.
- * Exposes Comlink-wrapped methods for off-thread OSM data operations.
+ * Worker handler for managing multiple Osm instances within a Web Worker.
+ * Exposes Comlink-wrapped methods for off-thread Osm data operations.
  */
 export class OsmixWorker extends EventTarget {
-	private osm: Record<string, Osmix> = {}
+	private osm: Record<string, Osm> = {}
+	private vtEncoders: Record<string, OsmixVtEncoder> = {}
 	private changesets: Record<string, OsmChangeset> = {}
 	private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"]
 	private entityTypes: OsmEntityType[] = ["node", "way", "relation"]
@@ -41,17 +71,17 @@ export class OsmixWorker extends EventTarget {
 
 	/**
 	 * Read only the header from PBF data without parsing entities.
-	 * Delegates to static Osmix.readHeader method.
+	 * Delegates to readHeader method.
 	 */
 	readHeader(data: ArrayBufferLike | ReadableStream) {
-		return Osmix.readHeader(
+		return readOsmPbfHeader(
 			data instanceof ReadableStream ? data : new Uint8Array(data),
 		)
 	}
 
 	/**
-	 * Load an Osmix instance from PBF data and store it in this worker.
-	 * Returns OSM metadata including entity counts and bbox.
+	 * Load an Osm instance from PBF data and store it in this worker.
+	 * Returns Osm metadata including entity counts and bbox.
 	 */
 	async fromPbf({
 		data,
@@ -60,13 +90,17 @@ export class OsmixWorker extends EventTarget {
 		data: ArrayBufferLike | ReadableStream
 		options?: Partial<OsmFromPbfOptions>
 	}) {
-		const osm = await Osmix.fromPbf(data, options, this.onProgress)
+		const osm = await fromPbf(
+			data instanceof ReadableStream ? data : new Uint8Array(data),
+			options,
+			this.onProgress,
+		)
 		this.set(osm.id, osm)
 		return osm.info()
 	}
 
 	/**
-	 * Serialize an Osmix instance to PBF and pipe into the provided writable stream.
+	 * Serialize an Osm instance to PBF and pipe into the provided writable stream.
 	 * Stream is transferred from the main thread for zero-copy efficiency.
 	 */
 	toPbfStream({
@@ -76,21 +110,21 @@ export class OsmixWorker extends EventTarget {
 		osmId: string
 		writeableStream: WritableStream<Uint8Array>
 	}) {
-		return this.get(osmId).toPbfStream().pipeTo(writeableStream)
+		return toPbfStream(this.get(osmId)).pipeTo(writeableStream)
 	}
 
 	/**
-	 * Serialize an Osmix instance to a single PBF buffer.
+	 * Serialize an Osm instance to a single PBF buffer.
 	 * Result is transferred back to the main thread.
 	 */
 	async toPbf(osmId: string) {
-		const data = await this.get(osmId).toPbf()
+		const data = await toPbfBuffer(this.get(osmId))
 		return Comlink.transfer(data, [data.buffer])
 	}
 
 	/**
-	 * Load an Osmix instance from GeoJSON data and store it in this worker.
-	 * Returns OSM metadata including entity counts and bbox.
+	 * Load an Osm instance from GeoJSON data and store it in this worker.
+	 * Returns Osm metadata including entity counts and bbox.
 	 */
 	async fromGeoJSON({
 		data,
@@ -99,21 +133,21 @@ export class OsmixWorker extends EventTarget {
 		data: ArrayBufferLike | ReadableStream
 		options?: Partial<OsmOptions>
 	}) {
-		const osm = await Osmix.fromGeoJSON(data, options, this.onProgress)
+		const osm = await fromGeoJSON(data, options, this.onProgress)
 		this.set(osm.id, osm)
 		return osm.info()
 	}
 
 	/**
-	 * Accept transferables from another worker or main thread and reconstruct an Osmix instance.
+	 * Accept transferables from another worker or main thread and reconstruct an Osm instance.
 	 * Used when SharedArrayBuffer is supported to share data across workers.
 	 */
 	transferIn(transferables: OsmTransferables) {
-		this.set(transferables.id, new Osmix(transferables))
+		this.set(transferables.id, new Osm(transferables))
 	}
 
 	/**
-	 * Transfer an Osmix instance out of this worker and remove it.
+	 * Transfer an Osm instance out of this worker and remove it.
 	 * Transfers underlying buffers for efficient cross-thread movement.
 	 */
 	transferOut(id: string) {
@@ -123,7 +157,7 @@ export class OsmixWorker extends EventTarget {
 	}
 
 	/**
-	 * Get the raw transferable buffers for an Osmix instance without removing it.
+	 * Get the raw transferable buffers for an Osm instance without removing it.
 	 * Used to duplicate data across workers when SharedArrayBuffer is available.
 	 */
 	getOsmBuffers(id: string) {
@@ -131,21 +165,21 @@ export class OsmixWorker extends EventTarget {
 	}
 
 	/**
-	 * Check if an Osmix instance with the given ID exists in this worker.
+	 * Check if an Osm instance with the given ID exists in this worker.
 	 */
 	has(id: string): boolean {
 		return this.osm[id] != null
 	}
 
 	/**
-	 * Check if an Osmix instance has completed index building and is ready for queries.
+	 * Check if an Osm instance has completed index building and is ready for queries.
 	 */
 	isReady(id: string): boolean {
 		return this.osm[id]?.isReady() ?? false
 	}
 
 	/**
-	 * Retrieve an Osmix instance by ID, throwing if not found.
+	 * Retrieve an Osm instance by ID, throwing if not found.
 	 * Protected to allow subclasses to access stored Osmix instances.
 	 */
 	protected get(id: string) {
@@ -154,18 +188,20 @@ export class OsmixWorker extends EventTarget {
 	}
 
 	/**
-	 * Store an Osmix instance by ID, replacing any existing instance with the same ID.
-	 * Protected to allow subclasses to manage Osmix instances.
+	 * Store an Osm instance by ID, replacing any existing instance with the same ID.
+	 * Protected to allow subclasses to manage Osm instances.
 	 */
-	protected set(id: string, osm: Osmix) {
+	protected set(id: string, osm: Osm) {
 		this.osm[id] = osm
+		this.vtEncoders[id] = new OsmixVtEncoder(osm)
 	}
 
 	/**
-	 * Remove an Osmix instance from this worker, freeing its memory.
+	 * Remove an Osm instance from this worker, freeing its memory.
 	 */
 	delete(id: string) {
 		delete this.osm[id]
+		delete this.vtEncoders[id]
 	}
 
 	/**
@@ -173,7 +209,7 @@ export class OsmixWorker extends EventTarget {
 	 * Returns transferred MVT data suitable for MapLibre rendering.
 	 */
 	getVectorTile(id: string, tile: Tile) {
-		const data = this.get(id).getVectorTile(tile)
+		const data = this.vtEncoders[id]?.getTile(tile)
 		if (!data || data.byteLength === 0) return new ArrayBuffer(0)
 		return Comlink.transfer(data, [data])
 	}
@@ -183,17 +219,21 @@ export class OsmixWorker extends EventTarget {
 	 * Returns transferred RGBA pixel data suitable for canvas rendering.
 	 */
 	getRasterTile(id: string, tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
-		const data = this.get(id).getRasterTile(tile, tileSize)
+		const data = drawToRasterTile(this.get(id), tile, tileSize).imageData
 		if (!data || data.byteLength === 0) return new Uint8ClampedArray(0)
 		return Comlink.transfer(data, [data.buffer])
 	}
 
 	/**
-	 * Search for OSM entities by tag key and optional value.
+	 * Search for entities by tag key and optional value.
 	 * Returns matching nodes, ways, and relations.
 	 */
 	search(id: string, key: string, val?: string) {
-		return this.get(id).search(key, val)
+		const osm = this.get(id)
+		const nodes = osm.nodes.search(key, val)
+		const ways = osm.ways.search(key, val)
+		const relations = osm.relations.search(key, val)
+		return { nodes, ways, relations }
 	}
 
 	/**
@@ -208,7 +248,7 @@ export class OsmixWorker extends EventTarget {
 		const baseOsm = this.get(baseOsmId)
 		const patchOsm = this.get(patchOsmId)
 		const mergedOsm = await merge(baseOsm, patchOsm, options, this.onProgress)
-		this.set(baseOsmId, new Osmix(mergedOsm.transferables()))
+		this.set(baseOsmId, new Osm(mergedOsm.transferables()))
 		this.delete(patchOsmId)
 		return mergedOsm.id
 	}
@@ -223,7 +263,8 @@ export class OsmixWorker extends EventTarget {
 		patchOsmId: string,
 		options: Partial<OsmMergeOptions> = {},
 	) {
-		const changeset = this.get(baseOsmId).createChangeset(
+		const changeset = generateChangeset(
+			this.get(baseOsmId),
 			this.get(patchOsmId),
 			options,
 			this.onProgress,
@@ -283,7 +324,7 @@ export class OsmixWorker extends EventTarget {
 		const changeset = this.changesets[osmId]
 		if (!changeset) throw Error("No active changeset")
 		const newOsm = applyChangesetToOsm(changeset)
-		this.set(osmId, new Osmix(newOsm))
+		this.set(osmId, new Osm(newOsm))
 		delete this.changesets[osmId]
 		delete this.filteredChanges[osmId]
 		return newOsm.id
@@ -318,32 +359,4 @@ export class OsmixWorker extends EventTarget {
 		}
 		this.filteredChanges[osmId] = filteredChanges
 	}
-}
-
-/**
- * Create a single OsmixWorker instance wrapped with Comlink.
- * Spawns a new Web Worker and returns a proxy for cross-thread RPC.
- *
- * @param workerUrl - Optional URL to a custom worker file. If not provided,
- *                    uses the default OsmixWorker.
- *
- * @example
- * // Default worker
- * const worker = await createOsmixWorker()
- *
- * @example
- * // Custom worker
- * const worker = await createOsmixWorker<MyCustomWorker>(
- *   new URL("./my-custom.worker.ts", import.meta.url)
- * )
- */
-export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
-	workerUrl?: URL,
-): Promise<Comlink.Remote<T>> {
-	if (typeof Worker === "undefined") {
-		throw Error("Worker not supported")
-	}
-	const url = workerUrl ?? new URL("./osmix.worker.ts", import.meta.url)
-	const worker = new Worker(url, { type: "module" })
-	return Comlink.wrap<T>(worker)
 }

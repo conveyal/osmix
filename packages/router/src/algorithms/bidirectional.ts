@@ -1,3 +1,13 @@
+/**
+ * Bidirectional breadth-first search algorithm.
+ *
+ * Searches from both start and end simultaneously, terminating when the
+ * frontiers meet. Very fast for finding any path, but does not guarantee
+ * the shortest path. Use Dijkstra or A* when optimality is required.
+ *
+ * @module
+ */
+
 import type { PathSegment, RoutingAlgorithmFn } from "../types"
 
 /**

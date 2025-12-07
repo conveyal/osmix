@@ -1,3 +1,13 @@
+/**
+ * Color compositing utilities for raster tiles.
+ *
+ * Implements physically correct alpha blending using linear color space
+ * and Porter-Duff "source-over" compositing. This produces visually
+ * accurate results when overlaying semi-transparent colors.
+ *
+ * @module
+ */
+
 import type { Rgba } from "@osmix/shared/types"
 
 /**

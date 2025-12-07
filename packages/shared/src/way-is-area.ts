@@ -1,3 +1,15 @@
+/**
+ * Area detection for OSM ways.
+ *
+ * Implements the OSM wiki heuristics for determining whether a closed way
+ * should be rendered as an area (polygon) or a closed linear feature.
+ *
+ * @see https://wiki.openstreetmap.org/wiki/Key:area
+ * @see https://wiki.openstreetmap.org/wiki/Overpass_turbo/Polygon_Features
+ *
+ * @module
+ */
+
 import type { OsmWay } from "./types"
 
 /**

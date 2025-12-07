@@ -6,7 +6,7 @@ import {
 } from "@osmix/geojson"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/shared/types"
-import { OsmixRemote } from "osmix"
+import * as Osmix from "osmix"
 import { calculateTestGeometriesFromBbox } from "../utils"
 import type {
 	BenchmarkMetric,
@@ -38,7 +38,7 @@ export async function runOsmixBenchmarks(
 
 	// Init
 	const initBenchmark = startBenchmark("Initialize")
-	const osmix = await OsmixRemote.connect({
+	const osmix = await Osmix.createRemote({
 		onProgress: (p) => onProgress(p.msg),
 	})
 	initBenchmark("Done")

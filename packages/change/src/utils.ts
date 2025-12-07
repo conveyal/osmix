@@ -1,3 +1,15 @@
+/**
+ * Utility functions for changeset operations.
+ *
+ * Provides helpers for:
+ * - Tag formatting (OSC XML)
+ * - Duplicate detection and removal
+ * - Way intersection detection
+ * - Entity comparison
+ *
+ * @module
+ */
+
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type {
 	OsmEntity,
@@ -8,6 +20,11 @@ import type {
 import sweeplineIntersections from "sweepline-intersections"
 import type { OsmChangesetStats } from "./types"
 
+/**
+ * Convert OSM tags object to OSC XML tag elements.
+ * @param tags - The tags to convert.
+ * @returns XML string of `<tag k="..." v="..." />` elements.
+ */
 export function osmTagsToOscTags(tags: OsmTags): string {
 	return Object.entries(tags)
 		.map(([key, value]) => {
@@ -44,6 +61,9 @@ export function removeDuplicateAdjacentRelationMembers(relation: OsmRelation) {
 	}
 }
 
+/**
+ * Filter adjacent coordinates that are identical.
+ */
 export function cleanCoords(coords: [number, number][]) {
 	return coords.filter((coord, index, array) => {
 		if (index === array.length - 1) return true
@@ -53,6 +73,13 @@ export function cleanCoords(coords: [number, number][]) {
 	})
 }
 
+/**
+ * Check if an entity has a specific tag with a specific value.
+ * @param entity - The OSM entity to check.
+ * @param tag - The tag key to look for.
+ * @param value - The expected tag value.
+ * @returns True if the entity has the tag with the specified value.
+ */
 export function entityHasTagValue(
 	entity: OsmEntity,
 	tag: string,
@@ -70,7 +97,11 @@ const isPolygonish = (t: OsmTags) =>
 	!!(t["building"] || t["landuse"] || t["natural"])
 
 /**
- * Determine if two ways should be connected based on their tags
+ * Determine if two ways should be connected based on their tags.
+ * Connection logic:
+ * - Never connect if either is an area (building, landuse, etc).
+ * - Never connect if separated by bridge/tunnel/layer.
+ * - Connect highway-highway, highway-footway, footway-footway.
  */
 export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
 	const a = tagsA || {}
@@ -105,6 +136,11 @@ export function isWayIntersectionCandidate(way: OsmWay) {
 	)
 }
 
+/**
+ * Convert camelCase string to sentence case.
+ * @param str - The camelCase string.
+ * @returns The string in sentence case (e.g., "deduplicatedNodes" -> "deduplicated nodes").
+ */
 export function camelCaseToSentenceCase(str: string) {
 	return str
 		.replace(/([A-Z])/g, " $1")
@@ -131,6 +167,8 @@ export function changeStatsSummary(stats: OsmChangesetStats) {
 
 /**
  * Check if the coordinates of two ways produce intersections.
+ * Uses `sweepline-intersections` for robust detection.
+ * Returns unique intersection points as [lon, lat] tuples.
  */
 export function waysIntersect(
 	wayA: [number, number][],
@@ -176,6 +214,7 @@ export function waysIntersect(
 
 /**
  * Find the nearest Node ref on a way to a given point.
+ * Used when splicing a node into an existing way.
  */
 export function nearestNodeOnWay(
 	way: OsmWay,
