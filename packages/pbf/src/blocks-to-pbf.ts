@@ -1,3 +1,12 @@
+/**
+ * Block-to-PBF serialization utilities.
+ *
+ * Converts parsed OSM header and primitive blocks back into spec-compliant
+ * PBF byte sequences with proper framing, compression, and size validation.
+ *
+ * @module
+ */
+
 import Pbf from "pbf"
 import { writeBlob, writeBlobHeader } from "./proto/fileformat"
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "./proto/osmformat"
@@ -11,10 +20,26 @@ import {
 import { concatUint8, uint32BE, webCompress } from "./utils"
 
 /**
- * Serializes a header or primitive block into a spec-compliant compressed blob.
- * Automatically sets the blob type, compresses the payload, and enforces size guardrails.
+ * Serialize a header or primitive block into spec-compliant PBF bytes.
+ *
+ * Handles protobuf encoding, zlib compression, blob wrapping, and length prefixing.
+ * Validates output against OSM PBF specification size limits and logs warnings
+ * if recommended sizes are exceeded.
+ *
  * @param block - Parsed header or primitive block to encode.
- * @returns BlobHeader length prefix + Blob bytes as a single Uint8Array.
+ * @param compress - Optional compression function (defaults to Web Streams zlib).
+ * @returns Complete blob bytes: 4-byte length prefix + BlobHeader + Blob.
+ * @throws If blob exceeds maximum size limits (64 KiB header, 32 MiB data).
+ *
+ * @example
+ * ```ts
+ * import { osmBlockToPbfBlobBytes } from "@osmix/pbf"
+ *
+ * const headerBytes = await osmBlockToPbfBlobBytes({
+ *   required_features: ["OsmSchema-V0.6", "DenseNodes"],
+ *   optional_features: [],
+ * })
+ * ```
  */
 export async function osmBlockToPbfBlobBytes(
 	block: OsmPbfBlock | OsmPbfHeaderBlock,
@@ -76,8 +101,20 @@ export async function osmBlockToPbfBlobBytes(
 }
 
 /**
- * Web `TransformStream` that converts OSM header/data blocks into PBF byte chunks.
- * Throws if the header is not the first block and reuses `osmBlockToPbfBlobBytes` for encoding.
+ * Web `TransformStream` that encodes OSM blocks into PBF byte chunks.
+ *
+ * Accepts a stream of header and primitive blocks and outputs spec-compliant
+ * PBF bytes. The header block must be the first item in the stream.
+ *
+ * @throws If a primitive block is received before the header.
+ *
+ * @example
+ * ```ts
+ * import { OsmBlocksToPbfBytesTransformStream } from "@osmix/pbf"
+ *
+ * const pbfStream = blocksStream.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
+ * await pbfStream.pipeTo(writableFile)
+ * ```
  */
 export class OsmBlocksToPbfBytesTransformStream extends TransformStream<
 	OsmPbfHeaderBlock | OsmPbfBlock,

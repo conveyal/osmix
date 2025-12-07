@@ -7,9 +7,28 @@ import {
 } from "./proto/fileformat"
 
 /**
- * Creates a stateful parser that slices incoming bytes into compressed OSM PBF blobs.
- * Works with buffers, iterables, or streams and yields `Uint8Array` payloads ready to decompress.
- * The first blob represents the file header; subsequent blobs hold primitive data.
+ * Create a stateful parser that extracts compressed blobs from raw PBF bytes.
+ *
+ * OSM PBF files consist of length-prefixed blobs. This function returns a generator
+ * that accumulates incoming byte chunks and yields complete compressed blobs as they
+ * become available. The caller is responsible for decompression.
+ *
+ * The first yielded blob contains the file header; subsequent blobs contain primitive data.
+ *
+ * @returns A generator function that accepts byte chunks and yields compressed blob payloads.
+ *
+ * @example
+ * ```ts
+ * import { createOsmPbfBlobGenerator } from "@osmix/pbf"
+ *
+ * const generateBlobs = createOsmPbfBlobGenerator()
+ *
+ * for await (const chunk of stream) {
+ *   for (const compressedBlob of generateBlobs(chunk)) {
+ *     // Decompress and parse blob...
+ *   }
+ * }
+ * ```
  */
 export function createOsmPbfBlobGenerator() {
 	let pbf: Pbf = new Pbf(new Uint8Array(0))
@@ -19,6 +38,8 @@ export function createOsmPbfBlobGenerator() {
 
 	/**
 	 * Feed the parser with the next chunk of bytes and yield any complete compressed blobs.
+	 * @param chunk - Raw bytes from the PBF file.
+	 * @yields Compressed blob payloads (zlib-compressed protobuf data).
 	 */
 	return function* nextChunk(chunk: Uint8Array) {
 		const currentBuffer: Uint8Array = pbf.buf.slice(pbf.pos)

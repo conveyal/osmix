@@ -13,11 +13,37 @@ import {
 	webDecompress,
 } from "./utils"
 
+/** Number of bytes used to encode the BlobHeader length prefix (big-endian uint32). */
 export const HEADER_LENGTH_BYTES = 4
 
 /**
- * Parses OSM PBF bytes from buffers, streams, or generators into header + block iterators.
- * Returns the decoded header and a lazy async generator of primitive blocks.
+ * Parse an OSM PBF file from various input sources.
+ *
+ * Accepts `ArrayBuffer`, `Uint8Array`, `ReadableStream<Uint8Array>`, or async generators.
+ * Returns the file header and a lazy async generator of primitive blocks for on-demand parsing.
+ *
+ * @param data - PBF bytes as buffer, stream, or async iterable.
+ * @returns Object with `header` (file metadata) and `blocks` (async generator of primitive blocks).
+ * @throws If the header block is missing or malformed.
+ *
+ * @example
+ * ```ts
+ * import { readOsmPbf } from "@osmix/pbf"
+ *
+ * // From a file stream
+ * const { header, blocks } = await readOsmPbf(Bun.file('./monaco.pbf').stream())
+ *
+ * // From a fetch response
+ * const response = await fetch('/data/monaco.pbf')
+ * const { header, blocks } = await readOsmPbf(response.body!)
+ *
+ * // Iterate blocks lazily
+ * for await (const block of blocks) {
+ *   for (const group of block.primitivegroup) {
+ *     console.log(group.dense?.id.length ?? 0, "dense nodes")
+ *   }
+ * }
+ * ```
  */
 export async function readOsmPbf(
 	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
@@ -43,8 +69,24 @@ export async function readOsmPbf(
 }
 
 /**
- * Web `TransformStream` that turns raw PBF byte chunks into OSM header/data blocks.
- * Assumes the first decoded blob carries the header and emits it before any primitive blocks.
+ * Web `TransformStream` that decodes raw PBF byte chunks into OSM header and data blocks.
+ *
+ * The first blob in an OSM PBF file is always the header block; subsequent blobs
+ * contain primitive data (nodes, ways, relations). This stream handles the framing,
+ * decompression, and protobuf decoding automatically.
+ *
+ * @example
+ * ```ts
+ * import { OsmPbfBytesToBlocksTransformStream } from "@osmix/pbf"
+ *
+ * const response = await fetch('/data/monaco.pbf')
+ * const blocksStream = response.body!
+ *   .pipeThrough(new OsmPbfBytesToBlocksTransformStream())
+ *
+ * const reader = blocksStream.getReader()
+ * const { value: header } = await reader.read() // First read yields header
+ * // Subsequent reads yield primitive blocks
+ * ```
  */
 export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
 	Uint8Array<ArrayBufferLike>,
