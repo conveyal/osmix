@@ -1,8 +1,32 @@
+/**
+ * Utility functions for GeoJSON data handling.
+ * @module
+ */
+
 import type { ImportableGeoJSON, ReadOsmDataTypes } from "./types"
 
 /**
- * Read data as a GeoJSON FeatureCollection.
- * Supports string, ReadableStream, ArrayBufferLike, and GeoJSON FeatureCollection.
+ * Parse GeoJSON from various input formats.
+ *
+ * Supports multiple input types for flexibility:
+ * - **string**: JSON string to parse
+ * - **ReadableStream**: Streaming JSON data
+ * - **ArrayBuffer/SharedArrayBuffer**: Binary data to decode and parse
+ * - **Object**: Already-parsed FeatureCollection (passed through)
+ *
+ * @param data - GeoJSON data in any supported format.
+ * @returns Parsed GeoJSON FeatureCollection.
+ * @throws If data is null or an unsupported type.
+ *
+ * @example
+ * ```ts
+ * // From string
+ * const geojson = await readDataAsGeoJSON('{"type":"FeatureCollection","features":[]}')
+ *
+ * // From fetch response
+ * const response = await fetch('/data.geojson')
+ * const geojson = await readDataAsGeoJSON(response.body!)
+ * ```
  */
 export async function readDataAsGeoJSON(
 	data: ReadOsmDataTypes,

@@ -1,3 +1,12 @@
+/**
+ * GeoJSON-to-OSM conversion utilities.
+ *
+ * Imports GeoJSON FeatureCollections into Osm indexes, mapping geometry
+ * types to appropriate OSM entity structures.
+ *
+ * @module
+ */
+
 import { Osm, type OsmOptions } from "@osmix/core"
 import rewind from "@osmix/shared/geojson-rewind"
 import {
@@ -17,7 +26,34 @@ import type { ReadOsmDataTypes } from "./types"
 import { readDataAsGeoJSON } from "./utils"
 
 /**
- * Create an Osm instance from a GeoJSON FeatureCollection.
+ * Create an Osm index from GeoJSON data.
+ *
+ * Accepts various input formats (string, stream, buffer, or parsed object)
+ * and converts features to OSM entities:
+ * - Point → Node
+ * - LineString → Way with nodes
+ * - Polygon → Way (simple) or Relation (with holes)
+ * - MultiPolygon → Relation
+ *
+ * Feature IDs are preserved if numeric; otherwise sequential negative IDs are assigned.
+ * Feature properties become OSM tags.
+ *
+ * @param data - GeoJSON data in any supported format.
+ * @param options - Osm index options (id, header).
+ * @param onProgress - Progress callback for UI feedback.
+ * @returns Populated Osm index with built indexes.
+ *
+ * @example
+ * ```ts
+ * import { fromGeoJSON } from "@osmix/geojson"
+ *
+ * // From file
+ * const geojson = await Bun.file('./roads.geojson').json()
+ * const osm = await fromGeoJSON(geojson, { id: "roads" })
+ *
+ * // Query the imported data
+ * const highways = osm.ways.search("highway")
+ * ```
  */
 export async function fromGeoJSON(
 	data: ReadOsmDataTypes,
@@ -35,12 +71,24 @@ export async function fromGeoJSON(
 }
 
 /**
- * Convert a GeoJSON FeatureCollection into an Osm instance.
- * Points are converted to Nodes, LineStrings are converted to Ways with Nodes.
- * Polygons are converted to Ways with area tags (outer ring) and separate ways for holes.
- * MultiPolygons are converted to multiple ways or relations.
- * Feature IDs are used if present, otherwise sequential IDs are generated.
- * All feature properties are converted to OSM tags.
+ * Generator that converts GeoJSON features to OSM entities.
+ *
+ * This is the core conversion logic, yielding progress events as features
+ * are processed. Called by `fromGeoJSON` with progress handling.
+ *
+ * Geometry mapping:
+ * - **Point**: Creates a single node with feature properties as tags.
+ * - **LineString**: Creates nodes for each coordinate, then a way referencing them.
+ * - **Polygon**: Creates a way for simple polygons; for polygons with holes,
+ *   creates separate ways for outer and inner rings plus a multipolygon relation.
+ * - **MultiPolygon**: Creates a multipolygon relation with all rings as way members.
+ *
+ * Coordinates are normalized using `rewind` to ensure correct winding order
+ * (outer rings counterclockwise, inner rings clockwise per OSM conventions).
+ *
+ * @param osm - Target Osm index to populate.
+ * @param geojson - Parsed GeoJSON FeatureCollection.
+ * @yields Progress events during conversion.
  */
 export function* startCreateOsmFromGeoJSON(
 	osm: Osm,
