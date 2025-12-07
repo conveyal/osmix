@@ -2,12 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test"
 import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/test/fixtures"
 import { fromPbf } from "osmix"
-import {
-	buildGraph,
-	findNearestNodeOnGraph,
-	getTransferableBuffers,
-	RoutingGraph,
-} from "../src"
+import { buildGraph, getTransferableBuffers, RoutingGraph } from "../src"
 import { Router } from "../src/router"
 
 /**
@@ -93,8 +88,8 @@ describe("Router", () => {
 		const router = new Router(osm, graph)
 
 		// Snap coordinates to nodes
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [0, 0.01], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [0, 0.01], 500)
 
 		expect(from).not.toBeNull()
 		expect(to).not.toBeNull()
@@ -111,8 +106,8 @@ describe("Router", () => {
 		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [0.01, 0.01], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [0.01, 0.01], 500)
 
 		const path = router.route(from!.nodeIndex, to!.nodeIndex)
 
@@ -143,8 +138,8 @@ describe("Router", () => {
 		const graph = buildGraph(osm)
 
 		// Can't snap because no routable ways
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [10, 10], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [10, 10], 500)
 
 		expect(from).toBeNull()
 		expect(to).toBeNull()
@@ -156,8 +151,8 @@ describe("Router", () => {
 		const graph = buildGraph(osm, (tags) => tags?.["highway"] === "primary")
 		const router = new Router(osm, graph)
 
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [0.01, 0.01], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [0.01, 0.01], 500)
 
 		const path = router.route(from!.nodeIndex, to!.nodeIndex)
 
@@ -174,7 +169,7 @@ describe("Router", () => {
 		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
 
 		const path = router.route(from!.nodeIndex, from!.nodeIndex)
 
@@ -188,8 +183,8 @@ describe("Router", () => {
 		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [0.01, 0.01], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [0.01, 0.01], 500)
 
 		const path1 = router.route(from!.nodeIndex, to!.nodeIndex, {
 			algorithm: "dijkstra",
@@ -216,8 +211,8 @@ describe("Router", () => {
 		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [0.01, 0.01], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [0.01, 0.01], 500)
 
 		const path1 = router.route(from!.nodeIndex, to!.nodeIndex, {
 			metric: "distance",
@@ -254,15 +249,13 @@ describe("Router with Monaco PBF", () => {
 		const router = new Router(monacoOsm, graph)
 
 		// Use coordinates known to have routeable nodes nearby
-		const from = findNearestNodeOnGraph(
+		const from = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4229093, 43.7371175],
 			500,
 		)
-		const to = findNearestNodeOnGraph(
+		const to = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4259193, 43.7377731],
 			500,
 		)
@@ -293,15 +286,13 @@ describe("Router with Monaco PBF", () => {
 		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 
-		const from = findNearestNodeOnGraph(
+		const from = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4229093, 43.7371175],
 			500,
 		)
-		const to = findNearestNodeOnGraph(
+		const to = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4259193, 43.7377731],
 			500,
 		)
@@ -323,15 +314,13 @@ describe("Router with Monaco PBF", () => {
 		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 
-		const from = findNearestNodeOnGraph(
+		const from = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4229093, 43.7371175],
 			500,
 		)
-		const to = findNearestNodeOnGraph(
+		const to = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4259193, 43.7377731],
 			500,
 		)
@@ -362,15 +351,13 @@ describe("Router with Monaco PBF", () => {
 		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 
-		const from = findNearestNodeOnGraph(
+		const from = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4229093, 43.7371175],
 			500,
 		)
-		const to = findNearestNodeOnGraph(
+		const to = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4259193, 43.7377731],
 			500,
 		)
@@ -387,7 +374,7 @@ describe("Router with Monaco PBF", () => {
 		const graph = buildGraph(monacoOsm)
 
 		// Point far outside Monaco
-		const farPoint = findNearestNodeOnGraph(monacoOsm, graph, [10.0, 50.0], 100)
+		const farPoint = graph.findNearestRoutableNode(monacoOsm, [10.0, 50.0], 100)
 		expect(farPoint).toBeNull()
 	})
 })
@@ -455,9 +442,9 @@ describe("RoutingGraph Serialization", () => {
 		}
 
 		// Verify routable and intersection flags
-		expect(reconstructedGraph.isRouteable(0)).toBe(originalGraph.isRouteable(0))
-		expect(reconstructedGraph.isRouteable(1)).toBe(originalGraph.isRouteable(1))
-		expect(reconstructedGraph.isRouteable(2)).toBe(originalGraph.isRouteable(2))
+		expect(reconstructedGraph.isRoutable(0)).toBe(originalGraph.isRoutable(0))
+		expect(reconstructedGraph.isRoutable(1)).toBe(originalGraph.isRoutable(1))
+		expect(reconstructedGraph.isRoutable(2)).toBe(originalGraph.isRoutable(2))
 		expect(reconstructedGraph.isIntersection(0)).toBe(
 			originalGraph.isIntersection(0),
 		)

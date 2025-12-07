@@ -32,7 +32,6 @@ import { fromGeoJSON } from "@osmix/geojson"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import {
 	type DefaultSpeeds,
-	findNearestNodeOnGraph,
 	type HighwayFilter,
 	type RouteOptions,
 	type RouteResult,
@@ -265,7 +264,6 @@ export class OsmixWorker extends EventTarget {
 	) {
 		const osm = this.get(osmId)
 		const graph = new RoutingGraph(osm, filter, defaultSpeeds)
-		graph.compact()
 		this.graphs[osmId] = graph
 		return { nodeCount: graph.size, edgeCount: graph.edges }
 	}
@@ -324,10 +322,9 @@ export class OsmixWorker extends EventTarget {
 	 * @param maxKm - Maximum search radius in kilometers.
 	 * @returns Nearest routable node info, or null if none found.
 	 */
-	findNearestNode(osmId: string, point: LonLat, maxKm: number) {
-		return findNearestNodeOnGraph(
+	findNearestRoutableNode(osmId: string, point: LonLat, maxKm: number) {
+		return this.getGraph(osmId).findNearestRoutableNode(
 			this.get(osmId),
-			this.getGraph(osmId),
 			point,
 			maxKm,
 		)

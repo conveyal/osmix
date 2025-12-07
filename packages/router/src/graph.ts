@@ -188,13 +188,16 @@ export class RoutingGraph {
 				}
 			}
 		}
+
+		// Convert to CSR format and free temporary structures
+		this.compact()
 	}
 
 	/**
 	 * Convert to CSR format and free temporary structures.
 	 * Must be called before transferables() or after construction for optimal memory usage.
 	 */
-	compact() {
+	private compact() {
 		if (this.compacted) return
 		if (!this.tempEdges || !this.tempRoutable || !this.tempIntersections) {
 			throw new Error("Cannot compact: graph was not built from OSM data")
@@ -269,7 +272,7 @@ export class RoutingGraph {
 	/**
 	 * Check if a node is part of the routable network.
 	 */
-	isRouteable(nodeIndex: number): boolean {
+	isRoutable(nodeIndex: number): boolean {
 		if (!this.compacted) {
 			return this.tempRoutable?.has(nodeIndex) ?? false
 		}
@@ -358,6 +361,50 @@ export class RoutingGraph {
 	get edges(): number {
 		return this.edgeCount
 	}
+
+	/**
+	 * Find the nearest routable OSM node from a geographic point.
+	 *
+	 * Searches for nodes within the given radius that are part of the routing
+	 * graph (i.e., lie on a routable way). Returns the closest match with its
+	 * coordinates and distance.
+	 *
+	 * @param osm - The OSM dataset.
+	 * @param point - The [lon, lat] coordinates to search from.
+	 * @param maxKm - Maximum search radius in kilometers.
+	 * @returns The nearest routable node, or null if none found.
+	 *
+	 * @example
+	 * ```ts
+	 * const nearest = graph.findNearestNodeOnGraph(osm, [-73.989, 40.733], 0.5)
+	 * if (nearest) {
+	 *   console.log(`Found node ${nearest.nodeIndex} at ${nearest.distance}km`)
+	 * }
+	 * ```
+	 */
+	findNearestRoutableNode(osm: Osm, point: LonLat, maxKm: number) {
+		const nearby = osm.nodes.findIndexesWithinRadius(point[0], point[1], maxKm)
+
+		let best: {
+			nodeIndex: number
+			coordinates: LonLat
+			distance: number
+		} | null = null
+		let bestDistKm = Number.POSITIVE_INFINITY
+
+		for (const nodeIndex of nearby) {
+			if (!this.isRoutable(nodeIndex)) continue
+
+			const nodeCoord = osm.nodes.getNodeLonLat({ index: nodeIndex })
+			const distKm = haversineDistance(point, nodeCoord) / 1000
+			if (distKm < bestDistKm && distKm <= maxKm) {
+				bestDistKm = distKm
+				best = { nodeIndex, coordinates: nodeCoord, distance: distKm }
+			}
+		}
+
+		return best
+	}
 }
 
 /**
@@ -375,59 +422,7 @@ export function buildGraph(
 	filter: HighwayFilter = defaultHighwayFilter,
 	defaultSpeeds: DefaultSpeeds = DEFAULT_SPEEDS,
 ): RoutingGraph {
-	const graph = new RoutingGraph(osm, filter, defaultSpeeds)
-	graph.compact()
-	return graph
-}
-
-/**
- * Find the nearest routable OSM node from a geographic point.
- *
- * Searches for nodes within the given radius that are part of the routing
- * graph (i.e., lie on a routable way). Returns the closest match with its
- * coordinates and distance.
- *
- * @param osm - The OSM dataset.
- * @param graph - The routing graph built from the OSM data.
- * @param point - The [lon, lat] coordinates to search from.
- * @param maxKm - Maximum search radius in kilometers.
- * @returns The nearest routable node, or null if none found.
- *
- * @example
- * ```ts
- * const nearest = findNearestNodeOnGraph(osm, graph, [-73.989, 40.733], 0.5)
- * if (nearest) {
- *   console.log(`Found node ${nearest.nodeIndex} at ${nearest.distance}km`)
- * }
- * ```
- */
-export function findNearestNodeOnGraph(
-	osm: Osm,
-	graph: RoutingGraph,
-	point: LonLat,
-	maxKm: number,
-) {
-	const nearby = osm.nodes.findIndexesWithinRadius(point[0], point[1], maxKm)
-
-	let best: {
-		nodeIndex: number
-		coordinates: LonLat
-		distance: number
-	} | null = null
-	let bestDist = Number.POSITIVE_INFINITY
-
-	for (const nodeIndex of nearby) {
-		if (!graph.isRouteable(nodeIndex)) continue
-
-		const nodeCoord = osm.nodes.getNodeLonLat({ index: nodeIndex })
-		const dist = haversineDistance(point, nodeCoord) / 1000
-		if (dist < bestDist && dist <= maxKm) {
-			bestDist = dist
-			best = { nodeIndex, coordinates: nodeCoord, distance: dist }
-		}
-	}
-
-	return best
+	return new RoutingGraph(osm, filter, defaultSpeeds)
 }
 
 /**

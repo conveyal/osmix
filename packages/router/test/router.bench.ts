@@ -2,7 +2,7 @@ import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/test/fixtures"
 import { bench, group, run } from "mitata"
 import { fromPbf } from "osmix"
-import { buildGraph, findNearestNodeOnGraph } from "../src"
+import { buildGraph } from "../src"
 import { Router } from "../src/router"
 
 /**
@@ -102,52 +102,44 @@ const gridGraph = buildGraph(gridOsm)
 const gridRouter = new Router(gridOsm, gridGraph)
 
 // Pre-snap coordinates to node indexes for benchmarking
-const monacoShortFrom = findNearestNodeOnGraph(
+const monacoShortFrom = monacoGraph.findNearestRoutableNode(
 	monacoOsm,
-	monacoGraph,
 	[7.42, 43.735],
 	500,
 )!.nodeIndex
-const monacoShortTo = findNearestNodeOnGraph(
+const monacoShortTo = monacoGraph.findNearestRoutableNode(
 	monacoOsm,
-	monacoGraph,
 	[7.425, 43.738],
 	500,
 )!.nodeIndex
-const monacoLongFrom = findNearestNodeOnGraph(
+const monacoLongFrom = monacoGraph.findNearestRoutableNode(
 	monacoOsm,
-	monacoGraph,
 	[7.41, 43.725],
 	500,
 )!.nodeIndex
-const monacoLongTo = findNearestNodeOnGraph(
+const monacoLongTo = monacoGraph.findNearestRoutableNode(
 	monacoOsm,
-	monacoGraph,
 	[7.44, 43.745],
 	500,
 )!.nodeIndex
 
-const gridShortFrom = findNearestNodeOnGraph(
+const gridShortFrom = gridGraph.findNearestRoutableNode(
 	gridOsm,
-	gridGraph,
 	[0.01, 0.01],
 	200,
 )!.nodeIndex
-const gridShortTo = findNearestNodeOnGraph(
+const gridShortTo = gridGraph.findNearestRoutableNode(
 	gridOsm,
-	gridGraph,
 	[0.015, 0.015],
 	200,
 )!.nodeIndex
-const gridLongFrom = findNearestNodeOnGraph(
+const gridLongFrom = gridGraph.findNearestRoutableNode(
 	gridOsm,
-	gridGraph,
 	[0, 0],
 	200,
 )!.nodeIndex
-const gridLongTo = findNearestNodeOnGraph(
+const gridLongTo = gridGraph.findNearestRoutableNode(
 	gridOsm,
-	gridGraph,
 	[(GRID_SIZE - 1) * GRID_SPACING, (GRID_SIZE - 1) * GRID_SPACING],
 	200,
 )!.nodeIndex

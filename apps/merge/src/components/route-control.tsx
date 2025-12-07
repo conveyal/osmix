@@ -56,7 +56,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 
 			setIsRouting(true)
 			try {
-				const snapped = await osmWorker.findNearestNode(
+				const snapped = await osmWorker.findNearestRoutableNode(
 					osm.id,
 					point,
 					SNAP_RADIUS_KM,
