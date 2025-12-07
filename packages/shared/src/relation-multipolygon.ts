@@ -26,6 +26,11 @@ export function getWayMembersByRole(relation: OsmRelation): {
 /**
  * Connect ways that share endpoints to form a continuous ring.
  * Returns an array of rings (each ring is an array of way IDs in order).
+ *
+ * This function handles:
+ * - Ways that are reversed (end matches end, or start matches start).
+ * - Closed ways (single ways that form a ring).
+ * - Disconnected chains (multiple independent rings).
  */
 export function connectWaysToRings(wayMembers: OsmWay[]): OsmWay[][] {
 	if (wayMembers.length === 0) return []
@@ -139,6 +144,11 @@ export function connectWaysToRings(wayMembers: OsmWay[]): OsmWay[][] {
  *
  * Based on OSM multipolygon relation specification:
  * https://wiki.openstreetmap.org/wiki/Relation:multipolygon
+ *
+ * This implementation connects way members into closed rings, and then groups them
+ * into polygons. Currently, it associates all inner rings with every outer ring
+ * found in the relation, which is a simplification. A robust implementation would
+ * use point-in-polygon checks to strictly nest holes inside their parent outer ring.
  */
 export function buildRelationRings(
 	relation: OsmRelation,

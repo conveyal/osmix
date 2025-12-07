@@ -2,6 +2,7 @@ import type { GeoBbox2D } from "./types"
 
 /**
  * Check if the two bboxes intersect or are contained within each other.
+ * Handles both partial overlaps and complete containment.
  */
 export function bboxContainsOrIntersects(bb1: GeoBbox2D, bb2: GeoBbox2D) {
 	const westIn =

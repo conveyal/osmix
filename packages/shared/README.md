@@ -25,12 +25,18 @@ bun install @osmix/shared
 | --- | --- |
 | `@osmix/shared/assert` | Tiny invariant helpers that throw typed errors. |
 | `@osmix/shared/bbox-intersects` | Bounding-box intersection + containment checks. |
+| `@osmix/shared/bytes-to-stream` | Create a ReadableStream from a Uint8Array. |
+| `@osmix/shared/coordinates` | Utilities for coordinate precision (7 decimal places). |
 | `@osmix/shared/haversine-distance` | Great-circle distance (meters) for lon/lat pairs. |
 | `@osmix/shared/lineclip` | Typed wrapper around `lineclip` for polylines/polygons. |
+| `@osmix/shared/progress` | Shared `ProgressEvent` helpers + `logProgress`. |
+| `@osmix/shared/relation-kind` | Detect relation types (multipolygon, route, etc). |
 | `@osmix/shared/relation-multipolygon` | Builds multipolygon rings from relation members. |
+| `@osmix/shared/stream-to-bytes` | Consume a ReadableStream into a Uint8Array. |
 | `@osmix/shared/throttle` | Worker-safe throttling for logging/progress updates. |
 | `@osmix/shared/tile` | Utilities for working with tile coordinates. |
-| `@osmix/shared/progress` | Shared `ProgressEvent` helpers + `logProgress`. |
+| `@osmix/shared/transform-bytes` | Transform streams (gzip, etc) helper. |
+| `@osmix/shared/utils` | General OSM entity utilities (equality, type checks). |
 | `@osmix/shared/way-is-area` | Implements the OSM wiki “is area” heuristics. |
 | `@osmix/shared/zigzag` | Protobuf-style zigzag encoding helpers. |
 
