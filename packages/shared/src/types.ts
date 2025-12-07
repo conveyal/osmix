@@ -44,12 +44,6 @@ export type TilePxBbox = [
 
 export type OsmEntityType = "node" | "way" | "relation"
 
-export interface OsmEntityTypeMap extends Record<OsmEntityType, IOsmEntity> {
-	node: OsmNode
-	way: OsmWay
-	relation: OsmRelation
-}
-
 export interface OsmInfoParsed {
 	version?: number
 	timestamp?: number
@@ -64,7 +58,7 @@ export interface OsmTags {
 	[key: string]: string | number
 }
 
-export interface IOsmEntity {
+interface IOsmEntity {
 	id: number
 	info?: OsmInfoParsed
 	tags?: OsmTags
@@ -88,6 +82,12 @@ export interface OsmRelation extends IOsmEntity {
 }
 
 export type OsmEntity = OsmNode | OsmWay | OsmRelation
+
+export interface OsmEntityTypeMap extends Record<OsmEntityType, IOsmEntity> {
+	node: OsmNode
+	way: OsmWay
+	relation: OsmRelation
+}
 
 /**
  * Semantic kinds of OSM relations based on their type tag and structure.

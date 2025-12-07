@@ -9,13 +9,13 @@ import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/shared/types"
 import { OsmixVtEncoder } from "@osmix/vt"
 import { expose, wrap } from "comlink"
-import { createOsmFromPbf } from "osmix"
+import { fromPbf } from "osmix"
 
 export class OsmixBenchWorker {
 	private osm: Osm | null = null
 
 	async loadFromPbf(data: ArrayBuffer): Promise<void> {
-		this.osm = await createOsmFromPbf(new Uint8Array(data), {
+		this.osm = await fromPbf(new Uint8Array(data), {
 			id: "benchmark",
 		})
 	}

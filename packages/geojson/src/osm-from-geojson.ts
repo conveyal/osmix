@@ -13,17 +13,22 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
+import type { ReadOsmDataTypes } from "./types"
+import { readDataAsGeoJSON } from "./utils"
 
 /**
  * Create an Osm instance from a GeoJSON FeatureCollection.
  */
-export function createOsmFromGeoJSON(
-	geojson: FeatureCollection<Point | LineString | Polygon | MultiPolygon>,
+export async function fromGeoJSON(
+	data: ReadOsmDataTypes,
 	options: Partial<OsmOptions> = {},
 	onProgress: (progress: ProgressEvent) => void = logProgress,
-): Osm {
+): Promise<Osm> {
 	const osm = new Osm(options)
-	for (const update of startCreateOsmFromGeoJSON(osm, geojson)) {
+	for (const update of startCreateOsmFromGeoJSON(
+		osm,
+		await readDataAsGeoJSON(data),
+	)) {
 		onProgress(update)
 	}
 	return osm

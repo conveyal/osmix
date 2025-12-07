@@ -29,6 +29,9 @@ import type {
 } from "geojson"
 import type { OsmGeoJSONFeature } from "./types"
 
+/**
+ * Convert an OsmNode to a GeoJSON Point feature.
+ */
 export function nodeToFeature(node: OsmNode): OsmGeoJSONFeature<Point> {
 	return {
 		type: "Feature",
@@ -46,6 +49,10 @@ export function nodeToFeature(node: OsmNode): OsmGeoJSONFeature<Point> {
 	}
 }
 
+/**
+ * Convert an OsmWay to a GeoJSON LineString or Polygon feature. Determines the geometry type based on
+ * the `wayIsArea` function.
+ */
 export function wayToFeature(
 	way: OsmWay,
 	refToPosition: (id: number) => [number, number],
@@ -71,6 +78,10 @@ export function wayToFeature(
 	}
 }
 
+/**
+ * Convert an OsmRelation to a GeoJSON feature. Determines the geometry type based on
+ * the `getRelationKind` function.
+ */
 export function relationToFeature(
 	relation: OsmRelation,
 	refToPosition: (id: number) => [number, number],
@@ -321,7 +332,7 @@ export function relationToFeature(
 }
 
 /**
- * Helper to convert an Osmix entity to a GeoJSON feature.
+ * Helper to convert an Osm entity to a GeoJSON feature.
  */
 export function osmEntityToGeoJSONFeature(
 	osm: Osm,

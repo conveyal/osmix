@@ -17,8 +17,7 @@ export class ShortbreadWorker extends OsmixWorker {
 	private encoders: Map<string, ShortbreadVtEncoder> = new Map()
 
 	/**
-	 * Get or create a ShortbreadVtEncoder for the given OSM id.
-	 * The Osmix class extends Osm, so we can pass it directly to the encoder.
+	 * Get or create a ShortbreadVtEncoder for the given Osm instance ID.
 	 */
 	private getEncoder(id: string): ShortbreadVtEncoder {
 		let encoder = this.encoders.get(id)

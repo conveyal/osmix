@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test"
 import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/test/fixtures"
-import { createOsmFromPbf } from "osmix"
+import { fromPbf } from "osmix"
 import { buildGraph, findNearestNodeOnGraph } from "../src"
 import { Router } from "../src/router"
 
@@ -233,7 +233,7 @@ describe("Router with Monaco PBF", () => {
 
 	beforeAll(async () => {
 		const pbfData = await getFixtureFile(monacoPbf.url)
-		monacoOsm = await createOsmFromPbf(pbfData)
+		monacoOsm = await fromPbf(pbfData)
 	})
 
 	it("should create a router from Monaco OSM data", () => {

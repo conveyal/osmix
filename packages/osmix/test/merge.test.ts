@@ -7,7 +7,7 @@ import {
 	getFixturePath,
 } from "@osmix/shared/test/fixtures"
 import type { OsmNode } from "@osmix/shared/types"
-import { createOsmFromPbf } from "../src/pbf"
+import { fromPbf } from "../src/pbf"
 
 const testNode: OsmNode = {
 	id: 2135545,
@@ -46,11 +46,11 @@ describe("merge osm", async () => {
 			// const _osmMergedName = "yakima-merged.osm.pbf"
 
 			const osm1Data = getFixtureFileReadStream(osm1Name)
-			let baseOsm = await createOsmFromPbf(osm1Data, { id: osm1Name })
+			let baseOsm = await fromPbf(osm1Data, { id: osm1Name })
 			expect(baseOsm.nodes.getById(testNode.id)).toBe(null)
 
 			const osm2Data = getFixtureFileReadStream(osm2Name)
-			const osm2 = await createOsmFromPbf(osm2Data, { id: osm2Name })
+			const osm2 = await fromPbf(osm2Data, { id: osm2Name })
 			expect(osm2.nodes.getById(testNode.id)).toEqual(testNode)
 
 			const baseSizes = sizes(baseOsm)
@@ -124,10 +124,10 @@ describe("merge osm", async () => {
 		const osm1Name = "seattle.osm.pbf"
 		const osm2Name = "seattle-osw.pbf"
 
-		let baseOsm = await createOsmFromPbf(getFixtureFileReadStream(osm1Name), {
+		let baseOsm = await fromPbf(getFixtureFileReadStream(osm1Name), {
 			id: osm1Name,
 		})
-		const osm2 = await createOsmFromPbf(getFixtureFileReadStream(osm2Name), {
+		const osm2 = await fromPbf(getFixtureFileReadStream(osm2Name), {
 			id: osm2Name,
 		})
 

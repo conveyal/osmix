@@ -6,7 +6,7 @@
  *
  * @example
  * // Using the default worker (via OsmixRemote with no workerUrl)
- * const remote = await OsmixRemote.connect()
+ * const remote = await createRemote()
  *
  * @example
  * // Custom worker - import from worker to avoid side effects

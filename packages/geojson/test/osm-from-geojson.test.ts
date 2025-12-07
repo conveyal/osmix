@@ -6,10 +6,10 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
-import { createOsmFromGeoJSON } from "../src/osm-from-geojson"
+import { fromGeoJSON } from "../src/osm-from-geojson"
 
-describe("fromGeoJSON", () => {
-	it("should convert Point features to Nodes", () => {
+describe("@osmix/geojson: createOsmFromGeoJSON", () => {
+	it("should convert Point features to Nodes", async () => {
 		const geojson: FeatureCollection<Point> = {
 			type: "FeatureCollection",
 			features: [
@@ -37,7 +37,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		expect(osm.nodes.size).toBe(2)
 		expect(osm.ways.size).toBe(0)
@@ -57,7 +57,7 @@ describe("fromGeoJSON", () => {
 		expect(node2?.tags?.["name"]).toBe("Another Point")
 	})
 
-	it("should convert LineString features to Ways with Nodes", () => {
+	it("should convert LineString features to Ways with Nodes", async () => {
 		const geojson: FeatureCollection<LineString> = {
 			type: "FeatureCollection",
 			features: [
@@ -79,7 +79,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		expect(osm.nodes.size).toBe(3)
 		expect(osm.ways.size).toBe(1)
@@ -103,7 +103,7 @@ describe("fromGeoJSON", () => {
 		expect(node3?.lat).toBe(37.7949)
 	})
 
-	it("should use feature IDs when present", () => {
+	it("should use feature IDs when present", async () => {
 		const geojson: FeatureCollection<Point | LineString> = {
 			type: "FeatureCollection",
 			features: [
@@ -135,7 +135,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		// Point should use ID 100
 		const node = osm.nodes.getById(100)
@@ -148,7 +148,7 @@ describe("fromGeoJSON", () => {
 		expect(way?.tags?.["highway"]).toBe("primary")
 	})
 
-	it("should generate sequential IDs when feature IDs are not present", () => {
+	it("should generate sequential IDs when feature IDs are not present", async () => {
 		const geojson: FeatureCollection<Point | LineString> = {
 			type: "FeatureCollection",
 			features: [
@@ -182,7 +182,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		// Nodes should have sequential IDs starting from 1
 		expect(osm.nodes.getById(-1)).toBeDefined()
@@ -194,7 +194,7 @@ describe("fromGeoJSON", () => {
 		expect(osm.ways.getById(-1)).toBeDefined()
 	})
 
-	it("should convert all properties to OSM tags", () => {
+	it("should convert all properties to OSM tags", async () => {
 		const geojson: FeatureCollection<Point> = {
 			type: "FeatureCollection",
 			features: [
@@ -215,7 +215,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		const node = osm.nodes.getById(-1)
 		expect(node?.tags?.["name"]).toBe("Test")
@@ -226,7 +226,7 @@ describe("fromGeoJSON", () => {
 		expect(node?.tags?.["undefinedValue"]).toBeUndefined()
 	})
 
-	it("should reuse nodes when LineStrings share coordinates", () => {
+	it("should reuse nodes when LineStrings share coordinates", async () => {
 		const geojson: FeatureCollection<LineString> = {
 			type: "FeatureCollection",
 			features: [
@@ -259,7 +259,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		// Should have 3 nodes (shared coordinate is reused)
 		expect(osm.nodes.size).toBe(3)
@@ -290,7 +290,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => createOsmFromGeoJSON(geojson)).toThrow(
+		expect(() => fromGeoJSON(geojson)).toThrow(
 			"Invalid GeoJSON coordinates in LineString.",
 		)
 	})
@@ -328,10 +328,10 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => createOsmFromGeoJSON(geojson)).toThrow()
+		expect(() => fromGeoJSON(geojson)).toThrow()
 	})
 
-	it("should handle mixed Point and LineString features", () => {
+	it("should handle mixed Point and LineString features", async () => {
 		const geojson: FeatureCollection<Point | LineString> = {
 			type: "FeatureCollection",
 			features: [
@@ -371,7 +371,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		// Should have 3 nodes (point node is reused by LineString)
 		expect(osm.nodes.size).toBe(3)
@@ -386,7 +386,7 @@ describe("fromGeoJSON", () => {
 		expect(pointNode?.lat).toBe(37.7749)
 	})
 
-	it("should build indexes after conversion", () => {
+	it("should build indexes after conversion", async () => {
 		const geojson: FeatureCollection<Point> = {
 			type: "FeatureCollection",
 			features: [
@@ -401,14 +401,14 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		expect(osm.isReady()).toBe(true)
 		expect(osm.nodes.isReady()).toBe(true)
 		expect(osm.ways.isReady()).toBe(true)
 	})
 
-	it("should handle features without properties", () => {
+	it("should handle features without properties", async () => {
 		const geojson: FeatureCollection<Point> = {
 			type: "FeatureCollection",
 			features: [
@@ -423,14 +423,14 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		const node = osm.nodes.getById(-1)
 		expect(node).toBeDefined()
 		expect(node?.tags).toBeUndefined()
 	})
 
-	it("should convert Polygon features to Ways with area tags", () => {
+	it("should convert Polygon features to Ways with area tags", async () => {
 		const geojson: FeatureCollection<Polygon> = {
 			type: "FeatureCollection",
 			features: [
@@ -456,7 +456,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		expect(osm.nodes.size).toBe(4) // 4 unique nodes (last is duplicate)
 		expect(osm.ways.size).toBe(1)
@@ -471,7 +471,7 @@ describe("fromGeoJSON", () => {
 		expect(way?.refs[0]).toBe(way?.refs[4]) // Ring is closed
 	})
 
-	it("should convert Polygon with holes to relation with multiple Ways", () => {
+	it("should convert Polygon with holes to relation with multiple Ways", async () => {
 		const geojson: FeatureCollection<Polygon> = {
 			type: "FeatureCollection",
 			features: [
@@ -505,7 +505,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		// Should have outer ring way + hole way + relation
 		expect(osm.ways.size).toBe(2)
@@ -534,7 +534,7 @@ describe("fromGeoJSON", () => {
 		expect(relation?.members[1]?.role).toBe("inner")
 	})
 
-	it("should convert MultiPolygon features to relation with multiple Ways", () => {
+	it("should convert MultiPolygon features to relation with multiple Ways", async () => {
 		const geojson: FeatureCollection<MultiPolygon> = {
 			type: "FeatureCollection",
 			features: [
@@ -572,7 +572,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		// Should have 2 ways + 1 relation
 		expect(osm.ways.size).toBe(2)
@@ -601,7 +601,7 @@ describe("fromGeoJSON", () => {
 		expect(relation?.members[1]?.role).toBe("outer")
 	})
 
-	it("should convert MultiPolygon with holes to relation with multiple Ways", () => {
+	it("should convert MultiPolygon with holes to relation with multiple Ways", async () => {
 		const geojson: FeatureCollection<MultiPolygon> = {
 			type: "FeatureCollection",
 			features: [
@@ -648,7 +648,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		// Should have 3 ways + 1 relation
 		expect(osm.ways.size).toBe(3)
@@ -707,12 +707,12 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => createOsmFromGeoJSON(geojson)).toThrow(
+		expect(() => fromGeoJSON(geojson)).toThrow(
 			"Outer ring of Polygon is not closed.",
 		)
 	})
 
-	it("should skip invalid Polygons with less than 3 coordinates", () => {
+	it("should skip invalid Polygons with less than 3 coordinates", async () => {
 		const geojson: FeatureCollection<Polygon> = {
 			type: "FeatureCollection",
 			features: [
@@ -751,14 +751,14 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		// Should only have one way (the valid one)
 		expect(osm.ways.size).toBe(1)
 		expect(osm.ways.getById(-1)?.tags?.["building"]).toBe("yes")
 	})
 
-	it("should normalize winding order using rewind", () => {
+	it("should normalize winding order using rewind", async () => {
 		// Create a polygon with clockwise winding (should be normalized to counterclockwise)
 		const geojson: FeatureCollection<Polygon> = {
 			type: "FeatureCollection",
@@ -785,7 +785,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		const osm = createOsmFromGeoJSON(geojson)
+		const osm = await fromGeoJSON(geojson)
 
 		// Should still create the way successfully (rewind normalizes winding)
 		expect(osm.ways.size).toBe(1)
@@ -829,7 +829,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => createOsmFromGeoJSON(geojson)).toThrow(
+		expect(() => fromGeoJSON(geojson)).toThrow(
 			"Hole ring of Polygon is not closed.",
 		)
 	})
@@ -861,7 +861,7 @@ describe("fromGeoJSON", () => {
 			],
 		}
 
-		expect(() => createOsmFromGeoJSON(geojson)).toThrow(
+		expect(() => fromGeoJSON(geojson)).toThrow(
 			"Outer ring of Polygon is not closed.",
 		)
 	})

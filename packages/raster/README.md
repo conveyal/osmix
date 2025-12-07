@@ -1,9 +1,8 @@
 # @osmix/raster
 
-`@osmix/raster` paints OSM entities into RGBA buffers sized for XYZ
+`@osmix/raster` paints entities into RGBA buffers sized for XYZ
 tiles. It ships a single `OsmixRasterTile` class plus compositing helpers, so
-you can render vector overlays into PNG/WebP tiles (or inline `<canvas>`
-elements) entirely in JavaScript runtimes that expose `OffscreenCanvas`.
+you can render vector overlays into PNG/WebP tiles.
 
 ## Highlights
 
@@ -30,7 +29,7 @@ const tile = new OsmixRasterTile({
 	tile: [9372, 12535, 15]
 })
 
-tile.setLonLat([-73.989, 40.733])
+tile.drawPoint([-73.989, 40.733])
 tile.drawLineString(
 	[
 		[-73.9892, 40.7326],

@@ -1,6 +1,5 @@
 import os from "node:os"
-import { OsmixVtEncoder } from "@osmix/vt"
-import { OsmixRemote } from "osmix"
+import { createRemote, OsmixVtEncoder } from "osmix"
 import indexHtml from "./index.html"
 
 const filename = "monaco.pbf"
@@ -10,7 +9,7 @@ const pbfUrl = new URL(`../../fixtures/${filename}`, import.meta.url)
 
 const log: string[] = []
 const workerCount = os.cpus().length
-const Osmix = await OsmixRemote.connect({
+const remote = await createRemote({
 	workerCount,
 	onProgress: (event) => log.push(event.msg),
 })
@@ -26,11 +25,11 @@ const server = Bun.serve({
 		"/": indexHtml,
 		"/index.html": indexHtml,
 		"/ready": async () => {
-			const ready = await Osmix.isReady(filename)
+			const ready = await remote.isReady(filename)
 			return Response.json({ ready, log }, { status: 200 })
 		},
 		"/meta.json": async () => {
-			const osm = await Osmix.get(filename)
+			const osm = await remote.get(filename)
 			const bbox = osm.bbox()
 			const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
 			const vtMetadata = OsmixVtEncoder.layerNames(filename)
@@ -42,7 +41,7 @@ const server = Bun.serve({
 		"/tiles/:z/:x/:y": async (req) => {
 			try {
 				console.time(req.url)
-				const tile = await Osmix.getVectorTile(filename, [
+				const tile = await remote.getVectorTile(filename, [
 					+req.params.x,
 					+req.params.y,
 					+req.params.z,
@@ -74,7 +73,7 @@ const server = Bun.serve({
 					{ status: 400 },
 				)
 			}
-			const results = await Osmix.search(filename, key, val)
+			const results = await remote.search(filename, key, val)
 			return Response.json(results, { status: 200 })
 		},
 	},
@@ -86,7 +85,7 @@ const server = Bun.serve({
 console.log(`Vector tile server running at http://localhost:${server.port}`)
 
 async function init() {
-	await Osmix.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
+	await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
 	console.log("Osmix initialized")
 }
 

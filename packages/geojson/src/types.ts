@@ -27,3 +27,13 @@ export type OsmGeoJSONFeature<
 		| MultiPoint
 		| GeometryCollection,
 > = Feature<T, OsmGeoJSONProperties>
+
+export type ImportableGeoJSON = GeoJSON.FeatureCollection<
+	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.MultiPolygon
+>
+
+export type ReadOsmDataTypes =
+	| ArrayBufferLike
+	| ReadableStream
+	| string
+	| ImportableGeoJSON

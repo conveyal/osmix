@@ -25,7 +25,7 @@ bun install osmix
 ### Examples
 
 ```ts
-import {Osmix} from 'osmix'
+import * as Osmix from 'osmix'
 
 // Get a PBF file
 const monacoPbf = await Bun.file('./monaco.pbf').arrayBuffer()
@@ -53,24 +53,22 @@ for await (const entity of Osmix.transformOsmPbfToJson(Bun.file("./monaco.pbf").
 }
 
 // Write the PBF
-await Bun.write('./new-monaco.pbf', await osm.toPbf())
+await Bun.write('./new-monaco.pbf', await Osmix.toPbfBuffer(osm))
 
 // Merge two OSM PBF files
 const monacoPatch = await Bun.file('./monaco-patch.pbf').arrayBuffer()
-const mergedOsm = await osm.merge(await Osmix.fromPbf(monacoPatch))
+const mergedOsm = await Osmix.merge(osm, await Osmix.fromPbf(monacoPatch))
 
 // Extract a bounding box
-const extract = osmix.extract(bbox)
+const extract = await Osmix.createExtract(osm, bbox)
 ```
 
 #### Use in a Web Worker
 
 ```ts
 // main.ts
-import {OsmixRemote} from 'osmix'
-
-const remote = await OsmixRemote.connect()
-const osmInfo = await remote.fromPbf(monacoPbf)
+const remote = await Osmix.createRemote()
+const osmInfo = await remote.fromPbf(monacoPbf) // Remote returns an info object
 
 // Operations run off the main thread
 const tile = await remote.getVectorTile(osmInfo.id, [9372, 12535, 15])

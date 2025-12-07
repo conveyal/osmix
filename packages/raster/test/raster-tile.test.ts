@@ -8,7 +8,7 @@ import {
 	OsmixRasterTile,
 } from "../src/raster-tile"
 
-describe("OsmixRasterTile", () => {
+describe("@osmix/raster: OsmixRasterTile", () => {
 	it("sets point pixels using lon/lat coordinates", () => {
 		const tileIndex: Tile = [6, 7, 4]
 		const tileSize = DEFAULT_RASTER_TILE_SIZE
@@ -16,7 +16,7 @@ describe("OsmixRasterTile", () => {
 		const nodePixel: XY = [12, 20]
 		const nodeLonLat = tile.tilePxToLonLat(nodePixel)
 
-		tile.setLonLat(nodeLonLat)
+		tile.drawPoint(nodeLonLat)
 
 		const idx = (nodePixel[1] * tileSize + nodePixel[0]) * 4
 		expect(Array.from(tile.imageData.slice(idx, idx + 4))).toEqual(
@@ -43,11 +43,11 @@ describe("OsmixRasterTile", () => {
 
 		const startIdx = tile.getIndex(startPixel)
 		const endIdx = tile.getIndex(endPixel)
-		expect(Array.from(tile.imageData.slice(startIdx, startIdx + 4))).toEqual(
-			Array.from(DEFAULT_LINE_COLOR),
+		expect(Array.from(tile.imageData.slice(startIdx, startIdx + 3))).toEqual(
+			Array.from(DEFAULT_LINE_COLOR.slice(0, -1)),
 		)
-		expect(Array.from(tile.imageData.slice(endIdx, endIdx + 4))).toEqual(
-			Array.from(DEFAULT_LINE_COLOR),
+		expect(Array.from(tile.imageData.slice(endIdx, endIdx + 3))).toEqual(
+			Array.from(DEFAULT_LINE_COLOR.slice(0, -1)),
 		)
 	})
 

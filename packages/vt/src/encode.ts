@@ -42,6 +42,9 @@ export function projectToTile(
 	return (lonLat) => llToTilePx(lonLat, tile, extent)
 }
 
+/**
+ * Encode an Osm instance into a Mapbox Vector Tile PBF.
+ */
 export class OsmixVtEncoder {
 	readonly nodeLayerName: string
 	readonly wayLayerName: string

@@ -10,7 +10,7 @@ import type { Progress } from "@osmix/shared/progress"
 import { ShortbreadVtEncoder } from "@osmix/shortbread"
 import * as Versatiles from "@versatiles/style"
 import type { StyleSpecification } from "maplibre-gl"
-import { OsmixRemote } from "osmix"
+import { createRemote } from "osmix"
 import indexHtml from "./index.html"
 import type { ShortbreadWorker } from "./shortbread.worker"
 
@@ -24,7 +24,7 @@ let log: Progress[] = []
 const workerCount = os.cpus().length
 
 // Connect with the custom ShortbreadWorker using the workerUrl option
-const Osmix = await OsmixRemote.connect<ShortbreadWorker>({
+const remote = await createRemote<ShortbreadWorker>({
 	workerCount,
 	workerUrl: new URL("./shortbread.worker.ts", import.meta.url),
 	onProgress: (event) => log.push(event),
@@ -40,7 +40,7 @@ const server = Bun.serve({
 		"/": indexHtml,
 		"/index.html": indexHtml,
 		"/remove": async () => {
-			await Osmix.delete(filename)
+			await remote.delete(filename)
 			// Clear the log
 			log = []
 			return Response.json({ status: "Removed" }, { status: 200 })
@@ -58,7 +58,7 @@ const server = Bun.serve({
 					}
 					// Set the new current filename
 					filename = id
-					await Osmix.fromPbf(data, { id })
+					await remote.fromPbf(data, { id })
 					return Response.json(
 						{
 							status: `Loading ${id}...`,
@@ -78,11 +78,11 @@ const server = Bun.serve({
 			},
 		},
 		"/ready": async () => {
-			const ready = await Osmix.isReady(filename)
+			const ready = await remote.isReady(filename)
 			return Response.json({ ready, log }, { status: 200 })
 		},
 		"/meta.json": async () => {
-			const osm = await Osmix.get(filename)
+			const osm = await remote.get(filename)
 			const bbox = osm.bbox()
 			const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
 			const layerNames = ShortbreadVtEncoder.layerNames
@@ -166,11 +166,13 @@ const server = Bun.serve({
 			try {
 				console.time(req.url)
 				// Use the extended worker method via getWorker()
-				const tile = await Osmix.getWorker().getShortbreadTile(filename, [
-					+req.params.x,
-					+req.params.y,
-					+req.params.z,
-				])
+				const tile = await remote
+					.getWorker()
+					.getShortbreadTile(filename, [
+						+req.params.x,
+						+req.params.y,
+						+req.params.z,
+					])
 				console.timeEnd(req.url)
 				return new Response(tile, {
 					headers: {
@@ -197,7 +199,7 @@ console.log(
 )
 
 async function init() {
-	await Osmix.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
+	await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
 	console.log("Osmix initialized with Shortbread encoder")
 }
 

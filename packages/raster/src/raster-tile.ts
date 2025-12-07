@@ -83,7 +83,7 @@ export class OsmixRasterTile {
 		const clampedMin = this.clampAndRoundPx([minX, minY])
 		const clampedMax = this.clampAndRoundPx([maxX, maxY])
 
-		// For each pixel from min to max, calculate the coverage ration
+		// For each pixel from min to max, calculate the coverage ratio
 		const pixels: { px: XY; coverage: number }[] = []
 		for (let y = clampedMin[1]; y <= clampedMax[1]; y++) {
 			for (let x = clampedMin[0]; x <= clampedMax[0]; x++) {
@@ -113,12 +113,16 @@ export class OsmixRasterTile {
 		return (px[1] * this.tileSize + px[0]) * 4
 	}
 
-	setLonLat(ll: LonLat, color: Rgba = DEFAULT_POINT_COLOR) {
+	drawPoint(ll: LonLat, color: Rgba = DEFAULT_POINT_COLOR) {
 		const px = this.llToTilePx(ll)
-		this.setPixel(px, color)
+		this.drawPixel(px, color)
 	}
 
-	setPixel(px: XY, color: Rgba) {
+	/**
+	 * Draw a color at a pixel. If the pixel is transparent, the color is drawn.
+	 * Otherwise, the color is blended with the existing color.
+	 */
+	drawPixel(px: XY, color: Rgba) {
 		const clampedPx = this.clampAndRoundPx(px)
 		const idx = this.getIndex(clampedPx)
 		if (this.imageData[idx + 3] === 0) {
@@ -151,11 +155,14 @@ export class OsmixRasterTile {
 			// Scale alpha by coverage ratio, ensuring at least 1 for visibility
 			const scaledAlpha = Math.max(1, Math.round(color[3] * coverage))
 			const scaledColor: Rgba = [color[0], color[1], color[2], scaledAlpha]
-			this.setPixel(px, scaledColor)
+			this.drawPixel(px, scaledColor)
 		}
 		return true
 	}
 
+	/**
+	 * Draw a line between two pixels.
+	 */
 	drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR) {
 		const tileSize = this.tileSize
 		const dx = Math.abs(px1[0] - px0[0])
@@ -169,11 +176,7 @@ export class OsmixRasterTile {
 		while (true) {
 			// Only draw pixels within tile bounds
 			if (x >= 0 && x < tileSize && y >= 0 && y < tileSize) {
-				const idx = this.getIndex([x, y])
-				this.imageData[idx] = color[0]
-				this.imageData[idx + 1] = color[1]
-				this.imageData[idx + 2] = color[2]
-				this.imageData[idx + 3] = color[3]
+				this.drawPixel([x, y], color)
 			}
 			if (x === px1[0] && y === px1[1]) break
 			const e2 = 2 * err
@@ -188,6 +191,9 @@ export class OsmixRasterTile {
 		}
 	}
 
+	/**
+	 * Split a line string into a series of line segments and draw each segment.
+	 */
 	drawLineString(coords: LonLat[], color: Rgba = DEFAULT_LINE_COLOR) {
 		const projectedCoords = coords.map((ll) => this.llToTilePx(ll))
 		const [clipped] = clipPolyline(projectedCoords, [
@@ -376,7 +382,7 @@ export class OsmixRasterTile {
 					if (x === 0 || x === tileSize - 1) {
 						continue
 					}
-					this.setPixel([x, y], color)
+					this.drawPixel([x, y], color)
 				}
 			}
 		}

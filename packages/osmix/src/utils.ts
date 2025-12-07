@@ -1,3 +1,6 @@
+import type { Osm } from "@osmix/core"
+import type { OsmPbfHeaderBlock } from "@osmix/pbf"
+import type { OsmEntity } from "@osmix/shared/types"
 import { transfer as comlinkTransfer } from "comlink"
 
 export type Transferables = ArrayBufferLike | ReadableStream
@@ -59,15 +62,48 @@ export function supportsReadableStreamTransfer(): boolean {
 	}
 }
 
-export const SUPPORTS_STREAM_TRANSFER = supportsReadableStreamTransfer()
-export const SUPPORTS_SHARED_ARRAY_BUFFER =
-	typeof SharedArrayBuffer !== "undefined"
+/**
+ * Create a generator that yields all entities in the `Osm` index, sorted by type and ID.
+ * Order: nodes first, then ways, then relations, each sorted by ID.
+ */
+function* getAllEntitiesSorted(osm: Osm): Generator<OsmEntity> {
+	for (const node of osm.nodes.sorted()) {
+		yield node
+	}
+	for (const way of osm.ways.sorted()) {
+		yield way
+	}
+	for (const relation of osm.relations.sorted()) {
+		yield relation
+	}
+}
 
 /**
- * The default number of workers to use.
- * If SharedArrayBuffer is supported, use the number of hardware concurrency.
- * Otherwise, use a single worker.
+ * Convert the `Osm` index to a `ReadableStream` of header and entity objects.
+ * Header is emitted first, followed by all entities in sorted order.
+ * Stream can be piped through transform streams for further processing.
  */
-export const DEFAULT_WORKER_COUNT = SUPPORTS_SHARED_ARRAY_BUFFER
-	? (navigator.hardwareConcurrency ?? 1)
-	: 1
+export function createReadableEntityStreamFromOsm(
+	osm: Osm,
+): ReadableStream<OsmPbfHeaderBlock | OsmEntity> {
+	let headerEnqueued = false
+	const entityGenerator = getAllEntitiesSorted(osm)
+	return new ReadableStream<OsmPbfHeaderBlock | OsmEntity>({
+		pull: async (controller) => {
+			if (!headerEnqueued) {
+				controller.enqueue({
+					...osm.header,
+					writingprogram: "@osmix/core",
+					osmosis_replication_timestamp: Date.now(),
+				})
+				headerEnqueued = true
+			}
+			const block = entityGenerator.next()
+			if (block.done) {
+				controller.close()
+			} else {
+				controller.enqueue(block.value)
+			}
+		},
+	})
+}
