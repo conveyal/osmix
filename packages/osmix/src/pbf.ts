@@ -1,3 +1,13 @@
+/**
+ * PBF loading and serialization utilities.
+ *
+ * Provides functions for loading OSM PBF data into Osm indexes and
+ * serializing Osm indexes back to PBF format. Supports streaming
+ * for memory-efficient processing of large datasets.
+ *
+ * @module
+ */
+
 import { Osm, type OsmOptions } from "@osmix/core/src/osm"
 import {
 	OsmBlocksToJsonTransformStream,
@@ -24,6 +34,9 @@ import type {
 } from "@osmix/shared/types"
 import { createReadableEntityStreamFromOsm } from "./utils"
 
+/**
+ * Options for loading OSM data from PBF.
+ */
 export interface OsmFromPbfOptions extends OsmOptions {
 	extractBbox: GeoBbox2D
 	filter<T extends OsmEntityType>(

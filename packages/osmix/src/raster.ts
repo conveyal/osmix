@@ -1,3 +1,12 @@
+/**
+ * Raster tile rendering from OSM indexes.
+ *
+ * Provides default rendering logic that draws relations, ways, and nodes
+ * onto raster tiles with appropriate styling based on geometry type.
+ *
+ * @module
+ */
+
 import type { Osm } from "@osmix/core"
 import {
 	DEFAULT_AREA_COLOR,

@@ -1,3 +1,12 @@
+/**
+ * High-level merge pipeline for OSM datasets.
+ *
+ * Orchestrates a complete merge workflow including deduplication of nodes and ways
+ * in both datasets, direct change generation, and optional intersection creation.
+ *
+ * @module
+ */
+
 import type { Osm } from "@osmix/core"
 import { type ProgressEvent, progressEvent } from "@osmix/shared/progress"
 import { applyChangesetToOsm } from "./apply-changeset"
@@ -7,10 +16,28 @@ import { changeStatsSummary } from "./utils"
 
 /**
  * Run a full merge pipeline on two OSM datasets.
- * @param base - The base OSM dataset.
- * @param patch - The patch OSM dataset.
- * @param options - The merge options.
- * @returns The merged OSM dataset.
+ *
+ * Executes a multi-stage merge process:
+ * 1. Deduplicates nodes and ways in both base and patch datasets
+ * 2. Optionally generates direct changes from patch to base (`directMerge`)
+ * 3. Optionally deduplicates nodes/ways in the final merged dataset
+ * 4. Optionally creates intersection nodes where ways cross
+ *
+ * @param base - The base OSM dataset to merge into.
+ * @param patch - The patch OSM dataset to merge from.
+ * @param options - Merge options controlling which stages to run.
+ * @param onProgress - Callback for progress updates during merge.
+ * @returns The merged OSM dataset with all changes applied.
+ *
+ * @example
+ * ```ts
+ * const merged = await merge(baseOsm, patchOsm, {
+ *   directMerge: true,
+ *   deduplicateNodes: true,
+ *   deduplicateWays: true,
+ *   createIntersections: false,
+ * })
+ * ```
  */
 export async function merge(
 	base: Osm,

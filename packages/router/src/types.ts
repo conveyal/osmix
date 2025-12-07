@@ -1,3 +1,8 @@
+/**
+ * Type definitions for the routing module.
+ * @module
+ */
+
 import type { LonLat, OsmTags } from "@osmix/shared/types"
 
 /** Route result containing the path geometry and metadata. */

@@ -1,9 +1,23 @@
+/**
+ * Shared type definitions used across all Osmix packages.
+ *
+ * Includes geographic primitives (LonLat, Bbox), tile coordinates,
+ * and core OSM entity types (Node, Way, Relation).
+ *
+ * @module
+ */
+
+/** Geographic coordinate as [longitude, latitude] tuple. */
 export type LonLat = [lon: number, lat: number]
+/** 2D pixel or cartesian coordinate as [x, y] tuple. */
 export type XY = [x: number, y: number]
+
+/** Geographic coordinate as object with lon/lat properties. */
 export interface ILonLat {
 	lon: number
 	lat: number
 }
+/** XYZ tile coordinate as [x, y, z] tuple. */
 export type Tile = [x: number, y: number, z: number]
 
 /**

@@ -80,6 +80,13 @@ Colors are RGBA tuples `[r, g, b, a]` (0-255). Defaults are provided.
 - `tilePxToLonLat(px)`: Convert tile pixel `[x, y]` to `[lon, lat]`.
 - `bbox()`: Get the tile's geographic bounding box.
 
+## Related Packages
+
+- [`@osmix/core`](../core/README.md) – In-memory OSM index that provides entities to render.
+- [`@osmix/shared`](../shared/README.md) – Tile utilities and coordinate helpers used internally.
+- [`@osmix/vt`](../vt/README.md) – Alternative vector tile output if you need MVT instead of raster.
+- [`osmix`](../osmix/README.md) – High-level API with `getRasterTile()` helper.
+
 ## Environment and limitations
 
 - Tile painting assumes `[lon, lat]` coordinates in WGS84 order.

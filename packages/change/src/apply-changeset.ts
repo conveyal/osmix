@@ -1,8 +1,37 @@
+/**
+ * Changeset application utilities.
+ *
+ * Applies accumulated changes from an OsmChangeset to produce a new Osm index
+ * with all creates, modifies, and deletes applied immutably.
+ *
+ * @module
+ */
+
 import { Osm } from "@osmix/core"
 import type { OsmChangeset } from "./changeset"
 
 /**
- * Apply a changeset to an Osm index, generating a new Osm index. Usually done on a changeset made from the base osm index.
+ * Apply a changeset to an Osm index, producing a new Osm index.
+ *
+ * Creates a fresh Osm instance and applies all changes from the changeset:
+ * - Entities marked for deletion are excluded
+ * - Modified entities use the updated version from the changeset
+ * - Created entities are added to the new index
+ *
+ * The original base Osm remains immutable. After application, the new Osm
+ * has built ID, tag, and spatial indexes.
+ *
+ * @param changeset - The changeset to apply (contains reference to base Osm).
+ * @param newOsmId - Optional ID for the new Osm index (defaults to base ID).
+ * @returns A new Osm index with all changes applied.
+ * @throws If changeset contains invalid change sequences (e.g., create for existing entity).
+ *
+ * @example
+ * ```ts
+ * const changeset = new OsmChangeset(baseOsm)
+ * changeset.deduplicateNodes(baseOsm.nodes)
+ * const newOsm = applyChangesetToOsm(changeset)
+ * ```
  */
 export function applyChangesetToOsm(
 	changeset: OsmChangeset,

@@ -89,7 +89,7 @@ Options:
 
 Applies all pending changes in the changeset to produce a **new** `Osm` instance. The original `base` is immutable.
 
-## See also
+## Related Packages
 
 - [`@osmix/core`](../core/README.md) – Typed-array index powering the change operations.
 - [`@osmix/pbf`](../pbf/README.md) – Streaming helpers used to read and write `.osm.pbf` data.

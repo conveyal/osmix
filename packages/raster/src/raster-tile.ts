@@ -1,3 +1,13 @@
+/**
+ * Raster tile rendering for XYZ tiles.
+ *
+ * The OsmixRasterTile class creates and manages pixel buffers for individual
+ * map tiles, providing methods to draw geographic geometries (points, lines,
+ * polygons) into the buffer with automatic projection and clipping.
+ *
+ * @module
+ */
+
 import rewind from "@osmix/shared/geojson-rewind"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
 import {
@@ -10,6 +20,7 @@ import {
 import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
 import { compositeRGBA } from "./color"
 
+/** Default image type for exported tiles. */
 export const DEFAULT_RASTER_IMAGE_TYPE = "image/png"
 export const DEFAULT_LINE_COLOR: Rgba = [255, 255, 255, 230] // semi-transparent white
 export const DEFAULT_POINT_COLOR: Rgba = [255, 0, 0, 255] // red

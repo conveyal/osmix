@@ -1,3 +1,13 @@
+/**
+ * Coordinate precision utilities for OSM data.
+ *
+ * OSM stores coordinates as integer microdegrees (7 decimal places) for
+ * compact storage and consistent precision. This module provides conversions
+ * between floating-point degrees and integer microdegrees.
+ *
+ * @module
+ */
+
 import type { GeoBbox2D } from "./types"
 
 /**

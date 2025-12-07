@@ -1,3 +1,15 @@
+/**
+ * Multipolygon relation building utilities.
+ *
+ * Implements the OSM multipolygon relation specification to construct
+ * polygon geometries from way members. Handles outer/inner roles,
+ * way connection, and ring closure.
+ *
+ * @see https://wiki.openstreetmap.org/wiki/Relation:multipolygon
+ *
+ * @module
+ */
+
 import type { LonLat, OsmRelation, OsmRelationMember, OsmWay } from "./types"
 
 /**

@@ -1,8 +1,18 @@
 /**
+ * Priority queue implementation for pathfinding algorithms.
+ * @module
+ */
+
+/**
  * Min-heap priority queue optimized for pathfinding.
  *
  * Uses a binary heap stored in a flat array for cache-friendly access.
- * Tracks item positions to support O(log n) priority updates.
+ * Tracks item positions to support O(log n) priority updates (decrease-key).
+ *
+ * Operations:
+ * - `push(item, priority)`: O(log n) - adds or updates item priority.
+ * - `pop()`: O(log n) - removes and returns minimum priority item.
+ * - `has(item)`: O(1) - checks if item is in heap.
  */
 export class BinaryHeap {
 	private heap: number[] = []

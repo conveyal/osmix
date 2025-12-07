@@ -16,23 +16,24 @@ bun install osmix
 ### Load a PBF and inspect it
 
 ```ts
-import * as Osmix from "osmix"
+import { fromPbf, fromGeoJSON, toPbfBuffer } from "osmix"
 
-const monacoPbf = await Bun.file("./monaco.pbf").arrayBuffer() 
-const osm = = await Osmix.fromPbf(monacoPbf)
+const monacoPbf = await Bun.file("./monaco.pbf").arrayBuffer()
+const osm = await fromPbf(monacoPbf)
 
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
-const tileBytes = await osm.getVectorTile([9372, 12535, 15])
 
 const geojsonFile = await fetch("/fixtures/buildings.geojson").then((r) => r.arrayBuffer())
-const osm = await Osmix.fromGeoJSON(geojsonFile)
-const pbfBytes = await Osmix.toPbfBuffer(osm)
+const geoOsm = await fromGeoJSON(geojsonFile)
+const pbfBytes = await toPbfBuffer(geoOsm)
 ```
 
 ### Work off the main thread with `OsmixRemote`
 
 ```ts
-const remote = await Osmix.createRemote()
+import { createRemote } from "osmix"
+
+const remote = await createRemote()
 const monacoOsmInfo = await remote.fromPbf(monacoPbf)
 const patchOsmInfo = await remote.fromPbf(Bun.file("patch.osm.pbf").stream(), {
 	id: "patch",
@@ -51,9 +52,11 @@ const rasterTile = await remote.getRasterTile(monacoOsmInfo, [10561, 22891, 16])
 ### Extract, stream, and write back to PBF
 
 ```ts
-const osm = await Osmix.fromPbf(Bun.file('./monaco.pbf').stream())
-const downtown = await Osmix.createExtract(osm, [-122.35, 47.60, -122.32, 47.62])
-await Osmix.toPbfStream(downtown).pipeTo(fileWritableStream)
+import { fromPbf, createExtract, toPbfStream } from "osmix"
+
+const osm = await fromPbf(Bun.file('./monaco.pbf').stream())
+const downtown = createExtract(osm, [-122.35, 47.60, -122.32, 47.62])
+await toPbfStream(downtown).pipeTo(fileWritableStream)
 ```
 
 `createExtract` can either clip ways/members to the bbox (`strategy: "simple"`)
@@ -63,7 +66,55 @@ spec-compliant without staging everything in memory.
 
 ## API
 
-WIP
+### Loading
+
+- `fromPbf(data, options?)` - Load OSM data from PBF (buffer, stream, or File).
+- `fromGeoJSON(data, options?)` - Load OSM data from GeoJSON.
+- `readOsmPbfHeader(data)` - Read only the PBF header without loading entities.
+
+### Export
+
+- `toPbfStream(osm)` - Stream Osm to PBF bytes (memory-efficient).
+- `toPbfBuffer(osm)` - Convert Osm to a single PBF buffer.
+
+### Extraction
+
+- `createExtract(osm, bbox, strategy?)` - Create geographic extract.
+  - `"simple"` - Strict spatial cut.
+  - `"complete_ways"` - Include complete way geometry.
+  - `"smart"` - Complete ways + resolved multipolygons.
+
+### Tiles
+
+- `drawToRasterTile(osm, tile, tileSize?)` - Render Osm to raster tile.
+
+### Workers (OsmixRemote)
+
+- `createRemote(options?)` - Create worker pool manager.
+- `remote.fromPbf(data, options?)` - Load in worker.
+- `remote.fromGeoJSON(data, options?)` - Load in worker.
+- `remote.getVectorTile(osmId, tile)` - Generate MVT in worker.
+- `remote.getRasterTile(osmId, tile, tileSize?)` - Generate raster in worker.
+- `remote.merge(baseId, patchId, options?)` - Merge datasets in worker.
+- `remote.search(osmId, key, val?)` - Search by tag.
+- `remote.toPbf(osmId, stream)` - Export to PBF.
+
+### Utilities
+
+- `collectTransferables(value)` - Find transferable buffers in nested objects.
+- `transfer(data)` - Wrap data for zero-copy worker transfer.
+
+## Related Packages
+
+- [`@osmix/core`](../core/README.md) – In-memory OSM index with typed arrays and spatial queries.
+- [`@osmix/pbf`](../pbf/README.md) – Low-level PBF reading and writing.
+- [`@osmix/json`](../json/README.md) – PBF to JSON entity conversion.
+- [`@osmix/geojson`](../geojson/README.md) – GeoJSON import/export.
+- [`@osmix/change`](../change/README.md) – Changeset management and merge workflows.
+- [`@osmix/raster`](../raster/README.md) – Raster tile rendering.
+- [`@osmix/vt`](../vt/README.md) – Vector tile encoding.
+- [`@osmix/router`](../router/README.md) – Pathfinding on OSM road networks.
+- [`@osmix/shared`](../shared/README.md) – Shared utilities and types.
 
 ## Environment and limitations
 

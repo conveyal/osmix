@@ -1,9 +1,29 @@
+/**
+ * OSC (OSM Change) XML generation.
+ *
+ * Converts changeset data into the standard OSC XML format used by
+ * OpenStreetMap for change uploads and auditing.
+ *
+ * @module
+ */
+
 import type { OsmChangeset } from "./changeset"
 import { osmTagsToOscTags } from "./utils"
 
 /**
- * Generate OSC (OSM Change) XML format string from this changeset.
- * Returns an `<osmChange>` document containing create, modify, and delete sections.
+ * Generate OSC (OSM Change) XML format string from a changeset.
+ *
+ * Produces an `<osmChange>` document with create, modify, and delete sections
+ * containing all nodes, ways, and relations from the changeset.
+ *
+ * @param changeset - The changeset to serialize.
+ * @returns XML string in OSC format.
+ *
+ * @example
+ * ```ts
+ * const osc = generateOscChanges(changeset)
+ * await Bun.write('changes.osc', osc)
+ * ```
  */
 export function generateOscChanges(changeset: OsmChangeset) {
 	let create = ""

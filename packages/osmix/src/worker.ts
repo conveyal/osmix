@@ -1,3 +1,23 @@
+/**
+ * Web Worker implementation for OSM operations.
+ *
+ * OsmixWorker runs inside a Web Worker and manages multiple Osm instances.
+ * It exposes methods via Comlink for cross-thread RPC from OsmixRemote.
+ *
+ * Can be extended to add custom functionality:
+ * @example
+ * ```ts
+ * class MyWorker extends OsmixWorker {
+ *   myCustomMethod(osmId: string) {
+ *     const osm = this.get(osmId)
+ *     // ... custom logic
+ *   }
+ * }
+ * ```
+ *
+ * @module
+ */
+
 import {
 	applyChangesetToOsm,
 	generateChangeset,

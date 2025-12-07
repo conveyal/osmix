@@ -1,3 +1,13 @@
+/**
+ * Worker-based remote API for OSM operations.
+ *
+ * OsmixRemote manages a pool of Web Workers and provides a high-level API
+ * for loading, querying, and manipulating OSM data off the main thread.
+ * Uses SharedArrayBuffer for efficient multi-worker data sharing when available.
+ *
+ * @module
+ */
+
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
@@ -14,6 +24,7 @@ import {
 import { transfer } from "./utils"
 import type { OsmixWorker } from "./worker"
 
+/** Identifier for an OSM dataset: string ID, Osm instance, or OsmInfo object. */
 type OsmId = string | Osm | OsmInfo
 
 export interface OsmixRemoteOptions {

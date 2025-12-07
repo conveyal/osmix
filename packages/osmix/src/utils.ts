@@ -1,8 +1,18 @@
+/**
+ * Utility functions for worker communication and data streaming.
+ *
+ * Provides helpers for collecting transferable buffers, feature detection,
+ * and converting Osm indexes to entity streams.
+ *
+ * @module
+ */
+
 import type { Osm } from "@osmix/core"
 import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import type { OsmEntity } from "@osmix/shared/types"
 import { transfer as comlinkTransfer } from "comlink"
 
+/** Types that can be transferred between workers without copying. */
 export type Transferables = ArrayBufferLike | ReadableStream
 
 /**

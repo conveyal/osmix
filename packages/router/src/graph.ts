@@ -1,3 +1,13 @@
+/**
+ * Routing graph construction from OSM data.
+ *
+ * Builds a directed graph from OSM ways suitable for pathfinding. Edges are
+ * created between consecutive nodes in each way, with pre-computed distance
+ * and time costs. Respects one-way restrictions.
+ *
+ * @module
+ */
+
 import type { Osm } from "@osmix/core"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type { LonLat } from "@osmix/shared/types"
@@ -15,12 +25,18 @@ import {
 } from "./utils"
 
 /**
- * Graph built from OSM ways and nodes.
+ * Build a routing graph from OSM ways.
  *
- * Construction by collecting routable ways and track which nodes they contain, then
- * creating bidirectional edges between consecutive nodes (respecting one-way).
+ * Constructs a directed graph by:
+ * 1. Filtering ways by highway type (customizable filter).
+ * 2. Creating bidirectional edges between consecutive nodes (unless one-way).
+ * 3. Pre-computing distance (meters) and time (seconds) for each edge.
+ * 4. Tracking intersections where multiple ways meet.
  *
- * Edges store pre-computed distance and time for fast weight lookups.
+ * @param osm - The OSM dataset to build from.
+ * @param filter - Function to determine which ways are routable.
+ * @param defaultSpeeds - Speed limits (km/h) by highway type.
+ * @returns A RoutingGraph ready for pathfinding.
  */
 export function buildGraph(
 	osm: Osm,
@@ -98,7 +114,25 @@ export function buildGraph(
 }
 
 /**
- * Find the nearest routeable OSM node from a point within a given radius
+ * Find the nearest routable OSM node from a geographic point.
+ *
+ * Searches for nodes within the given radius that are part of the routing
+ * graph (i.e., lie on a routable way). Returns the closest match with its
+ * coordinates and distance.
+ *
+ * @param osm - The OSM dataset.
+ * @param graph - The routing graph built from the OSM data.
+ * @param point - The [lon, lat] coordinates to search from.
+ * @param maxKm - Maximum search radius in kilometers.
+ * @returns The nearest routable node, or null if none found.
+ *
+ * @example
+ * ```ts
+ * const nearest = findNearestNodeOnGraph(osm, graph, [-73.989, 40.733], 0.5)
+ * if (nearest) {
+ *   console.log(`Found node ${nearest.nodeIndex} at ${nearest.distance}km`)
+ * }
+ * ```
  */
 export function findNearestNodeOnGraph(
 	osm: Osm,

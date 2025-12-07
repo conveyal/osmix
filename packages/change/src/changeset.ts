@@ -1,3 +1,13 @@
+/**
+ * OSM changeset tracking and manipulation.
+ *
+ * The OsmChangeset class tracks creates, modifies, and deletes for nodes, ways,
+ * and relations. It provides methods for deduplication, intersection creation,
+ * and direct merging of OSM datasets.
+ *
+ * @module
+ */
+
 import type { Nodes, Osm, Ways } from "@osmix/core"
 import type {
 	OsmEntity,
@@ -31,8 +41,7 @@ import {
 } from "./utils"
 
 /**
- * Tracks changes to an OSM dataset and provides utilities to generate those changes
- * through deduplication and merging.
+ * Tracks changes to an OSM dataset and provides utilities for deduplication and merging.
  *
  * The changeset maintains a record of creates, modifies, and deletes for nodes, ways,
  * and relations. It is optimized to minimize full entity retrieval until necessary.

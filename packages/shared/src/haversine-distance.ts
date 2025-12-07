@@ -1,5 +1,14 @@
 /**
- * Calculate the haversine distance between two LonLat points.
+ * Great-circle distance calculation using the Haversine formula.
+ *
+ * Computes the shortest distance between two points on a sphere,
+ * accounting for Earth's curvature. Accurate for most geographic distances.
+ *
+ * @module
+ */
+
+/**
+ * Calculate the great-circle distance between two geographic points.
  * @param p1 - The first point
  * @param p2 - The second point
  * @returns The haversine distance in meters

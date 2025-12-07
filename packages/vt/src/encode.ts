@@ -1,3 +1,13 @@
+/**
+ * Vector tile encoding for OSM data.
+ *
+ * The OsmixVtEncoder class converts Osmix datasets into Mapbox Vector Tiles,
+ * handling geometry projection, clipping, area detection, and proper
+ * MVT encoding for nodes, ways, and relations.
+ *
+ * @module
+ */
+
 import type { Osm } from "@osmix/core"
 import { bboxContainsOrIntersects } from "@osmix/shared/bbox-intersects"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
@@ -11,7 +21,9 @@ import type {
 } from "./types"
 import writeVtPbf from "./write-vt-pbf"
 
+/** Default tile extent (coordinate resolution). */
 const DEFAULT_EXTENT = 4096
+/** Default buffer around tile in extent units. */
 const DEFAULT_BUFFER = 64
 
 const SF_TYPE: VtSimpleFeatureType = {

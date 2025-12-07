@@ -1,3 +1,13 @@
+/**
+ * XYZ tile coordinate utilities.
+ *
+ * Provides conversions between geographic coordinates (lon/lat) and
+ * tile pixel coordinates for XYZ tiled map systems. Supports various
+ * tile sizes and zoom levels.
+ *
+ * @module
+ */
+
 import { pointToTileFraction } from "@mapbox/tilebelt"
 import type { GeoBbox2D, LonLat, Tile, TilePxBbox, XY } from "./types"
 

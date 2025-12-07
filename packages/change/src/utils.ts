@@ -1,3 +1,15 @@
+/**
+ * Utility functions for changeset operations.
+ *
+ * Provides helpers for:
+ * - Tag formatting (OSC XML)
+ * - Duplicate detection and removal
+ * - Way intersection detection
+ * - Entity comparison
+ *
+ * @module
+ */
+
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type {
 	OsmEntity,
@@ -8,6 +20,11 @@ import type {
 import sweeplineIntersections from "sweepline-intersections"
 import type { OsmChangesetStats } from "./types"
 
+/**
+ * Convert OSM tags object to OSC XML tag elements.
+ * @param tags - The tags to convert.
+ * @returns XML string of `<tag k="..." v="..." />` elements.
+ */
 export function osmTagsToOscTags(tags: OsmTags): string {
 	return Object.entries(tags)
 		.map(([key, value]) => {
@@ -56,6 +73,13 @@ export function cleanCoords(coords: [number, number][]) {
 	})
 }
 
+/**
+ * Check if an entity has a specific tag with a specific value.
+ * @param entity - The OSM entity to check.
+ * @param tag - The tag key to look for.
+ * @param value - The expected tag value.
+ * @returns True if the entity has the tag with the specified value.
+ */
 export function entityHasTagValue(
 	entity: OsmEntity,
 	tag: string,
@@ -112,6 +136,11 @@ export function isWayIntersectionCandidate(way: OsmWay) {
 	)
 }
 
+/**
+ * Convert camelCase string to sentence case.
+ * @param str - The camelCase string.
+ * @returns The string in sentence case (e.g., "deduplicatedNodes" -> "deduplicated nodes").
+ */
 export function camelCaseToSentenceCase(str: string) {
 	return str
 		.replace(/([A-Z])/g, " $1")

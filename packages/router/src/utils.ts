@@ -1,3 +1,11 @@
+/**
+ * Routing utility functions.
+ *
+ * Provides highway filtering, speed limit parsing, and travel time calculation.
+ *
+ * @module
+ */
+
 import type { OsmTags } from "@osmix/shared/types"
 import type { DefaultSpeeds } from "./types"
 

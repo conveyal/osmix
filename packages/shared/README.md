@@ -42,6 +42,14 @@ bun install @osmix/shared
 
 All modules are tree-shakeable; only import what you need.
 
+## Related Packages
+
+- [`@osmix/core`](../core/README.md) – In-memory OSM index using these shared utilities.
+- [`@osmix/pbf`](../pbf/README.md) – PBF parsing that uses zigzag encoding and streaming helpers.
+- [`@osmix/json`](../json/README.md) – JSON entity conversion using shared types.
+- [`@osmix/geojson`](../geojson/README.md) – GeoJSON conversion using coordinate and type utilities.
+- [`@osmix/change`](../change/README.md) – Changeset management using entity utilities.
+
 ## Development
 
 - `bun run test packages/shared`
