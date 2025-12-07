@@ -53,7 +53,32 @@ See the [example merge app](/apps/merge/src/lib/osmix-raster-protocol.ts) for ho
 
 ## API
 
-WIP
+### `OsmixRasterTile`
+
+Creates a 2D pixel buffer for a given tile coordinate.
+
+```ts
+constructor({ tile, tileSize = 256, imageData? })
+```
+
+- `tile`: XYZ tuple `[x, y, z]`.
+- `tileSize`: Size in pixels (default 256).
+- `imageData`: Optional existing `Uint8ClampedArray` to paint into.
+
+#### Drawing methods
+
+- `drawPoint(ll: [lon, lat], color?)`: Draw a single point.
+- `drawLineString(coords: [lon, lat][], color?)`: Draw a polyline.
+- `drawPolygon(rings: [lon, lat][][], color?)`: Draw a filled polygon.
+- `drawRelation(polygons: [lon, lat][][][], color?)`: Draw a multipolygon relation.
+
+Colors are RGBA tuples `[r, g, b, a]` (0-255). Defaults are provided.
+
+#### Coordinate utilities
+
+- `llToTilePx(ll)`: Convert `[lon, lat]` to tile pixel `[x, y]`.
+- `tilePxToLonLat(px)`: Convert tile pixel `[x, y]` to `[lon, lat]`.
+- `bbox()`: Get the tile's geographic bounding box.
 
 ## Environment and limitations
 

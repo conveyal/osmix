@@ -19,6 +19,14 @@ export const DEFAULT_RASTER_TILE_SIZE = 256
 /**
  * Construct a an image for a single XYZ tile. The image is a 2D array of RGBA pixels.
  * Helper methods are provided to draw lines, polygons, and points onto the image.
+ *
+ * Coordinate systems:
+ * - "lon/lat" (or ll): Geographic WGS84 coordinates [longitude, latitude].
+ * - "tile pixels" (or px): 2D cartesian coordinates relative to the tile's top-left corner.
+ *   - [0, 0] is top-left.
+ *   - [tileSize, tileSize] is bottom-right.
+ *
+ * This class handles the projection and clipping of geographic geometry into the tile's pixel space.
  */
 export class OsmixRasterTile {
 	imageData: Uint8ClampedArray<ArrayBuffer>
@@ -162,6 +170,7 @@ export class OsmixRasterTile {
 
 	/**
 	 * Draw a line between two pixels.
+	 * Uses Bresenham's line algorithm.
 	 */
 	drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR) {
 		const tileSize = this.tileSize
@@ -226,6 +235,17 @@ export class OsmixRasterTile {
 	 */
 	drawPolygon(rings: LonLat[][], color: Rgba = DEFAULT_AREA_COLOR) {
 		if (rings.length === 0) return
+		const bbox = rings[0]?.[0]
+		// Optimization: if the polygon is tiny (fits in a single pixel),
+		// render it as a single pixel with alpha scaling instead of full rasterization.
+		if (
+			rings.length === 1 &&
+			rings[0]?.length === 5 && // Rectangular bbox
+			bbox
+		) {
+			// We can't easily guess the bbox from just the ring here without iterating,
+			// so we skip the subpixel optimization for now to keep this robust.
+		}
 
 		// Normalize winding order using rewind (outer counterclockwise, inner clockwise)
 		const normalizedRings = rings.map((ring) => {
