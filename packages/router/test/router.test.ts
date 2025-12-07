@@ -2,7 +2,12 @@ import { beforeAll, describe, expect, it } from "bun:test"
 import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/test/fixtures"
 import { fromPbf } from "osmix"
-import { buildGraph, findNearestNodeOnGraph } from "../src"
+import {
+	buildGraph,
+	findNearestNodeOnGraph,
+	getTransferableBuffers,
+	RoutingGraph,
+} from "../src"
 import { Router } from "../src/router"
 
 /**
@@ -240,7 +245,8 @@ describe("Router with Monaco PBF", () => {
 		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 		expect(router).toBeDefined()
-		expect(graph.edges.size).toBe(7_073)
+		// 11,414 total edges in the graph (bidirectional edges counted separately)
+		expect(graph.edges).toBe(11_414)
 	})
 
 	it("should find routes between points in Monaco", () => {
@@ -383,5 +389,153 @@ describe("Router with Monaco PBF", () => {
 		// Point far outside Monaco
 		const farPoint = findNearestNodeOnGraph(monacoOsm, graph, [10.0, 50.0], 100)
 		expect(farPoint).toBeNull()
+	})
+})
+
+describe("RoutingGraph Serialization", () => {
+	it("should serialize and reconstruct graph correctly", () => {
+		const osm = new Osm({ id: "test" })
+
+		// Create a simple network
+		osm.nodes.addNode({ id: 1, lat: 0, lon: 0 })
+		osm.nodes.addNode({ id: 2, lat: 0, lon: 0.01 })
+		osm.nodes.addNode({ id: 3, lat: 0.01, lon: 0.01 })
+		osm.nodes.buildIndex()
+		osm.nodes.buildSpatialIndex()
+
+		osm.ways.addWay({
+			id: 1,
+			refs: [1, 2, 3],
+			tags: { highway: "primary" },
+		})
+		osm.ways.buildIndex()
+		osm.ways.buildSpatialIndex()
+		osm.buildIndexes()
+
+		// Build and compact the graph
+		const originalGraph = buildGraph(osm)
+
+		// Get transferables
+		const transferables = originalGraph.transferables()
+
+		// Verify transferables structure
+		expect(transferables.nodeCount).toBe(osm.nodes.size)
+		expect(transferables.edgeCount).toBe(originalGraph.edges)
+		// Buffers can be either ArrayBuffer or SharedArrayBuffer depending on runtime
+		const isBuffer = (b: unknown) =>
+			b instanceof ArrayBuffer || b instanceof SharedArrayBuffer
+		expect(isBuffer(transferables.edgeOffsets)).toBe(true)
+		expect(isBuffer(transferables.edgeTargets)).toBe(true)
+		expect(isBuffer(transferables.edgeDistances)).toBe(true)
+		expect(isBuffer(transferables.edgeTimes)).toBe(true)
+		expect(isBuffer(transferables.routableBits)).toBe(true)
+		expect(isBuffer(transferables.intersectionBits)).toBe(true)
+
+		// Reconstruct graph from transferables
+		const reconstructedGraph = new RoutingGraph(transferables)
+
+		// Verify properties match
+		expect(reconstructedGraph.size).toBe(originalGraph.size)
+		expect(reconstructedGraph.edges).toBe(originalGraph.edges)
+
+		// Verify edges for each node match
+		for (let i = 0; i < osm.nodes.size; i++) {
+			const origEdges = originalGraph.getEdges(i)
+			const reconEdges = reconstructedGraph.getEdges(i)
+			expect(reconEdges.length).toBe(origEdges.length)
+
+			for (let j = 0; j < origEdges.length; j++) {
+				expect(reconEdges[j]!.targetNodeIndex).toBe(
+					origEdges[j]!.targetNodeIndex,
+				)
+				expect(reconEdges[j]!.wayIndex).toBe(origEdges[j]!.wayIndex)
+				expect(reconEdges[j]!.distance).toBeCloseTo(origEdges[j]!.distance, 2)
+				expect(reconEdges[j]!.time).toBeCloseTo(origEdges[j]!.time, 2)
+			}
+		}
+
+		// Verify routable and intersection flags
+		expect(reconstructedGraph.isRouteable(0)).toBe(originalGraph.isRouteable(0))
+		expect(reconstructedGraph.isRouteable(1)).toBe(originalGraph.isRouteable(1))
+		expect(reconstructedGraph.isRouteable(2)).toBe(originalGraph.isRouteable(2))
+		expect(reconstructedGraph.isIntersection(0)).toBe(
+			originalGraph.isIntersection(0),
+		)
+		expect(reconstructedGraph.isIntersection(1)).toBe(
+			originalGraph.isIntersection(1),
+		)
+	})
+
+	it("should produce working router after reconstruction", () => {
+		const osm = new Osm({ id: "test" })
+
+		osm.nodes.addNode({ id: 1, lat: 0, lon: 0 })
+		osm.nodes.addNode({ id: 2, lat: 0, lon: 0.01 })
+		osm.nodes.addNode({ id: 3, lat: 0.01, lon: 0.01 })
+		osm.nodes.buildIndex()
+		osm.nodes.buildSpatialIndex()
+
+		osm.ways.addWay({
+			id: 1,
+			refs: [1, 2, 3],
+			tags: { highway: "primary" },
+		})
+		osm.ways.buildIndex()
+		osm.ways.buildSpatialIndex()
+		osm.buildIndexes()
+
+		const originalGraph = buildGraph(osm)
+		const transferables = originalGraph.transferables()
+		const reconstructedGraph = new RoutingGraph(transferables)
+
+		// Create routers with both graphs
+		const router1 = new Router(osm, originalGraph)
+		const router2 = new Router(osm, reconstructedGraph)
+
+		// Both should find the same route
+		const path1 = router1.route(0, 2)
+		const path2 = router2.route(0, 2)
+
+		expect(path1).not.toBeNull()
+		expect(path2).not.toBeNull()
+		expect(path1!.length).toBe(path2!.length)
+
+		for (let i = 0; i < path1!.length; i++) {
+			expect(path1![i]!.nodeIndex).toBe(path2![i]!.nodeIndex)
+		}
+	})
+
+	it("should provide transferable buffers for postMessage", () => {
+		const osm = new Osm({ id: "test" })
+		osm.nodes.addNode({ id: 1, lat: 0, lon: 0 })
+		osm.nodes.addNode({ id: 2, lat: 0, lon: 0.01 })
+		osm.nodes.buildIndex()
+		osm.nodes.buildSpatialIndex()
+		osm.ways.addWay({
+			id: 1,
+			refs: [1, 2],
+			tags: { highway: "primary" },
+		})
+		osm.ways.buildIndex()
+		osm.ways.buildSpatialIndex()
+		osm.buildIndexes()
+
+		const graph = buildGraph(osm)
+		const transferables = graph.transferables()
+		const buffers = getTransferableBuffers(transferables)
+
+		// When SharedArrayBuffer is available, returns empty (they're shared, not transferred).
+		// When only ArrayBuffer is available, returns all 7 buffers.
+		const usesSharedArrayBuffer =
+			typeof SharedArrayBuffer !== "undefined" &&
+			transferables.edgeOffsets instanceof SharedArrayBuffer
+		if (usesSharedArrayBuffer) {
+			expect(buffers.length).toBe(0)
+		} else {
+			expect(buffers.length).toBe(7)
+			for (const buffer of buffers) {
+				expect(buffer).toBeInstanceOf(ArrayBuffer)
+			}
+		}
 	})
 })

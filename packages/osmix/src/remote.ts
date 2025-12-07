@@ -11,9 +11,10 @@
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
+import type { DefaultSpeeds, HighwayFilter, RouteOptions } from "@osmix/router"
 import type { Progress } from "@osmix/shared/progress"
 import { streamToBytes } from "@osmix/shared/stream-to-bytes"
-import type { OsmEntityType, Tile } from "@osmix/shared/types"
+import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
 import { type OsmFromPbfOptions, toPbfStream } from "./pbf"
 import {
@@ -402,6 +403,125 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	search(osmId: OsmId, key: string, val?: string) {
 		return this.nextWorker().search(this.getId(osmId), key, val)
 	}
+
+	// ---------------------------------------------------------------------------
+	// Routing
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Synchronize a routing graph from one worker to all others using SharedArrayBuffer.
+	 * No-op if SharedArrayBuffer is unsupported (single-worker mode).
+	 */
+	private async populateRoutingGraphToOtherWorkers(
+		worker: Comlink.Remote<OsmixWorker>,
+		osmId: OsmId,
+	) {
+		if (!SUPPORTS_SHARED_ARRAY_BUFFER) return
+		const transferables = await worker.getRoutingGraphTransferables(
+			this.getId(osmId),
+		)
+		await Promise.all(
+			this.workers.map((w) =>
+				w.transferRoutingGraphIn(this.getId(osmId), transferables),
+			),
+		)
+	}
+
+	/**
+	 * Build a routing graph for an Osm instance in a worker.
+	 * Graph is built in the first available worker, then synchronized across all workers.
+	 *
+	 * @param osmId - ID of the Osm instance to build a graph for.
+	 * @param filter - Optional filter function to determine which ways are routable.
+	 * @param defaultSpeeds - Optional speed limits by highway type.
+	 * @returns Graph statistics (node and edge counts).
+	 */
+	async buildRoutingGraph(
+		osmId: OsmId,
+		filter?: HighwayFilter,
+		defaultSpeeds?: DefaultSpeeds,
+	) {
+		const worker0 = this.nextWorker()
+		const stats = await worker0.buildRoutingGraph(
+			this.getId(osmId),
+			filter,
+			defaultSpeeds,
+		)
+		await this.populateRoutingGraphToOtherWorkers(worker0, osmId)
+		return stats
+	}
+
+	/**
+	 * Check if a routing graph exists for an Osm instance.
+	 */
+	hasRoutingGraph(osmId: OsmId) {
+		return this.nextWorker().hasRoutingGraph(this.getId(osmId))
+	}
+
+	/**
+	 * Find the nearest routable node to a geographic point.
+	 * Delegates to an available worker for off-thread computation.
+	 *
+	 * @param osmId - ID of the Osm instance.
+	 * @param point - [lon, lat] coordinates to search from.
+	 * @param maxKm - Maximum search radius in kilometers.
+	 * @returns Nearest routable node info, or null if none found.
+	 */
+	findNearestNode(osmId: OsmId, point: LonLat, maxKm: number) {
+		return this.nextWorker().findNearestNode(this.getId(osmId), point, maxKm)
+	}
+
+	/**
+	 * Calculate a route between two node indexes.
+	 * Delegates to an available worker for off-thread pathfinding.
+	 *
+	 * @param osmId - ID of the Osm instance.
+	 * @param fromIndex - Starting node index.
+	 * @param toIndex - Destination node index.
+	 * @param options - Optional routing options (algorithm, metric).
+	 * @returns Route result with coordinates and way info, or null if no route found.
+	 */
+	route(
+		osmId: OsmId,
+		fromIndex: number,
+		toIndex: number,
+		options?: Partial<RouteOptions>,
+	) {
+		return this.nextWorker().route(
+			this.getId(osmId),
+			fromIndex,
+			toIndex,
+			options,
+		)
+	}
+
+	/**
+	 * Calculate a route with detailed statistics.
+	 * Delegates to an available worker for off-thread pathfinding.
+	 *
+	 * @param osmId - ID of the Osm instance.
+	 * @param fromIndex - Starting node index.
+	 * @param toIndex - Destination node index.
+	 * @param options - Optional routing options (algorithm, metric).
+	 * @returns Route result with statistics, or null if no route found.
+	 */
+	routeWithStats(
+		osmId: OsmId,
+		fromIndex: number,
+		toIndex: number,
+		options?: Partial<RouteOptions>,
+	) {
+		return this.nextWorker().routeWithStats(
+			this.getId(osmId),
+			fromIndex,
+			toIndex,
+			options,
+		)
+	}
+
+	// ---------------------------------------------------------------------------
+	// Merge & Changesets
+	// ---------------------------------------------------------------------------
 
 	/**
 	 * Merge two `Osm` instances in a worker.

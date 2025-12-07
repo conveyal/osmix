@@ -3,6 +3,7 @@
  * @module
  */
 
+import type { BufferType } from "@osmix/core"
 import type { LonLat, OsmTags } from "@osmix/shared/types"
 
 /** Route result containing the path geometry and metadata. */
@@ -47,18 +48,29 @@ export interface GraphEdge {
 	time: number
 }
 
-/** Routing graph built from OSM ways and nodes. */
-export interface RoutingGraph {
-	/** Adjacency list: node index -> outgoing edges */
-	readonly edges: Map<number, GraphEdge[]>
-	/** Nodes where multiple ways meet (for turn detection) */
-	readonly intersections: Set<number>
-	/** Check if node is part of the routable network. */
-	isRouteable: (nodeIndex: number) => boolean
-	/** Check if node is an intersection (multiple ways meet). */
-	isIntersection: (nodeIndex: number) => boolean
-	/** Get outgoing edges from a node. */
-	getEdges: (nodeIndex: number) => GraphEdge[]
+/**
+ * Serializable representation of a RoutingGraph for worker transfer.
+ * Uses CSR (Compressed Sparse Row) format for efficient storage and zero-copy transfer.
+ */
+export interface RoutingGraphTransferables {
+	/** Total number of nodes in the graph. */
+	nodeCount: number
+	/** Total number of edges in the graph. */
+	edgeCount: number
+	/** CSR offsets: edges for node i are at indices [edgeOffsets[i], edgeOffsets[i+1]) */
+	edgeOffsets: BufferType
+	/** Target node index for each edge. */
+	edgeTargets: BufferType
+	/** Way index for each edge. */
+	edgeWayIndexes: BufferType
+	/** Distance in meters for each edge. */
+	edgeDistances: BufferType
+	/** Travel time in seconds for each edge. */
+	edgeTimes: BufferType
+	/** Bitset: 1 bit per node indicating if routable. */
+	routableBits: BufferType
+	/** Bitset: 1 bit per node indicating if intersection. */
+	intersectionBits: BufferType
 }
 
 /** Path segment returned by routing algorithms. */

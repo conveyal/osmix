@@ -1,7 +1,7 @@
-import type { Osm } from "@osmix/core"
-import type { PathSegment, RouteResult, RoutingGraph } from "@osmix/router"
+import type { RouteResult } from "@osmix/router"
 import type { LonLat } from "@osmix/shared/types"
 import { atom } from "jotai"
+import type { WaySegment } from "osmix"
 
 /** Snapped node info with distance from original click point. */
 export interface SnappedNode {
@@ -15,31 +15,8 @@ export interface SnappedNode {
 	distance: number
 }
 
-/** Per-way segment with distance and time (consecutive same-name ways merged). */
-export interface WaySegment {
-	/** OSM way IDs included in this segment (multiple if merged). */
-	wayIds: number[]
-	/** Way name from tags (may be empty). */
-	name: string
-	/** Highway type from tags. */
-	highway: string
-	/** Distance travelled on this segment in meters. */
-	distance: number
-	/** Time travelled on this segment in seconds. */
-	time: number
-}
-
-/** Result of calculating route statistics. */
-export interface RouteStats {
-	/** Total route distance in meters. */
-	totalDistance: number
-	/** Total route time in seconds. */
-	totalTime: number
-	/** Per-way breakdown (consecutive same-name ways merged). */
-	waySegments: WaySegment[]
-	/** Coordinates where way name changes (turn points). */
-	turnPoints: LonLat[]
-}
+// Re-export WaySegment for convenience
+export type { WaySegment }
 
 /** Complete routing state for a single route. */
 export interface RoutingState {
@@ -73,128 +50,10 @@ const initialState: RoutingState = {
 /** Main routing state atom. */
 export const routingStateAtom = atom<RoutingState>(initialState)
 
-/** Cached routing graph keyed by osm id. */
-export const routingGraphAtom = atom<{
-	osmId: string
-	graph: RoutingGraph
-} | null>(null)
-
 /** Reset routing state to initial values. */
 export const clearRoutingAtom = atom(null, (_get, set) => {
 	set(routingStateAtom, initialState)
 })
-
-/** Get display name for a way (name or highway type). */
-function getDisplayName(tags: Record<string, string | number> | undefined) {
-	const name = (tags?.["name"] as string) ?? ""
-	const highway = (tags?.["highway"] as string) ?? ""
-	return name || highway
-}
-
-/**
- * Calculate route statistics from path segments.
- * Merges consecutive ways with the same name into single segments.
- * Returns turn points where the way name changes.
- */
-export function calculateRouteStats(
-	path: PathSegment[],
-	graph: RoutingGraph,
-	osm: Osm,
-): RouteStats {
-	let totalDistance = 0
-	let totalTime = 0
-
-	// First pass: build ordered list of edge traversals with per-edge stats
-	// Store the START node of each edge (previousNodeIndex) so we can correctly
-	// identify where way transitions occur (the turn point is where the previous
-	// way ends and the new way begins)
-	interface EdgeTraversal {
-		wayIndex: number
-		transitionNodeIndex: number
-		distance: number
-		time: number
-	}
-	const edgeSequence: EdgeTraversal[] = []
-
-	for (const seg of path) {
-		if (seg.wayIndex !== undefined && seg.previousNodeIndex !== undefined) {
-			const edges = graph.getEdges(seg.previousNodeIndex)
-			const edge = edges.find(
-				(e) =>
-					e.targetNodeIndex === seg.nodeIndex && e.wayIndex === seg.wayIndex,
-			)
-			if (edge) {
-				totalDistance += edge.distance
-				totalTime += edge.time
-
-				// Track this edge with its transition node and stats
-				edgeSequence.push({
-					wayIndex: seg.wayIndex,
-					transitionNodeIndex: seg.previousNodeIndex,
-					distance: edge.distance,
-					time: edge.time,
-				})
-			}
-		}
-	}
-
-	// Second pass: build segments, merging consecutive same-name ways
-	// Track turn points where the display name changes
-	// Note: We process EVERY edge in order, allowing routes like A→B→A to work correctly
-	const waySegments: WaySegment[] = []
-	const turnPoints: LonLat[] = []
-	let currentSegment: WaySegment | null = null
-	let currentDisplayName: string | null = null
-
-	for (const {
-		wayIndex,
-		transitionNodeIndex,
-		distance,
-		time,
-	} of edgeSequence) {
-		const wayId = osm.ways.ids.at(wayIndex)
-		const tags = osm.ways.tags.getTags(wayIndex)
-		const name = (tags?.["name"] as string) ?? ""
-		const highway = (tags?.["highway"] as string) ?? ""
-		const displayName = getDisplayName(tags)
-
-		if (currentSegment && currentDisplayName === displayName) {
-			// Merge with current segment (same name) - add this edge's stats
-			// Only add wayId if not already in the list (same way, consecutive edges)
-			if (!currentSegment.wayIds.includes(wayId)) {
-				currentSegment.wayIds.push(wayId)
-			}
-			currentSegment.distance += distance
-			currentSegment.time += time
-		} else {
-			// Name changed - record turn point and start new segment
-			if (currentSegment) {
-				waySegments.push(currentSegment)
-				// Add turn point at the transition node (where previous way ends
-				// and new way begins - this is the correct location for the turn)
-				const coord = osm.nodes.getNodeLonLat({ index: transitionNodeIndex })
-				if (coord) {
-					turnPoints.push(coord)
-				}
-			}
-			currentSegment = {
-				wayIds: [wayId],
-				name,
-				highway,
-				distance,
-				time,
-			}
-			currentDisplayName = displayName
-		}
-	}
-
-	// Don't forget the last segment
-	if (currentSegment) {
-		waySegments.push(currentSegment)
-	}
-
-	return { totalDistance, totalTime, waySegments, turnPoints }
-}
 
 /** Derived atom that builds GeoJSON from routing state. */
 export const routingGeoJsonAtom = atom<GeoJSON.FeatureCollection>((get) => {

@@ -1,18 +1,16 @@
 import type { Osm } from "@osmix/core"
-import { buildGraph, findNearestNodeOnGraph, Router } from "@osmix/router"
 import type { LonLat } from "@osmix/shared/types"
 import { useAtom, useSetAtom } from "jotai"
 import { NavigationIcon, XIcon } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre"
 import { useMap } from "../hooks/map"
 import {
-	calculateRouteStats,
 	clearRoutingAtom,
-	routingGraphAtom,
 	routingStateAtom,
 	type SnappedNode,
 } from "../state/routing"
+import { osmWorker } from "../state/worker"
 import { Button } from "./ui/button"
 
 /** Maximum distance (km) to snap click point to nearest node. */
@@ -43,100 +41,105 @@ function formatTime(seconds: number): string {
 export default function RouteControl({ osm }: { osm: Osm }) {
 	const map = useMap()
 	const [routingState, setRoutingState] = useAtom(routingStateAtom)
-	const [graphCache, setGraphCache] = useAtom(routingGraphAtom)
 	const clearRouting = useSetAtom(clearRoutingAtom)
 	const clickPhaseRef = useRef<"from" | "to">("from")
 	const [noNodeNearby, setNoNodeNearby] = useState(false)
-
-	// Build or retrieve cached routing graph
-	const graph = useMemo(() => {
-		if (graphCache?.osmId === osm.id) return graphCache.graph
-		const newGraph = buildGraph(osm)
-		setGraphCache({ osmId: osm.id, graph: newGraph })
-		return newGraph
-	}, [osm, graphCache, setGraphCache])
+	const [isRouting, setIsRouting] = useState(false)
 
 	// Handle map click for setting from/to points
+	// Routing graph builds automatically on first search if needed
 	const handleMapClick = useCallback(
-		(event: MapLayerMouseEvent) => {
+		async (event: MapLayerMouseEvent) => {
+			if (isRouting) return
+
 			const point: LonLat = [event.lngLat.lng, event.lngLat.lat]
-			const snapped = findNearestNodeOnGraph(osm, graph, point, SNAP_RADIUS_KM)
 
-			if (!snapped) {
-				// No routable node nearby - show feedback
-				setNoNodeNearby(true)
-				setTimeout(() => setNoNodeNearby(false), 2000)
-				return
-			}
+			setIsRouting(true)
+			try {
+				const snapped = await osmWorker.findNearestNode(
+					osm.id,
+					point,
+					SNAP_RADIUS_KM,
+				)
 
-			setNoNodeNearby(false)
-
-			// Get the OSM node ID from the node index
-			const nodeId = osm.nodes.ids.at(snapped.nodeIndex)
-
-			const snappedNode: SnappedNode = {
-				nodeIndex: snapped.nodeIndex,
-				nodeId,
-				coordinates: snapped.coordinates,
-				distance: snapped.distance,
-			}
-
-			if (clickPhaseRef.current === "from") {
-				// Setting from point
-				setRoutingState({
-					fromPoint: point,
-					toPoint: null,
-					fromNode: snappedNode,
-					toNode: null,
-					result: null,
-					waySegments: [],
-					turnPoints: [],
-					totalDistance: 0,
-					totalTime: 0,
-				})
-				clickPhaseRef.current = "to"
-			} else {
-				// Setting to point and calculating route
-				const fromNode = routingState.fromNode
-				if (!fromNode) {
-					clickPhaseRef.current = "from"
+				if (!snapped) {
+					// No routable node nearby - show feedback
+					setNoNodeNearby(true)
+					setTimeout(() => setNoNodeNearby(false), 2000)
 					return
 				}
 
-				const router = new Router(osm, graph)
-				const path = router.route(fromNode.nodeIndex, snappedNode.nodeIndex)
+				setNoNodeNearby(false)
 
-				if (path) {
-					const result = router.buildResult(path)
-					const { totalDistance, totalTime, waySegments, turnPoints } =
-						calculateRouteStats(path, graph, osm)
-					setRoutingState((prev) => ({
-						...prev,
-						toPoint: point,
-						toNode: snappedNode,
-						result,
-						waySegments,
-						turnPoints,
-						totalDistance,
-						totalTime,
-					}))
-				} else {
-					// No route found
-					setRoutingState((prev) => ({
-						...prev,
-						toPoint: point,
-						toNode: snappedNode,
+				// Get the OSM node ID from the node index
+				const nodeId = osm.nodes.ids.at(snapped.nodeIndex)
+
+				const snappedNode: SnappedNode = {
+					nodeIndex: snapped.nodeIndex,
+					nodeId,
+					coordinates: snapped.coordinates,
+					distance: snapped.distance,
+				}
+
+				if (clickPhaseRef.current === "from") {
+					// Setting from point
+					setRoutingState({
+						fromPoint: point,
+						toPoint: null,
+						fromNode: snappedNode,
+						toNode: null,
 						result: null,
 						waySegments: [],
 						turnPoints: [],
 						totalDistance: 0,
 						totalTime: 0,
-					}))
+					})
+					clickPhaseRef.current = "to"
+				} else {
+					// Setting to point and calculating route
+					const fromNode = routingState.fromNode
+					if (!fromNode) {
+						clickPhaseRef.current = "from"
+						return
+					}
+
+					const routeResult = await osmWorker.routeWithStats(
+						osm.id,
+						fromNode.nodeIndex,
+						snappedNode.nodeIndex,
+					)
+
+					if (routeResult) {
+						setRoutingState((prev) => ({
+							...prev,
+							toPoint: point,
+							toNode: snappedNode,
+							result: routeResult.result,
+							waySegments: routeResult.waySegments,
+							turnPoints: routeResult.turnPoints,
+							totalDistance: routeResult.totalDistance,
+							totalTime: routeResult.totalTime,
+						}))
+					} else {
+						// No route found
+						setRoutingState((prev) => ({
+							...prev,
+							toPoint: point,
+							toNode: snappedNode,
+							result: null,
+							waySegments: [],
+							turnPoints: [],
+							totalDistance: 0,
+							totalTime: 0,
+						}))
+					}
+					clickPhaseRef.current = "from"
 				}
-				clickPhaseRef.current = "from"
+			} finally {
+				setIsRouting(false)
 			}
 		},
-		[osm, graph, routingState.fromNode, setRoutingState],
+		[osm.id, osm.nodes.ids, isRouting, routingState.fromNode, setRoutingState],
 	)
 
 	// Attach/detach click handler to map
@@ -189,15 +192,23 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 				)}
 
 				{/* Instructions */}
-				{!hasFrom && !noNodeNearby && (
+				{!hasFrom && !noNodeNearby && !isRouting && (
 					<div className="text-muted-foreground">
 						Click on the map to set a starting point
+						<div className="text-xs">
+							(routing graph builds on first search)
+						</div>
 					</div>
 				)}
-				{hasFrom && !hasTo && !noNodeNearby && (
+				{hasFrom && !hasTo && !noNodeNearby && !isRouting && (
 					<div className="text-muted-foreground">
 						Click on the map to set a destination
 					</div>
+				)}
+
+				{/* Routing in progress */}
+				{isRouting && (
+					<div className="text-muted-foreground">Calculating route...</div>
 				)}
 
 				{/* From point info */}
@@ -223,7 +234,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 				)}
 
 				{/* Route result */}
-				{hasTo && !hasRoute && (
+				{hasTo && !hasRoute && !isRouting && (
 					<div className="text-destructive font-semibold">
 						No route found between these points
 					</div>
