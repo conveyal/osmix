@@ -1,14 +1,14 @@
 # @osmix/core
 
-In-memory OSM entity storage with spatial indexing. This package provides the core data structures for efficiently storing and querying OpenStreetMap nodes, ways, and relations.
+In-memory OSM entity storage with spatial indexing. Provides core data structures for efficiently storing and querying OpenStreetMap nodes, ways, and relations.
 
 ## Highlights
 
-- **Memory-efficient storage**: Uses typed arrays and microdegree coordinates (`Int32Array`) to minimize memory footprint while maintaining precision.
-- **Spatial indexing**: KDBush for point queries (nodes) and Flatbush for bounding-box queries (ways, relations). Supports both bbox and radius-based geographic queries via geokdbush/geoflatbush.
-- **Transferable buffers**: All data structures can be serialized to `ArrayBuffer`/`SharedArrayBuffer` for zero-copy transfer between workers via `transferables()` methods.
-- **Tag indexing**: Reverse-index lookup enables fast searches for entities by tag key.
-- **Streaming iteration**: Iterate over all entities or sorted by ID without materializing full arrays.
+- **Memory-efficient**: Typed arrays and microdegree coordinates (`Int32Array`) minimize memory while maintaining precision.
+- **Spatial indexing**: KDBush (points) and Flatbush (bboxes) for fast geographic queries. Supports bbox and radius searches via geokdbush/geoflatbush.
+- **Worker-ready**: Serialize to `ArrayBuffer`/`SharedArrayBuffer` for zero-copy transfer via `transferables()`.
+- **Tag search**: Reverse-index lookup for fast entity searches by tag key.
+- **Streaming**: Iterate entities or sorted-by-ID without materializing full arrays.
 
 ## Installation
 
@@ -20,16 +20,16 @@ bun add @osmix/core
 
 ### Loading PBF files
 
-`@osmix/core` focuses on the in-memory data structure. To parse `.osm.pbf` files, use the higher-level `osmix` package:
+`@osmix/core` provides the in-memory data structures. To parse `.osm.pbf` files, use the high-level `osmix` package:
 
 ```ts
-import { createOsmFromPbf } from "osmix"
+import { fromPbf } from "osmix"
 
-const osm = await createOsmFromPbf(Bun.file("./monaco.pbf").stream())
+const osm = await fromPbf(Bun.file("./monaco.pbf").stream())
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
 ```
 
-### Building fixtures directly
+### Building data directly
 
 For synthetic data or tests, instantiate `Osm` directly and call `buildIndexes()` / `buildSpatialIndexes()` before querying:
 
@@ -108,34 +108,64 @@ const osm = new Osm(transferables)
 // Index is already built, ready for queries
 ```
 
-## API Reference
+## API
 
-WIP
+### Classes
+
+| Class | Description |
+|-------|-------------|
+| `Osm` | Main container with nodes, ways, relations, and shared string table |
+| `Nodes` | Node storage with KDBush spatial index |
+| `Ways` | Way storage with Flatbush spatial index |
+| `Relations` | Relation storage with Flatbush spatial index |
+| `StringTable` | Deduplicated UTF-8 string storage for tags |
+| `Tags` | Bidirectional tag storage (entity→tags, key→entities) |
+
+### Osm Methods
+
+| Method | Description |
+|--------|-------------|
+| `buildIndexes()` | Finalize ID, tag, and entity indexes after adding data |
+| `buildSpatialIndexes()` | Build spatial indexes for all entity types |
+| `bbox()` | Get bounding box of all entities |
+| `info()` | Get summary info (id, bbox, header, stats) |
+| `transferables()` | Get serializable buffers for worker transfer |
+| `isReady()` | Check if all indexes are built |
+
+### Entity Collection Methods
+
+| Method | Description |
+|--------|-------------|
+| `getById(id)` | Get entity by OSM ID |
+| `get({ id } \| { index })` | Get by ID or internal index |
+| `getByIndex(index)` | Get by internal array index |
+| `search(key, value?)` | Find entities with tag key (and optional value) |
+| `withinBbox(bbox)` | Get entities within bounding box |
+| `findIndexesWithinRadius(lon, lat, km)` | Find nearby entities (nodes) |
+| `intersects(bbox)` | Find intersecting entities (ways/relations) |
+| `neighbors(lon, lat, max, maxKm)` | Find nearest entities (ways/relations) |
+| `sorted()` | Iterator over entities sorted by ID |
 
 ## Environment and Limitations
 
-- Requires runtimes with Web Streams, `TextEncoder`/`TextDecoder`, and zlib-compatible `CompressionStream`/`DecompressionStream` (Bun, Node 20+, modern browsers).
+- Requires Web Streams, `TextEncoder`/`TextDecoder`, `CompressionStream`/`DecompressionStream` (Bun, Node 20+, modern browsers).
 - Uses ES2024 resizable `ArrayBuffer` and growable `SharedArrayBuffer` when available.
-- Coordinates stored as `Int32Array` microdegrees (1e-7 degree precision, ~1cm at the equator) for memory efficiency; conversion to degrees happens at API boundaries.
+- Coordinates stored as `Int32Array` microdegrees (1e-7 degree precision, ~1cm at equator); converted to degrees at API boundaries.
 
 ## Related Packages
 
 - [`osmix`](../osmix/README.md) — High-level API for loading PBF files and worker orchestration.
 - [`@osmix/pbf`](../pbf/README.md) — Low-level PBF parsing and serialization.
+- [`@osmix/json`](../json/README.md) — JSON entity conversion.
 - [`@osmix/geojson`](../geojson/README.md) — Convert entities to GeoJSON features.
-- [`@osmix/change`](../change/README.md) — Changeset generation, deduplication, and merge workflows.
+- [`@osmix/change`](../change/README.md) — Changeset generation, deduplication, and merge.
 
 ## Development
 
 ```sh
-# Run tests
-bun run test
-
-# Type check
-bun run typecheck
-
-# Lint
-bun run lint
+bun run test packages/core
+bun run typecheck packages/core
+bun run lint packages/core
 ```
 
-Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type coverage.
+Run `bun run check` at the repo root before publishing.
