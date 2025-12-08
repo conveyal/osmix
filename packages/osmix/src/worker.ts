@@ -38,37 +38,13 @@ import {
 	Router,
 	RoutingGraph,
 	type RoutingGraphTransferables,
+	type WaySegment,
 } from "@osmix/router"
 import type { Progress, ProgressEvent } from "@osmix/shared/progress"
 import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types"
 
-/** Per-way segment with distance and time (consecutive same-name ways merged). */
-export interface WaySegment {
-	/** OSM way IDs included in this segment (multiple if merged). */
-	wayIds: number[]
-	/** Way name from tags (may be empty). */
-	name: string
-	/** Highway type from tags. */
-	highway: string
-	/** Distance travelled on this segment in meters. */
-	distance: number
-	/** Time travelled on this segment in seconds. */
-	time: number
-}
-
-/** Result of routing with detailed statistics. */
-export interface RouteWithStatsResult {
-	/** Route result with coordinates and way info. */
-	result: RouteResult
-	/** Total route distance in meters. */
-	totalDistance: number
-	/** Total route time in seconds. */
-	totalTime: number
-	/** Per-way breakdown (consecutive same-name ways merged). */
-	waySegments: WaySegment[]
-	/** Coordinates where way name changes (turn points). */
-	turnPoints: LonLat[]
-}
+// Re-export types from router for backwards compatibility
+export type { RouteResult, WaySegment }
 
 import { OsmixVtEncoder } from "@osmix/vt"
 import * as Comlink from "comlink"
@@ -346,131 +322,13 @@ export class OsmixWorker extends EventTarget {
 		fromIndex: number,
 		toIndex: number,
 		options?: Partial<RouteOptions>,
-	) {
+	): RouteResult | null {
 		const osm = this.get(osmId)
 		const graph = this.getGraph(osmId)
 		const router = new Router(osm, graph, options)
 		const path = router.route(fromIndex, toIndex, options)
 		if (!path) return null
-		return router.buildResult(path)
-	}
-
-	/**
-	 * Calculate a route with detailed statistics.
-	 * Returns both the route result and per-way breakdown with distances and times.
-	 *
-	 * @param osmId - ID of the Osm instance.
-	 * @param fromIndex - Starting node index.
-	 * @param toIndex - Destination node index.
-	 * @param options - Optional routing options (algorithm, metric).
-	 * @returns Route result with statistics, or null if no route found.
-	 */
-	routeWithStats(
-		osmId: string,
-		fromIndex: number,
-		toIndex: number,
-		options?: Partial<RouteOptions>,
-	): RouteWithStatsResult | null {
-		const osm = this.get(osmId)
-		const graph = this.getGraph(osmId)
-		const router = new Router(osm, graph, options)
-		const path = router.route(fromIndex, toIndex, options)
-		if (!path) return null
-
-		const result = router.buildResult(path)
-
-		// Calculate statistics from path segments
-		let totalDistance = 0
-		let totalTime = 0
-
-		interface EdgeTraversal {
-			wayIndex: number
-			transitionNodeIndex: number
-			distance: number
-			time: number
-		}
-		const edgeSequence: EdgeTraversal[] = []
-
-		for (const seg of path) {
-			if (seg.wayIndex !== undefined && seg.previousNodeIndex !== undefined) {
-				const edges = graph.getEdges(seg.previousNodeIndex)
-				const edge = edges.find(
-					(e) =>
-						e.targetNodeIndex === seg.nodeIndex && e.wayIndex === seg.wayIndex,
-				)
-				if (edge) {
-					totalDistance += edge.distance
-					totalTime += edge.time
-					edgeSequence.push({
-						wayIndex: seg.wayIndex,
-						transitionNodeIndex: seg.previousNodeIndex,
-						distance: edge.distance,
-						time: edge.time,
-					})
-				}
-			}
-		}
-
-		// Build segments, merging consecutive same-name ways
-		const waySegments: WaySegment[] = []
-		const turnPoints: LonLat[] = []
-		let currentSegment: WaySegment | null = null
-		let currentDisplayName: string | null = null
-
-		const getDisplayName = (tags?: Record<string, string | number>) => {
-			const name = (tags?.["name"] as string) ?? ""
-			const highway = (tags?.["highway"] as string) ?? ""
-			return name || highway
-		}
-
-		for (const {
-			wayIndex,
-			transitionNodeIndex,
-			distance,
-			time,
-		} of edgeSequence) {
-			const wayId = osm.ways.ids.at(wayIndex)
-			const tags = osm.ways.tags.getTags(wayIndex)
-			const name = (tags?.["name"] as string) ?? ""
-			const highway = (tags?.["highway"] as string) ?? ""
-			const displayName = getDisplayName(tags)
-
-			if (currentSegment && currentDisplayName === displayName) {
-				if (!currentSegment.wayIds.includes(wayId)) {
-					currentSegment.wayIds.push(wayId)
-				}
-				currentSegment.distance += distance
-				currentSegment.time += time
-			} else {
-				if (currentSegment) {
-					waySegments.push(currentSegment)
-					const coord = osm.nodes.getNodeLonLat({ index: transitionNodeIndex })
-					if (coord) {
-						turnPoints.push(coord)
-					}
-				}
-				currentSegment = {
-					wayIds: [wayId],
-					name,
-					highway,
-					distance,
-					time,
-				}
-				currentDisplayName = displayName
-			}
-		}
-
-		if (currentSegment) {
-			waySegments.push(currentSegment)
-		}
-
-		return {
-			result,
-			totalDistance,
-			totalTime,
-			waySegments,
-			turnPoints,
-		}
+		return router.buildResult(path, options)
 	}
 
 	// ---------------------------------------------------------------------------

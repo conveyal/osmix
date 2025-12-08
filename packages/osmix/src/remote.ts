@@ -11,7 +11,12 @@
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
-import type { DefaultSpeeds, HighwayFilter, RouteOptions } from "@osmix/router"
+import type {
+	DefaultSpeeds,
+	HighwayFilter,
+	RouteOptions,
+	RouteResult,
+} from "@osmix/router"
 import type { Progress } from "@osmix/shared/progress"
 import { streamToBytes } from "@osmix/shared/stream-to-bytes"
 import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types"
@@ -490,32 +495,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		fromIndex: number,
 		toIndex: number,
 		options?: Partial<RouteOptions>,
-	) {
+	): Promise<RouteResult | null> {
 		return this.nextWorker().route(
-			this.getId(osmId),
-			fromIndex,
-			toIndex,
-			options,
-		)
-	}
-
-	/**
-	 * Calculate a route with detailed statistics.
-	 * Delegates to an available worker for off-thread pathfinding.
-	 *
-	 * @param osmId - ID of the Osm instance.
-	 * @param fromIndex - Starting node index.
-	 * @param toIndex - Destination node index.
-	 * @param options - Optional routing options (algorithm, metric).
-	 * @returns Route result with statistics, or null if no route found.
-	 */
-	routeWithStats(
-		osmId: OsmId,
-		fromIndex: number,
-		toIndex: number,
-		options?: Partial<RouteOptions>,
-	) {
-		return this.nextWorker().routeWithStats(
 			this.getId(osmId),
 			fromIndex,
 			toIndex,

@@ -377,6 +377,216 @@ describe("Router with Monaco PBF", () => {
 		const farPoint = graph.findNearestRoutableNode(monacoOsm, [10.0, 50.0], 100)
 		expect(farPoint).toBeNull()
 	})
+
+	it("should calculate route statistics with getRouteStatistics()", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph)
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		const stats = router.getRouteStatistics(path!)
+
+		// Should have positive distance and time
+		expect(stats.distance).toBeGreaterThan(0)
+		expect(stats.time).toBeGreaterThan(0)
+
+		// Distance should be reasonable for Monaco (< 10km)
+		expect(stats.distance).toBeLessThan(10_000)
+	})
+
+	it("should build path info with getRoutePathInfo()", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph)
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		const pathInfo = router.getRoutePathInfo(path!)
+
+		// Should have at least one segment
+		expect(pathInfo.segments.length).toBeGreaterThan(0)
+
+		// Each segment should have required fields
+		for (const segment of pathInfo.segments) {
+			expect(Array.isArray(segment.wayIds)).toBe(true)
+			expect(segment.wayIds.length).toBeGreaterThan(0)
+			expect(typeof segment.name).toBe("string")
+			expect(typeof segment.highway).toBe("string")
+			expect(segment.distance).toBeGreaterThan(0)
+			expect(segment.time).toBeGreaterThan(0)
+		}
+
+		// Turn points should be coordinates
+		for (const turnPoint of pathInfo.turnPoints) {
+			expect(Array.isArray(turnPoint)).toBe(true)
+			expect(turnPoint.length).toBe(2)
+			expect(typeof turnPoint[0]).toBe("number")
+			expect(typeof turnPoint[1]).toBe("number")
+		}
+	})
+
+	it("should include stats in buildResult() when includeStats is true", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph)
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		// Without options - no stats
+		const resultWithoutStats = router.buildResult(path!)
+		expect(resultWithoutStats.distance).toBeUndefined()
+		expect(resultWithoutStats.time).toBeUndefined()
+
+		// With includeStats: true
+		const resultWithStats = router.buildResult(path!, { includeStats: true })
+		expect(resultWithStats.distance).toBeGreaterThan(0)
+		expect(resultWithStats.time).toBeGreaterThan(0)
+	})
+
+	it("should include path info in buildResult() when includePathInfo is true", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph)
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		// Without options - no path info
+		const resultWithoutPathInfo = router.buildResult(path!)
+		expect(resultWithoutPathInfo.segments).toBeUndefined()
+		expect(resultWithoutPathInfo.turnPoints).toBeUndefined()
+
+		// With includePathInfo: true
+		const resultWithPathInfo = router.buildResult(path!, {
+			includePathInfo: true,
+		})
+		expect(resultWithPathInfo.segments).toBeDefined()
+		expect(resultWithPathInfo.segments!.length).toBeGreaterThan(0)
+		expect(resultWithPathInfo.turnPoints).toBeDefined()
+	})
+
+	it("should include both stats and path info when both options are true", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph)
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		const result = router.buildResult(path!, {
+			includeStats: true,
+			includePathInfo: true,
+		})
+
+		// Should have coordinates (always present)
+		expect(result.coordinates.length).toBeGreaterThan(0)
+
+		// Should have stats
+		expect(result.distance).toBeGreaterThan(0)
+		expect(result.time).toBeGreaterThan(0)
+
+		// Should have path info
+		expect(result.segments).toBeDefined()
+		expect(result.segments!.length).toBeGreaterThan(0)
+		expect(result.turnPoints).toBeDefined()
+
+		// Verify segment totals roughly match stats
+		const segmentDistanceSum = result.segments!.reduce(
+			(sum, seg) => sum + seg.distance,
+			0,
+		)
+		const segmentTimeSum = result.segments!.reduce(
+			(sum, seg) => sum + seg.time,
+			0,
+		)
+
+		expect(segmentDistanceSum).toBeCloseTo(result.distance!, 1)
+		expect(segmentTimeSum).toBeCloseTo(result.time!, 1)
+	})
+
+	it("should use default options from constructor", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph, {
+			includeStats: true,
+			includePathInfo: true,
+		})
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		// buildResult without options should use constructor defaults
+		const result = router.buildResult(path!)
+
+		expect(result.distance).toBeGreaterThan(0)
+		expect(result.time).toBeGreaterThan(0)
+		expect(result.segments).toBeDefined()
+		expect(result.turnPoints).toBeDefined()
+	})
 })
 
 describe("RoutingGraph Serialization", () => {

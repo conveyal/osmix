@@ -1,7 +1,6 @@
-import type { RouteResult } from "@osmix/router"
+import type { RouteResult, WaySegment } from "@osmix/router"
 import type { LonLat } from "@osmix/shared/types"
 import { atom } from "jotai"
-import type { WaySegment } from "osmix"
 
 /** Snapped node info with distance from original click point. */
 export interface SnappedNode {
@@ -24,15 +23,8 @@ export interface RoutingState {
 	toPoint: LonLat | null
 	fromNode: SnappedNode | null
 	toNode: SnappedNode | null
+	/** Route result with coordinates and optional stats/path info. */
 	result: RouteResult | null
-	/** Per-way breakdown of route. */
-	waySegments: WaySegment[]
-	/** Coordinates where way name changes (turn points). */
-	turnPoints: LonLat[]
-	/** Total route distance in meters. */
-	totalDistance: number
-	/** Total route time in seconds. */
-	totalTime: number
 }
 
 const initialState: RoutingState = {
@@ -41,10 +33,6 @@ const initialState: RoutingState = {
 	fromNode: null,
 	toNode: null,
 	result: null,
-	waySegments: [],
-	turnPoints: [],
-	totalDistance: 0,
-	totalTime: 0,
 }
 
 /** Main routing state atom. */
@@ -98,15 +86,17 @@ export const routingGeoJsonAtom = atom<GeoJSON.FeatureCollection>((get) => {
 	}
 
 	// Turn points (where way name changes)
-	for (const coord of routingState.turnPoints) {
-		features.push({
-			type: "Feature",
-			properties: { layer: "turn-point" },
-			geometry: {
-				type: "Point",
-				coordinates: coord,
-			},
-		})
+	if (routingState.result?.turnPoints) {
+		for (const coord of routingState.result.turnPoints) {
+			features.push({
+				type: "Feature",
+				properties: { layer: "turn-point" },
+				geometry: {
+					type: "Point",
+					coordinates: coord,
+				},
+			})
+		}
 	}
 
 	// Click points

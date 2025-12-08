@@ -89,10 +89,6 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 						fromNode: snappedNode,
 						toNode: null,
 						result: null,
-						waySegments: [],
-						turnPoints: [],
-						totalDistance: 0,
-						totalTime: 0,
 					})
 					clickPhaseRef.current = "to"
 				} else {
@@ -103,36 +99,19 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 						return
 					}
 
-					const routeResult = await osmWorker.routeWithStats(
+					const result = await osmWorker.route(
 						osm.id,
 						fromNode.nodeIndex,
 						snappedNode.nodeIndex,
+						{ includeStats: true, includePathInfo: true },
 					)
 
-					if (routeResult) {
-						setRoutingState((prev) => ({
-							...prev,
-							toPoint: point,
-							toNode: snappedNode,
-							result: routeResult.result,
-							waySegments: routeResult.waySegments,
-							turnPoints: routeResult.turnPoints,
-							totalDistance: routeResult.totalDistance,
-							totalTime: routeResult.totalTime,
-						}))
-					} else {
-						// No route found
-						setRoutingState((prev) => ({
-							...prev,
-							toPoint: point,
-							toNode: snappedNode,
-							result: null,
-							waySegments: [],
-							turnPoints: [],
-							totalDistance: 0,
-							totalTime: 0,
-						}))
-					}
+					setRoutingState((prev) => ({
+						...prev,
+						toPoint: point,
+						toNode: snappedNode,
+						result,
+					}))
 					clickPhaseRef.current = "from"
 				}
 			} finally {
@@ -240,46 +219,48 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 					</div>
 				)}
 
-				{hasRoute && (
+				{hasRoute && routingState.result && (
 					<div className="space-y-2">
 						<div className="font-semibold text-blue-500">Route</div>
 						<div className="grid grid-cols-2 gap-2">
 							<div>
 								<div className="text-muted-foreground">Distance</div>
-								<div>{formatDistance(routingState.totalDistance)}</div>
+								<div>{formatDistance(routingState.result.distance ?? 0)}</div>
 							</div>
 							<div>
 								<div className="text-muted-foreground">Est. Time</div>
-								<div>{formatTime(routingState.totalTime)}</div>
+								<div>{formatTime(routingState.result.time ?? 0)}</div>
 							</div>
 						</div>
 
 						{/* Per-way breakdown */}
-						{routingState.waySegments.length > 0 && (
-							<div>
-								<div className="text-muted-foreground mb-1">
-									Directions ({routingState.waySegments.length} segments)
-								</div>
-								<div className="space-y-1 max-h-48 overflow-y-auto">
-									{routingState.waySegments.map((seg, i) => (
-										<div
-											key={`${seg.wayIds[0]}-${i}`}
-											className="border-l-2 border-blue-400 pl-2"
-										>
+						{routingState.result.segments &&
+							routingState.result.segments.length > 0 && (
+								<div>
+									<div className="text-muted-foreground mb-1">
+										Directions ({routingState.result.segments.length} segments)
+									</div>
+									<div className="space-y-1 max-h-48 overflow-y-auto">
+										{routingState.result.segments.map((seg, i) => (
 											<div
-												className="font-medium"
-												title={`Way IDs: ${seg.wayIds.join(", ")}`}
+												key={`${seg.wayIds[0]}-${i}`}
+												className="border-l-2 border-blue-400 pl-2"
 											>
-												{seg.name || `(${seg.highway})`}
+												<div
+													className="font-medium"
+													title={`Way IDs: ${seg.wayIds.join(", ")}`}
+												>
+													{seg.name || `(${seg.highway})`}
+												</div>
+												<div className="text-muted-foreground">
+													{formatDistance(seg.distance)} ·{" "}
+													{formatTime(seg.time)}
+												</div>
 											</div>
-											<div className="text-muted-foreground">
-												{formatDistance(seg.distance)} · {formatTime(seg.time)}
-											</div>
-										</div>
-									))}
+										))}
+									</div>
 								</div>
-							</div>
-						)}
+							)}
 					</div>
 				)}
 			</div>

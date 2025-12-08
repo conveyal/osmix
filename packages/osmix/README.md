@@ -65,18 +65,17 @@ const from = await remote.findNearestRoutableNode(osmInfo.id, [7.42, 43.73], 0.5
 const to = await remote.findNearestRoutableNode(osmInfo.id, [7.43, 43.74], 0.5)
 
 if (from && to) {
-	// Calculate route with statistics
-	const result = await remote.routeWithStats(
-		osmInfo.id,
-		from.nodeIndex,
-		to.nodeIndex,
-	)
+	// Calculate route with statistics and path info
+	const result = await remote.route(osmInfo.id, from.nodeIndex, to.nodeIndex, {
+		includeStats: true,
+		includePathInfo: true,
+	})
 
 	if (result) {
-		console.log(result.result.coordinates) // Route geometry
-		console.log(result.totalDistance) // Distance in meters
-		console.log(result.totalTime) // Time in seconds
-		console.log(result.waySegments) // Per-way breakdown
+		console.log(result.coordinates) // Route geometry
+		console.log(result.distance) // Distance in meters
+		console.log(result.time) // Time in seconds
+		console.log(result.segments) // Per-way breakdown
 	}
 }
 ```
@@ -140,7 +139,8 @@ spec-compliant without staging everything in memory.
 - `remote.hasRoutingGraph(osmId)` - Check if routing graph exists.
 - `remote.findNearestRoutableNode(osmId, point, maxKm)` - Snap coordinate to nearest routable node.
 - `remote.route(osmId, fromIndex, toIndex, options?)` - Calculate route between nodes.
-- `remote.routeWithStats(osmId, fromIndex, toIndex, options?)` - Calculate route with detailed statistics (distance, time, per-way breakdown).
+  - `options.includeStats` - Include `distance` and `time` in result.
+  - `options.includePathInfo` - Include `segments` and `turnPoints` in result.
 
 ### Utilities
 
