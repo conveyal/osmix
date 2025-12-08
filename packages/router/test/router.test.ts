@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test"
 import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/test/fixtures"
 import { fromPbf } from "osmix"
-import { buildGraph, findNearestNodeOnGraph } from "../src"
+import { buildGraph, getTransferableBuffers, RoutingGraph } from "../src"
 import { Router } from "../src/router"
 
 /**
@@ -88,8 +88,8 @@ describe("Router", () => {
 		const router = new Router(osm, graph)
 
 		// Snap coordinates to nodes
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [0, 0.01], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [0, 0.01], 500)
 
 		expect(from).not.toBeNull()
 		expect(to).not.toBeNull()
@@ -106,8 +106,8 @@ describe("Router", () => {
 		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [0.01, 0.01], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [0.01, 0.01], 500)
 
 		const path = router.route(from!.nodeIndex, to!.nodeIndex)
 
@@ -138,8 +138,8 @@ describe("Router", () => {
 		const graph = buildGraph(osm)
 
 		// Can't snap because no routable ways
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [10, 10], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [10, 10], 500)
 
 		expect(from).toBeNull()
 		expect(to).toBeNull()
@@ -151,8 +151,8 @@ describe("Router", () => {
 		const graph = buildGraph(osm, (tags) => tags?.["highway"] === "primary")
 		const router = new Router(osm, graph)
 
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [0.01, 0.01], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [0.01, 0.01], 500)
 
 		const path = router.route(from!.nodeIndex, to!.nodeIndex)
 
@@ -169,7 +169,7 @@ describe("Router", () => {
 		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
 
 		const path = router.route(from!.nodeIndex, from!.nodeIndex)
 
@@ -183,8 +183,8 @@ describe("Router", () => {
 		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [0.01, 0.01], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [0.01, 0.01], 500)
 
 		const path1 = router.route(from!.nodeIndex, to!.nodeIndex, {
 			algorithm: "dijkstra",
@@ -211,8 +211,8 @@ describe("Router", () => {
 		const graph = buildGraph(osm)
 		const router = new Router(osm, graph)
 
-		const from = findNearestNodeOnGraph(osm, graph, [0, 0], 500)
-		const to = findNearestNodeOnGraph(osm, graph, [0.01, 0.01], 500)
+		const from = graph.findNearestRoutableNode(osm, [0, 0], 500)
+		const to = graph.findNearestRoutableNode(osm, [0.01, 0.01], 500)
 
 		const path1 = router.route(from!.nodeIndex, to!.nodeIndex, {
 			metric: "distance",
@@ -240,7 +240,8 @@ describe("Router with Monaco PBF", () => {
 		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 		expect(router).toBeDefined()
-		expect(graph.edges.size).toBe(7_073)
+		// 11,414 total edges in the graph (bidirectional edges counted separately)
+		expect(graph.edges).toBe(11_414)
 	})
 
 	it("should find routes between points in Monaco", () => {
@@ -248,15 +249,13 @@ describe("Router with Monaco PBF", () => {
 		const router = new Router(monacoOsm, graph)
 
 		// Use coordinates known to have routeable nodes nearby
-		const from = findNearestNodeOnGraph(
+		const from = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4229093, 43.7371175],
 			500,
 		)
-		const to = findNearestNodeOnGraph(
+		const to = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4259193, 43.7377731],
 			500,
 		)
@@ -287,15 +286,13 @@ describe("Router with Monaco PBF", () => {
 		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 
-		const from = findNearestNodeOnGraph(
+		const from = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4229093, 43.7371175],
 			500,
 		)
-		const to = findNearestNodeOnGraph(
+		const to = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4259193, 43.7377731],
 			500,
 		)
@@ -317,15 +314,13 @@ describe("Router with Monaco PBF", () => {
 		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 
-		const from = findNearestNodeOnGraph(
+		const from = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4229093, 43.7371175],
 			500,
 		)
-		const to = findNearestNodeOnGraph(
+		const to = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4259193, 43.7377731],
 			500,
 		)
@@ -356,15 +351,13 @@ describe("Router with Monaco PBF", () => {
 		const graph = buildGraph(monacoOsm)
 		const router = new Router(monacoOsm, graph)
 
-		const from = findNearestNodeOnGraph(
+		const from = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4229093, 43.7371175],
 			500,
 		)
-		const to = findNearestNodeOnGraph(
+		const to = graph.findNearestRoutableNode(
 			monacoOsm,
-			graph,
 			[7.4259193, 43.7377731],
 			500,
 		)
@@ -381,7 +374,365 @@ describe("Router with Monaco PBF", () => {
 		const graph = buildGraph(monacoOsm)
 
 		// Point far outside Monaco
-		const farPoint = findNearestNodeOnGraph(monacoOsm, graph, [10.0, 50.0], 100)
+		const farPoint = graph.findNearestRoutableNode(monacoOsm, [10.0, 50.0], 100)
 		expect(farPoint).toBeNull()
+	})
+
+	it("should calculate route statistics with getRouteStatistics()", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph)
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		const stats = router.getRouteStatistics(path!)
+
+		// Should have positive distance and time
+		expect(stats.distance).toBeGreaterThan(0)
+		expect(stats.time).toBeGreaterThan(0)
+
+		// Distance should be reasonable for Monaco (< 10km)
+		expect(stats.distance).toBeLessThan(10_000)
+	})
+
+	it("should build path info with getRoutePathInfo()", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph)
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		const pathInfo = router.getRoutePathInfo(path!)
+
+		// Should have at least one segment
+		expect(pathInfo.segments.length).toBeGreaterThan(0)
+
+		// Each segment should have required fields
+		for (const segment of pathInfo.segments) {
+			expect(Array.isArray(segment.wayIds)).toBe(true)
+			expect(segment.wayIds.length).toBeGreaterThan(0)
+			expect(typeof segment.name).toBe("string")
+			expect(typeof segment.highway).toBe("string")
+			expect(segment.distance).toBeGreaterThan(0)
+			expect(segment.time).toBeGreaterThan(0)
+		}
+
+		// Turn points should be coordinates
+		for (const turnPoint of pathInfo.turnPoints) {
+			expect(Array.isArray(turnPoint)).toBe(true)
+			expect(turnPoint.length).toBe(2)
+			expect(typeof turnPoint[0]).toBe("number")
+			expect(typeof turnPoint[1]).toBe("number")
+		}
+	})
+
+	it("should include stats in buildResult() when includeStats is true", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph)
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		// Without options - no stats
+		const resultWithoutStats = router.buildResult(path!)
+		expect(resultWithoutStats.distance).toBeUndefined()
+		expect(resultWithoutStats.time).toBeUndefined()
+
+		// With includeStats: true
+		const resultWithStats = router.buildResult(path!, { includeStats: true })
+		expect(resultWithStats.distance).toBeGreaterThan(0)
+		expect(resultWithStats.time).toBeGreaterThan(0)
+	})
+
+	it("should include path info in buildResult() when includePathInfo is true", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph)
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		// Without options - no path info
+		const resultWithoutPathInfo = router.buildResult(path!)
+		expect(resultWithoutPathInfo.segments).toBeUndefined()
+		expect(resultWithoutPathInfo.turnPoints).toBeUndefined()
+
+		// With includePathInfo: true
+		const resultWithPathInfo = router.buildResult(path!, {
+			includePathInfo: true,
+		})
+		expect(resultWithPathInfo.segments).toBeDefined()
+		expect(resultWithPathInfo.segments!.length).toBeGreaterThan(0)
+		expect(resultWithPathInfo.turnPoints).toBeDefined()
+	})
+
+	it("should include both stats and path info when both options are true", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph)
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		const result = router.buildResult(path!, {
+			includeStats: true,
+			includePathInfo: true,
+		})
+
+		// Should have coordinates (always present)
+		expect(result.coordinates.length).toBeGreaterThan(0)
+
+		// Should have stats
+		expect(result.distance).toBeGreaterThan(0)
+		expect(result.time).toBeGreaterThan(0)
+
+		// Should have path info
+		expect(result.segments).toBeDefined()
+		expect(result.segments!.length).toBeGreaterThan(0)
+		expect(result.turnPoints).toBeDefined()
+
+		// Verify segment totals roughly match stats
+		const segmentDistanceSum = result.segments!.reduce(
+			(sum, seg) => sum + seg.distance,
+			0,
+		)
+		const segmentTimeSum = result.segments!.reduce(
+			(sum, seg) => sum + seg.time,
+			0,
+		)
+
+		expect(segmentDistanceSum).toBeCloseTo(result.distance!, 1)
+		expect(segmentTimeSum).toBeCloseTo(result.time!, 1)
+	})
+
+	it("should use default options from constructor", () => {
+		const graph = buildGraph(monacoOsm)
+		const router = new Router(monacoOsm, graph, {
+			includeStats: true,
+			includePathInfo: true,
+		})
+
+		const from = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4229093, 43.7371175],
+			500,
+		)
+		const to = graph.findNearestRoutableNode(
+			monacoOsm,
+			[7.4259193, 43.7377731],
+			500,
+		)
+
+		const path = router.route(from!.nodeIndex, to!.nodeIndex)
+		expect(path).not.toBeNull()
+
+		// buildResult without options should use constructor defaults
+		const result = router.buildResult(path!)
+
+		expect(result.distance).toBeGreaterThan(0)
+		expect(result.time).toBeGreaterThan(0)
+		expect(result.segments).toBeDefined()
+		expect(result.turnPoints).toBeDefined()
+	})
+})
+
+describe("RoutingGraph Serialization", () => {
+	it("should serialize and reconstruct graph correctly", () => {
+		const osm = new Osm({ id: "test" })
+
+		// Create a simple network
+		osm.nodes.addNode({ id: 1, lat: 0, lon: 0 })
+		osm.nodes.addNode({ id: 2, lat: 0, lon: 0.01 })
+		osm.nodes.addNode({ id: 3, lat: 0.01, lon: 0.01 })
+		osm.nodes.buildIndex()
+		osm.nodes.buildSpatialIndex()
+
+		osm.ways.addWay({
+			id: 1,
+			refs: [1, 2, 3],
+			tags: { highway: "primary" },
+		})
+		osm.ways.buildIndex()
+		osm.ways.buildSpatialIndex()
+		osm.buildIndexes()
+
+		// Build and compact the graph
+		const originalGraph = buildGraph(osm)
+
+		// Get transferables
+		const transferables = originalGraph.transferables()
+
+		// Verify transferables structure
+		expect(transferables.nodeCount).toBe(osm.nodes.size)
+		expect(transferables.edgeCount).toBe(originalGraph.edges)
+		// Buffers can be either ArrayBuffer or SharedArrayBuffer depending on runtime
+		const isBuffer = (b: unknown) =>
+			b instanceof ArrayBuffer || b instanceof SharedArrayBuffer
+		expect(isBuffer(transferables.edgeOffsets)).toBe(true)
+		expect(isBuffer(transferables.edgeTargets)).toBe(true)
+		expect(isBuffer(transferables.edgeDistances)).toBe(true)
+		expect(isBuffer(transferables.edgeTimes)).toBe(true)
+		expect(isBuffer(transferables.routableBits)).toBe(true)
+		expect(isBuffer(transferables.intersectionBits)).toBe(true)
+
+		// Reconstruct graph from transferables
+		const reconstructedGraph = new RoutingGraph(transferables)
+
+		// Verify properties match
+		expect(reconstructedGraph.size).toBe(originalGraph.size)
+		expect(reconstructedGraph.edges).toBe(originalGraph.edges)
+
+		// Verify edges for each node match
+		for (let i = 0; i < osm.nodes.size; i++) {
+			const origEdges = originalGraph.getEdges(i)
+			const reconEdges = reconstructedGraph.getEdges(i)
+			expect(reconEdges.length).toBe(origEdges.length)
+
+			for (let j = 0; j < origEdges.length; j++) {
+				expect(reconEdges[j]!.targetNodeIndex).toBe(
+					origEdges[j]!.targetNodeIndex,
+				)
+				expect(reconEdges[j]!.wayIndex).toBe(origEdges[j]!.wayIndex)
+				expect(reconEdges[j]!.distance).toBeCloseTo(origEdges[j]!.distance, 2)
+				expect(reconEdges[j]!.time).toBeCloseTo(origEdges[j]!.time, 2)
+			}
+		}
+
+		// Verify routable and intersection flags
+		expect(reconstructedGraph.isRoutable(0)).toBe(originalGraph.isRoutable(0))
+		expect(reconstructedGraph.isRoutable(1)).toBe(originalGraph.isRoutable(1))
+		expect(reconstructedGraph.isRoutable(2)).toBe(originalGraph.isRoutable(2))
+		expect(reconstructedGraph.isIntersection(0)).toBe(
+			originalGraph.isIntersection(0),
+		)
+		expect(reconstructedGraph.isIntersection(1)).toBe(
+			originalGraph.isIntersection(1),
+		)
+	})
+
+	it("should produce working router after reconstruction", () => {
+		const osm = new Osm({ id: "test" })
+
+		osm.nodes.addNode({ id: 1, lat: 0, lon: 0 })
+		osm.nodes.addNode({ id: 2, lat: 0, lon: 0.01 })
+		osm.nodes.addNode({ id: 3, lat: 0.01, lon: 0.01 })
+		osm.nodes.buildIndex()
+		osm.nodes.buildSpatialIndex()
+
+		osm.ways.addWay({
+			id: 1,
+			refs: [1, 2, 3],
+			tags: { highway: "primary" },
+		})
+		osm.ways.buildIndex()
+		osm.ways.buildSpatialIndex()
+		osm.buildIndexes()
+
+		const originalGraph = buildGraph(osm)
+		const transferables = originalGraph.transferables()
+		const reconstructedGraph = new RoutingGraph(transferables)
+
+		// Create routers with both graphs
+		const router1 = new Router(osm, originalGraph)
+		const router2 = new Router(osm, reconstructedGraph)
+
+		// Both should find the same route
+		const path1 = router1.route(0, 2)
+		const path2 = router2.route(0, 2)
+
+		expect(path1).not.toBeNull()
+		expect(path2).not.toBeNull()
+		expect(path1!.length).toBe(path2!.length)
+
+		for (let i = 0; i < path1!.length; i++) {
+			expect(path1![i]!.nodeIndex).toBe(path2![i]!.nodeIndex)
+		}
+	})
+
+	it("should provide transferable buffers for postMessage", () => {
+		const osm = new Osm({ id: "test" })
+		osm.nodes.addNode({ id: 1, lat: 0, lon: 0 })
+		osm.nodes.addNode({ id: 2, lat: 0, lon: 0.01 })
+		osm.nodes.buildIndex()
+		osm.nodes.buildSpatialIndex()
+		osm.ways.addWay({
+			id: 1,
+			refs: [1, 2],
+			tags: { highway: "primary" },
+		})
+		osm.ways.buildIndex()
+		osm.ways.buildSpatialIndex()
+		osm.buildIndexes()
+
+		const graph = buildGraph(osm)
+		const transferables = graph.transferables()
+		const buffers = getTransferableBuffers(transferables)
+
+		// When SharedArrayBuffer is available, returns empty (they're shared, not transferred).
+		// When only ArrayBuffer is available, returns all 7 buffers.
+		const usesSharedArrayBuffer =
+			typeof SharedArrayBuffer !== "undefined" &&
+			transferables.edgeOffsets instanceof SharedArrayBuffer
+		if (usesSharedArrayBuffer) {
+			expect(buffers.length).toBe(0)
+		} else {
+			expect(buffers.length).toBe(7)
+			for (const buffer of buffers) {
+				expect(buffer).toBeInstanceOf(ArrayBuffer)
+			}
+		}
 	})
 })

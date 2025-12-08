@@ -49,6 +49,40 @@ const rasterTile = await remote.getRasterTile(monacoOsmInfo, [10561, 22891, 16])
 `search`, `merge`, `generateChangeset`, etc. Use `collectTransferables` +
 `transfer` when you need to post Osmix payloads through your own worker setup.
 
+### Routing with workers
+
+`OsmixRemote` provides off-thread routing via `@osmix/router`. The routing graph
+builds lazily on first use, so there's no upfront cost until you actually route.
+
+```ts
+import { createRemote } from "osmix"
+
+const remote = await createRemote()
+const osmInfo = await remote.fromPbf(monacoPbf)
+
+// Find nearest routable nodes to coordinates
+const from = await remote.findNearestRoutableNode(osmInfo.id, [7.42, 43.73], 0.5)
+const to = await remote.findNearestRoutableNode(osmInfo.id, [7.43, 43.74], 0.5)
+
+if (from && to) {
+	// Calculate route with statistics and path info
+	const result = await remote.route(osmInfo.id, from.nodeIndex, to.nodeIndex, {
+		includeStats: true,
+		includePathInfo: true,
+	})
+
+	if (result) {
+		console.log(result.coordinates) // Route geometry
+		console.log(result.distance) // Distance in meters
+		console.log(result.time) // Time in seconds
+		console.log(result.segments) // Per-way breakdown
+	}
+}
+```
+
+The routing graph is automatically shared across all workers when using
+`SharedArrayBuffer`, so any worker can handle routing requests.
+
 ### Extract, stream, and write back to PBF
 
 ```ts
@@ -99,6 +133,15 @@ spec-compliant without staging everything in memory.
 - `remote.search(osmId, key, val?)` - Search by tag.
 - `remote.toPbf(osmId, stream)` - Export to PBF.
 
+#### Routing
+
+- `remote.buildRoutingGraph(osmId, filter?, speeds?)` - Explicitly build routing graph (optional, builds lazily on first use).
+- `remote.hasRoutingGraph(osmId)` - Check if routing graph exists.
+- `remote.findNearestRoutableNode(osmId, point, maxKm)` - Snap coordinate to nearest routable node.
+- `remote.route(osmId, fromIndex, toIndex, options?)` - Calculate route between nodes.
+  - `options.includeStats` - Include `distance` and `time` in result.
+  - `options.includePathInfo` - Include `segments` and `turnPoints` in result.
+
 ### Utilities
 
 - `collectTransferables(value)` - Find transferable buffers in nested objects.
@@ -106,15 +149,15 @@ spec-compliant without staging everything in memory.
 
 ## Related Packages
 
-- [`@osmix/core`](../core/README.md) – In-memory OSM index with typed arrays and spatial queries.
-- [`@osmix/pbf`](../pbf/README.md) – Low-level PBF reading and writing.
-- [`@osmix/json`](../json/README.md) – PBF to JSON entity conversion.
-- [`@osmix/geojson`](../geojson/README.md) – GeoJSON import/export.
-- [`@osmix/change`](../change/README.md) – Changeset management and merge workflows.
-- [`@osmix/raster`](../raster/README.md) – Raster tile rendering.
-- [`@osmix/vt`](../vt/README.md) – Vector tile encoding.
-- [`@osmix/router`](../router/README.md) – Pathfinding on OSM road networks.
-- [`@osmix/shared`](../shared/README.md) – Shared utilities and types.
+- [`@osmix/core`](../core/README.md) - In-memory OSM index with typed arrays and spatial queries.
+- [`@osmix/pbf`](../pbf/README.md) - Low-level PBF reading and writing.
+- [`@osmix/json`](../json/README.md) - PBF to JSON entity conversion.
+- [`@osmix/geojson`](../geojson/README.md) - GeoJSON import/export.
+- [`@osmix/change`](../change/README.md) - Changeset management and merge workflows.
+- [`@osmix/raster`](../raster/README.md) - Raster tile rendering.
+- [`@osmix/vt`](../vt/README.md) - Vector tile encoding.
+- [`@osmix/router`](../router/README.md) - Pathfinding on OSM road networks.
+- [`@osmix/shared`](../shared/README.md) - Shared utilities and types.
 
 ## Environment and limitations
 
@@ -132,4 +175,3 @@ spec-compliant without staging everything in memory.
 
 Run `bun run check` from the repo root before publishing to keep formatting,
 lint, and types consistent.
-

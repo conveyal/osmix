@@ -47,6 +47,7 @@ export * from "@osmix/geojson"
 export * from "@osmix/json"
 export * from "@osmix/pbf"
 export * from "@osmix/raster"
+export * from "@osmix/router"
 export * from "@osmix/shared/types"
 export * from "@osmix/vt"
 

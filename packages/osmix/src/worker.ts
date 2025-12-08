@@ -30,8 +30,22 @@ import {
 import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core"
 import { fromGeoJSON } from "@osmix/geojson"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
+import {
+	type DefaultSpeeds,
+	type HighwayFilter,
+	type RouteOptions,
+	type RouteResult,
+	Router,
+	RoutingGraph,
+	type RoutingGraphTransferables,
+	type WaySegment,
+} from "@osmix/router"
 import type { Progress, ProgressEvent } from "@osmix/shared/progress"
-import type { OsmEntityType, Tile } from "@osmix/shared/types"
+import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types"
+
+// Re-export types from router for backwards compatibility
+export type { RouteResult, WaySegment }
+
 import { OsmixVtEncoder } from "@osmix/vt"
 import * as Comlink from "comlink"
 import { dequal } from "dequal/lite"
@@ -52,6 +66,7 @@ import { transfer } from "./utils"
 export class OsmixWorker extends EventTarget {
 	private osm: Record<string, Osm> = {}
 	private vtEncoders: Record<string, OsmixVtEncoder> = {}
+	private graphs: Record<string, RoutingGraph> = {}
 	private changesets: Record<string, OsmChangeset> = {}
 	private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"]
 	private entityTypes: OsmEntityType[] = ["node", "way", "relation"]
@@ -189,11 +204,19 @@ export class OsmixWorker extends EventTarget {
 
 	/**
 	 * Store an Osm instance by ID, replacing any existing instance with the same ID.
-	 * Protected to allow subclasses to manage Osm instances.
+	 * Protected to allow subclasses to manage Osm instances. If a routing graph exists,
+	 * rebuild it.
 	 */
 	protected set(id: string, osm: Osm) {
 		this.osm[id] = osm
 		this.vtEncoders[id] = new OsmixVtEncoder(osm)
+		if (this.graphs[id]) {
+			this.buildRoutingGraph(
+				id,
+				this.graphs[id].filter,
+				this.graphs[id].defaultSpeeds,
+			)
+		}
 	}
 
 	/**
@@ -202,7 +225,121 @@ export class OsmixWorker extends EventTarget {
 	delete(id: string) {
 		delete this.osm[id]
 		delete this.vtEncoders[id]
+		delete this.graphs[id]
 	}
+
+	// ---------------------------------------------------------------------------
+	// Routing
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Build a routing graph for an Osm instance.
+	 * The graph is stored internally and can be shared via transferables.
+	 *
+	 * @param osmId - ID of the Osm instance to build a graph for.
+	 * @param filter - Optional filter function to determine which ways are routable.
+	 * @param defaultSpeeds - Optional speed limits by highway type.
+	 * @returns Graph statistics (node and edge counts).
+	 */
+	buildRoutingGraph(
+		osmId: string,
+		filter?: HighwayFilter,
+		defaultSpeeds?: DefaultSpeeds,
+	) {
+		const osm = this.get(osmId)
+		const graph = new RoutingGraph(osm, filter, defaultSpeeds)
+		this.graphs[osmId] = graph
+		return { nodeCount: graph.size, edgeCount: graph.edges }
+	}
+
+	/**
+	 * Check if a routing graph exists for an Osm instance.
+	 */
+	hasRoutingGraph(osmId: string): boolean {
+		return this.graphs[osmId] != null
+	}
+
+	/**
+	 * Get the routing graph for an Osm instance.
+	 * Auto-builds the graph on first access if it doesn't exist.
+	 * @throws If the graph cannot be built.
+	 */
+	protected getGraph(osmId: string): RoutingGraph {
+		let graph = this.graphs[osmId]
+		if (!graph) {
+			// Auto-build on first access
+			this.buildRoutingGraph(osmId)
+			graph = this.graphs[osmId]
+		}
+		if (!graph) throw Error(`Failed to build routing graph for: ${osmId}`)
+		return graph
+	}
+
+	/**
+	 * Get routing graph transferables for sharing with other workers.
+	 * @param osmId - ID of the Osm instance.
+	 * @returns Transferable buffers for the routing graph.
+	 */
+	getRoutingGraphTransferables(osmId: string): RoutingGraphTransferables {
+		return this.getGraph(osmId).transferables()
+	}
+
+	/**
+	 * Accept a routing graph from another worker or main thread.
+	 * Used to share pre-built graphs across workers.
+	 *
+	 * @param osmId - ID to associate with the graph.
+	 * @param transferables - Routing graph transferables.
+	 */
+	transferRoutingGraphIn(
+		osmId: string,
+		transferables: RoutingGraphTransferables,
+	) {
+		this.graphs[osmId] = new RoutingGraph(transferables)
+	}
+
+	/**
+	 * Find the nearest routable node to a geographic point.
+	 *
+	 * @param osmId - ID of the Osm instance.
+	 * @param point - [lon, lat] coordinates to search from.
+	 * @param maxDistanceM - Maximum search radius in meters.
+	 * @returns Nearest routable node info, or null if none found.
+	 */
+	findNearestRoutableNode(osmId: string, point: LonLat, maxDistanceM: number) {
+		return this.getGraph(osmId).findNearestRoutableNode(
+			this.get(osmId),
+			point,
+			maxDistanceM,
+		)
+	}
+
+	/**
+	 * Calculate a route between two node indexes.
+	 *
+	 * @param osmId - ID of the Osm instance.
+	 * @param fromIndex - Starting node index.
+	 * @param toIndex - Destination node index.
+	 * @param options - Optional routing options (algorithm, metric).
+	 * @returns Route result with coordinates and way info, or null if no route found.
+	 */
+	route(
+		osmId: string,
+		fromIndex: number,
+		toIndex: number,
+		options?: Partial<RouteOptions>,
+	): RouteResult | null {
+		const osm = this.get(osmId)
+		const graph = this.getGraph(osmId)
+		const router = new Router(osm, graph, options)
+		const path = router.route(fromIndex, toIndex, options)
+		if (!path) return null
+		return router.buildResult(path, options)
+	}
+
+	// ---------------------------------------------------------------------------
+	// Vector & Raster Tiles
+	// ---------------------------------------------------------------------------
 
 	/**
 	 * Generate a Mapbox Vector Tile for the specified tile coordinates.
