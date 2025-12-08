@@ -74,6 +74,10 @@ export class RoutingGraph {
 	/** Whether compact() has been called. */
 	private compacted = false
 
+	// Expose highway filter and default speeds
+	readonly filter: HighwayFilter
+	readonly defaultSpeeds: DefaultSpeeds
+
 	/**
 	 * Create a RoutingGraph.
 	 *
@@ -86,6 +90,8 @@ export class RoutingGraph {
 		filter: HighwayFilter = defaultHighwayFilter,
 		defaultSpeeds: DefaultSpeeds = DEFAULT_SPEEDS,
 	) {
+		this.filter = filter
+		this.defaultSpeeds = defaultSpeeds
 		if ("nodeCount" in source) {
 			// Reconstruct from transferables
 			this.fromTransferables(source)

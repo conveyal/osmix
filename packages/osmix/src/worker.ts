@@ -210,7 +210,13 @@ export class OsmixWorker extends EventTarget {
 	protected set(id: string, osm: Osm) {
 		this.osm[id] = osm
 		this.vtEncoders[id] = new OsmixVtEncoder(osm)
-		if (this.graphs[id]) this.buildRoutingGraph(id)
+		if (this.graphs[id]) {
+			this.buildRoutingGraph(
+				id,
+				this.graphs[id].filter,
+				this.graphs[id].defaultSpeeds,
+			)
+		}
 	}
 
 	/**
