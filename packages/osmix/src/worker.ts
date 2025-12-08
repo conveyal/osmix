@@ -228,11 +228,13 @@ export class OsmixWorker extends EventTarget {
 
 	/**
 	 * Store an Osm instance by ID, replacing any existing instance with the same ID.
-	 * Protected to allow subclasses to manage Osm instances.
+	 * Protected to allow subclasses to manage Osm instances. If a routing graph exists,
+	 * rebuild it.
 	 */
 	protected set(id: string, osm: Osm) {
 		this.osm[id] = osm
 		this.vtEncoders[id] = new OsmixVtEncoder(osm)
+		if (this.graphs[id]) this.buildRoutingGraph(id)
 	}
 
 	/**
