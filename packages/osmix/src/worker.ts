@@ -297,14 +297,14 @@ export class OsmixWorker extends EventTarget {
 	 *
 	 * @param osmId - ID of the Osm instance.
 	 * @param point - [lon, lat] coordinates to search from.
-	 * @param maxKm - Maximum search radius in kilometers.
+	 * @param maxDistanceM - Maximum search radius in meters.
 	 * @returns Nearest routable node info, or null if none found.
 	 */
-	findNearestRoutableNode(osmId: string, point: LonLat, maxKm: number) {
+	findNearestRoutableNode(osmId: string, point: LonLat, maxDistanceM: number) {
 		return this.getGraph(osmId).findNearestRoutableNode(
 			this.get(osmId),
 			point,
-			maxKm,
+			maxDistanceM,
 		)
 	}
 

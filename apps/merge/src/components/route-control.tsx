@@ -13,8 +13,8 @@ import {
 import { osmWorker } from "../state/worker"
 import { Button } from "./ui/button"
 
-/** Maximum distance (km) to snap click point to nearest node. */
-const SNAP_RADIUS_KM = 1
+/** Maximum distance (m) to snap click point to nearest node. */
+const SNAP_RADIUS_M = 1_000
 
 /** Format distance in meters to human readable string. */
 function formatDistance(meters: number): string {
@@ -59,7 +59,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 				const snapped = await osmWorker.findNearestRoutableNode(
 					osm.id,
 					point,
-					SNAP_RADIUS_KM,
+					SNAP_RADIUS_M,
 				)
 
 				if (!snapped) {

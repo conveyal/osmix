@@ -371,35 +371,39 @@ export class RoutingGraph {
 	 *
 	 * @param osm - The OSM dataset.
 	 * @param point - The [lon, lat] coordinates to search from.
-	 * @param maxKm - Maximum search radius in kilometers.
+	 * @param maxDistanceM - Maximum search radius in meters.
 	 * @returns The nearest routable node, or null if none found.
 	 *
 	 * @example
 	 * ```ts
 	 * const nearest = graph.findNearestNodeOnGraph(osm, [-73.989, 40.733], 0.5)
 	 * if (nearest) {
-	 *   console.log(`Found node ${nearest.nodeIndex} at ${nearest.distance}km`)
+	 *   console.log(`Found node ${nearest.nodeIndex} at ${nearest.distance}m`)
 	 * }
 	 * ```
 	 */
-	findNearestRoutableNode(osm: Osm, point: LonLat, maxKm: number) {
-		const nearby = osm.nodes.findIndexesWithinRadius(point[0], point[1], maxKm)
+	findNearestRoutableNode(osm: Osm, point: LonLat, maxDistanceM: number) {
+		const nearby = osm.nodes.findIndexesWithinRadius(
+			point[0],
+			point[1],
+			maxDistanceM / 1_000,
+		)
 
 		let best: {
 			nodeIndex: number
 			coordinates: LonLat
 			distance: number
 		} | null = null
-		let bestDistKm = Number.POSITIVE_INFINITY
+		let bestDistM = Number.POSITIVE_INFINITY
 
 		for (const nodeIndex of nearby) {
 			if (!this.isRoutable(nodeIndex)) continue
 
 			const nodeCoord = osm.nodes.getNodeLonLat({ index: nodeIndex })
-			const distKm = haversineDistance(point, nodeCoord) / 1000
-			if (distKm < bestDistKm && distKm <= maxKm) {
-				bestDistKm = distKm
-				best = { nodeIndex, coordinates: nodeCoord, distance: distKm }
+			const distance = haversineDistance(point, nodeCoord)
+			if (distance < bestDistM && distance <= maxDistanceM) {
+				bestDistM = distance
+				best = { nodeIndex, coordinates: nodeCoord, distance }
 			}
 		}
 

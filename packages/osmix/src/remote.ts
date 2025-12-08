@@ -469,14 +469,14 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	 *
 	 * @param osmId - ID of the Osm instance.
 	 * @param point - [lon, lat] coordinates to search from.
-	 * @param maxKm - Maximum search radius in kilometers.
+	 * @param maxDistanceM - Maximum search radius in meters.
 	 * @returns Nearest routable node info, or null if none found.
 	 */
-	findNearestRoutableNode(osmId: OsmId, point: LonLat, maxKm: number) {
+	findNearestRoutableNode(osmId: OsmId, point: LonLat, maxDistanceM: number) {
 		return this.nextWorker().findNearestRoutableNode(
 			this.getId(osmId),
 			point,
-			maxKm,
+			maxDistanceM,
 		)
 	}
 
