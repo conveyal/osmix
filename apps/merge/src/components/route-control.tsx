@@ -177,7 +177,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 					variant="ghost"
 					title="Clear route"
 					size="icon"
-					disabled={!hasFrom}
+					disabled={!hasFrom || isRouting}
 				>
 					<XIcon />
 				</Button>
