@@ -101,15 +101,6 @@ export function getSpeedLimit(
 	return 50
 }
 
-/** Travel time in seconds given distance (m) and speed (km/h). */
-export function calculateTime(
-	distanceMeters: number,
-	speedKmh: number,
-): number {
-	const speedMs = (speedKmh * 1000) / 3600
-	return distanceMeters / speedMs
-}
-
 /** Default filter: common vehicle highways. */
 export function defaultHighwayFilter(tags?: OsmTags): boolean {
 	if (!tags?.["highway"]) return false
