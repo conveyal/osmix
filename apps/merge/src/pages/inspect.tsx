@@ -62,7 +62,7 @@ export default function InspectPage() {
 	return (
 		<Main>
 			<Sidebar>
-				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+				<div className="flex flex-1 flex-col overflow-y-auto p-2 lg:p-4 gap-4">
 					{!osm || !osmInfo || !file ? (
 						<>
 							<OsmPbfSelectFileButton

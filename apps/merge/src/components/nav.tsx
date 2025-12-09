@@ -17,7 +17,7 @@ import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group"
 
 export default function Nav() {
 	return (
-		<div className="shadow z-20 flex flex-row justify-between items-center px-4 h-10 bg-white">
+		<div className="shadow z-20 flex flex-row justify-between items-center px-2 lg:px-4 h-10 bg-white">
 			<div className="flex flex-row gap-2 items-center">
 				<div className="font-bold pr-2">OSMIX</div>
 				<NavLink
