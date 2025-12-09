@@ -49,23 +49,40 @@ export class Osm {
 	/**
 	 * Create a new OSM Entity index.
 	 */
-	constructor(opts?: Partial<OsmOptions> | OsmTransferables) {
+	constructor(opts?: Partial<OsmOptions> | OsmTransferables | Osm) {
 		this.id = opts?.id ?? "unknown"
 		this.header = opts?.header ?? {
 			required_features: [],
 			optional_features: [],
 		}
 		if (opts && "stringTable" in opts) {
-			this.stringTable = new StringTable(opts.stringTable)
-			this.nodes = new Nodes(this.stringTable, opts.nodes)
-			this.ways = new Ways(this.stringTable, this.nodes, opts.ways)
-			this.relations = new Relations(
-				this.stringTable,
-				this.nodes,
-				this.ways,
-				opts.relations,
-			)
-			this.indexBuilt = true
+			if (opts instanceof Osm) {
+				this.stringTable = new StringTable(opts.stringTable.transferables())
+				this.nodes = new Nodes(this.stringTable, opts.nodes.transferables())
+				this.ways = new Ways(
+					this.stringTable,
+					this.nodes,
+					opts.ways.transferables(),
+				)
+				this.relations = new Relations(
+					this.stringTable,
+					this.nodes,
+					this.ways,
+					opts.relations.transferables(),
+				)
+				this.indexBuilt = true
+			} else {
+				this.stringTable = new StringTable(opts.stringTable)
+				this.nodes = new Nodes(this.stringTable, opts.nodes)
+				this.ways = new Ways(this.stringTable, this.nodes, opts.ways)
+				this.relations = new Relations(
+					this.stringTable,
+					this.nodes,
+					this.ways,
+					opts.relations,
+				)
+				this.indexBuilt = true
+			}
 		} else {
 			this.stringTable = new StringTable()
 			this.nodes = new Nodes(this.stringTable)
