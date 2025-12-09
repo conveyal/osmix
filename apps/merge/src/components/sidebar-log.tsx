@@ -13,7 +13,7 @@ import { Spinner } from "./ui/spinner"
 export default function SidebarLog() {
 	const { activeTasks, log } = useLog()
 	const status = log[log.length - 1]
-	const [open, setOpen] = useState(true)
+	const [open, setOpen] = useState(false)
 	return (
 		<Collapsible open={open} onOpenChange={setOpen}>
 			<CollapsibleTrigger className="border-t flex items-center justify-between px-4 py-2 h-8 shadow bg-white z-10 relative w-full cursor-pointer hover:bg-accent">

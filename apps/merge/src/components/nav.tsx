@@ -11,17 +11,21 @@ import {
 	searchControlIsOpenAtom,
 } from "../state/map"
 import BrowserCheck from "./browser-check"
+import Status from "./status"
 import { Button } from "./ui/button"
 import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group"
 
 export default function Nav() {
 	return (
-		<div className="shadow z-20 flex flex-row justify-between items-center px-4 h-8 bg-white">
+		<div className="shadow z-20 flex flex-row justify-between items-center px-4 h-10 bg-white">
 			<div className="flex flex-row gap-2 items-center">
 				<div className="font-bold pr-2">OSMIX</div>
 				<NavLink
 					className={({ isActive }) =>
-						cn("text-slate-950 py-4 px-2", isActive && "text-blue-600")
+						cn(
+							"text-slate-950 py-4 px-2 uppercase",
+							isActive && "text-blue-600",
+						)
 					}
 					to="/"
 				>
@@ -29,7 +33,10 @@ export default function Nav() {
 				</NavLink>
 				<NavLink
 					className={({ isActive }) =>
-						cn("text-slate-950 py-4 px-2", isActive && "text-blue-600")
+						cn(
+							"text-slate-950 py-4 px-2 uppercase",
+							isActive && "text-blue-600",
+						)
 					}
 					to="/inspect"
 				>
@@ -38,7 +45,9 @@ export default function Nav() {
 				<BrowserCheck />
 			</div>
 
-			<ButtonGroup className="flex flex-row h-full items-center">
+			<Status />
+
+			<ButtonGroup className="flex flex-row h-full items-center gap-1">
 				<ToggleButton atom={sidebarIsOpenAtom}>
 					<SidebarClose />
 				</ToggleButton>
@@ -52,7 +61,7 @@ export default function Nav() {
 					<SearchIcon />
 				</ToggleButton>
 				<ButtonGroupSeparator />
-				<div className="whitespace-nowrap px-4">
+				<div className="whitespace-nowrap px-2">
 					<CenterInfo />
 				</div>
 				<ButtonGroupSeparator />
