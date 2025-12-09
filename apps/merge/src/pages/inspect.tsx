@@ -2,17 +2,13 @@ import { changeStatsSummary } from "@osmix/change"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
 import { Suspense, useMemo } from "react"
-import { useSearchParams } from "react-router"
 import ActionButton from "../components/action-button"
 import Basemap from "../components/basemap"
 import CustomControl from "../components/custom-control"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import EntityDetailsMapControl from "../components/entity-details-map-control"
-import EntitySearchControl from "../components/entity-search-control"
 import ExtractList from "../components/extract-list"
 import { Main, MapContent, Sidebar } from "../components/layout"
-import MapLayerControl from "../components/map-layer-control"
-import NominatimSearchControl from "../components/nominatim-search-control"
 import ChangesSummary, {
 	ChangesFilters,
 	ChangesList,
@@ -25,7 +21,6 @@ import {
 } from "../components/osm-pbf-file-input"
 import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
-import RouteControl from "../components/route-control"
 import RouteLayer from "../components/route-layer"
 import SelectedEntityLayer from "../components/selected-entity-layer"
 import SidebarLog from "../components/sidebar-log"
@@ -40,15 +35,10 @@ import { selectOsmEntityAtom } from "../state/osm"
 import { osmWorker } from "../state/worker"
 
 export default function InspectPage() {
-	const [searchParams] = useSearchParams()
-	const osmId = useMemo(
-		() => searchParams.get("osmId") ?? "inspect",
-		[searchParams],
-	)
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
 	const { downloadOsm, osm, osmInfo, file, loadOsmFile, setOsm } = useOsmFile(
-		osmId,
+		"inspect",
 		"./monaco.pbf",
 	)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
@@ -185,34 +175,14 @@ export default function InspectPage() {
 					{osm && <OsmixVectorOverlay osm={osm} />}
 					{osm && <OsmixRasterSource osmId={osm.id} />}
 
-					{import.meta.env.DEV && <TileBoundsLayer />}
+					<TileBoundsLayer />
 
 					<SelectedEntityLayer />
 					<RouteLayer />
 
-					<CustomControl position="top-left">
-						<NominatimSearchControl />
-					</CustomControl>
-
-					{import.meta.env.DEV && (
-						<CustomControl position="bottom-left">
-							<MapLayerControl />
-						</CustomControl>
-					)}
-
-					{osm && (
-						<CustomControl position="top-left">
-							<EntitySearchControl osm={osm} />
-						</CustomControl>
-					)}
 					{osm && (
 						<CustomControl position="top-left">
 							<EntityDetailsMapControl osm={osm} />
-						</CustomControl>
-					)}
-					{osm && (
-						<CustomControl position="top-left">
-							<RouteControl osm={osm} />
 						</CustomControl>
 					)}
 				</Basemap>

@@ -1,8 +1,15 @@
-import { SearchIcon } from "lucide-react"
+import { type PrimitiveAtom, useAtom } from "jotai"
+import { Layers, Navigation, SearchIcon, SidebarClose } from "lucide-react"
 import { NavLink } from "react-router"
 import CenterInfo from "../components/center-info"
 import ZoomInfo from "../components/zoom-info"
 import { cn } from "../lib/utils"
+import { sidebarIsOpenAtom } from "../state/layout"
+import {
+	layerControlIsOpenAtom,
+	routingControlIsOpenAtom,
+	searchControlIsOpenAtom,
+} from "../state/map"
 import BrowserCheck from "./browser-check"
 import { Button } from "./ui/button"
 import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group"
@@ -32,9 +39,18 @@ export default function Nav() {
 			</div>
 
 			<ButtonGroup className="flex flex-row h-full items-center">
-				<Button size="icon-sm" variant="ghost">
+				<ToggleButton atom={sidebarIsOpenAtom}>
+					<SidebarClose />
+				</ToggleButton>
+				<ToggleButton atom={routingControlIsOpenAtom}>
+					<Navigation />
+				</ToggleButton>
+				<ToggleButton atom={layerControlIsOpenAtom}>
+					<Layers />
+				</ToggleButton>
+				<ToggleButton atom={searchControlIsOpenAtom}>
 					<SearchIcon />
-				</Button>
+				</ToggleButton>
 				<ButtonGroupSeparator />
 				<div className="whitespace-nowrap px-4">
 					<CenterInfo />
@@ -45,5 +61,25 @@ export default function Nav() {
 				</div>
 			</ButtonGroup>
 		</div>
+	)
+}
+
+function ToggleButton({
+	atom,
+	children,
+}: {
+	atom: PrimitiveAtom<boolean>
+	children: React.ReactNode
+}) {
+	const [isOpen, setIsOpen] = useAtom(atom)
+	return (
+		<Button
+			className={cn(isOpen ? "text-blue-500" : "text-muted-foreground")}
+			size="icon-sm"
+			variant="ghost"
+			onClick={() => setIsOpen((o) => !o)}
+		>
+			{children}
+		</Button>
 	)
 }

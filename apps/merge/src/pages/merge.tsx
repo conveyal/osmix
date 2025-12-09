@@ -21,9 +21,7 @@ import CustomControl from "../components/custom-control"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import EntityDetails from "../components/entity-details"
 import EntityDetailsMapControl from "../components/entity-details-map-control"
-import EntitySearchControl from "../components/entity-search-control"
 import { Main, MapContent, Sidebar } from "../components/layout"
-import NominatimSearchControl from "../components/nominatim-search-control"
 import ChangesSummary, {
 	ChangesExpandableList,
 	ChangesFilters,
@@ -727,7 +725,7 @@ export default function Merge() {
 										<CardContent>
 											<EntityDetails
 												entity={selectedEntity}
-												open={true}
+												defaultOpen={true}
 												osm={base.osm}
 											/>
 										</CardContent>
@@ -756,16 +754,6 @@ export default function Merge() {
 					)}
 
 					<SelectedEntityLayer />
-
-					<CustomControl position="top-left">
-						<NominatimSearchControl />
-					</CustomControl>
-
-					{base.osm && (
-						<CustomControl position="top-left">
-							<EntitySearchControl osm={base.osm} />
-						</CustomControl>
-					)}
 
 					{base.osm && (
 						<CustomControl position="top-left">

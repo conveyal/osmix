@@ -1,3 +1,4 @@
+import { useAtomValue } from "jotai"
 import { SearchIcon } from "lucide-react"
 import { useState, useTransition } from "react"
 import type { MapInstance } from "react-map-gl/maplibre"
@@ -8,6 +9,8 @@ import {
 	InputGroupInput,
 } from "../components/ui/input-group"
 import { cn } from "../lib/utils"
+import { searchControlIsOpenAtom } from "../state/map"
+import CustomControl from "./custom-control"
 import { Spinner } from "./ui/spinner"
 
 type NominatimResult = {
@@ -23,7 +26,17 @@ type NominatimResult = {
 
 const NOMINATIM_ENDPOINT = "https://nominatim.openstreetmap.org/search"
 
-export default function NominatimSearchControl({ map }: { map?: MapInstance }) {
+export default function NominatimSearchControl() {
+	const isOpen = useAtomValue(searchControlIsOpenAtom)
+	if (!isOpen) return false
+	return (
+		<CustomControl position="top-left">
+			<NominatimSearch />
+		</CustomControl>
+	)
+}
+
+export function NominatimSearch({ map }: { map?: MapInstance }) {
 	const [query, setQuery] = useState("")
 	const [results, setResults] = useState<NominatimResult[]>([])
 	const [error, setError] = useState<string | null>(null)
@@ -111,6 +124,9 @@ export default function NominatimSearchControl({ map }: { map?: MapInstance }) {
 			>
 				<InputGroup>
 					<InputGroupInput
+						ref={(ref) => {
+							ref?.focus()
+						}}
 						onFocus={(e) => e.target.select()}
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}

@@ -1,5 +1,5 @@
 import type { OsmInfo } from "@osmix/core"
-import { useAtom } from "jotai"
+import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useState, useTransition } from "react"
 import { Log } from "../state/log"
@@ -7,6 +7,7 @@ import {
 	osmAtomFamily,
 	osmFileAtomFamily,
 	osmInfoAtomFamily,
+	selectedOsmAtom,
 } from "../state/osm"
 import { osmWorker } from "../state/worker"
 import { useMap } from "./map"
@@ -40,6 +41,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 	const [file, setFile] = useAtom(osmFileAtomFamily(id))
 	const [osm, setOsm] = useAtom(osmAtomFamily(id))
 	const [osmInfo, setOsmInfo] = useAtom(osmInfoAtomFamily(id))
+	const setSelectedOsm = useSetAtom(selectedOsmAtom)
 
 	const loadOsmFile = useCallback(
 		async (file: File | null) => {
@@ -52,6 +54,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				setOsmInfo(osmInfo)
 				const osm = await osmWorker.get(osmInfo.id)
 				setOsm(osm)
+				setSelectedOsm(osm)
 				taskLog.end(`${file.name} fully loaded.`)
 				return osmInfo
 			} catch (e) {
@@ -60,7 +63,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				throw e
 			}
 		},
-		[setFile, setOsm, setOsmInfo, id],
+		[setFile, setOsm, setSelectedOsm, setOsmInfo, id],
 	)
 
 	const downloadOsm = useCallback(

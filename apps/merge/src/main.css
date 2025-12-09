@@ -162,8 +162,7 @@ table {
 }
 
 .maplibregl-ctrl {
-	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
-	border-radius: var(--radius);
+	border-radius: var(--radius-md);
 }
 
 .maplibregl-ctrl button:not(:disabled):hover {

@@ -11,14 +11,14 @@ import {
 export function Details({
 	className,
 	children,
-	open = true,
+	defaultOpen = true,
 }: {
 	className?: ClassValue
 	children: ReactNode
-	open?: boolean
+	defaultOpen?: boolean
 }) {
 	return (
-		<Collapsible defaultOpen={open} className={cn("w-full", className)}>
+		<Collapsible defaultOpen={defaultOpen} className={cn("w-full", className)}>
 			{children}
 		</Collapsible>
 	)

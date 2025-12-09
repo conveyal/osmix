@@ -1,16 +1,19 @@
 import type { Osm } from "@osmix/core"
 import type { LonLat } from "@osmix/shared/types"
-import { useAtom, useSetAtom } from "jotai"
+import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { NavigationIcon, XIcon } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre"
 import { useMap } from "../hooks/map"
+import { routingControlIsOpenAtom } from "../state/map"
+import { selectedOsmAtom } from "../state/osm"
 import {
 	clearRoutingAtom,
 	routingStateAtom,
 	type SnappedNode,
 } from "../state/routing"
 import { osmWorker } from "../state/worker"
+import CustomControl from "./custom-control"
 import { Button } from "./ui/button"
 
 /** Maximum distance (m) to snap click point to nearest node. */
@@ -38,7 +41,18 @@ function formatTime(seconds: number): string {
 	return `${hours} hr ${remainMins} min`
 }
 
-export default function RouteControl({ osm }: { osm: Osm }) {
+export default function RouteMapControl() {
+	const isOpen = useAtomValue(routingControlIsOpenAtom)
+	const osm = useAtomValue(selectedOsmAtom)
+	if (!isOpen || !osm) return null
+	return (
+		<CustomControl position="bottom-left">
+			<Routing osm={osm} />
+		</CustomControl>
+	)
+}
+
+export function Routing({ osm }: { osm: Osm }) {
 	const map = useMap()
 	const [routingState, setRoutingState] = useAtom(routingStateAtom)
 	const clearRouting = useSetAtom(clearRoutingAtom)
@@ -174,9 +188,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 				{!hasFrom && !noNodeNearby && !isRouting && (
 					<div className="text-muted-foreground text-center">
 						Click on the map to set a starting point
-						<div className="text-xs">
-							(routing graph builds on first search)
-						</div>
+						<div>(routing graph builds on first search)</div>
 					</div>
 				)}
 				{hasFrom && !hasTo && !noNodeNearby && !isRouting && (

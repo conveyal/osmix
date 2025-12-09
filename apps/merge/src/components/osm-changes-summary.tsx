@@ -246,7 +246,7 @@ export function ChangesExpandableList() {
 				const entityType = getEntityType(entity)
 				const summaryLabel = `${startIndex + i + 1}. ${changeType.toUpperCase()} ${entityType.toUpperCase()} ${entity.id}`
 				return (
-					<Details key={`${entityType}-${entity.id}`} open={false}>
+					<Details key={`${entityType}-${entity.id}`} defaultOpen={false}>
 						<DetailsSummary className={cn(changeTypeColor)}>
 							{summaryLabel}
 						</DetailsSummary>
