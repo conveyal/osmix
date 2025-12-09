@@ -1,4 +1,4 @@
-import type { Osm } from "@osmix/core"
+import { bboxFromLonLats, type Osm } from "@osmix/core"
 import type { LonLat } from "@osmix/shared/types"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { NavigationIcon, XIcon } from "lucide-react"
@@ -127,6 +127,10 @@ export function Routing({ osm }: { osm: Osm }) {
 						result,
 					}))
 					clickPhaseRef.current = "from"
+
+					if (result?.coordinates) {
+						map?.fitBounds(bboxFromLonLats(result.coordinates), { padding: 50 })
+					}
 				}
 			} finally {
 				setIsRouting(false)
