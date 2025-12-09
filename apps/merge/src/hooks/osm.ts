@@ -48,7 +48,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 			if (file == null) return
 			const taskLog = Log.startTask(`Processing file ${file.name}...`)
 			try {
-				const osmInfo = await osmWorker.fromFile(file, { id: file.name })
+				const osmInfo = await osmWorker.fromFile(file, { id })
 				setOsmInfo(osmInfo)
 				const osm = await osmWorker.get(osmInfo.id)
 				setOsm(osm)
@@ -60,7 +60,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				throw e
 			}
 		},
-		[setFile, setOsm, setOsmInfo],
+		[setFile, setOsm, setOsmInfo, id],
 	)
 
 	const downloadOsm = useCallback(

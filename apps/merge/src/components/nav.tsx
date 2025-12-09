@@ -1,13 +1,15 @@
+import { SearchIcon } from "lucide-react"
 import { NavLink } from "react-router"
 import CenterInfo from "../components/center-info"
-import { Separator } from "../components/ui/separator"
 import ZoomInfo from "../components/zoom-info"
 import { cn } from "../lib/utils"
 import BrowserCheck from "./browser-check"
+import { Button } from "./ui/button"
+import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group"
 
 export default function Nav() {
 	return (
-		<div className="border-b shadow flex flex-row justify-between items-center px-4 h-12">
+		<div className="shadow z-20 flex flex-row justify-between items-center px-4 h-8 bg-white">
 			<div className="flex flex-row gap-2 items-center">
 				<div className="font-bold pr-2">OSMIX</div>
 				<NavLink
@@ -29,15 +31,19 @@ export default function Nav() {
 				<BrowserCheck />
 			</div>
 
-			<div className="flex flex-row gap-4 h-6 items-center">
-				<div className="whitespace-nowrap">
+			<ButtonGroup className="flex flex-row h-full items-center">
+				<Button size="icon-sm" variant="ghost">
+					<SearchIcon />
+				</Button>
+				<ButtonGroupSeparator />
+				<div className="whitespace-nowrap px-4">
 					<CenterInfo />
 				</div>
-				<Separator orientation="vertical" />
-				<div>
+				<ButtonGroupSeparator />
+				<div className="pl-4">
 					z<ZoomInfo />
 				</div>
-			</div>
+			</ButtonGroup>
 		</div>
 	)
 }

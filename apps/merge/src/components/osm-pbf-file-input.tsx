@@ -1,6 +1,5 @@
 import { FilesIcon, XIcon } from "lucide-react"
 import ActionButton from "./action-button"
-import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group"
 
 function isOsmFile(file: File | null): file is File {
 	if (file == null) return false
@@ -21,29 +20,56 @@ export default function OsmPbfFileInput({
 	setFile: (file: File | null) => Promise<void>
 	testId?: string
 }) {
+	return !file ? (
+		<OsmPbfSelectFileButton disabled={disabled} setFile={setFile} />
+	) : (
+		<OsmPbfClearFileButton
+			disabled={disabled}
+			clearFile={() => setFile(null)}
+		/>
+	)
+}
+
+export function OsmPbfSelectFileButton({
+	disabled,
+	setFile,
+}: {
+	disabled?: boolean
+	setFile: (file: File | null) => Promise<void>
+}) {
 	return (
-		<ButtonGroup className="w-full" data-testid={testId}>
-			<ActionButton
-				className="flex-1"
-				disabled={disabled}
-				onAction={async () => {
-					const selectedFile = await showFileSelector()
-					if (isOsmFile(selectedFile)) {
-						await setFile(selectedFile)
-					}
-				}}
-				icon={<FilesIcon />}
-			>
-				Select OSM PBF or GeoJSON file
-			</ActionButton>
-			<ButtonGroupSeparator />
-			<ActionButton
-				disabled={disabled || !file}
-				onAction={() => setFile(null)}
-				title="Clear file"
-				icon={<XIcon />}
-			/>
-		</ButtonGroup>
+		<ActionButton
+			className="w-full"
+			disabled={disabled}
+			onAction={async () => {
+				const selectedFile = await showFileSelector()
+				if (isOsmFile(selectedFile)) {
+					await setFile(selectedFile)
+				}
+			}}
+			icon={<FilesIcon />}
+		>
+			Select OSM PBF or GeoJSON
+		</ActionButton>
+	)
+}
+
+export function OsmPbfClearFileButton({
+	disabled,
+	clearFile,
+}: {
+	disabled?: boolean
+	clearFile: () => Promise<void>
+}) {
+	return (
+		<ActionButton
+			disabled={disabled}
+			onAction={clearFile}
+			title="Clear file"
+			icon={<XIcon />}
+			size="icon-sm"
+			variant="ghost"
+		/>
 	)
 }
 

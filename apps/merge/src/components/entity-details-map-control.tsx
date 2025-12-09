@@ -10,48 +10,47 @@ import { Button } from "./ui/button"
 export default function EntityMapControl({ osm }: { osm: Osm }) {
 	const [selectedEntity, setSelectedEntity] = useAtom(selectedEntityAtom)
 	const flyToEntity = useFlyToEntity()
+	if (selectedEntity == null) {
+		return (
+			<div className="p-2 text-center font-bold">
+				SEARCH OR SELECT ENTITY ON MAP (Z{MIN_PICKABLE_ZOOM} AND UP)
+			</div>
+		)
+	}
 	return (
-		<div className="flex flex-col gap-2 bg-background w-sm max-h-[50lvh] overflow-y-auto shadow rounded-sm">
-			{selectedEntity == null ? (
-				<div className="px-1 text-center font-bold py-1">
-					SEARCH OR SELECT ENTITY ON MAP (Z{MIN_PICKABLE_ZOOM} AND UP)
+		<>
+			<div className="flex items-center justify-between gap-2 border-b">
+				<div className="font-bold pl-2">SELECTED ENTITY</div>
+				<div className="flex items-center">
+					<Button
+						onClick={() => {
+							setSelectedEntity(null)
+						}}
+						variant="ghost"
+						size="icon-sm"
+						title="Clear selection"
+					>
+						<XIcon />
+					</Button>
+					<Button
+						onClick={() => {
+							flyToEntity(osm, selectedEntity)
+						}}
+						variant="ghost"
+						size="icon-sm"
+						title="Fit bounds to entity"
+					>
+						<MaximizeIcon />
+					</Button>
 				</div>
-			) : (
-				<div>
-					<div className="flex items-center justify-between pl-2">
-						<div className="font-bold">SELECTED ENTITY</div>
-						<div className="flex items-center">
-							<Button
-								onClick={() => {
-									setSelectedEntity(null)
-								}}
-								variant="ghost"
-								size="icon"
-								title="Clear selection"
-							>
-								<XIcon />
-							</Button>
-							<Button
-								onClick={() => {
-									flyToEntity(osm, selectedEntity)
-								}}
-								variant="ghost"
-								size="icon"
-								title="Fit bounds to entity"
-							>
-								<MaximizeIcon />
-							</Button>
-						</div>
-					</div>
-					<div className="overflow-x-auto">
-						<EntityDetails
-							entity={selectedEntity}
-							osm={osm}
-							onSelect={setSelectedEntity}
-						/>
-					</div>
-				</div>
-			)}
-		</div>
+			</div>
+			<div className="overflow-x-auto">
+				<EntityDetails
+					entity={selectedEntity}
+					osm={osm}
+					onSelect={setSelectedEntity}
+				/>
+			</div>
+		</>
 	)
 }

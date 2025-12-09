@@ -10,18 +10,16 @@ export default function EntitySearchControl({ osm }: { osm: Osm }) {
 	const setSelectedOsm = useSetAtom(selectedOsmAtom)
 	const setSelectedEntity = useSetAtom(selectedEntityAtom)
 	return (
-		<div className="bg-background w-sm">
-			<EntityLookup
-				setSelectedEntity={(id) => {
-					const entity = getOsmixEntityByStringId(osm, id)
-					setSelectedOsm(osm)
-					setSelectedEntity(entity)
-					if (entity) {
-						flyToEntity(osm, entity)
-					}
-					return entity
-				}}
-			/>
-		</div>
+		<EntityLookup
+			setSelectedEntity={(id) => {
+				const entity = getOsmixEntityByStringId(osm, id)
+				setSelectedOsm(osm)
+				setSelectedEntity(entity)
+				if (entity) {
+					flyToEntity(osm, entity)
+				}
+				return entity
+			}}
+		/>
 	)
 }

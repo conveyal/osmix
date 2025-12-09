@@ -144,7 +144,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 	const hasRoute = routingState.result !== null
 
 	return (
-		<div className="bg-background w-sm max-h-[50lvh] overflow-y-auto shadow rounded-sm">
+		<>
 			<div className="flex items-center justify-between pl-2 border-b">
 				<div className="flex items-center gap-2">
 					<NavigationIcon className="size-4" />
@@ -155,24 +155,24 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 					onClick={() => clearRouting()}
 					variant="ghost"
 					title="Clear route"
-					size="icon"
+					size="icon-sm"
 					disabled={!hasFrom || isRouting}
 				>
 					<XIcon />
 				</Button>
 			</div>
 
-			<div className="p-3 space-y-3">
+			<div className="p-2 space-y-2">
 				{/* No node nearby feedback */}
 				{noNodeNearby && (
-					<div className="text-amber-500 font-medium">
+					<div className="text-amber-500 font-medium text-center">
 						No road found nearby. Click closer to a road.
 					</div>
 				)}
 
 				{/* Instructions */}
 				{!hasFrom && !noNodeNearby && !isRouting && (
-					<div className="text-muted-foreground">
+					<div className="text-muted-foreground text-center">
 						Click on the map to set a starting point
 						<div className="text-xs">
 							(routing graph builds on first search)
@@ -180,7 +180,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 					</div>
 				)}
 				{hasFrom && !hasTo && !noNodeNearby && !isRouting && (
-					<div className="text-muted-foreground">
+					<div className="text-muted-foreground text-center">
 						Click on the map to set a destination
 					</div>
 				)}
@@ -264,7 +264,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 					</div>
 				)}
 			</div>
-		</div>
+		</>
 	)
 }
 

@@ -60,7 +60,7 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 
 	return (
 		<MaplibreMap
-			mapStyle={MAP_STYLE}
+			// mapStyle={MAP_STYLE}
 			reuseMaps={true}
 			initialViewState={initialViewState}
 			onMove={onViewStateChange}

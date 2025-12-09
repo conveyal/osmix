@@ -2,7 +2,7 @@ import type { OsmEntity } from "@osmix/shared/types"
 import { getEntityType } from "@osmix/shared/utils"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { ArrowLeft, ArrowRight } from "lucide-react"
-import { Suspense, useTransition } from "react"
+import { useTransition } from "react"
 import { cn } from "../lib/utils"
 import {
 	changesAtom,
@@ -16,23 +16,14 @@ import { Details, DetailsContent, DetailsSummary } from "./details"
 import { EntityContent } from "./entity-details"
 import { Button } from "./ui/button"
 
-export default function ChangesSummary({
-	children,
-}: {
-	children: React.ReactNode
-}) {
+export default function ChangesSummary() {
 	return (
-		<div className="flex flex-col gap-2">
-			<Details open={true}>
-				<DetailsSummary>CHANGES SUMMARY</DetailsSummary>
-				<DetailsContent>
-					<ChangesSummaryTable />
-					<Suspense fallback={<div className="py-1 px-2">LOADING...</div>}>
-						{children}
-					</Suspense>
-				</DetailsContent>
-			</Details>
-		</div>
+		<Details>
+			<DetailsSummary>SUMMARY</DetailsSummary>
+			<DetailsContent>
+				<ChangesSummaryTable />
+			</DetailsContent>
+		</Details>
 	)
 }
 
@@ -84,7 +75,7 @@ export function ChangesFilters() {
 	const [, startTransition] = useTransition()
 
 	return (
-		<div className="filters flex gap-3 pl-2 pb-2">
+		<div className="filters flex justify-between px-2 py-2">
 			<label>
 				<input
 					type="checkbox"
@@ -226,7 +217,7 @@ export function ChangesList({
 					<button
 						key={`${entityType}-${entity.id}`}
 						className={cn(
-							"border-l pl-2 py-0.5 font-bold cursor-pointer w-full text-left select-text",
+							"pl-2 py-1 font-bold cursor-pointer w-full text-left select-text hover:bg-accent",
 							changeTypeColor,
 						)}
 						onClick={() => setSelectedEntity(entity)}
@@ -260,9 +251,9 @@ export function ChangesExpandableList() {
 							{summaryLabel}
 						</DetailsSummary>
 
-						<DetailsContent>
+						<DetailsContent className="w-full overflow-scroll inset-shadow">
 							{refs && (
-								<div className="p-1 border-1">
+								<div className="p-2 border-b-1">
 									Related:{" "}
 									{refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")}
 								</div>
@@ -298,11 +289,11 @@ export function ChangesPagination() {
 		<div className="flex items-center justify-between">
 			<Button
 				variant="ghost"
-				size="sm"
+				size="icon-sm"
 				onClick={goToPrevPage}
 				disabled={currentPage <= 0}
 			>
-				<ArrowLeft className="w-3 h-3 mr-1" />
+				<ArrowLeft />
 			</Button>
 			<span className="text-slate-500">
 				{(totalPages === 0 ? 0 : currentPage + 1).toLocaleString()} of{" "}
@@ -310,11 +301,11 @@ export function ChangesPagination() {
 			</span>
 			<Button
 				variant="ghost"
-				size="sm"
+				size="icon-sm"
 				onClick={goToNextPage}
 				disabled={currentPage >= totalPages - 1}
 			>
-				<ArrowRight className="w-3 h-3 ml-1" />
+				<ArrowRight />
 			</Button>
 		</div>
 	)

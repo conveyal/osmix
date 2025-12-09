@@ -14,7 +14,7 @@ import {
 	SkipForwardIcon,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import { useMemo } from "react"
+import { Suspense, useMemo } from "react"
 import ActionButton from "../components/action-button"
 import Basemap from "../components/basemap"
 import CustomControl from "../components/custom-control"
@@ -30,7 +30,10 @@ import ChangesSummary, {
 	ChangesPagination,
 } from "../components/osm-changes-summary"
 import OsmInfoTable from "../components/osm-info-table"
-import OsmPbfFileInput from "../components/osm-pbf-file-input"
+import {
+	OsmPbfClearFileButton,
+	OsmPbfSelectFileButton,
+} from "../components/osm-pbf-file-input"
 import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
 import SelectedEntityLayer from "../components/selected-entity-layer"
@@ -40,6 +43,7 @@ import {
 	ButtonGroup,
 	ButtonGroupSeparator,
 } from "../components/ui/button-group"
+import { Card, CardContent, CardHeader } from "../components/ui/card"
 import {
 	Item,
 	ItemActions,
@@ -60,7 +64,6 @@ import { osmWorker } from "../state/worker"
 
 const STEPS = [
 	"select-osm-pbf-files",
-	"run-all-steps",
 	"inspect-base-osm",
 	"review-changeset",
 	"inspect-patch-osm",
@@ -72,6 +75,7 @@ const STEPS = [
 	"create-intersections",
 	"review-changeset",
 	"inspect-final-osm",
+	"run-all-steps",
 ] as const
 
 const stepIndexAtom = atom<number>(0)
@@ -157,39 +161,63 @@ export default function Merge() {
 					<Step step="select-osm-pbf-files" title="SELECT OSM FILES">
 						<p>Select two OSM files (PBF or GeoJSON) to merge.</p>
 
-						<div className="flex flex-col border rounded shadow">
-							<div className="font-bold p-2">BASE OSM</div>
-							<OsmPbfFileInput
-								testId="merge-base-file"
-								file={base.file}
-								setFile={async (file) => {
-									const osm = await base.loadOsmFile(file)
-									flyToOsmBounds(osm)
-								}}
-							/>
-							<OsmInfoTable
-								defaultOpen={false}
-								osm={base.osm}
-								file={base.file}
-							/>
-						</div>
+						<Card>
+							<CardHeader>
+								<div className="p-2">BASE OSM</div>
+								{base.file && (
+									<OsmPbfClearFileButton
+										clearFile={async () => {
+											await base.loadOsmFile(null)
+										}}
+									/>
+								)}
+							</CardHeader>
+							<CardContent>
+								{!base.file ? (
+									<OsmPbfSelectFileButton
+										setFile={async (file) => {
+											const osm = await base.loadOsmFile(file)
+											flyToOsmBounds(osm)
+										}}
+									/>
+								) : (
+									<OsmInfoTable
+										defaultOpen={false}
+										osm={base.osm}
+										file={base.file}
+									/>
+								)}
+							</CardContent>
+						</Card>
 
-						<div className="flex flex-col border rounded shadow">
-							<div className="font-bold p-2">PATCH OSM</div>
-							<OsmPbfFileInput
-								testId="merge-patch-file"
-								file={patch.file}
-								setFile={async (file) => {
-									const osm = await patch.loadOsmFile(file)
-									flyToOsmBounds(osm)
-								}}
-							/>
-							<OsmInfoTable
-								defaultOpen={false}
-								osm={patch.osm}
-								file={patch.file}
-							/>
-						</div>
+						<Card>
+							<CardHeader>
+								<div className="p-2">PATCH OSM</div>
+								{patch.file && (
+									<OsmPbfClearFileButton
+										clearFile={async () => {
+											await patch.loadOsmFile(null)
+										}}
+									/>
+								)}
+							</CardHeader>
+							<CardContent>
+								{!patch.file ? (
+									<OsmPbfSelectFileButton
+										setFile={async (file) => {
+											const osm = await patch.loadOsmFile(file)
+											flyToOsmBounds(osm)
+										}}
+									/>
+								) : (
+									<OsmInfoTable
+										defaultOpen={false}
+										osm={patch.osm}
+										file={patch.file}
+									/>
+								)}
+							</CardContent>
+						</Card>
 
 						<div className="flex flex-col gap-2">
 							<div className="font-bold">MERGE STEPS</div>
@@ -213,7 +241,7 @@ export default function Merge() {
 								!base.osm || !patch.osm ? "opacity-50 pointer-events-none" : "",
 							)}
 						>
-							<Item variant="outline" asChild>
+							<Item asChild>
 								<a
 									href="#"
 									onClick={(e) => {
@@ -235,7 +263,7 @@ export default function Merge() {
 									</ItemActions>
 								</a>
 							</Item>
-							<Item variant="outline" asChild>
+							<Item asChild>
 								<a
 									href="#"
 									onClick={async (e) => {
@@ -306,14 +334,16 @@ export default function Merge() {
 							removes the extra copy. Review those proposals in the next step
 							before applying them.
 						</p>
-						<div className="flex flex-col border-1">
-							<div className="font-bold p-2">BASE OSM PBF</div>
-							<OsmInfoTable
-								defaultOpen={false}
-								osm={base.osm}
-								file={base.file}
-							/>
-						</div>
+						<Card>
+							<CardHeader className="p-2">BASE OSM PBF</CardHeader>
+							<CardContent>
+								<OsmInfoTable
+									defaultOpen={false}
+									osm={base.osm}
+									file={base.file}
+								/>
+							</CardContent>
+						</Card>
 						<ActionButton
 							disabled={!base.osm}
 							icon={<SearchCodeIcon />}
@@ -346,14 +376,16 @@ export default function Merge() {
 							patch file before it is merged into the base data.
 						</p>
 
-						<div className="flex flex-col border-1">
-							<div className="font-bold p-2">PATCH OSM PBF</div>
-							<OsmInfoTable
-								defaultOpen={false}
-								osm={patch.osm}
-								file={patch.file}
-							/>
-						</div>
+						<Card>
+							<CardHeader className="p-2">PATCH OSM PBF</CardHeader>
+							<CardContent>
+								<OsmInfoTable
+									defaultOpen={false}
+									osm={patch.osm}
+									file={patch.file}
+								/>
+							</CardContent>
+						</Card>
 						<ActionButton
 							disabled={!patch.osm}
 							icon={<SearchCodeIcon />}
@@ -386,38 +418,45 @@ export default function Merge() {
 							features that share the same IDs.
 						</p>
 
-						<div className="flex flex-col border-1">
-							<div className="flex flex-row justify-between items-center">
-								<div className="font-bold p-2">BASE OSM PBF</div>
+						<Card>
+							<CardHeader>
+								<div className="p-2">BASE OSM PBF</div>
+
 								{base.osm && (
 									<ActionButton
 										icon={<DownloadIcon />}
 										onAction={base.downloadOsm}
+										variant="ghost"
 									/>
 								)}
-							</div>
-							<OsmInfoTable
-								defaultOpen={false}
-								osm={base.osm}
-								file={base.file}
-							/>
-						</div>
-						<div className="flex flex-col border-1">
-							<div className="flex flex-row justify-between items-center">
-								<div className="font-bold p-2">PATCH OSM PBF</div>
+							</CardHeader>
+							<CardContent>
+								<OsmInfoTable
+									defaultOpen={false}
+									osm={base.osm}
+									file={base.file}
+								/>
+							</CardContent>
+						</Card>
+						<Card>
+							<CardHeader>
+								<div className="p-2">PATCH OSM PBF</div>
 								{patch.osm && (
 									<ActionButton
 										icon={<DownloadIcon />}
 										onAction={patch.downloadOsm}
+										variant="ghost"
 									/>
 								)}
-							</div>
-							<OsmInfoTable
-								defaultOpen={false}
-								osm={patch.osm}
-								file={patch.file}
-							/>
-						</div>
+							</CardHeader>
+							<CardContent>
+								<OsmInfoTable
+									defaultOpen={false}
+									osm={patch.osm}
+									file={patch.file}
+								/>
+							</CardContent>
+						</Card>
 
 						<ButtonGroup className="w-full">
 							<ActionButton
@@ -478,17 +517,22 @@ export default function Merge() {
 							</ActionButton>
 						</ButtonGroup>
 						{changesetStats && base.osm && (
-							<ChangesSummary>
-								{/* Changes List */}
-								<Details>
-									<DetailsSummary>CHANGES</DetailsSummary>
-									<DetailsContent>
-										<ChangesFilters />
-										<ChangesExpandableList />
-										<ChangesPagination />
-									</DetailsContent>
-								</Details>
-							</ChangesSummary>
+							<Card>
+								<CardHeader className="p-2">Changeset</CardHeader>
+								<CardContent>
+									<ChangesSummary />
+									<Suspense fallback={<div className="p-2">LOADING...</div>}>
+										<Details>
+											<DetailsSummary>ALL CHANGES</DetailsSummary>
+											<DetailsContent>
+												<ChangesFilters />
+												<ChangesExpandableList />
+												<ChangesPagination />
+											</DetailsContent>
+										</Details>
+									</Suspense>
+								</CardContent>
+							</Card>
 						)}
 
 						{changesetStats == null || hasZeroChanges ? (
@@ -518,7 +562,7 @@ export default function Merge() {
 									})
 								}
 							>
-								Apply changes
+								Apply all changes
 							</ActionButton>
 						)}
 					</Step>
@@ -530,22 +574,25 @@ export default function Merge() {
 							those nodes.
 						</p>
 
-						<div className="flex flex-col border-1">
-							<div className="flex flex-row justify-between">
-								<div className="font-bold p-2">CURRENT OSM PBF</div>
+						<Card>
+							<CardHeader>
+								<div className="p-2">CURRENT OSM PBF</div>
 								{base.osm && (
 									<ActionButton
 										icon={<DownloadIcon />}
 										onAction={base.downloadOsm}
+										variant="ghost"
 									/>
 								)}
-							</div>
-							<OsmInfoTable
-								defaultOpen={false}
-								osm={base.osm}
-								file={base.file}
-							/>
-						</div>
+							</CardHeader>
+							<CardContent>
+								<OsmInfoTable
+									defaultOpen={false}
+									osm={base.osm}
+									file={base.file}
+								/>
+							</CardContent>
+						</Card>
 
 						<ButtonGroup className="w-full">
 							<ActionButton
@@ -650,37 +697,41 @@ export default function Merge() {
 
 						{base.osm && (
 							<>
-								<div className="flex flex-col border-1">
-									<div className="font-bold p-2">NEW OSM PBF</div>
-									<OsmInfoTable
-										defaultOpen={false}
-										osm={base.osm}
-										file={base.file}
-									/>
-								</div>
+								<Card>
+									<CardHeader className="p-2">NEW OSM PBF</CardHeader>
+									<CardContent>
+										<OsmInfoTable
+											defaultOpen={false}
+											osm={base.osm}
+											file={base.file}
+										/>
+									</CardContent>
+								</Card>
 
 								{selectedEntity && (
-									<div className="flex flex-col border-1">
-										<div className="flex justify-between items-center">
-											<div className="font-bold p-2">SELECTED ENTITY</div>
+									<Card>
+										<CardHeader>
+											<div className="p-2">SELECTED ENTITY</div>
 											<Button
 												onClick={() => {
 													if (!base.osm || !selectedEntity) return
 													flyToEntity(base.osm, selectedEntity)
 												}}
 												variant="ghost"
-												size="icon"
+												size="icon-sm"
 												title="Fit bounds to entity"
 											>
 												<MaximizeIcon />
 											</Button>
-										</div>
-										<EntityDetails
-											entity={selectedEntity}
-											open={true}
-											osm={base.osm}
-										/>
-									</div>
+										</CardHeader>
+										<CardContent>
+											<EntityDetails
+												entity={selectedEntity}
+												open={true}
+												osm={base.osm}
+											/>
+										</CardContent>
+									</Card>
 								)}
 
 								<ActionButton

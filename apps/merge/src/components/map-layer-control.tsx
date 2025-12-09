@@ -75,11 +75,7 @@ export default function MapLayerControl() {
 	if (!map) return null
 
 	return (
-		<Collapsible
-			className="bg-background rounded shadow w-64"
-			open={isOpen}
-			onOpenChange={setIsOpen}
-		>
+		<Collapsible open={isOpen} onOpenChange={setIsOpen}>
 			<CollapsibleTrigger asChild>
 				<button
 					type="button"

@@ -1,7 +1,7 @@
 import { changeStatsSummary } from "@osmix/change"
 import { useAtom, useSetAtom } from "jotai"
 import { DownloadIcon, MaximizeIcon, MergeIcon, SearchCode } from "lucide-react"
-import { useMemo } from "react"
+import { Suspense, useMemo } from "react"
 import { useSearchParams } from "react-router"
 import ActionButton from "../components/action-button"
 import Basemap from "../components/basemap"
@@ -19,7 +19,10 @@ import ChangesSummary, {
 	ChangesPagination,
 } from "../components/osm-changes-summary"
 import OsmInfoTable from "../components/osm-info-table"
-import OsmPbfFileInput from "../components/osm-pbf-file-input"
+import {
+	OsmPbfClearFileButton,
+	OsmPbfSelectFileButton,
+} from "../components/osm-pbf-file-input"
 import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
 import RouteControl from "../components/route-control"
@@ -27,10 +30,8 @@ import RouteLayer from "../components/route-layer"
 import SelectedEntityLayer from "../components/selected-entity-layer"
 import SidebarLog from "../components/sidebar-log"
 import TileBoundsLayer from "../components/tile-bounds-layer"
-import {
-	ButtonGroup,
-	ButtonGroupSeparator,
-} from "../components/ui/button-group"
+import { ButtonGroup } from "../components/ui/button-group"
+import { Card, CardContent, CardHeader } from "../components/ui/card"
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
 import { changesetStatsAtom } from "../state/changes"
@@ -53,11 +54,12 @@ export default function InspectPage() {
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 
-	const applyChanges = async (osmId: string) => {
+	const applyChanges = async () => {
+		if (!osm) throw Error("Osm has not been loaded.")
 		const task = Log.startTask("Applying changes to OSM...")
-		await osmWorker.applyChangesAndReplace(osmId)
+		await osmWorker.applyChangesAndReplace(osm.id)
 		task.update("Refreshing OSM index...")
-		const newOsm = await osmWorker.get(osmId)
+		const newOsm = await osmWorker.get(osm.id)
 		setOsm(newOsm)
 		setChangesetStats(null)
 		task.end("Changes applied!")
@@ -71,30 +73,37 @@ export default function InspectPage() {
 		<Main>
 			<Sidebar>
 				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-					<OsmPbfFileInput
-						testId="inspect-file"
-						file={file}
-						setFile={async (file) => {
-							selectEntity(null, null)
-							setChangesetStats(null)
-							const osmInfo = await loadOsmFile(file)
-							flyToOsmBounds(osmInfo)
-						}}
-					/>
-
-					{osm && osmInfo && file ? (
-						<div className="flex flex-col gap-2">
-							<div className="flex flex-col">
-								<div className="flex items-center justify-between border-l border-r border-t pl-2 rounded-t">
-									<div className="font-bold">OPENSTREETMAP</div>
+					{!osm || !osmInfo || !file ? (
+						<>
+							<OsmPbfSelectFileButton
+								setFile={async (f) => {
+									selectEntity(null, null)
+									setChangesetStats(null)
+									const info = await loadOsmFile(f)
+									flyToOsmBounds(info)
+								}}
+							/>
+							<ExtractList />
+						</>
+					) : (
+						<>
+							<Card>
+								<CardHeader>
+									<div className="font-bold uppercase p-2">FILE</div>
 									<ButtonGroup>
+										<OsmPbfClearFileButton
+											clearFile={async () => {
+												selectEntity(null, null)
+												setChangesetStats(null)
+												await loadOsmFile(null)
+											}}
+										/>
 										<ActionButton
 											onAction={downloadOsm}
 											variant="ghost"
 											icon={<DownloadIcon />}
 											title="Download OSM PBF"
 										/>
-										<ButtonGroupSeparator />
 										<ActionButton
 											onAction={async () => flyToOsmBounds(osmInfo)}
 											variant="ghost"
@@ -102,9 +111,11 @@ export default function InspectPage() {
 											title="Fit bounds to file bbox"
 										/>
 									</ButtonGroup>
-								</div>
-								<OsmInfoTable file={file} osm={osm} />
-							</div>
+								</CardHeader>
+								<CardContent>
+									<OsmInfoTable file={file} osm={osm} />
+								</CardContent>
+							</Card>
 
 							{changesetStats == null ? (
 								<ActionButton
@@ -113,8 +124,8 @@ export default function InspectPage() {
 											"Finding duplicate nodes and ways",
 										)
 										const changes = await osmWorker.generateChangeset(
-											osmId,
-											osmId,
+											osm.id,
+											osm.id,
 											{
 												deduplicateNodes: true,
 												deduplicateWays: true,
@@ -129,26 +140,34 @@ export default function InspectPage() {
 								</ActionButton>
 							) : (
 								<>
-									<ChangesSummary>
-										{/* Changes List */}
-										<Details>
-											<DetailsSummary>CHANGES</DetailsSummary>
-											<DetailsContent>
-												<ChangesFilters />
-												<ChangesList
-													setSelectedEntity={(entity) => {
-														selectEntity(osm, entity)
-														flyToEntity(osm, entity)
-													}}
-												/>
-												<ChangesPagination />
-											</DetailsContent>
-										</Details>
-									</ChangesSummary>
+									<Card>
+										<CardHeader className="p-2">Changeset</CardHeader>
+										<CardContent>
+											<ChangesSummary />
+											<Suspense
+												fallback={<div className="py-1 px-2">LOADING...</div>}
+											>
+												<Details>
+													<DetailsSummary>CHANGES</DetailsSummary>
+													<DetailsContent>
+														<ChangesFilters />
+														<ChangesList
+															setSelectedEntity={(entity) => {
+																selectEntity(osm, entity)
+																flyToEntity(osm, entity)
+															}}
+														/>
+														<ChangesPagination />
+													</DetailsContent>
+												</Details>
+											</Suspense>
+										</CardContent>
+									</Card>
 
 									{!hasZeroChanges && (
 										<ActionButton
-											onAction={() => applyChanges(osm.id)}
+											className="w-full"
+											onAction={applyChanges}
 											icon={<MergeIcon />}
 										>
 											Apply changes
@@ -156,11 +175,7 @@ export default function InspectPage() {
 									)}
 								</>
 							)}
-						</div>
-					) : (
-						<div className="flex flex-col gap-2">
-							<ExtractList />
-						</div>
+						</>
 					)}
 				</div>
 				<SidebarLog />

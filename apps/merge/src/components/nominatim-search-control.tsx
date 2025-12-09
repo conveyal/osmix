@@ -102,7 +102,7 @@ export default function NominatimSearchControl({ map }: { map?: MapInstance }) {
 	}
 
 	return (
-		<div className="bg-background w-sm max-w-sm shadow rounded">
+		<>
 			<form
 				onSubmit={(e) => {
 					e.preventDefault()
@@ -163,6 +163,6 @@ export default function NominatimSearchControl({ map }: { map?: MapInstance }) {
 					</ul>
 				</div>
 			)}
-		</div>
+		</>
 	)
 }

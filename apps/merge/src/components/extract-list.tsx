@@ -3,7 +3,7 @@ import { Card, CardContent } from "./ui/card"
 export default function ExtractList() {
 	return (
 		<Card>
-			<CardContent className="flex flex-col gap-2 leading-relaxed">
+			<CardContent className="flex flex-col gap-2 leading-relaxed p-4">
 				<p>
 					Looking for OpenStreetMap PBF data? We recommend the following
 					services:
@@ -14,6 +14,7 @@ export default function ExtractList() {
 							href="https://slice.openstreetmap.us/#0/0/0"
 							target="_blank"
 							rel="noreferrer"
+							className="text-blue-500"
 						>
 							SliceOSM
 						</a>
@@ -25,6 +26,7 @@ export default function ExtractList() {
 							href="https://download.geofabrik.de"
 							target="_blank"
 							rel="noreferrer"
+							className="text-blue-500"
 						>
 							Geofabrik Extracts
 						</a>

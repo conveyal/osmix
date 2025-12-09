@@ -62,7 +62,14 @@ function CustomControl(props: {
 	const map = ctrl.getMap()
 	const el = ctrl.getElement()
 
-	return map && el && createPortal(cloneElement(props.children, { map }), el)
+	if (!map || !el) return null
+
+	return createPortal(
+		<div className="bg-white rounded-md shadow-lg w-sm max-h-[50lvh] overflow-scroll flex flex-col">
+			{cloneElement(props.children, { map })}
+		</div>,
+		el,
+	)
 }
 
 export default React.memo(CustomControl)

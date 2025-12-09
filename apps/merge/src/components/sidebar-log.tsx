@@ -1,37 +1,48 @@
+import { ChevronDown } from "lucide-react"
+import { useState } from "react"
 import { useLog } from "../hooks/log"
 import { cn } from "../lib/utils"
-import { formatTimestampMs } from "../utils"
 import LogContent from "./log"
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "./ui/collapsible"
 import { Spinner } from "./ui/spinner"
 
 export default function SidebarLog() {
 	const { activeTasks, log } = useLog()
 	const status = log[log.length - 1]
+	const [open, setOpen] = useState(true)
 	return (
-		<div className="border-t">
-			<div className="flex items-center justify-between px-4 py-2 border-b shadow">
-				<span className="font-bold uppercase">Activity Log</span>
-				{status && (
-					<span
-						className="flex items-center gap-2"
-						title={formatTimestampMs(status.timestamp)}
-					>
-						{activeTasks > 0 ? (
-							<Spinner />
-						) : (
-							<span
-								className={cn(
-									"h-2 w-2 rounded-full bg-green-500",
-									status.type === "error" && "bg-red-500",
-								)}
-							/>
-						)}
-					</span>
+		<Collapsible open={open} onOpenChange={setOpen}>
+			<CollapsibleTrigger className="border-t flex items-center justify-between px-4 py-2 h-8 shadow bg-white z-10 relative w-full cursor-pointer hover:bg-accent">
+				<div className="font-bold uppercase">Activity Log</div>
+
+				<div className="flex gap-4 items-center">
+					{activeTasks > 0 ? (
+						<Spinner />
+					) : (
+						<span
+							className={cn(
+								"h-2 w-2 rounded-full bg-green-500",
+								status.type === "error" && "bg-red-500",
+							)}
+						/>
+					)}
+					<ChevronDown
+						className={cn("transition-all size-4", open && "rotate-180")}
+					/>
+				</div>
+			</CollapsibleTrigger>
+			<CollapsibleContent
+				className={cn(
+					"h-0 bg-slate-50 flex transition-all flex-col overflow-x-auto overflow-y-auto gap-1 pb-4 px-2",
+					open && "h-36 pt-2",
 				)}
-			</div>
-			<div className="h-36 flex flex-col overflow-x-auto overflow-y-auto gap-1 pb-4 pl-2 pt-2">
+			>
 				<LogContent />
-			</div>
-		</div>
+			</CollapsibleContent>
+		</Collapsible>
 	)
 }
