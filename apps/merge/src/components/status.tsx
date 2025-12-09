@@ -9,7 +9,7 @@ export default function Status() {
 	if (!status) return null
 	return (
 		<div
-			className="flex flex-row items-center gap-2"
+			className="flex flex-row items-center gap-2 overflow-hidden px-4"
 			title={formatTimestampMs(status.timestamp)}
 		>
 			{activeTasks > 0 ? (
@@ -17,12 +17,14 @@ export default function Status() {
 			) : (
 				<div
 					className={cn(
-						"h-2 w-2 rounded-full bg-green-500",
+						"h-2 w-2 rounded-full bg-green-500 p-1",
 						status.type === "error" && "bg-red-500",
 					)}
 				/>
 			)}
-			<div className="text-slate-950">{status.message}</div>
+			<div className="text-slate-950 overflow-hidden whitespace-nowrap text-ellipsis shrink">
+				{status.message}
+			</div>
 		</div>
 	)
 }
