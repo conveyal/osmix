@@ -38,12 +38,12 @@ export function DetailsSummary({
 	return (
 		<CollapsibleTrigger
 			className={cn(
-				"border-t w-full flex justify-between items-center p-2 cursor-pointer hover:bg-accent transition-colors h-8 data-[state=open]:shadow-sm",
+				"group border-t w-full flex justify-between items-center p-2 cursor-pointer hover:bg-accent transition-colors h-8 data-[state=open]:shadow-sm",
 				className,
 			)}
 		>
 			<div className="font-bold uppercase">{children}</div>
-			<ChevronUp className="size-4" />
+			<ChevronUp className="size-4 group-data-[state=open]:rotate-180 transition-transform" />
 		</CollapsibleTrigger>
 	)
 }
