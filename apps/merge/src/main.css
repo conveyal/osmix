@@ -70,7 +70,7 @@
 	--accent: oklch(0.968 0.007 247.896);
 	--accent-foreground: oklch(0.208 0.042 265.755);
 	--destructive: oklch(0.577 0.245 27.325);
-	--border: var(--color-slate-400);
+	--border: var(--color-slate-200);
 	--input: oklch(0.929 0.013 255.508);
 	--ring: oklch(0.704 0.04 256.788);
 	--chart-1: oklch(0.646 0.222 41.116);
@@ -137,17 +137,19 @@ table {
 	width: 100%;
 
 	td {
-		border-color: var(--color-border);
-		border-width: 1px;
-		padding: 0.25rem;
+		padding: 0.25rem 0.5rem;
 		white-space: nowrap;
 		text-overflow: ellipsis;
 		overflow: hidden;
 		user-select: all;
-	}
 
-	td:hover {
-		background-color: var(--color-slate-100);
+		&:first-of-type {
+			border-left: none;
+		}
+
+		&:hover {
+			background-color: var(--color-slate-100);
+		}
 	}
 }
 
@@ -160,8 +162,7 @@ table {
 }
 
 .maplibregl-ctrl {
-	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
-	border-radius: var(--radius);
+	border-radius: var(--radius-md);
 }
 
 .maplibregl-ctrl button:not(:disabled):hover {

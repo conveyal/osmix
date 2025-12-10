@@ -38,11 +38,6 @@ const initialState: RoutingState = {
 /** Main routing state atom. */
 export const routingStateAtom = atom<RoutingState>(initialState)
 
-/** Reset routing state to initial values. */
-export const clearRoutingAtom = atom(null, (_get, set) => {
-	set(routingStateAtom, initialState)
-})
-
 /** Derived atom that builds GeoJSON from routing state. */
 export const routingGeoJsonAtom = atom<GeoJSON.FeatureCollection>((get) => {
 	const routingState = get(routingStateAtom)

@@ -461,7 +461,7 @@ export class OsmixWorker extends EventTarget {
 		const changeset = this.changesets[osmId]
 		if (!changeset) throw Error("No active changeset")
 		const newOsm = applyChangesetToOsm(changeset)
-		this.set(osmId, new Osm(newOsm))
+		this.set(osmId, newOsm)
 		delete this.changesets[osmId]
 		delete this.filteredChanges[osmId]
 		return newOsm.id

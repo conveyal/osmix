@@ -14,22 +14,23 @@ import { Details, DetailsContent, DetailsSummary } from "./details"
 const noop = (_: OsmEntity) => undefined
 
 export default function EntityDetails({
-	open,
+	defaultOpen,
 	entity,
 	onSelect = noop,
 	osm,
 }: {
-	open?: boolean
+	defaultOpen?: boolean
 	entity: OsmEntity
 	onSelect?: (entity: OsmEntity) => void
 	osm?: Osm
 }) {
-	if (isNode(entity)) return <NodeDetails node={entity} open={open} />
+	if (isNode(entity))
+		return <NodeDetails node={entity} defaultOpen={defaultOpen} />
 	if (isWay(entity))
 		return (
-			<WayDetails way={entity} open={open}>
+			<WayDetails way={entity} defaultOpen={defaultOpen}>
 				{osm && (
-					<Details open={false}>
+					<Details defaultOpen={false}>
 						<DetailsSummary>WAY NODES ({entity.refs.length})</DetailsSummary>
 						<DetailsContent>
 							<NodeListTable
@@ -45,9 +46,9 @@ export default function EntityDetails({
 		)
 	if (isRelation(entity))
 		return (
-			<RelationDetails relation={entity} open={open}>
+			<RelationDetails relation={entity} defaultOpen={defaultOpen}>
 				{osm && (
-					<Details open={false}>
+					<Details defaultOpen={false}>
 						<DetailsSummary>
 							RELATION MEMBERS ({entity.members.length})
 						</DetailsSummary>
@@ -70,9 +71,15 @@ export function EntityContent({ entity }: { entity: OsmEntity }) {
 	if (isRelation(entity)) return <RelationDetails relation={entity} />
 }
 
-export function NodeDetails({ node, open }: { node: OsmNode; open?: boolean }) {
+export function NodeDetails({
+	node,
+	defaultOpen,
+}: {
+	node: OsmNode
+	defaultOpen?: boolean
+}) {
 	return (
-		<Details open={open}>
+		<Details defaultOpen={defaultOpen}>
 			<DetailsSummary className="font-bold">NODE {node.id}</DetailsSummary>
 			<DetailsContent>
 				<NodeContent node={node} />
@@ -116,14 +123,14 @@ export function WayContent({ way }: { way: OsmWay }) {
 export function WayDetails({
 	way,
 	children,
-	open,
+	defaultOpen,
 }: {
 	way: OsmWay
 	children?: React.ReactNode
-	open?: boolean
+	defaultOpen?: boolean
 }) {
 	return (
-		<Details open={open}>
+		<Details defaultOpen={defaultOpen}>
 			<DetailsSummary>WAY {way.id}</DetailsSummary>
 			<DetailsContent>
 				<WayContent way={way} />
@@ -167,14 +174,14 @@ export function RelationContent({ relation }: { relation: OsmRelation }) {
 export function RelationDetails({
 	relation,
 	children,
-	open,
+	defaultOpen,
 }: {
 	relation: OsmRelation
 	children?: ReactNode
-	open?: boolean
+	defaultOpen?: boolean
 }) {
 	return (
-		<Details open={open}>
+		<Details defaultOpen={defaultOpen}>
 			<DetailsSummary className="font-bold">
 				RELATION {relation.id}
 			</DetailsSummary>
@@ -209,7 +216,7 @@ export function NodeListDetails({
 	onSelect: (node: OsmNode) => void
 }) {
 	return (
-		<Details open>
+		<Details defaultOpen>
 			<DetailsSummary>NODES ({nodes.length})</DetailsSummary>
 			<DetailsContent className="max-h-48 overflow-y-scroll">
 				<NodeListTable nodes={nodes} onSelect={onSelect} />

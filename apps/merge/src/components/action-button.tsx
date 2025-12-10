@@ -31,7 +31,7 @@ export default function ActionButton({
 					}
 				})
 			}}
-			size={children ? "default" : "icon"}
+			size={children ? "default" : "icon-sm"}
 			{...props}
 		>
 			{isTransitioning ? <Spinner /> : icon} {children}

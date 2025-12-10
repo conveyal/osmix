@@ -1,7 +1,10 @@
+import { useAtomValue } from "jotai"
 import { ChevronDown, Eye, EyeOff, Layers } from "lucide-react"
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { useMap } from "../hooks/map"
 import { cn } from "../lib/utils"
+import { layerControlIsOpenAtom } from "../state/map"
+import CustomControl from "./custom-control"
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -16,10 +19,20 @@ type LayerInfo = {
 }
 
 export default function MapLayerControl() {
+	const isOpen = useAtomValue(layerControlIsOpenAtom)
+	if (!isOpen) return null
+	return (
+		<CustomControl position="bottom-right" className="w-64">
+			<MapLayers />
+		</CustomControl>
+	)
+}
+
+export function MapLayers() {
 	const map = useMap()
 	const [layers, setLayers] = useState<LayerInfo[]>([])
 	const [searchQuery, setSearchQuery] = useState("")
-	const [isOpen, setIsOpen] = useState(false)
+	const [isOpen, setIsOpen] = useState(true)
 
 	// Fetch layers from the map
 	const refreshLayers = useCallback(() => {
@@ -75,11 +88,7 @@ export default function MapLayerControl() {
 	if (!map) return null
 
 	return (
-		<Collapsible
-			className="bg-background rounded shadow w-64"
-			open={isOpen}
-			onOpenChange={setIsOpen}
-		>
+		<Collapsible open={isOpen} onOpenChange={setIsOpen}>
 			<CollapsibleTrigger asChild>
 				<button
 					type="button"

@@ -14,8 +14,8 @@ export default function OsmInfoTable({
 }) {
 	if (!osm || !file) return null
 	return (
-		<Details open={defaultOpen}>
-			<DetailsSummary>FILE: {file.name}</DetailsSummary>
+		<Details defaultOpen={defaultOpen}>
+			<DetailsSummary>FILE INFO: {file.name}</DetailsSummary>
 			<DetailsContent className="overflow-auto">
 				<table>
 					<tbody>

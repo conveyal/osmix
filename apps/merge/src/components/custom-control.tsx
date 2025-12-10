@@ -1,3 +1,4 @@
+import type { ClassValue } from "clsx"
 import * as React from "react"
 import { cloneElement, useState } from "react"
 import { createPortal } from "react-dom"
@@ -7,6 +8,7 @@ import type {
 	MapInstance,
 } from "react-map-gl/maplibre"
 import { useControl } from "react-map-gl/maplibre"
+import { cn } from "../lib/utils"
 
 class OverlayControl implements IControl {
 	_map: MapInstance | null = null
@@ -46,6 +48,7 @@ class OverlayControl implements IControl {
  * A custom control that rerenders arbitrary React content whenever the camera changes
  */
 function CustomControl(props: {
+	className?: ClassValue
 	children: React.ReactElement<{ map: MapInstance }>
 	position?: ControlPosition
 }) {
@@ -62,7 +65,19 @@ function CustomControl(props: {
 	const map = ctrl.getMap()
 	const el = ctrl.getElement()
 
-	return map && el && createPortal(cloneElement(props.children, { map }), el)
+	if (!map || !el) return null
+
+	return createPortal(
+		<div
+			className={cn(
+				"bg-white rounded-md shadow-lg w-sm max-h-[50lvh] overflow-scroll flex flex-col",
+				props.className,
+			)}
+		>
+			{cloneElement(props.children, { map })}
+		</div>,
+		el,
+	)
 }
 
 export default React.memo(CustomControl)

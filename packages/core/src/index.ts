@@ -32,4 +32,5 @@ export * from "./relations"
 export * from "./stringtable"
 export * from "./tags"
 export { BufferConstructor, type BufferType } from "./typed-arrays"
+export * from "./utils" // TODO Move into shared?
 export * from "./ways"

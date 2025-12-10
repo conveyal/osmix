@@ -20,24 +20,17 @@ import type {
 	HighwayFilter,
 	RoutingGraphTransferables,
 } from "./types"
-import {
-	calculateTime,
-	DEFAULT_SPEEDS,
-	defaultHighwayFilter,
-	getSpeedLimit,
-} from "./utils"
+import { DEFAULT_SPEEDS, defaultHighwayFilter, getSpeedLimit } from "./utils"
 
 /**
  * Routing graph built from OSM ways and nodes.
  *
  * Uses CSR (Compressed Sparse Row) format internally for memory efficiency
- * and zero-copy transfer between workers. Call `compact()` after construction
- * before using `transferables()`.
+ * and zero-copy transfer between workers.
  *
  * @example Build from OSM data
  * ```ts
  * const graph = new RoutingGraph(osm)
- * graph.compact()
  * const route = router.route(graph, startNode, endNode)
  * ```
  *
@@ -65,14 +58,6 @@ export class RoutingGraph {
 	private edgeTimes: Float32Array | null = null
 	private routableBits: Uint8Array | null = null
 	private intersectionBits: Uint8Array | null = null
-
-	// Temporary structures used during construction (cleared after compact())
-	private tempEdges: Map<number, GraphEdge[]> | null = null
-	private tempRoutable: Set<number> | null = null
-	private tempIntersections: Set<number> | null = null
-
-	/** Whether compact() has been called. */
-	private compacted = false
 
 	// Expose highway filter and default speeds
 	readonly filter: HighwayFilter
@@ -114,7 +99,6 @@ export class RoutingGraph {
 		this.edgeTimes = new Float32Array(t.edgeTimes)
 		this.routableBits = new Uint8Array(t.routableBits)
 		this.intersectionBits = new Uint8Array(t.intersectionBits)
-		this.compacted = true
 	}
 
 	/**
@@ -126,15 +110,15 @@ export class RoutingGraph {
 		defaultSpeeds: DefaultSpeeds,
 	) {
 		this.nodeCount = osm.nodes.size
-		this.tempEdges = new Map()
-		this.tempRoutable = new Set()
-		this.tempIntersections = new Set()
+		const tempEdges = new Map<number, GraphEdge[]>()
+		const tempRoutable = new Set<number>()
+		const tempIntersections = new Set<number>()
 
 		const addEdgeToNode = (from: number, edge: GraphEdge) => {
-			let nodeEdges = this.tempEdges!.get(from)
+			let nodeEdges = tempEdges.get(from)
 			if (!nodeEdges) {
 				nodeEdges = []
-				this.tempEdges!.set(from, nodeEdges)
+				tempEdges.set(from, nodeEdges)
 			}
 			nodeEdges.push(edge)
 		}
@@ -144,12 +128,13 @@ export class RoutingGraph {
 			if (!filter(tags)) continue
 
 			const refs = osm.ways.getRefIds(wayIndex)
-			const nodes = refs.map((ref) => osm.nodes.ids.getIndexFromId(ref))
-			if (nodes.length < 2) continue
+			if (refs.length < 2) continue
 
 			// Create bidirectional edges between consecutive nodes (respecting one-way)
 			const oneway = tags?.["oneway"] === "yes" || tags?.["oneway"] === "1"
-			const speed = getSpeedLimit(tags, defaultSpeeds)
+			const speedKph = getSpeedLimit(tags, defaultSpeeds)
+			const speedMps = (speedKph * 1_000) / 60 / 60
+			const nodes = refs.map((ref) => osm.nodes.ids.getIndexFromId(ref))
 
 			for (let i = 0; i < nodes.length - 1; i++) {
 				const nodeIndex = nodes[i]!
@@ -157,14 +142,14 @@ export class RoutingGraph {
 				const fromCoord = osm.nodes.getNodeLonLat({ index: nodeIndex })
 				const targetCoord = osm.nodes.getNodeLonLat({ index: targetNodeIndex })
 
-				const distance = haversineDistance(fromCoord, targetCoord)
-				const time = calculateTime(distance, speed)
+				const distanceM = haversineDistance(fromCoord, targetCoord)
+				const time = distanceM / speedMps
 
 				// Forward edge
 				addEdgeToNode(nodeIndex, {
 					targetNodeIndex: targetNodeIndex,
 					wayIndex,
-					distance,
+					distance: distanceM,
 					time,
 				})
 				this.edgeCount++
@@ -174,40 +159,28 @@ export class RoutingGraph {
 					addEdgeToNode(targetNodeIndex, {
 						targetNodeIndex: nodeIndex,
 						wayIndex,
-						distance,
+						distance: distanceM,
 						time,
 					})
 					this.edgeCount++
 				}
 
 				// Track routable nodes and intersections (nodes appearing in multiple ways)
-				if (this.tempRoutable!.has(nodeIndex)) {
-					this.tempIntersections!.add(nodeIndex)
+				if (tempRoutable.has(nodeIndex)) {
+					tempIntersections.add(nodeIndex)
 				} else {
-					this.tempRoutable!.add(nodeIndex)
+					tempRoutable.add(nodeIndex)
 				}
 
-				if (this.tempRoutable!.has(targetNodeIndex)) {
-					this.tempIntersections!.add(targetNodeIndex)
+				if (tempRoutable!.has(targetNodeIndex)) {
+					tempIntersections.add(targetNodeIndex)
 				} else {
-					this.tempRoutable!.add(targetNodeIndex)
+					tempRoutable!.add(targetNodeIndex)
 				}
 			}
 		}
 
 		// Convert to CSR format and free temporary structures
-		this.compact()
-	}
-
-	/**
-	 * Convert to CSR format and free temporary structures.
-	 * Must be called before transferables() or after construction for optimal memory usage.
-	 */
-	private compact() {
-		if (this.compacted) return
-		if (!this.tempEdges || !this.tempRoutable || !this.tempIntersections) {
-			throw new Error("Cannot compact: graph was not built from OSM data")
-		}
 
 		// Allocate CSR arrays
 		const offsetsBuffer = new BufferConstructor(
@@ -236,7 +209,7 @@ export class RoutingGraph {
 		let edgeIndex = 0
 		for (let nodeIndex = 0; nodeIndex < this.nodeCount; nodeIndex++) {
 			this.edgeOffsets[nodeIndex] = edgeIndex
-			const edges = this.tempEdges.get(nodeIndex)
+			const edges = tempEdges.get(nodeIndex)
 			if (edges) {
 				for (const edge of edges) {
 					this.edgeTargets[edgeIndex] = edge.targetNodeIndex
@@ -256,32 +229,23 @@ export class RoutingGraph {
 		this.routableBits = new Uint8Array(routableBuffer)
 		this.intersectionBits = new Uint8Array(intersectionBuffer)
 
-		for (const nodeIndex of this.tempRoutable) {
+		for (const nodeIndex of tempRoutable) {
 			const byteIndex = nodeIndex >> 3
 			const bitMask = 1 << (nodeIndex & 7)
 			this.routableBits[byteIndex]! |= bitMask
 		}
 
-		for (const nodeIndex of this.tempIntersections) {
+		for (const nodeIndex of tempIntersections) {
 			const byteIndex = nodeIndex >> 3
 			const bitMask = 1 << (nodeIndex & 7)
 			this.intersectionBits[byteIndex]! |= bitMask
 		}
-
-		// Free temporary structures
-		this.tempEdges = null
-		this.tempRoutable = null
-		this.tempIntersections = null
-		this.compacted = true
 	}
 
 	/**
 	 * Check if a node is part of the routable network.
 	 */
 	isRoutable(nodeIndex: number): boolean {
-		if (!this.compacted) {
-			return this.tempRoutable?.has(nodeIndex) ?? false
-		}
 		if (nodeIndex < 0 || nodeIndex >= this.nodeCount) return false
 		const byteIndex = nodeIndex >> 3
 		const bitMask = 1 << (nodeIndex & 7)
@@ -292,9 +256,6 @@ export class RoutingGraph {
 	 * Check if a node is an intersection (multiple ways meet).
 	 */
 	isIntersection(nodeIndex: number): boolean {
-		if (!this.compacted) {
-			return this.tempIntersections?.has(nodeIndex) ?? false
-		}
 		if (nodeIndex < 0 || nodeIndex >= this.nodeCount) return false
 		const byteIndex = nodeIndex >> 3
 		const bitMask = 1 << (nodeIndex & 7)
@@ -305,9 +266,6 @@ export class RoutingGraph {
 	 * Get outgoing edges from a node.
 	 */
 	getEdges(nodeIndex: number): GraphEdge[] {
-		if (!this.compacted) {
-			return this.tempEdges?.get(nodeIndex) ?? []
-		}
 		if (
 			nodeIndex < 0 ||
 			nodeIndex >= this.nodeCount ||
@@ -335,12 +293,8 @@ export class RoutingGraph {
 
 	/**
 	 * Get transferable buffers for passing to another thread.
-	 * Must call compact() first.
 	 */
 	transferables(): RoutingGraphTransferables {
-		if (!this.compacted) {
-			throw new Error("Must call compact() before transferables()")
-		}
 		return {
 			nodeCount: this.nodeCount,
 			edgeCount: this.edgeCount,
@@ -420,12 +374,12 @@ export class RoutingGraph {
 /**
  * Build a routing graph from OSM ways.
  *
- * Convenience function that creates a RoutingGraph and compacts it.
+ * Convenience function that creates a RoutingGraph.
  *
  * @param osm - The OSM dataset to build from.
  * @param filter - Function to determine which ways are routable.
  * @param defaultSpeeds - Speed limits (km/h) by highway type.
- * @returns A compacted RoutingGraph ready for pathfinding.
+ * @returns A RoutingGraph ready for pathfinding.
  */
 export function buildGraph(
 	osm: Osm,

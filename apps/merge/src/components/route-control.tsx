@@ -1,16 +1,15 @@
-import type { Osm } from "@osmix/core"
+import { bboxFromLonLats, type Osm } from "@osmix/core"
 import type { LonLat } from "@osmix/shared/types"
-import { useAtom, useSetAtom } from "jotai"
+import { useAtom, useAtomValue } from "jotai"
 import { NavigationIcon, XIcon } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useRef, useState } from "react"
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre"
 import { useMap } from "../hooks/map"
-import {
-	clearRoutingAtom,
-	routingStateAtom,
-	type SnappedNode,
-} from "../state/routing"
+import { routingControlIsOpenAtom } from "../state/map"
+import { selectedOsmAtom } from "../state/osm"
+import { routingStateAtom, type SnappedNode } from "../state/routing"
 import { osmWorker } from "../state/worker"
+import CustomControl from "./custom-control"
 import { Button } from "./ui/button"
 
 /** Maximum distance (m) to snap click point to nearest node. */
@@ -38,113 +37,115 @@ function formatTime(seconds: number): string {
 	return `${hours} hr ${remainMins} min`
 }
 
-export default function RouteControl({ osm }: { osm: Osm }) {
+export default function RouteMapControl() {
+	const isOpen = useAtomValue(routingControlIsOpenAtom)
+	const osm = useAtomValue(selectedOsmAtom)
+	if (!isOpen || !osm) return null
+	return (
+		<CustomControl position="bottom-left">
+			<Routing osm={osm} />
+		</CustomControl>
+	)
+}
+
+export function Routing({ osm }: { osm: Osm }) {
 	const map = useMap()
 	const [routingState, setRoutingState] = useAtom(routingStateAtom)
-	const clearRouting = useSetAtom(clearRoutingAtom)
 	const clickPhaseRef = useRef<"from" | "to">("from")
 	const [noNodeNearby, setNoNodeNearby] = useState(false)
 	const [isRouting, setIsRouting] = useState(false)
 
 	// Handle map click for setting from/to points
 	// Routing graph builds automatically on first search if needed
-	const handleMapClick = useCallback(
-		async (event: MapLayerMouseEvent) => {
-			if (isRouting) return
+	const handleMapClick = useEffectEvent(async (event: MapLayerMouseEvent) => {
+		if (isRouting) return
 
-			const point: LonLat = [event.lngLat.lng, event.lngLat.lat]
+		const point: LonLat = [event.lngLat.lng, event.lngLat.lat]
 
-			setIsRouting(true)
-			try {
-				const snapped = await osmWorker.findNearestRoutableNode(
-					osm.id,
-					point,
-					SNAP_RADIUS_M,
-				)
+		setIsRouting(true)
+		try {
+			const snapped = await osmWorker.findNearestRoutableNode(
+				osm.id,
+				point,
+				SNAP_RADIUS_M,
+			)
 
-				if (!snapped) {
-					// No routable node nearby - show feedback
-					setNoNodeNearby(true)
-					setTimeout(() => setNoNodeNearby(false), 2000)
+			if (!snapped) {
+				// No routable node nearby - show feedback
+				setNoNodeNearby(true)
+				setTimeout(() => setNoNodeNearby(false), 2000)
+				return
+			}
+
+			setNoNodeNearby(false)
+
+			// Get the OSM node ID from the node index
+			const nodeId = osm.nodes.ids.at(snapped.nodeIndex)
+
+			const snappedNode: SnappedNode = {
+				nodeIndex: snapped.nodeIndex,
+				nodeId,
+				coordinates: snapped.coordinates,
+				distance: snapped.distance,
+			}
+
+			if (clickPhaseRef.current === "from") {
+				// Setting from point
+				setRoutingState({
+					fromPoint: point,
+					toPoint: null,
+					fromNode: snappedNode,
+					toNode: null,
+					result: null,
+				})
+				clickPhaseRef.current = "to"
+			} else {
+				// Setting to point and calculating route
+				const fromNode = routingState.fromNode
+				if (!fromNode) {
+					clickPhaseRef.current = "from"
 					return
 				}
 
-				setNoNodeNearby(false)
+				const result = await osmWorker.route(
+					osm.id,
+					fromNode.nodeIndex,
+					snappedNode.nodeIndex,
+					{ includeStats: true, includePathInfo: true },
+				)
 
-				// Get the OSM node ID from the node index
-				const nodeId = osm.nodes.ids.at(snapped.nodeIndex)
+				setRoutingState((prev) => ({
+					...prev,
+					toPoint: point,
+					toNode: snappedNode,
+					result,
+				}))
+				clickPhaseRef.current = "from"
 
-				const snappedNode: SnappedNode = {
-					nodeIndex: snapped.nodeIndex,
-					nodeId,
-					coordinates: snapped.coordinates,
-					distance: snapped.distance,
+				if (result?.coordinates) {
+					map?.fitBounds(bboxFromLonLats(result.coordinates), { padding: 50 })
 				}
-
-				if (clickPhaseRef.current === "from") {
-					// Setting from point
-					setRoutingState({
-						fromPoint: point,
-						toPoint: null,
-						fromNode: snappedNode,
-						toNode: null,
-						result: null,
-					})
-					clickPhaseRef.current = "to"
-				} else {
-					// Setting to point and calculating route
-					const fromNode = routingState.fromNode
-					if (!fromNode) {
-						clickPhaseRef.current = "from"
-						return
-					}
-
-					const result = await osmWorker.route(
-						osm.id,
-						fromNode.nodeIndex,
-						snappedNode.nodeIndex,
-						{ includeStats: true, includePathInfo: true },
-					)
-
-					setRoutingState((prev) => ({
-						...prev,
-						toPoint: point,
-						toNode: snappedNode,
-						result,
-					}))
-					clickPhaseRef.current = "from"
-				}
-			} finally {
-				setIsRouting(false)
 			}
-		},
-		[osm.id, osm.nodes.ids, isRouting, routingState.fromNode, setRoutingState],
-	)
+		} finally {
+			setIsRouting(false)
+		}
+	})
 
 	// Attach/detach click handler to map
 	useEffect(() => {
 		if (!map) return
-
 		map.on("click", handleMapClick)
-
 		return () => {
 			map.off("click", handleMapClick)
 		}
-	}, [map, handleMapClick])
-
-	// Reset click phase when routing is cleared
-	useEffect(() => {
-		if (!routingState.fromPoint) {
-			clickPhaseRef.current = "from"
-		}
-	}, [routingState.fromPoint])
+	}, [map])
 
 	const hasFrom = routingState.fromPoint !== null
 	const hasTo = routingState.toPoint !== null
 	const hasRoute = routingState.result !== null
 
 	return (
-		<div className="bg-background w-sm max-h-[50lvh] overflow-y-auto shadow rounded-sm">
+		<>
 			<div className="flex items-center justify-between pl-2 border-b">
 				<div className="flex items-center gap-2">
 					<NavigationIcon className="size-4" />
@@ -152,35 +153,43 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 				</div>
 
 				<Button
-					onClick={() => clearRouting()}
+					onClick={() => {
+						// Reset click phase when routing is cleared
+						clickPhaseRef.current = "from"
+						setRoutingState({
+							fromNode: null,
+							fromPoint: null,
+							toNode: null,
+							toPoint: null,
+							result: null,
+						})
+					}}
 					variant="ghost"
 					title="Clear route"
-					size="icon"
+					size="icon-sm"
 					disabled={!hasFrom || isRouting}
 				>
 					<XIcon />
 				</Button>
 			</div>
 
-			<div className="p-3 space-y-3">
+			<div className="p-2 space-y-2">
 				{/* No node nearby feedback */}
 				{noNodeNearby && (
-					<div className="text-amber-500 font-medium">
+					<div className="text-amber-500 font-medium text-center">
 						No road found nearby. Click closer to a road.
 					</div>
 				)}
 
 				{/* Instructions */}
 				{!hasFrom && !noNodeNearby && !isRouting && (
-					<div className="text-muted-foreground">
+					<div className="text-muted-foreground text-center">
 						Click on the map to set a starting point
-						<div className="text-xs">
-							(routing graph builds on first search)
-						</div>
+						<div>(routing graph builds on first search)</div>
 					</div>
 				)}
 				{hasFrom && !hasTo && !noNodeNearby && !isRouting && (
-					<div className="text-muted-foreground">
+					<div className="text-muted-foreground text-center">
 						Click on the map to set a destination
 					</div>
 				)}
@@ -193,7 +202,7 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 				{/* From point info */}
 				{hasFrom && routingState.fromPoint && routingState.fromNode && (
 					<div className="space-y-1">
-						<div className="font-semibold text-red-500">From</div>
+						<div className="font-bold uppercase text-red-500">From</div>
 						<SnappedNodeInfo
 							point={routingState.fromPoint}
 							node={routingState.fromNode}
@@ -214,21 +223,21 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 
 				{/* Route result */}
 				{hasTo && !hasRoute && !isRouting && (
-					<div className="text-destructive font-semibold">
+					<div className="text-destructive font-bold uppercase text-center">
 						No route found between these points
 					</div>
 				)}
 
 				{hasRoute && routingState.result && (
 					<div className="space-y-2">
-						<div className="font-semibold text-blue-500">Route</div>
+						<div className="font-bold text-blue-500 uppercase">Route</div>
 						<div className="grid grid-cols-2 gap-2">
 							<div>
-								<div className="text-muted-foreground">Distance</div>
+								<div className="text-muted-foreground uppercase">Distance</div>
 								<div>{formatDistance(routingState.result.distance ?? 0)}</div>
 							</div>
 							<div>
-								<div className="text-muted-foreground">Est. Time</div>
+								<div className="text-muted-foreground uppercase">Est. Time</div>
 								<div>{formatTime(routingState.result.time ?? 0)}</div>
 							</div>
 						</div>
@@ -236,11 +245,11 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 						{/* Per-way breakdown */}
 						{routingState.result.segments &&
 							routingState.result.segments.length > 0 && (
-								<div>
-									<div className="text-muted-foreground mb-1">
+								<>
+									<div className="text-muted-foreground uppercase">
 										Directions ({routingState.result.segments.length} segments)
 									</div>
-									<div className="space-y-1 max-h-48 overflow-y-auto">
+									<div className="space-y-2 max-h-48 overflow-y-auto">
 										{routingState.result.segments.map((seg, i) => (
 											<div
 												key={`${seg.wayIds[0]}-${i}`}
@@ -259,12 +268,12 @@ export default function RouteControl({ osm }: { osm: Osm }) {
 											</div>
 										))}
 									</div>
-								</div>
+								</>
 							)}
 					</div>
 				)}
 			</div>
-		</div>
+		</>
 	)
 }
 
@@ -278,11 +287,11 @@ function SnappedNodeInfo({
 	return (
 		<div className="grid grid-cols-2 gap-2">
 			<div>
-				<div className="text-muted-foreground">Click</div>
+				<div className="text-muted-foreground uppercase">Click</div>
 				<div>{formatCoord(point)}</div>
 			</div>
 			<div>
-				<div className="text-muted-foreground">Node</div>
+				<div className="text-muted-foreground uppercase">Node</div>
 				<div>
 					{node.nodeId} ({formatDistance(node.distance)} away)
 				</div>

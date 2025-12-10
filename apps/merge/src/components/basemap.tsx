@@ -9,6 +9,9 @@ import {
 } from "react-map-gl/maplibre"
 import { APPID } from "../settings"
 import { mapBoundsAtom, mapCenterAtom, zoomAtom } from "../state/map"
+import MapLayerControl from "./map-layer-control"
+import NominatimSearchControl from "./nominatim-search-control"
+import RouteMapControl from "./route-control"
 
 const MAP_STYLE =
 	"https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
@@ -78,6 +81,10 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 				position="bottom-left"
 				unit="imperial"
 			/>
+
+			<MapLayerControl />
+			<RouteMapControl />
+			<NominatimSearchControl />
 
 			{children}
 		</MaplibreMap>
