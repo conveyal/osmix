@@ -1,3 +1,4 @@
+import type { OsmChange } from "@osmix/change"
 import type { OsmEntity } from "@osmix/shared/types"
 import { getEntityType } from "@osmix/shared/utils"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
@@ -235,13 +236,57 @@ export function ChangesList({
 	)
 }
 
+/**
+ * Displays augmented diff content for a change.
+ * Shows old/new comparison for modify operations and old state for deletions.
+ */
+function AugmentedDiffContent({ change }: { change: OsmChange }) {
+	const { changeType, entity, oldEntity, refs } = change
+
+	return (
+		<>
+			{refs && (
+				<div className="p-2 border-b-1">
+					Related: {refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")}
+				</div>
+			)}
+			{changeType === "modify" && oldEntity ? (
+				<div className="grid grid-cols-2 gap-2">
+					<div className="border-r border-gray-300">
+						<div className="px-2 py-1 font-bold text-xs text-gray-500 bg-red-50 border-b border-gray-200">
+							OLD
+						</div>
+						<EntityContent entity={oldEntity} />
+					</div>
+					<div>
+						<div className="px-2 py-1 font-bold text-xs text-gray-500 bg-green-50 border-b border-gray-200">
+							NEW
+						</div>
+						<EntityContent entity={entity} />
+					</div>
+				</div>
+			) : changeType === "delete" && oldEntity ? (
+				<div>
+					<div className="px-2 py-1 font-bold text-xs text-gray-500 bg-red-50 border-b border-gray-200">
+						DELETED
+					</div>
+					<EntityContent entity={oldEntity} />
+				</div>
+			) : (
+				<EntityContent entity={entity} />
+			)}
+		</>
+	)
+}
+
 export function ChangesExpandableList() {
 	const changes = useAtomValue(changesAtom)?.changes
 	const startIndex = useAtomValue(startIndexAtom)
 
 	return (
 		<div className="flex flex-col">
-			{changes?.map(({ changeType, entity, refs }, i) => {
+			{changes?.map((change, i) => {
+				const { changeType, entity } = change
 				const changeTypeColor = CHANGE_TYPE_COLOR[changeType]
 				const entityType = getEntityType(entity)
 				const summaryLabel = `${startIndex + i + 1}. ${changeType.toUpperCase()} ${entityType.toUpperCase()} ${entity.id}`
@@ -252,13 +297,7 @@ export function ChangesExpandableList() {
 						</DetailsSummary>
 
 						<DetailsContent className="w-full overflow-scroll inset-shadow">
-							{refs && (
-								<div className="p-2 border-b-1">
-									Related:{" "}
-									{refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")}
-								</div>
-							)}
-							<EntityContent entity={entity} />
+							<AugmentedDiffContent change={change} />
 						</DetailsContent>
 					</Details>
 				)
