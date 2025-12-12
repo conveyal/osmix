@@ -36,6 +36,7 @@ import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
 import SelectedEntityLayer from "../components/selected-entity-layer"
 import SidebarLog from "../components/sidebar-log"
+import StoredOsmList from "../components/stored-osm-list"
 import { Button } from "../components/ui/button"
 import {
 	ButtonGroup,
@@ -171,7 +172,7 @@ export default function Merge() {
 								)}
 							</CardHeader>
 							<CardContent>
-								{!base.file ? (
+								{!base.osm ? (
 									<OsmPbfSelectFileButton
 										setFile={async (file) => {
 											const osm = await base.loadOsmFile(file)
@@ -200,7 +201,7 @@ export default function Merge() {
 								)}
 							</CardHeader>
 							<CardContent>
-								{!patch.file ? (
+								{!patch.osm ? (
 									<OsmPbfSelectFileButton
 										setFile={async (file) => {
 											const osm = await patch.loadOsmFile(file)
@@ -216,6 +217,15 @@ export default function Merge() {
 								)}
 							</CardContent>
 						</Card>
+
+						<StoredOsmList
+							onLoad={async (id) => {
+								const info = await base.loadFromStorage(id)
+								flyToOsmBounds(info ?? undefined)
+								return info
+							}}
+							activeOsmId={base.osmInfo?.id}
+						/>
 
 						<div className="flex flex-col gap-2">
 							<div className="font-bold">MERGE STEPS</div>
