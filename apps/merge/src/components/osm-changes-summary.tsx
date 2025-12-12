@@ -251,23 +251,27 @@ function AugmentedDiffContent({ change }: { change: OsmChange }) {
 				</div>
 			)}
 			{changeType === "modify" && oldEntity ? (
-				<div className="grid grid-cols-2 gap-2">
-					<div className="border-r border-gray-300">
-						<div className="px-2 py-1 font-bold text-xs text-gray-500 bg-red-50 border-b border-gray-200">
+				<div className="grid grid-cols-2">
+					<div className="border-r">
+						<div className="px-2 py-1 font-bold text-muted-foreground bg-red-50">
 							OLD
 						</div>
-						<EntityContent entity={oldEntity} />
+						<div className="w-full overflow-scroll shadow-inner">
+							<EntityContent entity={oldEntity} />
+						</div>
 					</div>
 					<div>
-						<div className="px-2 py-1 font-bold text-xs text-gray-500 bg-green-50 border-b border-gray-200">
+						<div className="px-2 py-1 font-bold text-muted-foreground bg-green-50">
 							NEW
 						</div>
-						<EntityContent entity={entity} />
+						<div className="w-full overflow-scroll shadow-inner">
+							<EntityContent entity={entity} />
+						</div>
 					</div>
 				</div>
 			) : changeType === "delete" && oldEntity ? (
 				<div>
-					<div className="px-2 py-1 font-bold text-xs text-gray-500 bg-red-50 border-b border-gray-200">
+					<div className="px-2 py-1 font-bold text-muted-foreground bg-red-50">
 						DELETED
 					</div>
 					<EntityContent entity={oldEntity} />
