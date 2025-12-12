@@ -1,12 +1,10 @@
 import { useSetAtom } from "jotai"
-import { useCallback, useRef } from "react"
+import { useCallback } from "react"
 import {
 	Map as MaplibreMap,
-	type MapStyleDataEvent,
 	ScaleControl,
 	type ViewStateChangeEvent,
 } from "react-map-gl/maplibre"
-import { APPID } from "../settings"
 import { mapBoundsAtom, mapCenterAtom, zoomAtom } from "../state/map"
 import MapLayerControl from "./map-layer-control"
 import NominatimSearchControl from "./nominatim-search-control"
@@ -31,7 +29,6 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 	const setCenter = useSetAtom(mapCenterAtom)
 	const setBounds = useSetAtom(mapBoundsAtom)
 	const setZoom = useSetAtom(zoomAtom)
-	const hasHiddenLayersRef = useRef(false)
 
 	const onViewStateChange = useCallback(
 		(e: ViewStateChangeEvent) => {
@@ -42,24 +39,6 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 		[setBounds, setCenter, setZoom],
 	)
 
-	// Hide roads in base map - only run once on initial style load
-	const onStyleData = useCallback((e: MapStyleDataEvent) => {
-		if (hasHiddenLayersRef.current) return
-
-		const map = e.target
-		const style = map.getStyle()
-		if (!style?.layers) return
-
-		for (const layer of style.layers) {
-			if (layer.id.startsWith(APPID)) continue
-			if (layer.type === "line" || layer.type === "symbol") {
-				map.setLayoutProperty(layer.id, "visibility", "none")
-			}
-		}
-
-		hasHiddenLayersRef.current = true
-	}, [])
-
 	return (
 		<MaplibreMap
 			mapStyle={MAP_STYLE}
@@ -67,7 +46,6 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 			initialViewState={initialViewState}
 			onMove={onViewStateChange}
 			onZoom={onViewStateChange}
-			onStyleData={onStyleData}
 		>
 			<ScaleControl
 				style={controlStyle}

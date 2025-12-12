@@ -103,14 +103,12 @@ export function MapLayers() {
 	const filteredGroups = useMemo((): LayerGroup[] => {
 		if (!searchQuery.trim()) return groups
 		const query = searchQuery.toLowerCase()
-		return groups
-			.map((group) => ({
-				...group,
-				layers: group.layers.filter((layer) =>
-					layer.id.toLowerCase().includes(query),
-				),
-			}))
-			.filter((group) => group.layers.length > 0)
+		return groups.map((group) => ({
+			...group,
+			layers: group.layers.filter((layer) =>
+				layer.id.toLowerCase().includes(query),
+			),
+		}))
 	}, [groups, searchQuery])
 
 	const totalFilteredLayers = useMemo(
@@ -150,7 +148,7 @@ export function MapLayers() {
 					<span className="font-bold uppercase">Layers</span>
 				</div>
 				<div className="flex items-center gap-2">
-					<span className="text-muted-foreground">{totalFilteredLayers}</span>
+					<span className="text-muted-foreground">{layers.length}</span>
 
 					<ChevronDown
 						className={cn(
@@ -204,10 +202,8 @@ function LayerGroupComponent({
 	const allVisible = visibleCount === group.layers.length
 	const noneVisible = visibleCount === 0
 
-	if (group.layers.length === 0) return null
-
 	return (
-		<Collapsible defaultOpen={group.layers.length > 0}>
+		<Collapsible>
 			<CollapsibleTrigger className="group cursor-pointer flex h-8 p-2 justify-between items-center w-full">
 				<div className="uppercase flex gap-2 items-center">
 					<FolderOpen className="size-4 hidden group-data-[state=open]:block" />
