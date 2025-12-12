@@ -1,5 +1,11 @@
 # @osmix/json
 
+## 0.0.7
+
+### Patch Changes
+
+- ff40416: Refactor main `osmix` lib external APIs
+
 ## 0.0.6
 
 ### Patch Changes
