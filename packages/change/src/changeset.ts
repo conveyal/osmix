@@ -128,6 +128,9 @@ export class OsmChangeset {
 	/**
 	 * Add or update an `OsmChange` for a given entity.
 	 * Requires the entity to exist in the base OSM dataset (or have a previous 'create' change).
+	 *
+	 * For augmented diffs, the `oldEntity` field captures the state of the entity before
+	 * modification (the original entity from the base dataset).
 	 */
 	modify<T extends OsmEntityType>(
 		type: T,
@@ -149,10 +152,18 @@ export class OsmChangeset {
 			: undefined
 		const existingEntity = changeEntity ?? this.getEntity(type, id)
 		if (existingEntity == null) throw Error("Entity not found")
+
+		// For augmented diffs: capture the original entity from the base dataset
+		// if this is the first modification (not an update to an existing change).
+		// If we already have a change, preserve the original oldEntity.
+		const oldEntity =
+			change?.oldEntity ?? (changeEntity ? undefined : existingEntity)
+
 		changes[id] = {
 			changeType: change?.changeType ?? "modify",
 			entity: modify(existingEntity),
 			osmId: this.osm.id, // If we're modifying an entity, it must exist in the base OSM
+			oldEntity,
 		}
 	}
 
@@ -167,12 +178,19 @@ export class OsmChangeset {
 			return this.osm.relations.get({ id }) as OsmEntityTypeMap[T]
 	}
 
+	/**
+	 * Schedule an entity for deletion.
+	 *
+	 * For augmented diffs, the `oldEntity` field is set to the entity being deleted,
+	 * capturing its state before removal.
+	 */
 	delete(entity: OsmEntity, refs?: OsmEntityRef[]) {
 		this.changes(getEntityType(entity))[entity.id] = {
 			changeType: "delete",
 			entity,
 			refs,
 			osmId: this.osm.id,
+			oldEntity: entity, // For augmented diffs: capture the entity being deleted
 		}
 	}
 
