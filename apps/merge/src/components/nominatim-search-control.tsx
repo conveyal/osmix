@@ -30,7 +30,7 @@ export default function NominatimSearchControl() {
 	const isOpen = useAtomValue(searchControlIsOpenAtom)
 	if (!isOpen) return false
 	return (
-		<CustomControl position="top-left">
+		<CustomControl position="top-right">
 			<NominatimSearch />
 		</CustomControl>
 	)
