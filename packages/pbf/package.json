@@ -36,7 +36,7 @@
 		"build": "tsc",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsgo --noEmit"
 	},
 	"devDependencies": {
 		"@osmix/shared": "workspace:*",

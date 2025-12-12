@@ -8,7 +8,7 @@
 		"build": "vite build",
 		"dev": "vite",
 		"test": "vitest",
-		"typecheck": "tsc --build --noEmit"
+		"typecheck": "tsgo --build --noEmit"
 	},
 	"devDependencies": {
 		"@types/react": "^19.2.0",
