@@ -3,6 +3,9 @@
  *
  * Stores `OsmTransferables` so they can be reloaded without re-parsing PBF files,
  * similar to how they're transferred across WebWorkers.
+ *
+ * Note: SharedArrayBuffer cannot be stored in IndexedDB, so we convert all buffers
+ * to regular ArrayBuffer before storing.
  */
 
 import type { OsmInfo, OsmTransferables } from "@osmix/core"
@@ -12,10 +15,91 @@ const DB_NAME = "osmix-storage"
 const DB_VERSION = 1
 const OSM_STORE = "osm"
 
+/**
+ * Stored transferables use regular ArrayBuffer (IndexedDB can't store SharedArrayBuffer).
+ * Structure mirrors OsmTransferables but with ArrayBuffer instead of BufferType.
+ */
+type StorableTransferables = {
+	id: string
+	header: OsmTransferables["header"]
+	stringTable: {
+		bytes: ArrayBuffer
+		start: ArrayBuffer
+		count: ArrayBuffer
+	}
+	nodes: {
+		// IdsTransferables
+		ids: ArrayBuffer
+		sortedIds: ArrayBuffer
+		sortedIdPositionToIndex: ArrayBuffer
+		anchors: ArrayBuffer
+		idsAreSorted: boolean
+		// TagsTransferables
+		tagStart: ArrayBuffer
+		tagCount: ArrayBuffer
+		tagKeys: ArrayBuffer
+		tagVals: ArrayBuffer
+		keyEntities: ArrayBuffer
+		keyIndexStart: ArrayBuffer
+		keyIndexCount: ArrayBuffer
+		// NodesTransferables
+		lons: ArrayBuffer
+		lats: ArrayBuffer
+		bbox: OsmTransferables["nodes"]["bbox"]
+		spatialIndex: ArrayBuffer
+	}
+	ways: {
+		// IdsTransferables
+		ids: ArrayBuffer
+		sortedIds: ArrayBuffer
+		sortedIdPositionToIndex: ArrayBuffer
+		anchors: ArrayBuffer
+		idsAreSorted: boolean
+		// TagsTransferables
+		tagStart: ArrayBuffer
+		tagCount: ArrayBuffer
+		tagKeys: ArrayBuffer
+		tagVals: ArrayBuffer
+		keyEntities: ArrayBuffer
+		keyIndexStart: ArrayBuffer
+		keyIndexCount: ArrayBuffer
+		// WaysTransferables
+		refStart: ArrayBuffer
+		refCount: ArrayBuffer
+		refs: ArrayBuffer
+		bbox: ArrayBuffer
+		spatialIndex: ArrayBuffer
+	}
+	relations: {
+		// IdsTransferables
+		ids: ArrayBuffer
+		sortedIds: ArrayBuffer
+		sortedIdPositionToIndex: ArrayBuffer
+		anchors: ArrayBuffer
+		idsAreSorted: boolean
+		// TagsTransferables
+		tagStart: ArrayBuffer
+		tagCount: ArrayBuffer
+		tagKeys: ArrayBuffer
+		tagVals: ArrayBuffer
+		keyEntities: ArrayBuffer
+		keyIndexStart: ArrayBuffer
+		keyIndexCount: ArrayBuffer
+		// RelationsTransferables
+		memberStart: ArrayBuffer
+		memberCount: ArrayBuffer
+		memberRefs: ArrayBuffer
+		memberTypes: ArrayBuffer
+		memberRoles: ArrayBuffer
+		bbox: ArrayBuffer
+		spatialIndex: ArrayBuffer
+	}
+}
+
 export interface StoredOsm {
 	id: string
 	info: OsmInfo
-	transferables: OsmTransferables
+	transferables: StorableTransferables
 	storedAt: number
 }
 
@@ -52,6 +136,115 @@ function getDB(): Promise<IDBPDatabase<OsmixDB>> {
 }
 
 /**
+ * Convert a buffer (possibly SharedArrayBuffer) to a regular ArrayBuffer.
+ * IndexedDB cannot store SharedArrayBuffer, so we need to copy the data.
+ */
+function toArrayBuffer(
+	buffer: ArrayBuffer | SharedArrayBuffer | ArrayBufferLike,
+): ArrayBuffer {
+	if (buffer instanceof ArrayBuffer) {
+		return buffer
+	}
+	// Copy SharedArrayBuffer to ArrayBuffer
+	const copy = new ArrayBuffer(buffer.byteLength)
+	new Uint8Array(copy).set(new Uint8Array(buffer))
+	return copy
+}
+
+/**
+ * Convert OsmTransferables to a storable format with regular ArrayBuffers.
+ */
+function toStorableTransferables(t: OsmTransferables): StorableTransferables {
+	return {
+		id: t.id,
+		header: t.header,
+		stringTable: {
+			bytes: toArrayBuffer(t.stringTable.bytes),
+			start: toArrayBuffer(t.stringTable.start),
+			count: toArrayBuffer(t.stringTable.count),
+		},
+		nodes: {
+			// IdsTransferables
+			ids: toArrayBuffer(t.nodes.ids),
+			sortedIds: toArrayBuffer(t.nodes.sortedIds),
+			sortedIdPositionToIndex: toArrayBuffer(t.nodes.sortedIdPositionToIndex),
+			anchors: toArrayBuffer(t.nodes.anchors),
+			idsAreSorted: t.nodes.idsAreSorted,
+			// TagsTransferables
+			tagStart: toArrayBuffer(t.nodes.tagStart),
+			tagCount: toArrayBuffer(t.nodes.tagCount),
+			tagKeys: toArrayBuffer(t.nodes.tagKeys),
+			tagVals: toArrayBuffer(t.nodes.tagVals),
+			keyEntities: toArrayBuffer(t.nodes.keyEntities),
+			keyIndexStart: toArrayBuffer(t.nodes.keyIndexStart),
+			keyIndexCount: toArrayBuffer(t.nodes.keyIndexCount),
+			// NodesTransferables
+			lons: toArrayBuffer(t.nodes.lons),
+			lats: toArrayBuffer(t.nodes.lats),
+			bbox: t.nodes.bbox,
+			spatialIndex: toArrayBuffer(t.nodes.spatialIndex),
+		},
+		ways: {
+			// IdsTransferables
+			ids: toArrayBuffer(t.ways.ids),
+			sortedIds: toArrayBuffer(t.ways.sortedIds),
+			sortedIdPositionToIndex: toArrayBuffer(t.ways.sortedIdPositionToIndex),
+			anchors: toArrayBuffer(t.ways.anchors),
+			idsAreSorted: t.ways.idsAreSorted,
+			// TagsTransferables
+			tagStart: toArrayBuffer(t.ways.tagStart),
+			tagCount: toArrayBuffer(t.ways.tagCount),
+			tagKeys: toArrayBuffer(t.ways.tagKeys),
+			tagVals: toArrayBuffer(t.ways.tagVals),
+			keyEntities: toArrayBuffer(t.ways.keyEntities),
+			keyIndexStart: toArrayBuffer(t.ways.keyIndexStart),
+			keyIndexCount: toArrayBuffer(t.ways.keyIndexCount),
+			// WaysTransferables
+			refStart: toArrayBuffer(t.ways.refStart),
+			refCount: toArrayBuffer(t.ways.refCount),
+			refs: toArrayBuffer(t.ways.refs),
+			bbox: toArrayBuffer(t.ways.bbox),
+			spatialIndex: toArrayBuffer(t.ways.spatialIndex),
+		},
+		relations: {
+			// IdsTransferables
+			ids: toArrayBuffer(t.relations.ids),
+			sortedIds: toArrayBuffer(t.relations.sortedIds),
+			sortedIdPositionToIndex: toArrayBuffer(
+				t.relations.sortedIdPositionToIndex,
+			),
+			anchors: toArrayBuffer(t.relations.anchors),
+			idsAreSorted: t.relations.idsAreSorted,
+			// TagsTransferables
+			tagStart: toArrayBuffer(t.relations.tagStart),
+			tagCount: toArrayBuffer(t.relations.tagCount),
+			tagKeys: toArrayBuffer(t.relations.tagKeys),
+			tagVals: toArrayBuffer(t.relations.tagVals),
+			keyEntities: toArrayBuffer(t.relations.keyEntities),
+			keyIndexStart: toArrayBuffer(t.relations.keyIndexStart),
+			keyIndexCount: toArrayBuffer(t.relations.keyIndexCount),
+			// RelationsTransferables
+			memberStart: toArrayBuffer(t.relations.memberStart),
+			memberCount: toArrayBuffer(t.relations.memberCount),
+			memberRefs: toArrayBuffer(t.relations.memberRefs),
+			memberTypes: toArrayBuffer(t.relations.memberTypes),
+			memberRoles: toArrayBuffer(t.relations.memberRoles),
+			bbox: toArrayBuffer(t.relations.bbox),
+			spatialIndex: toArrayBuffer(t.relations.spatialIndex),
+		},
+	}
+}
+
+/**
+ * Convert stored transferables back to OsmTransferables format.
+ * The stored ArrayBuffers are compatible with the OsmTransferables interface.
+ */
+function fromStorableTransferables(t: StorableTransferables): OsmTransferables {
+	// ArrayBuffer is assignable to BufferType, so we can cast directly
+	return t as unknown as OsmTransferables
+}
+
+/**
  * Store an Osm instance's transferables in IndexedDB.
  */
 export async function storeOsm(
@@ -62,7 +255,7 @@ export async function storeOsm(
 	const storedOsm: StoredOsm = {
 		id: info.id,
 		info,
-		transferables,
+		transferables: toStorableTransferables(transferables),
 		storedAt: Date.now(),
 	}
 	await db.put(OSM_STORE, storedOsm)
@@ -76,15 +269,31 @@ export async function loadOsmTransferables(
 ): Promise<OsmTransferables | null> {
 	const db = await getDB()
 	const stored = await db.get(OSM_STORE, id)
-	return stored?.transferables ?? null
+	if (!stored) return null
+	return fromStorableTransferables(stored.transferables)
 }
 
 /**
  * Load a stored Osm entry from IndexedDB.
+ * Returns the info and transferables in the proper OsmTransferables format.
  */
-export async function loadStoredOsm(id: string): Promise<StoredOsm | null> {
+export async function loadStoredOsm(
+	id: string,
+): Promise<{
+	id: string
+	info: OsmInfo
+	transferables: OsmTransferables
+	storedAt: number
+} | null> {
 	const db = await getDB()
-	return (await db.get(OSM_STORE, id)) ?? null
+	const stored = await db.get(OSM_STORE, id)
+	if (!stored) return null
+	return {
+		id: stored.id,
+		info: stored.info,
+		transferables: fromStorableTransferables(stored.transferables),
+		storedAt: stored.storedAt,
+	}
 }
 
 /**
