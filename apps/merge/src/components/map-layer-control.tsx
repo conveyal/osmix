@@ -111,11 +111,6 @@ export function MapLayers() {
 		}))
 	}, [groups, searchQuery])
 
-	const totalFilteredLayers = useMemo(
-		() => filteredGroups.reduce((sum, g) => sum + g.layers.length, 0),
-		[filteredGroups],
-	)
-
 	// Toggle layer visibility
 	const toggleLayerVisibility = useCallback(
 		(layerId: string, currentlyVisible: boolean) => {
