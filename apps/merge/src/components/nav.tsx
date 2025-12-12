@@ -2,7 +2,7 @@ import { type PrimitiveAtom, useAtom } from "jotai"
 import { Layers, Navigation, SearchIcon, SidebarClose } from "lucide-react"
 import { NavLink } from "react-router"
 import CenterInfo from "../components/center-info"
-import ZoomInfo from "../components/zoom-info"
+import ZoomInfo, { ZoomInButton, ZoomOutButton } from "../components/zoom-info"
 import { cn } from "../lib/utils"
 import { sidebarIsOpenAtom } from "../state/layout"
 import {
@@ -65,8 +65,12 @@ export default function Nav() {
 					<CenterInfo />
 				</div>
 				<ButtonGroupSeparator />
-				<div className="pl-4">
-					z<ZoomInfo />
+				<div className="flex items-center gap-1">
+					<ZoomOutButton />
+					<div>
+						z<ZoomInfo />
+					</div>
+					<ZoomInButton />
 				</div>
 			</ButtonGroup>
 		</div>

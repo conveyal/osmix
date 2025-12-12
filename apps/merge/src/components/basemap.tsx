@@ -3,7 +3,6 @@ import { useCallback, useRef } from "react"
 import {
 	Map as MaplibreMap,
 	type MapStyleDataEvent,
-	NavigationControl,
 	ScaleControl,
 	type ViewStateChangeEvent,
 } from "react-map-gl/maplibre"
@@ -70,12 +69,6 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 			onZoom={onViewStateChange}
 			onStyleData={onStyleData}
 		>
-			<NavigationControl
-				position="top-right"
-				style={controlStyle}
-				showCompass={false}
-				visualizePitch={false}
-			/>
 			<ScaleControl
 				style={controlStyle}
 				position="bottom-left"
