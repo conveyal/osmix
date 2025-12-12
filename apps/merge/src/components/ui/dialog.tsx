@@ -2,7 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 import type * as React from "react"
 
-import { cn } from "../../lib/utils"
+import { cn } from "@/lib/utils"
 
 function Dialog({
 	...props
@@ -108,7 +108,7 @@ function DialogTitle({
 	return (
 		<DialogPrimitive.Title
 			data-slot="dialog-title"
-			className={cn("leading-none font-bold", className)}
+			className={cn("text-lg leading-none font-semibold", className)}
 			{...props}
 		/>
 	)
@@ -121,7 +121,7 @@ function DialogDescription({
 	return (
 		<DialogPrimitive.Description
 			data-slot="dialog-description"
-			className={cn("text-muted-foreground", className)}
+			className={cn("text-muted-foreground text-sm", className)}
 			{...props}
 		/>
 	)
