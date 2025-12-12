@@ -1,4 +1,5 @@
-import { Osm, type OsmInfo } from "@osmix/core"
+import type { OsmInfo, OsmTransferables } from "@osmix/core"
+import { transfer } from "comlink"
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useState, useTransition } from "react"
@@ -13,6 +14,77 @@ import {
 import { storedOsmEntriesAtom } from "../state/storage"
 import { osmWorker } from "../state/worker"
 import { useMap } from "./map"
+
+/**
+ * Collect all ArrayBuffer objects from the transferables for Comlink transfer.
+ */
+function collectBuffers(t: OsmTransferables): ArrayBuffer[] {
+	const buffers: ArrayBuffer[] = []
+	const addBuffer = (b: ArrayBufferLike) => {
+		if (b instanceof ArrayBuffer) buffers.push(b)
+	}
+
+	// StringTable
+	addBuffer(t.stringTable.bytes)
+	addBuffer(t.stringTable.start)
+	addBuffer(t.stringTable.count)
+
+	// Nodes
+	addBuffer(t.nodes.ids)
+	addBuffer(t.nodes.sortedIds)
+	addBuffer(t.nodes.sortedIdPositionToIndex)
+	addBuffer(t.nodes.anchors)
+	addBuffer(t.nodes.tagStart)
+	addBuffer(t.nodes.tagCount)
+	addBuffer(t.nodes.tagKeys)
+	addBuffer(t.nodes.tagVals)
+	addBuffer(t.nodes.keyEntities)
+	addBuffer(t.nodes.keyIndexStart)
+	addBuffer(t.nodes.keyIndexCount)
+	addBuffer(t.nodes.lons)
+	addBuffer(t.nodes.lats)
+	addBuffer(t.nodes.spatialIndex)
+
+	// Ways
+	addBuffer(t.ways.ids)
+	addBuffer(t.ways.sortedIds)
+	addBuffer(t.ways.sortedIdPositionToIndex)
+	addBuffer(t.ways.anchors)
+	addBuffer(t.ways.tagStart)
+	addBuffer(t.ways.tagCount)
+	addBuffer(t.ways.tagKeys)
+	addBuffer(t.ways.tagVals)
+	addBuffer(t.ways.keyEntities)
+	addBuffer(t.ways.keyIndexStart)
+	addBuffer(t.ways.keyIndexCount)
+	addBuffer(t.ways.refStart)
+	addBuffer(t.ways.refCount)
+	addBuffer(t.ways.refs)
+	addBuffer(t.ways.bbox)
+	addBuffer(t.ways.spatialIndex)
+
+	// Relations
+	addBuffer(t.relations.ids)
+	addBuffer(t.relations.sortedIds)
+	addBuffer(t.relations.sortedIdPositionToIndex)
+	addBuffer(t.relations.anchors)
+	addBuffer(t.relations.tagStart)
+	addBuffer(t.relations.tagCount)
+	addBuffer(t.relations.tagKeys)
+	addBuffer(t.relations.tagVals)
+	addBuffer(t.relations.keyEntities)
+	addBuffer(t.relations.keyIndexStart)
+	addBuffer(t.relations.keyIndexCount)
+	addBuffer(t.relations.memberStart)
+	addBuffer(t.relations.memberCount)
+	addBuffer(t.relations.memberRefs)
+	addBuffer(t.relations.memberTypes)
+	addBuffer(t.relations.memberRoles)
+	addBuffer(t.relations.bbox)
+	addBuffer(t.relations.spatialIndex)
+
+	return buffers
+}
 
 function useOsmDefaultFile(
 	loadOsmFile: (file: File | null) => Promise<OsmInfo | undefined>,
@@ -86,9 +158,16 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 					return null
 				}
 
-				// Reconstruct Osm from stored transferables and transfer to workers
-				const osm = new Osm(stored.transferables)
-				await osmWorker.transferIn(osm)
+				// Send raw transferables directly to a worker using Comlink.transfer.
+				// We can't use osmWorker.transferIn(osm) because it tries to send
+				// the same ArrayBuffers to multiple workers, and regular ArrayBuffers
+				// get detached after the first transfer.
+				const worker = osmWorker.getWorker()
+				const buffers = collectBuffers(stored.transferables)
+				await worker.transferIn(transfer(stored.transferables, buffers))
+
+				// Get the Osm back from the worker for main thread use
+				const osm = await osmWorker.get(stored.info.id)
 				setOsmInfo(stored.info)
 				setOsm(osm)
 				setSelectedOsm(osm)

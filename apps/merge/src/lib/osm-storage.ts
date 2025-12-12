@@ -277,9 +277,7 @@ export async function loadOsmTransferables(
  * Load a stored Osm entry from IndexedDB.
  * Returns the info and transferables in the proper OsmTransferables format.
  */
-export async function loadStoredOsm(
-	id: string,
-): Promise<{
+export async function loadStoredOsm(id: string): Promise<{
 	id: string
 	info: OsmInfo
 	transferables: OsmTransferables
