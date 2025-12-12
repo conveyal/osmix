@@ -225,7 +225,7 @@ export function MapLayers() {
 
 				<div className="max-h-80 overflow-y-auto space-y-1 mt-2 mb-2">
 					{filteredGroups.length === 0 ? (
-						<div className="text-muted-foreground text-sm text-center py-2">
+						<div className="text-muted-foreground text-center py-2">
 							No layers found
 						</div>
 					) : (
@@ -311,12 +311,12 @@ function LayerGroupComponent({
 				<button
 					type="button"
 					onClick={onToggleExpanded}
-					className="flex-1 text-left text-sm font-medium cursor-pointer hover:underline"
+					className="flex-1 text-left font-medium cursor-pointer hover:underline"
 				>
 					{group.name}
 				</button>
 
-				<span className="text-xs text-muted-foreground">
+				<span className="text-muted-foreground">
 					{visibleCount}/{group.layers.length}
 				</span>
 
@@ -385,9 +385,12 @@ function LayerGroupComponent({
 
 			{expanded && (
 				<div className="px-2 py-1">
-					<div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 items-center">
+					<div className="flex flex-col gap-y-0.5">
 						{group.layers.map((layer) => (
-							<Fragment key={layer.id}>
+							<div
+								className="flex gap-1 justify-between w-full items-center"
+								key={layer.id}
+							>
 								<button
 									type="button"
 									onClick={() => onToggleLayer(layer.id, layer.visible)}
@@ -400,16 +403,11 @@ function LayerGroupComponent({
 										<EyeOff className="size-3.5 text-muted-foreground" />
 									)}
 								</button>
-								<div
-									className="truncate text-sm flex items-center gap-1"
-									title={`${layer.id} (${layer.type})`}
-								>
-									<span className="truncate">{layer.id}</span>
-									<span className="text-xs text-muted-foreground shrink-0">
-										{layer.type}
-									</span>
+								<div className="truncate flex-1">{layer.id}</div>
+								<div className="text-muted-foreground shrink-0">
+									{layer.type}
 								</div>
-							</Fragment>
+							</div>
 						))}
 					</div>
 				</div>
