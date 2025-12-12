@@ -13,12 +13,10 @@ export default function OsmPbfFileInput({
 	disabled,
 	file,
 	setFile,
-	testId,
 }: {
 	disabled?: boolean
 	file?: File | null
 	setFile: (file: File | null) => Promise<void>
-	testId?: string
 }) {
 	return !file ? (
 		<OsmPbfSelectFileButton disabled={disabled} setFile={setFile} />
