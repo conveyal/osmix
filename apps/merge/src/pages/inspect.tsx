@@ -24,6 +24,7 @@ import OsmixVectorOverlay from "../components/osmix-vector-overlay"
 import RouteLayer from "../components/route-layer"
 import SelectedEntityLayer from "../components/selected-entity-layer"
 import SidebarLog from "../components/sidebar-log"
+import StoredOsmList from "../components/stored-osm-list"
 import TileBoundsLayer from "../components/tile-bounds-layer"
 import { ButtonGroup } from "../components/ui/button-group"
 import { Card, CardContent, CardHeader } from "../components/ui/card"
@@ -37,10 +38,15 @@ import { osmWorker } from "../state/worker"
 export default function InspectPage() {
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
-	const { downloadOsm, osm, osmInfo, file, loadOsmFile, setOsm } = useOsmFile(
-		"inspect",
-		"./monaco.pbf",
-	)
+	const {
+		downloadOsm,
+		osm,
+		osmInfo,
+		file,
+		loadFromStorage,
+		loadOsmFile,
+		setOsm,
+	} = useOsmFile("inspect", "./monaco.pbf")
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 
@@ -63,7 +69,7 @@ export default function InspectPage() {
 		<Main>
 			<Sidebar>
 				<div className="flex flex-1 flex-col overflow-y-auto p-2 lg:p-4 gap-4">
-					{!osm || !osmInfo || !file ? (
+					{!osm || !osmInfo ? (
 						<>
 							<OsmPbfSelectFileButton
 								setFile={async (f) => {
@@ -72,6 +78,16 @@ export default function InspectPage() {
 									const info = await loadOsmFile(f)
 									flyToOsmBounds(info)
 								}}
+							/>
+							<StoredOsmList
+								onLoad={async (id) => {
+									selectEntity(null, null)
+									setChangesetStats(null)
+									const info = await loadFromStorage(id)
+									flyToOsmBounds(info ?? undefined)
+									return info
+								}}
+								activeOsmId={osmInfo?.id}
 							/>
 							<ExtractList />
 						</>

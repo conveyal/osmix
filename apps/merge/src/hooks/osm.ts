@@ -1,7 +1,8 @@
-import type { OsmInfo } from "@osmix/core"
+import { Osm, type OsmInfo } from "@osmix/core"
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useState, useTransition } from "react"
+import { loadStoredOsm, storeOsm } from "../lib/osm-storage"
 import { Log } from "../state/log"
 import {
 	osmAtomFamily,
@@ -9,6 +10,7 @@ import {
 	osmInfoAtomFamily,
 	selectedOsmAtom,
 } from "../state/osm"
+import { storedOsmEntriesAtom } from "../state/storage"
 import { osmWorker } from "../state/worker"
 import { useMap } from "./map"
 
@@ -42,6 +44,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 	const [osm, setOsm] = useAtom(osmAtomFamily(id))
 	const [osmInfo, setOsmInfo] = useAtom(osmInfoAtomFamily(id))
 	const setSelectedOsm = useSetAtom(selectedOsmAtom)
+	const refreshStoredEntries = useSetAtom(storedOsmEntriesAtom)
 
 	const loadOsmFile = useCallback(
 		async (file: File | null) => {
@@ -55,7 +58,14 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				const osm = await osmWorker.get(osmInfo.id)
 				setOsm(osm)
 				setSelectedOsm(osm)
-				taskLog.end(`${file.name} fully loaded.`)
+
+				// Auto-store to IndexedDB
+				taskLog.update("Storing to IndexedDB...")
+				const transferables = osm.transferables()
+				await storeOsm(osmInfo, transferables)
+				refreshStoredEntries()
+
+				taskLog.end(`${file.name} fully loaded and stored.`)
 				return osmInfo
 			} catch (e) {
 				console.error(e)
@@ -63,7 +73,35 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				throw e
 			}
 		},
-		[setFile, setOsm, setSelectedOsm, setOsmInfo, id],
+		[setFile, setOsm, setSelectedOsm, setOsmInfo, id, refreshStoredEntries],
+	)
+
+	const loadFromStorage = useCallback(
+		async (storageId: string) => {
+			const taskLog = Log.startTask(`Loading ${storageId} from storage...`)
+			try {
+				const stored = await loadStoredOsm(storageId)
+				if (!stored) {
+					taskLog.end(`${storageId} not found in storage.`, "error")
+					return null
+				}
+
+				// Reconstruct Osm from stored transferables and transfer to workers
+				const osm = new Osm(stored.transferables)
+				await osmWorker.transferIn(osm)
+				setOsmInfo(stored.info)
+				setOsm(osm)
+				setSelectedOsm(osm)
+
+				taskLog.end(`${storageId} loaded from storage.`)
+				return stored.info
+			} catch (e) {
+				console.error(e)
+				taskLog.end(`Failed to load ${storageId} from storage.`, "error")
+				throw e
+			}
+		},
+		[setOsm, setSelectedOsm, setOsmInfo],
 	)
 
 	const downloadOsm = useCallback(
@@ -91,5 +129,13 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 	// Load a default file in development mode
 	useOsmDefaultFile(loadOsmFile, defaultFilePath)
 
-	return { downloadOsm, file, loadOsmFile, osm, osmInfo, setOsm }
+	return {
+		downloadOsm,
+		file,
+		loadFromStorage,
+		loadOsmFile,
+		osm,
+		osmInfo,
+		setOsm,
+	}
 }
