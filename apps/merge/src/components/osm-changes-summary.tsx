@@ -1,6 +1,11 @@
 import type { OsmChange } from "@osmix/change"
-import type { OsmEntity } from "@osmix/shared/types"
-import { getEntityType } from "@osmix/shared/utils"
+import type {
+	OsmEntity,
+	OsmNode,
+	OsmRelation,
+	OsmWay,
+} from "@osmix/shared/types"
+import { getEntityType, isNode, isRelation, isWay } from "@osmix/shared/utils"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { useTransition } from "react"
@@ -236,9 +241,360 @@ export function ChangesList({
 	)
 }
 
+type DiffStatus = "added" | "removed" | "modified" | "unchanged"
+
+/**
+ * Renders a table row with diff highlighting.
+ */
+function DiffRow({
+	label,
+	oldValue,
+	newValue,
+	status,
+}: {
+	label: string
+	oldValue?: string
+	newValue?: string
+	status: DiffStatus
+}) {
+	return (
+		<tr
+			className={cn(
+				status === "added" && "bg-green-50",
+				status === "removed" && "bg-red-50",
+				status === "modified" && "bg-yellow-50",
+			)}
+		>
+			<td className="align-top">{label}</td>
+			<td>
+				{status === "removed" ? (
+					<span className="text-red-600 line-through">{oldValue}</span>
+				) : status === "added" ? (
+					<span className="text-green-600">{newValue}</span>
+				) : status === "modified" ? (
+					<>
+						<span className="text-red-600 line-through">{oldValue}</span>
+						<span className="mx-1">→</span>
+						<span className="text-green-600">{newValue}</span>
+					</>
+				) : (
+					<span>{newValue}</span>
+				)}
+			</td>
+		</tr>
+	)
+}
+
+/**
+ * Computes and displays a unified diff for tags.
+ */
+function TagsDiff({
+	oldTags,
+	newTags,
+}: {
+	oldTags?: Record<string, unknown>
+	newTags?: Record<string, unknown>
+}) {
+	const old = oldTags ?? {}
+	const current = newTags ?? {}
+	const allKeys = new Set([...Object.keys(old), ...Object.keys(current)])
+
+	const rows: Array<{
+		key: string
+		status: DiffStatus
+		oldValue?: string
+		newValue?: string
+	}> = []
+
+	for (const key of allKeys) {
+		const oldVal = old[key] !== undefined ? String(old[key]) : undefined
+		const newVal = current[key] !== undefined ? String(current[key]) : undefined
+
+		if (oldVal === undefined && newVal !== undefined) {
+			rows.push({ key, status: "added", newValue: newVal })
+		} else if (oldVal !== undefined && newVal === undefined) {
+			rows.push({ key, status: "removed", oldValue: oldVal })
+		} else if (oldVal !== newVal) {
+			rows.push({ key, status: "modified", oldValue: oldVal, newValue: newVal })
+		} else {
+			rows.push({ key, status: "unchanged", newValue: newVal })
+		}
+	}
+
+	// Sort: modified first, then added, then removed, then unchanged
+	const statusOrder: Record<DiffStatus, number> = {
+		modified: 0,
+		added: 1,
+		removed: 2,
+		unchanged: 3,
+	}
+	rows.sort((a, b) => statusOrder[a.status] - statusOrder[b.status])
+
+	return (
+		<>
+			{rows.map((row) => (
+				<DiffRow
+					key={row.key}
+					label={row.key}
+					oldValue={row.oldValue}
+					newValue={row.newValue}
+					status={row.status}
+				/>
+			))}
+		</>
+	)
+}
+
+/**
+ * Displays a unified diff for a node entity.
+ */
+function NodeDiff({
+	oldNode,
+	newNode,
+}: {
+	oldNode: OsmNode
+	newNode: OsmNode
+}) {
+	const lonChanged = oldNode.lon !== newNode.lon
+	const latChanged = oldNode.lat !== newNode.lat
+
+	return (
+		<table className="w-full">
+			<tbody>
+				<DiffRow
+					label="lon"
+					oldValue={String(oldNode.lon)}
+					newValue={String(newNode.lon)}
+					status={lonChanged ? "modified" : "unchanged"}
+				/>
+				<DiffRow
+					label="lat"
+					oldValue={String(oldNode.lat)}
+					newValue={String(newNode.lat)}
+					status={latChanged ? "modified" : "unchanged"}
+				/>
+				<TagsDiff oldTags={oldNode.tags} newTags={newNode.tags} />
+			</tbody>
+		</table>
+	)
+}
+
+/**
+ * Displays a unified diff for a way entity.
+ */
+function WayDiff({ oldWay, newWay }: { oldWay: OsmWay; newWay: OsmWay }) {
+	const oldRefs = oldWay.refs.join(",")
+	const newRefs = newWay.refs.join(",")
+	const refsChanged = oldRefs !== newRefs
+
+	return (
+		<table className="w-full">
+			<tbody>
+				<DiffRow
+					label="refs"
+					oldValue={oldRefs}
+					newValue={newRefs}
+					status={refsChanged ? "modified" : "unchanged"}
+				/>
+				<TagsDiff oldTags={oldWay.tags} newTags={newWay.tags} />
+			</tbody>
+		</table>
+	)
+}
+
+/**
+ * Displays a unified diff for a relation entity.
+ */
+function RelationDiff({
+	oldRelation,
+	newRelation,
+}: {
+	oldRelation: OsmRelation
+	newRelation: OsmRelation
+}) {
+	const formatMembers = (members: OsmRelation["members"]) =>
+		members
+			.map((m) => `${m.type}:${m.ref}${m.role ? `(${m.role})` : ""}`)
+			.join(", ")
+
+	const oldMembers = formatMembers(oldRelation.members)
+	const newMembers = formatMembers(newRelation.members)
+	const membersChanged = oldMembers !== newMembers
+
+	return (
+		<table className="w-full">
+			<tbody>
+				<DiffRow
+					label="members"
+					oldValue={oldMembers}
+					newValue={newMembers}
+					status={membersChanged ? "modified" : "unchanged"}
+				/>
+				<TagsDiff oldTags={oldRelation.tags} newTags={newRelation.tags} />
+			</tbody>
+		</table>
+	)
+}
+
+/**
+ * Displays a unified diff for any entity type.
+ */
+function EntityDiff({
+	oldEntity,
+	newEntity,
+}: {
+	oldEntity: OsmEntity
+	newEntity: OsmEntity
+}) {
+	if (isNode(oldEntity) && isNode(newEntity)) {
+		return <NodeDiff oldNode={oldEntity} newNode={newEntity} />
+	}
+	if (isWay(oldEntity) && isWay(newEntity)) {
+		return <WayDiff oldWay={oldEntity} newWay={newEntity} />
+	}
+	if (isRelation(oldEntity) && isRelation(newEntity)) {
+		return <RelationDiff oldRelation={oldEntity} newRelation={newEntity} />
+	}
+	// Fallback
+	return <EntityContent entity={newEntity} />
+}
+
+/**
+ * Displays a deleted entity with all properties shown as removed.
+ */
+function DeletedEntityContent({ entity }: { entity: OsmEntity }) {
+	if (isNode(entity)) {
+		return (
+			<table className="w-full">
+				<tbody>
+					<DiffRow label="lon" oldValue={String(entity.lon)} status="removed" />
+					<DiffRow label="lat" oldValue={String(entity.lat)} status="removed" />
+					{entity.tags &&
+						Object.entries(entity.tags).map(([k, v]) => (
+							<DiffRow
+								key={k}
+								label={k}
+								oldValue={String(v)}
+								status="removed"
+							/>
+						))}
+				</tbody>
+			</table>
+		)
+	}
+	if (isWay(entity)) {
+		return (
+			<table className="w-full">
+				<tbody>
+					<DiffRow
+						label="refs"
+						oldValue={entity.refs.join(",")}
+						status="removed"
+					/>
+					{entity.tags &&
+						Object.entries(entity.tags).map(([k, v]) => (
+							<DiffRow
+								key={k}
+								label={k}
+								oldValue={String(v)}
+								status="removed"
+							/>
+						))}
+				</tbody>
+			</table>
+		)
+	}
+	if (isRelation(entity)) {
+		const formatMembers = (members: OsmRelation["members"]) =>
+			members
+				.map((m) => `${m.type}:${m.ref}${m.role ? `(${m.role})` : ""}`)
+				.join(", ")
+		return (
+			<table className="w-full">
+				<tbody>
+					<DiffRow
+						label="members"
+						oldValue={formatMembers(entity.members)}
+						status="removed"
+					/>
+					{entity.tags &&
+						Object.entries(entity.tags).map(([k, v]) => (
+							<DiffRow
+								key={k}
+								label={k}
+								oldValue={String(v)}
+								status="removed"
+							/>
+						))}
+				</tbody>
+			</table>
+		)
+	}
+	return <EntityContent entity={entity} />
+}
+
+/**
+ * Displays a created entity with all properties shown as added.
+ */
+function CreatedEntityContent({ entity }: { entity: OsmEntity }) {
+	if (isNode(entity)) {
+		return (
+			<table className="w-full">
+				<tbody>
+					<DiffRow label="lon" newValue={String(entity.lon)} status="added" />
+					<DiffRow label="lat" newValue={String(entity.lat)} status="added" />
+					{entity.tags &&
+						Object.entries(entity.tags).map(([k, v]) => (
+							<DiffRow key={k} label={k} newValue={String(v)} status="added" />
+						))}
+				</tbody>
+			</table>
+		)
+	}
+	if (isWay(entity)) {
+		return (
+			<table className="w-full">
+				<tbody>
+					<DiffRow
+						label="refs"
+						newValue={entity.refs.join(",")}
+						status="added"
+					/>
+					{entity.tags &&
+						Object.entries(entity.tags).map(([k, v]) => (
+							<DiffRow key={k} label={k} newValue={String(v)} status="added" />
+						))}
+				</tbody>
+			</table>
+		)
+	}
+	if (isRelation(entity)) {
+		const formatMembers = (members: OsmRelation["members"]) =>
+			members
+				.map((m) => `${m.type}:${m.ref}${m.role ? `(${m.role})` : ""}`)
+				.join(", ")
+		return (
+			<table className="w-full">
+				<tbody>
+					<DiffRow
+						label="members"
+						newValue={formatMembers(entity.members)}
+						status="added"
+					/>
+					{entity.tags &&
+						Object.entries(entity.tags).map(([k, v]) => (
+							<DiffRow key={k} label={k} newValue={String(v)} status="added" />
+						))}
+				</tbody>
+			</table>
+		)
+	}
+	return <EntityContent entity={entity} />
+}
+
 /**
  * Displays augmented diff content for a change.
- * Shows old/new comparison for modify operations and old state for deletions.
+ * Shows a unified diff with additions, deletions, and modifications highlighted.
  */
 function AugmentedDiffContent({ change }: { change: OsmChange }) {
 	const { changeType, entity, oldEntity, refs } = change
@@ -246,36 +602,16 @@ function AugmentedDiffContent({ change }: { change: OsmChange }) {
 	return (
 		<>
 			{refs && (
-				<div className="p-2 border-b-1">
+				<div className="p-2 border-b">
 					Related: {refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")}
 				</div>
 			)}
 			{changeType === "modify" && oldEntity ? (
-				<div className="grid grid-cols-2">
-					<div className="border-r">
-						<div className="px-2 py-1 font-bold text-muted-foreground bg-red-50">
-							OLD
-						</div>
-						<div className="w-full overflow-scroll shadow-inner">
-							<EntityContent entity={oldEntity} />
-						</div>
-					</div>
-					<div>
-						<div className="px-2 py-1 font-bold text-muted-foreground bg-green-50">
-							NEW
-						</div>
-						<div className="w-full overflow-scroll shadow-inner">
-							<EntityContent entity={entity} />
-						</div>
-					</div>
-				</div>
+				<EntityDiff oldEntity={oldEntity} newEntity={entity} />
 			) : changeType === "delete" && oldEntity ? (
-				<div>
-					<div className="px-2 py-1 font-bold text-muted-foreground bg-red-50">
-						DELETED
-					</div>
-					<EntityContent entity={oldEntity} />
-				</div>
+				<DeletedEntityContent entity={oldEntity} />
+			) : changeType === "create" ? (
+				<CreatedEntityContent entity={entity} />
 			) : (
 				<EntityContent entity={entity} />
 			)}
