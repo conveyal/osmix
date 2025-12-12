@@ -4,15 +4,16 @@
  * Stores `OsmTransferables` so they can be reloaded without re-parsing PBF files,
  * similar to how they're transferred across WebWorkers.
  *
- * Note: SharedArrayBuffer cannot be stored in IndexedDB, so we convert all buffers
- * to regular ArrayBuffer before storing.
+ * Features:
+ * - Stores file hash to detect duplicates and avoid re-parsing
+ * - Converts SharedArrayBuffer to regular ArrayBuffer (IndexedDB requirement)
  */
 
 import type { OsmInfo, OsmTransferables } from "@osmix/core"
 import { openDB, type DBSchema, type IDBPDatabase } from "idb"
 
 const DB_NAME = "osmix-storage"
-const DB_VERSION = 1
+const DB_VERSION = 2 // Bumped for hash index
 const OSM_STORE = "osm"
 
 /**
@@ -101,12 +102,15 @@ export interface StoredOsm {
 	info: OsmInfo
 	transferables: StorableTransferables
 	storedAt: number
+	/** SHA-256 hash of the original file content */
+	fileHash?: string
 }
 
 export interface StoredOsmEntry {
 	id: string
 	info: OsmInfo
 	storedAt: number
+	fileHash?: string
 }
 
 interface OsmixDB extends DBSchema {
@@ -115,6 +119,7 @@ interface OsmixDB extends DBSchema {
 		value: StoredOsm
 		indexes: {
 			"by-stored-at": number
+			"by-hash": string
 		}
 	}
 }
@@ -124,15 +129,50 @@ let dbPromise: Promise<IDBPDatabase<OsmixDB>> | null = null
 function getDB(): Promise<IDBPDatabase<OsmixDB>> {
 	if (!dbPromise) {
 		dbPromise = openDB<OsmixDB>(DB_NAME, DB_VERSION, {
-			upgrade(db) {
-				if (!db.objectStoreNames.contains(OSM_STORE)) {
+			upgrade(db, oldVersion, _newVersion, transaction) {
+				if (oldVersion < 1) {
 					const store = db.createObjectStore(OSM_STORE, { keyPath: "id" })
 					store.createIndex("by-stored-at", "storedAt")
+					store.createIndex("by-hash", "fileHash")
+				} else if (oldVersion < 2) {
+					// Add hash index to existing store
+					const store = transaction.objectStore(OSM_STORE)
+					if (!store.indexNames.contains("by-hash")) {
+						store.createIndex("by-hash", "fileHash")
+					}
 				}
 			},
 		})
 	}
 	return dbPromise
+}
+
+/**
+ * Compute SHA-256 hash of a file and return as hex string.
+ */
+export async function hashFile(file: File): Promise<string> {
+	const buffer = await file.arrayBuffer()
+	const hashBuffer = await crypto.subtle.digest("SHA-256", buffer)
+	const hashArray = new Uint8Array(hashBuffer)
+	return Array.from(hashArray)
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join("")
+}
+
+/**
+ * Find a stored entry by file hash.
+ * Returns the stored entry if found, null otherwise.
+ */
+export async function findByHash(hash: string): Promise<StoredOsmEntry | null> {
+	const db = await getDB()
+	const stored = await db.getFromIndex(OSM_STORE, "by-hash", hash)
+	if (!stored) return null
+	return {
+		id: stored.id,
+		info: stored.info,
+		storedAt: stored.storedAt,
+		fileHash: stored.fileHash,
+	}
 }
 
 /**
@@ -246,10 +286,14 @@ function fromStorableTransferables(t: StorableTransferables): OsmTransferables {
 
 /**
  * Store an Osm instance's transferables in IndexedDB.
+ * @param info - The OsmInfo metadata
+ * @param transferables - The Osm transferables to store
+ * @param fileHash - Optional SHA-256 hash of the original file for deduplication
  */
 export async function storeOsm(
 	info: OsmInfo,
 	transferables: OsmTransferables,
+	fileHash?: string,
 ): Promise<void> {
 	const db = await getDB()
 	const storedOsm: StoredOsm = {
@@ -257,6 +301,7 @@ export async function storeOsm(
 		info,
 		transferables: toStorableTransferables(transferables),
 		storedAt: Date.now(),
+		fileHash,
 	}
 	await db.put(OSM_STORE, storedOsm)
 }
@@ -300,7 +345,12 @@ export async function loadStoredOsm(id: string): Promise<{
 export async function listStoredOsm(): Promise<StoredOsmEntry[]> {
 	const db = await getDB()
 	const all = await db.getAll(OSM_STORE)
-	return all.map(({ id, info, storedAt }) => ({ id, info, storedAt }))
+	return all.map(({ id, info, storedAt, fileHash }) => ({
+		id,
+		info,
+		storedAt,
+		fileHash,
+	}))
 }
 
 /**

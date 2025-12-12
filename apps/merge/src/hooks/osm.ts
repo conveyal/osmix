@@ -3,7 +3,12 @@ import { transfer } from "comlink"
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useState, useTransition } from "react"
-import { loadStoredOsm, storeOsm } from "../lib/osm-storage"
+import {
+	findByHash,
+	hashFile,
+	loadStoredOsm,
+	storeOsm,
+} from "../lib/osm-storage"
 import { Log } from "../state/log"
 import {
 	osmAtomFamily,
@@ -125,16 +130,43 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 			if (file == null) return
 			const taskLog = Log.startTask(`Processing file ${file.name}...`)
 			try {
+				// Hash the file first to check for duplicates
+				taskLog.update("Hashing file...")
+				const fileHash = await hashFile(file)
+
+				// Check if we already have this file stored
+				const existing = await findByHash(fileHash)
+				if (existing) {
+					taskLog.update("Found cached version, loading from storage...")
+					const stored = await loadStoredOsm(existing.id)
+					if (stored) {
+						// Load from storage instead of parsing
+						const worker = osmWorker.getWorker()
+						const buffers = collectBuffers(stored.transferables)
+						await worker.transferIn(transfer(stored.transferables, buffers))
+
+						const osm = await osmWorker.get(stored.info.id)
+						setOsmInfo(stored.info)
+						setOsm(osm)
+						setSelectedOsm(osm)
+
+						taskLog.end(`${file.name} loaded from cache.`)
+						return stored.info
+					}
+				}
+
+				// Parse the file normally
+				taskLog.update("Parsing file...")
 				const osmInfo = await osmWorker.fromFile(file, { id })
 				setOsmInfo(osmInfo)
 				const osm = await osmWorker.get(osmInfo.id)
 				setOsm(osm)
 				setSelectedOsm(osm)
 
-				// Auto-store to IndexedDB
+				// Auto-store to IndexedDB with hash
 				taskLog.update("Storing to IndexedDB...")
 				const transferables = osm.transferables()
-				await storeOsm(osmInfo, transferables)
+				await storeOsm(osmInfo, transferables, fileHash)
 				refreshStoredEntries()
 
 				taskLog.end(`${file.name} fully loaded and stored.`)
