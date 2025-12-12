@@ -37,7 +37,7 @@
 		"bench": "bun test --bench",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsgo --noEmit"
 	},
 	"devDependencies": {
 		"@types/bun": "catalog:",
