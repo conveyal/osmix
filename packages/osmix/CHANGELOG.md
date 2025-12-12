@@ -1,5 +1,23 @@
 # osmix
 
+## 0.1.0
+
+### Minor Changes
+
+- 29ed376: Routing: make graph transferable
+
+### Patch Changes
+
+- Updated dependencies [803c05c]
+- Updated dependencies [ff40416]
+- Updated dependencies [29ed376]
+  - @osmix/core@0.1.0
+  - @osmix/change@0.0.7
+  - @osmix/geojson@0.0.5
+  - @osmix/json@0.0.7
+  - @osmix/router@0.0.3
+  - @osmix/vt@0.0.6
+
 ## 0.0.6
 
 ### Patch Changes

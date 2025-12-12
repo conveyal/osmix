@@ -2,7 +2,7 @@
 	"$schema": "https://json.schemastore.org/package",
 	"name": "@osmix/change",
 	"type": "module",
-	"version": "0.0.6",
+	"version": "0.0.7",
 	"description": "An OSM changeset generator and merger built on top of @osmix/core",
 	"main": "./src/index.ts",
 	"publishConfig": {
