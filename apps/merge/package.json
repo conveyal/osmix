@@ -7,7 +7,7 @@
 		"build": "vite build",
 		"dev": "vite",
 		"test:e2e": "playwright test",
-		"typecheck": "tsc --build --noEmit"
+		"typecheck": "tsgo --build --noEmit"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.52.0",

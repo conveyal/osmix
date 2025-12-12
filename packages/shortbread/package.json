@@ -35,7 +35,7 @@
 		"build": "tsc",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsgo --noEmit"
 	},
 	"dependencies": {
 		"@osmix/core": "workspace:*",
