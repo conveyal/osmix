@@ -4,9 +4,13 @@
 
 import type { OsmInfo } from "@osmix/core"
 import { useAtom } from "jotai"
-import { DatabaseIcon, DownloadIcon, Trash2Icon } from "lucide-react"
+import { DatabaseIcon, RotateCcwIcon, Trash2Icon } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
-import { deleteStoredOsm, type StoredOsmEntry } from "../lib/osm-storage"
+import {
+	deleteStoredOsm,
+	getStorageStats,
+	type StoredOsmEntry,
+} from "../lib/osm-storage"
 import { storedOsmEntriesAtom } from "../state/storage"
 import ActionButton from "./action-button"
 import { Details, DetailsContent, DetailsSummary } from "./details"
@@ -18,6 +22,14 @@ import {
 	ItemHeader,
 	ItemTitle,
 } from "./ui/item"
+
+function formatBytes(bytes: number): string {
+	if (bytes === 0) return "0 B"
+	const mb = bytes / (1024 * 1024)
+	if (mb >= 1) return `${mb.toFixed(1)} MB`
+	const kb = bytes / 1024
+	return `${kb.toFixed(1)} KB`
+}
 
 function formatDate(timestamp: number): string {
 	return new Date(timestamp).toLocaleDateString(undefined, {
@@ -74,8 +86,8 @@ function StoredOsmItem({
 						<ActionButton
 							size="icon-sm"
 							variant="ghost"
-							title="Load from storage"
-							icon={<DownloadIcon />}
+							title="Restore from storage"
+							icon={<RotateCcwIcon />}
 							onAction={handleLoad}
 						/>
 						<ActionButton
@@ -104,11 +116,20 @@ interface StoredOsmListProps {
 export function StoredOsmList({ onLoad, activeOsmId }: StoredOsmListProps) {
 	const [entries, refreshEntries] = useAtom(storedOsmEntriesAtom)
 	const [isInitialized, setIsInitialized] = useState(false)
+	const [storageSize, setStorageSize] = useState(0)
 
 	// Load entries on mount
 	useEffect(() => {
 		refreshEntries().then(() => setIsInitialized(true))
 	}, [refreshEntries])
+
+	// Update storage stats when entries change
+	const entryCount = entries.length
+	useEffect(() => {
+		if (isInitialized && entryCount >= 0) {
+			getStorageStats().then((stats) => setStorageSize(stats.estimatedBytes))
+		}
+	}, [entryCount, isInitialized])
 
 	const handleDelete = useCallback(
 		async (id: string) => {
@@ -129,6 +150,9 @@ export function StoredOsmList({ onLoad, activeOsmId }: StoredOsmListProps) {
 					<DatabaseIcon className="size-4" />
 					STORED DATA
 				</div>
+				<span className="text-xs text-slate-500 pr-2">
+					{formatBytes(storageSize)}
+				</span>
 			</CardHeader>
 			<CardContent className="p-0">
 				<Details defaultOpen>

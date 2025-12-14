@@ -79,16 +79,6 @@ export default function InspectPage() {
 									flyToOsmBounds(info)
 								}}
 							/>
-							<StoredOsmList
-								onLoad={async (id) => {
-									selectEntity(null, null)
-									setChangesetStats(null)
-									const info = await loadFromStorage(id)
-									flyToOsmBounds(info ?? undefined)
-									return info
-								}}
-								activeOsmId={osmInfo?.id}
-							/>
 							<ExtractList />
 						</>
 					) : (
@@ -183,6 +173,18 @@ export default function InspectPage() {
 							)}
 						</>
 					)}
+
+					{/* Always show stored data */}
+					<StoredOsmList
+						onLoad={async (id) => {
+							selectEntity(null, null)
+							setChangesetStats(null)
+							const info = await loadFromStorage(id)
+							flyToOsmBounds(info ?? undefined)
+							return info
+						}}
+						activeOsmId={osmInfo?.id}
+					/>
 				</div>
 				<SidebarLog />
 			</Sidebar>
