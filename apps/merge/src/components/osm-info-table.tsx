@@ -1,4 +1,5 @@
 import type { Osm } from "@osmix/core"
+import type { StoredFileInfo } from "../lib/osm-storage"
 import { bytesSizeToHuman } from "../utils"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 import ObjectToTableRows from "./object-to-table"
@@ -7,22 +8,31 @@ export default function OsmInfoTable({
 	defaultOpen,
 	osm,
 	file,
+	fileInfo,
 }: {
 	defaultOpen?: boolean
 	osm: Osm | null
-	file: File | null
+	file?: File | null
+	/** Alternative to file - used when loading from storage */
+	fileInfo?: StoredFileInfo | null
 }) {
-	if (!osm || !file) return null
+	// Get file name and size from either file or fileInfo
+	const fileName = file?.name ?? fileInfo?.name
+	const fileSize = file?.size ?? fileInfo?.size
+
+	if (!osm || (!file && !fileInfo)) return null
 	return (
 		<Details defaultOpen={defaultOpen}>
-			<DetailsSummary>FILE INFO: {file.name}</DetailsSummary>
+			<DetailsSummary>FILE INFO: {fileName}</DetailsSummary>
 			<DetailsContent className="overflow-auto">
 				<table>
 					<tbody>
-						<tr>
-							<td>size</td>
-							<td>{bytesSizeToHuman(file.size)}</td>
-						</tr>
+						{fileSize != null && (
+							<tr>
+								<td>size</td>
+								<td>{bytesSizeToHuman(fileSize)}</td>
+							</tr>
+						)}
 						<tr>
 							<td>nodes</td>
 							<td>{osm.nodes.size.toLocaleString()}</td>

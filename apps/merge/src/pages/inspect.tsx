@@ -43,6 +43,7 @@ export default function InspectPage() {
 		osm,
 		osmInfo,
 		file,
+		fileInfo,
 		loadFromStorage,
 		loadOsmFile,
 		setOsm,
@@ -109,7 +110,7 @@ export default function InspectPage() {
 									</ButtonGroup>
 								</CardHeader>
 								<CardContent>
-									<OsmInfoTable file={file} osm={osm} />
+									<OsmInfoTable file={file} fileInfo={fileInfo} osm={osm} />
 								</CardContent>
 							</Card>
 

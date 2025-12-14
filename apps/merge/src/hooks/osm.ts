@@ -13,6 +13,7 @@ import { Log } from "../state/log"
 import {
 	osmAtomFamily,
 	osmFileAtomFamily,
+	osmFileInfoAtomFamily,
 	osmInfoAtomFamily,
 	selectedOsmAtom,
 } from "../state/osm"
@@ -118,6 +119,7 @@ function useOsmDefaultFile(
 
 export function useOsmFile(id: string, defaultFilePath?: string) {
 	const [file, setFile] = useAtom(osmFileAtomFamily(id))
+	const [fileInfo, setFileInfo] = useAtom(osmFileInfoAtomFamily(id))
 	const [osm, setOsm] = useAtom(osmAtomFamily(id))
 	const [osmInfo, setOsmInfo] = useAtom(osmInfoAtomFamily(id))
 	const setSelectedOsm = useSetAtom(selectedOsmAtom)
@@ -126,6 +128,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 	const loadOsmFile = useCallback(
 		async (file: File | null) => {
 			setFile(file)
+			setFileInfo(file ? { name: file.name, size: file.size } : null)
 			setOsm(null)
 			if (file == null) return
 			const taskLog = Log.startTask(`Processing file ${file.name}...`)
@@ -163,10 +166,13 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				setOsm(osm)
 				setSelectedOsm(osm)
 
-				// Auto-store to IndexedDB with hash
+				// Auto-store to IndexedDB with hash and file info
 				taskLog.update("Storing to IndexedDB...")
 				const transferables = osm.transferables()
-				await storeOsm(osmInfo, transferables, fileHash)
+				await storeOsm(osmInfo, transferables, {
+					fileHash,
+					fileInfo: { name: file.name, size: file.size },
+				})
 				refreshStoredEntries()
 
 				taskLog.end(`${file.name} fully loaded and stored.`)
@@ -177,7 +183,15 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				throw e
 			}
 		},
-		[setFile, setOsm, setSelectedOsm, setOsmInfo, id, refreshStoredEntries],
+		[
+			setFile,
+			setFileInfo,
+			setOsm,
+			setSelectedOsm,
+			setOsmInfo,
+			id,
+			refreshStoredEntries,
+		],
 	)
 
 	const loadFromStorage = useCallback(
@@ -204,6 +218,10 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				setOsm(osm)
 				setSelectedOsm(osm)
 
+				// Restore file info from storage (clear actual file since we loaded from storage)
+				setFile(null)
+				setFileInfo(stored.fileInfo ?? null)
+
 				taskLog.end(`${storageId} loaded from storage.`)
 				return stored.info
 			} catch (e) {
@@ -212,7 +230,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				throw e
 			}
 		},
-		[setOsm, setSelectedOsm, setOsmInfo],
+		[setOsm, setSelectedOsm, setOsmInfo, setFile, setFileInfo],
 	)
 
 	const downloadOsm = useCallback(
@@ -243,6 +261,7 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 	return {
 		downloadOsm,
 		file,
+		fileInfo,
 		loadFromStorage,
 		loadOsmFile,
 		osm,

@@ -2,6 +2,7 @@ import type { Osm, OsmInfo } from "@osmix/core"
 import type { OsmEntity } from "@osmix/shared/types"
 import { atom } from "jotai"
 import { atomFamily } from "jotai/utils"
+import type { StoredFileInfo } from "../lib/osm-storage"
 
 export const osmInfoAtomFamily = atomFamily((_id: string) =>
 	atom<OsmInfo | null>(null),
@@ -9,6 +10,9 @@ export const osmInfoAtomFamily = atomFamily((_id: string) =>
 export const osmAtomFamily = atomFamily((_id: string) => atom<Osm | null>(null))
 export const osmFileAtomFamily = atomFamily((_id: string) =>
 	atom<File | null>(null),
+)
+export const osmFileInfoAtomFamily = atomFamily((_id: string) =>
+	atom<StoredFileInfo | null>(null),
 )
 export const selectedEntityAtom = atom<OsmEntity | null>(null)
 export const selectedOsmAtom = atom<Osm | null>(null)

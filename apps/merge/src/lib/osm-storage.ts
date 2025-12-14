@@ -97,6 +97,12 @@ type StorableTransferables = {
 	}
 }
 
+/** File metadata stored alongside Osm data */
+export interface StoredFileInfo {
+	name: string
+	size: number
+}
+
 export interface StoredOsm {
 	id: string
 	info: OsmInfo
@@ -104,6 +110,8 @@ export interface StoredOsm {
 	storedAt: number
 	/** SHA-256 hash of the original file content */
 	fileHash?: string
+	/** Original file metadata */
+	fileInfo?: StoredFileInfo
 }
 
 export interface StoredOsmEntry {
@@ -111,6 +119,7 @@ export interface StoredOsmEntry {
 	info: OsmInfo
 	storedAt: number
 	fileHash?: string
+	fileInfo?: StoredFileInfo
 }
 
 interface OsmixDB extends DBSchema {
@@ -288,12 +297,15 @@ function fromStorableTransferables(t: StorableTransferables): OsmTransferables {
  * Store an Osm instance's transferables in IndexedDB.
  * @param info - The OsmInfo metadata
  * @param transferables - The Osm transferables to store
- * @param fileHash - Optional SHA-256 hash of the original file for deduplication
+ * @param options - Optional storage options
  */
 export async function storeOsm(
 	info: OsmInfo,
 	transferables: OsmTransferables,
-	fileHash?: string,
+	options?: {
+		fileHash?: string
+		fileInfo?: StoredFileInfo
+	},
 ): Promise<void> {
 	const db = await getDB()
 	const storedOsm: StoredOsm = {
@@ -301,7 +313,8 @@ export async function storeOsm(
 		info,
 		transferables: toStorableTransferables(transferables),
 		storedAt: Date.now(),
-		fileHash,
+		fileHash: options?.fileHash,
+		fileInfo: options?.fileInfo,
 	}
 	await db.put(OSM_STORE, storedOsm)
 }
@@ -327,6 +340,7 @@ export async function loadStoredOsm(id: string): Promise<{
 	info: OsmInfo
 	transferables: OsmTransferables
 	storedAt: number
+	fileInfo?: StoredFileInfo
 } | null> {
 	const db = await getDB()
 	const stored = await db.get(OSM_STORE, id)
@@ -336,6 +350,7 @@ export async function loadStoredOsm(id: string): Promise<{
 		info: stored.info,
 		transferables: fromStorableTransferables(stored.transferables),
 		storedAt: stored.storedAt,
+		fileInfo: stored.fileInfo,
 	}
 }
 
@@ -345,11 +360,12 @@ export async function loadStoredOsm(id: string): Promise<{
 export async function listStoredOsm(): Promise<StoredOsmEntry[]> {
 	const db = await getDB()
 	const all = await db.getAll(OSM_STORE)
-	return all.map(({ id, info, storedAt, fileHash }) => ({
+	return all.map(({ id, info, storedAt, fileHash, fileInfo }) => ({
 		id,
 		info,
 		storedAt,
 		fileHash,
+		fileInfo,
 	}))
 }
 

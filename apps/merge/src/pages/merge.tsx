@@ -184,6 +184,7 @@ export default function Merge() {
 										defaultOpen={false}
 										osm={base.osm}
 										file={base.file}
+										fileInfo={base.fileInfo}
 									/>
 								)}
 							</CardContent>
@@ -213,6 +214,7 @@ export default function Merge() {
 										defaultOpen={false}
 										osm={patch.osm}
 										file={patch.file}
+										fileInfo={patch.fileInfo}
 									/>
 								)}
 							</CardContent>
@@ -349,6 +351,7 @@ export default function Merge() {
 									defaultOpen={false}
 									osm={base.osm}
 									file={base.file}
+									fileInfo={base.fileInfo}
 								/>
 							</CardContent>
 						</Card>
@@ -391,6 +394,7 @@ export default function Merge() {
 									defaultOpen={false}
 									osm={patch.osm}
 									file={patch.file}
+									fileInfo={patch.fileInfo}
 								/>
 							</CardContent>
 						</Card>
@@ -443,6 +447,7 @@ export default function Merge() {
 									defaultOpen={false}
 									osm={base.osm}
 									file={base.file}
+									fileInfo={base.fileInfo}
 								/>
 							</CardContent>
 						</Card>
@@ -462,6 +467,7 @@ export default function Merge() {
 									defaultOpen={false}
 									osm={patch.osm}
 									file={patch.file}
+									fileInfo={patch.fileInfo}
 								/>
 							</CardContent>
 						</Card>
@@ -598,6 +604,7 @@ export default function Merge() {
 									defaultOpen={false}
 									osm={base.osm}
 									file={base.file}
+									fileInfo={base.fileInfo}
 								/>
 							</CardContent>
 						</Card>
@@ -712,6 +719,7 @@ export default function Merge() {
 											defaultOpen={false}
 											osm={base.osm}
 											file={base.file}
+											fileInfo={base.fileInfo}
 										/>
 									</CardContent>
 								</Card>
