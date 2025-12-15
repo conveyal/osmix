@@ -14,12 +14,13 @@ import {
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
 
-export interface WaysTransferables extends EntitiesTransferables {
-	refStart: BufferType
-	refCount: BufferType
-	refs: BufferType
-	bbox: BufferType
-	spatialIndex: BufferType
+export interface WaysTransferables<T extends BufferType = BufferType>
+	extends EntitiesTransferables<T> {
+	refStart: T
+	refCount: T
+	refs: T
+	bbox: T
+	spatialIndex: T
 }
 
 export class Ways extends Entities<OsmWay> {

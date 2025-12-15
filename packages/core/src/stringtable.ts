@@ -13,13 +13,13 @@ import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
 /**
  * Serializable state for worker transfer.
  */
-export interface StringTableTransferables {
+export interface StringTableTransferables<T extends BufferType = BufferType> {
 	/** Concatenated UTF-8 bytes. */
-	bytes: BufferType
+	bytes: T
 	/** Maps string index → byte offset. */
-	start: BufferType
+	start: T
 	/** Maps string index → byte length. */
-	count: BufferType
+	count: T
 }
 
 /**

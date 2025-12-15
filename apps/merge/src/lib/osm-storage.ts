@@ -9,8 +9,15 @@
  * - Converts SharedArrayBuffer to regular ArrayBuffer (IndexedDB requirement)
  */
 
-import type { OsmInfo, OsmTransferables } from "@osmix/core"
-import { openDB, type DBSchema, type IDBPDatabase } from "idb"
+import type {
+	NodesTransferables,
+	OsmInfo,
+	OsmTransferables,
+	RelationsTransferables,
+	StringTableTransferables,
+	WaysTransferables,
+} from "@osmix/core"
+import { type DBSchema, type IDBPDatabase, openDB } from "idb"
 
 const DB_NAME = "osmix-storage"
 const DB_VERSION = 2 // Bumped for hash index
@@ -23,78 +30,10 @@ const OSM_STORE = "osm"
 type StorableTransferables = {
 	id: string
 	header: OsmTransferables["header"]
-	stringTable: {
-		bytes: ArrayBuffer
-		start: ArrayBuffer
-		count: ArrayBuffer
-	}
-	nodes: {
-		// IdsTransferables
-		ids: ArrayBuffer
-		sortedIds: ArrayBuffer
-		sortedIdPositionToIndex: ArrayBuffer
-		anchors: ArrayBuffer
-		idsAreSorted: boolean
-		// TagsTransferables
-		tagStart: ArrayBuffer
-		tagCount: ArrayBuffer
-		tagKeys: ArrayBuffer
-		tagVals: ArrayBuffer
-		keyEntities: ArrayBuffer
-		keyIndexStart: ArrayBuffer
-		keyIndexCount: ArrayBuffer
-		// NodesTransferables
-		lons: ArrayBuffer
-		lats: ArrayBuffer
-		bbox: OsmTransferables["nodes"]["bbox"]
-		spatialIndex: ArrayBuffer
-	}
-	ways: {
-		// IdsTransferables
-		ids: ArrayBuffer
-		sortedIds: ArrayBuffer
-		sortedIdPositionToIndex: ArrayBuffer
-		anchors: ArrayBuffer
-		idsAreSorted: boolean
-		// TagsTransferables
-		tagStart: ArrayBuffer
-		tagCount: ArrayBuffer
-		tagKeys: ArrayBuffer
-		tagVals: ArrayBuffer
-		keyEntities: ArrayBuffer
-		keyIndexStart: ArrayBuffer
-		keyIndexCount: ArrayBuffer
-		// WaysTransferables
-		refStart: ArrayBuffer
-		refCount: ArrayBuffer
-		refs: ArrayBuffer
-		bbox: ArrayBuffer
-		spatialIndex: ArrayBuffer
-	}
-	relations: {
-		// IdsTransferables
-		ids: ArrayBuffer
-		sortedIds: ArrayBuffer
-		sortedIdPositionToIndex: ArrayBuffer
-		anchors: ArrayBuffer
-		idsAreSorted: boolean
-		// TagsTransferables
-		tagStart: ArrayBuffer
-		tagCount: ArrayBuffer
-		tagKeys: ArrayBuffer
-		tagVals: ArrayBuffer
-		keyEntities: ArrayBuffer
-		keyIndexStart: ArrayBuffer
-		keyIndexCount: ArrayBuffer
-		// RelationsTransferables
-		memberStart: ArrayBuffer
-		memberCount: ArrayBuffer
-		memberRefs: ArrayBuffer
-		memberTypes: ArrayBuffer
-		memberRoles: ArrayBuffer
-		bbox: ArrayBuffer
-		spatialIndex: ArrayBuffer
-	}
+	stringTable: StringTableTransferables<ArrayBuffer>
+	nodes: NodesTransferables<ArrayBuffer>
+	ways: WaysTransferables<ArrayBuffer>
+	relations: RelationsTransferables<ArrayBuffer>
 }
 
 /** File metadata stored alongside Osm data */

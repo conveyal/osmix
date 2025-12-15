@@ -14,11 +14,12 @@ import {
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
 
-export interface NodesTransferables extends EntitiesTransferables {
-	lons: BufferType
-	lats: BufferType
+export interface NodesTransferables<T extends BufferType = BufferType>
+	extends EntitiesTransferables<T> {
+	lons: T
+	lats: T
 	bbox: GeoBbox2D
-	spatialIndex: BufferType
+	spatialIndex: T
 }
 
 export interface AddNodeOptions {

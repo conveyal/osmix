@@ -36,14 +36,15 @@ import type { Ways } from "./ways"
 
 const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
 
-export interface RelationsTransferables extends EntitiesTransferables {
-	memberStart: BufferType
-	memberCount: BufferType
-	memberRefs: BufferType
-	memberTypes: BufferType
-	memberRoles: BufferType
-	bbox: BufferType
-	spatialIndex: BufferType
+export interface RelationsTransferables<T extends BufferType = BufferType>
+	extends EntitiesTransferables<T> {
+	memberStart: T
+	memberCount: T
+	memberRefs: T
+	memberTypes: T
+	memberRoles: T
+	bbox: T
+	spatialIndex: T
 }
 
 export class Relations extends Entities<OsmRelation> {

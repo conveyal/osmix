@@ -15,14 +15,15 @@ import type {
 } from "@osmix/shared/types"
 import type { IdOrIndex, Ids, IdsTransferables } from "./ids"
 import type { Tags, TagsTransferables } from "./tags"
+import type { BufferType } from "./typed-arrays"
 
 /**
  * Serializable representation of an Entities collection for worker transfer.
  * Combines ID and tag transferables; subclasses add entity-specific data.
  */
-export interface EntitiesTransferables
-	extends IdsTransferables,
-		TagsTransferables {}
+export interface EntitiesTransferables<T extends BufferType = BufferType>
+	extends IdsTransferables<T>,
+		TagsTransferables<T> {}
 
 /**
  * Abstract base for typed entity collections.

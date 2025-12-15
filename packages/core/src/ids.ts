@@ -29,15 +29,15 @@ const BLOCK_SIZE = 256
 /**
  * Serializable state for worker transfer.
  */
-export interface IdsTransferables {
+export interface IdsTransferables<T extends BufferType = BufferType> {
 	/** Entity IDs in insertion order. */
-	ids: BufferType
+	ids: T
 	/** Sorted IDs for binary search (aliases `ids` if already sorted). */
-	sortedIds: BufferType
+	sortedIds: T
 	/** Maps sorted position → original insertion index. */
-	sortedIdPositionToIndex: BufferType
+	sortedIdPositionToIndex: T
 	/** Anchor array: every BLOCK_SIZE-th sorted ID. */
-	anchors: BufferType
+	anchors: T
 	/** True if IDs were inserted in ascending order. */
 	idsAreSorted: boolean
 }
