@@ -17,8 +17,8 @@ export default function OsmInfoTable({
 	fileInfo?: StoredFileInfo | null
 }) {
 	// Get file name and size from either file or fileInfo
-	const fileName = file?.name ?? fileInfo?.name
-	const fileSize = file?.size ?? fileInfo?.size
+	const fileName = file?.name ?? fileInfo?.fileName
+	const fileSize = file?.size ?? fileInfo?.fileSize
 
 	if (!osm || (!file && !fileInfo)) return null
 	return (

@@ -281,6 +281,7 @@ function toSharedArrayBuffer(buffer: ArrayBuffer): SharedArrayBuffer {
 
 /**
  * Convert OsmTransferables to a storable format with regular ArrayBuffers.
+ * Spatial indexes are excluded since they can be rebuilt from the data.
  */
 function toStorableTransferables(
 	t: OsmTransferables,
@@ -308,11 +309,10 @@ function toStorableTransferables(
 			keyEntities: toArrayBuffer(t.nodes.keyEntities),
 			keyIndexStart: toArrayBuffer(t.nodes.keyIndexStart),
 			keyIndexCount: toArrayBuffer(t.nodes.keyIndexCount),
-			// NodesTransferables
+			// NodesTransferables (spatialIndex excluded - rebuilt on load)
 			lons: toArrayBuffer(t.nodes.lons),
 			lats: toArrayBuffer(t.nodes.lats),
 			bbox: t.nodes.bbox,
-			spatialIndex: toArrayBuffer(t.nodes.spatialIndex),
 		},
 		ways: {
 			// IdsTransferables
@@ -329,12 +329,11 @@ function toStorableTransferables(
 			keyEntities: toArrayBuffer(t.ways.keyEntities),
 			keyIndexStart: toArrayBuffer(t.ways.keyIndexStart),
 			keyIndexCount: toArrayBuffer(t.ways.keyIndexCount),
-			// WaysTransferables
+			// WaysTransferables (spatialIndex excluded - rebuilt on load)
 			refStart: toArrayBuffer(t.ways.refStart),
 			refCount: toArrayBuffer(t.ways.refCount),
 			refs: toArrayBuffer(t.ways.refs),
 			bbox: toArrayBuffer(t.ways.bbox),
-			spatialIndex: toArrayBuffer(t.ways.spatialIndex),
 		},
 		relations: {
 			// IdsTransferables
@@ -353,20 +352,20 @@ function toStorableTransferables(
 			keyEntities: toArrayBuffer(t.relations.keyEntities),
 			keyIndexStart: toArrayBuffer(t.relations.keyIndexStart),
 			keyIndexCount: toArrayBuffer(t.relations.keyIndexCount),
-			// RelationsTransferables
+			// RelationsTransferables (spatialIndex excluded - rebuilt on load)
 			memberStart: toArrayBuffer(t.relations.memberStart),
 			memberCount: toArrayBuffer(t.relations.memberCount),
 			memberRefs: toArrayBuffer(t.relations.memberRefs),
 			memberTypes: toArrayBuffer(t.relations.memberTypes),
 			memberRoles: toArrayBuffer(t.relations.memberRoles),
 			bbox: toArrayBuffer(t.relations.bbox),
-			spatialIndex: toArrayBuffer(t.relations.spatialIndex),
 		},
 	}
 }
 
 /**
- * Convert OsmTransferables to a storable format with regular ArrayBuffers.
+ * Convert stored OsmTransferables back to SharedArrayBuffers for use in workers.
+ * Spatial indexes are not included since they will be rebuilt on load.
  */
 function fromStorableTransferables(
 	t: OsmTransferables<ArrayBuffer>,
@@ -396,11 +395,10 @@ function fromStorableTransferables(
 			keyEntities: toSharedArrayBuffer(t.nodes.keyEntities),
 			keyIndexStart: toSharedArrayBuffer(t.nodes.keyIndexStart),
 			keyIndexCount: toSharedArrayBuffer(t.nodes.keyIndexCount),
-			// NodesTransferables
+			// NodesTransferables (spatialIndex excluded - rebuilt on load)
 			lons: toSharedArrayBuffer(t.nodes.lons),
 			lats: toSharedArrayBuffer(t.nodes.lats),
 			bbox: t.nodes.bbox,
-			spatialIndex: toSharedArrayBuffer(t.nodes.spatialIndex),
 		},
 		ways: {
 			// IdsTransferables
@@ -419,12 +417,11 @@ function fromStorableTransferables(
 			keyEntities: toSharedArrayBuffer(t.ways.keyEntities),
 			keyIndexStart: toSharedArrayBuffer(t.ways.keyIndexStart),
 			keyIndexCount: toSharedArrayBuffer(t.ways.keyIndexCount),
-			// WaysTransferables
+			// WaysTransferables (spatialIndex excluded - rebuilt on load)
 			refStart: toSharedArrayBuffer(t.ways.refStart),
 			refCount: toSharedArrayBuffer(t.ways.refCount),
 			refs: toSharedArrayBuffer(t.ways.refs),
 			bbox: toSharedArrayBuffer(t.ways.bbox),
-			spatialIndex: toSharedArrayBuffer(t.ways.spatialIndex),
 		},
 		relations: {
 			// IdsTransferables
@@ -443,14 +440,13 @@ function fromStorableTransferables(
 			keyEntities: toSharedArrayBuffer(t.relations.keyEntities),
 			keyIndexStart: toSharedArrayBuffer(t.relations.keyIndexStart),
 			keyIndexCount: toSharedArrayBuffer(t.relations.keyIndexCount),
-			// RelationsTransferables
+			// RelationsTransferables (spatialIndex excluded - rebuilt on load)
 			memberStart: toSharedArrayBuffer(t.relations.memberStart),
 			memberCount: toSharedArrayBuffer(t.relations.memberCount),
 			memberRefs: toSharedArrayBuffer(t.relations.memberRefs),
 			memberTypes: toSharedArrayBuffer(t.relations.memberTypes),
 			memberRoles: toSharedArrayBuffer(t.relations.memberRoles),
 			bbox: toSharedArrayBuffer(t.relations.bbox),
-			spatialIndex: toSharedArrayBuffer(t.relations.spatialIndex),
 		},
 	}
 }

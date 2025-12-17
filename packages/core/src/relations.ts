@@ -44,7 +44,8 @@ export interface RelationsTransferables<T extends BufferType = BufferType>
 	memberTypes: T
 	memberRoles: T
 	bbox: T
-	spatialIndex: T
+	/** Optional - can be rebuilt via buildSpatialIndex() */
+	spatialIndex?: T
 }
 
 export class Relations extends Entities<OsmRelation> {
@@ -60,6 +61,8 @@ export class Relations extends Entities<OsmRelation> {
 
 	// Spatial index
 	private spatialIndex: Flatbush = new Flatbush(1)
+	// Track if spatial index was properly built (vs default empty)
+	private spatialIndexBuilt = false
 
 	// Bounding box of the relation in geographic coordinates
 	private bbox: RTA<Float64Array>
@@ -89,7 +92,11 @@ export class Relations extends Entities<OsmRelation> {
 			this.memberTypes = RTA.from(Uint8Array, transferables.memberTypes)
 			this.memberRoles = RTA.from(Uint32Array, transferables.memberRoles)
 			this.bbox = RTA.from(Float64Array, transferables.bbox)
-			this.spatialIndex = Flatbush.from(transferables.spatialIndex)
+			// Only load spatial index if provided (not stored in IndexedDB)
+			if (transferables.spatialIndex?.byteLength) {
+				this.spatialIndex = Flatbush.from(transferables.spatialIndex)
+				this.spatialIndexBuilt = true
+			}
 			this.indexBuilt = true
 		} else {
 			super("relation", new Ids(), new Tags(stringTable))
@@ -240,9 +247,17 @@ export class Relations extends Entities<OsmRelation> {
 			this.spatialIndex.add(bbox[0], bbox[1], bbox[2], bbox[3])
 		}
 		this.spatialIndex.finish()
+		this.spatialIndexBuilt = true
 		this.bbox.compact()
 		console.timeEnd("RelationIndex.buildSpatialIndex")
 		return this.spatialIndex
+	}
+
+	/**
+	 * Check if the spatial index has been built.
+	 */
+	hasSpatialIndex(): boolean {
+		return this.spatialIndexBuilt
 	}
 
 	/**
@@ -464,9 +479,10 @@ export class Relations extends Entities<OsmRelation> {
 
 	/**
 	 * Get transferable objects for passing to another thread.
+	 * Only includes spatialIndex if it has been built.
 	 */
 	override transferables(): RelationsTransferables {
-		return {
+		const base = {
 			...super.transferables(),
 			memberStart: this.memberStart.array.buffer,
 			memberCount: this.memberCount.array.buffer,
@@ -474,8 +490,12 @@ export class Relations extends Entities<OsmRelation> {
 			memberTypes: this.memberTypes.array.buffer,
 			memberRoles: this.memberRoles.array.buffer,
 			bbox: this.bbox.array.buffer,
-			spatialIndex: this.spatialIndex.data,
 		}
+		// Only include spatial index if it was built
+		if (this.spatialIndexBuilt) {
+			return { ...base, spatialIndex: this.spatialIndex.data }
+		}
+		return base
 	}
 
 	/**

@@ -125,6 +125,17 @@ export class Osm {
 	}
 
 	/**
+	 * Check if spatial indexes have been built for all entity types.
+	 */
+	hasSpatialIndexes(): boolean {
+		return (
+			this.nodes.hasSpatialIndex() &&
+			this.ways.hasSpatialIndex() &&
+			this.relations.hasSpatialIndex()
+		)
+	}
+
+	/**
 	 * Get the bounding box of all entities in the OSM index.
 	 */
 	bbox(): GeoBbox2D {
