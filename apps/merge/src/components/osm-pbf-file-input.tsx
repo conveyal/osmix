@@ -47,7 +47,7 @@ export function OsmPbfSelectFileButton({
 			}}
 			icon={<FilesIcon />}
 		>
-			Select OSM PBF or GeoJSON
+			Open new OSM PBF or GeoJSON file
 		</ActionButton>
 	)
 }
