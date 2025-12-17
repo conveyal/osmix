@@ -199,7 +199,7 @@ function LayerGroupComponent({
 
 	return (
 		<Collapsible>
-			<CollapsibleTrigger className="group cursor-pointer flex h-8 p-2 justify-between items-center w-full">
+			<div className="group cursor-pointer flex h-8 pl-2 py-2 justify-between items-center w-full">
 				<div className="uppercase flex gap-2 items-center">
 					<FolderOpen className="size-4 hidden group-data-[state=open]:block" />
 					<Folder className="size-4 block group-data-[state=open]:hidden" />{" "}
@@ -227,13 +227,17 @@ function LayerGroupComponent({
 						)}
 					</Button>
 
-					<ChevronDown
-						className={
-							"size-4 transition-transform group-data-[state=open]:rotate-180"
-						}
-					/>
+					<CollapsibleTrigger asChild>
+						<Button variant="ghost" size="icon-sm">
+							<ChevronDown
+								className={
+									"size-4 transition-transform group-data-[state=open]:rotate-180"
+								}
+							/>
+						</Button>
+					</CollapsibleTrigger>
 				</div>
-			</CollapsibleTrigger>
+			</div>
 			<CollapsibleContent className="border-t shadow-inner">
 				<div className="flex flex-col gap-y-0">
 					{group.layers.map((layer) => (
