@@ -20,11 +20,14 @@ export interface WaysTransferables<T extends BufferType = BufferType>
 	refCount: T
 	refs: T
 	bbox: T
-	spatialIndex: T
+	/** Optional - can be rebuilt via buildSpatialIndex() */
+	spatialIndex?: T
 }
 
 export class Ways extends Entities<OsmWay> {
 	private spatialIndex: Flatbush = new Flatbush(1)
+	// Track if spatial index was properly built (vs default empty)
+	private spatialIndexBuilt = false
 
 	private refStart: RTA<Uint32Array>
 	private refCount: RTA<Uint16Array> // Maximum 2,000 nodes per way
@@ -52,7 +55,11 @@ export class Ways extends Entities<OsmWay> {
 			this.refCount = RTA.from(Uint16Array, transferables.refCount)
 			this.refs = RTA.from(IdArrayType, transferables.refs)
 			this.bbox = RTA.from(Float64Array, transferables.bbox)
-			this.spatialIndex = Flatbush.from(transferables.spatialIndex)
+			// Only load spatial index if provided (not stored in IndexedDB)
+			if (transferables.spatialIndex?.byteLength) {
+				this.spatialIndex = Flatbush.from(transferables.spatialIndex)
+				this.spatialIndexBuilt = true
+			}
 			this.indexBuilt = true
 		} else {
 			super("way", new Ids(), new Tags(stringTable))
@@ -164,8 +171,16 @@ export class Ways extends Entities<OsmWay> {
 			this.spatialIndex.add(minX, minY, maxX, maxY)
 		}
 		this.spatialIndex.finish()
+		this.spatialIndexBuilt = true
 		console.timeEnd("WayIndex.buildSpatialIndex")
 		return this.spatialIndex
+	}
+
+	/**
+	 * Check if the spatial index has been built.
+	 */
+	hasSpatialIndex(): boolean {
+		return this.spatialIndexBuilt
 	}
 
 	/**
@@ -323,16 +338,21 @@ export class Ways extends Entities<OsmWay> {
 
 	/**
 	 * Get transferable objects for passing to another thread.
+	 * Only includes spatialIndex if it has been built.
 	 */
 	override transferables(): WaysTransferables {
-		return {
+		const base = {
 			...super.transferables(),
 			refStart: this.refStart.array.buffer,
 			refCount: this.refCount.array.buffer,
 			refs: this.refs.array.buffer,
 			bbox: this.bbox.array.buffer,
-			spatialIndex: this.spatialIndex.data,
 		}
+		// Only include spatial index if it was built
+		if (this.spatialIndexBuilt) {
+			return { ...base, spatialIndex: this.spatialIndex.data }
+		}
+		return base
 	}
 
 	/**
