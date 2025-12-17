@@ -9,57 +9,27 @@
  * - Converts SharedArrayBuffer to regular ArrayBuffer (IndexedDB requirement)
  */
 
-import type {
-	NodesTransferables,
-	OsmInfo,
-	OsmTransferables,
-	RelationsTransferables,
-	StringTableTransferables,
-	WaysTransferables,
-} from "@osmix/core"
+import type { OsmInfo, OsmTransferables } from "@osmix/core"
+import { concatBytes } from "@osmix/shared/concat-bytes"
 import { type DBSchema, type IDBPDatabase, openDB } from "idb"
-
-const DB_NAME = "osmix-storage"
-const DB_VERSION = 2 // Bumped for hash index
-const OSM_STORE = "osm"
-
-/**
- * Stored transferables use regular ArrayBuffer (IndexedDB can't store SharedArrayBuffer).
- * Structure mirrors OsmTransferables but with ArrayBuffer instead of BufferType.
- */
-type StorableTransferables = {
-	id: string
-	header: OsmTransferables["header"]
-	stringTable: StringTableTransferables<ArrayBuffer>
-	nodes: NodesTransferables<ArrayBuffer>
-	ways: WaysTransferables<ArrayBuffer>
-	relations: RelationsTransferables<ArrayBuffer>
-}
+import { DB_NAME, DB_VERSION, OSM_STORE } from "../settings"
+import browserHash from "./browser-hash"
 
 /** File metadata stored alongside Osm data */
 export interface StoredFileInfo {
-	name: string
-	size: number
+	fileHash: string
+	fileName: string
+	fileSize: number
 }
 
-export interface StoredOsm {
-	id: string
+export interface StoredOsmEntry extends StoredFileInfo {
 	info: OsmInfo
-	transferables: StorableTransferables
 	storedAt: number
-	/** SHA-256 hash of the original file content */
-	fileHash?: string
-	/** Original file metadata */
-	fileInfo?: StoredFileInfo
 }
 
-export interface StoredOsmEntry {
-	id: string
-	info: OsmInfo
-	storedAt: number
-	fileHash?: string
-	fileInfo?: StoredFileInfo
-}
+export interface StoredOsm
+	extends StoredOsmEntry,
+		OsmTransferables<ArrayBuffer> {}
 
 interface OsmixDB extends DBSchema {
 	[OSM_STORE]: {
@@ -72,55 +42,215 @@ interface OsmixDB extends DBSchema {
 	}
 }
 
-let dbPromise: Promise<IDBPDatabase<OsmixDB>> | null = null
+class OsmStorage {
+	listeners = new Set<() => void>()
+	dbPromise: Promise<IDBPDatabase<OsmixDB>> | null = null
+	snapshot = {
+		entries: [] as StoredOsmEntry[],
+		loading: false,
+		estimatedBytes: 0,
+	}
 
-function getDB(): Promise<IDBPDatabase<OsmixDB>> {
-	if (!dbPromise) {
-		dbPromise = openDB<OsmixDB>(DB_NAME, DB_VERSION, {
-			upgrade(db, oldVersion, _newVersion, transaction) {
-				if (oldVersion < 1) {
-					const store = db.createObjectStore(OSM_STORE, { keyPath: "id" })
+	async getDB(): Promise<IDBPDatabase<OsmixDB>> {
+		if (!this.dbPromise) {
+			this.dbPromise = openDB<OsmixDB>(DB_NAME, DB_VERSION, {
+				upgrade(db) {
+					const store = db.createObjectStore(OSM_STORE, { keyPath: "fileHash" })
 					store.createIndex("by-stored-at", "storedAt")
 					store.createIndex("by-hash", "fileHash")
-				} else if (oldVersion < 2) {
-					// Add hash index to existing store
-					const store = transaction.objectStore(OSM_STORE)
-					if (!store.indexNames.contains("by-hash")) {
-						store.createIndex("by-hash", "fileHash")
-					}
-				}
-			},
-		})
+				},
+			})
+			await this.dbPromise
+			await this.refresh()
+		}
+		return this.dbPromise
 	}
-	return dbPromise
+
+	subscribe = (fn: () => void) => {
+		this.listeners.add(fn)
+		return () => {
+			this.listeners.delete(fn)
+		}
+	}
+
+	getSnapshot = () => {
+		return this.snapshot
+	}
+
+	async refresh() {
+		const entries = await this.listStoredOsm()
+
+		let estimatedBytes = 0
+		for (const t of entries) {
+			estimatedBytes += collectBuffers(t).reduce(
+				(acc, buffer) => acc + buffer.byteLength,
+				0,
+			)
+		}
+		this.snapshot = {
+			entries,
+			estimatedBytes,
+			loading: false,
+		}
+		for (const fn of this.listeners) {
+			console.log("calling listener", fn)
+			fn()
+		}
+	}
+
+	/**
+	 * Find a stored entry by file hash.
+	 * Returns the stored entry if found, null otherwise.
+	 */
+	async findByHash(hash: string): Promise<StoredOsmEntry | null> {
+		const db = await this.getDB()
+		const stored = await db.getFromIndex(OSM_STORE, "by-hash", hash)
+		if (!stored) return null
+		return {
+			info: stored.info,
+			storedAt: stored.storedAt,
+			fileHash: stored.fileHash,
+			fileName: stored.fileName,
+			fileSize: stored.fileSize,
+		}
+	}
+
+	/**
+	 * Store an Osm instance's transferables in IndexedDB.
+	 * @param info - The OsmInfo metadata
+	 * @param transferables - The Osm transferables to store
+	 * @param options - Optional storage options
+	 */
+	async storeOsm(
+		info: OsmInfo,
+		transferables: OsmTransferables,
+		fileInfo: StoredFileInfo,
+	): Promise<void> {
+		const db = await this.getDB()
+		await db.put(OSM_STORE, {
+			...toStorableTransferables(transferables),
+			info,
+			storedAt: Date.now(),
+			fileHash: fileInfo.fileHash,
+			fileName: fileInfo.fileName,
+			fileSize: fileInfo.fileSize,
+		})
+		await this.refresh()
+	}
+
+	/**
+	 * Load Osm transferables from IndexedDB.
+	 */
+	async loadOsmTransferables(id: string): Promise<OsmTransferables | null> {
+		const db = await this.getDB()
+		const stored = await db.get(OSM_STORE, id)
+		if (!stored) return null
+		return fromStorableTransferables(stored)
+	}
+
+	/**
+	 * Load a stored Osm entry from IndexedDB.
+	 * Returns the info and transferables in the proper OsmTransferables format.
+	 */
+	async loadStoredOsm(id: string): Promise<{
+		entry: StoredOsmEntry
+		transferables: OsmTransferables<SharedArrayBuffer>
+	} | null> {
+		const db = await this.getDB()
+		const stored = await db.get(OSM_STORE, id)
+		if (!stored) return null
+		return {
+			entry: {
+				info: stored.info,
+				storedAt: stored.storedAt,
+				fileHash: stored.fileHash,
+				fileName: stored.fileName,
+				fileSize: stored.fileSize,
+			},
+			transferables: fromStorableTransferables(stored),
+		}
+	}
+
+	/**
+	 * Get all stored Osm entries (without the full transferables for listing).
+	 */
+	async listStoredOsm(): Promise<StoredOsm[]> {
+		const db = await this.getDB()
+		return db.getAll(OSM_STORE)
+	}
+
+	/**
+	 * Delete a stored Osm entry from IndexedDB.
+	 */
+	async deleteStoredOsm(id: string): Promise<void> {
+		const db = await this.getDB()
+		await db.delete(OSM_STORE, id)
+		await this.refresh()
+	}
+
+	/**
+	 * Clear all stored Osm entries from IndexedDB.
+	 */
+	async clearStoredOsm(): Promise<void> {
+		const db = await this.getDB()
+		await db.clear(OSM_STORE)
+		await this.refresh()
+	}
+
+	/**
+	 * Check if an Osm entry exists in IndexedDB.
+	 */
+	async hasStoredOsm(id: string): Promise<boolean> {
+		const db = await this.getDB()
+		const count = await db.count(OSM_STORE, id)
+		return count > 0
+	}
+
+	/**
+	 * Get the approximate storage size of stored Osm data.
+	 */
+	async getStorageStats(): Promise<{
+		count: number
+		estimatedBytes: number
+	}> {
+		const db = await this.getDB()
+		const all = await db.getAll(OSM_STORE)
+		let estimatedBytes = 0
+		for (const t of all) {
+			estimatedBytes += collectBuffers(t).reduce(
+				(acc, buffer) => acc + buffer.byteLength,
+				0,
+			)
+		}
+		return { count: all.length, estimatedBytes }
+	}
 }
+
+export const osmStorage = new OsmStorage()
 
 /**
  * Compute SHA-256 hash of a file and return as hex string.
  */
 export async function hashFile(file: File): Promise<string> {
 	const buffer = await file.arrayBuffer()
-	const hashBuffer = await crypto.subtle.digest("SHA-256", buffer)
-	const hashArray = new Uint8Array(hashBuffer)
-	return Array.from(hashArray)
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("")
+	return browserHash(buffer)
 }
 
 /**
- * Find a stored entry by file hash.
- * Returns the stored entry if found, null otherwise.
+ * Compute a SHA-256 hash of OsmTransferable ArrayBuffers.
  */
-export async function findByHash(hash: string): Promise<StoredOsmEntry | null> {
-	const db = await getDB()
-	const stored = await db.getFromIndex(OSM_STORE, "by-hash", hash)
-	if (!stored) return null
-	return {
-		id: stored.id,
-		info: stored.info,
-		storedAt: stored.storedAt,
-		fileHash: stored.fileHash,
-	}
+export async function hashOsmTransferables(
+	t: OsmTransferables,
+): Promise<string> {
+	const buffers = collectBuffers(t)
+	const digests = await Promise.all(
+		buffers.map(
+			async (buffer) =>
+				new Uint8Array(await crypto.subtle.digest("SHA-256", buffer)),
+		),
+	)
+
+	return browserHash(concatBytes(digests).buffer)
 }
 
 /**
@@ -140,9 +270,21 @@ function toArrayBuffer(
 }
 
 /**
+ * Convert an ArrayBuffer to a SharedArrayBuffer, for copying to workers.
+ */
+function toSharedArrayBuffer(buffer: ArrayBuffer): SharedArrayBuffer {
+	// Copy SharedArrayBuffer to ArrayBuffer
+	const copy = new SharedArrayBuffer(buffer.byteLength)
+	new Uint8Array(copy).set(new Uint8Array(buffer))
+	return copy
+}
+
+/**
  * Convert OsmTransferables to a storable format with regular ArrayBuffers.
  */
-function toStorableTransferables(t: OsmTransferables): StorableTransferables {
+function toStorableTransferables(
+	t: OsmTransferables,
+): OsmTransferables<ArrayBuffer> {
 	return {
 		id: t.id,
 		header: t.header,
@@ -224,145 +366,105 @@ function toStorableTransferables(t: OsmTransferables): StorableTransferables {
 }
 
 /**
- * Convert stored transferables back to OsmTransferables format.
- * The stored ArrayBuffers are compatible with the OsmTransferables interface.
+ * Convert OsmTransferables to a storable format with regular ArrayBuffers.
  */
-function fromStorableTransferables(t: StorableTransferables): OsmTransferables {
-	// ArrayBuffer is assignable to BufferType, so we can cast directly
-	return t as unknown as OsmTransferables
-}
-
-/**
- * Store an Osm instance's transferables in IndexedDB.
- * @param info - The OsmInfo metadata
- * @param transferables - The Osm transferables to store
- * @param options - Optional storage options
- */
-export async function storeOsm(
-	info: OsmInfo,
-	transferables: OsmTransferables,
-	options?: {
-		fileHash?: string
-		fileInfo?: StoredFileInfo
-	},
-): Promise<void> {
-	const db = await getDB()
-	const storedOsm: StoredOsm = {
-		id: info.id,
-		info,
-		transferables: toStorableTransferables(transferables),
-		storedAt: Date.now(),
-		fileHash: options?.fileHash,
-		fileInfo: options?.fileInfo,
-	}
-	await db.put(OSM_STORE, storedOsm)
-}
-
-/**
- * Load Osm transferables from IndexedDB.
- */
-export async function loadOsmTransferables(
-	id: string,
-): Promise<OsmTransferables | null> {
-	const db = await getDB()
-	const stored = await db.get(OSM_STORE, id)
-	if (!stored) return null
-	return fromStorableTransferables(stored.transferables)
-}
-
-/**
- * Load a stored Osm entry from IndexedDB.
- * Returns the info and transferables in the proper OsmTransferables format.
- */
-export async function loadStoredOsm(id: string): Promise<{
-	id: string
-	info: OsmInfo
-	transferables: OsmTransferables
-	storedAt: number
-	fileInfo?: StoredFileInfo
-} | null> {
-	const db = await getDB()
-	const stored = await db.get(OSM_STORE, id)
-	if (!stored) return null
+function fromStorableTransferables(
+	t: OsmTransferables<ArrayBuffer>,
+): OsmTransferables<SharedArrayBuffer> {
 	return {
-		id: stored.id,
-		info: stored.info,
-		transferables: fromStorableTransferables(stored.transferables),
-		storedAt: stored.storedAt,
-		fileInfo: stored.fileInfo,
+		id: t.id,
+		header: t.header,
+		stringTable: {
+			bytes: toSharedArrayBuffer(t.stringTable.bytes),
+			start: toSharedArrayBuffer(t.stringTable.start),
+			count: toSharedArrayBuffer(t.stringTable.count),
+		},
+		nodes: {
+			// IdsTransferables
+			ids: toSharedArrayBuffer(t.nodes.ids),
+			sortedIds: toSharedArrayBuffer(t.nodes.sortedIds),
+			sortedIdPositionToIndex: toSharedArrayBuffer(
+				t.nodes.sortedIdPositionToIndex,
+			),
+			anchors: toSharedArrayBuffer(t.nodes.anchors),
+			idsAreSorted: t.nodes.idsAreSorted,
+			// TagsTransferables
+			tagStart: toSharedArrayBuffer(t.nodes.tagStart),
+			tagCount: toSharedArrayBuffer(t.nodes.tagCount),
+			tagKeys: toSharedArrayBuffer(t.nodes.tagKeys),
+			tagVals: toSharedArrayBuffer(t.nodes.tagVals),
+			keyEntities: toSharedArrayBuffer(t.nodes.keyEntities),
+			keyIndexStart: toSharedArrayBuffer(t.nodes.keyIndexStart),
+			keyIndexCount: toSharedArrayBuffer(t.nodes.keyIndexCount),
+			// NodesTransferables
+			lons: toSharedArrayBuffer(t.nodes.lons),
+			lats: toSharedArrayBuffer(t.nodes.lats),
+			bbox: t.nodes.bbox,
+			spatialIndex: toSharedArrayBuffer(t.nodes.spatialIndex),
+		},
+		ways: {
+			// IdsTransferables
+			ids: toSharedArrayBuffer(t.ways.ids),
+			sortedIds: toSharedArrayBuffer(t.ways.sortedIds),
+			sortedIdPositionToIndex: toSharedArrayBuffer(
+				t.ways.sortedIdPositionToIndex,
+			),
+			anchors: toSharedArrayBuffer(t.ways.anchors),
+			idsAreSorted: t.ways.idsAreSorted,
+			// TagsTransferables
+			tagStart: toSharedArrayBuffer(t.ways.tagStart),
+			tagCount: toSharedArrayBuffer(t.ways.tagCount),
+			tagKeys: toSharedArrayBuffer(t.ways.tagKeys),
+			tagVals: toSharedArrayBuffer(t.ways.tagVals),
+			keyEntities: toSharedArrayBuffer(t.ways.keyEntities),
+			keyIndexStart: toSharedArrayBuffer(t.ways.keyIndexStart),
+			keyIndexCount: toSharedArrayBuffer(t.ways.keyIndexCount),
+			// WaysTransferables
+			refStart: toSharedArrayBuffer(t.ways.refStart),
+			refCount: toSharedArrayBuffer(t.ways.refCount),
+			refs: toSharedArrayBuffer(t.ways.refs),
+			bbox: toSharedArrayBuffer(t.ways.bbox),
+			spatialIndex: toSharedArrayBuffer(t.ways.spatialIndex),
+		},
+		relations: {
+			// IdsTransferables
+			ids: toSharedArrayBuffer(t.relations.ids),
+			sortedIds: toSharedArrayBuffer(t.relations.sortedIds),
+			sortedIdPositionToIndex: toSharedArrayBuffer(
+				t.relations.sortedIdPositionToIndex,
+			),
+			anchors: toSharedArrayBuffer(t.relations.anchors),
+			idsAreSorted: t.relations.idsAreSorted,
+			// TagsTransferables
+			tagStart: toSharedArrayBuffer(t.relations.tagStart),
+			tagCount: toSharedArrayBuffer(t.relations.tagCount),
+			tagKeys: toSharedArrayBuffer(t.relations.tagKeys),
+			tagVals: toSharedArrayBuffer(t.relations.tagVals),
+			keyEntities: toSharedArrayBuffer(t.relations.keyEntities),
+			keyIndexStart: toSharedArrayBuffer(t.relations.keyIndexStart),
+			keyIndexCount: toSharedArrayBuffer(t.relations.keyIndexCount),
+			// RelationsTransferables
+			memberStart: toSharedArrayBuffer(t.relations.memberStart),
+			memberCount: toSharedArrayBuffer(t.relations.memberCount),
+			memberRefs: toSharedArrayBuffer(t.relations.memberRefs),
+			memberTypes: toSharedArrayBuffer(t.relations.memberTypes),
+			memberRoles: toSharedArrayBuffer(t.relations.memberRoles),
+			bbox: toSharedArrayBuffer(t.relations.bbox),
+			spatialIndex: toSharedArrayBuffer(t.relations.spatialIndex),
+		},
 	}
 }
 
 /**
- * Get all stored Osm entries (without the full transferables for listing).
+ * Collect all ArrayBuffer objects from the transferables for Comlink transfer.
  */
-export async function listStoredOsm(): Promise<StoredOsmEntry[]> {
-	const db = await getDB()
-	const all = await db.getAll(OSM_STORE)
-	return all.map(({ id, info, storedAt, fileHash, fileInfo }) => ({
-		id,
-		info,
-		storedAt,
-		fileHash,
-		fileInfo,
-	}))
-}
-
-/**
- * Delete a stored Osm entry from IndexedDB.
- */
-export async function deleteStoredOsm(id: string): Promise<void> {
-	const db = await getDB()
-	await db.delete(OSM_STORE, id)
-}
-
-/**
- * Clear all stored Osm entries from IndexedDB.
- */
-export async function clearStoredOsm(): Promise<void> {
-	const db = await getDB()
-	await db.clear(OSM_STORE)
-}
-
-/**
- * Check if an Osm entry exists in IndexedDB.
- */
-export async function hasStoredOsm(id: string): Promise<boolean> {
-	const db = await getDB()
-	const count = await db.count(OSM_STORE, id)
-	return count > 0
-}
-
-/**
- * Get the approximate storage size of stored Osm data.
- */
-export async function getStorageStats(): Promise<{
-	count: number
-	estimatedBytes: number
-}> {
-	const db = await getDB()
-	const all = await db.getAll(OSM_STORE)
-	let estimatedBytes = 0
-	for (const stored of all) {
-		const t = stored.transferables
-		estimatedBytes += t.stringTable.bytes.byteLength ?? 0
-		estimatedBytes += t.stringTable.start.byteLength ?? 0
-		estimatedBytes += t.stringTable.count.byteLength ?? 0
-		estimatedBytes += t.nodes.lons.byteLength ?? 0
-		estimatedBytes += t.nodes.lats.byteLength ?? 0
-		estimatedBytes += t.nodes.spatialIndex.byteLength ?? 0
-		estimatedBytes += t.ways.refStart.byteLength ?? 0
-		estimatedBytes += t.ways.refCount.byteLength ?? 0
-		estimatedBytes += t.ways.refs.byteLength ?? 0
-		estimatedBytes += t.ways.bbox.byteLength ?? 0
-		estimatedBytes += t.ways.spatialIndex.byteLength ?? 0
-		estimatedBytes += t.relations.memberStart.byteLength ?? 0
-		estimatedBytes += t.relations.memberCount.byteLength ?? 0
-		estimatedBytes += t.relations.memberRefs.byteLength ?? 0
-		estimatedBytes += t.relations.memberTypes.byteLength ?? 0
-		estimatedBytes += t.relations.memberRoles.byteLength ?? 0
-		estimatedBytes += t.relations.bbox.byteLength ?? 0
-		estimatedBytes += t.relations.spatialIndex.byteLength ?? 0
+function collectBuffers(t: unknown): ArrayBuffer[] {
+	const buffers: ArrayBuffer[] = []
+	if (t instanceof ArrayBuffer) return [t]
+	if (t != null && typeof t === "object") {
+		for (const item of Object.values(t)) {
+			buffers.push(...collectBuffers(item))
+		}
 	}
-	return { count: all.length, estimatedBytes }
+	return buffers
 }

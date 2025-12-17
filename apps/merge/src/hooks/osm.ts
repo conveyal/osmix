@@ -1,14 +1,8 @@
-import type { OsmInfo, OsmTransferables } from "@osmix/core"
-import { transfer } from "comlink"
+import { Osm, type OsmInfo } from "@osmix/core"
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback, useEffect, useState, useTransition } from "react"
-import {
-	findByHash,
-	hashFile,
-	loadStoredOsm,
-	storeOsm,
-} from "../lib/osm-storage"
+import { hashFile, osmStorage } from "../lib/osm-storage"
 import { Log } from "../state/log"
 import {
 	osmAtomFamily,
@@ -17,83 +11,11 @@ import {
 	osmInfoAtomFamily,
 	selectedOsmAtom,
 } from "../state/osm"
-import { storedOsmEntriesAtom } from "../state/storage"
 import { osmWorker } from "../state/worker"
 import { useMap } from "./map"
 
-/**
- * Collect all ArrayBuffer objects from the transferables for Comlink transfer.
- */
-function collectBuffers(t: OsmTransferables): ArrayBuffer[] {
-	const buffers: ArrayBuffer[] = []
-	const addBuffer = (b: ArrayBufferLike) => {
-		if (b instanceof ArrayBuffer) buffers.push(b)
-	}
-
-	// StringTable
-	addBuffer(t.stringTable.bytes)
-	addBuffer(t.stringTable.start)
-	addBuffer(t.stringTable.count)
-
-	// Nodes
-	addBuffer(t.nodes.ids)
-	addBuffer(t.nodes.sortedIds)
-	addBuffer(t.nodes.sortedIdPositionToIndex)
-	addBuffer(t.nodes.anchors)
-	addBuffer(t.nodes.tagStart)
-	addBuffer(t.nodes.tagCount)
-	addBuffer(t.nodes.tagKeys)
-	addBuffer(t.nodes.tagVals)
-	addBuffer(t.nodes.keyEntities)
-	addBuffer(t.nodes.keyIndexStart)
-	addBuffer(t.nodes.keyIndexCount)
-	addBuffer(t.nodes.lons)
-	addBuffer(t.nodes.lats)
-	addBuffer(t.nodes.spatialIndex)
-
-	// Ways
-	addBuffer(t.ways.ids)
-	addBuffer(t.ways.sortedIds)
-	addBuffer(t.ways.sortedIdPositionToIndex)
-	addBuffer(t.ways.anchors)
-	addBuffer(t.ways.tagStart)
-	addBuffer(t.ways.tagCount)
-	addBuffer(t.ways.tagKeys)
-	addBuffer(t.ways.tagVals)
-	addBuffer(t.ways.keyEntities)
-	addBuffer(t.ways.keyIndexStart)
-	addBuffer(t.ways.keyIndexCount)
-	addBuffer(t.ways.refStart)
-	addBuffer(t.ways.refCount)
-	addBuffer(t.ways.refs)
-	addBuffer(t.ways.bbox)
-	addBuffer(t.ways.spatialIndex)
-
-	// Relations
-	addBuffer(t.relations.ids)
-	addBuffer(t.relations.sortedIds)
-	addBuffer(t.relations.sortedIdPositionToIndex)
-	addBuffer(t.relations.anchors)
-	addBuffer(t.relations.tagStart)
-	addBuffer(t.relations.tagCount)
-	addBuffer(t.relations.tagKeys)
-	addBuffer(t.relations.tagVals)
-	addBuffer(t.relations.keyEntities)
-	addBuffer(t.relations.keyIndexStart)
-	addBuffer(t.relations.keyIndexCount)
-	addBuffer(t.relations.memberStart)
-	addBuffer(t.relations.memberCount)
-	addBuffer(t.relations.memberRefs)
-	addBuffer(t.relations.memberTypes)
-	addBuffer(t.relations.memberRoles)
-	addBuffer(t.relations.bbox)
-	addBuffer(t.relations.spatialIndex)
-
-	return buffers
-}
-
 function useOsmDefaultFile(
-	loadOsmFile: (file: File | null) => Promise<OsmInfo | undefined>,
+	loadOsmFile: (file: File | null) => Promise<OsmInfo | null>,
 	defaultFilePath?: string,
 ) {
 	const [, startTransition] = useTransition()
@@ -117,50 +39,51 @@ function useOsmDefaultFile(
 	}, [defaultFilePath, loadOsmFile, loadOnStart, map])
 }
 
-export function useOsmFile(id: string, defaultFilePath?: string) {
-	const [file, setFile] = useAtom(osmFileAtomFamily(id))
-	const [fileInfo, setFileInfo] = useAtom(osmFileInfoAtomFamily(id))
-	const [osm, setOsm] = useAtom(osmAtomFamily(id))
-	const [osmInfo, setOsmInfo] = useAtom(osmInfoAtomFamily(id))
+export function useOsmFile(osmKey: string, defaultFilePath?: string) {
+	const [file, setFile] = useAtom(osmFileAtomFamily(osmKey))
+	const [fileInfo, setFileInfo] = useAtom(osmFileInfoAtomFamily(osmKey))
+	const [osm, setOsm] = useAtom(osmAtomFamily(osmKey))
+	const [osmInfo, setOsmInfo] = useAtom(osmInfoAtomFamily(osmKey))
 	const setSelectedOsm = useSetAtom(selectedOsmAtom)
-	const refreshStoredEntries = useSetAtom(storedOsmEntriesAtom)
 
 	const loadOsmFile = useCallback(
 		async (file: File | null) => {
 			setFile(file)
-			setFileInfo(file ? { name: file.name, size: file.size } : null)
 			setOsm(null)
-			if (file == null) return
+			setFileInfo(null)
+			if (file == null) return null
 			const taskLog = Log.startTask(`Processing file ${file.name}...`)
 			try {
 				// Hash the file first to check for duplicates
 				taskLog.update("Hashing file...")
 				const fileHash = await hashFile(file)
+				setFileInfo({
+					fileHash,
+					fileName: file.name,
+					fileSize: file.size,
+				})
 
 				// Check if we already have this file stored
-				const existing = await findByHash(fileHash)
+				const existing = await osmStorage.findByHash(fileHash)
 				if (existing) {
 					taskLog.update("Found cached version, loading from storage...")
-					const stored = await loadStoredOsm(existing.id)
+					const stored = await osmStorage.loadStoredOsm(existing.fileHash)
 					if (stored) {
 						// Load from storage instead of parsing
-						const worker = osmWorker.getWorker()
-						const buffers = collectBuffers(stored.transferables)
-						await worker.transferIn(transfer(stored.transferables, buffers))
-
-						const osm = await osmWorker.get(stored.info.id)
-						setOsmInfo(stored.info)
+						const osm = new Osm(stored.transferables)
+						await osmWorker.transferIn(osm)
+						setOsmInfo(stored.entry.info)
 						setOsm(osm)
 						setSelectedOsm(osm)
 
 						taskLog.end(`${file.name} loaded from cache.`)
-						return stored.info
+						return stored.entry.info
 					}
 				}
 
 				// Parse the file normally
 				taskLog.update("Parsing file...")
-				const osmInfo = await osmWorker.fromFile(file, { id })
+				const osmInfo = await osmWorker.fromFile(file, { id: fileHash })
 				setOsmInfo(osmInfo)
 				const osm = await osmWorker.get(osmInfo.id)
 				setOsm(osm)
@@ -169,11 +92,11 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				// Auto-store to IndexedDB with hash and file info
 				taskLog.update("Storing to IndexedDB...")
 				const transferables = osm.transferables()
-				await storeOsm(osmInfo, transferables, {
+				await osmStorage.storeOsm(osmInfo, transferables, {
 					fileHash,
-					fileInfo: { name: file.name, size: file.size },
+					fileName: file.name,
+					fileSize: file.size,
 				})
-				refreshStoredEntries()
 
 				taskLog.end(`${file.name} fully loaded and stored.`)
 				return osmInfo
@@ -183,47 +106,32 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				throw e
 			}
 		},
-		[
-			setFile,
-			setFileInfo,
-			setOsm,
-			setSelectedOsm,
-			setOsmInfo,
-			id,
-			refreshStoredEntries,
-		],
+		[setFile, setFileInfo, setOsm, setSelectedOsm, setOsmInfo],
 	)
 
 	const loadFromStorage = useCallback(
 		async (storageId: string) => {
-			const taskLog = Log.startTask(`Loading ${storageId} from storage...`)
+			const taskLog = Log.startTask("Loading osm from storage...")
 			try {
-				const stored = await loadStoredOsm(storageId)
+				const stored = await osmStorage.loadStoredOsm(storageId)
 				if (!stored) {
-					taskLog.end(`${storageId} not found in storage.`, "error")
+					taskLog.end(`Osm for ${storageId} not found in storage.`, "error")
 					return null
 				}
 
-				// Send raw transferables directly to a worker using Comlink.transfer.
-				// We can't use osmWorker.transferIn(osm) because it tries to send
-				// the same ArrayBuffers to multiple workers, and regular ArrayBuffers
-				// get detached after the first transfer.
-				const worker = osmWorker.getWorker()
-				const buffers = collectBuffers(stored.transferables)
-				await worker.transferIn(transfer(stored.transferables, buffers))
-
-				// Get the Osm back from the worker for main thread use
-				const osm = await osmWorker.get(stored.info.id)
-				setOsmInfo(stored.info)
+				// Send raw transferables directly t
+				const osm = new Osm(stored.transferables)
+				await osmWorker.transferIn(osm)
+				setOsmInfo(stored.entry.info)
 				setOsm(osm)
 				setSelectedOsm(osm)
 
 				// Restore file info from storage (clear actual file since we loaded from storage)
 				setFile(null)
-				setFileInfo(stored.fileInfo ?? null)
+				setFileInfo(stored.entry)
 
-				taskLog.end(`${storageId} loaded from storage.`)
-				return stored.info
+				taskLog.end(`${stored.entry.fileName} loaded from storage.`)
+				return stored.entry.info
 			} catch (e) {
 				console.error(e)
 				taskLog.end(`Failed to load ${storageId} from storage.`, "error")

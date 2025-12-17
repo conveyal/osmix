@@ -13,7 +13,7 @@ export default function ActionButton({
 	...props
 }: React.ComponentProps<typeof Button> & {
 	icon?: React.ReactNode
-	onAction: () => Promise<void>
+	onAction: () => Promise<unknown>
 }) {
 	const [isPending, setIsPending] = useAtom(actionPendingAtom)
 	const [isTransitioning, startTransition] = useTransition()

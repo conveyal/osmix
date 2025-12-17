@@ -12,6 +12,7 @@ import {
 	MergeIcon,
 	SearchCodeIcon,
 	SkipForwardIcon,
+	XIcon,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { Suspense, useMemo } from "react"
@@ -28,10 +29,6 @@ import ChangesSummary, {
 	ChangesPagination,
 } from "../components/osm-changes-summary"
 import OsmInfoTable from "../components/osm-info-table"
-import {
-	OsmPbfClearFileButton,
-	OsmPbfSelectFileButton,
-} from "../components/osm-pbf-file-input"
 import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
 import SelectedEntityLayer from "../components/selected-entity-layer"
@@ -164,8 +161,11 @@ export default function Merge() {
 							<CardHeader>
 								<div className="p-2">BASE OSM</div>
 								{base.file && (
-									<OsmPbfClearFileButton
-										clearFile={async () => {
+									<ActionButton
+										icon={<XIcon />}
+										title="Clear base OSM file"
+										variant="ghost"
+										onAction={async () => {
 											await base.loadOsmFile(null)
 										}}
 									/>
@@ -173,10 +173,14 @@ export default function Merge() {
 							</CardHeader>
 							<CardContent>
 								{!base.osm ? (
-									<OsmPbfSelectFileButton
-										setFile={async (file) => {
-											const osm = await base.loadOsmFile(file)
-											flyToOsmBounds(osm)
+									<StoredOsmList
+										openOsmFile={async (file) => {
+											const osmInfo =
+												typeof file === "string"
+													? await base.loadFromStorage(file)
+													: await base.loadOsmFile(file)
+											flyToOsmBounds(osmInfo)
+											return osmInfo
 										}}
 									/>
 								) : (
@@ -194,8 +198,11 @@ export default function Merge() {
 							<CardHeader>
 								<div className="p-2">PATCH OSM</div>
 								{patch.file && (
-									<OsmPbfClearFileButton
-										clearFile={async () => {
+									<ActionButton
+										icon={<XIcon />}
+										title="Clear patch OSM file"
+										variant="ghost"
+										onAction={async () => {
 											await patch.loadOsmFile(null)
 										}}
 									/>
@@ -203,10 +210,14 @@ export default function Merge() {
 							</CardHeader>
 							<CardContent>
 								{!patch.osm ? (
-									<OsmPbfSelectFileButton
-										setFile={async (file) => {
-											const osm = await patch.loadOsmFile(file)
-											flyToOsmBounds(osm)
+									<StoredOsmList
+										openOsmFile={async (file) => {
+											const osmInfo =
+												typeof file === "string"
+													? await patch.loadFromStorage(file)
+													: await patch.loadOsmFile(file)
+											flyToOsmBounds(osmInfo)
+											return osmInfo
 										}}
 									/>
 								) : (
@@ -219,15 +230,6 @@ export default function Merge() {
 								)}
 							</CardContent>
 						</Card>
-
-						<StoredOsmList
-							onLoad={async (id) => {
-								const info = await base.loadFromStorage(id)
-								flyToOsmBounds(info ?? undefined)
-								return info
-							}}
-							activeOsmId={base.osmInfo?.id}
-						/>
 
 						<div className="flex flex-col gap-2">
 							<div className="font-bold">MERGE STEPS</div>

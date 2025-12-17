@@ -3,32 +3,29 @@
  */
 
 import type { OsmInfo } from "@osmix/core"
-import { useAtom } from "jotai"
 import { DatabaseIcon, RotateCcwIcon, Trash2Icon } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
-import {
-	deleteStoredOsm,
-	getStorageStats,
-	type StoredOsmEntry,
-} from "../lib/osm-storage"
-import { storedOsmEntriesAtom } from "../state/storage"
+import { useCallback, useState, useSyncExternalStore } from "react"
+import { osmStorage, type StoredOsmEntry } from "../lib/osm-storage"
 import ActionButton from "./action-button"
 import { Details, DetailsContent, DetailsSummary } from "./details"
+import { OsmPbfSelectFileButton } from "./osm-pbf-file-input"
 import { Card, CardContent, CardHeader } from "./ui/card"
 import {
 	Item,
 	ItemActions,
 	ItemContent,
+	ItemGroup,
 	ItemHeader,
 	ItemTitle,
 } from "./ui/item"
 
 function formatBytes(bytes: number): string {
 	if (bytes === 0) return "0 B"
-	const mb = bytes / (1024 * 1024)
-	if (mb >= 1) return `${mb.toFixed(1)} MB`
 	const kb = bytes / 1024
-	return `${kb.toFixed(1)} KB`
+	if (kb < 1000) return `${Math.ceil(kb)} KB`
+	const mb = kb / 1024
+	if (mb < 1000) return `${Math.ceil(mb)} MB`
+	return `${(mb / 1024).toFixed(2)} GB`
 }
 
 function formatDate(timestamp: number): string {
@@ -52,47 +49,36 @@ function formatStats(info: OsmInfo): string {
 interface StoredOsmItemProps {
 	entry: StoredOsmEntry
 	onLoad: (id: string) => Promise<OsmInfo | null>
-	onDelete: (id: string) => Promise<void>
 	isActive?: boolean
 }
 
-function StoredOsmItem({
-	entry,
-	onLoad,
-	onDelete,
-	isActive,
-}: StoredOsmItemProps) {
+function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 	const [isDeleting, setIsDeleting] = useState(false)
-
-	const handleLoad = useCallback(async () => {
-		await onLoad(entry.id)
-	}, [entry.id, onLoad])
 
 	const handleDelete = useCallback(async () => {
 		setIsDeleting(true)
 		try {
-			await onDelete(entry.id)
+			await osmStorage.deleteStoredOsm(entry.fileHash)
 		} finally {
 			setIsDeleting(false)
 		}
-	}, [entry.id, onDelete])
+	}, [entry.fileHash])
 
 	return (
-		<Item size="sm" className={isActive ? "bg-blue-50 border-blue-200" : ""}>
+		<Item className={isActive ? "bg-blue-50 border-blue-200" : ""}>
 			<ItemContent>
 				<ItemHeader>
-					<ItemTitle className="text-sm truncate">{entry.id}</ItemTitle>
+					<ItemTitle className="truncate">{entry.fileName}</ItemTitle>
+
 					<ItemActions>
 						<ActionButton
-							size="icon-sm"
-							variant="ghost"
+							variant="outline"
 							title="Restore from storage"
 							icon={<RotateCcwIcon />}
-							onAction={handleLoad}
+							onAction={() => onLoad(entry.fileHash)}
 						/>
 						<ActionButton
-							size="icon-sm"
-							variant="ghost"
+							variant="outline"
 							title="Delete from storage"
 							icon={<Trash2Icon />}
 							disabled={isDeleting}
@@ -100,7 +86,7 @@ function StoredOsmItem({
 						/>
 					</ItemActions>
 				</ItemHeader>
-				<span className="text-xs text-slate-500 truncate">
+				<span className="text-muted-foreground truncate">
 					{formatStats(entry.info)} &middot; {formatDate(entry.storedAt)}
 				</span>
 			</ItemContent>
@@ -109,66 +95,56 @@ function StoredOsmItem({
 }
 
 interface StoredOsmListProps {
-	onLoad: (id: string) => Promise<OsmInfo | null>
 	activeOsmId?: string
+	openOsmFile: (file: File | string) => Promise<OsmInfo | null>
 }
 
-export function StoredOsmList({ onLoad, activeOsmId }: StoredOsmListProps) {
-	const [entries, refreshEntries] = useAtom(storedOsmEntriesAtom)
-	const [isInitialized, setIsInitialized] = useState(false)
-	const [storageSize, setStorageSize] = useState(0)
-
-	// Load entries on mount
-	useEffect(() => {
-		refreshEntries().then(() => setIsInitialized(true))
-	}, [refreshEntries])
-
-	// Update storage stats when entries change
-	const entryCount = entries.length
-	useEffect(() => {
-		if (isInitialized && entryCount >= 0) {
-			getStorageStats().then((stats) => setStorageSize(stats.estimatedBytes))
-		}
-	}, [entryCount, isInitialized])
-
-	const handleDelete = useCallback(
-		async (id: string) => {
-			await deleteStoredOsm(id)
-			await refreshEntries()
-		},
-		[refreshEntries],
+export function StoredOsmList({
+	activeOsmId,
+	openOsmFile,
+}: StoredOsmListProps) {
+	const { entries, estimatedBytes } = useSyncExternalStore(
+		osmStorage.subscribe,
+		osmStorage.getSnapshot,
 	)
-
-	if (!isInitialized || entries.length === 0) {
-		return null
-	}
 
 	return (
 		<Card>
 			<CardHeader>
 				<div className="font-bold uppercase p-2 flex items-center gap-2">
-					<DatabaseIcon className="size-4" />
-					STORED DATA
+					<DatabaseIcon className="size-3" />
+					FILES
 				</div>
-				<span className="text-xs text-slate-500 pr-2">
-					{formatBytes(storageSize)}
-				</span>
+				{entries.length > 0 && (
+					<span className="text-muted-foreground pr-2">
+						{entries.length} &middot; {formatBytes(estimatedBytes)}
+					</span>
+				)}
 			</CardHeader>
 			<CardContent className="p-0">
-				<Details defaultOpen>
-					<DetailsSummary>{entries.length} stored file(s)</DetailsSummary>
-					<DetailsContent className="p-2 space-y-1">
-						{entries.map((entry) => (
-							<StoredOsmItem
-								key={entry.id}
-								entry={entry}
-								onLoad={onLoad}
-								onDelete={handleDelete}
-								isActive={entry.id === activeOsmId}
-							/>
-						))}
-					</DetailsContent>
-				</Details>
+				<OsmPbfSelectFileButton
+					setFile={async (file) => {
+						if (file == null) return
+						await openOsmFile(file)
+					}}
+				/>
+				{entries.length > 0 && (
+					<Details defaultOpen>
+						<DetailsSummary>Stored</DetailsSummary>
+						<DetailsContent>
+							<ItemGroup>
+								{entries.map((entry) => (
+									<StoredOsmItem
+										key={entry.fileHash}
+										entry={entry}
+										onLoad={openOsmFile}
+										isActive={entry.fileHash === activeOsmId}
+									/>
+								))}
+							</ItemGroup>
+						</DetailsContent>
+					</Details>
+				)}
 			</CardContent>
 		</Card>
 	)
