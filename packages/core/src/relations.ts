@@ -224,6 +224,7 @@ export class Relations extends Entities<OsmRelation> {
 	/**
 	 * Build the spatial index for relations.
 	 * Handles nested relations by resolving all descendant nodes and ways.
+	 * If bbox data already exists (e.g., loaded from storage), reuses it.
 	 */
 	buildSpatialIndex() {
 		if (!this.nodes.isReady()) throw Error("Node index is not ready.")
@@ -237,18 +238,42 @@ export class Relations extends Entities<OsmRelation> {
 			Float64Array,
 			BufferConstructor,
 		)
+
+		// If bbox already has data (loaded from storage), use it directly
+		const hasBboxData = this.bbox.length !== 0
+		console.log("hasBboxData", hasBboxData, this.bbox.length, this.size * 4)
 		for (let i = 0; i < this.size; i++) {
-			const lls = this.collectRelationCoordinates(i)
-			const bbox = bboxFromLonLats(lls)
-			this.bbox.push(bbox[0])
-			this.bbox.push(bbox[1])
-			this.bbox.push(bbox[2])
-			this.bbox.push(bbox[3])
-			this.spatialIndex.add(bbox[0], bbox[1], bbox[2], bbox[3])
+			let minX: number
+			let minY: number
+			let maxX: number
+			let maxY: number
+
+			if (hasBboxData) {
+				// Use stored bbox values
+				minX = this.bbox.at(i * 4)
+				minY = this.bbox.at(i * 4 + 1)
+				maxX = this.bbox.at(i * 4 + 2)
+				maxY = this.bbox.at(i * 4 + 3)
+			} else {
+				// Calculate bbox from coordinates
+				const lls = this.collectRelationCoordinates(i)
+				const bbox = bboxFromLonLats(lls)
+				minX = bbox[0]
+				minY = bbox[1]
+				maxX = bbox[2]
+				maxY = bbox[3]
+				this.bbox.push(minX)
+				this.bbox.push(minY)
+				this.bbox.push(maxX)
+				this.bbox.push(maxY)
+			}
+			this.spatialIndex.add(minX, minY, maxX, maxY)
 		}
 		this.spatialIndex.finish()
 		this.spatialIndexBuilt = true
-		this.bbox.compact()
+		if (!hasBboxData) {
+			this.bbox.compact()
+		}
 		console.timeEnd("RelationIndex.buildSpatialIndex")
 		return this.spatialIndex
 	}

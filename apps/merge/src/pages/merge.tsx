@@ -52,7 +52,6 @@ import { Spinner } from "../components/ui/spinner"
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
 import { cn } from "../lib/utils"
-import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
 import { Log } from "../state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "../state/osm"
@@ -81,8 +80,8 @@ const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
 })
 
 export default function Merge() {
-	const base = useOsmFile("base", DEFAULT_BASE_PBF_URL)
-	const patch = useOsmFile("patch", DEFAULT_PATCH_PBF_URL)
+	const base = useOsmFile("base")
+	const patch = useOsmFile("patch")
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()

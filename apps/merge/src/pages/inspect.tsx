@@ -49,7 +49,7 @@ export default function InspectPage() {
 		loadFromStorage,
 		loadOsmFile,
 		setOsm,
-	} = useOsmFile("inspect", "./monaco.pbf")
+	} = useOsmFile("inspect")
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 

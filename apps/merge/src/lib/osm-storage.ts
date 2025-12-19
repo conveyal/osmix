@@ -51,6 +51,10 @@ class OsmStorage {
 		estimatedBytes: 0,
 	}
 
+	constructor() {
+		this.refresh()
+	}
+
 	async getDB(): Promise<IDBPDatabase<OsmixDB>> {
 		if (!this.dbPromise) {
 			this.dbPromise = openDB<OsmixDB>(DB_NAME, DB_VERSION, {

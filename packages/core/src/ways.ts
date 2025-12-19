@@ -137,6 +137,7 @@ export class Ways extends Entities<OsmWay> {
 
 	/**
 	 * Build the spatial index for ways.
+	 * If bbox data already exists (e.g., loaded from storage), reuses it.
 	 */
 	buildSpatialIndex() {
 		if (!this.nodes.isReady()) throw Error("Node index is not ready.")
@@ -149,25 +150,42 @@ export class Ways extends Entities<OsmWay> {
 			Float64Array,
 			BufferConstructor,
 		)
+
+		// If bbox already has data (loaded from storage), use it directly
+		const hasBboxData = this.bbox.length === this.size * 4
 		for (let i = 0; i < this.size; i++) {
-			let minX = Number.POSITIVE_INFINITY
-			let minY = Number.POSITIVE_INFINITY
-			let maxX = Number.NEGATIVE_INFINITY
-			let maxY = Number.NEGATIVE_INFINITY
-			const start = this.refStart.at(i)
-			const count = this.refCount.at(i)
-			for (let j = start; j < start + count; j++) {
-				const refId = this.refs.at(j)
-				const [lon, lat] = this.nodes.getNodeLonLat({ id: refId })
-				if (lon < minX) minX = lon
-				if (lon > maxX) maxX = lon
-				if (lat < minY) minY = lat
-				if (lat > maxY) maxY = lat
+			let minX: number
+			let minY: number
+			let maxX: number
+			let maxY: number
+
+			if (hasBboxData) {
+				// Use stored bbox values
+				minX = this.bbox.at(i * 4)
+				minY = this.bbox.at(i * 4 + 1)
+				maxX = this.bbox.at(i * 4 + 2)
+				maxY = this.bbox.at(i * 4 + 3)
+			} else {
+				// Calculate bbox from node coordinates
+				minX = Number.POSITIVE_INFINITY
+				minY = Number.POSITIVE_INFINITY
+				maxX = Number.NEGATIVE_INFINITY
+				maxY = Number.NEGATIVE_INFINITY
+				const start = this.refStart.at(i)
+				const count = this.refCount.at(i)
+				for (let j = start; j < start + count; j++) {
+					const refId = this.refs.at(j)
+					const [lon, lat] = this.nodes.getNodeLonLat({ id: refId })
+					if (lon < minX) minX = lon
+					if (lon > maxX) maxX = lon
+					if (lat < minY) minY = lat
+					if (lat > maxY) maxY = lat
+				}
+				this.bbox.push(minX)
+				this.bbox.push(minY)
+				this.bbox.push(maxX)
+				this.bbox.push(maxY)
 			}
-			this.bbox.push(minX)
-			this.bbox.push(minY)
-			this.bbox.push(maxX)
-			this.bbox.push(maxY)
 			this.spatialIndex.add(minX, minY, maxX, maxY)
 		}
 		this.spatialIndex.finish()
