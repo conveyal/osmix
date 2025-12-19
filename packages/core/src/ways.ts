@@ -152,7 +152,8 @@ export class Ways extends Entities<OsmWay> {
 		)
 
 		// If bbox already has data (loaded from storage), use it directly
-		const hasBboxData = this.bbox.length === this.size * 4
+		// Use >= to handle legacy data where bbox buffer wasn't compacted before storage
+		const hasBboxData = this.bbox.length >= this.size * 4
 		for (let i = 0; i < this.size; i++) {
 			let minX: number
 			let minY: number
@@ -187,6 +188,10 @@ export class Ways extends Entities<OsmWay> {
 				this.bbox.push(maxY)
 			}
 			this.spatialIndex.add(minX, minY, maxX, maxY)
+		}
+		// Compact bbox if we just calculated it
+		if (!hasBboxData) {
+			this.bbox.compact()
 		}
 		this.spatialIndex.finish()
 		this.spatialIndexBuilt = true
