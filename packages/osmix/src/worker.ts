@@ -156,15 +156,9 @@ export class OsmixWorker extends EventTarget {
 	/**
 	 * Accept transferables from another worker or main thread and reconstruct an Osm instance.
 	 * Used when SharedArrayBuffer is supported to share data across workers.
-	 * Rebuilds spatial indexes if they were not included in the transferables (e.g., from IndexedDB).
 	 */
 	transferIn(transferables: OsmTransferables) {
-		const osm = new Osm(transferables)
-		// Rebuild spatial indexes if not provided (e.g., loaded from IndexedDB)
-		if (!osm.hasSpatialIndexes()) {
-			osm.buildSpatialIndexes()
-		}
-		this.set(transferables.id, osm)
+		this.set(transferables.id, new Osm(transferables))
 	}
 
 	/**

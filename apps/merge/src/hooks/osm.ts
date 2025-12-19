@@ -1,7 +1,7 @@
-import { Osm, type OsmInfo } from "@osmix/core"
+import { Osm } from "@osmix/core"
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import { useCallback, useEffect, useState, useTransition } from "react"
+import { useCallback } from "react"
 import { hashFile, osmStorage } from "../lib/osm-storage"
 import { Log } from "../state/log"
 import {
@@ -12,34 +12,8 @@ import {
 	selectedOsmAtom,
 } from "../state/osm"
 import { osmWorker } from "../state/worker"
-import { useMap } from "./map"
 
-function useOsmDefaultFile(
-	loadOsmFile: (file: File | null) => Promise<OsmInfo | null>,
-	defaultFilePath?: string,
-) {
-	const [, startTransition] = useTransition()
-	const [loadOnStart, setLoadOnStart] = useState(import.meta.env.DEV)
-	const map = useMap()
-	useEffect(() => {
-		if (!loadOnStart || !defaultFilePath || map == null) return
-		setLoadOnStart(false)
-		console.warn("LOADING DEFAULT FILE", defaultFilePath)
-		startTransition(async () => {
-			const response = await fetch(defaultFilePath)
-			const blob = await response.blob()
-			const osmInfo = await loadOsmFile(new File([blob], defaultFilePath))
-			if (osmInfo?.bbox) {
-				map.fitBounds(osmInfo.bbox, {
-					padding: 100,
-					maxDuration: 200,
-				})
-			}
-		})
-	}, [defaultFilePath, loadOsmFile, loadOnStart, map])
-}
-
-export function useOsmFile(osmKey: string, defaultFilePath?: string) {
+export function useOsmFile(osmKey: string) {
 	const [file, setFile] = useAtom(osmFileAtomFamily(osmKey))
 	const [fileInfo, setFileInfo] = useAtom(osmFileInfoAtomFamily(osmKey))
 	const [osm, setOsm] = useAtom(osmAtomFamily(osmKey))
@@ -71,6 +45,8 @@ export function useOsmFile(osmKey: string, defaultFilePath?: string) {
 					if (stored) {
 						// Load from storage instead of parsing
 						const osm = new Osm(stored.transferables)
+						// Build spatial indexes
+						osm.buildSpatialIndexes()
 						await osmWorker.transferIn(osm)
 						setOsmInfo(stored.entry.info)
 						setOsm(osm)
@@ -119,8 +95,10 @@ export function useOsmFile(osmKey: string, defaultFilePath?: string) {
 					return null
 				}
 
-				// Send raw transferables directly t
+				// Send raw transferables directly to worker
 				const osm = new Osm(stored.transferables)
+				// Build spatial indexes
+				osm.buildSpatialIndexes()
 				await osmWorker.transferIn(osm)
 				setOsmInfo(stored.entry.info)
 				setOsm(osm)
@@ -162,9 +140,6 @@ export function useOsmFile(osmKey: string, defaultFilePath?: string) {
 		},
 		[osmInfo],
 	)
-
-	// Load a default file in development mode
-	useOsmDefaultFile(loadOsmFile, defaultFilePath)
 
 	return {
 		downloadOsm,
