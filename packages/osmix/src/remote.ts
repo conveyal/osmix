@@ -31,7 +31,7 @@ import { transfer } from "./utils"
 import type { OsmixWorker } from "./worker"
 
 /** Identifier for an OSM dataset: string ID, Osm instance, or OsmInfo object. */
-type OsmId = string | Osm | OsmInfo
+export type OsmId = string | Osm | OsmInfo
 
 export interface OsmixRemoteOptions {
 	workerCount?: number
@@ -208,7 +208,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	 * Synchronize an `Osm` instance from one worker to all others using SharedArrayBuffer.
 	 * No-op if SharedArrayBuffer is unsupported (single-worker mode).
 	 */
-	private async populateOtherWorkers(
+	protected async populateOtherWorkers(
 		worker: Comlink.Remote<OsmixWorker>,
 		osmId: OsmId,
 	) {

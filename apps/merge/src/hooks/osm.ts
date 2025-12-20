@@ -1,8 +1,7 @@
-import { Osm } from "@osmix/core"
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback } from "react"
-import { hashFile, osmStorage } from "../lib/osm-storage"
+import type { StoredFileInfo } from "../lib/osm-storage"
 import { Log } from "../state/log"
 import {
 	osmAtomFamily,
@@ -28,36 +27,35 @@ export function useOsmFile(osmKey: string) {
 			if (file == null) return null
 			const taskLog = Log.startTask(`Processing file ${file.name}...`)
 			try {
-				// Hash the file first to check for duplicates
+				// Hash the file in the worker to avoid blocking UI
 				taskLog.update("Hashing file...")
-				const fileHash = await hashFile(file)
-				setFileInfo({
+				const buffer = await file.arrayBuffer()
+				const fileHash = await osmWorker.hashBuffer(buffer)
+				const storedFileInfo: StoredFileInfo = {
 					fileHash,
 					fileName: file.name,
 					fileSize: file.size,
-				})
+				}
+				setFileInfo(storedFileInfo)
 
-				// Check if we already have this file stored
-				const existing = await osmStorage.findByHash(fileHash)
+				// Check if we already have this file stored (in worker)
+				const existing = await osmWorker.findByHash(fileHash)
 				if (existing) {
 					taskLog.update("Found cached version, loading from storage...")
-					const stored = await osmStorage.loadStoredOsm(existing.fileHash)
+					const stored = await osmWorker.loadFromStorage(existing.fileHash)
 					if (stored) {
-						// Load from storage instead of parsing
-						const osm = new Osm(stored.transferables)
-						// Build spatial indexes
-						osm.buildSpatialIndexes()
-						await osmWorker.transferIn(osm)
-						setOsmInfo(stored.entry.info)
+						// Get the Osm instance from worker (already has spatial indexes built)
+						const osm = await osmWorker.get(stored.entry.fileHash)
+						setOsmInfo(stored.info)
 						setOsm(osm)
 						setSelectedOsm(osm)
 
 						taskLog.end(`${file.name} loaded from cache.`)
-						return stored.entry.info
+						return stored.info
 					}
 				}
 
-				// Parse the file normally
+				// Parse the file normally in the worker
 				taskLog.update("Parsing file...")
 				const osmInfo = await osmWorker.fromFile(file, { id: fileHash })
 				setOsmInfo(osmInfo)
@@ -65,14 +63,9 @@ export function useOsmFile(osmKey: string) {
 				setOsm(osm)
 				setSelectedOsm(osm)
 
-				// Auto-store to IndexedDB with hash and file info
+				// Store to IndexedDB in the worker (no UI blocking)
 				taskLog.update("Storing to IndexedDB...")
-				const transferables = osm.transferables()
-				await osmStorage.storeOsm(osmInfo, transferables, {
-					fileHash,
-					fileName: file.name,
-					fileSize: file.size,
-				})
+				await osmWorker.storeCurrentOsm(osmInfo.id, storedFileInfo)
 
 				taskLog.end(`${file.name} fully loaded and stored.`)
 				return osmInfo
@@ -89,18 +82,16 @@ export function useOsmFile(osmKey: string) {
 		async (storageId: string) => {
 			const taskLog = Log.startTask("Loading osm from storage...")
 			try {
-				const stored = await osmStorage.loadStoredOsm(storageId)
+				// Load from IndexedDB in the worker
+				const stored = await osmWorker.loadFromStorage(storageId)
 				if (!stored) {
 					taskLog.end(`Osm for ${storageId} not found in storage.`, "error")
 					return null
 				}
 
-				// Send raw transferables directly to worker
-				const osm = new Osm(stored.transferables)
-				// Build spatial indexes
-				osm.buildSpatialIndexes()
-				await osmWorker.transferIn(osm)
-				setOsmInfo(stored.entry.info)
+				// Get the Osm instance from worker (already has spatial indexes built)
+				const osm = await osmWorker.get(stored.entry.fileHash)
+				setOsmInfo(stored.info)
 				setOsm(osm)
 				setSelectedOsm(osm)
 
@@ -109,7 +100,7 @@ export function useOsmFile(osmKey: string) {
 				setFileInfo(stored.entry)
 
 				taskLog.end(`${stored.entry.fileName} loaded from storage.`)
-				return stored.entry.info
+				return stored.info
 			} catch (e) {
 				console.error(e)
 				taskLog.end(`Failed to load ${storageId} from storage.`, "error")

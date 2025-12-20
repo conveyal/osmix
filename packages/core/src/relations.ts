@@ -241,7 +241,6 @@ export class Relations extends Entities<OsmRelation> {
 
 		// If bbox already has data (loaded from storage), use it directly
 		const hasBboxData = this.bbox.length !== 0
-		console.log("hasBboxData", hasBboxData, this.bbox.length, this.size * 4)
 		for (let i = 0; i < this.size; i++) {
 			let minX: number
 			let minY: number

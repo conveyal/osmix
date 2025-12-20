@@ -25,3 +25,6 @@ export const DEFAULT_BASE_MAP_STYLE: keyof typeof BASE_MAP_STYLES = "carto-dark"
 export const DB_NAME = "@osmix/storage"
 export const DB_VERSION = 1 // Track bumps for database schema changes
 export const OSM_STORE = "osm"
+
+// BroadcastChannel name for storage notifications
+export const STORAGE_CHANNEL = "@osmix/storage-channel"
