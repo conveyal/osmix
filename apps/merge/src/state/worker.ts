@@ -1,16 +1,14 @@
-import * as Osmix from "osmix"
-import OsmWorkerUrl from "../workers/osm.worker.ts?worker&url"
+import { createMergeRemote, type MergeRemote } from "../lib/merge-remote"
 import { Log } from "./log"
 
 declare global {
 	interface Window {
-		osmWorker: Osmix.OsmixRemote
+		osmWorker: MergeRemote
 	}
 }
 
-export const osmWorker = await Osmix.createRemote({
+export const osmWorker = await createMergeRemote({
 	onProgress: (progress) => Log.addMessage(progress.msg),
-	workerUrl: new URL(OsmWorkerUrl, import.meta.url),
 })
 
 window.osmWorker = osmWorker

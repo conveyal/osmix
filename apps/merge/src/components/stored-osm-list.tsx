@@ -1,11 +1,13 @@
 /**
  * UI component for managing stored Osm data in IndexedDB.
+ * Uses BroadcastChannel to receive updates from the worker.
  */
 
 import type { OsmInfo } from "@osmix/core"
 import { DatabaseIcon, RotateCcwIcon, Trash2Icon } from "lucide-react"
-import { useCallback, useState, useSyncExternalStore } from "react"
-import { osmStorage, type StoredOsmEntry } from "../lib/osm-storage"
+import { useCallback, useState } from "react"
+import { type StoredOsmEntry, useStoredOsm } from "../hooks/storage-broadcast"
+import { osmWorker } from "../state/worker"
 import ActionButton from "./action-button"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 import { OsmPbfSelectFileButton } from "./osm-pbf-file-input"
@@ -58,7 +60,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 	const handleDelete = useCallback(async () => {
 		setIsDeleting(true)
 		try {
-			await osmStorage.deleteStoredOsm(entry.fileHash)
+			await osmWorker.deleteStoredOsm(entry.fileHash)
 		} finally {
 			setIsDeleting(false)
 		}
@@ -103,10 +105,7 @@ export function StoredOsmList({
 	activeOsmId,
 	openOsmFile,
 }: StoredOsmListProps) {
-	const { entries, estimatedBytes } = useSyncExternalStore(
-		osmStorage.subscribe,
-		osmStorage.getSnapshot,
-	)
+	const { entries, estimatedBytes } = useStoredOsm(osmWorker)
 
 	return (
 		<Card>
