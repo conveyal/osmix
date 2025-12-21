@@ -78,7 +78,8 @@ The stepper resets selection state between actions, and you can jump backward or
 
 ## Data loading tips
 
-- Drop new `.osm.pbf` files onto the file pickers or adjust the defaults in `src/settings.ts`.
+- Upload local `.osm.pbf` / `.geojson` / `.json` files, or use **Open from URL** for hosted files (the host must allow browser downloads via CORS).
+- Adjust the defaults in `src/settings.ts` if you want the app to reference local dev fixtures by URL.
 - Large extracts work best when the browser has several gigabytes of free memory; use the “Check system” dialog to see current limits.
 - Changes and temporary files never leave the browser unless you explicitly download them.
 

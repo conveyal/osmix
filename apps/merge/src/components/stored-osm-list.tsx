@@ -10,7 +10,10 @@ import { type StoredOsmEntry, useStoredOsm } from "../hooks/storage-broadcast"
 import { osmWorker } from "../state/worker"
 import ActionButton from "./action-button"
 import { Details, DetailsContent, DetailsSummary } from "./details"
-import { OsmPbfSelectFileButton } from "./osm-pbf-file-input"
+import {
+	OsmPbfOpenUrlButton,
+	OsmPbfSelectFileButton,
+} from "./osm-pbf-file-input"
 import { Card, CardContent, CardHeader } from "./ui/card"
 import {
 	Item,
@@ -119,12 +122,20 @@ export function StoredOsmList({
 				)}
 			</CardHeader>
 			<CardContent className="p-0">
-				<OsmPbfSelectFileButton
-					setFile={async (file) => {
-						if (file == null) return
-						await openOsmFile(file)
-					}}
-				/>
+				<div className="flex flex-col gap-2 p-2">
+					<OsmPbfSelectFileButton
+						setFile={async (file) => {
+							if (file == null) return
+							await openOsmFile(file)
+						}}
+					/>
+					<OsmPbfOpenUrlButton
+						setFile={async (file) => {
+							if (file == null) return
+							await openOsmFile(file)
+						}}
+					/>
+				</div>
 				{entries.length > 0 && (
 					<Details defaultOpen>
 						<DetailsSummary>Stored</DetailsSummary>
