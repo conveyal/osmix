@@ -14,11 +14,13 @@ import {
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
 
-export interface NodesTransferables extends EntitiesTransferables {
-	lons: BufferType
-	lats: BufferType
+export interface NodesTransferables<T extends BufferType = BufferType>
+	extends EntitiesTransferables<T> {
+	lons: T
+	lats: T
 	bbox: GeoBbox2D
-	spatialIndex: BufferType
+	/** Optional - can be rebuilt via buildSpatialIndex() */
+	spatialIndex?: T
 }
 
 export interface AddNodeOptions {
@@ -51,6 +53,8 @@ export class Nodes extends Entities<OsmNode> {
 		Float64Array,
 		BufferConstructor,
 	)
+	// Track if spatial index was properly built (vs default empty)
+	private spatialIndexBuilt = false
 
 	/**
 	 * Create a new Nodes index.
@@ -64,7 +68,11 @@ export class Nodes extends Entities<OsmNode> {
 			)
 			this.lons = RTA.from(Int32Array, transferables.lons)
 			this.lats = RTA.from(Int32Array, transferables.lats)
-			this.spatialIndex = KDBush.from(transferables.spatialIndex)
+			// Only load spatial index if provided (not stored in IndexedDB)
+			if (transferables.spatialIndex?.byteLength) {
+				this.spatialIndex = KDBush.from(transferables.spatialIndex)
+				this.spatialIndexBuilt = true
+			}
 			this.bbox = transferables.bbox
 			this.indexBuilt = true
 		} else {
@@ -217,7 +225,15 @@ export class Nodes extends Entities<OsmNode> {
 			this.spatialIndex.add(lon, lat)
 		}
 		this.spatialIndex.finish()
+		this.spatialIndexBuilt = true
 		console.timeEnd("NodeIndex.buildSpatialIndex")
+	}
+
+	/**
+	 * Check if the spatial index has been built.
+	 */
+	hasSpatialIndex(): boolean {
+		return this.spatialIndexBuilt
 	}
 
 	/**
@@ -339,15 +355,20 @@ export class Nodes extends Entities<OsmNode> {
 
 	/**
 	 * Get transferable objects for passing to another thread.
+	 * Only includes spatialIndex if it has been built.
 	 */
 	override transferables(): NodesTransferables {
-		return {
+		const base = {
 			...super.transferables(),
 			lons: this.lons.array.buffer,
 			lats: this.lats.array.buffer,
 			bbox: this.bbox,
-			spatialIndex: this.spatialIndex.data,
 		}
+		// Only include spatial index if it was built
+		if (this.spatialIndexBuilt) {
+			return { ...base, spatialIndex: this.spatialIndex.data }
+		}
+		return base
 	}
 
 	/**

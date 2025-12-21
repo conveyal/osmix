@@ -8,13 +8,13 @@
  */
 
 import { Osm, type OsmOptions } from "@osmix/core"
-import rewind from "@osmix/shared/geojson-rewind"
 import {
 	logProgress,
 	type ProgressEvent,
 	progressEvent,
 } from "@osmix/shared/progress"
 import type { OsmRelationMember, OsmTags } from "@osmix/shared/types"
+import { rewindFeature } from "@placemarkio/geojson-rewind"
 import type {
 	FeatureCollection,
 	LineString,
@@ -124,11 +124,11 @@ export function* startCreateOsmFromGeoJSON(
 	let count = 0
 	for (const feature of geojson.features) {
 		// Normalize winding order using rewind (outer rings counterclockwise, inner rings clockwise)
-		const normalizedFeature = rewind(feature, false)
+		const normalizedFeature = rewindFeature(feature)
 		const tags = propertiesToTags(normalizedFeature.properties)
 		const featureId = extractFeatureId(normalizedFeature.id)
 
-		if (normalizedFeature.geometry.type === "Point") {
+		if (normalizedFeature.geometry?.type === "Point") {
 			const [lon, lat] = normalizedFeature.geometry.coordinates
 			if (lon === undefined || lat === undefined)
 				throw Error("Invalid GeoJSON coordinates in Point.")
@@ -141,7 +141,7 @@ export function* startCreateOsmFromGeoJSON(
 				tags,
 			})
 			nodeMap.set(`${lon},${lat}`, nodeId)
-		} else if (normalizedFeature.geometry.type === "LineString") {
+		} else if (normalizedFeature.geometry?.type === "LineString") {
 			const coordinates = normalizedFeature.geometry.coordinates
 			if (coordinates.length < 2)
 				throw Error("Invalid GeoJSON coordinates in LineString.")
@@ -162,7 +162,7 @@ export function* startCreateOsmFromGeoJSON(
 				refs: nodeRefs,
 				tags,
 			})
-		} else if (normalizedFeature.geometry.type === "Polygon") {
+		} else if (normalizedFeature.geometry?.type === "Polygon") {
 			const coordinates = normalizedFeature.geometry.coordinates
 			if (coordinates.length === 0) continue
 
@@ -241,7 +241,7 @@ export function* startCreateOsmFromGeoJSON(
 					},
 				})
 			}
-		} else if (normalizedFeature.geometry.type === "MultiPolygon") {
+		} else if (normalizedFeature.geometry?.type === "MultiPolygon") {
 			const coordinates = normalizedFeature.geometry.coordinates
 			if (coordinates.length === 0) continue
 

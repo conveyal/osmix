@@ -14,16 +14,20 @@ import {
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
 
-export interface WaysTransferables extends EntitiesTransferables {
-	refStart: BufferType
-	refCount: BufferType
-	refs: BufferType
-	bbox: BufferType
-	spatialIndex: BufferType
+export interface WaysTransferables<T extends BufferType = BufferType>
+	extends EntitiesTransferables<T> {
+	refStart: T
+	refCount: T
+	refs: T
+	bbox: T
+	/** Optional - can be rebuilt via buildSpatialIndex() */
+	spatialIndex?: T
 }
 
 export class Ways extends Entities<OsmWay> {
 	private spatialIndex: Flatbush = new Flatbush(1)
+	// Track if spatial index was properly built (vs default empty)
+	private spatialIndexBuilt = false
 
 	private refStart: RTA<Uint32Array>
 	private refCount: RTA<Uint16Array> // Maximum 2,000 nodes per way
@@ -51,7 +55,11 @@ export class Ways extends Entities<OsmWay> {
 			this.refCount = RTA.from(Uint16Array, transferables.refCount)
 			this.refs = RTA.from(IdArrayType, transferables.refs)
 			this.bbox = RTA.from(Float64Array, transferables.bbox)
-			this.spatialIndex = Flatbush.from(transferables.spatialIndex)
+			// Only load spatial index if provided (not stored in IndexedDB)
+			if (transferables.spatialIndex?.byteLength) {
+				this.spatialIndex = Flatbush.from(transferables.spatialIndex)
+				this.spatialIndexBuilt = true
+			}
 			this.indexBuilt = true
 		} else {
 			super("way", new Ids(), new Tags(stringTable))
@@ -129,6 +137,7 @@ export class Ways extends Entities<OsmWay> {
 
 	/**
 	 * Build the spatial index for ways.
+	 * If bbox data already exists (e.g., loaded from storage), reuses it.
 	 */
 	buildSpatialIndex() {
 		if (!this.nodes.isReady()) throw Error("Node index is not ready.")
@@ -141,30 +150,59 @@ export class Ways extends Entities<OsmWay> {
 			Float64Array,
 			BufferConstructor,
 		)
+
+		// If bbox already has data (loaded from storage), use it directly
+		const hasBboxData = this.bbox.length >= this.size * 4
 		for (let i = 0; i < this.size; i++) {
-			let minX = Number.POSITIVE_INFINITY
-			let minY = Number.POSITIVE_INFINITY
-			let maxX = Number.NEGATIVE_INFINITY
-			let maxY = Number.NEGATIVE_INFINITY
-			const start = this.refStart.at(i)
-			const count = this.refCount.at(i)
-			for (let j = start; j < start + count; j++) {
-				const refId = this.refs.at(j)
-				const [lon, lat] = this.nodes.getNodeLonLat({ id: refId })
-				if (lon < minX) minX = lon
-				if (lon > maxX) maxX = lon
-				if (lat < minY) minY = lat
-				if (lat > maxY) maxY = lat
+			let minX: number
+			let minY: number
+			let maxX: number
+			let maxY: number
+
+			if (hasBboxData) {
+				// Use stored bbox values
+				minX = this.bbox.at(i * 4)
+				minY = this.bbox.at(i * 4 + 1)
+				maxX = this.bbox.at(i * 4 + 2)
+				maxY = this.bbox.at(i * 4 + 3)
+			} else {
+				// Calculate bbox from node coordinates
+				minX = Number.POSITIVE_INFINITY
+				minY = Number.POSITIVE_INFINITY
+				maxX = Number.NEGATIVE_INFINITY
+				maxY = Number.NEGATIVE_INFINITY
+				const start = this.refStart.at(i)
+				const count = this.refCount.at(i)
+				for (let j = start; j < start + count; j++) {
+					const refId = this.refs.at(j)
+					const [lon, lat] = this.nodes.getNodeLonLat({ id: refId })
+					if (lon < minX) minX = lon
+					if (lon > maxX) maxX = lon
+					if (lat < minY) minY = lat
+					if (lat > maxY) maxY = lat
+				}
+				this.bbox.push(minX)
+				this.bbox.push(minY)
+				this.bbox.push(maxX)
+				this.bbox.push(maxY)
 			}
-			this.bbox.push(minX)
-			this.bbox.push(minY)
-			this.bbox.push(maxX)
-			this.bbox.push(maxY)
 			this.spatialIndex.add(minX, minY, maxX, maxY)
 		}
+		// Compact bbox if we just calculated it
+		if (!hasBboxData) {
+			this.bbox.compact()
+		}
 		this.spatialIndex.finish()
+		this.spatialIndexBuilt = true
 		console.timeEnd("WayIndex.buildSpatialIndex")
 		return this.spatialIndex
+	}
+
+	/**
+	 * Check if the spatial index has been built.
+	 */
+	hasSpatialIndex(): boolean {
+		return this.spatialIndexBuilt
 	}
 
 	/**
@@ -322,16 +360,21 @@ export class Ways extends Entities<OsmWay> {
 
 	/**
 	 * Get transferable objects for passing to another thread.
+	 * Only includes spatialIndex if it has been built.
 	 */
 	override transferables(): WaysTransferables {
-		return {
+		const base = {
 			...super.transferables(),
 			refStart: this.refStart.array.buffer,
 			refCount: this.refCount.array.buffer,
 			refs: this.refs.array.buffer,
 			bbox: this.bbox.array.buffer,
-			spatialIndex: this.spatialIndex.data,
 		}
+		// Only include spatial index if it was built
+		if (this.spatialIndexBuilt) {
+			return { ...base, spatialIndex: this.spatialIndex.data }
+		}
+		return base
 	}
 
 	/**

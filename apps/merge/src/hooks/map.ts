@@ -45,7 +45,7 @@ export function useFlyToOsmBounds() {
 	const map = useMap()
 
 	return useCallback(
-		(osmInfo?: OsmInfo) => {
+		(osmInfo?: OsmInfo | null) => {
 			const bbox = osmInfo?.bbox
 			if (!map || !bbox) return
 			map.fitBounds(bbox, {

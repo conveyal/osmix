@@ -3,15 +3,16 @@ import type { GeoBbox2D } from "@osmix/shared/types"
 import { Nodes, type NodesTransferables } from "./nodes"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
+import type { BufferType } from "./typed-arrays"
 import { Ways, type WaysTransferables } from "./ways"
 
-export interface OsmTransferables {
+export interface OsmTransferables<T extends BufferType = BufferType> {
 	id: string
 	header: OsmPbfHeaderBlock
-	stringTable: StringTableTransferables
-	nodes: NodesTransferables
-	ways: WaysTransferables
-	relations: RelationsTransferables
+	stringTable: StringTableTransferables<T>
+	nodes: NodesTransferables<T>
+	ways: WaysTransferables<T>
+	relations: RelationsTransferables<T>
 }
 
 export interface OsmInfo {
@@ -121,6 +122,17 @@ export class Osm {
 		this.nodes.buildSpatialIndex()
 		this.ways.buildSpatialIndex()
 		this.relations.buildSpatialIndex()
+	}
+
+	/**
+	 * Check if spatial indexes have been built for all entity types.
+	 */
+	hasSpatialIndexes(): boolean {
+		return (
+			this.nodes.hasSpatialIndex() &&
+			this.ways.hasSpatialIndex() &&
+			this.relations.hasSpatialIndex()
+		)
 	}
 
 	/**

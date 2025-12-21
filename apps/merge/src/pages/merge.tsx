@@ -10,8 +10,10 @@ import {
 	FileDiff,
 	MaximizeIcon,
 	MergeIcon,
+	SaveIcon,
 	SearchCodeIcon,
 	SkipForwardIcon,
+	XIcon,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { Suspense, useMemo } from "react"
@@ -28,14 +30,11 @@ import ChangesSummary, {
 	ChangesPagination,
 } from "../components/osm-changes-summary"
 import OsmInfoTable from "../components/osm-info-table"
-import {
-	OsmPbfClearFileButton,
-	OsmPbfSelectFileButton,
-} from "../components/osm-pbf-file-input"
 import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
 import SelectedEntityLayer from "../components/selected-entity-layer"
 import SidebarLog from "../components/sidebar-log"
+import StoredOsmList from "../components/stored-osm-list"
 import { Button } from "../components/ui/button"
 import {
 	ButtonGroup,
@@ -54,7 +53,6 @@ import { Spinner } from "../components/ui/spinner"
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
 import { cn } from "../lib/utils"
-import { DEFAULT_BASE_PBF_URL, DEFAULT_PATCH_PBF_URL } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
 import { Log } from "../state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "../state/osm"
@@ -83,8 +81,8 @@ const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
 })
 
 export default function Merge() {
-	const base = useOsmFile("base", DEFAULT_BASE_PBF_URL)
-	const patch = useOsmFile("patch", DEFAULT_PATCH_PBF_URL)
+	const base = useOsmFile("base")
+	const patch = useOsmFile("patch")
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
@@ -162,20 +160,37 @@ export default function Merge() {
 						<Card>
 							<CardHeader>
 								<div className="p-2">BASE OSM</div>
-								{base.file && (
-									<OsmPbfClearFileButton
-										clearFile={async () => {
-											await base.loadOsmFile(null)
-										}}
-									/>
+								{base.osm && (
+									<ButtonGroup>
+										{!base.isStored && (
+											<ActionButton
+												icon={<SaveIcon />}
+												title="Save to storage"
+												variant="ghost"
+												onAction={base.saveToStorage}
+											/>
+										)}
+										<ActionButton
+											icon={<XIcon />}
+											title="Clear base OSM file"
+											variant="ghost"
+											onAction={async () => {
+												await base.loadOsmFile(null)
+											}}
+										/>
+									</ButtonGroup>
 								)}
 							</CardHeader>
 							<CardContent>
-								{!base.file ? (
-									<OsmPbfSelectFileButton
-										setFile={async (file) => {
-											const osm = await base.loadOsmFile(file)
-											flyToOsmBounds(osm)
+								{!base.osm ? (
+									<StoredOsmList
+										openOsmFile={async (file) => {
+											const osmInfo =
+												typeof file === "string"
+													? await base.loadFromStorage(file)
+													: await base.loadOsmFile(file)
+											flyToOsmBounds(osmInfo)
+											return osmInfo
 										}}
 									/>
 								) : (
@@ -183,6 +198,7 @@ export default function Merge() {
 										defaultOpen={false}
 										osm={base.osm}
 										file={base.file}
+										fileInfo={base.fileInfo}
 									/>
 								)}
 							</CardContent>
@@ -191,20 +207,37 @@ export default function Merge() {
 						<Card>
 							<CardHeader>
 								<div className="p-2">PATCH OSM</div>
-								{patch.file && (
-									<OsmPbfClearFileButton
-										clearFile={async () => {
-											await patch.loadOsmFile(null)
-										}}
-									/>
+								{patch.osm && (
+									<ButtonGroup>
+										{!patch.isStored && (
+											<ActionButton
+												icon={<SaveIcon />}
+												title="Save to storage"
+												variant="ghost"
+												onAction={patch.saveToStorage}
+											/>
+										)}
+										<ActionButton
+											icon={<XIcon />}
+											title="Clear patch OSM file"
+											variant="ghost"
+											onAction={async () => {
+												await patch.loadOsmFile(null)
+											}}
+										/>
+									</ButtonGroup>
 								)}
 							</CardHeader>
 							<CardContent>
-								{!patch.file ? (
-									<OsmPbfSelectFileButton
-										setFile={async (file) => {
-											const osm = await patch.loadOsmFile(file)
-											flyToOsmBounds(osm)
+								{!patch.osm ? (
+									<StoredOsmList
+										openOsmFile={async (file) => {
+											const osmInfo =
+												typeof file === "string"
+													? await patch.loadFromStorage(file)
+													: await patch.loadOsmFile(file)
+											flyToOsmBounds(osmInfo)
+											return osmInfo
 										}}
 									/>
 								) : (
@@ -212,6 +245,7 @@ export default function Merge() {
 										defaultOpen={false}
 										osm={patch.osm}
 										file={patch.file}
+										fileInfo={patch.fileInfo}
 									/>
 								)}
 							</CardContent>
@@ -339,6 +373,7 @@ export default function Merge() {
 									defaultOpen={false}
 									osm={base.osm}
 									file={base.file}
+									fileInfo={base.fileInfo}
 								/>
 							</CardContent>
 						</Card>
@@ -381,6 +416,7 @@ export default function Merge() {
 									defaultOpen={false}
 									osm={patch.osm}
 									file={patch.file}
+									fileInfo={patch.fileInfo}
 								/>
 							</CardContent>
 						</Card>
@@ -433,6 +469,7 @@ export default function Merge() {
 									defaultOpen={false}
 									osm={base.osm}
 									file={base.file}
+									fileInfo={base.fileInfo}
 								/>
 							</CardContent>
 						</Card>
@@ -452,6 +489,7 @@ export default function Merge() {
 									defaultOpen={false}
 									osm={patch.osm}
 									file={patch.file}
+									fileInfo={patch.fileInfo}
 								/>
 							</CardContent>
 						</Card>
@@ -588,6 +626,7 @@ export default function Merge() {
 									defaultOpen={false}
 									osm={base.osm}
 									file={base.file}
+									fileInfo={base.fileInfo}
 								/>
 							</CardContent>
 						</Card>
@@ -702,6 +741,7 @@ export default function Merge() {
 											defaultOpen={false}
 											osm={base.osm}
 											file={base.file}
+											fileInfo={base.fileInfo}
 										/>
 									</CardContent>
 								</Card>

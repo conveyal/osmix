@@ -32,7 +32,6 @@ function createLog() {
 			listeners.delete(fn)
 		}
 	}
-	const getSnapshot = () => state
 	const addMessage = (
 		message: string,
 		type: Status["type"] = "info",
@@ -74,7 +73,7 @@ function createLog() {
 	return {
 		emitChange,
 		subscribe,
-		getSnapshot,
+		getSnapshot: () => state,
 		addMessage,
 		startTask,
 	}

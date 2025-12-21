@@ -36,14 +36,16 @@ import type { Ways } from "./ways"
 
 const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
 
-export interface RelationsTransferables extends EntitiesTransferables {
-	memberStart: BufferType
-	memberCount: BufferType
-	memberRefs: BufferType
-	memberTypes: BufferType
-	memberRoles: BufferType
-	bbox: BufferType
-	spatialIndex: BufferType
+export interface RelationsTransferables<T extends BufferType = BufferType>
+	extends EntitiesTransferables<T> {
+	memberStart: T
+	memberCount: T
+	memberRefs: T
+	memberTypes: T
+	memberRoles: T
+	bbox: T
+	/** Optional - can be rebuilt via buildSpatialIndex() */
+	spatialIndex?: T
 }
 
 export class Relations extends Entities<OsmRelation> {
@@ -59,6 +61,8 @@ export class Relations extends Entities<OsmRelation> {
 
 	// Spatial index
 	private spatialIndex: Flatbush = new Flatbush(1)
+	// Track if spatial index was properly built (vs default empty)
+	private spatialIndexBuilt = false
 
 	// Bounding box of the relation in geographic coordinates
 	private bbox: RTA<Float64Array>
@@ -88,7 +92,11 @@ export class Relations extends Entities<OsmRelation> {
 			this.memberTypes = RTA.from(Uint8Array, transferables.memberTypes)
 			this.memberRoles = RTA.from(Uint32Array, transferables.memberRoles)
 			this.bbox = RTA.from(Float64Array, transferables.bbox)
-			this.spatialIndex = Flatbush.from(transferables.spatialIndex)
+			// Only load spatial index if provided (not stored in IndexedDB)
+			if (transferables.spatialIndex?.byteLength) {
+				this.spatialIndex = Flatbush.from(transferables.spatialIndex)
+				this.spatialIndexBuilt = true
+			}
 			this.indexBuilt = true
 		} else {
 			super("relation", new Ids(), new Tags(stringTable))
@@ -216,6 +224,7 @@ export class Relations extends Entities<OsmRelation> {
 	/**
 	 * Build the spatial index for relations.
 	 * Handles nested relations by resolving all descendant nodes and ways.
+	 * If bbox data already exists (e.g., loaded from storage), reuses it.
 	 */
 	buildSpatialIndex() {
 		if (!this.nodes.isReady()) throw Error("Node index is not ready.")
@@ -229,19 +238,50 @@ export class Relations extends Entities<OsmRelation> {
 			Float64Array,
 			BufferConstructor,
 		)
+
+		// If bbox already has data (loaded from storage), use it directly
+		const hasBboxData = this.bbox.length >= this.size * 4
 		for (let i = 0; i < this.size; i++) {
-			const lls = this.collectRelationCoordinates(i)
-			const bbox = bboxFromLonLats(lls)
-			this.bbox.push(bbox[0])
-			this.bbox.push(bbox[1])
-			this.bbox.push(bbox[2])
-			this.bbox.push(bbox[3])
-			this.spatialIndex.add(bbox[0], bbox[1], bbox[2], bbox[3])
+			let minX: number
+			let minY: number
+			let maxX: number
+			let maxY: number
+
+			if (hasBboxData) {
+				// Use stored bbox values
+				minX = this.bbox.at(i * 4)
+				minY = this.bbox.at(i * 4 + 1)
+				maxX = this.bbox.at(i * 4 + 2)
+				maxY = this.bbox.at(i * 4 + 3)
+			} else {
+				// Calculate bbox from coordinates
+				const lls = this.collectRelationCoordinates(i)
+				const bbox = bboxFromLonLats(lls)
+				minX = bbox[0]
+				minY = bbox[1]
+				maxX = bbox[2]
+				maxY = bbox[3]
+				this.bbox.push(minX)
+				this.bbox.push(minY)
+				this.bbox.push(maxX)
+				this.bbox.push(maxY)
+			}
+			this.spatialIndex.add(minX, minY, maxX, maxY)
+		}
+		if (!hasBboxData) {
+			this.bbox.compact()
 		}
 		this.spatialIndex.finish()
-		this.bbox.compact()
+		this.spatialIndexBuilt = true
 		console.timeEnd("RelationIndex.buildSpatialIndex")
 		return this.spatialIndex
+	}
+
+	/**
+	 * Check if the spatial index has been built.
+	 */
+	hasSpatialIndex(): boolean {
+		return this.spatialIndexBuilt
 	}
 
 	/**
@@ -463,9 +503,10 @@ export class Relations extends Entities<OsmRelation> {
 
 	/**
 	 * Get transferable objects for passing to another thread.
+	 * Only includes spatialIndex if it has been built.
 	 */
 	override transferables(): RelationsTransferables {
-		return {
+		const base = {
 			...super.transferables(),
 			memberStart: this.memberStart.array.buffer,
 			memberCount: this.memberCount.array.buffer,
@@ -473,8 +514,12 @@ export class Relations extends Entities<OsmRelation> {
 			memberTypes: this.memberTypes.array.buffer,
 			memberRoles: this.memberRoles.array.buffer,
 			bbox: this.bbox.array.buffer,
-			spatialIndex: this.spatialIndex.data,
 		}
+		// Only include spatial index if it was built
+		if (this.spatialIndexBuilt) {
+			return { ...base, spatialIndex: this.spatialIndex.data }
+		}
+		return base
 	}
 
 	/**

@@ -1,61 +1,74 @@
-import type { OsmInfo } from "@osmix/core"
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import { useCallback, useEffect, useState, useTransition } from "react"
+import { useCallback } from "react"
+import { canStoreFile } from "../lib/storage-utils"
 import { Log } from "../state/log"
 import {
 	osmAtomFamily,
 	osmFileAtomFamily,
+	osmFileInfoAtomFamily,
 	osmInfoAtomFamily,
+	osmStoredAtomFamily,
 	selectedOsmAtom,
 } from "../state/osm"
 import { osmWorker } from "../state/worker"
-import { useMap } from "./map"
+import type { StoredFileInfo } from "../workers/osm.worker"
 
-function useOsmDefaultFile(
-	loadOsmFile: (file: File | null) => Promise<OsmInfo | undefined>,
-	defaultFilePath?: string,
-) {
-	const [, startTransition] = useTransition()
-	const [loadOnStart, setLoadOnStart] = useState(import.meta.env.DEV)
-	const map = useMap()
-	useEffect(() => {
-		if (!loadOnStart || !defaultFilePath || map == null) return
-		setLoadOnStart(false)
-		console.warn("LOADING DEFAULT FILE", defaultFilePath)
-		startTransition(async () => {
-			const response = await fetch(defaultFilePath)
-			const blob = await response.blob()
-			const osmInfo = await loadOsmFile(new File([blob], defaultFilePath))
-			if (osmInfo?.bbox) {
-				map.fitBounds(osmInfo.bbox, {
-					padding: 100,
-					maxDuration: 200,
-				})
-			}
-		})
-	}, [defaultFilePath, loadOsmFile, loadOnStart, map])
-}
-
-export function useOsmFile(id: string, defaultFilePath?: string) {
-	const [file, setFile] = useAtom(osmFileAtomFamily(id))
-	const [osm, setOsm] = useAtom(osmAtomFamily(id))
-	const [osmInfo, setOsmInfo] = useAtom(osmInfoAtomFamily(id))
+export function useOsmFile(osmKey: string) {
+	const [file, setFile] = useAtom(osmFileAtomFamily(osmKey))
+	const [fileInfo, setFileInfo] = useAtom(osmFileInfoAtomFamily(osmKey))
+	const [osm, setOsm] = useAtom(osmAtomFamily(osmKey))
+	const [osmInfo, setOsmInfo] = useAtom(osmInfoAtomFamily(osmKey))
+	const [isStored, setIsStored] = useAtom(osmStoredAtomFamily(osmKey))
 	const setSelectedOsm = useSetAtom(selectedOsmAtom)
 
 	const loadOsmFile = useCallback(
 		async (file: File | null) => {
 			setFile(file)
 			setOsm(null)
-			if (file == null) return
+			setFileInfo(null)
+			setIsStored(false)
+			if (file == null) return null
 			const taskLog = Log.startTask(`Processing file ${file.name}...`)
 			try {
-				const osmInfo = await osmWorker.fromFile(file, { id })
+				// Hash the file in the worker to avoid blocking UI
+				taskLog.update("Hashing file...")
+				const buffer = await file.arrayBuffer()
+				const fileHash = await osmWorker.hashBuffer(buffer)
+				const storedFileInfo: StoredFileInfo = {
+					fileHash,
+					fileName: file.name,
+					fileSize: file.size,
+				}
+				setFileInfo(storedFileInfo)
+
+				// Check if we already have this file stored (in worker)
+				const existing = await osmWorker.findByHash(fileHash)
+				if (existing) {
+					taskLog.update("Found cached version, loading from storage...")
+					const stored = await osmWorker.loadFromStorage(existing.fileHash)
+					if (stored) {
+						// Get the Osm instance from worker (already has spatial indexes built)
+						const osm = await osmWorker.get(stored.entry.fileHash)
+						setOsmInfo(stored.info)
+						setOsm(osm)
+						setSelectedOsm(osm)
+						setIsStored(true)
+
+						taskLog.end(`${file.name} loaded from cache.`)
+						return stored.info
+					}
+				}
+
+				// Parse the file normally in the worker
+				taskLog.update("Parsing file...")
+				const osmInfo = await osmWorker.fromFile(file, { id: fileHash })
 				setOsmInfo(osmInfo)
 				const osm = await osmWorker.get(osmInfo.id)
 				setOsm(osm)
 				setSelectedOsm(osm)
-				taskLog.end(`${file.name} fully loaded.`)
+
+				taskLog.end(`${file.name} loaded.`)
 				return osmInfo
 			} catch (e) {
 				console.error(e)
@@ -63,7 +76,40 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 				throw e
 			}
 		},
-		[setFile, setOsm, setSelectedOsm, setOsmInfo, id],
+		[setFile, setFileInfo, setIsStored, setOsm, setSelectedOsm, setOsmInfo],
+	)
+
+	const loadFromStorage = useCallback(
+		async (storageId: string) => {
+			const taskLog = Log.startTask("Loading osm from storage...")
+			try {
+				// Load from IndexedDB in the worker
+				const stored = await osmWorker.loadFromStorage(storageId)
+				if (!stored) {
+					taskLog.end(`Osm for ${storageId} not found in storage.`, "error")
+					return null
+				}
+
+				// Get the Osm instance from worker (already has spatial indexes built)
+				const osm = await osmWorker.get(stored.entry.fileHash)
+				setOsmInfo(stored.info)
+				setOsm(osm)
+				setSelectedOsm(osm)
+				setIsStored(true)
+
+				// Restore file info from storage (clear actual file since we loaded from storage)
+				setFile(null)
+				setFileInfo(stored.entry)
+
+				taskLog.end(`${stored.entry.fileName} loaded from storage.`)
+				return stored.info
+			} catch (e) {
+				console.error(e)
+				taskLog.end(`Failed to load ${storageId} from storage.`, "error")
+				throw e
+			}
+		},
+		[setOsm, setSelectedOsm, setOsmInfo, setIsStored, setFile, setFileInfo],
 	)
 
 	const downloadOsm = useCallback(
@@ -88,8 +134,42 @@ export function useOsmFile(id: string, defaultFilePath?: string) {
 		[osmInfo],
 	)
 
-	// Load a default file in development mode
-	useOsmDefaultFile(loadOsmFile, defaultFilePath)
+	const saveToStorage = useCallback(async () => {
+		if (!osmInfo || !fileInfo || isStored) return
 
-	return { downloadOsm, file, loadOsmFile, osm, osmInfo, setOsm }
+		// Check storage availability
+		const storageCheck = await canStoreFile(fileInfo.fileSize)
+		if (!storageCheck.canStore) {
+			Log.addMessage(
+				`Insufficient storage: need ${Math.ceil(storageCheck.requiredBytes / 1024 / 1024)}MB, ` +
+					`have ${Math.ceil(storageCheck.availableBytes / 1024 / 1024)}MB available`,
+				"error",
+			)
+			return
+		}
+
+		const task = Log.startTask("Saving to storage...")
+		try {
+			await osmWorker.storeCurrentOsm(osmInfo.id, fileInfo)
+			setIsStored(true)
+			task.end(`${fileInfo.fileName} saved to storage.`)
+		} catch (e) {
+			console.error(e)
+			task.end("Failed to save to storage.", "error")
+			throw e
+		}
+	}, [osmInfo, fileInfo, isStored, setIsStored])
+
+	return {
+		downloadOsm,
+		file,
+		fileInfo,
+		isStored,
+		loadFromStorage,
+		loadOsmFile,
+		osm,
+		osmInfo,
+		saveToStorage,
+		setOsm,
+	}
 }

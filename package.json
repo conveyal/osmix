@@ -10,7 +10,7 @@
 		],
 		"catalog": {
 			"dequal": "^2.0.3",
-			"@mapbox/geojson-rewind": "^0.5.0",
+			"@placemarkio/geojson-rewind": "^1.0.3",
 			"maplibre-gl": "^5.9.0",
 			"pbf": "^4.0.1",
 			"typescript": "^5.9.0",

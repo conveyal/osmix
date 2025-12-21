@@ -15,22 +15,22 @@ import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
 /**
  * Serializable state for worker transfer.
  */
-export interface TagsTransferables {
+export interface TagsTransferables<T extends BufferType = BufferType> {
 	/** Maps entity index → start position in tagKeys/tagVals. */
-	tagStart: BufferType
+	tagStart: T
 	/** Maps entity index → number of tags. */
-	tagCount: BufferType
+	tagCount: T
 	/** Flattened tag key indices. */
-	tagKeys: BufferType
+	tagKeys: T
 	/** Flattened tag value indices. */
-	tagVals: BufferType
+	tagVals: T
 
 	/** Flattened entity indices for reverse key lookup. */
-	keyEntities: BufferType
+	keyEntities: T
 	/** Maps key index → start position in keyEntities. */
-	keyIndexStart: BufferType
+	keyIndexStart: T
 	/** Maps key index → count of entities with that key. */
-	keyIndexCount: BufferType
+	keyIndexCount: T
 }
 
 /**
