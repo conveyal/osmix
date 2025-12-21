@@ -33,10 +33,14 @@ import { ButtonGroup } from "../components/ui/button-group"
 import { Card, CardContent, CardHeader } from "../components/ui/card"
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
+import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file"
 import { changesetStatsAtom } from "../state/changes"
 import { Log } from "../state/log"
 import { selectOsmEntityAtom } from "../state/osm"
 import { osmWorker } from "../state/worker"
+
+const EXAMPLE_MONACO_PBF_URL =
+	"https://trevorgerhardt.github.io/files/487218b69358-1f24d3e4e476/monaco.pbf"
 
 export default function InspectPage() {
 	const flyToEntity = useFlyToEntity()
@@ -76,7 +80,28 @@ export default function InspectPage() {
 			<Sidebar>
 				<div className="flex flex-1 flex-col overflow-y-auto p-2 lg:p-4 gap-4">
 					{!osm || !osmInfo || !fileInfo ? (
-						<ExtractList />
+						<ExtractList
+							useExample={async () => {
+								selectEntity(null, null)
+								setChangesetStats(null)
+
+								const task = Log.startTask("Downloading Monaco.pbf example...")
+								try {
+									const exampleFile = await fetchOsmFileFromUrl(
+										EXAMPLE_MONACO_PBF_URL,
+									)
+									task.update("Opening file...")
+									const info = await loadOsmFile(exampleFile)
+									flyToOsmBounds(info)
+									task.end("Example loaded")
+								} catch (e) {
+									const message =
+										e instanceof Error ? e.message : "Unknown error"
+									task.end(`Failed to load example: ${message}`, "error")
+									throw e
+								}
+							}}
+						/>
 					) : (
 						<>
 							<Card>

@@ -1,9 +1,24 @@
+import { FilesIcon } from "lucide-react"
+import ActionButton from "./action-button"
 import { Card, CardContent } from "./ui/card"
 
-export default function ExtractList() {
+export default function ExtractList({
+	useExample,
+}: {
+	useExample?: () => Promise<void>
+}) {
 	return (
 		<Card>
 			<CardContent className="flex flex-col gap-2 leading-relaxed p-4">
+				{useExample && (
+					<ActionButton
+						className="w-full"
+						icon={<FilesIcon />}
+						onAction={useExample}
+					>
+						Use example Monaco.pbf file
+					</ActionButton>
+				)}
 				<p>
 					Looking for OpenStreetMap PBF data? We recommend the following
 					services:
