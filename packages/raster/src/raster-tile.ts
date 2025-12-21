@@ -8,7 +8,6 @@
  * @module
  */
 
-import rewind from "@osmix/shared/geojson-rewind"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
 import {
 	bboxToTilePx,
@@ -18,6 +17,7 @@ import {
 	tileToBbox,
 } from "@osmix/shared/tile"
 import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
+import { rewindGeometry } from "@placemarkio/geojson-rewind"
 import { compositeRGBA } from "./color"
 
 /** Default image type for exported tiles. */
@@ -260,20 +260,13 @@ export class OsmixRasterTile {
 
 		// Normalize winding order using rewind (outer counterclockwise, inner clockwise)
 		const normalizedRings = rings.map((ring) => {
-			const rewound = rewind(
-				{
-					type: "Feature",
-					geometry: {
-						type: "Polygon",
-						coordinates: [ring],
-					},
-					properties: {},
-				},
-				false,
-			)
-			const firstRing = rewound.geometry.coordinates[0]
+			const rewound = rewindGeometry({
+				type: "Polygon",
+				coordinates: [ring],
+			}) as GeoJSON.Polygon
+			const firstRing = rewound.coordinates[0]
 			if (!firstRing) return ring
-			return firstRing
+			return firstRing as LonLat[]
 		})
 
 		// Project and clip all rings

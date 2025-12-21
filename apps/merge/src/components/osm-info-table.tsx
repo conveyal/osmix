@@ -1,6 +1,6 @@
 import type { Osm } from "@osmix/core"
-import type { StoredFileInfo } from "../workers/osm.worker"
 import { bytesSizeToHuman } from "../utils"
+import type { StoredFileInfo } from "../workers/osm.worker"
 import { Details, DetailsContent, DetailsSummary } from "./details"
 import ObjectToTableRows from "./object-to-table"
 

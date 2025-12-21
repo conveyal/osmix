@@ -48,6 +48,7 @@
 		"@osmix/core": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/shared": "workspace:*",
+		"@placemarkio/geojson-rewind": "catalog:",
 		"dequal": "catalog:"
 	}
 }

@@ -1,7 +1,6 @@
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { useCallback } from "react"
-import type { StoredFileInfo } from "../workers/osm.worker"
 import { canStoreFile } from "../lib/storage-utils"
 import { Log } from "../state/log"
 import {
@@ -13,6 +12,7 @@ import {
 	selectedOsmAtom,
 } from "../state/osm"
 import { osmWorker } from "../state/worker"
+import type { StoredFileInfo } from "../workers/osm.worker"
 
 export function useOsmFile(osmKey: string) {
 	const [file, setFile] = useAtom(osmFileAtomFamily(osmKey))

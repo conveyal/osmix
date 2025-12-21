@@ -43,6 +43,7 @@
 		"typescript": "catalog:"
 	},
 	"dependencies": {
-		"@osmix/shared": "workspace:*"
+		"@osmix/shared": "workspace:*",
+		"@placemarkio/geojson-rewind": "catalog:"
 	}
 }
