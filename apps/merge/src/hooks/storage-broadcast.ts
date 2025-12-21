@@ -8,10 +8,10 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react"
 import type { MergeRemote } from "../lib/merge-remote"
 import { STORAGE_CHANNEL } from "../settings"
-import type { StoredOsmEntry } from "../workers/merge.worker"
+import type { StoredOsmEntry } from "../workers/osm.worker"
 
 // Re-export types for convenience
-export type { StoredFileInfo, StoredOsmEntry } from "../workers/merge.worker"
+export type { StoredFileInfo, StoredOsmEntry } from "../workers/osm.worker"
 
 /** Snapshot of storage state for useSyncExternalStore */
 interface StorageSnapshot {
