@@ -1,5 +1,17 @@
 # @osmix/core
 
+## 0.1.0
+
+### Minor Changes
+
+- 29ed376: Routing: make graph transferable
+
+### Patch Changes
+
+- 803c05c: Merge app style cleanup
+- cbe4273: Osm index storage and reload
+- ff40416: Refactor main `osmix` lib external APIs
+
 ## 0.0.6
 
 ### Patch Changes
