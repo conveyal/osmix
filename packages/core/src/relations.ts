@@ -240,7 +240,7 @@ export class Relations extends Entities<OsmRelation> {
 		)
 
 		// If bbox already has data (loaded from storage), use it directly
-		const hasBboxData = this.bbox.length !== 0
+		const hasBboxData = this.bbox.length >= this.size * 4
 		for (let i = 0; i < this.size; i++) {
 			let minX: number
 			let minY: number
@@ -268,11 +268,11 @@ export class Relations extends Entities<OsmRelation> {
 			}
 			this.spatialIndex.add(minX, minY, maxX, maxY)
 		}
-		this.spatialIndex.finish()
-		this.spatialIndexBuilt = true
 		if (!hasBboxData) {
 			this.bbox.compact()
 		}
+		this.spatialIndex.finish()
+		this.spatialIndexBuilt = true
 		console.timeEnd("RelationIndex.buildSpatialIndex")
 		return this.spatialIndex
 	}
