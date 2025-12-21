@@ -10,6 +10,7 @@ import {
 	FileDiff,
 	MaximizeIcon,
 	MergeIcon,
+	SaveIcon,
 	SearchCodeIcon,
 	SkipForwardIcon,
 	XIcon,
@@ -159,15 +160,25 @@ export default function Merge() {
 						<Card>
 							<CardHeader>
 								<div className="p-2">BASE OSM</div>
-								{base.file && (
-									<ActionButton
-										icon={<XIcon />}
-										title="Clear base OSM file"
-										variant="ghost"
-										onAction={async () => {
-											await base.loadOsmFile(null)
-										}}
-									/>
+								{base.osm && (
+									<ButtonGroup>
+										{!base.isStored && (
+											<ActionButton
+												icon={<SaveIcon />}
+												title="Save to storage"
+												variant="ghost"
+												onAction={base.saveToStorage}
+											/>
+										)}
+										<ActionButton
+											icon={<XIcon />}
+											title="Clear base OSM file"
+											variant="ghost"
+											onAction={async () => {
+												await base.loadOsmFile(null)
+											}}
+										/>
+									</ButtonGroup>
 								)}
 							</CardHeader>
 							<CardContent>
@@ -196,15 +207,25 @@ export default function Merge() {
 						<Card>
 							<CardHeader>
 								<div className="p-2">PATCH OSM</div>
-								{patch.file && (
-									<ActionButton
-										icon={<XIcon />}
-										title="Clear patch OSM file"
-										variant="ghost"
-										onAction={async () => {
-											await patch.loadOsmFile(null)
-										}}
-									/>
+								{patch.osm && (
+									<ButtonGroup>
+										{!patch.isStored && (
+											<ActionButton
+												icon={<SaveIcon />}
+												title="Save to storage"
+												variant="ghost"
+												onAction={patch.saveToStorage}
+											/>
+										)}
+										<ActionButton
+											icon={<XIcon />}
+											title="Clear patch OSM file"
+											variant="ghost"
+											onAction={async () => {
+												await patch.loadOsmFile(null)
+											}}
+										/>
+									</ButtonGroup>
 								)}
 							</CardHeader>
 							<CardContent>

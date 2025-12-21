@@ -68,29 +68,27 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 
 	return (
 		<Item className={isActive ? "bg-blue-50 border-blue-200" : ""}>
-			<ItemContent>
-				<ItemHeader>
-					<ItemTitle className="truncate">{entry.fileName}</ItemTitle>
+			<ItemHeader>
+				<ItemTitle className="truncate">{entry.fileName}</ItemTitle>
 
-					<ItemActions>
-						<ActionButton
-							variant="outline"
-							title="Restore from storage"
-							icon={<RotateCcwIcon />}
-							onAction={() => onLoad(entry.fileHash)}
-						/>
-						<ActionButton
-							variant="outline"
-							title="Delete from storage"
-							icon={<Trash2Icon />}
-							disabled={isDeleting}
-							onAction={handleDelete}
-						/>
-					</ItemActions>
-				</ItemHeader>
-				<span className="text-muted-foreground truncate">
-					{formatStats(entry.info)} &middot; {formatDate(entry.storedAt)}
-				</span>
+				<ItemActions>
+					<ActionButton
+						variant="outline"
+						title="Restore from storage"
+						icon={<RotateCcwIcon />}
+						onAction={() => onLoad(entry.fileHash)}
+					/>
+					<ActionButton
+						variant="outline"
+						title="Delete from storage"
+						icon={<Trash2Icon />}
+						disabled={isDeleting}
+						onAction={handleDelete}
+					/>
+				</ItemActions>
+			</ItemHeader>
+			<ItemContent className="text-muted-foreground">
+				{formatStats(entry.info)} &middot; {formatDate(entry.storedAt)}
 			</ItemContent>
 		</Item>
 	)

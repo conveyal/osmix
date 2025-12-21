@@ -4,6 +4,7 @@ import {
 	DownloadIcon,
 	MaximizeIcon,
 	MergeIcon,
+	SaveIcon,
 	SearchCode,
 	XIcon,
 } from "lucide-react"
@@ -42,12 +43,14 @@ export default function InspectPage() {
 	const flyToOsmBounds = useFlyToOsmBounds()
 	const {
 		downloadOsm,
+		isStored,
 		osm,
 		osmInfo,
 		file,
 		fileInfo,
 		loadFromStorage,
 		loadOsmFile,
+		saveToStorage,
 		setOsm,
 	} = useOsmFile("inspect")
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
@@ -82,6 +85,14 @@ export default function InspectPage() {
 										{fileInfo.fileName}
 									</div>
 									<ButtonGroup>
+										{!isStored && (
+											<ActionButton
+												onAction={saveToStorage}
+												variant="ghost"
+												icon={<SaveIcon />}
+												title="Save to storage"
+											/>
+										)}
 										<ActionButton
 											onAction={async () => {
 												selectEntity(null, null)
