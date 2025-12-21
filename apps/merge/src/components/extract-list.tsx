@@ -10,15 +10,6 @@ export default function ExtractList({
 	return (
 		<Card>
 			<CardContent className="flex flex-col gap-2 leading-relaxed p-4">
-				{useExample && (
-					<ActionButton
-						className="w-full"
-						icon={<FilesIcon />}
-						onAction={useExample}
-					>
-						Use example Monaco.pbf file
-					</ActionButton>
-				)}
 				<p>
 					Looking for OpenStreetMap PBF data? We recommend the following
 					services:
@@ -49,6 +40,15 @@ export default function ExtractList({
 						daily.
 					</li>
 				</ul>
+				{useExample && (
+					<ActionButton
+						className="w-full"
+						icon={<FilesIcon />}
+						onAction={useExample}
+					>
+						Use example Monaco.pbf file
+					</ActionButton>
+				)}
 			</CardContent>
 		</Card>
 	)
