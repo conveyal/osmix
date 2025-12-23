@@ -1,5 +1,16 @@
 # @osmix/change
 
+## 0.0.7
+
+### Patch Changes
+
+- ff40416: Refactor main `osmix` lib external APIs
+- Updated dependencies [803c05c]
+- Updated dependencies [cbe4273]
+- Updated dependencies [ff40416]
+- Updated dependencies [29ed376]
+  - @osmix/core@0.1.0
+
 ## 0.0.6
 
 ### Patch Changes

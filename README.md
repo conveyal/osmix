@@ -25,9 +25,7 @@ bun add osmix
 ### Examples
 
 ```ts
-import { fromPbf, toPbfBuffer, transformOsmPbfToJson, merge } from "osmix"
-import { toAsyncGenerator } from "@osmix/pbf"
-import { isNode } from "@osmix/shared/utils"
+import { fromPbf, toPbfBuffer, transformOsmPbfToJson, merge, isNode } from "osmix"
 
 // Load a PBF file
 const osm = await fromPbf(Bun.file('./monaco.pbf').stream())
@@ -45,7 +43,7 @@ console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} 
 
 // Stream parse a PBF into JSON entities
 const stream = transformOsmPbfToJson(Bun.file("./monaco.pbf").stream())
-for await (const entity of toAsyncGenerator(stream)) {
+for await (const entity of stream) {
 	if ("id" in entity) {
 		console.log(entity.id, entity.tags)
 		if (isNode(entity)) {
