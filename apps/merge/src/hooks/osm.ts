@@ -163,12 +163,29 @@ export function useOsmFile(osmKey: string) {
 	/**
 	 * Update the osm state with a newly generated/merged result.
 	 * Creates new file info with unique hash and name, resets stored state.
+	 * If the content hasn't changed (same entity counts as original), keeps original file info.
 	 */
 	const setMergedOsm = useCallback(
 		async (newOsmId: string, baseName?: string) => {
 			// Get the new Osm instance from the worker
 			const newOsm = await osmWorker.get(newOsmId)
 			const newOsmInfo = newOsm.info()
+
+			// Check if anything actually changed by comparing entity counts with original
+			const originalStats = osmInfo?.stats
+			const hasChanges =
+				!originalStats ||
+				originalStats.nodes !== newOsmInfo.stats.nodes ||
+				originalStats.ways !== newOsmInfo.stats.ways ||
+				originalStats.relations !== newOsmInfo.stats.relations
+
+			if (!hasChanges && fileInfo) {
+				// No changes - keep the original file info and stored state
+				setOsm(newOsm)
+				setOsmInfo(newOsmInfo)
+				setSelectedOsm(newOsm)
+				return newOsm
+			}
 
 			// Generate a new file name based on the base name or timestamp
 			const timestamp = new Date()
@@ -179,14 +196,17 @@ export function useOsmFile(osmKey: string) {
 				? baseName.replace(/\.pbf$/i, `-merged-${timestamp}.pbf`)
 				: `merged-${timestamp}.pbf`
 
-			// Create new file info - use the new osm ID as the hash
+			// Generate a unique hash for the merged file (different from original)
+			// Use timestamp + entity counts to ensure uniqueness
+			const uniqueHash = `merged-${timestamp}-${newOsmInfo.stats.nodes}-${newOsmInfo.stats.ways}-${newOsmInfo.stats.relations}`
+
 			// File size is estimated from entity counts (will be accurate after serialization)
 			const estimatedSize =
 				newOsmInfo.stats.nodes * 20 +
 				newOsmInfo.stats.ways * 100 +
 				newOsmInfo.stats.relations * 200
 			const newFileInfo: StoredFileInfo = {
-				fileHash: newOsmId,
+				fileHash: uniqueHash,
 				fileName: newFileName,
 				fileSize: estimatedSize,
 			}
@@ -201,7 +221,16 @@ export function useOsmFile(osmKey: string) {
 
 			return newOsm
 		},
-		[setFile, setFileInfo, setOsm, setOsmInfo, setIsStored, setSelectedOsm],
+		[
+			setFile,
+			setFileInfo,
+			setOsm,
+			setOsmInfo,
+			setIsStored,
+			setSelectedOsm,
+			osmInfo,
+			fileInfo,
+		],
 	)
 
 	return {
