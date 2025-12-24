@@ -1,110 +1,64 @@
 # @osmix/shapefile
 
-Import Shapefiles into Osmix indexes. Parse ZIP archives containing Shapefile components (.shp, .shx, .dbf) and convert them to OSM entities.
-
-## Highlights
-
-- **Import** Point, Polyline, Polygon, and MultiPoint shapes into Osm indexes.
-- **Preserve** Shapefile attributes (from .dbf) as OSM tags.
-- **Handle** complex geometries like polygons with holes automatically.
-- **Multiple shapefiles** in a single ZIP archive are all imported.
+Import Shapefiles into Osmix indexes.
 
 ## Installation
 
-```sh
-bun add @osmix/shapefile
+```bash
+npm install @osmix/shapefile
 ```
 
 ## Usage
 
-### Import Shapefile to Osm
-
 ```ts
 import { fromShapefile } from "@osmix/shapefile"
 
-const zipBuffer = await Bun.file('./buildings.zip').arrayBuffer()
+// From a ZIP file buffer
+const zipBuffer = await Bun.file("./buildings.zip").arrayBuffer()
 const osm = await fromShapefile(zipBuffer, { id: "buildings" })
 
-// Query imported data
+// From a URL
+const osm = await fromShapefile("https://example.com/data.zip")
+
+// Query the imported data
 const buildings = osm.ways.search("building")
-console.log(`Imported ${osm.ways.size} ways`)
 ```
 
-### From fetch response
+## How It Works
 
-```ts
-import { fromShapefile } from "@osmix/shapefile"
+This package uses [shpjs](https://github.com/calvinmetcalf/shapefile-js) to parse Shapefiles.
+The library automatically:
 
-const response = await fetch('/data/parcels.zip')
-const osm = await fromShapefile(await response.arrayBuffer())
-```
+- Extracts Shapefile components (`.shp`, `.dbf`, `.prj`) from ZIP archives
+- Projects coordinates to WGS84 (lat/lon)
+- Converts geometries to GeoJSON
 
-### With progress callback
+The GeoJSON is then converted to OSM entities:
 
-```ts
-import { fromShapefile } from "@osmix/shapefile"
+| Shapefile Geometry | OSM Entity                          |
+| ------------------ | ----------------------------------- |
+| Point              | Node                                |
+| MultiPoint         | Multiple Nodes                      |
+| PolyLine           | Way                                 |
+| Polygon            | Way (simple) or Relation (w/ holes) |
+| MultiPolygon       | Relation                            |
 
-const osm = await fromShapefile(zipBuffer, { id: "data" }, (progress) => {
-  console.log(progress.message)
-})
-```
+DBF attributes become OSM tags.
 
 ## API
 
-### Import (Shapefile → OSM)
+### `fromShapefile(data, options?, onProgress?)`
 
-| Export | Description |
-|--------|-------------|
-| `fromShapefile(data, options?, onProgress?)` | Create Osm index from Shapefile ZIP |
-| `startCreateOsmFromShapefile(osm, shapefile, name)` | Generator for custom progress handling |
+Create an Osm index from Shapefile data.
 
-### Types
+**Parameters:**
 
-| Export | Description |
-|--------|-------------|
-| `ReadShapefileDataTypes` | Input types for `fromShapefile` |
+- `data` - URL string or ArrayBuffer containing a ZIP file
+- `options` - Optional Osm options (`{ id?: string }`)
+- `onProgress` - Optional progress callback
 
-## Geometry Mapping
+**Returns:** `Promise<Osm>` - Populated Osm index with built indexes
 
-| Shapefile Type | OSM Entity |
-|----------------|------------|
-| Point | Node |
-| PointZ, PointM | Node |
-| MultiPoint | Multiple Nodes |
-| Polyline | Way (LineString) |
-| PolylineZ, PolylineM | Way |
-| Polygon (single ring) | Way |
-| Polygon (with holes) | Relation (multipolygon) |
-| PolygonZ, PolygonM | Way or Relation |
+## License
 
-## Shapefile Format
-
-Shapefiles must be provided as ZIP archives containing at minimum:
-- `.shp` - Shape geometry
-- `.shx` - Shape index
-- `.dbf` - Attribute data (dBase format)
-
-Optional files like `.prj` (projection) and `.cpg` (code page) are also supported by the underlying parser.
-
-## Related Packages
-
-- [`@osmix/core`](../core/README.md) – In-memory OSM storage these features import to.
-- [`@osmix/geojson`](../geojson/README.md) – GeoJSON import/export (similar functionality).
-- [`@osmix/pbf`](../pbf/README.md) – PBF reading/writing for complete workflows.
-
-## Environment and Limitations
-
-- Requires `ArrayBuffer`, typed arrays, and async/await (Bun, Node 20+, modern browsers).
-- Import supports Point, Polyline, Polygon, MultiPoint shape types.
-- Z and M variants are supported (Z/M values are currently ignored).
-- Uses [shapefile.js](https://github.com/matthewdowns/shapefile.js) for parsing.
-
-## Development
-
-```sh
-bun run test packages/shapefile
-bun run lint packages/shapefile
-bun run typecheck packages/shapefile
-```
-
-Run `bun run check` at the repo root before publishing.
+MIT

@@ -48,6 +48,6 @@
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@placemarkio/geojson-rewind": "catalog:",
-		"shapefile.js": "^1.2.1"
+		"shpjs": "^6.2.0"
 	}
 }

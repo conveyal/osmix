@@ -1,101 +1,51 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, mock } from "bun:test"
 import { Osm } from "@osmix/core"
 import { progressEventMessage } from "@osmix/shared/progress"
-import type {
-	Dbase,
-	DbaseField,
-	DbaseVersion,
-	Shape,
-	Shapefile,
-	ShapeMultiPoint,
-	ShapePoint,
-	ShapePolygon,
-	ShapePolyline,
-} from "shapefile.js"
-import { ShapeType } from "shapefile.js"
-import {
-	fromShapefile,
-	startCreateOsmFromShapefile,
-} from "../src/osm-from-shapefile"
+import type { FeatureCollection, LineString, Point, Polygon } from "geojson"
+import { startCreateOsmFromShapefile } from "../src/osm-from-shapefile"
 
-// Helper to create a mock Shapefile object
-function createMockShapefile(
-	shape: Shape,
-	dbf: Dbase<DbaseVersion, true>,
-): Shapefile {
-	return {
-		contents: {} as any,
-		parse: ((key: string, _options?: any) => {
-			if (key === "shp") return shape
-			if (key === "dbf") return dbf
-			return null
-		}) as any,
-	} as Shapefile
-}
+// Mock shpjs module
+mock.module("shpjs", () => ({
+	default: async (input: unknown) => {
+		// Return the mock data passed through
+		return input as FeatureCollection
+	},
+}))
 
-// Helper to create an empty DBF
-function createEmptyDbf(): Dbase<DbaseVersion, true> {
-	return {
-		header: {} as any,
-		fields: [],
-	}
-}
-
-// Helper to create a DBF with fields
-function createDbf(
-	fields: Array<{ name: string; properties: any[] }>,
-): Dbase<DbaseVersion, true> {
-	return {
-		header: {} as any,
-		fields: fields.map((f) => ({
-			name: f.name,
-			type: "C",
-			length: 50,
-			decimals: 0,
-			properties: f.properties,
-		})) as DbaseField<DbaseVersion, true>[],
-	}
-}
-
-// Helper to create a bounding box
-function bbox(minX: number, minY: number, maxX: number, maxY: number) {
-	return { minX, minY, maxX, maxY }
-}
-
-// Helper to create a record header
-function header(num: number, len: number) {
-	return { number: num, length: len }
-}
-
-describe("@osmix/shapefile: fromShapefile", () => {
-	it("should convert Point shapes to Nodes", async () => {
-		const shape: Shape = {
-			header: { shapeType: ShapeType.Point } as any,
-			records: [
+describe("@osmix/shapefile: startCreateOsmFromShapefile", () => {
+	it("should convert Point features to Nodes", () => {
+		const osm = new Osm()
+		const geojson: FeatureCollection<Point> = {
+			type: "FeatureCollection",
+			features: [
 				{
-					header: header(1, 10),
-					body: {
-						type: ShapeType.Point,
-						data: { x: -122.4194, y: 37.7749 } as ShapePoint,
+					type: "Feature",
+					geometry: {
+						type: "Point",
+						coordinates: [-122.4194, 37.7749],
+					},
+					properties: {
+						name: "San Francisco",
+						population: 873965,
 					},
 				},
 				{
-					header: header(2, 10),
-					body: {
-						type: ShapeType.Point,
-						data: { x: -122.4094, y: 37.7849 } as ShapePoint,
+					type: "Feature",
+					geometry: {
+						type: "Point",
+						coordinates: [-122.4094, 37.7849],
+					},
+					properties: {
+						name: "Another Point",
 					},
 				},
 			],
 		}
 
-		const dbf = createDbf([
-			{ name: "name", properties: ["San Francisco", "Another Point"] },
-			{ name: "population", properties: [873965, 50000] },
-		])
-
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
+		for (const _ of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			// Consume generator
+		}
+		osm.buildIndexes()
 
 		expect(osm.nodes.size).toBe(2)
 		expect(osm.ways.size).toBe(0)
@@ -105,7 +55,7 @@ describe("@osmix/shapefile: fromShapefile", () => {
 		expect(node1?.lon).toBe(-122.4194)
 		expect(node1?.lat).toBe(37.7749)
 		expect(node1?.tags?.["name"]).toBe("San Francisco")
-		// OSM tags are stored as strings in the Tags class
+		// OSM tags are stored as strings
 		expect(node1?.tags?.["population"]).toBe("873965")
 
 		const node2 = osm.nodes.getById(-2)
@@ -115,37 +65,33 @@ describe("@osmix/shapefile: fromShapefile", () => {
 		expect(node2?.tags?.["name"]).toBe("Another Point")
 	})
 
-	it("should convert Polyline shapes to Ways with Nodes", async () => {
-		const shape: Shape = {
-			header: { shapeType: ShapeType.Polyline } as any,
-			records: [
+	it("should convert LineString features to Ways with Nodes", () => {
+		const osm = new Osm()
+		const geojson: FeatureCollection<LineString> = {
+			type: "FeatureCollection",
+			features: [
 				{
-					header: header(1, 100),
-					body: {
-						type: ShapeType.Polyline,
-						data: {
-							boundingBox: bbox(-122.42, 37.77, -122.39, 37.8),
-							numberOfParts: 1,
-							numberOfPoints: 3,
-							parts: [0],
-							points: [
-								{ x: -122.4194, y: 37.7749 },
-								{ x: -122.4094, y: 37.7849 },
-								{ x: -122.3994, y: 37.7949 },
-							],
-						} as ShapePolyline,
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: [
+							[-122.4194, 37.7749],
+							[-122.4094, 37.7849],
+							[-122.3994, 37.7949],
+						],
+					},
+					properties: {
+						highway: "primary",
+						name: "Main Street",
 					},
 				},
 			],
 		}
 
-		const dbf = createDbf([
-			{ name: "highway", properties: ["primary"] },
-			{ name: "name", properties: ["Main Street"] },
-		])
-
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
+		for (const _ of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			// Consume generator
+		}
+		osm.buildIndexes()
 
 		expect(osm.nodes.size).toBe(3)
 		expect(osm.ways.size).toBe(1)
@@ -169,46 +115,37 @@ describe("@osmix/shapefile: fromShapefile", () => {
 		expect(node3?.lat).toBe(37.7949)
 	})
 
-	it("should convert simple Polygon shapes to Ways with area tags", async () => {
-		// Simple polygon: clockwise outer ring (will be normalized by rewind)
-		const shape: Shape = {
-			header: { shapeType: ShapeType.Polygon } as any,
-			records: [
+	it("should convert simple Polygon features to Ways with area tags", () => {
+		const osm = new Osm()
+		const geojson: FeatureCollection<Polygon> = {
+			type: "FeatureCollection",
+			features: [
 				{
-					header: header(1, 100),
-					body: {
-						type: ShapeType.Polygon,
-						data: {
-							boundingBox: bbox(-122.42, 37.77, -122.4, 37.79),
-							numberOfParts: 1,
-							numberOfPoints: 5,
-							parts: [0],
-							// Points stored as flat array [x1, y1, x2, y2, ...]
-							points: [
-								-122.4194,
-								37.7749,
-								-122.4094,
-								37.7749,
-								-122.4094,
-								37.7849,
-								-122.4194,
-								37.7849,
-								-122.4194,
-								37.7749, // Closed ring
+					type: "Feature",
+					geometry: {
+						type: "Polygon",
+						coordinates: [
+							[
+								[-122.4194, 37.7749],
+								[-122.4094, 37.7749],
+								[-122.4094, 37.7849],
+								[-122.4194, 37.7849],
+								[-122.4194, 37.7749], // Closed ring
 							],
-						} as ShapePolygon,
+						],
+					},
+					properties: {
+						building: "yes",
+						name: "Test Building",
 					},
 				},
 			],
 		}
 
-		const dbf = createDbf([
-			{ name: "building", properties: ["yes"] },
-			{ name: "name", properties: ["Test Building"] },
-		])
-
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
+		for (const _ of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			// Consume generator
+		}
+		osm.buildIndexes()
 
 		expect(osm.ways.size).toBe(1)
 		expect(osm.relations.size).toBe(0) // No relation for simple polygon
@@ -220,39 +157,45 @@ describe("@osmix/shapefile: fromShapefile", () => {
 		expect(way?.tags?.["area"]).toBe("yes")
 	})
 
-	it("should convert Polygon with holes to relation with multiple Ways", async () => {
-		// Polygon with outer ring and one hole
-		const shape: Shape = {
-			header: { shapeType: ShapeType.Polygon } as any,
-			records: [
+	it("should convert Polygon with holes to relation with multiple Ways", () => {
+		const osm = new Osm()
+		const geojson: FeatureCollection<Polygon> = {
+			type: "FeatureCollection",
+			features: [
 				{
-					header: header(1, 200),
-					body: {
-						type: ShapeType.Polygon,
-						data: {
-							boundingBox: bbox(-122.42, 37.77, -122.4, 37.79),
-							numberOfParts: 2,
-							numberOfPoints: 10,
-							parts: [0, 5], // First ring at index 0, second at index 5
-							// Flat points array
-							points: [
-								// Outer ring (5 points)
-								-122.4194, 37.7749, -122.4094, 37.7749, -122.4094, 37.7849,
-								-122.4194, 37.7849, -122.4194, 37.7749,
-								// Inner ring/hole (5 points)
-								-122.4164, 37.7779, -122.4144, 37.7779, -122.4144, 37.7799,
-								-122.4164, 37.7799, -122.4164, 37.7779,
+					type: "Feature",
+					geometry: {
+						type: "Polygon",
+						coordinates: [
+							// Outer ring
+							[
+								[-122.4194, 37.7749],
+								[-122.4094, 37.7749],
+								[-122.4094, 37.7849],
+								[-122.4194, 37.7849],
+								[-122.4194, 37.7749],
 							],
-						} as ShapePolygon,
+							// Hole
+							[
+								[-122.4164, 37.7779],
+								[-122.4144, 37.7779],
+								[-122.4144, 37.7799],
+								[-122.4164, 37.7799],
+								[-122.4164, 37.7779],
+							],
+						],
+					},
+					properties: {
+						building: "yes",
 					},
 				},
 			],
 		}
 
-		const dbf = createDbf([{ name: "building", properties: ["yes"] }])
-
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
+		for (const _ of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			// Consume generator
+		}
+		osm.buildIndexes()
 
 		// Should have outer ring way + hole way + relation
 		expect(osm.ways.size).toBe(2)
@@ -267,32 +210,32 @@ describe("@osmix/shapefile: fromShapefile", () => {
 		expect(relation?.members[1]?.role).toBe("inner")
 	})
 
-	it("should convert MultiPoint shapes to multiple Nodes", async () => {
-		const shape: Shape = {
-			header: { shapeType: ShapeType.MultiPoint } as any,
-			records: [
+	it("should convert MultiPoint features to multiple Nodes", () => {
+		const osm = new Osm()
+		const geojson: FeatureCollection = {
+			type: "FeatureCollection",
+			features: [
 				{
-					header: header(1, 50),
-					body: {
-						type: ShapeType.MultiPoint,
-						data: {
-							boundingBox: bbox(-122.42, 37.77, -122.39, 37.8),
-							numberOfPoints: 3,
-							points: [
-								{ x: -122.4194, y: 37.7749 },
-								{ x: -122.4094, y: 37.7849 },
-								{ x: -122.3994, y: 37.7949 },
-							],
-						} as ShapeMultiPoint,
+					type: "Feature",
+					geometry: {
+						type: "MultiPoint",
+						coordinates: [
+							[-122.4194, 37.7749],
+							[-122.4094, 37.7849],
+							[-122.3994, 37.7949],
+						],
+					},
+					properties: {
+						type: "stop",
 					},
 				},
 			],
 		}
 
-		const dbf = createDbf([{ name: "type", properties: ["stop"] }])
-
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
+		for (const _ of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			// Consume generator
+		}
+		osm.buildIndexes()
 
 		expect(osm.nodes.size).toBe(3)
 		expect(osm.ways.size).toBe(0)
@@ -307,24 +250,26 @@ describe("@osmix/shapefile: fromShapefile", () => {
 		expect(node3?.tags?.["type"]).toBe("stop")
 	})
 
-	it("should handle shapes without attributes", async () => {
-		const shape: Shape = {
-			header: { shapeType: ShapeType.Point } as any,
-			records: [
+	it("should handle features without properties", () => {
+		const osm = new Osm()
+		const geojson: FeatureCollection<Point> = {
+			type: "FeatureCollection",
+			features: [
 				{
-					header: header(1, 10),
-					body: {
-						type: ShapeType.Point,
-						data: { x: -122.4194, y: 37.7749 } as ShapePoint,
+					type: "Feature",
+					geometry: {
+						type: "Point",
+						coordinates: [-122.4194, 37.7749],
 					},
+					properties: null,
 				},
 			],
 		}
 
-		const dbf = createEmptyDbf()
-
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
+		for (const _ of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			// Consume generator
+		}
+		osm.buildIndexes()
 
 		expect(osm.nodes.size).toBe(1)
 		const node = osm.nodes.getById(-1)
@@ -332,131 +277,44 @@ describe("@osmix/shapefile: fromShapefile", () => {
 		expect(node?.tags).toBeUndefined()
 	})
 
-	it("should skip Null shapes", async () => {
-		const shape: Shape = {
-			header: { shapeType: ShapeType.Null } as any,
-			records: [
+	it("should reuse nodes when features share coordinates", () => {
+		const osm = new Osm()
+		const geojson: FeatureCollection<LineString> = {
+			type: "FeatureCollection",
+			features: [
 				{
-					header: header(1, 0),
-					body: {
-						type: ShapeType.Null,
-						data: null,
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: [
+							[-122.4194, 37.7749],
+							[-122.4094, 37.7849],
+						],
+					},
+					properties: {
+						highway: "primary",
 					},
 				},
 				{
-					header: header(2, 10),
-					body: {
-						type: ShapeType.Point,
-						data: { x: -122.4194, y: 37.7749 } as ShapePoint,
+					type: "Feature",
+					geometry: {
+						type: "LineString",
+						coordinates: [
+							[-122.4094, 37.7849], // Shared coordinate
+							[-122.3994, 37.7949],
+						],
 					},
-				},
-			],
-		}
-
-		const dbf = createEmptyDbf()
-
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
-
-		expect(osm.nodes.size).toBe(1) // Only the Point, not the Null
-	})
-
-	it("should build indexes after conversion", async () => {
-		const shape: Shape = {
-			header: { shapeType: ShapeType.Point } as any,
-			records: [
-				{
-					header: header(1, 10),
-					body: {
-						type: ShapeType.Point,
-						data: { x: -122.4194, y: 37.7749 } as ShapePoint,
+					properties: {
+						highway: "secondary",
 					},
 				},
 			],
 		}
 
-		const dbf = createEmptyDbf()
-
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
-
-		expect(osm.isReady()).toBe(true)
-		expect(osm.nodes.isReady()).toBe(true)
-		expect(osm.ways.isReady()).toBe(true)
-	})
-
-	it("should handle PointZ and PointM shapes", async () => {
-		const shape: Shape = {
-			header: { shapeType: ShapeType.PointZ } as any,
-			records: [
-				{
-					header: header(1, 20),
-					body: {
-						type: ShapeType.PointZ,
-						data: { x: -122.4194, y: 37.7749, z: 100, m: 0 } as any,
-					},
-				},
-				{
-					header: header(2, 20),
-					body: {
-						type: ShapeType.PointM,
-						data: { x: -122.4094, y: 37.7849, m: 50 } as any,
-					},
-				},
-			],
+		for (const _ of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			// Consume generator
 		}
-
-		const dbf = createEmptyDbf()
-
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
-
-		expect(osm.nodes.size).toBe(2)
-	})
-
-	it("should reuse nodes when shapes share coordinates", async () => {
-		const shape: Shape = {
-			header: { shapeType: ShapeType.Polyline } as any,
-			records: [
-				{
-					header: header(1, 50),
-					body: {
-						type: ShapeType.Polyline,
-						data: {
-							boundingBox: bbox(-122.42, 37.77, -122.39, 37.8),
-							numberOfParts: 1,
-							numberOfPoints: 2,
-							parts: [0],
-							points: [
-								{ x: -122.4194, y: 37.7749 },
-								{ x: -122.4094, y: 37.7849 },
-							],
-						} as ShapePolyline,
-					},
-				},
-				{
-					header: header(2, 50),
-					body: {
-						type: ShapeType.Polyline,
-						data: {
-							boundingBox: bbox(-122.41, 37.78, -122.39, 37.8),
-							numberOfParts: 1,
-							numberOfPoints: 2,
-							parts: [0],
-							points: [
-								{ x: -122.4094, y: 37.7849 }, // Shared coordinate
-								{ x: -122.3994, y: 37.7949 },
-							],
-						} as ShapePolyline,
-					},
-				},
-			],
-		}
-
-		const dbf = createEmptyDbf()
-
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
+		osm.buildIndexes()
 
 		// Should have 3 nodes (shared coordinate is reused)
 		expect(osm.nodes.size).toBe(3)
@@ -472,37 +330,116 @@ describe("@osmix/shapefile: fromShapefile", () => {
 		expect(way1?.refs[1]).toBe(way2?.refs[0])
 	})
 
-	it("should handle multi-part polylines", async () => {
-		const shape: Shape = {
-			header: { shapeType: ShapeType.Polyline } as any,
-			records: [
+	it("should use generator for custom progress handling", () => {
+		const osm = new Osm()
+		const geojson: FeatureCollection<Point> = {
+			type: "FeatureCollection",
+			features: [
 				{
-					header: header(1, 100),
-					body: {
-						type: ShapeType.Polyline,
-						data: {
-							boundingBox: bbox(-122.42, 37.77, -122.39, 37.8),
-							numberOfParts: 2,
-							numberOfPoints: 4,
-							parts: [0, 2], // First part at 0, second at 2
-							points: [
-								{ x: -122.4194, y: 37.7749 },
-								{ x: -122.4094, y: 37.7849 },
-								{ x: -122.3994, y: 37.7949 },
-								{ x: -122.3894, y: 37.8049 },
-							],
-						} as ShapePolyline,
+					type: "Feature",
+					geometry: {
+						type: "Point",
+						coordinates: [-122.4194, 37.7749],
+					},
+					properties: {},
+				},
+			],
+		}
+
+		const progressMessages: string[] = []
+		for (const update of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			progressMessages.push(progressEventMessage(update))
+		}
+
+		expect(progressMessages.length).toBeGreaterThan(0)
+		expect(progressMessages[0]).toContain("Converting")
+		expect(progressMessages[progressMessages.length - 1]).toContain(
+			"Finished converting",
+		)
+	})
+
+	it("should use feature IDs when present", () => {
+		const osm = new Osm()
+		const geojson: FeatureCollection<Point | LineString> = {
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					id: 100,
+					geometry: {
+						type: "Point",
+						coordinates: [-122.4194, 37.7749],
+					},
+					properties: {
+						name: "Point with ID",
+					},
+				},
+				{
+					type: "Feature",
+					id: "200",
+					geometry: {
+						type: "LineString",
+						coordinates: [
+							[-122.4194, 37.7749],
+							[-122.4094, 37.7849],
+						],
+					},
+					properties: {
+						highway: "primary",
 					},
 				},
 			],
 		}
 
-		const dbf = createDbf([{ name: "highway", properties: ["secondary"] }])
+		for (const _ of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			// Consume generator
+		}
+		osm.buildIndexes()
 
-		const shapefile = createMockShapefile(shape, dbf)
-		const osm = await fromShapefile({ test: shapefile })
+		// Point should use ID 100
+		const node = osm.nodes.getById(100)
+		expect(node).toBeDefined()
+		expect(node?.tags?.["name"]).toBe("Point with ID")
 
-		// Should create 2 ways (one for each part)
+		// Way should use ID 200
+		const way = osm.ways.getById(200)
+		expect(way).toBeDefined()
+		expect(way?.tags?.["highway"]).toBe("primary")
+	})
+
+	it("should handle MultiLineString features", () => {
+		const osm = new Osm()
+		const geojson: FeatureCollection = {
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: {
+						type: "MultiLineString",
+						coordinates: [
+							[
+								[-122.4194, 37.7749],
+								[-122.4094, 37.7849],
+							],
+							[
+								[-122.3994, 37.7949],
+								[-122.3894, 37.8049],
+							],
+						],
+					},
+					properties: {
+						highway: "secondary",
+					},
+				},
+			],
+		}
+
+		for (const _ of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			// Consume generator
+		}
+		osm.buildIndexes()
+
+		// Should create 2 ways (one for each line)
 		expect(osm.ways.size).toBe(2)
 		expect(osm.nodes.size).toBe(4)
 
@@ -515,73 +452,60 @@ describe("@osmix/shapefile: fromShapefile", () => {
 		expect(way2?.tags?.["highway"]).toBe("secondary")
 	})
 
-	it("should use generator for custom progress handling", () => {
+	it("should handle MultiPolygon features", () => {
 		const osm = new Osm()
-		const shape: Shape = {
-			header: { shapeType: ShapeType.Point } as any,
-			records: [
+		const geojson: FeatureCollection = {
+			type: "FeatureCollection",
+			features: [
 				{
-					header: header(1, 10),
-					body: {
-						type: ShapeType.Point,
-						data: { x: -122.4194, y: 37.7749 } as ShapePoint,
+					type: "Feature",
+					geometry: {
+						type: "MultiPolygon",
+						coordinates: [
+							// First polygon
+							[
+								[
+									[-122.4194, 37.7749],
+									[-122.4094, 37.7749],
+									[-122.4094, 37.7849],
+									[-122.4194, 37.7849],
+									[-122.4194, 37.7749],
+								],
+							],
+							// Second polygon
+							[
+								[
+									[-122.3994, 37.7649],
+									[-122.3894, 37.7649],
+									[-122.3894, 37.7749],
+									[-122.3994, 37.7749],
+									[-122.3994, 37.7649],
+								],
+							],
+						],
+					},
+					properties: {
+						landuse: "residential",
 					},
 				},
 			],
 		}
 
-		const dbf = createEmptyDbf()
-		const shapefile = createMockShapefile(shape, dbf)
-
-		const progressMessages: string[] = []
-		for (const update of startCreateOsmFromShapefile(osm, shapefile, "test")) {
-			progressMessages.push(progressEventMessage(update))
+		for (const _ of startCreateOsmFromShapefile(osm, geojson, "test")) {
+			// Consume generator
 		}
+		osm.buildIndexes()
 
-		expect(progressMessages.length).toBeGreaterThan(0)
-		expect(progressMessages[0]).toContain("Converting Shapefile")
-		expect(progressMessages[progressMessages.length - 1]).toContain(
-			"Finished converting",
-		)
-	})
+		// Should have 2 ways + 1 relation
+		expect(osm.ways.size).toBe(2)
+		expect(osm.relations.size).toBe(1)
 
-	it("should handle multiple shapefiles in one import", async () => {
-		const shape1: Shape = {
-			header: { shapeType: ShapeType.Point } as any,
-			records: [
-				{
-					header: header(1, 10),
-					body: {
-						type: ShapeType.Point,
-						data: { x: -122.4194, y: 37.7749 } as ShapePoint,
-					},
-				},
-			],
-		}
-
-		const shape2: Shape = {
-			header: { shapeType: ShapeType.Point } as any,
-			records: [
-				{
-					header: header(1, 10),
-					body: {
-						type: ShapeType.Point,
-						data: { x: -122.4094, y: 37.7849 } as ShapePoint,
-					},
-				},
-			],
-		}
-
-		const dbf = createEmptyDbf()
-
-		const shapefiles = {
-			first: createMockShapefile(shape1, dbf),
-			second: createMockShapefile(shape2, dbf),
-		}
-
-		const osm = await fromShapefile(shapefiles)
-
-		// Both shapefiles should be imported
-		expect(osm.nodes.size).toBe(2)
+		const relation = osm.relations.getById(-1)
+		expect(relation).toBeDefined()
+		expect(relation?.tags?.["type"]).toBe("multipolygon")
+		expect(relation?.tags?.["landuse"]).toBe("residential")
+		expect(relation?.members).toHaveLength(2)
+		expect(relation?.members[0]?.role).toBe("outer")
+		expect(relation?.members[1]?.role).toBe("outer")
 	})
 })

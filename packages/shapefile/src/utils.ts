@@ -1,83 +1,82 @@
+/// <reference path="./shpjs.d.ts" />
 /**
  * Utility functions for Shapefile data handling.
  * @module
  */
 
-import { Shapefile } from "shapefile.js"
-import type { ReadShapefileDataTypes } from "./types"
+import type { FeatureCollection } from "geojson"
+import shp from "shpjs"
+import type { ReadShapefileDataTypes, ShpjsResult } from "./types"
 
 /**
- * Load Shapefile data from various input formats.
+ * Parse Shapefile data and return GeoJSON FeatureCollection(s).
  *
- * Supports multiple input types for flexibility:
- * - **ReadableStream**: Streaming ZIP data
- * - **ArrayBuffer/SharedArrayBuffer**: Binary ZIP data to load
- * - **Record<string, Shapefile>**: Already-loaded Shapefile objects (passed through)
+ * Uses shpjs to parse Shapefiles and automatically project to WGS84.
  *
- * @param data - Shapefile data in any supported format.
- * @returns Record of loaded Shapefile objects keyed by name.
- * @throws If data is null or an unsupported type.
+ * @param data - Shapefile data (URL string, ArrayBuffer/ReadableStream of ZIP).
+ * @returns Array of GeoJSON FeatureCollections with optional fileName.
+ * @throws If data is null or parsing fails.
  *
  * @example
  * ```ts
  * // From ArrayBuffer
- * const shapefiles = await loadShapefileData(zipBuffer)
+ * const collections = await parseShapefile(zipBuffer)
  *
- * // From fetch response
- * const response = await fetch('/data.zip')
- * const shapefiles = await loadShapefileData(await response.arrayBuffer())
+ * // From URL
+ * const collections = await parseShapefile('https://example.com/data.zip')
  * ```
  */
-export async function loadShapefileData(
+export async function parseShapefile(
 	data: ReadShapefileDataTypes,
-): Promise<Record<string, Shapefile>> {
+): Promise<(FeatureCollection & { fileName?: string })[]> {
 	if (data == null) throw new Error("Data is null")
 
-	// Already-loaded Shapefile objects
-	if (
-		typeof data === "object" &&
-		!("byteLength" in data) &&
-		!("getReader" in data)
-	) {
-		// Check if this looks like a Record<string, Shapefile>
-		const firstValue = Object.values(data)[0]
-		if (firstValue && "parse" in firstValue && "contents" in firstValue) {
-			return data as Record<string, Shapefile>
-		}
-	}
+	let input: ArrayBufferLike | string
 
-	// ArrayBuffer or SharedArrayBuffer
-	if (data instanceof ArrayBuffer) {
-		return Shapefile.load(data)
-	}
-	if (data instanceof SharedArrayBuffer) {
-		// Convert SharedArrayBuffer to ArrayBuffer for shapefile.js
+	// Convert ReadableStream to ArrayBuffer
+	if (data instanceof ReadableStream) {
+		input = await streamToArrayBuffer(data)
+	} else if (data instanceof SharedArrayBuffer) {
+		// shpjs expects ArrayBuffer, not SharedArrayBuffer
 		const copy = new ArrayBuffer(data.byteLength)
 		new Uint8Array(copy).set(new Uint8Array(data))
-		return Shapefile.load(copy)
+		input = copy
+	} else {
+		input = data
 	}
 
-	// ReadableStream - read all chunks into an ArrayBuffer
-	if (data instanceof ReadableStream) {
-		const reader = data.getReader()
-		const chunks: Uint8Array[] = []
-		while (true) {
-			const { done, value } = await reader.read()
-			if (done) break
-			if (value) chunks.push(value)
-		}
-		// Combine chunks into a single ArrayBuffer
-		const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0)
-		const combined = new Uint8Array(totalLength)
-		let offset = 0
-		for (const chunk of chunks) {
-			combined.set(chunk, offset)
-			offset += chunk.length
-		}
-		return Shapefile.load(combined.buffer)
+	const result: ShpjsResult = await shp(input)
+
+	// Normalize to array
+	if (Array.isArray(result)) {
+		return result
+	}
+	return [result]
+}
+
+/**
+ * Convert a ReadableStream to an ArrayBuffer.
+ */
+async function streamToArrayBuffer(
+	stream: ReadableStream,
+): Promise<ArrayBuffer> {
+	const reader = stream.getReader()
+	const chunks: Uint8Array[] = []
+	let totalLength = 0
+
+	while (true) {
+		const { done, value } = await reader.read()
+		if (done) break
+		chunks.push(value)
+		totalLength += value.byteLength
 	}
 
-	throw new Error(
-		"Invalid data type. Accepts ArrayBufferLike, ReadableStream, or Record<string, Shapefile>.",
-	)
+	const result = new Uint8Array(totalLength)
+	let offset = 0
+	for (const chunk of chunks) {
+		result.set(chunk, offset)
+		offset += chunk.byteLength
+	}
+
+	return result.buffer
 }
