@@ -8,7 +8,8 @@ import {
 	SearchCode,
 	XIcon,
 } from "lucide-react"
-import { Suspense, useMemo } from "react"
+import { Suspense, useEffect, useMemo, useRef } from "react"
+import { useSearchParams } from "react-router"
 import ActionButton from "../components/action-button"
 import Basemap from "../components/basemap"
 import CustomControl from "../components/custom-control"
@@ -43,6 +44,7 @@ const EXAMPLE_MONACO_PBF_URL =
 	"https://trevorgerhardt.github.io/files/487218b69358-1f24d3e4e476/monaco.pbf"
 
 export default function InspectPage() {
+	const [searchParams, setSearchParams] = useSearchParams()
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
 	const {
@@ -59,6 +61,21 @@ export default function InspectPage() {
 	} = useOsmFile("inspect")
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
+
+	// Handle auto-loading from URL parameter
+	const loadParamProcessed = useRef(false)
+	useEffect(() => {
+		const loadId = searchParams.get("load")
+		if (loadId && !loadParamProcessed.current) {
+			loadParamProcessed.current = true
+			// Clear the URL parameter
+			setSearchParams({}, { replace: true })
+			// Load the file from storage
+			loadFromStorage(loadId).then((info) => {
+				if (info) flyToOsmBounds(info)
+			})
+		}
+	}, [searchParams, setSearchParams, loadFromStorage, flyToOsmBounds])
 
 	const applyChanges = async () => {
 		if (!osm) throw Error("Osm has not been loaded.")
