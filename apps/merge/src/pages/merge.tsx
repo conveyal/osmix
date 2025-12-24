@@ -155,7 +155,9 @@ export default function Merge() {
 			<Sidebar>
 				<div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
 					<Step step="select-osm-pbf-files" title="SELECT OSM FILES">
-						<p>Select two OSM files (PBF or GeoJSON) to merge.</p>
+						<p>
+							Select two OSM files (PBF, GeoJSON, or Shapefile ZIP) to merge.
+						</p>
 
 						<Card>
 							<CardHeader>
