@@ -288,16 +288,46 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	}
 
 	/**
+	 * Load an `Osm` instance from Shapefile (ZIP) data in a worker.
+	 * Data is sent to the first available worker, then synchronized across all workers.
+	 */
+	async fromShapefile(
+		data: ArrayBufferLike | ReadableStream | Uint8Array | File,
+		options: Partial<OsmOptions> = {},
+	) {
+		const workers = this.workers.slice()
+		const worker0 = workers.shift()!
+		const osmInfo = await worker0.fromShapefile(
+			transfer({
+				data: await this.getTransferableData(data),
+				options,
+			}),
+		)
+		await this.populateOtherWorkers(worker0, osmInfo.id)
+		return osmInfo
+	}
+
+	/**
 	 * Load an `Osm` instance from a File, auto-detecting format by extension.
-	 * .geojson and .json files are loaded as GeoJSON; all others as PBF.
+	 * - .geojson and .json files are loaded as GeoJSON
+	 * - .zip files are loaded as Shapefiles
+	 * - All others are loaded as PBF
 	 */
 	async fromFile(file: File, options: Partial<OsmOptions> = {}) {
 		const fileName = file.name.toLowerCase()
 		const isGeoJSON =
 			fileName.endsWith(".geojson") || fileName.endsWith(".json")
-		return isGeoJSON
-			? this.fromGeoJSON(file, { ...options, id: options.id ?? file.name })
-			: this.fromPbf(file, { ...options, id: options.id ?? file.name })
+		const isShapefile = fileName.endsWith(".zip")
+		if (isGeoJSON) {
+			return this.fromGeoJSON(file, { ...options, id: options.id ?? file.name })
+		}
+		if (isShapefile) {
+			return this.fromShapefile(file, {
+				...options,
+				id: options.id ?? file.name,
+			})
+		}
+		return this.fromPbf(file, { ...options, id: options.id ?? file.name })
 	}
 
 	/**

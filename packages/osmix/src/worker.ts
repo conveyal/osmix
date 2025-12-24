@@ -40,6 +40,7 @@ import {
 	type RoutingGraphTransferables,
 	type WaySegment,
 } from "@osmix/router"
+import { fromShapefile } from "@osmix/shapefile"
 import type { Progress, ProgressEvent } from "@osmix/shared/progress"
 import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types"
 
@@ -149,6 +150,22 @@ export class OsmixWorker extends EventTarget {
 		options?: Partial<OsmOptions>
 	}) {
 		const osm = await fromGeoJSON(data, options, this.onProgress)
+		this.set(osm.id, osm)
+		return osm.info()
+	}
+
+	/**
+	 * Load an Osm instance from Shapefile (ZIP) data and store it in this worker.
+	 * Returns Osm metadata including entity counts and bbox.
+	 */
+	async fromShapefile({
+		data,
+		options,
+	}: {
+		data: ArrayBufferLike | ReadableStream
+		options?: Partial<OsmOptions>
+	}) {
+		const osm = await fromShapefile(data, options, this.onProgress)
 		this.set(osm.id, osm)
 		return osm.info()
 	}

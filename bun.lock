@@ -195,6 +195,7 @@
         "@osmix/pbf": "workspace:*",
         "@osmix/raster": "workspace:*",
         "@osmix/router": "workspace:*",
+        "@osmix/shapefile": "workspace:*",
         "@osmix/shared": "workspace:*",
         "@osmix/vt": "workspace:*",
         "comlink": " ^4.4.2",
