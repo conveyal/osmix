@@ -320,9 +320,8 @@ export default function Merge() {
 												createIntersections: true,
 											},
 										)
-										const osm = await osmWorker.get(osmId)
-
-										base.setOsm(osm)
+										// Use setMergedOsm to properly update file info for the new merged result
+										await base.setMergedOsm(osmId, base.fileInfo?.fileName)
 										patch.setOsm(null)
 
 										task.end("All merge steps completed")

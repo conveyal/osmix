@@ -160,6 +160,50 @@ export function useOsmFile(osmKey: string) {
 		}
 	}, [osmInfo, fileInfo, isStored, setIsStored])
 
+	/**
+	 * Update the osm state with a newly generated/merged result.
+	 * Creates new file info with unique hash and name, resets stored state.
+	 */
+	const setMergedOsm = useCallback(
+		async (newOsmId: string, baseName?: string) => {
+			// Get the new Osm instance from the worker
+			const newOsm = await osmWorker.get(newOsmId)
+			const newOsmInfo = newOsm.info()
+
+			// Generate a new file name based on the base name or timestamp
+			const timestamp = new Date()
+				.toISOString()
+				.slice(0, 19)
+				.replace(/[:]/g, "-")
+			const newFileName = baseName
+				? baseName.replace(/\.pbf$/i, `-merged-${timestamp}.pbf`)
+				: `merged-${timestamp}.pbf`
+
+			// Create new file info - use the new osm ID as the hash
+			// File size is estimated from entity counts (will be accurate after serialization)
+			const estimatedSize =
+				newOsmInfo.stats.nodes * 20 +
+				newOsmInfo.stats.ways * 100 +
+				newOsmInfo.stats.relations * 200
+			const newFileInfo: StoredFileInfo = {
+				fileHash: newOsmId,
+				fileName: newFileName,
+				fileSize: estimatedSize,
+			}
+
+			// Update all state
+			setFile(null) // No actual File object for merged results
+			setFileInfo(newFileInfo)
+			setOsm(newOsm)
+			setOsmInfo(newOsmInfo)
+			setIsStored(false) // New file, not stored yet
+			setSelectedOsm(newOsm)
+
+			return newOsm
+		},
+		[setFile, setFileInfo, setOsm, setOsmInfo, setIsStored, setSelectedOsm],
+	)
+
 	return {
 		downloadOsm,
 		file,
@@ -170,6 +214,7 @@ export function useOsmFile(osmKey: string) {
 		osm,
 		osmInfo,
 		saveToStorage,
+		setMergedOsm,
 		setOsm,
 	}
 }
