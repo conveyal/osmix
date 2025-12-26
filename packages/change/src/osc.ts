@@ -54,13 +54,13 @@ export interface OscOptions {
 	 * versions of modified/deleted elements using `<old>` and `<new>` sections.
 	 * See: https://wiki.openstreetmap.org/wiki/Overpass_API/Augmented_Diffs
 	 *
-	 * @default true
+	 * @default false
 	 */
 	augmented: boolean
 }
 
 const DEFAULT_OSC_OPTIONS: OscOptions = {
-	augmented: true,
+	augmented: false,
 }
 
 /**
@@ -69,9 +69,9 @@ const DEFAULT_OSC_OPTIONS: OscOptions = {
  * Produces an `<osmChange>` document with create, modify, and delete sections
  * containing all nodes, ways, and relations from the changeset.
  *
- * When `augmented: true` (default), modifications and deletions include both
- * the old and new versions of elements wrapped in `<old>` and `<new>` elements,
- * following the Overpass API Augmented Diffs format.
+ * By default, generates standard OSC format compatible with OSM API 0.6 uploads.
+ * Set `augmented: true` to include both old and new versions of elements wrapped
+ * in `<old>` and `<new>` elements, following the Overpass API Augmented Diffs format.
  *
  * @param changeset - The changeset to serialize.
  * @param options - Options for OSC generation.
@@ -79,11 +79,11 @@ const DEFAULT_OSC_OPTIONS: OscOptions = {
  *
  * @example
  * ```ts
- * // Generate augmented diff (default)
+ * // Generate standard OSC for API uploads (default)
  * const osc = generateOscChanges(changeset)
  *
- * // Generate standard OSC without augmented data
- * const standardOsc = generateOscChanges(changeset, { augmented: false })
+ * // Generate augmented diff with old/new sections
+ * const augmentedOsc = generateOscChanges(changeset, { augmented: true })
  *
  * await Bun.write('changes.osc', osc)
  * ```
