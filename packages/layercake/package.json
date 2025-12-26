@@ -47,6 +47,7 @@
 	"dependencies": {
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
+		"@placemarkio/geojson-rewind": "catalog:",
 		"hyparquet": "^1.23.0",
 		"well-known-parser": "^0.6.1"
 	}
