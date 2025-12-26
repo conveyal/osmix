@@ -5,6 +5,7 @@
 ## Highlights
 
 - Construct repeatable `OsmixChangeset`s that track creates, modifies, and deletes with origin metadata and per-entity refs.
+- **Augmented diffs**: Automatically captures both old and new entity states for modifications and deletions, following the [Overpass API Augmented Diffs](https://wiki.openstreetmap.org/wiki/Overpass_API/Augmented_Diffs) format.
 - Deduplicate coincident nodes or overlapping ways, replace references, and optionally create intersection points where geometry meets.
 - Generate summary stats and OSC-friendly XML fragments so downstream systems can audit each change step.
 - Run `merge(base, patch, options)` to execute the full dedupe/merge workflow with a single call.
@@ -88,6 +89,39 @@ Options:
 ### `applyChangesToOsm(changeset: OsmixChangeset): Osm`
 
 Applies all pending changes in the changeset to produce a **new** `Osm` instance. The original `base` is immutable.
+
+### Augmented Diffs
+
+By default, all `OsmChange` records include an `oldEntity` field for modifications and deletions, capturing the entity's state before the change. This follows the [Overpass API Augmented Diffs](https://wiki.openstreetmap.org/wiki/Overpass_API/Augmented_Diffs) format.
+
+```ts
+import { OsmChangeset } from "@osmix/change"
+
+const changeset = new OsmChangeset(base)
+changeset.generateDirectChanges(patch)
+
+// Access the old and new state for a modified entity
+const wayChange = changeset.wayChanges[wayId]
+console.log("Old tags:", wayChange.oldEntity?.tags)
+console.log("New tags:", wayChange.entity.tags)
+```
+
+### `generateOscChanges(changeset, options?)`
+
+Generates OSC (OSM Change) XML format from a changeset.
+
+```ts
+import { generateOscChanges } from "@osmix/change"
+
+// Generate standard OSC for API uploads (default)
+const osc = generateOscChanges(changeset)
+
+// Generate augmented diff with old/new sections
+const augmentedOsc = generateOscChanges(changeset, { augmented: true })
+```
+
+Options:
+- `augmented` (boolean, default: `false`): When true, modifications include `<old>` and `<new>` sections, and deletions include `<old>` sections with the full entity data.
 
 ## Related Packages
 
