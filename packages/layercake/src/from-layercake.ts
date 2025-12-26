@@ -22,7 +22,12 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
-import { asyncBufferFromUrl, parquetReadObjects } from "hyparquet"
+import {
+	type AsyncBuffer,
+	asyncBufferFromUrl,
+	type ParquetReadOptions,
+	parquetReadObjects,
+} from "hyparquet"
 import type {
 	LayerCakeReadOptions,
 	LayerCakeRow,
@@ -95,7 +100,7 @@ async function readParquetRows(
 	const geometryColumn = readOptions.geometryColumn ?? "geometry"
 	const tagsColumn = readOptions.tagsColumn ?? "tags"
 
-	let file: unknown
+	let file: AsyncBuffer
 
 	if (typeof source === "string") {
 		// String sources are treated as URLs
@@ -116,11 +121,7 @@ async function readParquetRows(
 	}
 
 	const columns = [idColumn, geometryColumn, tagsColumn]
-	const readConfig: {
-		file: unknown
-		columns: string[]
-		rowEnd?: number
-	} = {
+	const readConfig: Omit<ParquetReadOptions, "onComplete"> = {
 		file,
 		columns,
 	}
