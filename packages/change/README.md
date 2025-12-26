@@ -113,15 +113,15 @@ Generates OSC (OSM Change) XML format from a changeset.
 ```ts
 import { generateOscChanges } from "@osmix/change"
 
-// Generate augmented diff OSC (default)
+// Generate standard OSC for API uploads (default)
 const osc = generateOscChanges(changeset)
 
-// Generate standard OSC without augmented data
-const standardOsc = generateOscChanges(changeset, { augmented: false })
+// Generate augmented diff with old/new sections
+const augmentedOsc = generateOscChanges(changeset, { augmented: true })
 ```
 
 Options:
-- `augmented` (boolean, default: `true`): When true, modifications include `<old>` and `<new>` sections, and deletions include `<old>` sections with the full entity data.
+- `augmented` (boolean, default: `false`): When true, modifications include `<old>` and `<new>` sections, and deletions include `<old>` sections with the full entity data.
 
 ## Related Packages
 

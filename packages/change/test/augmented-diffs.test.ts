@@ -89,7 +89,7 @@ describe("augmented diffs", () => {
 	})
 
 	describe("generateOscChanges", () => {
-		it("should generate augmented diffs by default", () => {
+		it("should generate standard OSC format by default", () => {
 			const base = createBaseOsm()
 			const patch = createPatchOsm()
 
@@ -98,12 +98,12 @@ describe("augmented diffs", () => {
 
 			const osc = generateOscChanges(changeset)
 
-			// Check that modify section contains old and new elements
+			// Check that modify section does not contain old/new wrappers
 			expect(osc).toContain("<modify>")
-			expect(osc).toContain("<old>")
-			expect(osc).toContain("<new>")
-			// Old version should have original tags
-			expect(osc).toContain('k="highway"')
+			expect(osc).not.toContain("<old>")
+			expect(osc).not.toContain("<new>")
+			// Should still contain the modified elements directly
+			expect(osc).toContain("<way")
 		})
 
 		it("should generate augmented diffs with old/new for modifications", () => {
