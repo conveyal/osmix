@@ -87,8 +87,14 @@ export function useOsmFile(osmKey: string) {
 			}
 
 			// Get the Osm instance from worker (already has spatial indexes built)
+			// Worker registers under fileHash, so use that as the ID
 			const osm = await osmWorker.get(stored.entry.fileHash)
-			setOsmInfo(stored.info)
+
+			// Update osmInfo.id to match the storage key (fileHash) since that's where
+			// the worker has it registered. This ensures downloadOsm and other calls
+			// that use osmInfo.id will find the correct worker entry.
+			const osmInfo = { ...stored.info, id: stored.entry.fileHash }
+			setOsmInfo(osmInfo)
 			setOsm(osm)
 			setSelectedOsm(osm)
 			setIsStored(true)
@@ -98,7 +104,7 @@ export function useOsmFile(osmKey: string) {
 			setFileInfo(stored.entry)
 
 			taskLog.end(`${stored.entry.fileName} loaded from storage.`)
-			return stored.info
+			return osmInfo
 		} catch (e) {
 			console.error(e)
 			taskLog.end(`Failed to load ${storageId} from storage.`, "error")
@@ -179,17 +185,30 @@ export function useOsmFile(osmKey: string) {
 			newOsmInfo.stats.nodes * 20 +
 			newOsmInfo.stats.ways * 100 +
 			newOsmInfo.stats.relations * 200
+
+		// Use content hash as the new ID to keep worker ID and storage key in sync
+		const newFileHash = newOsm.contentHash()
 		const newFileInfo: StoredFileInfo = {
-			fileHash: newOsm.contentHash(),
+			fileHash: newFileHash,
 			fileName: newFileName,
 			fileSize: estimatedSize,
 		}
+
+		// Re-register the Osm in the worker under the new fileHash so that
+		// downloadOsm, storeCurrentOsm, and other calls that use osmInfo.id
+		// will find the correct worker entry after saving/loading from storage.
+		if (newOsmId !== newFileHash) {
+			await osmWorker.rename(newOsmId, newFileHash)
+		}
+
+		// Update osmInfo.id to match the new fileHash (worker registration key)
+		const updatedOsmInfo = { ...newOsmInfo, id: newFileHash }
 
 		// Update all state
 		setFile(null) // No actual File object for merged results
 		setFileInfo(newFileInfo)
 		setOsm(newOsm)
-		setOsmInfo(newOsmInfo)
+		setOsmInfo(updatedOsmInfo)
 		setIsStored(false) // New file, not stored yet
 		setSelectedOsm(newOsm)
 

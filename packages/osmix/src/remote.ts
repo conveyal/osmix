@@ -416,6 +416,27 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	}
 
 	/**
+	 * Rename an `Osm` instance from one ID to another in all workers.
+	 * Useful when the content hash changes and you need to update the worker key
+	 * to match a new storage key.
+	 */
+	async rename(fromId: OsmId, toId: string): Promise<void> {
+		const from = this.getId(fromId)
+		if (from === toId) return
+		// Get the osm from one worker, then re-register under the new ID
+		const worker0 = this.workers[0]
+		if (!worker0) throw Error("No worker available")
+		const transferables = await worker0.getOsmBuffers(from)
+		// Update the id in the transferables
+		const updatedTransferables = { ...transferables, id: toId }
+		// Delete old entries and transfer in with new ID
+		await Promise.all(this.workers.map((w) => w.delete(from)))
+		await Promise.all(
+			this.workers.map((w) => w.transferIn(updatedTransferables)),
+		)
+	}
+
+	/**
 	 * Generate a Mapbox Vector Tile for the specified tile coordinates.
 	 * Delegates to an available worker for off-thread rendering.
 	 */
