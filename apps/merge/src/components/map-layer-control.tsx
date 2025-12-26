@@ -7,7 +7,7 @@ import {
 	FolderOpen,
 	Layers,
 } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useEffectEvent, useMemo, useState } from "react"
 import { useMap } from "../hooks/map"
 import { cn } from "../lib/utils"
 import { APPID } from "../settings"
@@ -50,7 +50,7 @@ export function MapLayers() {
 	const [isOpen, setIsOpen] = useState(true)
 
 	// Fetch layers from the map
-	const refreshLayers = useCallback(() => {
+	const refreshLayers = useEffectEvent(() => {
 		const layerInfos: LayerInfo[] = (map?.getStyle()?.layers ?? []).map(
 			(layer) => {
 				const visibility = map?.getLayoutProperty(layer.id, "visibility")
@@ -63,7 +63,7 @@ export function MapLayers() {
 		)
 
 		setLayers(layerInfos)
-	}, [map])
+	})
 
 	// Listen for style changes
 	useEffect(() => {
@@ -78,7 +78,7 @@ export function MapLayers() {
 			map.off("styledata", refreshLayers)
 			map.off("load", refreshLayers)
 		}
-	}, [map, refreshLayers])
+	}, [map])
 
 	// Group layers by prefix
 	const groups = useMemo((): LayerGroup[] => {
@@ -112,17 +112,16 @@ export function MapLayers() {
 	}, [groups, searchQuery])
 
 	// Toggle layer visibility
-	const toggleLayerVisibility = useCallback(
+	const toggleLayerVisibility = useEffectEvent(
 		(layerId: string, currentlyVisible: boolean) => {
 			const newVisibility = currentlyVisible ? "none" : "visible"
 			map?.getMap().setLayoutProperty(layerId, "visibility", newVisibility)
 			refreshLayers()
 		},
-		[map, refreshLayers],
 	)
 
 	// Toggle all layers in a group
-	const toggleGroupVisibility = useCallback(
+	const toggleGroupVisibility = useEffectEvent(
 		(group: LayerGroup, show: boolean) => {
 			const visibility = show ? "visible" : "none"
 			for (const layer of group.layers) {
@@ -130,7 +129,6 @@ export function MapLayers() {
 			}
 			refreshLayers()
 		},
-		[map, refreshLayers],
 	)
 
 	if (!map) return null

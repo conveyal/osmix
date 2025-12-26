@@ -5,7 +5,7 @@
  * allowing the UI to react without polling.
  */
 
-import { useCallback, useEffect, useSyncExternalStore } from "react"
+import { useEffect, useEffectEvent, useSyncExternalStore } from "react"
 import type { MergeRemote } from "../lib/merge-remote"
 import { STORAGE_CHANNEL } from "../settings"
 import type { StoredOsmEntry } from "../workers/osm.worker"
@@ -97,9 +97,9 @@ export function useStoredOsm(remote: MergeRemote) {
 		storageStore.getSnapshot,
 	)
 
-	const refresh = useCallback(() => {
+	const refresh = useEffectEvent(() => {
 		storageStore?.refresh()
-	}, [])
+	})
 
 	return { ...snapshot, refresh }
 }

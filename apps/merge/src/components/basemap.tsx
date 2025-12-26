@@ -1,5 +1,5 @@
 import { useSetAtom } from "jotai"
-import { useCallback, useRef } from "react"
+import { useEffectEvent, useRef } from "react"
 import {
 	Map as MaplibreMap,
 	ScaleControl,
@@ -30,17 +30,14 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 	const setZoom = useSetAtom(zoomAtom)
 	const hasHiddenLayersRef = useRef(false)
 
-	const onViewStateChange = useCallback(
-		(e: ViewStateChangeEvent) => {
-			setBounds(e.target.getBounds())
-			setCenter(e.target.getCenter())
-			setZoom(e.target.getZoom())
-		},
-		[setBounds, setCenter, setZoom],
-	)
+	const onViewStateChange = useEffectEvent((e: ViewStateChangeEvent) => {
+		setBounds(e.target.getBounds())
+		setCenter(e.target.getCenter())
+		setZoom(e.target.getZoom())
+	})
 
 	// Hide roads in base map - only run once on initial style load
-	const onStyleData = useCallback((e: maplibregl.MapStyleDataEvent) => {
+	const onStyleData = useEffectEvent((e: maplibregl.MapStyleDataEvent) => {
 		if (hasHiddenLayersRef.current) return
 
 		const map = e.target
@@ -55,7 +52,7 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 		}
 
 		hasHiddenLayersRef.current = true
-	}, [])
+	})
 
 	return (
 		<MaplibreMap

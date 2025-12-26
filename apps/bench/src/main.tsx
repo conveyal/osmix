@@ -1,8 +1,8 @@
 import type { GeoBbox2D } from "@osmix/shared/types"
 import {
 	StrictMode,
-	useCallback,
 	useEffect,
+	useEffectEvent,
 	useMemo,
 	useRef,
 	useState,
@@ -24,53 +24,50 @@ function App() {
 	const [selectedFile, setSelectedFile] = useState<File | null>(null)
 	const [log, setLog] = useState<BenchmarkStatus[]>([])
 	const currentStatus = useMemo(() => log[log.length - 1], [log])
-	const pushStatus = useCallback((status: BenchmarkStatus) => {
+	const pushStatus = useEffectEvent((status: BenchmarkStatus) => {
 		setLog((prev) => [...prev, status])
-	}, [])
+	})
 	const [results, setResults] = useState<BenchmarkResults[]>([])
 	const fileInputRef = useRef<HTMLInputElement>(null)
 	const autoLoadAttemptedRef = useRef(false)
 
-	const handleRunBenchmark = useCallback(
-		async (file: File) => {
-			setLog([])
+	const handleRunBenchmark = useEffectEvent(async (file: File) => {
+		setLog([])
+		pushStatus({
+			status: "running",
+			currentMetric: "Starting benchmarks...",
+			error: null,
+		})
+		setResults([])
+
+		try {
+			const benchResults = await runAllBenchmarks({
+				file,
+				onProgress: (metric) => {
+					pushStatus({
+						status: "running",
+						currentMetric: metric,
+						error: null,
+					})
+				},
+				engines: [runOsmixBenchmarks, runDuckDBBenchmarks],
+			})
+
+			setResults(benchResults)
 			pushStatus({
-				status: "running",
-				currentMetric: "Starting benchmarks...",
+				status: "completed",
+				currentMetric: null,
 				error: null,
 			})
-			setResults([])
-
-			try {
-				const benchResults = await runAllBenchmarks({
-					file,
-					onProgress: (metric) => {
-						pushStatus({
-							status: "running",
-							currentMetric: metric,
-							error: null,
-						})
-					},
-					engines: [runOsmixBenchmarks, runDuckDBBenchmarks],
-				})
-
-				setResults(benchResults)
-				pushStatus({
-					status: "completed",
-					currentMetric: null,
-					error: null,
-				})
-			} catch (error) {
-				console.error("Benchmark error:", error)
-				pushStatus({
-					status: "error",
-					currentMetric: null,
-					error: error instanceof Error ? error.message : "Unknown error",
-				})
-			}
-		},
-		[pushStatus],
-	)
+		} catch (error) {
+			console.error("Benchmark error:", error)
+			pushStatus({
+				status: "error",
+				currentMetric: null,
+				error: error instanceof Error ? error.message : "Unknown error",
+			})
+		}
+	})
 
 	// Auto-load default file in development
 	useEffect(() => {
@@ -87,7 +84,7 @@ function App() {
 					console.error("Failed to load default file:", err)
 				})
 		}
-	}, [selectedFile, handleRunBenchmark])
+	}, [selectedFile])
 
 	const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0]
