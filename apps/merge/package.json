@@ -4,10 +4,10 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"build": "vite build --excludeDirectory test",
+		"build": "vite build test",
 		"dev": "vite",
 		"test:e2e": "playwright test",
-		"typecheck": "tsgo --build --noEmit"
+		"typecheck": "tsgo --noEmit"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.52.0",

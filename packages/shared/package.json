@@ -36,7 +36,7 @@
 	},
 	"sideEffects": false,
 	"scripts": {
-		"build": "tsc --excludeDirectory test",
+		"build": "tsc --excludeDirectories test",
 		"bench": "bun test --bench",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
