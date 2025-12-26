@@ -1,7 +1,7 @@
 import type { Osm, OsmInfo } from "@osmix/core"
 import type { OsmEntity } from "@osmix/shared/types"
 import { isNode, isRelation, isWay } from "@osmix/shared/utils"
-import { useCallback } from "react"
+import { useEffectEvent } from "react"
 import { useMap as useMapCollection } from "react-map-gl/maplibre"
 
 export function useMap() {
@@ -13,46 +13,40 @@ export function useMap() {
 export function useFlyToEntity() {
 	const map = useMap()
 
-	return useCallback(
-		(osm: Osm, entity: OsmEntity) => {
-			if (!map) return
-			if (isNode(entity)) {
-				map.flyTo({
-					center: [entity.lon, entity.lat],
-					padding: 200,
-					maxDuration: 200,
-					zoom: 16,
-				})
-			} else if (isWay(entity)) {
-				const bbox = osm.ways.getEntityBbox({ id: entity.id })
-				map.fitBounds(bbox, {
-					padding: 100,
-					maxDuration: 200,
-				})
-			} else if (isRelation(entity)) {
-				const bbox = osm.relations.getEntityBbox({ id: entity.id })
-				map.fitBounds(bbox, {
-					padding: 100,
-					maxDuration: 200,
-				})
-			}
-		},
-		[map],
-	)
+	return useEffectEvent((osm: Osm, entity: OsmEntity) => {
+		if (!map) return
+		if (isNode(entity)) {
+			map.flyTo({
+				center: [entity.lon, entity.lat],
+				padding: 200,
+				maxDuration: 200,
+				zoom: 16,
+			})
+		} else if (isWay(entity)) {
+			const bbox = osm.ways.getEntityBbox({ id: entity.id })
+			map.fitBounds(bbox, {
+				padding: 100,
+				maxDuration: 200,
+			})
+		} else if (isRelation(entity)) {
+			const bbox = osm.relations.getEntityBbox({ id: entity.id })
+			map.fitBounds(bbox, {
+				padding: 100,
+				maxDuration: 200,
+			})
+		}
+	})
 }
 
 export function useFlyToOsmBounds() {
 	const map = useMap()
 
-	return useCallback(
-		(osmInfo?: OsmInfo | null) => {
-			const bbox = osmInfo?.bbox
-			if (!map || !bbox) return
-			map.fitBounds(bbox, {
-				padding: 100,
-				maxDuration: 200,
-			})
-		},
-		[map],
-	)
+	return useEffectEvent((osmInfo?: OsmInfo | null) => {
+		const bbox = osmInfo?.bbox
+		if (!map || !bbox) return
+		map.fitBounds(bbox, {
+			padding: 100,
+			maxDuration: 200,
+		})
+	})
 }

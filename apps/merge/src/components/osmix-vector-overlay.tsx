@@ -7,7 +7,7 @@ import {
 	type MapLayerMouseEvent,
 	Popup,
 } from "maplibre-gl"
-import { useCallback, useEffect, useRef } from "react"
+import { useEffect, useEffectEvent, useRef } from "react"
 import {
 	type CircleLayerSpecification,
 	Layer,
@@ -114,7 +114,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
 	const relationPolygonsLayerId = `${relationsLayerId}:polygons`
 	const sourceLayerPrefix = `@osmix:${osm.id}`
 
-	const clearHover = useCallback(() => {
+	const clearHover = useEffectEvent(() => {
 		if (map) {
 			map.getCanvas().style.setProperty("cursor", "")
 			const source = map.getSource(sourceId)
@@ -135,79 +135,73 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
 		}
 
 		popupRef.current?.remove()
-	}, [map, sourceId, sourceLayerPrefix])
+	})
 
-	const handleClick = useCallback(
-		async (event: MapLayerMouseEvent) => {
-			const feature = event.features?.[0]
-			if (!osm || !feature || typeof feature.id !== "number") {
-				selectEntity(null, null)
-				return
-			}
+	const handleClick = useEffectEvent(async (event: MapLayerMouseEvent) => {
+		const feature = event.features?.[0]
+		if (!osm || !feature || typeof feature.id !== "number") {
+			selectEntity(null, null)
+			return
+		}
+		// Decode zigzag-encoded ID if it was originally negative
+		const decodedId = decodeZigzag(feature.id)
+		if (feature.properties?.type === "node") {
+			selectEntity(osm, osm.nodes.getById(decodedId))
+		} else if (feature.properties?.type === "way") {
+			selectEntity(osm, osm.ways.getById(decodedId))
+		} else if (feature.properties?.type === "relation") {
+			selectEntity(osm, osm.relations.getById(decodedId))
+		} else {
+			selectEntity(osm, null)
+		}
+	})
+
+	const handleMove = useEffectEvent((event: MapLayerMouseEvent) => {
+		if (!map || !sourceId) return
+		const feature = event.features?.[0]
+		if (!feature || typeof feature.id !== "number") {
+			clearHover()
+			return
+		}
+		map.getCanvas().style.setProperty("cursor", "pointer")
+		if (!popupRef.current) {
+			popupRef.current = new Popup({
+				closeButton: false,
+				closeOnClick: false,
+				className: "osmix-overlay-popup",
+			})
+		}
+		const fs = map.getFeatureState({
+			source: feature.source,
+			sourceLayer: feature.sourceLayer,
+			id: feature.id,
+		})
+		if (!fs.hover) {
+			const featureType = feature.properties?.type || "unknown"
 			// Decode zigzag-encoded ID if it was originally negative
 			const decodedId = decodeZigzag(feature.id)
-			if (feature.properties?.type === "node") {
-				selectEntity(osm, osm.nodes.getById(decodedId))
-			} else if (feature.properties?.type === "way") {
-				selectEntity(osm, osm.ways.getById(decodedId))
-			} else if (feature.properties?.type === "relation") {
-				selectEntity(osm, osm.relations.getById(decodedId))
-			} else {
-				selectEntity(osm, null)
-			}
-		},
-		[osm, selectEntity, osm.nodes, osm.ways, osm.relations],
-	)
-
-	const handleMove = useCallback(
-		(event: MapLayerMouseEvent) => {
-			if (!map || !sourceId) return
-			const feature = event.features?.[0]
-			if (!feature || typeof feature.id !== "number") {
-				clearHover()
-				return
-			}
-			map.getCanvas().style.setProperty("cursor", "pointer")
-			if (!popupRef.current) {
-				popupRef.current = new Popup({
-					closeButton: false,
-					closeOnClick: false,
-					className: "osmix-overlay-popup",
-				})
-			}
-			const fs = map.getFeatureState({
+			popupRef
+				.current!.setLngLat(event.lngLat)
+				.setHTML(tooltipTemplate({ id: decodedId, type: featureType }))
+				.addTo(map.getMap())
+			map.removeFeatureState({
 				source: feature.source,
 				sourceLayer: feature.sourceLayer,
-				id: feature.id,
 			})
-			if (!fs.hover) {
-				const featureType = feature.properties?.type || "unknown"
-				// Decode zigzag-encoded ID if it was originally negative
-				const decodedId = decodeZigzag(feature.id)
-				popupRef
-					.current!.setLngLat(event.lngLat)
-					.setHTML(tooltipTemplate({ id: decodedId, type: featureType }))
-					.addTo(map.getMap())
-				map.removeFeatureState({
+			map.setFeatureState(
+				{
 					source: feature.source,
 					sourceLayer: feature.sourceLayer,
-				})
-				map.setFeatureState(
-					{
-						source: feature.source,
-						sourceLayer: feature.sourceLayer,
-						id: feature.id,
-					},
-					{ hover: true },
-				)
-			}
-		},
-		[clearHover, map, sourceId],
-	)
+					id: feature.id,
+				},
+				{ hover: true },
+			)
+		}
+	})
 
-	const handleLeave = useCallback(() => {
+	const handleLeave = useEffectEvent(() => {
 		clearHover()
-	}, [clearHover])
+	})
 
 	useEffect(() => {
 		if (!map) return
@@ -248,10 +242,6 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
 			clearHover()
 		}
 	}, [
-		clearHover,
-		handleClick,
-		handleLeave,
-		handleMove,
 		map,
 		nodesLayerId,
 		waysLayerId,

@@ -6,6 +6,7 @@ import {
 	CheckCircle,
 	ChevronRightIcon,
 	DownloadIcon,
+	EyeIcon,
 	FastForwardIcon,
 	FileDiff,
 	MaximizeIcon,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { Suspense, useMemo } from "react"
+import { Link } from "react-router"
 import ActionButton from "../components/action-button"
 import Basemap from "../components/basemap"
 import CustomControl from "../components/custom-control"
@@ -318,9 +320,8 @@ export default function Merge() {
 												createIntersections: true,
 											},
 										)
-										const osm = await osmWorker.get(osmId)
-
-										base.setOsm(osm)
+										// Use setMergedOsm to properly update file info for the new merged result
+										await base.setMergedOsm(osmId)
 										patch.setOsm(null)
 
 										task.end("All merge steps completed")
@@ -772,12 +773,33 @@ export default function Merge() {
 									</Card>
 								)}
 
-								<ActionButton
-									icon={<DownloadIcon />}
-									onAction={() => base.downloadOsm()}
-								>
-									Download merged OSM PBF
-								</ActionButton>
+								<div className="flex flex-col gap-2">
+									<ActionButton
+										icon={<DownloadIcon />}
+										onAction={() => base.downloadOsm()}
+									>
+										Download merged OSM PBF
+									</ActionButton>
+									{!base.isStored && (
+										<ActionButton
+											icon={<SaveIcon />}
+											onAction={base.saveToStorage}
+										>
+											Save to storage
+										</ActionButton>
+									)}
+									<Button asChild>
+										<Link
+											to={
+												base.isStored && base.fileInfo?.fileHash
+													? `/inspect?load=${base.fileInfo.fileHash}`
+													: "/inspect"
+											}
+										>
+											<EyeIcon /> Open in Inspect
+										</Link>
+									</Button>
+								</div>
 							</>
 						)}
 					</Step>

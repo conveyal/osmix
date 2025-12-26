@@ -5,7 +5,7 @@
 
 import type { OsmInfo } from "@osmix/core"
 import { DatabaseIcon, RotateCcwIcon, Trash2Icon } from "lucide-react"
-import { useCallback, useState } from "react"
+import { useEffectEvent, useState } from "react"
 import { type StoredOsmEntry, useStoredOsm } from "../hooks/storage-broadcast"
 import { osmWorker } from "../state/worker"
 import ActionButton from "./action-button"
@@ -60,14 +60,14 @@ interface StoredOsmItemProps {
 function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 	const [isDeleting, setIsDeleting] = useState(false)
 
-	const handleDelete = useCallback(async () => {
+	const handleDelete = useEffectEvent(async () => {
 		setIsDeleting(true)
 		try {
 			await osmWorker.deleteStoredOsm(entry.fileHash)
 		} finally {
 			setIsDeleting(false)
 		}
-	}, [entry.fileHash])
+	})
 
 	return (
 		<Item className={isActive ? "bg-blue-50 border-blue-200" : ""}>

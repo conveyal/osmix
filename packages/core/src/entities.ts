@@ -16,6 +16,7 @@ import type {
 import type { IdOrIndex, Ids, IdsTransferables } from "./ids"
 import type { Tags, TagsTransferables } from "./tags"
 import type { BufferType } from "./typed-arrays"
+import type { ContentHasher } from "./utils"
 
 /**
  * Serializable representation of an Entities collection for worker transfer.
@@ -207,5 +208,13 @@ export abstract class Entities<T extends OsmEntity> {
 			.map((index) => this.getByIndex(index))
 		if (val === undefined) return entities
 		return entities.filter((entity) => entity.tags?.[key] === val)
+	}
+
+	/**
+	 * Update a ContentHasher with this entity collection's base data (IDs and tags).
+	 * Subclasses should override to add entity-specific data.
+	 */
+	updateHash(hasher: ContentHasher): ContentHasher {
+		return this.ids.updateHash(this.tags.updateHash(hasher))
 	}
 }

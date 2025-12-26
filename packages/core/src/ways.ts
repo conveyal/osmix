@@ -13,6 +13,7 @@ import {
 	IdArrayType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
+import type { ContentHasher } from "./utils"
 
 export interface WaysTransferables<T extends BufferType = BufferType>
 	extends EntitiesTransferables<T> {
@@ -401,5 +402,16 @@ export class Ways extends Entities<OsmWay> {
 			count * 4 * Float64Array.BYTES_PER_ELEMENT + // bbox
 			spatialIndexBytes
 		)
+	}
+
+	/**
+	 * Update a ContentHasher with way-specific data (node references).
+	 */
+	override updateHash(hasher: ContentHasher): ContentHasher {
+		return super
+			.updateHash(hasher)
+			.update(this.refStart.array)
+			.update(this.refCount.array)
+			.update(this.refs.array)
 	}
 }
