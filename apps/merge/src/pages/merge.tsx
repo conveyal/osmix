@@ -321,7 +321,7 @@ export default function Merge() {
 											},
 										)
 										// Use setMergedOsm to properly update file info for the new merged result
-										await base.setMergedOsm(osmId, base.fileInfo?.fileName)
+										await base.setMergedOsm(osmId)
 										patch.setOsm(null)
 
 										task.end("All merge steps completed")
