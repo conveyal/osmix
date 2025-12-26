@@ -8,13 +8,13 @@
  */
 
 import { Osm, type OsmOptions } from "@osmix/core"
-import { rewindFeature } from "@placemarkio/geojson-rewind"
 import {
 	logProgress,
 	type ProgressEvent,
 	progressEvent,
 } from "@osmix/shared/progress"
 import type { OsmRelationMember, OsmTags } from "@osmix/shared/types"
+import { rewindFeature } from "@placemarkio/geojson-rewind"
 import type {
 	Geometry,
 	LineString,
@@ -22,6 +22,12 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
+import {
+	type AsyncBuffer,
+	asyncBufferFromUrl,
+	type ParquetReadOptions,
+	parquetReadObjects,
+} from "hyparquet"
 import type {
 	LayerCakeReadOptions,
 	LayerCakeRow,
@@ -69,17 +75,8 @@ export async function fromLayerCake(
 
 	onProgress(progressEvent("Loading Layercake GeoParquet file..."))
 
-	// Dynamically import hyparquet to work with both browser and Node.js
-	const { parquetReadObjects, asyncBufferFromUrl } = await import("hyparquet")
-
 	// Read rows from parquet file
-	const rows = await readParquetRows(
-		source,
-		readOptions,
-		parquetReadObjects,
-		asyncBufferFromUrl,
-		onProgress,
-	)
+	const rows = await readParquetRows(source, readOptions, onProgress)
 
 	onProgress(progressEvent(`Processing ${rows.length} features...`))
 
@@ -97,36 +94,18 @@ export async function fromLayerCake(
 async function readParquetRows(
 	source: LayerCakeSource,
 	readOptions: LayerCakeReadOptions,
-	// biome-ignore lint/suspicious/noExplicitAny: hyparquet types
-	parquetReadObjects: any,
-	// biome-ignore lint/suspicious/noExplicitAny: hyparquet types
-	asyncBufferFromUrl: any,
 	onProgress: (progress: ProgressEvent) => void,
 ): Promise<LayerCakeRow[]> {
 	const idColumn = readOptions.idColumn ?? "id"
 	const geometryColumn = readOptions.geometryColumn ?? "geometry"
 	const tagsColumn = readOptions.tagsColumn ?? "tags"
 
-	let file: unknown
+	let file: AsyncBuffer
 
 	if (typeof source === "string") {
-		// Check if it's a URL or file path
-		if (source.startsWith("http://") || source.startsWith("https://")) {
-			onProgress(progressEvent(`Fetching from URL: ${source}`))
-			file = await asyncBufferFromUrl({ url: source })
-		} else {
-			// Node.js/Bun file path - use fs to read the file
-			const { readFileSync } = await import("node:fs")
-			const buffer = readFileSync(source)
-			const arrayBuffer = buffer.buffer.slice(
-				buffer.byteOffset,
-				buffer.byteOffset + buffer.byteLength,
-			)
-			file = {
-				byteLength: arrayBuffer.byteLength,
-				slice: (start: number, end?: number) => arrayBuffer.slice(start, end),
-			}
-		}
+		// String sources are treated as URLs
+		onProgress(progressEvent(`Fetching from URL: ${source}`))
+		file = await asyncBufferFromUrl({ url: source })
 	} else if (source instanceof URL) {
 		onProgress(progressEvent(`Fetching from URL: ${source.href}`))
 		file = await asyncBufferFromUrl({ url: source.href })
@@ -142,11 +121,7 @@ async function readParquetRows(
 	}
 
 	const columns = [idColumn, geometryColumn, tagsColumn]
-	const readConfig: {
-		file: unknown
-		columns: string[]
-		rowEnd?: number
-	} = {
+	const readConfig: Omit<ParquetReadOptions, "onComplete"> = {
 		file,
 		columns,
 	}

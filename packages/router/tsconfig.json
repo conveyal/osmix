@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json.schemastore.org/tsconfig",
-	"extends": "../shared/tsconfig/base.json",
+	"extends": "@osmix/shared/tsconfig/base.json",
 	"exclude": ["node_modules", "dist"],
 	"include": ["src", "test"],
 	"compilerOptions": {

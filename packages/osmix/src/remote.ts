@@ -10,6 +10,7 @@
 
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core"
+import type { LayerCakeReadOptions } from "@osmix/layercake"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type {
 	DefaultSpeeds,
@@ -318,6 +319,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		const isGeoJSON =
 			fileName.endsWith(".geojson") || fileName.endsWith(".json")
 		const isShapefile = fileName.endsWith(".zip")
+		const isParquet = fileName.endsWith(".parquet")
 		if (isGeoJSON) {
 			return this.fromGeoJSON(file, { ...options, id: options.id ?? file.name })
 		}
@@ -327,7 +329,50 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 				id: options.id ?? file.name,
 			})
 		}
+		if (isParquet) {
+			return this.fromLayerCake(file, {
+				...options,
+				id: options.id ?? file.name,
+			})
+		}
 		return this.fromPbf(file, { ...options, id: options.id ?? file.name })
+	}
+
+	/**
+	 * Load an `Osm` instance from Layercake GeoParquet data in a worker.
+	 * Data is sent to the first available worker, then synchronized across all workers.
+	 */
+	async fromLayerCake(
+		data: ArrayBuffer | File | string | URL,
+		options: Partial<OsmOptions> = {},
+		readOptions: LayerCakeReadOptions = {},
+	) {
+		const workers = this.workers.slice()
+		const worker0 = workers.shift()!
+		const transferableData = await this.getLayerCakeTransferableData(data)
+		const osmInfo = await worker0.fromLayerCake(
+			transfer({
+				data: transferableData,
+				options,
+				readOptions,
+			}),
+		)
+		await this.populateOtherWorkers(worker0, osmInfo.id)
+		return osmInfo
+	}
+
+	/**
+	 * Convert LayerCake input data to a transferable format.
+	 * Strings and URLs are passed through; Files are converted to ArrayBuffer.
+	 */
+	private async getLayerCakeTransferableData(
+		data: ArrayBuffer | File | string | URL,
+	): Promise<ArrayBuffer | string | URL> {
+		if (typeof data === "string") return data
+		if (data instanceof URL) return data
+		if (data instanceof ArrayBuffer) return data
+		if (data instanceof File) return data.arrayBuffer()
+		throw Error("Invalid LayerCake data source")
 	}
 
 	/**

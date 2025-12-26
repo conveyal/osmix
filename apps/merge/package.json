@@ -4,7 +4,7 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"build": "vite build",
+		"build": "vite build --exludeDirectory test",
 		"dev": "vite",
 		"test:e2e": "playwright test",
 		"typecheck": "tsgo --build --noEmit"
@@ -28,6 +28,7 @@
 		"@osmix/core": "workspace:*",
 		"@osmix/geojson": "workspace:*",
 		"@osmix/json": "workspace:*",
+		"@osmix/layercake": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/raster": "workspace:*",
 		"@osmix/router": "workspace:*",

@@ -33,7 +33,7 @@
 	"sideEffects": false,
 	"scripts": {
 		"bench": "bun test --bench",
-		"build": "tsc",
+		"build": "tsc --exludeDirectory test",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"

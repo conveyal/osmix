@@ -35,7 +35,7 @@
 	},
 	"sideEffects": false,
 	"scripts": {
-		"build": "tsc",
+		"build": "tsc --exludeDirectory test",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
@@ -50,6 +50,7 @@
 		"@osmix/core": "workspace:*",
 		"@osmix/geojson": "workspace:*",
 		"@osmix/json": "workspace:*",
+		"@osmix/layercake": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/raster": "workspace:*",
 		"@osmix/router": "workspace:*",
