@@ -4,7 +4,7 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"build": "vite build test",
+		"build": "vite build",
 		"dev": "vite",
 		"test:e2e": "playwright test",
 		"typecheck": "tsgo --noEmit"
