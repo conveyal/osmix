@@ -10,6 +10,7 @@ import { Ways, type WaysTransferables } from "./ways"
 export interface OsmTransferables<T extends BufferType = BufferType> {
 	id: string
 	header: OsmPbfHeaderBlock
+	contentHash: string
 	stringTable: StringTableTransferables<T>
 	nodes: NodesTransferables<T>
 	ways: WaysTransferables<T>
@@ -47,6 +48,7 @@ export class Osm {
 	readonly relations: Relations
 
 	private indexBuilt = false
+	private _contentHash = ""
 
 	/**
 	 * Create a new OSM Entity index.
@@ -72,6 +74,7 @@ export class Osm {
 					this.ways,
 					opts.relations.transferables(),
 				)
+				this._contentHash = opts._contentHash
 				this.indexBuilt = true
 			} else {
 				this.stringTable = new StringTable(opts.stringTable)
@@ -83,6 +86,7 @@ export class Osm {
 					this.ways,
 					opts.relations,
 				)
+				this._contentHash = opts.contentHash
 				this.indexBuilt = true
 			}
 		} else {
@@ -95,6 +99,7 @@ export class Osm {
 
 	/**
 	 * Build the internal indexes for all entities.
+	 * Also computes the content hash after indexes are built.
 	 */
 	buildIndexes() {
 		this.stringTable.buildIndex()
@@ -102,6 +107,8 @@ export class Osm {
 		this.ways.buildIndex()
 		this.relations.buildIndex()
 		this.indexBuilt = true
+		// Compute content hash after indexes are built
+		this._contentHash = this.computeContentHash()
 	}
 
 	/**
@@ -166,6 +173,7 @@ export class Osm {
 		return {
 			id: this.id,
 			header: this.header,
+			contentHash: this._contentHash,
 			stringTable: this.stringTable.transferables(),
 			nodes: this.nodes.transferables(),
 			ways: this.ways.transferables(),
@@ -174,13 +182,34 @@ export class Osm {
 	}
 
 	/**
+	 * Get the content hash of this OSM dataset.
+	 * The hash is computed when indexes are built.
+	 *
+	 * @returns A hex string hash uniquely identifying the content.
+	 */
+	contentHash(): string {
+		return this._contentHash
+	}
+
+	/**
+	 * Check if this OSM dataset has identical content to another.
+	 * Uses the pre-computed content hash for fast comparison.
+	 *
+	 * @param other - The other Osm instance to compare with.
+	 * @returns True if both datasets have identical content.
+	 */
+	isEqual(other: Osm | null | undefined): boolean {
+		if (!other) return false
+		return this._contentHash === other._contentHash
+	}
+
+	/**
 	 * Compute a content hash of all underlying data.
 	 * This hash uniquely identifies the dataset content regardless of metadata.
-	 * Useful for detecting if two Osm instances have identical data.
 	 *
 	 * @returns A hex string hash of the content.
 	 */
-	contentHash(): string {
+	private computeContentHash(): string {
 		const hasher = new ContentHasher()
 		// Hash string table first (shared by all entities)
 		this.stringTable.updateHash(hasher)

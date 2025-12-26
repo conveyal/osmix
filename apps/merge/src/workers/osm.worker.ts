@@ -241,6 +241,7 @@ function toStorableTransferables(
 	return {
 		id: t.id,
 		header: t.header,
+		contentHash: t.contentHash,
 		stringTable: {
 			bytes: toArrayBuffer(t.stringTable.bytes),
 			start: toArrayBuffer(t.stringTable.start),
@@ -315,6 +316,7 @@ function fromStorableTransferables(
 	return {
 		id: t.id,
 		header: t.header,
+		contentHash: t.contentHash,
 		stringTable: {
 			bytes: toSharedArrayBuffer(t.stringTable.bytes),
 			start: toSharedArrayBuffer(t.stringTable.start),

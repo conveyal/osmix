@@ -161,15 +161,8 @@ export function useOsmFile(osmKey: string) {
 		const newOsm = await osmWorker.get(newOsmId)
 		const newOsmInfo = newOsm.info()
 
-		// Generate content hash from the actual data
-		const newContentHash = newOsm.contentHash()
-
-		// Check if anything actually changed by comparing content hashes
-		const originalContentHash = osm?.contentHash()
-		const hasChanges =
-			!originalContentHash || originalContentHash !== newContentHash
-
-		if (!hasChanges && fileInfo) {
+		// Check if anything actually changed using isEqual
+		if (newOsm.isEqual(osm) && fileInfo) {
 			// No changes - keep the original file info and stored state
 			setOsm(newOsm)
 			setOsmInfo(newOsmInfo)
@@ -177,7 +170,7 @@ export function useOsmFile(osmKey: string) {
 			return newOsm
 		}
 
-		// Generate a new file name based on the base name or timestamp
+		// Generate a new file name based on the timestamp
 		const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")
 		const newFileName = `merged-${timestamp}.pbf`
 
@@ -187,7 +180,7 @@ export function useOsmFile(osmKey: string) {
 			newOsmInfo.stats.ways * 100 +
 			newOsmInfo.stats.relations * 200
 		const newFileInfo: StoredFileInfo = {
-			fileHash: newContentHash,
+			fileHash: newOsm.contentHash(),
 			fileName: newFileName,
 			fileSize: estimatedSize,
 		}
