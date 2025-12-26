@@ -184,6 +184,21 @@
         "typescript": "catalog:",
       },
     },
+    "packages/layercake": {
+      "name": "@osmix/layercake",
+      "version": "0.0.1",
+      "dependencies": {
+        "@osmix/core": "workspace:*",
+        "@osmix/shared": "workspace:*",
+        "@placemarkio/geojson-rewind": "catalog:",
+        "hyparquet": "^1.23.0",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@types/geojson": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/osmix": {
       "name": "osmix",
       "version": "0.1.0",
@@ -528,6 +543,8 @@
     "@osmix/geojson": ["@osmix/geojson@workspace:packages/geojson"],
 
     "@osmix/json": ["@osmix/json@workspace:packages/json"],
+
+    "@osmix/layercake": ["@osmix/layercake@workspace:packages/layercake"],
 
     "@osmix/merge": ["@osmix/merge@workspace:apps/merge"],
 
@@ -948,6 +965,8 @@
     "has-flag": ["has-flag@4.0.0", "", {}, "sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ=="],
 
     "human-id": ["human-id@4.1.2", "", { "bin": { "human-id": "dist/cli.js" } }, "sha512-v/J+4Z/1eIJovEBdlV5TYj1IR+ZiohcYGRY+qN/oC9dAfKzVT023N/Bgw37hrKCoVRBvk3bqyzpr2PP5YeTMSg=="],
+
+    "hyparquet": ["hyparquet@1.23.0", "", {}, "sha512-v4hh+UXhiRb2UhGnIjo/wKmofCxve+b2DVTaMUNxmvRTyCdReZH6gzj+MxEitNDWLV39Z9QoHU1abwQmKJdvgQ=="],
 
     "iconv-lite": ["iconv-lite@0.7.0", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-cf6L2Ds3h57VVmkZe+Pn+5APsT7FpqJtEhhieDCvrE2MK5Qk9MyffgQyuxQTm6BChfeZNtcOLHp9IcWRVcIcBQ=="],
 
