@@ -291,6 +291,6 @@ describe("@osmix/layercake: WKB Parser", () => {
 			0x00, // Invalid type (100)
 		])
 
-		expect(() => parseWkb(wkb)).toThrow("GeometryType 100 not supported")
+		expect(() => parseWkb(wkb)).toThrow("Unsupported WKB geometry type: 100")
 	})
 })

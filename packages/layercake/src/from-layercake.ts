@@ -8,7 +8,7 @@
  */
 
 import { Osm, type OsmOptions } from "@osmix/core"
-import rewind from "@osmix/shared/geojson-rewind"
+import { rewindFeature } from "@placemarkio/geojson-rewind"
 import {
 	logProgress,
 	type ProgressEvent,
@@ -373,8 +373,8 @@ function normalizeGeometry(geometry: Geometry): Geometry {
 			geometry,
 			properties: {},
 		}
-		const rewound = rewind(feature, false)
-		return rewound.geometry
+		const rewound = rewindFeature(feature)
+		return rewound.geometry ?? geometry
 	}
 	return geometry
 }
