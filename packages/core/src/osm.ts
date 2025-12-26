@@ -4,6 +4,7 @@ import { Nodes, type NodesTransferables } from "./nodes"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import type { BufferType } from "./typed-arrays"
+import { ContentHasher } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
 export interface OsmTransferables<T extends BufferType = BufferType> {
@@ -170,5 +171,23 @@ export class Osm {
 			ways: this.ways.transferables(),
 			relations: this.relations.transferables(),
 		}
+	}
+
+	/**
+	 * Compute a content hash of all underlying data.
+	 * This hash uniquely identifies the dataset content regardless of metadata.
+	 * Useful for detecting if two Osm instances have identical data.
+	 *
+	 * @returns A hex string hash of the content.
+	 */
+	contentHash(): string {
+		const hasher = new ContentHasher()
+		// Hash string table first (shared by all entities)
+		this.stringTable.updateHash(hasher)
+		// Hash each entity collection
+		this.nodes.updateHash(hasher)
+		this.ways.updateHash(hasher)
+		this.relations.updateHash(hasher)
+		return hasher.digest()
 	}
 }

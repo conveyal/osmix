@@ -163,7 +163,7 @@ export function useOsmFile(osmKey: string) {
 	/**
 	 * Update the osm state with a newly generated/merged result.
 	 * Creates new file info with unique hash and name, resets stored state.
-	 * If the content hasn't changed (same entity counts as original), keeps original file info.
+	 * If the content hasn't changed (same content hash as original), keeps original file info.
 	 */
 	const setMergedOsm = useCallback(
 		async (newOsmId: string, baseName?: string) => {
@@ -171,13 +171,13 @@ export function useOsmFile(osmKey: string) {
 			const newOsm = await osmWorker.get(newOsmId)
 			const newOsmInfo = newOsm.info()
 
-			// Check if anything actually changed by comparing entity counts with original
-			const originalStats = osmInfo?.stats
+			// Generate content hash from the actual data
+			const newContentHash = newOsm.contentHash()
+
+			// Check if anything actually changed by comparing content hashes
+			const originalContentHash = osm?.contentHash()
 			const hasChanges =
-				!originalStats ||
-				originalStats.nodes !== newOsmInfo.stats.nodes ||
-				originalStats.ways !== newOsmInfo.stats.ways ||
-				originalStats.relations !== newOsmInfo.stats.relations
+				!originalContentHash || originalContentHash !== newContentHash
 
 			if (!hasChanges && fileInfo) {
 				// No changes - keep the original file info and stored state
@@ -196,17 +196,13 @@ export function useOsmFile(osmKey: string) {
 				? baseName.replace(/\.pbf$/i, `-merged-${timestamp}.pbf`)
 				: `merged-${timestamp}.pbf`
 
-			// Generate a unique hash for the merged file (different from original)
-			// Use timestamp + entity counts to ensure uniqueness
-			const uniqueHash = `merged-${timestamp}-${newOsmInfo.stats.nodes}-${newOsmInfo.stats.ways}-${newOsmInfo.stats.relations}`
-
 			// File size is estimated from entity counts (will be accurate after serialization)
 			const estimatedSize =
 				newOsmInfo.stats.nodes * 20 +
 				newOsmInfo.stats.ways * 100 +
 				newOsmInfo.stats.relations * 200
 			const newFileInfo: StoredFileInfo = {
-				fileHash: uniqueHash,
+				fileHash: newContentHash,
 				fileName: newFileName,
 				fileSize: estimatedSize,
 			}
@@ -228,7 +224,7 @@ export function useOsmFile(osmKey: string) {
 			setOsmInfo,
 			setIsStored,
 			setSelectedOsm,
-			osmInfo,
+			osm,
 			fileInfo,
 		],
 	)

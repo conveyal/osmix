@@ -9,6 +9,7 @@
 
 import type { OsmPbfStringTable } from "@osmix/pbf"
 import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
+import type { ContentHasher } from "./utils"
 
 /**
  * Serializable state for worker transfer.
@@ -191,5 +192,16 @@ export default class StringTable {
 		if (existing !== undefined) return existing
 		this.ensureReverseIndex()
 		return this.stringToIndex.get(str) ?? -1
+	}
+
+	/**
+	 * Update a ContentHasher with the string table's data.
+	 * Hashes the bytes, start offsets, and counts.
+	 */
+	updateHash(hasher: ContentHasher): ContentHasher {
+		return hasher
+			.update(this.bytes.array)
+			.update(this.start.array)
+			.update(this.count.array)
 	}
 }

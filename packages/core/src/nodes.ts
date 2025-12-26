@@ -13,6 +13,7 @@ import {
 	type BufferType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
+import type { ContentHasher } from "./utils"
 
 export interface NodesTransferables<T extends BufferType = BufferType>
 	extends EntitiesTransferables<T> {
@@ -389,5 +390,15 @@ export class Nodes extends Entities<OsmNode> {
 			count * Int32Array.BYTES_PER_ELEMENT + // lats (stored in microdegrees)
 			spatialIndexBytes
 		)
+	}
+
+	/**
+	 * Update a ContentHasher with node-specific data (coordinates).
+	 */
+	override updateHash(hasher: ContentHasher): ContentHasher {
+		return super
+			.updateHash(hasher)
+			.update(this.lons.array)
+			.update(this.lats.array)
 	}
 }

@@ -11,6 +11,7 @@
 import type { OsmTags } from "@osmix/shared/types"
 import StringTable from "./stringtable"
 import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
+import type { ContentHasher } from "./utils"
 
 /**
  * Serializable state for worker transfer.
@@ -279,5 +280,17 @@ export class Tags {
 		const tagIndex = new Tags(stringTable, transferables)
 		tagIndex.indexBuilt = true
 		return tagIndex
+	}
+
+	/**
+	 * Update a ContentHasher with the tags data.
+	 * Hashes tag keys and values for each entity.
+	 */
+	updateHash(hasher: ContentHasher): ContentHasher {
+		return hasher
+			.update(this.tagStart.array)
+			.update(this.tagCount.array)
+			.update(this.tagKeys.array)
+			.update(this.tagVals.array)
 	}
 }

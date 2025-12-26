@@ -31,7 +31,7 @@ import {
 	IdArrayType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
-import { bboxFromLonLats } from "./utils"
+import { bboxFromLonLats, type ContentHasher } from "./utils"
 import type { Ways } from "./ways"
 
 const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
@@ -546,5 +546,18 @@ export class Relations extends Entities<OsmRelation> {
 			count * 4 * Float64Array.BYTES_PER_ELEMENT + // bbox
 			spatialIndexBytes
 		)
+	}
+
+	/**
+	 * Update a ContentHasher with relation-specific data (members).
+	 */
+	override updateHash(hasher: ContentHasher): ContentHasher {
+		return super
+			.updateHash(hasher)
+			.update(this.memberStart.array)
+			.update(this.memberCount.array)
+			.update(this.memberRefs.array)
+			.update(this.memberTypes.array)
+			.update(this.memberRoles.array)
 	}
 }

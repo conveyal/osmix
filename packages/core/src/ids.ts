@@ -13,6 +13,7 @@ import {
 	type BufferType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
+import type { ContentHasher } from "./utils"
 
 /**
  * Union type for looking up entities by either OSM ID or internal array index.
@@ -278,5 +279,13 @@ export class Ids {
 			count * Uint32Array.BYTES_PER_ELEMENT + // sortedIdPositionToIndex
 			Math.ceil(count / BLOCK_SIZE) * Float64Array.BYTES_PER_ELEMENT // anchors
 		)
+	}
+
+	/**
+	 * Update a ContentHasher with the IDs data.
+	 * Uses the sorted IDs for consistent hashing regardless of insertion order.
+	 */
+	updateHash(hasher: ContentHasher): ContentHasher {
+		return hasher.update(this.idsSorted)
 	}
 }
