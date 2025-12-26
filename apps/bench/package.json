@@ -5,7 +5,7 @@
 	"private": true,
 	"scripts": {
 		"bench": "vitest bench",
-		"build": "vite build --exludeDirectory test",
+		"build": "vite build --excludeDirectory test",
 		"dev": "vite",
 		"test": "vitest",
 		"typecheck": "tsgo --build --noEmit"

@@ -35,7 +35,7 @@
 	},
 	"sideEffects": false,
 	"scripts": {
-		"build": "tsc --exludeDirectory test",
+		"build": "tsc --excludeDirectory test",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"

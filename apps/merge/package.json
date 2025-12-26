@@ -4,7 +4,7 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"build": "vite build --exludeDirectory test",
+		"build": "vite build --excludeDirectory test",
 		"dev": "vite",
 		"test:e2e": "playwright test",
 		"typecheck": "tsgo --build --noEmit"
