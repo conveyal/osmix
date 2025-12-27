@@ -1,5 +1,5 @@
 ---
-"@osmix/layercake": patch
+"@osmix/geoparquet": patch
 ---
 
-Import Layercake/GeoParquet
+Import GeoParquet

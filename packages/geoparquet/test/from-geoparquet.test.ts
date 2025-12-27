@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { GeoParquetOsmBuilder } from "../src/from-layercake"
+import { GeoParquetOsmBuilder } from "../src/from-geoparquet"
 import type { GeoParquetRow } from "../src/types"
 
 /**
@@ -90,7 +90,7 @@ function processRows(
 	return builder.buildOsm()
 }
 
-describe("@osmix/layercake: GeoParquetOsmBuilder", () => {
+describe("@osmix/geoparquet: GeoParquetOsmBuilder", () => {
 	it("should convert Point features to Nodes", () => {
 		const rows: GeoParquetRow[] = [
 			{

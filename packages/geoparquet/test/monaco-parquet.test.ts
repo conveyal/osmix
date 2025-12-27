@@ -17,7 +17,7 @@ import { fromGeoParquet, GeoParquetOsmBuilder } from "../src"
  * - ymin: 43.72335, ymax: 43.75169
  */
 
-describe("@osmix/layercake: Monaco highways fixture", () => {
+describe("@osmix/geoparquet: Monaco highways fixture", () => {
 	const fixtureFile = () => Bun.file(getFixturePath("monaco.parquet"))
 	const getOsm = async () => fromGeoParquet(await fixtureFile().arrayBuffer())
 
@@ -65,7 +65,7 @@ describe("@osmix/layercake: Monaco highways fixture", () => {
 		expect(osm.ways.size).toBeLessThan(10_000)
 	})
 
-	it("should preserve highway tags from LayerCake columns", async () => {
+	it("should preserve highway tags from GeoParquet columns", async () => {
 		const osm = await getOsm()
 
 		// Find ways with highway tags

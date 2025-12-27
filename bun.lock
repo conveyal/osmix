@@ -47,8 +47,8 @@
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
         "@osmix/geojson": "workspace:*",
+        "@osmix/geoparquet": "workspace:*",
         "@osmix/json": "workspace:*",
-        "@osmix/layercake": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/raster": "workspace:*",
         "@osmix/router": "workspace:*",
@@ -173,20 +173,8 @@
         "typescript": "catalog:",
       },
     },
-    "packages/json": {
-      "name": "@osmix/json",
-      "version": "0.0.7",
-      "dependencies": {
-        "@osmix/pbf": "workspace:*",
-        "@osmix/shared": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/bun": "catalog:",
-        "typescript": "catalog:",
-      },
-    },
-    "packages/layercake": {
-      "name": "@osmix/layercake",
+    "packages/geoparquet": {
+      "name": "@osmix/geoparquet",
       "version": "0.0.1",
       "dependencies": {
         "@osmix/core": "workspace:*",
@@ -200,6 +188,18 @@
         "typescript": "catalog:",
       },
     },
+    "packages/json": {
+      "name": "@osmix/json",
+      "version": "0.0.7",
+      "dependencies": {
+        "@osmix/pbf": "workspace:*",
+        "@osmix/shared": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "packages/osmix": {
       "name": "osmix",
       "version": "0.1.0",
@@ -207,8 +207,8 @@
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
         "@osmix/geojson": "workspace:*",
+        "@osmix/geoparquet": "workspace:*",
         "@osmix/json": "workspace:*",
-        "@osmix/layercake": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/raster": "workspace:*",
         "@osmix/router": "workspace:*",
@@ -544,9 +544,9 @@
 
     "@osmix/geojson": ["@osmix/geojson@workspace:packages/geojson"],
 
-    "@osmix/json": ["@osmix/json@workspace:packages/json"],
+    "@osmix/geoparquet": ["@osmix/geoparquet@workspace:packages/geoparquet"],
 
-    "@osmix/layercake": ["@osmix/layercake@workspace:packages/layercake"],
+    "@osmix/json": ["@osmix/json@workspace:packages/json"],
 
     "@osmix/merge": ["@osmix/merge@workspace:apps/merge"],
 

@@ -1,6 +1,6 @@
 ---
-"@osmix/layercake": patch
+"@osmix/geoparquet": patch
 "osmix": patch
 ---
 
-Add fromLayerCake to OsmixWorker and OsmixRemote
+Add fromGeoParquet to OsmixWorker and OsmixRemote

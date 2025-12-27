@@ -1,7 +1,7 @@
 /**
- * Layercake GeoParquet to OSM conversion utilities.
+ * GeoParquet to OSM conversion utilities.
  *
- * Imports Layercake GeoParquet files into Osm indexes, mapping geometry
+ * Imports GeoParquet files into Osm indexes, mapping geometry
  * types to appropriate OSM entity structures.
  *
  * @module
@@ -45,7 +45,7 @@ import { parseWkb } from "./wkb"
  * Feature IDs are preserved if available; otherwise sequential negative IDs
  * are assigned. Feature tags become OSM tags.
  *
- * @param source - Layercake data source (file path, URL, or buffer)
+ * @param source - GeoParquet data source (file path, URL, or buffer)
  * @param options - Osm index options (id, header)
  * @param readOptions - Options for reading the parquet file
  * @param onProgress - Progress callback for UI feedback
@@ -53,10 +53,10 @@ import { parseWkb } from "./wkb"
  *
  * @example
  * ```ts
- * import { fromLayerCake } from "@osmix/layercake"
+ * import { fromGeoParquet } from "@osmix/geoparquet"
  *
  * // From file
- * const osm = await fromLayerCake("./roads.parquet", { id: "roads" })
+ * const osm = await fromGeoParquet("./roads.parquet")
  *
  * // Query the imported data
  * const highways = osm.ways.search("highway")
@@ -70,7 +70,7 @@ export async function fromGeoParquet(
 ): Promise<Osm> {
 	const builder = new GeoParquetOsmBuilder(options, readOptions, onProgress)
 
-	onProgress(progressEvent("Loading Layercake GeoParquet file..."))
+	onProgress(progressEvent("Loading GeoParquet file..."))
 
 	// Read rows from parquet file
 	const rows = await builder.readParquetRows(source)
@@ -138,7 +138,7 @@ export class GeoParquetOsmBuilder {
 	 * Converts GeoParquet rows to OSM entities.
 	 */
 	processGeoParquetRows(rows: Record<string, unknown>[]) {
-		this.onProgress(progressEvent("Converting Layercake to Osmix..."))
+		this.onProgress(progressEvent("Converting GeoParquet to Osmix..."))
 
 		const idColumn = this.readOptions.idColumn ?? "id"
 		const typeColumn = this.readOptions.typeColumn ?? "type"

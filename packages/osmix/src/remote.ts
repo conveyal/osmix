@@ -10,7 +10,7 @@
 
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core"
-import type { GeoParquetReadOptions } from "@osmix/layercake"
+import type { GeoParquetReadOptions } from "@osmix/geoparquet"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type {
 	DefaultSpeeds,
@@ -330,7 +330,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			})
 		}
 		if (isParquet) {
-			return this.fromLayerCake(file, {
+			return this.fromGeoParquet(file, {
 				...options,
 				id: options.id ?? file.name,
 			})
@@ -339,18 +339,18 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	}
 
 	/**
-	 * Load an `Osm` instance from Layercake GeoParquet data in a worker.
+	 * Load an `Osm` instance from GeoParquet data in a worker.
 	 * Data is sent to the first available worker, then synchronized across all workers.
 	 */
-	async fromLayerCake(
+	async fromGeoParquet(
 		data: ArrayBuffer | File | string | URL,
 		options: Partial<OsmOptions> = {},
 		readOptions: GeoParquetReadOptions = {},
 	) {
 		const workers = this.workers.slice()
 		const worker0 = workers.shift()!
-		const transferableData = await this.getLayerCakeTransferableData(data)
-		const osmInfo = await worker0.fromLayerCake(
+		const transferableData = await this.getGeoParquetTransferableData(data)
+		const osmInfo = await worker0.fromGeoParquet(
 			transfer({
 				data: transferableData,
 				options,
@@ -362,17 +362,17 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	}
 
 	/**
-	 * Convert LayerCake input data to a transferable format.
+	 * Convert GeoParquet input data to a transferable format.
 	 * Strings and URLs are passed through; Files are converted to ArrayBuffer.
 	 */
-	private async getLayerCakeTransferableData(
+	private async getGeoParquetTransferableData(
 		data: ArrayBuffer | File | string | URL,
 	): Promise<ArrayBuffer | string | URL> {
 		if (typeof data === "string") return data
 		if (data instanceof URL) return data
 		if (data instanceof ArrayBuffer) return data
 		if (data instanceof File) return data.arrayBuffer()
-		throw Error("Invalid LayerCake data source")
+		throw Error("Invalid GeoParquet data source")
 	}
 
 	/**
