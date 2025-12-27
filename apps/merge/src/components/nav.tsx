@@ -1,5 +1,11 @@
 import { type PrimitiveAtom, useAtom } from "jotai"
-import { Layers, Navigation, SearchIcon, SidebarClose } from "lucide-react"
+import {
+	Github,
+	Layers,
+	Navigation,
+	SearchIcon,
+	SidebarClose,
+} from "lucide-react"
 import { NavLink } from "react-router"
 import CenterInfo from "../components/center-info"
 import ZoomInfo, { ZoomInButton, ZoomOutButton } from "../components/zoom-info"
@@ -20,6 +26,14 @@ export default function Nav() {
 		<div className="shadow z-20 flex flex-row justify-between items-center px-2 lg:px-4 h-10 bg-white">
 			<div className="flex flex-row gap-2 items-center">
 				<div className="font-bold pr-2">OSMIX</div>
+				<a
+					href="https://github.com/conveyal/osmix"
+					target="_blank"
+					rel="noopener noreferrer"
+					className="text-slate-600 hover:text-slate-900"
+				>
+					<Github className="size-5" />
+				</a>
 				<NavLink
 					className={({ isActive }) =>
 						cn(
