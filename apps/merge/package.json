@@ -23,7 +23,7 @@
 	},
 	"dependencies": {
 		"@fontsource-variable/roboto-mono": "^5.2.5",
-		"@mapbox/tilebelt": "^2.0.2",
+		"@mapbox/tilebelt": "^2.0.3",
 		"@osmix/change": "workspace:*",
 		"@osmix/core": "workspace:*",
 		"@osmix/geojson": "workspace:*",
