@@ -435,4 +435,86 @@ describe("@osmix/geoparquet: GeoParquetOsmBuilder", () => {
 		const node = osm.nodes.getById(-1)
 		expect(node?.tags?.["name"]).toBe("Custom columns")
 	})
+
+	it("should infer type from geometry when type column is missing", () => {
+		// Simple polygon without holes - should only create a way, not a relation
+		const simplePolygonRows: GeoParquetRow[] = [
+			{
+				type: undefined as unknown as "way", // Missing type
+				id: 123n,
+				geometry: createPolygonWkb([
+					[
+						[-122.4194, 37.7749],
+						[-122.4094, 37.7749],
+						[-122.4094, 37.7849],
+						[-122.4194, 37.7849],
+						[-122.4194, 37.7749],
+					],
+				]),
+				tags: { building: "yes" },
+				bbox: [-122.4194, 37.7749, -122.4094, 37.7849],
+			},
+		]
+
+		const osm1 = processRows(simplePolygonRows)
+
+		// Should create just a way, no relation
+		expect(osm1.ways.size).toBe(1)
+		expect(osm1.relations.size).toBe(0)
+
+		// Way should have the feature ID and tags
+		const way = osm1.ways.getById(123)
+		expect(way).toBeDefined()
+		expect(way?.tags?.["building"]).toBe("yes")
+		expect(way?.tags?.["area"]).toBe("yes")
+	})
+
+	it("should infer relation type for polygon with holes when type is missing", () => {
+		// Polygon with hole - should create a relation
+		const polygonWithHoleRows: GeoParquetRow[] = [
+			{
+				type: undefined as unknown as "relation", // Missing type
+				id: 456n,
+				geometry: createPolygonWkb([
+					// Outer ring
+					[
+						[-122.4194, 37.7749],
+						[-122.4094, 37.7749],
+						[-122.4094, 37.7849],
+						[-122.4194, 37.7849],
+						[-122.4194, 37.7749],
+					],
+					// Hole
+					[
+						[-122.4164, 37.7779],
+						[-122.4144, 37.7779],
+						[-122.4144, 37.7799],
+						[-122.4164, 37.7799],
+						[-122.4164, 37.7779],
+					],
+				]),
+				tags: { building: "yes" },
+				bbox: [-122.4194, 37.7749, -122.4094, 37.7849],
+			},
+		]
+
+		const osm2 = processRows(polygonWithHoleRows)
+
+		// Should create 2 ways (outer + hole) and 1 relation
+		expect(osm2.ways.size).toBe(2)
+		expect(osm2.relations.size).toBe(1)
+
+		// Relation should have the feature ID and tags
+		const relation = osm2.relations.getById(456)
+		expect(relation).toBeDefined()
+		expect(relation?.tags?.["type"]).toBe("multipolygon")
+		expect(relation?.tags?.["building"]).toBe("yes")
+		expect(relation?.members).toHaveLength(2)
+		expect(relation?.members[0]?.role).toBe("outer")
+		expect(relation?.members[1]?.role).toBe("inner")
+
+		// Ways should not have the feature ID (456 goes to relation)
+		const outerWay = osm2.ways.getByIndex(0)
+		expect(outerWay?.id).not.toBe(456)
+	})
 })

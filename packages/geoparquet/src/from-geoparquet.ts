@@ -208,7 +208,11 @@ export class GeoParquetOsmBuilder {
 					throw Error(
 						`ID: ${numericId} has type 'node' but geometry is a polygon`,
 					)
-				this.processPolygon(normalizedGeometry, type, numericId, tags)
+				// Infer type from geometry if missing: relation if has holes, way otherwise
+				const polygonType =
+					type ??
+					(normalizedGeometry.coordinates.length > 1 ? "relation" : "way")
+				this.processPolygon(normalizedGeometry, polygonType, numericId, tags)
 			} else if (normalizedGeometry.type === "MultiPolygon") {
 				this.processMultiPolygon(normalizedGeometry, numericId, tags)
 			} else if (normalizedGeometry.type === "MultiLineString") {
