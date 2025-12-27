@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { Osm } from "@osmix/core"
-import { processLayerCakeRows } from "../src/from-layercake"
-import type { LayerCakeRow } from "../src/types"
+import { processGeoParquetRows } from "../src/from-layercake"
+import type { GeoParquetRow } from "../src/types"
 
 /**
  * Create WKB Point geometry.
@@ -82,7 +82,7 @@ function createPolygonWkb(rings: [number, number][][]): Uint8Array {
 describe("@osmix/layercake: processLayerCakeRows", () => {
 	it("should convert Point features to Nodes", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: 100n,
 				geometry: createPointWkb(-122.4194, 37.7749),
@@ -95,7 +95,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -185,7 +185,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 
 	it("should convert Point features to Nodes with auto-generated IDs", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: undefined as unknown as bigint, // No ID provided
 				geometry: createPointWkb(-122.4194, 37.7749),
@@ -193,7 +193,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -209,7 +209,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 
 	it("should convert LineString features to Ways with Nodes", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: undefined as unknown as bigint, // Auto-generate IDs
 				geometry: createLineStringWkb([
@@ -221,7 +221,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -249,7 +249,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 
 	it("should convert Polygon features to Ways with area tags", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: undefined as unknown as bigint, // Auto-generate IDs
 				geometry: createPolygonWkb([
@@ -265,7 +265,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -284,7 +284,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 
 	it("should convert Polygon with holes to relation with multiple Ways", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: undefined as unknown as bigint, // Auto-generate IDs
 				geometry: createPolygonWkb([
@@ -309,7 +309,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -339,7 +339,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 
 	it("should handle JSON string tags", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: undefined as unknown as bigint,
 				geometry: createPointWkb(-122.4194, 37.7749),
@@ -347,7 +347,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -358,7 +358,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 
 	it("should handle null tags", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: undefined as unknown as bigint,
 				geometry: createPointWkb(-122.4194, 37.7749),
@@ -366,7 +366,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -376,7 +376,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 
 	it("should skip rows with missing geometry", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: undefined as unknown as bigint,
 				geometry: undefined as unknown as Uint8Array,
@@ -389,7 +389,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -400,7 +400,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 
 	it("should reuse nodes when features share coordinates", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: undefined as unknown as bigint,
 				geometry: createLineStringWkb([
@@ -419,7 +419,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -438,7 +438,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 
 	it("should build indexes after processing", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: undefined as unknown as bigint,
 				geometry: createPointWkb(-122.4194, 37.7749),
@@ -446,7 +446,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -457,7 +457,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 
 	it("should handle object tags", () => {
 		const osm = new Osm()
-		const rows: LayerCakeRow[] = [
+		const rows: GeoParquetRow[] = [
 			{
 				id: undefined as unknown as bigint,
 				geometry: createPointWkb(-122.4194, 37.7749),
@@ -465,7 +465,7 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 			},
 		]
 
-		for (const _update of processLayerCakeRows(osm, rows)) {
+		for (const _update of processGeoParquetRows(osm, rows)) {
 			// consume generator
 		}
 
@@ -482,9 +482,9 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 				geom: createPointWkb(-122.4194, 37.7749),
 				properties: { name: "Custom columns" },
 			},
-		] as unknown as LayerCakeRow[]
+		] as unknown as GeoParquetRow[]
 
-		for (const _update of processLayerCakeRows(osm, rows, {
+		for (const _update of processGeoParquetRows(osm, rows, {
 			idColumn: "osm_id",
 			geometryColumn: "geom",
 			tagsColumn: "properties",

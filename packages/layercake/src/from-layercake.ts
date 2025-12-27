@@ -13,11 +13,12 @@ import {
 	type ProgressEvent,
 	progressEvent,
 } from "@osmix/shared/progress"
-import type { OsmRelationMember, OsmTags } from "@osmix/shared/types"
+import type { GeoBbox2D, OsmRelationMember, OsmTags } from "@osmix/shared/types"
 import { rewindFeature } from "@placemarkio/geojson-rewind"
 import type {
 	Geometry,
 	LineString,
+	MultiLineString,
 	MultiPolygon,
 	Point,
 	Polygon,
@@ -28,15 +29,11 @@ import {
 	type ParquetReadOptions,
 	parquetReadObjects,
 } from "hyparquet"
-import type {
-	LayerCakeReadOptions,
-	LayerCakeRow,
-	LayerCakeSource,
-} from "./types"
+import type { GeoParquetReadOptions, GeoParquetSource } from "./types"
 import { parseWkb } from "./wkb"
 
 /**
- * Create an Osm index from Layercake GeoParquet data.
+ * Create an Osm index from GeoParquet data.
  *
  * Accepts various input formats (file path, URL, or buffer) and converts
  * features to OSM entities:
@@ -65,108 +62,207 @@ import { parseWkb } from "./wkb"
  * const highways = osm.ways.search("highway")
  * ```
  */
-export async function fromLayerCake(
-	source: LayerCakeSource,
+export async function fromGeoParquet(
+	source: GeoParquetSource,
 	options: Partial<OsmOptions> = {},
-	readOptions: LayerCakeReadOptions = {},
+	readOptions: GeoParquetReadOptions = {},
 	onProgress: (progress: ProgressEvent) => void = logProgress,
 ): Promise<Osm> {
-	const osm = new Osm(options)
+	const builder = new GeoParquetOsmBuilder(options, readOptions, onProgress)
 
 	onProgress(progressEvent("Loading Layercake GeoParquet file..."))
 
 	// Read rows from parquet file
-	const rows = await readParquetRows(source, readOptions, onProgress)
+	const rows = await builder.readParquetRows(source)
 
 	onProgress(progressEvent(`Processing ${rows.length} features...`))
 
 	// Convert to OSM entities
-	for (const update of processLayerCakeRows(osm, rows, readOptions)) {
-		onProgress(update)
-	}
+	builder.processGeoParquetRows(rows)
 
-	return osm
+	return builder.buildOsm()
 }
 
-/**
- * Read rows from a parquet file.
- */
-async function readParquetRows(
-	source: LayerCakeSource,
-	readOptions: LayerCakeReadOptions,
-	onProgress: (progress: ProgressEvent) => void,
-): Promise<LayerCakeRow[]> {
-	const idColumn = readOptions.idColumn ?? "id"
-	const geometryColumn = readOptions.geometryColumn ?? "geometry"
-	const tagsColumn = readOptions.tagsColumn ?? "tags"
+export class GeoParquetOsmBuilder {
+	private osm: Osm
+	private readOptions: GeoParquetReadOptions
+	private onProgress: (progress: ProgressEvent) => void
 
-	let file: AsyncBuffer
+	constructor(
+		osmOptions: Partial<OsmOptions> = {},
+		readOptions: GeoParquetReadOptions = {},
+		onProgress: (progress: ProgressEvent) => void = logProgress,
+	) {
+		this.osm = new Osm(osmOptions)
+		this.readOptions = readOptions
+		this.onProgress = onProgress
+	}
 
-	if (typeof source === "string") {
-		// String sources are treated as URLs
-		onProgress(progressEvent(`Fetching from URL: ${source}`))
-		file = await asyncBufferFromUrl({ url: source })
-	} else if (source instanceof URL) {
-		onProgress(progressEvent(`Fetching from URL: ${source.href}`))
-		file = await asyncBufferFromUrl({ url: source.href })
-	} else if (source instanceof ArrayBuffer) {
-		// Wrap ArrayBuffer as AsyncBuffer
-		file = {
-			byteLength: source.byteLength,
-			slice: (start: number, end?: number) => source.slice(start, end),
+	async readParquetRows(source: GeoParquetSource) {
+		let file: AsyncBuffer
+		if (typeof source === "string") {
+			// String sources are treated as URLs
+			this.onProgress(progressEvent(`Fetching from URL: ${source}`))
+			file = await asyncBufferFromUrl({ url: source })
+		} else if (source instanceof URL) {
+			this.onProgress(progressEvent(`Fetching from URL: ${source.href}`))
+			file = await asyncBufferFromUrl({ url: source.href })
+		} else if (source instanceof ArrayBuffer) {
+			// Wrap ArrayBuffer as AsyncBuffer
+			file = {
+				byteLength: source.byteLength,
+				slice: (start: number, end?: number) => source.slice(start, end),
+			}
+		} else {
+			// Assume it's already an AsyncBuffer
+			file = source
 		}
-	} else {
-		// Assume it's already an AsyncBuffer
-		file = source
+
+		const readConfig: Omit<ParquetReadOptions, "onComplete"> = {
+			file,
+			...this.readOptions,
+			columns: [
+				this.readOptions.typeColumn ?? "type",
+				this.readOptions.idColumn ?? "id",
+				this.readOptions.geometryColumn ?? "geometry",
+				this.readOptions.tagsColumn ?? "tags",
+				this.readOptions.bboxColumn ?? "bbox",
+			],
+		}
+
+		this.onProgress(progressEvent("Reading parquet data..."))
+		return parquetReadObjects(readConfig)
 	}
 
-	const columns = [idColumn, geometryColumn, tagsColumn]
-	const readConfig: Omit<ParquetReadOptions, "onComplete"> = {
-		file,
-		columns,
+	/**
+	 * Converts GeoParquet rows to OSM entities.
+	 */
+	processGeoParquetRows(rows: Record<string, unknown>[]) {
+		this.onProgress(progressEvent("Converting Layercake to Osmix..."))
+
+		const idColumn = this.readOptions.idColumn ?? "id"
+		const typeColumn = this.readOptions.typeColumn ?? "type"
+		const geometryColumn = this.readOptions.geometryColumn ?? "geometry"
+		const tagsColumn = this.readOptions.tagsColumn ?? "tags"
+		const bboxColumn = this.readOptions.bboxColumn ?? "bbox"
+
+		// Process each row
+		let count = 0
+		for (const row of rows) {
+			// Extract values using column names
+			// biome-ignore lint/suspicious/noExplicitAny: dynamic column access
+			const rowAny = row as any
+			const id = rowAny[idColumn] as bigint | number
+			const type = rowAny[typeColumn] as "node" | "way" | "relation"
+			const geometryData = rowAny[geometryColumn] as
+				| Uint8Array
+				| GeoJSON.Geometry
+				| string
+			const tagsData = rowAny[tagsColumn] as
+				| Record<string, string | number>
+				| string
+			const bboxData = rowAny[bboxColumn] as GeoBbox2D
+
+			if (!geometryData) {
+				count++
+				continue
+			}
+
+			// Parse WKB geometry
+			let geometry: Geometry
+			try {
+				if (geometryData instanceof Uint8Array) {
+					geometry = parseWkb(geometryData)
+				} else if (typeof geometryData === "string") {
+					geometry = JSON.parse(geometryData) as Geometry
+				} else {
+					geometry = geometryData
+				}
+			} catch (_e) {
+				// Skip invalid geometries
+				count++
+				continue
+			}
+
+			// Parse tags
+			const tags = parseTags(tagsData)
+
+			// Get numeric ID from bigint or generate one
+			const numericId =
+				id !== undefined
+					? typeof id === "bigint"
+						? Number(id)
+						: id
+					: undefined
+
+			// Normalize geometry winding order
+			const normalizedGeometry = normalizeGeometry(geometry)
+
+			if (normalizedGeometry.type === "Point") {
+				this.processPoint(normalizedGeometry, numericId, tags)
+			} else if (normalizedGeometry.type === "LineString") {
+				this.processLineString(normalizedGeometry, numericId, tags)
+			} else if (normalizedGeometry.type === "Polygon") {
+				if (type === "node")
+					throw Error(
+						`ID: ${numericId} has type 'node' but geometry is a polygon`,
+					)
+				this.processPolygon(normalizedGeometry, type, numericId, tags)
+			} else if (normalizedGeometry.type === "MultiPolygon") {
+				this.processMultiPolygon(normalizedGeometry, numericId, tags)
+			} else if (normalizedGeometry.type === "MultiLineString") {
+				this.processMultiLineString(normalizedGeometry, numericId, tags)
+			} else {
+				throw Error(`Unsupported geometry type: ${normalizedGeometry.type}`)
+			}
+
+			count++
+			if (count % 10000 === 0) {
+				this.onProgress(progressEvent(`Processed ${count} features...`))
+			}
+		}
+
+		this.onProgress(progressEvent(`Imported ${count} features`))
 	}
 
-	if (readOptions.maxRows !== undefined) {
-		readConfig.rowEnd = readOptions.maxRows
+	buildOsm() {
+		this.onProgress(
+			progressEvent(
+				"Finished converting GeoParquet to Osmix, building indexes...",
+			),
+		)
+		this.osm.buildIndexes()
+		this.osm.buildSpatialIndexes()
+		return this.osm
 	}
 
-	onProgress(progressEvent("Reading parquet data..."))
-	const rows = (await parquetReadObjects(readConfig)) as LayerCakeRow[]
-
-	return rows
-}
-
-/**
- * Generator that converts Layercake rows to OSM entities.
- */
-export function* processLayerCakeRows(
-	osm: Osm,
-	rows: LayerCakeRow[],
-	readOptions: LayerCakeReadOptions = {},
-): Generator<ProgressEvent> {
-	yield progressEvent("Converting Layercake to Osmix...")
-
-	const idColumn = readOptions.idColumn ?? "id"
-	const geometryColumn = readOptions.geometryColumn ?? "geometry"
-	const tagsColumn = readOptions.tagsColumn ?? "tags"
+	private nextNodeId = -1
+	private nextWayId = -1
+	private nextRelationId = -1
+	getNextRelationId() {
+		return this.nextRelationId--
+	}
+	getNextWayId() {
+		return this.nextWayId--
+	}
+	getNextNodeId() {
+		return this.nextNodeId--
+	}
 
 	// Map to track nodes by coordinate string for reuse when creating ways
-	const nodeMap = new Map<string, number>()
-	let nextNodeId = -1
-	let nextWayId = -1
-	let nextRelationId = -1
+	private nodeMap = new Map<string, number>()
 
 	// Helper to get or create a node for a coordinate
-	const getOrCreateNode = (lon: number, lat: number): number => {
+	private getOrCreateNode(lon: number, lat: number): number {
 		const coordKey = `${lon},${lat}`
-		const existingNodeId = nodeMap.get(coordKey)
+		const existingNodeId = this.nodeMap.get(coordKey)
 		if (existingNodeId !== undefined) {
 			return existingNodeId
 		}
 
-		const nodeId = nextNodeId--
-		nodeMap.set(coordKey, nodeId)
-		osm.nodes.addNode({
+		const nodeId = this.getNextNodeId()
+		this.nodeMap.set(coordKey, nodeId)
+		this.osm.nodes.addNode({
 			id: nodeId,
 			lon,
 			lat,
@@ -174,133 +270,242 @@ export function* processLayerCakeRows(
 		return nodeId
 	}
 
-	// Process each row
-	let count = 0
-	for (const row of rows) {
-		// Extract values using column names
-		// biome-ignore lint/suspicious/noExplicitAny: dynamic column access
-		const rowAny = row as any
-		const id = rowAny[idColumn] as bigint | number | undefined
-		const geometryData = rowAny[geometryColumn] as Uint8Array | undefined
-		const tagsData = rowAny[tagsColumn] as
-			| Record<string, string | number>
-			| string
-			| null
-			| undefined
+	private processPoint(
+		geometry: Point,
+		featureId?: number,
+		tags?: OsmTags,
+	): number {
+		const [lon, lat] = geometry.coordinates
+		if (lon === undefined || lat === undefined)
+			throw Error("Point must have lon and lat coordinates")
 
-		if (!geometryData) {
-			count++
-			continue
-		}
-
-		// Parse WKB geometry
-		let geometry: Geometry
-		try {
-			geometry = parseWkb(geometryData)
-		} catch (_e) {
-			// Skip invalid geometries
-			count++
-			continue
-		}
-
-		// Parse tags
-		const tags = parseTags(tagsData)
-
-		// Get numeric ID from bigint or generate one
-		const numericId =
-			id !== undefined ? (typeof id === "bigint" ? Number(id) : id) : undefined
-
-		// Normalize geometry winding order
-		const normalizedGeometry = normalizeGeometry(geometry)
-
-		if (normalizedGeometry.type === "Point") {
-			processPoint(
-				osm,
-				normalizedGeometry,
-				numericId,
-				tags,
-				nodeMap,
-				() => nextNodeId--,
-			)
-		} else if (normalizedGeometry.type === "LineString") {
-			processLineString(
-				osm,
-				normalizedGeometry,
-				numericId,
-				tags,
-				getOrCreateNode,
-				() => nextWayId--,
-			)
-		} else if (normalizedGeometry.type === "Polygon") {
-			const ids = processPolygon(
-				osm,
-				normalizedGeometry,
-				numericId,
-				tags,
-				getOrCreateNode,
-				() => nextWayId--,
-				() => nextRelationId--,
-			)
-			nextWayId = ids.nextWayId
-			nextRelationId = ids.nextRelationId
-		} else if (normalizedGeometry.type === "MultiPolygon") {
-			const ids = processMultiPolygon(
-				osm,
-				normalizedGeometry,
-				numericId,
-				tags,
-				getOrCreateNode,
-				() => nextWayId--,
-				() => nextRelationId--,
-			)
-			nextWayId = ids.nextWayId
-			nextRelationId = ids.nextRelationId
-		} else if (normalizedGeometry.type === "MultiLineString") {
-			for (const line of normalizedGeometry.coordinates) {
-				const lineGeometry: LineString = {
-					type: "LineString",
-					coordinates: line,
-				}
-				processLineString(
-					osm,
-					lineGeometry,
-					undefined,
-					tags,
-					getOrCreateNode,
-					() => nextWayId--,
-				)
-				nextWayId--
-			}
-		} else if (normalizedGeometry.type === "MultiPoint") {
-			for (const point of normalizedGeometry.coordinates) {
-				const pointGeometry: Point = { type: "Point", coordinates: point }
-				processPoint(
-					osm,
-					pointGeometry,
-					undefined,
-					undefined,
-					nodeMap,
-					() => nextNodeId--,
-				)
-				nextNodeId--
-			}
-		}
-
-		count++
-		if (count % 10000 === 0) {
-			yield progressEvent(`Processed ${count} features...`)
-		}
+		const nodeId = featureId ?? this.getNextNodeId()
+		this.osm.nodes.addNode({
+			id: nodeId,
+			lon,
+			lat,
+			tags,
+		})
+		this.nodeMap.set(`${lon},${lat}`, nodeId)
+		return nodeId
 	}
 
-	yield progressEvent(
-		"Finished converting Layercake to Osmix, building indexes...",
-	)
+	private processLineString(
+		geometry: LineString,
+		featureId?: number,
+		tags?: OsmTags,
+	): number {
+		const coordinates = geometry.coordinates
+		if (coordinates.length < 2)
+			throw Error("LineString must have at least 2 coordinates")
 
-	// Build indexes
-	osm.buildIndexes()
-	osm.buildSpatialIndexes()
+		const nodeRefs: number[] = []
+		for (const [lon, lat] of coordinates) {
+			if (lon === undefined || lat === undefined)
+				throw Error("LineString coordinates must have lon and lat")
+			nodeRefs.push(this.getOrCreateNode(lon, lat))
+		}
 
-	yield progressEvent(`Imported ${count} features`)
+		if (nodeRefs.length < 2)
+			throw Error("LineString must have at least 2 coordinates")
+
+		const wayId = featureId ?? this.getNextWayId()
+		this.osm.ways.addWay({
+			id: wayId,
+			refs: nodeRefs,
+			tags,
+		})
+
+		return wayId
+	}
+
+	private processMultiLineString(
+		geometry: MultiLineString,
+		featureId?: number,
+		tags?: OsmTags,
+	) {
+		const coordinates = geometry.coordinates
+		if (coordinates.length === 0)
+			throw Error("MultiLineString must have at least one LineString")
+
+		const wayIds: number[] = []
+		for (const line of coordinates) {
+			if (line.length < 2)
+				throw Error("LineString must have at least 2 coordinates")
+			const wayId = this.processLineString(
+				{ type: "LineString", coordinates: line },
+				this.getNextWayId(),
+			)
+			wayIds.push(wayId)
+		}
+
+		this.osm.relations.addRelation({
+			id: featureId ?? this.getNextRelationId(),
+			members: wayIds.map((id) => ({ type: "way", ref: id })),
+			tags: { type: "multilinestring", ...tags },
+		})
+	}
+
+	private processPolygon(
+		geometry: Polygon,
+		type: "way" | "relation",
+		featureId: number | undefined,
+		tags: OsmTags | undefined,
+	) {
+		const coordinates = geometry.coordinates
+		if (coordinates.length === 0) return
+
+		const outerRing = coordinates[0]
+		if (!outerRing || outerRing.length < 3) return
+
+		// Create nodes for outer ring
+		const outerNodeRefs: number[] = []
+		for (const [lon, lat] of outerRing) {
+			if (lon === undefined || lat === undefined) continue
+			const nodeId = this.getOrCreateNode(lon, lat)
+			outerNodeRefs.push(nodeId)
+		}
+
+		if (outerNodeRefs.length < 3) return
+
+		// Ensure the outer ring is closed
+		if (outerNodeRefs[0] !== outerNodeRefs[outerNodeRefs.length - 1]) {
+			outerNodeRefs.push(outerNodeRefs[0]!)
+		}
+
+		const outerWayId =
+			type === "relation"
+				? this.getNextWayId()
+				: (featureId ?? this.getNextWayId())
+		this.osm.ways.addWay({
+			id: outerWayId,
+			refs: outerNodeRefs,
+			tags: type === "relation" ? { area: "yes" } : { area: "yes", ...tags },
+		})
+
+		if (type === "way") return
+
+		// Create separate ways for holes
+		const holeWayIds: number[] = []
+		for (let i = 1; i < coordinates.length; i++) {
+			const holeRing = coordinates[i]
+			if (!holeRing || holeRing.length < 3) continue
+
+			const holeNodeRefs: number[] = []
+			for (const [lon, lat] of holeRing) {
+				if (lon === undefined || lat === undefined) continue
+				const nodeId = this.getOrCreateNode(lon, lat)
+				holeNodeRefs.push(nodeId)
+			}
+
+			if (holeNodeRefs.length < 3) continue
+
+			// Ensure the ring is closed
+			if (holeNodeRefs[0] !== holeNodeRefs[holeNodeRefs.length - 1]) {
+				holeNodeRefs.push(holeNodeRefs[0]!)
+			}
+
+			const holeWayId = this.getNextWayId()
+			this.osm.ways.addWay({
+				id: holeWayId,
+				refs: holeNodeRefs,
+				tags: { area: "yes" },
+			})
+			holeWayIds.push(holeWayId)
+		}
+
+		this.osm.relations.addRelation({
+			id: featureId ?? this.getNextRelationId(),
+			members: [
+				{ type: "way", ref: outerWayId, role: "outer" },
+				...holeWayIds.map(
+					(id) =>
+						({ type: "way", ref: id, role: "inner" }) as OsmRelationMember,
+				),
+			],
+			tags: {
+				type: "multipolygon",
+				...tags,
+			},
+		})
+	}
+
+	private processMultiPolygon(
+		geometry: MultiPolygon,
+		featureId: number | undefined,
+		tags: OsmTags | undefined,
+	) {
+		const coordinates = geometry.coordinates
+		if (coordinates.length === 0) return
+
+		const relationMembers: OsmRelationMember[] = []
+
+		for (const polygon of coordinates) {
+			if (polygon.length === 0) continue
+
+			const outerRing = polygon[0]
+			if (!outerRing || outerRing.length < 3) continue
+
+			// Create nodes for outer ring
+			const outerNodeRefs: number[] = []
+			for (const [lon, lat] of outerRing) {
+				if (lon === undefined || lat === undefined) continue
+				const nodeId = this.getOrCreateNode(lon, lat)
+				outerNodeRefs.push(nodeId)
+			}
+
+			if (outerNodeRefs.length < 3) continue
+
+			// Ensure the ring is closed
+			if (outerNodeRefs[0] !== outerNodeRefs[outerNodeRefs.length - 1]) {
+				outerNodeRefs.push(outerNodeRefs[0]!)
+			}
+
+			const outerWayId = this.getNextWayId()
+			this.osm.ways.addWay({
+				id: outerWayId,
+				refs: outerNodeRefs,
+				tags: { area: "yes" },
+			})
+			relationMembers.push({ type: "way", ref: outerWayId, role: "outer" })
+
+			// Create separate ways for holes
+			for (let i = 1; i < polygon.length; i++) {
+				const holeRing = polygon[i]
+				if (!holeRing || holeRing.length < 3) continue
+
+				const holeNodeRefs: number[] = []
+				for (const [lon, lat] of holeRing) {
+					if (lon === undefined || lat === undefined) continue
+					const nodeId = this.getOrCreateNode(lon, lat)
+					holeNodeRefs.push(nodeId)
+				}
+
+				if (holeNodeRefs.length < 3) continue
+
+				// Ensure the ring is closed
+				if (holeNodeRefs[0] !== holeNodeRefs[holeNodeRefs.length - 1]) {
+					holeNodeRefs.push(holeNodeRefs[0]!)
+				}
+
+				const holeWayId = this.getNextWayId()
+				this.osm.ways.addWay({
+					id: holeWayId,
+					refs: holeNodeRefs,
+					tags: { area: "yes" },
+				})
+				relationMembers.push({ type: "way", ref: holeWayId, role: "inner" })
+			}
+		}
+
+		if (relationMembers.length > 0) {
+			this.osm.relations.addRelation({
+				id: featureId ?? this.getNextRelationId(),
+				members: relationMembers,
+				tags: { type: "multipolygon", ...tags },
+			})
+		}
+	}
 }
 
 /**
@@ -352,244 +557,4 @@ function normalizeGeometry(geometry: Geometry): Geometry {
 		return rewound.geometry ?? geometry
 	}
 	return geometry
-}
-
-function processPoint(
-	osm: Osm,
-	geometry: Point,
-	featureId: number | undefined,
-	tags: OsmTags | undefined,
-	nodeMap: Map<string, number>,
-	getNextNodeId: () => number,
-): void {
-	const [lon, lat] = geometry.coordinates
-	if (lon === undefined || lat === undefined) return
-
-	const nodeId = featureId ?? getNextNodeId()
-	osm.nodes.addNode({
-		id: nodeId,
-		lon,
-		lat,
-		tags,
-	})
-	nodeMap.set(`${lon},${lat}`, nodeId)
-}
-
-function processLineString(
-	osm: Osm,
-	geometry: LineString,
-	featureId: number | undefined,
-	tags: OsmTags | undefined,
-	getOrCreateNode: (lon: number, lat: number) => number,
-	getNextWayId: () => number,
-): void {
-	const coordinates = geometry.coordinates
-	if (coordinates.length < 2) return
-
-	const nodeRefs: number[] = []
-	for (const [lon, lat] of coordinates) {
-		if (lon === undefined || lat === undefined) continue
-		const nodeId = getOrCreateNode(lon, lat)
-		nodeRefs.push(nodeId)
-	}
-
-	if (nodeRefs.length < 2) return
-
-	const wayId = featureId ?? getNextWayId()
-	osm.ways.addWay({
-		id: wayId,
-		refs: nodeRefs,
-		tags,
-	})
-}
-
-function processPolygon(
-	osm: Osm,
-	geometry: Polygon,
-	featureId: number | undefined,
-	tags: OsmTags | undefined,
-	getOrCreateNode: (lon: number, lat: number) => number,
-	getNextWayId: () => number,
-	getNextRelationId: () => number,
-): { nextWayId: number; nextRelationId: number } {
-	const coordinates = geometry.coordinates
-	if (coordinates.length === 0)
-		return {
-			nextWayId: getNextWayId() + 1,
-			nextRelationId: getNextRelationId() + 1,
-		}
-
-	const createRelation = coordinates.length > 1
-	const outerRing = coordinates[0]
-	if (!outerRing || outerRing.length < 3)
-		return {
-			nextWayId: getNextWayId() + 1,
-			nextRelationId: getNextRelationId() + 1,
-		}
-
-	let currentWayId = getNextWayId()
-	let currentRelationId = getNextRelationId()
-
-	// Create nodes for outer ring
-	const outerNodeRefs: number[] = []
-	for (const [lon, lat] of outerRing) {
-		if (lon === undefined || lat === undefined) continue
-		const nodeId = getOrCreateNode(lon, lat)
-		outerNodeRefs.push(nodeId)
-	}
-
-	if (outerNodeRefs.length < 3)
-		return { nextWayId: currentWayId, nextRelationId: currentRelationId }
-
-	// Ensure the outer ring is closed
-	if (outerNodeRefs[0] !== outerNodeRefs[outerNodeRefs.length - 1]) {
-		outerNodeRefs.push(outerNodeRefs[0]!)
-	}
-
-	const outerWayId = createRelation
-		? currentWayId--
-		: (featureId ?? currentWayId--)
-	osm.ways.addWay({
-		id: outerWayId,
-		refs: outerNodeRefs,
-		tags: createRelation ? { area: "yes" } : { area: "yes", ...tags },
-	})
-
-	// Create separate ways for holes
-	const holeWayIds: number[] = []
-	for (let i = 1; i < coordinates.length; i++) {
-		const holeRing = coordinates[i]
-		if (!holeRing || holeRing.length < 3) continue
-
-		const holeNodeRefs: number[] = []
-		for (const [lon, lat] of holeRing) {
-			if (lon === undefined || lat === undefined) continue
-			const nodeId = getOrCreateNode(lon, lat)
-			holeNodeRefs.push(nodeId)
-		}
-
-		if (holeNodeRefs.length < 3) continue
-
-		// Ensure the ring is closed
-		if (holeNodeRefs[0] !== holeNodeRefs[holeNodeRefs.length - 1]) {
-			holeNodeRefs.push(holeNodeRefs[0]!)
-		}
-
-		const holeWayId = currentWayId--
-		osm.ways.addWay({
-			id: holeWayId,
-			refs: holeNodeRefs,
-			tags: { area: "yes" },
-		})
-		holeWayIds.push(holeWayId)
-	}
-
-	if (createRelation) {
-		osm.relations.addRelation({
-			id: featureId ?? currentRelationId--,
-			members: [
-				{ type: "way", ref: outerWayId, role: "outer" },
-				...holeWayIds.map(
-					(id) =>
-						({ type: "way", ref: id, role: "inner" }) as OsmRelationMember,
-				),
-			],
-			tags: {
-				type: "multipolygon",
-				...tags,
-			},
-		})
-	}
-
-	return { nextWayId: currentWayId, nextRelationId: currentRelationId }
-}
-
-function processMultiPolygon(
-	osm: Osm,
-	geometry: MultiPolygon,
-	featureId: number | undefined,
-	tags: OsmTags | undefined,
-	getOrCreateNode: (lon: number, lat: number) => number,
-	getNextWayId: () => number,
-	getNextRelationId: () => number,
-): { nextWayId: number; nextRelationId: number } {
-	const coordinates = geometry.coordinates
-	if (coordinates.length === 0)
-		return {
-			nextWayId: getNextWayId() + 1,
-			nextRelationId: getNextRelationId() + 1,
-		}
-
-	let currentWayId = getNextWayId()
-	let currentRelationId = getNextRelationId()
-
-	const relationMembers: OsmRelationMember[] = []
-
-	for (const polygon of coordinates) {
-		if (polygon.length === 0) continue
-
-		const outerRing = polygon[0]
-		if (!outerRing || outerRing.length < 3) continue
-
-		// Create nodes for outer ring
-		const outerNodeRefs: number[] = []
-		for (const [lon, lat] of outerRing) {
-			if (lon === undefined || lat === undefined) continue
-			const nodeId = getOrCreateNode(lon, lat)
-			outerNodeRefs.push(nodeId)
-		}
-
-		if (outerNodeRefs.length < 3) continue
-
-		// Ensure the ring is closed
-		if (outerNodeRefs[0] !== outerNodeRefs[outerNodeRefs.length - 1]) {
-			outerNodeRefs.push(outerNodeRefs[0]!)
-		}
-
-		const outerWayId = currentWayId--
-		osm.ways.addWay({
-			id: outerWayId,
-			refs: outerNodeRefs,
-			tags: { area: "yes" },
-		})
-		relationMembers.push({ type: "way", ref: outerWayId, role: "outer" })
-
-		// Create separate ways for holes
-		for (let i = 1; i < polygon.length; i++) {
-			const holeRing = polygon[i]
-			if (!holeRing || holeRing.length < 3) continue
-
-			const holeNodeRefs: number[] = []
-			for (const [lon, lat] of holeRing) {
-				if (lon === undefined || lat === undefined) continue
-				const nodeId = getOrCreateNode(lon, lat)
-				holeNodeRefs.push(nodeId)
-			}
-
-			if (holeNodeRefs.length < 3) continue
-
-			// Ensure the ring is closed
-			if (holeNodeRefs[0] !== holeNodeRefs[holeNodeRefs.length - 1]) {
-				holeNodeRefs.push(holeNodeRefs[0]!)
-			}
-
-			const holeWayId = currentWayId--
-			osm.ways.addWay({
-				id: holeWayId,
-				refs: holeNodeRefs,
-				tags: { area: "yes" },
-			})
-			relationMembers.push({ type: "way", ref: holeWayId, role: "inner" })
-		}
-	}
-
-	if (relationMembers.length > 0) {
-		osm.relations.addRelation({
-			id: featureId ?? currentRelationId--,
-			members: relationMembers,
-			tags: { type: "multipolygon", ...tags },
-		})
-	}
-
-	return { nextWayId: currentWayId, nextRelationId: currentRelationId }
 }
