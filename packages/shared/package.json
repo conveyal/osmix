@@ -47,7 +47,7 @@
 		"typescript": "catalog:"
 	},
 	"dependencies": {
-		"@mapbox/tilebelt": "^2.0.2",
+		"@mapbox/tilebelt": "^2.0.3",
 		"dequal": "catalog:",
 		"lineclip": "^2.0.0"
 	}

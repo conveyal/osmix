@@ -43,7 +43,7 @@
       "name": "@osmix/merge",
       "dependencies": {
         "@fontsource-variable/roboto-mono": "^5.2.5",
-        "@mapbox/tilebelt": "^2.0.2",
+        "@mapbox/tilebelt": "^2.0.3",
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
         "@osmix/geojson": "workspace:*",
@@ -281,7 +281,7 @@
       "name": "@osmix/shared",
       "version": "0.0.6",
       "dependencies": {
-        "@mapbox/tilebelt": "^2.0.2",
+        "@mapbox/tilebelt": "^2.0.3",
         "dequal": "catalog:",
         "lineclip": "^2.0.0",
       },
@@ -299,7 +299,7 @@
         "@osmix/vt": "workspace:*",
       },
       "devDependencies": {
-        "@mapbox/tilebelt": "^2.0.2",
+        "@mapbox/tilebelt": "^2.0.3",
         "@mapbox/vector-tile": "^2.0.4",
         "@types/bun": "catalog:",
         "pbf": "catalog:",
@@ -315,7 +315,7 @@
         "pbf": "catalog:",
       },
       "devDependencies": {
-        "@mapbox/tilebelt": "^2.0.2",
+        "@mapbox/tilebelt": "^2.0.3",
         "@mapbox/vector-tile": "^2.0.4",
         "@osmix/core": "workspace:*",
         "typescript": "catalog:",
@@ -516,7 +516,7 @@
 
     "@mapbox/point-geometry": ["@mapbox/point-geometry@1.1.0", "", {}, "sha512-YGcBz1cg4ATXDCM/71L9xveh4dynfGmcLDqufR+nQQy3fKwsAZsWd/x4621/6uJaeB9mwOHE6hPeDgXz9uViUQ=="],
 
-    "@mapbox/tilebelt": ["@mapbox/tilebelt@2.0.2", "", {}, "sha512-pzFgrmsCUjOAAeYns1MKJ1dJICYdEC+sYwtWLdxO7iJwmDlepGrEXDqP9ejApO/YUVctA/SYKDS4Oc0mBNNLZw=="],
+    "@mapbox/tilebelt": ["@mapbox/tilebelt@2.0.3", "", {}, "sha512-HSscGw2yBlcm0GdLI3S5i8Xw/ffP2fTT2qmRbR1/AkJ02PnNN52yY+zzfw705LKKjesy8jJ/H1dieuioqN0Slw=="],
 
     "@mapbox/tiny-sdf": ["@mapbox/tiny-sdf@2.0.7", "", {}, "sha512-25gQLQMcpivjOSA40g3gO6qgiFPDpWRoMfd+G/GoppPIeP6JDaMMkMrEJnMZhKyyS6iKwVt5YKu02vCUyJM3Ug=="],
 

@@ -43,7 +43,7 @@
 		"@osmix/vt": "workspace:*"
 	},
 	"devDependencies": {
-		"@mapbox/tilebelt": "^2.0.2",
+		"@mapbox/tilebelt": "^2.0.3",
 		"@mapbox/vector-tile": "^2.0.4",
 		"@types/bun": "catalog:",
 		"pbf": "catalog:",
