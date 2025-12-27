@@ -186,6 +186,19 @@ export class MergeWorker extends OsmixWorker {
 	}
 
 	/**
+	 * Rename a stored Osm entry in IndexedDB.
+	 */
+	async renameStoredOsm(id: string, newFileName: string): Promise<void> {
+		const db = await this.getDB()
+		const stored = await db.get(OSM_STORE, id)
+		if (!stored) return
+
+		stored.fileName = newFileName
+		await db.put(OSM_STORE, stored)
+		this.notifyStorageChange()
+	}
+
+	/**
 	 * Get storage statistics.
 	 */
 	async getStorageStats(): Promise<{ count: number; estimatedBytes: number }> {

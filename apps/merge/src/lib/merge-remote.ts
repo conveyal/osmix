@@ -103,6 +103,13 @@ export class MergeRemote extends OsmixRemote<MergeWorker> {
 	}
 
 	/**
+	 * Rename a stored Osm entry in IndexedDB.
+	 */
+	renameStoredOsm(id: string, newFileName: string): Promise<void> {
+		return this.getWorker().renameStoredOsm(id, newFileName)
+	}
+
+	/**
 	 * Get storage statistics.
 	 */
 	getStorageStats(): Promise<{ count: number; estimatedBytes: number }> {

@@ -4,8 +4,15 @@
  */
 
 import type { OsmInfo } from "@osmix/core"
-import { DatabaseIcon, RotateCcwIcon, Trash2Icon } from "lucide-react"
-import { useEffectEvent, useState } from "react"
+import {
+	CheckIcon,
+	DatabaseIcon,
+	PencilIcon,
+	RotateCcwIcon,
+	Trash2Icon,
+	XIcon,
+} from "lucide-react"
+import { useEffectEvent, useRef, useState } from "react"
 import { type StoredOsmEntry, useStoredOsm } from "../hooks/storage-broadcast"
 import { osmWorker } from "../state/worker"
 import ActionButton from "./action-button"
@@ -14,7 +21,9 @@ import {
 	OsmPbfOpenUrlButton,
 	OsmPbfSelectFileButton,
 } from "./osm-pbf-file-input"
+import { Button } from "./ui/button"
 import { Card, CardContent, CardHeader } from "./ui/card"
+import { Input } from "./ui/input"
 import {
 	Item,
 	ItemActions,
@@ -59,6 +68,9 @@ interface StoredOsmItemProps {
 
 function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 	const [isDeleting, setIsDeleting] = useState(false)
+	const [isRenaming, setIsRenaming] = useState(false)
+	const [renameValue, setRenameValue] = useState(entry.fileName)
+	const inputRef = useRef<HTMLInputElement>(null)
 
 	const handleDelete = useEffectEvent(async () => {
 		setIsDeleting(true)
@@ -69,25 +81,97 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 		}
 	})
 
+	const handleStartRename = useEffectEvent(() => {
+		setRenameValue(entry.fileName)
+		setIsRenaming(true)
+		// Focus input after render
+		setTimeout(() => inputRef.current?.select(), 0)
+	})
+
+	const handleConfirmRename = useEffectEvent(async () => {
+		const trimmed = renameValue.trim()
+		if (trimmed && trimmed !== entry.fileName) {
+			await osmWorker.renameStoredOsm(entry.fileHash, trimmed)
+		}
+		setIsRenaming(false)
+	})
+
+	const handleCancelRename = useEffectEvent(() => {
+		setRenameValue(entry.fileName)
+		setIsRenaming(false)
+	})
+
+	const handleKeyDown = useEffectEvent((e: React.KeyboardEvent) => {
+		if (e.key === "Enter") {
+			e.preventDefault()
+			handleConfirmRename()
+		} else if (e.key === "Escape") {
+			e.preventDefault()
+			handleCancelRename()
+		}
+	})
+
 	return (
 		<Item className={isActive ? "bg-blue-50 border-blue-200" : ""}>
 			<ItemHeader>
-				<ItemTitle className="truncate">{entry.fileName}</ItemTitle>
+				{isRenaming ? (
+					<Input
+						ref={inputRef}
+						value={renameValue}
+						onChange={(e) => setRenameValue(e.target.value)}
+						onKeyDown={handleKeyDown}
+						onBlur={handleConfirmRename}
+						className="h-7 text-sm font-bold"
+					/>
+				) : (
+					<ItemTitle className="truncate">{entry.fileName}</ItemTitle>
+				)}
 
 				<ItemActions>
-					<ActionButton
-						variant="outline"
-						title="Restore from storage"
-						icon={<RotateCcwIcon />}
-						onAction={() => onLoad(entry.fileHash)}
-					/>
-					<ActionButton
-						variant="outline"
-						title="Delete from storage"
-						icon={<Trash2Icon />}
-						disabled={isDeleting}
-						onAction={handleDelete}
-					/>
+					{isRenaming ? (
+						<>
+							<Button
+								variant="outline"
+								size="icon-sm"
+								title="Confirm rename"
+								onClick={handleConfirmRename}
+							>
+								<CheckIcon />
+							</Button>
+							<Button
+								variant="outline"
+								size="icon-sm"
+								title="Cancel rename"
+								onClick={handleCancelRename}
+							>
+								<XIcon />
+							</Button>
+						</>
+					) : (
+						<>
+							<Button
+								variant="outline"
+								size="icon-sm"
+								title="Rename file"
+								onClick={handleStartRename}
+							>
+								<PencilIcon />
+							</Button>
+							<ActionButton
+								variant="outline"
+								title="Restore from storage"
+								icon={<RotateCcwIcon />}
+								onAction={() => onLoad(entry.fileHash)}
+							/>
+							<ActionButton
+								variant="outline"
+								title="Delete from storage"
+								icon={<Trash2Icon />}
+								disabled={isDeleting}
+								onAction={handleDelete}
+							/>
+						</>
+					)}
 				</ItemActions>
 			</ItemHeader>
 			<ItemContent className="text-muted-foreground">
