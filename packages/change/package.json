@@ -47,6 +47,6 @@
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"dequal": "catalog:",
-		"sweepline-intersections": "^1.5.0"
+		"sweepline-intersections": "^2.0.1"
 	}
 }
