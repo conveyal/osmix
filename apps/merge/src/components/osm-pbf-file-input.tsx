@@ -22,7 +22,8 @@ function isOsmFile(file: File | null): file is File {
 		name.endsWith(".pbf") ||
 		name.endsWith(".geojson") ||
 		name.endsWith(".json") ||
-		name.endsWith(".zip")
+		name.endsWith(".zip") ||
+		name.endsWith(".parquet")
 	)
 }
 
@@ -64,7 +65,7 @@ export function OsmPbfSelectFileButton({
 			}}
 			icon={<FilesIcon />}
 		>
-			Open OSM file (PBF, GeoJSON, or Shapefile)
+			Open OSM file (PBF, GeoJSON, Shapefile, or GeoParquet)
 		</ActionButton>
 	)
 }
@@ -92,8 +93,9 @@ export function OsmPbfOpenUrlButton({
 					<DialogTitle>Open OSM from URL</DialogTitle>
 					<DialogDescription>
 						Provide a direct link to a <code>.pbf</code>, <code>.geojson</code>,
-						<code>.json</code>, or <code>.zip</code> (Shapefile) file. The
-						server must allow browser downloads (CORS).
+						<code>.json</code>, <code>.zip</code> (Shapefile), or{" "}
+						<code>.parquet</code> (GeoParquet) file. The server must allow
+						browser downloads (CORS).
 					</DialogDescription>
 				</DialogHeader>
 
@@ -161,7 +163,7 @@ export function OsmPbfClearFileButton({
 function showFileSelector() {
 	const input = document.createElement("input")
 	input.type = "file"
-	input.accept = ".pbf,.geojson,.json,.zip"
+	input.accept = ".pbf,.geojson,.json,.zip,.parquet"
 
 	return new Promise<File | null>((resolve) => {
 		const focusListener = () => {

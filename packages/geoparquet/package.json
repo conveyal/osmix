@@ -1,7 +1,7 @@
 {
 	"$schema": "https://json.schemastore.org/package",
-	"name": "@osmix/layercake",
-	"description": "Import OSM data from OpenStreetMap US Layercake GeoParquet files.",
+	"name": "@osmix/geoparquet",
+	"description": "Import OSM data from GeoParquet files.",
 	"version": "0.0.1",
 	"type": "module",
 	"main": "./src/index.ts",

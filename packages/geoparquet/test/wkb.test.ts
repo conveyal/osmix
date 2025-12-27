@@ -24,7 +24,7 @@ function createPointWkb(
 	return new Uint8Array(buffer)
 }
 
-describe("@osmix/layercake: WKB Parser", () => {
+describe("@osmix/geoparquet: WKB Parser", () => {
 	it("should parse a Point geometry (little endian)", () => {
 		const wkb = createPointWkb(-122.4194, 37.7749, true)
 

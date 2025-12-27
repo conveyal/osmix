@@ -29,7 +29,7 @@ import {
 } from "@osmix/change"
 import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core"
 import { fromGeoJSON } from "@osmix/geojson"
-import { fromLayerCake, type LayerCakeReadOptions } from "@osmix/layercake"
+import { fromGeoParquet, type GeoParquetReadOptions } from "@osmix/geoparquet"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import {
 	type DefaultSpeeds,
@@ -172,19 +172,24 @@ export class OsmixWorker extends EventTarget {
 	}
 
 	/**
-	 * Load an Osm instance from Layercake GeoParquet data and store it in this worker.
+	 * Load an Osm instance from GeoParquet data and store it in this worker.
 	 * Returns Osm metadata including entity counts and bbox.
 	 */
-	async fromLayerCake({
+	async fromGeoParquet({
 		data,
 		options,
 		readOptions,
 	}: {
 		data: ArrayBuffer | string | URL
 		options?: Partial<OsmOptions>
-		readOptions?: LayerCakeReadOptions
+		readOptions?: GeoParquetReadOptions
 	}) {
-		const osm = await fromLayerCake(data, options, readOptions, this.onProgress)
+		const osm = await fromGeoParquet(
+			data,
+			options,
+			readOptions,
+			this.onProgress,
+		)
 		this.set(osm.id, osm)
 		return osm.info()
 	}
