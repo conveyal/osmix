@@ -10,7 +10,7 @@
 
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core"
-import type { LayerCakeReadOptions } from "@osmix/layercake"
+import type { GeoParquetReadOptions } from "@osmix/layercake"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type {
 	DefaultSpeeds,
@@ -345,7 +345,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	async fromLayerCake(
 		data: ArrayBuffer | File | string | URL,
 		options: Partial<OsmOptions> = {},
-		readOptions: LayerCakeReadOptions = {},
+		readOptions: GeoParquetReadOptions = {},
 	) {
 		const workers = this.workers.slice()
 		const worker0 = workers.shift()!

@@ -161,7 +161,8 @@ export class GeoParquetOsmBuilder {
 			const tagsData = rowAny[tagsColumn] as
 				| Record<string, string | number>
 				| string
-			const bboxData = rowAny[bboxColumn] as GeoBbox2D
+			// bboxData is read but currently unused - reserved for future optimization
+			void (rowAny[bboxColumn] as GeoBbox2D)
 
 			if (!geometryData) {
 				count++

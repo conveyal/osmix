@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { Osm } from "@osmix/core"
-import { processGeoParquetRows } from "../src/from-layercake"
+import { GeoParquetOsmBuilder } from "../src/from-layercake"
 import type { GeoParquetRow } from "../src/types"
 
 /**
@@ -79,96 +78,43 @@ function createPolygonWkb(rings: [number, number][][]): Uint8Array {
 	return new Uint8Array(buffer)
 }
 
-describe("@osmix/layercake: processLayerCakeRows", () => {
+/**
+ * Helper function to process rows using the builder.
+ */
+function processRows(
+	rows: GeoParquetRow[],
+	options?: { idColumn?: string; geometryColumn?: string; tagsColumn?: string },
+) {
+	const builder = new GeoParquetOsmBuilder({}, options, () => {})
+	builder.processGeoParquetRows(rows as unknown as Record<string, unknown>[])
+	return builder.buildOsm()
+}
+
+describe("@osmix/layercake: GeoParquetOsmBuilder", () => {
 	it("should convert Point features to Nodes", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "node",
 				id: 100n,
 				geometry: createPointWkb(-122.4194, 37.7749),
 				tags: { name: "San Francisco", population: "873965" },
+				bbox: [-122.4194, 37.7749, -122.4194, 37.7749],
 			},
 			{
+				type: "node",
 				id: 200n,
 				geometry: createPointWkb(-122.4094, 37.7849),
 				tags: { name: "Another Point" },
+				bbox: [-122.4094, 37.7849, -122.4094, 37.7849],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		expect(osm.nodes.size).toBe(2)
 		expect(osm.ways.size).toBe(0)
 
-		// With explicit feature IDs, Points should use those IDs
-		// But actually, looking at processPoint, it uses featureId if provided
-		// However, for Point, processPoint is called via the switch statement...
-		// Let me trace: processLayerCakeRows -> normalizedGeometry.type === "Point"
-		// -> processPoint(osm, geometry, numericId, tags, ...)
-		// -> const nodeId = featureId ?? getNextNodeId() = 100
-		// Hmm, but getById(-1) might be checking for generated IDs
-		// Actually the issue is that processPoint in fromLayerCake uses
-		// a different signature: processPoint(osm, geometry, numericId, tags, nodeMap, getNextNodeId)
-		// and getNextNodeId is called as a function that returns and decrements
-
-		// Let's check by getting nodes by their actual IDs
-		// Actually, since Points use the feature ID, we should check with feature IDs
-		// But wait - looking at the implementation, for Points it uses:
-		// featureId ?? getNextNodeId() where getNextNodeId is () => nextNodeId--
-		// So if featureId is undefined, it uses -1, -2, etc.
-		// But in this test, featureId = 100, 200, so nodes should have those IDs
-
-		// Actually wait - the implementation passes `undefined` sometimes...
-		// Let me check again: numericId is from `id !== undefined ? Number(id) : undefined`
-		// So for id: 100n, numericId = 100
-
-		// But actually I need to trace this - in the switch for Point, it calls:
-		// processPoint(osm, normalizedGeometry, numericId, tags, nodeMap, () => nextNodeId--)
-		// In processPoint: const nodeId = featureId ?? getNextNodeId()
-		// where featureId = numericId = 100
-		// So nodeId = 100
-
-		// Therefore node should be at ID 100, not -1
-		// But wait - getNextNodeId is () => nextNodeId-- which means it returns nextNodeId
-		// then decrements. So first call returns -1 and sets nextNodeId to -2
-		// Unless featureId is provided, in which case getNextNodeId is never called
-
-		// OK so actually for Points WITH explicit IDs, the node should use that ID
-		// But looking at my actual code more carefully:
-		// ```
-		// function processPoint(
-		//   osm: Osm,
-		//   geometry: Point,
-		//   featureId: number | undefined,
-		//   tags: OsmTags | undefined,
-		//   nodeMap: Map<string, number>,
-		//   getNextNodeId: () => number,
-		// ): void {
-		//   ...
-		//   const nodeId = featureId ?? getNextNodeId()
-		// ```
-		// featureId = 100, so nodeId = 100
-
-		// BUT - looking at the function signature in my implementation...
-		// wait I need to see what I actually have
-
-		// Let me just update the test to check what actually happens
-		// For Points with explicit IDs, the node gets that ID
-		// But actually - looking more carefully at the code, there might be a bug
-
-		// Actually, I think I see the issue now. In the old test, I was using
-		// `getById(-1)` expecting auto-generated IDs. But since I provide IDs,
-		// the nodes should have IDs 100 and 200.
-
-		// However, there's another issue - the order of nodes may not be what I expect
-		// Let me just test by getting nodes by index instead
-
-		// Actually, the cleanest fix is to use auto-generated IDs by not providing an id
-		// OR to check with the actual provided IDs
-
-		// Let's check with the provided IDs
+		// Get nodes by index to check values
 		const node1 = osm.nodes.getByIndex(0)
 		const node2 = osm.nodes.getByIndex(1)
 
@@ -184,18 +130,17 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 	})
 
 	it("should convert Point features to Nodes with auto-generated IDs", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "node",
 				id: undefined as unknown as bigint, // No ID provided
 				geometry: createPointWkb(-122.4194, 37.7749),
 				tags: { name: "San Francisco" },
+				bbox: [-122.4194, 37.7749, -122.4194, 37.7749],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		expect(osm.nodes.size).toBe(1)
 
@@ -208,9 +153,9 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 	})
 
 	it("should convert LineString features to Ways with Nodes", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "way",
 				id: undefined as unknown as bigint, // Auto-generate IDs
 				geometry: createLineStringWkb([
 					[-122.4194, 37.7749],
@@ -218,12 +163,11 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 					[-122.3994, 37.7949],
 				]),
 				tags: { highway: "primary", name: "Main Street" },
+				bbox: [-122.4194, 37.7749, -122.3994, 37.7949],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		expect(osm.nodes.size).toBe(3)
 		expect(osm.ways.size).toBe(1)
@@ -248,9 +192,9 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 	})
 
 	it("should convert Polygon features to Ways with area tags", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "way",
 				id: undefined as unknown as bigint, // Auto-generate IDs
 				geometry: createPolygonWkb([
 					[
@@ -262,12 +206,11 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 					],
 				]),
 				tags: { building: "yes", name: "Test Building" },
+				bbox: [-122.4194, 37.7749, -122.4094, 37.7849],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		expect(osm.nodes.size).toBe(4) // 4 unique nodes
 		expect(osm.ways.size).toBe(1)
@@ -283,9 +226,9 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 	})
 
 	it("should convert Polygon with holes to relation with multiple Ways", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "relation",
 				id: undefined as unknown as bigint, // Auto-generate IDs
 				geometry: createPolygonWkb([
 					// Outer ring
@@ -306,12 +249,11 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 					],
 				]),
 				tags: { building: "yes" },
+				bbox: [-122.4194, 37.7749, -122.4094, 37.7849],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		expect(osm.ways.size).toBe(2)
 		expect(osm.relations.size).toBe(1)
@@ -338,18 +280,17 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 	})
 
 	it("should handle JSON string tags", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "node",
 				id: undefined as unknown as bigint,
 				geometry: createPointWkb(-122.4194, 37.7749),
 				tags: '{"name":"Test","highway":"primary"}',
+				bbox: [-122.4194, 37.7749, -122.4194, 37.7749],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		const node = osm.nodes.getById(-1)
 		expect(node?.tags?.["name"]).toBe("Test")
@@ -357,41 +298,41 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 	})
 
 	it("should handle null tags", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "node",
 				id: undefined as unknown as bigint,
 				geometry: createPointWkb(-122.4194, 37.7749),
-				tags: null,
+				tags: null as unknown as string,
+				bbox: [-122.4194, 37.7749, -122.4194, 37.7749],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		const node = osm.nodes.getById(-1)
 		expect(node?.tags).toBeUndefined()
 	})
 
 	it("should skip rows with missing geometry", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "node",
 				id: undefined as unknown as bigint,
 				geometry: undefined as unknown as Uint8Array,
 				tags: { name: "Missing geometry" },
+				bbox: [0, 0, 0, 0],
 			},
 			{
+				type: "node",
 				id: undefined as unknown as bigint,
 				geometry: createPointWkb(-122.4194, 37.7749),
 				tags: { name: "Valid point" },
+				bbox: [-122.4194, 37.7749, -122.4194, 37.7749],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		expect(osm.nodes.size).toBe(1)
 		const node = osm.nodes.getById(-1)
@@ -399,29 +340,30 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 	})
 
 	it("should reuse nodes when features share coordinates", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "way",
 				id: undefined as unknown as bigint,
 				geometry: createLineStringWkb([
 					[-122.4194, 37.7749],
 					[-122.4094, 37.7849],
 				]),
 				tags: { highway: "primary" },
+				bbox: [-122.4194, 37.7749, -122.4094, 37.7849],
 			},
 			{
+				type: "way",
 				id: undefined as unknown as bigint,
 				geometry: createLineStringWkb([
 					[-122.4094, 37.7849], // Shared coordinate
 					[-122.3994, 37.7949],
 				]),
 				tags: { highway: "secondary" },
+				bbox: [-122.4094, 37.7849, -122.3994, 37.7949],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		// Should have 3 nodes (shared coordinate is reused)
 		expect(osm.nodes.size).toBe(3)
@@ -437,18 +379,17 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 	})
 
 	it("should build indexes after processing", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "node",
 				id: undefined as unknown as bigint,
 				geometry: createPointWkb(-122.4194, 37.7749),
 				tags: { name: "Test" },
+				bbox: [-122.4194, 37.7749, -122.4194, 37.7749],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		expect(osm.isReady()).toBe(true)
 		expect(osm.nodes.isReady()).toBe(true)
@@ -456,18 +397,17 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 	})
 
 	it("should handle object tags", () => {
-		const osm = new Osm()
 		const rows: GeoParquetRow[] = [
 			{
+				type: "node",
 				id: undefined as unknown as bigint,
 				geometry: createPointWkb(-122.4194, 37.7749),
 				tags: { name: "Test", highway: "primary" },
+				bbox: [-122.4194, 37.7749, -122.4194, 37.7749],
 			},
 		]
 
-		for (const _update of processGeoParquetRows(osm, rows)) {
-			// consume generator
-		}
+		const osm = processRows(rows)
 
 		const node = osm.nodes.getById(-1)
 		expect(node?.tags?.["name"]).toBe("Test")
@@ -475,22 +415,21 @@ describe("@osmix/layercake: processLayerCakeRows", () => {
 	})
 
 	it("should handle custom column names", () => {
-		const osm = new Osm()
 		const rows = [
 			{
+				type: "node",
 				osm_id: undefined,
 				geom: createPointWkb(-122.4194, 37.7749),
 				properties: { name: "Custom columns" },
+				bbox: [-122.4194, 37.7749, -122.4194, 37.7749],
 			},
 		] as unknown as GeoParquetRow[]
 
-		for (const _update of processGeoParquetRows(osm, rows, {
+		const osm = processRows(rows, {
 			idColumn: "osm_id",
 			geometryColumn: "geom",
 			tagsColumn: "properties",
-		})) {
-			// consume generator
-		}
+		})
 
 		expect(osm.nodes.size).toBe(1)
 		const node = osm.nodes.getById(-1)
