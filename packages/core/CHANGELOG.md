@@ -1,5 +1,11 @@
 # @osmix/core
 
+## 0.1.1
+
+### Patch Changes
+
+- d4f4b1f: Add content hashing for quick `isEqual`s checks of two similar `Osm` indexes. Typically used for checking post-merge.
+
 ## 0.1.0
 
 ### Minor Changes
