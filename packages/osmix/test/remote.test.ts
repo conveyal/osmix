@@ -10,7 +10,7 @@ import { createRemote } from "../src/remote"
 
 const monacoPbf = PBFs["monaco"]!
 // Increase timeout for worker tests
-const workerTestTimeout = 30_000
+const workerTestTimeout = process.env["CI"] ? 60_000 : 30_000
 
 describe("OsmixRemote", () => {
 	afterEach(async () => {
