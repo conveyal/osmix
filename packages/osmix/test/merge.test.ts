@@ -85,16 +85,20 @@ describe("merge osm", async () => {
 			changeset = new OsmChangeset(baseOsm)
 			changeset.createIntersectionsForWays(osm2.ways)
 
+			// The intersection detection correctly skips way modifications for shared endpoints
+			// (where both ways already share the same node), so fewer intersection points are
+			// "found" but the same number of new intersection nodes are created. However, we
+			// still add crossing tags to shared nodes, which increases nodeChanges.
 			expect(changeset.stats).toEqual({
 				osmId: baseOsm.id,
-				totalChanges: 9_536,
-				nodeChanges: 4_967,
-				wayChanges: 4_569,
+				totalChanges: 9_464,
+				nodeChanges: 5_820,
+				wayChanges: 3_644,
 				relationChanges: 0,
 				deduplicatedNodes: 0,
 				deduplicatedNodesReplaced: 0,
 				deduplicatedWays: 0,
-				intersectionPointsFound: 5_820,
+				intersectionPointsFound: 3_185,
 				intersectionNodesCreated: 2_618,
 			})
 

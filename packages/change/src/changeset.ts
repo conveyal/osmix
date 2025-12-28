@@ -9,6 +9,7 @@
  */
 
 import type { Nodes, Osm, Ways } from "@osmix/core"
+import type { IdOrIndex } from "@osmix/core/src/ids"
 import type {
 	OsmEntity,
 	OsmEntityType,
@@ -463,9 +464,8 @@ export class OsmChangeset {
 	*createIntersectionsForWaysGenerator(ways: Ways) {
 		const wayIdPairs = new IdPairs()
 		for (const way of ways) {
-			if (!isWayIntersectionCandidate(way)) continue
 			if (!this.osm.ways.ids.has(way.id)) continue
-			yield this.createIntersectionsForWay(way, wayIdPairs)
+			yield this.createIntersectionsForWay({ id: way.id }, wayIdPairs)
 		}
 	}
 
@@ -480,11 +480,14 @@ export class OsmChangeset {
 	 * - Calculates intersection points.
 	 * - Inserts existing nodes or creates new intersection nodes at the crossing points.
 	 */
-	createIntersectionsForWay(way: OsmWay, wayIdPairs: IdPairs) {
+	createIntersectionsForWay(wayIdOrIndex: IdOrIndex, wayIdPairs: IdPairs) {
 		let intersectionsFound = 0
 		let intersectionsCreated = 0
 
-		const wayIndex = this.osm.ways.ids.getIndexFromId(way.id)
+		// Get the actual way from the OSM data (which may have been modified by deduplication)
+		const [wayIndex] = this.osm.ways.ids.idOrIndex(wayIdOrIndex)
+		const way = this.osm.ways.getByIndex(wayIndex)
+		if (!isWayIntersectionCandidate(way)) return
 
 		// Check for intersecting ways. Since the way exists in the base OSM, there will always be at least one way.
 		const bbox = this.osm.ways.getEntityBbox({ index: wayIndex })
@@ -492,7 +495,6 @@ export class OsmChangeset {
 		if (intersectingWayIndexes.length <= 1) return // No candidates
 
 		const coordinates = cleanCoords(this.osm.ways.getCoordinates(wayIndex))
-
 		for (const intersectingWayIndex of intersectingWayIndexes) {
 			const intersectingWayId = this.osm.ways.ids.at(intersectingWayIndex)
 
@@ -517,14 +519,33 @@ export class OsmChangeset {
 				intersectingWayCoords,
 			)
 			for (const pt of intersectingPoints) {
-				intersectionsFound++
-
 				const intersectingWayNodeId = nearestNodeOnWay(
 					intersectingWay,
 					intersectingWayCoords,
 					pt,
 				).nodeId
 				const wayNodeId = nearestNodeOnWay(way, coordinates, pt).nodeId
+
+				// If both ways already share the same node at this intersection,
+				// just add the crossing tag (if needed) but don't count as an intersection.
+				if (
+					wayNodeId &&
+					intersectingWayNodeId &&
+					wayNodeId === intersectingWayNodeId
+				) {
+					const sharedNode = this.osm.nodes.getById(wayNodeId)
+					if (sharedNode && !entityHasTagValue(sharedNode, "crossing", "yes")) {
+						this.modify("node", sharedNode.id, (node) => {
+							return {
+								...node,
+								tags: { ...node.tags, crossing: "yes" },
+							}
+						})
+					}
+					continue
+				}
+
+				intersectionsFound++
 
 				// Prefer the incoming way node, then the intersecting way node, then a new node.
 				if (wayNodeId) {
