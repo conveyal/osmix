@@ -1,5 +1,23 @@
 # @osmix/change
 
+## 0.1.0
+
+### Minor Changes
+
+- 2944218: Add augmented diffs support following the Overpass API Augmented Diffs format.
+
+  - `OsmChange` type now includes an optional `oldEntity` field that captures the previous state of an entity for "modify" and "delete" operations
+  - `generateOscChanges()` now defaults to producing augmented diffs with `<old>` and `<new>` sections for modifications, and `<old>` sections for deletions
+  - Added `OscOptions.augmented` option to control whether augmented diffs are generated (defaults to `true`)
+  - Updated merge app UI to display side-by-side old/new comparison for modifications
+
+### Patch Changes
+
+- 4b91a34: Bump sweepline-intersections from 1.5.0 to 2.0.1
+- 2944218: Export Augmented Diffs
+- Updated dependencies [d4f4b1f]
+  - @osmix/core@0.1.1
+
 ## 0.0.7
 
 ### Patch Changes

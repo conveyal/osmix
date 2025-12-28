@@ -1,5 +1,27 @@
 # osmix
 
+## 0.1.1
+
+### Patch Changes
+
+- 54fe002: Add fromGeoParquet to OsmixWorker and OsmixRemote
+- 4b91a34: Bump sweepline-intersections from 1.5.0 to 2.0.1
+- 478f3b1: Add Shapefile support.
+- Updated dependencies [2944218]
+- Updated dependencies [54fe002]
+- Updated dependencies [31fa333]
+- Updated dependencies [4b91a34]
+- Updated dependencies [31fa333]
+- Updated dependencies [2944218]
+- Updated dependencies [d4f4b1f]
+  - @osmix/change@0.1.0
+  - @osmix/geoparquet@0.1.0
+  - @osmix/core@0.1.1
+  - @osmix/router@0.0.4
+  - @osmix/geojson@0.0.6
+  - @osmix/shapefile@0.0.2
+  - @osmix/vt@0.0.6
+
 ## 0.1.0
 
 ### Minor Changes
