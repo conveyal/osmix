@@ -25,6 +25,9 @@ export async function getFixtureFile(
 		const file = await Bun.file(filePath).arrayBuffer()
 		return new Uint8Array<ArrayBuffer>(file)
 	} catch (_error) {
+		if (process.env["CI"]) {
+			throw Error(`Do not download fixtures in CI: ${url} not found`)
+		}
 		const response = await fetch(url)
 		const buffer = await response.arrayBuffer()
 		const data = new Uint8Array<ArrayBuffer>(buffer)
