@@ -672,4 +672,19 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			pageSize,
 		)
 	}
+
+	/**
+	 * Terminate all workers and release their resources.
+	 */
+	terminate() {
+		for (const worker of this.workers) {
+			worker[Comlink.releaseProxy]()
+		}
+		this.workers = []
+		this.changesetWorker = null
+	}
+
+	[Symbol.dispose]() {
+		this.terminate()
+	}
 }
