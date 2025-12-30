@@ -92,34 +92,60 @@ export default function InspectPage() {
 		return changesetStats == null || changesetStats.totalChanges === 0
 	}, [changesetStats])
 
+	const useExample = async () => {
+		selectEntity(null, null)
+		setChangesetStats(null)
+
+		const task = Log.startTask("Downloading Monaco.pbf example...")
+		try {
+			const exampleFile = await fetchOsmFileFromUrl(EXAMPLE_MONACO_PBF_URL)
+			task.update("Opening file...")
+			const info = await loadOsmFile(exampleFile)
+			flyToOsmBounds(info)
+			task.end("Example loaded")
+		} catch (e) {
+			const message = e instanceof Error ? e.message : "Unknown error"
+			task.end(`Failed to load example: ${message}`, "error")
+			throw e
+		}
+	}
+
+	const openOsmFile = async (file: File | string) => {
+		selectEntity(null, null)
+		setChangesetStats(null)
+		const info =
+			typeof file === "string"
+				? await loadFromStorage(file)
+				: await loadOsmFile(file)
+		flyToOsmBounds(info)
+		return info
+	}
+
+	// Show full-screen file selector when no file is selected
+	if (!osm || !osmInfo || !fileInfo) {
+		return (
+			<div className="flex flex-1 flex-col items-center justify-center gap-8 p-8 bg-slate-50">
+				<div className="text-center">
+					<h1 className="text-3xl font-bold mb-2">OSM Inspect</h1>
+					<p className="text-muted-foreground max-w-md">
+						Open an OSM file (PBF, GeoJSON, or Shapefile ZIP) to explore and
+						inspect its contents.
+					</p>
+				</div>
+
+				<div className="flex flex-col gap-6 w-full max-w-xl">
+					<StoredOsmList openOsmFile={openOsmFile} />
+					<ExtractList useExample={useExample} />
+				</div>
+			</div>
+		)
+	}
+
 	return (
 		<Main>
 			<Sidebar>
 				<div className="flex flex-1 flex-col overflow-y-auto p-2 lg:p-4 gap-4">
-					{!osm || !osmInfo || !fileInfo ? (
-						<ExtractList
-							useExample={async () => {
-								selectEntity(null, null)
-								setChangesetStats(null)
-
-								const task = Log.startTask("Downloading Monaco.pbf example...")
-								try {
-									const exampleFile = await fetchOsmFileFromUrl(
-										EXAMPLE_MONACO_PBF_URL,
-									)
-									task.update("Opening file...")
-									const info = await loadOsmFile(exampleFile)
-									flyToOsmBounds(info)
-									task.end("Example loaded")
-								} catch (e) {
-									const message =
-										e instanceof Error ? e.message : "Unknown error"
-									task.end(`Failed to load example: ${message}`, "error")
-									throw e
-								}
-							}}
-						/>
-					) : (
+					{osmInfo && fileInfo && (
 						<>
 							<Card>
 								<CardHeader>
@@ -225,19 +251,7 @@ export default function InspectPage() {
 						</>
 					)}
 
-					<StoredOsmList
-						openOsmFile={async (file) => {
-							selectEntity(null, null)
-							setChangesetStats(null)
-							const info =
-								typeof file === "string"
-									? await loadFromStorage(file)
-									: await loadOsmFile(file)
-							flyToOsmBounds(info)
-							return info
-						}}
-						activeOsmId={osmInfo?.id}
-					/>
+					<StoredOsmList openOsmFile={openOsmFile} activeOsmId={osmInfo?.id} />
 				</div>
 				<SidebarLog />
 			</Sidebar>
