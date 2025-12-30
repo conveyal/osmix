@@ -83,7 +83,7 @@ export default function MergeBlock() {
 	const flyToOsmBounds = useFlyToOsmBounds()
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
-	const [stepIndex, setStepIndex] = useAtom(stepIndexAtom)
+	const setStepIndex = useSetAtom(stepIndexAtom)
 
 	const prevStep = () => {
 		selectEntity(null, null)
