@@ -20,7 +20,7 @@ import { showSaveFilePicker } from "native-file-system-adapter"
 import { Suspense, useMemo } from "react"
 import { Link } from "react-router"
 import ActionButton from "../components/action-button"
-import Basemap from "../components/basemap"
+import Basemap, { type MapInitialViewState } from "../components/basemap"
 import CustomControl from "../components/custom-control"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import EntityDetails from "../components/entity-details"
@@ -56,6 +56,7 @@ import { Spinner } from "../components/ui/spinner"
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
 import { cn } from "../lib/utils"
+import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
 import { Log } from "../state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "../state/osm"
@@ -84,8 +85,8 @@ const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
 })
 
 export default function Merge() {
-	const base = useOsmFile("base")
-	const patch = useOsmFile("patch")
+	const base = useOsmFile(BASE_OSM_KEY)
+	const patch = useOsmFile(PATCH_OSM_KEY)
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
@@ -157,6 +158,8 @@ export default function Merge() {
 	const noFilesSelected = !base.osm && !patch.osm
 
 	const openOsmFile = async (file: File | string) => {
+		selectEntity(null, null)
+		setChangesetStats(null)
 		const osmInfo =
 			typeof file === "string"
 				? await base.loadFromStorage(file)
@@ -165,14 +168,20 @@ export default function Merge() {
 		return osmInfo
 	}
 
+	const initialViewState: MapInitialViewState | undefined = useMemo(() => {
+		if (!base.osmInfo) return undefined
+		const bbox = base?.osmInfo?.bbox
+		if (!bbox) return undefined
+		return {
+			bounds: bbox,
+			fitBoundsOptions: {
+				padding: 100,
+			},
+		}
+	}, [base.osmInfo])
+
 	if (noFilesSelected) {
-		return (
-			<FileSelectorScreen
-				title="OSM Merge"
-				description="Select an OSM file (PBF, GeoJSON, or Shapefile ZIP) to get started."
-				openOsmFile={openOsmFile}
-			/>
-		)
+		return <FileSelectorScreen openOsmFile={openOsmFile} />
 	}
 
 	return (
@@ -832,7 +841,7 @@ export default function Merge() {
 				<SidebarLog />
 			</Sidebar>
 			<MapContent>
-				<Basemap>
+				<Basemap initialViewState={initialViewState}>
 					{base.osm && <OsmixRasterSource osmId={base.osm.id} />}
 					{patch.osm && <OsmixRasterSource osmId={patch.osm.id} />}
 					{base.osm && <OsmixVectorOverlay osm={base.osm} />}

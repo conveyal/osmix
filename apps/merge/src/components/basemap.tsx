@@ -2,6 +2,7 @@ import { useSetAtom } from "jotai"
 import { useEffectEvent, useRef } from "react"
 import {
 	Map as MaplibreMap,
+	type MapProps,
 	ScaleControl,
 	type ViewStateChangeEvent,
 } from "react-map-gl/maplibre"
@@ -14,7 +15,7 @@ import RouteMapControl from "./route-control"
 const MAP_CENTER = [-120.5, 46.6] as const // Yakima, WA
 const MAP_ZOOM = 10
 
-const initialViewState = {
+const DEFAULT_INITIAL_VIEW_STATE = {
 	longitude: MAP_CENTER[0],
 	latitude: MAP_CENTER[1],
 	zoom: MAP_ZOOM,
@@ -24,7 +25,15 @@ const controlStyle: React.CSSProperties = {
 	borderRadius: "var(--radius)",
 }
 
-export default function Basemap({ children }: { children?: React.ReactNode }) {
+export type MapInitialViewState = MapProps["initialViewState"]
+
+export default function Basemap({
+	children,
+	initialViewState,
+}: {
+	children?: React.ReactNode
+	initialViewState?: MapInitialViewState
+}) {
 	const setCenter = useSetAtom(mapCenterAtom)
 	const setBounds = useSetAtom(mapBoundsAtom)
 	const setZoom = useSetAtom(zoomAtom)
@@ -58,7 +67,7 @@ export default function Basemap({ children }: { children?: React.ReactNode }) {
 		<MaplibreMap
 			reuseMaps={true}
 			mapStyle={BASE_MAP_STYLES[DEFAULT_BASE_MAP_STYLE]}
-			initialViewState={initialViewState}
+			initialViewState={{ ...DEFAULT_INITIAL_VIEW_STATE, ...initialViewState }}
 			onMove={onViewStateChange}
 			onZoom={onViewStateChange}
 			onStyleData={onStyleData}
