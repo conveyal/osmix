@@ -71,11 +71,18 @@ export default function InspectPage() {
 			// Clear the URL parameter
 			setSearchParams({}, { replace: true })
 			// Load the file from storage
-			loadFromStorage(loadId).then((info) => {
-				if (info) flyToOsmBounds(info)
-			})
+			loadFromStorage(loadId)
 		}
-	}, [searchParams, setSearchParams, loadFromStorage, flyToOsmBounds])
+	}, [searchParams, setSearchParams, loadFromStorage])
+
+	// Automatically fit map bounds when osmInfo changes (after map is mounted)
+	const lastFittedOsmId = useRef<string | null>(null)
+	useEffect(() => {
+		if (osmInfo && osmInfo.id !== lastFittedOsmId.current) {
+			lastFittedOsmId.current = osmInfo.id
+			flyToOsmBounds(osmInfo)
+		}
+	}, [osmInfo, flyToOsmBounds])
 
 	const applyChanges = async () => {
 		if (!osm) throw Error("Osm has not been loaded.")
@@ -100,8 +107,7 @@ export default function InspectPage() {
 		try {
 			const exampleFile = await fetchOsmFileFromUrl(EXAMPLE_MONACO_PBF_URL)
 			task.update("Opening file...")
-			const info = await loadOsmFile(exampleFile)
-			flyToOsmBounds(info)
+			await loadOsmFile(exampleFile)
 			task.end("Example loaded")
 		} catch (e) {
 			const message = e instanceof Error ? e.message : "Unknown error"
@@ -113,12 +119,9 @@ export default function InspectPage() {
 	const openOsmFile = async (file: File | string) => {
 		selectEntity(null, null)
 		setChangesetStats(null)
-		const info =
-			typeof file === "string"
-				? await loadFromStorage(file)
-				: await loadOsmFile(file)
-		flyToOsmBounds(info)
-		return info
+		return typeof file === "string"
+			? await loadFromStorage(file)
+			: await loadOsmFile(file)
 	}
 
 	// Show full-screen file selector when no file is selected
