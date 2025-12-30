@@ -6,6 +6,7 @@ import CustomControl from "../components/custom-control"
 import EntityDetailsMapControl from "../components/entity-details-map-control"
 import FileSelectorScreen from "../components/file-selector-screen"
 import { Main, MapContent, Sidebar } from "../components/layout"
+import OsmFileMapControl from "../components/osm-file-map-control"
 import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
 import SelectedEntityLayer from "../components/selected-entity-layer"
@@ -70,6 +71,30 @@ export default function Merge() {
 
 					<SelectedEntityLayer />
 
+					<CustomControl position="top-left">
+						<OsmFileMapControl
+							files={[
+								{
+									label: "Base OSM",
+									osmFile: base,
+									onClear: async () => {
+										selectEntity(null, null)
+										setChangesetStats(null)
+										await base.loadOsmFile(null)
+									},
+								},
+								{
+									label: "Patch OSM",
+									osmFile: patch,
+									onClear: async () => {
+										selectEntity(null, null)
+										setChangesetStats(null)
+										await patch.loadOsmFile(null)
+									},
+								},
+							]}
+						/>
+					</CustomControl>
 					{base.osm && (
 						<CustomControl position="top-left">
 							<EntityDetailsMapControl osm={base.osm} />

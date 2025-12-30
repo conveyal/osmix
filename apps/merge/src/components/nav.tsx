@@ -1,5 +1,11 @@
 import { type PrimitiveAtom, useAtom } from "jotai"
-import { Layers, Navigation, SearchIcon, SidebarClose } from "lucide-react"
+import {
+	FileIcon,
+	Layers,
+	Navigation,
+	SearchIcon,
+	SidebarClose,
+} from "lucide-react"
 import { NavLink } from "react-router"
 import CenterInfo from "../components/center-info"
 import ZoomInfo, { ZoomInButton, ZoomOutButton } from "../components/zoom-info"
@@ -7,6 +13,7 @@ import { cn } from "../lib/utils"
 import { sidebarIsOpenAtom } from "../state/layout"
 import {
 	layerControlIsOpenAtom,
+	osmFileControlIsOpenAtom,
 	routingControlIsOpenAtom,
 	searchControlIsOpenAtom,
 } from "../state/map"
@@ -67,6 +74,9 @@ export default function Nav() {
 				</ToggleButton>
 				<ToggleButton atom={searchControlIsOpenAtom}>
 					<SearchIcon />
+				</ToggleButton>
+				<ToggleButton atom={osmFileControlIsOpenAtom}>
+					<FileIcon />
 				</ToggleButton>
 				<ButtonGroupSeparator />
 				<div className="whitespace-nowrap px-2">

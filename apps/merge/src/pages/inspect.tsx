@@ -22,6 +22,7 @@ import ChangesSummary, {
 	ChangesList,
 	ChangesPagination,
 } from "../components/osm-changes-summary"
+import OsmFileMapControl from "../components/osm-file-map-control"
 import OsmInfoTable from "../components/osm-info-table"
 import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
@@ -255,6 +256,21 @@ export default function InspectPage() {
 					<SelectedEntityLayer />
 					<RouteLayer />
 
+					<CustomControl position="top-left">
+						<OsmFileMapControl
+							files={[
+								{
+									label: baseOsm.fileInfo?.fileName ?? "OSM File",
+									osmFile: baseOsm,
+									onClear: async () => {
+										selectEntity(null, null)
+										setChangesetStats(null)
+										await baseOsm.loadOsmFile(null)
+									},
+								},
+							]}
+						/>
+					</CustomControl>
 					{baseOsm.osm && (
 						<CustomControl position="top-left">
 							<EntityDetailsMapControl osm={baseOsm.osm} />
