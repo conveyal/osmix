@@ -8,22 +8,23 @@ import OsmInfoTable from "./osm-info-table"
 import { ButtonGroup } from "./ui/button-group"
 
 interface OsmFileCardProps {
-	label: string
 	osmFile: UseOsmFileReturn
 	onClear?: () => Promise<void>
 }
 
-function OsmFileCard({ label, osmFile, onClear }: OsmFileCardProps) {
+function OsmFileCard({ osmFile, onClear }: OsmFileCardProps) {
 	const flyToOsmBounds = useFlyToOsmBounds()
 
 	if (!osmFile.osm || !osmFile.osmInfo || !osmFile.fileInfo) {
 		return null
 	}
 
+	const fileName = osmFile.fileInfo.fileName
+
 	return (
 		<div className="border-b last:border-b-0">
 			<div className="flex items-center justify-between border-b bg-slate-50 px-2 py-1">
-				<div className="font-bold text-xs uppercase">{label}</div>
+				<div className="font-bold text-xs uppercase">{fileName}</div>
 				<ButtonGroup>
 					{!osmFile.isStored && (
 						<ActionButton
@@ -55,21 +56,18 @@ function OsmFileCard({ label, osmFile, onClear }: OsmFileCardProps) {
 					)}
 				</ButtonGroup>
 			</div>
-			<div className="p-2">
-				<OsmInfoTable
-					defaultOpen={false}
-					osm={osmFile.osm}
-					file={osmFile.file}
-					fileInfo={osmFile.fileInfo}
-				/>
-			</div>
+			<OsmInfoTable
+				defaultOpen={false}
+				osm={osmFile.osm}
+				file={osmFile.file}
+				fileInfo={osmFile.fileInfo}
+			/>
 		</div>
 	)
 }
 
 export interface OsmFileMapControlProps {
 	files: Array<{
-		label: string
 		osmFile: UseOsmFileReturn
 		onClear?: () => Promise<void>
 	}>
@@ -91,8 +89,7 @@ export default function OsmFileMapControl({ files }: OsmFileMapControlProps) {
 		<div className="flex flex-col">
 			{loadedFiles.map((file) => (
 				<OsmFileCard
-					key={file.label}
-					label={file.label}
+					key={file.osmFile.fileInfo?.fileHash}
 					osmFile={file.osmFile}
 					onClear={file.onClear}
 				/>

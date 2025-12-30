@@ -75,7 +75,6 @@ export default function Merge() {
 						<OsmFileMapControl
 							files={[
 								{
-									label: "Base OSM",
 									osmFile: base,
 									onClear: async () => {
 										selectEntity(null, null)
@@ -84,7 +83,6 @@ export default function Merge() {
 									},
 								},
 								{
-									label: "Patch OSM",
 									osmFile: patch,
 									onClear: async () => {
 										selectEntity(null, null)

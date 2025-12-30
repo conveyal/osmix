@@ -260,7 +260,6 @@ export default function InspectPage() {
 						<OsmFileMapControl
 							files={[
 								{
-									label: baseOsm.fileInfo?.fileName ?? "OSM File",
 									osmFile: baseOsm,
 									onClear: async () => {
 										selectEntity(null, null)
