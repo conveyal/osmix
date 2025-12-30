@@ -28,3 +28,6 @@ export const OSM_STORE = "osm"
 
 // BroadcastChannel name for storage notifications
 export const STORAGE_CHANNEL = "@osmix/storage-channel"
+
+export const BASE_OSM_KEY = "main"
+export const PATCH_OSM_KEY = "patch"

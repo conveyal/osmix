@@ -1,12 +1,34 @@
 import { FilesIcon } from "lucide-react"
+import type { OsmInfo } from "osmix"
+import { useEffectEvent } from "react"
+import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file"
+import { Log } from "../state/log"
 import ActionButton from "./action-button"
 import { Card, CardContent } from "./ui/card"
 
+const EXAMPLE_MONACO_PBF_URL =
+	"https://trevorgerhardt.github.io/files/487218b69358-1f24d3e4e476/monaco.pbf"
+
 export default function ExtractList({
-	useExample,
+	openOsmFile,
 }: {
-	useExample?: () => Promise<void>
+	openOsmFile: (file: File) => Promise<OsmInfo | null>
 }) {
+	const useExample = useEffectEvent(async () => {
+		const task = Log.startTask("Downloading Monaco.pbf example...")
+		try {
+			const exampleFile = await fetchOsmFileFromUrl(EXAMPLE_MONACO_PBF_URL)
+			task.update("Opening file...")
+			const osmInfo = await openOsmFile(exampleFile)
+			task.end("Example loaded")
+			return osmInfo
+		} catch (e) {
+			const message = e instanceof Error ? e.message : "Unknown error"
+			task.end(`Failed to load example: ${message}`, "error")
+			throw e
+		}
+	})
+
 	return (
 		<Card>
 			<CardContent className="flex flex-col gap-2 leading-relaxed p-4">
@@ -40,15 +62,13 @@ export default function ExtractList({
 						daily.
 					</li>
 				</ul>
-				{useExample && (
-					<ActionButton
-						className="w-full"
-						icon={<FilesIcon />}
-						onAction={useExample}
-					>
-						Use example Monaco.pbf file
-					</ActionButton>
-				)}
+				<ActionButton
+					className="w-full"
+					icon={<FilesIcon />}
+					onAction={useExample}
+				>
+					Use example Monaco.pbf file
+				</ActionButton>
 			</CardContent>
 		</Card>
 	)

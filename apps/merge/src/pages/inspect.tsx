@@ -11,11 +11,11 @@ import {
 import { Suspense, useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "react-router"
 import ActionButton from "../components/action-button"
-import Basemap from "../components/basemap"
+import Basemap, { type MapInitialViewState } from "../components/basemap"
 import CustomControl from "../components/custom-control"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import EntityDetailsMapControl from "../components/entity-details-map-control"
-import ExtractList from "../components/extract-list"
+import FileSelectorScreen from "../components/file-selector-screen"
 import { Main, MapContent, Sidebar } from "../components/layout"
 import ChangesSummary, {
 	ChangesFilters,
@@ -34,31 +34,17 @@ import { ButtonGroup } from "../components/ui/button-group"
 import { Card, CardContent, CardHeader } from "../components/ui/card"
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
-import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file"
+import { BASE_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
 import { Log } from "../state/log"
 import { selectOsmEntityAtom } from "../state/osm"
 import { osmWorker } from "../state/worker"
 
-const EXAMPLE_MONACO_PBF_URL =
-	"https://trevorgerhardt.github.io/files/487218b69358-1f24d3e4e476/monaco.pbf"
-
 export default function InspectPage() {
 	const [searchParams, setSearchParams] = useSearchParams()
 	const flyToEntity = useFlyToEntity()
 	const flyToOsmBounds = useFlyToOsmBounds()
-	const {
-		downloadOsm,
-		isStored,
-		osm,
-		osmInfo,
-		file,
-		fileInfo,
-		loadFromStorage,
-		loadOsmFile,
-		saveToStorage,
-		setOsm,
-	} = useOsmFile("inspect")
+	const baseOsm = useOsmFile(BASE_OSM_KEY)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 
@@ -71,19 +57,21 @@ export default function InspectPage() {
 			// Clear the URL parameter
 			setSearchParams({}, { replace: true })
 			// Load the file from storage
-			loadFromStorage(loadId).then((info) => {
-				if (info) flyToOsmBounds(info)
+			baseOsm.loadFromStorage(loadId).then((osmInfo) => {
+				if (osmInfo) {
+					flyToOsmBounds(osmInfo)
+				}
 			})
 		}
-	}, [searchParams, setSearchParams, loadFromStorage, flyToOsmBounds])
+	}, [searchParams, setSearchParams, baseOsm.loadFromStorage, flyToOsmBounds])
 
 	const applyChanges = async () => {
-		if (!osm) throw Error("Osm has not been loaded.")
+		if (!baseOsm.osm) throw Error("Osm has not been loaded.")
 		const task = Log.startTask("Applying changes to OSM...")
-		await osmWorker.applyChangesAndReplace(osm.id)
+		await osmWorker.applyChangesAndReplace(baseOsm.osm.id)
 		task.update("Refreshing OSM index...")
-		const newOsm = await osmWorker.get(osm.id)
-		setOsm(newOsm)
+		const newOsm = await osmWorker.get(baseOsm.osm.id)
+		baseOsm.setOsm(newOsm)
 		setChangesetStats(null)
 		task.end("Changes applied!")
 	}
@@ -92,168 +80,179 @@ export default function InspectPage() {
 		return changesetStats == null || changesetStats.totalChanges === 0
 	}, [changesetStats])
 
+	const openOsmFile = async (file: File | string) => {
+		selectEntity(null, null)
+		setChangesetStats(null)
+		const osmInfo =
+			typeof file === "string"
+				? await baseOsm.loadFromStorage(file)
+				: await baseOsm.loadOsmFile(file)
+		flyToOsmBounds(osmInfo)
+		return osmInfo
+	}
+
+	const initialViewState: MapInitialViewState | undefined = useMemo(() => {
+		if (!baseOsm.osmInfo) return undefined
+		const bbox = baseOsm?.osmInfo?.bbox
+		if (!bbox) return undefined
+		return {
+			bounds: bbox,
+			fitBoundsOptions: {
+				padding: 100,
+			},
+		}
+	}, [baseOsm.osmInfo])
+
+	// Show full-screen file selector when no file is selected
+	if (!baseOsm.osm || !baseOsm.osmInfo || !baseOsm.fileInfo) {
+		return (
+			<Main>
+				<FileSelectorScreen openOsmFile={openOsmFile} />
+			</Main>
+		)
+	}
+
 	return (
 		<Main>
 			<Sidebar>
 				<div className="flex flex-1 flex-col overflow-y-auto p-2 lg:p-4 gap-4">
-					{!osm || !osmInfo || !fileInfo ? (
-						<ExtractList
-							useExample={async () => {
-								selectEntity(null, null)
-								setChangesetStats(null)
+					<Card>
+						<CardHeader>
+							<div className="font-bold uppercase p-2">
+								{baseOsm.fileInfo?.fileName}
+							</div>
+							<ButtonGroup>
+								{!baseOsm.isStored && (
+									<ActionButton
+										onAction={baseOsm.saveToStorage}
+										variant="ghost"
+										icon={<SaveIcon />}
+										title="Save to storage"
+									/>
+								)}
+								<ActionButton
+									onAction={async () => {
+										selectEntity(null, null)
+										setChangesetStats(null)
+										await baseOsm.loadOsmFile(null)
+									}}
+									icon={<XIcon />}
+									title="Clear file"
+									variant="ghost"
+								/>
+								<ActionButton
+									onAction={baseOsm.downloadOsm}
+									variant="ghost"
+									icon={<DownloadIcon />}
+									title="Download OSM PBF"
+								/>
+								<ActionButton
+									onAction={async () => flyToOsmBounds(baseOsm.osmInfo)}
+									variant="ghost"
+									icon={<MaximizeIcon />}
+									title="Fit bounds to file bbox"
+								/>
+							</ButtonGroup>
+						</CardHeader>
+						<CardContent>
+							<OsmInfoTable
+								file={baseOsm.file}
+								fileInfo={baseOsm.fileInfo}
+								osm={baseOsm.osm}
+							/>
+						</CardContent>
+					</Card>
 
-								const task = Log.startTask("Downloading Monaco.pbf example...")
-								try {
-									const exampleFile = await fetchOsmFileFromUrl(
-										EXAMPLE_MONACO_PBF_URL,
-									)
-									task.update("Opening file...")
-									const info = await loadOsmFile(exampleFile)
-									flyToOsmBounds(info)
-									task.end("Example loaded")
-								} catch (e) {
-									const message =
-										e instanceof Error ? e.message : "Unknown error"
-									task.end(`Failed to load example: ${message}`, "error")
-									throw e
-								}
+					{changesetStats == null ? (
+						<ActionButton
+							onAction={async () => {
+								if (!baseOsm.osm) throw Error("Osm has not been loaded.")
+								const task = Log.startTask("Finding duplicate nodes and ways")
+								const changes = await osmWorker.generateChangeset(
+									baseOsm.osm.id,
+									baseOsm.osm.id,
+									{
+										deduplicateNodes: true,
+										deduplicateWays: true,
+									},
+								)
+								setChangesetStats(changes)
+								task.end(changeStatsSummary(changes))
 							}}
-						/>
+							icon={<SearchCode />}
+						>
+							Find duplicate nodes and ways
+						</ActionButton>
 					) : (
 						<>
 							<Card>
-								<CardHeader>
-									<div className="font-bold uppercase p-2">
-										{fileInfo.fileName}
-									</div>
-									<ButtonGroup>
-										{!isStored && (
-											<ActionButton
-												onAction={saveToStorage}
-												variant="ghost"
-												icon={<SaveIcon />}
-												title="Save to storage"
-											/>
-										)}
-										<ActionButton
-											onAction={async () => {
-												selectEntity(null, null)
-												setChangesetStats(null)
-												await loadOsmFile(null)
-											}}
-											icon={<XIcon />}
-											title="Clear file"
-											variant="ghost"
-										/>
-										<ActionButton
-											onAction={downloadOsm}
-											variant="ghost"
-											icon={<DownloadIcon />}
-											title="Download OSM PBF"
-										/>
-										<ActionButton
-											onAction={async () => flyToOsmBounds(osmInfo)}
-											variant="ghost"
-											icon={<MaximizeIcon />}
-											title="Fit bounds to file bbox"
-										/>
-									</ButtonGroup>
-								</CardHeader>
+								<CardHeader className="p-2">Changeset</CardHeader>
 								<CardContent>
-									<OsmInfoTable file={file} fileInfo={fileInfo} osm={osm} />
+									<ChangesSummary />
+									<Suspense
+										fallback={<div className="py-1 px-2">LOADING...</div>}
+									>
+										<Details>
+											<DetailsSummary>CHANGES</DetailsSummary>
+											<DetailsContent>
+												<ChangesFilters />
+												<ChangesList
+													setSelectedEntity={(entity) => {
+														if (!baseOsm.osm)
+															throw Error("Osm has not been loaded.")
+														selectEntity(baseOsm.osm, entity)
+														flyToEntity(baseOsm.osm, entity)
+													}}
+												/>
+												<ChangesPagination />
+											</DetailsContent>
+										</Details>
+									</Suspense>
 								</CardContent>
 							</Card>
 
-							{changesetStats == null ? (
+							{!hasZeroChanges && (
 								<ActionButton
-									onAction={async () => {
-										const task = Log.startTask(
-											"Finding duplicate nodes and ways",
-										)
-										const changes = await osmWorker.generateChangeset(
-											osm.id,
-											osm.id,
-											{
-												deduplicateNodes: true,
-												deduplicateWays: true,
-											},
-										)
-										setChangesetStats(changes)
-										task.end(changeStatsSummary(changes))
-									}}
-									icon={<SearchCode />}
+									className="w-full"
+									onAction={applyChanges}
+									icon={<MergeIcon />}
 								>
-									Find duplicate nodes and ways
+									Apply changes
 								</ActionButton>
-							) : (
-								<>
-									<Card>
-										<CardHeader className="p-2">Changeset</CardHeader>
-										<CardContent>
-											<ChangesSummary />
-											<Suspense
-												fallback={<div className="py-1 px-2">LOADING...</div>}
-											>
-												<Details>
-													<DetailsSummary>CHANGES</DetailsSummary>
-													<DetailsContent>
-														<ChangesFilters />
-														<ChangesList
-															setSelectedEntity={(entity) => {
-																selectEntity(osm, entity)
-																flyToEntity(osm, entity)
-															}}
-														/>
-														<ChangesPagination />
-													</DetailsContent>
-												</Details>
-											</Suspense>
-										</CardContent>
-									</Card>
-
-									{!hasZeroChanges && (
-										<ActionButton
-											className="w-full"
-											onAction={applyChanges}
-											icon={<MergeIcon />}
-										>
-											Apply changes
-										</ActionButton>
-									)}
-								</>
 							)}
 						</>
 					)}
 
 					<StoredOsmList
-						openOsmFile={async (file) => {
-							selectEntity(null, null)
-							setChangesetStats(null)
-							const info =
-								typeof file === "string"
-									? await loadFromStorage(file)
-									: await loadOsmFile(file)
-							flyToOsmBounds(info)
-							return info
-						}}
-						activeOsmId={osmInfo?.id}
+						openOsmFile={openOsmFile}
+						activeOsmId={baseOsm.osmInfo?.id}
 					/>
 				</div>
 				<SidebarLog />
 			</Sidebar>
 			<MapContent>
-				<Basemap>
-					{osm && <OsmixVectorOverlay key={`${osm.id}:overlay`} osm={osm} />}
-					{osm && <OsmixRasterSource key={`${osm.id}:raster`} osmId={osm.id} />}
+				<Basemap initialViewState={initialViewState}>
+					{baseOsm.osm && (
+						<OsmixVectorOverlay
+							key={`${baseOsm.osm.id}:overlay`}
+							osm={baseOsm.osm}
+						/>
+					)}
+					{baseOsm.osm && (
+						<OsmixRasterSource
+							key={`${baseOsm.osm.id}:raster`}
+							osmId={baseOsm.osm.id}
+						/>
+					)}
 
 					<TileBoundsLayer />
 
 					<SelectedEntityLayer />
 					<RouteLayer />
 
-					{osm && (
+					{baseOsm.osm && (
 						<CustomControl position="top-left">
-							<EntityDetailsMapControl osm={osm} />
+							<EntityDetailsMapControl osm={baseOsm.osm} />
 						</CustomControl>
 					)}
 				</Basemap>
