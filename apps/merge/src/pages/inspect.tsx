@@ -15,7 +15,7 @@ import Basemap from "../components/basemap"
 import CustomControl from "../components/custom-control"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import EntityDetailsMapControl from "../components/entity-details-map-control"
-import ExtractList from "../components/extract-list"
+import FileSelectorScreen from "../components/file-selector-screen"
 import { Main, MapContent, Sidebar } from "../components/layout"
 import ChangesSummary, {
 	ChangesFilters,
@@ -127,20 +127,12 @@ export default function InspectPage() {
 	// Show full-screen file selector when no file is selected
 	if (!osm || !osmInfo || !fileInfo) {
 		return (
-			<div className="flex flex-1 flex-col items-center justify-center gap-8 p-8 bg-slate-50">
-				<div className="text-center">
-					<h1 className="text-3xl font-bold mb-2">OSM Inspect</h1>
-					<p className="text-muted-foreground max-w-md">
-						Open an OSM file (PBF, GeoJSON, or Shapefile ZIP) to explore and
-						inspect its contents.
-					</p>
-				</div>
-
-				<div className="flex flex-col gap-6 w-full max-w-xl">
-					<StoredOsmList openOsmFile={openOsmFile} />
-					<ExtractList useExample={useExample} />
-				</div>
-			</div>
+			<FileSelectorScreen
+				title="OSM Inspect"
+				description="Open an OSM file (PBF, GeoJSON, or Shapefile ZIP) to explore and inspect its contents."
+				openOsmFile={openOsmFile}
+				useExample={useExample}
+			/>
 		)
 	}
 

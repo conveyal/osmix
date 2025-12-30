@@ -25,6 +25,7 @@ import CustomControl from "../components/custom-control"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import EntityDetails from "../components/entity-details"
 import EntityDetailsMapControl from "../components/entity-details-map-control"
+import FileSelectorScreen from "../components/file-selector-screen"
 import { Main, MapContent, Sidebar } from "../components/layout"
 import ChangesSummary, {
 	ChangesExpandableList,
@@ -155,54 +156,22 @@ export default function Merge() {
 	// Show full-screen file selector when no files are selected
 	const noFilesSelected = !base.osm && !patch.osm
 
+	const openOsmFile = async (file: File | string) => {
+		const osmInfo =
+			typeof file === "string"
+				? await base.loadFromStorage(file)
+				: await base.loadOsmFile(file)
+		flyToOsmBounds(osmInfo)
+		return osmInfo
+	}
+
 	if (noFilesSelected) {
 		return (
-			<div className="flex flex-1 flex-col items-center justify-center gap-8 p-8 bg-slate-50">
-				<div className="text-center">
-					<h1 className="text-3xl font-bold mb-2">OSM Merge</h1>
-					<p className="text-muted-foreground max-w-md">
-						Select two OSM files (PBF, GeoJSON, or Shapefile ZIP) to merge.
-					</p>
-				</div>
-
-				<div className="flex flex-col md:flex-row gap-6 w-full max-w-4xl">
-					<Card className="flex-1">
-						<CardHeader>
-							<div className="p-2 font-bold">BASE OSM</div>
-						</CardHeader>
-						<CardContent>
-							<StoredOsmList
-								openOsmFile={async (file) => {
-									const osmInfo =
-										typeof file === "string"
-											? await base.loadFromStorage(file)
-											: await base.loadOsmFile(file)
-									flyToOsmBounds(osmInfo)
-									return osmInfo
-								}}
-							/>
-						</CardContent>
-					</Card>
-
-					<Card className="flex-1">
-						<CardHeader>
-							<div className="p-2 font-bold">PATCH OSM</div>
-						</CardHeader>
-						<CardContent>
-							<StoredOsmList
-								openOsmFile={async (file) => {
-									const osmInfo =
-										typeof file === "string"
-											? await patch.loadFromStorage(file)
-											: await patch.loadOsmFile(file)
-									flyToOsmBounds(osmInfo)
-									return osmInfo
-								}}
-							/>
-						</CardContent>
-					</Card>
-				</div>
-			</div>
+			<FileSelectorScreen
+				title="OSM Merge"
+				description="Select an OSM file (PBF, GeoJSON, or Shapefile ZIP) to get started."
+				openOsmFile={openOsmFile}
+			/>
 		)
 	}
 
