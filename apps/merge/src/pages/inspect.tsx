@@ -130,6 +130,29 @@ export default function InspectPage() {
 										title="Save to storage"
 									/>
 								)}
+								{changesetStats == null && (
+									<ActionButton
+										onAction={async () => {
+											if (!baseOsm.osm) throw Error("Osm has not been loaded.")
+											const task = Log.startTask(
+												"Finding duplicate nodes and ways",
+											)
+											const changes = await osmWorker.generateChangeset(
+												baseOsm.osm.id,
+												baseOsm.osm.id,
+												{
+													deduplicateNodes: true,
+													deduplicateWays: true,
+												},
+											)
+											setChangesetStats(changes)
+											task.end(changeStatsSummary(changes))
+										}}
+										icon={<SearchCode />}
+										title="Find duplicate nodes and ways"
+										variant="ghost"
+									/>
+								)}
 								<ActionButton
 									onAction={async () => {
 										selectEntity(null, null)
@@ -163,27 +186,7 @@ export default function InspectPage() {
 						</CardContent>
 					</Card>
 
-					{changesetStats == null ? (
-						<ActionButton
-							onAction={async () => {
-								if (!baseOsm.osm) throw Error("Osm has not been loaded.")
-								const task = Log.startTask("Finding duplicate nodes and ways")
-								const changes = await osmWorker.generateChangeset(
-									baseOsm.osm.id,
-									baseOsm.osm.id,
-									{
-										deduplicateNodes: true,
-										deduplicateWays: true,
-									},
-								)
-								setChangesetStats(changes)
-								task.end(changeStatsSummary(changes))
-							}}
-							icon={<SearchCode />}
-						>
-							Find duplicate nodes and ways
-						</ActionButton>
-					) : (
+					{changesetStats != null && (
 						<>
 							<Card>
 								<CardHeader className="p-2">Changeset</CardHeader>
@@ -223,10 +226,12 @@ export default function InspectPage() {
 						</>
 					)}
 
-					<StoredOsmList
-						openOsmFile={openOsmFile}
-						activeOsmId={baseOsm.osmInfo?.id}
-					/>
+					{!baseOsm.osm && (
+						<StoredOsmList
+							openOsmFile={openOsmFile}
+							activeOsmId={baseOsm.osmInfo?.id}
+						/>
+					)}
 				</div>
 				<SidebarLog />
 			</Sidebar>
