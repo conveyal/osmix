@@ -1,5 +1,6 @@
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
+import type { OsmInfo } from "osmix"
 import { useEffectEvent } from "react"
 import { canStoreFile } from "../lib/storage-utils"
 import { Log } from "../state/log"
@@ -61,7 +62,7 @@ export function useOsmFile(osmKey: string) {
 
 			// Parse the file normally in the worker
 			taskLog.update("Parsing file...")
-			const osmInfo = await osmWorker.fromFile(file, { id: fileHash })
+			const osmInfo: OsmInfo = await osmWorker.fromFile(file, { id: fileHash })
 			setOsmInfo(osmInfo)
 			const osm = await osmWorker.get(osmInfo.id)
 			setOsm(osm)
@@ -93,7 +94,7 @@ export function useOsmFile(osmKey: string) {
 			// Update osmInfo.id to match the storage key (fileHash) since that's where
 			// the worker has it registered. This ensures downloadOsm and other calls
 			// that use osmInfo.id will find the correct worker entry.
-			const osmInfo = { ...stored.info, id: stored.entry.fileHash }
+			const osmInfo: OsmInfo = { ...stored.info, id: stored.entry.fileHash }
 			setOsmInfo(osmInfo)
 			setOsm(osm)
 			setSelectedOsm(osm)

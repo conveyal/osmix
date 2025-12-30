@@ -7,6 +7,7 @@ import type { OsmInfo } from "@osmix/core"
 import {
 	CheckIcon,
 	DatabaseIcon,
+	FilesIcon,
 	PencilIcon,
 	RotateCcwIcon,
 	Trash2Icon,
@@ -195,15 +196,10 @@ export function StoredOsmList({
 	return (
 		<Card>
 			<CardHeader>
-				<div className="font-bold uppercase p-2 flex items-center gap-2">
-					<DatabaseIcon className="size-3" />
+				<div className="font-bold uppercase p-2 flex items-center gap-1">
+					<FilesIcon className="size-3" />
 					FILES
 				</div>
-				{entries.length > 0 && (
-					<span className="text-muted-foreground pr-2">
-						{entries.length} &middot; {formatBytes(estimatedBytes)}
-					</span>
-				)}
 			</CardHeader>
 			<CardContent className="p-0">
 				<div className="flex flex-col gap-2 p-2">
@@ -221,8 +217,16 @@ export function StoredOsmList({
 					/>
 				</div>
 				{entries.length > 0 && (
-					<Details defaultOpen>
-						<DetailsSummary>Stored</DetailsSummary>
+					<Details>
+						<DetailsSummary>
+							<div className="flex items-center gap-2">
+								<DatabaseIcon className="size-3" /> <div>Stored</div>
+								<span className="text-muted-foreground">
+									&middot; {entries.length} &middot;{" "}
+									{formatBytes(estimatedBytes)}
+								</span>
+							</div>
+						</DetailsSummary>
 						<DetailsContent>
 							<ItemGroup>
 								{entries.map((entry) => (
