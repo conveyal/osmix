@@ -114,7 +114,7 @@ function queryBbox(
 	const { nodes, ways } = osm
 	const nodesWithTags = nodes.withinBbox(
 		bbox,
-		(i) => nodes.tags.cardinality(i) > 0,
+		// (i) => nodes.tags.cardinality(i) > 0,
 	)
 	const wayResults = ways.withinBbox(bbox)
 
