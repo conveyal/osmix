@@ -1,11 +1,10 @@
 import { useAtomValue } from "jotai"
 import { DownloadIcon, MaximizeIcon, SaveIcon, XIcon } from "lucide-react"
-import type { UseOsmFileReturn } from "../hooks/osm"
 import { useFlyToOsmBounds } from "../hooks/map"
+import type { UseOsmFileReturn } from "../hooks/osm"
 import { osmFileControlIsOpenAtom } from "../state/map"
 import ActionButton from "./action-button"
 import OsmInfoTable from "./osm-info-table"
-import { ButtonGroup } from "./ui/button-group"
 
 interface OsmFileCardProps {
 	osmFile: UseOsmFileReturn
@@ -23,9 +22,9 @@ function OsmFileCard({ osmFile, onClear }: OsmFileCardProps) {
 
 	return (
 		<div className="border-b last:border-b-0">
-			<div className="flex items-center justify-between border-b bg-slate-50 px-2 py-1">
-				<div className="font-bold text-xs uppercase">{fileName}</div>
-				<ButtonGroup>
+			<div className="flex items-center justify-between gap-2 border-b">
+				<div className="font-bold pl-2">{fileName}</div>
+				<div className="flex items-center">
 					{!osmFile.isStored && (
 						<ActionButton
 							onAction={osmFile.saveToStorage}
@@ -54,7 +53,7 @@ function OsmFileCard({ osmFile, onClear }: OsmFileCardProps) {
 							variant="ghost"
 						/>
 					)}
-				</ButtonGroup>
+				</div>
 			</div>
 			<OsmInfoTable
 				defaultOpen={false}
