@@ -1,13 +1,9 @@
-import { beforeAll, describe, expect } from "bun:test"
 import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
 } from "@osmix/shared/test/fixtures"
-
-// @ts-expect-error - bench is available at runtime but not in types
-const { bench } = globalThis as { bench: typeof import("bun:test").test }
-
+import { bench, group, run } from "mitata"
 import {
 	OsmPbfBytesToBlocksTransformStream,
 	readOsmPbf,
@@ -15,27 +11,46 @@ import {
 import { readOsmPbfParallel } from "../src/pbf-to-blocks-parallel"
 import { createOsmEntityCounter, testOsmPbfReader } from "./utils"
 
-describe.each(Object.entries(PBFs))("%s", (_name, pbf) => {
-	beforeAll(() => getFixtureFile(pbf.url))
+/**
+ * OSM PBF parsing benchmarks (mitata).
+ *
+ * Run with: `bun --filter @osmix/pbf bench`
+ */
 
-	bench("parse with generators", async () => {
-		const file = await getFixtureFile(pbf.url)
-		const osm = await readOsmPbf(file)
+const monaco = PBFs["monaco"]
+if (!monaco) throw Error("Missing Monaco fixture metadata")
 
-		await testOsmPbfReader(osm, pbf)
+console.log("Loading fixture bytes...")
+const buffer = await getFixtureFile(monaco.url)
+console.log("Fixture loaded. Running benchmarks...\n")
+
+// Sanity check once (fail fast if parsing regressed)
+{
+	const single = await readOsmPbf(buffer.slice(0))
+	await testOsmPbfReader(single, monaco)
+	const parallel = await readOsmPbfParallel(buffer.slice(0), { workers: 2 })
+	await testOsmPbfReader(parallel, monaco)
+}
+
+group("readOsmPbf (monaco)", () => {
+	bench("generators (single-thread)", async () => {
+		const osm = await readOsmPbf(buffer.slice(0))
+		await testOsmPbfReader(osm, monaco)
 	})
 
-	bench("parse with generators (parallel decode)", async () => {
-		const file = await getFixtureFile(pbf.url)
-		const osm = await readOsmPbfParallel(file, { workers: 2 })
-
-		await testOsmPbfReader(osm, pbf)
+	bench("generators (parallel decode, workers=2)", async () => {
+		const osm = await readOsmPbfParallel(buffer.slice(0), { workers: 2 })
+		await testOsmPbfReader(osm, monaco)
 	})
 
-	bench("parse streaming", async () => {
+	bench("generators (parallel decode, workers=4)", async () => {
+		const osm = await readOsmPbfParallel(buffer.slice(0), { workers: 4 })
+		await testOsmPbfReader(osm, monaco)
+	})
+
+	bench("streaming TransformStream (single-thread)", async () => {
 		const { onGroup, count } = createOsmEntityCounter()
-
-		await getFixtureFileReadStream(pbf.url)
+		await getFixtureFileReadStream(monaco.url)
 			.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
 			.pipeTo(
 				new WritableStream({
@@ -47,8 +62,16 @@ describe.each(Object.entries(PBFs))("%s", (_name, pbf) => {
 				}),
 			)
 
-		expect(count.nodes).toBe(pbf.nodes)
-		expect(count.ways).toBe(pbf.ways)
-		expect(count.relations).toBe(pbf.relations)
+		if (
+			count.nodes !== monaco.nodes ||
+			count.ways !== monaco.ways ||
+			count.relations !== monaco.relations
+		) {
+			throw Error(
+				`Unexpected counts: ${count.nodes}/${count.ways}/${count.relations}`,
+			)
+		}
 	})
 })
+
+await run({ colors: true })

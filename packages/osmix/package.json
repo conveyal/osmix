@@ -36,6 +36,7 @@
 	"sideEffects": false,
 	"scripts": {
 		"build": "tsc --excludeDirectories test",
+		"bench": "bun run test/read-pbf.bench.ts && bun run test/extract.bench.ts",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
@@ -43,6 +44,7 @@
 	"devDependencies": {
 		"@types/bun": "catalog:",
 		"@types/geojson": "catalog:",
+		"mitata": "^1.0.34",
 		"typescript": "catalog:"
 	},
 	"dependencies": {

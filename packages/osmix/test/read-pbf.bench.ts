@@ -1,23 +1,24 @@
-import { beforeAll, describe } from "bun:test"
-import { getFixtureFile } from "@osmix/shared/test/fixtures"
-
-// @ts-expect-error - bench is available at runtime but not in types
-const { bench } = globalThis as { bench: typeof import("bun:test").test }
-
+import { getFixtureFile, PBFs } from "@osmix/shared/test/fixtures"
+import { bench, group, run } from "mitata"
 import { fromPbf } from "../src/pbf"
 
-const PBF = "monaco.pbf"
+/**
+ * Osmix ingestion benchmarks (mitata).
+ *
+ * Run with: `bun --filter osmix bench`
+ */
 
-let buffer: Uint8Array<ArrayBufferLike>
+const monaco = PBFs["monaco"]
+if (!monaco) throw Error("Missing Monaco fixture metadata")
 
-beforeAll(async () => {
-	buffer = await getFixtureFile(PBF)
-})
+console.log("Loading fixture bytes...")
+const buffer = await getFixtureFile(monaco.url)
+console.log("Fixture loaded. Running benchmarks...\n")
 
-describe("PBF parse concurrency benchmark", () => {
-	const noopProgress = () => {}
+const noopProgress = () => {}
 
-	bench("fromPbf (parseConcurrency=1)", async () => {
+group("fromPbf (monaco, no spatial indexes)", () => {
+	bench("parseConcurrency=1", async () => {
 		const data = buffer.slice(0)
 		await fromPbf(
 			data,
@@ -31,7 +32,7 @@ describe("PBF parse concurrency benchmark", () => {
 		)
 	})
 
-	bench("fromPbf (parseConcurrency=2)", async () => {
+	bench("parseConcurrency=2", async () => {
 		const data = buffer.slice(0)
 		await fromPbf(
 			data,
@@ -44,7 +45,7 @@ describe("PBF parse concurrency benchmark", () => {
 		)
 	})
 
-	bench("fromPbf (parseConcurrency=4)", async () => {
+	bench("parseConcurrency=4", async () => {
 		const data = buffer.slice(0)
 		await fromPbf(
 			data,
@@ -57,3 +58,5 @@ describe("PBF parse concurrency benchmark", () => {
 		)
 	})
 })
+
+await run({ colors: true })
