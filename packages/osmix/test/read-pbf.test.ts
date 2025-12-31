@@ -19,6 +19,15 @@ describe("read", () => {
 			expect(osm.ways.size).toBe(pbf.ways)
 		})
 
+		it("into OSM class (ingest in worker)", async () => {
+			const bytes = await getFixtureFile(pbf.url)
+			const osm = await fromPbf(bytes, { ingestInWorker: true })
+			expect(osm.nodes.size).toBe(pbf.nodes)
+			expect(osm.stringTable.length).toBe(pbf.uniqueStrings)
+			expect(osm.nodes.getByIndex(0)).toEqual(pbf.node0)
+			expect(osm.ways.size).toBe(pbf.ways)
+		})
+
 		it("into OSM class (parallel decode)", async () => {
 			const fileStream = getFixtureFileReadStream(pbf.url)
 			const osm = await fromPbf(fileStream, { parseConcurrency: 2 })

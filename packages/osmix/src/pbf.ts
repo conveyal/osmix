@@ -23,6 +23,7 @@ import {
 import {
 	logProgress,
 	type ProgressEvent,
+	type Progress,
 	progressEvent,
 } from "@osmix/shared/progress"
 import type {
@@ -47,6 +48,15 @@ export interface OsmFromPbfOptions extends OsmOptions {
 	 * deterministic. Set to `1` (default) to disable.
 	 */
 	parseConcurrency?: number
+	/**
+	 * Run entity ingestion (and index building) in a dedicated Worker.
+	 *
+	 * Notes:
+	 * - This is primarily for moving heavy ingestion work off the main thread.
+	 * - `filter` functions cannot be sent to workers; if `filter` is provided, this
+	 *   option is ignored and ingestion happens on the current thread.
+	 */
+	ingestInWorker?: boolean
 	filter<T extends OsmEntityType>(
 		type: T,
 		entity: OsmEntityTypeMap[T],
@@ -74,12 +84,119 @@ export async function fromPbf(
 	options: Partial<OsmFromPbfOptions> = {},
 	onProgress: (progress: ProgressEvent) => void = logProgress,
 ): Promise<Osm> {
+	// If a user passes a filter function, we must ingest locally (functions aren't transferable).
+	const hasFilter = typeof options.filter === "function"
+	if (options.ingestInWorker && !hasFilter && typeof Worker !== "undefined") {
+		const bytes = await toUint8Array(data)
+		return fromPbfInWorker(bytes, options, onProgress)
+	}
+
 	const createOsm = startCreateOsmFromPbf(data, options)
 	do {
 		const { value, done } = await createOsm.next()
 		if (done) return value
 		onProgress(value)
 	} while (true)
+}
+
+async function toUint8Array(
+	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
+): Promise<Uint8Array<ArrayBufferLike>> {
+	// Common fast-path: already a Uint8Array
+	if (data instanceof Uint8Array) return data
+	// Fall back to reading through @osmix/pbf's async normalization
+	const { toAsyncGenerator } = await import("@osmix/pbf")
+	const chunks: Uint8Array[] = []
+	let total = 0
+	for await (const chunk of toAsyncGenerator(data)) {
+		const u8 = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk)
+		chunks.push(u8)
+		total += u8.byteLength
+	}
+	const out = new Uint8Array(total) as Uint8Array<ArrayBufferLike>
+	let offset = 0
+	for (const c of chunks) {
+		out.set(c, offset)
+		offset += c.byteLength
+	}
+	return out
+}
+
+async function fromPbfInWorker(
+	data: Uint8Array<ArrayBufferLike>,
+	options: Partial<OsmFromPbfOptions>,
+	onProgress: (progress: ProgressEvent) => void,
+): Promise<Osm> {
+	return new Promise<Osm>((resolve, reject) => {
+		const worker = new Worker(
+			new URL("./workers/from-pbf.worker.ts", import.meta.url),
+			{ type: "module" },
+		)
+
+		const cleanup = () => {
+			worker.removeEventListener("message", onMessage)
+			worker.removeEventListener("error", onError)
+			worker.terminate()
+		}
+
+		const onError = (e: ErrorEvent) => {
+			cleanup()
+			reject(e.error ?? Error(e.message))
+		}
+
+		const onMessage = (e: MessageEvent) => {
+			const msg = e.data as
+				| { type: "progress"; value: Progress }
+				| { type: "result"; value: ReturnType<Osm["transferables"]> }
+				| { type: "error"; value: { message: string; stack?: string } }
+			if (msg.type === "progress") {
+				onProgress(
+					new CustomEvent("progress", { detail: msg.value }) as ProgressEvent,
+				)
+				return
+			}
+			if (msg.type === "result") {
+				cleanup()
+				const osm = new Osm(msg.value)
+				// Build spatial indexes on the main thread to avoid sending spatial-index
+				// buffers through postMessage (some runtimes can't clone them reliably).
+				onProgress(progressEvent("Building spatial indexes..."))
+				if (!Array.isArray(options.buildSpatialIndexes)) {
+					osm.buildSpatialIndexes()
+				} else if (options.buildSpatialIndexes.includes("node")) {
+					osm.nodes.buildSpatialIndex()
+				} else if (options.buildSpatialIndexes.includes("way")) {
+					osm.ways.buildSpatialIndex()
+				} else if (options.buildSpatialIndexes.includes("relation")) {
+					osm.relations.buildSpatialIndex()
+				}
+				resolve(osm)
+				return
+			}
+			if (msg.type === "error") {
+				cleanup()
+				const err = Error(msg.value.message)
+				if (msg.value.stack) err.stack = msg.value.stack
+				reject(err)
+			}
+		}
+
+		worker.addEventListener("message", onMessage)
+		worker.addEventListener("error", onError)
+
+		// Send bytes + options.
+		// - Do not transfer the buffer: the caller might reuse `data`.
+		// - Force spatial index building to happen on the main thread (see above).
+		const workerOptions: Partial<OsmFromPbfOptions> = {
+			...options,
+			ingestInWorker: false,
+			buildSpatialIndexes: [],
+		}
+		worker.postMessage({
+			data: data.slice(0),
+			options: workerOptions,
+		})
+	})
 }
 
 /**

@@ -59,4 +59,34 @@ group("fromPbf (monaco, no spatial indexes)", () => {
 	})
 })
 
+group("fromPbf (monaco, ingest in worker, no spatial indexes)", () => {
+	bench("parseConcurrency=1", async () => {
+		const data = buffer.slice(0)
+		await fromPbf(
+			data,
+			{
+				id: "bench-worker-1",
+				parseConcurrency: 1,
+				ingestInWorker: true,
+				buildSpatialIndexes: [],
+			},
+			noopProgress,
+		)
+	})
+
+	bench("parseConcurrency=2", async () => {
+		const data = buffer.slice(0)
+		await fromPbf(
+			data,
+			{
+				id: "bench-worker-2",
+				parseConcurrency: 2,
+				ingestInWorker: true,
+				buildSpatialIndexes: [],
+			},
+			noopProgress,
+		)
+	})
+})
+
 await run({ colors: true })
