@@ -13,6 +13,7 @@ import type { UseOsmFileReturn } from "../hooks/osm"
 import { APPID } from "../settings"
 import { osmFileControlIsOpenAtom } from "../state/map"
 import ActionButton from "./action-button"
+import CustomControl from "./custom-control"
 import OsmInfoTable from "./osm-info-table"
 import { Button } from "./ui/button"
 
@@ -112,7 +113,10 @@ function OsmFileCard({ osmFile, onClear }: OsmFileCardProps) {
 					/>
 					{onClear && (
 						<ActionButton
-							onAction={onClear}
+							onAction={async () => {
+								window.confirm("Are you sure you want to clear the file?") &&
+									onClear()
+							}}
 							icon={<XIcon />}
 							title="Clear file"
 							variant="ghost"
@@ -139,7 +143,6 @@ export interface OsmFileMapControlProps {
 
 export default function OsmFileMapControl({ files }: OsmFileMapControlProps) {
 	const isOpen = useAtomValue(osmFileControlIsOpenAtom)
-
 	if (!isOpen) return null
 
 	// Filter to only show files that are loaded
@@ -147,17 +150,11 @@ export default function OsmFileMapControl({ files }: OsmFileMapControlProps) {
 		(f) => f.osmFile.osm && f.osmFile.osmInfo && f.osmFile.fileInfo,
 	)
 
-	if (loadedFiles.length === 0) return null
-
-	return (
-		<div className="flex flex-col">
-			{loadedFiles.map((file) => (
-				<OsmFileCard
-					key={file.osmFile.fileInfo?.fileHash}
-					osmFile={file.osmFile}
-					onClear={file.onClear}
-				/>
-			))}
-		</div>
-	)
+	return loadedFiles.map((file) => (
+		<CustomControl key={file.osmFile.fileInfo?.fileHash} position="top-left">
+			<div className="flex flex-col">
+				<OsmFileCard osmFile={file.osmFile} onClear={file.onClear} />
+			</div>
+		</CustomControl>
+	))
 }

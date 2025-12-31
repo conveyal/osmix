@@ -1,13 +1,5 @@
-import { changeStatsSummary } from "@osmix/change"
 import { useAtom, useSetAtom } from "jotai"
-import {
-	DownloadIcon,
-	MaximizeIcon,
-	MergeIcon,
-	SaveIcon,
-	SearchCode,
-	XIcon,
-} from "lucide-react"
+import { MergeIcon } from "lucide-react"
 import { Suspense, useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "react-router"
 import ActionButton from "../components/action-button"
@@ -23,7 +15,6 @@ import ChangesSummary, {
 	ChangesPagination,
 } from "../components/osm-changes-summary"
 import OsmFileMapControl from "../components/osm-file-map-control"
-import OsmInfoTable from "../components/osm-info-table"
 import OsmixRasterSource from "../components/osmix-raster-source"
 import OsmixVectorOverlay from "../components/osmix-vector-overlay"
 import RouteLayer from "../components/route-layer"
@@ -31,7 +22,6 @@ import SelectedEntityLayer from "../components/selected-entity-layer"
 import SidebarLog from "../components/sidebar-log"
 import StoredOsmList from "../components/stored-osm-list"
 import TileBoundsLayer from "../components/tile-bounds-layer"
-import { ButtonGroup } from "../components/ui/button-group"
 import { Card, CardContent, CardHeader } from "../components/ui/card"
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
@@ -117,76 +107,24 @@ export default function InspectPage() {
 		<Main>
 			<Sidebar>
 				<div className="flex flex-1 flex-col overflow-y-auto p-2 lg:p-4 gap-4">
-					<Card>
-						<CardHeader>
-							<div className="font-bold uppercase p-2">
-								{baseOsm.fileInfo?.fileName}
-							</div>
-							<ButtonGroup>
-								{!baseOsm.isStored && (
-									<ActionButton
-										onAction={baseOsm.saveToStorage}
-										variant="ghost"
-										icon={<SaveIcon />}
-										title="Save to storage"
-									/>
-								)}
-								{changesetStats == null && (
-									<ActionButton
-										onAction={async () => {
-											if (!baseOsm.osm) throw Error("Osm has not been loaded.")
-											const task = Log.startTask(
-												"Finding duplicate nodes and ways",
-											)
-											const changes = await osmWorker.generateChangeset(
-												baseOsm.osm.id,
-												baseOsm.osm.id,
-												{
-													deduplicateNodes: true,
-													deduplicateWays: true,
-												},
-											)
-											setChangesetStats(changes)
-											task.end(changeStatsSummary(changes))
-										}}
-										icon={<SearchCode />}
-										title="Find duplicate nodes and ways"
-										variant="ghost"
-									/>
-								)}
-								<ActionButton
-									onAction={async () => {
-										selectEntity(null, null)
-										setChangesetStats(null)
-										await baseOsm.loadOsmFile(null)
-									}}
-									icon={<XIcon />}
-									title="Clear file"
-									variant="ghost"
-								/>
-								<ActionButton
-									onAction={baseOsm.downloadOsm}
-									variant="ghost"
-									icon={<DownloadIcon />}
-									title="Download OSM PBF"
-								/>
-								<ActionButton
-									onAction={async () => flyToOsmBounds(baseOsm.osmInfo)}
-									variant="ghost"
-									icon={<MaximizeIcon />}
-									title="Fit bounds to file bbox"
-								/>
-							</ButtonGroup>
-						</CardHeader>
-						<CardContent>
-							<OsmInfoTable
-								file={baseOsm.file}
-								fileInfo={baseOsm.fileInfo}
-								osm={baseOsm.osm}
-							/>
-						</CardContent>
-					</Card>
-
+					{baseOsm.osm && (
+						<ActionButton
+							onAction={async () => {
+								if (!baseOsm.osm) throw Error("Osm has not been loaded.")
+								const changes = await osmWorker.generateChangeset(
+									baseOsm.osm.id,
+									baseOsm.osm.id,
+									{
+										deduplicateNodes: true,
+										deduplicateWays: true,
+									},
+								)
+								setChangesetStats(changes)
+							}}
+						>
+							Find duplicate nodes and ways
+						</ActionButton>
+					)}
 					{changesetStats != null && (
 						<>
 							<Card>
@@ -252,24 +190,21 @@ export default function InspectPage() {
 					)}
 
 					<TileBoundsLayer />
-
 					<SelectedEntityLayer />
 					<RouteLayer />
 
-					<CustomControl position="top-left">
-						<OsmFileMapControl
-							files={[
-								{
-									osmFile: baseOsm,
-									onClear: async () => {
-										selectEntity(null, null)
-										setChangesetStats(null)
-										await baseOsm.loadOsmFile(null)
-									},
+					<OsmFileMapControl
+						files={[
+							{
+								osmFile: baseOsm,
+								onClear: async () => {
+									selectEntity(null, null)
+									setChangesetStats(null)
+									await baseOsm.loadOsmFile(null)
 								},
-							]}
-						/>
-					</CustomControl>
+							},
+						]}
+					/>
 					{baseOsm.osm && (
 						<CustomControl position="top-left">
 							<EntityDetailsMapControl osm={baseOsm.osm} />

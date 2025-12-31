@@ -71,28 +71,26 @@ export default function Merge() {
 
 					<SelectedEntityLayer />
 
-					<CustomControl position="top-left">
-						<OsmFileMapControl
-							files={[
-								{
-									osmFile: base,
-									onClear: async () => {
-										selectEntity(null, null)
-										setChangesetStats(null)
-										await base.loadOsmFile(null)
-									},
+					<OsmFileMapControl
+						files={[
+							{
+								osmFile: base,
+								onClear: async () => {
+									selectEntity(null, null)
+									setChangesetStats(null)
+									await base.loadOsmFile(null)
 								},
-								{
-									osmFile: patch,
-									onClear: async () => {
-										selectEntity(null, null)
-										setChangesetStats(null)
-										await patch.loadOsmFile(null)
-									},
+							},
+							{
+								osmFile: patch,
+								onClear: async () => {
+									selectEntity(null, null)
+									setChangesetStats(null)
+									await patch.loadOsmFile(null)
 								},
-							]}
-						/>
-					</CustomControl>
+							},
+						]}
+					/>
 					{base.osm && (
 						<CustomControl position="top-left">
 							<EntityDetailsMapControl osm={base.osm} />

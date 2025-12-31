@@ -1,6 +1,7 @@
 import { type PrimitiveAtom, useAtom } from "jotai"
 import {
 	FileIcon,
+	FilesIcon,
 	Layers,
 	Navigation,
 	SearchIcon,
@@ -76,7 +77,7 @@ export default function Nav() {
 					<SearchIcon />
 				</ToggleButton>
 				<ToggleButton atom={osmFileControlIsOpenAtom}>
-					<FileIcon />
+					<FilesIcon />
 				</ToggleButton>
 				<ButtonGroupSeparator />
 				<div className="whitespace-nowrap px-2">
