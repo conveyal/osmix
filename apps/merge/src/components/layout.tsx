@@ -18,7 +18,7 @@ export function Sidebar({ children }: { children: ReactNode }) {
 		<div className="relative flex h-full min-h-0 flex-row z-10 group/sidebar">
 			<div
 				className={cn(
-					"flex h-full min-h-0 flex-col w-0 transition-all overflow-hidden bg-slate-100",
+					"flex h-full min-h-0 flex-col w-0 overflow-hidden bg-slate-100",
 					isOpen && "w-xs md:w-sm lg:w-md xl:w-lg",
 				)}
 			>
@@ -28,7 +28,7 @@ export function Sidebar({ children }: { children: ReactNode }) {
 				type="button"
 				onClick={() => setIsOpen((o) => !o)}
 				className={cn(
-					"absolute top-0 h-full w-4 flex items-center justify-center cursor-pointer transition-all",
+					"absolute top-0 h-full w-4 flex items-center justify-center cursor-pointer",
 					"bg-slate-200 hover:bg-slate-300",
 					isOpen
 						? "right-0 translate-x-full opacity-0 group-hover/sidebar:opacity-100"
