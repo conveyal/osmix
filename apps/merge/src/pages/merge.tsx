@@ -1,5 +1,5 @@
 import { useSetAtom } from "jotai"
-import { useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import MergeBlock from "../blocks/merge"
 import Basemap, { type MapInitialViewState } from "../components/basemap"
 import CustomControl from "../components/custom-control"
@@ -16,6 +16,7 @@ import { useOsmFile } from "../hooks/osm"
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
 import { selectOsmEntityAtom } from "../state/osm"
+import { osmWorker } from "../state/worker"
 
 export default function Merge() {
 	const base = useOsmFile(BASE_OSM_KEY)
@@ -23,6 +24,21 @@ export default function Merge() {
 	const setChangesetStats = useSetAtom(changesetStatsAtom)
 	const flyToOsmBounds = useFlyToOsmBounds()
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
+	const autoLoadAttempted = useRef(false)
+
+	// Auto-load the most recently used file on mount
+	useEffect(() => {
+		if (autoLoadAttempted.current) return
+		autoLoadAttempted.current = true
+
+		osmWorker.getMostRecentlyUsed().then((mostRecent) => {
+			if (mostRecent) {
+				base.loadFromStorage(mostRecent.fileHash).then((osmInfo) => {
+					flyToOsmBounds(osmInfo)
+				})
+			}
+		})
+	}, [base, flyToOsmBounds])
 
 	// Show full-screen file selector when no files are selected
 	const noFilesSelected = !base.osm && !patch.osm

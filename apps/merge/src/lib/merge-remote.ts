@@ -115,4 +115,12 @@ export class MergeRemote extends OsmixRemote<MergeWorker> {
 	getStorageStats(): Promise<{ count: number; estimatedBytes: number }> {
 		return this.getWorker().getStorageStats()
 	}
+
+	/**
+	 * Get the most recently accessed stored Osm entry.
+	 * Returns null if no entries exist.
+	 */
+	getMostRecentlyUsed(): Promise<StoredOsmEntry | null> {
+		return this.getWorker().getMostRecentlyUsed()
+	}
 }

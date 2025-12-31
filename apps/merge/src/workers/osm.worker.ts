@@ -23,6 +23,7 @@ export interface StoredFileInfo {
 export interface StoredOsmEntry extends StoredFileInfo {
 	info: OsmInfo
 	storedAt: number
+	lastAccessedAt: number
 }
 
 export interface StoredOsm
@@ -36,6 +37,7 @@ interface OsmixDB extends DBSchema {
 		indexes: {
 			"by-stored-at": number
 			"by-hash": string
+			"by-last-accessed": number
 		}
 	}
 }
@@ -60,10 +62,20 @@ export class MergeWorker extends OsmixWorker {
 	private async getDB(): Promise<IDBPDatabase<OsmixDB>> {
 		if (!this.dbPromise) {
 			this.dbPromise = openDB<OsmixDB>(DB_NAME, DB_VERSION, {
-				upgrade(db) {
-					const store = db.createObjectStore(OSM_STORE, { keyPath: "fileHash" })
-					store.createIndex("by-stored-at", "storedAt")
-					store.createIndex("by-hash", "fileHash")
+				upgrade(db, oldVersion, _newVersion, transaction) {
+					if (oldVersion < 1) {
+						// Fresh install: create store with all indexes
+						const store = db.createObjectStore(OSM_STORE, {
+							keyPath: "fileHash",
+						})
+						store.createIndex("by-stored-at", "storedAt")
+						store.createIndex("by-hash", "fileHash")
+						store.createIndex("by-last-accessed", "lastAccessedAt")
+					} else if (oldVersion < 2) {
+						// Upgrade from v1: add lastAccessedAt index
+						const store = transaction.objectStore(OSM_STORE)
+						store.createIndex("by-last-accessed", "lastAccessedAt")
+					}
 				},
 			})
 		}
@@ -96,6 +108,7 @@ export class MergeWorker extends OsmixWorker {
 		return {
 			info: stored.info,
 			storedAt: stored.storedAt,
+			lastAccessedAt: stored.lastAccessedAt ?? stored.storedAt,
 			fileHash: stored.fileHash,
 			fileName: stored.fileName,
 			fileSize: stored.fileSize,
@@ -114,11 +127,13 @@ export class MergeWorker extends OsmixWorker {
 		const transferables = osm.transferables()
 		const info = osm.info()
 		const db = await this.getDB()
+		const now = Date.now()
 
 		await db.put(OSM_STORE, {
 			...toStorableTransferables(transferables),
 			info,
-			storedAt: Date.now(),
+			storedAt: now,
+			lastAccessedAt: now,
 			fileHash: fileInfo.fileHash,
 			fileName: fileInfo.fileName,
 			fileSize: fileInfo.fileSize,
@@ -129,6 +144,7 @@ export class MergeWorker extends OsmixWorker {
 	/**
 	 * Load an Osm from IndexedDB by storage ID and register it in this worker.
 	 * Builds spatial indexes automatically after loading.
+	 * Updates the lastAccessedAt timestamp.
 	 * Returns the OsmInfo if found, null otherwise.
 	 */
 	async loadFromStorage(storageId: string): Promise<{
@@ -138,6 +154,12 @@ export class MergeWorker extends OsmixWorker {
 		const db = await this.getDB()
 		const stored = await db.get(OSM_STORE, storageId)
 		if (!stored) return null
+
+		// Update lastAccessedAt timestamp
+		const now = Date.now()
+		stored.lastAccessedAt = now
+		await db.put(OSM_STORE, stored)
+		this.notifyStorageChange()
 
 		// Convert from storage format and reconstruct Osm
 		const transferables = fromStorableTransferables(stored)
@@ -151,6 +173,7 @@ export class MergeWorker extends OsmixWorker {
 			entry: {
 				info: stored.info,
 				storedAt: stored.storedAt,
+				lastAccessedAt: now,
 				fileHash: stored.fileHash,
 				fileName: stored.fileName,
 				fileSize: stored.fileSize,
@@ -161,17 +184,21 @@ export class MergeWorker extends OsmixWorker {
 
 	/**
 	 * Get all stored Osm entries (metadata only, not the full transferables).
+	 * Sorted by lastAccessedAt descending (most recently used first).
 	 */
 	async listStoredOsm(): Promise<StoredOsmEntry[]> {
 		const db = await this.getDB()
 		const all = await db.getAll(OSM_STORE)
-		return all.map((stored) => ({
-			info: stored.info,
-			storedAt: stored.storedAt,
-			fileHash: stored.fileHash,
-			fileName: stored.fileName,
-			fileSize: stored.fileSize,
-		}))
+		return all
+			.map((stored) => ({
+				info: stored.info,
+				storedAt: stored.storedAt,
+				lastAccessedAt: stored.lastAccessedAt ?? stored.storedAt,
+				fileHash: stored.fileHash,
+				fileName: stored.fileName,
+				fileSize: stored.fileSize,
+			}))
+			.sort((a, b) => b.lastAccessedAt - a.lastAccessedAt)
 	}
 
 	/**
@@ -212,6 +239,36 @@ export class MergeWorker extends OsmixWorker {
 			)
 		}
 		return { count: all.length, estimatedBytes }
+	}
+
+	/**
+	 * Get the most recently accessed stored Osm entry.
+	 * Returns null if no entries exist.
+	 */
+	async getMostRecentlyUsed(): Promise<StoredOsmEntry | null> {
+		const db = await this.getDB()
+		const all = await db.getAll(OSM_STORE)
+		if (all.length === 0) return null
+
+		// Find the entry with the highest lastAccessedAt (or storedAt as fallback)
+		let mostRecent = all[0]
+		let mostRecentTime = mostRecent.lastAccessedAt ?? mostRecent.storedAt
+		for (const stored of all) {
+			const accessTime = stored.lastAccessedAt ?? stored.storedAt
+			if (accessTime > mostRecentTime) {
+				mostRecent = stored
+				mostRecentTime = accessTime
+			}
+		}
+
+		return {
+			info: mostRecent.info,
+			storedAt: mostRecent.storedAt,
+			lastAccessedAt: mostRecent.lastAccessedAt ?? mostRecent.storedAt,
+			fileHash: mostRecent.fileHash,
+			fileName: mostRecent.fileName,
+			fileSize: mostRecent.fileSize,
+		}
 	}
 }
 

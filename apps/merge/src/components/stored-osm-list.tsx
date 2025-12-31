@@ -176,7 +176,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 				</ItemActions>
 			</ItemHeader>
 			<ItemContent className="text-muted-foreground">
-				{formatStats(entry.info)} &middot; {formatDate(entry.storedAt)}
+				{formatStats(entry.info)} &middot; {formatDate(entry.lastAccessedAt)}
 			</ItemContent>
 		</Item>
 	)
