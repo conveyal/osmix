@@ -17,3 +17,7 @@ export const searchControlIsOpenAtom = atomWithStorage(
 	"@osmix:map:searchIsOpen",
 	false,
 )
+export const osmFileControlIsOpenAtom = atomWithStorage(
+	"@osmix:map:osmFileControlIsOpen",
+	true,
+)

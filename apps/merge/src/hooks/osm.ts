@@ -15,6 +15,8 @@ import {
 import { osmWorker } from "../state/worker"
 import type { StoredFileInfo } from "../workers/osm.worker"
 
+export type UseOsmFileReturn = ReturnType<typeof useOsmFile>
+
 export function useOsmFile(osmKey: string) {
 	const [file, setFile] = useAtom(osmFileAtomFamily(osmKey))
 	const [fileInfo, setFileInfo] = useAtom(osmFileInfoAtomFamily(osmKey))

@@ -17,13 +17,12 @@ export default function OsmInfoTable({
 	fileInfo?: StoredFileInfo | null
 }) {
 	// Get file name and size from either file or fileInfo
-	const fileName = file?.name ?? fileInfo?.fileName
 	const fileSize = file?.size ?? fileInfo?.fileSize
 
 	if (!osm || (!file && !fileInfo)) return null
 	return (
 		<Details defaultOpen={defaultOpen}>
-			<DetailsSummary>FILE INFO: {fileName}</DetailsSummary>
+			<DetailsSummary>FILE INFO</DetailsSummary>
 			<DetailsContent className="overflow-auto">
 				<table>
 					<tbody>
