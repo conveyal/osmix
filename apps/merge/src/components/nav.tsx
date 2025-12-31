@@ -1,6 +1,5 @@
 import { type PrimitiveAtom, useAtom } from "jotai"
 import {
-	FileIcon,
 	FilesIcon,
 	Layers,
 	Navigation,
