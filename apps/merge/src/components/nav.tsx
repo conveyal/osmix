@@ -1,16 +1,9 @@
 import { type PrimitiveAtom, useAtom } from "jotai"
-import {
-	FilesIcon,
-	Layers,
-	Navigation,
-	SearchIcon,
-	SidebarClose,
-} from "lucide-react"
+import { FilesIcon, Layers, Navigation, SearchIcon } from "lucide-react"
 import { NavLink } from "react-router"
 import CenterInfo from "../components/center-info"
 import ZoomInfo, { ZoomInButton, ZoomOutButton } from "../components/zoom-info"
 import { cn } from "../lib/utils"
-import { sidebarIsOpenAtom } from "../state/layout"
 import {
 	layerControlIsOpenAtom,
 	osmFileControlIsOpenAtom,
@@ -63,9 +56,6 @@ export default function Nav() {
 			<Status />
 
 			<ButtonGroup className="flex flex-row h-full items-center gap-1">
-				<ToggleButton atom={sidebarIsOpenAtom}>
-					<SidebarClose />
-				</ToggleButton>
 				<ToggleButton atom={routingControlIsOpenAtom}>
 					<Navigation />
 				</ToggleButton>
