@@ -1,5 +1,4 @@
 import { useAtom } from "jotai"
-import { ChevronLeft, ChevronRight } from "lucide-react"
 import type { ReactNode } from "react"
 import { cn } from "../lib/utils"
 import { sidebarIsOpenAtom } from "../state/layout"
@@ -28,20 +27,14 @@ export function Sidebar({ children }: { children: ReactNode }) {
 				type="button"
 				onClick={() => setIsOpen((o) => !o)}
 				className={cn(
-					"absolute top-0 h-full w-4 flex items-center justify-center cursor-pointer",
+					"absolute top-0 h-full w-2 flex items-center justify-center cursor-col-resize",
 					"bg-slate-200 hover:bg-slate-300",
 					isOpen
 						? "right-0 translate-x-full opacity-0 group-hover/sidebar:opacity-100"
 						: "left-0 opacity-100",
 				)}
 				aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
-			>
-				{isOpen ? (
-					<ChevronLeft className="size-3" />
-				) : (
-					<ChevronRight className="size-3" />
-				)}
-			</button>
+			/>
 		</div>
 	)
 }
