@@ -29,13 +29,12 @@ export function Sidebar({ children }: { children: ReactNode }) {
 				onClick={() => setIsOpen((o) => !o)}
 				className={cn(
 					"h-full w-3 flex items-center justify-center cursor-col-resize",
-					"bg-slate-200 hover:bg-slate-300",
-					isOpen && "opacity-0 group-hover/sidebar:opacity-100",
+					"bg-slate-100 group-hover/sidebar:bg-slate-200 hover:bg-slate-300",
 				)}
 				aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
 			>
 				{isOpen ? (
-					<ChevronLeft className="size-2" />
+					<ChevronLeft className="size-2 opacity-0 group-hover/sidebar:opacity-100" />
 				) : (
 					<ChevronRight className="size-2" />
 				)}
