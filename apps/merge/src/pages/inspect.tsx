@@ -39,12 +39,14 @@ export default function InspectPage() {
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom)
 
-	// Handle auto-loading from URL parameter
-	const loadParamProcessed = useRef(false)
+	// Handle auto-loading from URL parameter or most recently used file
+	const autoLoadAttempted = useRef(false)
 	useEffect(() => {
+		if (autoLoadAttempted.current) return
+		autoLoadAttempted.current = true
+
 		const loadId = searchParams.get("load")
-		if (loadId && !loadParamProcessed.current) {
-			loadParamProcessed.current = true
+		if (loadId) {
 			// Clear the URL parameter
 			setSearchParams({}, { replace: true })
 			// Load the file from storage
@@ -53,8 +55,17 @@ export default function InspectPage() {
 					flyToOsmBounds(osmInfo)
 				}
 			})
+		} else {
+			// No URL parameter, try to load the most recently used file
+			osmWorker.getMostRecentlyUsed().then((mostRecent) => {
+				if (mostRecent) {
+					baseOsm.loadFromStorage(mostRecent.fileHash).then((osmInfo) => {
+						flyToOsmBounds(osmInfo)
+					})
+				}
+			})
 		}
-	}, [searchParams, setSearchParams, baseOsm.loadFromStorage, flyToOsmBounds])
+	}, [searchParams, setSearchParams, baseOsm, flyToOsmBounds])
 
 	const applyChanges = async () => {
 		if (!baseOsm.osm) throw Error("Osm has not been loaded.")
