@@ -19,7 +19,10 @@ bun install osmix
 import { fromPbf, fromGeoJSON, toPbfBuffer } from "osmix"
 
 const monacoPbf = await Bun.file("./monaco.pbf").arrayBuffer()
-const osm = await fromPbf(monacoPbf)
+const osm = await fromPbf(monacoPbf, {
+	// Decode primitive PBF blocks in parallel (worker pool). Default: 1
+	parseConcurrency: 4,
+})
 
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
 
@@ -103,6 +106,7 @@ spec-compliant without staging everything in memory.
 ### Loading
 
 - `fromPbf(data, options?)` - Load OSM data from PBF (buffer, stream, or File).
+  - `options.parseConcurrency` - Parallelize primitive-block decoding (default: `1`).
 - `fromGeoJSON(data, options?)` - Load OSM data from GeoJSON.
 - `readOsmPbfHeader(data)` - Read only the PBF header without loading entities.
 

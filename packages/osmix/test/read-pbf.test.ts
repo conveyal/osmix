@@ -18,5 +18,24 @@ describe("read", () => {
 			expect(osm.nodes.getByIndex(0)).toEqual(pbf.node0)
 			expect(osm.ways.size).toBe(pbf.ways)
 		})
+
+		it("into OSM class (parallel decode)", async () => {
+			const fileStream = getFixtureFileReadStream(pbf.url)
+			const osm = await fromPbf(fileStream, { parseConcurrency: 2 })
+			expect(osm.nodes.size).toBe(pbf.nodes)
+			expect(osm.stringTable.length).toBe(pbf.uniqueStrings)
+			expect(osm.nodes.getByIndex(0)).toEqual(pbf.node0)
+			expect(osm.ways.size).toBe(pbf.ways)
+		})
+
+		it("parallel decode matches single-thread content", async () => {
+			const fileStream1 = getFixtureFileReadStream(pbf.url)
+			const fileStream2 = getFixtureFileReadStream(pbf.url)
+			const [single, parallel] = await Promise.all([
+				fromPbf(fileStream1, { parseConcurrency: 1 }),
+				fromPbf(fileStream2, { parseConcurrency: 2 }),
+			])
+			expect(parallel.isEqual(single)).toBe(true)
+		})
 	})
 })

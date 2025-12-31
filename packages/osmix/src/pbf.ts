@@ -18,6 +18,7 @@ import {
 	OsmBlocksToPbfBytesTransformStream,
 	OsmPbfBytesToBlocksTransformStream,
 	readOsmPbf,
+	readOsmPbfParallel,
 } from "@osmix/pbf"
 import {
 	logProgress,
@@ -39,6 +40,13 @@ import { createReadableEntityStreamFromOsm } from "./utils"
  */
 export interface OsmFromPbfOptions extends OsmOptions {
 	extractBbox: GeoBbox2D
+	/**
+	 * Decode primitive PBF blocks in parallel using a worker pool.
+	 *
+	 * This speeds up decompression + protobuf decoding, while keeping entity ingestion
+	 * deterministic. Set to `1` (default) to disable.
+	 */
+	parseConcurrency?: number
 	filter<T extends OsmEntityType>(
 		type: T,
 		entity: OsmEntityTypeMap[T],
@@ -84,7 +92,11 @@ export async function* startCreateOsmFromPbf(
 	options: Partial<OsmFromPbfOptions> = {},
 ): AsyncGenerator<ProgressEvent, Osm> {
 	const { extractBbox } = options
-	const { header, blocks } = await readOsmPbf(data)
+	const parseConcurrency = options.parseConcurrency ?? 1
+	const { header, blocks } =
+		parseConcurrency > 1
+			? await readOsmPbfParallel(data, { workers: parseConcurrency })
+			: await readOsmPbf(data)
 	const osm = new Osm({
 		...options,
 		header,
