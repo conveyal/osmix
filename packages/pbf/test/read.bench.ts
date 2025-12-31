@@ -12,6 +12,7 @@ import {
 	OsmPbfBytesToBlocksTransformStream,
 	readOsmPbf,
 } from "../src/pbf-to-blocks"
+import { readOsmPbfParallel } from "../src/pbf-to-blocks-parallel"
 import { createOsmEntityCounter, testOsmPbfReader } from "./utils"
 
 describe.each(Object.entries(PBFs))("%s", (_name, pbf) => {
@@ -20,6 +21,13 @@ describe.each(Object.entries(PBFs))("%s", (_name, pbf) => {
 	bench("parse with generators", async () => {
 		const file = await getFixtureFile(pbf.url)
 		const osm = await readOsmPbf(file)
+
+		await testOsmPbfReader(osm, pbf)
+	})
+
+	bench("parse with generators (parallel decode)", async () => {
+		const file = await getFixtureFile(pbf.url)
+		const osm = await readOsmPbfParallel(file, { workers: 2 })
 
 		await testOsmPbfReader(osm, pbf)
 	})
