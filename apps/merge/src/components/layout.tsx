@@ -1,4 +1,5 @@
-import { useAtomValue } from "jotai"
+import { useAtom } from "jotai"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import type { ReactNode } from "react"
 import { cn } from "../lib/utils"
 import { sidebarIsOpenAtom } from "../state/layout"
@@ -12,15 +13,33 @@ export function Main({ children }: { children: ReactNode }) {
 }
 
 export function Sidebar({ children }: { children: ReactNode }) {
-	const isOpen = useAtomValue(sidebarIsOpenAtom)
+	const [isOpen, setIsOpen] = useAtom(sidebarIsOpenAtom)
 	return (
-		<div
-			className={cn(
-				"flex h-full min-h-0 flex-col w-0 transition-all overflow-hidden z-10 bg-slate-100",
-				isOpen && "w-xs md:w-sm lg:w-md xl:w-lg",
-			)}
-		>
-			{children}
+		<div className="flex h-full min-h-0 flex-row z-10 group/sidebar">
+			<div
+				className={cn(
+					"flex h-full min-h-0 flex-col w-0 overflow-hidden bg-slate-100",
+					isOpen && "w-xs md:w-sm lg:w-md xl:w-lg",
+				)}
+			>
+				{children}
+			</div>
+			<button
+				type="button"
+				onClick={() => setIsOpen((o) => !o)}
+				className={cn(
+					"h-full w-3 flex items-center justify-center cursor-col-resize",
+					"bg-slate-100 hover:bg-slate-200",
+					isOpen && "w-2",
+				)}
+				aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
+			>
+				{isOpen ? (
+					<ChevronLeft className="size-2" />
+				) : (
+					<ChevronRight className="size-3" />
+				)}
+			</button>
 		</div>
 	)
 }
