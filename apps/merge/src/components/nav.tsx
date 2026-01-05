@@ -57,7 +57,6 @@ export default function Nav() {
 					</div>
 					<ZoomInButton />
 				</div>
-				<ButtonGroupSeparator />
 			</ButtonGroup>
 		</div>
 	)
