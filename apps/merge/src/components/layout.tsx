@@ -6,9 +6,7 @@ import { sidebarIsOpenAtom } from "../state/layout"
 
 export function Main({ children }: { children: ReactNode }) {
 	return (
-		<div className="flex flex-row grow-1 h-full overflow-hidden">
-			{children}
-		</div>
+		<div className="flex flex-row grow h-full overflow-hidden">{children}</div>
 	)
 }
 
@@ -28,9 +26,9 @@ export function Sidebar({ children }: { children: ReactNode }) {
 				type="button"
 				onClick={() => setIsOpen((o) => !o)}
 				className={cn(
-					"h-full w-3 flex items-center justify-center cursor-col-resize",
+					"h-full w-3 flex items-center justify-center cursor-e-resize",
 					"bg-slate-100 hover:bg-slate-200",
-					isOpen && "w-2",
+					isOpen && "w-2 cursor-w-resize",
 				)}
 				aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
 			>
