@@ -55,7 +55,7 @@ export function OsmPbfSelectFileButton({
 }) {
 	return (
 		<ActionButton
-			className="w-full"
+			className="grow"
 			disabled={disabled}
 			onAction={async () => {
 				const selectedFile = await showFileSelector()
@@ -65,7 +65,7 @@ export function OsmPbfSelectFileButton({
 			}}
 			icon={<FilesIcon />}
 		>
-			Open OSM file (PBF, GeoJSON, Shapefile, or GeoParquet)
+			Open OSM file
 		</ActionButton>
 	)
 }
@@ -83,7 +83,7 @@ export function OsmPbfOpenUrlButton({
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button className="w-full" variant="outline" disabled={disabled}>
+				<Button variant="outline" disabled={disabled} className="grow">
 					<LinkIcon />
 					Open from URL
 				</Button>

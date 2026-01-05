@@ -22,13 +22,14 @@
 		"vite": "catalog:"
 	},
 	"dependencies": {
+		"@base-ui/react": "^1.0.0",
 		"@fontsource-variable/roboto-mono": "^5.2.5",
 		"@mapbox/tilebelt": "^2.0.3",
 		"@osmix/change": "workspace:*",
 		"@osmix/core": "workspace:*",
 		"@osmix/geojson": "workspace:*",
-		"@osmix/json": "workspace:*",
 		"@osmix/geoparquet": "workspace:*",
+		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/raster": "workspace:*",
 		"@osmix/router": "workspace:*",
@@ -41,6 +42,7 @@
 		"@radix-ui/react-menubar": "^1.1.16",
 		"@radix-ui/react-separator": "^1.1.7",
 		"@radix-ui/react-slot": "^1.2.4",
+		"@radix-ui/react-tabs": "^1.1.13",
 		"@turf/bbox-polygon": "7.2.0",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",

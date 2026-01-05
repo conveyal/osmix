@@ -81,7 +81,9 @@ function OsmFileCard({ osmFile, onClear }: OsmFileCardProps) {
 	return (
 		<div className="border-b last:border-b-0">
 			<div className="flex items-center justify-between gap-2 border-b">
-				<div className="font-bold pl-2">{fileName}</div>
+				<div className="grow font-bold pl-2 overflow-hidden whitespace-nowrap text-ellipsis">
+					{fileName}
+				</div>
 				<div className="flex items-center">
 					<Button
 						onClick={toggleLayersVisibility}
