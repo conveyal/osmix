@@ -4,5 +4,10 @@
 	"compilerOptions": {
 		"types": ["vite/client"]
 	},
-	"include": ["src", "test/duckdb.test.ts", "test/benchmark.bench.ts"]
+	"include": [
+		"src",
+		"test/duckdb.test.ts",
+		"test/benchmark.bench.ts",
+		"test/osmpbf-comparison.bench.ts"
+	]
 }

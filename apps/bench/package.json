@@ -27,10 +27,12 @@
 		"@osmix/pbf": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@osmix/vt": "workspace:*",
-		"osmix": "workspace:*",
 		"apache-arrow": "^17.0.0",
 		"comlink": "^4.4.2",
+		"fast-osmpbf-js": "^0.2.1",
 		"maplibre-gl": "catalog:",
+		"mitata": "^1.0.34",
+		"osmix": "workspace:*",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
 		"react-map-gl": "^8.0.4"

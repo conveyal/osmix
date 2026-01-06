@@ -23,7 +23,9 @@
         "@osmix/vt": "workspace:*",
         "apache-arrow": "^17.0.0",
         "comlink": "^4.4.2",
+        "fast-osmpbf-js": "^0.2.1",
         "maplibre-gl": "catalog:",
+        "mitata": "^1.0.34",
         "osmix": "workspace:*",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
@@ -1005,6 +1007,8 @@
     "fast-diff": ["fast-diff@1.3.0", "", {}, "sha512-VxPP4NqbUjj6MaAOafWeUn2cXWLcCtljklUtZf0Ind4XQ+QPtmA0b18zZy0jIQx+ExRVCR/ZQpBmik5lXshNsw=="],
 
     "fast-glob": ["fast-glob@3.3.3", "", { "dependencies": { "@nodelib/fs.stat": "^2.0.2", "@nodelib/fs.walk": "^1.2.3", "glob-parent": "^5.1.2", "merge2": "^1.3.0", "micromatch": "^4.0.8" } }, "sha512-7MptL8U0cqcFdzIzwOTHoilX9x5BrNqye7Z/LuC7kCMRio1EMSyqRK3BEAUD7sXRq4iT4AzTVuZdhgQ2TCvYLg=="],
+
+    "fast-osmpbf-js": ["fast-osmpbf-js@0.2.1", "", {}, "sha512-0B3mt9glwTE0yY/P6F7fXy05qdzSqMNyEsliry7jUEjyLu6ZaeFCqrieghuKu1C8SLnj/zPCd8UlsJLYE4lwZw=="],
 
     "fastq": ["fastq@1.19.1", "", { "dependencies": { "reusify": "^1.0.4" } }, "sha512-GwLTyxkCXjXbxqIhTsMI2Nui8huMPtnxg7krajPJAjnEG/iiOS7i+zCtWGZR9G0NBKbXKh6X9m9UIsYX/N6vvQ=="],
 
