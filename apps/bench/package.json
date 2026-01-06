@@ -20,7 +20,7 @@
 		"vitest": "^4.0.16"
 	},
 	"dependencies": {
-		"@duckdb/duckdb-wasm": "^1.31.0",
+		"@duckdb/duckdb-wasm": "^1.32.0",
 		"@osmix/core": "workspace:*",
 		"@osmix/geojson": "workspace:*",
 		"@osmix/json": "workspace:*",
