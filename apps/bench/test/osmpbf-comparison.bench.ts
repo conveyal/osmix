@@ -12,30 +12,31 @@
  * - Running Osmix benchmarks with mitata for statistical accuracy
  * - Running fast-osmpbf once at the end for a single comparison data point
  */
+/** biome-ignore-all lint/suspicious/noAssignInExpressions: <explanation> */
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
 import { OsmPbfBytesToBlocksTransformStream, readOsmPbf } from "@osmix/pbf"
-import type { JsElementBlock, JsElementFilter } from "fast-osmpbf-js"
-import { getTags, OsmReader } from "fast-osmpbf-js"
+import {
+	getTags,
+	type JsElementBlock,
+	type JsElementFilter,
+	OsmReader,
+} from "fast-osmpbf-js"
 import { bench, group, run } from "mitata"
 
 // Resolve fixture paths
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const MONACO_PBF_PATH = path.resolve(__dirname, "../../../fixtures/monaco.pbf")
+const PBF_NAME = "seattle.osm.pbf"
+const PBF_PATH = path.resolve(__dirname, "../../../fixtures", PBF_NAME)
 // fast-osmpbf-js requires .osm.pbf extension
-const MONACO_OSM_PBF_PATH = path.resolve(
-	__dirname,
-	"../../../fixtures/monaco.osm.pbf",
-)
+if (!PBF_PATH.endsWith(".osm.pbf")) {
+	throw new Error(`PBF fixture must end with .os.pbf: ${PBF_PATH}`)
+}
 
 // Verify fixtures exist
-if (!fs.existsSync(MONACO_PBF_PATH)) {
-	throw new Error(`Monaco PBF fixture not found at: ${MONACO_PBF_PATH}`)
-}
-// Create .osm.pbf copy if needed for fast-osmpbf-js
-if (!fs.existsSync(MONACO_OSM_PBF_PATH)) {
-	fs.copyFileSync(MONACO_PBF_PATH, MONACO_OSM_PBF_PATH)
+if (!(await Bun.file(PBF_PATH).exists())) {
+	throw new Error(`PBF fixture not found at: ${PBF_PATH}`)
 }
 
 // Address tag keys to filter
@@ -56,8 +57,7 @@ const ADDRESS_TAGS_SET = new Set(ADDRESS_TAGS)
  * Osmix: Count ways using streaming parser (async generator)
  */
 async function osmixCountWays(): Promise<number> {
-	const buffer = fs.readFileSync(MONACO_PBF_PATH)
-	const { blocks } = await readOsmPbf(buffer)
+	const { blocks } = await readOsmPbf(Bun.file(PBF_PATH).stream())
 	let wayCount = 0
 
 	for await (const block of blocks) {
@@ -75,29 +75,24 @@ async function osmixCountWays(): Promise<number> {
  * Osmix: Count ways using TransformStream API
  */
 async function osmixCountWaysStream(): Promise<number> {
-	const buffer = fs.readFileSync(MONACO_PBF_PATH)
 	let wayCount = 0
 
-	const stream = new ReadableStream({
-		start(controller) {
-			controller.enqueue(new Uint8Array(buffer))
-			controller.close()
-		},
-	})
-
-	await stream.pipeThrough(new OsmPbfBytesToBlocksTransformStream()).pipeTo(
-		new WritableStream({
-			write(block) {
-				if ("primitivegroup" in block) {
-					for (const group of block.primitivegroup) {
-						if (group.ways) {
-							wayCount += group.ways.length
+	await Bun.file(PBF_PATH)
+		.stream()
+		.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
+		.pipeTo(
+			new WritableStream({
+				write(block) {
+					if ("primitivegroup" in block) {
+						for (const group of block.primitivegroup) {
+							if (group.ways) {
+								wayCount += group.ways.length
+							}
 						}
 					}
-				}
-			},
-		}),
-	)
+				},
+			}),
+		)
 
 	return wayCount
 }
@@ -106,8 +101,7 @@ async function osmixCountWaysStream(): Promise<number> {
  * Osmix: Count elements with full addresses using streaming parser
  */
 async function osmixCountAddresses(): Promise<number> {
-	const buffer = fs.readFileSync(MONACO_PBF_PATH)
-	const { blocks } = await readOsmPbf(buffer)
+	const { blocks } = await readOsmPbf(Bun.file(PBF_PATH).stream())
 	let addressCount = 0
 	const decoder = new TextDecoder()
 
@@ -196,7 +190,7 @@ async function fastOsmpbfCountWays(): Promise<{
 	timeMs: number
 }> {
 	const start = performance.now()
-	const reader = new OsmReader(MONACO_OSM_PBF_PATH)
+	const reader = new OsmReader(PBF_PATH)
 	const elementFilter: JsElementFilter = {
 		nodes: false,
 		ways: true,
@@ -225,30 +219,21 @@ async function fastOsmpbfCountAddresses(): Promise<{
 	timeMs: number
 }> {
 	const start = performance.now()
-	const reader = new OsmReader(MONACO_OSM_PBF_PATH)
-	const stream = reader.streamBlocks(undefined, undefined)
+	const reader = new OsmReader(PBF_PATH)
+	const stream = reader.streamBlocks(undefined, ADDRESS_TAGS)
 	let addressCount = 0
 
-	let block: JsElementBlock | null = await stream.next()
-	while (block !== null) {
-		const blockLength = block.ids.length
+	let block: JsElementBlock | null = null
+	while ((block = await stream.next()) !== null) {
+		const { ids } = block
+		const blockLength = ids.length
 
 		for (let i = 0; i < blockLength; i++) {
 			const tags = getTags(block, i)
-			// Check if element has all 4 address tags
-			const tagKeys = new Set(tags.map(([key]) => key))
-			let hasAllAddressTags = true
-			for (const addrTag of ADDRESS_TAGS) {
-				if (!tagKeys.has(addrTag)) {
-					hasAllAddressTags = false
-					break
-				}
-			}
-			if (hasAllAddressTags) {
+			if (tags.length === ADDRESS_TAGS.length) {
 				addressCount++
 			}
 		}
-		block = await stream.next()
 	}
 
 	return { count: addressCount, timeMs: performance.now() - start }
@@ -262,7 +247,7 @@ async function main() {
 	console.log("OSM PBF Parsing Benchmark: Osmix vs fast-osmpbf-js")
 	console.log("==================================================")
 	console.log(
-		`Fixture: monaco.pbf (${(fs.statSync(MONACO_PBF_PATH).size / 1024).toFixed(1)} KB)`,
+		`Fixture: ${PBF_NAME} (${(fs.statSync(PBF_PATH).size / 1024).toFixed(1)} KB)`,
 	)
 	console.log()
 
@@ -305,7 +290,7 @@ async function main() {
 	console.log("Running Osmix benchmarks with mitata (multiple iterations)...")
 	console.log()
 
-	group("Count Ways - Osmix (monaco.pbf)", () => {
+	group(`Count Ways - Osmix (${PBF_NAME})`, () => {
 		bench("Osmix (generator)", async () => {
 			await osmixCountWays()
 		})
@@ -315,7 +300,7 @@ async function main() {
 		})
 	})
 
-	group("Count Addresses - Osmix (monaco.pbf)", () => {
+	group(`Count Addresses - Osmix (${PBF_NAME})`, () => {
 		bench("Osmix", async () => {
 			await osmixCountAddresses()
 		})
