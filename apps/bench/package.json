@@ -12,7 +12,7 @@
 	},
 	"devDependencies": {
 		"@types/react": "^19.2.0",
-		"@types/react-dom": "^19.2.0",
+		"@types/react-dom": "^19.2.3",
 		"@vitejs/plugin-react": "^5.1.2",
 		"@vitest/browser-preview": "^4.0.16",
 		"typescript": "catalog:",
@@ -32,7 +32,7 @@
 		"comlink": "^4.4.2",
 		"maplibre-gl": "catalog:",
 		"react": "^19.2.0",
-		"react-dom": "^19.2.0",
+		"react-dom": "^19.2.3",
 		"react-map-gl": "^8.0.4"
 	}
 }
