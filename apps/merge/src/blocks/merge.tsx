@@ -6,7 +6,6 @@ import {
 	CheckCircle,
 	ChevronRightIcon,
 	DownloadIcon,
-	EyeIcon,
 	FastForwardIcon,
 	FileDiff,
 	MaximizeIcon,
@@ -18,7 +17,6 @@ import {
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { Suspense, useMemo } from "react"
-import { Link } from "react-router"
 import ActionButton from "../components/action-button"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import EntityDetails from "../components/entity-details"
@@ -146,60 +144,30 @@ export default function MergeBlock() {
 	}, [changesetStats])
 
 	return (
-		<>
+		<div className="flex flex-col gap-4">
 			<Step step="select-osm-pbf-files" title="SELECT OSM FILES">
-				<p>Select two OSM files (PBF, GeoJSON, or Shapefile ZIP) to merge.</p>
-
 				<Card>
-					<CardHeader>
-						<div className="p-2">BASE OSM</div>
-						{base.osm && (
-							<ButtonGroup>
-								{!base.isStored && (
-									<ActionButton
-										icon={<SaveIcon />}
-										title="Save to storage"
-										variant="ghost"
-										onAction={base.saveToStorage}
-									/>
-								)}
-								<ActionButton
-									icon={<XIcon />}
-									title="Clear base OSM file"
-									variant="ghost"
-									onAction={async () => {
-										await base.loadOsmFile(null)
-									}}
-								/>
-							</ButtonGroup>
-						)}
+					<CardHeader className="uppercase font-bold border-b px-2">
+						MERGE STEPS
 					</CardHeader>
-					<CardContent>
-						{!base.osm ? (
-							<StoredOsmList
-								openOsmFile={async (file) => {
-									const osmInfo =
-										typeof file === "string"
-											? await base.loadFromStorage(file)
-											: await base.loadOsmFile(file)
-									flyToOsmBounds(osmInfo)
-									return osmInfo
-								}}
-							/>
-						) : (
-							<OsmInfoTable
-								defaultOpen={false}
-								osm={base.osm}
-								file={base.file}
-								fileInfo={base.fileInfo}
-							/>
-						)}
+					<CardContent className="flex flex-col gap-2 p-2">
+						<ol className="list-decimal list-inside">
+							<li>Deduplicate nodes and ways in base OSM</li>
+							<li>Deduplicate nodes and ways in patch OSM</li>
+							<li>Merge patch OSM onto base OSM.</li>
+							<li>Deduplicate nodes and ways in newly merged OSM</li>
+							<li>Create new intersections in merged data where ways cross</li>
+						</ol>
+						<p>
+							Note: entities from the patch file are prioritized over matching
+							entities in the base file.
+						</p>
 					</CardContent>
 				</Card>
 
 				<Card>
 					<CardHeader>
-						<div className="p-2">PATCH OSM</div>
+						<div className="p-2">SELECT PATCH OSM TO MERGE</div>
 						{patch.osm && (
 							<ButtonGroup>
 								{!patch.isStored && (
@@ -244,20 +212,6 @@ export default function MergeBlock() {
 					</CardContent>
 				</Card>
 
-				<div className="flex flex-col gap-2">
-					<div className="font-bold">MERGE STEPS</div>
-					<ol className="list-decimal list-inside">
-						<li>Deduplicate nodes and ways in base OSM</li>
-						<li>Deduplicate nodes and ways in patch OSM</li>
-						<li>Merge patch OSM onto base OSM.</li>
-						<li>Deduplicate nodes and ways in newly merged OSM</li>
-						<li>Create new intersections in merged data where ways cross</li>
-					</ol>
-					<p>
-						Note: entities from the patch file are prioritized over matching
-						entities in the base file.
-					</p>
-				</div>
 				<div
 					className={cn(
 						"flex flex-col gap-4",
@@ -769,22 +723,11 @@ export default function MergeBlock() {
 									Save to storage
 								</ActionButton>
 							)}
-							<Button asChild>
-								<Link
-									to={
-										base.isStored && base.fileInfo?.fileHash
-											? `/inspect?load=${base.fileInfo.fileHash}`
-											: "/inspect"
-									}
-								>
-									<EyeIcon /> Open in Inspect
-								</Link>
-							</Button>
 						</div>
 					</>
 				)}
 			</Step>
-		</>
+		</div>
 	)
 }
 
@@ -811,9 +754,11 @@ function Step({
 		)
 	return (
 		<>
-			<div className="font-bold">
-				{stepIndex + 1}: {title}
-			</div>
+			<Card>
+				<CardHeader className="font-bold uppercase p-2 bg-white">
+					{stepIndex + 1}: {title}
+				</CardHeader>
+			</Card>
 			{children}
 		</>
 	)
