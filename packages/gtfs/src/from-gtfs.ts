@@ -122,7 +122,7 @@ export class GtfsOsmBuilder {
 
 		this.onProgress(progressEvent("Processing stops..."))
 
-		for await (const stop of archive.iterStops()) {
+		for await (const stop of archive.iter("stops.txt")) {
 			// Filter by location_type if specified
 			if (stopTypes !== undefined) {
 				const locationType = Number.parseInt(stop.location_type ?? "0", 10)
@@ -211,7 +211,7 @@ export class GtfsOsmBuilder {
 		if (includeShapes && archive.hasFile("shapes.txt")) {
 			this.onProgress(progressEvent("Loading shape data..."))
 			shapeMap = new Map()
-			for await (const point of archive.iterShapes()) {
+			for await (const point of archive.iter("shapes.txt")) {
 				const points = shapeMap.get(point.shape_id) ?? []
 				points.push(point)
 				shapeMap.set(point.shape_id, points)
@@ -231,7 +231,7 @@ export class GtfsOsmBuilder {
 		if (shapeMap && shapeMap.size > 0) {
 			this.onProgress(progressEvent("Loading trip data..."))
 			routeToShapeId = new Map()
-			for await (const trip of archive.iterTrips()) {
+			for await (const trip of archive.iter("trips.txt")) {
 				if (trip.shape_id && !routeToShapeId.has(trip.route_id)) {
 					routeToShapeId.set(trip.route_id, trip.shape_id)
 				}
@@ -245,13 +245,13 @@ export class GtfsOsmBuilder {
 
 			// First get trip -> route mapping
 			const tripToRoute = new Map<string, string>()
-			for await (const trip of archive.iterTrips()) {
+			for await (const trip of archive.iter("trips.txt")) {
 				tripToRoute.set(trip.trip_id, trip.route_id)
 			}
 
 			// Group stop_times by trip, then extract stop sequence per route
 			const tripToStops = new Map<string, { stop_id: string; seq: number }[]>()
-			for await (const stopTime of archive.iterStopTimes()) {
+			for await (const stopTime of archive.iter("stop_times.txt")) {
 				const times = tripToStops.get(stopTime.trip_id) ?? []
 				times.push({
 					stop_id: stopTime.stop_id,
@@ -275,7 +275,7 @@ export class GtfsOsmBuilder {
 
 		// Process routes
 		let count = 0
-		for await (const route of archive.iterRoutes()) {
+		for await (const route of archive.iter("routes.txt")) {
 			// Filter by route_type if specified
 			if (routeTypes !== undefined) {
 				const routeType = Number.parseInt(route.route_type, 10)

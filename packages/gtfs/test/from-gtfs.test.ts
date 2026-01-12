@@ -75,12 +75,39 @@ describe("GtfsArchive", () => {
 		const archive = GtfsArchive.fromZip(zipData)
 
 		const stops = []
-		for await (const stop of archive.iterStops()) {
+		for await (const stop of archive.iter("stops.txt")) {
 			stops.push(stop)
 		}
 
 		expect(stops.length).toBe(3)
 		expect(stops[0]?.stop_name).toBe("Main St Station")
+	})
+
+	test("iter() returns correctly typed records", async () => {
+		const zipData = await createTestGtfsZip()
+		const archive = GtfsArchive.fromZip(zipData)
+
+		// TypeScript should infer the correct type for each file
+		for await (const stop of archive.iter("stops.txt")) {
+			// stop is GtfsStop
+			expect(stop.stop_id).toBeDefined()
+			expect(stop.stop_lat).toBeDefined()
+			break
+		}
+
+		for await (const route of archive.iter("routes.txt")) {
+			// route is GtfsRoute
+			expect(route.route_id).toBeDefined()
+			expect(route.route_type).toBeDefined()
+			break
+		}
+
+		for await (const shape of archive.iter("shapes.txt")) {
+			// shape is GtfsShapePoint
+			expect(shape.shape_id).toBeDefined()
+			expect(shape.shape_pt_lat).toBeDefined()
+			break
+		}
 	})
 
 	test("caches parsed data on repeated access", async () => {

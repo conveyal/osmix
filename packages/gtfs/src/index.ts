@@ -34,7 +34,11 @@
  */
 
 export { fromGtfs, GtfsOsmBuilder } from "./from-gtfs"
-export { GtfsArchive } from "./gtfs-archive"
+export {
+	GtfsArchive,
+	type GtfsFileName,
+	type GtfsFileTypeMap,
+} from "./gtfs-archive"
 export {
 	routeTypeToOsmRoute,
 	wheelchairBoardingToOsm,
