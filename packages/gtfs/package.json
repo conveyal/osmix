@@ -1,0 +1,54 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/gtfs",
+	"description": "Convert GTFS transit feeds to OSM format.",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"import": "./dist/index.js",
+				"types": "./dist/index.d.ts"
+			}
+		},
+		"files": [
+			"dist",
+			"README.md",
+			"LICENSE"
+		]
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/conveyal/osmix.git"
+	},
+	"homepage": "https://github.com/conveyal/osmix#readme",
+	"bugs": {
+		"url": "https://github.com/conveyal/osmix/issues"
+	},
+	"sideEffects": false,
+	"scripts": {
+		"build": "tsc --excludeDirectories test",
+		"bench": "bun test --bench",
+		"prepublishOnly": "tsc",
+		"test": "bun test",
+		"typecheck": "tsgo --noEmit"
+	},
+	"devDependencies": {
+		"@types/bun": "catalog:",
+		"@types/d3-dsv": "^3.0.7",
+		"fflate": "^0.8.2",
+		"typescript": "catalog:"
+	},
+	"dependencies": {
+		"@osmix/core": "workspace:*",
+		"@osmix/shared": "workspace:*",
+		"but-unzip": "^0.1.7",
+		"d3-dsv": "^3.0.1"
+	}
+}
