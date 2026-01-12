@@ -1,0 +1,126 @@
+# @osmix/gtfs
+
+Convert GTFS (General Transit Feed Specification) transit feeds to OSM format.
+
+## Installation
+
+```bash
+npm install @osmix/gtfs
+# or
+bun add @osmix/gtfs
+```
+
+## Usage
+
+```ts
+import { fromGtfs } from "@osmix/gtfs"
+
+// Fetch a GTFS zip file
+const response = await fetch("https://example.com/gtfs.zip")
+const zipData = await response.arrayBuffer()
+
+// Convert to OSM format
+const osm = await fromGtfs(zipData, { id: "transit" })
+
+console.log(`Imported ${osm.nodes.size} stops and ${osm.ways.size} routes`)
+```
+
+## GTFS to OSM Mapping
+
+### Stops → Nodes
+
+GTFS stops are converted to OSM nodes with the following tags:
+
+| GTFS Field           | OSM Tag              |
+| -------------------- | -------------------- |
+| `stop_name`          | `name`               |
+| `stop_id`            | `ref`                |
+| `stop_code`          | `ref:gtfs:stop_code` |
+| `stop_desc`          | `description`        |
+| `stop_url`           | `website`            |
+| `platform_code`      | `ref:platform`       |
+| `wheelchair_boarding`| `wheelchair`         |
+| `location_type`      | `public_transport`   |
+
+Location types are mapped as:
+- `0` (stop) → `public_transport=platform`
+- `1` (station) → `public_transport=station`
+- `2` (entrance) → `railway=subway_entrance`
+- `4` (boarding area) → `public_transport=platform`
+
+### Routes → Ways
+
+GTFS routes are converted to OSM ways with the following tags:
+
+| GTFS Field         | OSM Tag              |
+| ------------------ | -------------------- |
+| `route_long_name`  | `name`               |
+| `route_short_name` | `ref`                |
+| `route_id`         | `ref:gtfs:route_id`  |
+| `route_desc`       | `description`        |
+| `route_url`        | `website`            |
+| `route_color`      | `colour`             |
+| `route_text_color` | `text_colour`        |
+| `route_type`       | `route`, `gtfs:route_type` |
+
+Route types are mapped to OSM route values:
+- `0` → `tram`
+- `1` → `subway`
+- `2` → `train`
+- `3` → `bus`
+- `4` → `ferry`
+- `5` → `tram` (cable tram)
+- `6` → `aerialway`
+- `7` → `funicular`
+- `11` → `trolleybus`
+- `12` → `train` (monorail)
+
+### Geometry
+
+Route geometry is derived from:
+1. **shapes.txt** (preferred) - Uses shape points to create accurate route paths
+2. **stop_times.txt** (fallback) - Uses stop sequence when shapes are unavailable
+
+## Options
+
+```ts
+interface GtfsConversionOptions {
+  /** Filter stops by location_type. Default: include all types. */
+  stopTypes?: number[]
+  /** Filter routes by route_type. Default: include all types. */
+  routeTypes?: number[]
+  /** Whether to include shape geometry for routes. Default: true */
+  includeShapes?: boolean
+}
+```
+
+### Example with Options
+
+```ts
+import { fromGtfs } from "@osmix/gtfs"
+
+const osm = await fromGtfs(zipData, { id: "buses-only" }, {
+  routeTypes: [3], // Only bus routes
+  stopTypes: [0, 1], // Only stops and stations
+})
+```
+
+## API
+
+### `fromGtfs(zipData, options?, gtfsOptions?, onProgress?)`
+
+Main function to convert a GTFS zip file to an Osm index.
+
+### `parseGtfsZip(zipData)`
+
+Parse a GTFS zip file without converting to OSM. Returns a `GtfsFeed` object.
+
+### `GtfsOsmBuilder`
+
+Class for more fine-grained control over the conversion process.
+
+## Dependencies
+
+- [but-unzip](https://github.com/nicolo-ribaudo/but-unzip) - ZIP file parsing
+- [d3-dsv](https://github.com/d3/d3-dsv) - CSV parsing
+- [@osmix/core](../core) - OSM data structures
