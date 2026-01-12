@@ -359,14 +359,14 @@ export class GtfsOsmBuilder {
 			const color = route.route_color.startsWith("#")
 				? route.route_color
 				: `#${route.route_color}`
-			tags["colour"] = color
+			tags["color"] = color
 		}
 
 		if (route.route_text_color) {
 			const textColor = route.route_text_color.startsWith("#")
 				? route.route_text_color
 				: `#${route.route_text_color}`
-			tags["text_colour"] = textColor
+			tags["text_color"] = textColor
 		}
 
 		// Route type as additional tag
