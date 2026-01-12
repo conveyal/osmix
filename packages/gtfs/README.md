@@ -167,11 +167,27 @@ await archive.trips()
 await archive.stopTimes()
 await archive.shapes()
 
-// Streaming iterators (parse and yield one at a time)
-for await (const stop of archive.iterStops()) { ... }
-for await (const route of archive.iterRoutes()) { ... }
-for await (const shape of archive.iterShapes()) { ... }
+// Streaming iterator with automatic type inference
+for await (const stop of archive.iter("stops.txt")) {
+  console.log(stop.stop_name) // TypeScript knows this is GtfsStop
+}
+
+for await (const route of archive.iter("routes.txt")) {
+  console.log(route.route_type) // TypeScript knows this is GtfsRoute
+}
+
+for await (const shape of archive.iter("shapes.txt")) {
+  console.log(shape.shape_pt_lat) // TypeScript knows this is GtfsShapePoint
+}
 ```
+
+The `iter(filename)` method automatically infers the return type based on the filename:
+- `"agency.txt"` → `AsyncGenerator<GtfsAgency>`
+- `"stops.txt"` → `AsyncGenerator<GtfsStop>`
+- `"routes.txt"` → `AsyncGenerator<GtfsRoute>`
+- `"trips.txt"` → `AsyncGenerator<GtfsTrip>`
+- `"stop_times.txt"` → `AsyncGenerator<GtfsStopTime>`
+- `"shapes.txt"` → `AsyncGenerator<GtfsShapePoint>`
 
 ### `GtfsOsmBuilder`
 
