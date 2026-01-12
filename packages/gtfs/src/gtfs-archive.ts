@@ -1,14 +1,14 @@
 /**
- * Lazy GTFS archive parser.
+ * Lazy GTFS archive parser with streaming CSV support.
  *
  * Only parses CSV files when they are accessed, not upfront.
- * Uses streaming CSV parsing for memory efficiency.
+ * Uses @std/csv CsvParseStream for true line-by-line streaming.
  *
  * @module
  */
 
+import { CsvParseStream } from "@std/csv/parse-stream"
 import { unzip, type ZipItem } from "but-unzip"
-import { parse } from "csv-parse/sync"
 import type {
 	GtfsAgency,
 	GtfsRoute,
@@ -23,6 +23,8 @@ import type {
  *
  * Files are read from the zip and parsed only when their
  * corresponding getter is called for the first time.
+ * Streaming iterators parse CSV line-by-line without loading
+ * the entire file into memory.
  */
 export class GtfsArchive {
 	private entries: Map<string, ZipItem>
@@ -74,25 +76,81 @@ export class GtfsArchive {
 	}
 
 	/**
-	 * Parse a CSV file from the archive.
+	 * Get a readable stream of bytes for a file.
 	 */
-	private async parseFile<T>(filename: string): Promise<T[]> {
+	private async getFileBytes(filename: string): Promise<Uint8Array | null> {
 		const entry = this.entries.get(filename)
-		if (!entry) return []
+		if (!entry) return null
 
 		const data = entry.read()
-		const bytes = data instanceof Promise ? await data : data
-		const content = new TextDecoder().decode(bytes)
-
-		return parse(content, {
-			columns: true,
-			skip_empty_lines: true,
-			trim: true,
-		}) as T[]
+		return data instanceof Promise ? await data : data
 	}
 
 	/**
-	 * Get agencies (parsed on first access).
+	 * Create a ReadableStream of text from file bytes.
+	 */
+	private bytesToTextStream(bytes: Uint8Array): ReadableStream<string> {
+		const decoder = new TextDecoder()
+		let offset = 0
+		const chunkSize = 64 * 1024 // 64KB chunks
+
+		return new ReadableStream<string>({
+			pull(controller) {
+				if (offset >= bytes.length) {
+					controller.close()
+					return
+				}
+
+				const end = Math.min(offset + chunkSize, bytes.length)
+				const chunk = bytes.subarray(offset, end)
+				offset = end
+
+				controller.enqueue(
+					decoder.decode(chunk, { stream: offset < bytes.length }),
+				)
+			},
+		})
+	}
+
+	/**
+	 * Stream parse a CSV file, yielding typed records one at a time.
+	 */
+	private async *streamParseFile<T>(
+		filename: string,
+	): AsyncGenerator<T, void, unknown> {
+		const bytes = await this.getFileBytes(filename)
+		if (!bytes) return
+
+		const textStream = this.bytesToTextStream(bytes)
+		const csvStream = textStream.pipeThrough(
+			new CsvParseStream({ skipFirstRow: true }),
+		)
+
+		const reader = csvStream.getReader()
+		try {
+			while (true) {
+				const { value, done } = await reader.read()
+				if (done) break
+				yield value as T
+			}
+		} finally {
+			reader.releaseLock()
+		}
+	}
+
+	/**
+	 * Parse an entire CSV file into an array (caches result).
+	 */
+	private async parseFile<T>(filename: string): Promise<T[]> {
+		const results: T[] = []
+		for await (const record of this.streamParseFile<T>(filename)) {
+			results.push(record)
+		}
+		return results
+	}
+
+	/**
+	 * Get agencies (parsed on first access, cached).
 	 */
 	async agencies(): Promise<GtfsAgency[]> {
 		if (!this._agencies) {
@@ -102,7 +160,7 @@ export class GtfsArchive {
 	}
 
 	/**
-	 * Get stops (parsed on first access).
+	 * Get stops (parsed on first access, cached).
 	 */
 	async stops(): Promise<GtfsStop[]> {
 		if (!this._stops) {
@@ -112,7 +170,7 @@ export class GtfsArchive {
 	}
 
 	/**
-	 * Get routes (parsed on first access).
+	 * Get routes (parsed on first access, cached).
 	 */
 	async routes(): Promise<GtfsRoute[]> {
 		if (!this._routes) {
@@ -122,7 +180,7 @@ export class GtfsArchive {
 	}
 
 	/**
-	 * Get trips (parsed on first access).
+	 * Get trips (parsed on first access, cached).
 	 */
 	async trips(): Promise<GtfsTrip[]> {
 		if (!this._trips) {
@@ -132,7 +190,7 @@ export class GtfsArchive {
 	}
 
 	/**
-	 * Get stop times (parsed on first access).
+	 * Get stop times (parsed on first access, cached).
 	 */
 	async stopTimes(): Promise<GtfsStopTime[]> {
 		if (!this._stopTimes) {
@@ -142,7 +200,7 @@ export class GtfsArchive {
 	}
 
 	/**
-	 * Get shapes (parsed on first access).
+	 * Get shapes (parsed on first access, cached).
 	 */
 	async shapes(): Promise<GtfsShapePoint[]> {
 		if (!this._shapes) {
@@ -152,113 +210,44 @@ export class GtfsArchive {
 	}
 
 	/**
-	 * Iterate over stops without loading all into memory.
-	 * Parses the CSV row by row.
+	 * Stream stops line by line without loading all into memory.
 	 */
-	async *iterStops(): AsyncGenerator<GtfsStop> {
-		const entry = this.entries.get("stops.txt")
-		if (!entry) return
-
-		const data = entry.read()
-		const bytes = data instanceof Promise ? await data : data
-		const content = new TextDecoder().decode(bytes)
-
-		const records = parse(content, {
-			columns: true,
-			skip_empty_lines: true,
-			trim: true,
-		}) as GtfsStop[]
-
-		for (const record of records) {
-			yield record
-		}
+	async *iterStops(): AsyncGenerator<GtfsStop, void, unknown> {
+		yield* this.streamParseFile<GtfsStop>("stops.txt")
 	}
 
 	/**
-	 * Iterate over routes without loading all into memory.
+	 * Stream routes line by line without loading all into memory.
 	 */
-	async *iterRoutes(): AsyncGenerator<GtfsRoute> {
-		const entry = this.entries.get("routes.txt")
-		if (!entry) return
-
-		const data = entry.read()
-		const bytes = data instanceof Promise ? await data : data
-		const content = new TextDecoder().decode(bytes)
-
-		const records = parse(content, {
-			columns: true,
-			skip_empty_lines: true,
-			trim: true,
-		}) as GtfsRoute[]
-
-		for (const record of records) {
-			yield record
-		}
+	async *iterRoutes(): AsyncGenerator<GtfsRoute, void, unknown> {
+		yield* this.streamParseFile<GtfsRoute>("routes.txt")
 	}
 
 	/**
-	 * Iterate over shapes without loading all into memory.
+	 * Stream shapes line by line without loading all into memory.
 	 */
-	async *iterShapes(): AsyncGenerator<GtfsShapePoint> {
-		const entry = this.entries.get("shapes.txt")
-		if (!entry) return
-
-		const data = entry.read()
-		const bytes = data instanceof Promise ? await data : data
-		const content = new TextDecoder().decode(bytes)
-
-		const records = parse(content, {
-			columns: true,
-			skip_empty_lines: true,
-			trim: true,
-		}) as GtfsShapePoint[]
-
-		for (const record of records) {
-			yield record
-		}
+	async *iterShapes(): AsyncGenerator<GtfsShapePoint, void, unknown> {
+		yield* this.streamParseFile<GtfsShapePoint>("shapes.txt")
 	}
 
 	/**
-	 * Iterate over trips without loading all into memory.
+	 * Stream trips line by line without loading all into memory.
 	 */
-	async *iterTrips(): AsyncGenerator<GtfsTrip> {
-		const entry = this.entries.get("trips.txt")
-		if (!entry) return
-
-		const data = entry.read()
-		const bytes = data instanceof Promise ? await data : data
-		const content = new TextDecoder().decode(bytes)
-
-		const records = parse(content, {
-			columns: true,
-			skip_empty_lines: true,
-			trim: true,
-		}) as GtfsTrip[]
-
-		for (const record of records) {
-			yield record
-		}
+	async *iterTrips(): AsyncGenerator<GtfsTrip, void, unknown> {
+		yield* this.streamParseFile<GtfsTrip>("trips.txt")
 	}
 
 	/**
-	 * Iterate over stop times without loading all into memory.
+	 * Stream stop times line by line without loading all into memory.
 	 */
-	async *iterStopTimes(): AsyncGenerator<GtfsStopTime> {
-		const entry = this.entries.get("stop_times.txt")
-		if (!entry) return
+	async *iterStopTimes(): AsyncGenerator<GtfsStopTime, void, unknown> {
+		yield* this.streamParseFile<GtfsStopTime>("stop_times.txt")
+	}
 
-		const data = entry.read()
-		const bytes = data instanceof Promise ? await data : data
-		const content = new TextDecoder().decode(bytes)
-
-		const records = parse(content, {
-			columns: true,
-			skip_empty_lines: true,
-			trim: true,
-		}) as GtfsStopTime[]
-
-		for (const record of records) {
-			yield record
-		}
+	/**
+	 * Stream agencies line by line without loading all into memory.
+	 */
+	async *iterAgencies(): AsyncGenerator<GtfsAgency, void, unknown> {
+		yield* this.streamParseFile<GtfsAgency>("agency.txt")
 	}
 }
