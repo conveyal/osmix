@@ -5,6 +5,8 @@
  * - Stops → Nodes with transit tags
  * - Routes → Ways with shape geometry
  *
+ * Uses lazy, on-demand parsing - files are only parsed when needed.
+ *
  * @module
  */
 
@@ -15,17 +17,12 @@ import {
 	progressEvent,
 } from "@osmix/shared/progress"
 import type { OsmTags } from "@osmix/shared/types"
-import { unzip } from "but-unzip"
-import { csvParse } from "d3-dsv"
+import { GtfsArchive } from "./gtfs-archive"
 import {
-	type GtfsAgency,
 	type GtfsConversionOptions,
-	type GtfsFeed,
 	type GtfsRoute,
 	type GtfsShapePoint,
 	type GtfsStop,
-	type GtfsStopTime,
-	type GtfsTrip,
 	routeTypeToOsmRoute,
 	wheelchairBoardingToOsm,
 } from "./types"
@@ -33,8 +30,8 @@ import {
 /**
  * Create an Osm index from a zipped GTFS file.
  *
- * Parses the GTFS zip, extracts stops and routes, and converts them
- * to OSM entities:
+ * Parses the GTFS zip lazily - only reading files when needed.
+ * Converts stops and routes to OSM entities:
  * - Stops become nodes with transit-related tags
  * - Routes become ways with shape geometry (if available) or stop sequence
  *
@@ -63,62 +60,18 @@ export async function fromGtfs(
 ): Promise<Osm> {
 	const builder = new GtfsOsmBuilder(options, gtfsOptions, onProgress)
 
-	onProgress(progressEvent("Parsing GTFS zip file..."))
-	const feed = await builder.parseGtfsZip(zipData)
+	onProgress(progressEvent("Opening GTFS archive..."))
+	const archive = GtfsArchive.fromZip(zipData)
 
-	onProgress(
-		progressEvent(
-			`Processing ${feed.stops.length} stops and ${feed.routes.length} routes...`,
-		),
-	)
-	builder.processGtfsFeed(feed)
+	await builder.processArchive(archive)
 
 	return builder.buildOsm()
 }
 
 /**
- * Parse a GTFS zip file and return the parsed feed data.
- *
- * @param zipData - The GTFS zip file as ArrayBuffer or Uint8Array
- * @returns Parsed GTFS feed with all relevant files
- */
-export async function parseGtfsZip(
-	zipData: ArrayBuffer | Uint8Array,
-): Promise<GtfsFeed> {
-	const bytes =
-		zipData instanceof Uint8Array ? zipData : new Uint8Array(zipData)
-	const entries = unzip(bytes)
-
-	const files = new Map<string, string>()
-	for (const entry of entries) {
-		const name = entry.filename.replace(/^.*\//, "") // Remove directory prefix
-		if (name.endsWith(".txt")) {
-			const data = entry.read()
-			const content = new TextDecoder().decode(
-				data instanceof Promise ? await data : data,
-			)
-			files.set(name, content)
-		}
-	}
-
-	const parseFile = <T>(filename: string): T[] => {
-		const content = files.get(filename)
-		if (!content) return []
-		return csvParse(content) as unknown as T[]
-	}
-
-	return {
-		agencies: parseFile<GtfsAgency>("agency.txt"),
-		stops: parseFile<GtfsStop>("stops.txt"),
-		routes: parseFile<GtfsRoute>("routes.txt"),
-		trips: parseFile<GtfsTrip>("trips.txt"),
-		stopTimes: parseFile<GtfsStopTime>("stop_times.txt"),
-		shapes: parseFile<GtfsShapePoint>("shapes.txt"),
-	}
-}
-
-/**
  * Builder class for converting GTFS data to OSM entities.
+ *
+ * Uses lazy parsing - only reads GTFS files when needed.
  */
 export class GtfsOsmBuilder {
 	private osm: Osm
@@ -142,31 +95,28 @@ export class GtfsOsmBuilder {
 	}
 
 	/**
-	 * Parse a GTFS zip file.
+	 * Process the GTFS archive and add entities to the OSM index.
+	 * Only parses files that are needed based on options.
 	 */
-	async parseGtfsZip(zipData: ArrayBuffer | Uint8Array): Promise<GtfsFeed> {
-		return parseGtfsZip(zipData)
-	}
+	async processArchive(archive: GtfsArchive) {
+		// Always need stops for nodes
+		await this.processStops(archive)
 
-	/**
-	 * Process the parsed GTFS feed and add entities to the OSM index.
-	 */
-	processGtfsFeed(feed: GtfsFeed) {
-		// Process stops first (they become nodes)
-		this.processStops(feed.stops)
-
-		// Process routes (they become ways)
-		this.processRoutes(feed)
+		// Process routes if we have shape or stop_times data
+		await this.processRoutes(archive)
 	}
 
 	/**
 	 * Process GTFS stops into OSM nodes.
+	 * Uses streaming iteration to avoid loading all stops at once.
 	 */
-	private processStops(stops: GtfsStop[]) {
+	private async processStops(archive: GtfsArchive) {
 		const { stopTypes } = this.gtfsOptions
 		let count = 0
 
-		for (const stop of stops) {
+		this.onProgress(progressEvent("Processing stops..."))
+
+		for await (const stop of archive.iterStops()) {
 			// Filter by location_type if specified
 			if (stopTypes !== undefined) {
 				const locationType = Number.parseInt(stop.location_type ?? "0", 10)
@@ -240,14 +190,19 @@ export class GtfsOsmBuilder {
 
 	/**
 	 * Process GTFS routes into OSM ways.
+	 * Only parses shapes/trips/stop_times if needed.
 	 */
-	private processRoutes(feed: GtfsFeed) {
+	private async processRoutes(archive: GtfsArchive) {
 		const { routeTypes, includeShapes = true } = this.gtfsOptions
 
-		// Build shape lookup if available
-		const shapeMap = new Map<string, GtfsShapePoint[]>()
-		if (includeShapes && feed.shapes.length > 0) {
-			for (const point of feed.shapes) {
+		this.onProgress(progressEvent("Processing routes..."))
+
+		// Build shape lookup if shapes exist and are requested
+		let shapeMap: Map<string, GtfsShapePoint[]> | undefined
+		if (includeShapes && archive.hasFile("shapes.txt")) {
+			this.onProgress(progressEvent("Loading shape data..."))
+			shapeMap = new Map()
+			for await (const point of archive.iterShapes()) {
 				const points = shapeMap.get(point.shape_id) ?? []
 				points.push(point)
 				shapeMap.set(point.shape_id, points)
@@ -262,45 +217,56 @@ export class GtfsOsmBuilder {
 			}
 		}
 
-		// Build route -> shape mapping via trips
-		const routeToShapeId = new Map<string, string>()
-		for (const trip of feed.trips) {
-			if (trip.shape_id && !routeToShapeId.has(trip.route_id)) {
-				routeToShapeId.set(trip.route_id, trip.shape_id)
-			}
-		}
-
-		// Build route -> stops mapping via trips and stop_times (fallback if no shapes)
-		const routeToStops = new Map<string, string[]>()
-		if (shapeMap.size === 0) {
-			// Group stop_times by trip
-			const tripToStops = new Map<string, GtfsStopTime[]>()
-			for (const stopTime of feed.stopTimes) {
-				const times = tripToStops.get(stopTime.trip_id) ?? []
-				times.push(stopTime)
-				tripToStops.set(stopTime.trip_id, times)
-			}
-
-			// Get one trip per route and extract stop sequence
-			for (const trip of feed.trips) {
-				if (routeToStops.has(trip.route_id)) continue
-				const stopTimes = tripToStops.get(trip.trip_id)
-				if (stopTimes && stopTimes.length > 0) {
-					stopTimes.sort(
-						(a, b) =>
-							Number.parseInt(a.stop_sequence, 10) -
-							Number.parseInt(b.stop_sequence, 10),
-					)
-					routeToStops.set(
-						trip.route_id,
-						stopTimes.map((st) => st.stop_id),
-					)
+		// Build route -> shape mapping via trips (only if we have shapes)
+		let routeToShapeId: Map<string, string> | undefined
+		if (shapeMap && shapeMap.size > 0) {
+			this.onProgress(progressEvent("Loading trip data..."))
+			routeToShapeId = new Map()
+			for await (const trip of archive.iterTrips()) {
+				if (trip.shape_id && !routeToShapeId.has(trip.route_id)) {
+					routeToShapeId.set(trip.route_id, trip.shape_id)
 				}
 			}
 		}
 
+		// Build route -> stops mapping (fallback if no shapes)
+		let routeToStops: Map<string, string[]> | undefined
+		if (!shapeMap || shapeMap.size === 0) {
+			this.onProgress(progressEvent("Loading stop times for route geometry..."))
+
+			// First get trip -> route mapping
+			const tripToRoute = new Map<string, string>()
+			for await (const trip of archive.iterTrips()) {
+				tripToRoute.set(trip.trip_id, trip.route_id)
+			}
+
+			// Group stop_times by trip, then extract stop sequence per route
+			const tripToStops = new Map<string, { stop_id: string; seq: number }[]>()
+			for await (const stopTime of archive.iterStopTimes()) {
+				const times = tripToStops.get(stopTime.trip_id) ?? []
+				times.push({
+					stop_id: stopTime.stop_id,
+					seq: Number.parseInt(stopTime.stop_sequence, 10),
+				})
+				tripToStops.set(stopTime.trip_id, times)
+			}
+
+			// Get one trip per route and extract stop sequence
+			routeToStops = new Map()
+			for (const [tripId, stops] of tripToStops) {
+				const routeId = tripToRoute.get(tripId)
+				if (!routeId || routeToStops.has(routeId)) continue
+				stops.sort((a, b) => a.seq - b.seq)
+				routeToStops.set(
+					routeId,
+					stops.map((s) => s.stop_id),
+				)
+			}
+		}
+
+		// Process routes
 		let count = 0
-		for (const route of feed.routes) {
+		for await (const route of archive.iterRoutes()) {
 			// Filter by route_type if specified
 			if (routeTypes !== undefined) {
 				const routeType = Number.parseInt(route.route_type, 10)
@@ -310,23 +276,23 @@ export class GtfsOsmBuilder {
 			const tags = this.routeToTags(route)
 
 			// Try to get shape geometry
-			const shapeId = routeToShapeId.get(route.route_id)
-			const shapePoints = shapeId ? shapeMap.get(shapeId) : undefined
+			const shapeId = routeToShapeId?.get(route.route_id)
+			const shapePoints = shapeId ? shapeMap?.get(shapeId) : undefined
 
 			if (shapePoints && shapePoints.length >= 2) {
 				// Create way from shape points
 				this.createWayFromShape(tags, shapePoints)
-			} else {
+				count++
+			} else if (routeToStops) {
 				// Fall back to stop sequence
 				const stopIds = routeToStops.get(route.route_id)
 				if (stopIds && stopIds.length >= 2) {
 					this.createWayFromStops(tags, stopIds)
+					count++
 				}
-				// If neither shape nor stops available, skip this route
 			}
 
-			count++
-			if (count % 100 === 0) {
+			if (count % 100 === 0 && count > 0) {
 				this.onProgress(progressEvent(`Processed ${count} routes...`))
 			}
 		}

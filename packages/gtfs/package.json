@@ -41,7 +41,6 @@
 	},
 	"devDependencies": {
 		"@types/bun": "catalog:",
-		"@types/d3-dsv": "^3.0.7",
 		"fflate": "^0.8.2",
 		"typescript": "catalog:"
 	},
@@ -49,6 +48,6 @@
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"but-unzip": "^0.1.7",
-		"d3-dsv": "^3.0.1"
+		"csv-parse": "^5.6.0"
 	}
 }

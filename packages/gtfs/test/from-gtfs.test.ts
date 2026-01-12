@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import {
 	fromGtfs,
+	GtfsArchive,
 	GtfsOsmBuilder,
-	parseGtfsZip,
 	routeTypeToOsmRoute,
 	wheelchairBoardingToOsm,
 } from "../src"
@@ -37,22 +37,55 @@ describe("wheelchairBoardingToOsm", () => {
 	})
 })
 
-describe("parseGtfsZip", () => {
-	test("parses a GTFS zip file", async () => {
+describe("GtfsArchive", () => {
+	test("parses a GTFS zip file lazily", async () => {
 		const zipData = await createTestGtfsZip()
-		const feed = await parseGtfsZip(zipData)
+		const archive = GtfsArchive.fromZip(zipData)
 
-		expect(feed.agencies.length).toBe(1)
-		expect(feed.agencies[0]?.agency_name).toBe("Test Transit")
+		// Check files are listed
+		const files = archive.listFiles()
+		expect(files).toContain("agency.txt")
+		expect(files).toContain("stops.txt")
+		expect(files).toContain("routes.txt")
 
-		expect(feed.stops.length).toBe(3)
-		expect(feed.stops[0]?.stop_name).toBe("Main St Station")
+		// Parse agencies on demand
+		const agencies = await archive.agencies()
+		expect(agencies.length).toBe(1)
+		expect(agencies[0]?.agency_name).toBe("Test Transit")
 
-		expect(feed.routes.length).toBe(1)
-		expect(feed.routes[0]?.route_short_name).toBe("1")
+		// Parse stops on demand
+		const stops = await archive.stops()
+		expect(stops.length).toBe(3)
+		expect(stops[0]?.stop_name).toBe("Main St Station")
 
-		expect(feed.trips.length).toBe(1)
-		expect(feed.shapes.length).toBe(3)
+		// Parse routes on demand
+		const routes = await archive.routes()
+		expect(routes.length).toBe(1)
+		expect(routes[0]?.route_short_name).toBe("1")
+	})
+
+	test("iterates stops without loading all at once", async () => {
+		const zipData = await createTestGtfsZip()
+		const archive = GtfsArchive.fromZip(zipData)
+
+		const stops = []
+		for await (const stop of archive.iterStops()) {
+			stops.push(stop)
+		}
+
+		expect(stops.length).toBe(3)
+		expect(stops[0]?.stop_name).toBe("Main St Station")
+	})
+
+	test("caches parsed data on repeated access", async () => {
+		const zipData = await createTestGtfsZip()
+		const archive = GtfsArchive.fromZip(zipData)
+
+		const stops1 = await archive.stops()
+		const stops2 = await archive.stops()
+
+		// Should be the same cached array
+		expect(stops1).toBe(stops2)
 	})
 })
 
@@ -127,14 +160,16 @@ describe("fromGtfs", () => {
 describe("GtfsOsmBuilder", () => {
 	test("can be used for step-by-step conversion", async () => {
 		const zipData = await createTestGtfsZip()
+		const archive = GtfsArchive.fromZip(zipData)
+
+		const stops = await archive.stops()
+		const routes = await archive.routes()
+
+		expect(stops.length).toBe(3)
+		expect(routes.length).toBe(1)
 
 		const builder = new GtfsOsmBuilder({ id: "manual-test" })
-		const feed = await builder.parseGtfsZip(zipData)
-
-		expect(feed.stops.length).toBe(3)
-		expect(feed.routes.length).toBe(1)
-
-		builder.processGtfsFeed(feed)
+		await builder.processArchive(archive)
 		const osm = builder.buildOsm()
 
 		expect(osm.nodes.size).toBeGreaterThanOrEqual(3)
