@@ -107,8 +107,12 @@ Files are only parsed when needed for the conversion.
 
 ```ts
 interface GtfsConversionOptions {
+  /** Whether to include stops as nodes. Default: true */
+  includeStops?: boolean
   /** Filter stops by location_type. Default: include all types. */
   stopTypes?: number[]
+  /** Whether to include routes as ways. Default: true */
+  includeRoutes?: boolean
   /** Filter routes by route_type. Default: include all types. */
   routeTypes?: number[]
   /** Whether to include shape geometry for routes. Default: true */
@@ -121,9 +125,20 @@ interface GtfsConversionOptions {
 ```ts
 import { fromGtfs } from "@osmix/gtfs"
 
+// Only bus routes, with stops and stations
 const osm = await fromGtfs(zipData, { id: "buses-only" }, {
   routeTypes: [3], // Only bus routes
   stopTypes: [0, 1], // Only stops and stations
+})
+
+// Routes only (no stops) - useful for just getting route shapes
+const routesOnly = await fromGtfs(zipData, { id: "routes" }, {
+  includeStops: false,
+})
+
+// Stops only (no routes)
+const stopsOnly = await fromGtfs(zipData, { id: "stops" }, {
+  includeRoutes: false,
 })
 ```
 
