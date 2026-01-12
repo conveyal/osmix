@@ -8,6 +8,12 @@ import {
 } from "../src"
 import { createGtfsZipWithoutShapes, createTestGtfsZip } from "./helpers"
 
+// Path to the Monaco GTFS fixture
+const MONACO_GTFS_PATH = new URL(
+	"../../../fixtures/monaco-gtfs.zip",
+	import.meta.url,
+)
+
 describe("routeTypeToOsmRoute", () => {
 	test("maps GTFS route types to OSM route values", () => {
 		expect(routeTypeToOsmRoute("0")).toBe("tram")
@@ -155,6 +161,50 @@ describe("fromGtfs", () => {
 		}
 		expect(platformCount).toBe(1)
 	})
+
+	test("can exclude stops entirely", async () => {
+		const zipData = await createTestGtfsZip()
+		const osm = await fromGtfs(
+			zipData,
+			{ id: "routes-only" },
+			{ includeStops: false },
+		)
+
+		// Should have only shape nodes, no stop nodes
+		let stopCount = 0
+		for (let i = 0; i < osm.nodes.size; i++) {
+			const tags = osm.nodes.tags.getTags(i)
+			if (tags?.["public_transport"]) {
+				stopCount++
+			}
+		}
+		expect(stopCount).toBe(0)
+
+		// Should still have the route
+		expect(osm.ways.size).toBe(1)
+	})
+
+	test("can exclude routes entirely", async () => {
+		const zipData = await createTestGtfsZip()
+		const osm = await fromGtfs(
+			zipData,
+			{ id: "stops-only" },
+			{ includeRoutes: false },
+		)
+
+		// Should have stops
+		let stopCount = 0
+		for (let i = 0; i < osm.nodes.size; i++) {
+			const tags = osm.nodes.tags.getTags(i)
+			if (tags?.["public_transport"]) {
+				stopCount++
+			}
+		}
+		expect(stopCount).toBe(3)
+
+		// Should have no routes
+		expect(osm.ways.size).toBe(0)
+	})
 })
 
 describe("GtfsOsmBuilder", () => {
@@ -191,5 +241,95 @@ describe("fromGtfs without shapes", () => {
 		// The way should reference the stop nodes
 		const wayRefs = osm.ways.getRefIds(0)
 		expect(wayRefs.length).toBe(3)
+	})
+})
+
+describe("Monaco GTFS fixture", () => {
+	test("parses Monaco GTFS archive", async () => {
+		const file = Bun.file(MONACO_GTFS_PATH)
+		const zipData = await file.arrayBuffer()
+		const archive = GtfsArchive.fromZip(zipData)
+
+		// Check expected files exist
+		expect(archive.hasFile("agency.txt")).toBe(true)
+		expect(archive.hasFile("stops.txt")).toBe(true)
+		expect(archive.hasFile("routes.txt")).toBe(true)
+		expect(archive.hasFile("shapes.txt")).toBe(true)
+		expect(archive.hasFile("trips.txt")).toBe(true)
+		expect(archive.hasFile("stop_times.txt")).toBe(true)
+
+		// Parse agency
+		const agencies = await archive.agencies()
+		expect(agencies.length).toBeGreaterThan(0)
+
+		// Parse stops
+		const stops = await archive.stops()
+		expect(stops.length).toBeGreaterThan(0)
+
+		// Parse routes
+		const routes = await archive.routes()
+		expect(routes.length).toBeGreaterThan(0)
+	})
+
+	test("converts Monaco GTFS to OSM with routes only", async () => {
+		const file = Bun.file(MONACO_GTFS_PATH)
+		const zipData = await file.arrayBuffer()
+
+		// Only include routes (no stops) to test shapes parsing
+		const osm = await fromGtfs(
+			zipData,
+			{ id: "monaco-routes" },
+			{ includeStops: false },
+		)
+
+		// Should have routes as ways
+		expect(osm.ways.size).toBeGreaterThan(0)
+
+		// Check a route has proper tags
+		const wayTags = osm.ways.tags.getTags(0)
+		expect(wayTags?.["route"]).toBeDefined()
+	})
+
+	test("converts Monaco GTFS to OSM with stops only", async () => {
+		const file = Bun.file(MONACO_GTFS_PATH)
+		const zipData = await file.arrayBuffer()
+
+		// Only include stops (no routes)
+		const osm = await fromGtfs(
+			zipData,
+			{ id: "monaco-stops" },
+			{ includeRoutes: false },
+		)
+
+		// Should have stops as nodes
+		expect(osm.nodes.size).toBeGreaterThan(0)
+
+		// No routes
+		expect(osm.ways.size).toBe(0)
+
+		// Check a stop has proper tags
+		let foundStop = false
+		for (let i = 0; i < osm.nodes.size; i++) {
+			const tags = osm.nodes.tags.getTags(i)
+			if (tags?.["public_transport"]) {
+				foundStop = true
+				expect(tags["name"]).toBeDefined()
+				break
+			}
+		}
+		expect(foundStop).toBe(true)
+	})
+
+	test("converts full Monaco GTFS to OSM", async () => {
+		const file = Bun.file(MONACO_GTFS_PATH)
+		const zipData = await file.arrayBuffer()
+
+		const osm = await fromGtfs(zipData, { id: "monaco-full" })
+
+		// Should have both stops and routes
+		expect(osm.nodes.size).toBeGreaterThan(0)
+		expect(osm.ways.size).toBeGreaterThan(0)
+
+		console.log(`Monaco GTFS: ${osm.nodes.size} nodes, ${osm.ways.size} ways`)
 	})
 })

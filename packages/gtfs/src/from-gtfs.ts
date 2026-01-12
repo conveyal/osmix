@@ -99,11 +99,17 @@ export class GtfsOsmBuilder {
 	 * Only parses files that are needed based on options.
 	 */
 	async processArchive(archive: GtfsArchive) {
-		// Always need stops for nodes
-		await this.processStops(archive)
+		const { includeStops = true, includeRoutes = true } = this.gtfsOptions
 
-		// Process routes if we have shape or stop_times data
-		await this.processRoutes(archive)
+		// Process stops if requested
+		if (includeStops) {
+			await this.processStops(archive)
+		}
+
+		// Process routes if requested
+		if (includeRoutes) {
+			await this.processRoutes(archive, includeStops)
+		}
 	}
 
 	/**
@@ -191,8 +197,11 @@ export class GtfsOsmBuilder {
 	/**
 	 * Process GTFS routes into OSM ways.
 	 * Only parses shapes/trips/stop_times if needed.
+	 *
+	 * @param archive - The GTFS archive
+	 * @param stopsProcessed - Whether stops were already processed (enables stop sequence fallback)
 	 */
-	private async processRoutes(archive: GtfsArchive) {
+	private async processRoutes(archive: GtfsArchive, stopsProcessed: boolean) {
 		const { routeTypes, includeShapes = true } = this.gtfsOptions
 
 		this.onProgress(progressEvent("Processing routes..."))
@@ -229,9 +238,9 @@ export class GtfsOsmBuilder {
 			}
 		}
 
-		// Build route -> stops mapping (fallback if no shapes)
+		// Build route -> stops mapping (fallback if no shapes, only if stops were processed)
 		let routeToStops: Map<string, string[]> | undefined
-		if (!shapeMap || shapeMap.size === 0) {
+		if (stopsProcessed && (!shapeMap || shapeMap.size === 0)) {
 			this.onProgress(progressEvent("Loading stop times for route geometry..."))
 
 			// First get trip -> route mapping
