@@ -59,8 +59,8 @@ GTFS routes are converted to OSM ways with the following tags:
 | `route_id`         | `ref:gtfs:route_id`  |
 | `route_desc`       | `description`        |
 | `route_url`        | `website`            |
-| `route_color`      | `colour`             |
-| `route_text_color` | `text_colour`        |
+| `route_color`      | `color`              |
+| `route_text_color` | `text_color`         |
 | `route_type`       | `route`, `gtfs:route_type` |
 
 Route types are mapped to OSM route values:
