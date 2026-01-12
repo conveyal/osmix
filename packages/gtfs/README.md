@@ -2,6 +2,8 @@
 
 Convert GTFS (General Transit Feed Specification) transit feeds to OSM format.
 
+**Lazy parsing**: Files are only parsed when accessed, not upfront.
+
 ## Installation
 
 ```bash
@@ -23,6 +25,24 @@ const zipData = await response.arrayBuffer()
 const osm = await fromGtfs(zipData, { id: "transit" })
 
 console.log(`Imported ${osm.nodes.size} stops and ${osm.ways.size} routes`)
+```
+
+### Using GtfsArchive for Custom Processing
+
+For more control, use `GtfsArchive` directly. Files are only parsed when you access them:
+
+```ts
+import { GtfsArchive } from "@osmix/gtfs"
+
+const archive = GtfsArchive.fromZip(zipData)
+
+// Only stops.txt is parsed - other files remain unread
+for await (const stop of archive.iterStops()) {
+  console.log(stop.stop_name, stop.stop_lat, stop.stop_lon)
+}
+
+// Access routes later - now routes.txt is parsed
+const routes = await archive.routes()
 ```
 
 ## GTFS to OSM Mapping
@@ -81,6 +101,8 @@ Route geometry is derived from:
 1. **shapes.txt** (preferred) - Uses shape points to create accurate route paths
 2. **stop_times.txt** (fallback) - Uses stop sequence when shapes are unavailable
 
+Files are only parsed when needed for the conversion.
+
 ## Options
 
 ```ts
@@ -111,9 +133,30 @@ const osm = await fromGtfs(zipData, { id: "buses-only" }, {
 
 Main function to convert a GTFS zip file to an Osm index.
 
-### `parseGtfsZip(zipData)`
+### `GtfsArchive`
 
-Parse a GTFS zip file without converting to OSM. Returns a `GtfsFeed` object.
+Lazy GTFS archive class. Files are parsed on-demand:
+
+```ts
+const archive = GtfsArchive.fromZip(zipData)
+
+// Check what files exist
+archive.listFiles()      // ['agency.txt', 'stops.txt', ...]
+archive.hasFile('shapes.txt')
+
+// Lazy accessors (parse on first call, cache result)
+await archive.agencies()
+await archive.stops()
+await archive.routes()
+await archive.trips()
+await archive.stopTimes()
+await archive.shapes()
+
+// Streaming iterators (parse and yield one at a time)
+for await (const stop of archive.iterStops()) { ... }
+for await (const route of archive.iterRoutes()) { ... }
+for await (const shape of archive.iterShapes()) { ... }
+```
 
 ### `GtfsOsmBuilder`
 
@@ -122,5 +165,5 @@ Class for more fine-grained control over the conversion process.
 ## Dependencies
 
 - [but-unzip](https://github.com/nicolo-ribaudo/but-unzip) - ZIP file parsing
-- [d3-dsv](https://github.com/d3/d3-dsv) - CSV parsing
+- [csv-parse](https://csv.js.org/parse/) - CSV parsing
 - [@osmix/core](../core) - OSM data structures
