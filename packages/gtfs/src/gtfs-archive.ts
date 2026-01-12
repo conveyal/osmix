@@ -87,32 +87,6 @@ export class GtfsArchive {
 	}
 
 	/**
-	 * Create a ReadableStream of text from file bytes.
-	 */
-	private bytesToTextStream(bytes: Uint8Array): ReadableStream<string> {
-		const decoder = new TextDecoder()
-		let offset = 0
-		const chunkSize = 64 * 1024 // 64KB chunks
-
-		return new ReadableStream<string>({
-			pull(controller) {
-				if (offset >= bytes.length) {
-					controller.close()
-					return
-				}
-
-				const end = Math.min(offset + chunkSize, bytes.length)
-				const chunk = bytes.subarray(offset, end)
-				offset = end
-
-				controller.enqueue(
-					decoder.decode(chunk, { stream: offset < bytes.length }),
-				)
-			},
-		})
-	}
-
-	/**
 	 * Stream parse a CSV file, yielding typed records one at a time.
 	 */
 	private async *streamParseFile<T>(
@@ -121,7 +95,7 @@ export class GtfsArchive {
 		const bytes = await this.getFileBytes(filename)
 		if (!bytes) return
 
-		const textStream = this.bytesToTextStream(bytes)
+		const textStream = bytesToTextStream(bytes)
 		const csvStream = textStream.pipeThrough(
 			new CsvParseStream({ skipFirstRow: true }),
 		)
@@ -250,4 +224,30 @@ export class GtfsArchive {
 	async *iterAgencies(): AsyncGenerator<GtfsAgency, void, unknown> {
 		yield* this.streamParseFile<GtfsAgency>("agency.txt")
 	}
+}
+
+/**
+ * Create a ReadableStream of text from file bytes.
+ */
+function bytesToTextStream(bytes: Uint8Array): ReadableStream<string> {
+	const decoder = new TextDecoder()
+	let offset = 0
+	const chunkSize = 64 * 1024 // 64KB chunks
+
+	return new ReadableStream<string>({
+		pull(controller) {
+			if (offset >= bytes.length) {
+				controller.close()
+				return
+			}
+
+			const end = Math.min(offset + chunkSize, bytes.length)
+			const chunk = bytes.subarray(offset, end)
+			offset = end
+
+			controller.enqueue(
+				decoder.decode(chunk, { stream: offset < bytes.length }),
+			)
+		},
+	})
 }
