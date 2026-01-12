@@ -180,5 +180,5 @@ Class for more fine-grained control over the conversion process.
 ## Dependencies
 
 - [but-unzip](https://github.com/nicolo-ribaudo/but-unzip) - ZIP file parsing
-- [csv-parse](https://csv.js.org/parse/) - CSV parsing
+- [@std/csv](https://jsr.io/@std/csv) - Streaming CSV parsing (from Deno standard library)
 - [@osmix/core](../core) - OSM data structures

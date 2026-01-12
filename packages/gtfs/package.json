@@ -48,7 +48,6 @@
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@std/csv": "npm:@jsr/std__csv",
-		"but-unzip": "^0.1.7",
-		"csv-parse": "^5.6.0"
+		"but-unzip": "^0.1.7"
 	}
 }
