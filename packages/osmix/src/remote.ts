@@ -11,7 +11,10 @@
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core"
 import type { GeoParquetReadOptions } from "@osmix/geoparquet"
-import type { GtfsConversionOptions } from "@osmix/gtfs"
+import {
+	type GtfsConversionOptions,
+	isGtfsZip as isGtfsZipBytes,
+} from "@osmix/gtfs"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type {
 	DefaultSpeeds,
@@ -450,58 +453,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		try {
 			const buffer = await file.arrayBuffer()
 			const bytes = new Uint8Array(buffer)
-
-			// GTFS required files per the spec
-			const requiredGtfsFiles = [
-				"agency.txt",
-				"stops.txt",
-				"routes.txt",
-				"trips.txt",
-				"stop_times.txt",
-			]
-
-			// Find filenames in the ZIP by scanning for the local file headers
-			// ZIP local file header signature: 0x04034b50 (little-endian: 50 4b 03 04)
-			const foundFiles = new Set<string>()
-			let pos = 0
-
-			while (pos < bytes.length - 30) {
-				// Check for ZIP local file header signature
-				if (
-					bytes[pos] === 0x50 &&
-					bytes[pos + 1] === 0x4b &&
-					bytes[pos + 2] === 0x03 &&
-					bytes[pos + 3] === 0x04
-				) {
-					// Read filename length at offset 26-27 (little-endian)
-					const nameLen = (bytes[pos + 26] ?? 0) | ((bytes[pos + 27] ?? 0) << 8)
-					// Read extra field length at offset 28-29 (little-endian)
-					const extraLen =
-						(bytes[pos + 28] ?? 0) | ((bytes[pos + 29] ?? 0) << 8)
-					// Read compressed size at offset 18-21 (little-endian)
-					const compSize =
-						(bytes[pos + 18] ?? 0) |
-						((bytes[pos + 19] ?? 0) << 8) |
-						((bytes[pos + 20] ?? 0) << 16) |
-						((bytes[pos + 21] ?? 0) << 24)
-
-					// Extract filename (starts at offset 30)
-					const nameBytes = bytes.slice(pos + 30, pos + 30 + nameLen)
-					const filename = new TextDecoder().decode(nameBytes)
-
-					// Normalize path - extract just the filename part
-					const basename = filename.replace(/^.*\//, "").toLowerCase()
-					foundFiles.add(basename)
-
-					// Move to next entry
-					pos += 30 + nameLen + extraLen + compSize
-				} else {
-					pos++
-				}
-			}
-
-			// Check if all required GTFS files are present
-			return requiredGtfsFiles.every((f) => foundFiles.has(f))
+			return isGtfsZipBytes(bytes)
 		} catch {
 			return false
 		}

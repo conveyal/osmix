@@ -3,6 +3,7 @@ import {
 	fromGtfs,
 	GtfsArchive,
 	GtfsOsmBuilder,
+	isGtfsZip,
 	routeTypeToOsmRoute,
 	wheelchairBoardingToOsm,
 } from "../src"
@@ -163,6 +164,31 @@ describe("GtfsArchive", () => {
 			expect(shape.shape_pt_lat).toBeDefined()
 			break
 		}
+	})
+})
+
+describe("isGtfsZip", () => {
+	test("detects GTFS zip created in tests", async () => {
+		const zipData = await createTestGtfsZip()
+		expect(isGtfsZip(zipData)).toBe(true)
+	})
+
+	test("detects Monaco GTFS fixture as GTFS", async () => {
+		const file = Bun.file(MONACO_GTFS_PATH)
+		const zipData = new Uint8Array(await file.arrayBuffer())
+		expect(isGtfsZip(zipData)).toBe(true)
+	})
+
+	test("returns false for non-GTFS zip", async () => {
+		const encoder = new TextEncoder()
+		const { zipSync } = await import("fflate")
+
+		const bytes = zipSync({
+			"readme.txt": encoder.encode("not a gtfs feed"),
+			"data.csv": encoder.encode("col1,col2\n1,2\n"),
+		})
+
+		expect(isGtfsZip(bytes)).toBe(false)
 	})
 })
 

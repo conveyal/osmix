@@ -40,8 +40,6 @@ export {
 	type GtfsFileTypeMap,
 } from "./gtfs-archive"
 export {
-	routeTypeToOsmRoute,
-	wheelchairBoardingToOsm,
 	type GtfsAgency,
 	type GtfsConversionOptions,
 	type GtfsFeed,
@@ -50,4 +48,7 @@ export {
 	type GtfsStop,
 	type GtfsStopTime,
 	type GtfsTrip,
+	routeTypeToOsmRoute,
+	wheelchairBoardingToOsm,
 } from "./types"
+export { isGtfsZip } from "./utils"
