@@ -18,8 +18,8 @@ import {
 } from "@osmix/shared/progress"
 import type { OsmTags } from "@osmix/shared/types"
 import { GtfsArchive } from "./gtfs-archive"
-import type { GtfsConversionOptions, GtfsShapePoint, GtfsTrip } from "./types"
-import { routeToTags, stopToTags, tripToTags } from "./utils"
+import type { GtfsConversionOptions, GtfsShapePoint } from "./types"
+import { routeToTags, stopToTags } from "./utils"
 
 /**
  * Create an Osm index from a zipped GTFS file.
@@ -127,14 +127,14 @@ export class GtfsOsmBuilder {
 
 	/**
 	 * Process GTFS routes into OSM ways.
-	 * Only parses shapes/trips/stop_times if needed.
+	 * Creates one way per unique shape, collecting all trip IDs that share that shape.
 	 *
 	 * @param archive - The GTFS archive
 	 */
 	async processRoutes(archive: GtfsArchive) {
 		this.onProgress(progressEvent("Processing routes..."))
 
-		// Build shape lookup if shapes exist and are requested
+		// Build shape lookup if shapes exist
 		const shapeMap = new Map<string, GtfsShapePoint[]>()
 		if (archive.hasFile("shapes.txt")) {
 			this.onProgress(progressEvent("Loading shape data..."))
@@ -155,59 +155,65 @@ export class GtfsOsmBuilder {
 			throw Error("No shape data found. Cannot process routes.")
 		}
 
-		// Build route -> shape mapping via trips (only if we have shapes)
-		const routeTrips = new Map<string, GtfsTrip[]>()
-		const tripToShapeId = new Map<string, string>()
-		const routeShapes = new Map<string, Set<string>>()
+		// Group trips by shape_id, tracking route info for each shape
+		// shape_id -> { route_id, trip_ids[] }
+		const shapeToTrips = new Map<
+			string,
+			{ routeId: string; tripIds: string[] }
+		>()
 		this.onProgress(progressEvent("Loading trip data..."))
 		for await (const trip of archive.iter("trips.txt")) {
-			if (trip.shape_id) {
-				tripToShapeId.set(trip.trip_id, trip.shape_id)
-				const shapes = routeShapes.get(trip.route_id) ?? new Set<string>()
-				shapes.add(trip.shape_id)
-				routeShapes.set(trip.route_id, shapes)
+			if (!trip.shape_id) continue
+
+			const existing = shapeToTrips.get(trip.shape_id)
+			if (existing) {
+				existing.tripIds.push(trip.trip_id)
+			} else {
+				shapeToTrips.set(trip.shape_id, {
+					routeId: trip.route_id,
+					tripIds: [trip.trip_id],
+				})
 			}
-			const trips = routeTrips.get(trip.route_id) ?? []
-			trips.push(trip)
-			routeTrips.set(trip.route_id, trips)
 		}
 
-		// Process routes
-		let count = 0
+		// Load routes into a map for lookup
+		const routeMap = new Map<string, Awaited<ReturnType<typeof routeToTags>>>()
 		for await (const route of archive.iter("routes.txt")) {
-			const routeTags = routeToTags(route)
-			const trips = routeTrips.get(route.route_id)
-			const shapes = routeShapes.get(route.route_id)
-			if (!trips || !shapes) continue
+			routeMap.set(route.route_id, routeToTags(route))
+		}
 
-			for (const trip of trips) {
-				// Add trip tags to route tags
-				const tags = { ...routeTags, ...tripToTags(trip) }
+		// Process unique shapes - one way per shape
+		let count = 0
+		for (const [shapeId, { routeId, tripIds }] of shapeToTrips) {
+			const routeTags = routeMap.get(routeId)
+			if (!routeTags) continue
 
-				// Try to get shape geometry
-				const shapeId = tripToShapeId.get(trip.trip_id)
-				const shapePoints = shapeId ? shapeMap.get(shapeId) : undefined
+			const shapePoints = shapeMap.get(shapeId)
+			if (!shapePoints || shapePoints.length < 2) {
+				this.onProgress(
+					progressEvent(`No shape data found for shape ${shapeId}`, "error"),
+				)
+				continue
+			}
 
-				if (shapePoints && shapePoints.length >= 2) {
-					// Create way from shape points
-					this.createWayFromShape(tags, shapePoints)
-					count++
-				} else {
-					this.onProgress(
-						progressEvent(
-							`No shape data found for trip ${trip.trip_id}`,
-							"error",
-						),
-					)
-				}
+			// Build tags with route info and all trip IDs
+			const tags: OsmTags = {
+				...routeTags,
+				"gtfs:shape_id": shapeId,
+				"gtfs:trip_ids": tripIds.join(";"),
+				"gtfs:trip_count": tripIds.length,
+			}
 
-				if (count % 100 === 0 && count > 0) {
-					this.onProgress(progressEvent(`Processed ${count} routes...`))
-				}
+			// Create way from shape points
+			this.createWayFromShape(tags, shapePoints)
+			count++
+
+			if (count % 100 === 0) {
+				this.onProgress(progressEvent(`Processed ${count} shapes...`))
 			}
 		}
 
-		this.onProgress(progressEvent(`Added ${count} routes as ways`))
+		this.onProgress(progressEvent(`Added ${count} unique shapes as ways`))
 	}
 
 	/**
