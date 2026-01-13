@@ -1,4 +1,4 @@
-import { Menu } from "@base-ui-components/react/menu"
+import { Menu } from "@base-ui/react/menu"
 import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 import type { OsmFileType } from "osmix"

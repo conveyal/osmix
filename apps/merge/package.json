@@ -22,7 +22,7 @@
 		"vite": "catalog:"
 	},
 	"dependencies": {
-		"@base-ui-components/react": "^1.0.0-rc.0",
+		"@base-ui/react": "^1.0.0",
 		"@fontsource-variable/roboto-mono": "^5.2.5",
 		"@mapbox/tilebelt": "^2.0.3",
 		"@osmix/change": "workspace:*",
