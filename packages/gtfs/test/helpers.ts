@@ -71,35 +71,3 @@ trip1,stop1,1`),
 
 	return zipSync(files)
 }
-
-/**
- * Create a GTFS zip with routes but no shapes (uses stop sequence as fallback).
- */
-export async function createGtfsZipWithoutShapes(): Promise<Uint8Array> {
-	const encoder = new TextEncoder()
-
-	const files: Record<string, Uint8Array> = {
-		"agency.txt":
-			encoder.encode(`agency_id,agency_name,agency_url,agency_timezone
-agency1,No Shape Transit,https://example.com,America/New_York`),
-
-		"stops.txt": encoder.encode(`stop_id,stop_name,stop_lat,stop_lon
-stop1,First Stop,40.7128,-74.0060
-stop2,Second Stop,40.7300,-73.9900
-stop3,Third Stop,40.7500,-73.9800`),
-
-		"routes.txt":
-			encoder.encode(`route_id,route_short_name,route_long_name,route_type
-route1,A,Line A,3`),
-
-		"trips.txt": encoder.encode(`trip_id,route_id,service_id
-trip1,route1,daily`),
-
-		"stop_times.txt": encoder.encode(`trip_id,stop_id,stop_sequence
-trip1,stop1,1
-trip1,stop2,2
-trip1,stop3,3`),
-	}
-
-	return zipSync(files)
-}

@@ -133,14 +133,8 @@ export interface GtfsFeed {
 export interface GtfsConversionOptions {
 	/** Whether to include stops as nodes. Default: true */
 	includeStops?: boolean
-	/** Filter stops by location_type. Default: include all types. */
-	stopTypes?: number[]
 	/** Whether to include routes as ways. Default: true */
 	includeRoutes?: boolean
-	/** Filter routes by route_type. Default: include all types. */
-	routeTypes?: number[]
-	/** Whether to include shape geometry for routes. Default: true */
-	includeShapes?: boolean
 }
 
 /**
