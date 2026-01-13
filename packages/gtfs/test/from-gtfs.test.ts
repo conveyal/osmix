@@ -6,6 +6,7 @@ import {
 	routeTypeToOsmRoute,
 	wheelchairBoardingToOsm,
 } from "../src"
+import { stopToTags } from "../src/utils"
 import { createTestGtfsZip } from "./helpers"
 
 // Path to the Monaco GTFS fixture
@@ -40,6 +41,60 @@ describe("wheelchairBoardingToOsm", () => {
 		expect(wheelchairBoardingToOsm("2")).toBe("no")
 		expect(wheelchairBoardingToOsm("0")).toBeUndefined()
 		expect(wheelchairBoardingToOsm(undefined)).toBeUndefined()
+	})
+})
+
+describe("stopToTags", () => {
+	test("tags regular stops as platforms", () => {
+		const tags = stopToTags({
+			stop_id: "stop1",
+			stop_name: "Main St",
+			stop_lat: "40.7128",
+			stop_lon: "-74.0060",
+			location_type: "0",
+		})
+
+		expect(tags["public_transport"]).toBe("platform")
+		expect(tags["name"]).toBe("Main St")
+	})
+
+	test("tags stations correctly", () => {
+		const tags = stopToTags({
+			stop_id: "station1",
+			stop_name: "Central Station",
+			stop_lat: "40.7128",
+			stop_lon: "-74.0060",
+			location_type: "1",
+		})
+
+		expect(tags["public_transport"]).toBe("station")
+	})
+
+	test("tags entrances without public_transport tag", () => {
+		const tags = stopToTags({
+			stop_id: "entrance1",
+			stop_name: "Station Entrance A",
+			stop_lat: "40.7128",
+			stop_lon: "-74.0060",
+			location_type: "2",
+		})
+
+		// Entrances should have railway=subway_entrance but NOT public_transport
+		expect(tags["railway"]).toBe("subway_entrance")
+		expect(tags["public_transport"]).toBeUndefined()
+		expect(tags["name"]).toBe("Station Entrance A")
+	})
+
+	test("tags boarding areas as platforms", () => {
+		const tags = stopToTags({
+			stop_id: "boarding1",
+			stop_name: "Platform A",
+			stop_lat: "40.7128",
+			stop_lon: "-74.0060",
+			location_type: "4",
+		})
+
+		expect(tags["public_transport"]).toBe("platform")
 	})
 })
 

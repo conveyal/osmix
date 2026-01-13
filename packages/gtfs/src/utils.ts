@@ -29,6 +29,8 @@ export function stopToTags(stop: GtfsStop): OsmTags {
 			tags["public_transport"] = "station"
 			break
 		case "2":
+			// Entrances are not platforms - remove the default and use railway tag
+			delete tags["public_transport"]
 			tags["railway"] = "subway_entrance"
 			break
 		case "3":
