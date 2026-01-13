@@ -18,14 +18,8 @@ import {
 } from "@osmix/shared/progress"
 import type { OsmTags } from "@osmix/shared/types"
 import { GtfsArchive } from "./gtfs-archive"
-import {
-	type GtfsConversionOptions,
-	type GtfsRoute,
-	type GtfsShapePoint,
-	type GtfsStop,
-	routeTypeToOsmRoute,
-	wheelchairBoardingToOsm,
-} from "./types"
+import type { GtfsConversionOptions, GtfsShapePoint, GtfsTrip } from "./types"
+import { routeToTags, stopToTags, tripToTags } from "./utils"
 
 /**
  * Create an Osm index from a zipped GTFS file.
@@ -58,12 +52,16 @@ export async function fromGtfs(
 	gtfsOptions: GtfsConversionOptions = {},
 	onProgress: (progress: ProgressEvent) => void = logProgress,
 ): Promise<Osm> {
-	const builder = new GtfsOsmBuilder(options, gtfsOptions, onProgress)
-
 	onProgress(progressEvent("Opening GTFS archive..."))
 	const archive = GtfsArchive.fromZip(zipData)
+	const builder = new GtfsOsmBuilder(options, onProgress)
+	if (gtfsOptions.includeStops ?? true) {
+		await builder.processStops(archive)
+	}
 
-	await builder.processArchive(archive)
+	if (gtfsOptions.includeRoutes ?? true) {
+		await builder.processRoutes(archive)
+	}
 
 	return builder.buildOsm()
 }
@@ -75,7 +73,6 @@ export async function fromGtfs(
  */
 export class GtfsOsmBuilder {
 	private osm: Osm
-	private gtfsOptions: GtfsConversionOptions
 	private onProgress: (progress: ProgressEvent) => void
 
 	private nextNodeId = -1
@@ -86,55 +83,28 @@ export class GtfsOsmBuilder {
 
 	constructor(
 		osmOptions: Partial<OsmOptions> = {},
-		gtfsOptions: GtfsConversionOptions = {},
 		onProgress: (progress: ProgressEvent) => void = logProgress,
 	) {
 		this.osm = new Osm(osmOptions)
-		this.gtfsOptions = gtfsOptions
 		this.onProgress = onProgress
-	}
-
-	/**
-	 * Process the GTFS archive and add entities to the OSM index.
-	 * Only parses files that are needed based on options.
-	 */
-	async processArchive(archive: GtfsArchive) {
-		const { includeStops = true, includeRoutes = true } = this.gtfsOptions
-
-		// Process stops if requested
-		if (includeStops) {
-			await this.processStops(archive)
-		}
-
-		// Process routes if requested
-		if (includeRoutes) {
-			await this.processRoutes(archive, includeStops)
-		}
 	}
 
 	/**
 	 * Process GTFS stops into OSM nodes.
 	 * Uses streaming iteration to avoid loading all stops at once.
 	 */
-	private async processStops(archive: GtfsArchive) {
-		const { stopTypes } = this.gtfsOptions
+	async processStops(archive: GtfsArchive) {
 		let count = 0
 
 		this.onProgress(progressEvent("Processing stops..."))
 
 		for await (const stop of archive.iter("stops.txt")) {
-			// Filter by location_type if specified
-			if (stopTypes !== undefined) {
-				const locationType = Number.parseInt(stop.location_type ?? "0", 10)
-				if (!stopTypes.includes(locationType)) continue
-			}
-
 			const lat = Number.parseFloat(stop.stop_lat)
 			const lon = Number.parseFloat(stop.stop_lon)
 
 			if (Number.isNaN(lat) || Number.isNaN(lon)) continue
 
-			const tags = this.stopToTags(stop)
+			const tags = stopToTags(stop)
 			const nodeId = this.nextNodeId--
 
 			this.osm.nodes.addNode({
@@ -156,61 +126,18 @@ export class GtfsOsmBuilder {
 	}
 
 	/**
-	 * Convert a GTFS stop to OSM tags.
-	 */
-	private stopToTags(stop: GtfsStop): OsmTags {
-		const tags: OsmTags = {
-			public_transport: "platform",
-		}
-
-		if (stop.stop_name) tags["name"] = stop.stop_name
-		if (stop.stop_id) tags["ref"] = stop.stop_id
-		if (stop.stop_code) tags["ref:gtfs:stop_code"] = stop.stop_code
-		if (stop.stop_desc) tags["description"] = stop.stop_desc
-		if (stop.stop_url) tags["website"] = stop.stop_url
-		if (stop.platform_code) tags["ref:platform"] = stop.platform_code
-
-		// Location type determines more specific tagging
-		const locationType = stop.location_type ?? "0"
-		switch (locationType) {
-			case "1":
-				tags["public_transport"] = "station"
-				break
-			case "2":
-				tags["railway"] = "subway_entrance"
-				break
-			case "3":
-				// Generic node - keep as platform
-				break
-			case "4":
-				tags["public_transport"] = "platform"
-				break
-		}
-
-		// Wheelchair accessibility
-		const wheelchair = wheelchairBoardingToOsm(stop.wheelchair_boarding)
-		if (wheelchair) tags["wheelchair"] = wheelchair
-
-		return tags
-	}
-
-	/**
 	 * Process GTFS routes into OSM ways.
 	 * Only parses shapes/trips/stop_times if needed.
 	 *
 	 * @param archive - The GTFS archive
-	 * @param stopsProcessed - Whether stops were already processed (enables stop sequence fallback)
 	 */
-	private async processRoutes(archive: GtfsArchive, stopsProcessed: boolean) {
-		const { routeTypes, includeShapes = true } = this.gtfsOptions
-
+	async processRoutes(archive: GtfsArchive) {
 		this.onProgress(progressEvent("Processing routes..."))
 
 		// Build shape lookup if shapes exist and are requested
-		let shapeMap: Map<string, GtfsShapePoint[]> | undefined
-		if (includeShapes && archive.hasFile("shapes.txt")) {
+		const shapeMap = new Map<string, GtfsShapePoint[]>()
+		if (archive.hasFile("shapes.txt")) {
 			this.onProgress(progressEvent("Loading shape data..."))
-			shapeMap = new Map()
 			for await (const point of archive.iter("shapes.txt")) {
 				const points = shapeMap.get(point.shape_id) ?? []
 				points.push(point)
@@ -224,130 +151,63 @@ export class GtfsOsmBuilder {
 						Number.parseInt(b.shape_pt_sequence, 10),
 				)
 			}
+		} else {
+			throw Error("No shape data found. Cannot process routes.")
 		}
 
 		// Build route -> shape mapping via trips (only if we have shapes)
-		let routeToShapeId: Map<string, string> | undefined
-		if (shapeMap && shapeMap.size > 0) {
-			this.onProgress(progressEvent("Loading trip data..."))
-			routeToShapeId = new Map()
-			for await (const trip of archive.iter("trips.txt")) {
-				if (trip.shape_id && !routeToShapeId.has(trip.route_id)) {
-					routeToShapeId.set(trip.route_id, trip.shape_id)
-				}
+		const routeTrips = new Map<string, GtfsTrip[]>()
+		const tripToShapeId = new Map<string, string>()
+		const routeShapes = new Map<string, Set<string>>()
+		this.onProgress(progressEvent("Loading trip data..."))
+		for await (const trip of archive.iter("trips.txt")) {
+			if (trip.shape_id) {
+				tripToShapeId.set(trip.trip_id, trip.shape_id)
+				const shapes = routeShapes.get(trip.route_id) ?? new Set<string>()
+				shapes.add(trip.shape_id)
+				routeShapes.set(trip.route_id, shapes)
 			}
-		}
-
-		// Build route -> stops mapping (fallback if no shapes, only if stops were processed)
-		let routeToStops: Map<string, string[]> | undefined
-		if (stopsProcessed && (!shapeMap || shapeMap.size === 0)) {
-			this.onProgress(progressEvent("Loading stop times for route geometry..."))
-
-			// First get trip -> route mapping
-			const tripToRoute = new Map<string, string>()
-			for await (const trip of archive.iter("trips.txt")) {
-				tripToRoute.set(trip.trip_id, trip.route_id)
-			}
-
-			// Group stop_times by trip, then extract stop sequence per route
-			const tripToStops = new Map<string, { stop_id: string; seq: number }[]>()
-			for await (const stopTime of archive.iter("stop_times.txt")) {
-				const times = tripToStops.get(stopTime.trip_id) ?? []
-				times.push({
-					stop_id: stopTime.stop_id,
-					seq: Number.parseInt(stopTime.stop_sequence, 10),
-				})
-				tripToStops.set(stopTime.trip_id, times)
-			}
-
-			// Get one trip per route and extract stop sequence
-			routeToStops = new Map()
-			for (const [tripId, stops] of tripToStops) {
-				const routeId = tripToRoute.get(tripId)
-				if (!routeId || routeToStops.has(routeId)) continue
-				stops.sort((a, b) => a.seq - b.seq)
-				routeToStops.set(
-					routeId,
-					stops.map((s) => s.stop_id),
-				)
-			}
+			const trips = routeTrips.get(trip.route_id) ?? []
+			trips.push(trip)
+			routeTrips.set(trip.route_id, trips)
 		}
 
 		// Process routes
 		let count = 0
 		for await (const route of archive.iter("routes.txt")) {
-			// Filter by route_type if specified
-			if (routeTypes !== undefined) {
-				const routeType = Number.parseInt(route.route_type, 10)
-				if (!routeTypes.includes(routeType)) continue
-			}
+			const routeTags = routeToTags(route)
+			const trips = routeTrips.get(route.route_id)
+			const shapes = routeShapes.get(route.route_id)
+			if (!trips || !shapes) continue
 
-			const tags = this.routeToTags(route)
+			for (const trip of trips) {
+				// Add trip tags to route tags
+				const tags = { ...routeTags, ...tripToTags(trip) }
 
-			// Try to get shape geometry
-			const shapeId = routeToShapeId?.get(route.route_id)
-			const shapePoints = shapeId ? shapeMap?.get(shapeId) : undefined
+				// Try to get shape geometry
+				const shapeId = tripToShapeId.get(trip.trip_id)
+				const shapePoints = shapeId ? shapeMap.get(shapeId) : undefined
 
-			if (shapePoints && shapePoints.length >= 2) {
-				// Create way from shape points
-				this.createWayFromShape(tags, shapePoints)
-				count++
-			} else if (routeToStops) {
-				// Fall back to stop sequence
-				const stopIds = routeToStops.get(route.route_id)
-				if (stopIds && stopIds.length >= 2) {
-					this.createWayFromStops(tags, stopIds)
+				if (shapePoints && shapePoints.length >= 2) {
+					// Create way from shape points
+					this.createWayFromShape(tags, shapePoints)
 					count++
+				} else {
+					this.onProgress(
+						progressEvent(
+							`No shape data found for trip ${trip.trip_id}`,
+							"error",
+						),
+					)
 				}
-			}
 
-			if (count % 100 === 0 && count > 0) {
-				this.onProgress(progressEvent(`Processed ${count} routes...`))
+				if (count % 100 === 0 && count > 0) {
+					this.onProgress(progressEvent(`Processed ${count} routes...`))
+				}
 			}
 		}
 
 		this.onProgress(progressEvent(`Added ${count} routes as ways`))
-	}
-
-	/**
-	 * Convert a GTFS route to OSM tags.
-	 */
-	private routeToTags(route: GtfsRoute): OsmTags {
-		const tags: OsmTags = {
-			route: routeTypeToOsmRoute(route.route_type),
-		}
-
-		// Use long name if available, otherwise short name
-		if (route.route_long_name) {
-			tags["name"] = route.route_long_name
-		} else if (route.route_short_name) {
-			tags["name"] = route.route_short_name
-		}
-
-		if (route.route_short_name) tags["ref"] = route.route_short_name
-		if (route.route_id) tags["ref:gtfs:route_id"] = route.route_id
-		if (route.route_desc) tags["description"] = route.route_desc
-		if (route.route_url) tags["website"] = route.route_url
-
-		// Route color (normalize to include # prefix)
-		if (route.route_color) {
-			const color = route.route_color.startsWith("#")
-				? route.route_color
-				: `#${route.route_color}`
-			tags["color"] = color
-		}
-
-		if (route.route_text_color) {
-			const textColor = route.route_text_color.startsWith("#")
-				? route.route_text_color
-				: `#${route.route_text_color}`
-			tags["text_color"] = textColor
-		}
-
-		// Route type as additional tag
-		tags["gtfs:route_type"] = route.route_type
-
-		return tags
 	}
 
 	/**
@@ -370,29 +230,6 @@ export class GtfsOsmBuilder {
 				lon,
 			})
 			nodeRefs.push(nodeId)
-		}
-
-		if (nodeRefs.length >= 2) {
-			const wayId = this.nextWayId--
-			this.osm.ways.addWay({
-				id: wayId,
-				refs: nodeRefs,
-				tags,
-			})
-		}
-	}
-
-	/**
-	 * Create a way from stop IDs (fallback when no shape data).
-	 */
-	private createWayFromStops(tags: OsmTags, stopIds: string[]) {
-		const nodeRefs: number[] = []
-
-		for (const stopId of stopIds) {
-			const nodeId = this.stopIdToNodeId.get(stopId)
-			if (nodeId !== undefined) {
-				nodeRefs.push(nodeId)
-			}
 		}
 
 		if (nodeRefs.length >= 2) {
