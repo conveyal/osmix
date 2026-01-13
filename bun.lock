@@ -148,7 +148,7 @@
       "dependencies": {
         "@osmix/shared": "workspace:*",
         "flatbush": "^4.4.1",
-        "geoflatbush": "^2.0.0",
+        "geoflatbush": "^2.1.0",
         "geokdbush": "^2.0.1",
         "kdbush": "mourner/kdbush#16416cd",
       },
@@ -1043,7 +1043,7 @@
 
     "gensync": ["gensync@1.0.0-beta.2", "", {}, "sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg=="],
 
-    "geoflatbush": ["geoflatbush@2.0.0", "", {}, "sha512-YdK82L0RXD4nQpcYAp7kuJw9xxCdYRN6RsQRuJ47Ut/fyBvP6jRU2hLBvPaDo9ayBFIgLURLlI9ZVkUvMeZHfA=="],
+    "geoflatbush": ["geoflatbush@2.1.0", "", {}, "sha512-au5uSa0WFX455ubSgZYKkoIGVnMoLQ0IkJegA+OGatF9006Cvhlj5QS4vZ9cMyNFypXIyql0wtg2yW9XyWM1jQ=="],
 
     "geojson-vt": ["geojson-vt@4.0.2", "", {}, "sha512-AV9ROqlNqoZEIJGfm1ncNjEXfkz2hdFlZf0qkVfmkwdKa8vj7H16YUOT81rJw1rdFhyEDlN2Tds91p/glzbl5A=="],
 
