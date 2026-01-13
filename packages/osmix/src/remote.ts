@@ -11,6 +11,7 @@
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core"
 import type { GeoParquetReadOptions } from "@osmix/geoparquet"
+import type { GtfsConversionOptions } from "@osmix/gtfs"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type {
 	DefaultSpeeds,
@@ -338,11 +339,33 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	}
 
 	/**
+	 * Load an `Osm` instance from GTFS (ZIP) data in a worker.
+	 * Data is sent to the first available worker, then synchronized across all workers.
+	 */
+	async fromGtfs(
+		data: ArrayBufferLike | ReadableStream | Uint8Array | File,
+		options: Partial<OsmOptions> = {},
+		gtfsOptions: GtfsConversionOptions = {},
+	) {
+		const workers = this.workers.slice()
+		const worker0 = workers.shift()!
+		const osmInfo = await worker0.fromGtfs(
+			transfer({
+				data: await this.getTransferableData(data),
+				options,
+				gtfsOptions,
+			}),
+		)
+		await this.populateOtherWorkers(worker0, osmInfo.id)
+		return osmInfo
+	}
+
+	/**
 	 * Load an `Osm` instance from a File.
 	 * If fileType is provided, uses that format directly.
 	 * Otherwise auto-detects format by extension:
 	 * - .geojson and .json files are loaded as GeoJSON
-	 * - .zip files are loaded as Shapefiles
+	 * - .zip files are inspected to determine if they are GTFS or Shapefile
 	 * - .parquet files are loaded as GeoParquet
 	 * - All others are loaded as PBF
 	 */
@@ -351,25 +374,125 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		options: Partial<OsmOptions> = {},
 		fileType?: OsmFileType,
 	) {
-		const resolvedFileType = fileType ?? detectFileType(file.name)
-		switch (resolvedFileType) {
-			case "geojson":
-				return this.fromGeoJSON(file, {
-					...options,
-					id: options.id ?? file.name,
-				})
-			case "shapefile":
-				return this.fromShapefile(file, {
-					...options,
-					id: options.id ?? file.name,
-				})
-			case "geoparquet":
-				return this.fromGeoParquet(file, {
-					...options,
-					id: options.id ?? file.name,
-				})
-			default:
-				return this.fromPbf(file, { ...options, id: options.id ?? file.name })
+		if (fileType) {
+			// Use provided file type directly
+			switch (fileType) {
+				case "geojson":
+					return this.fromGeoJSON(file, {
+						...options,
+						id: options.id ?? file.name,
+					})
+				case "shapefile":
+					return this.fromShapefile(file, {
+						...options,
+						id: options.id ?? file.name,
+					})
+				case "geoparquet":
+					return this.fromGeoParquet(file, {
+						...options,
+						id: options.id ?? file.name,
+					})
+				default:
+					return this.fromPbf(file, {
+						...options,
+						id: options.id ?? file.name,
+					})
+			}
+		}
+
+		// Auto-detect file type
+		const fileName = file.name.toLowerCase()
+		const isGeoJSON =
+			fileName.endsWith(".geojson") || fileName.endsWith(".json")
+		const isZip = fileName.endsWith(".zip")
+		const isParquet = fileName.endsWith(".parquet")
+
+		if (isGeoJSON) {
+			return this.fromGeoJSON(file, { ...options, id: options.id ?? file.name })
+		}
+		if (isZip) {
+			// Peek into the zip to determine if it's GTFS or Shapefile
+			const isGtfs = await this.isGtfsZip(file)
+			if (isGtfs) {
+				return this.fromGtfs(file, { ...options, id: options.id ?? file.name })
+			}
+			return this.fromShapefile(file, {
+				...options,
+				id: options.id ?? file.name,
+			})
+		}
+		if (isParquet) {
+			return this.fromGeoParquet(file, {
+				...options,
+				id: options.id ?? file.name,
+			})
+		}
+		return this.fromPbf(file, { ...options, id: options.id ?? file.name })
+	}
+
+	/**
+	 * Check if a ZIP file is a GTFS archive by looking for characteristic GTFS files.
+	 * GTFS archives must contain at least agency.txt, stops.txt, routes.txt, trips.txt,
+	 * and stop_times.txt according to the GTFS specification.
+	 */
+	private async isGtfsZip(file: File): Promise<boolean> {
+		try {
+			const buffer = await file.arrayBuffer()
+			const bytes = new Uint8Array(buffer)
+
+			// GTFS required files per the spec
+			const requiredGtfsFiles = [
+				"agency.txt",
+				"stops.txt",
+				"routes.txt",
+				"trips.txt",
+				"stop_times.txt",
+			]
+
+			// Find filenames in the ZIP by scanning for the local file headers
+			// ZIP local file header signature: 0x04034b50 (little-endian: 50 4b 03 04)
+			const foundFiles = new Set<string>()
+			let pos = 0
+
+			while (pos < bytes.length - 30) {
+				// Check for ZIP local file header signature
+				if (
+					bytes[pos] === 0x50 &&
+					bytes[pos + 1] === 0x4b &&
+					bytes[pos + 2] === 0x03 &&
+					bytes[pos + 3] === 0x04
+				) {
+					// Read filename length at offset 26-27 (little-endian)
+					const nameLen = (bytes[pos + 26] ?? 0) | ((bytes[pos + 27] ?? 0) << 8)
+					// Read extra field length at offset 28-29 (little-endian)
+					const extraLen =
+						(bytes[pos + 28] ?? 0) | ((bytes[pos + 29] ?? 0) << 8)
+					// Read compressed size at offset 18-21 (little-endian)
+					const compSize =
+						(bytes[pos + 18] ?? 0) |
+						((bytes[pos + 19] ?? 0) << 8) |
+						((bytes[pos + 20] ?? 0) << 16) |
+						((bytes[pos + 21] ?? 0) << 24)
+
+					// Extract filename (starts at offset 30)
+					const nameBytes = bytes.slice(pos + 30, pos + 30 + nameLen)
+					const filename = new TextDecoder().decode(nameBytes)
+
+					// Normalize path - extract just the filename part
+					const basename = filename.replace(/^.*\//, "").toLowerCase()
+					foundFiles.add(basename)
+
+					// Move to next entry
+					pos += 30 + nameLen + extraLen + compSize
+				} else {
+					pos++
+				}
+			}
+
+			// Check if all required GTFS files are present
+			return requiredGtfsFiles.every((f) => foundFiles.has(f))
+		} catch {
+			return false
 		}
 	}
 

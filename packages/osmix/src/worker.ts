@@ -30,6 +30,7 @@ import {
 import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core"
 import { fromGeoJSON } from "@osmix/geojson"
 import { fromGeoParquet, type GeoParquetReadOptions } from "@osmix/geoparquet"
+import { fromGtfs, type GtfsConversionOptions } from "@osmix/gtfs"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import {
 	type DefaultSpeeds,
@@ -43,6 +44,7 @@ import {
 } from "@osmix/router"
 import { fromShapefile } from "@osmix/shapefile"
 import type { Progress, ProgressEvent } from "@osmix/shared/progress"
+import { streamToBytes } from "@osmix/shared/stream-to-bytes"
 import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types"
 
 // Re-export types from router for backwards compatibility
@@ -188,6 +190,31 @@ export class OsmixWorker extends EventTarget {
 			data,
 			options,
 			readOptions,
+			this.onProgress,
+		)
+		this.set(osm.id, osm)
+		return osm.info()
+	}
+
+	/**
+	 * Load an Osm instance from GTFS (ZIP) data and store it in this worker.
+	 * Returns Osm metadata including entity counts and bbox.
+	 */
+	async fromGtfs({
+		data,
+		options,
+		gtfsOptions,
+	}: {
+		data: ArrayBufferLike | ReadableStream
+		options?: Partial<OsmOptions>
+		gtfsOptions?: GtfsConversionOptions
+	}) {
+		const osm = await fromGtfs(
+			data instanceof ReadableStream
+				? new Uint8Array(await streamToBytes(data))
+				: new Uint8Array(data),
+			options,
+			gtfsOptions,
 			this.onProgress,
 		)
 		this.set(osm.id, osm)
