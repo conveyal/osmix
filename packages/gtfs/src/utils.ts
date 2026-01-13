@@ -8,6 +8,99 @@ import {
 } from "./types"
 
 /**
+ * Check if a ZIP file (as bytes) is a GTFS archive by looking for characteristic GTFS files.
+ * GTFS archives must contain at least agency.txt, stops.txt, routes.txt, trips.txt,
+ * and stop_times.txt according to the GTFS specification.
+ */
+export function isGtfsZip(bytes: Uint8Array): boolean {
+	// GTFS required files per the spec
+	const requiredGtfsFiles = [
+		"agency.txt",
+		"stops.txt",
+		"routes.txt",
+		"trips.txt",
+		"stop_times.txt",
+	]
+
+	// Find filenames in the ZIP by scanning for the local file headers
+	// ZIP local file header signature: 0x04034b50 (little-endian: 50 4b 03 04)
+	const foundFiles = new Set<string>()
+	const decoder = new TextDecoder()
+	let pos = 0
+
+	while (pos < bytes.length - 30) {
+		// Check for ZIP local file header signature
+		const isLocalHeader =
+			bytes[pos] === 0x50 &&
+			bytes[pos + 1] === 0x4b &&
+			bytes[pos + 2] === 0x03 &&
+			bytes[pos + 3] === 0x04
+
+		if (isLocalHeader) {
+			// Read filename length at offset 26-27 (little-endian)
+			const nameLen = (bytes[pos + 26] ?? 0) | ((bytes[pos + 27] ?? 0) << 8)
+			// Read extra field length at offset 28-29 (little-endian)
+			const extraLen = (bytes[pos + 28] ?? 0) | ((bytes[pos + 29] ?? 0) << 8)
+
+			// Defensive bounds check
+			if (nameLen < 0 || extraLen < 0) break
+			if (pos + 30 + nameLen + extraLen > bytes.length) break
+
+			// General purpose bit flag at offset 6-7 (little-endian)
+			// Bit 3 indicates the presence of a data descriptor, in which case
+			// the compressed size fields in the local header are zero and the
+			// actual sizes follow the compressed data.
+			const flags = (bytes[pos + 6] ?? 0) | ((bytes[pos + 7] ?? 0) << 8)
+			const hasDataDescriptor = (flags & 0x0008) !== 0
+
+			// Extract filename (starts at offset 30)
+			const nameBytes = bytes.slice(pos + 30, pos + 30 + nameLen)
+			const filename = decoder.decode(nameBytes)
+
+			// Normalize path - extract just the filename part
+			const basename = filename.replace(/^.*\//, "").toLowerCase()
+			if (basename) {
+				foundFiles.add(basename)
+			}
+
+			if (!hasDataDescriptor) {
+				// Read compressed size at offset 18-21 (little-endian)
+				const compSize =
+					(bytes[pos + 18] ?? 0) |
+					((bytes[pos + 19] ?? 0) << 8) |
+					((bytes[pos + 20] ?? 0) << 16) |
+					((bytes[pos + 21] ?? 0) << 24)
+
+				// Move to next entry using the known compressed size
+				pos += 30 + nameLen + extraLen + compSize
+			} else {
+				// When a data descriptor is present, the compressed size is not
+				// available in the local header. Skip past the header, filename,
+				// and extra fields, then scan forward for the next local header
+				// signature. This avoids getting stuck at the same position when
+				// the compressed size field is zero.
+				pos += 30 + nameLen + extraLen
+
+				while (pos < bytes.length - 3) {
+					const nextIsHeader =
+						bytes[pos] === 0x50 &&
+						bytes[pos + 1] === 0x4b &&
+						bytes[pos + 2] === 0x03 &&
+						bytes[pos + 3] === 0x04
+					if (nextIsHeader) break
+					pos++
+				}
+			}
+		} else {
+			pos++
+		}
+	}
+
+	// Check if all required GTFS files are present
+	return requiredGtfsFiles.every((f) => foundFiles.has(f))
+}
+
+/**
  * Convert a GTFS stop to OSM tags.
  */
 export function stopToTags(stop: GtfsStop): OsmTags {
@@ -108,6 +201,7 @@ export function tripToTags(trip: GtfsTrip): OsmTags {
 
 	return tags
 }
+
 /**
  * Create a ReadableStream of text from file bytes.
  */
