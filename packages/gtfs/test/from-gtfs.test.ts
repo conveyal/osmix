@@ -250,8 +250,8 @@ describe("Monaco GTFS fixture", () => {
 			{ includeStops: false },
 		)
 
-		// Should have routes as ways
-		expect(osm.ways.size).toBe(10344)
+		// Should have routes as ways (one per unique shape, not per trip)
+		expect(osm.ways.size).toBe(271)
 
 		// Check a route has proper tags
 		const wayTags = osm.ways.tags.getTags(0)
