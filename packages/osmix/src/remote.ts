@@ -36,7 +36,12 @@ import type { OsmixWorker } from "./worker"
 export type OsmId = string | Osm | OsmInfo
 
 /** Supported file types for OSM data loading. */
-export type OsmFileType = "pbf" | "geojson" | "shapefile" | "geoparquet"
+export type OsmFileType =
+	| "pbf"
+	| "geojson"
+	| "shapefile"
+	| "geoparquet"
+	| "gtfs"
 
 /** All supported file types for display/selection purposes. */
 export const OSM_FILE_TYPES: OsmFileType[] = [
@@ -44,6 +49,7 @@ export const OSM_FILE_TYPES: OsmFileType[] = [
 	"geojson",
 	"shapefile",
 	"geoparquet",
+	"gtfs",
 ]
 
 /**
@@ -389,6 +395,11 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 					})
 				case "geoparquet":
 					return this.fromGeoParquet(file, {
+						...options,
+						id: options.id ?? file.name,
+					})
+				case "gtfs":
+					return this.fromGtfs(file, {
 						...options,
 						id: options.id ?? file.name,
 					})
