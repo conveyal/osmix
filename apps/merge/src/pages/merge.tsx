@@ -1,4 +1,5 @@
 import { useSetAtom } from "jotai"
+import type { OsmFileType } from "osmix"
 import { useEffect, useMemo, useRef } from "react"
 import MergeBlock from "../blocks/merge"
 import Basemap, { type MapInitialViewState } from "../components/basemap"
@@ -43,13 +44,13 @@ export default function Merge() {
 	// Show full-screen file selector when no files are selected
 	const noFilesSelected = !base.osm && !patch.osm
 
-	const openOsmFile = async (file: File | string) => {
+	const openOsmFile = async (file: File | string, fileType?: OsmFileType) => {
 		selectEntity(null, null)
 		setChangesetStats(null)
 		const osmInfo =
 			typeof file === "string"
 				? await base.loadFromStorage(file)
-				: await base.loadOsmFile(file)
+				: await base.loadOsmFile(file, fileType)
 		flyToOsmBounds(osmInfo)
 		return osmInfo
 	}

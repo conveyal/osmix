@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
-import type { OsmInfo } from "osmix"
+import type { OsmFileType, OsmInfo } from "osmix"
 import { useEffectEvent } from "react"
 import { canStoreFile } from "../lib/storage-utils"
 import { Log } from "../state/log"
@@ -25,59 +25,65 @@ export function useOsmFile(osmKey: string) {
 	const [isStored, setIsStored] = useAtom(osmStoredAtomFamily(osmKey))
 	const setSelectedOsm = useSetAtom(selectedOsmAtom)
 
-	const loadOsmFile = useEffectEvent(async (file: File | null) => {
-		setFile(file)
-		setOsm(null)
-		setFileInfo(null)
-		setIsStored(false)
-		if (file == null) return null
-		const taskLog = Log.startTask(`Processing file ${file.name}...`)
-		try {
-			// Hash the file in the worker to avoid blocking UI
-			taskLog.update("Hashing file...")
-			const buffer = await file.arrayBuffer()
-			const fileHash = await osmWorker.hashBuffer(buffer)
-			const storedFileInfo: StoredFileInfo = {
-				fileHash,
-				fileName: file.name,
-				fileSize: file.size,
-			}
-			setFileInfo(storedFileInfo)
-
-			// Check if we already have this file stored (in worker)
-			const existing = await osmWorker.findByHash(fileHash)
-			if (existing) {
-				taskLog.update("Found cached version, loading from storage...")
-				const stored = await osmWorker.loadFromStorage(existing.fileHash)
-				if (stored) {
-					// Get the Osm instance from worker (already has spatial indexes built)
-					const osm = await osmWorker.get(stored.entry.fileHash)
-					setOsmInfo(stored.info)
-					setOsm(osm)
-					setSelectedOsm(osm)
-					setIsStored(true)
-
-					taskLog.end(`${file.name} loaded from cache.`)
-					return stored.info
+	const loadOsmFile = useEffectEvent(
+		async (file: File | null, fileType?: OsmFileType) => {
+			setFile(file)
+			setOsm(null)
+			setFileInfo(null)
+			setIsStored(false)
+			if (file == null) return null
+			const taskLog = Log.startTask(`Processing file ${file.name}...`)
+			try {
+				// Hash the file in the worker to avoid blocking UI
+				taskLog.update("Hashing file...")
+				const buffer = await file.arrayBuffer()
+				const fileHash = await osmWorker.hashBuffer(buffer)
+				const storedFileInfo: StoredFileInfo = {
+					fileHash,
+					fileName: file.name,
+					fileSize: file.size,
 				}
+				setFileInfo(storedFileInfo)
+
+				// Check if we already have this file stored (in worker)
+				const existing = await osmWorker.findByHash(fileHash)
+				if (existing) {
+					taskLog.update("Found cached version, loading from storage...")
+					const stored = await osmWorker.loadFromStorage(existing.fileHash)
+					if (stored) {
+						// Get the Osm instance from worker (already has spatial indexes built)
+						const osm = await osmWorker.get(stored.entry.fileHash)
+						setOsmInfo(stored.info)
+						setOsm(osm)
+						setSelectedOsm(osm)
+						setIsStored(true)
+
+						taskLog.end(`${file.name} loaded from cache.`)
+						return stored.info
+					}
+				}
+
+				// Parse the file normally in the worker with explicit file type
+				taskLog.update("Parsing file...")
+				const osmInfo: OsmInfo = await osmWorker.fromFile(
+					file,
+					{ id: fileHash },
+					fileType,
+				)
+				setOsmInfo(osmInfo)
+				const osm = await osmWorker.get(osmInfo.id)
+				setOsm(osm)
+				setSelectedOsm(osm)
+
+				taskLog.end(`${file.name} loaded.`)
+				return osmInfo
+			} catch (e) {
+				console.error(e)
+				taskLog.end(`${file.name} failed to load.`, "error")
+				throw e
 			}
-
-			// Parse the file normally in the worker
-			taskLog.update("Parsing file...")
-			const osmInfo: OsmInfo = await osmWorker.fromFile(file, { id: fileHash })
-			setOsmInfo(osmInfo)
-			const osm = await osmWorker.get(osmInfo.id)
-			setOsm(osm)
-			setSelectedOsm(osm)
-
-			taskLog.end(`${file.name} loaded.`)
-			return osmInfo
-		} catch (e) {
-			console.error(e)
-			taskLog.end(`${file.name} failed to load.`, "error")
-			throw e
-		}
-	})
+		},
+	)
 
 	const loadFromStorage = useEffectEvent(async (storageId: string) => {
 		const taskLog = Log.startTask("Loading osm from storage...")

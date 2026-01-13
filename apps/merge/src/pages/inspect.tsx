@@ -1,5 +1,6 @@
 import { useAtom, useSetAtom } from "jotai"
 import { MergeIcon } from "lucide-react"
+import type { OsmFileType } from "osmix"
 import { Suspense, useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "react-router"
 import ActionButton from "../components/action-button"
@@ -82,13 +83,13 @@ export default function InspectPage() {
 		return changesetStats == null || changesetStats.totalChanges === 0
 	}, [changesetStats])
 
-	const openOsmFile = async (file: File | string) => {
+	const openOsmFile = async (file: File | string, fileType?: OsmFileType) => {
 		selectEntity(null, null)
 		setChangesetStats(null)
 		const osmInfo =
 			typeof file === "string"
 				? await baseOsm.loadFromStorage(file)
-				: await baseOsm.loadOsmFile(file)
+				: await baseOsm.loadOsmFile(file, fileType)
 		flyToOsmBounds(osmInfo)
 		return osmInfo
 	}
