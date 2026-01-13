@@ -224,6 +224,7 @@
         "@osmix/core": "workspace:*",
         "@osmix/geojson": "workspace:*",
         "@osmix/geoparquet": "workspace:*",
+        "@osmix/gtfs": "workspace:*",
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
         "@osmix/raster": "workspace:*",
