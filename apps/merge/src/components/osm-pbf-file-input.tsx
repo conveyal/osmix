@@ -48,6 +48,12 @@ const FILE_TYPE_OPTIONS: {
 		description: "Apache Parquet with geometry",
 		accept: ".parquet",
 	},
+	{
+		type: "gtfs",
+		label: "GTFS (ZIP)",
+		description: "General Transit Feed Specification in ZIP archive",
+		accept: ".zip",
+	},
 ]
 
 export default function OsmPbfFileInput({
