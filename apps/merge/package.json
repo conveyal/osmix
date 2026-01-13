@@ -22,13 +22,14 @@
 		"vite": "catalog:"
 	},
 	"dependencies": {
+		"@base-ui/react": "^1.0.0",
 		"@fontsource-variable/roboto-mono": "^5.2.5",
 		"@mapbox/tilebelt": "^2.0.3",
 		"@osmix/change": "workspace:*",
 		"@osmix/core": "workspace:*",
 		"@osmix/geojson": "workspace:*",
-		"@osmix/json": "workspace:*",
 		"@osmix/geoparquet": "workspace:*",
+		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/raster": "workspace:*",
 		"@osmix/router": "workspace:*",

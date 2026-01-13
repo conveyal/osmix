@@ -13,6 +13,7 @@ import {
 	Trash2Icon,
 	XIcon,
 } from "lucide-react"
+import type { OsmFileType } from "osmix"
 import { useEffectEvent, useRef, useState } from "react"
 import { type StoredOsmEntry, useStoredOsm } from "../hooks/storage-broadcast"
 import { osmWorker } from "../state/worker"
@@ -184,7 +185,10 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 
 interface StoredOsmListProps {
 	activeOsmId?: string
-	openOsmFile: (file: File | string) => Promise<OsmInfo | null>
+	openOsmFile: (
+		file: File | string,
+		fileType?: OsmFileType,
+	) => Promise<OsmInfo | null>
 }
 
 export function StoredOsmList({
@@ -204,15 +208,15 @@ export function StoredOsmList({
 			<CardContent className="p-0">
 				<div className="flex flex-col gap-2 p-2">
 					<OsmPbfSelectFileButton
-						setFile={async (file) => {
+						setFile={async (file, fileType) => {
 							if (file == null) return
-							await openOsmFile(file)
+							await openOsmFile(file, fileType)
 						}}
 					/>
 					<OsmPbfOpenUrlButton
-						setFile={async (file) => {
+						setFile={async (file, fileType) => {
 							if (file == null) return
-							await openOsmFile(file)
+							await openOsmFile(file, fileType)
 						}}
 					/>
 				</div>

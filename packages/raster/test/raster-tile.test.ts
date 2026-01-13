@@ -616,202 +616,201 @@ describe("@osmix/raster: OsmixRasterTile", () => {
 		[4265, 2897, 13.5],
 		[1066, 746, 11],
 	]
-	describe.each(tiles)(
-		"subpixel entity rendering tile %p/%p/%p",
-		(...tileIndex) => {
-			const tileSize = 4 // Easier to debug math with a smaller tile
+	describe.each(
+		tiles,
+	)("subpixel entity rendering tile %p/%p/%p", (...tileIndex) => {
+		const tileSize = 4 // Easier to debug math with a smaller tile
 
-			it("draws entities that fit in a single pixel", () => {
-				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
-				const tileBbox = tile.bbox()
-				const centerLon = (tileBbox[0] + tileBbox[2]) / 2
-				const centerLat = (tileBbox[1] + tileBbox[3]) / 2
+		it("draws entities that fit in a single pixel", () => {
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+			const tileBbox = tile.bbox()
+			const centerLon = (tileBbox[0] + tileBbox[2]) / 2
+			const centerLat = (tileBbox[1] + tileBbox[3]) / 2
 
-				// Create a tiny bbox (much smaller than a pixel)
-				const centerPx = tile.llToTilePx([centerLon, centerLat])
-				const offsetMin = tile.tilePxToLonLat([
-					centerPx[0] - 0.25,
-					centerPx[1] + 0.25,
-				])
-				const offsetMax = tile.tilePxToLonLat([
-					centerPx[0] + 0.25,
-					centerPx[1] - 0.25,
-				])
-				const bbox: GeoBbox2D = [
-					offsetMin[0],
-					offsetMin[1],
-					offsetMax[0],
-					offsetMax[1],
-				]
+			// Create a tiny bbox (much smaller than a pixel)
+			const centerPx = tile.llToTilePx([centerLon, centerLat])
+			const offsetMin = tile.tilePxToLonLat([
+				centerPx[0] - 0.25,
+				centerPx[1] + 0.25,
+			])
+			const offsetMax = tile.tilePxToLonLat([
+				centerPx[0] + 0.25,
+				centerPx[1] - 0.25,
+			])
+			const bbox: GeoBbox2D = [
+				offsetMin[0],
+				offsetMin[1],
+				offsetMax[0],
+				offsetMax[1],
+			]
 
-				const color: Rgba = [255, 0, 0, 255]
-				const drawn = tile.drawSubpixelEntity(bbox, color)
+			const color: Rgba = [255, 0, 0, 255]
+			const drawn = tile.drawSubpixelEntity(bbox, color)
 
-				expect(drawn).toBe(true)
+			expect(drawn).toBe(true)
 
-				// Find which pixel was drawn (should be near center)
-				// The exact pixel depends on projection, but we can check that something was drawn
-				let foundPixel = false
-				for (let y = 0; y < tileSize; y++) {
-					for (let x = 0; x < tileSize; x++) {
-						const idx = tile.getIndex([x, y])
-						if (tile.imageData[idx + 3]! > 0) {
-							foundPixel = true
-							const pixelColor = Array.from(tile.imageData.slice(idx, idx + 4))
-							expect(pixelColor[0]).toBe(255) // Red
-							expect(pixelColor[1]).toBe(0)
-							expect(pixelColor[2]).toBe(0)
-							// Alpha should be scaled by coverage (at least 1, less than 255)
-							expect(pixelColor[3]).toBeGreaterThanOrEqual(1)
-							expect(pixelColor[3]).toBeLessThanOrEqual(255)
-							break
-						}
+			// Find which pixel was drawn (should be near center)
+			// The exact pixel depends on projection, but we can check that something was drawn
+			let foundPixel = false
+			for (let y = 0; y < tileSize; y++) {
+				for (let x = 0; x < tileSize; x++) {
+					const idx = tile.getIndex([x, y])
+					if (tile.imageData[idx + 3]! > 0) {
+						foundPixel = true
+						const pixelColor = Array.from(tile.imageData.slice(idx, idx + 4))
+						expect(pixelColor[0]).toBe(255) // Red
+						expect(pixelColor[1]).toBe(0)
+						expect(pixelColor[2]).toBe(0)
+						// Alpha should be scaled by coverage (at least 1, less than 255)
+						expect(pixelColor[3]).toBeGreaterThanOrEqual(1)
+						expect(pixelColor[3]).toBeLessThanOrEqual(255)
+						break
 					}
-					if (foundPixel) break
 				}
-				expect(foundPixel).toBe(true)
-			})
+				if (foundPixel) break
+			}
+			expect(foundPixel).toBe(true)
+		})
 
-			it("returns false for entities that span multiple pixels", () => {
-				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+		it("returns false for entities that span multiple pixels", () => {
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
-				// Create a bbox that spans multiple pixels
-				const minLl = tile.tilePxToLonLat([10, 10])
-				const maxLl = tile.tilePxToLonLat([50, 50])
-				const bbox: GeoBbox2D = [minLl[0], minLl[1], maxLl[0], maxLl[1]]
+			// Create a bbox that spans multiple pixels
+			const minLl = tile.tilePxToLonLat([10, 10])
+			const maxLl = tile.tilePxToLonLat([50, 50])
+			const bbox: GeoBbox2D = [minLl[0], minLl[1], maxLl[0], maxLl[1]]
 
-				const color: Rgba = [255, 0, 0, 255]
-				const drawn = tile.drawSubpixelEntity(bbox, color)
+			const color: Rgba = [255, 0, 0, 255]
+			const drawn = tile.drawSubpixelEntity(bbox, color)
 
-				expect(drawn).toBe(false)
-			})
+			expect(drawn).toBe(false)
+		})
 
-			it("scales alpha by coverage ratio for subpixel entities", () => {
-				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+		it("scales alpha by coverage ratio for subpixel entities", () => {
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
-				// Create a bbox that covers a small portion of a pixel
-				// Use the tile's bbox and create a tiny subpixel area
-				const tileBbox = tile.bbox()
-				const centerLon = (tileBbox[0] + tileBbox[2]) / 2
-				const centerLat = (tileBbox[1] + tileBbox[3]) / 2
+			// Create a bbox that covers a small portion of a pixel
+			// Use the tile's bbox and create a tiny subpixel area
+			const tileBbox = tile.bbox()
+			const centerLon = (tileBbox[0] + tileBbox[2]) / 2
+			const centerLat = (tileBbox[1] + tileBbox[3]) / 2
 
-				// Create a very small bbox (smaller coverage = lower alpha)
-				// Use a smaller offset to get less coverage
-				const tinyOffset = 0.0005 // Half the size of the previous test
-				const smallBbox: GeoBbox2D = [
-					centerLon - tinyOffset,
-					centerLat - tinyOffset,
-					centerLon + tinyOffset,
-					centerLat + tinyOffset,
-				]
+			// Create a very small bbox (smaller coverage = lower alpha)
+			// Use a smaller offset to get less coverage
+			const tinyOffset = 0.0005 // Half the size of the previous test
+			const smallBbox: GeoBbox2D = [
+				centerLon - tinyOffset,
+				centerLat - tinyOffset,
+				centerLon + tinyOffset,
+				centerLat + tinyOffset,
+			]
 
-				const fullAlphaColor: Rgba = [255, 0, 0, 255]
-				const drawn = tile.drawSubpixelEntity(smallBbox, fullAlphaColor)
+			const fullAlphaColor: Rgba = [255, 0, 0, 255]
+			const drawn = tile.drawSubpixelEntity(smallBbox, fullAlphaColor)
 
-				expect(drawn).toBe(true)
+			expect(drawn).toBe(true)
 
-				// Find which pixel was drawn and check that alpha was scaled
-				let foundPixel = false
-				for (let y = 0; y < tileSize; y++) {
-					for (let x = 0; x < tileSize; x++) {
-						const idx = tile.getIndex([x, y])
-						if (tile.imageData[idx + 3]! > 0) {
-							foundPixel = true
-							const pixelColor = Array.from(tile.imageData.slice(idx, idx + 4))
-							// Alpha should be less than 255 due to coverage scaling
-							// but at least 1 for visibility
-							expect(pixelColor[3]).toBeLessThan(255)
-							expect(pixelColor[3]).toBeGreaterThanOrEqual(1)
-							break
-						}
+			// Find which pixel was drawn and check that alpha was scaled
+			let foundPixel = false
+			for (let y = 0; y < tileSize; y++) {
+				for (let x = 0; x < tileSize; x++) {
+					const idx = tile.getIndex([x, y])
+					if (tile.imageData[idx + 3]! > 0) {
+						foundPixel = true
+						const pixelColor = Array.from(tile.imageData.slice(idx, idx + 4))
+						// Alpha should be less than 255 due to coverage scaling
+						// but at least 1 for visibility
+						expect(pixelColor[3]).toBeLessThan(255)
+						expect(pixelColor[3]).toBeGreaterThanOrEqual(1)
+						break
 					}
-					if (foundPixel) break
 				}
-				expect(foundPixel).toBe(true)
-			})
+				if (foundPixel) break
+			}
+			expect(foundPixel).toBe(true)
+		})
 
-			it("handles bboxes outside tile bounds", () => {
-				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+		it("handles bboxes outside tile bounds", () => {
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
-				// Create a bbox that's completely outside the tile
-				// Use coordinates that are far enough outside that even after projection
-				// they remain outside the tile bounds
-				// Get the tile's geographic bbox
-				const tileBbox = tile.bbox()
-				// Create a bbox that's completely to the west of the tile
-				const outsideBbox: GeoBbox2D = [
-					tileBbox[0] - 1.0, // Well to the west
-					tileBbox[1] - 1.0, // Well to the south
-					tileBbox[0] - 0.5, // Still to the west
-					tileBbox[1] - 0.5, // Still to the south
-				]
+			// Create a bbox that's completely outside the tile
+			// Use coordinates that are far enough outside that even after projection
+			// they remain outside the tile bounds
+			// Get the tile's geographic bbox
+			const tileBbox = tile.bbox()
+			// Create a bbox that's completely to the west of the tile
+			const outsideBbox: GeoBbox2D = [
+				tileBbox[0] - 1.0, // Well to the west
+				tileBbox[1] - 1.0, // Well to the south
+				tileBbox[0] - 0.5, // Still to the west
+				tileBbox[1] - 0.5, // Still to the south
+			]
 
-				const color: Rgba = [255, 0, 0, 255]
-				const drawn = tile.drawSubpixelEntity(outsideBbox, color)
+			const color: Rgba = [255, 0, 0, 255]
+			const drawn = tile.drawSubpixelEntity(outsideBbox, color)
 
-				expect(drawn).toBe(false)
-			})
+			expect(drawn).toBe(false)
+		})
 
-			it("uses horizontal extent when height collapses to zero", () => {
-				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+		it("uses horizontal extent when height collapses to zero", () => {
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
-				const tileBbox = tile.bbox()
-				const centerLon = (tileBbox[0] + tileBbox[2]) / 2
-				const centerLat = (tileBbox[1] + tileBbox[3]) / 2
+			const tileBbox = tile.bbox()
+			const centerLon = (tileBbox[0] + tileBbox[2]) / 2
+			const centerLat = (tileBbox[1] + tileBbox[3]) / 2
 
-				const lonDelta = ((tileBbox[2] - tileBbox[0]) / tileSize) * 0.2
-				const bbox: GeoBbox2D = [
-					centerLon,
-					centerLat,
-					centerLon + lonDelta,
-					centerLat, // zero height
-				]
+			const lonDelta = ((tileBbox[2] - tileBbox[0]) / tileSize) * 0.2
+			const bbox: GeoBbox2D = [
+				centerLon,
+				centerLat,
+				centerLon + lonDelta,
+				centerLat, // zero height
+			]
 
-				const minPx = tile.llToTilePx([bbox[0], bbox[1]])
-				const basePixel: XY = [Math.floor(minPx[0]), Math.floor(minPx[1])]
+			const minPx = tile.llToTilePx([bbox[0], bbox[1]])
+			const basePixel: XY = [Math.floor(minPx[0]), Math.floor(minPx[1])]
 
-				const color: Rgba = [50, 50, 50, 200]
-				const drawn = tile.drawSubpixelEntity(bbox, color)
-				expect(drawn).toBe(true)
+			const color: Rgba = [50, 50, 50, 200]
+			const drawn = tile.drawSubpixelEntity(bbox, color)
+			expect(drawn).toBe(true)
 
-				const idx = tile.getIndex(basePixel)
-				const alpha = tile.imageData[idx + 3]!
-				expect(alpha).toBeGreaterThan(1)
-				expect(alpha).toBeLessThan(color[3]!)
-			})
+			const idx = tile.getIndex(basePixel)
+			const alpha = tile.imageData[idx + 3]!
+			expect(alpha).toBeGreaterThan(1)
+			expect(alpha).toBeLessThan(color[3]!)
+		})
 
-			it("uses vertical extent when width collapses to zero", () => {
-				const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
+		it("uses vertical extent when width collapses to zero", () => {
+			const tile = new OsmixRasterTile({ tile: tileIndex, tileSize })
 
-				const tileBbox = tile.bbox()
-				const centerLon = (tileBbox[0] + tileBbox[2]) / 2
-				const centerLat = (tileBbox[1] + tileBbox[3]) / 2
-				const centerPixel = tile.llToTilePx([centerLon, centerLat])
+			const tileBbox = tile.bbox()
+			const centerLon = (tileBbox[0] + tileBbox[2]) / 2
+			const centerLat = (tileBbox[1] + tileBbox[3]) / 2
+			const centerPixel = tile.llToTilePx([centerLon, centerLat])
 
-				const centerOffset = tile.tilePxToLonLat([
-					centerPixel[0] + 0.5,
-					centerPixel[1],
-				])
+			const centerOffset = tile.tilePxToLonLat([
+				centerPixel[0] + 0.5,
+				centerPixel[1],
+			])
 
-				const bbox: GeoBbox2D = [
-					centerLon,
-					centerLat,
-					centerOffset[0], // zero width
-					centerOffset[1],
-				]
+			const bbox: GeoBbox2D = [
+				centerLon,
+				centerLat,
+				centerOffset[0], // zero width
+				centerOffset[1],
+			]
 
-				const minPx = tile.llToTilePx([bbox[0], bbox[1]])
-				const basePixel: XY = [Math.floor(minPx[0]), Math.floor(minPx[1])]
+			const minPx = tile.llToTilePx([bbox[0], bbox[1]])
+			const basePixel: XY = [Math.floor(minPx[0]), Math.floor(minPx[1])]
 
-				const color: Rgba = [200, 100, 50, 180]
-				const drawn = tile.drawSubpixelEntity(bbox, color)
-				expect(drawn).toBe(true)
+			const color: Rgba = [200, 100, 50, 180]
+			const drawn = tile.drawSubpixelEntity(bbox, color)
+			expect(drawn).toBe(true)
 
-				const idx = tile.getIndex(basePixel)
-				const alpha = tile.imageData[idx + 3]!
-				expect(alpha).toBeGreaterThan(1)
-				expect(alpha).toBeLessThan(color[3]!)
-			})
-		},
-	)
+			const idx = tile.getIndex(basePixel)
+			const alpha = tile.imageData[idx + 3]!
+			expect(alpha).toBeGreaterThan(1)
+			expect(alpha).toBeLessThan(color[3]!)
+		})
+	})
 })

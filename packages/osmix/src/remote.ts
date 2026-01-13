@@ -34,6 +34,35 @@ import type { OsmixWorker } from "./worker"
 /** Identifier for an OSM dataset: string ID, Osm instance, or OsmInfo object. */
 export type OsmId = string | Osm | OsmInfo
 
+/** Supported file types for OSM data loading. */
+export type OsmFileType = "pbf" | "geojson" | "shapefile" | "geoparquet"
+
+/** All supported file types for display/selection purposes. */
+export const OSM_FILE_TYPES: OsmFileType[] = [
+	"pbf",
+	"geojson",
+	"shapefile",
+	"geoparquet",
+]
+
+/**
+ * Detect file type from filename extension.
+ * Returns "pbf" as default for unknown extensions.
+ */
+export function detectFileType(fileName: string): OsmFileType {
+	const lowerName = fileName.toLowerCase()
+	if (lowerName.endsWith(".geojson") || lowerName.endsWith(".json")) {
+		return "geojson"
+	}
+	if (lowerName.endsWith(".zip")) {
+		return "shapefile"
+	}
+	if (lowerName.endsWith(".parquet")) {
+		return "geoparquet"
+	}
+	return "pbf"
+}
+
 export interface OsmixRemoteOptions {
 	workerCount?: number
 	onProgress?: (progress: Progress) => void
@@ -309,33 +338,39 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	}
 
 	/**
-	 * Load an `Osm` instance from a File, auto-detecting format by extension.
+	 * Load an `Osm` instance from a File.
+	 * If fileType is provided, uses that format directly.
+	 * Otherwise auto-detects format by extension:
 	 * - .geojson and .json files are loaded as GeoJSON
 	 * - .zip files are loaded as Shapefiles
+	 * - .parquet files are loaded as GeoParquet
 	 * - All others are loaded as PBF
 	 */
-	async fromFile(file: File, options: Partial<OsmOptions> = {}) {
-		const fileName = file.name.toLowerCase()
-		const isGeoJSON =
-			fileName.endsWith(".geojson") || fileName.endsWith(".json")
-		const isShapefile = fileName.endsWith(".zip")
-		const isParquet = fileName.endsWith(".parquet")
-		if (isGeoJSON) {
-			return this.fromGeoJSON(file, { ...options, id: options.id ?? file.name })
+	async fromFile(
+		file: File,
+		options: Partial<OsmOptions> = {},
+		fileType?: OsmFileType,
+	) {
+		const resolvedFileType = fileType ?? detectFileType(file.name)
+		switch (resolvedFileType) {
+			case "geojson":
+				return this.fromGeoJSON(file, {
+					...options,
+					id: options.id ?? file.name,
+				})
+			case "shapefile":
+				return this.fromShapefile(file, {
+					...options,
+					id: options.id ?? file.name,
+				})
+			case "geoparquet":
+				return this.fromGeoParquet(file, {
+					...options,
+					id: options.id ?? file.name,
+				})
+			default:
+				return this.fromPbf(file, { ...options, id: options.id ?? file.name })
 		}
-		if (isShapefile) {
-			return this.fromShapefile(file, {
-				...options,
-				id: options.id ?? file.name,
-			})
-		}
-		if (isParquet) {
-			return this.fromGeoParquet(file, {
-				...options,
-				id: options.id ?? file.name,
-			})
-		}
-		return this.fromPbf(file, { ...options, id: options.id ?? file.name })
 	}
 
 	/**

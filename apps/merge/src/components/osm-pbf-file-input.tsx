@@ -1,5 +1,7 @@
-import { FilesIcon, LinkIcon, XIcon } from "lucide-react"
+import { Menu } from "@base-ui/react/menu"
+import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react"
 import { useState } from "react"
+import type { OsmFileType } from "osmix"
 import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file"
 import { Log } from "../state/log"
 import ActionButton from "./action-button"
@@ -15,17 +17,38 @@ import {
 } from "./ui/dialog"
 import { Input } from "./ui/input"
 
-function isOsmFile(file: File | null): file is File {
-	if (file == null) return false
-	const name = file.name.toLowerCase()
-	return (
-		name.endsWith(".pbf") ||
-		name.endsWith(".geojson") ||
-		name.endsWith(".json") ||
-		name.endsWith(".zip") ||
-		name.endsWith(".parquet")
-	)
-}
+/** File type options with labels and accepted extensions */
+const FILE_TYPE_OPTIONS: {
+	type: OsmFileType
+	label: string
+	description: string
+	accept: string
+}[] = [
+	{
+		type: "pbf",
+		label: "OSM PBF",
+		description: "OpenStreetMap Protocol Buffer format",
+		accept: ".pbf,.osm.pbf",
+	},
+	{
+		type: "geojson",
+		label: "GeoJSON",
+		description: "GeoJSON feature collection",
+		accept: ".geojson,.json",
+	},
+	{
+		type: "shapefile",
+		label: "Shapefile (ZIP)",
+		description: "ESRI Shapefile in ZIP archive",
+		accept: ".zip",
+	},
+	{
+		type: "geoparquet",
+		label: "GeoParquet",
+		description: "Apache Parquet with geometry",
+		accept: ".parquet",
+	},
+]
 
 export default function OsmPbfFileInput({
 	disabled,
@@ -34,7 +57,7 @@ export default function OsmPbfFileInput({
 }: {
 	disabled?: boolean
 	file?: File | null
-	setFile: (file: File | null) => Promise<void>
+	setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>
 }) {
 	return !file ? (
 		<OsmPbfSelectFileButton disabled={disabled} setFile={setFile} />
@@ -51,22 +74,56 @@ export function OsmPbfSelectFileButton({
 	setFile,
 }: {
 	disabled?: boolean
-	setFile: (file: File | null) => Promise<void>
+	setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>
 }) {
+	const [isLoading, setIsLoading] = useState(false)
+
+	const handleSelectFileType = async (fileType: OsmFileType) => {
+		const option = FILE_TYPE_OPTIONS.find((opt) => opt.type === fileType)
+		if (!option) return
+
+		setIsLoading(true)
+		try {
+			const selectedFile = await showFileSelector(option.accept)
+			if (selectedFile) {
+				await setFile(selectedFile, fileType)
+			}
+		} finally {
+			setIsLoading(false)
+		}
+	}
+
 	return (
-		<ActionButton
-			className="w-full"
-			disabled={disabled}
-			onAction={async () => {
-				const selectedFile = await showFileSelector()
-				if (isOsmFile(selectedFile)) {
-					await setFile(selectedFile)
-				}
-			}}
-			icon={<FilesIcon />}
-		>
-			Open OSM file (PBF, GeoJSON, Shapefile, or GeoParquet)
-		</ActionButton>
+		<Menu.Root>
+			<Menu.Trigger
+				disabled={disabled || isLoading}
+				className="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3 w-full"
+			>
+				<FilesIcon />
+				Open file
+				<ChevronDownIcon className="ml-auto" />
+			</Menu.Trigger>
+			<Menu.Portal>
+				<Menu.Positioner className="z-50" sideOffset={4}>
+					<Menu.Popup className="min-w-[200px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
+						{FILE_TYPE_OPTIONS.map((option) => (
+							<Menu.Item
+								key={option.type}
+								className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+								onClick={() => handleSelectFileType(option.type)}
+							>
+								<div className="flex flex-col gap-0.5">
+									<span className="font-medium">{option.label}</span>
+									<span className="text-muted-foreground">
+										{option.description}
+									</span>
+								</div>
+							</Menu.Item>
+						))}
+					</Menu.Popup>
+				</Menu.Positioner>
+			</Menu.Portal>
+		</Menu.Root>
 	)
 }
 
@@ -75,10 +132,11 @@ export function OsmPbfOpenUrlButton({
 	setFile,
 }: {
 	disabled?: boolean
-	setFile: (file: File | null) => Promise<void>
+	setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>
 }) {
 	const [open, setOpen] = useState(false)
 	const [url, setUrl] = useState("")
+	const [selectedFileType, setSelectedFileType] = useState<OsmFileType>("pbf")
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
@@ -92,20 +150,55 @@ export function OsmPbfOpenUrlButton({
 				<DialogHeader>
 					<DialogTitle>Open OSM from URL</DialogTitle>
 					<DialogDescription>
-						Provide a direct link to a <code>.pbf</code>, <code>.geojson</code>,
-						<code>.json</code>, <code>.zip</code> (Shapefile), or{" "}
-						<code>.parquet</code> (GeoParquet) file. The server must allow
-						browser downloads (CORS).
+						Provide a direct link and select the file type. The server must
+						allow browser downloads (CORS).
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="flex flex-col gap-2">
-					<Input
-						placeholder="https://example.com/data.osm.pbf"
-						value={url}
-						onChange={(e) => setUrl(e.target.value)}
-						autoFocus
-					/>
+				<div className="flex flex-col gap-4">
+					<div className="flex flex-col gap-2">
+						<div className="font-medium">File Type</div>
+						<Menu.Root>
+							<Menu.Trigger className="cursor-pointer inline-flex items-center justify-between gap-2 whitespace-nowrap rounded-md font-medium border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2 w-full">
+								{FILE_TYPE_OPTIONS.find((o) => o.type === selectedFileType)
+									?.label ?? "Select file type"}
+								<ChevronDownIcon />
+							</Menu.Trigger>
+							<Menu.Portal>
+								<Menu.Positioner className="z-50" sideOffset={4}>
+									<Menu.Popup className="min-w-[200px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
+										{FILE_TYPE_OPTIONS.map((option) => (
+											<Menu.Item
+												key={option.type}
+												className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+												onClick={() => setSelectedFileType(option.type)}
+											>
+												<div className="flex flex-col gap-0.5">
+													<span className="font-medium">{option.label}</span>
+													<span className="text-muted-foreground">
+														{option.description}
+													</span>
+												</div>
+											</Menu.Item>
+										))}
+									</Menu.Popup>
+								</Menu.Positioner>
+							</Menu.Portal>
+						</Menu.Root>
+					</div>
+
+					<div className="flex flex-col gap-2">
+						<label htmlFor="url-input" className="font-medium">
+							URL
+						</label>
+						<Input
+							id="url-input"
+							placeholder="https://example.com/data.osm.pbf"
+							value={url}
+							onChange={(e) => setUrl(e.target.value)}
+							autoFocus
+						/>
+					</div>
 				</div>
 
 				<DialogFooter>
@@ -124,7 +217,7 @@ export function OsmPbfOpenUrlButton({
 							try {
 								const file = await fetchOsmFileFromUrl(url)
 								task.end(`Downloaded ${file.name}`)
-								await setFile(file)
+								await setFile(file, selectedFileType)
 								setOpen(false)
 							} catch (e) {
 								const message = e instanceof Error ? e.message : "Unknown error"
@@ -160,10 +253,10 @@ export function OsmPbfClearFileButton({
 	)
 }
 
-function showFileSelector() {
+function showFileSelector(accept: string) {
 	const input = document.createElement("input")
 	input.type = "file"
-	input.accept = ".pbf,.geojson,.json,.zip,.parquet"
+	input.accept = accept
 
 	return new Promise<File | null>((resolve) => {
 		const focusListener = () => {
