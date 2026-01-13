@@ -4,7 +4,8 @@ function isSupportedOsmFileName(name: string): boolean {
 		lower.endsWith(".pbf") ||
 		lower.endsWith(".geojson") ||
 		lower.endsWith(".json") ||
-		lower.endsWith(".zip")
+		lower.endsWith(".zip") ||
+		lower.endsWith(".parquet")
 	)
 }
 
@@ -65,6 +66,7 @@ function extensionFromContentType(contentType: string | null): string | null {
 	if (type === "text/json") return ".json"
 	if (type === "application/zip") return ".zip"
 	if (type === "application/x-zip-compressed") return ".zip"
+	if (type === "application/vnd.apache.parquet") return ".parquet"
 	return null
 }
 
@@ -106,7 +108,7 @@ export async function fetchOsmFileFromUrl(
 
 	if (!isSupportedOsmFileName(name)) {
 		throw new Error(
-			`URL must resolve to a .pbf, .geojson, .json, or .zip file (got "${name}")`,
+			`URL must resolve to a .pbf, .geojson, .json, .zip, or .parquet file (got "${name}")`,
 		)
 	}
 
