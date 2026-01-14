@@ -11,6 +11,10 @@
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change"
 import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core"
 import type { GeoParquetReadOptions } from "@osmix/geoparquet"
+import {
+	type GtfsConversionOptions,
+	isGtfsZip as isGtfsZipBytes,
+} from "@osmix/gtfs"
 import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type {
 	DefaultSpeeds,
@@ -35,7 +39,12 @@ import type { OsmixWorker } from "./worker"
 export type OsmId = string | Osm | OsmInfo
 
 /** Supported file types for OSM data loading. */
-export type OsmFileType = "pbf" | "geojson" | "shapefile" | "geoparquet"
+export type OsmFileType =
+	| "pbf"
+	| "geojson"
+	| "shapefile"
+	| "geoparquet"
+	| "gtfs"
 
 /** All supported file types for display/selection purposes. */
 export const OSM_FILE_TYPES: OsmFileType[] = [
@@ -43,6 +52,7 @@ export const OSM_FILE_TYPES: OsmFileType[] = [
 	"geojson",
 	"shapefile",
 	"geoparquet",
+	"gtfs",
 ]
 
 /**
@@ -338,11 +348,33 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	}
 
 	/**
+	 * Load an `Osm` instance from GTFS (ZIP) data in a worker.
+	 * Data is sent to the first available worker, then synchronized across all workers.
+	 */
+	async fromGtfs(
+		data: ArrayBufferLike | ReadableStream | Uint8Array | File,
+		options: Partial<OsmOptions> = {},
+		gtfsOptions: GtfsConversionOptions = {},
+	) {
+		const workers = this.workers.slice()
+		const worker0 = workers.shift()!
+		const osmInfo = await worker0.fromGtfs(
+			transfer({
+				data: await this.getTransferableData(data),
+				options,
+				gtfsOptions,
+			}),
+		)
+		await this.populateOtherWorkers(worker0, osmInfo.id)
+		return osmInfo
+	}
+
+	/**
 	 * Load an `Osm` instance from a File.
 	 * If fileType is provided, uses that format directly.
 	 * Otherwise auto-detects format by extension:
 	 * - .geojson and .json files are loaded as GeoJSON
-	 * - .zip files are loaded as Shapefiles
+	 * - .zip files are inspected to determine if they are GTFS or Shapefile
 	 * - .parquet files are loaded as GeoParquet
 	 * - All others are loaded as PBF
 	 */
@@ -351,25 +383,79 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		options: Partial<OsmOptions> = {},
 		fileType?: OsmFileType,
 	) {
-		const resolvedFileType = fileType ?? detectFileType(file.name)
-		switch (resolvedFileType) {
-			case "geojson":
-				return this.fromGeoJSON(file, {
-					...options,
-					id: options.id ?? file.name,
-				})
-			case "shapefile":
-				return this.fromShapefile(file, {
-					...options,
-					id: options.id ?? file.name,
-				})
-			case "geoparquet":
-				return this.fromGeoParquet(file, {
-					...options,
-					id: options.id ?? file.name,
-				})
-			default:
-				return this.fromPbf(file, { ...options, id: options.id ?? file.name })
+		if (fileType) {
+			// Use provided file type directly
+			switch (fileType) {
+				case "geojson":
+					return this.fromGeoJSON(file, {
+						...options,
+						id: options.id ?? file.name,
+					})
+				case "shapefile":
+					return this.fromShapefile(file, {
+						...options,
+						id: options.id ?? file.name,
+					})
+				case "geoparquet":
+					return this.fromGeoParquet(file, {
+						...options,
+						id: options.id ?? file.name,
+					})
+				case "gtfs":
+					return this.fromGtfs(file, {
+						...options,
+						id: options.id ?? file.name,
+					})
+				default:
+					return this.fromPbf(file, {
+						...options,
+						id: options.id ?? file.name,
+					})
+			}
+		}
+
+		// Auto-detect file type
+		const fileName = file.name.toLowerCase()
+		const isGeoJSON =
+			fileName.endsWith(".geojson") || fileName.endsWith(".json")
+		const isZip = fileName.endsWith(".zip")
+		const isParquet = fileName.endsWith(".parquet")
+
+		if (isGeoJSON) {
+			return this.fromGeoJSON(file, { ...options, id: options.id ?? file.name })
+		}
+		if (isZip) {
+			// Peek into the zip to determine if it's GTFS or Shapefile
+			const isGtfs = await this.isGtfsZip(file)
+			if (isGtfs) {
+				return this.fromGtfs(file, { ...options, id: options.id ?? file.name })
+			}
+			return this.fromShapefile(file, {
+				...options,
+				id: options.id ?? file.name,
+			})
+		}
+		if (isParquet) {
+			return this.fromGeoParquet(file, {
+				...options,
+				id: options.id ?? file.name,
+			})
+		}
+		return this.fromPbf(file, { ...options, id: options.id ?? file.name })
+	}
+
+	/**
+	 * Check if a ZIP file is a GTFS archive by looking for characteristic GTFS files.
+	 * GTFS archives must contain at least agency.txt, stops.txt, routes.txt, trips.txt,
+	 * and stop_times.txt according to the GTFS specification.
+	 */
+	private async isGtfsZip(file: File): Promise<boolean> {
+		try {
+			const buffer = await file.arrayBuffer()
+			const bytes = new Uint8Array(buffer)
+			return isGtfsZipBytes(bytes)
+		} catch {
+			return false
 		}
 	}
 

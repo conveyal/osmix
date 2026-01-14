@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu"
 import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react"
-import { useState } from "react"
 import type { OsmFileType } from "osmix"
+import { useState } from "react"
 import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file"
 import { Log } from "../state/log"
 import ActionButton from "./action-button"
@@ -47,6 +47,12 @@ const FILE_TYPE_OPTIONS: {
 		label: "GeoParquet",
 		description: "Apache Parquet with geometry",
 		accept: ".parquet",
+	},
+	{
+		type: "gtfs",
+		label: "GTFS (ZIP)",
+		description: "General Transit Feed Specification in ZIP archive",
+		accept: ".zip",
 	},
 ]
 
@@ -150,8 +156,10 @@ export function OsmPbfOpenUrlButton({
 				<DialogHeader>
 					<DialogTitle>Open OSM from URL</DialogTitle>
 					<DialogDescription>
-						Provide a direct link and select the file type. The server must
-						allow browser downloads (CORS).
+						Provide a direct link to a <code>.pbf</code>, <code>.geojson</code>,
+						<code>.json</code>, <code>.zip</code> (Shapefile or GTFS), or{" "}
+						<code>.parquet</code> (GeoParquet) file. The server must allow
+						browser downloads (CORS).
 					</DialogDescription>
 				</DialogHeader>
 
