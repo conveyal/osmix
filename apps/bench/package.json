@@ -33,6 +33,6 @@
 		"maplibre-gl": "catalog:",
 		"react": "^19.2.3",
 		"react-dom": "^19.2.3",
-		"react-map-gl": "^8.0.4"
+		"react-map-gl": "^8.1.0"
 	}
 }
