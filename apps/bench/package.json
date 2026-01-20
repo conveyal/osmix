@@ -17,7 +17,7 @@
 		"@vitest/browser-preview": "^4.0.17",
 		"typescript": "catalog:",
 		"vite": "catalog:",
-		"vitest": "^4.0.16"
+		"vitest": "^4.0.17"
 	},
 	"dependencies": {
 		"@duckdb/duckdb-wasm": "^1.32.0",
