@@ -121,6 +121,7 @@ spec-compliant without staging everything in memory.
 ### Tiles
 
 - `drawToRasterTile(osm, tile, tileSize?)` - Render Osm to raster tile.
+  - Uses way `color`/`colour` tags when present to style line and area geometry.
 
 ### Workers (OsmixRemote)
 

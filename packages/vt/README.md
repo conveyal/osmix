@@ -74,6 +74,7 @@ Lower-level method to encode a specific bounding box with a custom projection fu
 ### Tags and metadata
 
 - Feature properties include the OSM tags available in the source dataset. Styling keys can be derived at ingestion time; for very large tag sets consider pre-filtering to a stable subset to keep tile size reasonable.
+- Way features normalize `color`/`colour` tags into a single `color` property formatted as `#RRGGBB` (or `#RRGGBBAA` when provided).
 
 ## Related Packages
 

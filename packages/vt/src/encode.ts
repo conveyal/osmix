@@ -10,6 +10,7 @@
 
 import type { Osm } from "@osmix/core"
 import { bboxContainsOrIntersects } from "@osmix/shared/bbox-intersects"
+import { normalizeHexColor } from "@osmix/shared/color"
 import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
 import { llToTilePx, tileToBbox } from "@osmix/shared/tile"
 import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
@@ -173,6 +174,7 @@ export class OsmixVtEncoder {
 			const tags = this.osm.ways.tags.getTags(wayIndex)
 			// Skip ways without tags (they are likely only for relations)
 			if (!tags || Object.keys(tags).length === 0) continue
+			const normalizedColor = normalizeHexColor(tags["color"] ?? tags["colour"])
 			const wayLine = this.osm.ways.getCoordinates(wayIndex)
 			const points: XY[] = wayLine.map((ll) => proj(ll))
 
@@ -218,7 +220,11 @@ export class OsmixVtEncoder {
 			yield {
 				id,
 				type: isArea ? SF_TYPE.POLYGON : SF_TYPE.LINE,
-				properties: { ...tags, type: "way" },
+				properties: {
+					...tags,
+					...(normalizedColor ? { color: normalizedColor } : {}),
+					type: "way",
+				},
 				geometry,
 			}
 		}

@@ -40,7 +40,7 @@ osm.nodes.addNode({
 osm.ways.addWay({
 	id: 5,
 	refs: [1, 2],
-	tags: { highway: "primary" },
+	tags: { highway: "primary", color: "ff0000" },
 })
 osm.buildIndexes()
 osm.buildSpatialIndexes()
@@ -102,6 +102,7 @@ describe("OsmixVtEncoder", () => {
 			expect(decodedId).toBe(5)
 		}
 		expect(way?.type).toBe(2)
+		expect(way?.properties["color"]).toBe("#FF0000")
 		const wayGeom = way?.loadGeometry()
 		expect(wayGeom?.[0]?.length).toBeGreaterThanOrEqual(2)
 	})
