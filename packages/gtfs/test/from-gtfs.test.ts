@@ -7,7 +7,7 @@ import {
 	routeTypeToOsmRoute,
 	wheelchairBoardingToOsm,
 } from "../src"
-import { stopToTags } from "../src/utils"
+import { routeToTags, stopToTags } from "../src/utils"
 import { createSharedShapeGtfsZip, createTestGtfsZip } from "./helpers"
 
 // Path to the Monaco GTFS fixture
@@ -96,6 +96,81 @@ describe("stopToTags", () => {
 		})
 
 		expect(tags["public_transport"]).toBe("platform")
+	})
+})
+
+describe("routeToTags", () => {
+	test("normalizes valid hex colors", () => {
+		const tags = routeToTags({
+			route_id: "route1",
+			route_short_name: "1",
+			route_type: "3",
+			route_color: "ff0000",
+			route_text_color: "FFFFFF",
+		})
+
+		expect(tags["color"]).toBe("#FF0000")
+		expect(tags["text_color"]).toBe("#FFFFFF")
+	})
+
+	test("accepts colors with # prefix", () => {
+		const tags = routeToTags({
+			route_id: "route1",
+			route_short_name: "1",
+			route_type: "3",
+			route_color: "#00FF00",
+		})
+
+		expect(tags["color"]).toBe("#00FF00")
+	})
+
+	test("accepts 3-character shorthand colors", () => {
+		const tags = routeToTags({
+			route_id: "route1",
+			route_short_name: "1",
+			route_type: "3",
+			route_color: "F00",
+		})
+
+		expect(tags["color"]).toBe("#FF0000")
+	})
+
+	test("rejects invalid hex colors", () => {
+		const tags = routeToTags({
+			route_id: "route1",
+			route_short_name: "1",
+			route_type: "3",
+			route_color: "ZZZZZZ",
+			route_text_color: "not-a-color",
+		})
+
+		// Invalid colors should not be added to tags
+		expect(tags["color"]).toBeUndefined()
+		expect(tags["text_color"]).toBeUndefined()
+	})
+
+	test("handles missing colors", () => {
+		const tags = routeToTags({
+			route_id: "route1",
+			route_short_name: "1",
+			route_type: "3",
+		})
+
+		expect(tags["color"]).toBeUndefined()
+		expect(tags["text_color"]).toBeUndefined()
+	})
+
+	test("sets route type and name correctly", () => {
+		const tags = routeToTags({
+			route_id: "route1",
+			route_short_name: "R1",
+			route_long_name: "Red Line",
+			route_type: "1",
+		})
+
+		expect(tags["route"]).toBe("subway")
+		expect(tags["name"]).toBe("Red Line")
+		expect(tags["ref"]).toBe("R1")
 	})
 })
 

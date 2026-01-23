@@ -1,3 +1,4 @@
+import { normalizeHexColor } from "@osmix/shared/color"
 import type { OsmTags } from "@osmix/shared/types"
 import {
 	type GtfsRoute,
@@ -161,20 +162,12 @@ export function routeToTags(route: GtfsRoute): OsmTags {
 	if (route.route_desc) tags["description"] = route.route_desc
 	if (route.route_url) tags["website"] = route.route_url
 
-	// Route color (normalize to include # prefix)
-	if (route.route_color) {
-		const color = route.route_color.startsWith("#")
-			? route.route_color
-			: `#${route.route_color}`
-		tags["color"] = color
-	}
+	// Route color (validate and normalize hex color)
+	const color = normalizeHexColor(route.route_color)
+	if (color) tags["color"] = color
 
-	if (route.route_text_color) {
-		const textColor = route.route_text_color.startsWith("#")
-			? route.route_text_color
-			: `#${route.route_text_color}`
-		tags["text_color"] = textColor
-	}
+	const textColor = normalizeHexColor(route.route_text_color)
+	if (textColor) tags["text_color"] = textColor
 
 	// Route type as additional tag
 	tags["gtfs:route_type"] = route.route_type
