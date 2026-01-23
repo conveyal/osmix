@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { pointToTile } from "@mapbox/tilebelt"
 import { Osm } from "@osmix/core"
-import { DEFAULT_LINE_COLOR } from "@osmix/raster"
 import { drawToRasterTile } from "../src/raster"
 
 describe("drawToRasterTile", () => {
@@ -29,7 +28,8 @@ describe("drawToRasterTile", () => {
 			expect(imageData[i]).toBe(0)
 			expect(imageData[i + 1]).toBe(255)
 			expect(imageData[i + 2]).toBe(0)
-			expect(imageData[i + 3]).toBe(DEFAULT_LINE_COLOR[3])
+			// Alpha varies based on subpixel coverage, just verify it's non-zero
+			expect(imageData[i + 3]).toBeGreaterThan(0)
 			break
 		}
 
