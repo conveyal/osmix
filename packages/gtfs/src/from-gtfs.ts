@@ -127,7 +127,8 @@ export class GtfsOsmBuilder {
 
 	/**
 	 * Process GTFS routes into OSM ways.
-	 * Creates one way per unique shape, collecting all trip IDs that share that shape.
+	 * Creates one way per unique (shape_id, route_id) pair, so each route gets
+	 * its own way with correct metadata even when routes share the same shape.
 	 *
 	 * @param archive - The GTFS archive
 	 */
@@ -155,24 +156,19 @@ export class GtfsOsmBuilder {
 			throw Error("No shape data found. Cannot process routes.")
 		}
 
-		// Group trips by shape_id, tracking route info for each shape
-		// shape_id -> { route_id, trip_ids[] }
-		const shapeToTrips = new Map<
-			string,
-			{ routeId: string; tripIds: string[] }
-		>()
+		// Group trips by (shape_id, route_id) to ensure each route gets its own way
+		// even when multiple routes share the same shape geometry
+		const shapeRouteToTrips = new Map<string, { tripIds: string[] }>()
 		this.onProgress(progressEvent("Loading trip data..."))
 		for await (const trip of archive.iter("trips.txt")) {
 			if (!trip.shape_id) continue
 
-			const existing = shapeToTrips.get(trip.shape_id)
+			const key = `${trip.shape_id}:${trip.route_id}`
+			const existing = shapeRouteToTrips.get(key)
 			if (existing) {
 				existing.tripIds.push(trip.trip_id)
 			} else {
-				shapeToTrips.set(trip.shape_id, {
-					routeId: trip.route_id,
-					tripIds: [trip.trip_id],
-				})
+				shapeRouteToTrips.set(key, { tripIds: [trip.trip_id] })
 			}
 		}
 
@@ -182,13 +178,14 @@ export class GtfsOsmBuilder {
 			routeMap.set(route.route_id, routeToTags(route))
 		}
 
-		// Process unique shapes - one way per shape
+		// Process unique (shape, route) pairs - one way per combination
 		let count = 0
-		for (const [shapeId, { routeId, tripIds }] of shapeToTrips) {
-			const routeTags = routeMap.get(routeId)
+		for (const [key, { tripIds }] of shapeRouteToTrips) {
+			const [shapeId, routeId] = key.split(":")
+			const routeTags = routeMap.get(routeId!)
 			if (!routeTags) continue
 
-			const shapePoints = shapeMap.get(shapeId)
+			const shapePoints = shapeMap.get(shapeId!)
 			if (!shapePoints || shapePoints.length < 2) {
 				this.onProgress(
 					progressEvent(`No shape data found for shape ${shapeId}`, "error"),
@@ -196,10 +193,10 @@ export class GtfsOsmBuilder {
 				continue
 			}
 
-			// Build tags with route info and all trip IDs
+			// Build tags with route info and all trip IDs for this route
 			const tags: OsmTags = {
 				...routeTags,
-				"gtfs:shape_id": shapeId,
+				"gtfs:shape_id": shapeId!,
 				"gtfs:trip_ids": tripIds.join(";"),
 				"gtfs:trip_count": tripIds.length,
 			}
@@ -209,11 +206,13 @@ export class GtfsOsmBuilder {
 			count++
 
 			if (count % 100 === 0) {
-				this.onProgress(progressEvent(`Processed ${count} shapes...`))
+				this.onProgress(
+					progressEvent(`Processed ${count} shape-route pairs...`),
+				)
 			}
 		}
 
-		this.onProgress(progressEvent(`Added ${count} unique shapes as ways`))
+		this.onProgress(progressEvent(`Added ${count} shape-route pairs as ways`))
 	}
 
 	/**

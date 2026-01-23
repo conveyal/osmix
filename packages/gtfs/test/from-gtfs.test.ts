@@ -8,7 +8,7 @@ import {
 	wheelchairBoardingToOsm,
 } from "../src"
 import { stopToTags } from "../src/utils"
-import { createTestGtfsZip } from "./helpers"
+import { createSharedShapeGtfsZip, createTestGtfsZip } from "./helpers"
 
 // Path to the Monaco GTFS fixture
 const MONACO_GTFS_PATH = new URL(
@@ -271,6 +271,49 @@ describe("fromGtfs", () => {
 		// Should have no routes
 		expect(osm.ways.size).toBe(0)
 	})
+
+	test("creates separate ways for routes sharing the same shape", async () => {
+		const zipData = await createSharedShapeGtfsZip()
+		const osm = await fromGtfs(
+			zipData,
+			{ id: "shared-shape" },
+			{ includeStops: false },
+		)
+
+		// Should have 2 ways - one for each route, even though they share a shape
+		expect(osm.ways.size).toBe(2)
+
+		// Collect way tags
+		const wayTagsList: Record<string, unknown>[] = []
+		for (let i = 0; i < osm.ways.size; i++) {
+			const tags = osm.ways.tags.getTags(i)
+			if (tags) wayTagsList.push(tags)
+		}
+
+		// Find the Red Line (route1) way
+		const redLineWay = wayTagsList.find((tags) => tags["ref"] === "R1")
+		expect(redLineWay).toBeDefined()
+		expect(redLineWay?.["name"]).toBe("Red Line")
+		expect(redLineWay?.["route"]).toBe("subway")
+		expect(redLineWay?.["color"]).toBe("#FF0000")
+		// Should have 2 trips (trip1 and trip2)
+		expect(Number(redLineWay?.["gtfs:trip_count"])).toBe(2)
+		expect(redLineWay?.["gtfs:trip_ids"]).toBe("trip1;trip2")
+
+		// Find the Blue Express (route2) way
+		const blueExpressWay = wayTagsList.find((tags) => tags["ref"] === "B2")
+		expect(blueExpressWay).toBeDefined()
+		expect(blueExpressWay?.["name"]).toBe("Blue Express")
+		expect(blueExpressWay?.["route"]).toBe("bus")
+		expect(blueExpressWay?.["color"]).toBe("#0000FF")
+		// Should have 1 trip (trip3)
+		expect(Number(blueExpressWay?.["gtfs:trip_count"])).toBe(1)
+		expect(blueExpressWay?.["gtfs:trip_ids"]).toBe("trip3")
+
+		// Both should reference the same shape
+		expect(redLineWay?.["gtfs:shape_id"]).toBe("shared_shape")
+		expect(blueExpressWay?.["gtfs:shape_id"]).toBe("shared_shape")
+	})
 })
 
 describe("GtfsOsmBuilder", () => {
@@ -331,8 +374,9 @@ describe("Monaco GTFS fixture", () => {
 			{ includeStops: false },
 		)
 
-		// Should have routes as ways (one per unique shape, not per trip)
-		expect(osm.ways.size).toBe(271)
+		// Should have routes as ways (one per shape+route pair, not per trip)
+		// Previously 271 when grouping by shape only, now 315 with shape+route pairs
+		expect(osm.ways.size).toBe(315)
 
 		// Check a route has proper tags
 		const wayTags = osm.ways.tags.getTags(0)

@@ -45,6 +45,51 @@ weekday,1,1,1,1,1,0,0,20240101,20241231`),
 }
 
 /**
+ * Create a GTFS zip where two routes share the same shape.
+ * Used to test that each route gets its own way with correct metadata.
+ */
+export async function createSharedShapeGtfsZip(): Promise<Uint8Array> {
+	const encoder = new TextEncoder()
+
+	const files: Record<string, Uint8Array> = {
+		"agency.txt":
+			encoder.encode(`agency_id,agency_name,agency_url,agency_timezone
+agency1,Test Transit,https://example.com,America/New_York`),
+
+		"stops.txt": encoder.encode(`stop_id,stop_name,stop_lat,stop_lon
+stop1,Stop A,40.7128,-74.0060
+stop2,Stop B,40.7614,-73.9776`),
+
+		"routes.txt":
+			encoder.encode(`route_id,route_short_name,route_long_name,route_type,route_color
+route1,R1,Red Line,1,FF0000
+route2,B2,Blue Express,3,0000FF`),
+
+		// Both trips use the same shape but different routes
+		"trips.txt": encoder.encode(`trip_id,route_id,service_id,shape_id
+trip1,route1,daily,shared_shape
+trip2,route1,daily,shared_shape
+trip3,route2,daily,shared_shape`),
+
+		"stop_times.txt": encoder.encode(`trip_id,stop_id,stop_sequence
+trip1,stop1,1
+trip1,stop2,2
+trip2,stop1,1
+trip2,stop2,2
+trip3,stop1,1
+trip3,stop2,2`),
+
+		"shapes.txt":
+			encoder.encode(`shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence
+shared_shape,40.7128,-74.0060,1
+shared_shape,40.7400,-73.9900,2
+shared_shape,40.7614,-73.9776,3`),
+	}
+
+	return zipSync(files)
+}
+
+/**
  * Create a minimal GTFS zip with just stops (no routes or shapes).
  */
 export async function createMinimalGtfsZip(): Promise<Uint8Array> {
