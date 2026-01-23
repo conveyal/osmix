@@ -33,7 +33,7 @@
 	},
 	"sideEffects": false,
 	"scripts": {
-		"build": "tsc --excludeDirectories test",
+		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun test --bench",
 		"prepublishOnly": "tsc",
 		"test": "bun test",

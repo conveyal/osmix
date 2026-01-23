@@ -32,7 +32,7 @@
 	},
 	"sideEffects": false,
 	"scripts": {
-		"build": "tsc --excludeDirectories test",
+		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun run test/router.bench.ts",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
