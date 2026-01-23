@@ -1,8 +1,9 @@
 # Osmix Guide
 
 ## Run These Every Change
-- `bun run format`, `bun run lint`, `bun run typecheck`, and `bun run test` must be green.
+- For each changed package/app (and packages/apps that depend on the changed code): `bun run format`, `bun run lint`, `bun run typecheck`, and `bun run test` must be green.
 - Add or extend tests and documentation when behavior or public APIs change.
+- Only run root tests before committing.
 
 ## Testing Notes
 - Bun + Vitest with helpers in `@osmix/test-utils`; tests live as `*.test.ts`.
