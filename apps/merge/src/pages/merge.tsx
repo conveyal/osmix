@@ -1,5 +1,6 @@
 import { Tabs } from "@base-ui/react/tabs"
-import { useSetAtom } from "jotai"
+import { useAtom, useSetAtom } from "jotai"
+import { atomWithStorage } from "jotai/utils"
 import { useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "react-router"
 import InspectBlock from "../blocks/inspect"
@@ -15,11 +16,18 @@ import OsmixVectorOverlay from "../components/osmix-vector-overlay"
 import SelectedEntityLayer from "../components/selected-entity-layer"
 import SidebarLog from "../components/sidebar-log"
 import { buttonVariants } from "../components/ui/button"
+import { useLog } from "../hooks/log"
 import { useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
 import { cn } from "../lib/utils"
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
+
+const activeTabAtom = atomWithStorage<string>(
+	"@osmix:merge:activeTab",
+	"Inspect",
+)
+
 import { selectOsmEntityAtom } from "../state/osm"
 import { osmWorker } from "../state/worker"
 
@@ -31,6 +39,9 @@ export default function Merge() {
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const autoLoadAttempted = useRef(false)
 	const [searchParams, setSearchParams] = useSearchParams()
+	const { activeTasks } = useLog()
+	const isMergeInProgress = activeTasks > 0
+	const [activeTab, setActiveTab] = useAtom(activeTabAtom)
 
 	// Handle auto-loading from URL parameter or most recently used file
 	useEffect(() => {
@@ -91,13 +102,15 @@ export default function Merge() {
 		<Main>
 			<Sidebar>
 				<div className="flex-1 p-2 lg:p-4 overflow-y-auto">
-					<Tabs.Root>
+					<Tabs.Root value={activeTab} onValueChange={setActiveTab}>
 						<Tabs.List className="flex gap-2 pb-2">
 							<Tabs.Tab
 								className={cn(
 									buttonVariants({ variant: "outline", size: "sm" }),
 									"data-active:border-accent-foreground",
+									isMergeInProgress && "opacity-50 cursor-not-allowed",
 								)}
+								disabled={isMergeInProgress}
 								value="Inspect"
 							>
 								Inspect
@@ -106,7 +119,9 @@ export default function Merge() {
 								className={cn(
 									buttonVariants({ variant: "outline", size: "sm" }),
 									"data-active:border-primary",
+									isMergeInProgress && "opacity-50 cursor-not-allowed",
 								)}
+								disabled={isMergeInProgress}
 								value="Merge"
 							>
 								Merge
@@ -138,7 +153,22 @@ export default function Merge() {
 								onClear: async () => {
 									selectEntity(null, null)
 									setChangesetStats(null)
-									await base.loadOsmFile(null)
+									if (patch.osm) {
+										// Capture patch state before clearing to avoid duplicate source ids
+										const patchState = {
+											file: patch.file,
+											fileInfo: patch.fileInfo,
+											osm: patch.osm,
+											osmInfo: patch.osmInfo,
+											isStored: patch.isStored,
+										}
+										// Clear patch first to remove it from the map
+										await patch.loadOsmFile(null)
+										// Then transfer captured state to base
+										base.copyStateFrom(patchState)
+									} else {
+										await base.loadOsmFile(null)
+									}
 								},
 							},
 							{

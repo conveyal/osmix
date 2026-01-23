@@ -13,6 +13,7 @@ import {
 	SaveIcon,
 	SearchCodeIcon,
 	SkipForwardIcon,
+	StopCircleIcon,
 	XIcon,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
@@ -49,6 +50,7 @@ import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
 import { Log } from "../state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "../state/osm"
+import { mergeAbortControllerAtom } from "../state/status"
 import { osmWorker } from "../state/worker"
 
 const STEPS = [
@@ -82,6 +84,9 @@ export default function MergeBlock() {
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const setStepIndex = useSetAtom(stepIndexAtom)
+	const [mergeAbortController, setMergeAbortController] = useAtom(
+		mergeAbortControllerAtom,
+	)
 
 	const prevStep = () => {
 		selectEntity(null, null)
@@ -246,25 +251,55 @@ export default function MergeBlock() {
 							onClick={async (e) => {
 								e.preventDefault()
 								goToStep("run-all-steps")
+
+								const abortController = new AbortController()
+								setMergeAbortController(abortController)
+
 								const task = Log.startTask(
 									"Running all merge steps, please wait...",
 								)
 								if (!base.osm) throw Error("Base OSM is not loaded")
 								if (!patch.osm) throw Error("Patch OSM is not loaded")
 
-								setChangesetStats(null)
-								const osmId = await osmWorker.merge(base.osm.id, patch.osm.id, {
-									deduplicateNodes: true,
-									deduplicateWays: true,
-									directMerge: true,
-									createIntersections: true,
-								})
-								// Use setMergedOsm to properly update file info for the new merged result
-								await base.setMergedOsm(osmId)
-								patch.setOsm(null)
+								try {
+									setChangesetStats(null)
+									const osmId = await osmWorker.merge(
+										base.osm.id,
+										patch.osm.id,
+										{
+											deduplicateNodes: true,
+											deduplicateWays: true,
+											directMerge: true,
+											createIntersections: true,
+										},
+									)
 
-								task.end("All merge steps completed")
-								goToStep("inspect-final-osm")
+									// Check if cancelled before applying results
+									if (abortController.signal.aborted) {
+										task.end("Merge cancelled by user")
+										goToStep("select-osm-pbf-files")
+										return
+									}
+
+									// Use setMergedOsm to properly update file info for the new merged result
+									await base.setMergedOsm(osmId)
+									patch.setOsm(null)
+
+									task.end("All merge steps completed")
+									goToStep("inspect-final-osm")
+								} catch (error) {
+									if (abortController.signal.aborted) {
+										task.end("Merge cancelled by user")
+										goToStep("select-osm-pbf-files")
+									} else {
+										task.end(
+											`Merge failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+											"error",
+										)
+									}
+								} finally {
+									setMergeAbortController(null)
+								}
 							}}
 						>
 							<ItemMedia>
@@ -289,6 +324,19 @@ export default function MergeBlock() {
 					Monitor the activity log below for progress. This may take a few
 					minutes to complete.
 				</p>
+				{mergeAbortController && (
+					<Button
+						variant="destructive"
+						className="w-full"
+						onClick={() => {
+							mergeAbortController.abort()
+							setMergeAbortController(null)
+						}}
+					>
+						<StopCircleIcon className="mr-2 h-4 w-4" />
+						Cancel Merge
+					</Button>
+				)}
 			</Step>
 
 			<Step step="inspect-base-osm" title="INSPECT BASE OSM">
