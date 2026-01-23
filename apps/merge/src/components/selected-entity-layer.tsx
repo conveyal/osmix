@@ -16,6 +16,7 @@ import { selectedEntityAtom, selectedOsmAtom } from "../state/osm"
 const SOURCE_ID = `${APPID}:selected-entity`
 const LINE_ID = `${APPID}:selected-line`
 const POINTS_ID = `${APPID}:selected-points`
+const OUTLINE_ID = `${LINE_ID}:outline`
 
 const selectionColorExpression: ExpressionSpecification = [
 	"case",
@@ -80,7 +81,7 @@ export default function SelectedEntityLayer() {
 
 	useEffect(() => {
 		if (!map || !selectedEntity) return
-		const ids = [LINE_ID, POINTS_ID]
+		const ids = [OUTLINE_ID, LINE_ID, POINTS_ID]
 		ids.forEach((id) => {
 			if (map.getLayer(id)) map.moveLayer(id)
 		})
@@ -89,7 +90,7 @@ export default function SelectedEntityLayer() {
 	return (
 		<Source id={SOURCE_ID} type="geojson" data={geojson}>
 			<Layer
-				id={`${LINE_ID}:outline`}
+				id={OUTLINE_ID}
 				type="line"
 				layout={lineLayout}
 				paint={outlinePaint}
