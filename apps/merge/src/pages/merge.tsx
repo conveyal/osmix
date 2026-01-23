@@ -1,6 +1,7 @@
 import { Tabs } from "@base-ui/react/tabs"
 import { useAtom, useSetAtom } from "jotai"
 import { atomWithStorage } from "jotai/utils"
+import type { OsmFileType } from "osmix"
 import { useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "react-router"
 import InspectBlock from "../blocks/inspect"
@@ -73,13 +74,13 @@ export default function Merge() {
 	// Show full-screen file selector when no files are selected
 	const noFilesSelected = !base.osm && !patch.osm
 
-	const openOsmFile = async (file: File | string) => {
+	const openOsmFile = async (file: File | string, fileType?: OsmFileType) => {
 		selectEntity(null, null)
 		setChangesetStats(null)
 		const osmInfo =
 			typeof file === "string"
 				? await base.loadFromStorage(file)
-				: await base.loadOsmFile(file)
+				: await base.loadOsmFile(file, fileType)
 		flyToOsmBounds(osmInfo)
 		return osmInfo
 	}

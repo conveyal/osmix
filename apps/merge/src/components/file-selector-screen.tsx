@@ -1,9 +1,13 @@
 import type { OsmInfo } from "@osmix/core"
+import type { OsmFileType } from "osmix"
 import ExtractList from "./extract-list"
 import StoredOsmList from "./stored-osm-list"
 
 interface FileSelectorScreenProps {
-	openOsmFile: (file: File | string) => Promise<OsmInfo | null>
+	openOsmFile: (
+		file: File | string,
+		fileType?: OsmFileType,
+	) => Promise<OsmInfo | null>
 }
 
 export default function FileSelectorScreen({
