@@ -65,12 +65,16 @@ export function isGtfsZip(bytes: Uint8Array): boolean {
 			}
 
 			if (!hasDataDescriptor) {
-				// Read compressed size at offset 18-21 (little-endian)
+				// Read compressed size at offset 18-21 (little-endian).
+				// Use >>> 0 to ensure unsigned 32-bit interpretation, since
+				// JavaScript bitwise operations return signed 32-bit integers.
+				// Without this, files >= 2GB would produce negative values.
 				const compSize =
-					(bytes[pos + 18] ?? 0) |
-					((bytes[pos + 19] ?? 0) << 8) |
-					((bytes[pos + 20] ?? 0) << 16) |
-					((bytes[pos + 21] ?? 0) << 24)
+					((bytes[pos + 18] ?? 0) |
+						((bytes[pos + 19] ?? 0) << 8) |
+						((bytes[pos + 20] ?? 0) << 16) |
+						((bytes[pos + 21] ?? 0) << 24)) >>>
+					0
 
 				// Move to next entry using the known compressed size
 				pos += 30 + nameLen + extraLen + compSize
