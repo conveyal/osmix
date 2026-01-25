@@ -14,6 +14,7 @@ import {
 	DEFAULT_RASTER_TILE_SIZE,
 	OsmixRasterTile,
 } from "@osmix/raster"
+import { hexColorToRgba } from "@osmix/shared/color"
 import type { Rgba, Tile } from "@osmix/shared/types"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 
@@ -74,11 +75,18 @@ export function drawToRasterTile(
 	osm.ways.intersects(bbox, (wayIndex) => {
 		if (relationWayIds.has(osm.ways.ids.at(wayIndex))) return false
 		const way = osm.ways.getByIndex(wayIndex)
+		const tagColor = hexColorToRgba(way.tags?.["color"] ?? way.tags?.["colour"])
+		const lineColor: Rgba = tagColor
+			? [tagColor[0], tagColor[1], tagColor[2], DEFAULT_LINE_COLOR[3]]
+			: DEFAULT_LINE_COLOR
+		const areaColor: Rgba = tagColor
+			? [tagColor[0], tagColor[1], tagColor[2], DEFAULT_AREA_COLOR[3]]
+			: DEFAULT_AREA_COLOR
 
 		// Try fast path: check if way bbox fits in a single pixel
 		const wayBbox = osm.ways.getEntityBbox({ index: wayIndex })
 		const isArea = wayIsArea(way)
-		const wayColor: Rgba = isArea ? [255, 0, 0, 64] : DEFAULT_LINE_COLOR
+		const wayColor: Rgba = isArea ? areaColor : lineColor
 
 		// Try fast path for way
 		if (rasterTile.drawSubpixelEntity(wayBbox, wayColor)) return false
@@ -86,9 +94,9 @@ export function drawToRasterTile(
 		// Fall back to full geometry rendering
 		const coords = osm.ways.getCoordinates(wayIndex)
 		if (isArea) {
-			rasterTile.drawPolygon([coords], [255, 0, 0, 64])
+			rasterTile.drawPolygon([coords], areaColor)
 		} else {
-			rasterTile.drawLineString(coords)
+			rasterTile.drawLineString(coords, lineColor)
 		}
 		return false
 	})

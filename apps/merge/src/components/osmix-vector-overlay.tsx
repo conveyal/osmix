@@ -2,6 +2,7 @@ import type { Osm } from "@osmix/core"
 import { decodeZigzag } from "@osmix/shared/zigzag"
 import { useSetAtom } from "jotai"
 import {
+	type ExpressionSpecification,
 	type FillLayerSpecification,
 	type FilterSpecification,
 	type MapLayerMouseEvent,
@@ -31,20 +32,22 @@ if (typeof window !== "undefined") {
 	addOsmixVectorProtocol()
 }
 
+const wayBaseColorExpression: ExpressionSpecification = [
+	"case",
+	["has", "color"],
+	["to-color", ["get", "color"]],
+	["rgba", 255, 255, 255, 1],
+]
+
 const waysPaint: LineLayerSpecification["paint"] = {
 	"line-color": [
 		"case",
 		["boolean", ["feature-state", "hover"], false],
 		["rgba", 255, 0, 0, 1],
-		["rgba", 0, 0, 0, 0.15],
+		wayBaseColorExpression,
 	],
 	"line-opacity": 1,
 	"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 2, 18, 10],
-}
-
-const waysOutlinePaint: LineLayerSpecification["paint"] = {
-	"line-color": "white",
-	"line-width": ["interpolate", ["linear"], ["zoom"], 12, 1, 14, 3, 18, 15],
 }
 
 const waysLayout: LineLayerSpecification["layout"] = {
@@ -52,12 +55,22 @@ const waysLayout: LineLayerSpecification["layout"] = {
 }
 
 const wayPolygonsPaint: FillLayerSpecification["paint"] = {
-	"fill-color": "red",
+	"fill-color": [
+		"case",
+		["has", "color"],
+		["to-color", ["get", "color"]],
+		"red",
+	],
 	"fill-opacity": 0.25,
 }
 
 const wayPolygonsOutlinePaint: LineLayerSpecification["paint"] = {
-	"line-color": "red",
+	"line-color": [
+		"case",
+		["has", "color"],
+		["to-color", ["get", "color"]],
+		"red",
+	],
 	"line-opacity": 0.5,
 	"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 1],
 }
@@ -287,14 +300,6 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
 				paint={wayPolygonsOutlinePaint}
 			/>
 			{/* Way lines - rendered on top of polygon fills */}
-			<Layer
-				id={`${waysLayerId}:outline`}
-				filter={wayLinesFilter}
-				type="line"
-				{...{ "source-layer": `${sourceLayerPrefix}:ways` }}
-				layout={waysLayout}
-				paint={waysOutlinePaint}
-			/>
 			<Layer
 				id={waysLayerId}
 				filter={wayLinesFilter}

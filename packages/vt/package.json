@@ -32,7 +32,7 @@
 	},
 	"sideEffects": false,
 	"scripts": {
-		"build": "tsc --excludeDirectories test",
+		"build": "tsc -p tsconfig.build.json",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"

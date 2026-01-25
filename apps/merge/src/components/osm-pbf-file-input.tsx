@@ -48,6 +48,12 @@ const FILE_TYPE_OPTIONS: {
 		description: "Apache Parquet with geometry",
 		accept: ".parquet",
 	},
+	{
+		type: "gtfs",
+		label: "GTFS (ZIP)",
+		description: "General Transit Feed Specification in ZIP archive",
+		accept: ".zip",
+	},
 ]
 
 export default function OsmPbfFileInput({
@@ -150,8 +156,10 @@ export function OsmPbfOpenUrlButton({
 				<DialogHeader>
 					<DialogTitle>Open OSM from URL</DialogTitle>
 					<DialogDescription>
-						Provide a direct link and select the file type. The server must
-						allow browser downloads (CORS).
+						Provide a direct link to a <code>.pbf</code>, <code>.geojson</code>,
+						<code>.json</code>, <code>.zip</code> (Shapefile or GTFS), or{" "}
+						<code>.parquet</code> (GeoParquet) file. The server must allow
+						browser downloads (CORS).
 					</DialogDescription>
 				</DialogHeader>
 

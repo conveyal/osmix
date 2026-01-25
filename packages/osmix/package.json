@@ -35,7 +35,7 @@
 	},
 	"sideEffects": false,
 	"scripts": {
-		"build": "tsc --excludeDirectories test",
+		"build": "tsc -p tsconfig.build.json",
 		"prepublishOnly": "tsc",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
@@ -49,8 +49,9 @@
 		"@osmix/change": "workspace:*",
 		"@osmix/core": "workspace:*",
 		"@osmix/geojson": "workspace:*",
-		"@osmix/json": "workspace:*",
 		"@osmix/geoparquet": "workspace:*",
+		"@osmix/gtfs": "workspace:*",
+		"@osmix/json": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/raster": "workspace:*",
 		"@osmix/router": "workspace:*",
