@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu"
 import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react"
-import { useState } from "react"
 import type { OsmFileType } from "osmix"
+import { useState } from "react"
 import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file"
 import { Log } from "../state/log"
 import ActionButton from "./action-button"
@@ -97,7 +97,7 @@ export function OsmPbfSelectFileButton({
 		<Menu.Root>
 			<Menu.Trigger
 				disabled={disabled || isLoading}
-				className="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3 w-full"
+				className="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3 flex-1"
 			>
 				<FilesIcon />
 				Open file
@@ -141,7 +141,7 @@ export function OsmPbfOpenUrlButton({
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button className="w-full" variant="outline" disabled={disabled}>
+				<Button className="flex-1" variant="outline" disabled={disabled}>
 					<LinkIcon />
 					Open from URL
 				</Button>
