@@ -1,6 +1,5 @@
 import { type PrimitiveAtom, useAtom } from "jotai"
 import { FilesIcon, Layers, Navigation, SearchIcon } from "lucide-react"
-import { NavLink } from "react-router"
 import CenterInfo from "../components/center-info"
 import ZoomInfo, { ZoomInButton, ZoomOutButton } from "../components/zoom-info"
 import { cn } from "../lib/utils"
@@ -28,28 +27,6 @@ export default function Nav() {
 					<GithubLogo />
 				</a>
 				<div className="font-bold pr-2">OSMIX</div>
-				<NavLink
-					className={({ isActive }) =>
-						cn(
-							"text-slate-950 py-4 px-2 uppercase",
-							isActive && "text-blue-600",
-						)
-					}
-					to="/"
-				>
-					Merge
-				</NavLink>
-				<NavLink
-					className={({ isActive }) =>
-						cn(
-							"text-slate-950 py-4 px-2 uppercase",
-							isActive && "text-blue-600",
-						)
-					}
-					to="/inspect"
-				>
-					Inspect
-				</NavLink>
 				<BrowserCheck />
 			</div>
 
@@ -80,7 +57,6 @@ export default function Nav() {
 					</div>
 					<ZoomInButton />
 				</div>
-				<ButtonGroupSeparator />
 			</ButtonGroup>
 		</div>
 	)

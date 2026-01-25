@@ -6,7 +6,6 @@ import {
 	CheckCircle,
 	ChevronRightIcon,
 	DownloadIcon,
-	EyeIcon,
 	FastForwardIcon,
 	FileDiff,
 	MaximizeIcon,
@@ -14,11 +13,11 @@ import {
 	SaveIcon,
 	SearchCodeIcon,
 	SkipForwardIcon,
+	StopCircleIcon,
 	XIcon,
 } from "lucide-react"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import { Suspense, useMemo } from "react"
-import { Link } from "react-router"
 import ActionButton from "../components/action-button"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import EntityDetails from "../components/entity-details"
@@ -51,6 +50,7 @@ import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
 import { Log } from "../state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "../state/osm"
+import { mergeAbortControllerAtom } from "../state/status"
 import { osmWorker } from "../state/worker"
 
 const STEPS = [
@@ -84,6 +84,9 @@ export default function MergeBlock() {
 	const selectedEntity = useAtomValue(selectedEntityAtom)
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const setStepIndex = useSetAtom(stepIndexAtom)
+	const [mergeAbortController, setMergeAbortController] = useAtom(
+		mergeAbortControllerAtom,
+	)
 
 	const prevStep = () => {
 		selectEntity(null, null)
@@ -146,60 +149,30 @@ export default function MergeBlock() {
 	}, [changesetStats])
 
 	return (
-		<>
+		<div className="flex flex-col gap-4">
 			<Step step="select-osm-pbf-files" title="SELECT OSM FILES">
-				<p>Select two OSM files (PBF, GeoJSON, or Shapefile ZIP) to merge.</p>
-
 				<Card>
-					<CardHeader>
-						<div className="p-2">BASE OSM</div>
-						{base.osm && (
-							<ButtonGroup>
-								{!base.isStored && (
-									<ActionButton
-										icon={<SaveIcon />}
-										title="Save to storage"
-										variant="ghost"
-										onAction={base.saveToStorage}
-									/>
-								)}
-								<ActionButton
-									icon={<XIcon />}
-									title="Clear base OSM file"
-									variant="ghost"
-									onAction={async () => {
-										await base.loadOsmFile(null)
-									}}
-								/>
-							</ButtonGroup>
-						)}
+					<CardHeader className="uppercase font-bold border-b px-2">
+						MERGE STEPS
 					</CardHeader>
-					<CardContent>
-						{!base.osm ? (
-							<StoredOsmList
-								openOsmFile={async (file) => {
-									const osmInfo =
-										typeof file === "string"
-											? await base.loadFromStorage(file)
-											: await base.loadOsmFile(file)
-									flyToOsmBounds(osmInfo)
-									return osmInfo
-								}}
-							/>
-						) : (
-							<OsmInfoTable
-								defaultOpen={false}
-								osm={base.osm}
-								file={base.file}
-								fileInfo={base.fileInfo}
-							/>
-						)}
+					<CardContent className="flex flex-col gap-2 p-2">
+						<ol className="list-decimal list-inside">
+							<li>Deduplicate nodes and ways in base OSM</li>
+							<li>Deduplicate nodes and ways in patch OSM</li>
+							<li>Merge patch OSM onto base OSM.</li>
+							<li>Deduplicate nodes and ways in newly merged OSM</li>
+							<li>Create new intersections in merged data where ways cross</li>
+						</ol>
+						<p>
+							Note: entities from the patch file are prioritized over matching
+							entities in the base file.
+						</p>
 					</CardContent>
 				</Card>
 
 				<Card>
 					<CardHeader>
-						<div className="p-2">PATCH OSM</div>
+						<div className="p-2">SELECT PATCH OSM TO MERGE</div>
 						{patch.osm && (
 							<ButtonGroup>
 								{!patch.isStored && (
@@ -244,20 +217,6 @@ export default function MergeBlock() {
 					</CardContent>
 				</Card>
 
-				<div className="flex flex-col gap-2">
-					<div className="font-bold">MERGE STEPS</div>
-					<ol className="list-decimal list-inside">
-						<li>Deduplicate nodes and ways in base OSM</li>
-						<li>Deduplicate nodes and ways in patch OSM</li>
-						<li>Merge patch OSM onto base OSM.</li>
-						<li>Deduplicate nodes and ways in newly merged OSM</li>
-						<li>Create new intersections in merged data where ways cross</li>
-					</ol>
-					<p>
-						Note: entities from the patch file are prioritized over matching
-						entities in the base file.
-					</p>
-				</div>
 				<div
 					className={cn(
 						"flex flex-col gap-4",
@@ -292,25 +251,55 @@ export default function MergeBlock() {
 							onClick={async (e) => {
 								e.preventDefault()
 								goToStep("run-all-steps")
+
+								const abortController = new AbortController()
+								setMergeAbortController(abortController)
+
 								const task = Log.startTask(
 									"Running all merge steps, please wait...",
 								)
 								if (!base.osm) throw Error("Base OSM is not loaded")
 								if (!patch.osm) throw Error("Patch OSM is not loaded")
 
-								setChangesetStats(null)
-								const osmId = await osmWorker.merge(base.osm.id, patch.osm.id, {
-									deduplicateNodes: true,
-									deduplicateWays: true,
-									directMerge: true,
-									createIntersections: true,
-								})
-								// Use setMergedOsm to properly update file info for the new merged result
-								await base.setMergedOsm(osmId)
-								patch.setOsm(null)
+								try {
+									setChangesetStats(null)
+									const osmId = await osmWorker.merge(
+										base.osm.id,
+										patch.osm.id,
+										{
+											deduplicateNodes: true,
+											deduplicateWays: true,
+											directMerge: true,
+											createIntersections: true,
+										},
+									)
 
-								task.end("All merge steps completed")
-								goToStep("inspect-final-osm")
+									// Check if cancelled before applying results
+									if (abortController.signal.aborted) {
+										task.end("Merge cancelled by user")
+										goToStep("select-osm-pbf-files")
+										return
+									}
+
+									// Use setMergedOsm to properly update file info for the new merged result
+									await base.setMergedOsm(osmId)
+									patch.setOsm(null)
+
+									task.end("All merge steps completed")
+									goToStep("inspect-final-osm")
+								} catch (error) {
+									if (abortController.signal.aborted) {
+										task.end("Merge cancelled by user")
+										goToStep("select-osm-pbf-files")
+									} else {
+										task.end(
+											`Merge failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+											"error",
+										)
+									}
+								} finally {
+									setMergeAbortController(null)
+								}
 							}}
 						>
 							<ItemMedia>
@@ -335,6 +324,19 @@ export default function MergeBlock() {
 					Monitor the activity log below for progress. This may take a few
 					minutes to complete.
 				</p>
+				{mergeAbortController && (
+					<Button
+						variant="destructive"
+						className="w-full"
+						onClick={() => {
+							mergeAbortController.abort()
+							setMergeAbortController(null)
+						}}
+					>
+						<StopCircleIcon className="mr-2 h-4 w-4" />
+						Cancel Merge
+					</Button>
+				)}
 			</Step>
 
 			<Step step="inspect-base-osm" title="INSPECT BASE OSM">
@@ -769,22 +771,11 @@ export default function MergeBlock() {
 									Save to storage
 								</ActionButton>
 							)}
-							<Button asChild>
-								<Link
-									to={
-										base.isStored && base.fileInfo?.fileHash
-											? `/inspect?load=${base.fileInfo.fileHash}`
-											: "/inspect"
-									}
-								>
-									<EyeIcon /> Open in Inspect
-								</Link>
-							</Button>
 						</div>
 					</>
 				)}
 			</Step>
-		</>
+		</div>
 	)
 }
 
@@ -811,9 +802,11 @@ function Step({
 		)
 	return (
 		<>
-			<div className="font-bold">
-				{stepIndex + 1}: {title}
-			</div>
+			<Card>
+				<CardHeader className="font-bold uppercase p-2 bg-white">
+					{stepIndex + 1}: {title}
+				</CardHeader>
+			</Card>
 			{children}
 		</>
 	)

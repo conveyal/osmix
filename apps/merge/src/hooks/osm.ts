@@ -167,6 +167,27 @@ export function useOsmFile(osmKey: string) {
 	})
 
 	/**
+	 * Copy all state from another useOsmFile instance.
+	 * Used to transfer patch to base when base is cleared.
+	 */
+	const copyStateFrom = useEffectEvent(
+		(source: {
+			file: File | null
+			fileInfo: StoredFileInfo | null
+			osm: ReturnType<typeof useOsmFile>["osm"]
+			osmInfo: ReturnType<typeof useOsmFile>["osmInfo"]
+			isStored: boolean
+		}) => {
+			setFile(source.file)
+			setFileInfo(source.fileInfo)
+			setOsm(source.osm)
+			setOsmInfo(source.osmInfo)
+			setIsStored(source.isStored)
+			setSelectedOsm(source.osm)
+		},
+	)
+
+	/**
 	 * Update the osm state with a newly generated/merged result.
 	 * Creates new file info with unique hash and name, resets stored state.
 	 * If the content hasn't changed (same content hash as original), keeps original file info.
@@ -225,6 +246,7 @@ export function useOsmFile(osmKey: string) {
 	})
 
 	return {
+		copyStateFrom,
 		downloadOsm,
 		file,
 		fileInfo,

@@ -206,7 +206,7 @@ export function StoredOsmList({
 				</div>
 			</CardHeader>
 			<CardContent className="p-0">
-				<div className="flex flex-col gap-2 p-2">
+				<div className="flex flex-col lg:flex-row gap-2 p-2 items-stretch">
 					<OsmPbfSelectFileButton
 						setFile={async (file, fileType) => {
 							if (file == null) return
