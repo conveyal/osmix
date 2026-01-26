@@ -225,10 +225,9 @@ export default function MergeBlock() {
 				>
 					<Item
 						render={
-							<a
-								href="#"
-								onClick={(e) => {
-									e.preventDefault()
+							<button
+								type="button"
+								onClick={() => {
 									nextStep()
 								}}
 							/>
@@ -249,10 +248,9 @@ export default function MergeBlock() {
 					</Item>
 					<Item
 						render={
-							<a
-								href="#"
-								onClick={async (e) => {
-									e.preventDefault()
+							<button
+								type="button"
+								onClick={async () => {
 									goToStep("run-all-steps")
 
 									const abortController = new AbortController()

@@ -49,7 +49,7 @@ function Button({
 		render?: React.ReactElement
 	}) {
 	return useRender({
-		render: render ?? <button />,
+		render: render ?? <button type="button" />,
 		props: {
 			"data-slot": "button",
 			className: cn(buttonVariants({ variant, size, className })),
