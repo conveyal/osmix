@@ -1,4 +1,4 @@
-import { Slot } from "@radix-ui/react-slot"
+import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 import { Separator } from "./separator"
@@ -38,22 +38,21 @@ function ButtonGroup({
 
 function ButtonGroupText({
 	className,
-	asChild = false,
+	render,
 	...props
 }: React.ComponentProps<"div"> & {
-	asChild?: boolean
+	render?: React.ReactElement
 }) {
-	const Comp = asChild ? Slot : "div"
-
-	return (
-		<Comp
-			className={cn(
+	return useRender({
+		render: render ?? <div />,
+		props: {
+			className: cn(
 				"bg-muted flex items-center gap-2 rounded-md border px-4 font-medium shadow-xs [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
 				className,
-			)}
-			{...props}
-		/>
-	)
+			),
+			...props,
+		},
+	})
 }
 
 function ButtonGroupSeparator({

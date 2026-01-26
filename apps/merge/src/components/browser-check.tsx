@@ -15,10 +15,8 @@ import { Spinner } from "./ui/spinner"
 export default function BrowserCheck() {
 	return (
 		<Dialog>
-			<DialogTrigger asChild>
-				<Button size="sm" variant="link">
-					Check system
-				</Button>
+			<DialogTrigger render={<Button size="sm" variant="link" />}>
+				Check system
 			</DialogTrigger>
 			<DialogContent>
 				<DialogHeader>

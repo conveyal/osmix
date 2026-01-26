@@ -225,14 +225,14 @@ function LayerGroupComponent({
 						)}
 					</Button>
 
-					<CollapsibleTrigger asChild>
-						<Button variant="ghost" size="icon-sm">
-							<ChevronDown
-								className={
-									"size-4 transition-transform group-data-[state=open]:rotate-180"
-								}
-							/>
-						</Button>
+					<CollapsibleTrigger
+						render={<Button variant="ghost" size="icon-sm" />}
+					>
+						<ChevronDown
+							className={
+								"size-4 transition-transform group-data-open:rotate-180"
+							}
+						/>
 					</CollapsibleTrigger>
 				</div>
 			</div>
