@@ -182,7 +182,7 @@
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
         "@placemarkio/geojson-rewind": "catalog:",
-        "hyparquet": "^1.24.0",
+        "hyparquet": "^1.24.1",
       },
       "devDependencies": {
         "@types/bun": "catalog:",
@@ -1104,7 +1104,7 @@
 
     "human-id": ["human-id@4.1.2", "", { "bin": { "human-id": "dist/cli.js" } }, "sha512-v/J+4Z/1eIJovEBdlV5TYj1IR+ZiohcYGRY+qN/oC9dAfKzVT023N/Bgw37hrKCoVRBvk3bqyzpr2PP5YeTMSg=="],
 
-    "hyparquet": ["hyparquet@1.24.0", "", {}, "sha512-w9TL/dSK/55kPUQcxryhwVisp4fxSq3xDoDz/MNYjoomVMFsh/mLK+BA3xxpRuoPTyxLJRnlRQJt6IZ9bXgOcA=="],
+    "hyparquet": ["hyparquet@1.24.1", "", {}, "sha512-t8mZwSrV7BFhJ0HuXK2dARkPIGqTMfIYmNa2ZhbTIwH/OLFwfNQmXGz1TzCSuX+Nu46KVgmHplc14COq/sMcfA=="],
 
     "iconv-lite": ["iconv-lite@0.7.0", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-cf6L2Ds3h57VVmkZe+Pn+5APsT7FpqJtEhhieDCvrE2MK5Qk9MyffgQyuxQTm6BChfeZNtcOLHp9IcWRVcIcBQ=="],
 
