@@ -10,16 +10,6 @@
 - Fixtures: prefer `fixtures/monaco.pbf` or synthetic data.
 - Cover parsing, serialization, spatial queries, merge workflows, and regressions.
 
-## Browser Automation
-
-Use `bunx agent-browser` for web automation. Run `bunx agent-browser --help` for all commands.
-
-Core workflow:
-1. `bunx agent-browser open <url>` - Navigate to page
-2. `bunx agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
-3. `bunx agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
-4. Re-snapshot after page changes
-
 ## Architecture in Brief
 - In-browser merge: Comlink workers host `@osmix/core`, `@osmix/change`, and `@osmix/raster` to keep the React UI responsive.
 - `@osmix/pbf` + `@osmix/json` stream PBF blocks to entities; `@osmix/core` indexes and ships transferables to dodge clone costs.
