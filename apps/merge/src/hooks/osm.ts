@@ -1,7 +1,7 @@
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePicker } from "native-file-system-adapter"
 import type { OsmFileType, OsmInfo } from "osmix"
-import { useEffectEvent } from "react"
+import { useEffectEvent, useRef } from "react"
 import { canStoreFile } from "../lib/storage-utils"
 import { Log } from "../state/log"
 import {
@@ -32,8 +32,12 @@ export function useOsmFile(osmKey: string) {
 	const [isStored, setIsStored] = useAtom(osmStoredAtomFamily(osmKey))
 	const setSelectedOsm = useSetAtom(selectedOsmAtom)
 
+	// Track current load to prevent stale cancellations from clearing newer load state
+	const currentLoadIdRef = useRef(0)
+
 	const loadOsmFile = useEffectEvent(
 		async (file: File | null, fileType?: OsmFileType, signal?: AbortSignal) => {
+			const loadId = ++currentLoadIdRef.current
 			setFile(file)
 			setOsm(null)
 			setFileInfo(null)
@@ -117,12 +121,15 @@ export function useOsmFile(osmKey: string) {
 				return osmInfo
 			} catch (e) {
 				if (e instanceof LoadCancelledError) {
-					// Reset state on cancellation
-					setFile(null)
-					setFileInfo(null)
-					setOsm(null)
-					setOsmInfo(null)
-					setIsStored(false)
+					// Only reset state if this is still the current load
+					// (prevents stale cancellations from clearing newer load state)
+					if (loadId === currentLoadIdRef.current) {
+						setFile(null)
+						setFileInfo(null)
+						setOsm(null)
+						setOsmInfo(null)
+						setIsStored(false)
+					}
 					taskLog.end(`${file.name} loading cancelled.`)
 					return null
 				}
@@ -135,6 +142,7 @@ export function useOsmFile(osmKey: string) {
 
 	const loadFromStorage = useEffectEvent(
 		async (storageId: string, signal?: AbortSignal) => {
+			const loadId = ++currentLoadIdRef.current
 			const taskLog = Log.startTask("Loading osm from storage...")
 			try {
 				// Check cancellation before starting
@@ -175,12 +183,15 @@ export function useOsmFile(osmKey: string) {
 				return osmInfo
 			} catch (e) {
 				if (e instanceof LoadCancelledError) {
-					// Reset state on cancellation
-					setFile(null)
-					setFileInfo(null)
-					setOsm(null)
-					setOsmInfo(null)
-					setIsStored(false)
+					// Only reset state if this is still the current load
+					// (prevents stale cancellations from clearing newer load state)
+					if (loadId === currentLoadIdRef.current) {
+						setFile(null)
+						setFileInfo(null)
+						setOsm(null)
+						setOsmInfo(null)
+						setIsStored(false)
+					}
 					taskLog.end("Loading from storage cancelled.")
 					return null
 				}
