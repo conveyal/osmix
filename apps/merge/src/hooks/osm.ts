@@ -15,6 +15,13 @@ import {
 import { osmWorker } from "../state/worker"
 import type { StoredFileInfo } from "../workers/osm.worker"
 
+export class LoadCancelledError extends Error {
+	constructor() {
+		super("OSM file loading was cancelled")
+		this.name = "LoadCancelledError"
+	}
+}
+
 export type UseOsmFileReturn = ReturnType<typeof useOsmFile>
 
 export function useOsmFile(osmKey: string) {
@@ -26,7 +33,7 @@ export function useOsmFile(osmKey: string) {
 	const setSelectedOsm = useSetAtom(selectedOsmAtom)
 
 	const loadOsmFile = useEffectEvent(
-		async (file: File | null, fileType?: OsmFileType) => {
+		async (file: File | null, fileType?: OsmFileType, signal?: AbortSignal) => {
 			setFile(file)
 			setOsm(null)
 			setFileInfo(null)
@@ -34,10 +41,21 @@ export function useOsmFile(osmKey: string) {
 			if (file == null) return null
 			const taskLog = Log.startTask(`Processing file ${file.name}...`)
 			try {
+				// Check cancellation before starting
+				if (signal?.aborted) throw new LoadCancelledError()
+
 				// Hash the file in the worker to avoid blocking UI
 				taskLog.update("Hashing file...")
 				const buffer = await file.arrayBuffer()
+
+				// Check after file read
+				if (signal?.aborted) throw new LoadCancelledError()
+
 				const fileHash = await osmWorker.hashBuffer(buffer)
+
+				// Check after hashing
+				if (signal?.aborted) throw new LoadCancelledError()
+
 				const storedFileInfo: StoredFileInfo = {
 					fileHash,
 					fileName: file.name,
@@ -47,12 +65,24 @@ export function useOsmFile(osmKey: string) {
 
 				// Check if we already have this file stored (in worker)
 				const existing = await osmWorker.findByHash(fileHash)
+
+				// Check after cache lookup
+				if (signal?.aborted) throw new LoadCancelledError()
+
 				if (existing) {
 					taskLog.update("Found cached version, loading from storage...")
 					const stored = await osmWorker.loadFromStorage(existing.fileHash)
+
+					// Check after loading from storage
+					if (signal?.aborted) throw new LoadCancelledError()
+
 					if (stored) {
 						// Get the Osm instance from worker (already has spatial indexes built)
 						const osm = await osmWorker.get(stored.entry.fileHash)
+
+						// Final check before setting state
+						if (signal?.aborted) throw new LoadCancelledError()
+
 						setOsmInfo(stored.info)
 						setOsm(osm)
 						setSelectedOsm(osm)
@@ -70,14 +100,32 @@ export function useOsmFile(osmKey: string) {
 					{ id: fileHash },
 					fileType,
 				)
+
+				// Check after parsing
+				if (signal?.aborted) throw new LoadCancelledError()
+
 				setOsmInfo(osmInfo)
 				const osm = await osmWorker.get(osmInfo.id)
+
+				// Final check before setting state
+				if (signal?.aborted) throw new LoadCancelledError()
+
 				setOsm(osm)
 				setSelectedOsm(osm)
 
 				taskLog.end(`${file.name} loaded.`)
 				return osmInfo
 			} catch (e) {
+				if (e instanceof LoadCancelledError) {
+					// Reset state on cancellation
+					setFile(null)
+					setFileInfo(null)
+					setOsm(null)
+					setOsmInfo(null)
+					setIsStored(false)
+					taskLog.end(`${file.name} loading cancelled.`)
+					return null
+				}
 				console.error(e)
 				taskLog.end(`${file.name} failed to load.`, "error")
 				throw e
@@ -85,41 +133,63 @@ export function useOsmFile(osmKey: string) {
 		},
 	)
 
-	const loadFromStorage = useEffectEvent(async (storageId: string) => {
-		const taskLog = Log.startTask("Loading osm from storage...")
-		try {
-			// Load from IndexedDB in the worker
-			const stored = await osmWorker.loadFromStorage(storageId)
-			if (!stored) {
-				taskLog.end(`Osm for ${storageId} not found in storage.`, "error")
-				return null
+	const loadFromStorage = useEffectEvent(
+		async (storageId: string, signal?: AbortSignal) => {
+			const taskLog = Log.startTask("Loading osm from storage...")
+			try {
+				// Check cancellation before starting
+				if (signal?.aborted) throw new LoadCancelledError()
+
+				// Load from IndexedDB in the worker
+				const stored = await osmWorker.loadFromStorage(storageId)
+
+				// Check after loading from storage
+				if (signal?.aborted) throw new LoadCancelledError()
+
+				if (!stored) {
+					taskLog.end(`Osm for ${storageId} not found in storage.`, "error")
+					return null
+				}
+
+				// Get the Osm instance from worker (already has spatial indexes built)
+				// Worker registers under fileHash, so use that as the ID
+				const osm = await osmWorker.get(stored.entry.fileHash)
+
+				// Final check before setting state
+				if (signal?.aborted) throw new LoadCancelledError()
+
+				// Update osmInfo.id to match the storage key (fileHash) since that's where
+				// the worker has it registered. This ensures downloadOsm and other calls
+				// that use osmInfo.id will find the correct worker entry.
+				const osmInfo: OsmInfo = { ...stored.info, id: stored.entry.fileHash }
+				setOsmInfo(osmInfo)
+				setOsm(osm)
+				setSelectedOsm(osm)
+				setIsStored(true)
+
+				// Restore file info from storage (clear actual file since we loaded from storage)
+				setFile(null)
+				setFileInfo(stored.entry)
+
+				taskLog.end(`${stored.entry.fileName} loaded from storage.`)
+				return osmInfo
+			} catch (e) {
+				if (e instanceof LoadCancelledError) {
+					// Reset state on cancellation
+					setFile(null)
+					setFileInfo(null)
+					setOsm(null)
+					setOsmInfo(null)
+					setIsStored(false)
+					taskLog.end("Loading from storage cancelled.")
+					return null
+				}
+				console.error(e)
+				taskLog.end(`Failed to load ${storageId} from storage.`, "error")
+				throw e
 			}
-
-			// Get the Osm instance from worker (already has spatial indexes built)
-			// Worker registers under fileHash, so use that as the ID
-			const osm = await osmWorker.get(stored.entry.fileHash)
-
-			// Update osmInfo.id to match the storage key (fileHash) since that's where
-			// the worker has it registered. This ensures downloadOsm and other calls
-			// that use osmInfo.id will find the correct worker entry.
-			const osmInfo: OsmInfo = { ...stored.info, id: stored.entry.fileHash }
-			setOsmInfo(osmInfo)
-			setOsm(osm)
-			setSelectedOsm(osm)
-			setIsStored(true)
-
-			// Restore file info from storage (clear actual file since we loaded from storage)
-			setFile(null)
-			setFileInfo(stored.entry)
-
-			taskLog.end(`${stored.entry.fileName} loaded from storage.`)
-			return osmInfo
-		} catch (e) {
-			console.error(e)
-			taskLog.end(`Failed to load ${storageId} from storage.`, "error")
-			throw e
-		}
-	})
+		},
+	)
 
 	const downloadOsm = useEffectEvent(async (name?: string) => {
 		if (!osmInfo) return

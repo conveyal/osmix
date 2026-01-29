@@ -4,18 +4,21 @@
  */
 
 import type { OsmInfo } from "@osmix/core"
+import { useAtom } from "jotai"
 import {
 	CheckIcon,
 	DatabaseIcon,
 	FilesIcon,
 	PencilIcon,
 	RotateCcwIcon,
+	StopCircleIcon,
 	Trash2Icon,
 	XIcon,
 } from "lucide-react"
 import type { OsmFileType } from "osmix"
 import { useEffectEvent, useRef, useState } from "react"
 import { type StoredOsmEntry, useStoredOsm } from "../hooks/storage-broadcast"
+import { osmLoadingAbortControllerAtom } from "../state/status"
 import { osmWorker } from "../state/worker"
 import ActionButton from "./action-button"
 import { Details, DetailsContent, DetailsSummary } from "./details"
@@ -185,6 +188,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 
 interface StoredOsmListProps {
 	activeOsmId?: string
+	osmKey?: string
 	openOsmFile: (
 		file: File | string,
 		fileType?: OsmFileType,
@@ -193,9 +197,12 @@ interface StoredOsmListProps {
 
 export function StoredOsmList({
 	activeOsmId,
+	osmKey,
 	openOsmFile,
 }: StoredOsmListProps) {
 	const { entries, estimatedBytes } = useStoredOsm(osmWorker)
+	const [loadingState, setLoadingState] = useAtom(osmLoadingAbortControllerAtom)
+	const isLoading = loadingState !== null && (!osmKey || loadingState.osmKey === osmKey)
 
 	return (
 		<Card>
@@ -207,18 +214,34 @@ export function StoredOsmList({
 			</CardHeader>
 			<CardContent className="p-0">
 				<div className="flex flex-col lg:flex-row gap-2 p-2 items-stretch">
-					<OsmPbfSelectFileButton
-						setFile={async (file, fileType) => {
-							if (file == null) return
-							await openOsmFile(file, fileType)
-						}}
-					/>
-					<OsmPbfOpenUrlButton
-						setFile={async (file, fileType) => {
-							if (file == null) return
-							await openOsmFile(file, fileType)
-						}}
-					/>
+					{isLoading ? (
+						<Button
+							variant="destructive"
+							className="flex-1"
+							onClick={() => {
+								loadingState.controller.abort()
+								setLoadingState(null)
+							}}
+						>
+							<StopCircleIcon className="mr-2 h-4 w-4" />
+							Cancel Loading
+						</Button>
+					) : (
+						<>
+							<OsmPbfSelectFileButton
+								setFile={async (file, fileType) => {
+									if (file == null) return
+									await openOsmFile(file, fileType)
+								}}
+							/>
+							<OsmPbfOpenUrlButton
+								setFile={async (file, fileType) => {
+									if (file == null) return
+									await openOsmFile(file, fileType)
+								}}
+							/>
+						</>
+					)}
 				</div>
 				{entries.length > 0 && (
 					<Details>

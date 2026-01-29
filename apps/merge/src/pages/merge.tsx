@@ -23,6 +23,7 @@ import { useOsmFile } from "../hooks/osm"
 import { cn } from "../lib/utils"
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
+import { osmLoadingAbortControllerAtom } from "../state/status"
 
 const activeTabAtom = atomWithStorage<string>(
 	"@osmix:merge:activeTab",
@@ -43,6 +44,7 @@ export default function Merge() {
 	const { activeTasks } = useLog()
 	const isMergeInProgress = activeTasks > 0
 	const [activeTab, setActiveTab] = useAtom(activeTabAtom)
+	const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom)
 
 	// Handle auto-loading from URL parameter or most recently used file
 	useEffect(() => {
@@ -77,12 +79,21 @@ export default function Merge() {
 	const openOsmFile = async (file: File | string, fileType?: OsmFileType) => {
 		selectEntity(null, null)
 		setChangesetStats(null)
-		const osmInfo =
-			typeof file === "string"
-				? await base.loadFromStorage(file)
-				: await base.loadOsmFile(file, fileType)
-		flyToOsmBounds(osmInfo)
-		return osmInfo
+
+		// Create abort controller for cancellation
+		const abortController = new AbortController()
+		setLoadingState({ controller: abortController, osmKey: BASE_OSM_KEY })
+
+		try {
+			const osmInfo =
+				typeof file === "string"
+					? await base.loadFromStorage(file, abortController.signal)
+					: await base.loadOsmFile(file, fileType, abortController.signal)
+			flyToOsmBounds(osmInfo)
+			return osmInfo
+		} finally {
+			setLoadingState(null)
+		}
 	}
 
 	const initialViewState: MapInitialViewState | undefined = useMemo(() => {

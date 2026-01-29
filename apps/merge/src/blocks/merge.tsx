@@ -50,7 +50,7 @@ import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
 import { Log } from "../state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "../state/osm"
-import { mergeAbortControllerAtom } from "../state/status"
+import { mergeAbortControllerAtom, osmLoadingAbortControllerAtom } from "../state/status"
 import { osmWorker } from "../state/worker"
 
 const STEPS = [
@@ -87,6 +87,7 @@ export default function MergeBlock() {
 	const [mergeAbortController, setMergeAbortController] = useAtom(
 		mergeAbortControllerAtom,
 	)
+	const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom)
 
 	const prevStep = () => {
 		selectEntity(null, null)
@@ -197,13 +198,20 @@ export default function MergeBlock() {
 					<CardContent>
 						{!patch.osm ? (
 							<StoredOsmList
+								osmKey={PATCH_OSM_KEY}
 								openOsmFile={async (file) => {
-									const osmInfo =
-										typeof file === "string"
-											? await patch.loadFromStorage(file)
-											: await patch.loadOsmFile(file)
-									flyToOsmBounds(osmInfo)
-									return osmInfo
+									const abortController = new AbortController()
+									setLoadingState({ controller: abortController, osmKey: PATCH_OSM_KEY })
+									try {
+										const osmInfo =
+											typeof file === "string"
+												? await patch.loadFromStorage(file, abortController.signal)
+												: await patch.loadOsmFile(file, undefined, abortController.signal)
+										flyToOsmBounds(osmInfo)
+										return osmInfo
+									} finally {
+										setLoadingState(null)
+									}
 								}}
 							/>
 						) : (
