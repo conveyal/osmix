@@ -25,7 +25,7 @@
         "comlink": "^4.4.2",
         "maplibre-gl": "catalog:",
         "osmix": "workspace:*",
-        "react": "^19.2.3",
+        "react": "^19.2.4",
         "react-dom": "^19.2.4",
         "react-map-gl": "^8.1.0",
       },
@@ -67,7 +67,7 @@
         "maplibre-gl": "catalog:",
         "native-file-system-adapter": "^3.0.1",
         "osmix": "workspace:*",
-        "react": "^19.2.3",
+        "react": "^19.2.4",
         "react-dom": "^19.2.4",
         "react-map-gl": "^8.1.0",
         "react-router": "^7.13.0",
@@ -1304,7 +1304,7 @@
 
     "quickselect": ["quickselect@3.0.0", "", {}, "sha512-XdjUArbK4Bm5fLLvlm5KpTFOiOThgfWWI4axAZDWg4E/0mKdZyI9tNEfds27qCi1ze/vwTR16kvmmGhRra3c2g=="],
 
-    "react": ["react@19.2.3", "", {}, "sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA=="],
+    "react": ["react@19.2.4", "", {}, "sha512-9nfp2hYpCwOjAN+8TZFGhtWEwgvWHXqESH8qT89AT/lWklpLON22Lc8pEtnpsZz7VmawabSU0gCjnj8aC0euHQ=="],
 
     "react-dom": ["react-dom@19.2.4", "", { "dependencies": { "scheduler": "^0.27.0" }, "peerDependencies": { "react": "^19.2.4" } }, "sha512-AXJdLo8kgMbimY95O2aKQqsz2iWi9jMgKJhRBAxECE4IFxfcazB2LmzloIoibJI3C12IlY20+KFaLv+71bUJeQ=="],
 
