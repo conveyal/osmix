@@ -41,6 +41,7 @@
 		"typecheck": "tsgo --noEmit"
 	},
 	"devDependencies": {
+		"@mapbox/tilebelt": "^2.0.3",
 		"@types/bun": "catalog:",
 		"@types/geojson": "catalog:",
 		"typescript": "catalog:"
