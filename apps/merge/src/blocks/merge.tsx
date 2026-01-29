@@ -223,98 +223,100 @@ export default function MergeBlock() {
 						!base.osm || !patch.osm ? "opacity-50 pointer-events-none" : "",
 					)}
 				>
-					<Item asChild>
-						<a
-							href="#"
-							onClick={(e) => {
-								e.preventDefault()
-								nextStep()
-							}}
-						>
-							<ItemMedia>
-								<CheckCircle />
-							</ItemMedia>
-							<ItemContent>
-								<ItemTitle>OPTION 1. VERIFY EACH STEP</ItemTitle>
-								<ItemDescription>
-									Verify changes before applying them.
-								</ItemDescription>
-							</ItemContent>
-							<ItemActions>
-								<ChevronRightIcon />
-							</ItemActions>
-						</a>
+					<Item
+						render={
+							<button
+								type="button"
+								onClick={() => {
+									nextStep()
+								}}
+							/>
+						}
+					>
+						<ItemMedia>
+							<CheckCircle />
+						</ItemMedia>
+						<ItemContent>
+							<ItemTitle>OPTION 1. VERIFY EACH STEP</ItemTitle>
+							<ItemDescription>
+								Verify changes before applying them.
+							</ItemDescription>
+						</ItemContent>
+						<ItemActions>
+							<ChevronRightIcon />
+						</ItemActions>
 					</Item>
-					<Item asChild>
-						<a
-							href="#"
-							onClick={async (e) => {
-								e.preventDefault()
-								goToStep("run-all-steps")
+					<Item
+						render={
+							<button
+								type="button"
+								onClick={async () => {
+									goToStep("run-all-steps")
 
-								const abortController = new AbortController()
-								setMergeAbortController(abortController)
+									const abortController = new AbortController()
+									setMergeAbortController(abortController)
 
-								const task = Log.startTask(
-									"Running all merge steps, please wait...",
-								)
-								if (!base.osm) throw Error("Base OSM is not loaded")
-								if (!patch.osm) throw Error("Patch OSM is not loaded")
-
-								try {
-									setChangesetStats(null)
-									const osmId = await osmWorker.merge(
-										base.osm.id,
-										patch.osm.id,
-										{
-											deduplicateNodes: true,
-											deduplicateWays: true,
-											directMerge: true,
-											createIntersections: true,
-										},
+									const task = Log.startTask(
+										"Running all merge steps, please wait...",
 									)
+									if (!base.osm) throw Error("Base OSM is not loaded")
+									if (!patch.osm) throw Error("Patch OSM is not loaded")
 
-									// Check if cancelled before applying results
-									if (abortController.signal.aborted) {
-										task.end("Merge cancelled by user")
-										goToStep("select-osm-pbf-files")
-										return
-									}
-
-									// Use setMergedOsm to properly update file info for the new merged result
-									await base.setMergedOsm(osmId)
-									patch.setOsm(null)
-
-									task.end("All merge steps completed")
-									goToStep("inspect-final-osm")
-								} catch (error) {
-									if (abortController.signal.aborted) {
-										task.end("Merge cancelled by user")
-										goToStep("select-osm-pbf-files")
-									} else {
-										task.end(
-											`Merge failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-											"error",
+									try {
+										setChangesetStats(null)
+										const osmId = await osmWorker.merge(
+											base.osm.id,
+											patch.osm.id,
+											{
+												deduplicateNodes: true,
+												deduplicateWays: true,
+												directMerge: true,
+												createIntersections: true,
+											},
 										)
+
+										// Check if cancelled before applying results
+										if (abortController.signal.aborted) {
+											task.end("Merge cancelled by user")
+											goToStep("select-osm-pbf-files")
+											return
+										}
+
+										// Use setMergedOsm to properly update file info for the new merged result
+										await base.setMergedOsm(osmId)
+										patch.setOsm(null)
+
+										task.end("All merge steps completed")
+										goToStep("inspect-final-osm")
+									} catch (error) {
+										if (abortController.signal.aborted) {
+											task.end("Merge cancelled by user")
+											goToStep("select-osm-pbf-files")
+										} else {
+											task.end(
+												`Merge failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+												"error",
+											)
+										}
+									} finally {
+										setMergeAbortController(null)
 									}
-								} finally {
-									setMergeAbortController(null)
-								}
-							}}
-						>
-							<ItemMedia>
-								<FastForwardIcon />
-							</ItemMedia>
-							<ItemContent>
-								<ItemTitle>OPTION 2. RUN ALL MERGE STEPS</ItemTitle>
-								<ItemDescription>
-									Run without stopping for verification.
-								</ItemDescription>
-							</ItemContent>
-							<ItemActions>
-								<ChevronRightIcon />
-							</ItemActions>
-						</a>
+								}}
+							/>
+						}
+					>
+						<ItemMedia>
+							<FastForwardIcon />
+						</ItemMedia>
+						<ItemContent>
+							<ItemTitle>OPTION 2. RUN ALL MERGE STEPS</ItemTitle>
+							<ItemDescription>
+								Run without stopping for verification.
+							</ItemDescription>
+						</ItemContent>
+						<ItemActions>
+							<ChevronRightIcon />
+						</ItemActions>
 					</Item>
 				</div>
 			</Step>
