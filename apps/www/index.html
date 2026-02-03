@@ -57,6 +57,7 @@
 
 				<div class="example">
 					<h3>1. Load File and Get Stats</h3>
+					<p>Load an OSM PBF file and extract basic statistics including node, way, and relation counts, plus the geographic bounding box.</p>
 					<pre><code id="code-stats" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
 
 const remote = await createRemote()
@@ -73,6 +74,7 @@ console.log("Bbox:", osmInfo.bbox)</code></pre>
 
 				<div class="example">
 					<h3>2. Display OSM on a Map</h3>
+					<p>Render OSM data as raster tiles using a custom MapLibre protocol, overlaying the data on any base map style.</p>
 					<pre><code id="code-map" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
 import maplibregl from "maplibre-gl"
 
@@ -108,6 +110,7 @@ map.on("load", () => {
 
 				<div class="example">
 					<h3>3. Search Tags</h3>
+					<p>Query OSM elements by tag key and optional value, returning matching nodes, ways, and relations from the loaded dataset.</p>
 					<pre><code id="code-search" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
 
 const remote = await createRemote()
@@ -146,6 +149,7 @@ console.log("Relations:", results.relations.length)</code></pre>
 
 				<div class="example">
 					<h3>4. Routing</h3>
+					<p>Calculate routes between points on the road network. Click the map to set origin and destination, with automatic snapping to the nearest routable node.</p>
 					<pre class="terminal"><code id="code-routing" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
 
 const remote = await createRemote()
