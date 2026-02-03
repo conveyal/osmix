@@ -50,7 +50,10 @@ import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
 import { Log } from "../state/log"
 import { selectedEntityAtom, selectOsmEntityAtom } from "../state/osm"
-import { mergeAbortControllerAtom, osmLoadingAbortControllerAtom } from "../state/status"
+import {
+	mergeAbortControllerAtom,
+	osmLoadingAbortControllerAtom,
+} from "../state/status"
 import { osmWorker } from "../state/worker"
 
 const STEPS = [
@@ -201,12 +204,22 @@ export default function MergeBlock() {
 								osmKey={PATCH_OSM_KEY}
 								openOsmFile={async (file) => {
 									const abortController = new AbortController()
-									setLoadingState({ controller: abortController, osmKey: PATCH_OSM_KEY })
+									setLoadingState({
+										controller: abortController,
+										osmKey: PATCH_OSM_KEY,
+									})
 									try {
 										const osmInfo =
 											typeof file === "string"
-												? await patch.loadFromStorage(file, abortController.signal)
-												: await patch.loadOsmFile(file, undefined, abortController.signal)
+												? await patch.loadFromStorage(
+														file,
+														abortController.signal,
+													)
+												: await patch.loadOsmFile(
+														file,
+														undefined,
+														abortController.signal,
+													)
 										flyToOsmBounds(osmInfo)
 										return osmInfo
 									} finally {

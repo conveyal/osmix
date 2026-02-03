@@ -202,7 +202,8 @@ export function StoredOsmList({
 }: StoredOsmListProps) {
 	const { entries, estimatedBytes } = useStoredOsm(osmWorker)
 	const [loadingState, setLoadingState] = useAtom(osmLoadingAbortControllerAtom)
-	const isLoading = loadingState !== null && (!osmKey || loadingState.osmKey === osmKey)
+	const isLoading =
+		loadingState !== null && (!osmKey || loadingState.osmKey === osmKey)
 
 	return (
 		<Card>
