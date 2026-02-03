@@ -147,7 +147,9 @@ export function OsmPbfOpenUrlButton({
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger
-				render={<Button className="flex-1" variant="outline" disabled={disabled} />}
+				render={
+					<Button className="flex-1" variant="outline" disabled={disabled} />
+				}
 			>
 				<LinkIcon />
 				Open from URL
