@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Osmix - OSM Toolkit for the Browser</title>
+		<link href="main.css" rel="stylesheet" />
+		<script src="client.ts" type="module" defer></script>
+	</head>
+	<body>
+		<main>
+			<header>
+				<h1>OSMIX</h1>
+				<p class="tagline">OpenStreetMap toolkit for the browser</p>
+				<nav>
+					<a href="https://github.com/conveyal/osmix">GitHub</a>
+					<a href="https://merge.osmix.dev">Merge App (built with Osmix)</a>
+					<a href="https://deepwiki.com/conveyal/osmix">Docs (by DeepWiki)</a>
+				</nav>
+			</header>
+
+			<section id="intro">
+				<h2>About</h2>
+				<p>
+					Osmix is a high-level toolkit for loading, manipulating, and
+					exporting OpenStreetMap data in the browser. It provides streaming
+					PBF parsing, memory-efficient indexing, raster/vector tile
+					generation, routing, and merge workflows - all running off the main
+					thread via Web Workers.
+				</p>
+			</section>
+
+			<section id="installation">
+				<h2>Installation</h2>
+				<p>Install the <code>@osmix/core</code> package with your package manager of choice.</p>
+				<pre><code class="highlight-this" data-lang="bash">$ bun add osmix</code></pre>
+			</section>
+
+			<section id="examples">
+				<h2>Examples</h2>
+
+				<div class="file-input">
+					<div class="button-group">
+						<button id="load-monaco" onclick="loadMonaco()">Load Monaco PBF</button>
+						<label id="load-file">
+							Open an OSM PBF File
+							<input
+								type="file"
+								id="file-input-el"
+								accept=".pbf,.osm.pbf"
+								onchange="handleFileSelect(this)"
+							/>
+						</label>
+					</div>
+					<div id="loading-status"></div>
+				</div>
+
+				<div class="example">
+					<h3>1. Load File and Get Stats</h3>
+					<pre><code id="code-stats" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
+
+const remote = await createRemote()
+const osmInfo = await remote.fromPbf(pbfFile)
+
+console.log("Nodes:", osmInfo.stats.nodes)
+console.log("Ways:", osmInfo.stats.ways)
+console.log("Relations:", osmInfo.stats.relations)
+console.log("Bbox:", osmInfo.bbox)</code></pre>
+					<div class="result-box" id="stats-result">
+						<p class="placeholder">Select a file above to see results...</p>
+					</div>
+				</div>
+
+				<div class="example">
+					<h3>2. Display OSM on a Map</h3>
+					<pre><code id="code-map" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
+import maplibregl from "maplibre-gl"
+
+const remote = await createRemote()
+const osmInfo = await remote.fromPbf(pbfFile)
+
+maplibregl.addProtocol("osmix", async (req) => {
+  const [, osmId, z, x, y] = req.url.match(
+    /osmix:\\/\\/(.+)\\/(\\d+)\\/(\\d+)\\/(\\d+)/
+  )
+  const tile = await remote.getRasterTile(osmId, [+x, +y, +z])
+  return { data: await tileToImageBuffer(tile) }
+})
+
+const map = new maplibregl.Map({
+  container: "map",
+  style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+})
+
+map.on("load", () => {
+  map.addSource("osmix", {
+    type: "raster",
+    tiles: [\`osmix://\${osmInfo.id}/{z}/{x}/{y}\`],
+    tileSize: 256
+  })
+  map.addLayer({ id: "osmix", type: "raster", source: "osmix" })
+})</code></pre>
+					<div class="result-box" id="map-result">
+						<p class="placeholder">Select a file above to see the map...</p>
+						<div id="map"></div>
+					</div>
+				</div>
+
+				<div class="example">
+					<h3>3. Search Tags</h3>
+					<pre><code id="code-search" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
+
+const remote = await createRemote()
+const osmInfo = await remote.fromPbf(pbfFile)
+
+const results = await remote.search(osmInfo.id, "amenity", "restaurant")
+
+console.log("Nodes:", results.nodes.length)
+console.log("Ways:", results.ways.length)
+console.log("Relations:", results.relations.length)</code></pre>
+					<div class="search-controls">
+						<input
+							type="text"
+							id="search-key"
+							placeholder="Tag key (e.g., amenity)"
+						/>
+						<input type="text" id="search-value" placeholder="Value (optional)" />
+						<button id="search-btn" disabled onclick="handleSearch()">Search</button>
+					</div>
+					<div class="result-box" id="search-result">
+						<p class="placeholder">
+							Select a file and enter a search query...
+						</p>
+						<table id="search-table">
+							<thead>
+								<tr>
+									<th>Type</th>
+									<th>ID</th>
+									<th>Tags</th>
+								</tr>
+							</thead>
+							<tbody></tbody>
+						</table>
+					</div>
+				</div>
+
+				<div class="example">
+					<h3>4. Routing</h3>
+					<pre class="terminal"><code id="code-routing" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
+
+const remote = await createRemote()
+const osmInfo = await remote.fromPbf(pbfFile)
+
+// Click on map to set origin and destination
+map.on('click', async (e) => {
+	const point = [e.lngLat.lng, e.lngLat.lat]
+	const snapped = await remote.findNearestRoutableNode(
+	osmInfo.id, point, 500
+	)
+	if (snapped) {
+	// Use snapped.nodeIndex for routing
+	}
+})
+
+// Calculate route between two snapped nodes
+const result = await remote.route(
+	osmInfo.id, fromNode.nodeIndex, toNode.nodeIndex,
+	{ includeStats: true, includePathInfo: true }
+)</code></pre>
+					<div class="result-box" id="routing-result">
+						<p class="placeholder">
+							Select a file above, then click on the map to set origin and
+							destination...
+						</p>
+						<div id="route-map"></div>
+						<table id="route-table">
+							<thead>
+								<tr>
+									<th>Property</th>
+									<th>Value</th>
+								</tr>
+							</thead>
+							<tbody></tbody>
+						</table>
+					</div>
+				</div>
+			</section>
+
+			<section id="packages">
+				<h2>Packages</h2>
+				<p>Osmix is a collection of packages that work together to provide a complete toolkit for working with OpenStreetMap data. You can use each package individually or together to build your own workflow.</p>
+				<table>
+					<thead>
+						<tr>
+							<th>Package</th>
+							<th>Description</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/core"
+									>@osmix/core</a
+								>
+							</td>
+							<td>In-memory OSM index with typed arrays and spatial queries</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/pbf"
+									>@osmix/pbf</a
+								>
+							</td>
+							<td>Low-level PBF reading and writing</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/json"
+									>@osmix/json</a
+								>
+							</td>
+							<td>PBF to JSON entity conversion</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/geojson"
+									>@osmix/geojson</a
+								>
+							</td>
+							<td>GeoJSON import/export</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/geoparquet"
+									>@osmix/geoparquet</a
+								>
+							</td>
+							<td>GeoParquet import</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/gtfs"
+									>@osmix/gtfs</a
+								>
+							</td>
+							<td>GTFS feed import</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/shapefile"
+									>@osmix/shapefile</a
+								>
+							</td>
+							<td>Shapefile import</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/change"
+									>@osmix/change</a
+								>
+							</td>
+							<td>Changeset generation and merge workflows</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/raster"
+									>@osmix/raster</a
+								>
+							</td>
+							<td>Raster tile rendering</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/vt"
+									>@osmix/vt</a
+								>
+							</td>
+							<td>Vector tile encoding (MVT)</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/shortbread"
+									>@osmix/shortbread</a
+								>
+							</td>
+							<td>Shortbread schema vector tiles</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/router"
+									>@osmix/router</a
+								>
+							</td>
+							<td>Pathfinding on OSM road networks</td>
+						</tr>
+						<tr>
+							<td>
+								<a
+									href="https://github.com/conveyal/osmix/tree/main/packages/shared"
+									>@osmix/shared</a
+								>
+							</td>
+							<td>Shared utilities and types</td>
+						</tr>
+					</tbody>
+				</table>
+			</section>
+			<footer>
+				<nav>
+					<a href="https://github.com/conveyal/osmix">GitHub</a>
+					<a href="https://conveyal.com">Conveyal</a>
+				</nav>
+			</footer>
+		</main>
+	</body>
+</html>
