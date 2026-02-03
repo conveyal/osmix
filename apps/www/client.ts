@@ -30,7 +30,9 @@ const IDB_NAME_KEY = "osmix-pbf-name"
 const IDB_MAX_SIZE = 1024 * 1024 * 500 // 500MB
 
 // Initialize osmix remote (single worker for docs)
-const remote = await createRemote()
+const remote = await createRemote({
+	workerUrl: new URL("./worker.ts", import.meta.url),
+})
 
 // Setup raster protocol
 maplibregl.addProtocol(
