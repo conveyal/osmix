@@ -55,7 +55,7 @@
         "@osmix/router": "workspace:*",
         "@osmix/shared": "workspace:*",
         "@osmix/vt": "workspace:*",
-        "@turf/bbox-polygon": "7.2.0",
+        "@turf/bbox-polygon": "7.3.3",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
@@ -772,7 +772,7 @@
 
     "@testing-library/user-event": ["@testing-library/user-event@14.6.1", "", { "peerDependencies": { "@testing-library/dom": ">=7.21.4" } }, "sha512-vq7fv0rnt+QTXgPxr5Hjc210p6YKq2kmdziLgnsZGgLJ9e6VAShx1pACLuRjd/AS/sr7phAR58OIIpf0LlmQNw=="],
 
-    "@turf/bbox-polygon": ["@turf/bbox-polygon@7.2.0", "", { "dependencies": { "@turf/helpers": "^7.2.0", "@types/geojson": "^7946.0.10", "tslib": "^2.8.1" } }, "sha512-Aj4G1GAAy26fmOqMjUk0Z+Lcax5VQ9g1xYDbHLQWXvfTsaueBT+RzdH6XPnZ/seEEnZkio2IxE8V5af/osupgA=="],
+    "@turf/bbox-polygon": ["@turf/bbox-polygon@7.3.3", "", { "dependencies": { "@turf/helpers": "7.3.3", "@types/geojson": "^7946.0.10", "tslib": "^2.8.1" } }, "sha512-m2WfHVoJLZJf+nJizRfnm0GHyJN3eYY/oWL6xsp1bDodgBgrNqNPRD3OfA00x4HIt5VYXOyQ0GMDfvILLjlXWw=="],
 
     "@turf/helpers": ["@turf/helpers@7.3.3", "", { "dependencies": { "@types/geojson": "^7946.0.10", "tslib": "^2.8.1" } }, "sha512-9Ias0L1GuZPIzO6sk8jraTEuLJye6n9LYNEdw69ZGOQ6C1IigjxkPW49zmn21aTv1z27vxdVLSS3r+78DB2QnQ=="],
 
