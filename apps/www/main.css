@@ -46,18 +46,29 @@ header {
 		font-size: 1.2rem;
 		color: var(--color-muted);
 	}
+}
 
-	nav {
-		display: flex;
-		gap: 1.5rem;
+nav {
+	display: flex;
+	gap: 1.5rem;
+	justify-content: space-between;
 
-		a {
-			color: var(--color-text);
-			text-decoration: underline;
+	a {
+		flex: 1;
+		color: var(--color-text);
+		text-decoration: underline;
+		text-align: center;
 
-			&:hover {
-				text-decoration: none;
-			}
+		&:hover {
+			text-decoration: none;
+		}
+
+		&:first-child {
+			text-align: left;
+		}
+
+		&:last-child {
+			text-align: right;
 		}
 	}
 }
@@ -77,7 +88,7 @@ h2 {
 }
 
 h3 {
-	font-size: 1rem;
+	font-size: 1.1rem;
 	font-weight: 700;
 	margin: 0 0 0.5rem 0;
 }
@@ -95,7 +106,6 @@ pre.shiki {
 
 /* Result boxes */
 .result-box {
-	min-height: 100px;
 	margin-top: 1rem;
 	position: relative;
 
@@ -250,7 +260,7 @@ input[type="text"] {
 
 /* Example sections */
 .example {
-	margin-bottom: 2rem;
+	margin: 2rem 0 4rem;
 }
 
 .example:last-child {
