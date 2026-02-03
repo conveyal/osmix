@@ -25,6 +25,17 @@ body {
 	background: var(--color-bg);
 }
 
+.admin-only {
+	display: none;
+}
+
+.ADMIN .admin-only {
+	display: inherit;
+	border: 1px solid red;
+	padding: 1rem;
+	margin-bottom: 1rem;
+}
+
 main {
 	max-width: 800px;
 	margin: 0 auto;

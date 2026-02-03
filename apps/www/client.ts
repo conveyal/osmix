@@ -1,14 +1,10 @@
-/**
- * Osmix Docs Client
- *
- * Handles file loading, map display, search, and code highlighting.
- */
 import type { OsmInfo } from "@osmix/core"
 import type { OsmTags, Tile } from "@osmix/shared/types"
-import { get, set } from "idb-keyval"
+import * as idb from "idb-keyval"
 import maplibregl from "maplibre-gl"
 import { createRemote } from "osmix"
 import { codeToHtml } from "./shiki.bundle"
+import MergeWorkerUrl from "./worker.ts?worker&url"
 
 // Monaco PBF URL - use local fixture in dev, remote in production
 const MONACO_URL =
@@ -23,6 +19,7 @@ declare global {
 		loadMonaco: () => Promise<void>
 		handleFileSelect: (input: HTMLInputElement) => Promise<void>
 		handleSearch: () => Promise<void>
+		clearIndexedDB: () => Promise<void>
 	}
 }
 
@@ -35,7 +32,9 @@ const IDB_NAME_KEY = "osmix-pbf-name"
 const IDB_MAX_SIZE = 1024 * 1024 * 500 // 500MB
 
 // Initialize osmix remote (single worker for docs)
-const remote = await createRemote()
+const remote = await createRemote({
+	workerUrl: new URL(MergeWorkerUrl, import.meta.url),
+})
 
 // Setup raster protocol
 maplibregl.addProtocol(
@@ -62,8 +61,8 @@ async function init() {
 	// Highlight code examples
 	highlightCodeExamples()
 
-	const pbf = await get(IDB_PBF_KEY)
-	const name = await get(IDB_NAME_KEY)
+	const pbf = await idb.get(IDB_PBF_KEY)
+	const name = await idb.get(IDB_NAME_KEY)
 	if (pbf && name) {
 		setLoadButtonsEnabled(false)
 		try {
@@ -105,8 +104,8 @@ window.loadMonaco = async () => {
 		if (!res.ok) throw Error(`Failed to fetch: ${res.status}`)
 		const buffer = await res.arrayBuffer()
 
-		await set(IDB_PBF_KEY, buffer)
-		await set(IDB_NAME_KEY, "monaco.pbf")
+		await idb.set(IDB_PBF_KEY, buffer)
+		await idb.set(IDB_NAME_KEY, "monaco.pbf")
 
 		setLoadingStatus("Loading into Osmix...")
 		currentOsmInfo = await remote.fromPbf(buffer, { id: "monaco.pbf" })
@@ -132,8 +131,8 @@ window.handleFileSelect = async (input: HTMLInputElement) => {
 
 	try {
 		if (file.size < IDB_MAX_SIZE) {
-			await set(IDB_PBF_KEY, await file.arrayBuffer())
-			await set(IDB_NAME_KEY, file.name)
+			await idb.set(IDB_PBF_KEY, await file.arrayBuffer())
+			await idb.set(IDB_NAME_KEY, file.name)
 		}
 		currentOsmInfo = await remote.fromPbf(file, { id: file.name })
 
@@ -649,3 +648,14 @@ async function rasterTileToImageBuffer(
 
 // Initialize on load
 init()
+
+// Admin functions
+
+if (localStorage.getItem("ADMIN")) {
+	document.body.classList.add("ADMIN")
+}
+
+window.clearIndexedDB = async () => {
+	await idb.clear()
+	location.reload()
+}
