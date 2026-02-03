@@ -1,0 +1,24 @@
+{
+	"$schema": "https://json.schemastore.org/package",
+	"name": "@osmix/www",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "vite dev",
+		"start": "vite",
+		"typecheck": "tsgo --build --noEmit"
+	},
+	"dependencies": {
+		"@osmix/core": "workspace:*",
+		"idb-keyval": "^6.2.2",
+		"maplibre-gl": "catalog:",
+		"osmix": "workspace:*",
+		"shiki": "^3.0.0",
+		"vite": "catalog:"
+	},
+	"devDependencies": {
+		"@osmix/shared": "workspace:*",
+		"@types/bun": "catalog:",
+		"typescript": "catalog:"
+	}
+}
