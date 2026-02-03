@@ -28,7 +28,7 @@
 		"@osmix/shared": "workspace:*",
 		"@osmix/vt": "workspace:*",
 		"osmix": "workspace:*",
-		"apache-arrow": "^17.0.0",
+		"apache-arrow": "^19.0.1",
 		"comlink": "^4.4.2",
 		"maplibre-gl": "catalog:",
 		"react": "^19.2.4",
