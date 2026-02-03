@@ -8,7 +8,7 @@ import type { OsmTags, Tile } from "@osmix/shared/types"
 import { get, set } from "idb-keyval"
 import maplibregl from "maplibre-gl"
 import { createRemote } from "osmix"
-import { createHighlighter } from "shiki"
+import { codeToHtml } from "./shiki.bundle"
 
 // Monaco PBF URL - use local fixture in dev, remote in production
 const MONACO_URL =
@@ -29,12 +29,6 @@ declare global {
 // State
 let currentOsmInfo: OsmInfo | null = null
 let map: maplibregl.Map | null = null
-
-// Initialize Shiki highlighter
-const highlighter = await createHighlighter({
-	themes: ["github-light"],
-	langs: ["typescript", "bash"],
-})
 
 const IDB_PBF_KEY = "osmix-pbf"
 const IDB_NAME_KEY = "osmix-pbf-name"
@@ -84,15 +78,13 @@ async function init() {
 	}
 }
 
-function highlightCodeExamples() {
-	if (!highlighter) return
-
+async function highlightCodeExamples() {
 	const codeBlocks =
 		document.querySelectorAll<HTMLPreElement>(".highlight-this")
 
 	for (const el of codeBlocks) {
 		if (el) {
-			const html = highlighter.codeToHtml(el.textContent ?? "", {
+			const html = await codeToHtml(el.textContent ?? "", {
 				lang: el.dataset.lang ?? "typescript",
 				theme: "github-light",
 			})
