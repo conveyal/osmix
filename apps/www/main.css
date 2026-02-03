@@ -31,6 +31,9 @@ body {
 
 .ADMIN .admin-only {
 	display: inherit;
+	border: 1px solid red;
+	padding: 1rem;
+	margin-bottom: 1rem;
 }
 
 main {

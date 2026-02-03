@@ -4,6 +4,7 @@ import * as idb from "idb-keyval"
 import maplibregl from "maplibre-gl"
 import { createRemote } from "osmix"
 import { codeToHtml } from "./shiki.bundle"
+import MergeWorkerUrl from "./worker.ts?worker&url"
 
 if (localStorage.getItem("ADMIN")) {
 	document.body.classList.add("ADMIN")
@@ -36,7 +37,7 @@ const IDB_MAX_SIZE = 1024 * 1024 * 500 // 500MB
 
 // Initialize osmix remote (single worker for docs)
 const remote = await createRemote({
-	workerUrl: new URL("./worker.ts", import.meta.url),
+	workerUrl: new URL(MergeWorkerUrl, import.meta.url),
 })
 
 // Setup raster protocol
