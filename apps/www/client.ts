@@ -6,10 +6,6 @@ import { createRemote } from "osmix"
 import { codeToHtml } from "./shiki.bundle"
 import MergeWorkerUrl from "./worker.ts?worker&url"
 
-if (localStorage.getItem("ADMIN")) {
-	document.body.classList.add("ADMIN")
-}
-
 // Monaco PBF URL - use local fixture in dev, remote in production
 const MONACO_URL =
 	window.location.hostname === "localhost"
@@ -654,6 +650,11 @@ async function rasterTileToImageBuffer(
 init()
 
 // Admin functions
+
+if (localStorage.getItem("ADMIN")) {
+	document.body.classList.add("ADMIN")
+}
+
 window.clearIndexedDB = async () => {
 	await idb.clear()
 	location.reload()
