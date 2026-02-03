@@ -1,6 +1,6 @@
 {
 	"$schema": "https://json.schemastore.org/package",
-	"name": "@osmix/docs",
+	"name": "@osmix/www",
 	"type": "module",
 	"private": true,
 	"scripts": {

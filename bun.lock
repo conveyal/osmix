@@ -39,22 +39,6 @@
         "vitest": "^4.0.17",
       },
     },
-    "apps/docs": {
-      "name": "@osmix/docs",
-      "dependencies": {
-        "@osmix/core": "workspace:*",
-        "idb-keyval": "^6.2.2",
-        "maplibre-gl": "catalog:",
-        "osmix": "workspace:*",
-        "shiki": "^3.0.0",
-        "vite": "catalog:",
-      },
-      "devDependencies": {
-        "@osmix/shared": "workspace:*",
-        "@types/bun": "catalog:",
-        "typescript": "catalog:",
-      },
-    },
     "apps/merge": {
       "name": "@osmix/merge",
       "dependencies": {
@@ -131,6 +115,22 @@
       "devDependencies": {
         "@osmix/json": "workspace:*",
         "@osmix/pbf": "workspace:*",
+        "@osmix/shared": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
+    "apps/www": {
+      "name": "@osmix/www",
+      "dependencies": {
+        "@osmix/core": "workspace:*",
+        "idb-keyval": "^6.2.2",
+        "maplibre-gl": "catalog:",
+        "osmix": "workspace:*",
+        "shiki": "^3.0.0",
+        "vite": "catalog:",
+      },
+      "devDependencies": {
         "@osmix/shared": "workspace:*",
         "@types/bun": "catalog:",
         "typescript": "catalog:",
@@ -585,8 +585,6 @@
 
     "@osmix/core": ["@osmix/core@workspace:packages/core"],
 
-    "@osmix/docs": ["@osmix/docs@workspace:apps/docs"],
-
     "@osmix/geojson": ["@osmix/geojson@workspace:packages/geojson"],
 
     "@osmix/geoparquet": ["@osmix/geoparquet@workspace:packages/geoparquet"],
@@ -614,6 +612,8 @@
     "@osmix/vt": ["@osmix/vt@workspace:packages/vt"],
 
     "@osmix/vt-server": ["@osmix/vt-server@workspace:apps/vt-server"],
+
+    "@osmix/www": ["@osmix/www@workspace:apps/www"],
 
     "@pkgjs/parseargs": ["@pkgjs/parseargs@0.11.0", "", {}, "sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg=="],
 
