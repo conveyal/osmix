@@ -1,8 +1,3 @@
-/**
- * Osmix Docs Client
- *
- * Handles file loading, map display, search, and code highlighting.
- */
 import type { OsmInfo } from "@osmix/core"
 import type { OsmTags, Tile } from "@osmix/shared/types"
 import { get, set } from "idb-keyval"
