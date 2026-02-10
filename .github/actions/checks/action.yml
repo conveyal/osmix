@@ -1,4 +1,5 @@
 name: CI Checks
+description: Run checks and tests
 
 runs:
   using: composite

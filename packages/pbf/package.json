@@ -7,6 +7,7 @@
 	"main": "./src/index.ts",
 	"publishConfig": {
 		"access": "public",
+		"registry": "https://registry.npmjs.org/",
 		"main": "./dist/index.js",
 		"types": "./dist/index.d.ts",
 		"exports": {
@@ -35,6 +36,7 @@
 		"bench": "bun test --bench",
 		"build": "tsc -p tsconfig.build.json",
 		"prepublishOnly": "tsc",
+		"publish": "bun publish",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},

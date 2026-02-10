@@ -32,13 +32,12 @@
 		"clean": "rm -rf packages/*/dist apps/*/dist node_modules packages/*/node_modules apps/*/node_modules",
 		"format": "biome format --write .",
 		"lint": "biome lint --write --unsafe .",
-		"publish": "changeset publish",
 		"test": "bun run test:packages",
 		"test:all": "bun run test:packages && bun run test:apps && bun run typecheck && bun run lint && bun run check",
 		"test:apps": "bun --filter './apps/**' test --silent",
 		"test:packages": "bun --filter './packages/**' test --silent",
 		"typecheck": "bun --filter '*' typecheck",
-		"version": "changeset version"
+		"version": "changeset version && bun update"
 	},
 	"trustedDependencies": [
 		"@tailwindcss/oxide"
