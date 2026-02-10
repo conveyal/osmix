@@ -1,5 +1,15 @@
 # @osmix/gtfs
 
+## 0.0.3
+
+### Patch Changes
+
+- f468db5: Fix publishing (2)
+- 536a3cd: Remove JSR dependency for CSV parsing
+- Updated dependencies [f468db5]
+  - @osmix/core@0.1.3
+  - @osmix/shared@0.0.8
+
 ## 0.0.2
 
 ### Patch Changes

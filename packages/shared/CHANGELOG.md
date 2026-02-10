@@ -1,5 +1,11 @@
 # @osmix/shared
 
+## 0.0.8
+
+### Patch Changes
+
+- f468db5: Fix publishing (2)
+
 ## 0.0.7
 
 ### Patch Changes

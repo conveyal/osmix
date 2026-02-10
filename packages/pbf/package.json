@@ -2,7 +2,7 @@
 	"$schema": "https://json.schemastore.org/package",
 	"name": "@osmix/pbf",
 	"description": "A low level, modern, runtime agnostic OSM PBF parser and writer written in TypeScript.",
-	"version": "0.0.4",
+	"version": "0.0.5",
 	"type": "module",
 	"main": "./src/index.ts",
 	"publishConfig": {
