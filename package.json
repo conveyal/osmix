@@ -32,7 +32,6 @@
 		"clean": "rm -rf packages/*/dist apps/*/dist node_modules packages/*/node_modules apps/*/node_modules",
 		"format": "biome format --write .",
 		"lint": "biome lint --write --unsafe .",
-		"publish": "bun run publish",
 		"test": "bun run test:packages",
 		"test:all": "bun run test:packages && bun run test:apps && bun run typecheck && bun run lint && bun run check",
 		"test:apps": "bun --filter './apps/**' test --silent",
