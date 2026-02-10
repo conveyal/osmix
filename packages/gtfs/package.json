@@ -49,7 +49,7 @@
 	"dependencies": {
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
-		"@std/csv": "npm:@jsr/std__csv",
-		"but-unzip": "^0.1.7"
+		"but-unzip": "^0.1.7",
+		"csv-parse": "^6.1.0"
 	}
 }

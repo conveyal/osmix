@@ -201,6 +201,21 @@ describe("GtfsArchive", () => {
 		expect(routes[0]?.route_short_name).toBe("1")
 	})
 
+	test("parses quoted CSV fields", async () => {
+		const { zipSync } = await import("fflate")
+		const encoder = new TextEncoder()
+		const zipData = zipSync({
+			"stops.txt": encoder.encode(`stop_id,stop_name,stop_lat,stop_lon
+stop1,"Main ""Central"", Downtown",40.7128,-74.0060`),
+		})
+
+		const archive = GtfsArchive.fromZip(zipData)
+		const stops = await Array.fromAsync(archive.iter("stops.txt"))
+
+		expect(stops.length).toBe(1)
+		expect(stops[0]?.stop_name).toBe('Main "Central", Downtown')
+	})
+
 	test("iterates stops without loading all at once", async () => {
 		const zipData = await createTestGtfsZip()
 		const archive = GtfsArchive.fromZip(zipData)
