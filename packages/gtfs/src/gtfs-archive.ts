@@ -1,13 +1,13 @@
 /**
- * Lazy GTFS archive parser with streaming CSV support.
+ * Lazy GTFS archive parser.
  *
  * Only parses CSV files when they are accessed, not upfront.
- * Uses @std/csv CsvParseStream for true line-by-line streaming.
+ * Uses csv-parse from npm for CSV parsing.
  *
  * @module
  */
 
-import { CsvParseStream } from "@std/csv/parse-stream"
+import { parse } from "csv-parse/sync"
 import { unzip, type ZipItem } from "but-unzip"
 import type {
 	GtfsAgency,
@@ -17,7 +17,6 @@ import type {
 	GtfsStopTime,
 	GtfsTrip,
 } from "./types"
-import { bytesToTextStream } from "./utils"
 
 /**
  * Map of GTFS filenames to their record types.
@@ -38,9 +37,8 @@ export type GtfsFileName = keyof GtfsFileTypeMap
  * Lazy GTFS archive that only parses files on demand.
  *
  * Files are read from the zip and parsed only when their
- * corresponding getter is called for the first time.
- * Streaming iterators parse CSV line-by-line without loading
- * the entire file into memory.
+ * corresponding iterator is called for the first time.
+ * Iterators yield typed rows one record at a time.
  */
 export class GtfsArchive {
 	private entries: Map<string, ZipItem>
@@ -119,20 +117,15 @@ export class GtfsArchive {
 		const bytes = await this.getFileBytes(filename)
 		if (!bytes) return
 
-		const textStream = bytesToTextStream(bytes)
-		const csvStream = textStream.pipeThrough(
-			new CsvParseStream({ skipFirstRow: true }),
-		)
+		const csvText = new TextDecoder().decode(bytes)
+		const rows = parse<Record<string, string>>(csvText, {
+			bom: true,
+			columns: true,
+			skip_empty_lines: true,
+		})
 
-		const reader = csvStream.getReader()
-		try {
-			while (true) {
-				const { value, done } = await reader.read()
-				if (done) break
-				yield value as unknown as GtfsFileTypeMap[F]
-			}
-		} finally {
-			reader.releaseLock()
+		for (const row of rows) {
+			yield row as unknown as GtfsFileTypeMap[F]
 		}
 	}
 }
