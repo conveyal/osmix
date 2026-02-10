@@ -1,5 +1,14 @@
 # @osmix/shapefile
 
+## 0.0.3
+
+### Patch Changes
+
+- 68d6bd8: Fix publishing for packages.
+- Updated dependencies [68d6bd8]
+  - @osmix/core@0.1.2
+  - @osmix/shared@0.0.7
+
 ## 0.0.2
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @osmix/vt
 
+## 0.0.7
+
+### Patch Changes
+
+- 68d6bd8: Fix publishing for packages.
+- Updated dependencies [68d6bd8]
+  - @osmix/shared@0.0.7
+
 ## 0.0.6
 
 ### Patch Changes

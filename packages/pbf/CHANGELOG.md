@@ -1,5 +1,11 @@
 # @osmix/pbf
 
+## 0.0.4
+
+### Patch Changes
+
+- 68d6bd8: Fix publishing for packages.
+
 ## 0.0.3
 
 ### Patch Changes
