@@ -1,5 +1,14 @@
 # @osmix/json
 
+## 0.0.8
+
+### Patch Changes
+
+- 68d6bd8: Fix publishing for packages.
+- Updated dependencies [68d6bd8]
+  - @osmix/pbf@0.0.4
+  - @osmix/shared@0.0.7
+
 ## 0.0.7
 
 ### Patch Changes

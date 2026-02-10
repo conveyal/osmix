@@ -1,5 +1,14 @@
 # @osmix/router
 
+## 0.0.5
+
+### Patch Changes
+
+- 68d6bd8: Fix publishing for packages.
+- Updated dependencies [68d6bd8]
+  - @osmix/core@0.1.2
+  - @osmix/shared@0.0.7
+
 ## 0.0.4
 
 ### Patch Changes

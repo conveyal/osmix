@@ -1,5 +1,24 @@
 # osmix
 
+## 0.1.2
+
+### Patch Changes
+
+- 68d6bd8: Fix publishing for packages.
+- Updated dependencies [68d6bd8]
+  - @osmix/change@0.1.1
+  - @osmix/core@0.1.2
+  - @osmix/geojson@0.0.7
+  - @osmix/geoparquet@0.1.1
+  - @osmix/gtfs@0.0.2
+  - @osmix/json@0.0.8
+  - @osmix/pbf@0.0.4
+  - @osmix/raster@0.0.7
+  - @osmix/router@0.0.5
+  - @osmix/shapefile@0.0.3
+  - @osmix/shared@0.0.7
+  - @osmix/vt@0.0.7
+
 ## 0.1.1
 
 ### Patch Changes
