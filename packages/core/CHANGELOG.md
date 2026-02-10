@@ -1,5 +1,13 @@
 # @osmix/core
 
+## 0.1.3
+
+### Patch Changes
+
+- f468db5: Fix publishing (2)
+- Updated dependencies [f468db5]
+  - @osmix/shared@0.0.8
+
 ## 0.1.2
 
 ### Patch Changes

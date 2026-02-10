@@ -1,5 +1,11 @@
 # @osmix/pbf
 
+## 0.0.5
+
+### Patch Changes
+
+- f468db5: Fix publishing (2)
+
 ## 0.0.4
 
 ### Patch Changes
