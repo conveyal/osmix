@@ -1,4 +1,5 @@
 name: CI Setup
+description: Setup Bun and install dependencies
 
 runs:
   using: composite
