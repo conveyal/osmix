@@ -36,10 +36,10 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun test --bench",
-		"prepublishOnly": "tsc",
-		"publish": "bun publish",
+		"prepare": "bun run build",
+		"release": "bun publish",
 		"test": "bun test",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsgo --noEmit"
 	},
 	"devDependencies": {
 		"@types/bun": "catalog:",

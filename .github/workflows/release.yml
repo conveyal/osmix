@@ -30,7 +30,7 @@ jobs:
         uses: changesets/action@v1
         with:
           version: bun run version
-          publish: bun run publish
+          publish: bun --filter '*' release
         env:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

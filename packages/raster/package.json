@@ -35,8 +35,8 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun test --bench",
-		"prepublishOnly": "tsc",
-		"publish": "bun publish",
+		"prepare": "bun run build",
+		"release": "bun publish",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},

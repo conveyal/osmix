@@ -35,8 +35,8 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun run test/router.bench.ts",
-		"prepublishOnly": "tsc",
-		"publish": "bun publish",
+		"prepare": "bun run build",
+		"release": "bun publish",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},
