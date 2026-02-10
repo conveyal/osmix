@@ -10,6 +10,7 @@
 	},
 	"publishConfig": {
 		"access": "public",
+		"registry": "https://registry.npmjs.org/",
 		"main": "./dist/index.js",
 		"types": "./dist/index.d.ts",
 		"exports": {
@@ -37,6 +38,7 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"prepublishOnly": "tsc",
+		"publish": "bun publish",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},
