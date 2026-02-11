@@ -1,14 +1,14 @@
 /**
- * Lazy GTFS archive parser.
+ * Lazy GTFS archive parser with streaming CSV support.
  *
  * Only parses CSV files when they are accessed, not upfront.
- * Uses csv-parse from npm for CSV parsing.
+ * Uses shared CsvParseStream for true line-by-line streaming.
  *
  * @module
  */
 
+import { CsvParseStream } from "@osmix/shared/csv-parse-stream"
 import { unzip, type ZipItem } from "but-unzip"
-import { parse } from "csv-parse/sync"
 import type {
 	GtfsAgency,
 	GtfsRoute,
@@ -17,6 +17,7 @@ import type {
 	GtfsStopTime,
 	GtfsTrip,
 } from "./types"
+import { bytesToTextStream } from "./utils"
 
 /**
  * Map of GTFS filenames to their record types.
@@ -117,15 +118,20 @@ export class GtfsArchive {
 		const bytes = await this.getFileBytes(filename)
 		if (!bytes) return
 
-		const csvText = new TextDecoder().decode(bytes)
-		const rows = parse<Record<string, string>>(csvText, {
-			bom: true,
-			columns: true,
-			skip_empty_lines: true,
-		})
+		const textStream = bytesToTextStream(bytes)
+		const csvStream = textStream.pipeThrough(
+			new CsvParseStream({ skipFirstRow: true }),
+		)
 
-		for (const row of rows) {
-			yield row as unknown as GtfsFileTypeMap[F]
+		const reader = csvStream.getReader()
+		try {
+			while (true) {
+				const { value, done } = await reader.read()
+				if (done) break
+				yield value as unknown as GtfsFileTypeMap[F]
+			}
+		} finally {
+			reader.releaseLock()
 		}
 	}
 }

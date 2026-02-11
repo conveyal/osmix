@@ -49,7 +49,6 @@
 	"dependencies": {
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
-		"but-unzip": "^0.1.7",
-		"csv-parse": "^6.1.0"
+		"but-unzip": "^0.1.7"
 	}
 }
