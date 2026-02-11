@@ -1,5 +1,4 @@
 ---
-"@osmix/merge": patch
 "@osmix/change": patch
 "@osmix/core": patch
 "@osmix/geojson": patch
