@@ -205,10 +205,12 @@ function matchLand(tags: OsmTags): LandProperties | null {
 
 	let kind: LandKind | null = null
 
-	if (natural && LAND_KIND_MAP[natural]) {
-		kind = LAND_KIND_MAP[natural]!
-	} else if (landuse && LAND_KIND_MAP[landuse]) {
-		kind = LAND_KIND_MAP[landuse]!
+	const naturalKind = natural ? LAND_KIND_MAP[natural] : undefined
+	const landuseKind = landuse ? LAND_KIND_MAP[landuse] : undefined
+	if (naturalKind) {
+		kind = naturalKind
+	} else if (landuseKind) {
+		kind = landuseKind
 	} else if (landuse === "forest") {
 		kind = "forest"
 	} else if (leisure === "recreation_ground") {
