@@ -8,7 +8,11 @@
  */
 
 import type { Osm } from "@osmix/core"
-import { type ProgressEvent, progressEvent } from "@osmix/shared/progress"
+import {
+	type ProgressEvent,
+	progressEvent,
+	logProgress,
+} from "@osmix/shared/progress"
 import { throttle } from "@osmix/shared/throttle"
 import { OsmChangeset } from "./changeset"
 import type { OsmMergeOptions } from "./types"
@@ -39,7 +43,7 @@ export function generateChangeset(
 	base: Osm,
 	patch: Osm,
 	options: Partial<OsmMergeOptions> = {},
-	onProgress: (progress: ProgressEvent) => void = console.log,
+	onProgress: (progress: ProgressEvent) => void = logProgress,
 ) {
 	const patchId = patch.id
 	const baseId = base.id
