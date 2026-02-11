@@ -3,7 +3,8 @@
 :root {
 	--color-text: #0f172a; /* slate-900 */
 	--color-bg: #fff; /* white */
-	--color-border: #e2e8f0; /* slate-200 */
+	--color-light-gray: #f1f5f9; /* slate-100 */
+	--color-border: #cbd5e1; /* slate-300 */
 	--color-muted: #64748b; /* slate-500 */
 	--font-mono:
 		ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -14,6 +15,15 @@
 	box-sizing: border-box;
 }
 
+html {
+	background: repeating-linear-gradient(
+		-45deg,
+		transparent 0 3px,
+		var(--color-light-gray) 3px 5px
+	);
+	background-color: var(--color-bg);
+}
+
 html,
 body {
 	margin: 0;
@@ -22,7 +32,10 @@ body {
 	font-size: var(--font-size);
 	line-height: 1.6;
 	color: var(--color-text);
-	background: var(--color-bg);
+}
+
+body {
+	background: transparent;
 }
 
 .admin-only {
@@ -31,7 +44,7 @@ body {
 
 .ADMIN .admin-only {
 	display: inherit;
-	border: 1px solid red;
+	border: 2px dashed red;
 	padding: 1rem;
 	margin-bottom: 1rem;
 }
@@ -40,6 +53,9 @@ main {
 	max-width: 800px;
 	margin: 0 auto;
 	padding: 2rem;
+	background: var(--color-bg);
+	border-left: 2px dashed var(--color-border);
+	border-right: 2px dashed var(--color-border);
 }
 
 header {
@@ -94,8 +110,8 @@ h2 {
 	text-transform: uppercase;
 	letter-spacing: -0.025em;
 	margin: 0 0 1rem 0;
-	padding-bottom: 0.5rem;
-	border-bottom: 1px solid var(--color-border);
+	padding-bottom: 0.25rem;
+	border-bottom: 2px solid var(--color-border);
 }
 
 h3 {
@@ -168,13 +184,20 @@ td {
 th {
 	font-weight: 700;
 	font-size: 12px;
-	background: #f0f0f0;
+	background: var(--color-light-gray);
 }
 
 button {
 	font-family: inherit;
 	font-size: 1rem;
 	padding: 0.5rem;
+	background-color: var(--color-light-gray);
+	border: 1px solid var(--color-border);
+	cursor: pointer;
+
+	&:hover {
+		background-color: oklch(from var(--color-light-gray) calc(l * 0.97) c h);
+	}
 }
 
 #search-table {
@@ -201,14 +224,18 @@ button {
 		display: flex;
 		gap: 1rem;
 
+		--box-shadow: 0.2rem 0.2rem 0.4rem 0 var(--color-border);
+
 		button {
 			flex: 1;
+			box-shadow: var(--box-shadow);
 		}
 
 		label {
-			border: 1px solid var(--color-border);
+			border: 2px solid var(--color-border);
 			padding: 0.5rem 1rem;
 			background-color: #fff;
+			box-shadow: var(--box-shadow);
 		}
 	}
 
@@ -216,7 +243,7 @@ button {
 	#loading-status {
 		margin-top: 1rem;
 		border: 1px solid var(--color-border);
-		background-color: #fff;
+		background-color: var(--color-bg);
 		text-align: center;
 		padding: 1rem;
 	}
@@ -239,6 +266,11 @@ input[type="text"] {
 	padding: 0.5rem;
 	border: 1px solid var(--color-border);
 	flex: 1;
+}
+
+input[type="file"] {
+	font-family: var(--font-mono);
+	font-size: var(--font-size);
 }
 
 /* Map container */
