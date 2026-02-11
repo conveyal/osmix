@@ -1,5 +1,11 @@
 # @osmix/pbf
 
+## 0.0.6
+
+### Patch Changes
+
+- f32e4ee: General cleanup
+
 ## 0.0.5
 
 ### Patch Changes

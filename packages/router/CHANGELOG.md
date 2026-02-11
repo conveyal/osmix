@@ -1,5 +1,13 @@
 # @osmix/router
 
+## 0.0.7
+
+### Patch Changes
+
+- Updated dependencies [f32e4ee]
+  - @osmix/core@0.1.4
+  - @osmix/shared@0.0.9
+
 ## 0.0.6
 
 ### Patch Changes
