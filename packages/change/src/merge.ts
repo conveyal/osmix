@@ -8,7 +8,11 @@
  */
 
 import type { Osm } from "@osmix/core"
-import { type ProgressEvent, progressEvent } from "@osmix/shared/progress"
+import {
+	type ProgressEvent,
+	progressEvent,
+	logProgress,
+} from "@osmix/shared/progress"
 import { applyChangesetToOsm } from "./apply-changeset"
 import { OsmChangeset } from "./changeset"
 import type { OsmMergeOptions } from "./types"
@@ -43,7 +47,7 @@ export async function merge(
 	base: Osm,
 	patch: Osm,
 	options: Partial<OsmMergeOptions> = {},
-	onProgress: (progress: ProgressEvent) => void = console.log,
+	onProgress: (progress: ProgressEvent) => void = logProgress,
 ) {
 	const log = (msg: string) => onProgress(progressEvent(msg))
 	// De-duplicate nodes and ways in original datasets
