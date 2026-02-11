@@ -1,5 +1,6 @@
-import { bboxFromLonLats, type Osm } from "@osmix/core"
+import type { Osm } from "@osmix/core"
 import type { LonLat } from "@osmix/shared/types"
+import { bboxFromLonLats } from "@osmix/shared/utils"
 import { useAtom, useAtomValue } from "jotai"
 import { NavigationIcon, XIcon } from "lucide-react"
 import { useEffect, useEffectEvent, useRef, useState } from "react"
