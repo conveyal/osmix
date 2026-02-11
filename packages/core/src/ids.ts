@@ -140,7 +140,6 @@ export class Ids {
 		if (this.indexBuilt) throw Error("ID index already built.")
 		this.ids.compact()
 		if (!this.idsAreSorted) {
-			console.warn("IDs were not sorted. Sorting now...")
 			// Build the sorted index
 			const idsBuffer = new BufferConstructor(
 				this.size * Float64Array.BYTES_PER_ELEMENT,
