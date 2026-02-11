@@ -9,9 +9,9 @@
 
 import type { Osm } from "@osmix/core"
 import {
+	logProgress,
 	type ProgressEvent,
 	progressEvent,
-	logProgress,
 } from "@osmix/shared/progress"
 import { applyChangesetToOsm } from "./apply-changeset"
 import { OsmChangeset } from "./changeset"
