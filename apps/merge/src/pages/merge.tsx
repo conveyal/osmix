@@ -71,7 +71,13 @@ export default function Merge() {
 				}
 			})
 		}
-	}, [searchParams, setSearchParams, base.loadFromStorage, flyToOsmBounds])
+	}, [
+		searchParams,
+		setSearchParams,
+		base.loadFromStorage,
+		flyToOsmBounds, // Load the file from storage
+		base,
+	])
 
 	// Show full-screen file selector when no files are selected
 	const noFilesSelected = !base.osm && !patch.osm
