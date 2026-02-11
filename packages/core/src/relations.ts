@@ -1,5 +1,6 @@
 import type { OsmPbfRelation } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
+import type { ContentHasher } from "@osmix/shared/content-hasher"
 import {
 	buildRelationLineStrings,
 	collectRelationPoints,
@@ -18,6 +19,7 @@ import type {
 	OsmRelationMember,
 	OsmTags,
 } from "@osmix/shared/types"
+import { bboxFromLonLats } from "@osmix/shared/utils"
 import Flatbush from "flatbush"
 import { around as geoAround } from "geoflatbush"
 import { Entities, type EntitiesTransferables } from "./entities"
@@ -31,7 +33,6 @@ import {
 	IdArrayType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
-import { bboxFromLonLats, type ContentHasher } from "./utils"
 import type { Ways } from "./ways"
 
 const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]

@@ -1,5 +1,6 @@
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf"
 import { assertValue } from "@osmix/shared/assert"
+import type { ContentHasher } from "@osmix/shared/content-hasher"
 import { microToDegrees, toMicroDegrees } from "@osmix/shared/coordinates"
 import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/shared/types"
 import { around as geoAround } from "geokdbush"
@@ -13,7 +14,6 @@ import {
 	type BufferType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
-import type { ContentHasher } from "./utils"
 
 export interface NodesTransferables<T extends BufferType = BufferType>
 	extends EntitiesTransferables<T> {
