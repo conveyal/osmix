@@ -209,7 +209,6 @@ export function writePrimitiveBlock(obj: OsmPbfBlock, pbf: Pbf) {
 		}
 	}
 	if (obj.granularity != null && obj.granularity !== 1e7) {
-		console.error("writeGranularity", obj.granularity)
 		pbf.writeVarintField(17, 1e9 / obj.granularity)
 	}
 	if (obj.lat_offset) pbf.writeVarintField(19, obj.lat_offset / 1e-9)
