@@ -25,12 +25,17 @@ jobs:
       - name: Setup npmrc
         run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
 
+
+      - name: Preflight workspace package detection
+        run: |
+          bun pm ls --all | head -n 200
+
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@v1
         with:
           version: bun run version
-          publish: bun --filter '*' release
+          publish: bun run release
         env:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
