@@ -139,11 +139,9 @@ export class OsmChangeset {
 		modify: (entity: OsmEntityTypeMap[T]) => OsmEntityTypeMap[T],
 	): void {
 		if (this.changes(type)[id]?.changeType === "delete") {
-			console.error("Attempting to modify an entity scheduled for deletion", {
-				type,
-				id,
-			})
-			return
+			throw Error(
+				`Cannot modify ${type} ${id}: entity is scheduled for deletion`,
+			)
 		}
 
 		const changes = this.changes(type)
