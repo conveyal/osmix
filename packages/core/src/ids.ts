@@ -137,7 +137,7 @@ export class Ids {
 	 * If the IDs are sorted, we can use the existing index.
 	 */
 	buildIndex() {
-		if (this.indexBuilt) throw Error("ID index already build.")
+		if (this.indexBuilt) throw Error("ID index already built.")
 		this.ids.compact()
 		if (!this.idsAreSorted) {
 			console.warn("IDs were not sorted. Sorting now...")
