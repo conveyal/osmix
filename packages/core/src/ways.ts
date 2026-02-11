@@ -143,7 +143,6 @@ export class Ways extends Entities<OsmWay> {
 	buildSpatialIndex() {
 		if (!this.nodes.isReady()) throw Error("Node index is not ready.")
 		if (this.size === 0) return this.spatialIndex
-		console.time("WayIndex.buildSpatialIndex")
 
 		this.spatialIndex = new Flatbush(
 			this.size,
@@ -195,7 +194,6 @@ export class Ways extends Entities<OsmWay> {
 		}
 		this.spatialIndex.finish()
 		this.spatialIndexBuilt = true
-		console.timeEnd("WayIndex.buildSpatialIndex")
 		return this.spatialIndex
 	}
 
@@ -271,7 +269,6 @@ export class Ways extends Entities<OsmWay> {
 				coord[0] === undefined ||
 				coord[1] === undefined
 			) {
-				console.error("node index has ref", this.nodes.ids.has(ref))
 				throw Error(
 					`Invalid coordinate for way id ${this.ids.at(index)}, index ${index}, node ref ${ref}, ref index ${refIndex}`,
 				)
@@ -325,14 +322,12 @@ export class Ways extends Entities<OsmWay> {
 		positions: Float64Array
 		startIndices: Uint32Array
 	} {
-		console.time("Ways.withinBbox")
 		const wayCandidates = this.intersects(bbox, include)
 		const ids = new Float64Array(wayCandidates.length)
 		const wayPositions: Float64Array[] = []
 		const wayStartIndices = new Uint32Array(wayCandidates.length + 1)
 		wayStartIndices[0] = 0
 
-		console.time("Ways.withinBbox.loop")
 		let size = 0
 		wayCandidates.forEach((wayIndex, i) => {
 			ids[i] = this.ids.at(wayIndex)
@@ -343,7 +338,6 @@ export class Ways extends Entities<OsmWay> {
 			if (prevIndex === undefined) throw Error("Previous index is undefined")
 			wayStartIndices[i + 1] = prevIndex + way.length / 2
 		})
-		console.timeEnd("Ways.withinBbox.loop")
 		const wayPositionsArray = new Float64Array(size)
 		let pIndex = 0
 		for (const way of wayPositions) {
@@ -351,7 +345,6 @@ export class Ways extends Entities<OsmWay> {
 			pIndex += way.length
 		}
 
-		console.timeEnd("Ways.withinBbox")
 		return {
 			ids,
 			positions: wayPositionsArray,
