@@ -174,10 +174,12 @@ export function buildRelationLineStrings(
 	const roleGroups = new Map<string, OsmRelationMember[]>()
 	for (const member of wayMembers) {
 		const role = member.role?.toLowerCase() ?? ""
-		if (!roleGroups.has(role)) {
-			roleGroups.set(role, [])
+		let roleGroup = roleGroups.get(role)
+		if (!roleGroup) {
+			roleGroup = []
+			roleGroups.set(role, roleGroup)
 		}
-		roleGroups.get(role)!.push(member)
+		roleGroup.push(member)
 	}
 
 	// If no roles or single role group, process all ways together
