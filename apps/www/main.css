@@ -3,12 +3,12 @@
 :root {
 	--color-text: #0f172a; /* slate-900 */
 	--color-bg: #fff; /* white */
+	--color-light-gray: #f1f5f9; /* slate-100 */
 	--color-border: #cbd5e1; /* slate-300 */
 	--color-muted: #64748b; /* slate-500 */
 	--font-mono:
 		ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 	--font-size: 14px;
-	--color-grid-lines: #f1f5f9; /* slate-100 */
 }
 
 * {
@@ -19,7 +19,7 @@ html {
 	background: repeating-linear-gradient(
 		-45deg,
 		transparent 0 3px,
-		var(--color-grid-lines) 3px 5px
+		var(--color-light-gray) 3px 5px
 	);
 	background-color: var(--color-bg);
 }
@@ -184,13 +184,20 @@ td {
 th {
 	font-weight: 700;
 	font-size: 12px;
-	background: #f0f0f0;
+	background: var(--color-light-gray);
 }
 
 button {
 	font-family: inherit;
 	font-size: 1rem;
 	padding: 0.5rem;
+	background-color: var(--color-light-gray);
+	border: 1px solid var(--color-border);
+	cursor: pointer;
+
+	&:hover {
+		background-color: oklch(from var(--color-light-gray) calc(l * 0.97) c h);
+	}
 }
 
 #search-table {
@@ -217,16 +224,18 @@ button {
 		display: flex;
 		gap: 1rem;
 
+		--box-shadow: 0.2rem 0.2rem 0.4rem 0 var(--color-border);
+
 		button {
 			flex: 1;
-			box-shadow: 0 0 0.75rem 0 var(--color-border);
+			box-shadow: var(--box-shadow);
 		}
 
 		label {
 			border: 2px solid var(--color-border);
 			padding: 0.5rem 1rem;
 			background-color: #fff;
-			box-shadow: 0 0 0.75rem 0 var(--color-border);
+			box-shadow: var(--box-shadow);
 		}
 	}
 
@@ -234,7 +243,7 @@ button {
 	#loading-status {
 		margin-top: 1rem;
 		border: 1px solid var(--color-border);
-		background-color: #fff;
+		background-color: var(--color-bg);
 		text-align: center;
 		padding: 1rem;
 	}
