@@ -30,7 +30,7 @@ export async function streamToBytes(
 			break
 		}
 
-		chunks.push(value)
+		if (value !== undefined) chunks.push(value)
 	}
 
 	return concatBytes(chunks)
