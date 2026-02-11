@@ -8,10 +8,10 @@
  * @module
  */
 
+import type { ContentHasher } from "@osmix/shared/content-hasher"
 import type { OsmTags } from "@osmix/shared/types"
 import StringTable from "./stringtable"
 import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
-import type { ContentHasher } from "./utils"
 
 /**
  * Serializable state for worker transfer.

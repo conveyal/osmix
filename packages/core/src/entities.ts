@@ -7,6 +7,7 @@
  * @module
  */
 
+import type { ContentHasher } from "@osmix/shared/content-hasher"
 import type {
 	GeoBbox2D,
 	OsmEntity,
@@ -16,7 +17,6 @@ import type {
 import type { IdOrIndex, Ids, IdsTransferables } from "./ids"
 import type { Tags, TagsTransferables } from "./tags"
 import type { BufferType } from "./typed-arrays"
-import type { ContentHasher } from "./utils"
 
 /**
  * Serializable representation of an Entities collection for worker transfer.

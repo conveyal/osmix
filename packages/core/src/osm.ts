@@ -1,10 +1,10 @@
 import type { OsmPbfHeaderBlock } from "@osmix/pbf"
+import { ContentHasher } from "@osmix/shared/content-hasher"
 import type { GeoBbox2D } from "@osmix/shared/types"
 import { Nodes, type NodesTransferables } from "./nodes"
 import { Relations, type RelationsTransferables } from "./relations"
 import StringTable, { type StringTableTransferables } from "./stringtable"
 import type { BufferType } from "./typed-arrays"
-import { ContentHasher } from "./utils"
 import { Ways, type WaysTransferables } from "./ways"
 
 export interface OsmTransferables<T extends BufferType = BufferType> {

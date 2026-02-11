@@ -1,4 +1,5 @@
 import type { OsmPbfWay } from "@osmix/pbf"
+import type { ContentHasher } from "@osmix/shared/content-hasher"
 import type { GeoBbox2D, LonLat, OsmTags, OsmWay } from "@osmix/shared/types"
 import Flatbush from "flatbush"
 import { around as geoAround } from "geoflatbush"
@@ -13,7 +14,6 @@ import {
 	IdArrayType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
-import type { ContentHasher } from "./utils"
 
 export interface WaysTransferables<T extends BufferType = BufferType>
 	extends EntitiesTransferables<T> {

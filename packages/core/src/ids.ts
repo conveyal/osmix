@@ -8,12 +8,12 @@
  */
 
 import { assertValue } from "@osmix/shared/assert"
+import type { ContentHasher } from "@osmix/shared/content-hasher"
 import {
 	BufferConstructor,
 	type BufferType,
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays"
-import type { ContentHasher } from "./utils"
 
 /**
  * Union type for looking up entities by either OSM ID or internal array index.

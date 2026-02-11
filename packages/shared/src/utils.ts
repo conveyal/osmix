@@ -9,6 +9,8 @@
 
 import { dequal } from "dequal/lite"
 import type {
+	GeoBbox2D,
+	LonLat,
 	OsmEntity,
 	OsmEntityType,
 	OsmNode,
@@ -76,4 +78,22 @@ export function getEntityType(entity: OsmEntity): OsmEntityType {
  */
 export function isMultipolygonRelation(relation: OsmRelation): boolean {
 	return relation.tags?.["type"] === "multipolygon"
+}
+
+/**
+ * Compute the bounding box of a set of coordinates.
+ * Returns `[minLon, minLat, maxLon, maxLat]`.
+ */
+export function bboxFromLonLats(lonLats: LonLat[]): GeoBbox2D {
+	let minLon = Number.POSITIVE_INFINITY
+	let minLat = Number.POSITIVE_INFINITY
+	let maxLon = Number.NEGATIVE_INFINITY
+	let maxLat = Number.NEGATIVE_INFINITY
+	for (const [lon, lat] of lonLats) {
+		if (lon < minLon) minLon = lon
+		if (lat < minLat) minLat = lat
+		if (lon > maxLon) maxLon = lon
+		if (lat > maxLat) maxLat = lat
+	}
+	return [minLon, minLat, maxLon, maxLat]
 }
