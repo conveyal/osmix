@@ -13,7 +13,7 @@ import {
 	type ProgressEvent,
 	progressEvent,
 } from "@osmix/shared/progress"
-import type { GeoBbox2D, OsmRelationMember, OsmTags } from "@osmix/shared/types"
+import type { OsmRelationMember, OsmTags } from "@osmix/shared/types"
 import { rewindFeature } from "@placemarkio/geojson-rewind"
 import type {
 	Geometry,
@@ -144,10 +144,10 @@ export class GeoParquetOsmBuilder {
 		const typeColumn = this.readOptions.typeColumn ?? "type"
 		const geometryColumn = this.readOptions.geometryColumn ?? "geometry"
 		const tagsColumn = this.readOptions.tagsColumn ?? "tags"
-		const bboxColumn = this.readOptions.bboxColumn ?? "bbox"
 
 		// Process each row
 		let count = 0
+		let skippedInvalidGeometries = 0
 		for (const row of rows) {
 			// Extract values using column names
 			// biome-ignore lint/suspicious/noExplicitAny: dynamic column access
@@ -161,9 +161,6 @@ export class GeoParquetOsmBuilder {
 			const tagsData = rowAny[tagsColumn] as
 				| Record<string, string | number>
 				| string
-			// bboxData is read but currently unused - reserved for future optimization
-			void (rowAny[bboxColumn] as GeoBbox2D)
-
 			if (!geometryData) {
 				count++
 				continue
@@ -179,8 +176,9 @@ export class GeoParquetOsmBuilder {
 				} else {
 					geometry = geometryData
 				}
-			} catch (_e) {
+			} catch {
 				// Skip invalid geometries
+				skippedInvalidGeometries++
 				count++
 				continue
 			}
@@ -227,6 +225,14 @@ export class GeoParquetOsmBuilder {
 			}
 		}
 
+		if (skippedInvalidGeometries > 0) {
+			this.onProgress(
+				progressEvent(
+					`Skipped ${skippedInvalidGeometries} features with invalid geometry`,
+					"warn",
+				),
+			)
+		}
 		this.onProgress(progressEvent(`Imported ${count} features`))
 	}
 
