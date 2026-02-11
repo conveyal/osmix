@@ -1,6 +1,7 @@
 name: Release
 
 permissions:
+  id-token: write  # Required for OIDC
   contents: write
   pull-requests: write
 
@@ -22,10 +23,6 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: ./.github/actions/checks
 
-      - name: Setup npmrc
-        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > .npmrc
-
-
       - name: Preflight workspace package detection
         run: |
           bun pm ls --all | head -n 200
@@ -38,4 +35,3 @@ jobs:
           publish: bun run release
         env:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
