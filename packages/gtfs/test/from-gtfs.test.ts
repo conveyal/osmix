@@ -510,7 +510,5 @@ describe("Monaco GTFS fixture", () => {
 		// Should have both stops and routes
 		expect(osm.nodes.size).toBeGreaterThan(0)
 		expect(osm.ways.size).toBeGreaterThan(0)
-
-		console.log(`Monaco GTFS: ${osm.nodes.size} nodes, ${osm.ways.size} ways`)
 	})
 })
