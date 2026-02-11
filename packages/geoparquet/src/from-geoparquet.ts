@@ -150,15 +150,13 @@ export class GeoParquetOsmBuilder {
 		let skippedInvalidGeometries = 0
 		for (const row of rows) {
 			// Extract values using column names
-			// biome-ignore lint/suspicious/noExplicitAny: dynamic column access
-			const rowAny = row as any
-			const id = rowAny[idColumn] as bigint | number
-			const type = rowAny[typeColumn] as "node" | "way" | "relation"
-			const geometryData = rowAny[geometryColumn] as
+			const id = row[idColumn] as bigint | number
+			const type = row[typeColumn] as "node" | "way" | "relation"
+			const geometryData = row[geometryColumn] as
 				| Uint8Array
 				| GeoJSON.Geometry
 				| string
-			const tagsData = rowAny[tagsColumn] as
+			const tagsData = row[tagsColumn] as
 				| Record<string, string | number>
 				| string
 			if (!geometryData) {
