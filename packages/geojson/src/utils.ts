@@ -39,8 +39,8 @@ export async function readDataAsGeoJSON(
 		let result = ""
 		while (true) {
 			const { done, value } = await reader.read()
-			result += value
 			if (done) break
+			if (value !== undefined) result += value
 		}
 		return JSON.parse(result) as ImportableGeoJSON
 	}
