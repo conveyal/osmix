@@ -2,7 +2,7 @@
 	"$schema": "https://json.schemastore.org/package",
 	"name": "@osmix/vt",
 	"type": "module",
-	"version": "0.0.9",
+	"version": "0.0.10",
 	"description": "Encode Osmix binary overlay tiles directly into Mapbox Vector Tiles",
 	"main": "./src/index.ts",
 	"publishConfig": {

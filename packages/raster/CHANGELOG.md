@@ -1,5 +1,12 @@
 # @osmix/raster
 
+## 0.0.10
+
+### Patch Changes
+
+- Updated dependencies [12728ed]
+  - @osmix/shared@0.0.10
+
 ## 0.0.9
 
 ### Patch Changes

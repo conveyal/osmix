@@ -1,5 +1,14 @@
 # @osmix/geojson
 
+## 0.0.10
+
+### Patch Changes
+
+- Updated dependencies [12728ed]
+  - @osmix/shared@0.0.10
+  - @osmix/core@0.1.5
+  - @osmix/pbf@0.0.6
+
 ## 0.0.9
 
 ### Patch Changes

@@ -1,5 +1,24 @@
 # osmix
 
+## 0.1.5
+
+### Patch Changes
+
+- 12728ed: Replace `csv-parse` usage in `@osmix/gtfs` with a browser-friendly shared streaming CSV parser in `@osmix/shared`, adapted from `mafintosh/csv-parser` parsing behavior.
+- Updated dependencies [12728ed]
+  - @osmix/gtfs@0.0.5
+  - @osmix/shared@0.0.10
+  - @osmix/change@0.1.4
+  - @osmix/core@0.1.5
+  - @osmix/geojson@0.0.10
+  - @osmix/geoparquet@0.1.4
+  - @osmix/json@0.0.11
+  - @osmix/pbf@0.0.6
+  - @osmix/raster@0.0.10
+  - @osmix/router@0.0.8
+  - @osmix/shapefile@0.0.6
+  - @osmix/vt@0.0.10
+
 ## 0.1.4
 
 ### Patch Changes
