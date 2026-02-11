@@ -7,8 +7,8 @@
  * @module
  */
 
-import { parse } from "csv-parse/sync"
 import { unzip, type ZipItem } from "but-unzip"
+import { parse } from "csv-parse/sync"
 import type {
 	GtfsAgency,
 	GtfsRoute,
