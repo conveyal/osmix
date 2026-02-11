@@ -1,5 +1,15 @@
 # @osmix/geojson
 
+## 0.0.9
+
+### Patch Changes
+
+- f32e4ee: General cleanup
+- Updated dependencies [f32e4ee]
+  - @osmix/core@0.1.4
+  - @osmix/pbf@0.0.6
+  - @osmix/shared@0.0.9
+
 ## 0.0.8
 
 ### Patch Changes

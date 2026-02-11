@@ -1,5 +1,12 @@
 # @osmix/raster
 
+## 0.0.9
+
+### Patch Changes
+
+- Updated dependencies [f32e4ee]
+  - @osmix/shared@0.0.9
+
 ## 0.0.8
 
 ### Patch Changes

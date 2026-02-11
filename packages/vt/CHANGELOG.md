@@ -1,5 +1,13 @@
 # @osmix/vt
 
+## 0.0.9
+
+### Patch Changes
+
+- f32e4ee: General cleanup
+- Updated dependencies [f32e4ee]
+  - @osmix/shared@0.0.9
+
 ## 0.0.8
 
 ### Patch Changes

@@ -1,5 +1,23 @@
 # osmix
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [f32e4ee]
+  - @osmix/change@0.1.3
+  - @osmix/core@0.1.4
+  - @osmix/geojson@0.0.9
+  - @osmix/geoparquet@0.1.3
+  - @osmix/gtfs@0.0.4
+  - @osmix/pbf@0.0.6
+  - @osmix/shapefile@0.0.5
+  - @osmix/shared@0.0.9
+  - @osmix/vt@0.0.9
+  - @osmix/router@0.0.7
+  - @osmix/json@0.0.10
+  - @osmix/raster@0.0.9
+
 ## 0.1.3
 
 ### Patch Changes

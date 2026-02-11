@@ -1,5 +1,11 @@
 # @osmix/shared
 
+## 0.0.9
+
+### Patch Changes
+
+- f32e4ee: General cleanup
+
 ## 0.0.8
 
 ### Patch Changes
