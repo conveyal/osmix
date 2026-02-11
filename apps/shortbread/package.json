@@ -11,7 +11,7 @@
 	"dependencies": {
 		"@osmix/core": "workspace:*",
 		"@osmix/shortbread": "workspace:*",
-		"@versatiles/style": "^5.9.1",
+		"@versatiles/style": "^5.9.2",
 		"comlink": "^4.4.2",
 		"maplibre-gl": "catalog:",
 		"osmix": "workspace:*"
