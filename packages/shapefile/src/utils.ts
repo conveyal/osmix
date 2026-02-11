@@ -67,8 +67,10 @@ async function streamToArrayBuffer(
 	while (true) {
 		const { done, value } = await reader.read()
 		if (done) break
-		chunks.push(value)
-		totalLength += value.byteLength
+		if (value !== undefined) {
+			chunks.push(value)
+			totalLength += value.byteLength
+		}
 	}
 
 	const result = new Uint8Array(totalLength)
