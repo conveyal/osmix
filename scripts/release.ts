@@ -50,7 +50,10 @@ function rewritePkgJsonForDist(pkgJson: PackageJson): PackageJson {
 			...pkgJson,
 			exports: {
 				...pkgJson.exports,
-				"./*": "./dist/*.js",
+				"./*": {
+					default: "./dist/*.js",
+					types: "./dist/*.d.ts",
+				},
 			},
 		}
 	}
