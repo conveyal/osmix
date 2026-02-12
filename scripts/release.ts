@@ -9,8 +9,6 @@ import { $ } from "bun"
  *  3. Convert the package.json to use `dist/index.js` as the main entry point.
  *  4. Pack the package.
  *  5. Publish the package to npm.
- *  6. Run `changeset tag` to update the version in the changelog.
- *  7. Push the tags to the remote repository.
  */
 
 interface PackageJson {
@@ -127,15 +125,10 @@ async function run(): Promise<void> {
 	}
 
 	if (publishedCount === 0) {
-		console.log("No new package versions to publish.")
-		return
+		console.log("No new packages published.")
+	} else {
+		console.log(`Published ${publishedCount} package(s)`)
 	}
-
-	console.log(`Published ${publishedCount} package(s). Tagging release...`)
-	$.cwd(repoRoot)
-	await $`bunx changeset tag`
-	await $`git push --tags`
-	console.log("Pushed release tags to remote.")
 }
 
 await run()
