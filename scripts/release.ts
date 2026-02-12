@@ -60,7 +60,7 @@ function rewritePkgJsonForDist(pkgJson: PackageJson): PackageJson {
 		return {
 			...pkgJson,
 			main: "./dist/index.js",
-			types: "./dist/index.d.ts"
+			types: "./dist/index.d.ts",
 		}
 	}
 	throw Error(`Cannot rewrite package.json for ${pkgJson.name}`)
@@ -93,7 +93,6 @@ async function publishPackage({
 
 		// Clean up the tarball.
 		await rm(tarballToPublish, { force: true })
-
 	} finally {
 		// Revert the package.json to the original.
 		await Bun.write(packageJsonPath, JSON.stringify(manifest, null, "\t"))
