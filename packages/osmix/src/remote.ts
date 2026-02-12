@@ -34,6 +34,7 @@ import {
 } from "./settings"
 import { transfer } from "./utils"
 import type { OsmixWorker } from "./worker"
+import type { DrawToRasterTileOptions } from "./raster";
 
 /** Identifier for an OSM dataset: string ID, Osm instance, or OsmInfo object. */
 export type OsmId = string | Osm | OsmInfo
@@ -614,8 +615,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	 * Generate a raster tile as ImageData for the specified tile coordinates.
 	 * Delegates to an available worker for off-thread rendering.
 	 */
-	getRasterTile(osmId: OsmId, tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
-		return this.nextWorker().getRasterTile(this.getId(osmId), tile, tileSize)
+	getRasterTile(osmId: OsmId, tile: Tile, opts?: DrawToRasterTileOptions) {
+		return this.nextWorker().getRasterTile(this.getId(osmId), tile, opts)
 	}
 
 	/**

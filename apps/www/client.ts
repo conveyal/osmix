@@ -1,4 +1,5 @@
 import type { OsmInfo } from "@osmix/core"
+import { bboxToTileRange } from "@osmix/shared/tile"
 import type { OsmTags, Tile } from "@osmix/shared/types"
 import * as idb from "idb-keyval"
 import maplibregl from "maplibre-gl"
@@ -13,6 +14,9 @@ const MONACO_URL =
 		: "https://trevorgerhardt.github.io/files/487218b69358-1f24d3e4e476/monaco.pbf"
 const MAP_STYLE =
 	"https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+const MAP_PREVIEW_TILE_SIZE = 128
+const MAP_PREVIEW_INITIAL_ZOOM = 15
+const MAP_PREVIEW_MAX_TILES = 64
 
 declare global {
 	interface Window {
@@ -25,7 +29,6 @@ declare global {
 
 // State
 let currentOsmInfo: OsmInfo | null = null
-let map: maplibregl.Map | null = null
 
 const IDB_PBF_KEY = "osmix-pbf"
 const IDB_NAME_KEY = "osmix-pbf-name"
@@ -48,7 +51,7 @@ maplibregl.addProtocol(
 		const rasterTile = await remote.getRasterTile(
 			decodeURIComponent(osmId),
 			tile,
-			256,
+			{ tileSize: 256 },
 		)
 
 		const data = await rasterTileToImageBuffer(rasterTile, 256)
@@ -177,7 +180,7 @@ function updateResults() {
 	updateStatsResult()
 
 	// Update map
-	updateMap()
+	void updateMap()
 
 	// Clear search results
 	const table = document.getElementById("search-table")
@@ -217,42 +220,66 @@ function updateStatsResult() {
 	`
 }
 
-function updateMap() {
+async function updateMap() {
 	if (!currentOsmInfo) return
 
 	const mapResult = document.getElementById("map-result")
+	const canvas = document.getElementById("map-canvas")
+	if (!(canvas instanceof HTMLCanvasElement)) return
 	if (mapResult) mapResult.classList.add("has-content")
-	if (map) map.remove()
 
 	const [west, south, east, north] = currentOsmInfo.bbox
-	const center: [number, number] = [(west + east) / 2, (south + north) / 2]
 	const osmId = currentOsmInfo.id
 
-	map = new maplibregl.Map({
-		container: "map",
-		style: MAP_STYLE,
-		center,
-		zoom: 12,
-	})
+	const tileRange = choosePreviewTileRange([west, south, east, north])
+	const tileColumns = tileRange.maxX - tileRange.minX + 1
+	const tileRows = tileRange.maxY - tileRange.minY + 1
+	const tileSize = MAP_PREVIEW_TILE_SIZE
 
-	map.once("load", () => {
-		// Add OSM raster layer on top of basemap
-		map?.addSource("osmix", {
-			type: "raster",
-			tiles: [`osmix://${encodeURIComponent(osmId)}/{z}/{x}/{y}`],
-			tileSize: 256,
-		})
-		map?.addLayer({
-			id: "osmix",
-			type: "raster",
-			source: "osmix",
-		})
+	const mosaicCanvas = document.createElement("canvas")
+	mosaicCanvas.width = tileColumns * tileSize
+	mosaicCanvas.height = tileRows * tileSize
+	const mosaicContext = mosaicCanvas.getContext("2d")
+	if (!mosaicContext) throw new Error("Failed to get 2d context")
 
-		map?.fitBounds([west, south, east, north], {
-			padding: 20,
-			duration: 0,
-		})
-	})
+	for (let y = tileRange.minY; y <= tileRange.maxY; y++) {
+		for (let x = tileRange.minX; x <= tileRange.maxX; x++) {
+			try {
+				const tile = await remote.getRasterTile(
+					osmId,
+					[x, y, tileRange.zoom],
+					{ tileSize, lineColor: [15, 23, 42, 255] },
+				)
+				const tx = (x - tileRange.minX) * tileSize
+				const ty = (y - tileRange.minY) * tileSize
+				mosaicContext.putImageData(new ImageData(tile, tileSize, tileSize), tx, ty)
+			} catch (err) {
+				console.warn(`Skipping raster tile ${tileRange.zoom}/${x}/${y}:`, err)
+			}
+		}
+	}
+
+	const displayWidth = Math.max(canvas.clientWidth, 1)
+	const displayHeight = Math.max(canvas.clientHeight, 1)
+	const dpr = window.devicePixelRatio || 1
+	canvas.width = Math.round(displayWidth * dpr)
+	canvas.height = Math.round(displayHeight * dpr)
+
+	const context = canvas.getContext("2d")
+	if (!context) throw new Error("Failed to get 2d context")
+	context.setTransform(dpr, 0, 0, dpr, 0, 0)
+	context.clearRect(0, 0, displayWidth, displayHeight)
+	context.imageSmoothingEnabled = true
+
+	const scale = Math.min(
+		displayWidth / mosaicCanvas.width,
+		displayHeight / mosaicCanvas.height,
+	)
+	const drawWidth = mosaicCanvas.width * scale
+	const drawHeight = mosaicCanvas.height * scale
+	const offsetX = (displayWidth - drawWidth) / 2
+	const offsetY = (displayHeight - drawHeight) / 2
+	context.drawImage(mosaicCanvas, offsetX, offsetY, drawWidth, drawHeight)
 }
 
 window.handleSearch = async () => {
@@ -629,6 +656,21 @@ function escapeHtml(str: string): string {
 		.replace(/</g, "&lt;")
 		.replace(/>/g, "&gt;")
 		.replace(/"/g, "&quot;")
+}
+
+/**
+ * Calculate an initial tile range for the map preview, lowering zoom if needed.
+ */
+function choosePreviewTileRange(bbox: [number, number, number, number]) {
+	let zoom = MAP_PREVIEW_INITIAL_ZOOM
+	let tileRange = bboxToTileRange(bbox, zoom)
+
+	while (tileRange.count > MAP_PREVIEW_MAX_TILES && zoom > 0) {
+		zoom--
+		tileRange = bboxToTileRange(bbox, zoom)
+	}
+
+	return { ...tileRange, zoom }
 }
 
 /**

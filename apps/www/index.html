@@ -77,38 +77,27 @@ console.log("Bbox:", osmInfo.bbox)</code></pre>
 				</div>
 
 				<div class="example">
-					<h3>2. Display OSM on a Map</h3>
-					<p>Render OSM data as raster tiles using a custom MapLibre protocol, overlaying the data on any base map style.</p>
+					<h3>2. Render Raster Tiles to Canvas</h3>
+					<p>Fetch OSM raster tiles directly from Osmix and draw a static preview onto a canvas element without a map library.</p>
 					<pre><code id="code-map" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
-import maplibregl from "maplibre-gl"
 
 const remote = await createRemote()
 const osmInfo = await remote.fromPbf(pbfFile)
 
-maplibregl.addProtocol("osmix", async (req) => {
-  const [, osmId, z, x, y] = req.url.match(
-    /osmix:\\/\\/(.+)\\/(\\d+)\\/(\\d+)\\/(\\d+)/
-  )
-  const tile = await remote.getRasterTile(osmId, [+x, +y, +z])
-  return { data: await tileToImageBuffer(tile) }
-})
+const zoom = 14
+const tileSize = 256
+const [minX, minY, maxX, maxY] = bboxToTileRange(osmInfo.bbox, zoom)
+const canvas = document.getElementById("map-canvas") as HTMLCanvasElement
+const ctx = canvas.getContext("2d")
 
-const map = new maplibregl.Map({
-  container: "map",
-  style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-})
-
-map.on("load", () => {
-  map.addSource("osmix", {
-    type: "raster",
-    tiles: [\`osmix://\${osmInfo.id}/{z}/{x}/{y}\`],
-    tileSize: 256
-  })
-  map.addLayer({ id: "osmix", type: "raster", source: "osmix" })
-})</code></pre>
+for (const [x, y] of listTiles(minX, minY, maxX, maxY)) {
+  const tile = await remote.getRasterTile(osmInfo.id, [x, y, zoom], tileSize)
+  const image = new ImageData(tile, tileSize, tileSize)
+  ctx.putImageData(image, (x - minX) * tileSize, (y - minY) * tileSize)
+}</code></pre>
 					<div class="result-box" id="map-result">
-						<p class="placeholder">Select a file above to see the map...</p>
-						<div id="map"></div>
+						<p class="placeholder">Select a file above to render tiles...</p>
+						<canvas id="map-canvas"></canvas>
 					</div>
 				</div>
 
