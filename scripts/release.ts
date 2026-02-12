@@ -16,6 +16,7 @@ interface PackageJson {
 	version: string
 	private?: boolean
 	main?: string
+	types?: string
 	dependencies?: Record<string, string>
 	exports?: Record<string, string | { types: string; default: string }>
 }
@@ -59,6 +60,7 @@ function rewritePkgJsonForDist(pkgJson: PackageJson): PackageJson {
 		return {
 			...pkgJson,
 			main: "./dist/index.js",
+			types: "./dist/index.d.ts"
 		}
 	}
 	throw Error(`Cannot rewrite package.json for ${pkgJson.name}`)
