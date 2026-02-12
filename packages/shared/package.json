@@ -14,10 +14,9 @@
 		"./tsconfig/test.json": "./tsconfig/test.json",
 		"./tsconfig/app.json": "./tsconfig/app.json",
 		"./*": {
-			"import": "./src/*.ts",
+			"types": "./src/*.ts",
 			"default": "./dist/*.js"
-		},
-		"./package.json": "./package.json"
+		}
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",

@@ -11,10 +11,9 @@
 	},
 	"exports": {
 		".": {
-			"import": "./src/index.ts",
+			"types": "./src/index.ts",
 			"default": "./dist/index.js"
-		},
-		"./package.json": "./package.json"
+		}
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
