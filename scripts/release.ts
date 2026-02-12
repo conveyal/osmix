@@ -78,22 +78,26 @@ async function publishPackage({
 	console.log(`- Publishing ${name}@${version}`)
 	await $`bun run build`
 
-	// Rewrite the package.json to use the built entry point.
-	await Bun.write(
-		packageJsonPath,
-		JSON.stringify(rewritePkgJsonForDist(manifest), null, "\t"),
-	)
+	try {
+		// Rewrite the package.json to use the built entry point.
+		await Bun.write(
+			packageJsonPath,
+			JSON.stringify(rewritePkgJsonForDist(manifest), null, "\t"),
+		)
 
-	const tarballToPublish = await $`bun pm pack --quiet`.text()
-	if (!tarballToPublish)
-		throw Error(`No tarball generated for ${name}@${version}`)
+		const tarballToPublish = await $`bun pm pack --quiet`.text()
+		if (!tarballToPublish)
+			throw Error(`No tarball generated for ${name}@${version}`)
 
-	await $`npm publish ${tarballToPublish} --access=public --provenance=true`
+		await $`npm publish ${tarballToPublish} --access=public --provenance=true`
 
-	// Clean up the tarball.
-	await rm(tarballToPublish, { force: true })
-	// Revert the package.json to the original.
-	await Bun.write(packageJsonPath, JSON.stringify(manifest, null, "\t"))
+		// Clean up the tarball.
+		await rm(tarballToPublish, { force: true })
+
+	} finally {
+		// Revert the package.json to the original.
+		await Bun.write(packageJsonPath, JSON.stringify(manifest, null, "\t"))
+	}
 	return true
 }
 
