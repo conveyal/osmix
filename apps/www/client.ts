@@ -68,7 +68,7 @@ async function init() {
 		try {
 			setLoadingStatus(`Loading ${name} from IndexedDB cache...`)
 			currentOsmInfo = await remote.fromPbf(pbf, { id: name })
-			setLoadingStatus(`${name} loaded`)
+			setLoadingStatus(`ACTIVE FILE: ${name}`)
 			enableSearch()
 			updateResults()
 		} finally {

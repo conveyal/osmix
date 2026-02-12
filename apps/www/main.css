@@ -56,6 +56,11 @@ main {
 	background: var(--color-bg);
 	border-left: 2px dashed var(--color-border);
 	border-right: 2px dashed var(--color-border);
+
+	@media (max-width: 800px) {
+		margin: 0 1rem;
+		padding: 1rem;
+	}
 }
 
 header {
@@ -194,6 +199,7 @@ button {
 	background-color: var(--color-light-gray);
 	border: 1px solid var(--color-border);
 	cursor: pointer;
+	border-radius: 0.1rem;
 
 	&:hover {
 		background-color: oklch(from var(--color-light-gray) calc(l * 0.97) c h);
@@ -218,34 +224,24 @@ button {
 	position: sticky;
 	top: 1rem;
 	z-index: 10;
-	padding-bottom: 1rem;
+	padding: 1rem;
+	border: 1px solid var(--color-border);
+	--box-shadow: 0 0 0.4rem 0 var(--color-border);
+	box-shadow: var(--box-shadow);
+	background-color: #fff;
 
 	.button-group {
 		display: flex;
 		gap: 1rem;
-
-		--box-shadow: 0.2rem 0.2rem 0.4rem 0 var(--color-border);
+		align-items: center;
 
 		button {
 			flex: 1;
-			box-shadow: var(--box-shadow);
-		}
-
-		label {
-			border: 2px solid var(--color-border);
-			padding: 0.5rem 1rem;
-			background-color: #fff;
-			box-shadow: var(--box-shadow);
 		}
 	}
 
-	/* Loading status */
 	#loading-status {
-		margin-top: 1rem;
-		border: 1px solid var(--color-border);
-		background-color: var(--color-bg);
-		text-align: center;
-		padding: 1rem;
+		font-weight: 900;
 	}
 
 	#loading-status:empty {
