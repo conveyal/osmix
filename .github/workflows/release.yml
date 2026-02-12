@@ -27,10 +27,6 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      - name: Preflight workspace package detection
-        run: |
-          bun pm ls --all | head -n 200
-
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@v1
@@ -40,7 +36,7 @@ jobs:
 
           # `bun pm pack` is necessary to replace workspace deps. 
           # But we need `npm publish` to publish via OIDC.
-          publish: bun run release
+          publish: bun run scripts/release.ts
         env:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
           NPM_CONFIG_PROVENANCE: true

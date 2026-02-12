@@ -2,6 +2,7 @@
 packages/**/dist/
 apps/**/dist/
 *.tsbuildinfo
+*.tgz
 
 # Dependencies
 node_modules/

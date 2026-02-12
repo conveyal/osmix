@@ -12,7 +12,6 @@
 	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"release": "bun run build && bun pm pack --quiet && npm publish *.tgz --access=public --provenance=true",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},
