@@ -27,6 +27,7 @@
 /// <reference path="./types/geoflatbush.d.ts" />
 
 export type { IdOrIndex } from "./ids"
+export * from "./mocks"
 export * from "./nodes"
 export * from "./osm"
 export * from "./relations"

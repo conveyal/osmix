@@ -1,53 +1,28 @@
 {
-	"$schema": "https://json.schemastore.org/package",
+	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/shared",
 	"type": "module",
 	"version": "0.0.11",
 	"description": "Shared utilities for Osmix",
-	"exports": {
-		"./tsconfig/base.json": "./tsconfig/base.json",
-		"./tsconfig/test.json": "./tsconfig/test.json",
-		"./tsconfig/app.json": "./tsconfig/app.json",
-		"./*": {
-			"types": "./src/*.ts",
-			"bun": "./src/*.ts",
-			"default": "./dist/*.js"
-		}
-	},
-	"typesVersions": {
-		"*": {
-			"tsconfig/base.json": [
-				"tsconfig/base.json"
-			],
-			"tsconfig/test.json": [
-				"tsconfig/test.json"
-			],
-			"tsconfig/app.json": [
-				"tsconfig/app.json"
-			],
-			"*": [
-				"src/*"
-			]
-		}
-	},
-	"publishConfig": {
-		"access": "public"
-	},
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
-	"homepage": "https://github.com/conveyal/osmix#readme",
-	"bugs": {
-		"url": "https://github.com/conveyal/osmix/issues"
+	"exports": {
+		"./tsconfig/base.json": "./tsconfig/base.json",
+		"./tsconfig/test.json": "./tsconfig/test.json",
+		"./tsconfig/app.json": "./tsconfig/app.json",
+		"./*": {
+			"import": "./src/*.ts",
+			"default": "./dist/*.js"
+		},
+		"./package.json": "./package.json"
 	},
-	"sideEffects": false,
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun test --bench",
-		"prepare": "bun run build",
-		"release": "bun publish",
+		"release": "bun run build && bun pm pack --quiet && npm publish *.tgz --access=public --provenance=true",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},
@@ -59,12 +34,5 @@
 		"@mapbox/tilebelt": "^2.0.3",
 		"dequal": "catalog:",
 		"lineclip": "^2.0.0"
-	},
-	"files": [
-		"dist",
-		"src",
-		"tsconfig",
-		"README.md",
-		"LICENSE"
-	]
+	}
 }

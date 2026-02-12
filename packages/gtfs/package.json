@@ -1,28 +1,25 @@
 {
-	"$schema": "https://json.schemastore.org/package",
+	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/gtfs",
 	"description": "Convert GTFS transit feeds to OSM format.",
 	"version": "0.0.6",
 	"type": "module",
-	"types": "./dist/index.d.ts",
-	"publishConfig": {
-		"access": "public"
-	},
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
-	"homepage": "https://github.com/conveyal/osmix#readme",
-	"bugs": {
-		"url": "https://github.com/conveyal/osmix/issues"
+	"exports": {
+		".": {
+			"import": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
 	},
-	"sideEffects": false,
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun test --bench",
-		"prepare": "bun run build",
-		"release": "bun publish",
+		"release": "bun run build && bun pm pack --quiet && npm publish *.tgz --access=public --provenance=true",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},
@@ -35,19 +32,5 @@
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"but-unzip": "^0.1.7"
-	},
-	"exports": {
-		".": {
-			"types": "./src/index.ts",
-			"bun": "./src/index.ts",
-			"development|production": "./src/index.ts",
-			"default": "./dist/index.js"
-		}
-	},
-	"files": [
-		"dist",
-		"src",
-		"README.md",
-		"LICENSE"
-	]
+	}
 }

@@ -1,6 +1,5 @@
 {
-	"$schema": "https://json.schemastore.org/package",
-	"name": "osmix",
+	"$schema": "https://json.schemastore.org/package.json",
 	"packageManager": "bun@1.3.9",
 	"private": true,
 	"workspaces": {
@@ -38,7 +37,7 @@
 		"test:packages": "bun --filter './packages/**' test --silent",
 		"typecheck": "bun --filter '*' typecheck",
 		"version": "changeset version && bun update",
-		"release": "bun --filter './packages/**' build && changeset publish"
+		"release": "bun --filter './packages/**' release"
 	},
 	"trustedDependencies": [
 		"@tailwindcss/oxide"

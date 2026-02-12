@@ -1,31 +1,24 @@
 {
-	"$schema": "https://json.schemastore.org/package",
+	"$schema": "https://json.schemastore.org/package.json",
 	"name": "osmix",
 	"type": "module",
 	"version": "0.1.6",
 	"description": "Full OSM toolkit for JavaScript and TypeScript",
-	"exports": {
-		".": {
-			"types": "./src/index.ts",
-			"bun": "./src/index.ts",
-			"development|production": "./src/index.ts",
-			"default": "./dist/index.js"
-		}
-	},
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
-	"homepage": "https://github.com/conveyal/osmix#readme",
-	"bugs": {
-		"url": "https://github.com/conveyal/osmix/issues"
+	"exports": {
+		".": {
+			"import": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
 	},
-	"sideEffects": false,
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"prepare": "bun run build",
-		"release": "bun publish",
+		"release": "bun run build && bun pm pack --quiet && npm publish *.tgz --access=public --provenance=true",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},
@@ -50,12 +43,5 @@
 		"@osmix/vt": "workspace:*",
 		"comlink": " ^4.4.2",
 		"dequal": "catalog:"
-	},
-	"types": "./dist/index.d.ts",
-	"files": [
-		"dist",
-		"src",
-		"README.md",
-		"LICENSE"
-	]
+	}
 }

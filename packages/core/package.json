@@ -1,44 +1,25 @@
 {
-	"$schema": "https://json.schemastore.org/package",
+	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/core",
 	"type": "module",
 	"version": "0.1.6",
 	"description": "An OSM PBF reader, writer, and merge tool written in TypeScript",
-	"publishConfig": {
-		"access": "public"
-	},
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./src/index.ts",
-			"bun": "./src/index.ts",
-			"development|production": "./src/index.ts",
-			"default": "./dist/index.js"
-		},
-		"./test/*": "./test/*.ts"
-	},
-	"files": [
-		"dist",
-		"src",
-		"test",
-		"README.md",
-		"LICENSE"
-	],
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
-	"homepage": "https://github.com/conveyal/osmix#readme",
-	"bugs": {
-		"url": "https://github.com/conveyal/osmix/issues"
+	"exports": {
+		".": {
+			"import": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
 	},
-	"sideEffects": false,
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun test --bench",
-		"prepare": "bun run build",
-		"release": "bun publish",
+		"release": "bun run build && bun pm pack --quiet && npm publish *.tgz --access=public --provenance=true",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},

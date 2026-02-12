@@ -35,7 +35,11 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
+          # After versioning, `bun update` must be run to update the package.json files.
           version: bun run version
+
+          # `bun pm pack` is necessary to replace workspace deps. 
+          # But we need `npm publish` to publish via OIDC.
           publish: bun run release
         env:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}

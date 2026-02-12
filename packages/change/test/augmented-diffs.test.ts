@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test"
-import { createBaseOsm, createPatchOsm } from "@osmix/core/test/mock-osm"
+import { createMockBaseOsm, createMockPatchOsm } from "@osmix/core"
 import { OsmChangeset } from "../src/changeset"
 import { generateOscChanges } from "../src/osc"
 
 describe("augmented diffs", () => {
 	it("should capture oldEntity for modify operations", () => {
-		const base = createBaseOsm()
-		const patch = createPatchOsm()
+		const base = createMockBaseOsm()
+		const patch = createMockPatchOsm()
 
 		const changeset = new OsmChangeset(base)
 		changeset.generateDirectChanges(patch)
@@ -26,7 +26,7 @@ describe("augmented diffs", () => {
 	})
 
 	it("should capture oldEntity for delete operations", () => {
-		const base = createBaseOsm()
+		const base = createMockBaseOsm()
 		const changeset = new OsmChangeset(base)
 
 		// Delete a node
@@ -41,8 +41,8 @@ describe("augmented diffs", () => {
 	})
 
 	it("should not have oldEntity for create operations", () => {
-		const base = createBaseOsm()
-		const patch = createPatchOsm()
+		const base = createMockBaseOsm()
+		const patch = createMockPatchOsm()
 
 		const changeset = new OsmChangeset(base)
 		changeset.generateDirectChanges(patch)
@@ -55,7 +55,7 @@ describe("augmented diffs", () => {
 	})
 
 	it("should preserve oldEntity when modify is called multiple times", () => {
-		const base = createBaseOsm()
+		const base = createMockBaseOsm()
 		const changeset = new OsmChangeset(base)
 
 		// First modification
@@ -90,8 +90,8 @@ describe("augmented diffs", () => {
 
 	describe("generateOscChanges", () => {
 		it("should generate standard OSC format by default", () => {
-			const base = createBaseOsm()
-			const patch = createPatchOsm()
+			const base = createMockBaseOsm()
+			const patch = createMockPatchOsm()
 
 			const changeset = new OsmChangeset(base)
 			changeset.generateDirectChanges(patch)
@@ -107,7 +107,7 @@ describe("augmented diffs", () => {
 		})
 
 		it("should generate augmented diffs with old/new for modifications", () => {
-			const base = createBaseOsm()
+			const base = createMockBaseOsm()
 			const changeset = new OsmChangeset(base)
 
 			// Modify node 0 to add a tag
@@ -126,7 +126,7 @@ describe("augmented diffs", () => {
 		})
 
 		it("should generate augmented diffs with old for deletions", () => {
-			const base = createBaseOsm()
+			const base = createMockBaseOsm()
 			const changeset = new OsmChangeset(base)
 
 			// Delete node 0
@@ -142,8 +142,8 @@ describe("augmented diffs", () => {
 		})
 
 		it("should not generate augmented format when augmented: false", () => {
-			const base = createBaseOsm()
-			const patch = createPatchOsm()
+			const base = createMockBaseOsm()
+			const patch = createMockPatchOsm()
 
 			const changeset = new OsmChangeset(base)
 			changeset.generateDirectChanges(patch)
@@ -159,7 +159,7 @@ describe("augmented diffs", () => {
 		})
 
 		it("should generate standard delete format when augmented: false", () => {
-			const base = createBaseOsm()
+			const base = createMockBaseOsm()
 			const changeset = new OsmChangeset(base)
 
 			// Delete node 0
