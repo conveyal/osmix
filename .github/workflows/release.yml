@@ -39,3 +39,4 @@ jobs:
           publish: bun run release
         env:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
+          NPM_TOKEN: '' # Workaround to support trusted publishing
