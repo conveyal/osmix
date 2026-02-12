@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import type { OsmPbfBlock } from "@osmix/pbf"
-import { createSampleHeader } from "@osmix/pbf/test/helpers"
+import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf"
 import type { OsmEntity } from "@osmix/shared/types"
 import {
 	createOsmJsonReadableStream,
@@ -8,6 +7,15 @@ import {
 	OsmJsonToBlocksTransformStream,
 } from "../src/json-to-pbf"
 import type { OsmPbfBlockBuilder } from "../src/osm-pbf-block-builder"
+
+export function createSampleHeader(): OsmPbfHeaderBlock {
+	return {
+		bbox: { left: 0, right: 1, top: 1, bottom: 0 },
+		required_features: ["OsmSchema-V0.6"],
+		optional_features: ["DenseNodes"],
+		writingprogram: "osmix-tests",
+	}
+}
 
 async function* entityGenerator(entities: OsmEntity[]) {
 	for (const entity of entities) {

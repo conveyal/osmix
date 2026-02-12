@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { getFixturePath } from "@osmix/shared/test/fixtures"
+import { getFixturePath } from "@osmix/shared/fixtures"
 import { fromGeoParquet, GeoParquetOsmBuilder } from "../src"
 
 /**

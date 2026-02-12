@@ -4,7 +4,7 @@ import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
-} from "@osmix/shared/test/fixtures"
+} from "@osmix/shared/fixtures"
 import type { FeatureCollection, LineString, Point } from "geojson"
 import { createRemote } from "../src/remote"
 

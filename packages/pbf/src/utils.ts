@@ -1,4 +1,11 @@
+import { assertValue as assert } from "@osmix/shared/assert"
+import type { PbfFixture } from "@osmix/shared/fixtures"
 import { transformBytes } from "@osmix/shared/transform-bytes"
+import type {
+	OsmPbfBlock,
+	OsmPbfGroup,
+	OsmPbfHeaderBlock,
+} from "../src/proto/osmformat"
 
 export type AsyncGeneratorValue<T> =
 	| T
@@ -80,4 +87,83 @@ export function uint32BE(n: number): Uint8Array {
 	out[2] = (n >>> 8) & 0xff
 	out[3] = n & 0xff
 	return out
+}
+
+export async function testOsmPbfReader(
+	osm: {
+		header: OsmPbfHeaderBlock
+		blocks: AsyncGenerator<OsmPbfBlock>
+	},
+	pbf: PbfFixture,
+) {
+	assert(
+		JSON.stringify(osm.header.bbox) === JSON.stringify(pbf.bbox),
+		`Header bbox ${JSON.stringify(osm.header.bbox)} != ${JSON.stringify(pbf.bbox)}`,
+	)
+
+	const { onGroup, count } = createOsmEntityCounter()
+	for await (const block of osm.blocks)
+		for (const group of block.primitivegroup) onGroup(group)
+
+	assert(
+		count.nodes === pbf.nodes,
+		`Expected nodes: ${pbf.nodes}, got: ${count.nodes}`,
+	)
+	assert(
+		count.ways === pbf.ways,
+		`Expected ways: ${pbf.ways}, got: ${count.ways}`,
+	)
+	assert(
+		count.relations === pbf.relations,
+		`Expected relations: ${pbf.relations}, got: ${count.relations}`,
+	)
+	assert(
+		count.node0 === pbf.node0.id,
+		`Expected node0: ${pbf.node0.id}, got: ${count.node0}`,
+	)
+	assert(
+		count.way0 === pbf.way0,
+		`Expected way0: ${pbf.way0}, got: ${count.way0}`,
+	)
+	assert(
+		count.relation0 === pbf.relation0,
+		`Expected relation0: ${pbf.relation0}, got: ${count.relation0}`,
+	)
+
+	return count
+}
+
+export function createOsmEntityCounter() {
+	const count = {
+		nodes: 0,
+		ways: 0,
+		relations: 0,
+		node0: -1,
+		way0: -1,
+		relation0: -1,
+	}
+
+	const onGroup = (group: OsmPbfGroup) => {
+		if (count.node0 === -1 && group.dense?.id?.[0] != null) {
+			count.node0 = group.dense.id[0]
+		}
+		if (count.way0 === -1 && group.ways?.[0]?.id != null) {
+			count.way0 = group.ways[0].id
+		}
+		if (count.relation0 === -1 && group.relations?.[0]?.id != null) {
+			count.relation0 = group.relations[0].id
+		}
+
+		count.nodes += group.nodes?.length ?? 0
+		if (group.dense) {
+			count.nodes += group.dense.id.length
+		}
+		count.ways += group.ways?.length ?? 0
+		count.relations += group.relations?.length ?? 0
+	}
+
+	return {
+		onGroup,
+		count,
+	}
 }

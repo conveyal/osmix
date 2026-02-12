@@ -33,7 +33,7 @@
 		"format": "biome format --write .",
 		"lint": "biome lint --write --unsafe .",
 		"test": "bun run test:packages",
-		"test:all": "bun run test:packages && bun run test:apps && bun run typecheck && bun run lint && bun run check",
+		"test:all": "bun run typecheck && bun run lint && bun run check && bun run test:packages && bun run test:apps",
 		"test:apps": "bun --filter './apps/**' test --silent",
 		"test:packages": "bun --filter './packages/**' test --silent",
 		"typecheck": "bun --filter '*' typecheck",

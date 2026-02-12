@@ -4,26 +4,13 @@
 	"type": "module",
 	"version": "0.1.5",
 	"description": "Full OSM toolkit for JavaScript and TypeScript",
-	"main": "./src/index.ts",
 	"exports": {
-		".": "./src/index.ts"
-	},
-	"publishConfig": {
-		"access": "public",
-		"registry": "https://registry.npmjs.org/",
-		"main": "./dist/index.js",
-		"types": "./dist/index.d.ts",
-		"exports": {
-			".": {
-				"import": "./dist/index.js",
-				"types": "./dist/index.d.ts"
-			}
-		},
-		"files": [
-			"dist",
-			"README.md",
-			"LICENSE"
-		]
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts",
+			"development|production": "./src/index.ts",
+			"default": "./dist/index.js"
+		}
 	},
 	"license": "MIT",
 	"repository": {
@@ -63,5 +50,12 @@
 		"@osmix/vt": "workspace:*",
 		"comlink": " ^4.4.2",
 		"dequal": "catalog:"
-	}
+	},
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"src",
+		"README.md",
+		"LICENSE"
+	]
 }
