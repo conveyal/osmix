@@ -1,5 +1,14 @@
 # @osmix/router
 
+## 0.0.9
+
+### Patch Changes
+
+- 3c8ee95: Fix and simplify package exports
+- Updated dependencies [3c8ee95]
+  - @osmix/core@0.1.6
+  - @osmix/shared@0.0.11
+
 ## 0.0.8
 
 ### Patch Changes

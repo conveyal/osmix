@@ -2,7 +2,7 @@
 	"$schema": "https://json.schemastore.org/package",
 	"name": "@osmix/shortbread",
 	"type": "module",
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"description": "Shortbread schema vector tile encoder for Osmix",
 	"publishConfig": {
 		"access": "public"

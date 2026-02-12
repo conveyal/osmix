@@ -2,7 +2,7 @@
 	"$schema": "https://json.schemastore.org/package",
 	"name": "@osmix/json",
 	"description": "Convert OSM PBF files to and from JSON.",
-	"version": "0.0.11",
+	"version": "0.0.12",
 	"type": "module",
 	"types": "./dist/index.d.ts",
 	"publishConfig": {

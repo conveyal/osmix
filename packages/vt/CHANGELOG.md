@@ -1,5 +1,13 @@
 # @osmix/vt
 
+## 0.0.11
+
+### Patch Changes
+
+- 3c8ee95: Fix and simplify package exports
+- Updated dependencies [3c8ee95]
+  - @osmix/shared@0.0.11
+
 ## 0.0.10
 
 ### Patch Changes

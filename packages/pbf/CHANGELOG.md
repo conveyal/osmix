@@ -1,5 +1,11 @@
 # @osmix/pbf
 
+## 0.0.7
+
+### Patch Changes
+
+- 3c8ee95: Fix and simplify package exports
+
 ## 0.0.6
 
 ### Patch Changes

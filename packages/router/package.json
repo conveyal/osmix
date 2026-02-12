@@ -2,7 +2,7 @@
 	"$schema": "https://json.schemastore.org/package",
 	"name": "@osmix/router",
 	"type": "module",
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"description": "A routing engine for OSM data built on top of @osmix/core",
 	"publishConfig": {
 		"access": "public"
