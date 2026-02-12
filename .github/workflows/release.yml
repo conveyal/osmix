@@ -36,7 +36,7 @@ jobs:
 
           # `bun pm pack` is necessary to replace workspace deps. 
           # But we need `npm publish` to publish via OIDC.
-          publish: bun run scripts/release.ts
+          publish: bun scripts/release.ts
         env:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
