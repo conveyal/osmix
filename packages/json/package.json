@@ -4,24 +4,9 @@
 	"description": "Convert OSM PBF files to and from JSON.",
 	"version": "0.0.11",
 	"type": "module",
-	"main": "./src/index.ts",
-	"types": "./src/index.ts",
+	"types": "./dist/index.d.ts",
 	"publishConfig": {
-		"access": "public",
-		"registry": "https://registry.npmjs.org/",
-		"main": "./dist/index.js",
-		"types": "./dist/index.d.ts",
-		"exports": {
-			".": {
-				"import": "./dist/index.js",
-				"types": "./dist/index.d.ts"
-			}
-		},
-		"files": [
-			"dist",
-			"README.md",
-			"LICENSE"
-		]
+		"access": "public"
 	},
 	"license": "MIT",
 	"repository": {
@@ -48,5 +33,19 @@
 	"dependencies": {
 		"@osmix/pbf": "workspace:*",
 		"@osmix/shared": "workspace:*"
-	}
+	},
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts",
+			"development|production": "./src/index.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist",
+		"src",
+		"README.md",
+		"LICENSE"
+	]
 }

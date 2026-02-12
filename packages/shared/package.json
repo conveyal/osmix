@@ -5,25 +5,33 @@
 	"version": "0.0.10",
 	"description": "Shared utilities for Osmix",
 	"exports": {
-		"./*": "./src/*.ts",
 		"./tsconfig/base.json": "./tsconfig/base.json",
 		"./tsconfig/test.json": "./tsconfig/test.json",
 		"./tsconfig/app.json": "./tsconfig/app.json",
-		"./test/*": "./src/test/*.ts"
+		"./*": {
+			"types": "./src/*.ts",
+			"bun": "./src/*.ts",
+			"default": "./dist/*.js"
+		}
+	},
+	"typesVersions": {
+		"*": {
+			"tsconfig/base.json": [
+				"tsconfig/base.json"
+			],
+			"tsconfig/test.json": [
+				"tsconfig/test.json"
+			],
+			"tsconfig/app.json": [
+				"tsconfig/app.json"
+			],
+			"*": [
+				"src/*"
+			]
+		}
 	},
 	"publishConfig": {
-		"access": "public",
-		"exports": {
-			"./*": {
-				"import": "./dist/*.js",
-				"types": "./dist/*.d.ts"
-			}
-		},
-		"files": [
-			"dist",
-			"README.md",
-			"LICENSE"
-		]
+		"access": "public"
 	},
 	"license": "MIT",
 	"repository": {
@@ -51,5 +59,12 @@
 		"@mapbox/tilebelt": "^2.0.3",
 		"dequal": "catalog:",
 		"lineclip": "^2.0.0"
-	}
+	},
+	"files": [
+		"dist",
+		"src",
+		"tsconfig",
+		"README.md",
+		"LICENSE"
+	]
 }

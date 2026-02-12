@@ -4,23 +4,8 @@
 	"type": "module",
 	"version": "0.0.10",
 	"description": "Encode Osmix binary overlay tiles directly into Mapbox Vector Tiles",
-	"main": "./src/index.ts",
 	"publishConfig": {
-		"access": "public",
-		"registry": "https://registry.npmjs.org/",
-		"main": "./dist/index.js",
-		"types": "./dist/index.d.ts",
-		"exports": {
-			".": {
-				"import": "./dist/index.js",
-				"types": "./dist/index.d.ts"
-			}
-		},
-		"files": [
-			"dist",
-			"README.md",
-			"LICENSE"
-		]
+		"access": "public"
 	},
 	"license": "MIT",
 	"repository": {
@@ -49,5 +34,21 @@
 		"@mapbox/vector-tile": "^2.0.4",
 		"@osmix/core": "workspace:*",
 		"typescript": "catalog:"
-	}
+	},
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts",
+			"development|production": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"dist",
+		"src",
+		"README.md",
+		"LICENSE"
+	]
 }

@@ -4,24 +4,26 @@
 	"type": "module",
 	"version": "0.1.5",
 	"description": "An OSM PBF reader, writer, and merge tool written in TypeScript",
-	"main": "./src/index.ts",
 	"publishConfig": {
-		"access": "public",
-		"registry": "https://registry.npmjs.org/",
-		"main": "./dist/index.js",
-		"types": "./dist/index.d.ts",
-		"exports": {
-			".": {
-				"import": "./dist/index.js",
-				"types": "./dist/index.d.ts"
-			}
-		},
-		"files": [
-			"dist",
-			"README.md",
-			"LICENSE"
-		]
+		"access": "public"
 	},
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts",
+			"development|production": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./test/*": "./test/*.ts"
+	},
+	"files": [
+		"dist",
+		"src",
+		"test",
+		"README.md",
+		"LICENSE"
+	],
 	"license": "MIT",
 	"repository": {
 		"type": "git",

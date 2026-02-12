@@ -3,12 +3,12 @@ import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
-} from "@osmix/shared/test/fixtures"
+} from "@osmix/shared/fixtures"
 import {
 	OsmPbfBytesToBlocksTransformStream,
 	readOsmPbf,
 } from "../src/pbf-to-blocks"
-import { createOsmEntityCounter, testOsmPbfReader } from "./utils"
+import { createOsmEntityCounter, testOsmPbfReader } from "../src/utils"
 
 describe("read", () => {
 	describe.each(Object.entries(PBFs))("%s", async (_name, pbf) => {

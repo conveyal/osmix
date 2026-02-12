@@ -1,5 +1,5 @@
 import { beforeAll, describe } from "bun:test"
-import { getFixtureFile } from "@osmix/shared/test/fixtures"
+import { getFixtureFile } from "@osmix/shared/fixtures"
 import type { GeoBbox2D } from "@osmix/shared/types"
 
 // @ts-expect-error - bench is available at runtime but not in types

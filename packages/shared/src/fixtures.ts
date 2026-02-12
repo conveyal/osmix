@@ -1,8 +1,9 @@
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import * as Bun from "bun"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const ROOT_DIR = resolve(__dirname, "../../../../")
+const ROOT_DIR = resolve(__dirname, "../../../")
 const FIXTURES_DIR = resolve(ROOT_DIR, "fixtures")
 
 export function getFixturePath(url: string) {

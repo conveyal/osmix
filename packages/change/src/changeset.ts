@@ -8,8 +8,7 @@
  * @module
  */
 
-import type { Nodes, Osm, Ways } from "@osmix/core"
-import type { IdOrIndex } from "@osmix/core/src/ids"
+import type { IdOrIndex, Nodes, Osm, Ways } from "@osmix/core"
 import type {
 	OsmEntity,
 	OsmEntityType,

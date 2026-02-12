@@ -3,7 +3,7 @@ import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
-} from "@osmix/shared/test/fixtures"
+} from "@osmix/shared/fixtures"
 import { fromPbf } from "../src/pbf"
 
 describe("read", () => {

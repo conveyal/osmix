@@ -4,23 +4,8 @@
 	"type": "module",
 	"version": "0.1.4",
 	"description": "An OSM changeset generator and merger built on top of @osmix/core",
-	"main": "./src/index.ts",
 	"publishConfig": {
-		"access": "public",
-		"registry": "https://registry.npmjs.org/",
-		"main": "./dist/index.js",
-		"types": "./dist/index.d.ts",
-		"exports": {
-			".": {
-				"import": "./dist/index.js",
-				"types": "./dist/index.d.ts"
-			}
-		},
-		"files": [
-			"dist",
-			"README.md",
-			"LICENSE"
-		]
+		"access": "public"
 	},
 	"license": "MIT",
 	"repository": {
@@ -50,5 +35,21 @@
 		"@osmix/shared": "workspace:*",
 		"dequal": "catalog:",
 		"sweepline-intersections": "^2.0.1"
-	}
+	},
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"bun": "./src/index.ts",
+			"development|production": "./src/index.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist",
+		"src",
+		"test",
+		"README.md",
+		"LICENSE"
+	]
 }
