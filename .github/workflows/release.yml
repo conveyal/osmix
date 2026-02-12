@@ -20,8 +20,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
       - uses: ./.github/actions/setup
-      - uses: ./.github/actions/checks
 
       - name: Preflight workspace package detection
         run: |
