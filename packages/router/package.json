@@ -9,13 +9,7 @@
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
-	"exports": {
-		".": {
-			"types": "./src/index.ts",
-			"default": "./dist/index.js"
-		},
-		"./package.json": "./package.json"
-	},
+	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun run test/router.bench.ts",

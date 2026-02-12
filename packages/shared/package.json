@@ -13,10 +13,7 @@
 		"./tsconfig/base.json": "./tsconfig/base.json",
 		"./tsconfig/test.json": "./tsconfig/test.json",
 		"./tsconfig/app.json": "./tsconfig/app.json",
-		"./*": {
-			"types": "./src/*.ts",
-			"default": "./dist/*.js"
-		}
+		"./*": "./src/*.ts"
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
