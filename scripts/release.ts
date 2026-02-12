@@ -85,7 +85,7 @@ async function publishPackage({
 			JSON.stringify(rewritePkgJsonForDist(manifest), null, "\t"),
 		)
 
-		const tarballToPublish = await $`bun pm pack --quiet`.text().trim()
+		const tarballToPublish = (await $`bun pm pack --quiet`.text()).trim()
 		if (!tarballToPublish)
 			throw Error(`No tarball generated for ${name}@${version}`)
 
