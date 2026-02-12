@@ -1,5 +1,11 @@
 # @osmix/pbf
 
+## 0.0.8
+
+### Patch Changes
+
+- 2a634cb: Fix publishing
+
 ## 0.0.7
 
 ### Patch Changes

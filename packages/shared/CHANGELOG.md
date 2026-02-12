@@ -1,5 +1,11 @@
 # @osmix/shared
 
+## 0.0.12
+
+### Patch Changes
+
+- 2a634cb: Fix publishing
+
 ## 0.0.11
 
 ### Patch Changes

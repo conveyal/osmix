@@ -2,7 +2,7 @@
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/raster",
 	"type": "module",
-	"version": "0.0.11",
+	"version": "0.0.12",
 	"description": "An OSM raster tile generator",
 	"license": "MIT",
 	"repository": {
