@@ -38,7 +38,7 @@
 		"test:packages": "bun --filter './packages/**' test --silent",
 		"typecheck": "bun --filter '*' typecheck",
 		"version": "changeset version && bun update",
-		"release": "bun --filter './packages/**' release"
+		"release": "bun --filter './packages/**' build && changeset publish"
 	},
 	"trustedDependencies": [
 		"@tailwindcss/oxide"
