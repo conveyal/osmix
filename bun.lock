@@ -143,7 +143,7 @@
     },
     "packages/change": {
       "name": "@osmix/change",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -158,7 +158,7 @@
     },
     "packages/core": {
       "name": "@osmix/core",
-      "version": "0.1.6",
+      "version": "0.1.7",
       "dependencies": {
         "@osmix/shared": "workspace:*",
         "flatbush": "^4.4.1",
@@ -174,7 +174,7 @@
     },
     "packages/geojson": {
       "name": "@osmix/geojson",
-      "version": "0.0.11",
+      "version": "0.0.12",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/pbf": "workspace:*",
@@ -190,7 +190,7 @@
     },
     "packages/geoparquet": {
       "name": "@osmix/geoparquet",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -205,7 +205,7 @@
     },
     "packages/gtfs": {
       "name": "@osmix/gtfs",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -219,7 +219,7 @@
     },
     "packages/json": {
       "name": "@osmix/json",
-      "version": "0.0.12",
+      "version": "0.0.13",
       "dependencies": {
         "@osmix/pbf": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -231,7 +231,7 @@
     },
     "packages/osmix": {
       "name": "osmix",
-      "version": "0.1.6",
+      "version": "0.1.7",
       "dependencies": {
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
@@ -257,7 +257,7 @@
     },
     "packages/pbf": {
       "name": "@osmix/pbf",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "dependencies": {
         "pbf": "catalog:",
       },
@@ -269,7 +269,7 @@
     },
     "packages/raster": {
       "name": "@osmix/raster",
-      "version": "0.0.11",
+      "version": "0.0.12",
       "dependencies": {
         "@osmix/shared": "workspace:*",
         "@placemarkio/geojson-rewind": "catalog:",
@@ -281,7 +281,7 @@
     },
     "packages/router": {
       "name": "@osmix/router",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -295,7 +295,7 @@
     },
     "packages/shapefile": {
       "name": "@osmix/shapefile",
-      "version": "0.0.7",
+      "version": "0.0.8",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -310,7 +310,7 @@
     },
     "packages/shared": {
       "name": "@osmix/shared",
-      "version": "0.0.11",
+      "version": "0.0.12",
       "dependencies": {
         "@mapbox/tilebelt": "^2.0.3",
         "dequal": "catalog:",
@@ -323,7 +323,7 @@
     },
     "packages/shortbread": {
       "name": "@osmix/shortbread",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -339,7 +339,7 @@
     },
     "packages/vt": {
       "name": "@osmix/vt",
-      "version": "0.0.11",
+      "version": "0.0.12",
       "dependencies": {
         "@osmix/shared": "workspace:*",
         "@types/bun": "catalog:",
