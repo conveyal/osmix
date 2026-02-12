@@ -1,28 +1,18 @@
 {
-	"$schema": "https://json.schemastore.org/package",
+	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/shapefile",
 	"description": "Import Shapefiles into Osmix indexes.",
 	"version": "0.0.7",
 	"type": "module",
-	"types": "./dist/index.d.ts",
-	"publishConfig": {
-		"access": "public"
-	},
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
-	"homepage": "https://github.com/conveyal/osmix#readme",
-	"bugs": {
-		"url": "https://github.com/conveyal/osmix/issues"
-	},
-	"sideEffects": false,
+	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun test --bench",
-		"prepare": "bun run build",
-		"release": "bun publish",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},
@@ -36,19 +26,5 @@
 		"@osmix/shared": "workspace:*",
 		"@placemarkio/geojson-rewind": "catalog:",
 		"shpjs": "^6.2.0"
-	},
-	"exports": {
-		".": {
-			"types": "./src/index.ts",
-			"bun": "./src/index.ts",
-			"development|production": "./src/index.ts",
-			"default": "./dist/index.js"
-		}
-	},
-	"files": [
-		"dist",
-		"src",
-		"README.md",
-		"LICENSE"
-	]
+	}
 }

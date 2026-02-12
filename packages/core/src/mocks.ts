@@ -1,5 +1,5 @@
 import type { OsmNode } from "@osmix/shared/types"
-import { Osm } from "../src/osm"
+import { Osm } from "./osm"
 
 const YAKIM_LAT = 46.60207
 const YAKIM_LON = -120.505898
@@ -37,7 +37,7 @@ function addBaseWays(osm: Osm) {
 /**
  * Create a base OSM with one way and two nodes.
  */
-export function createBaseOsm(): Osm {
+export function createMockBaseOsm(): Osm {
 	const base = new Osm()
 	addBaseNodes(base)
 	base.nodes.buildIndex()
@@ -52,7 +52,7 @@ export function createBaseOsm(): Osm {
  * - A way that has an overlapping node with the first way, but does not share a node and so starts disconnected
  * - A way that crosses over the first way, but does not share a node and so starts disconnected
  */
-export function createPatchOsm(): Osm {
+export function createMockPatchOsm(): Osm {
 	const osm = new Osm()
 
 	addBaseNodes(osm)

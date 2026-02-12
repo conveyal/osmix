@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import type { Osm } from "@osmix/core"
-import { createBaseOsm, createPatchOsm } from "@osmix/core/test/mock-osm"
+import { createMockBaseOsm, createMockPatchOsm } from "@osmix/core"
 import { applyChangesetToOsm } from "../src/apply-changeset"
 import { OsmChangeset } from "../src/changeset"
 
@@ -12,8 +12,8 @@ const sizes = (osm: Osm) => ({
 
 describe("merge osm", () => {
 	it("should generate and apply osm changes", () => {
-		const base = createBaseOsm()
-		const patch = createPatchOsm()
+		const base = createMockBaseOsm()
+		const patch = createMockPatchOsm()
 
 		expect(sizes(base)).toEqual({
 			nodes: 2,
