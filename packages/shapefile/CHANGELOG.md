@@ -1,5 +1,14 @@
 # @osmix/shapefile
 
+## 0.0.8
+
+### Patch Changes
+
+- 2a634cb: Fix publishing
+- Updated dependencies [2a634cb]
+  - @osmix/shared@0.0.12
+  - @osmix/core@0.1.7
+
 ## 0.0.7
 
 ### Patch Changes

@@ -2,7 +2,7 @@
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/geojson",
 	"description": "Convert OSM files to and from GeoJSON.",
-	"version": "0.0.11",
+	"version": "0.0.12",
 	"type": "module",
 	"license": "MIT",
 	"repository": {
