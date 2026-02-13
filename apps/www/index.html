@@ -20,7 +20,7 @@
 			</header>
 
 			<div class="admin-only">
-				<button onclick="clearIndexedDB()">Clear IndexedDB</button>
+				<button id="clear-db-btn">Clear IndexedDB</button>
 			</div>
 
 			<section id="intro">
@@ -51,10 +51,9 @@
 								type="file"
 								id="file-input-el"
 								accept=".pbf,.osm.pbf"
-								onchange="handleFileSelect(this)"
 							/>
 						</label>
-						<button id="load-monaco" onclick="loadMonaco()">use monaco.pbf</button>
+						<button id="load-monaco">use monaco.pbf</button>
 					</div>
 					<div id="loading-status"></div>
 				</div>
@@ -121,7 +120,7 @@ console.log("Relations:", results.relations.length)</code></pre>
 							placeholder="Tag key (e.g., amenity)"
 						/>
 						<input type="text" id="search-value" placeholder="Value (optional)" />
-						<button id="search-btn" disabled onclick="handleSearch()">Search</button>
+						<button id="search-btn" disabled>Search</button>
 					</div>
 					<div class="result-box" id="search-result">
 						<p class="placeholder">
