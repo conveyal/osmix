@@ -31,7 +31,6 @@ import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core"
 import { fromGeoJSON } from "@osmix/geojson"
 import { fromGeoParquet, type GeoParquetReadOptions } from "@osmix/geoparquet"
 import { fromGtfs, type GtfsConversionOptions } from "@osmix/gtfs"
-import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import {
 	type DefaultSpeeds,
 	type HighwayFilter,
@@ -60,7 +59,7 @@ import {
 	toPbfBuffer,
 	toPbfStream,
 } from "./pbf"
-import { drawToRasterTile,type DrawToRasterTileOptions } from "./raster"
+import { drawToRasterTile, type DrawToRasterTileOptions } from "./raster"
 import { transfer } from "./utils"
 
 /**

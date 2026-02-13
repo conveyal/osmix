@@ -43,7 +43,7 @@ export interface DrawToRasterTileOptions {
 export function drawToRasterTile(
 	osm: Osm,
 	tile: Tile,
-	opts?: DrawToRasterTileOptions
+	opts?: DrawToRasterTileOptions,
 ) {
 	const tileSize = opts?.tileSize ?? DEFAULT_RASTER_TILE_SIZE
 	const rasterTile = new OsmixRasterTile({ tile, tileSize })
@@ -56,7 +56,12 @@ export function drawToRasterTile(
 	osm.relations.intersects(bbox, (relIndex) => {
 		// Try fast path: check if relation bbox fits in a single pixel
 		const relationBbox = osm.relations.getEntityBbox({ index: relIndex })
-		if (rasterTile.drawSubpixelEntity(relationBbox, opts?.areaColor ?? DEFAULT_AREA_COLOR))
+		if (
+			rasterTile.drawSubpixelEntity(
+				relationBbox,
+				opts?.areaColor ?? DEFAULT_AREA_COLOR,
+			)
+		)
 			return false
 
 		const geometry = osm.relations.getRelationGeometry(relIndex)
@@ -86,10 +91,10 @@ export function drawToRasterTile(
 		const tagColor = hexColorToRgba(way.tags?.["color"] ?? way.tags?.["colour"])
 		const lineColor: Rgba = tagColor
 			? [tagColor[0], tagColor[1], tagColor[2], DEFAULT_LINE_COLOR[3]]
-			: opts?.lineColor ?? DEFAULT_LINE_COLOR
+			: (opts?.lineColor ?? DEFAULT_LINE_COLOR)
 		const areaColor: Rgba = tagColor
 			? [tagColor[0], tagColor[1], tagColor[2], DEFAULT_AREA_COLOR[3]]
-			: opts?.areaColor ?? DEFAULT_AREA_COLOR
+			: (opts?.areaColor ?? DEFAULT_AREA_COLOR)
 
 		// Try fast path: check if way bbox fits in a single pixel
 		const wayBbox = osm.ways.getEntityBbox({ index: wayIndex })

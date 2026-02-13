@@ -15,7 +15,6 @@ import {
 	type GtfsConversionOptions,
 	isGtfsZip as isGtfsZipBytes,
 } from "@osmix/gtfs"
-import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type {
 	DefaultSpeeds,
 	HighwayFilter,
@@ -34,7 +33,7 @@ import {
 } from "./settings"
 import { transfer } from "./utils"
 import type { OsmixWorker } from "./worker"
-import type { DrawToRasterTileOptions } from "./raster";
+import type { DrawToRasterTileOptions } from "./raster"
 
 /** Identifier for an OSM dataset: string ID, Osm instance, or OsmInfo object. */
 export type OsmId = string | Osm | OsmInfo
