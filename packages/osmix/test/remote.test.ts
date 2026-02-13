@@ -266,7 +266,9 @@ describe("OsmixRemote", () => {
 				const osm = await remote.fromPbf(fileStream)
 
 				const tile: [number, number, number] = [7, 4, 3]
-				const tileData = await remote.getRasterTile(osm.id, tile, {tileSize: 512})
+				const tileData = await remote.getRasterTile(osm.id, tile, {
+					tileSize: 512,
+				})
 
 				expect(tileData).toBeInstanceOf(Uint8ClampedArray)
 				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)

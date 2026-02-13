@@ -26,6 +26,7 @@ import { streamToBytes } from "@osmix/shared/stream-to-bytes"
 import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
 import { type OsmFromPbfOptions, toPbfStream } from "./pbf"
+import type { DrawToRasterTileOptions } from "./raster"
 import {
 	DEFAULT_WORKER_COUNT,
 	SUPPORTS_SHARED_ARRAY_BUFFER,
@@ -33,7 +34,6 @@ import {
 } from "./settings"
 import { transfer } from "./utils"
 import type { OsmixWorker } from "./worker"
-import type { DrawToRasterTileOptions } from "./raster"
 
 /** Identifier for an OSM dataset: string ID, Osm instance, or OsmInfo object. */
 export type OsmId = string | Osm | OsmInfo

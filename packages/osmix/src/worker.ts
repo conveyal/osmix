@@ -59,7 +59,7 @@ import {
 	toPbfBuffer,
 	toPbfStream,
 } from "./pbf"
-import { drawToRasterTile, type DrawToRasterTileOptions } from "./raster"
+import { type DrawToRasterTileOptions, drawToRasterTile } from "./raster"
 import { transfer } from "./utils"
 
 /**

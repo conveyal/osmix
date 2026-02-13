@@ -48,13 +48,15 @@ maplibregl.addProtocol("@osmix/vector", async (params, abort) => {
 
 async function init() {
 	// Highlight code
-	document.querySelectorAll<HTMLElement>(".highlight-this").forEach(async (el) => {
-		const html = await codeToHtml(el.textContent ?? "", {
-			lang: el.dataset.lang ?? "typescript",
-			theme: "github-light",
+	document
+		.querySelectorAll<HTMLElement>(".highlight-this")
+		.forEach(async (el) => {
+			const html = await codeToHtml(el.textContent ?? "", {
+				lang: el.dataset.lang ?? "typescript",
+				theme: "github-light",
+			})
+			if (el.parentElement) el.parentElement.outerHTML = html
 		})
-		if (el.parentElement) el.parentElement.outerHTML = html
-	})
 
 	// Admin
 	if (localStorage.getItem("ADMIN")) document.body.classList.add("ADMIN")
@@ -165,7 +167,10 @@ async function renderPreview(
 
 	let zoom = 16
 	let range = bboxToTileRange(bbox, zoom)
-	while (range.count > 16 && zoom > 0) range = bboxToTileRange(bbox, (zoom -= 0.1))
+	while (range.count > 16 && zoom > 0) {
+		zoom -= 0.1
+		range = bboxToTileRange(bbox, zoom)
+	}
 
 	const size = 128
 	const cols = range.maxX - range.minX + 1
@@ -277,7 +282,9 @@ function initRouteMap(info: OsmInfo) {
 				"line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 10],
 			},
 		})
-		routeMap.on("click", (e) => handleRouteClick(info.id, [e.lngLat.lng, e.lngLat.lat]))
+		routeMap.on("click", (e) =>
+			handleRouteClick(info.id, [e.lngLat.lng, e.lngLat.lat]),
+		)
 		updateRouteTable([["Instructions", "Click on the map to set origin"]])
 	})
 }
@@ -285,7 +292,7 @@ function initRouteMap(info: OsmInfo) {
 async function handleRouteClick(id: string, pt: [number, number]) {
 	if (!routeMap) return
 	if (routeState.origin && routeState.dest) {
-		routeState.markers.forEach((m) => m.remove())
+		routeState.markers.forEach((m) => void m.remove())
 		routeState.markers = []
 		routeState.origin = routeState.dest = undefined
 		if (routeMap.getLayer("route")) routeMap.removeLayer("route")
@@ -293,16 +300,12 @@ async function handleRouteClick(id: string, pt: [number, number]) {
 	}
 
 	const rows: [string, string][] = []
-	if (routeState.origin)
-		rows.push(["Origin", fmt(routeState.origin.coords)])
+	if (routeState.origin) rows.push(["Origin", fmt(routeState.origin.coords)])
 	updateRouteTable([...rows, ["Status", "Finding nearest road..."]])
 
 	const snap = await remote.findNearestRoutableNode(id, pt, 500)
 	if (!snap)
-		return updateRouteTable([
-			...rows,
-			["Error", "No road found within 500m."],
-		])
+		return updateRouteTable([...rows, ["Error", "No road found within 500m."]])
 
 	const coords = snap.coordinates as [number, number]
 	const marker = new maplibregl.Marker({

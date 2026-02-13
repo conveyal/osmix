@@ -30,7 +30,7 @@ export function addOsmixRasterProtocol() {
 			const rasterTile = await osmWorker.getRasterTile(
 				decodeURIComponent(osmId),
 				tileIndex,
-				{tileSize},
+				{ tileSize },
 			)
 			const data = await rasterTileToImageBuffer(rasterTile, tileSize)
 			return {
