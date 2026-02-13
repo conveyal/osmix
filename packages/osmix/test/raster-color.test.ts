@@ -17,7 +17,7 @@ describe("drawToRasterTile", () => {
 		osm.buildSpatialIndexes()
 
 		const tile = pointToTile(-74, 40, 12)
-		const rasterTile = drawToRasterTile(osm, tile, 64)
+		const rasterTile = drawToRasterTile(osm, tile, {tileSize: 64})
 		const imageData = rasterTile.imageData
 		let found = false
 
