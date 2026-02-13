@@ -15,8 +15,13 @@ const MONACO_URL =
 const MAP_STYLE =
 	"https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
 const MAP_PREVIEW_TILE_SIZE = 128
-const MAP_PREVIEW_INITIAL_ZOOM = 15
-const MAP_PREVIEW_MAX_TILES = 64
+const MAP_PREVIEW_INITIAL_ZOOM = 16
+const MAP_PREVIEW_MAX_TILES = 16
+const MAX_SEARCH_RESULTS = 10
+const SNAP_RADIUS_METERS = 500
+const NO_ROAD_FOUND_MESSAGE = `No road found within ${SNAP_RADIUS_METERS}m. Try clicking closer to a road.`
+const ROUTE_SOURCE_ID = "route"
+const ROUTE_LAYER_ID = "route"
 
 declare global {
 	interface Window {
@@ -30,6 +35,21 @@ declare global {
 // State
 let currentOsmInfo: OsmInfo | null = null
 
+function byId<T extends HTMLElement>(id: string): T | null {
+	return document.getElementById(id) as T | null
+}
+
+function getErrorMessage(err: unknown): string {
+	return err instanceof Error ? err.message : "Unknown error"
+}
+
+async function loadIntoOsmix(data: ArrayBuffer | File, name: string) {
+	currentOsmInfo = await remote.fromPbf(data, { id: name })
+	setLoadingStatus(`LOADED FILE: ${name}`)
+	enableSearch()
+	updateResults()
+}
+
 const IDB_PBF_KEY = "osmix-pbf"
 const IDB_NAME_KEY = "osmix-pbf-name"
 const IDB_MAX_SIZE = 1024 * 1024 * 500 // 500MB
@@ -41,21 +61,24 @@ const remote = await createRemote({
 
 // Setup raster protocol
 maplibregl.addProtocol(
-	"osmix",
-	async (req): Promise<maplibregl.GetResourceResponse<ArrayBuffer>> => {
-		const match = /^osmix:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)$/.exec(req.url)
+	"@osmix/vector",
+	async (
+		req,
+		abortController,
+	): Promise<maplibregl.GetResourceResponse<ArrayBuffer | null>> => {
+		const match = /^@osmix\/vector:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\.mvt$/.exec(
+			req.url,
+		)
 		if (!match || !remote) throw new Error(`Bad URL: ${req.url}`)
 
 		const [, osmId, zStr, xStr, yStr] = match
 		const tile: Tile = [+xStr, +yStr, +zStr]
-		const rasterTile = await remote.getRasterTile(
+		const rasterTile = await remote.getVectorTile(
 			decodeURIComponent(osmId),
 			tile,
-			{ tileSize: 256 },
 		)
 
-		const data = await rasterTileToImageBuffer(rasterTile, 256)
-		return { data, cacheControl: "no-store" }
+		return { data: abortController.signal.aborted ? null : rasterTile }
 	},
 )
 
@@ -70,10 +93,7 @@ async function init() {
 		setLoadButtonsEnabled(false)
 		try {
 			setLoadingStatus(`Loading ${name} from IndexedDB cache...`)
-			currentOsmInfo = await remote.fromPbf(pbf, { id: name })
-			setLoadingStatus(`ACTIVE FILE: ${name}`)
-			enableSearch()
-			updateResults()
+			await loadIntoOsmix(pbf, name)
 		} finally {
 			setLoadButtonsEnabled(true)
 		}
@@ -85,24 +105,35 @@ async function highlightCodeExamples() {
 		document.querySelectorAll<HTMLPreElement>(".highlight-this")
 
 	for (const el of codeBlocks) {
-		if (el) {
-			const html = await codeToHtml(el.textContent ?? "", {
-				lang: el.dataset.lang ?? "typescript",
-				theme: "github-light",
-			})
-			const parent = el.parentElement
-			if (parent) {
-				parent.outerHTML = html
-			}
+		const html = await codeToHtml(el.textContent ?? "", {
+			lang: el.dataset.lang ?? "typescript",
+			theme: "github-light",
+		})
+		const parent = el.parentElement
+		if (parent) {
+			parent.outerHTML = html
 		}
 	}
 }
 
-window.loadMonaco = async () => {
+async function runLoadAction(action: () => Promise<void>) {
 	setLoadButtonsEnabled(false)
-	setLoadingStatus("Downloading Monaco PBF...")
-
 	try {
+		await action()
+	} catch (err) {
+		if (err instanceof Error && err.name === "AbortError") {
+			setLoadingStatus("Load cancelled")
+			return
+		}
+		setLoadingStatus(`Error: ${getErrorMessage(err)}`)
+	} finally {
+		setLoadButtonsEnabled(true)
+	}
+}
+
+window.loadMonaco = async () => {
+	await runLoadAction(async () => {
+		setLoadingStatus("Downloading Monaco PBF...")
 		const res = await fetch(MONACO_URL)
 		if (!res.ok) throw Error(`Failed to fetch: ${res.status}`)
 		const buffer = await res.arrayBuffer()
@@ -111,65 +142,41 @@ window.loadMonaco = async () => {
 		await idb.set(IDB_NAME_KEY, "monaco.pbf")
 
 		setLoadingStatus("Loading into Osmix...")
-		currentOsmInfo = await remote.fromPbf(buffer, { id: "monaco.pbf" })
-
-		setLoadingStatus("monaco.pbf loaded")
-		enableSearch()
-		updateResults()
-	} catch (err) {
-		setLoadingStatus(
-			`Error: ${err instanceof Error ? err.message : "Unknown error"}`,
-		)
-	} finally {
-		setLoadButtonsEnabled(true)
-	}
+		await loadIntoOsmix(buffer, "monaco.pbf")
+	})
 }
 
 window.handleFileSelect = async (input: HTMLInputElement) => {
 	const file = input.files?.[0]
 	if (!file) return
 
-	setLoadButtonsEnabled(false)
-	setLoadingStatus(`Loading ${file.name}...`)
-
-	try {
+	await runLoadAction(async () => {
+		setLoadingStatus(`Loading ${file.name}...`)
+		let cachedBuffer: ArrayBuffer | null = null
 		if (file.size < IDB_MAX_SIZE) {
-			await idb.set(IDB_PBF_KEY, await file.arrayBuffer())
+			cachedBuffer = await file.arrayBuffer()
+			await idb.set(IDB_PBF_KEY, cachedBuffer)
 			await idb.set(IDB_NAME_KEY, file.name)
 		}
-		currentOsmInfo = await remote.fromPbf(file, { id: file.name })
-
-		setLoadingStatus(`${file.name} loaded`)
-		enableSearch()
-		updateResults()
-	} catch (err) {
-		if (err instanceof Error && err.name === "AbortError") {
-			setLoadingStatus("Load cancelled")
-			return
-		}
-		setLoadingStatus(
-			`Error: ${err instanceof Error ? err.message : "Unknown error"}`,
-		)
-	} finally {
-		setLoadButtonsEnabled(true)
-		input.value = ""
-	}
+		await loadIntoOsmix(cachedBuffer ?? file, file.name)
+	})
+	input.value = ""
 }
 
 function setLoadingStatus(msg: string) {
-	const el = document.getElementById("loading-status")
-	if (el) el.textContent = msg
+	const loadingStatus = byId<HTMLElement>("loading-status")
+	if (loadingStatus) loadingStatus.textContent = msg
 }
 
 function setLoadButtonsEnabled(enabled: boolean) {
-	const monaco = document.getElementById("load-monaco") as HTMLButtonElement
-	const file = document.getElementById("file-input-el") as HTMLInputElement
+	const monaco = byId<HTMLButtonElement>("load-monaco")
+	const file = byId<HTMLInputElement>("file-input-el")
 	if (monaco) monaco.disabled = !enabled
 	if (file) file.disabled = !enabled
 }
 
 function enableSearch() {
-	const searchBtn = document.getElementById("search-btn") as HTMLButtonElement
+	const searchBtn = byId<HTMLButtonElement>("search-btn")
 	if (searchBtn) searchBtn.disabled = false
 }
 
@@ -180,12 +187,12 @@ function updateResults() {
 	updateStatsResult()
 
 	// Update map
-	void updateMap()
+	void updateRasterCanvasMap()
 
 	// Clear search results
-	const table = document.getElementById("search-table")
+	const table = byId<HTMLElement>("search-table")
 	const tbody = table?.querySelector("tbody")
-	const resultBox = document.getElementById("search-result")
+	const resultBox = byId<HTMLElement>("search-result")
 
 	if (tbody) tbody.innerHTML = ""
 	table?.classList.remove("has-results")
@@ -198,7 +205,7 @@ function updateResults() {
 function updateStatsResult() {
 	if (!currentOsmInfo) return
 
-	const el = document.getElementById("stats-result")
+	const el = byId<HTMLElement>("stats-result")
 	if (!el) return
 
 	const [west, south, east, north] = currentOsmInfo.bbox
@@ -220,11 +227,11 @@ function updateStatsResult() {
 	`
 }
 
-async function updateMap() {
+async function updateRasterCanvasMap() {
 	if (!currentOsmInfo) return
 
-	const mapResult = document.getElementById("map-result")
-	const canvas = document.getElementById("map-canvas")
+	const mapResult = byId<HTMLElement>("map-result")
+	const canvas = byId<HTMLElement>("map-canvas")
 	if (!(canvas instanceof HTMLCanvasElement)) return
 	if (mapResult) mapResult.classList.add("has-content")
 
@@ -245,14 +252,17 @@ async function updateMap() {
 	for (let y = tileRange.minY; y <= tileRange.maxY; y++) {
 		for (let x = tileRange.minX; x <= tileRange.maxX; x++) {
 			try {
-				const tile = await remote.getRasterTile(
-					osmId,
-					[x, y, tileRange.zoom],
-					{ tileSize, lineColor: [15, 23, 42, 255] },
-				)
+				const tile = await remote.getRasterTile(osmId, [x, y, tileRange.zoom], {
+					tileSize,
+					lineColor: [15, 23, 42, 255],
+				})
 				const tx = (x - tileRange.minX) * tileSize
 				const ty = (y - tileRange.minY) * tileSize
-				mosaicContext.putImageData(new ImageData(tile, tileSize, tileSize), tx, ty)
+				mosaicContext.putImageData(
+					new ImageData(tile, tileSize, tileSize),
+					tx,
+					ty,
+				)
 			} catch (err) {
 				console.warn(`Skipping raster tile ${tileRange.zoom}/${x}/${y}:`, err)
 			}
@@ -269,7 +279,6 @@ async function updateMap() {
 	if (!context) throw new Error("Failed to get 2d context")
 	context.setTransform(dpr, 0, 0, dpr, 0, 0)
 	context.clearRect(0, 0, displayWidth, displayHeight)
-	context.imageSmoothingEnabled = true
 
 	const scale = Math.min(
 		displayWidth / mosaicCanvas.width,
@@ -285,8 +294,9 @@ async function updateMap() {
 window.handleSearch = async () => {
 	if (!currentOsmInfo) return
 
-	const keyInput = document.getElementById("search-key") as HTMLInputElement
-	const valueInput = document.getElementById("search-value") as HTMLInputElement
+	const keyInput = byId<HTMLInputElement>("search-key")
+	const valueInput = byId<HTMLInputElement>("search-value")
+	if (!keyInput || !valueInput) return
 	const key = keyInput.value.trim()
 	if (!key) return
 
@@ -301,13 +311,12 @@ window.handleSearch = async () => {
 
 	tbody.innerHTML = ""
 
-	// Display up to 10 results total
+	// Display up to MAX_SEARCH_RESULTS total
 	let count = 0
-	const maxResults = 10
 
 	// Helper to add a row
 	const addRow = (type: string, id: number, tags: OsmTags | undefined) => {
-		if (count >= maxResults) return false
+		if (count >= MAX_SEARCH_RESULTS) return false
 		const tr = document.createElement("tr")
 		const tagsStr = tags
 			? Object.entries(tags)
@@ -324,12 +333,19 @@ window.handleSearch = async () => {
 		return true
 	}
 
-	for (const entity of results.nodes)
-		if (!addRow("node", entity.id, entity.tags)) break
-	for (const entity of results.ways)
-		if (!addRow("way", entity.id, entity.tags)) break
-	for (const entity of results.relations)
-		if (!addRow("relation", entity.id, entity.tags)) break
+	const groups = [
+		["node", results.nodes],
+		["way", results.ways],
+		["relation", results.relations],
+	] as const
+	let hasSpace = true
+	for (const [type, entities] of groups) {
+		for (const entity of entities) {
+			hasSpace = addRow(type, entity.id, entity.tags)
+			if (!hasSpace) break
+		}
+		if (!hasSpace) break
+	}
 
 	if (count === 0)
 		tbody.innerHTML = "<tr><td colspan='3'>No results found</td></tr>"
@@ -352,7 +368,7 @@ let destinationMarker: maplibregl.Marker | null = null
 function initRouteMap() {
 	if (!currentOsmInfo) return
 
-	const resultBox = document.getElementById("routing-result")
+	const resultBox = byId<HTMLElement>("routing-result")
 	if (resultBox) resultBox.classList.add("has-content")
 
 	// Clear any existing state
@@ -378,14 +394,40 @@ function initRouteMap() {
 
 		// Add OSM raster layer so users can see the roads
 		routeMap.addSource("osmix", {
-			type: "raster",
-			tiles: [`osmix://${encodeURIComponent(osmId)}/{z}/{x}/{y}`],
-			tileSize: 256,
+			type: "vector",
+			tiles: [`@osmix/vector://${encodeURIComponent(osmId)}/{z}/{x}/{y}.mvt`],
 		})
+		const wayBaseColorExpression: maplibregl.ExpressionSpecification = [
+			"case",
+			["has", "color"],
+			["to-color", ["get", "color"]],
+			["rgba", 255, 255, 255, 1],
+		]
 		routeMap.addLayer({
-			id: "osmix",
-			type: "raster",
+			id: "@osmix:ways",
+			"source-layer": `@osmix:${osmId}:ways`,
 			source: "osmix",
+			type: "line",
+			paint: {
+				"line-color": [
+					"case",
+					["boolean", ["feature-state", "hover"], false],
+					["rgba", 255, 0, 0, 1],
+					wayBaseColorExpression,
+				],
+				"line-opacity": 1,
+				"line-width": [
+					"interpolate",
+					["linear"],
+					["zoom"],
+					12,
+					0.5,
+					14,
+					2,
+					18,
+					10,
+				],
+			},
 		})
 
 		// Add click handler for routing
@@ -395,96 +437,53 @@ function initRouteMap() {
 			const clickedPoint: [number, number] = [e.lngLat.lng, e.lngLat.lat]
 			const osmId = currentOsmInfo.id
 
-			// State machine: origin -> destination -> clear & new origin
-			if (!routeOrigin) {
-				// First click: set origin
-				updateRouteTable([["Status", "Finding nearest road..."]])
+			// If both are set, clear and start over
+			if (routeOrigin && routeDestination) clearRoute()
 
-				const snapped = await remote.findNearestRoutableNode(
-					osmId,
-					clickedPoint,
-					500,
-				)
+			if (!routeOrigin) {
+				const snapped = await findNearestRoad(osmId, clickedPoint)
 				if (!snapped) {
-					updateRouteTable([
-						[
-							"Error",
-							"No road found within 500m. Try clicking closer to a road.",
-						],
-					])
 					return
 				}
 
 				routeOrigin = {
 					nodeIndex: snapped.nodeIndex,
-					coordinates: snapped.coordinates as [number, number],
+					coordinates: snapped.coordinates,
 				}
 
-				// Add green origin marker
-				originMarker = new maplibregl.Marker({ color: "#00ff00" })
-					.setLngLat(routeOrigin.coordinates)
-					.addTo(routeMap)
+				originMarker = addRouteMarker("#00ff00", routeOrigin.coordinates)
 
 				updateRouteTable([
-					[
-						"Origin",
-						`${routeOrigin.coordinates[1].toFixed(5)}, ${routeOrigin.coordinates[0].toFixed(5)}`,
-					],
+					["Origin", formatCoords(routeOrigin.coordinates)],
 					["Snap distance", `${snapped.distance.toFixed(0)} m`],
 					["Instructions", "Click on the map to set destination"],
 				])
-			} else if (!routeDestination) {
-				// Second click: set destination and calculate route
-				updateRouteTable([
-					[
-						"Origin",
-						`${routeOrigin.coordinates[1].toFixed(5)}, ${routeOrigin.coordinates[0].toFixed(5)}`,
-					],
-					["Status", "Finding nearest road..."],
-				])
-
-				const snapped = await remote.findNearestRoutableNode(
-					osmId,
-					clickedPoint,
-					500,
-				)
+			} else {
+				// Set destination and calculate route
+				const baseRows: [string, string][] = [
+					["Origin", formatCoords(routeOrigin.coordinates)],
+				]
+				const snapped = await findNearestRoad(osmId, clickedPoint, baseRows)
 				if (!snapped) {
-					updateRouteTable([
-						[
-							"Origin",
-							`${routeOrigin.coordinates[1].toFixed(5)}, ${routeOrigin.coordinates[0].toFixed(5)}`,
-						],
-						[
-							"Error",
-							"No road found within 500m. Try clicking closer to a road.",
-						],
-					])
 					return
 				}
 
 				routeDestination = {
 					nodeIndex: snapped.nodeIndex,
-					coordinates: snapped.coordinates as [number, number],
+					coordinates: snapped.coordinates,
 				}
 
-				// Add red destination marker
-				destinationMarker = new maplibregl.Marker({ color: "#ff0000" })
-					.setLngLat(routeDestination.coordinates)
-					.addTo(routeMap)
+				destinationMarker = addRouteMarker(
+					"#ff0000",
+					routeDestination.coordinates,
+				)
 
 				updateRouteTable([
-					[
-						"Origin",
-						`${routeOrigin.coordinates[1].toFixed(5)}, ${routeOrigin.coordinates[0].toFixed(5)}`,
-					],
-					[
-						"Destination",
-						`${routeDestination.coordinates[1].toFixed(5)}, ${routeDestination.coordinates[0].toFixed(5)}`,
-					],
+					["Origin", formatCoords(routeOrigin.coordinates)],
+					["Destination", formatCoords(routeDestination.coordinates)],
 					["Status", "Calculating route..."],
 				])
 
-				// Calculate route
 				const result = await remote.route(
 					osmId,
 					routeOrigin.nodeIndex,
@@ -494,68 +493,20 @@ function initRouteMap() {
 
 				if (!result) {
 					updateRouteTable([
-						[
-							"Origin",
-							`${routeOrigin.coordinates[1].toFixed(5)}, ${routeOrigin.coordinates[0].toFixed(5)}`,
-						],
-						[
-							"Destination",
-							`${routeDestination.coordinates[1].toFixed(5)}, ${routeDestination.coordinates[0].toFixed(5)}`,
-						],
+						["Origin", formatCoords(routeOrigin.coordinates)],
+						["Destination", formatCoords(routeDestination.coordinates)],
 						["Error", "No route found. Click to start over."],
 					])
 					return
 				}
 
-				// Draw route on map
 				drawRoute(result.coordinates)
 
-				// Display route details
 				updateRouteTable([
 					["Distance", `${((result.distance ?? 0) / 1000).toFixed(2)} km`],
 					["Time", `${Math.round((result.time ?? 0) / 60)} min`],
 					["Points", `${result.coordinates.length}`],
 					["Instructions", "Click to start a new route"],
-				])
-			} else {
-				// Third click: clear and start new origin
-				clearRoute()
-
-				// Now set new origin
-				updateRouteTable([["Status", "Finding nearest road..."]])
-
-				const snapped = await remote.findNearestRoutableNode(
-					osmId,
-					clickedPoint,
-					500,
-				)
-				if (!snapped) {
-					updateRouteTable([
-						[
-							"Error",
-							"No road found within 500m. Try clicking closer to a road.",
-						],
-					])
-					return
-				}
-
-				routeOrigin = {
-					nodeIndex: snapped.nodeIndex,
-					coordinates: snapped.coordinates as [number, number],
-				}
-
-				// Add green origin marker
-				originMarker = new maplibregl.Marker({ color: "#00ff00" })
-					.setLngLat(routeOrigin.coordinates)
-					.addTo(routeMap)
-
-				updateRouteTable([
-					[
-						"Origin",
-						`${routeOrigin.coordinates[1].toFixed(5)}, ${routeOrigin.coordinates[0].toFixed(5)}`,
-					],
-					["Snap distance", `${snapped.distance.toFixed(0)} m`],
-					["Instructions", "Click on the map to set destination"],
 				])
 			}
 		})
@@ -573,12 +524,7 @@ function clearRoute() {
 	destinationMarker = null
 
 	// Remove route layer if it exists
-	if (routeMap?.getLayer("route")) {
-		routeMap.removeLayer("route")
-	}
-	if (routeMap?.getSource("route")) {
-		routeMap.removeSource("route")
-	}
+	removeRoutePath()
 
 	// Reset state
 	routeOrigin = null
@@ -589,15 +535,10 @@ function drawRoute(coordinates: [number, number][]) {
 	if (!routeMap) return
 
 	// Remove existing route layer
-	if (routeMap.getLayer("route")) {
-		routeMap.removeLayer("route")
-	}
-	if (routeMap.getSource("route")) {
-		routeMap.removeSource("route")
-	}
+	removeRoutePath()
 
 	// Add route line
-	routeMap.addSource("route", {
+	routeMap.addSource(ROUTE_SOURCE_ID, {
 		type: "geojson",
 		data: {
 			type: "Feature",
@@ -610,9 +551,9 @@ function drawRoute(coordinates: [number, number][]) {
 	})
 
 	routeMap.addLayer({
-		id: "route",
+		id: ROUTE_LAYER_ID,
 		type: "line",
-		source: "route",
+		source: ROUTE_SOURCE_ID,
 		layout: {
 			"line-join": "round",
 			"line-cap": "round",
@@ -636,7 +577,7 @@ function drawRoute(coordinates: [number, number][]) {
 }
 
 function updateRouteTable(rows: [string, string][]) {
-	const routeTable = document.getElementById("route-table")
+	const routeTable = byId<HTMLElement>("route-table")
 	const routeTableBody = routeTable?.querySelector("tbody")
 	if (!routeTableBody || !routeTable) return
 
@@ -650,12 +591,50 @@ function updateRouteTable(rows: [string, string][]) {
 	routeTable.classList.add("has-results")
 }
 
+function removeRoutePath() {
+	if (!routeMap) return
+	if (routeMap.getLayer(ROUTE_LAYER_ID)) routeMap.removeLayer(ROUTE_LAYER_ID)
+	if (routeMap.getSource(ROUTE_SOURCE_ID))
+		routeMap.removeSource(ROUTE_SOURCE_ID)
+}
+
+function addRouteMarker(color: string, coordinates: [number, number]) {
+	if (!routeMap) return null
+	return new maplibregl.Marker({ color }).setLngLat(coordinates).addTo(routeMap)
+}
+
+async function findNearestRoad(
+	osmId: string,
+	point: [number, number],
+	rows: [string, string][] = [],
+) {
+	updateRouteTable([...rows, ["Status", "Finding nearest road..."]])
+	const snapped = await remote.findNearestRoutableNode(
+		osmId,
+		point,
+		SNAP_RADIUS_METERS,
+	)
+	if (!snapped) {
+		updateRouteTable([...rows, ["Error", NO_ROAD_FOUND_MESSAGE]])
+		return null
+	}
+	return {
+		nodeIndex: snapped.nodeIndex,
+		coordinates: snapped.coordinates as [number, number],
+		distance: snapped.distance,
+	}
+}
+
 function escapeHtml(str: string): string {
 	return str
 		.replace(/&/g, "&amp;")
 		.replace(/</g, "&lt;")
 		.replace(/>/g, "&gt;")
 		.replace(/"/g, "&quot;")
+}
+
+function formatCoords(coords: [number, number]): string {
+	return `${coords[1].toFixed(5)}, ${coords[0].toFixed(5)}`
 }
 
 /**
@@ -666,33 +645,16 @@ function choosePreviewTileRange(bbox: [number, number, number, number]) {
 	let tileRange = bboxToTileRange(bbox, zoom)
 
 	while (tileRange.count > MAP_PREVIEW_MAX_TILES && zoom > 0) {
-		zoom--
+		zoom -= 0.1
 		tileRange = bboxToTileRange(bbox, zoom)
 	}
 
 	return { ...tileRange, zoom }
 }
 
-/**
- * Convert raster tile data to PNG image buffer.
- */
-async function rasterTileToImageBuffer(
-	imageData: Uint8ClampedArray<ArrayBuffer>,
-	tileSize: number,
-): Promise<ArrayBuffer> {
-	const canvas = new OffscreenCanvas(tileSize, tileSize)
-	const ctx = canvas.getContext("2d")
-	if (!ctx) throw new Error("Failed to get 2d context")
-	ctx.putImageData(new ImageData(imageData, tileSize, tileSize), 0, 0)
-	const blob = await canvas.convertToBlob({ type: "image/png" })
-	return blob.arrayBuffer()
-}
-
 // Initialize on load
 init()
-
 // Admin functions
-
 if (localStorage.getItem("ADMIN")) {
 	document.body.classList.add("ADMIN")
 }
@@ -701,3 +663,4 @@ window.clearIndexedDB = async () => {
 	await idb.clear()
 	location.reload()
 }
+
