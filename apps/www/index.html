@@ -20,7 +20,7 @@
 			</header>
 
 			<div class="admin-only">
-				<button onclick="clearIndexedDB()">Clear IndexedDB</button>
+				<button id="clear-db-btn">Clear IndexedDB</button>
 			</div>
 
 			<section id="intro">
@@ -36,7 +36,7 @@
 
 			<section id="installation">
 				<h2>Installation</h2>
-				<p>Install the <code>@osmix/core</code> package with your package manager of choice.</p>
+				<p>Install the <code>osmix</code> package with your package manager of choice.</p>
 				<pre><code class="highlight-this" data-lang="bash">$ bun add osmix</code></pre>
 			</section>
 
@@ -45,16 +45,15 @@
 
 				<div class="file-input">
 					<div class="button-group">
-						<button id="load-monaco" onclick="loadMonaco()">Load Monaco PBF</button>
 						<label id="load-file">
 							Open an OSM PBF File
 							<input
 								type="file"
 								id="file-input-el"
 								accept=".pbf,.osm.pbf"
-								onchange="handleFileSelect(this)"
 							/>
 						</label>
+						<button id="load-monaco">use monaco.pbf</button>
 					</div>
 					<div id="loading-status"></div>
 				</div>
@@ -77,38 +76,27 @@ console.log("Bbox:", osmInfo.bbox)</code></pre>
 				</div>
 
 				<div class="example">
-					<h3>2. Display OSM on a Map</h3>
-					<p>Render OSM data as raster tiles using a custom MapLibre protocol, overlaying the data on any base map style.</p>
+					<h3>2. Render Raster Tiles to Canvas</h3>
+					<p>Fetch OSM raster tiles directly from Osmix and draw a static preview onto a canvas element without a map library.</p>
 					<pre><code id="code-map" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
-import maplibregl from "maplibre-gl"
 
 const remote = await createRemote()
 const osmInfo = await remote.fromPbf(pbfFile)
 
-maplibregl.addProtocol("osmix", async (req) => {
-  const [, osmId, z, x, y] = req.url.match(
-    /osmix:\\/\\/(.+)\\/(\\d+)\\/(\\d+)\\/(\\d+)/
-  )
-  const tile = await remote.getRasterTile(osmId, [+x, +y, +z])
-  return { data: await tileToImageBuffer(tile) }
-})
+const zoom = 14
+const tileSize = 256
+const [minX, minY, maxX, maxY] = bboxToTileRange(osmInfo.bbox, zoom)
+const canvas = document.getElementById("map-canvas") as HTMLCanvasElement
+const ctx = canvas.getContext("2d")
 
-const map = new maplibregl.Map({
-  container: "map",
-  style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-})
-
-map.on("load", () => {
-  map.addSource("osmix", {
-    type: "raster",
-    tiles: [\`osmix://\${osmInfo.id}/{z}/{x}/{y}\`],
-    tileSize: 256
-  })
-  map.addLayer({ id: "osmix", type: "raster", source: "osmix" })
-})</code></pre>
+for (const [x, y] of listTiles(minX, minY, maxX, maxY)) {
+  const tile = await remote.getRasterTile(osmInfo.id, [x, y, zoom], tileSize)
+  const image = new ImageData(tile, tileSize, tileSize)
+  ctx.putImageData(image, (x - minX) * tileSize, (y - minY) * tileSize)
+}</code></pre>
 					<div class="result-box" id="map-result">
-						<p class="placeholder">Select a file above to see the map...</p>
-						<div id="map"></div>
+						<p class="placeholder">Select a file above to render tiles...</p>
+						<canvas id="map-canvas"></canvas>
 					</div>
 				</div>
 
@@ -132,7 +120,7 @@ console.log("Relations:", results.relations.length)</code></pre>
 							placeholder="Tag key (e.g., amenity)"
 						/>
 						<input type="text" id="search-value" placeholder="Value (optional)" />
-						<button id="search-btn" disabled onclick="handleSearch()">Search</button>
+						<button id="search-btn" disabled>Search</button>
 					</div>
 					<div class="result-box" id="search-result">
 						<p class="placeholder">

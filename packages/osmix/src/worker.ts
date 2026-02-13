@@ -31,7 +31,6 @@ import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core"
 import { fromGeoJSON } from "@osmix/geojson"
 import { fromGeoParquet, type GeoParquetReadOptions } from "@osmix/geoparquet"
 import { fromGtfs, type GtfsConversionOptions } from "@osmix/gtfs"
-import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import {
 	type DefaultSpeeds,
 	type HighwayFilter,
@@ -60,7 +59,7 @@ import {
 	toPbfBuffer,
 	toPbfStream,
 } from "./pbf"
-import { drawToRasterTile } from "./raster"
+import { type DrawToRasterTileOptions, drawToRasterTile } from "./raster"
 import { transfer } from "./utils"
 
 /**
@@ -423,8 +422,8 @@ export class OsmixWorker extends EventTarget {
 	 * Generate a raster tile as ImageData for the specified tile coordinates.
 	 * Returns transferred RGBA pixel data suitable for canvas rendering.
 	 */
-	getRasterTile(id: string, tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
-		const data = drawToRasterTile(this.get(id), tile, tileSize).imageData
+	getRasterTile(id: string, tile: Tile, opts?: DrawToRasterTileOptions) {
+		const data = drawToRasterTile(this.get(id), tile, opts).imageData
 		if (!data || data.byteLength === 0) return new Uint8ClampedArray(0)
 		return Comlink.transfer(data, [data.buffer])
 	}
