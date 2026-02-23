@@ -86,7 +86,6 @@ export default function BrowserCheck() {
 						<span
 							className="inline-block size-2 rounded-full bg-red-500"
 							title={hoverText}
-							aria-label={hoverText}
 						/>
 					) : null}
 				</span>
