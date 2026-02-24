@@ -86,7 +86,7 @@ The stepper resets selection state between actions, and you can jump backward or
 ## Troubleshooting
 
 - **Secure context warnings** – If the system check reports a missing secure context, make sure you’re on `https://` (or `localhost`) and disable extensions that inject insecure content.
-- **File picker errors** – `showSaveFilePicker` currently requires Chromium; use Chrome/Edge when exporting JSON or merged PBFs.
+- **File picker errors** – Exports try native `showSaveFilePicker` first, then automatically fall back to browser download when picker APIs are unavailable/restricted.
 - **Raster tiles missing** – Cross-origin isolation is required for OffscreenCanvas. Confirm the dev server sent the COOP/COEP headers listed in `vite.config.ts`.
 
 ## Related packages

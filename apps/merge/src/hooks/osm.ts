@@ -1,5 +1,5 @@
 import { useAtom, useSetAtom } from "jotai"
-import { showSaveFilePicker } from "native-file-system-adapter"
+import { showSaveFilePickerWithFallback } from "../lib/save-file-picker"
 import type { OsmFileType, OsmInfo } from "osmix"
 import { useEffectEvent, useRef } from "react"
 import { canStoreFile } from "../lib/storage-utils"
@@ -207,15 +207,22 @@ export function useOsmFile(osmKey: string) {
 		const task = Log.startTask("Generating OSM file to download")
 		const suggestedName =
 			name ?? (osmInfo.id.endsWith(".pbf") ? osmInfo.id : `${osmInfo.id}.pbf`)
-		const fileHandle = await showSaveFilePicker({
-			suggestedName,
-			types: [
-				{
-					description: "OSM PBF",
-					accept: { "application/x-protobuf": [".pbf"] },
-				},
-			],
-		})
+		const fileHandle = await showSaveFilePickerWithFallback(
+			{
+				suggestedName,
+				types: [
+					{
+						description: "OSM PBF",
+						accept: { "application/x-protobuf": [".pbf"] },
+					},
+				],
+			},
+			() => {
+				task.update(
+					"Native save picker unavailable, falling back to browser download",
+				)
+			},
+		)
 		const stream = await fileHandle.createWritable()
 		await osmWorker.toPbf(osmInfo.id, stream)
 		task.end(`Created ${fileHandle.name} PBF for download`)

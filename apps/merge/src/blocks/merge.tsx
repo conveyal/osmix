@@ -16,7 +16,7 @@ import {
 	StopCircleIcon,
 	XIcon,
 } from "lucide-react"
-import { showSaveFilePicker } from "native-file-system-adapter"
+import { showSaveFilePickerWithFallback } from "../lib/save-file-picker"
 import { Suspense, useMemo } from "react"
 import ActionButton from "../components/action-button"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
@@ -114,9 +114,16 @@ export default function MergeBlock() {
 
 	const downloadJsonChanges = async () => {
 		if (!changesetStats) return
-		const fileHandle = await showSaveFilePicker({
-			suggestedName: "osm-changes.json",
-		})
+		const fileHandle = await showSaveFilePickerWithFallback(
+			{
+				suggestedName: "osm-changes.json",
+			},
+			() => {
+				Log.addMessage(
+					"Native save picker unavailable, falling back to browser download",
+				)
+			},
+		)
 		if (!fileHandle) return
 		const stream = await fileHandle.createWritable()
 
