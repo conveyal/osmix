@@ -1,41 +1,17 @@
 {
-	"$schema": "https://json.schemastore.org/package",
+	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/shortbread",
 	"type": "module",
-	"version": "0.0.8",
+	"version": "0.0.10",
 	"description": "Shortbread schema vector tile encoder for Osmix",
-	"main": "./src/index.ts",
-	"publishConfig": {
-		"access": "public",
-		"registry": "https://registry.npmjs.org/",
-		"main": "./dist/index.js",
-		"types": "./dist/index.d.ts",
-		"exports": {
-			".": {
-				"import": "./dist/index.js",
-				"types": "./dist/index.d.ts"
-			}
-		},
-		"files": [
-			"dist",
-			"README.md",
-			"LICENSE"
-		]
-	},
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
-	"homepage": "https://github.com/conveyal/osmix#readme",
-	"bugs": {
-		"url": "https://github.com/conveyal/osmix/issues"
-	},
-	"sideEffects": false,
+	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"prepare": "bun run build",
-		"release": "bun publish",
 		"test": "bun test",
 		"typecheck": "tsgo --noEmit"
 	},

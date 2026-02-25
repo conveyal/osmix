@@ -8,7 +8,7 @@
  * @module
  */
 
-import { Osm, type OsmOptions } from "@osmix/core/src/osm"
+import { Osm, type OsmOptions } from "@osmix/core"
 import {
 	OsmBlocksToJsonTransformStream,
 	OsmJsonToBlocksTransformStream,

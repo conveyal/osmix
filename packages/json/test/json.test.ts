@@ -4,9 +4,9 @@ import {
 	OsmPbfBytesToBlocksTransformStream,
 	type OsmPbfHeaderBlock,
 	readOsmPbf,
+	testOsmPbfReader,
 } from "@osmix/pbf"
-import { testOsmPbfReader } from "@osmix/pbf/test/utils"
-import { getFixtureFileReadStream, PBFs } from "@osmix/shared/test/fixtures"
+import { getFixtureFileReadStream, PBFs } from "@osmix/shared/fixtures"
 import { OsmJsonToBlocksTransformStream } from "../src/json-to-pbf"
 import { OsmBlocksToJsonTransformStream } from "../src/pbf-to-json"
 

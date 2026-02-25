@@ -3,7 +3,7 @@ import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
-} from "@osmix/shared/test/fixtures"
+} from "@osmix/shared/fixtures"
 
 // @ts-expect-error - bench is available at runtime but not in types
 const { bench } = globalThis as { bench: typeof import("bun:test").test }
@@ -12,7 +12,7 @@ import {
 	OsmPbfBytesToBlocksTransformStream,
 	readOsmPbf,
 } from "../src/pbf-to-blocks"
-import { createOsmEntityCounter, testOsmPbfReader } from "./utils"
+import { createOsmEntityCounter, testOsmPbfReader } from "../src/utils"
 
 describe.each(Object.entries(PBFs))("%s", (_name, pbf) => {
 	beforeAll(() => getFixtureFile(pbf.url))

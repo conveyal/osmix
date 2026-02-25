@@ -13,6 +13,8 @@ import type { GeoBbox2D, LonLat, Tile, TilePxBbox, XY } from "./types"
 
 const RADIANS_TO_DEGREES = 180 / Math.PI
 
+export { pointToTileFraction }
+
 function tile2lon(x: number, z: number): number {
 	return (x / 2 ** z) * 360 - 180
 }
@@ -58,6 +60,21 @@ export function llToTilePx(ll: LonLat, tile: Tile, tileSize = 256): XY {
 	const x = (tf[0] - tx) * tileSize
 	const y = (tf[1] - ty) * tileSize
 	return [x, y]
+}
+
+/**
+ * Convert lon/lat bounds to Web Mercator tile range for a zoom.
+ */
+export function bboxToTileRange(bbox: GeoBbox2D, zoom: number) {
+	const [west, south, east, north] = bbox
+	const [xA, yA] = pointToTileFraction(west, north, zoom)
+	const [xB, yB] = pointToTileFraction(east, south, zoom)
+	const minX = Math.min(xA, xB)
+	const maxX = Math.max(xA, xB)
+	const minY = Math.min(yA, yB)
+	const maxY = Math.max(yA, yB)
+	const count = (maxX - minX + 1) * (maxY - minY + 1)
+	return { minX, minY, maxX, maxY, count }
 }
 
 /**

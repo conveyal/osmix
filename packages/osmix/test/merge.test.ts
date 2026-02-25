@@ -1,11 +1,10 @@
 import { describe, expect, it } from "bun:test"
-import { OsmChangeset } from "@osmix/change"
-import { applyChangesetToOsm } from "@osmix/change/src/apply-changeset"
+import { applyChangesetToOsm, OsmChangeset } from "@osmix/change"
 import type { Osm } from "@osmix/core"
 import {
 	getFixtureFileReadStream,
 	getFixturePath,
-} from "@osmix/shared/test/fixtures"
+} from "@osmix/shared/fixtures"
 import type { OsmNode } from "@osmix/shared/types"
 import { fromPbf } from "../src/pbf"
 

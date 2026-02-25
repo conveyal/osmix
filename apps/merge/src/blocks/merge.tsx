@@ -78,6 +78,23 @@ const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
 	return STEPS[stepIndex]
 })
 
+const toStem = (name: string | null | undefined) => {
+	if (!name) return "dataset"
+	return name
+		.replace(/\.[^.]+$/, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+		.slice(0, 40) || "dataset"
+}
+
+const makeMergedDownloadName = (baseName?: string | null, patchName?: string | null) => {
+	const baseStem = toStem(baseName)
+	const patchStem = toStem(patchName)
+	const combined = `osmix-merged-${baseStem}-with-${patchStem}`
+	return `${combined.slice(0, 120)}.pbf`
+}
+
 export default function MergeBlock() {
 	const base = useOsmFile(BASE_OSM_KEY)
 	const patch = useOsmFile(PATCH_OSM_KEY)
@@ -311,7 +328,11 @@ export default function MergeBlock() {
 										}
 
 										// Use setMergedOsm to properly update file info for the new merged result
-										await base.setMergedOsm(osmId)
+										const mergedName = makeMergedDownloadName(
+											base.fileInfo?.fileName,
+											patch.fileInfo?.fileName,
+										)
+										await base.setMergedOsm(osmId, mergedName)
 										patch.setOsm(null)
 
 										task.end("All merge steps completed")

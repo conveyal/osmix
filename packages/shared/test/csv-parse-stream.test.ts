@@ -33,9 +33,7 @@ describe("CsvParseStream", () => {
 			'id,name,notes\n1,"Alice, A.","says ""hi"""\n',
 		])
 
-		expect(rows).toEqual([
-			{ id: "1", name: "Alice, A.", notes: 'says "hi"' },
-		])
+		expect(rows).toEqual([{ id: "1", name: "Alice, A.", notes: 'says "hi"' }])
 	})
 
 	it("handles fields split across chunks", async () => {
@@ -53,12 +51,7 @@ describe("CsvParseStream", () => {
 
 	it("supports comment skipping + header/value mapping", async () => {
 		const rows = await parseCsv(
-			[
-				"# comment\n",
-				"id,name\n",
-				"1,Alice\n",
-				"2,Bob\n",
-			],
+			["# comment\n", "id,name\n", "1,Alice\n", "2,Bob\n"],
 			{
 				skipComments: true,
 				mapHeaders: ({ header }) => header.toUpperCase(),

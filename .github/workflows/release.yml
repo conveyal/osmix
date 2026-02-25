@@ -20,18 +20,24 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
-      - uses: ./.github/actions/setup
-      - uses: ./.github/actions/checks
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
 
-      - name: Preflight workspace package detection
-        run: |
-          bun pm ls --all | head -n 200
+      - uses: ./.github/actions/setup
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@v1
         with:
+          # After versioning, `bun update` must be run to update the package.json files.
           version: bun run version
-          publish: bun run release
+
+          # `bun pm pack` is necessary to replace workspace deps. 
+          # But we need `npm publish` to publish via OIDC.
+          publish: bun scripts/release.ts
         env:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+          NPM_TOKEN: '' # Workaround to support trusted publishing

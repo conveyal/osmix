@@ -1,5 +1,43 @@
 # osmix
 
+## 0.1.7
+
+### Patch Changes
+
+- 2a634cb: Fix publishing
+- Updated dependencies [2a634cb]
+  - @osmix/geoparquet@0.1.6
+  - @osmix/shapefile@0.0.8
+  - @osmix/geojson@0.0.12
+  - @osmix/change@0.1.6
+  - @osmix/raster@0.0.12
+  - @osmix/router@0.0.10
+  - @osmix/shared@0.0.12
+  - @osmix/core@0.1.7
+  - @osmix/gtfs@0.0.7
+  - @osmix/json@0.0.13
+  - @osmix/pbf@0.0.8
+  - @osmix/vt@0.0.12
+
+## 0.1.6
+
+### Patch Changes
+
+- 3c8ee95: Fix and simplify package exports
+- Updated dependencies [3c8ee95]
+  - @osmix/change@0.1.5
+  - @osmix/core@0.1.6
+  - @osmix/geojson@0.0.11
+  - @osmix/geoparquet@0.1.5
+  - @osmix/gtfs@0.0.6
+  - @osmix/json@0.0.12
+  - @osmix/pbf@0.0.7
+  - @osmix/raster@0.0.11
+  - @osmix/router@0.0.9
+  - @osmix/shapefile@0.0.7
+  - @osmix/shared@0.0.11
+  - @osmix/vt@0.0.11
+
 ## 0.1.5
 
 ### Patch Changes

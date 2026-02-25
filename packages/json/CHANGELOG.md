@@ -1,5 +1,23 @@
 # @osmix/json
 
+## 0.0.13
+
+### Patch Changes
+
+- 2a634cb: Fix publishing
+- Updated dependencies [2a634cb]
+  - @osmix/shared@0.0.12
+  - @osmix/pbf@0.0.8
+
+## 0.0.12
+
+### Patch Changes
+
+- 3c8ee95: Fix and simplify package exports
+- Updated dependencies [3c8ee95]
+  - @osmix/pbf@0.0.7
+  - @osmix/shared@0.0.11
+
 ## 0.0.11
 
 ### Patch Changes

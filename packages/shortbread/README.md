@@ -11,14 +11,14 @@ bun add @osmix/shortbread
 ## Usage
 
 ```typescript
-import { Osmix } from "@osmix/osmix"
+import { fromPbf } from "osmix"
 import { ShortbreadVtEncoder } from "@osmix/shortbread"
 
 // Load OSM data
-const osmix = await Osmix.fromPbf(pbfData)
+const osm = await fromPbf(pbfStream)
 
 // Create encoder
-const encoder = new ShortbreadVtEncoder(osmix.osm)
+const encoder = new ShortbreadVtEncoder(osm)
 
 // Generate a tile
 const tile = encoder.getTile([z, x, y])

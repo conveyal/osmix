@@ -18,6 +18,13 @@ import { hexColorToRgba } from "@osmix/shared/color"
 import type { Rgba, Tile } from "@osmix/shared/types"
 import { wayIsArea } from "@osmix/shared/way-is-area"
 
+export interface DrawToRasterTileOptions {
+	tileSize?: number
+	areaColor?: Rgba
+	lineColor?: Rgba
+	pointColor?: Rgba
+}
+
 /**
  * Draw an Osm index into a raster tile using default rendering logic.
  *
@@ -36,8 +43,9 @@ import { wayIsArea } from "@osmix/shared/way-is-area"
 export function drawToRasterTile(
 	osm: Osm,
 	tile: Tile,
-	tileSize = DEFAULT_RASTER_TILE_SIZE,
+	opts?: DrawToRasterTileOptions,
 ) {
+	const tileSize = opts?.tileSize ?? DEFAULT_RASTER_TILE_SIZE
 	const rasterTile = new OsmixRasterTile({ tile, tileSize })
 	const bbox = rasterTile.bbox()
 
@@ -48,7 +56,12 @@ export function drawToRasterTile(
 	osm.relations.intersects(bbox, (relIndex) => {
 		// Try fast path: check if relation bbox fits in a single pixel
 		const relationBbox = osm.relations.getEntityBbox({ index: relIndex })
-		if (rasterTile.drawSubpixelEntity(relationBbox, DEFAULT_AREA_COLOR))
+		if (
+			rasterTile.drawSubpixelEntity(
+				relationBbox,
+				opts?.areaColor ?? DEFAULT_AREA_COLOR,
+			)
+		)
 			return false
 
 		const geometry = osm.relations.getRelationGeometry(relIndex)
@@ -78,10 +91,10 @@ export function drawToRasterTile(
 		const tagColor = hexColorToRgba(way.tags?.["color"] ?? way.tags?.["colour"])
 		const lineColor: Rgba = tagColor
 			? [tagColor[0], tagColor[1], tagColor[2], DEFAULT_LINE_COLOR[3]]
-			: DEFAULT_LINE_COLOR
+			: (opts?.lineColor ?? DEFAULT_LINE_COLOR)
 		const areaColor: Rgba = tagColor
 			? [tagColor[0], tagColor[1], tagColor[2], DEFAULT_AREA_COLOR[3]]
-			: DEFAULT_AREA_COLOR
+			: (opts?.areaColor ?? DEFAULT_AREA_COLOR)
 
 		// Try fast path: check if way bbox fits in a single pixel
 		const wayBbox = osm.ways.getEntityBbox({ index: wayIndex })

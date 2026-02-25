@@ -14,7 +14,7 @@ Osmix is a collection of composable libraries for reading, querying, merging, an
 - Generate raster and vector tiles
 - Worker-based processing for responsive UIs
 
-**Try it:** [merge.osmix.dev](https://merge.osmix.dev)
+**Try it:** [merge.osmix.dev](https://merge.osmix.dev) · **Docs & examples:** [osmix.dev](https://osmix.dev)
 
 ## Quick Start
 
@@ -84,9 +84,13 @@ See each package's README for full API and description.
 | [`@osmix/pbf`](packages/pbf/README.md) | Low-level PBF protobuf parsing and writing. |
 | [`@osmix/json`](packages/json/README.md) | Streaming transforms: PBF bytes ↔ typed JSON entities. |
 | [`@osmix/geojson`](packages/geojson/README.md) | Convert OSM entities to/from GeoJSON. |
+| [`@osmix/geoparquet`](packages/geoparquet/README.md) | GeoParquet import. |
+| [`@osmix/gtfs`](packages/gtfs/README.md) | GTFS feed import. |
+| [`@osmix/shapefile`](packages/shapefile/README.md) | Shapefile import. |
 | [`@osmix/change`](packages/change/README.md) | Deduplication, merging, and changeset workflows. |
 | [`@osmix/raster`](packages/raster/README.md) | Render OSM entities as raster bitmaps. |
 | [`@osmix/vt`](packages/vt/README.md) | Encode OSM entities as Mapbox Vector Tiles (MVT). |
+| [`@osmix/shortbread`](packages/shortbread/README.md) | Shortbread schema vector tiles. |
 | [`@osmix/shared`](packages/shared/README.md) | Utility functions and geometry helpers. |
 | [`@osmix/router`](packages/router/README.md) | Experimental routing. WIP. |
 
@@ -117,12 +121,16 @@ bun run check
 
 ## Apps
 
+- **[www](apps/www/)** – Main site with interactive examples and package overview ([osmix.dev](https://osmix.dev))
 - **[merge](apps/merge/README.md)** – Interactive merge tool for OSM extracts with MapLibre visualization ([live demo](https://merge.osmix.dev))
 - **[bench](apps/bench/README.md)** – Performance benchmarks comparing Osmix with DuckDB-wasm
 - **[vt-server](apps/vt-server/README.md)** – Example vector tile server implementation
+- **[shortbread](apps/shortbread/)** – Shortbread schema vector tile server demo
 
 ## Resources
 
+- [osmix.dev](https://osmix.dev) – Docs, examples, and package overview
+- [GitHub](https://github.com/conveyal/osmix) – Issues and discussions
 - [OpenStreetMap PBF format](https://wiki.openstreetmap.org/wiki/PBF_Format)
 - [Bun](https://bun.sh/) workspace documentation
 - [MapLibre GL JS](https://maplibre.org/projects/maplibre-gl-js/)

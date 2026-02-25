@@ -15,7 +15,6 @@ import {
 	type GtfsConversionOptions,
 	isGtfsZip as isGtfsZipBytes,
 } from "@osmix/gtfs"
-import { DEFAULT_RASTER_TILE_SIZE } from "@osmix/raster"
 import type {
 	DefaultSpeeds,
 	HighwayFilter,
@@ -27,6 +26,7 @@ import { streamToBytes } from "@osmix/shared/stream-to-bytes"
 import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
 import { type OsmFromPbfOptions, toPbfStream } from "./pbf"
+import type { DrawToRasterTileOptions } from "./raster"
 import {
 	DEFAULT_WORKER_COUNT,
 	SUPPORTS_SHARED_ARRAY_BUFFER,
@@ -614,8 +614,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	 * Generate a raster tile as ImageData for the specified tile coordinates.
 	 * Delegates to an available worker for off-thread rendering.
 	 */
-	getRasterTile(osmId: OsmId, tile: Tile, tileSize = DEFAULT_RASTER_TILE_SIZE) {
-		return this.nextWorker().getRasterTile(this.getId(osmId), tile, tileSize)
+	getRasterTile(osmId: OsmId, tile: Tile, opts?: DrawToRasterTileOptions) {
+		return this.nextWorker().getRasterTile(this.getId(osmId), tile, opts)
 	}
 
 	/**

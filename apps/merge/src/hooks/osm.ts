@@ -205,8 +205,10 @@ export function useOsmFile(osmKey: string) {
 	const downloadOsm = useEffectEvent(async (name?: string) => {
 		if (!osmInfo) return
 		const task = Log.startTask("Generating OSM file to download")
-		const suggestedName =
-			name ?? (osmInfo.id.endsWith(".pbf") ? osmInfo.id : `${osmInfo.id}.pbf`)
+		const fallbackName = osmInfo.id.endsWith(".pbf") ? osmInfo.id : `${osmInfo.id}.pbf`
+		const sourceName = fileInfo?.fileName ?? fallbackName
+		const withPrefix = sourceName.startsWith("osmix-") ? sourceName : `osmix-${sourceName}`
+		const suggestedName = name ?? withPrefix
 		const fileHandle = await showSaveFilePickerWithFallback(
 			{
 				suggestedName,
@@ -280,7 +282,7 @@ export function useOsmFile(osmKey: string) {
 	 * Creates new file info with unique hash and name, resets stored state.
 	 * If the content hasn't changed (same content hash as original), keeps original file info.
 	 */
-	const setMergedOsm = useEffectEvent(async (newOsmId: string) => {
+	const setMergedOsm = useEffectEvent(async (newOsmId: string, mergedFileName?: string) => {
 		// Get the new Osm instance from the worker
 		const newOsm = await osmWorker.get(newOsmId)
 		const newOsmInfo = newOsm.info()
@@ -294,9 +296,9 @@ export function useOsmFile(osmKey: string) {
 			return newOsm
 		}
 
-		// Generate a new file name based on the timestamp
+		// Generate a new file name based on merge context (fallback to timestamp)
 		const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, "-")
-		const newFileName = `merged-${timestamp}.pbf`
+		const newFileName = mergedFileName ?? `osmix-merged-${timestamp}.pbf`
 
 		// File size is estimated from entity counts (will be accurate after serialization)
 		const estimatedSize =
