@@ -250,6 +250,7 @@ export function useOsmFile(osmKey: string) {
 			await stream.close()
 		}
 		task.end(`Created ${fileHandle.name} PBF for download`)
+		Log.addMessage(`Download complete: ${fileHandle.name}`)
 	})
 
 	const saveToStorage = useEffectEvent(async () => {
