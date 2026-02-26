@@ -24,6 +24,19 @@ export class LoadCancelledError extends Error {
 
 export type UseOsmFileReturn = ReturnType<typeof useOsmFile>
 
+function isStreamCloneable(stream: WritableStream<Uint8Array>): boolean {
+	const { port1, port2 } = new MessageChannel()
+	try {
+		port1.postMessage(stream)
+		return true
+	} catch {
+		return false
+	} finally {
+		port1.close()
+		port2.close()
+	}
+}
+
 export function useOsmFile(osmKey: string) {
 	const [file, setFile] = useAtom(osmFileAtomFamily(osmKey))
 	const [fileInfo, setFileInfo] = useAtom(osmFileInfoAtomFamily(osmKey))
@@ -226,7 +239,16 @@ export function useOsmFile(osmKey: string) {
 			},
 		)
 		const stream = await fileHandle.createWritable()
-		await osmWorker.toPbf(osmInfo.id, stream)
+		if (isStreamCloneable(stream)) {
+			await osmWorker.toPbf(osmInfo.id, stream)
+		} else {
+			task.update(
+				"Stream transfer unsupported in this browser; using buffered download fallback",
+			)
+			const data = await osmWorker.toPbfData(osmInfo.id)
+			await stream.write(data)
+			await stream.close()
+		}
 		task.end(`Created ${fileHandle.name} PBF for download`)
 	})
 
