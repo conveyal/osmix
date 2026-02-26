@@ -1,8 +1,9 @@
 import { useAtom, useSetAtom } from "jotai"
-import { showSaveFilePicker } from "native-file-system-adapter"
+import { showSaveFilePickerWithFallback } from "../lib/save-file-picker"
 import type { OsmFileType, OsmInfo } from "osmix"
 import { useEffectEvent, useRef } from "react"
 import { canStoreFile } from "../lib/storage-utils"
+import { isStreamCloneable } from "../lib/stream-transfer"
 import { Log } from "../state/log"
 import {
 	osmAtomFamily,
@@ -209,18 +210,35 @@ export function useOsmFile(osmKey: string) {
 		const sourceName = fileInfo?.fileName ?? fallbackName
 		const withPrefix = sourceName.startsWith("osmix-") ? sourceName : `osmix-${sourceName}`
 		const suggestedName = name ?? withPrefix
-		const fileHandle = await showSaveFilePicker({
-			suggestedName,
-			types: [
-				{
-					description: "OSM PBF",
-					accept: { "application/x-protobuf": [".pbf"] },
-				},
-			],
-		})
+		const fileHandle = await showSaveFilePickerWithFallback(
+			{
+				suggestedName,
+				types: [
+					{
+						description: "OSM PBF",
+						accept: { "application/x-protobuf": [".pbf"] },
+					},
+				],
+			},
+			() => {
+				task.update(
+					"Native save picker unavailable, falling back to browser download",
+				)
+			},
+		)
 		const stream = await fileHandle.createWritable()
-		await osmWorker.toPbf(osmInfo.id, stream)
+		if (isStreamCloneable(stream)) {
+			await osmWorker.toPbf(osmInfo.id, stream)
+		} else {
+			task.update(
+				"Stream transfer unsupported in this browser; using buffered download fallback",
+			)
+			const data = await osmWorker.toPbfData(osmInfo.id)
+			await stream.write(data)
+			await stream.close()
+		}
 		task.end(`Created ${fileHandle.name} PBF for download`)
+		Log.addMessage(`Download complete: ${fileHandle.name}`)
 	})
 
 	const saveToStorage = useEffectEvent(async () => {
