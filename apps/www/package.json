@@ -10,7 +10,7 @@
 	},
 	"dependencies": {
 		"@osmix/core": "workspace:*",
-		"@shikijs/core": "3.22.0",
+		"@shikijs/core": "4.0.0",
 		"@shikijs/engine-javascript": "3.22.0",
 		"@shikijs/langs": "3.22.0",
 		"@shikijs/themes": "3.22.0",
