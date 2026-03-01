@@ -13,6 +13,7 @@ const remote = await createRemote({
 	workerCount,
 	onProgress: (event) => log.push(event.msg),
 })
+let dataset = await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
 
 // Print number of VT workers available
 console.log(`Number of VT workers available: ${workerCount}`)
@@ -25,11 +26,11 @@ const server = Bun.serve({
 		"/": indexHtml,
 		"/index.html": indexHtml,
 		"/ready": async () => {
-			const ready = await remote.isReady(filename)
+			const ready = await dataset.isReady()
 			return Response.json({ ready, log }, { status: 200 })
 		},
 		"/meta.json": async () => {
-			const osm = await remote.get(filename)
+			const osm = await dataset.get()
 			const bbox = osm.bbox()
 			const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
 			const vtMetadata = OsmixVtEncoder.layerNames(filename)
@@ -41,7 +42,7 @@ const server = Bun.serve({
 		"/tiles/:z/:x/:y": async (req) => {
 			try {
 				console.time(req.url)
-				const tile = await remote.getVectorTile(filename, [
+				const tile = await dataset.getVectorTile([
 					+req.params.x,
 					+req.params.y,
 					+req.params.z,
@@ -73,7 +74,7 @@ const server = Bun.serve({
 					{ status: 400 },
 				)
 			}
-			const results = await remote.search(filename, key, val)
+			const results = await dataset.search(key, val)
 			return Response.json(results, { status: 200 })
 		},
 	},
@@ -84,9 +85,3 @@ const server = Bun.serve({
 
 console.log(`Vector tile server running at http://localhost:${server.port}`)
 
-async function init() {
-	await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
-	console.log("Osmix initialized")
-}
-
-init()

@@ -82,15 +82,15 @@ export function detectFileType(fileName: string): OsmFileType {
  * methods so callers do not need to pass IDs repeatedly.
  */
 export class OsmRemoteDataset implements OsmInfo {
+	private readonly remote: OsmixRemote
+	id: string
 	readonly bbox: OsmInfo["bbox"]
 	readonly header: OsmInfo["header"]
 	readonly stats: OsmInfo["stats"]
 
-	constructor(
-		private readonly remote: OsmixRemote,
-		public id: string,
-		info: Omit<OsmInfo, "id">,
-	) {
+	constructor(remote: OsmixRemote, id: string, info: Omit<OsmInfo, "id">) {
+		this.remote = remote
+		this.id = id
 		this.bbox = info.bbox
 		this.header = info.header
 		this.stats = info.stats

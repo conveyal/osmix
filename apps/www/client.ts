@@ -1,9 +1,8 @@
-import type { OsmInfo } from "@osmix/core"
 import { bboxToTileRange } from "@osmix/shared/tile"
 import type { OsmTags, Tile } from "@osmix/shared/types"
 import * as idb from "idb-keyval"
 import maplibregl from "maplibre-gl"
-import { createRemote } from "osmix"
+import { createRemote, type OsmRemoteDataset } from "osmix"
 import { codeToHtml } from "./shiki.bundle"
 import MergeWorkerUrl from "./worker.ts?worker&url"
 
@@ -17,7 +16,7 @@ const IDB_KEY = { PBF: "osmix-pbf", NAME: "osmix-pbf-name" }
 const IDB_MAX = 500 * 1024 * 1024
 
 // State
-let osm: OsmInfo | null = null
+let osm: OsmRemoteDataset | null = null
 let routeMap: maplibregl.Map | null = null
 let routeState: {
 	origin?: { nodeIndex: number; coords: [number, number] }
@@ -147,7 +146,7 @@ async function loadPbf(data: ArrayBuffer | File, name: string) {
 	}
 
 	// Update Map Preview
-	renderPreview(osm.bbox, osm.id)
+	renderPreview(osm)
 
 	// Reset Search & Route
 	const tbody = document.querySelector("#search-table tbody")
@@ -157,10 +156,8 @@ async function loadPbf(data: ArrayBuffer | File, name: string) {
 	initRouteMap(osm)
 }
 
-async function renderPreview(
-	bbox: [number, number, number, number],
-	id: string,
-) {
+async function renderPreview(dataset: OsmRemoteDataset) {
+	const bbox = dataset.bbox
 	const canvas = $<HTMLCanvasElement>("map-canvas")
 	if (!canvas) return
 	$("map-result")?.classList.add("has-content")
@@ -183,7 +180,7 @@ async function renderPreview(
 	for (let y = range.minY; y <= range.maxY; y++) {
 		for (let x = range.minX; x <= range.maxX; x++) {
 			try {
-				const tile = await remote.getRasterTile(id, [x, y, zoom], {
+				const tile = await dataset.getRasterTile([x, y, zoom], {
 					tileSize: size,
 					lineColor: [15, 23, 42, 255],
 				})
@@ -214,7 +211,7 @@ async function search() {
 	const key = $<HTMLInputElement>("search-key")?.value.trim()
 	if (!key) return
 	const val = $<HTMLInputElement>("search-value")?.value.trim() || undefined
-	const res = await remote.search(osm.id, key, val)
+	const res = await osm.search(key, val)
 
 	const tbody = document.querySelector("#search-table tbody")
 	if (!tbody) return
@@ -249,7 +246,7 @@ async function search() {
 	$("search-result")?.classList.add("has-content")
 }
 
-function initRouteMap(info: OsmInfo) {
+function initRouteMap(info: OsmRemoteDataset) {
 	$("routing-result")?.classList.add("has-content")
 	routeMap?.remove()
 	routeState = { markers: [] }
@@ -283,13 +280,13 @@ function initRouteMap(info: OsmInfo) {
 			},
 		})
 		routeMap.on("click", (e) =>
-			handleRouteClick(info.id, [e.lngLat.lng, e.lngLat.lat]),
+			handleRouteClick(info, [e.lngLat.lng, e.lngLat.lat]),
 		)
 		updateRouteTable([["Instructions", "Click on the map to set origin"]])
 	})
 }
 
-async function handleRouteClick(id: string, pt: [number, number]) {
+async function handleRouteClick(dataset: OsmRemoteDataset, pt: [number, number]) {
 	if (!routeMap) return
 	if (routeState.origin && routeState.dest) {
 		routeState.markers.forEach((m) => void m.remove())
@@ -303,7 +300,7 @@ async function handleRouteClick(id: string, pt: [number, number]) {
 	if (routeState.origin) rows.push(["Origin", fmt(routeState.origin.coords)])
 	updateRouteTable([...rows, ["Status", "Finding nearest road..."]])
 
-	const snap = await remote.findNearestRoutableNode(id, pt, 500)
+	const snap = await dataset.findNearestRoutableNode(pt, 500)
 	if (!snap)
 		return updateRouteTable([...rows, ["Error", "No road found within 500m."]])
 
@@ -330,8 +327,7 @@ async function handleRouteClick(id: string, pt: [number, number]) {
 			["Status", "Calculating..."],
 		])
 
-		const res = await remote.route(
-			id,
+		const res = await dataset.route(
 			routeState.origin.nodeIndex,
 			routeState.dest.nodeIndex,
 			{ includeStats: true, includePathInfo: true },

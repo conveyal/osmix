@@ -115,7 +115,7 @@ describe("OsmixRemote", () => {
 				const osmInfo = await remote.fromPbf(pbfData.buffer, {
 					id: "remote-get",
 				})
-				const osm = await remote.get(osmInfo.id)
+				const osm = await osmInfo.get()
 
 				expect(osm.id).toBe("remote-get")
 				expect(osm.nodes.size).toBe(monacoPbf.nodes)
@@ -135,7 +135,7 @@ describe("OsmixRemote", () => {
 				const osmInfo = await remote.fromPbf(pbfData.buffer, {
 					id: "original-remote",
 				})
-				const osm = await remote.transferOut(osmInfo.id)
+				const osm = await osmInfo.transferOut()
 				await remote.transferIn(
 					new Osm({ ...osm.transferables(), id: "manual-set-remote" }),
 				)
@@ -158,9 +158,9 @@ describe("OsmixRemote", () => {
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osm1 = await remote.fromPbf(pbfData.buffer)
 
-				expect(await remote.has(osm1.id)).toBe(true)
-				await remote.delete(osm1.id)
-				expect(await remote.has(osm1.id)).toBe(false)
+				expect(await osm1.has()).toBe(true)
+				await osm1.delete()
+				expect(await osm1.has()).toBe(false)
 			},
 			workerTestTimeout,
 		)
@@ -176,7 +176,7 @@ describe("OsmixRemote", () => {
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osm = await remote.fromPbf(pbfData.buffer)
 
-				expect(await remote.isReady(osm.id)).toBe(true)
+				expect(await osm.isReady()).toBe(true)
 			},
 			workerTestTimeout,
 		)
@@ -192,7 +192,7 @@ describe("OsmixRemote", () => {
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
 				const osm = await remote.fromPbf(fileStream)
 
-				const result = await remote.search(osm.id, "name")
+				const result = await osm.search("name")
 				expect(result).toHaveProperty("nodes")
 				expect(result).toHaveProperty("ways")
 				expect(result).toHaveProperty("relations")
@@ -210,7 +210,7 @@ describe("OsmixRemote", () => {
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
 				const osm = await remote.fromPbf(fileStream)
 
-				const result = await remote.search(osm.id, "highway", "residential")
+				const result = await osm.search("highway", "residential")
 				expect(result).toHaveProperty("nodes")
 				expect(result).toHaveProperty("ways")
 				expect(result).toHaveProperty("relations")
@@ -230,7 +230,7 @@ describe("OsmixRemote", () => {
 				const osm = await remote.fromPbf(fileStream)
 
 				const tile: [number, number, number] = [7, 4, 3]
-				const tileData = await remote.getVectorTile(osm.id, tile)
+				const tileData = await osm.getVectorTile(tile)
 
 				expect(tileData).toBeInstanceOf(ArrayBuffer)
 				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)
@@ -250,7 +250,7 @@ describe("OsmixRemote", () => {
 				const osm = await remote.fromPbf(fileStream)
 
 				const tile: [number, number, number] = [7, 4, 3]
-				const tileData = await remote.getRasterTile(osm.id, tile)
+				const tileData = await osm.getRasterTile(tile)
 
 				expect(tileData).toBeInstanceOf(Uint8ClampedArray)
 				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)
@@ -266,7 +266,7 @@ describe("OsmixRemote", () => {
 				const osm = await remote.fromPbf(fileStream)
 
 				const tile: [number, number, number] = [7, 4, 3]
-				const tileData = await remote.getRasterTile(osm.id, tile, {
+				const tileData = await osm.getRasterTile(tile, {
 					tileSize: 512,
 				})
 

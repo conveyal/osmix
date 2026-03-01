@@ -47,7 +47,7 @@ export async function runOsmixBenchmarks(
 	onProgress("Osmix: Loading file...")
 	const loadBenchmark = startBenchmark("Load Speed")
 	const osmInfo = await osmix.fromPbf(fileData)
-	const osm = await osmix.get(osmInfo.id)
+	const osm = await osmInfo.get()
 	const stats = osmInfo.stats
 
 	// Get bbox and stats from loaded data

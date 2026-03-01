@@ -31,6 +31,7 @@ const remote = await createRemote<ShortbreadWorker>({
 })
 
 console.log(`Number of workers available: ${workerCount}`)
+let dataset = await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
 
 const server = Bun.serve({
 	port: PORT,
@@ -40,7 +41,7 @@ const server = Bun.serve({
 		"/": indexHtml,
 		"/index.html": indexHtml,
 		"/remove": async () => {
-			await remote.delete(filename)
+			await dataset.delete()
 			// Clear the log
 			log = []
 			return Response.json({ status: "Removed" }, { status: 200 })
@@ -58,7 +59,7 @@ const server = Bun.serve({
 					}
 					// Set the new current filename
 					filename = id
-					await remote.fromPbf(data, { id })
+					dataset = await remote.fromPbf(data, { id })
 					return Response.json(
 						{
 							status: `Loading ${id}...`,
@@ -78,11 +79,11 @@ const server = Bun.serve({
 			},
 		},
 		"/ready": async () => {
-			const ready = await remote.isReady(filename)
+			const ready = await dataset.isReady()
 			return Response.json({ ready, log }, { status: 200 })
 		},
 		"/meta.json": async () => {
-			const osm = await remote.get(filename)
+			const osm = await dataset.get()
 			const bbox = osm.bbox()
 			const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
 			const layerNames = ShortbreadVtEncoder.layerNames
@@ -168,7 +169,7 @@ const server = Bun.serve({
 				// Use the extended worker method via getWorker()
 				const tile = await remote
 					.getWorker()
-					.getShortbreadTile(filename, [
+					.getShortbreadTile(dataset.id, [
 						+req.params.x,
 						+req.params.y,
 						+req.params.z,
@@ -198,9 +199,4 @@ console.log(
 	`Shortbread vector tile server running at http://localhost:${server.port}`,
 )
 
-async function init() {
-	await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
-	console.log("Osmix initialized with Shortbread encoder")
-}
-
-init()
+console.log("Osmix initialized with Shortbread encoder")

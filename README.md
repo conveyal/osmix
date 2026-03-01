@@ -67,10 +67,10 @@ import { createRemote } from "osmix"
 
 // main.ts
 const remote = await createRemote()
-const osmInfo = await remote.fromPbf(monacoPbf) // Remote returns an info object
+const osm = await remote.fromPbf(monacoPbf) // Returns a dataset handle
 
 // Operations run off the main thread
-const tile = await remote.getVectorTile(osmInfo.id, [9372, 12535, 15])
+const tile = await osm.getVectorTile([9372, 12535, 15])
 ```
 
 ## Monorepo Structure

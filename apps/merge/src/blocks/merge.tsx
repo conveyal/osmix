@@ -309,7 +309,7 @@ export default function MergeBlock() {
 
 									try {
 										setChangesetStats(null)
-										const osmId = await osmWorker.merge(
+										const merged = await osmWorker.merge(
 											base.osm.id,
 											patch.osm.id,
 											{
@@ -332,7 +332,7 @@ export default function MergeBlock() {
 											base.fileInfo?.fileName,
 											patch.fileInfo?.fileName,
 										)
-										await base.setMergedOsm(osmId, mergedName)
+										await base.setMergedOsm(merged.id, mergedName)
 										patch.setOsm(null)
 
 										task.end("All merge steps completed")
