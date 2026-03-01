@@ -73,6 +73,94 @@ export function detectFileType(fileName: string): OsmFileType {
 	return "pbf"
 }
 
+
+
+/**
+ * Object-oriented handle for a remote Osm dataset.
+ *
+ * Includes `OsmInfo` fields (`id`, `bbox`, `header`, `stats`) plus convenience
+ * methods so callers do not need to pass IDs repeatedly.
+ */
+export class OsmRemoteDataset implements OsmInfo {
+	readonly bbox: OsmInfo["bbox"]
+	readonly header: OsmInfo["header"]
+	readonly stats: OsmInfo["stats"]
+
+	constructor(
+		private readonly remote: OsmixRemote,
+		public id: string,
+		info: Omit<OsmInfo, "id">,
+	) {
+		this.bbox = info.bbox
+		this.header = info.header
+		this.stats = info.stats
+	}
+
+	get() {
+		return this.remote.get(this.id)
+	}
+
+	has() {
+		return this.remote.has(this.id)
+	}
+
+	isReady() {
+		return this.remote.isReady(this.id)
+	}
+
+	search(key: string, val?: string) {
+		return this.remote.search(this.id, key, val)
+	}
+
+	getVectorTile(tile: Tile) {
+		return this.remote.getVectorTile(this.id, tile)
+	}
+
+	getRasterTile(tile: Tile, opts?: DrawToRasterTileOptions) {
+		return this.remote.getRasterTile(this.id, tile, opts)
+	}
+
+	toPbfData() {
+		return this.remote.toPbfData(this.id)
+	}
+
+	toPbf(stream: WritableStream<Uint8Array>) {
+		return this.remote.toPbf(this.id, stream)
+	}
+
+	transferOut() {
+		return this.remote.transferOut(this.id)
+	}
+
+	delete() {
+		return this.remote.delete(this.id)
+	}
+
+	async rename(toId: string) {
+		await this.remote.rename(this.id, toId)
+		this.id = toId
+	}
+
+	buildRoutingGraph(filter?: HighwayFilter, defaultSpeeds?: DefaultSpeeds) {
+		return this.remote.buildRoutingGraph(this.id, filter, defaultSpeeds)
+	}
+
+	hasRoutingGraph() {
+		return this.remote.hasRoutingGraph(this.id)
+	}
+
+	findNearestRoutableNode(point: LonLat, maxDistanceM: number) {
+		return this.remote.findNearestRoutableNode(this.id, point, maxDistanceM)
+	}
+
+	route(fromIndex: number, toIndex: number, options?: Partial<RouteOptions>) {
+		return this.remote.route(this.id, fromIndex, toIndex, options)
+	}
+
+	merge(patch: OsmId, options: Partial<OsmMergeOptions> = {}) {
+		return this.remote.merge(this, patch, options)
+	}
+}
 export interface OsmixRemoteOptions {
 	workerCount?: number
 	onProgress?: (progress: Progress) => void
@@ -259,6 +347,12 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		)
 	}
 
+
+	private wrap(info: OsmInfo): OsmRemoteDataset {
+		const { id, ...rest } = info
+		return new OsmRemoteDataset(this, id, rest)
+	}
+
 	/**
 	 * Load an `Osm` instance from PBF data in a worker.
 	 * Data is sent to the first available worker, then synchronized across all workers.
@@ -273,7 +367,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			transfer({ data: await this.getTransferableData(data), options }),
 		)
 		await this.populateOtherWorkers(worker0, osmInfo.id)
-		return osmInfo
+		return this.wrap(osmInfo)
 	}
 
 	/**
@@ -324,7 +418,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			}),
 		)
 		await this.populateOtherWorkers(worker0, osmInfo.id)
-		return osmInfo
+		return this.wrap(osmInfo)
 	}
 
 	/**
@@ -344,7 +438,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			}),
 		)
 		await this.populateOtherWorkers(worker0, osmInfo.id)
-		return osmInfo
+		return this.wrap(osmInfo)
 	}
 
 	/**
@@ -366,7 +460,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			}),
 		)
 		await this.populateOtherWorkers(worker0, osmInfo.id)
-		return osmInfo
+		return this.wrap(osmInfo)
 	}
 
 	/**
@@ -479,7 +573,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			}),
 		)
 		await this.populateOtherWorkers(worker0, osmInfo.id)
-		return osmInfo
+		return this.wrap(osmInfo)
 	}
 
 	/**
@@ -743,7 +837,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		)
 		await this.populateOtherWorkers(worker0, osmId)
 		await this.delete(patchOsmId)
-		return osmId
+		const merged = await this.get(osmId)
+		return this.wrap(merged.info())
 	}
 
 	/**

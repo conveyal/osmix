@@ -277,6 +277,72 @@ describe("OsmixRemote", () => {
 		)
 	})
 
+
+	describe("dataset handle API", () => {
+		it(
+			"should expose instance methods without passing IDs",
+			async () => {
+				using remote = await createRemote({ workerCount: 1 })
+				const geojson: FeatureCollection<Point> = {
+					type: "FeatureCollection",
+					features: [
+						{
+							type: "Feature",
+							geometry: {
+								type: "Point",
+								coordinates: [-122.4194, 37.7749],
+							},
+							properties: { amenity: "cafe", name: "Cafe" },
+						},
+					],
+				}
+
+				const data = new TextEncoder().encode(JSON.stringify(geojson)).buffer
+				const dataset = await remote.fromGeoJSON(data, { id: "handle-test" })
+
+				expect(dataset.id).toBe("handle-test")
+				expect(dataset.stats.nodes).toBe(1)
+				expect(await dataset.has()).toBe(true)
+				expect(await dataset.isReady()).toBe(true)
+				const local = await dataset.get()
+				expect(local.id).toBe("handle-test")
+			},
+			workerTestTimeout,
+		)
+
+		it(
+			"should return a dataset handle from merge",
+			async () => {
+				using remote = await createRemote({ workerCount: 1 })
+				const point = (name: string, lon: number, lat: number): FeatureCollection<Point> => ({
+					type: "FeatureCollection",
+					features: [
+						{
+							type: "Feature",
+							geometry: { type: "Point", coordinates: [lon, lat] },
+							properties: { name },
+						},
+					],
+				})
+
+				const base = await remote.fromGeoJSON(
+					new TextEncoder().encode(JSON.stringify(point("base", -122.4, 37.7))).buffer,
+					{ id: "base-osm" },
+				)
+				const patch = await remote.fromGeoJSON(
+					new TextEncoder().encode(JSON.stringify(point("patch", -122.41, 37.71))).buffer,
+					{ id: "patch-osm" },
+				)
+
+				const merged = await base.merge(patch)
+				expect(merged.id).toBe("base-osm")
+				expect(merged.stats.nodes).toBeGreaterThanOrEqual(1)
+				expect(await remote.has("patch-osm")).toBe(false)
+			},
+			workerTestTimeout,
+		)
+	})
+
 	describe("worker pool management", () => {
 		beforeAll(() => getFixtureFile(monacoPbf.url))
 
