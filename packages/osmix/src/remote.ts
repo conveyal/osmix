@@ -77,58 +77,48 @@ export function detectFileType(fileName: string): OsmFileType {
 
 type DatasetMember = "nodes" | "ways" | "relations"
 
-type DatasetProxyMethodExclusions =
-	| "getId"
-	| "rename"
-	| "merge"
-	| `${DatasetMember}${string}`
+type BoundDatasetMethod<F> = F extends (osmId: OsmId, ...args: infer Args) => infer Return
+	? (...args: Args) => Return
+	: never
 
-type OsmRemoteDatasetMethodKeys<T extends OsmixWorker> = Exclude<
-	{
-		[K in keyof OsmixRemote<T>]: OsmixRemote<T>[K] extends (
-			osmId: OsmId,
-			...args: any[]
-		) => any
-			? K
-			: never
-	}[keyof OsmixRemote<T>],
-	DatasetProxyMethodExclusions
->
+type DatasetProxyMethodName =
+	| "get"
+	| "has"
+	| "isReady"
+	| "search"
+	| "getVectorTile"
+	| "getRasterTile"
+	| "toPbfData"
+	| "toPbf"
+	| "transferOut"
+	| "delete"
+	| "buildRoutingGraph"
+	| "hasRoutingGraph"
+	| "findNearestRoutableNode"
+	| "route"
+	| "generateChangeset"
+	| "applyChangesAndReplace"
+	| "setChangesetFilters"
+	| "getChangesetPage"
 
 type OsmRemoteDatasetMethods<T extends OsmixWorker> = {
-	[K in OsmRemoteDatasetMethodKeys<T>]: OsmixRemote<T>[K] extends (
-		osmId: OsmId,
-		...args: infer Args
-	) => infer Return
-		? (...args: Args) => Return
-		: never
+	[K in DatasetProxyMethodName]: BoundDatasetMethod<OsmixRemote<T>[K]>
 }
 
-type MemberRemoteMethodKeys<
-	T extends OsmixWorker,
-	M extends DatasetMember,
-> = {
-	[K in keyof OsmixRemote<T>]: K extends `${M}${string}`
-		? OsmixRemote<T>[K] extends (osmId: OsmId, ...args: any[]) => any
-			? K
-			: never
-		: never
-}[keyof OsmixRemote<T>]
+type DatasetMemberMethodName = "size" | "getById" | "search"
 
-type MemberMethodName<K extends string, M extends DatasetMember> =
-	K extends `${M}${infer Rest}` ? Uncapitalize<Rest> : never
+type MemberRemoteMethodName<
+	M extends DatasetMember,
+	K extends DatasetMemberMethodName,
+> = `${M}${Capitalize<K>}`
 
 type OsmRemoteDatasetMemberMethods<
 	T extends OsmixWorker,
 	M extends DatasetMember,
 > = {
-	[K in MemberRemoteMethodKeys<T, M> as K extends string
-		? MemberMethodName<K, M>
-		: never]: K extends keyof OsmixRemote<T>
-		? OsmixRemote<T>[K] extends (osmId: OsmId, ...args: infer Args) => infer Return
-			? (...args: Args) => Return
-			: never
-		: never
+	[K in DatasetMemberMethodName]: BoundDatasetMethod<
+		OsmixRemote<T>[MemberRemoteMethodName<M, K>]
+	>
 }
 
 /**
