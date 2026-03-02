@@ -131,10 +131,8 @@ type OsmRemoteDatasetMemberMethods<
  * `OsmixRemote` method with signature `(osmId, ...args)` is exposed here,
  * with `osmId` automatically bound to this dataset's `id`.
  */
-export class OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
-	implements OsmInfo
-{
-	private readonly remote: OsmixRemote<T>
+class OsmRemoteDatasetBase<T extends OsmixWorker = OsmixWorker> implements OsmInfo {
+	readonly remote: OsmixRemote<T>
 	id: string
 	readonly bbox: OsmInfo["bbox"]
 	readonly header: OsmInfo["header"]
@@ -152,21 +150,7 @@ export class OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
 		this.nodes = this.createMemberProxy("nodes")
 		this.ways = this.createMemberProxy("ways")
 		this.relations = this.createMemberProxy("relations")
-
-		return new Proxy(this, {
-			get: (target, prop, receiver) => {
-				const value = Reflect.get(target, prop, receiver)
-				if (value !== undefined) return value
-				if (typeof prop !== "string") return value
-
-				const remoteValue = Reflect.get(target.remote, prop)
-				if (typeof remoteValue !== "function") return remoteValue
-				return (...args: unknown[]) =>
-					remoteValue.call(target.remote, target.id, ...args)
-			},
-		})
 	}
-
 
 	private createMemberProxy<M extends DatasetMember>(
 		member: M,
@@ -193,11 +177,28 @@ export class OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
 	}
 }
 
-export interface OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
-	extends OsmRemoteDatasetMethods<T> {
-	readonly nodes: OsmRemoteDatasetMemberMethods<T, "nodes">
-	readonly ways: OsmRemoteDatasetMemberMethods<T, "ways">
-	readonly relations: OsmRemoteDatasetMemberMethods<T, "relations">
+export type OsmRemoteDataset<T extends OsmixWorker = OsmixWorker> =
+	& OsmRemoteDatasetBase<T>
+	& OsmRemoteDatasetMethods<T>
+
+function createOsmRemoteDataset<T extends OsmixWorker = OsmixWorker>(
+	remote: OsmixRemote<T>,
+	id: string,
+	info: Omit<OsmInfo, "id">,
+): OsmRemoteDataset<T> {
+	const base = new OsmRemoteDatasetBase<T>(remote, id, info)
+	return new Proxy(base, {
+		get: (target, prop, receiver) => {
+			const value = Reflect.get(target, prop, receiver)
+			if (value !== undefined) return value
+			if (typeof prop !== "string") return value
+
+			const remoteValue = Reflect.get(target.remote, prop)
+			if (typeof remoteValue !== "function") return remoteValue
+			return (...args: unknown[]) =>
+				remoteValue.call(target.remote, target.id, ...args)
+		},
+	}) as OsmRemoteDataset<T>
 }
 export interface OsmixRemoteOptions {
 	workerCount?: number
@@ -388,7 +389,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 
 	private wrap(info: OsmInfo): OsmRemoteDataset<T> {
 		const { id, ...rest } = info
-		return new OsmRemoteDataset(this, id, rest)
+		return createOsmRemoteDataset(this, id, rest)
 	}
 
 	/**
