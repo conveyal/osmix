@@ -75,65 +75,67 @@ export function detectFileType(fileName: string): OsmFileType {
 
 
 
+type DatasetProxyMethodExclusions = "getId" | "rename" | "merge"
+
+type OsmRemoteDatasetMethodKeys<T extends OsmixWorker> = Exclude<
+	{
+		[K in keyof OsmixRemote<T>]: OsmixRemote<T>[K] extends (
+			osmId: OsmId,
+			...args: any[]
+		) => any
+			? K
+			: never
+	}[keyof OsmixRemote<T>],
+	DatasetProxyMethodExclusions
+>
+
+type OsmRemoteDatasetMethods<T extends OsmixWorker> = {
+	[K in OsmRemoteDatasetMethodKeys<T>]: OsmixRemote<T>[K] extends (
+		osmId: OsmId,
+		...args: infer Args
+	) => infer Return
+		? (...args: Args) => Return
+		: never
+}
+
 /**
  * Object-oriented handle for a remote Osm dataset.
  *
  * Includes `OsmInfo` fields (`id`, `bbox`, `header`, `stats`) plus convenience
  * methods so callers do not need to pass IDs repeatedly.
+ *
+ * Method forwarding is proxied from `OsmixRemote` at runtime. Any public
+ * `OsmixRemote` method with signature `(osmId, ...args)` is exposed here,
+ * with `osmId` automatically bound to this dataset's `id`.
  */
-export class OsmRemoteDataset implements OsmInfo {
-	private readonly remote: OsmixRemote
+export class OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
+	implements OsmInfo
+{
+	private readonly remote: OsmixRemote<T>
 	id: string
 	readonly bbox: OsmInfo["bbox"]
 	readonly header: OsmInfo["header"]
 	readonly stats: OsmInfo["stats"]
 
-	constructor(remote: OsmixRemote, id: string, info: Omit<OsmInfo, "id">) {
+	constructor(remote: OsmixRemote<T>, id: string, info: Omit<OsmInfo, "id">) {
 		this.remote = remote
 		this.id = id
 		this.bbox = info.bbox
 		this.header = info.header
 		this.stats = info.stats
-	}
 
-	get() {
-		return this.remote.get(this.id)
-	}
+		return new Proxy(this, {
+			get: (target, prop, receiver) => {
+				const value = Reflect.get(target, prop, receiver)
+				if (value !== undefined) return value
+				if (typeof prop !== "string") return value
 
-	has() {
-		return this.remote.has(this.id)
-	}
-
-	isReady() {
-		return this.remote.isReady(this.id)
-	}
-
-	search(key: string, val?: string) {
-		return this.remote.search(this.id, key, val)
-	}
-
-	getVectorTile(tile: Tile) {
-		return this.remote.getVectorTile(this.id, tile)
-	}
-
-	getRasterTile(tile: Tile, opts?: DrawToRasterTileOptions) {
-		return this.remote.getRasterTile(this.id, tile, opts)
-	}
-
-	toPbfData() {
-		return this.remote.toPbfData(this.id)
-	}
-
-	toPbf(stream: WritableStream<Uint8Array>) {
-		return this.remote.toPbf(this.id, stream)
-	}
-
-	transferOut() {
-		return this.remote.transferOut(this.id)
-	}
-
-	delete() {
-		return this.remote.delete(this.id)
+				const remoteValue = Reflect.get(target.remote, prop)
+				if (typeof remoteValue !== "function") return remoteValue
+				return (...args: unknown[]) =>
+					remoteValue.call(target.remote, target.id, ...args)
+			},
+		})
 	}
 
 	async rename(toId: string) {
@@ -141,26 +143,13 @@ export class OsmRemoteDataset implements OsmInfo {
 		this.id = toId
 	}
 
-	buildRoutingGraph(filter?: HighwayFilter, defaultSpeeds?: DefaultSpeeds) {
-		return this.remote.buildRoutingGraph(this.id, filter, defaultSpeeds)
-	}
-
-	hasRoutingGraph() {
-		return this.remote.hasRoutingGraph(this.id)
-	}
-
-	findNearestRoutableNode(point: LonLat, maxDistanceM: number) {
-		return this.remote.findNearestRoutableNode(this.id, point, maxDistanceM)
-	}
-
-	route(fromIndex: number, toIndex: number, options?: Partial<RouteOptions>) {
-		return this.remote.route(this.id, fromIndex, toIndex, options)
-	}
-
 	merge(patch: OsmId, options: Partial<OsmMergeOptions> = {}) {
 		return this.remote.merge(this, patch, options)
 	}
 }
+
+export interface OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
+	extends OsmRemoteDatasetMethods<T> {}
 export interface OsmixRemoteOptions {
 	workerCount?: number
 	onProgress?: (progress: Progress) => void
@@ -348,7 +337,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	}
 
 
-	private wrap(info: OsmInfo): OsmRemoteDataset {
+	private wrap(info: OsmInfo): OsmRemoteDataset<T> {
 		const { id, ...rest } = info
 		return new OsmRemoteDataset(this, id, rest)
 	}
