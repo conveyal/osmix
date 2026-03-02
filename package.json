@@ -19,7 +19,7 @@
 		}
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.3.15",
+		"@biomejs/biome": "^2.4.4",
 		"@changesets/cli": "^2.29.8",
 		"@typescript/native-preview": "latest",
 		"typescript": "^5.9.3"

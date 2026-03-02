@@ -1,5 +1,15 @@
 # osmix
 
+## 0.2.0
+
+### Minor Changes
+
+- 384f9c1: Improve OsmixRemote API with dataset handles
+
+### Patch Changes
+
+- @osmix/router@0.0.10
+
 ## 0.1.7
 
 ### Patch Changes
