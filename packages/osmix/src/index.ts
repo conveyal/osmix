@@ -33,8 +33,8 @@
  * import { createRemote } from "osmix"
  *
  * const remote = await createRemote()
- * const osmInfo = await remote.fromPbf(pbfFile)
- * const tile = await remote.getVectorTile(osmInfo.id, [9372, 12535, 15])
+ * const osm = await remote.fromPbf(pbfFile)
+ * const tile = await osm.getVectorTile([9372, 12535, 15])
  * ```
  *
  * @module osmix

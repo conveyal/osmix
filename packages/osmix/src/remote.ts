@@ -73,6 +73,133 @@ export function detectFileType(fileName: string): OsmFileType {
 	return "pbf"
 }
 
+
+
+type DatasetMember = "nodes" | "ways" | "relations"
+
+type BoundDatasetMethod<F> = F extends (osmId: OsmId, ...args: infer Args) => infer Return
+	? (...args: Args) => Return
+	: never
+
+type DatasetProxyMethodName =
+	| "get"
+	| "has"
+	| "isReady"
+	| "search"
+	| "getVectorTile"
+	| "getRasterTile"
+	| "toPbfData"
+	| "toPbf"
+	| "transferOut"
+	| "delete"
+	| "buildRoutingGraph"
+	| "hasRoutingGraph"
+	| "findNearestRoutableNode"
+	| "route"
+	| "generateChangeset"
+	| "applyChangesAndReplace"
+	| "setChangesetFilters"
+	| "getChangesetPage"
+
+type OsmRemoteDatasetMethods<T extends OsmixWorker> = {
+	[K in DatasetProxyMethodName]: BoundDatasetMethod<OsmixRemote<T>[K]>
+}
+
+type DatasetMemberMethodName = "size" | "getById" | "search"
+
+type MemberRemoteMethodName<
+	M extends DatasetMember,
+	K extends DatasetMemberMethodName,
+> = `${M}${Capitalize<K>}`
+
+type OsmRemoteDatasetMemberMethods<
+	T extends OsmixWorker,
+	M extends DatasetMember,
+> = {
+	[K in DatasetMemberMethodName]: BoundDatasetMethod<
+		OsmixRemote<T>[MemberRemoteMethodName<M, K>]
+	>
+}
+
+/**
+ * Object-oriented handle for a remote Osm dataset.
+ *
+ * Includes `OsmInfo` fields (`id`, `bbox`, `header`, `stats`) plus convenience
+ * methods so callers do not need to pass IDs repeatedly.
+ *
+ * Method forwarding is proxied from `OsmixRemote` at runtime. Any public
+ * `OsmixRemote` method with signature `(osmId, ...args)` is exposed here,
+ * with `osmId` automatically bound to this dataset's `id`.
+ */
+class OsmRemoteDatasetBase<T extends OsmixWorker = OsmixWorker> implements OsmInfo {
+	readonly remote: OsmixRemote<T>
+	id: string
+	readonly bbox: OsmInfo["bbox"]
+	readonly header: OsmInfo["header"]
+	readonly stats: OsmInfo["stats"]
+	readonly nodes: OsmRemoteDatasetMemberMethods<T, "nodes">
+	readonly ways: OsmRemoteDatasetMemberMethods<T, "ways">
+	readonly relations: OsmRemoteDatasetMemberMethods<T, "relations">
+
+	constructor(remote: OsmixRemote<T>, id: string, info: Omit<OsmInfo, "id">) {
+		this.remote = remote
+		this.id = id
+		this.bbox = info.bbox
+		this.header = info.header
+		this.stats = info.stats
+		this.nodes = this.createMemberProxy("nodes")
+		this.ways = this.createMemberProxy("ways")
+		this.relations = this.createMemberProxy("relations")
+	}
+
+	private createMemberProxy<M extends DatasetMember>(
+		member: M,
+	): OsmRemoteDatasetMemberMethods<T, M> {
+		return new Proxy({} as OsmRemoteDatasetMemberMethods<T, M>, {
+			get: (_target, prop) => {
+				if (typeof prop !== "string") return undefined
+				const method = `${member}${prop.charAt(0).toUpperCase()}${prop.slice(1)}`
+				const remoteValue = Reflect.get(this.remote, method)
+				if (typeof remoteValue !== "function") return undefined
+				return (...args: unknown[]) =>
+					remoteValue.call(this.remote, this.id, ...args)
+			},
+		})
+	}
+
+	async rename(toId: string) {
+		await this.remote.rename(this.id, toId)
+		this.id = toId
+	}
+
+	merge(patch: OsmId, options: Partial<OsmMergeOptions> = {}) {
+		return this.remote.merge(this, patch, options)
+	}
+}
+
+export type OsmRemoteDataset<T extends OsmixWorker = OsmixWorker> =
+	& OsmRemoteDatasetBase<T>
+	& OsmRemoteDatasetMethods<T>
+
+function createOsmRemoteDataset<T extends OsmixWorker = OsmixWorker>(
+	remote: OsmixRemote<T>,
+	id: string,
+	info: Omit<OsmInfo, "id">,
+): OsmRemoteDataset<T> {
+	const base = new OsmRemoteDatasetBase<T>(remote, id, info)
+	return new Proxy(base, {
+		get: (target, prop, receiver) => {
+			const value = Reflect.get(target, prop, receiver)
+			if (value !== undefined) return value
+			if (typeof prop !== "string") return value
+
+			const remoteValue = Reflect.get(target.remote, prop)
+			if (typeof remoteValue !== "function") return remoteValue
+			return (...args: unknown[]) =>
+				remoteValue.call(target.remote, target.id, ...args)
+		},
+	}) as OsmRemoteDataset<T>
+}
 export interface OsmixRemoteOptions {
 	workerCount?: number
 	onProgress?: (progress: Progress) => void
@@ -259,6 +386,12 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		)
 	}
 
+
+	private wrap(info: OsmInfo): OsmRemoteDataset<T> {
+		const { id, ...rest } = info
+		return createOsmRemoteDataset(this, id, rest)
+	}
+
 	/**
 	 * Load an `Osm` instance from PBF data in a worker.
 	 * Data is sent to the first available worker, then synchronized across all workers.
@@ -273,7 +406,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			transfer({ data: await this.getTransferableData(data), options }),
 		)
 		await this.populateOtherWorkers(worker0, osmInfo.id)
-		return osmInfo
+		return this.wrap(osmInfo)
 	}
 
 	/**
@@ -324,7 +457,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			}),
 		)
 		await this.populateOtherWorkers(worker0, osmInfo.id)
-		return osmInfo
+		return this.wrap(osmInfo)
 	}
 
 	/**
@@ -344,7 +477,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			}),
 		)
 		await this.populateOtherWorkers(worker0, osmInfo.id)
-		return osmInfo
+		return this.wrap(osmInfo)
 	}
 
 	/**
@@ -366,7 +499,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			}),
 		)
 		await this.populateOtherWorkers(worker0, osmInfo.id)
-		return osmInfo
+		return this.wrap(osmInfo)
 	}
 
 	/**
@@ -479,7 +612,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			}),
 		)
 		await this.populateOtherWorkers(worker0, osmInfo.id)
-		return osmInfo
+		return this.wrap(osmInfo)
 	}
 
 	/**
@@ -626,6 +759,42 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		return this.nextWorker().search(this.getId(osmId), key, val)
 	}
 
+	nodesSize(osmId: OsmId) {
+		return this.nextWorker().nodesSize(this.getId(osmId))
+	}
+
+	nodesGetById(osmId: OsmId, nodeId: number) {
+		return this.nextWorker().nodesGetById(this.getId(osmId), nodeId)
+	}
+
+	nodesSearch(osmId: OsmId, key: string, val?: string) {
+		return this.nextWorker().nodesSearch(this.getId(osmId), key, val)
+	}
+
+	waysSize(osmId: OsmId) {
+		return this.nextWorker().waysSize(this.getId(osmId))
+	}
+
+	waysGetById(osmId: OsmId, wayId: number) {
+		return this.nextWorker().waysGetById(this.getId(osmId), wayId)
+	}
+
+	waysSearch(osmId: OsmId, key: string, val?: string) {
+		return this.nextWorker().waysSearch(this.getId(osmId), key, val)
+	}
+
+	relationsSize(osmId: OsmId) {
+		return this.nextWorker().relationsSize(this.getId(osmId))
+	}
+
+	relationsGetById(osmId: OsmId, relationId: number) {
+		return this.nextWorker().relationsGetById(this.getId(osmId), relationId)
+	}
+
+	relationsSearch(osmId: OsmId, key: string, val?: string) {
+		return this.nextWorker().relationsSearch(this.getId(osmId), key, val)
+	}
+
 	// ---------------------------------------------------------------------------
 	// Routing
 	// ---------------------------------------------------------------------------
@@ -743,7 +912,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		)
 		await this.populateOtherWorkers(worker0, osmId)
 		await this.delete(patchOsmId)
-		return osmId
+		const merged = await this.get(osmId)
+		return this.wrap(merged.info())
 	}
 
 	/**

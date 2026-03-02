@@ -64,12 +64,12 @@
 					<pre><code id="code-stats" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
 
 const remote = await createRemote()
-const osmInfo = await remote.fromPbf(pbfFile)
+const osm = await remote.fromPbf(pbfFile)
 
-console.log("Nodes:", osmInfo.stats.nodes)
-console.log("Ways:", osmInfo.stats.ways)
-console.log("Relations:", osmInfo.stats.relations)
-console.log("Bbox:", osmInfo.bbox)</code></pre>
+console.log("Nodes:", osm.stats.nodes)
+console.log("Ways:", osm.stats.ways)
+console.log("Relations:", osm.stats.relations)
+console.log("Bbox:", osm.bbox)</code></pre>
 					<div class="result-box" id="stats-result">
 						<p class="placeholder">Select a file above to see results...</p>
 					</div>
@@ -81,16 +81,16 @@ console.log("Bbox:", osmInfo.bbox)</code></pre>
 					<pre><code id="code-map" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
 
 const remote = await createRemote()
-const osmInfo = await remote.fromPbf(pbfFile)
+const osm = await remote.fromPbf(pbfFile)
 
 const zoom = 14
 const tileSize = 256
-const [minX, minY, maxX, maxY] = bboxToTileRange(osmInfo.bbox, zoom)
+const [minX, minY, maxX, maxY] = bboxToTileRange(osm.bbox, zoom)
 const canvas = document.getElementById("map-canvas") as HTMLCanvasElement
 const ctx = canvas.getContext("2d")
 
 for (const [x, y] of listTiles(minX, minY, maxX, maxY)) {
-  const tile = await remote.getRasterTile(osmInfo.id, [x, y, zoom], tileSize)
+  const tile = await osm.getRasterTile([x, y, zoom], tileSize)
   const image = new ImageData(tile, tileSize, tileSize)
   ctx.putImageData(image, (x - minX) * tileSize, (y - minY) * tileSize)
 }</code></pre>
@@ -106,9 +106,9 @@ for (const [x, y] of listTiles(minX, minY, maxX, maxY)) {
 					<pre><code id="code-search" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
 
 const remote = await createRemote()
-const osmInfo = await remote.fromPbf(pbfFile)
+const osm = await remote.fromPbf(pbfFile)
 
-const results = await remote.search(osmInfo.id, "amenity", "restaurant")
+const results = await osm.search("amenity", "restaurant")
 
 console.log("Nodes:", results.nodes.length)
 console.log("Ways:", results.ways.length)
@@ -145,22 +145,21 @@ console.log("Relations:", results.relations.length)</code></pre>
 					<pre class="terminal"><code id="code-routing" class="highlight-this" data-lang="typescript">import { createRemote } from "osmix"
 
 const remote = await createRemote()
-const osmInfo = await remote.fromPbf(pbfFile)
+const osm = await remote.fromPbf(pbfFile)
 
 // Click on map to set origin and destination
 map.on('click', async (e) => {
 	const point = [e.lngLat.lng, e.lngLat.lat]
-	const snapped = await remote.findNearestRoutableNode(
-	osmInfo.id, point, 500
-	)
+	const snapped = await osm.findNearestRoutableNode(point, 500)
 	if (snapped) {
-	// Use snapped.nodeIndex for routing
+		// Use snapped.nodeIndex for routing
 	}
 })
 
 // Calculate route between two snapped nodes
-const result = await remote.route(
-	osmInfo.id, fromNode.nodeIndex, toNode.nodeIndex,
+const result = await osm.route(
+	fromNode.nodeIndex,
+	toNode.nodeIndex,
 	{ includeStats: true, includePathInfo: true }
 )</code></pre>
 					<div class="result-box" id="routing-result">

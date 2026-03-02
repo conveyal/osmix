@@ -34,12 +34,12 @@ const pbfBytes = await toPbfBuffer(geoOsm)
 import { createRemote } from "osmix"
 
 const remote = await createRemote()
-const monacoOsmInfo = await remote.fromPbf(monacoPbf)
-const patchOsmInfo = await remote.fromPbf(Bun.file("patch.osm.pbf").stream(), {
+const monaco = await remote.fromPbf(monacoPbf)
+const patch = await remote.fromPbf(Bun.file("patch.osm.pbf").stream(), {
 	id: "patch",
 })
-await remote.merge(monacoOsmInfo, patchOsmInfo)
-const rasterTile = await remote.getRasterTile(monacoOsmInfo, [10561, 22891, 16])
+const merged = await monaco.merge(patch)
+const rasterTile = await merged.getRasterTile([10561, 22891, 16])
 ```
 
 #### How?
@@ -58,15 +58,15 @@ builds lazily on first use, so there's no upfront cost until you actually route.
 import { createRemote } from "osmix"
 
 const remote = await createRemote()
-const osmInfo = await remote.fromPbf(monacoPbf)
+const osm = await remote.fromPbf(monacoPbf)
 
 // Find nearest routable nodes to coordinates
-const from = await remote.findNearestRoutableNode(osmInfo.id, [7.42, 43.73], 0.5)
-const to = await remote.findNearestRoutableNode(osmInfo.id, [7.43, 43.74], 0.5)
+const from = await osm.findNearestRoutableNode([7.42, 43.73], 0.5)
+const to = await osm.findNearestRoutableNode([7.43, 43.74], 0.5)
 
 if (from && to) {
 	// Calculate route with statistics and path info
-	const result = await remote.route(osmInfo.id, from.nodeIndex, to.nodeIndex, {
+	const result = await osm.route(from.nodeIndex, to.nodeIndex, {
 		includeStats: true,
 		includePathInfo: true,
 	})
@@ -130,7 +130,8 @@ spec-compliant without staging everything in memory.
 - `remote.fromGeoJSON(data, options?)` - Load in worker.
 - `remote.getVectorTile(osmId, tile)` - Generate MVT in worker.
 - `remote.getRasterTile(osmId, tile, tileSize?)` - Generate raster in worker.
-- `remote.merge(baseId, patchId, options?)` - Merge datasets in worker.
+- `remote.merge(baseId, patchId, options?)` - Merge datasets in worker (legacy).
+- `dataset.merge(patch, options?)` - Merge datasets via dataset handles.
 - `remote.search(osmId, key, val?)` - Search by tag.
 - `remote.toPbf(osmId, stream)` - Export to PBF.
 

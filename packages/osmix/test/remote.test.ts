@@ -12,6 +12,8 @@ const monacoPbf = PBFs["monaco"]!
 // Increase timeout for worker tests
 const workerTestTimeout = 30_000
 
+
+
 describe("OsmixRemote", () => {
 	afterEach(async () => {
 		// Clean up workers between tests
@@ -115,7 +117,7 @@ describe("OsmixRemote", () => {
 				const osmInfo = await remote.fromPbf(pbfData.buffer, {
 					id: "remote-get",
 				})
-				const osm = await remote.get(osmInfo.id)
+				const osm = await osmInfo.get()
 
 				expect(osm.id).toBe("remote-get")
 				expect(osm.nodes.size).toBe(monacoPbf.nodes)
@@ -135,7 +137,7 @@ describe("OsmixRemote", () => {
 				const osmInfo = await remote.fromPbf(pbfData.buffer, {
 					id: "original-remote",
 				})
-				const osm = await remote.transferOut(osmInfo.id)
+				const osm = await osmInfo.transferOut()
 				await remote.transferIn(
 					new Osm({ ...osm.transferables(), id: "manual-set-remote" }),
 				)
@@ -158,9 +160,9 @@ describe("OsmixRemote", () => {
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osm1 = await remote.fromPbf(pbfData.buffer)
 
-				expect(await remote.has(osm1.id)).toBe(true)
-				await remote.delete(osm1.id)
-				expect(await remote.has(osm1.id)).toBe(false)
+				expect(await osm1.has()).toBe(true)
+				await osm1.delete()
+				expect(await osm1.has()).toBe(false)
 			},
 			workerTestTimeout,
 		)
@@ -176,7 +178,7 @@ describe("OsmixRemote", () => {
 				const pbfData = await getFixtureFile(monacoPbf.url)
 				const osm = await remote.fromPbf(pbfData.buffer)
 
-				expect(await remote.isReady(osm.id)).toBe(true)
+				expect(await osm.isReady()).toBe(true)
 			},
 			workerTestTimeout,
 		)
@@ -192,7 +194,7 @@ describe("OsmixRemote", () => {
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
 				const osm = await remote.fromPbf(fileStream)
 
-				const result = await remote.search(osm.id, "name")
+				const result = await osm.search("name")
 				expect(result).toHaveProperty("nodes")
 				expect(result).toHaveProperty("ways")
 				expect(result).toHaveProperty("relations")
@@ -210,7 +212,7 @@ describe("OsmixRemote", () => {
 				const fileStream = getFixtureFileReadStream(monacoPbf.url)
 				const osm = await remote.fromPbf(fileStream)
 
-				const result = await remote.search(osm.id, "highway", "residential")
+				const result = await osm.search("highway", "residential")
 				expect(result).toHaveProperty("nodes")
 				expect(result).toHaveProperty("ways")
 				expect(result).toHaveProperty("relations")
@@ -230,7 +232,7 @@ describe("OsmixRemote", () => {
 				const osm = await remote.fromPbf(fileStream)
 
 				const tile: [number, number, number] = [7, 4, 3]
-				const tileData = await remote.getVectorTile(osm.id, tile)
+				const tileData = await osm.getVectorTile(tile)
 
 				expect(tileData).toBeInstanceOf(ArrayBuffer)
 				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)
@@ -250,7 +252,7 @@ describe("OsmixRemote", () => {
 				const osm = await remote.fromPbf(fileStream)
 
 				const tile: [number, number, number] = [7, 4, 3]
-				const tileData = await remote.getRasterTile(osm.id, tile)
+				const tileData = await osm.getRasterTile(tile)
 
 				expect(tileData).toBeInstanceOf(Uint8ClampedArray)
 				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)
@@ -266,12 +268,85 @@ describe("OsmixRemote", () => {
 				const osm = await remote.fromPbf(fileStream)
 
 				const tile: [number, number, number] = [7, 4, 3]
-				const tileData = await remote.getRasterTile(osm.id, tile, {
+				const tileData = await osm.getRasterTile(tile, {
 					tileSize: 512,
 				})
 
 				expect(tileData).toBeInstanceOf(Uint8ClampedArray)
 				expect(tileData.byteLength).toBeGreaterThanOrEqual(0)
+			},
+			workerTestTimeout,
+		)
+	})
+
+
+	describe("dataset handle API", () => {
+		it(
+			"should expose instance methods without passing IDs",
+			async () => {
+				using remote = await createRemote({ workerCount: 1 })
+				const geojson: FeatureCollection<Point> = {
+					type: "FeatureCollection",
+					features: [
+						{
+							type: "Feature",
+							geometry: {
+								type: "Point",
+								coordinates: [-122.4194, 37.7749],
+							},
+							properties: { amenity: "cafe", name: "Cafe" },
+						},
+					],
+				}
+
+				const data = new TextEncoder().encode(JSON.stringify(geojson)).buffer
+				const dataset = await remote.fromGeoJSON(data, { id: "handle-test" })
+
+				expect(dataset.id).toBe("handle-test")
+				expect(dataset.stats.nodes).toBe(1)
+				expect(await dataset.has()).toBe(true)
+				expect(await dataset.isReady()).toBe(true)
+				expect(await dataset.nodes.size()).toBe(1)
+				const cafeNodes = await dataset.nodes.search("amenity", "cafe")
+				expect(cafeNodes).toHaveLength(1)
+				const cafe = cafeNodes[0]
+				expect(cafe?.tags?.["name"]).toBe("Cafe")
+				if (!cafe) throw Error("Expected cafe node")
+				expect(await dataset.nodes.getById(cafe.id)).toEqual(cafe)
+				const local = await dataset.get()
+				expect(local.id).toBe("handle-test")
+			},
+			workerTestTimeout,
+		)
+
+		it(
+			"should return a dataset handle from merge",
+			async () => {
+				using remote = await createRemote({ workerCount: 1 })
+				const point = (name: string, lon: number, lat: number): FeatureCollection<Point> => ({
+					type: "FeatureCollection",
+					features: [
+						{
+							type: "Feature",
+							geometry: { type: "Point", coordinates: [lon, lat] },
+							properties: { name },
+						},
+					],
+				})
+
+				const base = await remote.fromGeoJSON(
+					new TextEncoder().encode(JSON.stringify(point("base", -122.4, 37.7))).buffer,
+					{ id: "base-osm" },
+				)
+				const patch = await remote.fromGeoJSON(
+					new TextEncoder().encode(JSON.stringify(point("patch", -122.41, 37.71))).buffer,
+					{ id: "patch-osm" },
+				)
+
+				const merged = await base.merge(patch)
+				expect(merged.id).toBe("base-osm")
+				expect(merged.stats.nodes).toBeGreaterThanOrEqual(1)
+				expect(await remote.has("patch-osm")).toBe(false)
 			},
 			workerTestTimeout,
 		)
