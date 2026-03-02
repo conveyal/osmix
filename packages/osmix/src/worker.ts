@@ -440,6 +440,47 @@ export class OsmixWorker extends EventTarget {
 		return { nodes, ways, relations }
 	}
 
+
+	// ---------------------------------------------------------------------------
+	// Entity collection proxies
+	// ---------------------------------------------------------------------------
+
+	nodesSize(osmId: string) {
+		return this.get(osmId).nodes.size
+	}
+
+	nodesGetById(osmId: string, nodeId: number) {
+		return this.get(osmId).nodes.getById(nodeId)
+	}
+
+	nodesSearch(osmId: string, key: string, val?: string) {
+		return this.get(osmId).nodes.search(key, val)
+	}
+
+	waysSize(osmId: string) {
+		return this.get(osmId).ways.size
+	}
+
+	waysGetById(osmId: string, wayId: number) {
+		return this.get(osmId).ways.getById(wayId)
+	}
+
+	waysSearch(osmId: string, key: string, val?: string) {
+		return this.get(osmId).ways.search(key, val)
+	}
+
+	relationsSize(osmId: string) {
+		return this.get(osmId).relations.size
+	}
+
+	relationsGetById(osmId: string, relationId: number) {
+		return this.get(osmId).relations.getById(relationId)
+	}
+
+	relationsSearch(osmId: string, key: string, val?: string) {
+		return this.get(osmId).relations.search(key, val)
+	}
+
 	/**
 	 * Perform a full merge of two Osm indexes inside of a worker. Both Osm indexes must be loaded already.
 	 * Replaces the base Osm and deletes the patch Osm.

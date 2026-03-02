@@ -75,7 +75,13 @@ export function detectFileType(fileName: string): OsmFileType {
 
 
 
-type DatasetProxyMethodExclusions = "getId" | "rename" | "merge"
+type DatasetMember = "nodes" | "ways" | "relations"
+
+type DatasetProxyMethodExclusions =
+	| "getId"
+	| "rename"
+	| "merge"
+	| `${DatasetMember}${string}`
 
 type OsmRemoteDatasetMethodKeys<T extends OsmixWorker> = Exclude<
 	{
@@ -98,6 +104,33 @@ type OsmRemoteDatasetMethods<T extends OsmixWorker> = {
 		: never
 }
 
+type MemberRemoteMethodKeys<
+	T extends OsmixWorker,
+	M extends DatasetMember,
+> = {
+	[K in keyof OsmixRemote<T>]: K extends `${M}${string}`
+		? OsmixRemote<T>[K] extends (osmId: OsmId, ...args: any[]) => any
+			? K
+			: never
+		: never
+}[keyof OsmixRemote<T>]
+
+type MemberMethodName<K extends string, M extends DatasetMember> =
+	K extends `${M}${infer Rest}` ? Uncapitalize<Rest> : never
+
+type OsmRemoteDatasetMemberMethods<
+	T extends OsmixWorker,
+	M extends DatasetMember,
+> = {
+	[K in MemberRemoteMethodKeys<T, M> as K extends string
+		? MemberMethodName<K, M>
+		: never]: K extends keyof OsmixRemote<T>
+		? OsmixRemote<T>[K] extends (osmId: OsmId, ...args: infer Args) => infer Return
+			? (...args: Args) => Return
+			: never
+		: never
+}
+
 /**
  * Object-oriented handle for a remote Osm dataset.
  *
@@ -116,6 +149,9 @@ export class OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
 	readonly bbox: OsmInfo["bbox"]
 	readonly header: OsmInfo["header"]
 	readonly stats: OsmInfo["stats"]
+	readonly nodes: OsmRemoteDatasetMemberMethods<T, "nodes">
+	readonly ways: OsmRemoteDatasetMemberMethods<T, "ways">
+	readonly relations: OsmRemoteDatasetMemberMethods<T, "relations">
 
 	constructor(remote: OsmixRemote<T>, id: string, info: Omit<OsmInfo, "id">) {
 		this.remote = remote
@@ -123,6 +159,9 @@ export class OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
 		this.bbox = info.bbox
 		this.header = info.header
 		this.stats = info.stats
+		this.nodes = this.createMemberProxy("nodes")
+		this.ways = this.createMemberProxy("ways")
+		this.relations = this.createMemberProxy("relations")
 
 		return new Proxy(this, {
 			get: (target, prop, receiver) => {
@@ -138,6 +177,22 @@ export class OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
 		})
 	}
 
+
+	private createMemberProxy<M extends DatasetMember>(
+		member: M,
+	): OsmRemoteDatasetMemberMethods<T, M> {
+		return new Proxy({} as OsmRemoteDatasetMemberMethods<T, M>, {
+			get: (_target, prop) => {
+				if (typeof prop !== "string") return undefined
+				const method = `${member}${prop.charAt(0).toUpperCase()}${prop.slice(1)}`
+				const remoteValue = Reflect.get(this.remote, method)
+				if (typeof remoteValue !== "function") return undefined
+				return (...args: unknown[]) =>
+					remoteValue.call(this.remote, this.id, ...args)
+			},
+		})
+	}
+
 	async rename(toId: string) {
 		await this.remote.rename(this.id, toId)
 		this.id = toId
@@ -149,7 +204,11 @@ export class OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
 }
 
 export interface OsmRemoteDataset<T extends OsmixWorker = OsmixWorker>
-	extends OsmRemoteDatasetMethods<T> {}
+	extends OsmRemoteDatasetMethods<T> {
+	readonly nodes: OsmRemoteDatasetMemberMethods<T, "nodes">
+	readonly ways: OsmRemoteDatasetMemberMethods<T, "ways">
+	readonly relations: OsmRemoteDatasetMemberMethods<T, "relations">
+}
 export interface OsmixRemoteOptions {
 	workerCount?: number
 	onProgress?: (progress: Progress) => void
@@ -707,6 +766,42 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	 */
 	search(osmId: OsmId, key: string, val?: string) {
 		return this.nextWorker().search(this.getId(osmId), key, val)
+	}
+
+	nodesSize(osmId: OsmId) {
+		return this.nextWorker().nodesSize(this.getId(osmId))
+	}
+
+	nodesGetById(osmId: OsmId, nodeId: number) {
+		return this.nextWorker().nodesGetById(this.getId(osmId), nodeId)
+	}
+
+	nodesSearch(osmId: OsmId, key: string, val?: string) {
+		return this.nextWorker().nodesSearch(this.getId(osmId), key, val)
+	}
+
+	waysSize(osmId: OsmId) {
+		return this.nextWorker().waysSize(this.getId(osmId))
+	}
+
+	waysGetById(osmId: OsmId, wayId: number) {
+		return this.nextWorker().waysGetById(this.getId(osmId), wayId)
+	}
+
+	waysSearch(osmId: OsmId, key: string, val?: string) {
+		return this.nextWorker().waysSearch(this.getId(osmId), key, val)
+	}
+
+	relationsSize(osmId: OsmId) {
+		return this.nextWorker().relationsSize(this.getId(osmId))
+	}
+
+	relationsGetById(osmId: OsmId, relationId: number) {
+		return this.nextWorker().relationsGetById(this.getId(osmId), relationId)
+	}
+
+	relationsSearch(osmId: OsmId, key: string, val?: string) {
+		return this.nextWorker().relationsSearch(this.getId(osmId), key, val)
 	}
 
 	// ---------------------------------------------------------------------------

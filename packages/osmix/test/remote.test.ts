@@ -320,6 +320,13 @@ describe("OsmixRemote", () => {
 				expect(dataset.stats.nodes).toBe(1)
 				expect(await dataset.has()).toBe(true)
 				expect(await dataset.isReady()).toBe(true)
+				expect(await dataset.nodes.size()).toBe(1)
+				const cafeNodes = await dataset.nodes.search("amenity", "cafe")
+				expect(cafeNodes).toHaveLength(1)
+				const cafe = cafeNodes[0]
+				expect(cafe?.tags?.["name"]).toBe("Cafe")
+				if (!cafe) throw Error("Expected cafe node")
+				expect(await dataset.nodes.getById(cafe.id)).toEqual(cafe)
 				const local = await dataset.get()
 				expect(local.id).toBe("handle-test")
 			},
