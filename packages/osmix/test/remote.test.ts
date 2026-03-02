@@ -6,11 +6,27 @@ import {
 	PBFs,
 } from "@osmix/shared/fixtures"
 import type { FeatureCollection, LineString, Point } from "geojson"
-import { createRemote } from "../src/remote"
+import { createRemote, type OsmRemoteDataset } from "../src/remote"
+import type { OsmixWorker } from "../src/worker"
 
 const monacoPbf = PBFs["monaco"]!
 // Increase timeout for worker tests
 const workerTestTimeout = 30_000
+
+
+declare module "../src/remote" {
+	interface OsmixRemote<T extends OsmixWorker = OsmixWorker> {
+		__datasetProxyTypeTest(osmId: import("../src/remote").OsmId, value: number): Promise<number>
+	}
+}
+
+function assertDatasetAutoProxyTyping(dataset: OsmRemoteDataset) {
+	const call = dataset.__datasetProxyTypeTest(1)
+	const _typed: Promise<number> = call
+	return _typed
+}
+
+void assertDatasetAutoProxyTyping
 
 describe("OsmixRemote", () => {
 	afterEach(async () => {
