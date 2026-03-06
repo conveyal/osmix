@@ -8,7 +8,7 @@ export default function LogContent() {
 		<>
 			{log.toReversed().map((message, index) => (
 				<div
-					key={`${index}-${message.timestamp}`}
+					key={`${message.timestamp}-${message.message}`}
 					className={cn(
 						"whitespace-nowrap",
 						"text-slate-600",
