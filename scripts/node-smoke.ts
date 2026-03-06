@@ -103,6 +103,10 @@ function rewritePkgJsonForDist(pkgJson: PackageJson): PackageJson {
 	throw Error(`Cannot rewrite package.json for ${pkgJson.name}`)
 }
 
+function serializePackageJson(pkgJson: PackageJson): string {
+	return `${JSON.stringify(pkgJson, null, "\t")}\n`
+}
+
 async function withPublishedManifest<T>(
 	{ dir, manifest }: WorkspacePackage,
 	callback: () => Promise<T>,
@@ -111,13 +115,13 @@ async function withPublishedManifest<T>(
 
 	await Bun.write(
 		packageJsonPath,
-		JSON.stringify(rewritePkgJsonForDist(manifest), null, "\t"),
+		serializePackageJson(rewritePkgJsonForDist(manifest)),
 	)
 
 	try {
 		return await callback()
 	} finally {
-		await Bun.write(packageJsonPath, JSON.stringify(manifest, null, "\t"))
+		await Bun.write(packageJsonPath, serializePackageJson(manifest))
 	}
 }
 

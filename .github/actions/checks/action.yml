@@ -19,3 +19,7 @@ runs:
     - name: Run package tests
       shell: bash
       run: bun run test:packages
+
+    - name: Run Node.js smoke test
+      shell: bash
+      run: bun run test:node-smoke
