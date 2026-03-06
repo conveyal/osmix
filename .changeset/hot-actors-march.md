@@ -1,0 +1,16 @@
+---
+"@osmix/change": patch
+"@osmix/core": patch
+"@osmix/geojson": patch
+"@osmix/geoparquet": patch
+"@osmix/gtfs": patch
+"@osmix/json": patch
+"osmix": patch
+"@osmix/pbf": patch
+"@osmix/router": patch
+"@osmix/shapefile": patch
+"@osmix/shortbread": patch
+"@osmix/vt": patch
+---
+
+Fix for nodejs package imports
