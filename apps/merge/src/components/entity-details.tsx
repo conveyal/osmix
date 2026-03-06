@@ -236,7 +236,7 @@ function NodeListTable({
 		<table className="table-auto">
 			<tbody>
 				{nodes.map((node, i) => (
-					<Fragment key={`${node.id}-${i}`}>
+					<Fragment key={String(node.id)}>
 						<tr
 							onClick={() => onSelect(node)}
 							onKeyDown={() => onSelect(node)}
@@ -286,7 +286,7 @@ function RelationMemberListTable({
 					}
 
 					return (
-						<Fragment key={`${member.type}-${member.ref}-${i}`}>
+						<Fragment key={`${member.type}-${member.ref}-${member.role ?? ""}`}>
 							<tr
 								onClick={() => entity && onSelect(entity)}
 								onKeyDown={() => entity && onSelect(entity)}

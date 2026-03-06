@@ -251,9 +251,9 @@ export function Routing({ osm }: { osm: Osm }) {
 										Directions ({routingState.result.segments.length} segments)
 									</div>
 									<div className="space-y-2 max-h-48 overflow-y-auto">
-										{routingState.result.segments.map((seg, i) => (
+										{routingState.result.segments.map((seg, _i) => (
 											<div
-												key={`${seg.wayIds[0]}-${i}`}
+												key={`${seg.wayIds.join("-")}-${seg.distance}-${seg.time}`}
 												className="border-l-2 border-blue-400 pl-2"
 											>
 												<div

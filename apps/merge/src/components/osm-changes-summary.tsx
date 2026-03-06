@@ -488,13 +488,13 @@ function RefsDiff({
 				<tr className="bg-red-50">
 					<td className="align-top pl-4 text-muted-foreground">removed</td>
 					<td>
-						{deletes.map((op, i) => (
-							<span key={`del-${op.index}-${i}`} className="text-red-600">
+						{deletes.map((op) => (
+							<span key={`del-${op.index}-${op.value}`} className="text-red-600">
 								<span className="text-muted-foreground text-xs">
 									[{op.index}]
 								</span>
 								<span className="line-through">{op.value}</span>
-								{i < deletes.length - 1 && ", "}
+								{op !== deletes[deletes.length - 1] && ", "}
 							</span>
 						))}
 					</td>
@@ -504,13 +504,13 @@ function RefsDiff({
 				<tr className="bg-green-50">
 					<td className="align-top pl-4 text-muted-foreground">added</td>
 					<td>
-						{inserts.map((op, i) => (
-							<span key={`ins-${op.index}-${i}`} className="text-green-600">
+						{inserts.map((op) => (
+							<span key={`ins-${op.index}-${op.value}`} className="text-green-600">
 								<span className="text-muted-foreground text-xs">
 									[{op.index}]
 								</span>
 								{op.value}
-								{i < inserts.length - 1 && ", "}
+								{op !== inserts[inserts.length - 1] && ", "}
 							</span>
 						))}
 					</td>
@@ -655,13 +655,13 @@ function MembersDiff({
 				<tr className="bg-red-50">
 					<td className="align-top pl-4 text-muted-foreground">removed</td>
 					<td>
-						{deletes.map((op, i) => (
-							<span key={`del-${op.index}-${i}`} className="text-red-600">
+						{deletes.map((op) => (
+							<span key={`del-${op.index}-${op.value}`} className="text-red-600">
 								<span className="text-muted-foreground text-xs">
 									[{op.index}]
 								</span>
 								<span className="line-through">{formatMember(op.value)}</span>
-								{i < deletes.length - 1 && ", "}
+								{op !== deletes[deletes.length - 1] && ", "}
 							</span>
 						))}
 					</td>
@@ -671,13 +671,13 @@ function MembersDiff({
 				<tr className="bg-green-50">
 					<td className="align-top pl-4 text-muted-foreground">added</td>
 					<td>
-						{inserts.map((op, i) => (
-							<span key={`ins-${op.index}-${i}`} className="text-green-600">
+						{inserts.map((op) => (
+							<span key={`ins-${op.index}-${op.value}`} className="text-green-600">
 								<span className="text-muted-foreground text-xs">
 									[{op.index}]
 								</span>
 								{formatMember(op.value)}
-								{i < inserts.length - 1 && ", "}
+								{op !== inserts[inserts.length - 1] && ", "}
 							</span>
 						))}
 					</td>
