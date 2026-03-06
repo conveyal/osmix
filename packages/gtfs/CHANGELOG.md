@@ -1,5 +1,14 @@
 # @osmix/gtfs
 
+## 0.0.8
+
+### Patch Changes
+
+- aba4bd8: Fix for nodejs package imports
+- Updated dependencies [aba4bd8]
+  - @osmix/core@0.1.8
+  - @osmix/shared@0.0.13
+
 ## 0.0.7
 
 ### Patch Changes

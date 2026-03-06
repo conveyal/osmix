@@ -1,5 +1,13 @@
 # @osmix/core
 
+## 0.1.8
+
+### Patch Changes
+
+- aba4bd8: Fix for nodejs package imports
+- Updated dependencies [aba4bd8]
+  - @osmix/shared@0.0.13
+
 ## 0.1.7
 
 ### Patch Changes
