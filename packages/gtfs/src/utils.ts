@@ -6,7 +6,7 @@ import {
 	type GtfsTrip,
 	routeTypeToOsmRoute,
 	wheelchairBoardingToOsm,
-} from "./types"
+} from "./types.ts"
 
 /**
  * Check if a ZIP file (as bytes) is a GTFS archive by looking for characteristic GTFS files.

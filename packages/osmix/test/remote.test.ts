@@ -12,8 +12,6 @@ const monacoPbf = PBFs["monaco"]!
 // Increase timeout for worker tests
 const workerTestTimeout = 30_000
 
-
-
 describe("OsmixRemote", () => {
 	afterEach(async () => {
 		// Clean up workers between tests
@@ -279,7 +277,6 @@ describe("OsmixRemote", () => {
 		)
 	})
 
-
 	describe("dataset handle API", () => {
 		it(
 			"should expose instance methods without passing IDs",
@@ -323,7 +320,11 @@ describe("OsmixRemote", () => {
 			"should return a dataset handle from merge",
 			async () => {
 				using remote = await createRemote({ workerCount: 1 })
-				const point = (name: string, lon: number, lat: number): FeatureCollection<Point> => ({
+				const point = (
+					name: string,
+					lon: number,
+					lat: number,
+				): FeatureCollection<Point> => ({
 					type: "FeatureCollection",
 					features: [
 						{
@@ -335,11 +336,14 @@ describe("OsmixRemote", () => {
 				})
 
 				const base = await remote.fromGeoJSON(
-					new TextEncoder().encode(JSON.stringify(point("base", -122.4, 37.7))).buffer,
+					new TextEncoder().encode(JSON.stringify(point("base", -122.4, 37.7)))
+						.buffer,
 					{ id: "base-osm" },
 				)
 				const patch = await remote.fromGeoJSON(
-					new TextEncoder().encode(JSON.stringify(point("patch", -122.41, 37.71))).buffer,
+					new TextEncoder().encode(
+						JSON.stringify(point("patch", -122.41, 37.71)),
+					).buffer,
 					{ id: "patch-osm" },
 				)
 

@@ -19,5 +19,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
       - uses: ./.github/actions/setup
       - uses: ./.github/actions/checks

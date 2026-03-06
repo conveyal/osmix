@@ -10,7 +10,7 @@
  * @module
  */
 
-import type { OsmWay } from "./types"
+import type { OsmWay } from "./types.ts"
 
 /**
  * Tags that imply an area unless their value is exactly "no"

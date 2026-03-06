@@ -16,7 +16,7 @@ import type {
 	OsmNode,
 	OsmRelation,
 	OsmWay,
-} from "./types"
+} from "./types.ts"
 
 /**
  * Check if two entities have equal tags and info.

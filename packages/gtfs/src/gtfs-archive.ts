@@ -16,8 +16,8 @@ import type {
 	GtfsStop,
 	GtfsStopTime,
 	GtfsTrip,
-} from "./types"
-import { bytesToTextStream } from "./utils"
+} from "./types.ts"
+import { bytesToTextStream } from "./utils.ts"
 
 /**
  * Map of GTFS filenames to their record types.

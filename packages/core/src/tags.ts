@@ -10,8 +10,8 @@
 
 import type { ContentHasher } from "@osmix/shared/content-hasher"
 import type { OsmTags } from "@osmix/shared/types"
-import StringTable from "./stringtable"
-import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays"
+import StringTable from "./stringtable.ts"
+import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts"
 
 /**
  * Serializable state for worker transfer.

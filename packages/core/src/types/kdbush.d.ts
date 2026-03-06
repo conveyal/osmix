@@ -4,7 +4,7 @@ declare module "kdbush" {
 		BufferType,
 		TypedArray,
 		TypedArrayConstructor,
-	} from "../typed-arrays"
+	} from "../typed-arrays.ts"
 
 	export default class KDBush {
 		constructor(

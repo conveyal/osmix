@@ -1,4 +1,4 @@
-import type { Rgba } from "./types"
+import type { Rgba } from "./types.ts"
 
 const hexPattern = /^[0-9a-fA-F]+$/
 

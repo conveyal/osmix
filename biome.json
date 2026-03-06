@@ -18,6 +18,18 @@
 			"tailwindDirectives": true
 		}
 	},
+	"overrides": [
+		{
+			"includes": ["packages/*/src/**/*.ts", "packages/*/src/**/*.tsx"],
+			"linter": {
+				"rules": {
+					"correctness": {
+						"useImportExtensions": "error"
+					}
+				}
+			}
+		}
+	],
 	"linter": {
 		"rules": {
 			"a11y": {

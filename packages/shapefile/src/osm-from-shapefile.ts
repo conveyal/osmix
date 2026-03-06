@@ -23,8 +23,8 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
-import type { ReadShapefileDataTypes } from "./types"
-import { parseShapefile } from "./utils"
+import type { ReadShapefileDataTypes } from "./types.ts"
+import { parseShapefile } from "./utils.ts"
 
 /**
  * Create an Osm index from Shapefile data.

@@ -13,6 +13,8 @@
 		"moduleDetection": "force",
 
 		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"rewriteRelativeImportExtensions": true,
 		"verbatimModuleSyntax": true,
 		"isolatedModules": true,
 		"erasableSyntaxOnly": true,

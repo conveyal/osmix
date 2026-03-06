@@ -34,6 +34,7 @@
 		"test": "bun run test:packages",
 		"test:all": "bun run typecheck && bun run lint && bun run check && bun run test:packages && bun run test:apps",
 		"test:apps": "bun --filter './apps/**' test --silent",
+		"test:node-smoke": "bun scripts/node-smoke.ts",
 		"test:packages": "bun --filter './packages/**' test --silent",
 		"typecheck": "bun --filter '*' typecheck",
 		"version": "changeset version && bun update",

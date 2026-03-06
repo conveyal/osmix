@@ -33,12 +33,12 @@
  * @module @osmix/gtfs
  */
 
-export { fromGtfs, GtfsOsmBuilder } from "./from-gtfs"
+export { fromGtfs, GtfsOsmBuilder } from "./from-gtfs.ts"
 export {
 	GtfsArchive,
 	type GtfsFileName,
 	type GtfsFileTypeMap,
-} from "./gtfs-archive"
+} from "./gtfs-archive.ts"
 export {
 	type GtfsAgency,
 	type GtfsConversionOptions,
@@ -50,5 +50,5 @@ export {
 	type GtfsTrip,
 	routeTypeToOsmRoute,
 	wheelchairBoardingToOsm,
-} from "./types"
-export { isGtfsZip } from "./utils"
+} from "./types.ts"
+export { isGtfsZip } from "./utils.ts"

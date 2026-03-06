@@ -13,7 +13,7 @@ import {
 	type OsmPbfHeaderBlock,
 } from "@osmix/pbf"
 import type { OsmEntity } from "@osmix/shared/types"
-import { OsmPbfBlockParser } from "./osm-pbf-block-parser"
+import { OsmPbfBlockParser } from "./osm-pbf-block-parser.ts"
 
 /**
  * Convert a PBF byte stream into a stream of JSON entities.

@@ -6,7 +6,7 @@
  * @module
  */
 
-import { concatBytes } from "./concat-bytes"
+import { concatBytes } from "./concat-bytes.ts"
 
 /**
  * Consume a ReadableStream and return all data as a single Uint8Array.

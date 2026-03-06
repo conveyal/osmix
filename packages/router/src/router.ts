@@ -9,8 +9,8 @@
 
 import type { Osm } from "@osmix/core"
 import type { LonLat } from "@osmix/shared/types"
-import { routingAlgorithms } from "./algorithms"
-import type { RoutingGraph } from "./graph"
+import { routingAlgorithms } from "./algorithms/index.ts"
+import type { RoutingGraph } from "./graph.ts"
 import type {
 	PathSegment,
 	RouteOptions,
@@ -18,7 +18,7 @@ import type {
 	RouteResult,
 	RouteStatistics,
 	WaySegment,
-} from "./types"
+} from "./types.ts"
 
 /**
  * Router for finding paths through OSM road networks.

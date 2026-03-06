@@ -28,7 +28,10 @@ function useSystemIssues() {
 		setCrossOriginIsolated(window.crossOriginIsolated)
 		setDeviceMemory(
 			"deviceMemory" in navigator
-				? Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 0)
+				? Number(
+						(navigator as Navigator & { deviceMemory?: number }).deviceMemory ??
+							0,
+					)
 				: null,
 		)
 	}, [])
@@ -96,8 +99,8 @@ export default function BrowserCheck() {
 					<DialogDescription>
 						{issues.length > 0
 							? `Detected ${issues.length} potential issue${
-								issues.length === 1 ? "" : "s"
-							}.`
+									issues.length === 1 ? "" : "s"
+								}.`
 							: "No issues detected."}
 					</DialogDescription>
 				</DialogHeader>

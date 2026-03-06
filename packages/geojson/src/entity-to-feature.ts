@@ -36,7 +36,7 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
-import type { OsmGeoJSONFeature } from "./types"
+import type { OsmGeoJSONFeature } from "./types.ts"
 
 /**
  * Convert an OSM node to a GeoJSON Point feature.

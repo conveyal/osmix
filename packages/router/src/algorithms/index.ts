@@ -9,9 +9,9 @@
  * @module
  */
 
-import type { RoutingAlgorithm, RoutingAlgorithmFn } from "../types"
-import { bidirectional } from "./bidirectional"
-import { astar, dijkstra } from "./shortest-path"
+import type { RoutingAlgorithm, RoutingAlgorithmFn } from "../types.ts"
+import { bidirectional } from "./bidirectional.ts"
+import { astar, dijkstra } from "./shortest-path.ts"
 
 export { astar, bidirectional, dijkstra }
 export type { RoutingAlgorithmFn }

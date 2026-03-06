@@ -26,12 +26,12 @@
 /// <reference path="./types/geokdbush.d.ts" />
 /// <reference path="./types/geoflatbush.d.ts" />
 
-export type { IdOrIndex } from "./ids"
-export * from "./mocks"
-export * from "./nodes"
-export * from "./osm"
-export * from "./relations"
-export * from "./stringtable"
-export * from "./tags"
-export { BufferConstructor, type BufferType } from "./typed-arrays"
-export * from "./ways"
+export type { IdOrIndex } from "./ids.ts"
+export * from "./mocks.ts"
+export * from "./nodes.ts"
+export * from "./osm.ts"
+export * from "./relations.ts"
+export * from "./stringtable.ts"
+export * from "./tags.ts"
+export { BufferConstructor, type BufferType } from "./typed-arrays.ts"
+export * from "./ways.ts"

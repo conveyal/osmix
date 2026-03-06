@@ -58,9 +58,9 @@ import {
 	readOsmPbfHeader,
 	toPbfBuffer,
 	toPbfStream,
-} from "./pbf"
-import { type DrawToRasterTileOptions, drawToRasterTile } from "./raster"
-import { transfer } from "./utils"
+} from "./pbf.ts"
+import { type DrawToRasterTileOptions, drawToRasterTile } from "./raster.ts"
+import { transfer } from "./utils.ts"
 
 /**
  * Worker handler for managing multiple Osm instances within a Web Worker.
@@ -439,7 +439,6 @@ export class OsmixWorker extends EventTarget {
 		const relations = osm.relations.search(key, val)
 		return { nodes, ways, relations }
 	}
-
 
 	// ---------------------------------------------------------------------------
 	// Entity collection proxies

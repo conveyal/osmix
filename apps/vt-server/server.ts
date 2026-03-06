@@ -13,7 +13,9 @@ const remote = await createRemote({
 	workerCount,
 	onProgress: (event) => log.push(event.msg),
 })
-let dataset = await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
+const dataset = await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), {
+	id: filename,
+})
 
 // Print number of VT workers available
 console.log(`Number of VT workers available: ${workerCount}`)
@@ -84,4 +86,3 @@ const server = Bun.serve({
 })
 
 console.log(`Vector tile server running at http://localhost:${server.port}`)
-

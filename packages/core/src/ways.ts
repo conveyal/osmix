@@ -3,17 +3,17 @@ import type { ContentHasher } from "@osmix/shared/content-hasher"
 import type { GeoBbox2D, LonLat, OsmTags, OsmWay } from "@osmix/shared/types"
 import Flatbush from "flatbush"
 import { around as geoAround } from "geoflatbush"
-import { Entities, type EntitiesTransferables } from "./entities"
-import { type IdOrIndex, Ids } from "./ids"
-import type { Nodes } from "./nodes"
-import type StringTable from "./stringtable"
-import { Tags } from "./tags"
+import { Entities, type EntitiesTransferables } from "./entities.ts"
+import { type IdOrIndex, Ids } from "./ids.ts"
+import type { Nodes } from "./nodes.ts"
+import type StringTable from "./stringtable.ts"
+import { Tags } from "./tags.ts"
 import {
 	BufferConstructor,
 	type BufferType,
 	IdArrayType,
 	ResizeableTypedArray as RTA,
-} from "./typed-arrays"
+} from "./typed-arrays.ts"
 
 export interface WaysTransferables<T extends BufferType = BufferType>
 	extends EntitiesTransferables<T> {

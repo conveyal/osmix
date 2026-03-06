@@ -8,7 +8,7 @@
  * @module
  */
 
-import type { PathSegment, RoutingAlgorithmFn } from "../types"
+import type { PathSegment, RoutingAlgorithmFn } from "../types.ts"
 
 /**
  * Bidirectional BFS - fast path finding from both ends.

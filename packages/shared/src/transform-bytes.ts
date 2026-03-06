@@ -6,8 +6,8 @@
  * @module
  */
 
-import { bytesToStream } from "./bytes-to-stream"
-import { streamToBytes } from "./stream-to-bytes"
+import { bytesToStream } from "./bytes-to-stream.ts"
+import { streamToBytes } from "./stream-to-bytes.ts"
 
 /**
  * Pipe a byte array through a TransformStream and return the result.

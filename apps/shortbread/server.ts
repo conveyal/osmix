@@ -31,7 +31,9 @@ const remote = await createRemote<ShortbreadWorker>({
 })
 
 console.log(`Number of workers available: ${workerCount}`)
-let dataset = await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), { id: filename })
+let dataset = await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), {
+	id: filename,
+})
 
 const server = Bun.serve({
 	port: PORT,

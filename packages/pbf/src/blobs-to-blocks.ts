@@ -13,8 +13,8 @@ import {
 	type OsmPbfHeaderBlock,
 	readHeaderBlock,
 	readPrimitiveBlock,
-} from "./proto/osmformat"
-import { webDecompress } from "./utils"
+} from "./proto/osmformat.ts"
+import { webDecompress } from "./utils.ts"
 
 /**
  * Decompress and decode a stream of raw PBF blobs into typed blocks.

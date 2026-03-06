@@ -18,7 +18,7 @@ import {
 } from "@osmix/shared/tile"
 import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
 import { rewindGeometry } from "@placemarkio/geojson-rewind"
-import { compositeRGBA } from "./color"
+import { compositeRGBA } from "./color.ts"
 
 /** Default image type for exported tiles. */
 export const DEFAULT_RASTER_IMAGE_TYPE = "image/png"

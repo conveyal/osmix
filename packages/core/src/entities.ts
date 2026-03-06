@@ -14,9 +14,9 @@ import type {
 	OsmEntityType,
 	OsmTags,
 } from "@osmix/shared/types"
-import type { IdOrIndex, Ids, IdsTransferables } from "./ids"
-import type { Tags, TagsTransferables } from "./tags"
-import type { BufferType } from "./typed-arrays"
+import type { IdOrIndex, Ids, IdsTransferables } from "./ids.ts"
+import type { Tags, TagsTransferables } from "./tags.ts"
+import type { BufferType } from "./typed-arrays.ts"
 
 /**
  * Serializable representation of an Entities collection for worker transfer.

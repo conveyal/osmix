@@ -11,8 +11,8 @@
  */
 
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/shared/types"
-import type { OsmChangeset } from "./changeset"
-import { osmTagsToOscTags } from "./utils"
+import type { OsmChangeset } from "./changeset.ts"
+import { osmTagsToOscTags } from "./utils.ts"
 
 /**
  * Generate a node XML element.

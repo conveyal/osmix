@@ -13,7 +13,7 @@ import {
 	BufferConstructor,
 	type BufferType,
 	ResizeableTypedArray as RTA,
-} from "./typed-arrays"
+} from "./typed-arrays.ts"
 
 /**
  * Union type for looking up entities by either OSM ID or internal array index.
