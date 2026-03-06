@@ -7,6 +7,7 @@
 "@osmix/json": patch
 "osmix": patch
 "@osmix/pbf": patch
+"@osmix/raster": patch
 "@osmix/router": patch
 "@osmix/shapefile": patch
 "@osmix/shared": patch
