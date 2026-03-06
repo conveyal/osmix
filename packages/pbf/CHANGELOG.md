@@ -1,5 +1,11 @@
 # @osmix/pbf
 
+## 0.0.9
+
+### Patch Changes
+
+- aba4bd8: Fix for nodejs package imports
+
 ## 0.0.8
 
 ### Patch Changes

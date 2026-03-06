@@ -1,5 +1,13 @@
 # @osmix/raster
 
+## 0.0.13
+
+### Patch Changes
+
+- aba4bd8: Fix for nodejs package imports
+- Updated dependencies [aba4bd8]
+  - @osmix/shared@0.0.13
+
 ## 0.0.12
 
 ### Patch Changes

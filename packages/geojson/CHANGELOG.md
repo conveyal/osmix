@@ -1,5 +1,15 @@
 # @osmix/geojson
 
+## 0.0.13
+
+### Patch Changes
+
+- aba4bd8: Fix for nodejs package imports
+- Updated dependencies [aba4bd8]
+  - @osmix/core@0.1.8
+  - @osmix/pbf@0.0.9
+  - @osmix/shared@0.0.13
+
 ## 0.0.12
 
 ### Patch Changes

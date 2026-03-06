@@ -1,5 +1,28 @@
 # osmix
 
+## 0.2.0
+
+### Minor Changes
+
+- 384f9c1: Improve OsmixRemote API with dataset handles
+
+### Patch Changes
+
+- aba4bd8: Fix for nodejs package imports
+- Updated dependencies [aba4bd8]
+  - @osmix/change@0.1.7
+  - @osmix/core@0.1.8
+  - @osmix/geojson@0.0.13
+  - @osmix/geoparquet@0.1.7
+  - @osmix/gtfs@0.0.8
+  - @osmix/json@0.0.14
+  - @osmix/pbf@0.0.9
+  - @osmix/raster@0.0.13
+  - @osmix/router@0.0.11
+  - @osmix/shapefile@0.0.9
+  - @osmix/shared@0.0.13
+  - @osmix/vt@0.0.13
+
 ## 0.1.7
 
 ### Patch Changes
