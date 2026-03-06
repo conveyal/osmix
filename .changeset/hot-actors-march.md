@@ -9,6 +9,7 @@
 "@osmix/pbf": patch
 "@osmix/router": patch
 "@osmix/shapefile": patch
+"@osmix/shared": patch
 "@osmix/shortbread": patch
 "@osmix/vt": patch
 ---
