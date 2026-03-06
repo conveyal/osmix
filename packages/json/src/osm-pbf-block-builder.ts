@@ -22,7 +22,7 @@ import type {
 	OsmTags,
 	OsmWay,
 } from "@osmix/shared/types"
-import { OSM_ENTITY_TYPES } from "./constants"
+import { OSM_ENTITY_TYPES } from "./constants.ts"
 
 /**
  * Build PBF primitive blocks from JSON entities.

@@ -32,7 +32,7 @@ import type {
 	OsmRelation,
 	OsmWay,
 } from "@osmix/shared/types"
-import { createReadableEntityStreamFromOsm } from "./utils"
+import { createReadableEntityStreamFromOsm } from "./utils.ts"
 
 /**
  * Options for loading OSM data from PBF.

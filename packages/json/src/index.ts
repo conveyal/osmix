@@ -35,8 +35,8 @@
  * @module @osmix/json
  */
 
-export * from "./constants"
-export * from "./json-to-pbf"
-export * from "./osm-pbf-block-builder"
-export * from "./osm-pbf-block-parser"
-export * from "./pbf-to-json"
+export * from "./constants.ts"
+export * from "./json-to-pbf.ts"
+export * from "./osm-pbf-block-builder.ts"
+export * from "./osm-pbf-block-parser.ts"
+export * from "./pbf-to-json.ts"

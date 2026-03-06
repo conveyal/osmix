@@ -32,10 +32,10 @@
  * @module @osmix/change
  */
 
-export * from "./apply-changeset"
-export * from "./changeset"
-export * from "./generate-changeset"
-export * from "./merge"
-export * from "./osc"
-export * from "./types"
-export * from "./utils"
+export * from "./apply-changeset.ts"
+export * from "./changeset.ts"
+export * from "./generate-changeset.ts"
+export * from "./merge.ts"
+export * from "./osc.ts"
+export * from "./types.ts"
+export * from "./utils.ts"

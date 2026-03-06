@@ -25,15 +25,15 @@ import type { Progress } from "@osmix/shared/progress"
 import { streamToBytes } from "@osmix/shared/stream-to-bytes"
 import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
-import { type OsmFromPbfOptions, toPbfStream } from "./pbf"
-import type { DrawToRasterTileOptions } from "./raster"
+import { type OsmFromPbfOptions, toPbfStream } from "./pbf.ts"
+import type { DrawToRasterTileOptions } from "./raster.ts"
 import {
 	DEFAULT_WORKER_COUNT,
 	SUPPORTS_SHARED_ARRAY_BUFFER,
 	SUPPORTS_STREAM_TRANSFER,
-} from "./settings"
-import { transfer } from "./utils"
-import type { OsmixWorker } from "./worker"
+} from "./settings.ts"
+import { transfer } from "./utils.ts"
+import type { OsmixWorker } from "./worker.ts"
 
 /** Identifier for an OSM dataset: string ID, Osm instance, or OsmInfo object. */
 export type OsmId = string | Osm | OsmInfo
@@ -73,11 +73,12 @@ export function detectFileType(fileName: string): OsmFileType {
 	return "pbf"
 }
 
-
-
 type DatasetMember = "nodes" | "ways" | "relations"
 
-type BoundDatasetMethod<F> = F extends (osmId: OsmId, ...args: infer Args) => infer Return
+type BoundDatasetMethod<F> = F extends (
+	osmId: OsmId,
+	...args: infer Args
+) => infer Return
 	? (...args: Args) => Return
 	: never
 
@@ -131,7 +132,9 @@ type OsmRemoteDatasetMemberMethods<
  * `OsmixRemote` method with signature `(osmId, ...args)` is exposed here,
  * with `osmId` automatically bound to this dataset's `id`.
  */
-class OsmRemoteDatasetBase<T extends OsmixWorker = OsmixWorker> implements OsmInfo {
+class OsmRemoteDatasetBase<T extends OsmixWorker = OsmixWorker>
+	implements OsmInfo
+{
 	readonly remote: OsmixRemote<T>
 	id: string
 	readonly bbox: OsmInfo["bbox"]
@@ -178,8 +181,7 @@ class OsmRemoteDatasetBase<T extends OsmixWorker = OsmixWorker> implements OsmIn
 }
 
 export type OsmRemoteDataset<T extends OsmixWorker = OsmixWorker> =
-	& OsmRemoteDatasetBase<T>
-	& OsmRemoteDatasetMethods<T>
+	OsmRemoteDatasetBase<T> & OsmRemoteDatasetMethods<T>
 
 function createOsmRemoteDataset<T extends OsmixWorker = OsmixWorker>(
 	remote: OsmixRemote<T>,
@@ -385,7 +387,6 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 			this.workers.map((worker) => worker.transferIn(transferables)),
 		)
 	}
-
 
 	private wrap(info: OsmInfo): OsmRemoteDataset<T> {
 		const { id, ...rest } = info

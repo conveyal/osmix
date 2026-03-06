@@ -3,7 +3,7 @@
  * @module
  */
 
-import type { ImportableGeoJSON, ReadOsmDataTypes } from "./types"
+import type { ImportableGeoJSON, ReadOsmDataTypes } from "./types.ts"
 
 /**
  * Parse GeoJSON from various input formats.

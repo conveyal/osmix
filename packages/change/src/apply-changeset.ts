@@ -8,7 +8,7 @@
  */
 
 import { Osm } from "@osmix/core"
-import type { OsmChangeset } from "./changeset"
+import type { OsmChangeset } from "./changeset.ts"
 
 /**
  * Apply a changeset to an Osm index, producing a new Osm index.

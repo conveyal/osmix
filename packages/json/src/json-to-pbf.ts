@@ -14,7 +14,7 @@ import {
 } from "@osmix/pbf"
 import type { OsmEntity } from "@osmix/shared/types"
 import { isNode, isRelation, isWay } from "@osmix/shared/utils"
-import { OsmPbfBlockBuilder } from "./osm-pbf-block-builder"
+import { OsmPbfBlockBuilder } from "./osm-pbf-block-builder.ts"
 
 /**
  * Convert JSON entities to a PBF byte stream.

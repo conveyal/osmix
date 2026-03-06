@@ -22,8 +22,8 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
-import type { ReadOsmDataTypes } from "./types"
-import { readDataAsGeoJSON } from "./utils"
+import type { ReadOsmDataTypes } from "./types.ts"
+import { readDataAsGeoJSON } from "./utils.ts"
 
 /**
  * Create an Osm index from GeoJSON data.

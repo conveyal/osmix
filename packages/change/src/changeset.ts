@@ -27,7 +27,7 @@ import type {
 	OsmChanges,
 	OsmChangesetStats,
 	OsmEntityRef,
-} from "./types"
+} from "./types.ts"
 import {
 	cleanCoords,
 	entityHasTagValue,
@@ -38,7 +38,7 @@ import {
 	removeDuplicateAdjacentWayRefs,
 	waysIntersect,
 	waysShouldConnect,
-} from "./utils"
+} from "./utils.ts"
 
 /**
  * Tracks changes to an OSM dataset and provides utilities for deduplication and merging.

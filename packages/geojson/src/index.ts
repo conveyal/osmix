@@ -30,6 +30,6 @@
  * @module @osmix/geojson
  */
 
-export * from "./entity-to-feature"
-export * from "./osm-from-geojson"
-export * from "./types"
+export * from "./entity-to-feature.ts"
+export * from "./osm-from-geojson.ts"
+export * from "./types.ts"

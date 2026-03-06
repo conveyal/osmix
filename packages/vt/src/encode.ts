@@ -19,8 +19,8 @@ import type {
 	VtSimpleFeature,
 	VtSimpleFeatureGeometry,
 	VtSimpleFeatureType,
-} from "./types"
-import writeVtPbf from "./write-vt-pbf"
+} from "./types.ts"
+import writeVtPbf from "./write-vt-pbf.ts"
 
 /** Default tile extent (coordinate resolution). */
 const DEFAULT_EXTENT = 4096

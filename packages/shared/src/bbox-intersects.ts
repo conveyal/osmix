@@ -7,7 +7,7 @@
  * @module
  */
 
-import type { GeoBbox2D } from "./types"
+import type { GeoBbox2D } from "./types.ts"
 
 /**
  * Check if two bounding boxes intersect or contain each other.

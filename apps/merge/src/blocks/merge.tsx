@@ -80,15 +80,20 @@ const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
 
 const toStem = (name: string | null | undefined) => {
 	if (!name) return "dataset"
-	return name
-		.replace(/\.[^.]+$/, "")
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 40) || "dataset"
+	return (
+		name
+			.replace(/\.[^.]+$/, "")
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 40) || "dataset"
+	)
 }
 
-const makeMergedDownloadName = (baseName?: string | null, patchName?: string | null) => {
+const makeMergedDownloadName = (
+	baseName?: string | null,
+	patchName?: string | null,
+) => {
 	const baseStem = toStem(baseName)
 	const patchStem = toStem(patchName)
 	const combined = `osmix-merged-${baseStem}-with-${patchStem}`

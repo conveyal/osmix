@@ -15,7 +15,7 @@ import type {
 	OsmWay,
 	RelationKind,
 	RelationKindMetadata,
-} from "./types"
+} from "./types.ts"
 
 /**
  * Get the semantic kind of a relation based on its type tag.

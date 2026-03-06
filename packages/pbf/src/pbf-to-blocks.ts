@@ -1,17 +1,17 @@
 import Pbf from "pbf"
-import { osmPbfBlobsToBlocksGenerator } from "./blobs-to-blocks"
-import { createOsmPbfBlobGenerator } from "./pbf-to-blobs"
+import { osmPbfBlobsToBlocksGenerator } from "./blobs-to-blocks.ts"
+import { createOsmPbfBlobGenerator } from "./pbf-to-blobs.ts"
 import {
 	type OsmPbfBlock,
 	type OsmPbfHeaderBlock,
 	readHeaderBlock,
 	readPrimitiveBlock,
-} from "./proto/osmformat"
+} from "./proto/osmformat.ts"
 import {
 	type AsyncGeneratorValue,
 	toAsyncGenerator,
 	webDecompress,
-} from "./utils"
+} from "./utils.ts"
 
 /** Number of bytes used to encode the BlobHeader length prefix (big-endian uint32). */
 export const HEADER_LENGTH_BYTES = 4

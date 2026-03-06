@@ -1,4 +1,4 @@
-import { supportsReadableStreamTransfer } from "./utils"
+import { supportsReadableStreamTransfer } from "./utils.ts"
 
 export const SUPPORTS_STREAM_TRANSFER = supportsReadableStreamTransfer()
 export const SUPPORTS_SHARED_ARRAY_BUFFER =

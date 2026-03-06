@@ -14,8 +14,8 @@ import {
 	progressEvent,
 } from "@osmix/shared/progress"
 import { throttle } from "@osmix/shared/throttle"
-import { OsmChangeset } from "./changeset"
-import type { OsmMergeOptions } from "./types"
+import { OsmChangeset } from "./changeset.ts"
+import type { OsmMergeOptions } from "./types.ts"
 
 /**
  * Generate a changeset from a patch dataset with configurable operations.

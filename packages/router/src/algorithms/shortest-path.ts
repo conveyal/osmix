@@ -8,8 +8,8 @@
  */
 
 import { haversineDistance } from "@osmix/shared/haversine-distance"
-import { BinaryHeap } from "../binary-heap"
-import type { GraphEdge, PathSegment, RoutingAlgorithmFn } from "../types"
+import { BinaryHeap } from "../binary-heap.ts"
+import type { GraphEdge, PathSegment, RoutingAlgorithmFn } from "../types.ts"
 
 /**
  * Maximum speed (m/s) for time-based heuristic.

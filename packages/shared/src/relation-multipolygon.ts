@@ -10,7 +10,7 @@
  * @module
  */
 
-import type { LonLat, OsmRelation, OsmRelationMember, OsmWay } from "./types"
+import type { LonLat, OsmRelation, OsmRelationMember, OsmWay } from "./types.ts"
 
 /**
  * Get way members from a relation, grouped by role (outer/inner).

@@ -5,7 +5,7 @@ import type {
 	OsmPbfBlock,
 	OsmPbfGroup,
 	OsmPbfHeaderBlock,
-} from "../src/proto/osmformat"
+} from "./proto/osmformat.ts"
 
 export type AsyncGeneratorValue<T> =
 	| T

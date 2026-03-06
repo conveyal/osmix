@@ -27,8 +27,7 @@ interface WorkspacePackage {
 	manifest: PackageJson
 }
 
-const repoRoot = resolve(import.meta.dir, "..")
-const packagesRoot = join(repoRoot, "packages")
+const packagesRoot = resolve(import.meta.dir, "../packages")
 
 async function isVersionPublished(
 	name: string,
@@ -56,6 +55,7 @@ function rewritePkgJsonForDist(pkgJson: PackageJson): PackageJson {
 			},
 		}
 	}
+
 	if (pkgJson.main) {
 		return {
 			...pkgJson,
@@ -63,41 +63,46 @@ function rewritePkgJsonForDist(pkgJson: PackageJson): PackageJson {
 			types: "./dist/index.d.ts",
 		}
 	}
+
 	throw Error(`Cannot rewrite package.json for ${pkgJson.name}`)
 }
 
-async function publishPackage({
-	dir,
-	manifest,
-	packageJsonPath,
-}: WorkspacePackage): Promise<boolean> {
-	const { name, version } = manifest
+async function withPublishedManifest<T>(
+	{ manifest, packageJsonPath }: WorkspacePackage,
+	run: () => Promise<T>,
+): Promise<T> {
+	try {
+		await Bun.write(
+			packageJsonPath,
+			JSON.stringify(rewritePkgJsonForDist(manifest), null, "\t"),
+		)
+		return await run()
+	} finally {
+		await Bun.write(packageJsonPath, JSON.stringify(manifest, null, "\t"))
+	}
+}
+
+async function publishPackage(
+	workspacePackage: WorkspacePackage,
+): Promise<void> {
+	const {
+		dir,
+		manifest: { name, version },
+	} = workspacePackage
 
 	$.cwd(dir)
 
 	console.log(`- Publishing ${name}@${version}`)
 	await $`bun run build`
 
-	try {
-		// Rewrite the package.json to use the built entry point.
-		await Bun.write(
-			packageJsonPath,
-			JSON.stringify(rewritePkgJsonForDist(manifest), null, "\t"),
-		)
-
+	await withPublishedManifest(workspacePackage, async () => {
 		const tarballToPublish = (await $`bun pm pack --quiet`.text()).trim()
 		if (!tarballToPublish)
 			throw Error(`No tarball generated for ${name}@${version}`)
 
 		await $`npm publish ./${tarballToPublish} --access=public --provenance=true`
-
-		// Clean up the tarball.
 		await rm(tarballToPublish, { force: true })
-	} finally {
-		// Revert the package.json to the original.
-		await Bun.write(packageJsonPath, JSON.stringify(manifest, null, "\t"))
-	}
-	return true
+	})
 }
 
 async function run(): Promise<void> {
@@ -121,8 +126,9 @@ async function run(): Promise<void> {
 			)
 			continue
 		}
-		const published = await publishPackage({ dir, packageJsonPath, manifest })
-		if (published) publishedCount++
+
+		await publishPackage({ dir, packageJsonPath, manifest })
+		publishedCount++
 	}
 
 	if (publishedCount === 0) {

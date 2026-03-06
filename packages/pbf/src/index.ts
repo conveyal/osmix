@@ -27,11 +27,11 @@
  * @module @osmix/pbf
  */
 
-export * from "./blobs-to-blocks"
-export * from "./blocks-to-pbf"
-export * from "./pbf-to-blobs"
-export * from "./pbf-to-blocks"
-export * from "./proto/fileformat"
-export * from "./proto/osmformat"
-export * from "./spec"
-export * from "./utils"
+export * from "./blobs-to-blocks.ts"
+export * from "./blocks-to-pbf.ts"
+export * from "./pbf-to-blobs.ts"
+export * from "./pbf-to-blocks.ts"
+export * from "./proto/fileformat.ts"
+export * from "./proto/osmformat.ts"
+export * from "./spec.ts"
+export * from "./utils.ts"

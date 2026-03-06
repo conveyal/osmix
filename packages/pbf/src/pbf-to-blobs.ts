@@ -1,10 +1,10 @@
 import Pbf from "pbf"
-import { HEADER_LENGTH_BYTES } from "./pbf-to-blocks"
+import { HEADER_LENGTH_BYTES } from "./pbf-to-blocks.ts"
 import {
 	type OsmPbfBlobHeader,
 	readBlob,
 	readBlobHeader,
-} from "./proto/fileformat"
+} from "./proto/fileformat.ts"
 
 /**
  * Create a stateful parser that extracts compressed blobs from raw PBF bytes.

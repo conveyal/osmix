@@ -1,5 +1,5 @@
 import type { OsmNode } from "@osmix/shared/types"
-import { Osm } from "./osm"
+import { Osm } from "./osm.ts"
 
 const YAKIM_LAT = 46.60207
 const YAKIM_LON = -120.505898

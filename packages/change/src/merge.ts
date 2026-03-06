@@ -13,10 +13,10 @@ import {
 	type ProgressEvent,
 	progressEvent,
 } from "@osmix/shared/progress"
-import { applyChangesetToOsm } from "./apply-changeset"
-import { OsmChangeset } from "./changeset"
-import type { OsmMergeOptions } from "./types"
-import { changeStatsSummary } from "./utils"
+import { applyChangesetToOsm } from "./apply-changeset.ts"
+import { OsmChangeset } from "./changeset.ts"
+import type { OsmMergeOptions } from "./types.ts"
+import { changeStatsSummary } from "./utils.ts"
 
 /**
  * Run a full merge pipeline on two OSM datasets.

@@ -8,16 +8,16 @@
  */
 
 import Pbf from "pbf"
-import { writeBlob, writeBlobHeader } from "./proto/fileformat"
-import type { OsmPbfBlock, OsmPbfHeaderBlock } from "./proto/osmformat"
-import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat"
+import { writeBlob, writeBlobHeader } from "./proto/fileformat.ts"
+import type { OsmPbfBlock, OsmPbfHeaderBlock } from "./proto/osmformat.ts"
+import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat.ts"
 import {
 	MAX_BLOB_SIZE_BYTES,
 	MAX_HEADER_SIZE_BYTES,
 	RECOMMENDED_BLOB_SIZE_BYTES,
 	RECOMMENDED_HEADER_SIZE_BYTES,
-} from "./spec"
-import { concatUint8, uint32BE, webCompress } from "./utils"
+} from "./spec.ts"
+import { concatUint8, uint32BE, webCompress } from "./utils.ts"
 
 /**
  * Serialize a header or primitive block into spec-compliant PBF bytes.

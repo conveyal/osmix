@@ -35,7 +35,7 @@ import type {
 	WaterLineKind,
 	WaterLineProperties,
 	WaterProperties,
-} from "./types"
+} from "./types.ts"
 
 /**
  * Get a string tag value from OsmTags

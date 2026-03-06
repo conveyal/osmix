@@ -19,8 +19,8 @@ import type {
 	GraphEdge,
 	HighwayFilter,
 	RoutingGraphTransferables,
-} from "./types"
-import { DEFAULT_SPEEDS, defaultHighwayFilter, getSpeedLimit } from "./utils"
+} from "./types.ts"
+import { DEFAULT_SPEEDS, defaultHighwayFilter, getSpeedLimit } from "./utils.ts"
 
 /**
  * Routing graph built from OSM ways and nodes.

@@ -286,7 +286,10 @@ function initRouteMap(info: OsmRemoteDataset) {
 	})
 }
 
-async function handleRouteClick(dataset: OsmRemoteDataset, pt: [number, number]) {
+async function handleRouteClick(
+	dataset: OsmRemoteDataset,
+	pt: [number, number],
+) {
 	if (!routeMap) return
 	if (routeState.origin && routeState.dest) {
 		routeState.markers.forEach((m) => void m.remove())
