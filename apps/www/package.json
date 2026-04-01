@@ -13,7 +13,7 @@
 		"@shikijs/core": "4.0.0",
 		"@shikijs/engine-javascript": "3.22.0",
 		"@shikijs/langs": "3.22.0",
-		"@shikijs/themes": "3.22.0",
+		"@shikijs/themes": "4.0.2",
 		"@shikijs/types": "4.0.0",
 		"comlink": "^4.4.2",
 		"idb-keyval": "^6.2.2",
