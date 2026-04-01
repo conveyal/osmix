@@ -23,7 +23,7 @@
 	},
 	"dependencies": {
 		"@osmix/shared": "workspace:*",
-		"flatbush": "^4.4.1",
+		"flatbush": "^4.5.1",
 		"geoflatbush": "^2.1.0",
 		"geokdbush": "^2.0.1",
 		"kdbush": "mourner/kdbush#16416cd"
