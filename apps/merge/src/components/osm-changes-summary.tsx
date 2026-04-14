@@ -489,7 +489,10 @@ function RefsDiff({
 					<td className="align-top pl-4 text-muted-foreground">removed</td>
 					<td>
 						{deletes.map((op) => (
-							<span key={`del-${op.index}-${op.value}`} className="text-red-600">
+							<span
+								key={`del-${op.index}-${op.value}`}
+								className="text-red-600"
+							>
 								<span className="text-muted-foreground text-xs">
 									[{op.index}]
 								</span>
@@ -505,7 +508,10 @@ function RefsDiff({
 					<td className="align-top pl-4 text-muted-foreground">added</td>
 					<td>
 						{inserts.map((op) => (
-							<span key={`ins-${op.index}-${op.value}`} className="text-green-600">
+							<span
+								key={`ins-${op.index}-${op.value}`}
+								className="text-green-600"
+							>
 								<span className="text-muted-foreground text-xs">
 									[{op.index}]
 								</span>
@@ -656,7 +662,10 @@ function MembersDiff({
 					<td className="align-top pl-4 text-muted-foreground">removed</td>
 					<td>
 						{deletes.map((op) => (
-							<span key={`del-${op.index}-${op.value}`} className="text-red-600">
+							<span
+								key={`del-${op.index}-${op.value}`}
+								className="text-red-600"
+							>
 								<span className="text-muted-foreground text-xs">
 									[{op.index}]
 								</span>
@@ -672,7 +681,10 @@ function MembersDiff({
 					<td className="align-top pl-4 text-muted-foreground">added</td>
 					<td>
 						{inserts.map((op) => (
-							<span key={`ins-${op.index}-${op.value}`} className="text-green-600">
+							<span
+								key={`ins-${op.index}-${op.value}`}
+								className="text-green-600"
+							>
 								<span className="text-muted-foreground text-xs">
 									[{op.index}]
 								</span>

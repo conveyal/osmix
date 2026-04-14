@@ -1,5 +1,6 @@
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePickerWithFallback } from "../lib/save-file-picker"
+import { ensureOsmPbfDownloadName } from "../lib/osm-pbf-download-name"
 import type { OsmFileType, OsmInfo } from "osmix"
 import { useEffectEvent, useRef } from "react"
 import { canStoreFile } from "../lib/storage-utils"
@@ -213,7 +214,8 @@ export function useOsmFile(osmKey: string) {
 		const withPrefix = sourceName.startsWith("osmix-")
 			? sourceName
 			: `osmix-${sourceName}`
-		const suggestedName = name ?? withPrefix
+		const rawSuggestedName = name ?? withPrefix
+		const suggestedName = ensureOsmPbfDownloadName(rawSuggestedName)
 		const fileHandle = await showSaveFilePickerWithFallback(
 			{
 				suggestedName,
