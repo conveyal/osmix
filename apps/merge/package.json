@@ -16,7 +16,7 @@
 		"@types/react": "^19.2.14",
 		"@types/react-dom": "^19.2.3",
 		"@vitejs/plugin-react": "^5.1.4",
-		"tailwindcss": "4.1.18",
+		"tailwindcss": "4.2.4",
 		"tw-animate-css": "^1.3.4",
 		"typescript": "catalog:",
 		"vite": "catalog:"
