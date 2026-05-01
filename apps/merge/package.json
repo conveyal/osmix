@@ -41,7 +41,7 @@
 		"comlink": "^4.4.2",
 		"dequal": "catalog:",
 		"idb": "^8.0.3",
-		"jotai": "^2.17.1",
+		"jotai": "^2.19.1",
 		"lucide-react": "^1.7.0",
 		"maplibre-gl": "catalog:",
 		"native-file-system-adapter": "^3.0.1",
