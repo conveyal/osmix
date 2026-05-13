@@ -41,17 +41,6 @@ export default function Nav() {
 					>
 						Merge
 					</NavLink>
-					<NavLink
-						to="/extract"
-						className={({ isActive }) =>
-							cn(
-								"text-sm font-normal hover:underline",
-								isActive ? "text-blue-500" : "text-muted-foreground",
-							)
-						}
-					>
-						Extract
-					</NavLink>
 				</div>
 				<BrowserCheck />
 			</div>

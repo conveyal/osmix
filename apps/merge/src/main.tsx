@@ -4,7 +4,6 @@ import { MapProvider } from "react-map-gl/maplibre"
 import { BrowserRouter, Outlet, Route, Routes } from "react-router"
 import { ErrorBoundary } from "./components/error-boundary"
 import Nav from "./components/nav"
-import ExtractPage from "./pages/extract"
 import MergePage from "./pages/merge"
 
 function RootLayout() {
@@ -30,7 +29,7 @@ createRoot(rootEl).render(
 				<Routes>
 					<Route path={"/"} element={<RootLayout />}>
 						<Route path="" element={<MergePage />} />
-						<Route path="extract" element={<ExtractPage />} />
+						<Route path="extract" element={<MergePage />} />
 					</Route>
 				</Routes>
 			</BrowserRouter>

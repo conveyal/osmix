@@ -1,15 +1,15 @@
 import { Tabs } from "@base-ui/react/tabs"
 import { useAtom, useSetAtom } from "jotai"
-import { atomWithStorage } from "jotai/utils"
 import type { OsmFileType } from "osmix"
 import { useEffect, useMemo, useRef } from "react"
-import { useSearchParams } from "react-router"
+import { useLocation, useNavigate, useSearchParams } from "react-router"
+import ExtractBlock from "../blocks/extract"
 import InspectBlock from "../blocks/inspect"
 import MergeBlock from "../blocks/merge"
 import Basemap, { type MapInitialViewState } from "../components/basemap"
 import CustomControl from "../components/custom-control"
 import EntityDetailsMapControl from "../components/entity-details-map-control"
-import FileSelectorScreen from "../components/file-selector-screen"
+import ExtractMapLayers from "../components/extract-map-layers"
 import { Main, MapContent, Sidebar } from "../components/layout"
 import OsmFileMapControl from "../components/osm-file-map-control"
 import OsmixRasterSource from "../components/osmix-raster-source"
@@ -20,29 +20,28 @@ import { buttonVariants } from "../components/ui/button"
 import { useLog } from "../hooks/log"
 import { useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
+import { DEFAULT_EXTRACT_BBOX } from "../lib/extract-bbox"
 import { cn } from "../lib/utils"
-import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings"
+import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"
-import { osmLoadingAbortControllerAtom } from "../state/status"
-
-const activeTabAtom = atomWithStorage<string>(
-	"@osmix:merge:activeTab",
-	"Inspect",
-)
-
+import { activeTabAtom } from "../state/extract"
 import { selectOsmEntityAtom } from "../state/osm"
+import { osmLoadingAbortControllerAtom } from "../state/status"
 import { osmWorker } from "../state/worker"
 
 export default function Merge() {
 	const base = useOsmFile(BASE_OSM_KEY)
 	const patch = useOsmFile(PATCH_OSM_KEY)
+	const extract = useOsmFile(EXTRACT_OSM_KEY)
 	const setChangesetStats = useSetAtom(changesetStatsAtom)
 	const flyToOsmBounds = useFlyToOsmBounds()
 	const selectEntity = useSetAtom(selectOsmEntityAtom)
 	const autoLoadAttempted = useRef(false)
+	const location = useLocation()
+	const navigate = useNavigate()
 	const [searchParams, setSearchParams] = useSearchParams()
 	const { activeTasks } = useLog()
-	const isMergeInProgress = activeTasks > 0
+	const isBusy = activeTasks > 0
 	const [activeTab, setActiveTab] = useAtom(activeTabAtom)
 	const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom)
 
@@ -75,18 +74,33 @@ export default function Merge() {
 		searchParams,
 		setSearchParams,
 		base.loadFromStorage,
-		flyToOsmBounds, // Load the file from storage
+		flyToOsmBounds,
 		base,
 	])
 
-	// Show full-screen file selector when no files are selected
-	const noFilesSelected = !base.osm && !patch.osm
+	useEffect(() => {
+		if (location.pathname.endsWith("/extract")) {
+			setActiveTab("Extract")
+		}
+	}, [location.pathname, setActiveTab])
+
+	const onTabChange = (tab: string) => {
+		setActiveTab(tab)
+		if (tab === "Extract") {
+			navigate("/extract", { replace: true })
+		} else {
+			navigate("/", { replace: true })
+		}
+	}
+
+	useEffect(() => {
+		if (extract.osmInfo) flyToOsmBounds(extract.osmInfo)
+	}, [extract.osmInfo, flyToOsmBounds])
 
 	const openOsmFile = async (file: File | string, fileType?: OsmFileType) => {
 		selectEntity(null, null)
 		setChangesetStats(null)
 
-		// Create abort controller for cancellation
 		const abortController = new AbortController()
 		setLoadingState({ controller: abortController, osmKey: BASE_OSM_KEY })
 
@@ -103,32 +117,38 @@ export default function Merge() {
 	}
 
 	const initialViewState: MapInitialViewState | undefined = useMemo(() => {
-		if (!base.osmInfo) return undefined
-		const bbox = base?.osmInfo?.bbox
-		if (!bbox) return undefined
-		return {
-			bounds: bbox,
-			fitBoundsOptions: {
-				padding: 100,
-			},
+		if (activeTab === "Extract") {
+			if (extract.osmInfo?.bbox) {
+				return {
+					bounds: extract.osmInfo.bbox,
+					fitBoundsOptions: { padding: 100 },
+				}
+			}
+			return {
+				bounds: DEFAULT_EXTRACT_BBOX,
+				fitBoundsOptions: { padding: 80 },
+			}
 		}
-	}, [base.osmInfo])
-
-	if (noFilesSelected) return <FileSelectorScreen openOsmFile={openOsmFile} />
+		if (!base.osmInfo?.bbox) return undefined
+		return {
+			bounds: base.osmInfo.bbox,
+			fitBoundsOptions: { padding: 100 },
+		}
+	}, [activeTab, base.osmInfo, extract.osmInfo])
 
 	return (
 		<Main>
 			<Sidebar>
 				<div className="flex-1 p-2 lg:p-4 overflow-y-auto">
-					<Tabs.Root value={activeTab} onValueChange={setActiveTab}>
+					<Tabs.Root value={activeTab} onValueChange={onTabChange}>
 						<Tabs.List className="flex gap-2 pb-2">
 							<Tabs.Tab
 								className={cn(
 									buttonVariants({ variant: "outline", size: "sm" }),
 									"data-active:border-accent-foreground",
-									isMergeInProgress && "opacity-50 cursor-not-allowed",
+									isBusy && "opacity-50 cursor-not-allowed",
 								)}
-								disabled={isMergeInProgress}
+								disabled={isBusy}
 								value="Inspect"
 							>
 								Inspect
@@ -137,19 +157,33 @@ export default function Merge() {
 								className={cn(
 									buttonVariants({ variant: "outline", size: "sm" }),
 									"data-active:border-primary",
-									isMergeInProgress && "opacity-50 cursor-not-allowed",
+									isBusy && "opacity-50 cursor-not-allowed",
 								)}
-								disabled={isMergeInProgress}
+								disabled={isBusy}
 								value="Merge"
 							>
 								Merge
 							</Tabs.Tab>
+							<Tabs.Tab
+								className={cn(
+									buttonVariants({ variant: "outline", size: "sm" }),
+									"data-active:border-accent-foreground",
+									isBusy && "opacity-50 cursor-not-allowed",
+								)}
+								disabled={isBusy}
+								value="Extract"
+							>
+								Extract
+							</Tabs.Tab>
 						</Tabs.List>
 						<Tabs.Panel value="Inspect">
-							<InspectBlock />
+							<InspectBlock openOsmFile={openOsmFile} />
 						</Tabs.Panel>
 						<Tabs.Panel value="Merge">
 							<MergeBlock />
+						</Tabs.Panel>
+						<Tabs.Panel value="Extract">
+							<ExtractBlock />
 						</Tabs.Panel>
 					</Tabs.Root>
 				</div>
@@ -161,6 +195,14 @@ export default function Merge() {
 					{patch.osm && <OsmixRasterSource osmId={patch.osm.id} />}
 					{base.osm && <OsmixVectorOverlay osm={base.osm} />}
 					{patch.osm && <OsmixVectorOverlay osm={patch.osm} />}
+					{activeTab === "Extract" && extract.osm ? (
+						<>
+							<OsmixRasterSource osmId={extract.osm.id} />
+							<OsmixVectorOverlay osm={extract.osm} />
+						</>
+					) : null}
+
+					{activeTab === "Extract" ? <ExtractMapLayers /> : null}
 
 					<SelectedEntityLayer />
 
@@ -172,7 +214,6 @@ export default function Merge() {
 									selectEntity(null, null)
 									setChangesetStats(null)
 									if (patch.osm) {
-										// Capture patch state before clearing to avoid duplicate source ids
 										const patchState = {
 											file: patch.file,
 											fileInfo: patch.fileInfo,
@@ -180,9 +221,7 @@ export default function Merge() {
 											osmInfo: patch.osmInfo,
 											isStored: patch.isStored,
 										}
-										// Clear patch first to remove it from the map
 										await patch.loadOsmFile(null)
-										// Then transfer captured state to base
 										base.copyStateFrom(patchState)
 									} else {
 										await base.loadOsmFile(null)
