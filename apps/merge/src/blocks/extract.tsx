@@ -22,14 +22,10 @@ import {
 } from "../lib/extract-bbox"
 import { cn } from "../lib/utils"
 import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings"
+import { activeTabAtom, extractBboxAtom } from "../state/extract"
 import { mapBoundsAtom } from "../state/map"
 import { selectOsmEntityAtom } from "../state/osm"
 import { osmLoadingAbortControllerAtom } from "../state/status"
-import {
-	activeTabAtom,
-	extractBboxAtom,
-	extractSyncMapToBboxAtom,
-} from "../state/extract"
 
 const STRATEGY_OPTIONS: {
 	value: ExtractStrategy
@@ -96,7 +92,6 @@ export default function ExtractBlock() {
 	const setActiveTab = useSetAtom(activeTabAtom)
 
 	const [bbox, setBbox] = useAtom(extractBboxAtom)
-	const [syncMapToBbox, setSyncMapToBbox] = useAtom(extractSyncMapToBboxAtom)
 	const [bboxText, setBboxText] = useState("")
 	const [bboxInputs, setBboxInputs] = useState(() => bbox.map((v) => String(v)))
 	const [strategy, setStrategy] = useState<ExtractStrategy>("complete_ways")
@@ -111,12 +106,6 @@ export default function ExtractBlock() {
 		const [w, s, e, n] = bbox
 		setBboxInputs([String(w), String(s), String(e), String(n)])
 	}, [bbox])
-
-	useEffect(() => {
-		if (!syncMapToBbox) return
-		const next = boundsLikeToBbox(mapBounds)
-		if (next) setBbox(next)
-	}, [mapBounds, syncMapToBbox, setBbox])
 
 	const canExtract = !!pendingFile && isValidBbox(bbox) && !isExtracting
 	const hasExtractResult = !!extract.osm && !!extract.osmInfo
@@ -268,7 +257,7 @@ export default function ExtractBlock() {
 							htmlFor="extract-bbox-paste"
 						>
 							Paste bbox{" "}
-							<code className="text-[10px] bg-muted px-1 rounded">
+							<code className="bg-muted px-1 rounded">
 								min_lon,min_lat,max_lon,max_lat
 							</code>
 						</label>
@@ -278,36 +267,26 @@ export default function ExtractBlock() {
 								value={bboxText}
 								onChange={(e) => setBboxText(e.target.value)}
 								placeholder="-122.5,47.2,-122.3,47.5"
-								className="font-mono "
+								className="font-mono"
 							/>
 							<Button
 								type="button"
-								variant="secondary"
-								size="sm"
+								variant="outline"
 								onClick={applyParsedBboxString}
 							>
 								Parse
 							</Button>
 						</div>
 					</div>
-					<div className="flex flex-wrap gap-2 mt-2">
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							onClick={useMapViewAsBbox}
-						>
-							Use current map view as bbox
-						</Button>
-						<label className="flex items-center gap-2  cursor-pointer">
-							<input
-								type="checkbox"
-								checked={syncMapToBbox}
-								onChange={(e) => setSyncMapToBbox(e.target.checked)}
-							/>
-							Keep bbox synced while panning/zooming
-						</label>
-					</div>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						className="w-full"
+						onClick={useMapViewAsBbox}
+					>
+						Use current map view as bbox
+					</Button>
 					{!isValidBbox(bbox) ? (
 						<p className=" text-destructive mt-1">
 							Bbox must have min &lt; max for both lon and lat.
@@ -318,7 +297,20 @@ export default function ExtractBlock() {
 
 			<Card>
 				<CardHeader className="p-2">2. Extract strategy</CardHeader>
-				<CardContent className="p-2">
+				<CardContent className="p-2 flex flex-col gap-2">
+					<p className="text-muted-foreground">
+						See the{" "}
+						<a
+							href="https://osmcode.org/osmium-tool/manual.html#creating-geographic-extracts"
+							target="_blank"
+							rel="noreferrer"
+							className="text-blue-500"
+						>
+							Osmium Tool Manual
+						</a>{" "}
+						for more information about each strategy. For usage with Conveyal,
+						use "Complete ways".
+					</p>
 					{STRATEGY_OPTIONS.map((opt) => {
 						const inputId = `extract-strategy-${opt.value}`
 						return (
@@ -361,7 +353,7 @@ export default function ExtractBlock() {
 
 			<Card>
 				<CardHeader className="p-2">4. OSM PBF file</CardHeader>
-				<CardContent className="p-2">
+				<CardContent className="p-2 flex gap-2 items-center">
 					<OsmPbfFileInput
 						file={pendingFile}
 						setFile={async (f) => {
@@ -371,6 +363,7 @@ export default function ExtractBlock() {
 						pbfOnly
 						disabled={isExtracting}
 					/>
+					{pendingFile?.name}
 				</CardContent>
 			</Card>
 
@@ -387,8 +380,8 @@ export default function ExtractBlock() {
 					</Button>
 					<Button
 						type="button"
-						disabled={isExtracting || !hasExtractResult}
-						variant="secondary"
+						disabled={!extract.osm || isExtracting || !hasExtractResult}
+						variant="outline"
 						className="w-full"
 						onClick={() => void extract.downloadOsm()}
 					>
@@ -398,7 +391,7 @@ export default function ExtractBlock() {
 						<Button
 							type="button"
 							disabled={isExtracting}
-							variant="secondary"
+							variant="outline"
 							className="w-full"
 							onClick={() => void extract.saveToStorage()}
 						>

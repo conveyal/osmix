@@ -145,10 +145,10 @@ export default function ExtractTagFilterEditor({
 	}
 
 	return (
-		<div className="flex flex-col gap-2">
+		<div className="flex flex-col gap-4">
 			<Button
 				type="button"
-				variant="secondary"
+				variant="outline"
 				size="sm"
 				onClick={() => onChange(conveyalTagFilterEditorState())}
 			>
