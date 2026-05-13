@@ -514,7 +514,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 	 */
 	async fromFile(
 		file: File,
-		options: Partial<OsmOptions> = {},
+		options: Partial<OsmFromPbfOptions> = {},
 		fileType?: OsmFileType,
 	) {
 		if (fileType) {

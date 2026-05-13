@@ -1,7 +1,13 @@
 import { useAtom, useSetAtom } from "jotai"
 import { showSaveFilePickerWithFallback } from "../lib/save-file-picker"
 import { ensureOsmPbfDownloadName } from "../lib/osm-pbf-download-name"
-import type { OsmFileType, OsmInfo } from "osmix"
+import type {
+	ExtractStrategy,
+	ExtractTagFilterRules,
+	OsmFileType,
+	OsmInfo,
+} from "osmix"
+import type { GeoBbox2D } from "@osmix/shared/types"
 import { useEffectEvent, useRef } from "react"
 import { canStoreFile } from "../lib/storage-utils"
 import { isStreamCloneable } from "../lib/stream-transfer"
@@ -137,6 +143,83 @@ export function useOsmFile(osmKey: string) {
 				}
 				console.error(e)
 				taskLog.end(`${file.name} failed to load.`, "error")
+				throw e
+			}
+		},
+	)
+
+	const loadExtractFromPbf = useEffectEvent(
+		async (
+			file: File | null,
+			extract: {
+				extractBbox: GeoBbox2D
+				extractStrategy: ExtractStrategy
+				extractTagFilter: ExtractTagFilterRules
+			},
+			signal?: AbortSignal,
+		) => {
+			const loadId = ++currentLoadIdRef.current
+			setFile(file)
+			setOsm(null)
+			setFileInfo(null)
+			setIsStored(false)
+			if (file == null) return null
+			const taskLog = Log.startTask(`Extracting ${file.name}…`)
+			try {
+				if (signal?.aborted) throw new LoadCancelledError()
+
+				taskLog.update("Hashing file…")
+				const buffer = await file.arrayBuffer()
+				if (signal?.aborted) throw new LoadCancelledError()
+
+				const fileHash = await osmWorker.hashBuffer(buffer)
+				if (signal?.aborted) throw new LoadCancelledError()
+
+				const storedFileInfo: StoredFileInfo = {
+					fileHash,
+					fileName: file.name,
+					fileSize: file.size,
+				}
+				setFileInfo(storedFileInfo)
+
+				taskLog.update("Reading PBF and applying extract…")
+				const osmInfo: OsmInfo = await osmWorker.fromFile(
+					file,
+					{
+						id: fileHash,
+						extractBbox: extract.extractBbox,
+						extractStrategy: extract.extractStrategy,
+						extractTagFilter: extract.extractTagFilter,
+					},
+					"pbf",
+				)
+
+				if (signal?.aborted) throw new LoadCancelledError()
+
+				setOsmInfo(osmInfo)
+				const osm = await osmWorker.get(osmInfo.id)
+
+				if (signal?.aborted) throw new LoadCancelledError()
+
+				setOsm(osm)
+				setSelectedOsm(osm)
+
+				taskLog.end(`${file.name} extracted.`)
+				return osmInfo
+			} catch (e) {
+				if (e instanceof LoadCancelledError) {
+					if (loadId === currentLoadIdRef.current) {
+						setFile(null)
+						setFileInfo(null)
+						setOsm(null)
+						setOsmInfo(null)
+						setIsStored(false)
+					}
+					taskLog.end("Extract cancelled.")
+					return null
+				}
+				console.error(e)
+				taskLog.end(`${file.name} extract failed.`, "error")
 				throw e
 			}
 		},
@@ -363,6 +446,7 @@ export function useOsmFile(osmKey: string) {
 		file,
 		fileInfo,
 		isStored,
+		loadExtractFromPbf,
 		loadFromStorage,
 		loadOsmFile,
 		osm,

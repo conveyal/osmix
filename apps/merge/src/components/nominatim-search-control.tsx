@@ -13,7 +13,7 @@ import { searchControlIsOpenAtom } from "../state/map"
 import CustomControl from "./custom-control"
 import { Spinner } from "./ui/spinner"
 
-type NominatimResult = {
+export type NominatimResult = {
 	addresstype: string
 	address: Record<string, string>
 	place_id: number
@@ -36,7 +36,14 @@ export default function NominatimSearchControl() {
 	)
 }
 
-export function NominatimSearch({ map }: { map?: MapInstance }) {
+export function NominatimSearch({
+	map,
+	onPlaceResolved,
+}: {
+	map?: MapInstance
+	/** Called after the map is focused on the chosen result (bbox or center). */
+	onPlaceResolved?: (result: NominatimResult) => void
+}) {
 	const [query, setQuery] = useState("")
 	const [results, setResults] = useState<NominatimResult[]>([])
 	const [error, setError] = useState<string | null>(null)
@@ -98,6 +105,7 @@ export function NominatimSearch({ map }: { map?: MapInstance }) {
 				],
 				{ padding: 100, maxDuration: 100 },
 			)
+			onPlaceResolved?.(result)
 			return
 		}
 
@@ -112,6 +120,7 @@ export function NominatimSearch({ map }: { map?: MapInstance }) {
 				maxDuration: 100,
 			})
 		}
+		onPlaceResolved?.(result)
 	}
 
 	return (

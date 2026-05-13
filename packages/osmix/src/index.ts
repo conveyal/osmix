@@ -54,6 +54,7 @@ export * from "@osmix/shared/types"
 export * from "@osmix/vt"
 
 // Export new utilities
+export * from "./extract-tag-filter.ts"
 export * from "./extract.ts"
 export * from "./pbf.ts"
 export * from "./raster.ts"

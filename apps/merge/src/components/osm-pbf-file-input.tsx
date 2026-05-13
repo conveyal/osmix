@@ -59,14 +59,20 @@ const FILE_TYPE_OPTIONS: {
 export default function OsmPbfFileInput({
 	disabled,
 	file,
+	pbfOnly,
 	setFile,
 }: {
 	disabled?: boolean
 	file?: File | null
+	pbfOnly?: boolean
 	setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>
 }) {
 	return !file ? (
-		<OsmPbfSelectFileButton disabled={disabled} setFile={setFile} />
+		<OsmPbfSelectFileButton
+			disabled={disabled}
+			pbfOnly={pbfOnly}
+			setFile={setFile}
+		/>
 	) : (
 		<OsmPbfClearFileButton
 			disabled={disabled}
@@ -77,9 +83,12 @@ export default function OsmPbfFileInput({
 
 export function OsmPbfSelectFileButton({
 	disabled,
+	pbfOnly,
 	setFile,
 }: {
 	disabled?: boolean
+	/** Skip format menu and open only `.pbf` / `.osm.pbf`. */
+	pbfOnly?: boolean
 	setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>
 }) {
 	const [isLoading, setIsLoading] = useState(false)
@@ -97,6 +106,28 @@ export function OsmPbfSelectFileButton({
 		} finally {
 			setIsLoading(false)
 		}
+	}
+
+	if (pbfOnly) {
+		return (
+			<Button
+				type="button"
+				disabled={disabled || isLoading}
+				className="flex-1 w-full"
+				onClick={async () => {
+					setIsLoading(true)
+					try {
+						const selectedFile = await showFileSelector(".pbf,.osm.pbf")
+						if (selectedFile) await setFile(selectedFile, "pbf")
+					} finally {
+						setIsLoading(false)
+					}
+				}}
+			>
+				<FilesIcon />
+				Select PBF
+			</Button>
+		)
 	}
 
 	return (
