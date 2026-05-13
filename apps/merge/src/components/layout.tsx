@@ -13,7 +13,7 @@ export function Main({ children }: { children: ReactNode }) {
 export function Sidebar({ children }: { children: ReactNode }) {
 	const [isOpen, setIsOpen] = useAtom(sidebarIsOpenAtom)
 	return (
-		<div className="flex h-full min-h-0 flex-row z-10 group/sidebar relative">
+		<div className="flex h-full min-h-0 flex-row z-30 group/sidebar relative">
 			<div
 				className={cn(
 					"flex h-full min-h-0 flex-col w-3 overflow-hidden bg-slate-100",

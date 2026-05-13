@@ -32,19 +32,100 @@ import type {
 	OsmRelation,
 	OsmWay,
 } from "@osmix/shared/types"
+import {
+	type ExtractTagFilterRules,
+	hasExtractTagFilter,
+	nodeMatchesExtractTagRules,
+	normalizeTagFilterRules,
+	relationMatchesExtractTagRules,
+	wayMatchesExtractTagRules,
+} from "./extract-tag-filter.ts"
+import { createExtract, type ExtractStrategy } from "./extract.ts"
 import { createReadableEntityStreamFromOsm } from "./utils.ts"
+
+/** When `extractBbox` is set but `extractStrategy` is omitted, default to in-stream simple extract. */
+function resolveEffectiveExtractStrategy(
+	extractBbox: GeoBbox2D | undefined,
+	extractStrategy: ExtractStrategy | undefined,
+): ExtractStrategy | undefined {
+	if (extractStrategy !== undefined) return extractStrategy
+	if (extractBbox !== undefined) return "simple"
+	return undefined
+}
 
 /**
  * Options for loading OSM data from PBF.
  */
 export interface OsmFromPbfOptions extends OsmOptions {
 	extractBbox: GeoBbox2D
+	extractStrategy: ExtractStrategy
+	/** Optional tag-filter rules (worker-safe). Omitted => no tag filtering. */
+	extractTagFilter?: ExtractTagFilterRules
 	filter<T extends OsmEntityType>(
 		type: T,
 		entity: OsmEntityTypeMap[T],
 		osmix: Osm,
 	): boolean
 	buildSpatialIndexes: OsmEntityType[]
+}
+
+function composeNodeIngestFilter(
+	bboxFilter: ((node: OsmNode) => boolean) | undefined,
+	tagRules: ExtractTagFilterRules | null,
+	entityFilter: OsmFromPbfOptions["filter"] | undefined,
+	osm: Osm,
+): ((node: OsmNode) => boolean) | undefined {
+	const applyNodeTags = tagRules !== null && tagRules.nodes.length > 0
+	if (!bboxFilter && !applyNodeTags && !entityFilter) return undefined
+	return (node: OsmNode) => {
+		if (bboxFilter && !bboxFilter(node)) return false
+		// Dense node tag filtering may leave orphan refs when nodes precede ways in a block.
+		if (applyNodeTags && !nodeMatchesExtractTagRules(node, tagRules!))
+			return false
+		if (entityFilter && !entityFilter("node", node, osm)) return false
+		return true
+	}
+}
+
+function composeWayIngestFilter(
+	spatialFilter: ((way: OsmWay) => OsmWay | null) | undefined,
+	tagRules: ExtractTagFilterRules | null,
+	entityFilter: OsmFromPbfOptions["filter"] | undefined,
+	osm: Osm,
+): ((way: OsmWay) => OsmWay | null) | undefined {
+	const applyWayTags = tagRules !== null && tagRules.ways.length > 0
+	if (!spatialFilter && !applyWayTags && !entityFilter) return undefined
+	return (way: OsmWay) => {
+		let w: OsmWay | null = way
+		if (spatialFilter) {
+			w = spatialFilter(way)
+			if (w === null) return null
+		}
+		if (applyWayTags && !wayMatchesExtractTagRules(w, tagRules!)) return null
+		if (entityFilter && !entityFilter("way", w, osm)) return null
+		return w
+	}
+}
+
+function composeRelationIngestFilter(
+	spatialFilter: ((relation: OsmRelation) => OsmRelation | null) | undefined,
+	tagRules: ExtractTagFilterRules | null,
+	entityFilter: OsmFromPbfOptions["filter"] | undefined,
+	osm: Osm,
+): ((relation: OsmRelation) => OsmRelation | null) | undefined {
+	const applyRelationTags = tagRules !== null && tagRules.relations.length > 0
+	if (!spatialFilter && !applyRelationTags && !entityFilter) return undefined
+	return (relation: OsmRelation) => {
+		let r: OsmRelation | null = relation
+		if (spatialFilter) {
+			r = spatialFilter(relation)
+			if (r === null) return null
+		}
+		if (applyRelationTags && !relationMatchesExtractTagRules(r, tagRules!))
+			return null
+		if (entityFilter && !entityFilter("relation", r, osm)) return null
+		return r
+	}
 }
 
 /**
@@ -83,7 +164,17 @@ export async function* startCreateOsmFromPbf(
 	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
 	options: Partial<OsmFromPbfOptions> = {},
 ): AsyncGenerator<ProgressEvent, Osm> {
-	const { extractBbox } = options
+	const { extractBbox, extractStrategy } = options
+	const effectiveExtractStrategy = resolveEffectiveExtractStrategy(
+		extractBbox,
+		extractStrategy,
+	)
+	const tagRules = options.extractTagFilter
+		? normalizeTagFilterRules(options.extractTagFilter)
+		: null
+	const tagRulesActive =
+		tagRules !== null && hasExtractTagFilter(tagRules) ? tagRules : null
+	const entityFilter = options.filter
 	const { header, blocks } = await readOsmPbf(data)
 	const osm = new Osm({
 		...options,
@@ -97,6 +188,25 @@ export async function* startCreateOsmFromPbf(
 			top: extractBbox[3],
 		}
 	}
+
+	const simpleSpatialNodeFilter =
+		extractBbox && effectiveExtractStrategy === "simple"
+			? (node: OsmNode) => {
+					return (
+						node.lon >= extractBbox[0] &&
+						node.lon <= extractBbox[2] &&
+						node.lat >= extractBbox[1] &&
+						node.lat <= extractBbox[3]
+					)
+				}
+			: undefined
+
+	const nodeIngestFilter = composeNodeIngestFilter(
+		simpleSpatialNodeFilter,
+		tagRulesActive,
+		entityFilter,
+		osm,
+	)
 
 	let blockCount = 0
 	for await (const block of blocks) {
@@ -113,26 +223,15 @@ export async function* startCreateOsmFromPbf(
 					dense,
 					block,
 					blockStringIndexMap,
-					extractBbox
-						? (node: OsmNode) => {
-								return (
-									node.lon >= extractBbox[0] &&
-									node.lon <= extractBbox[2] &&
-									node.lat >= extractBbox[1] &&
-									node.lat <= extractBbox[3]
-								)
-							}
-						: undefined,
+					nodeIngestFilter,
 				)
 			}
 
 			if (ways.length > 0) {
 				// Nodes are finished, build their index.
 				if (!osm.nodes.isReady()) osm.nodes.buildIndex()
-				osm.ways.addWays(
-					ways,
-					blockStringIndexMap,
-					extractBbox
+				const simpleWaySpatial =
+					extractBbox && effectiveExtractStrategy === "simple"
 						? (way: OsmWay) => {
 								const refs = way.refs.filter((ref) => osm.nodes.ids.has(ref))
 								if (refs.length === 0) return null
@@ -141,16 +240,23 @@ export async function* startCreateOsmFromPbf(
 									refs,
 								}
 							}
-						: undefined,
+						: undefined
+				osm.ways.addWays(
+					ways,
+					blockStringIndexMap,
+					composeWayIngestFilter(
+						simpleWaySpatial,
+						tagRulesActive,
+						entityFilter,
+						osm,
+					),
 				)
 			}
 
 			if (relations.length > 0) {
 				if (!osm.ways.isReady()) osm.ways.buildIndex()
-				osm.relations.addRelations(
-					relations,
-					blockStringIndexMap,
-					extractBbox
+				const simpleRelationSpatial =
+					extractBbox && effectiveExtractStrategy === "simple"
 						? (relation: OsmRelation) => {
 								const members = relation.members.filter((member) => {
 									if (member.type === "node")
@@ -164,7 +270,16 @@ export async function* startCreateOsmFromPbf(
 									members,
 								}
 							}
-						: undefined,
+						: undefined
+				osm.relations.addRelations(
+					relations,
+					blockStringIndexMap,
+					composeRelationIngestFilter(
+						simpleRelationSpatial,
+						tagRulesActive,
+						entityFilter,
+						osm,
+					),
 				)
 			}
 		}
@@ -196,8 +311,26 @@ export async function* startCreateOsmFromPbf(
 		osm.relations.buildSpatialIndex()
 	}
 
-	yield progressEvent(`Finished loading ${osm.id} PBF data into Osmix.`)
+	if (
+		extractBbox &&
+		effectiveExtractStrategy !== undefined &&
+		effectiveExtractStrategy !== "simple"
+	) {
+		yield progressEvent(
+			`Creating extract using strategy ${effectiveExtractStrategy}...`,
+		)
+		const extractedOsm = createExtract(
+			osm,
+			extractBbox,
+			effectiveExtractStrategy,
+		)
+		yield progressEvent(
+			`Finished creating extract. Loaded ${osm.id} PBF data into Osmix.`,
+		)
+		return extractedOsm
+	}
 
+	yield progressEvent(`Finished loading ${osm.id} PBF data into Osmix.`)
 	return osm
 }
 
