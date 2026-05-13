@@ -9,5 +9,3 @@ export const activeTabAtom = atomWithStorage<string>(
 )
 
 export const extractBboxAtom = atom<GeoBbox2D>(DEFAULT_EXTRACT_BBOX)
-
-export const extractSyncMapToBboxAtom = atom(false)
