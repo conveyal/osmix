@@ -25,7 +25,7 @@
 		"@osmix/shared": "workspace:*",
 		"flatbush": "^4.5.1",
 		"geoflatbush": "^2.1.0",
-		"geokdbush": "^2.0.1",
+		"geokdbush": "^2.1.0",
 		"kdbush": "mourner/kdbush#16416cd"
 	}
 }

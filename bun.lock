@@ -162,7 +162,7 @@
         "@osmix/shared": "workspace:*",
         "flatbush": "^4.5.1",
         "geoflatbush": "^2.1.0",
-        "geokdbush": "^2.0.1",
+        "geokdbush": "^2.1.0",
         "kdbush": "mourner/kdbush#16416cd",
       },
       "devDependencies": {
@@ -1090,7 +1090,7 @@
 
     "geoflatbush": ["geoflatbush@2.1.0", "", {}, "sha512-au5uSa0WFX455ubSgZYKkoIGVnMoLQ0IkJegA+OGatF9006Cvhlj5QS4vZ9cMyNFypXIyql0wtg2yW9XyWM1jQ=="],
 
-    "geokdbush": ["geokdbush@2.0.1", "", { "dependencies": { "tinyqueue": "^2.0.3" } }, "sha512-0M8so1Qx6+jJ1xpirpCNrgUsWAzIcQ3LrLmh0KJPBYI3gH7vy70nY5zEEjSp9Tn0nBt6Q2Fh922oL08lfib4Zg=="],
+    "geokdbush": ["geokdbush@2.1.0", "", { "dependencies": { "tinyqueue": "^3.0.0" } }, "sha512-bMc7mu+SeUxtHwRpVvZ36qnZa/x8YAGuaPNeGDxd9bxp/jYuJ5GrUirUPz6UNiT+nn/79IQ4gCNan0y4alEUxw=="],
 
     "get-caller-file": ["get-caller-file@2.0.5", "", {}, "sha512-DyFP3BM/3YHTQOCUL/w0OZHR0lpKeGrxotcHWcqNEdnltqFwXVfhEBQ94eIo34AfQpo0rGki4cyIiftY06h2Fg=="],
 
@@ -1721,8 +1721,6 @@
     "command-line-usage/typical": ["typical@7.3.0", "", {}, "sha512-ya4mg/30vm+DOWfBg4YK3j2WD6TWtRkCbasOJr40CseYENzCUby/7rIvXA99JGsQHeNxLbnXdyLLxKSv3tauFw=="],
 
     "dir-glob/path-type": ["path-type@4.0.0", "", {}, "sha512-gDKb8aZMDeD/tZWs9P6+q0J9Mwkdl6xMV8TjnGP3qJVJ06bdMgkbBlLU8IdfOsIsFz2BW1rNVT3XuNEl8zPAvw=="],
-
-    "geokdbush/tinyqueue": ["tinyqueue@2.0.3", "", {}, "sha512-ppJZNDuKGgxzkHihX8v9v9G5f+18gzaTfrukGrq6ueg0lmH4nqVnA2IPG0AEH3jKEk2GRJCUhDoqpoiw3PHLBA=="],
 
     "maplibre-gl/kdbush": ["kdbush@4.0.2", "", {}, "sha512-WbCVYJ27Sz8zi9Q7Q0xHC+05iwkm3Znipc2XTlrnJbsHMYktW4hPhXUE8Ys1engBrvffoSCqbil1JQAa7clRpA=="],
 
