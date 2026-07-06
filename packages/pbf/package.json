@@ -14,7 +14,7 @@
 		"bench": "bun test --bench",
 		"build": "tsc -p tsconfig.build.json",
 		"test": "bun test",
-		"typecheck": "tsgo --noEmit"
+		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@osmix/shared": "workspace:*",

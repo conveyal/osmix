@@ -618,7 +618,8 @@ describe("@osmix/raster: OsmixRasterTile", () => {
 	]
 	describe.each(
 		tiles,
-	)("subpixel entity rendering tile %p/%p/%p", (...tileIndex) => {
+	)("subpixel entity rendering tile %p/%p/%p", (x: number, y: number, z: number) => {
+		const tileIndex: Tile = [x, y, z]
 		const tileSize = 4 // Easier to debug math with a smaller tile
 
 		it("draws entities that fit in a single pixel", () => {

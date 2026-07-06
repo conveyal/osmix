@@ -7,7 +7,7 @@
  * @module
  */
 
-import Pbf from "pbf"
+import { PbfReader } from "pbf"
 import {
 	type OsmPbfBlock,
 	type OsmPbfHeaderBlock,
@@ -76,7 +76,7 @@ export async function readOsmHeaderBlock(
 	) => Promise<Uint8Array<ArrayBuffer>> = webDecompress,
 ): Promise<OsmPbfHeaderBlock> {
 	const decompressedBlob = await decompress(compressedBlob)
-	const pbf = new Pbf(decompressedBlob)
+	const pbf = new PbfReader(decompressedBlob)
 	return readHeaderBlock(pbf)
 }
 
@@ -94,6 +94,6 @@ export async function readOsmPrimitiveBlock(
 	) => Promise<Uint8Array<ArrayBuffer>> = webDecompress,
 ): Promise<OsmPbfBlock> {
 	const decompressedBlob = await decompress(compressedBlob)
-	const pbf = new Pbf(decompressedBlob)
+	const pbf = new PbfReader(decompressedBlob)
 	return readPrimitiveBlock(pbf)
 }

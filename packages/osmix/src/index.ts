@@ -52,10 +52,9 @@ export * from "@osmix/router"
 export * from "@osmix/shapefile"
 export * from "@osmix/shared/types"
 export * from "@osmix/vt"
-
+export * from "./extract.ts"
 // Export new utilities
 export * from "./extract-tag-filter.ts"
-export * from "./extract.ts"
 export * from "./pbf.ts"
 export * from "./raster.ts"
 export * from "./remote.ts"

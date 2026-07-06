@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import Pbf from "pbf"
+import { PbfWriter } from "pbf"
 import { osmPbfBlobsToBlocksGenerator } from "../src/blobs-to-blocks"
 import { createOsmPbfBlobGenerator } from "../src/pbf-to-blobs"
 import { writeBlob, writeBlobHeader } from "../src/proto/fileformat"
@@ -71,15 +71,15 @@ describe("createOsmPbfBlobGenerator", () => {
 
 	it("throws when a blob omits zlib data", () => {
 		const headerBlock = createSampleHeader()
-		const headerPbf = new Pbf()
+		const headerPbf = new PbfWriter()
 		writeHeaderBlock(headerBlock, headerPbf)
 		const headerContent = headerPbf.finish()
 
-		const blobPbf = new Pbf()
+		const blobPbf = new PbfWriter()
 		writeBlob({ raw_size: headerContent.length, raw: headerContent }, blobPbf)
 		const blob = blobPbf.finish()
 
-		const blobHeaderPbf = new Pbf()
+		const blobHeaderPbf = new PbfWriter()
 		writeBlobHeader({ type: "OSMHeader", datasize: blob.length }, blobHeaderPbf)
 		const blobHeader = blobHeaderPbf.finish()
 

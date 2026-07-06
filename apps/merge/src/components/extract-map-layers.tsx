@@ -1,14 +1,14 @@
 import type { GeoBbox2D } from "@osmix/shared/types"
 import { useAtom, useAtomValue } from "jotai"
 import type { MapInstance } from "react-map-gl/maplibre"
+import { useMap } from "../hooks/map"
+import { extractBboxAtom } from "../state/extract"
 import CustomControl from "./custom-control"
 import ExtractBboxCornerMarkers, {
 	bboxAfterCornerDrag,
 } from "./extract-bbox-corner-markers"
 import ExtractBboxLayer from "./extract-bbox-layer"
 import { NominatimSearch } from "./nominatim-search-control"
-import { useMap } from "../hooks/map"
-import { extractBboxAtom } from "../state/extract"
 
 function ExtractMapSearch() {
 	const map = useMap()

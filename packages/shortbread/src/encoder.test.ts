@@ -3,11 +3,11 @@ import { pointToTile } from "@mapbox/tilebelt"
 import { VectorTile } from "@mapbox/vector-tile"
 import { Osm } from "@osmix/core"
 import type { GeoBbox2D, Tile } from "@osmix/shared/types"
-import Protobuf from "pbf"
+import { PbfReader } from "pbf"
 import { ShortbreadVtEncoder } from "./encoder"
 
 function decodeTile(data: ArrayBuffer) {
-	const tile = new VectorTile(new Protobuf(data))
+	const tile = new VectorTile(new PbfReader(data))
 	return tile.layers
 }
 

@@ -18,7 +18,7 @@
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun test --bench",
 		"test": "bun test",
-		"typecheck": "tsgo --noEmit"
+		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@types/bun": "catalog:",

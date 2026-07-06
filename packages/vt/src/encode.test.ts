@@ -5,7 +5,7 @@ import { Osm } from "@osmix/core"
 import { llToTilePx } from "@osmix/shared/tile"
 import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import { decodeZigzag } from "@osmix/shared/zigzag"
-import Protobuf from "pbf"
+import { PbfReader } from "pbf"
 import { OsmixVtEncoder } from "./encode"
 
 const osm = new Osm()
@@ -49,7 +49,7 @@ const WAY_LAYER_ID = `@osmix:${osm.id}:ways`
 const NODE_LAYER_ID = `@osmix:${osm.id}:nodes`
 
 function decodeTile(data: ArrayBuffer) {
-	const tile = new VectorTile(new Protobuf(data))
+	const tile = new VectorTile(new PbfReader(data))
 	return tile.layers
 }
 

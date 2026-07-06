@@ -13,7 +13,7 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"test": "bun test",
-		"typecheck": "tsgo --noEmit"
+		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
 		"@types/bun": "catalog:",
@@ -22,7 +22,7 @@
 	},
 	"devDependencies": {
 		"@mapbox/tilebelt": "^2.0.3",
-		"@mapbox/vector-tile": "^2.0.4",
+		"@mapbox/vector-tile": "^3.0.0",
 		"@osmix/core": "workspace:*",
 		"typescript": "catalog:"
 	}

@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "bun --hot server.ts",
 		"start": "bun server.ts",
-		"typecheck": "tsgo --build --noEmit"
+		"typecheck": "tsc --build --noEmit"
 	},
 	"dependencies": {
 		"osmix": "workspace:*",

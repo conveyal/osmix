@@ -6,12 +6,12 @@
 	"scripts": {
 		"dev": "bun --hot server.ts",
 		"start": "bun server.ts",
-		"typecheck": "tsgo --build --noEmit"
+		"typecheck": "tsc --build --noEmit"
 	},
 	"dependencies": {
 		"@osmix/core": "workspace:*",
 		"@osmix/shortbread": "workspace:*",
-		"@versatiles/style": "^5.9.2",
+		"@versatiles/style": "^5.13.0",
 		"comlink": "^4.4.2",
 		"maplibre-gl": "catalog:",
 		"osmix": "workspace:*"

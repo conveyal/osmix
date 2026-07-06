@@ -11,7 +11,7 @@
  */
 
 import { zigzag, zigzag32 } from "@osmix/shared/zigzag"
-import Pbf from "pbf"
+import { PbfWriter } from "pbf"
 import type { VtPbfLayer, VtSimpleFeature } from "./types.ts"
 
 /** Internal context for encoding a layer's features. */
@@ -30,14 +30,14 @@ type VtLayerContext = {
  * @returns ArrayBuffer containing the encoded vector tile.
  */
 export default function writeVtPbf(layers: VtPbfLayer[]) {
-	const pbf = new Pbf()
+	const pbf = new PbfWriter()
 	for (const layer of layers) {
 		pbf.writeMessage(3, writeLayer, layer)
 	}
 	return pbf.finish().buffer as ArrayBuffer
 }
 
-function writeLayer(layer: VtPbfLayer, pbf: Pbf) {
+function writeLayer(layer: VtPbfLayer, pbf: PbfWriter) {
 	pbf.writeVarintField(15, layer.version ?? 1)
 	pbf.writeStringField(1, layer.name ?? "")
 	pbf.writeVarintField(5, layer.extent ?? 4096)
@@ -68,7 +68,7 @@ function writeLayer(layer: VtPbfLayer, pbf: Pbf) {
 	})
 }
 
-function writeFeature(ctx: VtLayerContext, pbf: Pbf) {
+function writeFeature(ctx: VtLayerContext, pbf: PbfWriter) {
 	if (ctx.feature.id !== undefined) {
 		const id = ctx.feature.id
 
@@ -83,7 +83,7 @@ function writeFeature(ctx: VtLayerContext, pbf: Pbf) {
 	pbf.writeMessage(4, writeGeometry, ctx.feature)
 }
 
-function writeProperties(ctx: VtLayerContext, pbf: Pbf) {
+function writeProperties(ctx: VtLayerContext, pbf: PbfWriter) {
 	Object.entries(ctx.feature.properties).forEach(([key, value]) => {
 		let keyIndex = ctx.keycache[key]
 		if (value === null) return // don't encode null value properties
@@ -115,7 +115,7 @@ function command(cmd: number, length: number) {
 	return (length << 3) + (cmd & 0x7)
 }
 
-function writeGeometry(feature: VtSimpleFeature, pbf: Pbf) {
+function writeGeometry(feature: VtSimpleFeature, pbf: PbfWriter) {
 	const type = feature.type
 	let x = 0
 	let y = 0
@@ -146,7 +146,7 @@ function writeGeometry(feature: VtSimpleFeature, pbf: Pbf) {
 	})
 }
 
-function writeValue(value: unknown, pbf: Pbf) {
+function writeValue(value: unknown, pbf: PbfWriter) {
 	if (typeof value === "string") {
 		pbf.writeStringField(1, value)
 	} else if (typeof value === "boolean") {

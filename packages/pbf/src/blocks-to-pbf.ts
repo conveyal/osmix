@@ -7,7 +7,7 @@
  * @module
  */
 
-import Pbf from "pbf"
+import { PbfWriter } from "pbf"
 import { writeBlob, writeBlobHeader } from "./proto/fileformat.ts"
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "./proto/osmformat.ts"
 import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat.ts"
@@ -47,7 +47,7 @@ export async function osmBlockToPbfBlobBytes(
 		data: Uint8Array<ArrayBuffer>,
 	) => Promise<Uint8Array<ArrayBuffer>> = webCompress,
 ) {
-	const contentPbf = new Pbf()
+	const contentPbf = new PbfWriter()
 	let type: "OSMHeader" | "OSMData"
 	if ("primitivegroup" in block) {
 		type = "OSMData"
@@ -60,7 +60,7 @@ export async function osmBlockToPbfBlobBytes(
 	const raw_size = contentData.length
 	const compressedBuffer = await compress(contentData)
 
-	const blobPbf = new Pbf()
+	const blobPbf = new PbfWriter()
 	writeBlob(
 		{
 			raw_size,
@@ -70,7 +70,7 @@ export async function osmBlockToPbfBlobBytes(
 	)
 	const blob = blobPbf.finish()
 
-	const blobHeaderPbf = new Pbf()
+	const blobHeaderPbf = new PbfWriter()
 	writeBlobHeader(
 		{
 			type,

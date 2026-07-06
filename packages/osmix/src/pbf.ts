@@ -32,6 +32,7 @@ import type {
 	OsmRelation,
 	OsmWay,
 } from "@osmix/shared/types"
+import { createExtract, type ExtractStrategy } from "./extract.ts"
 import {
 	type ExtractTagFilterRules,
 	hasExtractTagFilter,
@@ -40,7 +41,6 @@ import {
 	relationMatchesExtractTagRules,
 	wayMatchesExtractTagRules,
 } from "./extract-tag-filter.ts"
-import { createExtract, type ExtractStrategy } from "./extract.ts"
 import { createReadableEntityStreamFromOsm } from "./utils.ts"
 
 /** When `extractBbox` is set but `extractStrategy` is omitted, default to in-stream simple extract. */

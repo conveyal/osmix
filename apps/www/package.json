@@ -6,17 +6,17 @@
 	"scripts": {
 		"dev": "vite dev",
 		"start": "vite",
-		"typecheck": "tsgo --build --noEmit"
+		"typecheck": "tsc --build --noEmit"
 	},
 	"dependencies": {
 		"@osmix/core": "workspace:*",
-		"@shikijs/core": "4.0.0",
-		"@shikijs/engine-javascript": "3.22.0",
-		"@shikijs/langs": "4.1.0",
-		"@shikijs/themes": "4.0.2",
-		"@shikijs/types": "4.0.0",
+		"@shikijs/core": "4.3.1",
+		"@shikijs/engine-javascript": "4.3.1",
+		"@shikijs/langs": "4.3.1",
+		"@shikijs/themes": "4.3.1",
+		"@shikijs/types": "4.3.1",
 		"comlink": "^4.4.2",
-		"idb-keyval": "^6.2.2",
+		"idb-keyval": "^6.2.6",
 		"maplibre-gl": "catalog:",
 		"osmix": "workspace:*",
 		"vite": "catalog:"
