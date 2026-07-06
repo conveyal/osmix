@@ -1,9 +1,4 @@
 ---
-"@osmix/bench": patch
-"@osmix/merge": patch
-"@osmix/shortbread-server": patch
-"@osmix/vt-server": patch
-"@osmix/www": patch
 "@osmix/change": patch
 "@osmix/core": patch
 "@osmix/geojson": patch
