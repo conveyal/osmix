@@ -7,7 +7,7 @@
       "devDependencies": {
         "@biomejs/biome": "^2.5.2",
         "@changesets/cli": "^2.31.0",
-        "typescript": "^7.0.1-rc",
+        "typescript": "npm:typescript@rc",
       },
     },
     "apps/bench": {
@@ -141,7 +141,7 @@
     },
     "packages/change": {
       "name": "@osmix/change",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -156,7 +156,7 @@
     },
     "packages/core": {
       "name": "@osmix/core",
-      "version": "0.1.8",
+      "version": "0.1.9",
       "dependencies": {
         "@osmix/shared": "workspace:*",
         "flatbush": "^4.6.2",
@@ -172,7 +172,7 @@
     },
     "packages/geojson": {
       "name": "@osmix/geojson",
-      "version": "0.0.13",
+      "version": "0.0.14",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/pbf": "workspace:*",
@@ -188,7 +188,7 @@
     },
     "packages/geoparquet": {
       "name": "@osmix/geoparquet",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -203,7 +203,7 @@
     },
     "packages/gtfs": {
       "name": "@osmix/gtfs",
-      "version": "0.0.8",
+      "version": "0.0.9",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -229,7 +229,7 @@
     },
     "packages/osmix": {
       "name": "osmix",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@osmix/change": "workspace:*",
         "@osmix/core": "workspace:*",
@@ -279,7 +279,7 @@
     },
     "packages/router": {
       "name": "@osmix/router",
-      "version": "0.0.11",
+      "version": "0.0.12",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -293,7 +293,7 @@
     },
     "packages/shapefile": {
       "name": "@osmix/shapefile",
-      "version": "0.0.9",
+      "version": "0.0.10",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
@@ -321,7 +321,7 @@
     },
     "packages/shortbread": {
       "name": "@osmix/shortbread",
-      "version": "0.0.11",
+      "version": "0.0.12",
       "dependencies": {
         "@osmix/core": "workspace:*",
         "@osmix/shared": "workspace:*",
