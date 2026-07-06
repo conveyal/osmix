@@ -3,6 +3,7 @@ import { useAtom, useSetAtom } from "jotai"
 import type { OsmFileType } from "osmix"
 import { useEffect, useMemo, useRef } from "react"
 import { useLocation, useNavigate, useSearchParams } from "react-router"
+
 import ExtractBlock from "../blocks/extract"
 import InspectBlock from "../blocks/inspect"
 import MergeBlock from "../blocks/merge"
@@ -55,16 +56,16 @@ export default function Merge() {
 			// Clear the URL parameter
 			setSearchParams({}, { replace: true })
 			// Load the file from storage
-			base.loadFromStorage(loadId).then((osmInfo) => {
+			void base.loadFromStorage(loadId).then((osmInfo) => {
 				if (osmInfo) {
 					flyToOsmBounds(osmInfo)
 				}
 			})
 		} else {
 			// No URL parameter, try to load the most recently used file
-			osmWorker.getMostRecentlyUsed().then((mostRecent) => {
+			void osmWorker.getMostRecentlyUsed().then((mostRecent) => {
 				if (mostRecent) {
-					base.loadFromStorage(mostRecent.fileHash).then((osmInfo) => {
+					void base.loadFromStorage(mostRecent.fileHash).then((osmInfo) => {
 						flyToOsmBounds(osmInfo)
 					})
 				}
@@ -87,9 +88,9 @@ export default function Merge() {
 	const onTabChange = (tab: string) => {
 		setActiveTab(tab)
 		if (tab === "Extract") {
-			navigate("/extract", { replace: true })
+			void navigate("/extract", { replace: true })
 		} else {
-			navigate("/", { replace: true })
+			void navigate("/", { replace: true })
 		}
 	}
 

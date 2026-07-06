@@ -23,6 +23,7 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
+
 import type { ReadShapefileDataTypes } from "./types.ts"
 import { parseShapefile } from "./utils.ts"
 

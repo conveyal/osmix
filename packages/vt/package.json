@@ -1,7 +1,6 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/vt",
-	"type": "module",
 	"version": "0.0.13",
 	"description": "Encode Osmix binary overlay tiles directly into Mapbox Vector Tiles",
 	"license": "MIT",
@@ -9,6 +8,7 @@
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
+	"type": "module",
 	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",

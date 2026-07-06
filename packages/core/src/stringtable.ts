@@ -9,6 +9,7 @@
 
 import type { OsmPbfStringTable } from "@osmix/pbf"
 import type { ContentHasher } from "@osmix/shared/content-hasher"
+
 import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts"
 
 /**

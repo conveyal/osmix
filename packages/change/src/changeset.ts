@@ -22,6 +22,7 @@ import {
 	isWayEqual,
 } from "@osmix/shared/utils"
 import { dequal } from "dequal" // dequal/lite does not work with `TypedArray`s
+
 import type {
 	OsmChange,
 	OsmChanges,

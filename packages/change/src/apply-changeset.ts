@@ -8,6 +8,7 @@
  */
 
 import { Osm } from "@osmix/core"
+
 import type { OsmChangeset } from "./changeset.ts"
 
 /**

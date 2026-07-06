@@ -1,14 +1,14 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/geoparquet",
-	"description": "Import OSM data from GeoParquet files.",
 	"version": "0.1.9",
-	"type": "module",
+	"description": "Import OSM data from GeoParquet files.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
+	"type": "module",
 	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
@@ -16,14 +16,14 @@
 		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
 		"typecheck": "tsc --noEmit"
 	},
-	"devDependencies": {
-		"@types/geojson": "catalog:",
-		"typescript": "catalog:"
-	},
 	"dependencies": {
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@placemarkio/geojson-rewind": "catalog:",
 		"hyparquet": "^1.26.2"
+	},
+	"devDependencies": {
+		"@types/geojson": "catalog:",
+		"typescript": "catalog:"
 	}
 }

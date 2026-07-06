@@ -22,6 +22,7 @@ import type {
 	OsmTags,
 	OsmWay,
 } from "@osmix/shared/types"
+
 import { OSM_ENTITY_TYPES } from "./constants.ts"
 
 /**
@@ -155,7 +156,7 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
 	addInfo(info: OsmInfoParsed): OsmPbfInfo {
 		return {
 			...info,
-			timestamp: Math.floor(info.timestamp ?? 0 / this.date_granularity),
+			timestamp: Math.floor(info.timestamp ?? 0),
 			user_sid: this.getStringtableIndex(info.user ?? ""),
 		}
 	}

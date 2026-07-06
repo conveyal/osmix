@@ -3,6 +3,7 @@ import type { OsmTags, Tile } from "@osmix/shared/types"
 import * as idb from "idb-keyval"
 import maplibregl from "maplibre-gl"
 import { createRemote, type OsmRemoteDataset } from "osmix"
+
 import { codeToHtml } from "./shiki.bundle"
 import MergeWorkerUrl from "./worker.ts?worker&url"
 
@@ -79,7 +80,7 @@ async function init() {
 	$("file-input-el")?.addEventListener("change", (e) => {
 		const file = (e.target as HTMLInputElement).files?.[0]
 		if (!file) return
-		loadAction(`Loading ${file.name}...`, async () => {
+		void loadAction(`Loading ${file.name}...`, async () => {
 			let buf: ArrayBuffer | null = null
 			if (file.size < IDB_MAX) {
 				buf = await file.arrayBuffer()
@@ -99,7 +100,7 @@ async function init() {
 		idb.get(IDB_KEY.NAME),
 	])
 	if (pbf && name) {
-		loadAction(`Restoring ${name}...`, () => loadPbf(pbf, name))
+		void loadAction(`Restoring ${name}...`, () => loadPbf(pbf, name))
 	}
 }
 
@@ -146,7 +147,7 @@ async function loadPbf(data: ArrayBuffer | File, name: string) {
 	}
 
 	// Update Map Preview
-	renderPreview(osm)
+	void renderPreview(osm)
 
 	// Reset Search & Route
 	const tbody = document.querySelector("#search-table tbody")
@@ -392,4 +393,4 @@ function updateRouteTable(rows: [string, string][]) {
 
 const fmt = (c: [number, number]) => `${c[1].toFixed(5)}, ${c[0].toFixed(5)}`
 
-init()
+void init()

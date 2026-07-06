@@ -1,6 +1,7 @@
 import { assertValue as assert } from "@osmix/shared/assert"
 import type { PbfFixture } from "@osmix/shared/fixtures"
 import { transformBytes } from "@osmix/shared/transform-bytes"
+
 import type {
 	OsmPbfBlock,
 	OsmPbfGroup,

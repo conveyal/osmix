@@ -14,6 +14,7 @@ import {
 } from "@osmix/pbf"
 import type { OsmEntity } from "@osmix/shared/types"
 import { isNode, isRelation, isWay } from "@osmix/shared/utils"
+
 import { OsmPbfBlockBuilder } from "./osm-pbf-block-builder.ts"
 
 /**

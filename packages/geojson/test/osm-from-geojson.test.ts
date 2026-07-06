@@ -6,6 +6,7 @@ import type {
 	Polygon,
 } from "geojson"
 import { describe, expect, it } from "vitest"
+
 import { fromGeoJSON } from "../src/osm-from-geojson"
 
 describe("@osmix/geojson: createOsmFromGeoJSON", () => {

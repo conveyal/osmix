@@ -2,6 +2,7 @@ import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/fixtures"
 import { fromPbf } from "osmix"
 import { beforeAll, describe, expect, it } from "vitest"
+
 import {
 	buildGraph,
 	getTransferableBuffers,

@@ -2,6 +2,7 @@ import { Osm } from "@osmix/core"
 import { progressEventMessage } from "@osmix/shared/progress"
 import type { FeatureCollection, LineString, Point, Polygon } from "geojson"
 import { describe, expect, it, vi } from "vitest"
+
 import { startCreateOsmFromShapefile } from "../src/osm-from-shapefile"
 
 vi.mock("shpjs", () => ({

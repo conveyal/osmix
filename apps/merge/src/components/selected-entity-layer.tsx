@@ -9,6 +9,7 @@ import {
 	type LineLayerSpecification,
 	Source,
 } from "react-map-gl/maplibre"
+
 import { useMap } from "../hooks/map"
 import { APPID } from "../settings"
 import { selectedEntityAtom, selectedOsmAtom } from "../state/osm"

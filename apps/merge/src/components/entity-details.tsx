@@ -9,6 +9,7 @@ import type {
 import { isNode, isRelation, isWay } from "@osmix/shared/utils"
 import type { ReactNode } from "react"
 import { Fragment } from "react/jsx-runtime"
+
 import { Details, DetailsContent, DetailsSummary } from "./details"
 
 const noop = (_: OsmEntity) => undefined

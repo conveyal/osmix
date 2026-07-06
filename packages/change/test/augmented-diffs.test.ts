@@ -1,5 +1,6 @@
 import { createMockBaseOsm, createMockPatchOsm } from "@osmix/core"
 import { describe, expect, it } from "vitest"
+
 import { OsmChangeset } from "../src/changeset"
 import { generateOscChanges } from "../src/osc"
 

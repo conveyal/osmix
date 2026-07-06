@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+
 import { OsmPbfBlockBuilder } from "../src/osm-pbf-block-builder"
 
 const decoder = new TextDecoder()

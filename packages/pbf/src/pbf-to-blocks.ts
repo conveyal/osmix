@@ -1,4 +1,5 @@
 import { PbfReader } from "pbf"
+
 import { osmPbfBlobsToBlocksGenerator } from "./blobs-to-blocks.ts"
 import { createOsmPbfBlobGenerator } from "./pbf-to-blobs.ts"
 import {
@@ -52,7 +53,7 @@ export async function readOsmPbf(
 	const blocks = osmPbfBlobsToBlocksGenerator(
 		(async function* () {
 			for await (const chunk of toAsyncGenerator(data)) {
-				for await (const blob of generateBlobsFromChunk(chunk)) {
+				for (const blob of generateBlobsFromChunk(chunk)) {
 					yield blob
 				}
 			}
@@ -101,7 +102,7 @@ export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
 	) {
 		super({
 			transform: async (bytesChunk, controller) => {
-				for await (const rawBlobs of this.generateBlobsFromChunk(bytesChunk)) {
+				for (const rawBlobs of this.generateBlobsFromChunk(bytesChunk)) {
 					const decompressed = await decompress(rawBlobs)
 					const pbf = new PbfReader(decompressed)
 					if (this.header == null) {

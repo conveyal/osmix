@@ -1,14 +1,14 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/geojson",
-	"description": "Convert OSM files to and from GeoJSON.",
 	"version": "0.0.15",
-	"type": "module",
+	"description": "Convert OSM files to and from GeoJSON.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
+	"type": "module",
 	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
@@ -16,15 +16,15 @@
 		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
 		"typecheck": "tsc --noEmit"
 	},
-	"devDependencies": {
-		"@types/geojson": "catalog:",
-		"typescript": "catalog:"
-	},
 	"dependencies": {
 		"@osmix/core": "workspace:*",
 		"@osmix/pbf": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@placemarkio/geojson-rewind": "catalog:",
 		"dequal": "catalog:"
+	},
+	"devDependencies": {
+		"@types/geojson": "catalog:",
+		"typescript": "catalog:"
 	}
 }

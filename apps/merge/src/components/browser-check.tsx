@@ -1,5 +1,6 @@
 import { releaseProxy } from "comlink"
 import { useEffect, useMemo, useState, useTransition } from "react"
+
 import { createBrowserCheckWorker } from "../workers/browser-check.worker"
 import { Button } from "./ui/button"
 import {
@@ -175,7 +176,7 @@ function StorageEstimate() {
 	})
 
 	useEffect(() => {
-		navigator.storage.estimate().then((estimate) => {
+		void navigator.storage.estimate().then((estimate) => {
 			setStorage({
 				quota: estimate.quota ?? 0,
 				usage: estimate.usage ?? 0,

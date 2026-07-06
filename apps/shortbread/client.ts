@@ -73,7 +73,7 @@ window.addEventListener("drop", async (e) => {
 				alert("Error removing current OSM data. Please try again.")
 				return
 			}
-			waitForServerReady()
+			void waitForServerReady()
 			const res = await fetch("/pbf", {
 				method: "POST",
 				body: file,
@@ -93,7 +93,7 @@ window.addEventListener("drop", async (e) => {
 })
 
 // Wait for server to be ready before loading the map
-waitForServerReady()
+void waitForServerReady()
 
 async function waitForServerReady() {
 	try {
@@ -188,7 +188,7 @@ async function loadMap() {
 	`
 
 	// Fit to bounds when style loads
-	map.once("load", () => {
+	void map.once("load", () => {
 		map?.fitBounds(meta.bbox, { padding: 50, duration: 500 })
 		updateLayerControl(map!, $layerControl)
 		setupInteraction(map!, $entity)

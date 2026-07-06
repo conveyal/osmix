@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/shortbread-server",
-	"type": "module",
 	"private": true,
+	"type": "module",
 	"scripts": {
 		"dev": "node --watch server.ts",
 		"start": "node server.ts",

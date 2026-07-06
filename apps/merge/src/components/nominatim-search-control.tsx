@@ -2,6 +2,7 @@ import { useAtomValue } from "jotai"
 import { SearchIcon } from "lucide-react"
 import { useState, useTransition } from "react"
 import type { MapInstance } from "react-map-gl/maplibre"
+
 import {
 	InputGroup,
 	InputGroupAddon,

@@ -7,6 +7,7 @@
  */
 
 import type { OsmTags } from "@osmix/shared/types"
+
 import type { DefaultSpeeds } from "./types.ts"
 
 /** Default speeds (km/h) by highway type. */

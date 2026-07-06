@@ -8,6 +8,7 @@
  */
 
 import { PbfWriter } from "pbf"
+
 import { writeBlob, writeBlobHeader } from "./proto/fileformat.ts"
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "./proto/osmformat.ts"
 import { writeHeaderBlock, writePrimitiveBlock } from "./proto/osmformat.ts"

@@ -8,13 +8,17 @@ runs:
       shell: bash
       run: pnpm run typecheck
 
-    - name: Lint (Biome)
+    - name: Build packages
       shell: bash
-      run: pnpm run lint . --reporter github
+      run: pnpm run build
 
-    - name: Biome checks
+    - name: Lint (oxlint)
       shell: bash
-      run: pnpm run check . --reporter github
+      run: pnpm exec oxlint --type-aware -f github
+
+    - name: Format check (oxfmt)
+      shell: bash
+      run: pnpm exec oxfmt . --check
 
     - name: Run package tests
       shell: bash

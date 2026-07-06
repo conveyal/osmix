@@ -25,10 +25,14 @@ You will typically install this alongside [`@osmix/core`](../core/README.md), wh
 
 ```ts
 import { Osmix } from "osmix"
-import { OsmixChangeset, changeStatsSummary, applyChangesToOsm } from "@osmix/change"
+import {
+	OsmixChangeset,
+	changeStatsSummary,
+	applyChangesToOsm,
+} from "@osmix/change"
 
-const base = await Osmix.fromPbf(Bun.file('./monaco.pbf').stream())
-const patch = await Osmix.fromPbf(Bun.file('./monaco-changes.pbf').stream())
+const base = await Osmix.fromPbf(Bun.file("./monaco.pbf").stream())
+const patch = await Osmix.fromPbf(Bun.file("./monaco-changes.pbf").stream())
 
 const changeset = new OsmixChangeset(base)
 changeset.deduplicateNodes(base.nodes)
@@ -81,6 +85,7 @@ constructor(base: Osm)
 High-level pipeline to merge `patch` into `base`. Returns a new `Osm` instance.
 
 Options:
+
 - `directMerge` (boolean): Apply creates/updates from patch.
 - `deduplicateNodes` (boolean): Run node deduplication.
 - `deduplicateWays` (boolean): Run way deduplication.
@@ -121,6 +126,7 @@ const augmentedOsc = generateOscChanges(changeset, { augmented: true })
 ```
 
 Options:
+
 - `augmented` (boolean, default: `false`): When true, modifications include `<old>` and `<new>` sections, and deletions include `<old>` sections with the full entity data.
 
 ## Related Packages

@@ -17,6 +17,7 @@ import {
 	progressEvent,
 } from "@osmix/shared/progress"
 import type { OsmTags } from "@osmix/shared/types"
+
 import { GtfsArchive } from "./gtfs-archive.ts"
 import type { GtfsConversionOptions, GtfsShapePoint } from "./types.ts"
 import { routeToTags, stopToTags } from "./utils.ts"

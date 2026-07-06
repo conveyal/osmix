@@ -20,6 +20,7 @@
  */
 
 import { expose } from "comlink"
+
 import { OsmixWorker } from "./worker.ts"
 
 expose(new OsmixWorker())

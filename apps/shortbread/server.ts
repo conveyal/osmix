@@ -9,6 +9,7 @@ import { createReadStream, readFileSync } from "node:fs"
 import os from "node:os"
 import { Readable } from "node:stream"
 import { fileURLToPath } from "node:url"
+
 import { serve } from "@hono/node-server"
 import type { Progress } from "@osmix/shared/progress"
 import { ShortbreadVtEncoder } from "@osmix/shortbread"
@@ -16,6 +17,7 @@ import * as Versatiles from "@versatiles/style"
 import { Hono } from "hono"
 import type { StyleSpecification } from "maplibre-gl"
 import { createRemote } from "osmix"
+
 import type { ShortbreadWorker } from "./shortbread.worker"
 
 let filename = "monaco.pbf"

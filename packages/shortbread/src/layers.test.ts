@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+
 import {
 	matchAddresses,
 	matchAerialways,
@@ -17,7 +18,7 @@ import {
 	matchTags,
 	matchWater,
 	matchWaterLines,
-} from "./layers"
+} from "./layers.ts"
 
 describe("Shortbread Layer Matchers", () => {
 	describe("matchWater", () => {

@@ -22,6 +22,7 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
+
 import type { ReadOsmDataTypes } from "./types.ts"
 import { readDataAsGeoJSON } from "./utils.ts"
 

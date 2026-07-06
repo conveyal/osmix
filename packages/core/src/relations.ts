@@ -22,6 +22,7 @@ import type {
 import { bboxFromLonLats } from "@osmix/shared/utils"
 import Flatbush from "flatbush"
 import { around as geoAround } from "geoflatbush"
+
 import { Entities, type EntitiesTransferables } from "./entities.ts"
 import { type IdOrIndex, Ids } from "./ids.ts"
 import type { Nodes } from "./nodes.ts"
@@ -37,8 +38,9 @@ import type { Ways } from "./ways.ts"
 
 const RELATION_MEMBER_TYPES: OsmEntityType[] = ["node", "way", "relation"]
 
-export interface RelationsTransferables<T extends BufferType = BufferType>
-	extends EntitiesTransferables<T> {
+export interface RelationsTransferables<
+	T extends BufferType = BufferType,
+> extends EntitiesTransferables<T> {
 	memberStart: T
 	memberCount: T
 	memberRefs: T

@@ -1,5 +1,6 @@
 import { normalizeHexColor } from "@osmix/shared/color"
 import type { OsmTags } from "@osmix/shared/types"
+
 import {
 	type GtfsRoute,
 	type GtfsStop,

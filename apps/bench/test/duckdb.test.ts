@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest"
+
 import monacoPbf from "../../../fixtures/monaco.pbf?url"
 
 const getPbf = () => fetch(monacoPbf).then((res) => res.arrayBuffer())

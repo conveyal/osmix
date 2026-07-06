@@ -2,6 +2,7 @@ import type { OsmNode, OsmRelation, OsmWay } from "@osmix/json"
 import type { OsmPbfHeaderBlock } from "@osmix/pbf"
 import type { GeoBbox2D, LonLat } from "@osmix/shared/types"
 import maplibregl, { type ControlPosition } from "maplibre-gl"
+
 import { nodesPaint, waysOutlinePaint, waysPaint } from "./map-style"
 
 const map = new maplibregl.Map({
@@ -56,9 +57,9 @@ $searchInput.addEventListener("input", async (e) => {
 	`
 })
 
-map.once("styledata", updateLayerControl)
+void map.once("styledata", updateLayerControl)
 
-waitForServerReady()
+void waitForServerReady()
 
 /**
  * On initial load, the server needs to process the PBF in order to be ready to serve tiles.
@@ -204,7 +205,7 @@ async function loadNewOsmMap() {
 	if (map.isStyleLoaded()) {
 		addSourcesAndLayers()
 	} else {
-		map.once("load", addSourcesAndLayers)
+		void map.once("load", addSourcesAndLayers)
 	}
 }
 

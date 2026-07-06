@@ -1,4 +1,5 @@
 import { useAtomValue } from "jotai"
+
 import { mapCenterAtom } from "../state/map"
 
 export default function CenterInfo() {

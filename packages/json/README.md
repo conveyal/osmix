@@ -23,7 +23,7 @@ pnpm add @osmix/json
 import { osmPbfToJson } from "@osmix/json"
 import { toAsyncGenerator } from "@osmix/pbf"
 
-const stream = osmPbfToJson(Bun.file('./monaco.pbf').stream())
+const stream = osmPbfToJson(Bun.file("./monaco.pbf").stream())
 
 for await (const item of toAsyncGenerator(stream)) {
 	if ("id" in item) {
@@ -56,7 +56,7 @@ async function* generateEntities() {
 
 // Convert to PBF stream
 const pbfStream = osmJsonToPbf(header, generateEntities())
-await Bun.write('./output.pbf', pbfStream)
+await Bun.write("./output.pbf", pbfStream)
 ```
 
 ### Using TransformStreams
@@ -86,28 +86,28 @@ const pbfStream = entityStream
 
 ### Decoding (PBF → JSON)
 
-| Export | Description |
-|--------|-------------|
-| `osmPbfToJson(stream)` | Convert PBF bytes to stream of header + JSON entities |
-| `OsmBlocksToJsonTransformStream` | TransformStream: primitive blocks → JSON entities |
-| `blocksToJsonEntities(block)` | Generator: extract entities from a single block |
-| `OsmPbfBlockParser` | Class for parsing blocks with configurable options |
+| Export                           | Description                                           |
+| -------------------------------- | ----------------------------------------------------- |
+| `osmPbfToJson(stream)`           | Convert PBF bytes to stream of header + JSON entities |
+| `OsmBlocksToJsonTransformStream` | TransformStream: primitive blocks → JSON entities     |
+| `blocksToJsonEntities(block)`    | Generator: extract entities from a single block       |
+| `OsmPbfBlockParser`              | Class for parsing blocks with configurable options    |
 
 ### Encoding (JSON → PBF)
 
-| Export | Description |
-|--------|-------------|
-| `osmJsonToPbf(header, entities)` | Convert header + entities to PBF byte stream |
+| Export                           | Description                                       |
+| -------------------------------- | ------------------------------------------------- |
+| `osmJsonToPbf(header, entities)` | Convert header + entities to PBF byte stream      |
 | `OsmJsonToBlocksTransformStream` | TransformStream: JSON entities → primitive blocks |
-| `jsonEntitiesToBlocks(entities)` | Async generator: entities → blocks |
-| `OsmPbfBlockBuilder` | Class for building blocks from entities |
+| `jsonEntitiesToBlocks(entities)` | Async generator: entities → blocks                |
+| `OsmPbfBlockBuilder`             | Class for building blocks from entities           |
 
 ### Types
 
-| Export | Description |
-|--------|-------------|
-| `ParseOptions` | Options for `OsmPbfBlockParser` (parseTags, includeInfo) |
-| `OSM_ENTITY_TYPES` | Array: `["node", "way", "relation"]` |
+| Export             | Description                                              |
+| ------------------ | -------------------------------------------------------- |
+| `ParseOptions`     | Options for `OsmPbfBlockParser` (parseTags, includeInfo) |
+| `OSM_ENTITY_TYPES` | Array: `["node", "way", "relation"]`                     |
 
 ## Related Packages
 

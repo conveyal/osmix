@@ -1,7 +1,6 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/raster",
-	"type": "module",
 	"version": "0.0.13",
 	"description": "An OSM raster tile generator",
 	"license": "MIT",
@@ -9,6 +8,7 @@
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
+	"type": "module",
 	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
@@ -16,11 +16,11 @@
 		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
 		"typecheck": "tsc --noEmit"
 	},
-	"devDependencies": {
-		"typescript": "catalog:"
-	},
 	"dependencies": {
 		"@osmix/shared": "workspace:*",
 		"@placemarkio/geojson-rewind": "catalog:"
+	},
+	"devDependencies": {
+		"typescript": "catalog:"
 	}
 }

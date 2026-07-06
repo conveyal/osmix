@@ -5,6 +5,7 @@ import type {
 	LineLayerSpecification,
 } from "maplibre-gl"
 import { Layer, Source } from "react-map-gl/maplibre"
+
 import { APPID } from "../settings"
 
 const SOURCE_ID = `${APPID}:extract-bbox`

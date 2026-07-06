@@ -38,7 +38,7 @@ const archive = GtfsArchive.fromZip(zipData)
 
 // Only stops.txt is parsed - other files remain unread
 for await (const stop of archive.iterStops()) {
-  console.log(stop.stop_name, stop.stop_lat, stop.stop_lon)
+	console.log(stop.stop_name, stop.stop_lat, stop.stop_lon)
 }
 
 // Access routes later - now routes.txt is parsed
@@ -51,18 +51,19 @@ const routes = await archive.routes()
 
 GTFS stops are converted to OSM nodes with the following tags:
 
-| GTFS Field           | OSM Tag              |
-| -------------------- | -------------------- |
-| `stop_name`          | `name`               |
-| `stop_id`            | `ref`                |
-| `stop_code`          | `ref:gtfs:stop_code` |
-| `stop_desc`          | `description`        |
-| `stop_url`           | `website`            |
-| `platform_code`      | `ref:platform`       |
-| `wheelchair_boarding`| `wheelchair`         |
-| `location_type`      | `public_transport`   |
+| GTFS Field            | OSM Tag              |
+| --------------------- | -------------------- |
+| `stop_name`           | `name`               |
+| `stop_id`             | `ref`                |
+| `stop_code`           | `ref:gtfs:stop_code` |
+| `stop_desc`           | `description`        |
+| `stop_url`            | `website`            |
+| `platform_code`       | `ref:platform`       |
+| `wheelchair_boarding` | `wheelchair`         |
+| `location_type`       | `public_transport`   |
 
 Location types are mapped as:
+
 - `0` (stop) → `public_transport=platform`
 - `1` (station) → `public_transport=station`
 - `2` (entrance) → `railway=subway_entrance`
@@ -72,18 +73,19 @@ Location types are mapped as:
 
 GTFS routes are converted to OSM ways with the following tags:
 
-| GTFS Field         | OSM Tag              |
-| ------------------ | -------------------- |
-| `route_long_name`  | `name`               |
-| `route_short_name` | `ref`                |
-| `route_id`         | `ref:gtfs:route_id`  |
-| `route_desc`       | `description`        |
-| `route_url`        | `website`            |
-| `route_color`      | `color`              |
-| `route_text_color` | `text_color`         |
+| GTFS Field         | OSM Tag                    |
+| ------------------ | -------------------------- |
+| `route_long_name`  | `name`                     |
+| `route_short_name` | `ref`                      |
+| `route_id`         | `ref:gtfs:route_id`        |
+| `route_desc`       | `description`              |
+| `route_url`        | `website`                  |
+| `route_color`      | `color`                    |
+| `route_text_color` | `text_color`               |
 | `route_type`       | `route`, `gtfs:route_type` |
 
 Route types are mapped to OSM route values:
+
 - `0` → `tram`
 - `1` → `subway`
 - `2` → `train`
@@ -98,6 +100,7 @@ Route types are mapped to OSM route values:
 ### Geometry
 
 Route geometry is derived from:
+
 1. **shapes.txt** (preferred) - Uses shape points to create accurate route paths
 2. **stop_times.txt** (fallback) - Uses stop sequence when shapes are unavailable
 
@@ -107,16 +110,16 @@ Files are only parsed when needed for the conversion.
 
 ```ts
 interface GtfsConversionOptions {
-  /** Whether to include stops as nodes. Default: true */
-  includeStops?: boolean
-  /** Filter stops by location_type. Default: include all types. */
-  stopTypes?: number[]
-  /** Whether to include routes as ways. Default: true */
-  includeRoutes?: boolean
-  /** Filter routes by route_type. Default: include all types. */
-  routeTypes?: number[]
-  /** Whether to include shape geometry for routes. Default: true */
-  includeShapes?: boolean
+	/** Whether to include stops as nodes. Default: true */
+	includeStops?: boolean
+	/** Filter stops by location_type. Default: include all types. */
+	stopTypes?: number[]
+	/** Whether to include routes as ways. Default: true */
+	includeRoutes?: boolean
+	/** Filter routes by route_type. Default: include all types. */
+	routeTypes?: number[]
+	/** Whether to include shape geometry for routes. Default: true */
+	includeShapes?: boolean
 }
 ```
 
@@ -126,20 +129,32 @@ interface GtfsConversionOptions {
 import { fromGtfs } from "@osmix/gtfs"
 
 // Only bus routes, with stops and stations
-const osm = await fromGtfs(zipData, { id: "buses-only" }, {
-  routeTypes: [3], // Only bus routes
-  stopTypes: [0, 1], // Only stops and stations
-})
+const osm = await fromGtfs(
+	zipData,
+	{ id: "buses-only" },
+	{
+		routeTypes: [3], // Only bus routes
+		stopTypes: [0, 1], // Only stops and stations
+	},
+)
 
 // Routes only (no stops) - useful for just getting route shapes
-const routesOnly = await fromGtfs(zipData, { id: "routes" }, {
-  includeStops: false,
-})
+const routesOnly = await fromGtfs(
+	zipData,
+	{ id: "routes" },
+	{
+		includeStops: false,
+	},
+)
 
 // Stops only (no routes)
-const stopsOnly = await fromGtfs(zipData, { id: "stops" }, {
-  includeRoutes: false,
-})
+const stopsOnly = await fromGtfs(
+	zipData,
+	{ id: "stops" },
+	{
+		includeRoutes: false,
+	},
+)
 ```
 
 ## API
@@ -156,8 +171,8 @@ Lazy GTFS archive class. Files are parsed on-demand:
 const archive = GtfsArchive.fromZip(zipData)
 
 // Check what files exist
-archive.listFiles()      // ['agency.txt', 'stops.txt', ...]
-archive.hasFile('shapes.txt')
+archive.listFiles() // ['agency.txt', 'stops.txt', ...]
+archive.hasFile("shapes.txt")
 
 // Lazy accessors (parse on first call, cache result)
 await archive.agencies()
@@ -169,19 +184,20 @@ await archive.shapes()
 
 // Streaming iterator with automatic type inference
 for await (const stop of archive.iter("stops.txt")) {
-  console.log(stop.stop_name) // TypeScript knows this is GtfsStop
+	console.log(stop.stop_name) // TypeScript knows this is GtfsStop
 }
 
 for await (const route of archive.iter("routes.txt")) {
-  console.log(route.route_type) // TypeScript knows this is GtfsRoute
+	console.log(route.route_type) // TypeScript knows this is GtfsRoute
 }
 
 for await (const shape of archive.iter("shapes.txt")) {
-  console.log(shape.shape_pt_lat) // TypeScript knows this is GtfsShapePoint
+	console.log(shape.shape_pt_lat) // TypeScript knows this is GtfsShapePoint
 }
 ```
 
 The `iter(filename)` method automatically infers the return type based on the filename:
+
 - `"agency.txt"` → `AsyncGenerator<GtfsAgency>`
 - `"stops.txt"` → `AsyncGenerator<GtfsStop>`
 - `"routes.txt"` → `AsyncGenerator<GtfsRoute>`

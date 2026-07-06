@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+
 import { Nodes, Relations, Ways } from "../src"
 
 export function getOsmCoreMemoryRequirements(

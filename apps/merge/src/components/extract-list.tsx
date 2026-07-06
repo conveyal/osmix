@@ -1,6 +1,7 @@
 import { FilesIcon } from "lucide-react"
 import type { OsmInfo } from "osmix"
 import { useEffectEvent } from "react"
+
 import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file"
 import { Log } from "../state/log"
 import ActionButton from "./action-button"

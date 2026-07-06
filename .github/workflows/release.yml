@@ -1,7 +1,7 @@
 name: Release
 
 permissions:
-  id-token: write  # Required for OIDC
+  id-token: write # Required for OIDC
   contents: write
   pull-requests: write
 
@@ -35,4 +35,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
-          NPM_TOKEN: '' # Workaround to support trusted publishing
+          NPM_TOKEN: "" # Workaround to support trusted publishing

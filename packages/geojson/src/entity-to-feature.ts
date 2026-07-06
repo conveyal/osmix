@@ -36,6 +36,7 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
+
 import type { OsmGeoJSONFeature } from "./types.ts"
 
 /**

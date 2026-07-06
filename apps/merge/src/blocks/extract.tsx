@@ -3,6 +3,7 @@ import { Info, SaveIcon } from "lucide-react"
 import type { ExtractStrategy } from "osmix"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router"
+
 import ExtractTagFilterEditor, {
 	conveyalTagFilterEditorState,
 	rulesFromEditorState,
@@ -150,7 +151,7 @@ export default function ExtractBlock() {
 			isStored: extract.isStored,
 		})
 		setActiveTab("Inspect")
-		navigate("/", { replace: true })
+		void navigate("/", { replace: true })
 		if (extract.osmInfo) flyToOsmBounds(extract.osmInfo)
 	}
 
@@ -164,7 +165,7 @@ export default function ExtractBlock() {
 			isStored: extract.isStored,
 		})
 		setActiveTab("Merge")
-		navigate("/", { replace: true })
+		void navigate("/", { replace: true })
 		if (extract.osmInfo) flyToOsmBounds(extract.osmInfo)
 	}
 

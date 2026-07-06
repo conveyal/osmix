@@ -3,6 +3,7 @@ import { useAtom, useSetAtom } from "jotai"
 import { MergeIcon } from "lucide-react"
 import type { OsmFileType } from "osmix"
 import { Suspense, useMemo } from "react"
+
 import ActionButton from "../components/action-button"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import ExtractList from "../components/extract-list"

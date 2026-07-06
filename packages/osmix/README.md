@@ -23,7 +23,9 @@ const osm = await fromPbf(monacoPbf)
 
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
 
-const geojsonFile = await fetch("/fixtures/buildings.geojson").then((r) => r.arrayBuffer())
+const geojsonFile = await fetch("/fixtures/buildings.geojson").then((r) =>
+	r.arrayBuffer(),
+)
 const geoOsm = await fromGeoJSON(geojsonFile)
 const pbfBytes = await toPbfBuffer(geoOsm)
 ```
@@ -88,8 +90,8 @@ The routing graph is automatically shared across all workers when using
 ```ts
 import { fromPbf, createExtract, toPbfStream } from "osmix"
 
-const osm = await fromPbf(Bun.file('./monaco.pbf').stream())
-const downtown = createExtract(osm, [-122.35, 47.60, -122.32, 47.62])
+const osm = await fromPbf(Bun.file("./monaco.pbf").stream())
+const downtown = createExtract(osm, [-122.35, 47.6, -122.32, 47.62])
 await toPbfStream(downtown).pipeTo(fileWritableStream)
 ```
 

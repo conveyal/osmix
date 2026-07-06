@@ -8,6 +8,7 @@ import {
 	XIcon,
 } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
+
 import { useFlyToOsmBounds, useMap } from "../hooks/map"
 import type { UseOsmFileReturn } from "../hooks/osm"
 import { APPID } from "../settings"
@@ -116,8 +117,10 @@ function OsmFileCard({ osmFile, onClear }: OsmFileCardProps) {
 					{onClear && (
 						<ActionButton
 							onAction={async () => {
-								window.confirm("Are you sure you want to clear the file?") &&
+								void (
+									window.confirm("Are you sure you want to clear the file?") &&
 									onClear()
+								)
 							}}
 							icon={<XIcon />}
 							title="Clear file"

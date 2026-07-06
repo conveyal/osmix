@@ -7,6 +7,7 @@
 Osmix is a collection of composable libraries for reading, querying, merging, and transforming OpenStreetMap PBF data in browsers and Node.js. Built on streaming APIs and Web Workers, Osmix handles large extracts efficiently with spatial indexing, vector tile generation, and in-browser merge workflows.
 
 **Key Features:**
+
 - Streaming PBF parsing with minimal memory overhead
 - Spatial queries via R-tree indexes (KDBush, Flatbush)
 - Merge and deduplicate OSM extracts
@@ -25,10 +26,16 @@ pnpm add osmix
 ### Examples
 
 ```ts
-import { fromPbf, toPbfBuffer, transformOsmPbfToJson, merge, isNode } from "osmix"
+import {
+	fromPbf,
+	toPbfBuffer,
+	transformOsmPbfToJson,
+	merge,
+	isNode,
+} from "osmix"
 
 // Load a PBF file
-const osm = await fromPbf(Bun.file('./monaco.pbf').stream())
+const osm = await fromPbf(Bun.file("./monaco.pbf").stream())
 
 // Query entities by ID
 const node = osm.nodes.getById(123456)
@@ -39,7 +46,9 @@ const relation = osm.relations.getById(345678)
 const bbox: [number, number, number, number] = [7.41, 43.72, 7.43, 43.74]
 const nodeResults = osm.nodes.withinBbox(bbox)
 const wayResults = osm.ways.withinBbox(bbox)
-console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways`)
+console.log(
+	`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways`,
+)
 
 // Stream parse a PBF into JSON entities
 const stream = transformOsmPbfToJson(Bun.file("./monaco.pbf").stream())
@@ -53,10 +62,10 @@ for await (const entity of stream) {
 }
 
 // Write the PBF
-await Bun.write('./new-monaco.pbf', await toPbfBuffer(osm))
+await Bun.write("./new-monaco.pbf", await toPbfBuffer(osm))
 
 // Merge two OSM PBF files
-const patchOsm = await fromPbf(Bun.file('./monaco-patch.pbf').stream())
+const patchOsm = await fromPbf(Bun.file("./monaco-patch.pbf").stream())
 const mergedOsm = merge(osm, patchOsm)
 ```
 
@@ -77,23 +86,22 @@ const tile = await osm.getVectorTile([9372, 12535, 15])
 
 See each package's README for full API and description.
 
-| Package | Description |
-|---------|-------------|
-| [`osmix`](packages/osmix/README.md) | Main library packaging all tools into a unified API. |
-| [`@osmix/core`](packages/core/README.md) | In-memory data structures for storing entities, building indexes, and spatial queries. |
-| [`@osmix/pbf`](packages/pbf/README.md) | Low-level PBF protobuf parsing and writing. |
-| [`@osmix/json`](packages/json/README.md) | Streaming transforms: PBF bytes ↔ typed JSON entities. |
-| [`@osmix/geojson`](packages/geojson/README.md) | Convert OSM entities to/from GeoJSON. |
-| [`@osmix/geoparquet`](packages/geoparquet/README.md) | GeoParquet import. |
-| [`@osmix/gtfs`](packages/gtfs/README.md) | GTFS feed import. |
-| [`@osmix/shapefile`](packages/shapefile/README.md) | Shapefile import. |
-| [`@osmix/change`](packages/change/README.md) | Deduplication, merging, and changeset workflows. |
-| [`@osmix/raster`](packages/raster/README.md) | Render OSM entities as raster bitmaps. |
-| [`@osmix/vt`](packages/vt/README.md) | Encode OSM entities as Mapbox Vector Tiles (MVT). |
-| [`@osmix/shortbread`](packages/shortbread/README.md) | Shortbread schema vector tiles. |
-| [`@osmix/shared`](packages/shared/README.md) | Utility functions and geometry helpers. |
-| [`@osmix/router`](packages/router/README.md) | Experimental routing. WIP. |
-
+| Package                                              | Description                                                                            |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [`osmix`](packages/osmix/README.md)                  | Main library packaging all tools into a unified API.                                   |
+| [`@osmix/core`](packages/core/README.md)             | In-memory data structures for storing entities, building indexes, and spatial queries. |
+| [`@osmix/pbf`](packages/pbf/README.md)               | Low-level PBF protobuf parsing and writing.                                            |
+| [`@osmix/json`](packages/json/README.md)             | Streaming transforms: PBF bytes ↔ typed JSON entities.                                 |
+| [`@osmix/geojson`](packages/geojson/README.md)       | Convert OSM entities to/from GeoJSON.                                                  |
+| [`@osmix/geoparquet`](packages/geoparquet/README.md) | GeoParquet import.                                                                     |
+| [`@osmix/gtfs`](packages/gtfs/README.md)             | GTFS feed import.                                                                      |
+| [`@osmix/shapefile`](packages/shapefile/README.md)   | Shapefile import.                                                                      |
+| [`@osmix/change`](packages/change/README.md)         | Deduplication, merging, and changeset workflows.                                       |
+| [`@osmix/raster`](packages/raster/README.md)         | Render OSM entities as raster bitmaps.                                                 |
+| [`@osmix/vt`](packages/vt/README.md)                 | Encode OSM entities as Mapbox Vector Tiles (MVT).                                      |
+| [`@osmix/shortbread`](packages/shortbread/README.md) | Shortbread schema vector tiles.                                                        |
+| [`@osmix/shared`](packages/shared/README.md)         | Utility functions and geometry helpers.                                                |
+| [`@osmix/router`](packages/router/README.md)         | Experimental routing. WIP.                                                             |
 
 ## Development
 

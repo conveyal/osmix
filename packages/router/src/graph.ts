@@ -14,6 +14,7 @@
 import { BufferConstructor, type BufferType, type Osm } from "@osmix/core"
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type { LonLat } from "@osmix/shared/types"
+
 import type {
 	DefaultSpeeds,
 	GraphEdge,

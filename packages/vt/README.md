@@ -17,7 +17,7 @@ import { Osm } from "@osmix/core"
 import { OsmixVtEncoder } from "@osmix/vt"
 
 // Load your Osm dataset
-const osm = await Osmix.fromPbf(Bun.file('./monaco.pbf').stream())
+const osm = await Osmix.fromPbf(Bun.file("./monaco.pbf").stream())
 
 // Create an encoder. Defaults: extent=4096, buffer=64px
 const encoder = new OsmixVtEncoder(osm)

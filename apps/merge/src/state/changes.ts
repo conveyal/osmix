@@ -1,6 +1,7 @@
 import type { OsmChangesetStats, OsmChangeTypes } from "@osmix/change"
 import type { OsmEntityType } from "@osmix/shared/types"
 import { atom } from "jotai"
+
 import { osmWorker } from "./worker"
 
 export const DEFAULT_PAGE_SIZE = 10
@@ -29,7 +30,7 @@ export const changesAtom = atom(async (get) => {
 	const page = get(pageAtom)
 	const changeTypeFilter = get(changeTypeFilterAtom)
 	const entityTypeFilter = get(entityTypeFilterAtom)
-	await osmWorker.setChangesetFilters(changeTypeFilter, entityTypeFilter)
+	osmWorker.setChangesetFilters(changeTypeFilter, entityTypeFilter)
 	return osmWorker.getChangesetPage(changeStats.osmId, page, pageSize)
 })
 

@@ -25,7 +25,7 @@ pnpm add @osmix/pbf
 ```ts
 import { readOsmPbf } from "@osmix/pbf"
 
-const { header, blocks } = await readOsmPbf(Bun.file('./monaco.pbf').stream())
+const { header, blocks } = await readOsmPbf(Bun.file("./monaco.pbf").stream())
 
 console.log(header.required_features)
 
@@ -47,12 +47,14 @@ import {
 } from "@osmix/pbf"
 
 // Decode PBF bytes into blocks
-const blocksStream = response.body!
-	.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
+const blocksStream = response.body!.pipeThrough(
+	new OsmPbfBytesToBlocksTransformStream(),
+)
 
 // Encode blocks back to PBF bytes
-const pbfStream = blocksStream
-	.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
+const pbfStream = blocksStream.pipeThrough(
+	new OsmBlocksToPbfBytesTransformStream(),
+)
 ```
 
 ### Write a PBF file
@@ -74,39 +76,39 @@ const dataBytes = await osmBlockToPbfBlobBytes(primitiveBlock)
 
 ### Reading
 
-| Export | Description |
-|--------|-------------|
-| `readOsmPbf(data)` | Parse PBF from buffer/stream/iterable into header + blocks generator |
-| `OsmPbfBytesToBlocksTransformStream` | TransformStream: raw bytes → header/primitive blocks |
-| `createOsmPbfBlobGenerator()` | Stateful parser that extracts compressed blobs from byte chunks |
-| `osmPbfBlobsToBlocksGenerator(blobs)` | Async generator: compressed blobs → typed blocks |
-| `readOsmHeaderBlock(blob)` | Decompress and parse a header blob |
-| `readOsmPrimitiveBlock(blob)` | Decompress and parse a primitive blob |
+| Export                                | Description                                                          |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| `readOsmPbf(data)`                    | Parse PBF from buffer/stream/iterable into header + blocks generator |
+| `OsmPbfBytesToBlocksTransformStream`  | TransformStream: raw bytes → header/primitive blocks                 |
+| `createOsmPbfBlobGenerator()`         | Stateful parser that extracts compressed blobs from byte chunks      |
+| `osmPbfBlobsToBlocksGenerator(blobs)` | Async generator: compressed blobs → typed blocks                     |
+| `readOsmHeaderBlock(blob)`            | Decompress and parse a header blob                                   |
+| `readOsmPrimitiveBlock(blob)`         | Decompress and parse a primitive blob                                |
 
 ### Writing
 
-| Export | Description |
-|--------|-------------|
-| `osmBlockToPbfBlobBytes(block)` | Serialize a block to spec-compliant PBF bytes |
+| Export                               | Description                                          |
+| ------------------------------------ | ---------------------------------------------------- |
+| `osmBlockToPbfBlobBytes(block)`      | Serialize a block to spec-compliant PBF bytes        |
 | `OsmBlocksToPbfBytesTransformStream` | TransformStream: header/primitive blocks → PBF bytes |
 
 ### Types
 
-| Export | Description |
-|--------|-------------|
-| `OsmPbfHeaderBlock` | Parsed header with required/optional features and bbox |
-| `OsmPbfBlock` | Parsed primitive block with string table and groups |
-| `OsmPbfGroup` | Primitive group containing nodes, ways, or relations |
-| `OsmPbfDenseNodes` | Delta-encoded dense node format |
-| `OsmPbfWay`, `OsmPbfRelation`, `OsmPbfNode` | Raw entity structures |
+| Export                                      | Description                                            |
+| ------------------------------------------- | ------------------------------------------------------ |
+| `OsmPbfHeaderBlock`                         | Parsed header with required/optional features and bbox |
+| `OsmPbfBlock`                               | Parsed primitive block with string table and groups    |
+| `OsmPbfGroup`                               | Primitive group containing nodes, ways, or relations   |
+| `OsmPbfDenseNodes`                          | Delta-encoded dense node format                        |
+| `OsmPbfWay`, `OsmPbfRelation`, `OsmPbfNode` | Raw entity structures                                  |
 
 ### Constants
 
-| Export | Description |
-|--------|-------------|
-| `MAX_BLOB_SIZE_BYTES` | Maximum blob size per spec (32 MiB) |
-| `RECOMMENDED_BLOB_SIZE_BYTES` | Recommended blob size (16 MiB) |
-| `MAX_ENTITIES_PER_BLOCK` | Recommended max entities per block (8,000) |
+| Export                        | Description                                |
+| ----------------------------- | ------------------------------------------ |
+| `MAX_BLOB_SIZE_BYTES`         | Maximum blob size per spec (32 MiB)        |
+| `RECOMMENDED_BLOB_SIZE_BYTES` | Recommended blob size (16 MiB)             |
+| `MAX_ENTITIES_PER_BLOCK`      | Recommended max entities per block (8,000) |
 
 ## Related Packages
 

@@ -1,5 +1,6 @@
 import type { OsmInfo } from "@osmix/core"
 import type { OsmFileType } from "osmix"
+
 import { BASE_OSM_KEY } from "../settings"
 import ExtractList from "./extract-list"
 import StoredOsmList from "./stored-osm-list"
