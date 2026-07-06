@@ -1,28 +1,28 @@
 {
-	"$schema": "https://json.schemastore.org/package.json",
-	"name": "@osmix/vt",
-	"version": "0.0.13",
-	"description": "Encode Osmix binary overlay tiles directly into Mapbox Vector Tiles",
-	"license": "MIT",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/conveyal/osmix.git"
-	},
-	"type": "module",
-	"main": "./src/index.ts",
-	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-		"typecheck": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@osmix/shared": "workspace:*",
-		"pbf": "catalog:"
-	},
-	"devDependencies": {
-		"@mapbox/tilebelt": "^2.0.3",
-		"@mapbox/vector-tile": "^3.0.0",
-		"@osmix/core": "workspace:*",
-		"typescript": "catalog:"
-	}
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/vt",
+  "version": "0.0.13",
+  "description": "Encode Osmix binary overlay tiles directly into Mapbox Vector Tiles",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@osmix/shared": "workspace:*",
+    "pbf": "catalog:"
+  },
+  "devDependencies": {
+    "@mapbox/tilebelt": "^2.0.3",
+    "@mapbox/vector-tile": "^3.0.0",
+    "@osmix/core": "workspace:*",
+    "typescript": "catalog:"
+  }
 }

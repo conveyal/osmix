@@ -13,21 +13,21 @@ pnpm add @osmix/vt
 ### Encode a single vector tile from an Osm dataset
 
 ```ts
-import { Osm } from "@osmix/core"
-import { OsmixVtEncoder } from "@osmix/vt"
+import { Osm } from "@osmix/core";
+import { OsmixVtEncoder } from "@osmix/vt";
 
 // Load your Osm dataset
-const osm = await Osmix.fromPbf(Bun.file("./monaco.pbf").stream())
+const osm = await Osmix.fromPbf(Bun.file("./monaco.pbf").stream());
 
 // Create an encoder. Defaults: extent=4096, buffer=64px
-const encoder = new OsmixVtEncoder(osm)
+const encoder = new OsmixVtEncoder(osm);
 
 // XYZ tile tuple: [x, y, z]
-const tile: [number, number, number] = [9372, 12535, 15]
+const tile: [number, number, number] = [9372, 12535, 15];
 
 // Returns an ArrayBuffer containing up to three layers:
 // "@osmix:<id>:ways", "@osmix:<id>:nodes", "@osmix:<id>:relations"
-const pbfBuffer = encoder.getTile(tile)
+const pbfBuffer = encoder.getTile(tile);
 ```
 
 ### Displaying in a browser (manual Blob URL)

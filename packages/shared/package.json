@@ -1,32 +1,32 @@
 {
-	"name": "@osmix/shared",
-	"version": "0.0.13",
-	"description": "Shared utilities for Osmix",
-	"license": "MIT",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/conveyal/osmix.git"
-	},
-	"type": "module",
-	"exports": {
-		"./tsconfig/base.json": "./tsconfig/base.json",
-		"./tsconfig/test.json": "./tsconfig/test.json",
-		"./tsconfig/app.json": "./tsconfig/app.json",
-		"./*": "./src/*.ts"
-	},
-	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"bench": "vitest bench",
-		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-		"typecheck": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@mapbox/tilebelt": "^2.0.3",
-		"dequal": "catalog:",
-		"lineclip": "^2.0.0"
-	},
-	"devDependencies": {
-		"@types/node": "catalog:",
-		"typescript": "catalog:"
-	}
+  "name": "@osmix/shared",
+  "version": "0.0.13",
+  "description": "Shared utilities for Osmix",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "type": "module",
+  "exports": {
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/test.json": "./tsconfig/test.json",
+    "./tsconfig/app.json": "./tsconfig/app.json",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "bench": "vitest bench",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mapbox/tilebelt": "^2.0.3",
+    "dequal": "catalog:",
+    "lineclip": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
 }

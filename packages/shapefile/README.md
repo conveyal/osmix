@@ -11,17 +11,17 @@ npm install @osmix/shapefile
 ## Usage
 
 ```ts
-import { fromShapefile } from "@osmix/shapefile"
+import { fromShapefile } from "@osmix/shapefile";
 
 // From a ZIP file buffer
-const zipBuffer = await Bun.file("./buildings.zip").arrayBuffer()
-const osm = await fromShapefile(zipBuffer, { id: "buildings" })
+const zipBuffer = await Bun.file("./buildings.zip").arrayBuffer();
+const osm = await fromShapefile(zipBuffer, { id: "buildings" });
 
 // From a URL
-const osm = await fromShapefile("https://example.com/data.zip")
+const osm = await fromShapefile("https://example.com/data.zip");
 
 // Query the imported data
-const buildings = osm.ways.search("building")
+const buildings = osm.ways.search("building");
 ```
 
 ## How It Works

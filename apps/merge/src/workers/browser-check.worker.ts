@@ -1,33 +1,30 @@
-import * as Comlink from "comlink"
+import * as Comlink from "comlink";
 
-const START_SIZE_BYTES = 2 ** 24
+const START_SIZE_BYTES = 2 ** 24;
 
 const BrowserCheckWorker = {
-	getMaxArraySize() {
-		let maxBytes = START_SIZE_BYTES
-		while (true) {
-			try {
-				new ArrayBuffer(maxBytes)
-			} catch (_error) {
-				return maxBytes - 1_000_000
-			}
-			maxBytes += 1_000_000
-		}
-	},
-}
+  getMaxArraySize() {
+    let maxBytes = START_SIZE_BYTES;
+    while (true) {
+      try {
+        new ArrayBuffer(maxBytes);
+      } catch (_error) {
+        return maxBytes - 1_000_000;
+      }
+      maxBytes += 1_000_000;
+    }
+  },
+};
 
-const isWorker = "importScripts" in globalThis
+const isWorker = "importScripts" in globalThis;
 if (isWorker) {
-	Comlink.expose(BrowserCheckWorker)
+  Comlink.expose(BrowserCheckWorker);
 }
 
 export function createBrowserCheckWorker() {
-	if (isWorker) throw new Error("Cannot create worker in worker.")
-	const worker = new Worker(
-		new URL("./browser-check.worker.ts", import.meta.url),
-		{
-			type: "module",
-		},
-	)
-	return Comlink.wrap<typeof BrowserCheckWorker>(worker)
+  if (isWorker) throw new Error("Cannot create worker in worker.");
+  const worker = new Worker(new URL("./browser-check.worker.ts", import.meta.url), {
+    type: "module",
+  });
+  return Comlink.wrap<typeof BrowserCheckWorker>(worker);
 }

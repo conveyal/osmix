@@ -1,28 +1,28 @@
 {
-	"$schema": "https://json.schemastore.org/package.json",
-	"name": "@osmix/router",
-	"version": "0.0.13",
-	"description": "A routing engine for OSM data built on top of @osmix/core",
-	"license": "MIT",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/conveyal/osmix.git"
-	},
-	"type": "module",
-	"main": "./src/index.ts",
-	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"bench": "node test/router.bench.ts",
-		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-		"typecheck": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@osmix/core": "workspace:*",
-		"@osmix/shared": "workspace:*"
-	},
-	"devDependencies": {
-		"mitata": "^1.0.34",
-		"osmix": "workspace:*",
-		"typescript": "catalog:"
-	}
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/router",
+  "version": "0.0.13",
+  "description": "A routing engine for OSM data built on top of @osmix/core",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "bench": "node test/router.bench.ts",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@osmix/core": "workspace:*",
+    "@osmix/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "mitata": "^1.0.34",
+    "osmix": "workspace:*",
+    "typescript": "catalog:"
+  }
 }

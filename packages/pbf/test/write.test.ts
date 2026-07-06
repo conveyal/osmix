@@ -1,93 +1,87 @@
-import { unlink } from "node:fs/promises"
+import { unlink } from "node:fs/promises";
 
 import {
-	getFixtureFile,
-	getFixtureFileReadStream,
-	getFixtureFileWriteStream,
-	getFixturePath,
-	PBFs,
-} from "@osmix/shared/fixtures"
-import { describe, expect, it } from "vitest"
+  getFixtureFile,
+  getFixtureFileReadStream,
+  getFixtureFileWriteStream,
+  getFixturePath,
+  PBFs,
+} from "@osmix/shared/fixtures";
+import { describe, expect, it } from "vitest";
 
-import {
-	OsmBlocksToPbfBytesTransformStream,
-	osmBlockToPbfBlobBytes,
-} from "../src/blocks-to-pbf"
-import {
-	OsmPbfBytesToBlocksTransformStream,
-	readOsmPbf,
-} from "../src/pbf-to-blocks"
-import { testOsmPbfReader } from "../src/utils"
+import { OsmBlocksToPbfBytesTransformStream, osmBlockToPbfBlobBytes } from "../src/blocks-to-pbf";
+import { OsmPbfBytesToBlocksTransformStream, readOsmPbf } from "../src/pbf-to-blocks";
+import { testOsmPbfReader } from "../src/utils";
 
 describe("write", () => {
-	describe.each(Object.entries(PBFs))("%s", (name, pbf) => {
-		it("to buffer", async () => {
-			const fileData = await getFixtureFile(pbf.url)
-			const osm = await readOsmPbf(fileData)
+  describe.each(Object.entries(PBFs))("%s", (name, pbf) => {
+    it("to buffer", async () => {
+      const fileData = await getFixtureFile(pbf.url);
+      const osm = await readOsmPbf(fileData);
 
-			let node0: number | null = null
-			let way0: number | null = null
-			let relation0: number | null = null
+      let node0: number | null = null;
+      let way0: number | null = null;
+      let relation0: number | null = null;
 
-			// Write the PBF to an array buffer
-			let data = new Uint8Array(0)
-			const write = (chunk: Uint8Array) => {
-				const newData = new Uint8Array(data.length + chunk.length)
-				newData.set(data)
-				newData.set(chunk, data.length)
-				data = newData
-			}
+      // Write the PBF to an array buffer
+      let data = new Uint8Array(0);
+      const write = (chunk: Uint8Array) => {
+        const newData = new Uint8Array(data.length + chunk.length);
+        newData.set(data);
+        newData.set(chunk, data.length);
+        data = newData;
+      };
 
-			write(await osmBlockToPbfBlobBytes(osm.header))
-			for await (const block of osm.blocks) {
-				for (const group of block.primitivegroup) {
-					if (node0 == null && group.dense?.id?.[0] != null) {
-						node0 = group.dense.id[0]
-					}
-					if (way0 == null && group.ways?.[0]?.id != null) {
-						way0 = group.ways[0].id
-					}
-					if (relation0 == null && group.relations?.[0]?.id != null) {
-						relation0 = group.relations[0].id
-					}
-				}
-				write(await osmBlockToPbfBlobBytes(block))
-			}
+      write(await osmBlockToPbfBlobBytes(osm.header));
+      for await (const block of osm.blocks) {
+        for (const group of block.primitivegroup) {
+          if (node0 == null && group.dense?.id?.[0] != null) {
+            node0 = group.dense.id[0];
+          }
+          if (way0 == null && group.ways?.[0]?.id != null) {
+            way0 = group.ways[0].id;
+          }
+          if (relation0 == null && group.relations?.[0]?.id != null) {
+            relation0 = group.relations[0].id;
+          }
+        }
+        write(await osmBlockToPbfBlobBytes(block));
+      }
 
-			// Re-parse the new PBF and test
-			expect(data.buffer).toBeDefined()
-			// Note: We don't assert byte-level equality because the written PBF may have
-			// different compression, block ordering, or encoding than the original file.
-			// Semantic equivalence (verified by parsing and comparing entities) is more meaningful.
-			const osm2 = await readOsmPbf(data)
+      // Re-parse the new PBF and test
+      expect(data.buffer).toBeDefined();
+      // Note: We don't assert byte-level equality because the written PBF may have
+      // different compression, block ordering, or encoding than the original file.
+      // Semantic equivalence (verified by parsing and comparing entities) is more meaningful.
+      const osm2 = await readOsmPbf(data);
 
-			expect(osm.header).toEqual(osm2.header)
-			const entities = await testOsmPbfReader(osm2, pbf)
-			if (node0 === null || way0 === null || relation0 === null) {
-				throw new Error("Expected node0, way0, and relation0 to be set")
-			}
-			expect(entities.node0).toBe(node0)
-			expect(entities.way0).toBe(way0)
-			expect(entities.relation0).toBe(relation0)
-		})
+      expect(osm.header).toEqual(osm2.header);
+      const entities = await testOsmPbfReader(osm2, pbf);
+      if (node0 === null || way0 === null || relation0 === null) {
+        throw new Error("Expected node0, way0, and relation0 to be set");
+      }
+      expect(entities.node0).toBe(node0);
+      expect(entities.way0).toBe(way0);
+      expect(entities.relation0).toBe(relation0);
+    });
 
-		it("to file", async () => {
-			const testFileName = `${name}-write-test.pbf`
-			const fileStream = getFixtureFileReadStream(pbf.url)
+    it("to file", async () => {
+      const testFileName = `${name}-write-test.pbf`;
+      const fileStream = getFixtureFileReadStream(pbf.url);
 
-			const fileWriteStream = getFixtureFileWriteStream(testFileName)
-			await fileStream
-				.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
-				.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
-				.pipeTo(fileWriteStream)
+      const fileWriteStream = getFixtureFileWriteStream(testFileName);
+      await fileStream
+        .pipeThrough(new OsmPbfBytesToBlocksTransformStream())
+        .pipeThrough(new OsmBlocksToPbfBytesTransformStream())
+        .pipeTo(fileWriteStream);
 
-			const testFileData = await getFixtureFile(pbf.url)
-			const testOsm = await readOsmPbf(testFileData)
+      const testFileData = await getFixtureFile(pbf.url);
+      const testOsm = await readOsmPbf(testFileData);
 
-			expect(testOsm.header.bbox).toEqual(pbf.bbox)
-			await testOsmPbfReader(testOsm, pbf)
+      expect(testOsm.header.bbox).toEqual(pbf.bbox);
+      await testOsmPbfReader(testOsm, pbf);
 
-			await unlink(getFixturePath(testFileName))
-		})
-	})
-})
+      await unlink(getFixturePath(testFileName));
+    });
+  });
+});

@@ -13,10 +13,6 @@
  * ```
  */
 
-export { ShortbreadVtEncoder } from "./encoder.ts"
-export {
-	getLayersForGeometryType,
-	matchTags,
-	SHORTBREAD_LAYERS,
-} from "./layers.ts"
-export type * from "./types.ts"
+export { ShortbreadVtEncoder } from "./encoder.ts";
+export { getLayersForGeometryType, matchTags, SHORTBREAD_LAYERS } from "./layers.ts";
+export type * from "./types.ts";

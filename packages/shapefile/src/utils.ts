@@ -4,10 +4,10 @@
  * @module
  */
 
-import type { FeatureCollection } from "geojson"
-import shp from "shpjs"
+import type { FeatureCollection } from "geojson";
+import shp from "shpjs";
 
-import type { ReadShapefileDataTypes, ShpjsResult } from "./types.ts"
+import type { ReadShapefileDataTypes, ShpjsResult } from "./types.ts";
 
 /**
  * Parse Shapefile data and return GeoJSON FeatureCollection(s).
@@ -28,58 +28,56 @@ import type { ReadShapefileDataTypes, ShpjsResult } from "./types.ts"
  * ```
  */
 export async function parseShapefile(
-	data: ReadShapefileDataTypes,
+  data: ReadShapefileDataTypes,
 ): Promise<(FeatureCollection & { fileName?: string })[]> {
-	if (data == null) throw new Error("Data is null")
+  if (data == null) throw new Error("Data is null");
 
-	let input: ArrayBufferLike | string
+  let input: ArrayBufferLike | string;
 
-	// Convert ReadableStream to ArrayBuffer
-	if (data instanceof ReadableStream) {
-		input = await streamToArrayBuffer(data)
-	} else if (data instanceof SharedArrayBuffer) {
-		// shpjs expects ArrayBuffer, not SharedArrayBuffer
-		const copy = new ArrayBuffer(data.byteLength)
-		new Uint8Array(copy).set(new Uint8Array(data))
-		input = copy
-	} else {
-		input = data
-	}
+  // Convert ReadableStream to ArrayBuffer
+  if (data instanceof ReadableStream) {
+    input = await streamToArrayBuffer(data);
+  } else if (data instanceof SharedArrayBuffer) {
+    // shpjs expects ArrayBuffer, not SharedArrayBuffer
+    const copy = new ArrayBuffer(data.byteLength);
+    new Uint8Array(copy).set(new Uint8Array(data));
+    input = copy;
+  } else {
+    input = data;
+  }
 
-	const result: ShpjsResult = await shp(input)
+  const result: ShpjsResult = await shp(input);
 
-	// Normalize to array
-	if (Array.isArray(result)) {
-		return result
-	}
-	return [result]
+  // Normalize to array
+  if (Array.isArray(result)) {
+    return result;
+  }
+  return [result];
 }
 
 /**
  * Convert a ReadableStream to an ArrayBuffer.
  */
-async function streamToArrayBuffer(
-	stream: ReadableStream,
-): Promise<ArrayBuffer> {
-	const reader = stream.getReader()
-	const chunks: Uint8Array[] = []
-	let totalLength = 0
+async function streamToArrayBuffer(stream: ReadableStream): Promise<ArrayBuffer> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
 
-	while (true) {
-		const { done, value } = await reader.read()
-		if (done) break
-		if (value !== undefined) {
-			chunks.push(value)
-			totalLength += value.byteLength
-		}
-	}
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value !== undefined) {
+      chunks.push(value);
+      totalLength += value.byteLength;
+    }
+  }
 
-	const result = new Uint8Array(totalLength)
-	let offset = 0
-	for (const chunk of chunks) {
-		result.set(chunk, offset)
-		offset += chunk.byteLength
-	}
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
 
-	return result.buffer
+  return result.buffer;
 }

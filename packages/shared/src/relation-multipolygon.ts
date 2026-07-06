@@ -10,29 +10,29 @@
  * @module
  */
 
-import type { LonLat, OsmRelation, OsmRelationMember, OsmWay } from "./types.ts"
+import type { LonLat, OsmRelation, OsmRelationMember, OsmWay } from "./types.ts";
 
 /**
  * Get way members from a relation, grouped by role (outer/inner).
  */
 export function getWayMembersByRole(relation: OsmRelation): {
-	outer: OsmRelationMember[]
-	inner: OsmRelationMember[]
+  outer: OsmRelationMember[];
+  inner: OsmRelationMember[];
 } {
-	const outer: OsmRelationMember[] = []
-	const inner: OsmRelationMember[] = []
+  const outer: OsmRelationMember[] = [];
+  const inner: OsmRelationMember[] = [];
 
-	for (const member of relation.members) {
-		if (member.type !== "way") continue
-		const role = member.role?.toLowerCase() ?? ""
-		if (role === "outer") {
-			outer.push(member)
-		} else if (role === "inner") {
-			inner.push(member)
-		}
-	}
+  for (const member of relation.members) {
+    if (member.type !== "way") continue;
+    const role = member.role?.toLowerCase() ?? "";
+    if (role === "outer") {
+      outer.push(member);
+    } else if (role === "inner") {
+      inner.push(member);
+    }
+  }
 
-	return { outer, inner }
+  return { outer, inner };
 }
 
 /**
@@ -45,109 +45,109 @@ export function getWayMembersByRole(relation: OsmRelation): {
  * - Disconnected chains (multiple independent rings).
  */
 export function connectWaysToRings(wayMembers: OsmWay[]): OsmWay[][] {
-	if (wayMembers.length === 0) return []
+  if (wayMembers.length === 0) return [];
 
-	const rings: OsmWay[][] = []
-	const used = new Set<number>()
-	const wayMap = new Map<number, OsmWay>()
+  const rings: OsmWay[][] = [];
+  const used = new Set<number>();
+  const wayMap = new Map<number, OsmWay>();
 
-	// Build map of way ID to member
-	for (const member of wayMembers) {
-		wayMap.set(member.id, member)
-	}
+  // Build map of way ID to member
+  for (const member of wayMembers) {
+    wayMap.set(member.id, member);
+  }
 
-	// Helper to reverse a way's refs
-	const reverseWay = (way: OsmWay): OsmWay => ({
-		...way,
-		refs: [...way.refs].reverse(),
-	})
+  // Helper to reverse a way's refs
+  const reverseWay = (way: OsmWay): OsmWay => ({
+    ...way,
+    refs: [...way.refs].reverse(),
+  });
 
-	// Build rings by connecting ways
-	for (const startWay of wayMembers) {
-		if (used.has(startWay.id)) continue
-		if (startWay.refs.length < 2) throw Error("Way has less than 2 refs")
+  // Build rings by connecting ways
+  for (const startWay of wayMembers) {
+    if (used.has(startWay.id)) continue;
+    if (startWay.refs.length < 2) throw Error("Way has less than 2 refs");
 
-		const ring: OsmWay[] = [startWay]
-		used.add(startWay.id)
+    const ring: OsmWay[] = [startWay];
+    used.add(startWay.id);
 
-		let currentStart = startWay.refs[0]!
-		let currentEnd = startWay.refs[startWay.refs.length - 1]!
+    let currentStart = startWay.refs[0]!;
+    let currentEnd = startWay.refs[startWay.refs.length - 1]!;
 
-		// Try to extend the ring forward
-		while (true) {
-			let found = false
-			for (const nextWay of wayMembers) {
-				if (used.has(nextWay.id)) continue
-				if (nextWay.refs.length < 2) throw Error("Way has less than 2 refs")
-				const nextStart = nextWay.refs[0]!
-				const nextEnd = nextWay.refs[nextWay.refs.length - 1]!
+    // Try to extend the ring forward
+    while (true) {
+      let found = false;
+      for (const nextWay of wayMembers) {
+        if (used.has(nextWay.id)) continue;
+        if (nextWay.refs.length < 2) throw Error("Way has less than 2 refs");
+        const nextStart = nextWay.refs[0]!;
+        const nextEnd = nextWay.refs[nextWay.refs.length - 1]!;
 
-				// Check if next way connects to current end
-				if (currentEnd === nextStart) {
-					ring.push(nextWay)
-					used.add(nextWay.id)
-					currentEnd = nextEnd
-					found = true
-					break
-				}
-				if (currentEnd === nextEnd) {
-					// Need to reverse next way
-					ring.push(reverseWay(nextWay))
-					used.add(nextWay.id)
-					currentEnd = nextStart
-					found = true
-					break
-				}
-			}
+        // Check if next way connects to current end
+        if (currentEnd === nextStart) {
+          ring.push(nextWay);
+          used.add(nextWay.id);
+          currentEnd = nextEnd;
+          found = true;
+          break;
+        }
+        if (currentEnd === nextEnd) {
+          // Need to reverse next way
+          ring.push(reverseWay(nextWay));
+          used.add(nextWay.id);
+          currentEnd = nextStart;
+          found = true;
+          break;
+        }
+      }
 
-			if (!found) break
-		}
+      if (!found) break;
+    }
 
-		// Try to extend the ring backward
-		currentStart = startWay.refs[0]!
-		currentEnd = startWay.refs[startWay.refs.length - 1]!
+    // Try to extend the ring backward
+    currentStart = startWay.refs[0]!;
+    currentEnd = startWay.refs[startWay.refs.length - 1]!;
 
-		while (true) {
-			let found = false
-			for (const nextWay of wayMembers) {
-				if (used.has(nextWay.id)) continue
-				if (nextWay.refs.length < 2) throw Error("Way has less than 2 refs")
+    while (true) {
+      let found = false;
+      for (const nextWay of wayMembers) {
+        if (used.has(nextWay.id)) continue;
+        if (nextWay.refs.length < 2) throw Error("Way has less than 2 refs");
 
-				const nextStart = nextWay.refs[0]!
-				const nextEnd = nextWay.refs[nextWay.refs.length - 1]!
+        const nextStart = nextWay.refs[0]!;
+        const nextEnd = nextWay.refs[nextWay.refs.length - 1]!;
 
-				// Check if next way connects to current start
-				if (currentStart === nextEnd) {
-					ring.unshift(nextWay)
-					used.add(nextWay.id)
-					currentStart = nextStart
-					found = true
-					break
-				}
-				if (currentStart === nextStart) {
-					// Need to reverse next way
-					ring.unshift(reverseWay(nextWay))
-					used.add(nextWay.id)
-					currentStart = nextEnd
-					found = true
-					break
-				}
-			}
+        // Check if next way connects to current start
+        if (currentStart === nextEnd) {
+          ring.unshift(nextWay);
+          used.add(nextWay.id);
+          currentStart = nextStart;
+          found = true;
+          break;
+        }
+        if (currentStart === nextStart) {
+          // Need to reverse next way
+          ring.unshift(reverseWay(nextWay));
+          used.add(nextWay.id);
+          currentStart = nextEnd;
+          found = true;
+          break;
+        }
+      }
 
-			if (!found) break
-		}
+      if (!found) break;
+    }
 
-		// Only add ring if it's closed (first and last node are the same)
-		if (ring.length > 0) {
-			const firstWay = ring[0]
-			const lastWay = ring[ring.length - 1]
-			if (firstWay?.refs[0] === lastWay?.refs[lastWay.refs.length - 1]) {
-				rings.push(ring)
-			}
-		}
-	}
+    // Only add ring if it's closed (first and last node are the same)
+    if (ring.length > 0) {
+      const firstWay = ring[0];
+      const lastWay = ring[ring.length - 1];
+      if (firstWay?.refs[0] === lastWay?.refs[lastWay.refs.length - 1]) {
+        rings.push(ring);
+      }
+    }
+  }
 
-	return rings
+  return rings;
 }
 
 /**
@@ -163,63 +163,59 @@ export function connectWaysToRings(wayMembers: OsmWay[]): OsmWay[][] {
  * use point-in-polygon checks to strictly nest holes inside their parent outer ring.
  */
 export function buildRelationRings(
-	relation: OsmRelation,
-	getWay: (wayId: number) => OsmWay | null,
-	getNodeCoordinates: (nodeId: number) => LonLat | undefined,
+  relation: OsmRelation,
+  getWay: (wayId: number) => OsmWay | null,
+  getNodeCoordinates: (nodeId: number) => LonLat | undefined,
 ): LonLat[][][] {
-	const { outer, inner } = getWayMembersByRole(relation)
+  const { outer, inner } = getWayMembersByRole(relation);
 
-	// Connect outer ways into rings
-	const outerRings = connectWaysToRings(
-		outer.map((m) => getWay(m.ref)).filter((w) => w !== null),
-	)
-	// Connect inner ways into rings
-	const innerRings = connectWaysToRings(
-		inner.map((m) => getWay(m.ref)).filter((w) => w !== null),
-	)
+  // Connect outer ways into rings
+  const outerRings = connectWaysToRings(outer.map((m) => getWay(m.ref)).filter((w) => w !== null));
+  // Connect inner ways into rings
+  const innerRings = connectWaysToRings(inner.map((m) => getWay(m.ref)).filter((w) => w !== null));
 
-	const wayRingToCoords = (ring: OsmWay[]): LonLat[] => {
-		const coords: LonLat[] = []
-		for (const way of ring) {
-			for (const nodeId of way.refs) {
-				const coord = getNodeCoordinates(nodeId)
-				if (coord) coords.push(coord)
-			}
-		}
+  const wayRingToCoords = (ring: OsmWay[]): LonLat[] => {
+    const coords: LonLat[] = [];
+    for (const way of ring) {
+      for (const nodeId of way.refs) {
+        const coord = getNodeCoordinates(nodeId);
+        if (coord) coords.push(coord);
+      }
+    }
 
-		// Ensure ring is closed
-		if (coords.length > 0) {
-			const first = coords[0]
-			const last = coords[coords.length - 1]
-			if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
-				coords.push([first[0], first[1]])
-			}
-		}
-		return coords
-	}
+    // Ensure ring is closed
+    if (coords.length > 0) {
+      const first = coords[0];
+      const last = coords[coords.length - 1];
+      if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
+        coords.push([first[0], first[1]]);
+      }
+    }
+    return coords;
+  };
 
-	// Convert way rings to coordinate rings
-	const coordinateRings: LonLat[][][] = []
+  // Convert way rings to coordinate rings
+  const coordinateRings: LonLat[][][] = [];
 
-	for (const outerRing of outerRings) {
-		const outerCoordinates: LonLat[] = wayRingToCoords(outerRing)
+  for (const outerRing of outerRings) {
+    const outerCoordinates: LonLat[] = wayRingToCoords(outerRing);
 
-		if (outerCoordinates.length >= 3) {
-			// Find inner rings that belong to this outer ring
-			const innerCoordinates: LonLat[][] = []
-			for (const innerRing of innerRings) {
-				const innerCoords: LonLat[] = wayRingToCoords(innerRing)
+    if (outerCoordinates.length >= 3) {
+      // Find inner rings that belong to this outer ring
+      const innerCoordinates: LonLat[][] = [];
+      for (const innerRing of innerRings) {
+        const innerCoords: LonLat[] = wayRingToCoords(innerRing);
 
-				if (innerCoords.length >= 3) {
-					// TODO: do proper point-in-polygon test with https://github.com/rowanwins/point-in-polygon-hao
-					innerCoordinates.push(innerCoords)
-				}
-			}
+        if (innerCoords.length >= 3) {
+          // TODO: do proper point-in-polygon test with https://github.com/rowanwins/point-in-polygon-hao
+          innerCoordinates.push(innerCoords);
+        }
+      }
 
-			// Create polygon: [outer ring, ...inner rings]
-			coordinateRings.push([outerCoordinates, ...innerCoordinates])
-		}
-	}
+      // Create polygon: [outer ring, ...inner rings]
+      coordinateRings.push([outerCoordinates, ...innerCoordinates]);
+    }
+  }
 
-	return coordinateRings
+  return coordinateRings;
 }

@@ -1,6 +1,3 @@
-import { atomWithStorage } from "jotai/utils"
+import { atomWithStorage } from "jotai/utils";
 
-export const sidebarIsOpenAtom = atomWithStorage(
-	"@osmix:layout:sidebarIsOpen",
-	true,
-)
+export const sidebarIsOpenAtom = atomWithStorage("@osmix:layout:sidebarIsOpen", true);

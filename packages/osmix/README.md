@@ -16,32 +16,30 @@ pnpm add osmix
 ### Load a PBF and inspect it
 
 ```ts
-import { fromPbf, fromGeoJSON, toPbfBuffer } from "osmix"
+import { fromPbf, fromGeoJSON, toPbfBuffer } from "osmix";
 
-const monacoPbf = await Bun.file("./monaco.pbf").arrayBuffer()
-const osm = await fromPbf(monacoPbf)
+const monacoPbf = await Bun.file("./monaco.pbf").arrayBuffer();
+const osm = await fromPbf(monacoPbf);
 
-console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
+console.log(osm.nodes.size, osm.ways.size, osm.relations.size);
 
-const geojsonFile = await fetch("/fixtures/buildings.geojson").then((r) =>
-	r.arrayBuffer(),
-)
-const geoOsm = await fromGeoJSON(geojsonFile)
-const pbfBytes = await toPbfBuffer(geoOsm)
+const geojsonFile = await fetch("/fixtures/buildings.geojson").then((r) => r.arrayBuffer());
+const geoOsm = await fromGeoJSON(geojsonFile);
+const pbfBytes = await toPbfBuffer(geoOsm);
 ```
 
 ### Work off the main thread with `OsmixRemote`
 
 ```ts
-import { createRemote } from "osmix"
+import { createRemote } from "osmix";
 
-const remote = await createRemote()
-const monaco = await remote.fromPbf(monacoPbf)
+const remote = await createRemote();
+const monaco = await remote.fromPbf(monacoPbf);
 const patch = await remote.fromPbf(Bun.file("patch.osm.pbf").stream(), {
-	id: "patch",
-})
-const merged = await monaco.merge(patch)
-const rasterTile = await merged.getRasterTile([10561, 22891, 16])
+  id: "patch",
+});
+const merged = await monaco.merge(patch);
+const rasterTile = await merged.getRasterTile([10561, 22891, 16]);
 ```
 
 #### How?
@@ -57,28 +55,28 @@ const rasterTile = await merged.getRasterTile([10561, 22891, 16])
 builds lazily on first use, so there's no upfront cost until you actually route.
 
 ```ts
-import { createRemote } from "osmix"
+import { createRemote } from "osmix";
 
-const remote = await createRemote()
-const osm = await remote.fromPbf(monacoPbf)
+const remote = await createRemote();
+const osm = await remote.fromPbf(monacoPbf);
 
 // Find nearest routable nodes to coordinates
-const from = await osm.findNearestRoutableNode([7.42, 43.73], 0.5)
-const to = await osm.findNearestRoutableNode([7.43, 43.74], 0.5)
+const from = await osm.findNearestRoutableNode([7.42, 43.73], 0.5);
+const to = await osm.findNearestRoutableNode([7.43, 43.74], 0.5);
 
 if (from && to) {
-	// Calculate route with statistics and path info
-	const result = await osm.route(from.nodeIndex, to.nodeIndex, {
-		includeStats: true,
-		includePathInfo: true,
-	})
+  // Calculate route with statistics and path info
+  const result = await osm.route(from.nodeIndex, to.nodeIndex, {
+    includeStats: true,
+    includePathInfo: true,
+  });
 
-	if (result) {
-		console.log(result.coordinates) // Route geometry
-		console.log(result.distance) // Distance in meters
-		console.log(result.time) // Time in seconds
-		console.log(result.segments) // Per-way breakdown
-	}
+  if (result) {
+    console.log(result.coordinates); // Route geometry
+    console.log(result.distance); // Distance in meters
+    console.log(result.time); // Time in seconds
+    console.log(result.segments); // Per-way breakdown
+  }
 }
 ```
 
@@ -88,11 +86,11 @@ The routing graph is automatically shared across all workers when using
 ### Extract, stream, and write back to PBF
 
 ```ts
-import { fromPbf, createExtract, toPbfStream } from "osmix"
+import { fromPbf, createExtract, toPbfStream } from "osmix";
 
-const osm = await fromPbf(Bun.file("./monaco.pbf").stream())
-const downtown = createExtract(osm, [-122.35, 47.6, -122.32, 47.62])
-await toPbfStream(downtown).pipeTo(fileWritableStream)
+const osm = await fromPbf(Bun.file("./monaco.pbf").stream());
+const downtown = createExtract(osm, [-122.35, 47.6, -122.32, 47.62]);
+await toPbfStream(downtown).pipeTo(fileWritableStream);
 ```
 
 `createExtract` can either clip ways/members to the bbox (`strategy: "simple"`)

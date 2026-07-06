@@ -8,25 +8,25 @@
  * @module
  */
 
-import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
+import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip";
 import {
-	bboxToTilePx,
-	clampAndRoundPx,
-	llToTilePx,
-	tilePxToLonLat,
-	tileToBbox,
-} from "@osmix/shared/tile"
-import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
-import { rewindGeometry } from "@placemarkio/geojson-rewind"
+  bboxToTilePx,
+  clampAndRoundPx,
+  llToTilePx,
+  tilePxToLonLat,
+  tileToBbox,
+} from "@osmix/shared/tile";
+import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types";
+import { rewindGeometry } from "@placemarkio/geojson-rewind";
 
-import { compositeRGBA } from "./color.ts"
+import { compositeRGBA } from "./color.ts";
 
 /** Default image type for exported tiles. */
-export const DEFAULT_RASTER_IMAGE_TYPE = "image/png"
-export const DEFAULT_LINE_COLOR: Rgba = [255, 255, 255, 230] // semi-transparent white
-export const DEFAULT_POINT_COLOR: Rgba = [255, 0, 0, 255] // red
-export const DEFAULT_AREA_COLOR: Rgba = [0, 0, 255, 64] // low opacity blue
-export const DEFAULT_RASTER_TILE_SIZE = 256
+export const DEFAULT_RASTER_IMAGE_TYPE = "image/png";
+export const DEFAULT_LINE_COLOR: Rgba = [255, 255, 255, 230]; // semi-transparent white
+export const DEFAULT_POINT_COLOR: Rgba = [255, 0, 0, 255]; // red
+export const DEFAULT_AREA_COLOR: Rgba = [0, 0, 255, 64]; // low opacity blue
+export const DEFAULT_RASTER_TILE_SIZE = 256;
 
 /**
  * Construct a an image for a single XYZ tile. The image is a 2D array of RGBA pixels.
@@ -41,375 +41,358 @@ export const DEFAULT_RASTER_TILE_SIZE = 256
  * This class handles the projection and clipping of geographic geometry into the tile's pixel space.
  */
 export class OsmixRasterTile {
-	imageData: Uint8ClampedArray<ArrayBuffer>
-	tile: Tile
-	tileSize: number
+  imageData: Uint8ClampedArray<ArrayBuffer>;
+  tile: Tile;
+  tileSize: number;
 
-	// Minimum pixel coverage for subpixel entities
-	// This is used to avoid drawing entities that are too small to be visible
-	minPixelCoverage: number
+  // Minimum pixel coverage for subpixel entities
+  // This is used to avoid drawing entities that are too small to be visible
+  minPixelCoverage: number;
 
-	constructor({
-		imageData,
-		tile,
-		tileSize,
-	}: {
-		imageData?: Uint8ClampedArray<ArrayBuffer>
-		tile: Tile
-		tileSize: number
-	}) {
-		this.imageData = imageData ?? new Uint8ClampedArray(tileSize * tileSize * 4)
-		this.tile = tile
-		this.tileSize = tileSize
-		this.minPixelCoverage = 1 / tileSize
-	}
+  constructor({
+    imageData,
+    tile,
+    tileSize,
+  }: {
+    imageData?: Uint8ClampedArray<ArrayBuffer>;
+    tile: Tile;
+    tileSize: number;
+  }) {
+    this.imageData = imageData ?? new Uint8ClampedArray(tileSize * tileSize * 4);
+    this.tile = tile;
+    this.tileSize = tileSize;
+    this.minPixelCoverage = 1 / tileSize;
+  }
 
-	bbox(): GeoBbox2D {
-		return tileToBbox(this.tile)
-	}
+  bbox(): GeoBbox2D {
+    return tileToBbox(this.tile);
+  }
 
-	llToTilePx(ll: LonLat): XY {
-		return llToTilePx(ll, this.tile, this.tileSize)
-	}
+  llToTilePx(ll: LonLat): XY {
+    return llToTilePx(ll, this.tile, this.tileSize);
+  }
 
-	tilePxToLonLat(px: XY): LonLat {
-		return tilePxToLonLat(px, this.tile, this.tileSize)
-	}
+  tilePxToLonLat(px: XY): LonLat {
+    return tilePxToLonLat(px, this.tile, this.tileSize);
+  }
 
-	clampAndRoundPx(px: XY): XY {
-		return clampAndRoundPx(px, this.tileSize)
-	}
+  clampAndRoundPx(px: XY): XY {
+    return clampAndRoundPx(px, this.tileSize);
+  }
 
-	/**
-	 * Project a geographic bounding box to tile pixel space and check if it fits in a single pixel.
-	 * Returns the pixel coordinates and coverage ratio if it fits, null otherwise.
-	 */
-	private projectBboxToPixelSpace(bbox: GeoBbox2D) {
-		// Swap min and max lat to get the correct y pixel bounds
-		const [minX, minY, maxX, maxY] = bboxToTilePx(
-			bbox,
-			this.tile,
-			this.tileSize,
-		)
+  /**
+   * Project a geographic bounding box to tile pixel space and check if it fits in a single pixel.
+   * Returns the pixel coordinates and coverage ratio if it fits, null otherwise.
+   */
+  private projectBboxToPixelSpace(bbox: GeoBbox2D) {
+    // Swap min and max lat to get the correct y pixel bounds
+    const [minX, minY, maxX, maxY] = bboxToTilePx(bbox, this.tile, this.tileSize);
 
-		// Check if the bbox fits entirely within a single pixel
-		// Use original unclamped dimensions to check if it's subpixel
-		const width = Math.abs(maxX - minX)
-		const height = Math.abs(maxY - minY)
+    // Check if the bbox fits entirely within a single pixel
+    // Use original unclamped dimensions to check if it's subpixel
+    const width = Math.abs(maxX - minX);
+    const height = Math.abs(maxY - minY);
 
-		// Must be strictly less than 1 pixel in both dimensions
-		if (width >= 1 || height >= 1) return null
+    // Must be strictly less than 1 pixel in both dimensions
+    if (width >= 1 || height >= 1) return null;
 
-		const clampedMin = this.clampAndRoundPx([minX, minY])
-		const clampedMax = this.clampAndRoundPx([maxX, maxY])
+    const clampedMin = this.clampAndRoundPx([minX, minY]);
+    const clampedMax = this.clampAndRoundPx([maxX, maxY]);
 
-		// For each pixel from min to max, calculate the coverage ratio
-		const pixels: { px: XY; coverage: number }[] = []
-		for (let y = clampedMin[1]; y <= clampedMax[1]; y++) {
-			for (let x = clampedMin[0]; x <= clampedMax[0]; x++) {
-				// Intersection bbox between entity bbox and pixel bbox
-				const iMinX = Math.max(minX, x)
-				const iMinY = Math.max(minY, y)
-				const iMaxX = Math.min(maxX, x + 1)
-				const iMaxY = Math.min(maxY, y + 1)
+    // For each pixel from min to max, calculate the coverage ratio
+    const pixels: { px: XY; coverage: number }[] = [];
+    for (let y = clampedMin[1]; y <= clampedMax[1]; y++) {
+      for (let x = clampedMin[0]; x <= clampedMax[0]; x++) {
+        // Intersection bbox between entity bbox and pixel bbox
+        const iMinX = Math.max(minX, x);
+        const iMinY = Math.max(minY, y);
+        const iMaxX = Math.min(maxX, x + 1);
+        const iMaxY = Math.min(maxY, y + 1);
 
-				// Width/height of intersection (clamped to 0 if no overlap)
-				const iWidth = Math.max(0, iMaxX - iMinX)
-				const iHeight = Math.max(0, iMaxY - iMinY)
-				const coverage = iWidth * iHeight
+        // Width/height of intersection (clamped to 0 if no overlap)
+        const iWidth = Math.max(0, iMaxX - iMinX);
+        const iHeight = Math.max(0, iMaxY - iMinY);
+        const coverage = iWidth * iHeight;
 
-				// Handle degenerate cases where the intersection is too small to be visible
-				pixels.push({
-					px: [x, y],
-					coverage: Math.max(coverage, this.minPixelCoverage),
-				})
-			}
-		}
+        // Handle degenerate cases where the intersection is too small to be visible
+        pixels.push({
+          px: [x, y],
+          coverage: Math.max(coverage, this.minPixelCoverage),
+        });
+      }
+    }
 
-		return pixels
-	}
+    return pixels;
+  }
 
-	getIndex(px: XY) {
-		return (px[1] * this.tileSize + px[0]) * 4
-	}
+  getIndex(px: XY) {
+    return (px[1] * this.tileSize + px[0]) * 4;
+  }
 
-	drawPoint(ll: LonLat, color: Rgba = DEFAULT_POINT_COLOR) {
-		const px = this.llToTilePx(ll)
-		this.drawPixel(px, color)
-	}
+  drawPoint(ll: LonLat, color: Rgba = DEFAULT_POINT_COLOR) {
+    const px = this.llToTilePx(ll);
+    this.drawPixel(px, color);
+  }
 
-	/**
-	 * Draw a color at a pixel. If the pixel is transparent, the color is drawn.
-	 * Otherwise, the color is blended with the existing color.
-	 */
-	drawPixel(px: XY, color: Rgba) {
-		const clampedPx = this.clampAndRoundPx(px)
-		const idx = this.getIndex(clampedPx)
-		if (this.imageData[idx + 3] === 0) {
-			this.imageData[idx] = color[0]
-			this.imageData[idx + 1] = color[1]
-			this.imageData[idx + 2] = color[2]
-			this.imageData[idx + 3] = color[3]
-		} else {
-			const composite = compositeRGBA([
-				this.imageData.slice(idx, idx + 4),
-				color,
-			])
-			this.imageData[idx] = composite[0]
-			this.imageData[idx + 1] = composite[1]
-			this.imageData[idx + 2] = composite[2]
-			this.imageData[idx + 3] = composite[3]
-		}
-	}
+  /**
+   * Draw a color at a pixel. If the pixel is transparent, the color is drawn.
+   * Otherwise, the color is blended with the existing color.
+   */
+  drawPixel(px: XY, color: Rgba) {
+    const clampedPx = this.clampAndRoundPx(px);
+    const idx = this.getIndex(clampedPx);
+    if (this.imageData[idx + 3] === 0) {
+      this.imageData[idx] = color[0];
+      this.imageData[idx + 1] = color[1];
+      this.imageData[idx + 2] = color[2];
+      this.imageData[idx + 3] = color[3];
+    } else {
+      const composite = compositeRGBA([this.imageData.slice(idx, idx + 4), color]);
+      this.imageData[idx] = composite[0];
+      this.imageData[idx + 1] = composite[1];
+      this.imageData[idx + 2] = composite[2];
+      this.imageData[idx + 3] = composite[3];
+    }
+  }
 
-	/**
-	 * Draw an entity whose bounding box fits entirely within a single pixel.
-	 * Returns true if the entity was drawn as a single pixel, false if it spans multiple pixels.
-	 * The alpha channel is scaled by the coverage ratio (percentage of pixel covered by the bbox).
-	 */
-	drawSubpixelEntity(bbox: GeoBbox2D, color: Rgba): boolean {
-		const result = this.projectBboxToPixelSpace(bbox)
-		if (result == null) return false
+  /**
+   * Draw an entity whose bounding box fits entirely within a single pixel.
+   * Returns true if the entity was drawn as a single pixel, false if it spans multiple pixels.
+   * The alpha channel is scaled by the coverage ratio (percentage of pixel covered by the bbox).
+   */
+  drawSubpixelEntity(bbox: GeoBbox2D, color: Rgba): boolean {
+    const result = this.projectBboxToPixelSpace(bbox);
+    if (result == null) return false;
 
-		for (const { px, coverage } of result) {
-			// Scale alpha by coverage ratio, ensuring at least 1 for visibility
-			const scaledAlpha = Math.max(1, Math.round(color[3] * coverage))
-			const scaledColor: Rgba = [color[0], color[1], color[2], scaledAlpha]
-			this.drawPixel(px, scaledColor)
-		}
-		return true
-	}
+    for (const { px, coverage } of result) {
+      // Scale alpha by coverage ratio, ensuring at least 1 for visibility
+      const scaledAlpha = Math.max(1, Math.round(color[3] * coverage));
+      const scaledColor: Rgba = [color[0], color[1], color[2], scaledAlpha];
+      this.drawPixel(px, scaledColor);
+    }
+    return true;
+  }
 
-	/**
-	 * Draw a line between two pixels.
-	 * Uses Bresenham's line algorithm.
-	 */
-	drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR) {
-		const tileSize = this.tileSize
-		const dx = Math.abs(px1[0] - px0[0])
-		const dy = Math.abs(px1[1] - px0[1])
-		const sx = px0[0] < px1[0] ? 1 : -1
-		const sy = px0[1] < px1[1] ? 1 : -1
-		let err = dx - dy
-		let x = px0[0]
-		let y = px0[1]
+  /**
+   * Draw a line between two pixels.
+   * Uses Bresenham's line algorithm.
+   */
+  drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR) {
+    const tileSize = this.tileSize;
+    const dx = Math.abs(px1[0] - px0[0]);
+    const dy = Math.abs(px1[1] - px0[1]);
+    const sx = px0[0] < px1[0] ? 1 : -1;
+    const sy = px0[1] < px1[1] ? 1 : -1;
+    let err = dx - dy;
+    let x = px0[0];
+    let y = px0[1];
 
-		while (true) {
-			// Only draw pixels within tile bounds
-			if (x >= 0 && x < tileSize && y >= 0 && y < tileSize) {
-				this.drawPixel([x, y], color)
-			}
-			if (x === px1[0] && y === px1[1]) break
-			const e2 = 2 * err
-			if (e2 > -dy) {
-				err -= dy
-				x += sx
-			}
-			if (e2 < dx) {
-				err += dx
-				y += sy
-			}
-		}
-	}
+    while (true) {
+      // Only draw pixels within tile bounds
+      if (x >= 0 && x < tileSize && y >= 0 && y < tileSize) {
+        this.drawPixel([x, y], color);
+      }
+      if (x === px1[0] && y === px1[1]) break;
+      const e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y += sy;
+      }
+    }
+  }
 
-	/**
-	 * Split a line string into a series of line segments and draw each segment.
-	 */
-	drawLineString(coords: LonLat[], color: Rgba = DEFAULT_LINE_COLOR) {
-		const projectedCoords = coords.map((ll) => this.llToTilePx(ll))
-		const [clipped] = clipPolyline(projectedCoords, [
-			0,
-			0,
-			this.tileSize,
-			this.tileSize,
-		])
-		if (clipped != null) {
-			let prev: XY = clipped[0] as XY
-			for (const curr of clipped) {
-				if (prev == null) {
-					prev = curr
-					return
-				}
-				const px0 = this.clampAndRoundPx(prev)
-				const px1 = this.clampAndRoundPx(curr)
-				if (px0[0] !== px1[0] || px0[1] !== px1[1]) {
-					this.drawLine(px0, px1, color)
-				}
-				prev = curr
-			}
-		}
-	}
+  /**
+   * Split a line string into a series of line segments and draw each segment.
+   */
+  drawLineString(coords: LonLat[], color: Rgba = DEFAULT_LINE_COLOR) {
+    const projectedCoords = coords.map((ll) => this.llToTilePx(ll));
+    const [clipped] = clipPolyline(projectedCoords, [0, 0, this.tileSize, this.tileSize]);
+    if (clipped != null) {
+      let prev: XY = clipped[0] as XY;
+      for (const curr of clipped) {
+        if (prev == null) {
+          prev = curr;
+          return;
+        }
+        const px0 = this.clampAndRoundPx(prev);
+        const px1 = this.clampAndRoundPx(curr);
+        if (px0[0] !== px1[0] || px0[1] !== px1[1]) {
+          this.drawLine(px0, px1, color);
+        }
+        prev = curr;
+      }
+    }
+  }
 
-	/**
-	 * Draw a filled polygon with optional holes.
-	 * First ring is the outer boundary, subsequent rings are holes.
-	 * Uses even-odd winding rule for fill determination.
-	 */
-	drawPolygon(rings: LonLat[][], color: Rgba = DEFAULT_AREA_COLOR) {
-		if (rings.length === 0) return
-		const bbox = rings[0]?.[0]
-		// Optimization: if the polygon is tiny (fits in a single pixel),
-		// render it as a single pixel with alpha scaling instead of full rasterization.
-		if (
-			rings.length === 1 &&
-			rings[0]?.length === 5 && // Rectangular bbox
-			bbox
-		) {
-			// We can't easily guess the bbox from just the ring here without iterating,
-			// so we skip the subpixel optimization for now to keep this robust.
-		}
+  /**
+   * Draw a filled polygon with optional holes.
+   * First ring is the outer boundary, subsequent rings are holes.
+   * Uses even-odd winding rule for fill determination.
+   */
+  drawPolygon(rings: LonLat[][], color: Rgba = DEFAULT_AREA_COLOR) {
+    if (rings.length === 0) return;
+    const bbox = rings[0]?.[0];
+    // Optimization: if the polygon is tiny (fits in a single pixel),
+    // render it as a single pixel with alpha scaling instead of full rasterization.
+    if (
+      rings.length === 1 &&
+      rings[0]?.length === 5 && // Rectangular bbox
+      bbox
+    ) {
+      // We can't easily guess the bbox from just the ring here without iterating,
+      // so we skip the subpixel optimization for now to keep this robust.
+    }
 
-		// Normalize winding order using rewind (outer counterclockwise, inner clockwise)
-		const normalizedRings = rings.map((ring) => {
-			const rewound = rewindGeometry({
-				type: "Polygon",
-				coordinates: [ring],
-			}) as GeoJSON.Polygon
-			const firstRing = rewound.coordinates[0]
-			if (!firstRing) return ring
-			return firstRing as LonLat[]
-		})
+    // Normalize winding order using rewind (outer counterclockwise, inner clockwise)
+    const normalizedRings = rings.map((ring) => {
+      const rewound = rewindGeometry({
+        type: "Polygon",
+        coordinates: [ring],
+      }) as GeoJSON.Polygon;
+      const firstRing = rewound.coordinates[0];
+      if (!firstRing) return ring;
+      return firstRing as LonLat[];
+    });
 
-		// Project and clip all rings
-		const tileBbox: [number, number, number, number] = [
-			0,
-			0,
-			this.tileSize,
-			this.tileSize,
-		]
-		const clippedRings: XY[][] = []
-		for (const ring of normalizedRings) {
-			const projected = ring.map((ll) => this.llToTilePx(ll))
-			const clipped = clipPolygon(projected, tileBbox)
-			if (clipped.length >= 3) {
-				// Ensure ring is closed
-				const first = clipped[0]
-				const last = clipped[clipped.length - 1]
-				if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
-					clipped.push([first[0], first[1]])
-				}
-				clippedRings.push(clipped.map((xy) => this.clampAndRoundPx(xy)))
-			}
-		}
+    // Project and clip all rings
+    const tileBbox: [number, number, number, number] = [0, 0, this.tileSize, this.tileSize];
+    const clippedRings: XY[][] = [];
+    for (const ring of normalizedRings) {
+      const projected = ring.map((ll) => this.llToTilePx(ll));
+      const clipped = clipPolygon(projected, tileBbox);
+      if (clipped.length >= 3) {
+        // Ensure ring is closed
+        const first = clipped[0];
+        const last = clipped[clipped.length - 1];
+        if (first && last && (first[0] !== last[0] || first[1] !== last[1])) {
+          clipped.push([first[0], first[1]]);
+        }
+        clippedRings.push(clipped.map((xy) => this.clampAndRoundPx(xy)));
+      }
+    }
 
-		if (clippedRings.length === 0) return
+    if (clippedRings.length === 0) return;
 
-		// Use scanline fill algorithm with even-odd rule
-		this.fillPolygonScanline(clippedRings, color)
-	}
+    // Use scanline fill algorithm with even-odd rule
+    this.fillPolygonScanline(clippedRings, color);
+  }
 
-	/**
-	 * Draw a MultiPolygon (multiple polygons, each with optional holes).
-	 */
-	drawMultiPolygon(polygons: LonLat[][][], color: Rgba = DEFAULT_AREA_COLOR) {
-		for (const polygon of polygons) {
-			this.drawPolygon(polygon, color)
-		}
-	}
+  /**
+   * Draw a MultiPolygon (multiple polygons, each with optional holes).
+   */
+  drawMultiPolygon(polygons: LonLat[][][], color: Rgba = DEFAULT_AREA_COLOR) {
+    for (const polygon of polygons) {
+      this.drawPolygon(polygon, color);
+    }
+  }
 
-	/**
-	 * Draw a relation as polygon(s).
-	 * Takes an array of polygons (each polygon is an array of rings: [outer, ...inner]).
-	 */
-	drawRelation(polygons: LonLat[][][], color: Rgba = DEFAULT_AREA_COLOR) {
-		this.drawMultiPolygon(polygons, color)
-	}
+  /**
+   * Draw a relation as polygon(s).
+   * Takes an array of polygons (each polygon is an array of rings: [outer, ...inner]).
+   */
+  drawRelation(polygons: LonLat[][][], color: Rgba = DEFAULT_AREA_COLOR) {
+    this.drawMultiPolygon(polygons, color);
+  }
 
-	/**
-	 * Fill polygon using scanline algorithm with even-odd winding rule.
-	 * Handles holes correctly by toggling fill state on each edge crossing.
-	 */
-	private fillPolygonScanline(rings: XY[][], color: Rgba) {
-		const tileSize = this.tileSize
-		const outerRing = rings[0]
-		if (!outerRing || outerRing.length < 3) return
+  /**
+   * Fill polygon using scanline algorithm with even-odd winding rule.
+   * Handles holes correctly by toggling fill state on each edge crossing.
+   */
+  private fillPolygonScanline(rings: XY[][], color: Rgba) {
+    const tileSize = this.tileSize;
+    const outerRing = rings[0];
+    if (!outerRing || outerRing.length < 3) return;
 
-		// Build edge list for all rings
-		const edges: Array<{ y0: number; y1: number; x0: number; x1: number }> = []
-		for (const ring of rings) {
-			for (let i = 0; i < ring.length - 1; i++) {
-				const p0 = ring[i]
-				const p1 = ring[i + 1]
-				if (!p0 || !p1) continue
+    // Build edge list for all rings
+    const edges: Array<{ y0: number; y1: number; x0: number; x1: number }> = [];
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const p0 = ring[i];
+        const p1 = ring[i + 1];
+        if (!p0 || !p1) continue;
 
-				// Only add horizontal edges (for scanline)
-				if (p0[1] !== p1[1]) {
-					edges.push({
-						y0: Math.min(p0[1], p1[1]),
-						y1: Math.max(p0[1], p1[1]),
-						x0: p0[0],
-						x1: p1[0],
-					})
-				}
-			}
-		}
+        // Only add horizontal edges (for scanline)
+        if (p0[1] !== p1[1]) {
+          edges.push({
+            y0: Math.min(p0[1], p1[1]),
+            y1: Math.max(p0[1], p1[1]),
+            x0: p0[0],
+            x1: p1[0],
+          });
+        }
+      }
+    }
 
-		// Find y bounds
-		let minY = tileSize
-		let maxY = 0
-		for (const ring of rings) {
-			for (const [, y] of ring) {
-				if (y < minY) minY = Math.max(0, y)
-				if (y > maxY) maxY = Math.min(tileSize - 1, y)
-			}
-		}
+    // Find y bounds
+    let minY = tileSize;
+    let maxY = 0;
+    for (const ring of rings) {
+      for (const [, y] of ring) {
+        if (y < minY) minY = Math.max(0, y);
+        if (y > maxY) maxY = Math.min(tileSize - 1, y);
+      }
+    }
 
-		// Scanline fill
-		// Skip top and bottom boundary rows (y=0 and y=tileSize-1) to avoid edge artifacts
-		for (let y = minY; y <= maxY; y++) {
-			// Skip boundary rows to prevent edge artifacts
-			if (y === 0 || y === tileSize - 1) {
-				continue
-			}
+    // Scanline fill
+    // Skip top and bottom boundary rows (y=0 and y=tileSize-1) to avoid edge artifacts
+    for (let y = minY; y <= maxY; y++) {
+      // Skip boundary rows to prevent edge artifacts
+      if (y === 0 || y === tileSize - 1) {
+        continue;
+      }
 
-			const intersections: number[] = []
+      const intersections: number[] = [];
 
-			// Find all x intersections at this y
-			for (const ring of rings) {
-				for (let i = 0; i < ring.length - 1; i++) {
-					const p0 = ring[i]
-					const p1 = ring[i + 1]
-					if (!p0 || !p1) continue
+      // Find all x intersections at this y
+      for (const ring of rings) {
+        for (let i = 0; i < ring.length - 1; i++) {
+          const p0 = ring[i];
+          const p1 = ring[i + 1];
+          if (!p0 || !p1) continue;
 
-					// Check if edge crosses this scanline
-					const [x0, y0] = p0
-					const [x1, y1] = p1
-					if ((y0 <= y && y < y1) || (y1 <= y && y < y0)) {
-						// Calculate x intersection
-						const dx = x1 - x0
-						const dy = y1 - y0
-						if (dy !== 0) {
-							const x = x0 + ((y - y0) * dx) / dy
-							intersections.push(Math.round(x))
-						}
-					}
-				}
-			}
+          // Check if edge crosses this scanline
+          const [x0, y0] = p0;
+          const [x1, y1] = p1;
+          if ((y0 <= y && y < y1) || (y1 <= y && y < y0)) {
+            // Calculate x intersection
+            const dx = x1 - x0;
+            const dy = y1 - y0;
+            if (dy !== 0) {
+              const x = x0 + ((y - y0) * dx) / dy;
+              intersections.push(Math.round(x));
+            }
+          }
+        }
+      }
 
-			// Sort intersections
-			intersections.sort((a, b) => a - b)
+      // Sort intersections
+      intersections.sort((a, b) => a - b);
 
-			// Fill between pairs (even-odd rule)
-			// Skip boundary pixels (x=0 and x=tileSize-1) to avoid edge artifacts
-			// when tiles are rendered side-by-side. This ensures adjacent tiles don't have
-			// overlapping pixels at their boundaries.
-			for (let i = 0; i < intersections.length - 1; i += 2) {
-				const rawX0 = intersections[i]!
-				const rawX1 = intersections[i + 1]!
+      // Fill between pairs (even-odd rule)
+      // Skip boundary pixels (x=0 and x=tileSize-1) to avoid edge artifacts
+      // when tiles are rendered side-by-side. This ensures adjacent tiles don't have
+      // overlapping pixels at their boundaries.
+      for (let i = 0; i < intersections.length - 1; i += 2) {
+        const rawX0 = intersections[i]!;
+        const rawX1 = intersections[i + 1]!;
 
-				// Clamp intersections to tile bounds
-				const x0 = Math.max(0, Math.min(tileSize - 1, rawX0))
-				const x1 = Math.max(0, Math.min(tileSize - 1, rawX1))
+        // Clamp intersections to tile bounds
+        const x0 = Math.max(0, Math.min(tileSize - 1, rawX0));
+        const x1 = Math.max(0, Math.min(tileSize - 1, rawX1));
 
-				// Fill the range, but skip boundary pixels
-				for (let x = x0; x <= x1; x++) {
-					// Skip boundary pixels to prevent edge artifacts
-					if (x === 0 || x === tileSize - 1) {
-						continue
-					}
-					this.drawPixel([x, y], color)
-				}
-			}
-		}
-	}
+        // Fill the range, but skip boundary pixels
+        for (let x = x0; x <= x1; x++) {
+          // Skip boundary pixels to prevent edge artifacts
+          if (x === 0 || x === tileSize - 1) {
+            continue;
+          }
+          this.drawPixel([x, y], color);
+        }
+      }
+    }
+  }
 }

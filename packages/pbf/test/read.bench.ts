@@ -1,43 +1,36 @@
-import {
-	getFixtureFile,
-	getFixtureFileReadStream,
-	PBFs,
-} from "@osmix/shared/fixtures"
-import { beforeAll, bench, describe, expect } from "vitest"
+import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/shared/fixtures";
+import { beforeAll, bench, describe, expect } from "vitest";
 
-import {
-	OsmPbfBytesToBlocksTransformStream,
-	readOsmPbf,
-} from "../src/pbf-to-blocks"
-import { createOsmEntityCounter, testOsmPbfReader } from "../src/utils"
+import { OsmPbfBytesToBlocksTransformStream, readOsmPbf } from "../src/pbf-to-blocks";
+import { createOsmEntityCounter, testOsmPbfReader } from "../src/utils";
 
 describe.each(Object.entries(PBFs))("%s", (_name, pbf) => {
-	beforeAll(() => getFixtureFile(pbf.url))
+  beforeAll(() => getFixtureFile(pbf.url));
 
-	bench("parse with generators", async () => {
-		const file = await getFixtureFile(pbf.url)
-		const osm = await readOsmPbf(file)
+  bench("parse with generators", async () => {
+    const file = await getFixtureFile(pbf.url);
+    const osm = await readOsmPbf(file);
 
-		await testOsmPbfReader(osm, pbf)
-	})
+    await testOsmPbfReader(osm, pbf);
+  });
 
-	bench("parse streaming", async () => {
-		const { onGroup, count } = createOsmEntityCounter()
+  bench("parse streaming", async () => {
+    const { onGroup, count } = createOsmEntityCounter();
 
-		await getFixtureFileReadStream(pbf.url)
-			.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
-			.pipeTo(
-				new WritableStream({
-					write: (block) => {
-						if ("primitivegroup" in block) {
-							for (const group of block.primitivegroup) onGroup(group)
-						}
-					},
-				}),
-			)
+    await getFixtureFileReadStream(pbf.url)
+      .pipeThrough(new OsmPbfBytesToBlocksTransformStream())
+      .pipeTo(
+        new WritableStream({
+          write: (block) => {
+            if ("primitivegroup" in block) {
+              for (const group of block.primitivegroup) onGroup(group);
+            }
+          },
+        }),
+      );
 
-		expect(count.nodes).toBe(pbf.nodes)
-		expect(count.ways).toBe(pbf.ways)
-		expect(count.relations).toBe(pbf.relations)
-	})
-})
+    expect(count.nodes).toBe(pbf.nodes);
+    expect(count.ways).toBe(pbf.ways);
+    expect(count.relations).toBe(pbf.relations);
+  });
+});

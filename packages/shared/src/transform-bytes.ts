@@ -6,8 +6,8 @@
  * @module
  */
 
-import { bytesToStream } from "./bytes-to-stream.ts"
-import { streamToBytes } from "./stream-to-bytes.ts"
+import { bytesToStream } from "./bytes-to-stream.ts";
+import { streamToBytes } from "./stream-to-bytes.ts";
 
 /**
  * Pipe a byte array through a TransformStream and return the result.
@@ -25,11 +25,8 @@ import { streamToBytes } from "./stream-to-bytes.ts"
  * ```
  */
 export async function transformBytes(
-	bytes: Uint8Array<ArrayBuffer>,
-	transformStream: TransformStream<
-		Uint8Array<ArrayBuffer>,
-		Uint8Array<ArrayBuffer>
-	>,
+  bytes: Uint8Array<ArrayBuffer>,
+  transformStream: TransformStream<Uint8Array<ArrayBuffer>, Uint8Array<ArrayBuffer>>,
 ): Promise<Uint8Array<ArrayBuffer>> {
-	return streamToBytes(bytesToStream(bytes).pipeThrough(transformStream))
+  return streamToBytes(bytesToStream(bytes).pipeThrough(transformStream));
 }

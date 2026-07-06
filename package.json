@@ -1,31 +1,31 @@
 {
-	"$schema": "https://json.schemastore.org/package.json",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev": "pnpm -r dev",
-		"build": "pnpm -r build",
-		"check": "oxfmt . && oxlint --type-aware --fix --fix-dangerously",
-		"clean": "rm -rf packages/*/dist apps/*/dist node_modules packages/*/node_modules apps/*/node_modules packages/*/*.tgz",
-		"format": "oxfmt .",
-		"lint": "oxlint --type-aware --fix --fix-dangerously",
-		"test": "vitest run",
-		"test:all": "pnpm run typecheck && pnpm run check && VITEST_INCLUDE_APPS=1 vitest run",
-		"test:apps": "VITEST_INCLUDE_APPS=1 vitest run '--project=@osmix/merge' '--project=@osmix/bench*'",
-		"test:node-smoke": "node scripts/node-smoke.ts",
-		"test:packages": "vitest run",
-		"typecheck": "pnpm -r typecheck",
-		"version": "changeset version && pnpm install",
-		"release": "node scripts/release.ts"
-	},
-	"devDependencies": {
-		"@changesets/cli": "^2.31.0",
-		"@types/node": "catalog:",
-		"oxfmt": "^0.57.0",
-		"oxlint": "^1.72.0",
-		"oxlint-tsgolint": "^0.24.0",
-		"typescript": "7.0.1-rc",
-		"vitest": "^4.1.9"
-	},
-	"packageManager": "pnpm@11.10.0"
+  "$schema": "https://json.schemastore.org/package.json",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "build": "pnpm -r build",
+    "check": "oxfmt . && oxlint --type-aware --fix --fix-dangerously",
+    "clean": "rm -rf packages/*/dist apps/*/dist node_modules packages/*/node_modules apps/*/node_modules packages/*/*.tgz",
+    "format": "oxfmt .",
+    "lint": "oxlint --type-aware --fix --fix-dangerously",
+    "test": "vitest run",
+    "test:all": "pnpm run typecheck && pnpm run check && VITEST_INCLUDE_APPS=1 vitest run",
+    "test:apps": "VITEST_INCLUDE_APPS=1 vitest run '--project=@osmix/merge' '--project=@osmix/bench*'",
+    "test:node-smoke": "node scripts/node-smoke.ts",
+    "test:packages": "vitest run",
+    "typecheck": "pnpm -r typecheck",
+    "version": "changeset version && pnpm install",
+    "release": "node scripts/release.ts"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@types/node": "catalog:",
+    "oxfmt": "^0.57.0",
+    "oxlint": "^1.72.0",
+    "oxlint-tsgolint": "^0.24.0",
+    "typescript": "7.0.1-rc",
+    "vitest": "^4.1.9"
+  },
+  "packageManager": "pnpm@11.10.0"
 }

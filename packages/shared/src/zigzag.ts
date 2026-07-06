@@ -17,7 +17,7 @@
  * for unsigned varint encoding.
  */
 export function zigzag(num: number): number {
-	return num < 0 ? -2 * num - 1 : 2 * num
+  return num < 0 ? -2 * num - 1 : 2 * num;
 }
 
 /**
@@ -26,7 +26,7 @@ export function zigzag(num: number): number {
  * Used for small coordinate deltas in geometry encoding.
  */
 export function zigzag32(num: number): number {
-	return (num << 1) ^ (num >> 31)
+  return (num << 1) ^ (num >> 31);
 }
 
 /**
@@ -37,6 +37,6 @@ export function zigzag32(num: number): number {
  * Formula: (encoded & 1) === 1 ? -(encoded + 1) / 2 : encoded / 2
  */
 export function decodeZigzag(encoded: number): number {
-	// Check if encoded is odd (negative) using bitwise, then use arithmetic
-	return (encoded & 1) === 1 ? -(encoded + 1) / 2 : encoded / 2
+  // Check if encoded is odd (negative) using bitwise, then use arithmetic
+  return (encoded & 1) === 1 ? -(encoded + 1) / 2 : encoded / 2;
 }

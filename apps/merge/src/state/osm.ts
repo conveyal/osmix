@@ -1,30 +1,22 @@
-import type { Osm, OsmInfo } from "@osmix/core"
-import type { OsmEntity } from "@osmix/shared/types"
-import { atom } from "jotai"
-import { atomFamily } from "jotai/utils"
+import type { Osm, OsmInfo } from "@osmix/core";
+import type { OsmEntity } from "@osmix/shared/types";
+import { atom } from "jotai";
+import { atomFamily } from "jotai/utils";
 
-import type { StoredFileInfo } from "../workers/osm.worker"
+import type { StoredFileInfo } from "../workers/osm.worker";
 
-export const osmInfoAtomFamily = atomFamily((_id: string) =>
-	atom<OsmInfo | null>(null),
-)
-export const osmAtomFamily = atomFamily((_id: string) => atom<Osm | null>(null))
-export const osmFileAtomFamily = atomFamily((_id: string) =>
-	atom<File | null>(null),
-)
-export const osmFileInfoAtomFamily = atomFamily((_id: string) =>
-	atom<StoredFileInfo | null>(null),
-)
-export const osmStoredAtomFamily = atomFamily((_id: string) =>
-	atom<boolean>(false),
-)
-export const selectedEntityAtom = atom<OsmEntity | null>(null)
-export const selectedOsmAtom = atom<Osm | null>(null)
+export const osmInfoAtomFamily = atomFamily((_id: string) => atom<OsmInfo | null>(null));
+export const osmAtomFamily = atomFamily((_id: string) => atom<Osm | null>(null));
+export const osmFileAtomFamily = atomFamily((_id: string) => atom<File | null>(null));
+export const osmFileInfoAtomFamily = atomFamily((_id: string) => atom<StoredFileInfo | null>(null));
+export const osmStoredAtomFamily = atomFamily((_id: string) => atom<boolean>(false));
+export const selectedEntityAtom = atom<OsmEntity | null>(null);
+export const selectedOsmAtom = atom<Osm | null>(null);
 
 export const selectOsmEntityAtom = atom(
-	null,
-	(_get, set, osm: Osm | null, entity: OsmEntity | null) => {
-		set(selectedOsmAtom, osm)
-		set(selectedEntityAtom, entity)
-	},
-)
+  null,
+  (_get, set, osm: Osm | null, entity: OsmEntity | null) => {
+    set(selectedOsmAtom, osm);
+    set(selectedEntityAtom, entity);
+  },
+);

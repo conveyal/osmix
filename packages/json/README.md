@@ -20,66 +20,60 @@ pnpm add @osmix/json
 ### Decode a PBF stream
 
 ```ts
-import { osmPbfToJson } from "@osmix/json"
-import { toAsyncGenerator } from "@osmix/pbf"
+import { osmPbfToJson } from "@osmix/json";
+import { toAsyncGenerator } from "@osmix/pbf";
 
-const stream = osmPbfToJson(Bun.file("./monaco.pbf").stream())
+const stream = osmPbfToJson(Bun.file("./monaco.pbf").stream());
 
 for await (const item of toAsyncGenerator(stream)) {
-	if ("id" in item) {
-		// item is OsmNode | OsmWay | OsmRelation
-		console.log(item.id, item.tags?.name)
-	} else {
-		// item is OsmPbfHeaderBlock
-		console.log("Features:", item.required_features)
-	}
+  if ("id" in item) {
+    // item is OsmNode | OsmWay | OsmRelation
+    console.log(item.id, item.tags?.name);
+  } else {
+    // item is OsmPbfHeaderBlock
+    console.log("Features:", item.required_features);
+  }
 }
 ```
 
 ### Encode JSON to PBF
 
 ```ts
-import { osmJsonToPbf } from "@osmix/json"
+import { osmJsonToPbf } from "@osmix/json";
 
 // Create header
 const header = {
-	required_features: ["OsmSchema-V0.6", "DenseNodes"],
-	optional_features: [],
-}
+  required_features: ["OsmSchema-V0.6", "DenseNodes"],
+  optional_features: [],
+};
 
 // Create entity generator
 async function* generateEntities() {
-	yield { id: 1, lon: -122.4, lat: 47.6, tags: { name: "Seattle" } }
-	yield { id: 2, lon: -122.3, lat: 47.5 }
-	yield { id: 10, refs: [1, 2], tags: { highway: "primary" } }
+  yield { id: 1, lon: -122.4, lat: 47.6, tags: { name: "Seattle" } };
+  yield { id: 2, lon: -122.3, lat: 47.5 };
+  yield { id: 10, refs: [1, 2], tags: { highway: "primary" } };
 }
 
 // Convert to PBF stream
-const pbfStream = osmJsonToPbf(header, generateEntities())
-await Bun.write("./output.pbf", pbfStream)
+const pbfStream = osmJsonToPbf(header, generateEntities());
+await Bun.write("./output.pbf", pbfStream);
 ```
 
 ### Using TransformStreams
 
 ```ts
-import {
-	OsmBlocksToJsonTransformStream,
-	OsmJsonToBlocksTransformStream,
-} from "@osmix/json"
-import {
-	OsmPbfBytesToBlocksTransformStream,
-	OsmBlocksToPbfBytesTransformStream,
-} from "@osmix/pbf"
+import { OsmBlocksToJsonTransformStream, OsmJsonToBlocksTransformStream } from "@osmix/json";
+import { OsmPbfBytesToBlocksTransformStream, OsmBlocksToPbfBytesTransformStream } from "@osmix/pbf";
 
 // Decode: bytes → blocks → JSON entities
 const jsonStream = pbfBytes
-	.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
-	.pipeThrough(new OsmBlocksToJsonTransformStream())
+  .pipeThrough(new OsmPbfBytesToBlocksTransformStream())
+  .pipeThrough(new OsmBlocksToJsonTransformStream());
 
 // Encode: JSON entities → blocks → bytes
 const pbfStream = entityStream
-	.pipeThrough(new OsmJsonToBlocksTransformStream())
-	.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
+  .pipeThrough(new OsmJsonToBlocksTransformStream())
+  .pipeThrough(new OsmBlocksToPbfBytesTransformStream());
 ```
 
 ## API

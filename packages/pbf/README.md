@@ -23,16 +23,16 @@ pnpm add @osmix/pbf
 `readOsmPbf` accepts an `ArrayBufferLike`, async iterable, or Web `ReadableStream`. It returns the header block and an async generator of primitive blocks.
 
 ```ts
-import { readOsmPbf } from "@osmix/pbf"
+import { readOsmPbf } from "@osmix/pbf";
 
-const { header, blocks } = await readOsmPbf(Bun.file("./monaco.pbf").stream())
+const { header, blocks } = await readOsmPbf(Bun.file("./monaco.pbf").stream());
 
-console.log(header.required_features)
+console.log(header.required_features);
 
 for await (const block of blocks) {
-	for (const group of block.primitivegroup) {
-		console.log(group.nodes?.length, group.ways.length, group.relations.length)
-	}
+  for (const group of block.primitivegroup) {
+    console.log(group.nodes?.length, group.ways.length, group.relations.length);
+  }
 }
 ```
 
@@ -41,35 +41,28 @@ for await (const block of blocks) {
 For large files, use `TransformStream` helpers to process data incrementally:
 
 ```ts
-import {
-	OsmPbfBytesToBlocksTransformStream,
-	OsmBlocksToPbfBytesTransformStream,
-} from "@osmix/pbf"
+import { OsmPbfBytesToBlocksTransformStream, OsmBlocksToPbfBytesTransformStream } from "@osmix/pbf";
 
 // Decode PBF bytes into blocks
-const blocksStream = response.body!.pipeThrough(
-	new OsmPbfBytesToBlocksTransformStream(),
-)
+const blocksStream = response.body!.pipeThrough(new OsmPbfBytesToBlocksTransformStream());
 
 // Encode blocks back to PBF bytes
-const pbfStream = blocksStream.pipeThrough(
-	new OsmBlocksToPbfBytesTransformStream(),
-)
+const pbfStream = blocksStream.pipeThrough(new OsmBlocksToPbfBytesTransformStream());
 ```
 
 ### Write a PBF file
 
 ```ts
-import { osmBlockToPbfBlobBytes } from "@osmix/pbf"
+import { osmBlockToPbfBlobBytes } from "@osmix/pbf";
 
 // Serialize a header block
 const headerBytes = await osmBlockToPbfBlobBytes({
-	required_features: ["OsmSchema-V0.6", "DenseNodes"],
-	optional_features: [],
-})
+  required_features: ["OsmSchema-V0.6", "DenseNodes"],
+  optional_features: [],
+});
 
 // Serialize a primitive block
-const dataBytes = await osmBlockToPbfBlobBytes(primitiveBlock)
+const dataBytes = await osmBlockToPbfBlobBytes(primitiveBlock);
 ```
 
 ## API

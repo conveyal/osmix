@@ -3,120 +3,120 @@
 html,
 body,
 #map {
-	height: 100%;
-	margin: 0;
-	font-family: monospace;
-	color: #162456;
-	font-size: 16px;
+  height: 100%;
+  margin: 0;
+  font-family: monospace;
+  color: #162456;
+  font-size: 16px;
 }
 
 header {
-	font-weight: bold;
+  font-weight: bold;
 }
 
 hr {
-	border: 1px solid #dbeafe;
+  border: 1px solid #dbeafe;
 }
 
 .map-control {
-	background: rgba(255, 255, 255, 0.9);
-	padding: 0.5rem;
-	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-	max-width: 30rem;
-	max-height: 40vh;
-	overflow-x: auto;
-	overflow-y: auto;
-	margin: 1rem;
-	pointer-events: all;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.5rem;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  max-width: 30rem;
+  max-height: 40vh;
+  overflow-x: auto;
+  overflow-y: auto;
+  margin: 1rem;
+  pointer-events: all;
 
-	label {
-		display: block;
-	}
+  label {
+    display: block;
+  }
 
-	header {
-		margin-bottom: 0.5rem;
-		text-transform: uppercase;
-	}
+  header {
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+  }
 }
 
 #entity {
-	header {
-		margin-bottom: 0.25rem;
-		margin-top: 1rem;
-	}
+  header {
+    margin-bottom: 0.25rem;
+    margin-top: 1rem;
+  }
 
-	header:first-of-type {
-		margin-top: 0;
-		border-top: none;
-		padding-top: 0;
-	}
+  header:first-of-type {
+    margin-top: 0;
+    border-top: none;
+    padding-top: 0;
+  }
 }
 
 dialog {
-	background: #fff;
-	padding: 1rem;
-	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-	border: none;
-	max-width: 50%;
-	max-height: 10rem;
-	overflow-y: auto;
+  background: #fff;
+  padding: 1rem;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  border: none;
+  max-width: 50%;
+  max-height: 10rem;
+  overflow-y: auto;
 }
 
 pre {
-	padding: 0;
-	margin: 0;
+  padding: 0;
+  margin: 0;
 }
 
 table {
-	width: 100%;
-	border-collapse: collapse;
+  width: 100%;
+  border-collapse: collapse;
 }
 
 td {
-	padding-left: 1rem;
-	white-space: nowrap;
+  padding-left: 1rem;
+  white-space: nowrap;
 }
 
 td:first-of-type {
-	font-weight: bold;
-	padding-left: 0;
+  font-weight: bold;
+  padding-left: 0;
 }
 
 td:nth-of-type(2):before {
-	content: " = ";
+  content: " = ";
 }
 
 #entity:empty {
-	display: none;
+  display: none;
 }
 
 dl {
-	display: flex;
-	flex-direction: column;
-	gap: 0;
-	margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
 
-	dt {
-		font-weight: bold;
-		text-transform: uppercase;
-		margin-top: 0.5rem;
-	}
+  dt {
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-top: 0.5rem;
+  }
 
-	dt:first-of-type {
-		margin-top: 0;
-	}
+  dt:first-of-type {
+    margin-top: 0;
+  }
 
-	dd {
-		margin-left: 0;
-	}
+  dd {
+    margin-left: 0;
+  }
 }
 
 input[type="text"] {
-	font-size: 1rem;
-	font-family: monospace;
-	display: block;
-	padding: 0.5rem;
-	border: none;
-	background: #dbeafe;
-	box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.2);
+  font-size: 1rem;
+  font-family: monospace;
+  display: block;
+  padding: 0.5rem;
+  border: none;
+  background: #dbeafe;
+  box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.2);
 }

@@ -8,112 +8,100 @@
  */
 
 /** Geographic coordinate as [longitude, latitude] tuple. */
-export type LonLat = [lon: number, lat: number]
+export type LonLat = [lon: number, lat: number];
 /** 2D pixel or cartesian coordinate as [x, y] tuple. */
-export type XY = [x: number, y: number]
+export type XY = [x: number, y: number];
 
 /** Geographic coordinate as object with lon/lat properties. */
 export interface ILonLat {
-	lon: number
-	lat: number
+  lon: number;
+  lat: number;
 }
 /** XYZ tile coordinate as [x, y, z] tuple. */
-export type Tile = [x: number, y: number, z: number]
+export type Tile = [x: number, y: number, z: number];
 
 /**
  * Project LonLat to pixels
  */
-export type LonLatToPixel = (ll: LonLat, zoom: number) => XY
+export type LonLatToPixel = (ll: LonLat, zoom: number) => XY;
 
-export type LonLatToTilePixel = (ll: LonLat, z: number, extent: number) => XY
+export type LonLatToTilePixel = (ll: LonLat, z: number, extent: number) => XY;
 
-export type Rgba =
-	| [r: number, g: number, b: number, a: number]
-	| Uint8ClampedArray
+export type Rgba = [r: number, g: number, b: number, a: number] | Uint8ClampedArray;
 
 /**
  * A bounding box in the format [minLon, minLat, maxLon, maxLat].
  * GeoJSON.BBox allows for 3D bounding boxes, but we use tools that expect 2D bounding boxes.
  */
-export type GeoBbox2D = [
-	minLon: number,
-	minLat: number,
-	maxLon: number,
-	maxLat: number,
-]
+export type GeoBbox2D = [minLon: number, minLat: number, maxLon: number, maxLat: number];
 
 /**
  * A pixel bounding box in the format [minX, minY, maxX, maxY]. Note: minY is north. maxY is south.
  */
-export type TilePxBbox = [
-	minX: number,
-	minY: number,
-	maxX: number,
-	maxY: number,
-]
+export type TilePxBbox = [minX: number, minY: number, maxX: number, maxY: number];
 
 /**
  * Shared OSM Types
  */
 
-export type OsmEntityType = "node" | "way" | "relation"
+export type OsmEntityType = "node" | "way" | "relation";
 
 export interface OsmInfoParsed {
-	version?: number
-	timestamp?: number
-	changeset?: number
-	uid?: number
-	user_sid?: number
-	visible?: boolean
-	user?: string
+  version?: number;
+  timestamp?: number;
+  changeset?: number;
+  uid?: number;
+  user_sid?: number;
+  visible?: boolean;
+  user?: string;
 }
 
 export interface OsmTags {
-	[key: string]: string | number
+  [key: string]: string | number;
 }
 
 interface IOsmEntity {
-	id: number
-	info?: OsmInfoParsed
-	tags?: OsmTags
+  id: number;
+  info?: OsmInfoParsed;
+  tags?: OsmTags;
 }
 
 export interface OsmNode extends IOsmEntity, ILonLat {}
 
 export interface OsmWay extends IOsmEntity {
-	// OSM IDs of the nodes that make up this way
-	refs: number[]
+  // OSM IDs of the nodes that make up this way
+  refs: number[];
 }
 
 export interface OsmRelationMember {
-	type: OsmEntityType
-	ref: number
-	role?: string
+  type: OsmEntityType;
+  ref: number;
+  role?: string;
 }
 
 export interface OsmRelation extends IOsmEntity {
-	members: OsmRelationMember[]
+  members: OsmRelationMember[];
 }
 
-export type OsmEntity = OsmNode | OsmWay | OsmRelation
+export type OsmEntity = OsmNode | OsmWay | OsmRelation;
 
 export interface OsmEntityTypeMap extends Record<OsmEntityType, IOsmEntity> {
-	node: OsmNode
-	way: OsmWay
-	relation: OsmRelation
+  node: OsmNode;
+  way: OsmWay;
+  relation: OsmRelation;
 }
 
 /**
  * Semantic kinds of OSM relations based on their type tag and structure.
  */
-export type RelationKind = "area" | "line" | "point" | "logic" | "super"
+export type RelationKind = "area" | "line" | "point" | "logic" | "super";
 
 /**
  * Metadata about a relation kind, including expected roles and whether member order matters.
  */
 export interface RelationKindMetadata {
-	kind: RelationKind
-	expectedRoles?: string[]
-	orderMatters: boolean
-	description: string
+  kind: RelationKind;
+  expectedRoles?: string[];
+  orderMatters: boolean;
+  description: string;
 }

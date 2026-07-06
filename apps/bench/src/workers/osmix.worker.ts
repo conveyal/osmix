@@ -1,195 +1,177 @@
-import type { Osm } from "@osmix/core"
-import {
-	nodeToFeature,
-	type OsmGeoJSONFeature,
-	wayToFeature,
-} from "@osmix/geojson"
-import { type OsmPbfHeaderBlock, readOsmPbf } from "@osmix/pbf"
-import { haversineDistance } from "@osmix/shared/haversine-distance"
-import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/shared/types"
-import { OsmixVtEncoder } from "@osmix/vt"
-import { expose, wrap } from "comlink"
-import { fromPbf } from "osmix"
+import type { Osm } from "@osmix/core";
+import { nodeToFeature, type OsmGeoJSONFeature, wayToFeature } from "@osmix/geojson";
+import { type OsmPbfHeaderBlock, readOsmPbf } from "@osmix/pbf";
+import { haversineDistance } from "@osmix/shared/haversine-distance";
+import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/shared/types";
+import { OsmixVtEncoder } from "@osmix/vt";
+import { expose, wrap } from "comlink";
+import { fromPbf } from "osmix";
 
 export class OsmixBenchWorker {
-	private osm: Osm | null = null
+  private osm: Osm | null = null;
 
-	async loadFromPbf(data: ArrayBuffer): Promise<void> {
-		this.osm = await fromPbf(new Uint8Array(data), {
-			id: "benchmark",
-		})
-	}
+  async loadFromPbf(data: ArrayBuffer): Promise<void> {
+    this.osm = await fromPbf(new Uint8Array(data), {
+      id: "benchmark",
+    });
+  }
 
-	async buildSpatialIndexes(): Promise<void> {
-		if (!this.osm) throw new Error("OSM not loaded")
-		this.osm.buildSpatialIndexes()
-	}
+  async buildSpatialIndexes(): Promise<void> {
+    if (!this.osm) throw new Error("OSM not loaded");
+    this.osm.buildSpatialIndexes();
+  }
 
-	async getHeader(data: ArrayBuffer): Promise<OsmPbfHeaderBlock> {
-		const { header } = await readOsmPbf(new Uint8Array(data))
-		return header
-	}
+  async getHeader(data: ArrayBuffer): Promise<OsmPbfHeaderBlock> {
+    const { header } = await readOsmPbf(new Uint8Array(data));
+    return header;
+  }
 
-	async queryBbox(
-		osm: Osm,
-		bbox: GeoBbox2D,
-		includeTags = false,
-	): Promise<{
-		nodes: OsmNode[]
-		ways: OsmWay[]
-	}> {
-		const { nodes, ways } = osm
-		const nodesWithTags = nodes.withinBbox(
-			bbox,
-			(i) => nodes.tags.cardinality(i) > 0,
-		)
-		const wayResults = ways.withinBbox(bbox)
+  async queryBbox(
+    osm: Osm,
+    bbox: GeoBbox2D,
+    includeTags = false,
+  ): Promise<{
+    nodes: OsmNode[];
+    ways: OsmWay[];
+  }> {
+    const { nodes, ways } = osm;
+    const nodesWithTags = nodes.withinBbox(bbox, (i) => nodes.tags.cardinality(i) > 0);
+    const wayResults = ways.withinBbox(bbox);
 
-		const nodesWithinBbox: OsmNode[] = []
-		for (let i = 0; i < nodesWithTags.ids.length; i++) {
-			const id = nodesWithTags.ids[i]
-			if (!id) continue
-			const lon = nodesWithTags.positions[i * 2]
-			const lat = nodesWithTags.positions[i * 2 + 1]
-			if (lon === undefined || lat === undefined) continue
-			if (includeTags) {
-				const node = nodes.getById(id)
-				nodesWithinBbox.push({ id, lon, lat, tags: node?.tags ?? undefined })
-			} else {
-				nodesWithinBbox.push({ id, lon, lat })
-			}
-		}
+    const nodesWithinBbox: OsmNode[] = [];
+    for (let i = 0; i < nodesWithTags.ids.length; i++) {
+      const id = nodesWithTags.ids[i];
+      if (!id) continue;
+      const lon = nodesWithTags.positions[i * 2];
+      const lat = nodesWithTags.positions[i * 2 + 1];
+      if (lon === undefined || lat === undefined) continue;
+      if (includeTags) {
+        const node = nodes.getById(id);
+        nodesWithinBbox.push({ id, lon, lat, tags: node?.tags ?? undefined });
+      } else {
+        nodesWithinBbox.push({ id, lon, lat });
+      }
+    }
 
-		const waysInBbox: OsmWay[] = []
-		for (let i = 0; i < wayResults.ids.length; i++) {
-			const id = wayResults.ids[i]
-			if (!id) continue
-			if (includeTags) {
-				const way = ways.getById(id)
-				waysInBbox.push({
-					id,
-					refs: way?.refs ?? [],
-					tags: way?.tags ?? undefined,
-				})
-			} else {
-				waysInBbox.push({ id, refs: [] })
-			}
-		}
+    const waysInBbox: OsmWay[] = [];
+    for (let i = 0; i < wayResults.ids.length; i++) {
+      const id = wayResults.ids[i];
+      if (!id) continue;
+      if (includeTags) {
+        const way = ways.getById(id);
+        waysInBbox.push({
+          id,
+          refs: way?.refs ?? [],
+          tags: way?.tags ?? undefined,
+        });
+      } else {
+        waysInBbox.push({ id, refs: [] });
+      }
+    }
 
-		return { nodes: nodesWithinBbox, ways: waysInBbox }
-	}
+    return { nodes: nodesWithinBbox, ways: waysInBbox };
+  }
 
-	async nearestNeighbor(
-		osm: Osm,
-		lon: number,
-		lat: number,
-		count: number,
-	): Promise<OsmNode[]> {
-		// Use withinRadius with a reasonable search radius (11 km ≈ 0.1 degrees)
-		const candidates = osm.nodes.findIndexesWithinRadius(lon, lat, 11)
+  async nearestNeighbor(osm: Osm, lon: number, lat: number, count: number): Promise<OsmNode[]> {
+    // Use withinRadius with a reasonable search radius (11 km ≈ 0.1 degrees)
+    const candidates = osm.nodes.findIndexesWithinRadius(lon, lat, 11);
 
-		// Calculate distances and sort
-		const nodesWithDistance: Array<{
-			nodeIndex: number
-			id: number
-			lon: number
-			lat: number
-			distance: number
-		}> = []
+    // Calculate distances and sort
+    const nodesWithDistance: Array<{
+      nodeIndex: number;
+      id: number;
+      lon: number;
+      lat: number;
+      distance: number;
+    }> = [];
 
-		for (const nodeIndex of candidates) {
-			const id = osm.nodes.ids.at(nodeIndex)
-			const [nodeLon, nodeLat] = osm.nodes.getNodeLonLat({
-				index: nodeIndex,
-			})
-			const distance = haversineDistance([lon, lat], [nodeLon, nodeLat])
-			nodesWithDistance.push({
-				nodeIndex,
-				id,
-				lon: nodeLon,
-				lat: nodeLat,
-				distance,
-			})
-		}
+    for (const nodeIndex of candidates) {
+      const id = osm.nodes.ids.at(nodeIndex);
+      const [nodeLon, nodeLat] = osm.nodes.getNodeLonLat({
+        index: nodeIndex,
+      });
+      const distance = haversineDistance([lon, lat], [nodeLon, nodeLat]);
+      nodesWithDistance.push({
+        nodeIndex,
+        id,
+        lon: nodeLon,
+        lat: nodeLat,
+        distance,
+      });
+    }
 
-		// Sort by distance and take top N
-		nodesWithDistance.sort((a, b) => a.distance - b.distance)
+    // Sort by distance and take top N
+    nodesWithDistance.sort((a, b) => a.distance - b.distance);
 
-		return nodesWithDistance.slice(0, count).map((n) => ({
-			id: n.id,
-			lon: n.lon,
-			lat: n.lat,
-		}))
-	}
+    return nodesWithDistance.slice(0, count).map((n) => ({
+      id: n.id,
+      lon: n.lon,
+      lat: n.lat,
+    }));
+  }
 
-	async generateVectorTile(bbox: GeoBbox2D): Promise<Uint8Array> {
-		if (!this.osm) throw new Error("OSM not loaded")
+  async generateVectorTile(bbox: GeoBbox2D): Promise<Uint8Array> {
+    if (!this.osm) throw new Error("OSM not loaded");
 
-		// Encode a single-tile VT using bbox-projected coordinates
-		const encoder = new OsmixVtEncoder(this.osm)
-		const [minLon, minLat, maxLon, maxLat] = bbox
-		const extent = 4096
-		const proj = ([lon, lat]: [number, number]) => {
-			const x = ((lon - minLon) / (maxLon - minLon)) * extent
-			const y = ((maxLat - lat) / (maxLat - minLat)) * extent
-			return [x, y] as [number, number]
-		}
-		const pbf = encoder.getTileForBbox(bbox, proj)
-		return new Uint8Array(pbf)
-	}
+    // Encode a single-tile VT using bbox-projected coordinates
+    const encoder = new OsmixVtEncoder(this.osm);
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    const extent = 4096;
+    const proj = ([lon, lat]: [number, number]) => {
+      const x = ((lon - minLon) / (maxLon - minLon)) * extent;
+      const y = ((maxLat - lat) / (maxLat - minLat)) * extent;
+      return [x, y] as [number, number];
+    };
+    const pbf = encoder.getTileForBbox(bbox, proj);
+    return new Uint8Array(pbf);
+  }
 
-	async exportWaysGeoJSON(
-		limit = Number.POSITIVE_INFINITY,
-	): Promise<GeoJSON.FeatureCollection> {
-		if (!this.osm) throw new Error("OSM not loaded")
+  async exportWaysGeoJSON(limit = Number.POSITIVE_INFINITY): Promise<GeoJSON.FeatureCollection> {
+    if (!this.osm) throw new Error("OSM not loaded");
 
-		const features: OsmGeoJSONFeature<
-			GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon
-		>[] = []
+    const features: OsmGeoJSONFeature<GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon>[] = [];
 
-		const { nodes } = this.osm
-		for (const node of nodes) {
-			if (!node.tags || Object.keys(node.tags).length === 0) continue
-			features.push(nodeToFeature(node))
-		}
+    const { nodes } = this.osm;
+    for (const node of nodes) {
+      if (!node.tags || Object.keys(node.tags).length === 0) continue;
+      features.push(nodeToFeature(node));
+    }
 
-		for (const way of this.osm.ways) {
-			if (features.length >= limit) break
-			features.push(
-				wayToFeature(way, (ref) => nodes.getNodeLonLat({ id: ref })),
-			)
-		}
+    for (const way of this.osm.ways) {
+      if (features.length >= limit) break;
+      features.push(wayToFeature(way, (ref) => nodes.getNodeLonLat({ id: ref })));
+    }
 
-		return {
-			type: "FeatureCollection",
-			features,
-		}
-	}
+    return {
+      type: "FeatureCollection",
+      features,
+    };
+  }
 
-	getStats(): {
-		nodes: number
-		ways: number
-		relations: number
-		bbox: [number, number, number, number]
-	} | null {
-		if (!this.osm) return null
-		return {
-			nodes: this.osm.nodes.size,
-			ways: this.osm.ways.size,
-			relations: this.osm.relations.size,
-			bbox: this.osm.bbox(),
-		}
-	}
+  getStats(): {
+    nodes: number;
+    ways: number;
+    relations: number;
+    bbox: [number, number, number, number];
+  } | null {
+    if (!this.osm) return null;
+    return {
+      nodes: this.osm.nodes.size,
+      ways: this.osm.ways.size,
+      relations: this.osm.relations.size,
+      bbox: this.osm.bbox(),
+    };
+  }
 }
 
-const isWorker = "importScripts" in globalThis
+const isWorker = "importScripts" in globalThis;
 if (isWorker) {
-	expose(new OsmixBenchWorker())
+  expose(new OsmixBenchWorker());
 }
 
 export function createWorker() {
-	const worker = new Worker(new URL("./osmix.worker.ts", import.meta.url), {
-		type: "module",
-	})
-	return wrap<OsmixBenchWorker>(worker)
+  const worker = new Worker(new URL("./osmix.worker.ts", import.meta.url), {
+    type: "module",
+  });
+  return wrap<OsmixBenchWorker>(worker);
 }

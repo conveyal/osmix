@@ -1,26 +1,26 @@
 {
-	"$schema": "https://json.schemastore.org/package.json",
-	"name": "@osmix/json",
-	"version": "0.0.15",
-	"description": "Convert OSM PBF files to and from JSON.",
-	"license": "MIT",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/conveyal/osmix.git"
-	},
-	"type": "module",
-	"main": "./src/index.ts",
-	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"bench": "vitest bench",
-		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-		"typecheck": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@osmix/pbf": "workspace:*",
-		"@osmix/shared": "workspace:*"
-	},
-	"devDependencies": {
-		"typescript": "catalog:"
-	}
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/json",
+  "version": "0.0.15",
+  "description": "Convert OSM PBF files to and from JSON.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "bench": "vitest bench",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@osmix/pbf": "workspace:*",
+    "@osmix/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
 }

@@ -6,7 +6,7 @@
  * @module
  */
 
-import { concatBytes } from "./concat-bytes.ts"
+import { concatBytes } from "./concat-bytes.ts";
 
 /**
  * Consume a ReadableStream and return all data as a single Uint8Array.
@@ -18,20 +18,20 @@ import { concatBytes } from "./concat-bytes.ts"
  * @returns A Promise resolving to the concatenated bytes.
  */
 export async function streamToBytes(
-	stream: ReadableStream<Uint8Array<ArrayBuffer>>,
+  stream: ReadableStream<Uint8Array<ArrayBuffer>>,
 ): Promise<Uint8Array<ArrayBuffer>> {
-	const reader = stream.getReader()
-	const chunks: Uint8Array<ArrayBuffer>[] = []
+  const reader = stream.getReader();
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
 
-	while (true) {
-		const { done, value } = await reader.read()
+  while (true) {
+    const { done, value } = await reader.read();
 
-		if (done) {
-			break
-		}
+    if (done) {
+      break;
+    }
 
-		if (value !== undefined) chunks.push(value)
-	}
+    if (value !== undefined) chunks.push(value);
+  }
 
-	return concatBytes(chunks)
+  return concatBytes(chunks);
 }

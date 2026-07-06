@@ -34,8 +34,8 @@
  * @module @osmix/router
  */
 
-export * from "./algorithms/index.ts"
-export * from "./graph.ts"
-export * from "./router.ts"
-export * from "./types.ts"
-export * from "./utils.ts"
+export * from "./algorithms/index.ts";
+export * from "./graph.ts";
+export * from "./router.ts";
+export * from "./types.ts";
+export * from "./utils.ts";

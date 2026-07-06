@@ -8,7 +8,7 @@
  * @module
  */
 
-import type { Rgba } from "@osmix/shared/types"
+import type { Rgba } from "@osmix/shared/types";
 
 /**
  * Convert an sRGB channel (0..255) to linear light (0..1).
@@ -16,8 +16,8 @@ import type { Rgba } from "@osmix/shared/types"
  * Blend in linear space for physically meaningful results.
  */
 function srgbToLinear(u: number) {
-	const c = u / 255
-	return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  const c = u / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 }
 
 /**
@@ -25,9 +25,7 @@ function srgbToLinear(u: number) {
  * Inverse of `srgbToLinear`. Keep these two in sync.
  */
 function linearToSrgb(x: number) {
-	return x <= 0.0031308
-		? 255 * (12.92 * x)
-		: 255 * (1.055 * x ** (1 / 2.4) - 0.055)
+  return x <= 0.0031308 ? 255 * (12.92 * x) : 255 * (1.055 * x ** (1 / 2.4) - 0.055);
 }
 
 /**
@@ -40,11 +38,11 @@ function linearToSrgb(x: number) {
  *   c_out = c_src + c_dst * (1 - a_src)  // for each of r,g,b (premultiplied)
  */
 function over(dst: Rgba, src: Rgba): Rgba {
-	const a = src[3] + dst[3] * (1 - src[3])
-	const r = src[0] + dst[0] * (1 - src[3])
-	const g = src[1] + dst[1] * (1 - src[3])
-	const b = src[2] + dst[2] * (1 - src[3])
-	return [r, g, b, a]
+  const a = src[3] + dst[3] * (1 - src[3]);
+  const r = src[0] + dst[0] * (1 - src[3]);
+  const g = src[1] + dst[1] * (1 - src[3]);
+  const b = src[2] + dst[2] * (1 - src[3]);
+  return [r, g, b, a];
 }
 
 /**
@@ -63,36 +61,24 @@ function over(dst: Rgba, src: Rgba): Rgba {
  *  - Order matters when colors differ (standard source‑over compositing).
  */
 export function compositeRGBA(pixels: Rgba[]): Rgba {
-	// start transparent in linear, premultiplied space
-	let acc: Rgba = [0, 0, 0, 0]
+  // start transparent in linear, premultiplied space
+  let acc: Rgba = [0, 0, 0, 0];
 
-	for (const [r8, g8, b8, a8] of pixels) {
-		if (
-			r8 === undefined ||
-			g8 === undefined ||
-			b8 === undefined ||
-			a8 === undefined
-		)
-			continue
-		const a = a8 / 255
-		const r = srgbToLinear(r8) * a
-		const g = srgbToLinear(g8) * a
-		const b = srgbToLinear(b8) * a
-		acc = over(acc, [r, g, b, a])
-	}
+  for (const [r8, g8, b8, a8] of pixels) {
+    if (r8 === undefined || g8 === undefined || b8 === undefined || a8 === undefined) continue;
+    const a = a8 / 255;
+    const r = srgbToLinear(r8) * a;
+    const g = srgbToLinear(g8) * a;
+    const b = srgbToLinear(b8) * a;
+    acc = over(acc, [r, g, b, a]);
+  }
 
-	if (acc[3] <= 0) return [0, 0, 0, 0]
+  if (acc[3] <= 0) return [0, 0, 0, 0];
 
-	// unpremultiply + convert back to sRGB
-	const r8 = Math.round(
-		Math.min(255, Math.max(0, linearToSrgb(acc[0] / acc[3]))),
-	)
-	const g8 = Math.round(
-		Math.min(255, Math.max(0, linearToSrgb(acc[1] / acc[3]))),
-	)
-	const b8 = Math.round(
-		Math.min(255, Math.max(0, linearToSrgb(acc[2] / acc[3]))),
-	)
-	const a8 = Math.round(Math.min(255, Math.max(0, acc[3] * 255)))
-	return [r8, g8, b8, a8]
+  // unpremultiply + convert back to sRGB
+  const r8 = Math.round(Math.min(255, Math.max(0, linearToSrgb(acc[0] / acc[3]))));
+  const g8 = Math.round(Math.min(255, Math.max(0, linearToSrgb(acc[1] / acc[3]))));
+  const b8 = Math.round(Math.min(255, Math.max(0, linearToSrgb(acc[2] / acc[3]))));
+  const a8 = Math.round(Math.min(255, Math.max(0, acc[3] * 255)));
+  return [r8, g8, b8, a8];
 }

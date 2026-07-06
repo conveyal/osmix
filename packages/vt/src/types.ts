@@ -7,42 +7,42 @@
  * @module
  */
 
-import type { OsmTags, XY } from "@osmix/shared/types"
+import type { OsmTags, XY } from "@osmix/shared/types";
 
 /**
  * Geometry for a vector tile feature.
  * Array of rings/segments, where each ring/segment is an array of [x, y] coordinates.
  */
-export type VtSimpleFeatureGeometry = XY[][]
+export type VtSimpleFeatureGeometry = XY[][];
 
 /**
  * Properties attached to a vector tile feature.
  * Includes OSM tags plus optional source metadata.
  */
 export type VtSimpleFeatureProperties = {
-	sourceId?: string
-	tileKey?: string
-} & OsmTags
+  sourceId?: string;
+  tileKey?: string;
+} & OsmTags;
 
 /**
  * MVT geometry type constants.
  * Point = 1, Line = 2, Polygon = 3.
  */
 export type VtSimpleFeatureType = {
-	POINT: 1
-	LINE: 2
-	POLYGON: 3
-}
+  POINT: 1;
+  LINE: 2;
+  POLYGON: 3;
+};
 
 /**
  * A simplified vector tile feature ready for encoding.
  * Geometry coordinates are in tile extent units (typically 0-4096).
  */
 export interface VtSimpleFeature {
-	id: number
-	type: VtSimpleFeatureType[keyof VtSimpleFeatureType]
-	properties: VtSimpleFeatureProperties
-	geometry: VtSimpleFeatureGeometry
+  id: number;
+  type: VtSimpleFeatureType[keyof VtSimpleFeatureType];
+  properties: VtSimpleFeatureProperties;
+  geometry: VtSimpleFeatureGeometry;
 }
 
 /**
@@ -50,8 +50,8 @@ export interface VtSimpleFeature {
  * Features are provided via a generator to support lazy evaluation.
  */
 export type VtPbfLayer = {
-	name: string
-	version: number
-	extent: number
-	features: Generator<VtSimpleFeature>
-}
+  name: string;
+  version: number;
+  extent: number;
+  features: Generator<VtSimpleFeature>;
+};

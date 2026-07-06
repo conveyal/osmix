@@ -10,17 +10,13 @@
  * @module
  */
 
-import { Osm, type OsmOptions } from "@osmix/core"
-import {
-	logProgress,
-	type ProgressEvent,
-	progressEvent,
-} from "@osmix/shared/progress"
-import type { OsmTags } from "@osmix/shared/types"
+import { Osm, type OsmOptions } from "@osmix/core";
+import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
+import type { OsmTags } from "@osmix/shared/types";
 
-import { GtfsArchive } from "./gtfs-archive.ts"
-import type { GtfsConversionOptions, GtfsShapePoint } from "./types.ts"
-import { routeToTags, stopToTags } from "./utils.ts"
+import { GtfsArchive } from "./gtfs-archive.ts";
+import type { GtfsConversionOptions, GtfsShapePoint } from "./types.ts";
+import { routeToTags, stopToTags } from "./utils.ts";
 
 /**
  * Create an Osm index from a zipped GTFS file.
@@ -48,23 +44,23 @@ import { routeToTags, stopToTags } from "./utils.ts"
  * ```
  */
 export async function fromGtfs(
-	zipData: ArrayBuffer | Uint8Array,
-	options: Partial<OsmOptions> = {},
-	gtfsOptions: GtfsConversionOptions = {},
-	onProgress: (progress: ProgressEvent) => void = logProgress,
+  zipData: ArrayBuffer | Uint8Array,
+  options: Partial<OsmOptions> = {},
+  gtfsOptions: GtfsConversionOptions = {},
+  onProgress: (progress: ProgressEvent) => void = logProgress,
 ): Promise<Osm> {
-	onProgress(progressEvent("Opening GTFS archive..."))
-	const archive = GtfsArchive.fromZip(zipData)
-	const builder = new GtfsOsmBuilder(options, onProgress)
-	if (gtfsOptions.includeStops ?? true) {
-		await builder.processStops(archive)
-	}
+  onProgress(progressEvent("Opening GTFS archive..."));
+  const archive = GtfsArchive.fromZip(zipData);
+  const builder = new GtfsOsmBuilder(options, onProgress);
+  if (gtfsOptions.includeStops ?? true) {
+    await builder.processStops(archive);
+  }
 
-	if (gtfsOptions.includeRoutes ?? true) {
-		await builder.processRoutes(archive)
-	}
+  if (gtfsOptions.includeRoutes ?? true) {
+    await builder.processRoutes(archive);
+  }
 
-	return builder.buildOsm()
+  return builder.buildOsm();
 }
 
 /**
@@ -73,188 +69,183 @@ export async function fromGtfs(
  * Uses lazy parsing - only reads GTFS files when needed.
  */
 export class GtfsOsmBuilder {
-	private osm: Osm
-	private onProgress: (progress: ProgressEvent) => void
+  private osm: Osm;
+  private onProgress: (progress: ProgressEvent) => void;
 
-	private nextNodeId = -1
-	private nextWayId = -1
+  private nextNodeId = -1;
+  private nextWayId = -1;
 
-	// Map GTFS stop_id to OSM node ID
-	private stopIdToNodeId = new Map<string, number>()
+  // Map GTFS stop_id to OSM node ID
+  private stopIdToNodeId = new Map<string, number>();
 
-	constructor(
-		osmOptions: Partial<OsmOptions> = {},
-		onProgress: (progress: ProgressEvent) => void = logProgress,
-	) {
-		this.osm = new Osm(osmOptions)
-		this.onProgress = onProgress
-	}
+  constructor(
+    osmOptions: Partial<OsmOptions> = {},
+    onProgress: (progress: ProgressEvent) => void = logProgress,
+  ) {
+    this.osm = new Osm(osmOptions);
+    this.onProgress = onProgress;
+  }
 
-	/**
-	 * Process GTFS stops into OSM nodes.
-	 * Uses streaming iteration to avoid loading all stops at once.
-	 */
-	async processStops(archive: GtfsArchive) {
-		let count = 0
+  /**
+   * Process GTFS stops into OSM nodes.
+   * Uses streaming iteration to avoid loading all stops at once.
+   */
+  async processStops(archive: GtfsArchive) {
+    let count = 0;
 
-		this.onProgress(progressEvent("Processing stops..."))
+    this.onProgress(progressEvent("Processing stops..."));
 
-		for await (const stop of archive.iter("stops.txt")) {
-			const lat = Number.parseFloat(stop.stop_lat)
-			const lon = Number.parseFloat(stop.stop_lon)
+    for await (const stop of archive.iter("stops.txt")) {
+      const lat = Number.parseFloat(stop.stop_lat);
+      const lon = Number.parseFloat(stop.stop_lon);
 
-			if (Number.isNaN(lat) || Number.isNaN(lon)) continue
+      if (Number.isNaN(lat) || Number.isNaN(lon)) continue;
 
-			const tags = stopToTags(stop)
-			const nodeId = this.nextNodeId--
+      const tags = stopToTags(stop);
+      const nodeId = this.nextNodeId--;
 
-			this.osm.nodes.addNode({
-				id: nodeId,
-				lat,
-				lon,
-				tags,
-			})
+      this.osm.nodes.addNode({
+        id: nodeId,
+        lat,
+        lon,
+        tags,
+      });
 
-			this.stopIdToNodeId.set(stop.stop_id, nodeId)
-			count++
+      this.stopIdToNodeId.set(stop.stop_id, nodeId);
+      count++;
 
-			if (count % 1000 === 0) {
-				this.onProgress(progressEvent(`Processed ${count} stops...`))
-			}
-		}
+      if (count % 1000 === 0) {
+        this.onProgress(progressEvent(`Processed ${count} stops...`));
+      }
+    }
 
-		this.onProgress(progressEvent(`Added ${count} stops as nodes`))
-	}
+    this.onProgress(progressEvent(`Added ${count} stops as nodes`));
+  }
 
-	/**
-	 * Process GTFS routes into OSM ways.
-	 * Creates one way per unique (shape_id, route_id) pair, so each route gets
-	 * its own way with correct metadata even when routes share the same shape.
-	 *
-	 * @param archive - The GTFS archive
-	 */
-	async processRoutes(archive: GtfsArchive) {
-		this.onProgress(progressEvent("Processing routes..."))
+  /**
+   * Process GTFS routes into OSM ways.
+   * Creates one way per unique (shape_id, route_id) pair, so each route gets
+   * its own way with correct metadata even when routes share the same shape.
+   *
+   * @param archive - The GTFS archive
+   */
+  async processRoutes(archive: GtfsArchive) {
+    this.onProgress(progressEvent("Processing routes..."));
 
-		// Build shape lookup if shapes exist
-		const shapeMap = new Map<string, GtfsShapePoint[]>()
-		if (archive.hasFile("shapes.txt")) {
-			this.onProgress(progressEvent("Loading shape data..."))
-			for await (const point of archive.iter("shapes.txt")) {
-				const points = shapeMap.get(point.shape_id) ?? []
-				points.push(point)
-				shapeMap.set(point.shape_id, points)
-			}
-			// Sort each shape by sequence
-			for (const points of shapeMap.values()) {
-				points.sort(
-					(a, b) =>
-						Number.parseInt(a.shape_pt_sequence, 10) -
-						Number.parseInt(b.shape_pt_sequence, 10),
-				)
-			}
-		} else {
-			throw Error("No shape data found. Cannot process routes.")
-		}
+    // Build shape lookup if shapes exist
+    const shapeMap = new Map<string, GtfsShapePoint[]>();
+    if (archive.hasFile("shapes.txt")) {
+      this.onProgress(progressEvent("Loading shape data..."));
+      for await (const point of archive.iter("shapes.txt")) {
+        const points = shapeMap.get(point.shape_id) ?? [];
+        points.push(point);
+        shapeMap.set(point.shape_id, points);
+      }
+      // Sort each shape by sequence
+      for (const points of shapeMap.values()) {
+        points.sort(
+          (a, b) =>
+            Number.parseInt(a.shape_pt_sequence, 10) - Number.parseInt(b.shape_pt_sequence, 10),
+        );
+      }
+    } else {
+      throw Error("No shape data found. Cannot process routes.");
+    }
 
-		// Group trips by (shape_id, route_id) to ensure each route gets its own way
-		// even when multiple routes share the same shape geometry
-		const shapeRouteToTrips = new Map<string, { tripIds: string[] }>()
-		this.onProgress(progressEvent("Loading trip data..."))
-		for await (const trip of archive.iter("trips.txt")) {
-			if (!trip.shape_id) continue
+    // Group trips by (shape_id, route_id) to ensure each route gets its own way
+    // even when multiple routes share the same shape geometry
+    const shapeRouteToTrips = new Map<string, { tripIds: string[] }>();
+    this.onProgress(progressEvent("Loading trip data..."));
+    for await (const trip of archive.iter("trips.txt")) {
+      if (!trip.shape_id) continue;
 
-			const key = `${trip.shape_id}:${trip.route_id}`
-			const existing = shapeRouteToTrips.get(key)
-			if (existing) {
-				existing.tripIds.push(trip.trip_id)
-			} else {
-				shapeRouteToTrips.set(key, { tripIds: [trip.trip_id] })
-			}
-		}
+      const key = `${trip.shape_id}:${trip.route_id}`;
+      const existing = shapeRouteToTrips.get(key);
+      if (existing) {
+        existing.tripIds.push(trip.trip_id);
+      } else {
+        shapeRouteToTrips.set(key, { tripIds: [trip.trip_id] });
+      }
+    }
 
-		// Load routes into a map for lookup
-		const routeMap = new Map<string, Awaited<ReturnType<typeof routeToTags>>>()
-		for await (const route of archive.iter("routes.txt")) {
-			routeMap.set(route.route_id, routeToTags(route))
-		}
+    // Load routes into a map for lookup
+    const routeMap = new Map<string, Awaited<ReturnType<typeof routeToTags>>>();
+    for await (const route of archive.iter("routes.txt")) {
+      routeMap.set(route.route_id, routeToTags(route));
+    }
 
-		// Process unique (shape, route) pairs - one way per combination
-		let count = 0
-		for (const [key, { tripIds }] of shapeRouteToTrips) {
-			const [shapeId, routeId] = key.split(":")
-			const routeTags = routeMap.get(routeId!)
-			if (!routeTags) continue
+    // Process unique (shape, route) pairs - one way per combination
+    let count = 0;
+    for (const [key, { tripIds }] of shapeRouteToTrips) {
+      const [shapeId, routeId] = key.split(":");
+      const routeTags = routeMap.get(routeId!);
+      if (!routeTags) continue;
 
-			const shapePoints = shapeMap.get(shapeId!)
-			if (!shapePoints || shapePoints.length < 2) {
-				this.onProgress(
-					progressEvent(`No shape data found for shape ${shapeId}`, "error"),
-				)
-				continue
-			}
+      const shapePoints = shapeMap.get(shapeId!);
+      if (!shapePoints || shapePoints.length < 2) {
+        this.onProgress(progressEvent(`No shape data found for shape ${shapeId}`, "error"));
+        continue;
+      }
 
-			// Build tags with route info and all trip IDs for this route
-			const tags: OsmTags = {
-				...routeTags,
-				"gtfs:shape_id": shapeId!,
-				"gtfs:trip_ids": tripIds.join(";"),
-				"gtfs:trip_count": tripIds.length,
-			}
+      // Build tags with route info and all trip IDs for this route
+      const tags: OsmTags = {
+        ...routeTags,
+        "gtfs:shape_id": shapeId!,
+        "gtfs:trip_ids": tripIds.join(";"),
+        "gtfs:trip_count": tripIds.length,
+      };
 
-			// Create way from shape points
-			this.createWayFromShape(tags, shapePoints)
-			count++
+      // Create way from shape points
+      this.createWayFromShape(tags, shapePoints);
+      count++;
 
-			if (count % 100 === 0) {
-				this.onProgress(
-					progressEvent(`Processed ${count} shape-route pairs...`),
-				)
-			}
-		}
+      if (count % 100 === 0) {
+        this.onProgress(progressEvent(`Processed ${count} shape-route pairs...`));
+      }
+    }
 
-		this.onProgress(progressEvent(`Added ${count} shape-route pairs as ways`))
-	}
+    this.onProgress(progressEvent(`Added ${count} shape-route pairs as ways`));
+  }
 
-	/**
-	 * Create a way from shape points.
-	 */
-	private createWayFromShape(tags: OsmTags, shapePoints: GtfsShapePoint[]) {
-		const nodeRefs: number[] = []
+  /**
+   * Create a way from shape points.
+   */
+  private createWayFromShape(tags: OsmTags, shapePoints: GtfsShapePoint[]) {
+    const nodeRefs: number[] = [];
 
-		for (const point of shapePoints) {
-			const lat = Number.parseFloat(point.shape_pt_lat)
-			const lon = Number.parseFloat(point.shape_pt_lon)
+    for (const point of shapePoints) {
+      const lat = Number.parseFloat(point.shape_pt_lat);
+      const lon = Number.parseFloat(point.shape_pt_lon);
 
-			if (Number.isNaN(lat) || Number.isNaN(lon)) continue
+      if (Number.isNaN(lat) || Number.isNaN(lon)) continue;
 
-			// Create a node for this shape point
-			const nodeId = this.nextNodeId--
-			this.osm.nodes.addNode({
-				id: nodeId,
-				lat,
-				lon,
-			})
-			nodeRefs.push(nodeId)
-		}
+      // Create a node for this shape point
+      const nodeId = this.nextNodeId--;
+      this.osm.nodes.addNode({
+        id: nodeId,
+        lat,
+        lon,
+      });
+      nodeRefs.push(nodeId);
+    }
 
-		if (nodeRefs.length >= 2) {
-			const wayId = this.nextWayId--
-			this.osm.ways.addWay({
-				id: wayId,
-				refs: nodeRefs,
-				tags,
-			})
-		}
-	}
+    if (nodeRefs.length >= 2) {
+      const wayId = this.nextWayId--;
+      this.osm.ways.addWay({
+        id: wayId,
+        refs: nodeRefs,
+        tags,
+      });
+    }
+  }
 
-	/**
-	 * Build the OSM index with all entities.
-	 */
-	buildOsm(): Osm {
-		this.onProgress(progressEvent("Building indexes..."))
-		this.osm.buildIndexes()
-		this.osm.buildSpatialIndexes()
-		return this.osm
-	}
+  /**
+   * Build the OSM index with all entities.
+   */
+  buildOsm(): Osm {
+    this.onProgress(progressEvent("Building indexes..."));
+    this.osm.buildIndexes();
+    this.osm.buildSpatialIndexes();
+    return this.osm;
+  }
 }

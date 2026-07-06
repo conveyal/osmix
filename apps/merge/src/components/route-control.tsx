@@ -1,303 +1,278 @@
-import type { Osm } from "@osmix/core"
-import type { LonLat } from "@osmix/shared/types"
-import { bboxFromLonLats } from "@osmix/shared/utils"
-import { useAtom, useAtomValue } from "jotai"
-import { NavigationIcon, XIcon } from "lucide-react"
-import { useEffect, useEffectEvent, useRef, useState } from "react"
-import type { MapLayerMouseEvent } from "react-map-gl/maplibre"
+import type { Osm } from "@osmix/core";
+import type { LonLat } from "@osmix/shared/types";
+import { bboxFromLonLats } from "@osmix/shared/utils";
+import { useAtom, useAtomValue } from "jotai";
+import { NavigationIcon, XIcon } from "lucide-react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import type { MapLayerMouseEvent } from "react-map-gl/maplibre";
 
-import { useMap } from "../hooks/map"
-import { routingControlIsOpenAtom } from "../state/map"
-import { selectedOsmAtom } from "../state/osm"
-import { routingStateAtom, type SnappedNode } from "../state/routing"
-import { osmWorker } from "../state/worker"
-import CustomControl from "./custom-control"
-import { Button } from "./ui/button"
+import { useMap } from "../hooks/map";
+import { routingControlIsOpenAtom } from "../state/map";
+import { selectedOsmAtom } from "../state/osm";
+import { routingStateAtom, type SnappedNode } from "../state/routing";
+import { osmWorker } from "../state/worker";
+import CustomControl from "./custom-control";
+import { Button } from "./ui/button";
 
 /** Maximum distance (m) to snap click point to nearest node. */
-const SNAP_RADIUS_M = 1_000
+const SNAP_RADIUS_M = 1_000;
 
 /** Format distance in meters to human readable string. */
 function formatDistance(meters: number): string {
-	if (meters < 1000) return `${Math.round(meters)}m`
-	return `${(meters / 1000).toFixed(2)}km`
+  if (meters < 1000) return `${Math.round(meters)}m`;
+  return `${(meters / 1000).toFixed(2)}km`;
 }
 
 /** Format coordinates to a readable string. */
 function formatCoord(coord: LonLat): string {
-	return `${coord[1].toFixed(6)}, ${coord[0].toFixed(6)}`
+  return `${coord[1].toFixed(6)}, ${coord[0].toFixed(6)}`;
 }
 
 /** Format time in seconds to human readable string. */
 function formatTime(seconds: number): string {
-	if (seconds < 60) return `${Math.round(seconds)} sec`
-	const mins = Math.floor(seconds / 60)
-	const secs = Math.round(seconds % 60)
-	if (mins < 60) return secs > 0 ? `${mins} min ${secs} sec` : `${mins} min`
-	const hours = Math.floor(mins / 60)
-	const remainMins = mins % 60
-	return `${hours} hr ${remainMins} min`
+  if (seconds < 60) return `${Math.round(seconds)} sec`;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  if (mins < 60) return secs > 0 ? `${mins} min ${secs} sec` : `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  return `${hours} hr ${remainMins} min`;
 }
 
 export default function RouteMapControl() {
-	const isOpen = useAtomValue(routingControlIsOpenAtom)
-	const osm = useAtomValue(selectedOsmAtom)
-	if (!isOpen || !osm) return null
-	return (
-		<CustomControl position="bottom-left">
-			<Routing osm={osm} />
-		</CustomControl>
-	)
+  const isOpen = useAtomValue(routingControlIsOpenAtom);
+  const osm = useAtomValue(selectedOsmAtom);
+  if (!isOpen || !osm) return null;
+  return (
+    <CustomControl position="bottom-left">
+      <Routing osm={osm} />
+    </CustomControl>
+  );
 }
 
 export function Routing({ osm }: { osm: Osm }) {
-	const map = useMap()
-	const [routingState, setRoutingState] = useAtom(routingStateAtom)
-	const clickPhaseRef = useRef<"from" | "to">("from")
-	const [noNodeNearby, setNoNodeNearby] = useState(false)
-	const [isRouting, setIsRouting] = useState(false)
+  const map = useMap();
+  const [routingState, setRoutingState] = useAtom(routingStateAtom);
+  const clickPhaseRef = useRef<"from" | "to">("from");
+  const [noNodeNearby, setNoNodeNearby] = useState(false);
+  const [isRouting, setIsRouting] = useState(false);
 
-	// Handle map click for setting from/to points
-	// Routing graph builds automatically on first search if needed
-	const handleMapClick = useEffectEvent(async (event: MapLayerMouseEvent) => {
-		if (isRouting) return
+  // Handle map click for setting from/to points
+  // Routing graph builds automatically on first search if needed
+  const handleMapClick = useEffectEvent(async (event: MapLayerMouseEvent) => {
+    if (isRouting) return;
 
-		const point: LonLat = [event.lngLat.lng, event.lngLat.lat]
+    const point: LonLat = [event.lngLat.lng, event.lngLat.lat];
 
-		setIsRouting(true)
-		try {
-			const snapped = await osmWorker.findNearestRoutableNode(
-				osm.id,
-				point,
-				SNAP_RADIUS_M,
-			)
+    setIsRouting(true);
+    try {
+      const snapped = await osmWorker.findNearestRoutableNode(osm.id, point, SNAP_RADIUS_M);
 
-			if (!snapped) {
-				// No routable node nearby - show feedback
-				setNoNodeNearby(true)
-				setTimeout(() => setNoNodeNearby(false), 2000)
-				return
-			}
+      if (!snapped) {
+        // No routable node nearby - show feedback
+        setNoNodeNearby(true);
+        setTimeout(() => setNoNodeNearby(false), 2000);
+        return;
+      }
 
-			setNoNodeNearby(false)
+      setNoNodeNearby(false);
 
-			// Get the OSM node ID from the node index
-			const nodeId = osm.nodes.ids.at(snapped.nodeIndex)
+      // Get the OSM node ID from the node index
+      const nodeId = osm.nodes.ids.at(snapped.nodeIndex);
 
-			const snappedNode: SnappedNode = {
-				nodeIndex: snapped.nodeIndex,
-				nodeId,
-				coordinates: snapped.coordinates,
-				distance: snapped.distance,
-			}
+      const snappedNode: SnappedNode = {
+        nodeIndex: snapped.nodeIndex,
+        nodeId,
+        coordinates: snapped.coordinates,
+        distance: snapped.distance,
+      };
 
-			if (clickPhaseRef.current === "from") {
-				// Setting from point
-				setRoutingState({
-					fromPoint: point,
-					toPoint: null,
-					fromNode: snappedNode,
-					toNode: null,
-					result: null,
-				})
-				clickPhaseRef.current = "to"
-			} else {
-				// Setting to point and calculating route
-				const fromNode = routingState.fromNode
-				if (!fromNode) {
-					clickPhaseRef.current = "from"
-					return
-				}
+      if (clickPhaseRef.current === "from") {
+        // Setting from point
+        setRoutingState({
+          fromPoint: point,
+          toPoint: null,
+          fromNode: snappedNode,
+          toNode: null,
+          result: null,
+        });
+        clickPhaseRef.current = "to";
+      } else {
+        // Setting to point and calculating route
+        const fromNode = routingState.fromNode;
+        if (!fromNode) {
+          clickPhaseRef.current = "from";
+          return;
+        }
 
-				const result = await osmWorker.route(
-					osm.id,
-					fromNode.nodeIndex,
-					snappedNode.nodeIndex,
-					{ includeStats: true, includePathInfo: true },
-				)
+        const result = await osmWorker.route(osm.id, fromNode.nodeIndex, snappedNode.nodeIndex, {
+          includeStats: true,
+          includePathInfo: true,
+        });
 
-				setRoutingState((prev) => ({
-					...prev,
-					toPoint: point,
-					toNode: snappedNode,
-					result,
-				}))
-				clickPhaseRef.current = "from"
+        setRoutingState((prev) => ({
+          ...prev,
+          toPoint: point,
+          toNode: snappedNode,
+          result,
+        }));
+        clickPhaseRef.current = "from";
 
-				if (result?.coordinates) {
-					map?.fitBounds(bboxFromLonLats(result.coordinates), { padding: 50 })
-				}
-			}
-		} finally {
-			setIsRouting(false)
-		}
-	})
+        if (result?.coordinates) {
+          map?.fitBounds(bboxFromLonLats(result.coordinates), { padding: 50 });
+        }
+      }
+    } finally {
+      setIsRouting(false);
+    }
+  });
 
-	// Attach/detach click handler to map
-	useEffect(() => {
-		if (!map) return
-		map.on("click", handleMapClick)
-		return () => {
-			map.off("click", handleMapClick)
-		}
-	}, [map])
+  // Attach/detach click handler to map
+  useEffect(() => {
+    if (!map) return;
+    map.on("click", handleMapClick);
+    return () => {
+      map.off("click", handleMapClick);
+    };
+  }, [map]);
 
-	const hasFrom = routingState.fromPoint !== null
-	const hasTo = routingState.toPoint !== null
-	const hasRoute = routingState.result !== null
+  const hasFrom = routingState.fromPoint !== null;
+  const hasTo = routingState.toPoint !== null;
+  const hasRoute = routingState.result !== null;
 
-	return (
-		<>
-			<div className="flex items-center justify-between pl-2 border-b">
-				<div className="flex items-center gap-2">
-					<NavigationIcon className="size-4" />
-					<span className="font-bold">ROUTING</span>
-				</div>
+  return (
+    <>
+      <div className="flex items-center justify-between pl-2 border-b">
+        <div className="flex items-center gap-2">
+          <NavigationIcon className="size-4" />
+          <span className="font-bold">ROUTING</span>
+        </div>
 
-				<Button
-					onClick={() => {
-						// Reset click phase when routing is cleared
-						clickPhaseRef.current = "from"
-						setRoutingState({
-							fromNode: null,
-							fromPoint: null,
-							toNode: null,
-							toPoint: null,
-							result: null,
-						})
-					}}
-					variant="ghost"
-					title="Clear route"
-					size="icon-sm"
-					disabled={!hasFrom || isRouting}
-				>
-					<XIcon />
-				</Button>
-			</div>
+        <Button
+          onClick={() => {
+            // Reset click phase when routing is cleared
+            clickPhaseRef.current = "from";
+            setRoutingState({
+              fromNode: null,
+              fromPoint: null,
+              toNode: null,
+              toPoint: null,
+              result: null,
+            });
+          }}
+          variant="ghost"
+          title="Clear route"
+          size="icon-sm"
+          disabled={!hasFrom || isRouting}
+        >
+          <XIcon />
+        </Button>
+      </div>
 
-			<div className="p-2 space-y-2">
-				{/* No node nearby feedback */}
-				{noNodeNearby && (
-					<div className="text-amber-500 font-medium text-center">
-						No road found nearby. Click closer to a road.
-					</div>
-				)}
+      <div className="p-2 space-y-2">
+        {/* No node nearby feedback */}
+        {noNodeNearby && (
+          <div className="text-amber-500 font-medium text-center">
+            No road found nearby. Click closer to a road.
+          </div>
+        )}
 
-				{/* Instructions */}
-				{!hasFrom && !noNodeNearby && !isRouting && (
-					<div className="text-muted-foreground text-center">
-						Click on the map to set a starting point
-						<div>(routing graph builds on first search)</div>
-					</div>
-				)}
-				{hasFrom && !hasTo && !noNodeNearby && !isRouting && (
-					<div className="text-muted-foreground text-center">
-						Click on the map to set a destination
-					</div>
-				)}
+        {/* Instructions */}
+        {!hasFrom && !noNodeNearby && !isRouting && (
+          <div className="text-muted-foreground text-center">
+            Click on the map to set a starting point
+            <div>(routing graph builds on first search)</div>
+          </div>
+        )}
+        {hasFrom && !hasTo && !noNodeNearby && !isRouting && (
+          <div className="text-muted-foreground text-center">
+            Click on the map to set a destination
+          </div>
+        )}
 
-				{/* Routing in progress */}
-				{isRouting && (
-					<div className="text-muted-foreground">Calculating route...</div>
-				)}
+        {/* Routing in progress */}
+        {isRouting && <div className="text-muted-foreground">Calculating route...</div>}
 
-				{/* From point info */}
-				{hasFrom && routingState.fromPoint && routingState.fromNode && (
-					<div className="space-y-1">
-						<div className="font-bold uppercase text-red-500">From</div>
-						<SnappedNodeInfo
-							point={routingState.fromPoint}
-							node={routingState.fromNode}
-						/>
-					</div>
-				)}
+        {/* From point info */}
+        {hasFrom && routingState.fromPoint && routingState.fromNode && (
+          <div className="space-y-1">
+            <div className="font-bold uppercase text-red-500">From</div>
+            <SnappedNodeInfo point={routingState.fromPoint} node={routingState.fromNode} />
+          </div>
+        )}
 
-				{/* To point info */}
-				{hasTo && routingState.toPoint && routingState.toNode && (
-					<div className="space-y-1">
-						<div className="font-semibold text-red-500">To</div>
-						<SnappedNodeInfo
-							point={routingState.toPoint}
-							node={routingState.toNode}
-						/>
-					</div>
-				)}
+        {/* To point info */}
+        {hasTo && routingState.toPoint && routingState.toNode && (
+          <div className="space-y-1">
+            <div className="font-semibold text-red-500">To</div>
+            <SnappedNodeInfo point={routingState.toPoint} node={routingState.toNode} />
+          </div>
+        )}
 
-				{/* Route result */}
-				{hasTo && !hasRoute && !isRouting && (
-					<div className="text-destructive font-bold uppercase text-center">
-						No route found between these points
-					</div>
-				)}
+        {/* Route result */}
+        {hasTo && !hasRoute && !isRouting && (
+          <div className="text-destructive font-bold uppercase text-center">
+            No route found between these points
+          </div>
+        )}
 
-				{hasRoute && routingState.result && (
-					<div className="space-y-2">
-						<div className="font-bold text-blue-500 uppercase">Route</div>
-						<div className="grid grid-cols-2 gap-2">
-							<div>
-								<div className="text-muted-foreground uppercase">Distance</div>
-								<div>{formatDistance(routingState.result.distance ?? 0)}</div>
-							</div>
-							<div>
-								<div className="text-muted-foreground uppercase">Est. Time</div>
-								<div>{formatTime(routingState.result.time ?? 0)}</div>
-							</div>
-						</div>
+        {hasRoute && routingState.result && (
+          <div className="space-y-2">
+            <div className="font-bold text-blue-500 uppercase">Route</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="text-muted-foreground uppercase">Distance</div>
+                <div>{formatDistance(routingState.result.distance ?? 0)}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground uppercase">Est. Time</div>
+                <div>{formatTime(routingState.result.time ?? 0)}</div>
+              </div>
+            </div>
 
-						{/* Per-way breakdown */}
-						{routingState.result.segments &&
-							routingState.result.segments.length > 0 && (
-								<>
-									<div className="text-muted-foreground uppercase">
-										Directions ({routingState.result.segments.length} segments)
-									</div>
-									<div className="space-y-2 max-h-48 overflow-y-auto">
-										{routingState.result.segments.map((seg, _i) => (
-											<div
-												key={`${seg.wayIds.join("-")}-${seg.distance}-${seg.time}`}
-												className="border-l-2 border-blue-400 pl-2"
-											>
-												<div
-													className="font-medium"
-													title={`Way IDs: ${seg.wayIds.join(", ")}`}
-												>
-													{seg.name || `(${seg.highway})`}
-												</div>
-												<div className="text-muted-foreground">
-													{formatDistance(seg.distance)} ·{" "}
-													{formatTime(seg.time)}
-												</div>
-											</div>
-										))}
-									</div>
-								</>
-							)}
-					</div>
-				)}
-			</div>
-		</>
-	)
+            {/* Per-way breakdown */}
+            {routingState.result.segments && routingState.result.segments.length > 0 && (
+              <>
+                <div className="text-muted-foreground uppercase">
+                  Directions ({routingState.result.segments.length} segments)
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {routingState.result.segments.map((seg, _i) => (
+                    <div
+                      key={`${seg.wayIds.join("-")}-${seg.distance}-${seg.time}`}
+                      className="border-l-2 border-blue-400 pl-2"
+                    >
+                      <div className="font-medium" title={`Way IDs: ${seg.wayIds.join(", ")}`}>
+                        {seg.name || `(${seg.highway})`}
+                      </div>
+                      <div className="text-muted-foreground">
+                        {formatDistance(seg.distance)} · {formatTime(seg.time)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
 }
 
-function SnappedNodeInfo({
-	point,
-	node,
-}: {
-	point: LonLat
-	node: SnappedNode
-}) {
-	return (
-		<div className="grid grid-cols-2 gap-2">
-			<div>
-				<div className="text-muted-foreground uppercase">Click</div>
-				<div>{formatCoord(point)}</div>
-			</div>
-			<div>
-				<div className="text-muted-foreground uppercase">Node</div>
-				<div>
-					{node.nodeId} ({formatDistance(node.distance)} away)
-				</div>
-			</div>
-		</div>
-	)
+function SnappedNodeInfo({ point, node }: { point: LonLat; node: SnappedNode }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <div>
+        <div className="text-muted-foreground uppercase">Click</div>
+        <div>{formatCoord(point)}</div>
+      </div>
+      <div>
+        <div className="text-muted-foreground uppercase">Node</div>
+        <div>
+          {node.nodeId} ({formatDistance(node.distance)} away)
+        </div>
+      </div>
+    </div>
+  );
 }

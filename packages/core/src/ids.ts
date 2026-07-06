@@ -7,41 +7,37 @@
  * @module
  */
 
-import { assertValue } from "@osmix/shared/assert"
-import type { ContentHasher } from "@osmix/shared/content-hasher"
+import { assertValue } from "@osmix/shared/assert";
+import type { ContentHasher } from "@osmix/shared/content-hasher";
 
-import {
-	BufferConstructor,
-	type BufferType,
-	ResizeableTypedArray as RTA,
-} from "./typed-arrays.ts"
+import { BufferConstructor, type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts";
 
 /**
  * Union type for looking up entities by either OSM ID or internal array index.
  */
-export type IdOrIndex = { id: number } | { index: number }
+export type IdOrIndex = { id: number } | { index: number };
 
 /**
  * Number of IDs per anchor block for the two-level binary search.
  * Smaller values increase anchor array size but speed up block-level search;
  * larger values reduce anchor overhead but slow the final search.
  */
-const BLOCK_SIZE = 256
+const BLOCK_SIZE = 256;
 
 /**
  * Serializable state for worker transfer.
  */
 export interface IdsTransferables<T extends BufferType = BufferType> {
-	/** Entity IDs in insertion order. */
-	ids: T
-	/** Sorted IDs for binary search (aliases `ids` if already sorted). */
-	sortedIds: T
-	/** Maps sorted position → original insertion index. */
-	sortedIdPositionToIndex: T
-	/** Anchor array: every BLOCK_SIZE-th sorted ID. */
-	anchors: T
-	/** True if IDs were inserted in ascending order. */
-	idsAreSorted: boolean
+  /** Entity IDs in insertion order. */
+  ids: T;
+  /** Sorted IDs for binary search (aliases `ids` if already sorted). */
+  sortedIds: T;
+  /** Maps sorted position → original insertion index. */
+  sortedIdPositionToIndex: T;
+  /** Anchor array: every BLOCK_SIZE-th sorted ID. */
+  anchors: T;
+  /** True if IDs were inserted in ascending order. */
+  idsAreSorted: boolean;
 }
 
 /**
@@ -51,241 +47,230 @@ export interface IdsTransferables<T extends BufferType = BufferType> {
  * Max capacity: ~2^32 entities.
  */
 export class Ids {
-	/** All IDs in insertion order */
-	private ids: RTA<Float64Array>
-	/** Whether buildIndex() has been called */
-	private indexBuilt = false
-	/** True if IDs were added in ascending order (allows index optimization) */
-	private idsAreSorted = true
-	/** Sorted view of IDs for binary search */
-	private idsSorted: Float64Array
-	/** Maps position in sorted array → original insertion index */
-	private sortedIdPositionToIndex: Uint32Array
-	/** Anchor array for two-level binary search: every BLOCK_SIZE-th sorted ID */
-	private anchors: Float64Array
+  /** All IDs in insertion order */
+  private ids: RTA<Float64Array>;
+  /** Whether buildIndex() has been called */
+  private indexBuilt = false;
+  /** True if IDs were added in ascending order (allows index optimization) */
+  private idsAreSorted = true;
+  /** Sorted view of IDs for binary search */
+  private idsSorted: Float64Array;
+  /** Maps position in sorted array → original insertion index */
+  private sortedIdPositionToIndex: Uint32Array;
+  /** Anchor array for two-level binary search: every BLOCK_SIZE-th sorted ID */
+  private anchors: Float64Array;
 
-	/**
-	 * Create a new Ids index.
-	 * @param transferables - Optional serialized state to reconstruct from.
-	 */
-	constructor(transferables?: IdsTransferables) {
-		if (transferables) {
-			this.ids = RTA.from(Float64Array, transferables.ids)
-			this.idsSorted = new Float64Array(transferables.sortedIds)
-			this.sortedIdPositionToIndex = new Uint32Array(
-				transferables.sortedIdPositionToIndex,
-			)
-			this.anchors = new Float64Array(transferables.anchors)
-			this.idsAreSorted = transferables.idsAreSorted
-			this.indexBuilt = true
-		} else {
-			this.ids = new RTA(Float64Array)
-			this.idsSorted = new Float64Array(new BufferConstructor(0))
-			this.sortedIdPositionToIndex = new Uint32Array(new BufferConstructor(0))
-			this.anchors = new Float64Array(new BufferConstructor(0))
-		}
-	}
+  /**
+   * Create a new Ids index.
+   * @param transferables - Optional serialized state to reconstruct from.
+   */
+  constructor(transferables?: IdsTransferables) {
+    if (transferables) {
+      this.ids = RTA.from(Float64Array, transferables.ids);
+      this.idsSorted = new Float64Array(transferables.sortedIds);
+      this.sortedIdPositionToIndex = new Uint32Array(transferables.sortedIdPositionToIndex);
+      this.anchors = new Float64Array(transferables.anchors);
+      this.idsAreSorted = transferables.idsAreSorted;
+      this.indexBuilt = true;
+    } else {
+      this.ids = new RTA(Float64Array);
+      this.idsSorted = new Float64Array(new BufferConstructor(0));
+      this.sortedIdPositionToIndex = new Uint32Array(new BufferConstructor(0));
+      this.anchors = new Float64Array(new BufferConstructor(0));
+    }
+  }
 
-	/** Number of IDs stored in this index. */
-	get size() {
-		return this.ids.length
-	}
+  /** Number of IDs stored in this index. */
+  get size() {
+    return this.ids.length;
+  }
 
-	/** Returns true if buildIndex() has been called and lookups are enabled. */
-	isReady() {
-		return this.indexBuilt
-	}
+  /** Returns true if buildIndex() has been called and lookups are enabled. */
+  isReady() {
+    return this.indexBuilt;
+  }
 
-	/** Returns true if IDs were inserted in ascending order. */
-	isSorted() {
-		return this.idsAreSorted
-	}
+  /** Returns true if IDs were inserted in ascending order. */
+  isSorted() {
+    return this.idsAreSorted;
+  }
 
-	/**
-	 * Add an ID to the index.
-	 * @param id - The OSM entity ID to add.
-	 * @returns The internal array index where this ID was stored.
-	 * @throws If the index has already been built.
-	 */
-	add(id: number): number {
-		if (this.indexBuilt) throw Error("ID index already built.")
-		if (this.ids.length > 0 && id < this.ids.at(-1)) this.idsAreSorted = false
-		return this.ids.push(id)
-	}
+  /**
+   * Add an ID to the index.
+   * @param id - The OSM entity ID to add.
+   * @returns The internal array index where this ID was stored.
+   * @throws If the index has already been built.
+   */
+  add(id: number): number {
+    if (this.indexBuilt) throw Error("ID index already built.");
+    if (this.ids.length > 0 && id < this.ids.at(-1)) this.idsAreSorted = false;
+    return this.ids.push(id);
+  }
 
-	/**
-	 * Get the ID at a specific internal index.
-	 * @param index - The internal array index.
-	 * @returns The OSM entity ID at that index.
-	 */
-	at(index: number): number {
-		return this.ids.at(index)
-	}
+  /**
+   * Get the ID at a specific internal index.
+   * @param index - The internal array index.
+   * @returns The OSM entity ID at that index.
+   */
+  at(index: number): number {
+    return this.ids.at(index);
+  }
 
-	/**
-	 * Check if an ID exists in this index.
-	 * @param id - The OSM entity ID to check.
-	 * @returns True if the ID exists in this index.
-	 */
-	has(id: number): boolean {
-		return this.getIndexFromId(id) !== -1
-	}
+  /**
+   * Check if an ID exists in this index.
+   * @param id - The OSM entity ID to check.
+   * @returns True if the ID exists in this index.
+   */
+  has(id: number): boolean {
+    return this.getIndexFromId(id) !== -1;
+  }
 
-	/**
-	 * Build the index of IDs to positions.
-	 *
-	 * If the IDs are not sorted, we need to sort them and build a new index.
-	 * If the IDs are sorted, we can use the existing index.
-	 */
-	buildIndex() {
-		if (this.indexBuilt) throw Error("ID index already built.")
-		this.ids.compact()
-		if (!this.idsAreSorted) {
-			// Build the sorted index
-			const idsBuffer = new BufferConstructor(
-				this.size * Float64Array.BYTES_PER_ELEMENT,
-			)
-			const posBuffer = new BufferConstructor(
-				this.size * Uint32Array.BYTES_PER_ELEMENT,
-			)
-			this.idsSorted = new Float64Array(idsBuffer)
-			this.sortedIdPositionToIndex = new Uint32Array(posBuffer)
+  /**
+   * Build the index of IDs to positions.
+   *
+   * If the IDs are not sorted, we need to sort them and build a new index.
+   * If the IDs are sorted, we can use the existing index.
+   */
+  buildIndex() {
+    if (this.indexBuilt) throw Error("ID index already built.");
+    this.ids.compact();
+    if (!this.idsAreSorted) {
+      // Build the sorted index
+      const idsBuffer = new BufferConstructor(this.size * Float64Array.BYTES_PER_ELEMENT);
+      const posBuffer = new BufferConstructor(this.size * Uint32Array.BYTES_PER_ELEMENT);
+      this.idsSorted = new Float64Array(idsBuffer);
+      this.sortedIdPositionToIndex = new Uint32Array(posBuffer);
 
-			// Fill and sort with positions.
-			for (let i = 0; i < this.size; i++) {
-				this.idsSorted[i] = this.ids.at(i)
-				this.sortedIdPositionToIndex[i] = i
-			}
+      // Fill and sort with positions.
+      for (let i = 0; i < this.size; i++) {
+        this.idsSorted[i] = this.ids.at(i);
+        this.sortedIdPositionToIndex[i] = i;
+      }
 
-			// Sort by id, carrying position; use native sort on chunks or a custom radix/merge for stability.
-			// For simplicity:
-			const tmp: { id: number; pos: number }[] = Array.from(
-				{ length: this.size },
-				(_, i) => ({
-					id: this.idsSorted[i] as number,
-					pos: this.sortedIdPositionToIndex[i] as number,
-				}),
-			)
-			tmp.sort((a, b) => a.id - b.id)
-			tmp.forEach(({ id, pos }, i) => {
-				this.idsSorted[i] = id
-				this.sortedIdPositionToIndex[i] = pos
-			})
-		} else {
-			// Point to the same array
-			this.idsSorted = this.ids.array
-			// Create the sortedIdPositionToIndex array
-			const posBuffer = new BufferConstructor(
-				this.size * Uint32Array.BYTES_PER_ELEMENT,
-			)
-			this.sortedIdPositionToIndex = new Uint32Array(posBuffer)
-			for (let i = 0; i < this.size; i++) {
-				this.sortedIdPositionToIndex[i] = i
-			}
-		}
+      // Sort by id, carrying position; use native sort on chunks or a custom radix/merge for stability.
+      // For simplicity:
+      const tmp: { id: number; pos: number }[] = Array.from({ length: this.size }, (_, i) => ({
+        id: this.idsSorted[i] as number,
+        pos: this.sortedIdPositionToIndex[i] as number,
+      }));
+      tmp.sort((a, b) => a.id - b.id);
+      tmp.forEach(({ id, pos }, i) => {
+        this.idsSorted[i] = id;
+        this.sortedIdPositionToIndex[i] = pos;
+      });
+    } else {
+      // Point to the same array
+      this.idsSorted = this.ids.array;
+      // Create the sortedIdPositionToIndex array
+      const posBuffer = new BufferConstructor(this.size * Uint32Array.BYTES_PER_ELEMENT);
+      this.sortedIdPositionToIndex = new Uint32Array(posBuffer);
+      for (let i = 0; i < this.size; i++) {
+        this.sortedIdPositionToIndex[i] = i;
+      }
+    }
 
-		// Build anchors (every blockSize-th key)
-		const aLen = Math.ceil(this.size / BLOCK_SIZE)
-		const sab = new BufferConstructor(aLen * Float64Array.BYTES_PER_ELEMENT)
-		this.anchors = new Float64Array(sab, 0, aLen)
-		for (let j = 0; j < aLen; j++) {
-			const id = this.idsSorted[Math.min(j * BLOCK_SIZE, this.size - 1)]
-			assertValue(id, "ID is undefined")
-			this.anchors[j] = id
-		}
+    // Build anchors (every blockSize-th key)
+    const aLen = Math.ceil(this.size / BLOCK_SIZE);
+    const sab = new BufferConstructor(aLen * Float64Array.BYTES_PER_ELEMENT);
+    this.anchors = new Float64Array(sab, 0, aLen);
+    for (let j = 0; j < aLen; j++) {
+      const id = this.idsSorted[Math.min(j * BLOCK_SIZE, this.size - 1)];
+      assertValue(id, "ID is undefined");
+      this.anchors[j] = id;
+    }
 
-		this.indexBuilt = true
-	}
+    this.indexBuilt = true;
+  }
 
-	/**
-	 * Look up the internal array index for an OSM entity ID.
-	 *
-	 * @param id - The OSM entity ID to look up.
-	 * @returns The internal array index, or -1 if not found.
-	 * @throws If the index has not been built.
-	 */
-	getIndexFromId(id: number): number {
-		if (!this.indexBuilt) throw Error("IdIndex not built.")
+  /**
+   * Look up the internal array index for an OSM entity ID.
+   *
+   * @param id - The OSM entity ID to look up.
+   * @returns The internal array index, or -1 if not found.
+   * @throws If the index has not been built.
+   */
+  getIndexFromId(id: number): number {
+    if (!this.indexBuilt) throw Error("IdIndex not built.");
 
-		// binary search anchors
-		let lo = 0
-		let hi = this.anchors.length - 1
-		while (lo < hi) {
-			const mid = (lo + hi + 1) >>> 1
-			const anchor = this.anchors[mid]
-			assertValue(anchor, "Anchor is undefined")
-			if (anchor <= id) lo = mid
-			else hi = mid - 1
-		}
-		const start = lo * BLOCK_SIZE
-		const end = Math.min(start + BLOCK_SIZE, this.idsSorted.length)
+    // binary search anchors
+    let lo = 0;
+    let hi = this.anchors.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >>> 1;
+      const anchor = this.anchors[mid];
+      assertValue(anchor, "Anchor is undefined");
+      if (anchor <= id) lo = mid;
+      else hi = mid - 1;
+    }
+    const start = lo * BLOCK_SIZE;
+    const end = Math.min(start + BLOCK_SIZE, this.idsSorted.length);
 
-		// binary search within block
-		let l = start
-		let r = end - 1
-		while (l <= r) {
-			const m = (l + r) >>> 1
-			const v = this.idsSorted[m]
-			assertValue(v, "Value is undefined")
-			if (v === id) {
-				if (this.idsAreSorted) return m
-				const index = this.sortedIdPositionToIndex[m]
-				assertValue(index, "Position is undefined")
-				return index
-			}
-			if (v < id) l = m + 1
-			else r = m - 1
-		}
+    // binary search within block
+    let l = start;
+    let r = end - 1;
+    while (l <= r) {
+      const m = (l + r) >>> 1;
+      const v = this.idsSorted[m];
+      assertValue(v, "Value is undefined");
+      if (v === id) {
+        if (this.idsAreSorted) return m;
+        const index = this.sortedIdPositionToIndex[m];
+        assertValue(index, "Position is undefined");
+        return index;
+      }
+      if (v < id) l = m + 1;
+      else r = m - 1;
+    }
 
-		// ID not found
-		return -1
-	}
+    // ID not found
+    return -1;
+  }
 
-	/**
-	 * Pass an ID or an index, get both.
-	 */
-	idOrIndex(i: IdOrIndex): [index: number, id: number] {
-		if ("id" in i) return [this.getIndexFromId(i.id), i.id]
-		return [i.index, this.at(i.index)]
-	}
+  /**
+   * Pass an ID or an index, get both.
+   */
+  idOrIndex(i: IdOrIndex): [index: number, id: number] {
+    if ("id" in i) return [this.getIndexFromId(i.id), i.id];
+    return [i.index, this.at(i.index)];
+  }
 
-	/** Returns the sorted array of IDs for iteration. */
-	get sorted() {
-		return this.idsSorted
-	}
+  /** Returns the sorted array of IDs for iteration. */
+  get sorted() {
+    return this.idsSorted;
+  }
 
-	/**
-	 * Get transferable buffers for passing to another thread.
-	 * @returns Serializable representation of this index.
-	 */
-	transferables(): IdsTransferables {
-		return {
-			ids: this.ids.array.buffer,
-			sortedIds: this.idsSorted.buffer,
-			sortedIdPositionToIndex: this.sortedIdPositionToIndex.buffer,
-			anchors: this.anchors.buffer,
-			idsAreSorted: this.idsAreSorted,
-		}
-	}
+  /**
+   * Get transferable buffers for passing to another thread.
+   * @returns Serializable representation of this index.
+   */
+  transferables(): IdsTransferables {
+    return {
+      ids: this.ids.array.buffer,
+      sortedIds: this.idsSorted.buffer,
+      sortedIdPositionToIndex: this.sortedIdPositionToIndex.buffer,
+      anchors: this.anchors.buffer,
+      idsAreSorted: this.idsAreSorted,
+    };
+  }
 
-	/**
-	 * Get the approximate memory requirements for a given number of IDs in bytes.
-	 */
-	static getBytesRequired(count: number) {
-		if (count === 0) return 0
-		return (
-			count * Float64Array.BYTES_PER_ELEMENT + // ids
-			count * Float64Array.BYTES_PER_ELEMENT + // sortedIds
-			count * Uint32Array.BYTES_PER_ELEMENT + // sortedIdPositionToIndex
-			Math.ceil(count / BLOCK_SIZE) * Float64Array.BYTES_PER_ELEMENT // anchors
-		)
-	}
+  /**
+   * Get the approximate memory requirements for a given number of IDs in bytes.
+   */
+  static getBytesRequired(count: number) {
+    if (count === 0) return 0;
+    return (
+      count * Float64Array.BYTES_PER_ELEMENT + // ids
+      count * Float64Array.BYTES_PER_ELEMENT + // sortedIds
+      count * Uint32Array.BYTES_PER_ELEMENT + // sortedIdPositionToIndex
+      Math.ceil(count / BLOCK_SIZE) * Float64Array.BYTES_PER_ELEMENT // anchors
+    );
+  }
 
-	/**
-	 * Update a ContentHasher with the IDs data.
-	 * Uses the sorted IDs for consistent hashing regardless of insertion order.
-	 */
-	updateHash(hasher: ContentHasher): ContentHasher {
-		return hasher.update(this.idsSorted)
-	}
+  /**
+   * Update a ContentHasher with the IDs data.
+   * Uses the sorted IDs for consistent hashing regardless of insertion order.
+   */
+  updateHash(hasher: ContentHasher): ContentHasher {
+    return hasher.update(this.idsSorted);
+  }
 }

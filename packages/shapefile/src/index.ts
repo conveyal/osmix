@@ -29,5 +29,5 @@
  * @module @osmix/shapefile
  */
 
-export * from "./osm-from-shapefile.ts"
-export * from "./types.ts"
+export * from "./osm-from-shapefile.ts";
+export * from "./types.ts";

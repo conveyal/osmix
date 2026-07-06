@@ -15,16 +15,16 @@ pnpm add @osmix/gtfs
 ## Usage
 
 ```ts
-import { fromGtfs } from "@osmix/gtfs"
+import { fromGtfs } from "@osmix/gtfs";
 
 // Fetch a GTFS zip file
-const response = await fetch("https://example.com/gtfs.zip")
-const zipData = await response.arrayBuffer()
+const response = await fetch("https://example.com/gtfs.zip");
+const zipData = await response.arrayBuffer();
 
 // Convert to OSM format
-const osm = await fromGtfs(zipData, { id: "transit" })
+const osm = await fromGtfs(zipData, { id: "transit" });
 
-console.log(`Imported ${osm.nodes.size} stops and ${osm.ways.size} routes`)
+console.log(`Imported ${osm.nodes.size} stops and ${osm.ways.size} routes`);
 ```
 
 ### Using GtfsArchive for Custom Processing
@@ -32,17 +32,17 @@ console.log(`Imported ${osm.nodes.size} stops and ${osm.ways.size} routes`)
 For more control, use `GtfsArchive` directly. Files are only parsed when you access them:
 
 ```ts
-import { GtfsArchive } from "@osmix/gtfs"
+import { GtfsArchive } from "@osmix/gtfs";
 
-const archive = GtfsArchive.fromZip(zipData)
+const archive = GtfsArchive.fromZip(zipData);
 
 // Only stops.txt is parsed - other files remain unread
 for await (const stop of archive.iterStops()) {
-	console.log(stop.stop_name, stop.stop_lat, stop.stop_lon)
+  console.log(stop.stop_name, stop.stop_lat, stop.stop_lon);
 }
 
 // Access routes later - now routes.txt is parsed
-const routes = await archive.routes()
+const routes = await archive.routes();
 ```
 
 ## GTFS to OSM Mapping
@@ -110,51 +110,51 @@ Files are only parsed when needed for the conversion.
 
 ```ts
 interface GtfsConversionOptions {
-	/** Whether to include stops as nodes. Default: true */
-	includeStops?: boolean
-	/** Filter stops by location_type. Default: include all types. */
-	stopTypes?: number[]
-	/** Whether to include routes as ways. Default: true */
-	includeRoutes?: boolean
-	/** Filter routes by route_type. Default: include all types. */
-	routeTypes?: number[]
-	/** Whether to include shape geometry for routes. Default: true */
-	includeShapes?: boolean
+  /** Whether to include stops as nodes. Default: true */
+  includeStops?: boolean;
+  /** Filter stops by location_type. Default: include all types. */
+  stopTypes?: number[];
+  /** Whether to include routes as ways. Default: true */
+  includeRoutes?: boolean;
+  /** Filter routes by route_type. Default: include all types. */
+  routeTypes?: number[];
+  /** Whether to include shape geometry for routes. Default: true */
+  includeShapes?: boolean;
 }
 ```
 
 ### Example with Options
 
 ```ts
-import { fromGtfs } from "@osmix/gtfs"
+import { fromGtfs } from "@osmix/gtfs";
 
 // Only bus routes, with stops and stations
 const osm = await fromGtfs(
-	zipData,
-	{ id: "buses-only" },
-	{
-		routeTypes: [3], // Only bus routes
-		stopTypes: [0, 1], // Only stops and stations
-	},
-)
+  zipData,
+  { id: "buses-only" },
+  {
+    routeTypes: [3], // Only bus routes
+    stopTypes: [0, 1], // Only stops and stations
+  },
+);
 
 // Routes only (no stops) - useful for just getting route shapes
 const routesOnly = await fromGtfs(
-	zipData,
-	{ id: "routes" },
-	{
-		includeStops: false,
-	},
-)
+  zipData,
+  { id: "routes" },
+  {
+    includeStops: false,
+  },
+);
 
 // Stops only (no routes)
 const stopsOnly = await fromGtfs(
-	zipData,
-	{ id: "stops" },
-	{
-		includeRoutes: false,
-	},
-)
+  zipData,
+  { id: "stops" },
+  {
+    includeRoutes: false,
+  },
+);
 ```
 
 ## API
@@ -168,31 +168,31 @@ Main function to convert a GTFS zip file to an Osm index.
 Lazy GTFS archive class. Files are parsed on-demand:
 
 ```ts
-const archive = GtfsArchive.fromZip(zipData)
+const archive = GtfsArchive.fromZip(zipData);
 
 // Check what files exist
-archive.listFiles() // ['agency.txt', 'stops.txt', ...]
-archive.hasFile("shapes.txt")
+archive.listFiles(); // ['agency.txt', 'stops.txt', ...]
+archive.hasFile("shapes.txt");
 
 // Lazy accessors (parse on first call, cache result)
-await archive.agencies()
-await archive.stops()
-await archive.routes()
-await archive.trips()
-await archive.stopTimes()
-await archive.shapes()
+await archive.agencies();
+await archive.stops();
+await archive.routes();
+await archive.trips();
+await archive.stopTimes();
+await archive.shapes();
 
 // Streaming iterator with automatic type inference
 for await (const stop of archive.iter("stops.txt")) {
-	console.log(stop.stop_name) // TypeScript knows this is GtfsStop
+  console.log(stop.stop_name); // TypeScript knows this is GtfsStop
 }
 
 for await (const route of archive.iter("routes.txt")) {
-	console.log(route.route_type) // TypeScript knows this is GtfsRoute
+  console.log(route.route_type); // TypeScript knows this is GtfsRoute
 }
 
 for await (const shape of archive.iter("shapes.txt")) {
-	console.log(shape.shape_pt_lat) // TypeScript knows this is GtfsShapePoint
+  console.log(shape.shape_pt_lat); // TypeScript knows this is GtfsShapePoint
 }
 ```
 

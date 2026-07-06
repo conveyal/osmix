@@ -22,6 +22,6 @@
  * @module @osmix/geoparquet
  */
 
-export * from "./from-geoparquet.ts"
-export * from "./types.ts"
-export { parseWkb } from "./wkb.ts"
+export * from "./from-geoparquet.ts";
+export * from "./types.ts";
+export { parseWkb } from "./wkb.ts";
