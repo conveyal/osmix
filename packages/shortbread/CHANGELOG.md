@@ -1,5 +1,13 @@
 # @osmix/shortbread
 
+## 0.0.12
+
+### Patch Changes
+
+- Updated dependencies [6144903]
+  - @osmix/core@0.1.9
+  - @osmix/vt@0.0.13
+
 ## 0.0.11
 
 ### Patch Changes

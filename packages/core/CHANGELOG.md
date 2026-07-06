@@ -1,5 +1,11 @@
 # @osmix/core
 
+## 0.1.9
+
+### Patch Changes
+
+- 6144903: Use published kdbush package for pnpm compatibility
+
 ## 0.1.8
 
 ### Patch Changes
