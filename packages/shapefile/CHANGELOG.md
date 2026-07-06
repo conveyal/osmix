@@ -1,5 +1,12 @@
 # @osmix/shapefile
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [d67e38d]
+  - @osmix/core@0.1.10
+
 ## 0.0.10
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @osmix/geoparquet
 
+## 0.1.9
+
+### Patch Changes
+
+- d67e38d: Bump dependencies to latest majors and adopt TypeScript 7 RC
+- Updated dependencies [d67e38d]
+  - @osmix/core@0.1.10
+
 ## 0.1.8
 
 ### Patch Changes

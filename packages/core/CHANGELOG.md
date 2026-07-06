@@ -1,5 +1,11 @@
 # @osmix/core
 
+## 0.1.10
+
+### Patch Changes
+
+- d67e38d: Bump dependencies to latest majors and adopt TypeScript 7 RC
+
 ## 0.1.9
 
 ### Patch Changes

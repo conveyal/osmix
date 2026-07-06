@@ -1,5 +1,11 @@
 # @osmix/json
 
+## 0.0.15
+
+### Patch Changes
+
+- d67e38d: Bump dependencies to latest majors and adopt TypeScript 7 RC
+
 ## 0.0.14
 
 ### Patch Changes
