@@ -1,6 +1,7 @@
 import { useAtom } from "jotai"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import type { ReactNode } from "react"
+
 import { cn } from "../lib/utils"
 import { sidebarIsOpenAtom } from "../state/layout"
 

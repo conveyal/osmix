@@ -7,6 +7,7 @@ import {
 import { haversineDistance } from "@osmix/shared/haversine-distance"
 import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/shared/types"
 import * as Osmix from "osmix"
+
 import { calculateTestGeometriesFromBbox } from "../utils"
 import type {
 	BenchmarkMetric,

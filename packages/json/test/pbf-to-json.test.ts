@@ -3,6 +3,7 @@ import { getFixtureFileReadStream, PBFs } from "@osmix/shared/fixtures"
 import type { OsmEntity, OsmNode } from "@osmix/shared/types"
 import { isNode, isWay } from "@osmix/shared/utils"
 import { describe, expect, it } from "vitest"
+
 import { osmPbfToJson } from "../src/pbf-to-json"
 
 describe("geojson", () => {

@@ -5,6 +5,7 @@ import { useAtom, useAtomValue } from "jotai"
 import { NavigationIcon, XIcon } from "lucide-react"
 import { useEffect, useEffectEvent, useRef, useState } from "react"
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre"
+
 import { useMap } from "../hooks/map"
 import { routingControlIsOpenAtom } from "../state/map"
 import { selectedOsmAtom } from "../state/osm"

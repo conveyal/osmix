@@ -9,6 +9,7 @@ import {
 } from "react"
 import { createRoot } from "react-dom/client"
 import { Layer, Map as MaplibreMap, Source } from "react-map-gl/maplibre"
+
 import { runDuckDBBenchmarks } from "./benchmarks/duckdb-bench"
 import { runOsmixBenchmarks } from "./benchmarks/osmix-bench"
 import { runAllBenchmarks } from "./benchmarks/runner"
@@ -78,7 +79,7 @@ function App() {
 				.then((blob) => {
 					const file = new File([blob], "monaco.pbf")
 					setSelectedFile(file)
-					handleRunBenchmark(file)
+					void handleRunBenchmark(file)
 				})
 				.catch((err) => {
 					console.error("Failed to load default file:", err)
@@ -90,7 +91,7 @@ function App() {
 		const file = event.target.files?.[0]
 		if (file) {
 			setSelectedFile(file)
-			handleRunBenchmark(file)
+			void handleRunBenchmark(file)
 		}
 	}
 

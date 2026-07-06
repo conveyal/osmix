@@ -11,6 +11,7 @@
  */
 
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/shared/types"
+
 import type { OsmChangeset } from "./changeset.ts"
 import { osmTagsToOscTags } from "./utils.ts"
 

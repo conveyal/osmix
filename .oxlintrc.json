@@ -1,0 +1,51 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["eslint", "typescript", "unicorn", "oxc", "react", "import"],
+	"env": {
+		"browser": true,
+		"node": true
+	},
+	"options": {
+		"typeAware": true
+	},
+	"rules": {
+		"no-constant-condition": "off",
+		"no-else-return": "error",
+		"no-param-reassign": "error",
+		"default-param-last": "error",
+		"no-unused-vars": [
+			"error",
+			{
+				"args": "none",
+				"caughtErrors": "none",
+				"varsIgnorePattern": "^_",
+				"destructuredArrayIgnorePattern": "^_",
+				"fix": {
+					"imports": "safe-fix",
+					"variables": "off"
+				}
+			}
+		],
+		"react/self-closing-comp": "error",
+		"typescript/no-inferrable-types": "error",
+		"typescript/no-non-null-assertion": "off",
+		"typescript/prefer-as-const": "error",
+		"typescript/prefer-enum-initializers": "error",
+		"typescript/no-unnecessary-template-expression": "error",
+		"typescript/ban-ts-comment": "off"
+	},
+	"overrides": [
+		{
+			"files": ["packages/*/src/**/*.ts", "packages/*/src/**/*.tsx"],
+			"rules": {
+				"import/extensions": ["error", "always", { "ignorePackages": true }]
+			}
+		},
+		{
+			"files": ["**/*.test.ts", "**/*.test.tsx"],
+			"env": {
+				"vitest": true
+			}
+		}
+	]
+}

@@ -52,6 +52,7 @@ export type { RouteResult, WaySegment }
 import { OsmixVtEncoder } from "@osmix/vt"
 import * as Comlink from "comlink"
 import { dequal } from "dequal/lite"
+
 import {
 	fromPbf,
 	type OsmFromPbfOptions,

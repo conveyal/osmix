@@ -14,7 +14,9 @@ pnpm add @osmix/geoparquet
 import { fromGeoParquet } from "@osmix/geoparquet"
 
 // From a local file buffer
-const osm = await fromGeoParquet(await Bun.file('./monaco.parquet').arrayBuffer())
+const osm = await fromGeoParquet(
+	await Bun.file("./monaco.parquet").arrayBuffer(),
+)
 
 // Query imported data
 const highways = osm.ways.search("highway")
@@ -39,6 +41,7 @@ and converts them to Osmix's in-memory format for spatial queries and analysis.
 Create an Osm index from GeoParquet data.
 
 **Parameters:**
+
 - `source` - File path, URL, or ArrayBuffer containing parquet data
 - `osmOptions` - Optional Osm configuration (id, header)
 - `readOptions` - Optional GeoParquet read options

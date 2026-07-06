@@ -1,4 +1,5 @@
 import type { Osm } from "@osmix/core"
+
 import { bytesSizeToHuman } from "../utils"
 import type { StoredFileInfo } from "../workers/osm.worker"
 import { Details, DetailsContent, DetailsSummary } from "./details"

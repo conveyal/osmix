@@ -4,7 +4,8 @@ import { Osm } from "@osmix/core"
 import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import { PbfReader } from "pbf"
 import { describe, expect, it } from "vitest"
-import { ShortbreadVtEncoder } from "./encoder"
+
+import { ShortbreadVtEncoder } from "./encoder.ts"
 
 function decodeTile(data: ArrayBuffer) {
 	const tile = new VectorTile(new PbfReader(data))

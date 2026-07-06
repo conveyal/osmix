@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+
 import { astar, bidirectional, dijkstra } from "../src/algorithms"
 import type { GraphEdge } from "../src/types"
 

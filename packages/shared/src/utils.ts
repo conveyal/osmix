@@ -8,6 +8,7 @@
  */
 
 import { dequal } from "dequal/lite"
+
 import type {
 	GeoBbox2D,
 	LonLat,

@@ -6,7 +6,7 @@
 
 - Builds a directed graph from OSM ways and nodes
 - Configurable highway type filtering
-- Multiple routing algorithms (Dijkstra, A*, bidirectional search)
+- Multiple routing algorithms (Dijkstra, A\*, bidirectional search)
 - Support for both distance and time-based routing
 - Returns detailed route information including coordinates, way IDs, and node IDs
 - Serializable graph format for Web Worker support
@@ -128,11 +128,11 @@ const router = new Router(osm, graph, { algorithm: "astar", metric: "time" })
 
 ### Algorithms
 
-| Algorithm       | Optimal? | Speed   | Best For                              |
-| --------------- | -------- | ------- | ------------------------------------- |
+| Algorithm       | Optimal? | Speed   | Best For                               |
+| --------------- | -------- | ------- | -------------------------------------- |
 | `dijkstra`      | Yes      | Slower  | When you need guaranteed shortest path |
-| `astar`         | Yes      | Fast    | Point-to-point queries (default)      |
-| `bidirectional` | No       | Fastest | Quick connectivity checks             |
+| `astar`         | Yes      | Fast    | Point-to-point queries (default)       |
+| `bidirectional` | No       | Fastest | Quick connectivity checks              |
 
 ## Related Packages
 

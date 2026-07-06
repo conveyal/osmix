@@ -8,6 +8,7 @@ import type {
 	MapInstance,
 } from "react-map-gl/maplibre"
 import { useControl } from "react-map-gl/maplibre"
+
 import { cn } from "../lib/utils"
 
 class OverlayControl implements IControl {

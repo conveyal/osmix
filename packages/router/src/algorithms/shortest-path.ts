@@ -8,6 +8,7 @@
  */
 
 import { haversineDistance } from "@osmix/shared/haversine-distance"
+
 import { BinaryHeap } from "../binary-heap.ts"
 import type { GraphEdge, PathSegment, RoutingAlgorithmFn } from "../types.ts"
 

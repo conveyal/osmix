@@ -1,14 +1,14 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/shapefile",
-	"description": "Import Shapefiles into Osmix indexes.",
 	"version": "0.0.11",
-	"type": "module",
+	"description": "Import Shapefiles into Osmix indexes.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
+	"type": "module",
 	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
@@ -16,14 +16,14 @@
 		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
 		"typecheck": "tsc --noEmit"
 	},
-	"devDependencies": {
-		"@types/geojson": "catalog:",
-		"typescript": "catalog:"
-	},
 	"dependencies": {
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"@placemarkio/geojson-rewind": "catalog:",
 		"shpjs": "^6.2.0"
+	},
+	"devDependencies": {
+		"@types/geojson": "catalog:",
+		"typescript": "catalog:"
 	}
 }

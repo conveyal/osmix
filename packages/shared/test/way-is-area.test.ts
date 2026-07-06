@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+
 import { wayIsArea } from "../src/way-is-area"
 
 describe("wayIsArea", () => {

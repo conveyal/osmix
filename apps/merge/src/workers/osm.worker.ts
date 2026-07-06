@@ -11,6 +11,7 @@ import { Osm } from "@osmix/core"
 import { expose } from "comlink"
 import { type DBSchema, type IDBPDatabase, openDB } from "idb"
 import { OsmixWorker } from "osmix"
+
 import { DB_NAME, DB_VERSION, OSM_STORE, STORAGE_CHANNEL } from "../settings"
 
 /** File metadata stored alongside Osm data */
@@ -27,8 +28,7 @@ export interface StoredOsmEntry extends StoredFileInfo {
 }
 
 export interface StoredOsm
-	extends StoredOsmEntry,
-		OsmTransferables<ArrayBuffer> {}
+	extends StoredOsmEntry, OsmTransferables<ArrayBuffer> {}
 
 interface OsmixDB extends DBSchema {
 	[OSM_STORE]: {

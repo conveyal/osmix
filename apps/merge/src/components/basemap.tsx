@@ -6,6 +6,7 @@ import {
 	ScaleControl,
 	type ViewStateChangeEvent,
 } from "react-map-gl/maplibre"
+
 import { APPID, BASE_MAP_STYLES, DEFAULT_BASE_MAP_STYLE } from "../settings"
 import { mapBoundsAtom, mapCenterAtom, zoomAtom } from "../state/map"
 import MapLayerControl from "./map-layer-control"

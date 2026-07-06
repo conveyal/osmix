@@ -1,4 +1,5 @@
 import { PbfReader } from "pbf"
+
 import { HEADER_LENGTH_BYTES } from "./pbf-to-blocks.ts"
 import {
 	type OsmPbfBlobHeader,

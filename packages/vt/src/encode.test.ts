@@ -6,7 +6,8 @@ import type { GeoBbox2D, Tile } from "@osmix/shared/types"
 import { decodeZigzag } from "@osmix/shared/zigzag"
 import { PbfReader } from "pbf"
 import { describe, expect, it } from "vitest"
-import { OsmixVtEncoder } from "./encode"
+
+import { OsmixVtEncoder } from "./encode.ts"
 
 const osm = new Osm()
 osm.nodes.addNode({

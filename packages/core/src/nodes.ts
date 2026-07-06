@@ -5,6 +5,7 @@ import { microToDegrees, toMicroDegrees } from "@osmix/shared/coordinates"
 import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/shared/types"
 import { around as geoAround } from "geokdbush"
 import KDBush from "kdbush"
+
 import { Entities, type EntitiesTransferables } from "./entities.ts"
 import { type IdOrIndex, Ids } from "./ids.ts"
 import type StringTable from "./stringtable.ts"
@@ -15,8 +16,9 @@ import {
 	ResizeableTypedArray as RTA,
 } from "./typed-arrays.ts"
 
-export interface NodesTransferables<T extends BufferType = BufferType>
-	extends EntitiesTransferables<T> {
+export interface NodesTransferables<
+	T extends BufferType = BufferType,
+> extends EntitiesTransferables<T> {
 	lons: T
 	lats: T
 	bbox: GeoBbox2D

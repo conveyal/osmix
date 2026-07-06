@@ -1,7 +1,6 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/core",
-	"type": "module",
 	"version": "0.1.10",
 	"description": "An OSM PBF reader, writer, and merge tool written in TypeScript",
 	"license": "MIT",
@@ -9,6 +8,7 @@
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
+	"type": "module",
 	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
@@ -16,15 +16,15 @@
 		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
 		"typecheck": "tsc --noEmit"
 	},
-	"devDependencies": {
-		"@osmix/pbf": "workspace:*",
-		"typescript": "catalog:"
-	},
 	"dependencies": {
 		"@osmix/shared": "workspace:*",
 		"flatbush": "^4.6.2",
 		"geoflatbush": "^2.2.1",
 		"geokdbush": "^2.1.0",
 		"kdbush": "^4.1.0"
+	},
+	"devDependencies": {
+		"@osmix/pbf": "workspace:*",
+		"typescript": "catalog:"
 	}
 }

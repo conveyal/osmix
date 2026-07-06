@@ -14,6 +14,7 @@ import {
 	progressEvent,
 } from "@osmix/shared/progress"
 import { throttle } from "@osmix/shared/throttle"
+
 import { OsmChangeset } from "./changeset.ts"
 import type { OsmMergeOptions } from "./types.ts"
 

@@ -1,7 +1,6 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/change",
-	"type": "module",
 	"version": "0.1.9",
 	"description": "An OSM changeset generator and merger built on top of @osmix/core",
 	"license": "MIT",
@@ -9,6 +8,7 @@
 		"type": "git",
 		"url": "git+https://github.com/conveyal/osmix.git"
 	},
+	"type": "module",
 	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
@@ -16,14 +16,14 @@
 		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
 		"typecheck": "tsc --noEmit"
 	},
-	"devDependencies": {
-		"@types/geojson": "catalog:",
-		"typescript": "catalog:"
-	},
 	"dependencies": {
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
 		"dequal": "catalog:",
 		"sweepline-intersections": "^2.0.1"
+	},
+	"devDependencies": {
+		"@types/geojson": "catalog:",
+		"typescript": "catalog:"
 	}
 }

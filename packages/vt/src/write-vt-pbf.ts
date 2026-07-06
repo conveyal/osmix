@@ -12,6 +12,7 @@
 
 import { zigzag, zigzag32 } from "@osmix/shared/zigzag"
 import { PbfWriter } from "pbf"
+
 import type { VtPbfLayer, VtSimpleFeature } from "./types.ts"
 
 /** Internal context for encoding a layer's features. */

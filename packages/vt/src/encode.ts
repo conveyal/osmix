@@ -15,6 +15,7 @@ import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip"
 import { llToTilePx, tileToBbox } from "@osmix/shared/tile"
 import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types"
 import { wayIsArea } from "@osmix/shared/way-is-area"
+
 import type {
 	VtSimpleFeature,
 	VtSimpleFeatureGeometry,

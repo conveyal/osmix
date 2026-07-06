@@ -81,9 +81,13 @@ const cafes = osm.nodes.search("amenity", "cafe")
 
 ```ts
 // Bounding box query
-const bbox: [number, number, number, number] = [-122.34, 47.57, -122.30, 47.61]
+const bbox: [number, number, number, number] = [-122.34, 47.57, -122.3, 47.61]
 const { ids, positions } = osm.nodes.withinBbox(bbox)
-const { ids: wayIds, positions: wayCoords, startIndices } = osm.ways.withinBbox(bbox)
+const {
+	ids: wayIds,
+	positions: wayCoords,
+	startIndices,
+} = osm.ways.withinBbox(bbox)
 
 // Radius query (uses great-circle distance)
 const nearbyIndexes = osm.nodes.findIndexesWithinRadius(-122.4, 47.6, 10) // 10km
@@ -101,7 +105,10 @@ const nearestWays = osm.ways.neighbors(-122.4, 47.6, 5, 10) // 5 results, 10km m
 ```ts
 // In the main thread
 const transferables = osm.transferables()
-worker.postMessage(transferables, Object.values(transferables).filter(ArrayBuffer.isView))
+worker.postMessage(
+	transferables,
+	Object.values(transferables).filter(ArrayBuffer.isView),
+)
 
 // In the worker
 const osm = new Osm(transferables)
@@ -112,39 +119,39 @@ const osm = new Osm(transferables)
 
 ### Classes
 
-| Class | Description |
-|-------|-------------|
-| `Osm` | Main container with nodes, ways, relations, and shared string table |
-| `Nodes` | Node storage with KDBush spatial index |
-| `Ways` | Way storage with Flatbush spatial index |
-| `Relations` | Relation storage with Flatbush spatial index |
-| `StringTable` | Deduplicated UTF-8 string storage for tags |
-| `Tags` | Bidirectional tag storage (entity→tags, key→entities) |
+| Class         | Description                                                         |
+| ------------- | ------------------------------------------------------------------- |
+| `Osm`         | Main container with nodes, ways, relations, and shared string table |
+| `Nodes`       | Node storage with KDBush spatial index                              |
+| `Ways`        | Way storage with Flatbush spatial index                             |
+| `Relations`   | Relation storage with Flatbush spatial index                        |
+| `StringTable` | Deduplicated UTF-8 string storage for tags                          |
+| `Tags`        | Bidirectional tag storage (entity→tags, key→entities)               |
 
 ### Osm Methods
 
-| Method | Description |
-|--------|-------------|
-| `buildIndexes()` | Finalize ID, tag, and entity indexes after adding data |
-| `buildSpatialIndexes()` | Build spatial indexes for all entity types |
-| `bbox()` | Get bounding box of all entities |
-| `info()` | Get summary info (id, bbox, header, stats) |
-| `transferables()` | Get serializable buffers for worker transfer |
-| `isReady()` | Check if all indexes are built |
+| Method                  | Description                                            |
+| ----------------------- | ------------------------------------------------------ |
+| `buildIndexes()`        | Finalize ID, tag, and entity indexes after adding data |
+| `buildSpatialIndexes()` | Build spatial indexes for all entity types             |
+| `bbox()`                | Get bounding box of all entities                       |
+| `info()`                | Get summary info (id, bbox, header, stats)             |
+| `transferables()`       | Get serializable buffers for worker transfer           |
+| `isReady()`             | Check if all indexes are built                         |
 
 ### Entity Collection Methods
 
-| Method | Description |
-|--------|-------------|
-| `getById(id)` | Get entity by OSM ID |
-| `get({ id } \| { index })` | Get by ID or internal index |
-| `getByIndex(index)` | Get by internal array index |
-| `search(key, value?)` | Find entities with tag key (and optional value) |
-| `withinBbox(bbox)` | Get entities within bounding box |
-| `findIndexesWithinRadius(lon, lat, km)` | Find nearby entities (nodes) |
-| `intersects(bbox)` | Find intersecting entities (ways/relations) |
-| `neighbors(lon, lat, max, maxKm)` | Find nearest entities (ways/relations) |
-| `sorted()` | Iterator over entities sorted by ID |
+| Method                                  | Description                                     |
+| --------------------------------------- | ----------------------------------------------- |
+| `getById(id)`                           | Get entity by OSM ID                            |
+| `get({ id } \| { index })`              | Get by ID or internal index                     |
+| `getByIndex(index)`                     | Get by internal array index                     |
+| `search(key, value?)`                   | Find entities with tag key (and optional value) |
+| `withinBbox(bbox)`                      | Get entities within bounding box                |
+| `findIndexesWithinRadius(lon, lat, km)` | Find nearby entities (nodes)                    |
+| `intersects(bbox)`                      | Find intersecting entities (ways/relations)     |
+| `neighbors(lon, lat, max, maxKm)`       | Find nearest entities (ways/relations)          |
+| `sorted()`                              | Iterator over entities sorted by ID             |
 
 ## Environment and Limitations
 

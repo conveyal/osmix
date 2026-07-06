@@ -1,5 +1,6 @@
 import type { Rgba } from "@osmix/shared/types"
 import { describe, expect, test } from "vitest"
+
 import { compositeRGBA } from "../src/color"
 
 const W50: Rgba = [255, 255, 255, 128]

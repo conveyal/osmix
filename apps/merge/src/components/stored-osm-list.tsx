@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import type { OsmFileType } from "osmix"
 import { useEffectEvent, useRef, useState } from "react"
+
 import { type StoredOsmEntry, useStoredOsm } from "../hooks/storage-broadcast"
 import { osmLoadingAbortControllerAtom } from "../state/status"
 import { osmWorker } from "../state/worker"
@@ -109,7 +110,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 	const handleKeyDown = useEffectEvent((e: React.KeyboardEvent) => {
 		if (e.key === "Enter") {
 			e.preventDefault()
-			handleConfirmRename()
+			void handleConfirmRename()
 		} else if (e.key === "Escape") {
 			e.preventDefault()
 			handleCancelRename()

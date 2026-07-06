@@ -6,6 +6,7 @@
 
 import type { FeatureCollection } from "geojson"
 import shp from "shpjs"
+
 import type { ReadShapefileDataTypes, ShpjsResult } from "./types.ts"
 
 /**

@@ -1,4 +1,5 @@
 import { expect, test } from "vitest"
+
 import { haversineDistance } from "../src/haversine-distance"
 
 test("haversineDistance", () => {

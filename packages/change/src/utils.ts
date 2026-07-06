@@ -18,6 +18,7 @@ import type {
 	OsmWay,
 } from "@osmix/shared/types"
 import sweeplineIntersections from "sweepline-intersections"
+
 import type { OsmChangesetStats } from "./types.ts"
 
 /**

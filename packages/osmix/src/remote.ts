@@ -25,6 +25,7 @@ import type { Progress } from "@osmix/shared/progress"
 import { streamToBytes } from "@osmix/shared/stream-to-bytes"
 import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types"
 import * as Comlink from "comlink"
+
 import { type OsmFromPbfOptions, toPbfStream } from "./pbf.ts"
 import type { DrawToRasterTileOptions } from "./raster.ts"
 import {
@@ -132,9 +133,9 @@ type OsmRemoteDatasetMemberMethods<
  * `OsmixRemote` method with signature `(osmId, ...args)` is exposed here,
  * with `osmId` automatically bound to this dataset's `id`.
  */
-class OsmRemoteDatasetBase<T extends OsmixWorker = OsmixWorker>
-	implements OsmInfo
-{
+class OsmRemoteDatasetBase<
+	T extends OsmixWorker = OsmixWorker,
+> implements OsmInfo {
 	readonly remote: OsmixRemote<T>
 	id: string
 	readonly bbox: OsmInfo["bbox"]
@@ -967,7 +968,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 		changeTypes: OsmChangeTypes[],
 		entityTypes: OsmEntityType[],
 	) {
-		this.getChangesetWorker().setChangesetFilters(changeTypes, entityTypes)
+		void this.getChangesetWorker().setChangesetFilters(changeTypes, entityTypes)
 	}
 
 	/**

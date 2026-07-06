@@ -13,6 +13,7 @@ import {
 	type ProgressEvent,
 	progressEvent,
 } from "@osmix/shared/progress"
+
 import { applyChangesetToOsm } from "./apply-changeset.ts"
 import { OsmChangeset } from "./changeset.ts"
 import type { OsmMergeOptions } from "./types.ts"

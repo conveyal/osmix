@@ -1,5 +1,6 @@
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/shared/types"
 import { describe, expect, it } from "vitest"
+
 import {
 	nodeToFeature,
 	relationToFeature,

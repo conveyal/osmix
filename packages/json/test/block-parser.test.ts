@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+
 import { OsmPbfBlockBuilder } from "../src/osm-pbf-block-builder"
 import { OsmPbfBlockParser } from "../src/osm-pbf-block-parser"
 import { blocksToJsonEntities } from "../src/pbf-to-json"

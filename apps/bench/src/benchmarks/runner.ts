@@ -1,5 +1,6 @@
 import type { GeoBbox2D } from "@osmix/shared/types"
 import * as Osmix from "osmix"
+
 import type { BenchmarkResults, WorkerBenchmarkOptions } from "./types"
 
 export type RunEngineBenchmark = (

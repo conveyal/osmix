@@ -29,6 +29,7 @@ import {
 	type ParquetReadOptions,
 	parquetReadObjects,
 } from "hyparquet"
+
 import type { GeoParquetReadOptions, GeoParquetSource } from "./types.ts"
 import { parseWkb } from "./wkb.ts"
 

@@ -14,6 +14,7 @@ import type {
 	OsmEntityType,
 	OsmTags,
 } from "@osmix/shared/types"
+
 import type { IdOrIndex, Ids, IdsTransferables } from "./ids.ts"
 import type { Tags, TagsTransferables } from "./tags.ts"
 import type { BufferType } from "./typed-arrays.ts"
@@ -23,8 +24,7 @@ import type { BufferType } from "./typed-arrays.ts"
  * Combines ID and tag transferables; subclasses add entity-specific data.
  */
 export interface EntitiesTransferables<T extends BufferType = BufferType>
-	extends IdsTransferables<T>,
-		TagsTransferables<T> {}
+	extends IdsTransferables<T>, TagsTransferables<T> {}
 
 /**
  * Abstract base for typed entity collections.

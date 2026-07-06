@@ -1,5 +1,6 @@
 import * as Osmix from "osmix"
 import { beforeAll, bench, describe } from "vitest"
+
 import monacoPbf from "../../../fixtures/monaco.pbf?url"
 import { DuckDBBenchWorker } from "../src/workers/duckdb.worker"
 

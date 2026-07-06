@@ -1,6 +1,7 @@
 import { type PrimitiveAtom, useAtom } from "jotai"
 import { FilesIcon, Layers, Navigation, SearchIcon } from "lucide-react"
 import { NavLink } from "react-router"
+
 import CenterInfo from "../components/center-info"
 import ZoomInfo, { ZoomInButton, ZoomOutButton } from "../components/zoom-info"
 import { cn } from "../lib/utils"

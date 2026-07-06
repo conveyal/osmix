@@ -8,6 +8,7 @@
  */
 
 import { PbfReader } from "pbf"
+
 import {
 	type OsmPbfBlock,
 	type OsmPbfHeaderBlock,

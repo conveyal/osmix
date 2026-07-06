@@ -4,6 +4,7 @@
 	"exclude": ["node_modules", "dist"],
 	"include": ["src"],
 	"compilerOptions": {
-		"outDir": "./dist"
+		"outDir": "./dist",
+		"rootDir": "./src"
 	}
 }

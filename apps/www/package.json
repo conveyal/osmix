@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json.schemastore.org/package.json",
 	"name": "@osmix/www",
-	"type": "module",
 	"private": true,
+	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
 		"start": "vite",

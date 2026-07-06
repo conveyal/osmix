@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useEffectEvent, useSyncExternalStore } from "react"
+
 import type { MergeRemote } from "../lib/merge-remote"
 import { STORAGE_CHANNEL } from "../settings"
 import type { StoredOsmEntry } from "../workers/osm.worker"
@@ -58,7 +59,7 @@ export function createStorageStore(remote: MergeRemote) {
 			channel = new BroadcastChannel(STORAGE_CHANNEL)
 			channel.onmessage = () => refresh()
 			// Initial fetch
-			refresh()
+			void refresh()
 		}
 	}
 
@@ -98,7 +99,7 @@ export function useStoredOsm(remote: MergeRemote) {
 	)
 
 	const refresh = useEffectEvent(() => {
-		storageStore?.refresh()
+		void storageStore?.refresh()
 	})
 
 	return { ...snapshot, refresh }

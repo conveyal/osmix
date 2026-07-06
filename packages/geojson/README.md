@@ -24,14 +24,13 @@ import { nodeToFeature, wayToFeature, relationToFeature } from "@osmix/geojson"
 
 // Convert individual entities
 const nodeFeature = nodeToFeature(osm.nodes.get({ id: 1 })!)
-const wayFeature = wayToFeature(
-	osm.ways.get({ id: 10 })!,
-	(ref) => osm.nodes.getNodeLonLat({ id: ref })
+const wayFeature = wayToFeature(osm.ways.get({ id: 10 })!, (ref) =>
+	osm.nodes.getNodeLonLat({ id: ref }),
 )
 const relationFeature = relationToFeature(
 	osm.relations.get({ id: 50 })!,
 	(ref) => osm.nodes.getNodeLonLat({ id: ref }),
-	(wayId) => osm.ways.getById(wayId)
+	(wayId) => osm.ways.getById(wayId),
 )
 ```
 
@@ -57,7 +56,7 @@ const featureCollection = {
 ```ts
 import { fromGeoJSON } from "@osmix/geojson"
 
-const geojsonFile = await Bun.file('./roads.geojson').json()
+const geojsonFile = await Bun.file("./roads.geojson").json()
 const osm = await fromGeoJSON(geojsonFile, { id: "roads" })
 
 // Query imported data
@@ -71,40 +70,40 @@ console.log(`Imported ${osm.ways.size} ways`)
 
 ### Export (OSM → GeoJSON)
 
-| Export | Description |
-|--------|-------------|
-| `nodeToFeature(node)` | Node → Point Feature |
-| `wayToFeature(way, refToPosition)` | Way → LineString or Polygon Feature |
-| `relationToFeature(relation, refToPosition, getWay?)` | Relation → Multi* or GeometryCollection |
-| `osmEntityToGeoJSONFeature(osm, entity)` | Any entity → Feature with auto coordinate resolution |
+| Export                                                | Description                                          |
+| ----------------------------------------------------- | ---------------------------------------------------- |
+| `nodeToFeature(node)`                                 | Node → Point Feature                                 |
+| `wayToFeature(way, refToPosition)`                    | Way → LineString or Polygon Feature                  |
+| `relationToFeature(relation, refToPosition, getWay?)` | Relation → Multi\* or GeometryCollection             |
+| `osmEntityToGeoJSONFeature(osm, entity)`              | Any entity → Feature with auto coordinate resolution |
 
 ### Import (GeoJSON → OSM)
 
-| Export | Description |
-|--------|-------------|
-| `fromGeoJSON(data, options?, onProgress?)` | Create Osm index from GeoJSON |
-| `startCreateOsmFromGeoJSON(osm, geojson)` | Generator for custom progress handling |
+| Export                                     | Description                            |
+| ------------------------------------------ | -------------------------------------- |
+| `fromGeoJSON(data, options?, onProgress?)` | Create Osm index from GeoJSON          |
+| `startCreateOsmFromGeoJSON(osm, geojson)`  | Generator for custom progress handling |
 
 ### Types
 
-| Export | Description |
-|--------|-------------|
-| `OsmGeoJSONFeature<T>` | GeoJSON Feature with OSM properties |
-| `OsmGeoJSONProperties` | Properties type (id, type, tags, info) |
-| `ImportableGeoJSON` | FeatureCollection types supported for import |
-| `ReadOsmDataTypes` | Input types for `fromGeoJSON` |
+| Export                 | Description                                  |
+| ---------------------- | -------------------------------------------- |
+| `OsmGeoJSONFeature<T>` | GeoJSON Feature with OSM properties          |
+| `OsmGeoJSONProperties` | Properties type (id, type, tags, info)       |
+| `ImportableGeoJSON`    | FeatureCollection types supported for import |
+| `ReadOsmDataTypes`     | Input types for `fromGeoJSON`                |
 
 ## Geometry Mapping
 
-| OSM Entity | GeoJSON Geometry |
-|------------|------------------|
-| Node | Point |
-| Way (linear) | LineString |
-| Way (area) | Polygon |
-| Relation (multipolygon) | MultiPolygon or Polygon |
-| Relation (route) | MultiLineString or LineString |
-| Relation (site) | MultiPoint or Point |
-| Relation (other) | GeometryCollection |
+| OSM Entity              | GeoJSON Geometry              |
+| ----------------------- | ----------------------------- |
+| Node                    | Point                         |
+| Way (linear)            | LineString                    |
+| Way (area)              | Polygon                       |
+| Relation (multipolygon) | MultiPolygon or Polygon       |
+| Relation (route)        | MultiLineString or LineString |
+| Relation (site)         | MultiPoint or Point           |
+| Relation (other)        | GeometryCollection            |
 
 ## Related Packages
 

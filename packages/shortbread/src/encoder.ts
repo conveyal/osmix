@@ -16,6 +16,7 @@ import {
 	type VtSimpleFeatureType,
 	writeVtPbf,
 } from "@osmix/vt"
+
 import { matchTags, SHORTBREAD_LAYERS } from "./layers.ts"
 import type { ShortbreadLayerName, ShortbreadProperties } from "./types.ts"
 

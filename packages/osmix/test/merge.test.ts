@@ -1,4 +1,5 @@
 import { access } from "node:fs/promises"
+
 import { applyChangesetToOsm, OsmChangeset } from "@osmix/change"
 import type { Osm } from "@osmix/core"
 import {
@@ -7,6 +8,7 @@ import {
 } from "@osmix/shared/fixtures"
 import type { OsmNode } from "@osmix/shared/types"
 import { describe, expect, it } from "vitest"
+
 import { fromPbf } from "../src/pbf"
 
 const testNode: OsmNode = {

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest"
+
 import { isStreamCloneable } from "../src/lib/stream-transfer"
 
 const OriginalMessageChannel = globalThis.MessageChannel

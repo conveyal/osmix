@@ -9,6 +9,7 @@ import { getEntityType, isNode, isRelation, isWay } from "@osmix/shared/utils"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { useTransition } from "react"
+
 import { cn } from "../lib/utils"
 import {
 	changesAtom,

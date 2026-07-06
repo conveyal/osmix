@@ -36,8 +36,10 @@ export interface GeoParquetRow {
 /**
  * Options for reading GeoParquet files.
  */
-export interface GeoParquetReadOptions
-	extends Omit<ParquetReadOptions, "onComplete" | "file" | "columns"> {
+export interface GeoParquetReadOptions extends Omit<
+	ParquetReadOptions,
+	"onComplete" | "file" | "columns"
+> {
 	/** Column name for the entity type (default: "type") */
 	typeColumn?: string
 	/** Column name for the entity ID (default: "id") */

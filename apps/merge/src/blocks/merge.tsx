@@ -17,6 +17,7 @@ import {
 	XIcon,
 } from "lucide-react"
 import { Suspense, useMemo } from "react"
+
 import ActionButton from "../components/action-button"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
 import EntityDetails from "../components/entity-details"
@@ -164,7 +165,7 @@ export default function MergeBlock() {
 			const json = JSON.stringify(changesetPage.changes, null, 2)
 			await stream.write(json)
 		} while (changesetPage.changes && changesetPage.changes.length > 0)
-		stream.close()
+		void stream.close()
 		task.end("Changeset converted to JSON")
 	}
 

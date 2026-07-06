@@ -21,26 +21,26 @@ pnpm add @osmix/raster
 ## Usage
 
 ```ts
-import {
-	OsmixRasterTile
-} from "@osmix/raster"
+import { OsmixRasterTile } from "@osmix/raster"
 
 const tile = new OsmixRasterTile({
-	tile: [9372, 12535, 15]
+	tile: [9372, 12535, 15],
 })
 
 tile.drawPoint([-73.989, 40.733])
-tile.drawLineString(
-	[
-		[-73.9892, 40.7326],
-		[-73.9887, 40.7331],
-		[-73.9883, 40.7336],
-	]
-)
+tile.drawLineString([
+	[-73.9892, 40.7326],
+	[-73.9887, 40.7331],
+	[-73.9883, 40.7336],
+])
 
 const canvas = new OffscreenCanvas(tile.tileSize, tile.tileSize)
 const ctx = canvas.getContext("2d")
-ctx.putImageData(new ImageData(tile.imageData, tile.tileSize, tile.tileSize), 0, 0)
+ctx.putImageData(
+	new ImageData(tile.imageData, tile.tileSize, tile.tileSize),
+	0,
+	0,
+)
 const pngBlob = await canvas.convertToBlob({ type: "image/png" })
 ```
 
