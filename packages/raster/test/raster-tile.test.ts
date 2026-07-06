@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test"
 import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types"
+import { describe, expect, it } from "vitest"
 import {
 	DEFAULT_AREA_COLOR,
 	DEFAULT_LINE_COLOR,

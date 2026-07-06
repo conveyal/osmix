@@ -1,8 +1,12 @@
-import { beforeAll, describe, expect, it } from "bun:test"
 import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/fixtures"
 import { fromPbf } from "osmix"
-import { buildGraph, getTransferableBuffers, RoutingGraph } from "../src"
+import { beforeAll, describe, expect, it } from "vitest"
+import {
+	buildGraph,
+	getTransferableBuffers,
+	RoutingGraph,
+} from "../src/index.ts"
 import { Router } from "../src/router"
 
 /**

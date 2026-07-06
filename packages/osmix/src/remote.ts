@@ -260,12 +260,28 @@ export async function createRemote<T extends OsmixWorker = OsmixWorker>({
  *   new URL("./my-custom.worker.ts", import.meta.url)
  * )
  */
+async function createInProcessOsmixWorker<
+	T extends OsmixWorker = OsmixWorker,
+>(): Promise<Comlink.Remote<T>> {
+	const { MessageChannel } = await import("node:worker_threads")
+	const { expose } = await import("comlink")
+	const { OsmixWorker } = await import("./worker.ts")
+	const { port1, port2 } = new MessageChannel()
+	expose(new OsmixWorker(), port1 as Comlink.Endpoint)
+	return Comlink.wrap<T>(port2 as Comlink.Endpoint)
+}
+
 export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
 	workerUrl?: URL,
 ): Promise<Comlink.Remote<T>> {
-	if (typeof Worker === "undefined") {
-		throw Error("Worker not supported")
+	if (workerUrl && typeof Worker === "undefined") {
+		throw Error("Custom worker URLs require Web Worker support")
 	}
+
+	if (process.env["VITEST"] === "true" || typeof Worker === "undefined") {
+		return createInProcessOsmixWorker<T>()
+	}
+
 	const url = workerUrl ?? new URL("./osmix.worker.ts", import.meta.url)
 	const worker = new Worker(url, { type: "module" })
 	return Comlink.wrap<T>(worker)

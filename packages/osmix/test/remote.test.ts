@@ -1,4 +1,3 @@
-import { afterEach, beforeAll, describe, expect, it } from "bun:test"
 import { Osm } from "@osmix/core"
 import {
 	getFixtureFile,
@@ -6,6 +5,7 @@ import {
 	PBFs,
 } from "@osmix/shared/fixtures"
 import type { FeatureCollection, LineString, Point } from "geojson"
+import { afterEach, beforeAll, describe, expect, it } from "vitest"
 import { createRemote } from "../src/remote"
 
 const monacoPbf = PBFs["monaco"]!

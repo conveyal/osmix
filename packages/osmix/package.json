@@ -12,14 +12,14 @@
 	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"test": "bun test",
+		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@mapbox/tilebelt": "^2.0.3",
-		"@types/bun": "catalog:",
 		"@types/geojson": "catalog:",
-		"typescript": "catalog:"
+		"typescript": "catalog:",
+		"vitest": "^4.1.9"
 	},
 	"dependencies": {
 		"@osmix/change": "workspace:*",

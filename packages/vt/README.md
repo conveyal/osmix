@@ -5,7 +5,7 @@
 ## Installation
 
 ```sh
-bun install @osmix/vt
+pnpm add @osmix/vt
 ```
 
 ## Usage
@@ -85,8 +85,8 @@ Lower-level method to encode a specific bounding box with a custom projection fu
 
 ## Development
 
-- `bun run test packages/vt`
-- `bun run lint packages/vt`
-- `bun run typecheck packages/vt`
+- `pnpm run test packages/vt`
+- `pnpm run lint packages/vt`
+- `pnpm run typecheck packages/vt`
 
-Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type coverage.
+Run `pnpm run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

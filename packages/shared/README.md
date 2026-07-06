@@ -16,7 +16,7 @@ import the functions you need directly from `@osmix/shared/<module>`.
 ## Installation
 
 ```sh
-bun install @osmix/shared
+pnpm add @osmix/shared
 ```
 
 ## Frequently used modules
@@ -52,9 +52,9 @@ All modules are tree-shakeable; only import what you need.
 
 ## Development
 
-- `bun run test packages/shared`
-- `bun run lint packages/shared`
-- `bun run typecheck packages/shared`
+- `pnpm run test packages/shared`
+- `pnpm run lint packages/shared`
+- `pnpm run typecheck packages/shared`
 
-Run `bun run check` at the repo root before publishing to ensure formatting,
+Run `pnpm run check` at the repo root before publishing to ensure formatting,
 lint, and type coverage.

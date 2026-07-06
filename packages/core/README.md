@@ -13,7 +13,7 @@ In-memory OSM entity storage with spatial indexing. Provides core data structure
 ## Installation
 
 ```sh
-bun add @osmix/core
+pnpm add @osmix/core
 ```
 
 ## Usage
@@ -163,9 +163,9 @@ const osm = new Osm(transferables)
 ## Development
 
 ```sh
-bun run test packages/core
-bun run typecheck packages/core
-bun run lint packages/core
+pnpm run test packages/core
+pnpm run typecheck packages/core
+pnpm run lint packages/core
 ```
 
-Run `bun run check` at the repo root before publishing.
+Run `pnpm run check` at the repo root before publishing.

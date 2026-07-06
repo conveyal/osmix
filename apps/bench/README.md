@@ -17,7 +17,7 @@ This app provides experimental benchmarking of Osmix and DuckDB-wasm across mult
 ### Development
 
 ```bash
-bun run dev
+pnpm run dev
 ```
 
 Automatically loads `fixtures/monaco.pbf` and runs benchmarks.

@@ -1,4 +1,3 @@
-import { describe, expect, it } from "bun:test"
 import { unlink } from "node:fs/promises"
 import {
 	getFixtureFile,
@@ -7,6 +6,7 @@ import {
 	getFixturePath,
 	PBFs,
 } from "@osmix/shared/fixtures"
+import { describe, expect, it } from "vitest"
 import {
 	OsmBlocksToPbfBytesTransformStream,
 	osmBlockToPbfBlobBytes,

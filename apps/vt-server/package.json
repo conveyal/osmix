@@ -4,22 +4,23 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"dev": "bun --hot server.ts",
-		"start": "bun server.ts",
+		"dev": "node --watch server.ts",
+		"start": "node server.ts",
 		"typecheck": "tsc --build --noEmit"
 	},
 	"dependencies": {
-		"osmix": "workspace:*",
+		"@hono/node-server": "^1.14.4",
 		"@osmix/core": "workspace:*",
 		"@osmix/vt": "workspace:*",
 		"comlink": "^4.4.2",
-		"maplibre-gl": "catalog:"
+		"hono": "^4.8.3",
+		"maplibre-gl": "catalog:",
+		"osmix": "workspace:*"
 	},
 	"devDependencies": {
-		"@osmix/shared": "workspace:*",
-		"@osmix/pbf": "workspace:*",
 		"@osmix/json": "workspace:*",
-		"@types/bun": "catalog:",
+		"@osmix/pbf": "workspace:*",
+		"@osmix/shared": "workspace:*",
 		"typescript": "catalog:"
 	}
 }

@@ -23,7 +23,6 @@
 	},
 	"devDependencies": {
 		"@osmix/shared": "workspace:*",
-		"@types/bun": "catalog:",
 		"typescript": "catalog:"
 	}
 }

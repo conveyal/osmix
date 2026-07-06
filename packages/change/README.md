@@ -14,7 +14,7 @@
 ## Installation
 
 ```sh
-bun install @osmix/change
+pnpm add @osmix/change
 ```
 
 You will typically install this alongside [`@osmix/core`](../core/README.md), which supplies the `Osmix` datasets the changes operate on.
@@ -138,8 +138,8 @@ Options:
 
 ## Development
 
-- `bun run test packages/change`
-- `bun run lint packages/change`
-- `bun run typecheck packages/change`
+- `pnpm run test packages/change`
+- `pnpm run lint packages/change`
+- `pnpm run typecheck packages/change`
 
-Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type coverage.
+Run `pnpm run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

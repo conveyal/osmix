@@ -7,7 +7,7 @@
 		"bench": "vitest bench",
 		"build": "vite build",
 		"dev": "vite",
-		"test": "vitest",
+		"test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run --project '@osmix/bench*'",
 		"typecheck": "tsc --build --noEmit"
 	},
 	"devDependencies": {

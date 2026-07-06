@@ -1,15 +1,11 @@
-import { describe, expect, it, mock } from "bun:test"
 import { Osm } from "@osmix/core"
 import { progressEventMessage } from "@osmix/shared/progress"
 import type { FeatureCollection, LineString, Point, Polygon } from "geojson"
+import { describe, expect, it, vi } from "vitest"
 import { startCreateOsmFromShapefile } from "../src/osm-from-shapefile"
 
-// Mock shpjs module
-mock.module("shpjs", () => ({
-	default: async (input: unknown) => {
-		// Return the mock data passed through
-		return input as FeatureCollection
-	},
+vi.mock("shpjs", () => ({
+	default: async (input: unknown) => input as FeatureCollection,
 }))
 
 describe("@osmix/shapefile: startCreateOsmFromShapefile", () => {

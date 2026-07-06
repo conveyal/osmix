@@ -1,11 +1,21 @@
+import { createReadStream, readFileSync } from "node:fs"
 import os from "node:os"
+import { Readable } from "node:stream"
+import { fileURLToPath } from "node:url"
+import { serve } from "@hono/node-server"
+import { Hono } from "hono"
 import { createRemote, OsmixVtEncoder } from "osmix"
-import indexHtml from "./index.html"
 
 const filename = "monaco.pbf"
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000
 
-// Resolve the Monaco fixture path relative to the repo root
-const pbfUrl = new URL(`../../fixtures/${filename}`, import.meta.url)
+const pbfPath = fileURLToPath(
+	new URL(`../../fixtures/${filename}`, import.meta.url),
+)
+const indexHtml = readFileSync(
+	fileURLToPath(new URL("./index.html", import.meta.url)),
+	"utf8",
+)
 
 const log: string[] = []
 const workerCount = os.cpus().length
@@ -13,76 +23,63 @@ const remote = await createRemote({
 	workerCount,
 	onProgress: (event) => log.push(event.msg),
 })
-const dataset = await remote.fromPbf(Bun.file(pbfUrl.pathname).stream(), {
-	id: filename,
-})
+const dataset = await remote.fromPbf(
+	Readable.toWeb(createReadStream(pbfPath)) as ReadableStream,
+	{ id: filename },
+)
 
-// Print number of VT workers available
 console.log(`Number of VT workers available: ${workerCount}`)
 
-const server = Bun.serve({
-	port: process.env.PORT ? Number(process.env.PORT) : 3000,
-	idleTimeout: 255, // 5 minutes
-	development: true,
-	routes: {
-		"/": indexHtml,
-		"/index.html": indexHtml,
-		"/ready": async () => {
-			const ready = await dataset.isReady()
-			return Response.json({ ready, log }, { status: 200 })
-		},
-		"/meta.json": async () => {
-			const osm = await dataset.get()
-			const bbox = osm.bbox()
-			const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
-			const vtMetadata = OsmixVtEncoder.layerNames(filename)
-			return Response.json(
-				{ filename, bbox, center, header: osm.header, ...vtMetadata },
-				{ status: 200 },
-			)
-		},
-		"/tiles/:z/:x/:y": async (req) => {
-			try {
-				console.time(req.url)
-				const tile = await dataset.getVectorTile([
-					+req.params.x,
-					+req.params.y,
-					+req.params.z,
-				])
-				console.timeEnd(req.url)
-				return new Response(tile, {
-					headers: {
-						"content-type": "application/vnd.mapbox-vector-tile",
-					},
-				})
-			} catch (error) {
-				console.error(error)
-				return Response.json(
-					{ error: "Internal server error", message: (error as Error).message },
-					{ status: 500 },
-				)
-			}
-		},
-		"/search/:kv": async (req) => {
-			const { kv } = req.params
-			const [key, val] = kv.split("=", 2)
-			console.log("searching for", key, val)
-			if (!key) {
-				return Response.json(
-					{
-						error: "Invalid key",
-						message: "Key is required",
-					},
-					{ status: 400 },
-				)
-			}
-			const results = await dataset.search(key, val)
-			return Response.json(results, { status: 200 })
-		},
-	},
-	fetch: async () => {
-		return new Response("Not found", { status: 404 })
-	},
+const app = new Hono()
+
+app.get("/", (c) => c.html(indexHtml))
+app.get("/index.html", (c) => c.html(indexHtml))
+
+app.get("/ready", async (c) => {
+	const ready = await dataset.isReady()
+	return c.json({ ready, log })
 })
 
-console.log(`Vector tile server running at http://localhost:${server.port}`)
+app.get("/meta.json", async (c) => {
+	const osm = await dataset.get()
+	const bbox = osm.bbox()
+	const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]
+	const vtMetadata = OsmixVtEncoder.layerNames(filename)
+	return c.json({ filename, bbox, center, header: osm.header, ...vtMetadata })
+})
+
+app.get("/tiles/:z/:x/:y", async (c) => {
+	try {
+		const url = c.req.url
+		console.time(url)
+		const { x, y, z } = c.req.param()
+		const tile = await dataset.getVectorTile([+x, +y, +z])
+		console.timeEnd(url)
+		return c.body(tile, 200, {
+			"content-type": "application/vnd.mapbox-vector-tile",
+		})
+	} catch (error) {
+		console.error(error)
+		return c.json(
+			{ error: "Internal server error", message: (error as Error).message },
+			500,
+		)
+	}
+})
+
+app.get("/search/:kv", async (c) => {
+	const { kv } = c.req.param()
+	const [key, val] = kv.split("=", 2)
+	console.log("searching for", key, val)
+	if (!key) {
+		return c.json({ error: "Invalid key", message: "Key is required" }, 400)
+	}
+	const results = await dataset.search(key, val)
+	return c.json(results)
+})
+
+app.notFound((c) => c.text("Not found", 404))
+
+serve({ fetch: app.fetch, port: PORT }, (info) => {
+	console.log(`Vector tile server running at http://localhost:${info.port}`)
+})

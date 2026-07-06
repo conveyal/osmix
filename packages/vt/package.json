@@ -12,11 +12,10 @@
 	"main": "./src/index.ts",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"test": "bun test",
+		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@types/bun": "catalog:",
 		"@osmix/shared": "workspace:*",
 		"pbf": "catalog:"
 	},

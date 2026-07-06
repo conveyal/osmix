@@ -14,7 +14,7 @@
 ## Installation
 
 ```sh
-bun install @osmix/router
+pnpm add @osmix/router
 ```
 
 ## Usage
@@ -142,8 +142,8 @@ const router = new Router(osm, graph, { algorithm: "astar", metric: "time" })
 
 ## Development
 
-- `bun run test packages/router`
-- `bun run lint packages/router`
-- `bun run typecheck packages/router`
+- `pnpm run test packages/router`
+- `pnpm run lint packages/router`
+- `pnpm run typecheck packages/router`
 
-Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type coverage.
+Run `pnpm run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

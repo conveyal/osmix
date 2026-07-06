@@ -1,6 +1,6 @@
-import { readdir, rm } from "node:fs/promises"
+import { spawnSync } from "node:child_process"
+import { readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
-import { $ } from "bun"
 
 /**
  *  For each package in the repo:
@@ -27,16 +27,40 @@ interface WorkspacePackage {
 	manifest: PackageJson
 }
 
-const packagesRoot = resolve(import.meta.dir, "../packages")
+const packagesRoot = resolve(import.meta.dirname, "../packages")
+
+function run(
+	command: string,
+	args: string[],
+	cwd: string,
+	options: { captureOutput?: boolean } = {},
+): string {
+	const { captureOutput = false } = options
+	const result = spawnSync(command, args, {
+		cwd,
+		encoding: "utf8",
+		stdio: captureOutput ? ["ignore", "pipe", "inherit"] : "inherit",
+	})
+
+	if (result.status !== 0) {
+		throw Error(`Command failed: ${command} ${args.join(" ")}`)
+	}
+
+	return captureOutput ? result.stdout.trim() : ""
+}
 
 async function isVersionPublished(
 	name: string,
 	version: string,
 ): Promise<boolean> {
 	try {
-		const output =
-			await $`npm view ${`${name}@${version}`} version --json`.quiet()
-		return output.text().trim() !== ""
+		const output = run(
+			"npm",
+			["view", `${name}@${version}`, "version", "--json"],
+			packagesRoot,
+			{ captureOutput: true },
+		)
+		return output.trim() !== ""
 	} catch {
 		return false
 	}
@@ -73,16 +97,16 @@ function serializePackageJson(pkgJson: PackageJson): string {
 
 async function withPublishedManifest<T>(
 	{ manifest, packageJsonPath }: WorkspacePackage,
-	run: () => Promise<T>,
+	runPublish: () => Promise<T>,
 ): Promise<T> {
 	try {
-		await Bun.write(
+		await writeFile(
 			packageJsonPath,
 			serializePackageJson(rewritePkgJsonForDist(manifest)),
 		)
-		return await run()
+		return await runPublish()
 	} finally {
-		await Bun.write(packageJsonPath, serializePackageJson(manifest))
+		await writeFile(packageJsonPath, serializePackageJson(manifest))
 	}
 }
 
@@ -94,22 +118,32 @@ async function publishPackage(
 		manifest: { name, version },
 	} = workspacePackage
 
-	$.cwd(dir)
-
 	console.log(`- Publishing ${name}@${version}`)
-	await $`bun run build`
+	run("pnpm", ["run", "build"], dir)
 
 	await withPublishedManifest(workspacePackage, async () => {
-		const tarballToPublish = (await $`bun pm pack --quiet`.text()).trim()
+		const packOutput = run("pnpm", ["pack"], dir, {
+			captureOutput: true,
+		})
+		const tarballToPublish = packOutput.split("\n").at(-1)?.trim()
 		if (!tarballToPublish)
 			throw Error(`No tarball generated for ${name}@${version}`)
 
-		await $`npm publish ./${tarballToPublish} --access=public --provenance=true`
-		await rm(tarballToPublish, { force: true })
+		run(
+			"npm",
+			[
+				"publish",
+				`./${tarballToPublish}`,
+				"--access=public",
+				"--provenance=true",
+			],
+			dir,
+		)
+		await rm(join(dir, tarballToPublish), { force: true })
 	})
 }
 
-async function run(): Promise<void> {
+async function runRelease(): Promise<void> {
 	const entries = await readdir(packagesRoot, { withFileTypes: true })
 	let publishedCount = 0
 
@@ -118,7 +152,9 @@ async function run(): Promise<void> {
 
 		const dir = join(packagesRoot, entry.name)
 		const packageJsonPath = join(dir, "package.json")
-		const manifest = (await Bun.file(packageJsonPath).json()) as PackageJson
+		const manifest = JSON.parse(
+			await readFile(packageJsonPath, "utf8"),
+		) as PackageJson
 		if (!manifest.name || !manifest.version || manifest.private) continue
 		const alreadyPublished = await isVersionPublished(
 			manifest.name,
@@ -142,4 +178,4 @@ async function run(): Promise<void> {
 	}
 }
 
-await run()
+void runRelease()

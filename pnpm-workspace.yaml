@@ -1,0 +1,20 @@
+packages:
+  - apps/*
+  - packages/*
+
+autoInstallPeers: true
+minimumReleaseAge: 0
+
+allowBuilds:
+  "@tailwindcss/oxide": true
+  esbuild: true
+
+catalog:
+  "@placemarkio/geojson-rewind": ^1.0.3
+  "@types/geojson": ^7946.0.16
+  "@types/node": ^22.15.0
+  dequal: ^2.0.3
+  maplibre-gl: ^5.24.0
+  pbf: ^5.1.0
+  typescript: npm:typescript@rc
+  vite: ^8.1.3

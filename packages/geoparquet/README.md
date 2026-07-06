@@ -5,7 +5,7 @@ Import GeoParquet files into Osmix. OpenStreetMap US publishes GeoParquet extrac
 ## Installation
 
 ```bash
-bun add @osmix/geoparquet
+pnpm add @osmix/geoparquet
 ```
 
 ## Usage

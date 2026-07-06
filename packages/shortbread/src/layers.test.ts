@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "vitest"
 import {
 	matchAddresses,
 	matchAerialways,
@@ -532,7 +532,7 @@ describe("Shortbread Layer Matchers", () => {
 
 		it("returns empty array when no layer matches", () => {
 			const result = matchTags({ unknown: "tag" }, "Point")
-			expect(result).toBeArrayOfSize(0)
+			expect(result).toHaveLength(0)
 		})
 	})
 })

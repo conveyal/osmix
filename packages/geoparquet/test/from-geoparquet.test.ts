@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "vitest"
 import { GeoParquetOsmBuilder } from "../src/from-geoparquet"
 import type { GeoParquetRow } from "../src/types"
 

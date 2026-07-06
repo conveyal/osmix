@@ -15,7 +15,7 @@ you can render vector overlays into PNG/WebP tiles.
 ## Installation
 
 ```sh
-bun install @osmix/raster
+pnpm add @osmix/raster
 ```
 
 ## Usage
@@ -93,9 +93,9 @@ Colors are RGBA tuples `[r, g, b, a]` (0-255). Defaults are provided.
 
 ## Development
 
-- `bun run test packages/raster`
-- `bun run lint packages/raster`
-- `bun run typecheck packages/raster`
+- `pnpm run test packages/raster`
+- `pnpm run lint packages/raster`
+- `pnpm run typecheck packages/raster`
 
-Run `bun run check` at the repo root before publishing to ensure formatting,
+Run `pnpm run check` at the repo root before publishing to ensure formatting,
 lint, and type coverage.

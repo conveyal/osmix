@@ -1,5 +1,6 @@
-import { describe, expect, it } from "bun:test"
+import { readFile, stat } from "node:fs/promises"
 import { getFixturePath } from "@osmix/shared/fixtures"
+import { describe, expect, it } from "vitest"
 import { fromGeoParquet, GeoParquetOsmBuilder } from "../src"
 
 /**
@@ -18,23 +19,25 @@ import { fromGeoParquet, GeoParquetOsmBuilder } from "../src"
  */
 
 describe("@osmix/geoparquet: Monaco highways fixture", () => {
-	const fixtureFile = () => Bun.file(getFixturePath("monaco.parquet"))
-	const getOsm = async () => fromGeoParquet(await fixtureFile().arrayBuffer())
+	const fixturePath = () => getFixturePath("monaco.parquet")
+	const readFixture = async (): Promise<ArrayBuffer> => {
+		const buffer = await readFile(fixturePath())
+		return buffer.buffer.slice(
+			buffer.byteOffset,
+			buffer.byteOffset + buffer.byteLength,
+		)
+	}
+	const getOsm = async () => fromGeoParquet(await readFixture())
 
 	it("should load the monaco.parquet fixture", async () => {
-		const file = fixtureFile()
-		expect(await file.exists()).toBe(true)
-
-		const size = file.size
+		const { size } = await stat(fixturePath())
 		expect(size).toBeGreaterThan(0)
 		expect(size).toBeLessThan(1_000_000) // Should be a small fixture
 	})
 
 	it("should read parquet rows with correct structure", async () => {
 		const builder = new GeoParquetOsmBuilder({ id: "monaco" }, { rowEnd: 5 })
-		const rows = await builder.readParquetRows(
-			await fixtureFile().arrayBuffer(),
-		)
+		const rows = await builder.readParquetRows(await readFixture())
 
 		expect(rows.length).toBe(5)
 
@@ -137,9 +140,7 @@ describe("@osmix/geoparquet: Monaco highways fixture", () => {
 
 	it("should handle maxRows option to limit features", async () => {
 		const builder = new GeoParquetOsmBuilder({ id: "monaco" }, { rowEnd: 10 })
-		const rows = await builder.readParquetRows(
-			await fixtureFile().arrayBuffer(),
-		)
+		const rows = await builder.readParquetRows(await readFixture())
 		builder.processGeoParquetRows(rows)
 		const osm = builder.buildOsm()
 
@@ -232,9 +233,7 @@ describe("@osmix/geoparquet: Monaco highways fixture", () => {
 
 	it("should count geometry types in the fixture", async () => {
 		const builder = new GeoParquetOsmBuilder({ id: "monaco" })
-		const rows = await builder.readParquetRows(
-			await fixtureFile().arrayBuffer(),
-		)
+		const rows = await builder.readParquetRows(await readFixture())
 
 		const typeCounts = new Map<string, number>()
 		for (const row of rows) {

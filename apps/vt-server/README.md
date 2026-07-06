@@ -5,13 +5,13 @@ Example vector tile server that serves Mapbox Vector Tiles (MVT) from an OSM PBF
 ## Setup
 
 ```bash
-bun install
+pnpm install
 ```
 
 ## Run
 
 ```bash
-bun run dev
+pnpm run dev
 ```
 
 The server starts on `http://localhost:3000` (or `PORT` env var) and loads the Monaco fixture PBF from the repo.

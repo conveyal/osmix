@@ -2,13 +2,13 @@ import { Osm } from "@osmix/core"
 import { getFixtureFile, PBFs } from "@osmix/shared/fixtures"
 import { bench, group, run } from "mitata"
 import { fromPbf } from "osmix"
-import { buildGraph } from "../src"
-import { Router } from "../src/router"
+import { buildGraph } from "../src/index.ts"
+import { Router } from "../src/router.ts"
 
 /**
  * Router Benchmark Suite using mitata
  *
- * Run with: bun test/router.bench.ts
+ * Run with: pnpm --filter @osmix/router run bench
  *
  * These benchmarks compare the performance of different routing algorithms
  * using both real-world OSM data (Monaco) and synthetic grid networks.

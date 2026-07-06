@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "vitest"
 import { osmPbfBlobsToBlocksGenerator } from "../src/blobs-to-blocks"
 import { createOsmPbfBlobGenerator } from "../src/pbf-to-blobs"
 import {
