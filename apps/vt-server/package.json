@@ -9,7 +9,7 @@
 		"typecheck": "tsc --build --noEmit"
 	},
 	"dependencies": {
-		"@hono/node-server": "^1.14.4",
+		"@hono/node-server": "^2.0.8",
 		"@osmix/core": "workspace:*",
 		"@osmix/vt": "workspace:*",
 		"comlink": "^4.4.2",
