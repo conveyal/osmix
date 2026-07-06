@@ -338,8 +338,7 @@ export class ShortbreadVtEncoder {
 			const relation = this.osm.relations.getByIndex(relIndex)
 			const relationGeometry = this.osm.relations.getRelationGeometry(relIndex)
 			if (
-				!relation ||
-				!relation.tags ||
+				!relation?.tags ||
 				(!relationGeometry.lineStrings &&
 					!relationGeometry.rings &&
 					!relationGeometry.points)

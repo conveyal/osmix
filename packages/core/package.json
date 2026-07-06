@@ -14,7 +14,7 @@
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun test --bench",
 		"test": "bun test",
-		"typecheck": "tsgo --noEmit"
+		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@osmix/pbf": "workspace:*",
@@ -23,9 +23,9 @@
 	},
 	"dependencies": {
 		"@osmix/shared": "workspace:*",
-		"flatbush": "^4.5.1",
-		"geoflatbush": "^2.1.0",
+		"flatbush": "^4.6.2",
+		"geoflatbush": "^2.2.1",
 		"geokdbush": "^2.1.0",
-		"kdbush": "^4.0.2"
+		"kdbush": "^4.1.0"
 	}
 }

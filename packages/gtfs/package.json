@@ -14,16 +14,16 @@
 		"build": "tsc -p tsconfig.build.json",
 		"bench": "bun test --bench",
 		"test": "bun test",
-		"typecheck": "tsgo --noEmit"
+		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@types/bun": "catalog:",
-		"fflate": "^0.8.2",
+		"fflate": "^0.8.3",
 		"typescript": "catalog:"
 	},
 	"dependencies": {
 		"@osmix/core": "workspace:*",
 		"@osmix/shared": "workspace:*",
-		"but-unzip": "^0.1.7"
+		"but-unzip": "^0.1.10"
 	}
 }

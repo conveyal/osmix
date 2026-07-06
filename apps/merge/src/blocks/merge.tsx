@@ -16,7 +16,6 @@ import {
 	StopCircleIcon,
 	XIcon,
 } from "lucide-react"
-import { showSaveFilePickerWithFallback } from "../lib/save-file-picker"
 import { Suspense, useMemo } from "react"
 import ActionButton from "../components/action-button"
 import { Details, DetailsContent, DetailsSummary } from "../components/details"
@@ -45,6 +44,7 @@ import {
 import { Spinner } from "../components/ui/spinner"
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map"
 import { useOsmFile } from "../hooks/osm"
+import { showSaveFilePickerWithFallback } from "../lib/save-file-picker"
 import { cn } from "../lib/utils"
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings"
 import { changesetStatsAtom } from "../state/changes"

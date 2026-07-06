@@ -13,8 +13,8 @@ import type { RoutingAlgorithm, RoutingAlgorithmFn } from "../types.ts"
 import { bidirectional } from "./bidirectional.ts"
 import { astar, dijkstra } from "./shortest-path.ts"
 
-export { astar, bidirectional, dijkstra }
 export type { RoutingAlgorithmFn }
+export { astar, bidirectional, dijkstra }
 
 export const routingAlgorithms: Record<RoutingAlgorithm, RoutingAlgorithmFn> = {
 	dijkstra,

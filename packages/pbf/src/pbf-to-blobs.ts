@@ -1,4 +1,4 @@
-import Pbf from "pbf"
+import { PbfReader } from "pbf"
 import { HEADER_LENGTH_BYTES } from "./pbf-to-blocks.ts"
 import {
 	type OsmPbfBlobHeader,
@@ -31,7 +31,7 @@ import {
  * ```
  */
 export function createOsmPbfBlobGenerator() {
-	let pbf: Pbf = new Pbf(new Uint8Array(0))
+	let pbf: PbfReader = new PbfReader(new Uint8Array(0))
 	let state: "header-length" | "header" | "blob" = "header-length"
 	let bytesNeeded: number = HEADER_LENGTH_BYTES
 	let blobHeader: OsmPbfBlobHeader | null = null
@@ -48,7 +48,7 @@ export function createOsmPbfBlobGenerator() {
 		)
 		tmpBuffer.set(currentBuffer.subarray(0))
 		tmpBuffer.set(new Uint8Array(chunk), currentBuffer.byteLength)
-		pbf = new Pbf(tmpBuffer)
+		pbf = new PbfReader(tmpBuffer)
 
 		while (pbf.pos + bytesNeeded <= pbf.length) {
 			if (state === "header-length") {

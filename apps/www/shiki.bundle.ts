@@ -59,6 +59,7 @@ const {
 	createHighlighter,
 )
 
+export type { BundledLanguage, BundledTheme, Highlighter }
 export {
 	bundledLanguages,
 	bundledThemes,
@@ -69,4 +70,3 @@ export {
 	createHighlighter,
 	getSingletonHighlighter,
 }
-export type { BundledLanguage, BundledTheme, Highlighter }
