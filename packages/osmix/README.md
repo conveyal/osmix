@@ -8,7 +8,7 @@ request raster/vector tiles with a single import.
 ## Installation
 
 ```sh
-bun install osmix
+pnpm add osmix
 ```
 
 ## Usage
@@ -171,9 +171,9 @@ spec-compliant without staging everything in memory.
 
 ## Development
 
-- `bun run test packages/osmix`
-- `bun run lint packages/osmix`
-- `bun run typecheck packages/osmix`
+- `pnpm run test packages/osmix`
+- `pnpm run lint packages/osmix`
+- `pnpm run typecheck packages/osmix`
 
-Run `bun run check` from the repo root before publishing to keep formatting,
+Run `pnpm run check` from the repo root before publishing to keep formatting,
 lint, and types consistent.

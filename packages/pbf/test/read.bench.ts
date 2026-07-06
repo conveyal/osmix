@@ -1,12 +1,9 @@
-import { beforeAll, describe, expect } from "bun:test"
 import {
 	getFixtureFile,
 	getFixtureFileReadStream,
 	PBFs,
 } from "@osmix/shared/fixtures"
-
-// @ts-expect-error - bench is available at runtime but not in types
-const { bench } = globalThis as { bench: typeof import("bun:test").test }
+import { beforeAll, bench, describe, expect } from "vitest"
 
 import {
 	OsmPbfBytesToBlocksTransformStream,

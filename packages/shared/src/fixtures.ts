@@ -1,6 +1,8 @@
+import { createReadStream, createWriteStream } from "node:fs"
+import { readFile, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
+import { Readable, Writable } from "node:stream"
 import { fileURLToPath } from "node:url"
-import * as Bun from "bun"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = resolve(__dirname, "../../../")
@@ -23,8 +25,8 @@ export async function getFixtureFile(
 ): Promise<Uint8Array<ArrayBufferLike>> {
 	const filePath = getFixturePath(url)
 	try {
-		const file = await Bun.file(filePath).arrayBuffer()
-		return new Uint8Array<ArrayBuffer>(file)
+		const file = await readFile(filePath)
+		return new Uint8Array(file)
 	} catch (_error) {
 		if (process.env["CI"]) {
 			throw Error(`Do not download fixtures in CI: ${url} not found`)
@@ -32,25 +34,21 @@ export async function getFixtureFile(
 		const response = await fetch(url)
 		const buffer = await response.arrayBuffer()
 		const data = new Uint8Array<ArrayBuffer>(buffer)
-		await Bun.write(filePath, data)
+		await writeFile(filePath, data)
 		return data
 	}
 }
 
 export function getFixtureFileReadStream(url: string) {
-	return Bun.file(getFixturePath(url)).stream()
+	return Readable.toWeb(
+		createReadStream(getFixturePath(url)),
+	) as ReadableStream<Uint8Array>
 }
 
 export function getFixtureFileWriteStream(url: string) {
-	const incrementalWriter = Bun.file(getFixturePath(url)).writer()
-	return new WritableStream<Uint8Array<ArrayBufferLike>>({
-		write: (chunk: Uint8Array<ArrayBufferLike>) => {
-			incrementalWriter.write(chunk)
-		},
-		close: () => {
-			incrementalWriter.end()
-		},
-	})
+	return Writable.toWeb(
+		createWriteStream(getFixturePath(url)),
+	) as WritableStream<Uint8Array>
 }
 
 export type PbfFixture = {

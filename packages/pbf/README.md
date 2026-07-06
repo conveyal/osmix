@@ -13,7 +13,7 @@ Low-level TypeScript library for reading and writing OpenStreetMap PBF data. Sta
 ## Installation
 
 ```sh
-bun add @osmix/pbf
+pnpm add @osmix/pbf
 ```
 
 ## Usage
@@ -129,9 +129,9 @@ const dataBytes = await osmBlockToPbfBlobBytes(primitiveBlock)
 ## Development
 
 ```sh
-bun run test packages/pbf
-bun run lint packages/pbf
-bun run typecheck packages/pbf
+pnpm run test packages/pbf
+pnpm run lint packages/pbf
+pnpm run typecheck packages/pbf
 ```
 
-Run `bun run check` at the repo root before publishing to ensure formatting, lint, and type coverage.
+Run `pnpm run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

@@ -5,7 +5,7 @@ Shortbread schema vector tile encoder for Osmix. Generates vector tiles followin
 ## Installation
 
 ```bash
-bun add @osmix/shortbread
+pnpm add @osmix/shortbread
 ```
 
 ## Usage

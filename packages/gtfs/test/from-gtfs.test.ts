@@ -1,4 +1,6 @@
-import { describe, expect, test } from "bun:test"
+import { readFile } from "node:fs/promises"
+import { fileURLToPath } from "node:url"
+import { describe, expect, test } from "vitest"
 import {
 	fromGtfs,
 	GtfsArchive,
@@ -10,11 +12,10 @@ import {
 import { routeToTags, stopToTags } from "../src/utils"
 import { createSharedShapeGtfsZip, createTestGtfsZip } from "./helpers"
 
-// Path to the Monaco GTFS fixture
-const MONACO_GTFS_PATH = new URL(
-	"../../../fixtures/monaco-gtfs.zip",
-	import.meta.url,
+const MONACO_GTFS_PATH = fileURLToPath(
+	new URL("../../../fixtures/monaco-gtfs.zip", import.meta.url),
 )
+const readMonacoGtfs = () => readFile(MONACO_GTFS_PATH)
 
 describe("routeTypeToOsmRoute", () => {
 	test("maps GTFS route types to OSM route values", () => {
@@ -264,8 +265,7 @@ describe("isGtfsZip", () => {
 	})
 
 	test("detects Monaco GTFS fixture as GTFS", async () => {
-		const file = Bun.file(MONACO_GTFS_PATH)
-		const zipData = new Uint8Array(await file.arrayBuffer())
+		const zipData = new Uint8Array(await readMonacoGtfs())
 		expect(isGtfsZip(zipData)).toBe(true)
 	})
 
@@ -429,8 +429,7 @@ describe("GtfsOsmBuilder", () => {
 
 describe("Monaco GTFS fixture", () => {
 	test("parses Monaco GTFS archive", async () => {
-		const file = Bun.file(MONACO_GTFS_PATH)
-		const zipData = await file.arrayBuffer()
+		const zipData = await readMonacoGtfs()
 		const archive = GtfsArchive.fromZip(zipData)
 
 		// Check expected files exist
@@ -455,7 +454,7 @@ describe("Monaco GTFS fixture", () => {
 	})
 
 	test("converts Monaco GTFS to OSM with routes only", async () => {
-		const zipData = await Bun.file(MONACO_GTFS_PATH).arrayBuffer()
+		const zipData = await readMonacoGtfs()
 
 		// Only include routes (no stops) to test shapes parsing
 		const osm = await fromGtfs(
@@ -474,7 +473,7 @@ describe("Monaco GTFS fixture", () => {
 	})
 
 	test("converts Monaco GTFS to OSM with stops only", async () => {
-		const zipData = await Bun.file(MONACO_GTFS_PATH).arrayBuffer()
+		const zipData = await readMonacoGtfs()
 
 		// Only include stops (no routes)
 		const osm = await fromGtfs(
@@ -503,7 +502,7 @@ describe("Monaco GTFS fixture", () => {
 	})
 
 	test("converts full Monaco GTFS to OSM", async () => {
-		const zipData = await Bun.file(MONACO_GTFS_PATH).arrayBuffer()
+		const zipData = await readMonacoGtfs()
 
 		const osm = await fromGtfs(zipData, { id: "monaco-full" })
 

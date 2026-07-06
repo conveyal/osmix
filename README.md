@@ -19,7 +19,7 @@ Osmix is a collection of composable libraries for reading, querying, merging, an
 ## Quick Start
 
 ```bash
-bun add osmix
+pnpm add osmix
 ```
 
 ### Examples
@@ -99,25 +99,25 @@ See each package's README for full API and description.
 
 ```bash
 # Install dependencies
-bun install
+pnpm install
 
 # Run all apps in watch mode
-bun run dev
+pnpm run dev
 
 # Build all packages
-bun run build
+pnpm run build
 
 # Run tests
-bun run test
+pnpm run test
 
 # Type check
-bun run typecheck
+pnpm run typecheck
 
 # Format and lint
-bun run check
+pnpm run check
 ```
 
-**Workspace commands** support filtering: `bun run --filter @osmix/merge dev`
+**Workspace commands** support filtering: `pnpm --filter @osmix/merge dev`
 
 ## Apps
 
@@ -132,6 +132,6 @@ bun run check
 - [osmix.dev](https://osmix.dev) – Docs, examples, and package overview
 - [GitHub](https://github.com/conveyal/osmix) – Issues and discussions
 - [OpenStreetMap PBF format](https://wiki.openstreetmap.org/wiki/PBF_Format)
-- [Bun](https://bun.sh/) workspace documentation
+- [pnpm](https://pnpm.io/) workspace documentation
 - [MapLibre GL JS](https://maplibre.org/projects/maplibre-gl-js/)
 - [Web Compression Streams API](https://developer.mozilla.org/docs/Web/API/Compression_Streams_API)

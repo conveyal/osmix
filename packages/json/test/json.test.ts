@@ -1,4 +1,3 @@
-import { describe, expect, it } from "bun:test"
 import {
 	OsmBlocksToPbfBytesTransformStream,
 	OsmPbfBytesToBlocksTransformStream,
@@ -7,6 +6,7 @@ import {
 	testOsmPbfReader,
 } from "@osmix/pbf"
 import { getFixtureFileReadStream, PBFs } from "@osmix/shared/fixtures"
+import { describe, expect, it } from "vitest"
 import { OsmJsonToBlocksTransformStream } from "../src/json-to-pbf"
 import { OsmBlocksToJsonTransformStream } from "../src/pbf-to-json"
 

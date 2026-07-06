@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "vitest"
 import { BufferConstructor, ResizeableTypedArray } from "../src/typed-arrays"
 
 describe("typed array helpers", () => {

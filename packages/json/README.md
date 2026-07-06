@@ -12,7 +12,7 @@ Convert OpenStreetMap PBF bytes to ergonomic JSON entities (and back again) for 
 ## Installation
 
 ```sh
-bun add @osmix/json
+pnpm add @osmix/json
 ```
 
 ## Usage
@@ -125,9 +125,9 @@ const pbfStream = entityStream
 ## Development
 
 ```sh
-bun run test packages/json
-bun run lint packages/json
-bun run typecheck packages/json
+pnpm run test packages/json
+pnpm run lint packages/json
+pnpm run typecheck packages/json
 ```
 
-Run `bun run check` at the repo root before publishing.
+Run `pnpm run check` at the repo root before publishing.

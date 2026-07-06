@@ -1,4 +1,3 @@
-import { describe, expect, it } from "bun:test"
 import type {
 	FeatureCollection,
 	LineString,
@@ -6,6 +5,7 @@ import type {
 	Point,
 	Polygon,
 } from "geojson"
+import { describe, expect, it } from "vitest"
 import { fromGeoJSON } from "../src/osm-from-geojson"
 
 describe("@osmix/geojson: createOsmFromGeoJSON", () => {
@@ -275,7 +275,7 @@ describe("@osmix/geojson: createOsmFromGeoJSON", () => {
 		expect(way1?.refs[1]).toBe(way2?.refs[0])
 	})
 
-	it("should error on LineStrings with less than 2 coordinates", () => {
+	it("should error on LineStrings with less than 2 coordinates", async () => {
 		const geojson: FeatureCollection<LineString> = {
 			type: "FeatureCollection",
 			features: [
@@ -290,12 +290,12 @@ describe("@osmix/geojson: createOsmFromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(geojson)).toThrow(
+		await expect(fromGeoJSON(geojson)).rejects.toThrow(
 			"Invalid GeoJSON coordinates in LineString.",
 		)
 	})
 
-	it("should error on LineStrings with invalid coordinates that result in less than 2 valid nodes", () => {
+	it("should error on LineStrings with invalid coordinates that result in less than 2 valid nodes", async () => {
 		const geojson: FeatureCollection<LineString> = {
 			type: "FeatureCollection",
 			features: [
@@ -328,7 +328,7 @@ describe("@osmix/geojson: createOsmFromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(geojson)).toThrow()
+		await expect(fromGeoJSON(geojson)).rejects.toThrow()
 	})
 
 	it("should handle mixed Point and LineString features", async () => {
@@ -682,7 +682,7 @@ describe("@osmix/geojson: createOsmFromGeoJSON", () => {
 		expect(relation?.members[2]?.role).toBe("outer")
 	})
 
-	it("should error on Polygon with unclosed ring", () => {
+	it("should error on Polygon with unclosed ring", async () => {
 		const geojson: FeatureCollection<Polygon> = {
 			type: "FeatureCollection",
 			features: [
@@ -707,7 +707,7 @@ describe("@osmix/geojson: createOsmFromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(geojson)).toThrow(
+		await expect(fromGeoJSON(geojson)).rejects.toThrow(
 			"Outer ring of Polygon is not closed.",
 		)
 	})
@@ -795,7 +795,7 @@ describe("@osmix/geojson: createOsmFromGeoJSON", () => {
 		expect(way?.tags?.["area"]).toBe("yes")
 	})
 
-	it("should error on unclosed hole ring", () => {
+	it("should error on unclosed hole ring", async () => {
 		const geojson: FeatureCollection<Polygon> = {
 			type: "FeatureCollection",
 			features: [
@@ -829,12 +829,12 @@ describe("@osmix/geojson: createOsmFromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(geojson)).toThrow(
+		await expect(fromGeoJSON(geojson)).rejects.toThrow(
 			"Hole ring of Polygon is not closed.",
 		)
 	})
 
-	it("should error on unclosed MultiPolygon ring", () => {
+	it("should error on unclosed MultiPolygon ring", async () => {
 		const geojson: FeatureCollection<MultiPolygon> = {
 			type: "FeatureCollection",
 			features: [
@@ -861,7 +861,7 @@ describe("@osmix/geojson: createOsmFromGeoJSON", () => {
 			],
 		}
 
-		expect(() => fromGeoJSON(geojson)).toThrow(
+		await expect(fromGeoJSON(geojson)).rejects.toThrow(
 			"Outer ring of Polygon is not closed.",
 		)
 	})

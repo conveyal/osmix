@@ -1,5 +1,13 @@
 import { spawnSync } from "node:child_process"
-import { mkdir, mkdtemp, readdir, rename, rm } from "node:fs/promises"
+import {
+	mkdir,
+	mkdtemp,
+	readdir,
+	readFile,
+	rename,
+	rm,
+	writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -17,7 +25,7 @@ interface WorkspacePackage {
 	manifest: PackageJson
 }
 
-const repoRoot = resolve(import.meta.dir, "..")
+const repoRoot = resolve(import.meta.dirname, "..")
 const packagesRoot = join(repoRoot, "packages")
 const smokeDependencies = ["@osmix/core", "osmix"] as const
 const consumerSource = `import assert from "node:assert/strict"
@@ -32,16 +40,27 @@ assert.equal(typeof createRemote, "function")
 console.log("Node/npm smoke test passed")
 `
 
+function npmEnv(): NodeJS.ProcessEnv {
+	const env = { ...process.env }
+	for (const key of Object.keys(env)) {
+		if (key.startsWith("npm_config_")) {
+			delete env[key]
+		}
+	}
+	return env
+}
+
 function run(
 	command: string,
 	args: string[],
 	cwd: string,
-	options: { captureOutput?: boolean } = {},
+	options: { captureOutput?: boolean; cleanNpmEnv?: boolean } = {},
 ): string {
-	const { captureOutput = false } = options
+	const { captureOutput = false, cleanNpmEnv = false } = options
 	const result = spawnSync(command, args, {
 		cwd,
 		encoding: "utf8",
+		env: cleanNpmEnv ? npmEnv() : process.env,
 		stdio: captureOutput ? ["ignore", "pipe", "inherit"] : "inherit",
 	})
 
@@ -63,9 +82,9 @@ async function listWorkspacePackages(): Promise<WorkspacePackage[]> {
 			.filter((entry) => entry.isDirectory())
 			.map(async (entry) => {
 				const dir = join(packagesRoot, entry.name)
-				const manifest = (await Bun.file(
-					getPackageJsonPath(dir),
-				).json()) as PackageJson
+				const manifest = JSON.parse(
+					await readFile(getPackageJsonPath(dir), "utf8"),
+				) as PackageJson
 
 				if (!manifest.name || !manifest.version || manifest.private) {
 					return null
@@ -113,7 +132,7 @@ async function withPublishedManifest<T>(
 ): Promise<T> {
 	const packageJsonPath = getPackageJsonPath(dir)
 
-	await Bun.write(
+	await writeFile(
 		packageJsonPath,
 		serializePackageJson(rewritePkgJsonForDist(manifest)),
 	)
@@ -121,7 +140,7 @@ async function withPublishedManifest<T>(
 	try {
 		return await callback()
 	} finally {
-		await Bun.write(packageJsonPath, serializePackageJson(manifest))
+		await writeFile(packageJsonPath, serializePackageJson(manifest))
 	}
 }
 
@@ -132,12 +151,10 @@ async function packWorkspacePackage(
 	const tarballName = await withPublishedManifest(
 		workspacePackage,
 		async () => {
-			const packedTarball = run(
-				"bun",
-				["pm", "pack", "--quiet"],
-				workspacePackage.dir,
-				{ captureOutput: true },
-			)
+			const packOutput = run("pnpm", ["pack"], workspacePackage.dir, {
+				captureOutput: true,
+			})
+			const packedTarball = packOutput.split("\n").at(-1)?.trim()
 
 			if (!packedTarball) {
 				throw Error(
@@ -178,8 +195,8 @@ async function writeConsumerApp(
 ): Promise<void> {
 	await mkdir(consumerDir, { recursive: true })
 
-	await Bun.write(join(consumerDir, "index.mjs"), consumerSource)
-	await Bun.write(
+	await writeFile(join(consumerDir, "index.mjs"), consumerSource)
+	await writeFile(
 		join(consumerDir, "package.json"),
 		JSON.stringify(
 			{
@@ -202,7 +219,7 @@ async function main(): Promise<void> {
 
 	try {
 		console.log("Building workspace packages for npm smoke test...")
-		run("bun", ["--filter", "./packages/**", "build"], repoRoot)
+		run("pnpm", ["--filter", "./packages/**", "build"], repoRoot)
 
 		const tarballDir = join(tempRoot, "tarballs")
 		await mkdir(tarballDir, { recursive: true })
@@ -220,7 +237,9 @@ async function main(): Promise<void> {
 		await writeConsumerApp(consumerDir, overrides)
 
 		console.log("Installing local tarballs into npm consumer app...")
-		run("npm", ["install", "--no-fund", "--no-audit"], consumerDir)
+		run("npm", ["install", "--no-fund", "--no-audit"], consumerDir, {
+			cleanNpmEnv: true,
+		})
 
 		console.log("Running Node.js import smoke test...")
 		run("node", ["./index.mjs"], consumerDir)
@@ -229,4 +248,4 @@ async function main(): Promise<void> {
 	}
 }
 
-await main()
+void main()

@@ -4,9 +4,9 @@ import monacoPbf from "../../../fixtures/monaco.pbf?url"
 const getPbf = () => fetch(monacoPbf).then((res) => res.arrayBuffer())
 
 describe("DuckDB", () => {
-	const shouldSkip = "Bun" in globalThis || import.meta.env.CI === "true"
+	const shouldSkip = import.meta.env.CI === "true"
 	if (shouldSkip) {
-		it.skip("skips DuckDB tests in Bun or CI", () => {})
+		it.skip("skips DuckDB tests in CI", () => {})
 		return
 	}
 

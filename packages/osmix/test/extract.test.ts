@@ -1,7 +1,7 @@
-import { describe, expect, test } from "bun:test"
 import { Osm } from "@osmix/core"
 import { getFixtureFileReadStream } from "@osmix/shared/fixtures"
 import type { GeoBbox2D } from "@osmix/shared/types"
+import { describe, expect, test } from "vitest"
 import { createExtract } from "../src/extract"
 import { fromPbf, toPbfBuffer, toPbfStream } from "../src/pbf"
 

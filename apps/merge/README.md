@@ -18,7 +18,7 @@ Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PB
 ## Install
 
 ```sh
-bun install
+pnpm install
 ```
 
 Fixture PBF files live in `fixtures/` at the repository root. During development Vite serves this directory as the public asset folder (`publicDir`), so URLs like `./monaco.pbf` resolve without extra copying.
@@ -26,7 +26,7 @@ Fixture PBF files live in `fixtures/` at the repository root. During development
 ## Run the dev server
 
 ```sh
-bun run --filter @osmix/merge dev
+pnpm run --filter @osmix/merge dev
 ```
 
 Vite runs on `http://localhost:5173` by default. Open the “Check system” dialog in the top navigation to confirm the page is secure and cross-origin isolated; polished raster rendering and large array allocations depend on it.
@@ -34,7 +34,7 @@ Vite runs on `http://localhost:5173` by default. Open the “Check system” dia
 ## Build for production
 
 ```sh
-bun run --filter @osmix/merge build
+pnpm run --filter @osmix/merge build
 ```
 
 Artifacts land in `apps/merge/dist/`. Deploy behind an HTTPS origin that sends the same COOP/COEP headers configured in `vite.config.ts`.
@@ -42,8 +42,8 @@ Artifacts land in `apps/merge/dist/`. Deploy behind an HTTPS origin that sends t
 ## End-to-end tests
 
 ```sh
-bunx playwright install --with-deps   # first run
-bun run --filter @osmix/merge test:e2e
+pnpm exec playwright install --with-deps   # first run
+pnpm run --filter @osmix/merge test:e2e
 ```
 
 Tests load sample fixtures from `fixtures/monaco.pbf` and exercise both Merge and Inspect flows.

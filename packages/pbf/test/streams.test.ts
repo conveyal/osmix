@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it } from "vitest"
 import { OsmBlocksToPbfBytesTransformStream } from "../src/blocks-to-pbf"
 import { OsmPbfBytesToBlocksTransformStream } from "../src/pbf-to-blocks"
 import { concatUint8 } from "../src/utils"

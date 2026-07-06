@@ -9,7 +9,7 @@ Convert GTFS (General Transit Feed Specification) transit feeds to OSM format.
 ```bash
 npm install @osmix/gtfs
 # or
-bun add @osmix/gtfs
+pnpm add @osmix/gtfs
 ```
 
 ## Usage

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test"
 import { pointToTile } from "@mapbox/tilebelt"
 import { Osm } from "@osmix/core"
+import { describe, expect, it } from "vitest"
 import { drawToRasterTile } from "../src/raster"
 
 describe("drawToRasterTile", () => {
