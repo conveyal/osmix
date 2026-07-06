@@ -23,10 +23,10 @@ pnpm add @osmix/core
 `@osmix/core` provides the in-memory data structures. To parse `.osm.pbf` files, use the high-level `osmix` package:
 
 ```ts
-import { fromPbf } from "osmix"
+import { fromPbf } from "osmix";
 
-const osm = await fromPbf(Bun.file("./monaco.pbf").stream())
-console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
+const osm = await fromPbf(Bun.file("./monaco.pbf").stream());
+console.log(osm.nodes.size, osm.ways.size, osm.relations.size);
 ```
 
 ### Building data directly
@@ -34,84 +34,77 @@ console.log(osm.nodes.size, osm.ways.size, osm.relations.size)
 For synthetic data or tests, instantiate `Osm` directly and call `buildIndexes()` / `buildSpatialIndexes()` before querying:
 
 ```ts
-import { Osm } from "@osmix/core"
+import { Osm } from "@osmix/core";
 
-const osm = new Osm({ id: "fixture" })
+const osm = new Osm({ id: "fixture" });
 
 osm.nodes.addNode({
-	id: 1,
-	lon: -122.4,
-	lat: 47.6,
-	tags: { amenity: "cafe" },
-})
+  id: 1,
+  lon: -122.4,
+  lat: 47.6,
+  tags: { amenity: "cafe" },
+});
 
 osm.ways.addWay({
-	id: 10,
-	refs: [1],
-	tags: { highway: "service" },
-})
+  id: 10,
+  refs: [1],
+  tags: { highway: "service" },
+});
 
-osm.buildIndexes()
-osm.buildSpatialIndexes()
+osm.buildIndexes();
+osm.buildSpatialIndexes();
 ```
 
 ### Querying entities
 
 ```ts
 // Get by ID
-const node = osm.nodes.getById(123)
-const way = osm.ways.get({ id: 456 })
+const node = osm.nodes.getById(123);
+const way = osm.ways.get({ id: 456 });
 
 // Iterate all entities
 for (const node of osm.nodes) {
-	console.log(node.id, node.lon, node.lat)
+  console.log(node.id, node.lon, node.lat);
 }
 
 // Iterate sorted by ID (useful for PBF export)
 for (const way of osm.ways.sorted()) {
-	console.log(way.id, way.refs)
+  console.log(way.id, way.refs);
 }
 
 // Search by tag key
-const highways = osm.ways.search("highway")
-const cafes = osm.nodes.search("amenity", "cafe")
+const highways = osm.ways.search("highway");
+const cafes = osm.nodes.search("amenity", "cafe");
 ```
 
 ### Spatial queries
 
 ```ts
 // Bounding box query
-const bbox: [number, number, number, number] = [-122.34, 47.57, -122.3, 47.61]
-const { ids, positions } = osm.nodes.withinBbox(bbox)
-const {
-	ids: wayIds,
-	positions: wayCoords,
-	startIndices,
-} = osm.ways.withinBbox(bbox)
+const bbox: [number, number, number, number] = [-122.34, 47.57, -122.3, 47.61];
+const { ids, positions } = osm.nodes.withinBbox(bbox);
+const { ids: wayIds, positions: wayCoords, startIndices } = osm.ways.withinBbox(bbox);
 
 // Radius query (uses great-circle distance)
-const nearbyIndexes = osm.nodes.findIndexesWithinRadius(-122.4, 47.6, 10) // 10km
+const nearbyIndexes = osm.nodes.findIndexesWithinRadius(-122.4, 47.6, 10); // 10km
 
 // Get entities from indexes
-const nearbyNodes = nearbyIndexes.map((i) => osm.nodes.getByIndex(i))
+const nearbyNodes = nearbyIndexes.map((i) => osm.nodes.getByIndex(i));
 
 // Ways/relations use Flatbush for bounding-box intersection
-const intersectingWays = osm.ways.intersects(bbox)
-const nearestWays = osm.ways.neighbors(-122.4, 47.6, 5, 10) // 5 results, 10km max
+const intersectingWays = osm.ways.intersects(bbox);
+const nearestWays = osm.ways.neighbors(-122.4, 47.6, 5, 10); // 5 results, 10km max
 ```
 
 ### Transferring between workers
 
 ```ts
 // In the main thread
-const transferables = osm.transferables()
-worker.postMessage(
-	transferables,
-	Object.values(transferables).filter(ArrayBuffer.isView),
-)
+const transferables = osm.transferables();
+worker.postMessage(transferables, Object.values(transferables).filter(ArrayBuffer.isView));
 
 // In the worker
-const osm = new Osm(transferables)
+const osm = new Osm(transferables);
 // Index is already built, ready for queries
 ```
 

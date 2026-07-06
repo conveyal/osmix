@@ -1,26 +1,26 @@
 {
-	"$schema": "https://json.schemastore.org/package.json",
-	"name": "@osmix/pbf",
-	"version": "0.0.9",
-	"description": "A low level, modern, runtime agnostic OSM PBF parser and writer written in TypeScript.",
-	"license": "MIT",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/conveyal/osmix.git"
-	},
-	"type": "module",
-	"main": "./src/index.ts",
-	"scripts": {
-		"bench": "vitest bench",
-		"build": "tsc -p tsconfig.build.json",
-		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-		"typecheck": "tsc --noEmit"
-	},
-	"dependencies": {
-		"pbf": "catalog:"
-	},
-	"devDependencies": {
-		"@osmix/shared": "workspace:*",
-		"typescript": "catalog:"
-	}
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/pbf",
+  "version": "0.0.9",
+  "description": "A low level, modern, runtime agnostic OSM PBF parser and writer written in TypeScript.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "bench": "vitest bench",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pbf": "catalog:"
+  },
+  "devDependencies": {
+    "@osmix/shared": "workspace:*",
+    "typescript": "catalog:"
+  }
 }

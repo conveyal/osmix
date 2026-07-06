@@ -3,17 +3,17 @@
  * @module
  */
 
-import type { OsmEntityType, OsmInfoParsed, OsmTags } from "@osmix/shared/types"
+import type { OsmEntityType, OsmInfoParsed, OsmTags } from "@osmix/shared/types";
 import type {
-	Feature,
-	GeometryCollection,
-	LineString,
-	MultiLineString,
-	MultiPoint,
-	MultiPolygon,
-	Point,
-	Polygon,
-} from "geojson"
+  Feature,
+  GeometryCollection,
+  LineString,
+  MultiLineString,
+  MultiPoint,
+  MultiPolygon,
+  Point,
+  Polygon,
+} from "geojson";
 
 /**
  * GeoJSON Feature properties for OSM entities.
@@ -22,15 +22,15 @@ import type {
  * All OSM tags are spread into the properties object.
  */
 export type OsmGeoJSONProperties = {
-	/** OSM entity ID. */
-	id: number
-	/** Entity type: "node", "way", or "relation". */
-	type: OsmEntityType
-	/** OSM tags (key-value pairs). */
-	tags?: OsmTags
-	/** Entity metadata (version, timestamp, user, etc.). */
-	info?: OsmInfoParsed
-}
+  /** OSM entity ID. */
+  id: number;
+  /** Entity type: "node", "way", or "relation". */
+  type: OsmEntityType;
+  /** OSM tags (key-value pairs). */
+  tags?: OsmTags;
+  /** Entity metadata (version, timestamp, user, etc.). */
+  info?: OsmInfoParsed;
+};
 
 /**
  * GeoJSON Feature with OSM-specific properties.
@@ -41,15 +41,15 @@ export type OsmGeoJSONProperties = {
  * - Relations → MultiPolygon, MultiLineString, MultiPoint, or GeometryCollection
  */
 export type OsmGeoJSONFeature<
-	T extends
-		| Point
-		| LineString
-		| Polygon
-		| MultiPolygon
-		| MultiLineString
-		| MultiPoint
-		| GeometryCollection,
-> = Feature<T, OsmGeoJSONProperties>
+  T extends
+    | Point
+    | LineString
+    | Polygon
+    | MultiPolygon
+    | MultiLineString
+    | MultiPoint
+    | GeometryCollection,
+> = Feature<T, OsmGeoJSONProperties>;
 
 /**
  * GeoJSON FeatureCollection types that can be imported into an Osm index.
@@ -58,8 +58,8 @@ export type OsmGeoJSONFeature<
  * Other geometry types are not supported for import.
  */
 export type ImportableGeoJSON = GeoJSON.FeatureCollection<
-	GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.MultiPolygon
->
+  GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon | GeoJSON.MultiPolygon
+>;
 
 /**
  * Input types accepted by `fromGeoJSON`.
@@ -70,8 +70,4 @@ export type ImportableGeoJSON = GeoJSON.FeatureCollection<
  * - `string` - JSON string
  * - `ImportableGeoJSON` - Already-parsed FeatureCollection
  */
-export type ReadOsmDataTypes =
-	| ArrayBufferLike
-	| ReadableStream
-	| string
-	| ImportableGeoJSON
+export type ReadOsmDataTypes = ArrayBufferLike | ReadableStream | string | ImportableGeoJSON;

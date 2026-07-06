@@ -1,14 +1,14 @@
 {
-	"$schema": "https://json.schemastore.org/tsconfig",
-	"display": "@osmix/tsconfig/test",
-	"extends": "./base.json",
-	"exclude": ["node_modules", "dist"],
-	"compilerOptions": {
-		"noEmit": true,
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "@osmix/tsconfig/test",
+  "extends": "./base.json",
+  "exclude": ["node_modules", "dist"],
+  "compilerOptions": {
+    "noEmit": true,
 
-		"noUncheckedIndexedAccess": false,
-		"noUnusedLocals": false,
-		"noUnusedParameters": false,
-		"noPropertyAccessFromIndexSignature": false
-	}
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false
+  }
 }

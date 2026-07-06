@@ -21,11 +21,8 @@
  * // TypeScript now knows item is non-nullable
  * ```
  */
-export function assertValue<T>(
-	value?: T,
-	message?: string,
-): asserts value is NonNullable<T> {
-	if (value === undefined || value === null) {
-		throw Error(message ?? "Value is undefined or null")
-	}
+export function assertValue<T>(value?: T, message?: string): asserts value is NonNullable<T> {
+  if (value === undefined || value === null) {
+    throw Error(message ?? "Value is undefined or null");
+  }
 }

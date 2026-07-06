@@ -24,24 +24,20 @@ You will typically install this alongside [`@osmix/core`](../core/README.md), wh
 ### Build and apply a changeset
 
 ```ts
-import { Osmix } from "osmix"
-import {
-	OsmixChangeset,
-	changeStatsSummary,
-	applyChangesToOsm,
-} from "@osmix/change"
+import { Osmix } from "osmix";
+import { OsmixChangeset, changeStatsSummary, applyChangesToOsm } from "@osmix/change";
 
-const base = await Osmix.fromPbf(Bun.file("./monaco.pbf").stream())
-const patch = await Osmix.fromPbf(Bun.file("./monaco-changes.pbf").stream())
+const base = await Osmix.fromPbf(Bun.file("./monaco.pbf").stream());
+const patch = await Osmix.fromPbf(Bun.file("./monaco-changes.pbf").stream());
 
-const changeset = new OsmixChangeset(base)
-changeset.deduplicateNodes(base.nodes)
-changeset.deduplicateWays(base.ways)
-changeset.generateDirectChanges(patch)
+const changeset = new OsmixChangeset(base);
+changeset.deduplicateNodes(base.nodes);
+changeset.deduplicateWays(base.ways);
+changeset.generateDirectChanges(patch);
 
-console.log(changeStatsSummary(changeset.stats))
+console.log(changeStatsSummary(changeset.stats));
 
-const merged = applyChangesToOsm(changeset)
+const merged = applyChangesToOsm(changeset);
 ```
 
 `OsmixChangeset` keeps track of creates/modifies/deletes per entity type. Call the helpers (`deduplicateNodes`, `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, etc.) in whatever order your workflow requires, then use `applyChangesToOsm()` to produce a new `Osm` instance with the edits applied.
@@ -49,14 +45,14 @@ const merged = applyChangesToOsm(changeset)
 ### Run the bundled merge pipeline
 
 ```ts
-import { merge } from "@osmix/change"
+import { merge } from "@osmix/change";
 
 const combined = await merge(base, patch, {
-	directMerge: true,
-	deduplicateNodes: true,
-	deduplicateWays: true,
-	createIntersections: true,
-})
+  directMerge: true,
+  deduplicateNodes: true,
+  deduplicateWays: true,
+  createIntersections: true,
+});
 ```
 
 `merge` wraps a sequence of changesets that deduplicate each dataset, optionally create intersections, and (when `directMerge` is true) generate modifications that reconcile the patch into the base. All options default to `false`, so you can enable only the stages you need.
@@ -100,15 +96,15 @@ Applies all pending changes in the changeset to produce a **new** `Osm` instance
 By default, all `OsmChange` records include an `oldEntity` field for modifications and deletions, capturing the entity's state before the change. This follows the [Overpass API Augmented Diffs](https://wiki.openstreetmap.org/wiki/Overpass_API/Augmented_Diffs) format.
 
 ```ts
-import { OsmChangeset } from "@osmix/change"
+import { OsmChangeset } from "@osmix/change";
 
-const changeset = new OsmChangeset(base)
-changeset.generateDirectChanges(patch)
+const changeset = new OsmChangeset(base);
+changeset.generateDirectChanges(patch);
 
 // Access the old and new state for a modified entity
-const wayChange = changeset.wayChanges[wayId]
-console.log("Old tags:", wayChange.oldEntity?.tags)
-console.log("New tags:", wayChange.entity.tags)
+const wayChange = changeset.wayChanges[wayId];
+console.log("Old tags:", wayChange.oldEntity?.tags);
+console.log("New tags:", wayChange.entity.tags);
 ```
 
 ### `generateOscChanges(changeset, options?)`
@@ -116,13 +112,13 @@ console.log("New tags:", wayChange.entity.tags)
 Generates OSC (OSM Change) XML format from a changeset.
 
 ```ts
-import { generateOscChanges } from "@osmix/change"
+import { generateOscChanges } from "@osmix/change";
 
 // Generate standard OSC for API uploads (default)
-const osc = generateOscChanges(changeset)
+const osc = generateOscChanges(changeset);
 
 // Generate augmented diff with old/new sections
-const augmentedOsc = generateOscChanges(changeset, { augmented: true })
+const augmentedOsc = generateOscChanges(changeset, { augmented: true });
 ```
 
 Options:

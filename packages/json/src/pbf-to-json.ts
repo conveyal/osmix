@@ -8,13 +8,13 @@
  */
 
 import {
-	type OsmPbfBlock,
-	OsmPbfBytesToBlocksTransformStream,
-	type OsmPbfHeaderBlock,
-} from "@osmix/pbf"
-import type { OsmEntity } from "@osmix/shared/types"
+  type OsmPbfBlock,
+  OsmPbfBytesToBlocksTransformStream,
+  type OsmPbfHeaderBlock,
+} from "@osmix/pbf";
+import type { OsmEntity } from "@osmix/shared/types";
 
-import { OsmPbfBlockParser } from "./osm-pbf-block-parser.ts"
+import { OsmPbfBlockParser } from "./osm-pbf-block-parser.ts";
 
 /**
  * Convert a PBF byte stream into a stream of JSON entities.
@@ -44,9 +44,9 @@ import { OsmPbfBlockParser } from "./osm-pbf-block-parser.ts"
  * ```
  */
 export function osmPbfToJson(pbf: ReadableStream<Uint8Array<ArrayBufferLike>>) {
-	return pbf
-		.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
-		.pipeThrough(new OsmBlocksToJsonTransformStream())
+  return pbf
+    .pipeThrough(new OsmPbfBytesToBlocksTransformStream())
+    .pipeThrough(new OsmBlocksToJsonTransformStream());
 }
 
 /**
@@ -62,22 +62,22 @@ export function osmPbfToJson(pbf: ReadableStream<Uint8Array<ArrayBufferLike>>) {
  * ```
  */
 export class OsmBlocksToJsonTransformStream extends TransformStream<
-	OsmPbfHeaderBlock | OsmPbfBlock,
-	OsmPbfHeaderBlock | OsmEntity
+  OsmPbfHeaderBlock | OsmPbfBlock,
+  OsmPbfHeaderBlock | OsmEntity
 > {
-	constructor() {
-		super({
-			transform: async (block, controller) => {
-				if ("primitivegroup" in block) {
-					for (const entity of blocksToJsonEntities(block)) {
-						controller.enqueue(entity)
-					}
-				} else {
-					controller.enqueue(block)
-				}
-			},
-		})
-	}
+  constructor() {
+    super({
+      transform: async (block, controller) => {
+        if ("primitivegroup" in block) {
+          for (const entity of blocksToJsonEntities(block)) {
+            controller.enqueue(entity);
+          }
+        } else {
+          controller.enqueue(block);
+        }
+      },
+    });
+  }
 }
 
 /**
@@ -89,30 +89,28 @@ export class OsmBlocksToJsonTransformStream extends TransformStream<
  * @param block - Parsed primitive block with string table and groups.
  * @yields Individual OsmNode, OsmWay, or OsmRelation objects.
  */
-export function* blocksToJsonEntities(
-	block: OsmPbfBlock,
-): Generator<OsmEntity> {
-	const blockParser = new OsmPbfBlockParser(block)
-	for (const group of blockParser.primitivegroup) {
-		if (group.nodes.length > 0) {
-			for (const n of group.nodes) {
-				yield blockParser.parseNode(n)
-			}
-		}
-		if (group.dense != null) {
-			for (const node of blockParser.parseDenseNodes(group.dense)) {
-				yield node
-			}
-		}
-		if (group.ways.length > 0) {
-			for (const w of group.ways) {
-				yield blockParser.parseWay(w)
-			}
-		}
-		if (group.relations.length > 0) {
-			for (const r of group.relations) {
-				yield blockParser.parseRelation(r)
-			}
-		}
-	}
+export function* blocksToJsonEntities(block: OsmPbfBlock): Generator<OsmEntity> {
+  const blockParser = new OsmPbfBlockParser(block);
+  for (const group of blockParser.primitivegroup) {
+    if (group.nodes.length > 0) {
+      for (const n of group.nodes) {
+        yield blockParser.parseNode(n);
+      }
+    }
+    if (group.dense != null) {
+      for (const node of blockParser.parseDenseNodes(group.dense)) {
+        yield node;
+      }
+    }
+    if (group.ways.length > 0) {
+      for (const w of group.ways) {
+        yield blockParser.parseWay(w);
+      }
+    }
+    if (group.relations.length > 0) {
+      for (const r of group.relations) {
+        yield blockParser.parseRelation(r);
+      }
+    }
+  }
 }

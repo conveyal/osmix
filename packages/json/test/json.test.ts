@@ -1,66 +1,66 @@
 import {
-	OsmBlocksToPbfBytesTransformStream,
-	OsmPbfBytesToBlocksTransformStream,
-	type OsmPbfHeaderBlock,
-	readOsmPbf,
-	testOsmPbfReader,
-} from "@osmix/pbf"
-import { getFixtureFileReadStream, PBFs } from "@osmix/shared/fixtures"
-import { describe, expect, it } from "vitest"
+  OsmBlocksToPbfBytesTransformStream,
+  OsmPbfBytesToBlocksTransformStream,
+  type OsmPbfHeaderBlock,
+  readOsmPbf,
+  testOsmPbfReader,
+} from "@osmix/pbf";
+import { getFixtureFileReadStream, PBFs } from "@osmix/shared/fixtures";
+import { describe, expect, it } from "vitest";
 
-import { OsmJsonToBlocksTransformStream } from "../src/json-to-pbf"
-import { OsmBlocksToJsonTransformStream } from "../src/pbf-to-json"
+import { OsmJsonToBlocksTransformStream } from "../src/json-to-pbf";
+import { OsmBlocksToJsonTransformStream } from "../src/pbf-to-json";
 
 describe("pbf json", () => {
-	describe.each(Object.entries(PBFs))("%s", async (_name, pbf) => {
-		it("parse all entities", async () => {
-			const file = getFixtureFileReadStream(pbf.url)
-			let header: OsmPbfHeaderBlock | undefined
-			let entityCount = 0
-			await file
-				.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
-				.pipeThrough(new OsmBlocksToJsonTransformStream())
-				.pipeTo(
-					new WritableStream({
-						write: (entity) => {
-							if ("id" in entity) {
-								entityCount++
-							} else {
-								header = entity
-							}
-						},
-					}),
-				)
+  describe.each(Object.entries(PBFs))("%s", async (_name, pbf) => {
+    it("parse all entities", async () => {
+      const file = getFixtureFileReadStream(pbf.url);
+      let header: OsmPbfHeaderBlock | undefined;
+      let entityCount = 0;
+      await file
+        .pipeThrough(new OsmPbfBytesToBlocksTransformStream())
+        .pipeThrough(new OsmBlocksToJsonTransformStream())
+        .pipeTo(
+          new WritableStream({
+            write: (entity) => {
+              if ("id" in entity) {
+                entityCount++;
+              } else {
+                header = entity;
+              }
+            },
+          }),
+        );
 
-			expect(header?.bbox).toEqual(pbf.bbox)
-			expect(entityCount).toBe(pbf.nodes + pbf.ways + pbf.relations)
-		})
+      expect(header?.bbox).toEqual(pbf.bbox);
+      expect(entityCount).toBe(pbf.nodes + pbf.ways + pbf.relations);
+    });
 
-		it("build from parsed entites", async () => {
-			const file = getFixtureFileReadStream(pbf.url)
+    it("build from parsed entites", async () => {
+      const file = getFixtureFileReadStream(pbf.url);
 
-			// Write the PBF to an array buffer
-			let data = new Uint8Array(0)
-			await file
-				.pipeThrough(new OsmPbfBytesToBlocksTransformStream())
-				.pipeThrough(new OsmBlocksToJsonTransformStream()) // Convert PBF blocks to JSON entities
-				.pipeThrough(new OsmJsonToBlocksTransformStream()) // And convert right back to PBF blocks
-				.pipeThrough(new OsmBlocksToPbfBytesTransformStream())
-				.pipeTo(
-					new WritableStream({
-						write: (buffer) => {
-							const chunk = new Uint8Array(buffer)
-							const newData = new Uint8Array(data.length + chunk.length)
-							newData.set(data)
-							newData.set(chunk, data.length)
-							data = newData
-						},
-					}),
-				)
+      // Write the PBF to an array buffer
+      let data = new Uint8Array(0);
+      await file
+        .pipeThrough(new OsmPbfBytesToBlocksTransformStream())
+        .pipeThrough(new OsmBlocksToJsonTransformStream()) // Convert PBF blocks to JSON entities
+        .pipeThrough(new OsmJsonToBlocksTransformStream()) // And convert right back to PBF blocks
+        .pipeThrough(new OsmBlocksToPbfBytesTransformStream())
+        .pipeTo(
+          new WritableStream({
+            write: (buffer) => {
+              const chunk = new Uint8Array(buffer);
+              const newData = new Uint8Array(data.length + chunk.length);
+              newData.set(data);
+              newData.set(chunk, data.length);
+              data = newData;
+            },
+          }),
+        );
 
-			// Re-parse the new PBF and test
-			const osm2 = await readOsmPbf(data)
-			await testOsmPbfReader(osm2, pbf)
-		})
-	})
-})
+      // Re-parse the new PBF and test
+      const osm2 = await readOsmPbf(data);
+      await testOsmPbfReader(osm2, pbf);
+    });
+  });
+});

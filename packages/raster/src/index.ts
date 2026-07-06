@@ -25,4 +25,4 @@
  * @module @osmix/raster
  */
 
-export * from "./raster-tile.ts"
+export * from "./raster-tile.ts";

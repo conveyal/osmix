@@ -1,8 +1,7 @@
-import { supportsReadableStreamTransfer } from "./utils.ts"
+import { supportsReadableStreamTransfer } from "./utils.ts";
 
-export const SUPPORTS_STREAM_TRANSFER = supportsReadableStreamTransfer()
-export const SUPPORTS_SHARED_ARRAY_BUFFER =
-	typeof SharedArrayBuffer !== "undefined"
+export const SUPPORTS_STREAM_TRANSFER = supportsReadableStreamTransfer();
+export const SUPPORTS_SHARED_ARRAY_BUFFER = typeof SharedArrayBuffer !== "undefined";
 
 /**
  * The default number of workers to use.
@@ -10,5 +9,5 @@ export const SUPPORTS_SHARED_ARRAY_BUFFER =
  * Otherwise, use a single worker.
  */
 export const DEFAULT_WORKER_COUNT = SUPPORTS_SHARED_ARRAY_BUFFER
-	? (navigator.hardwareConcurrency ?? 1)
-	: 1
+  ? (navigator.hardwareConcurrency ?? 1)
+  : 1;

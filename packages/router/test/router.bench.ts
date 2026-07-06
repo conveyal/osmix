@@ -1,10 +1,10 @@
-import { Osm } from "@osmix/core"
-import { getFixtureFile, PBFs } from "@osmix/shared/fixtures"
-import { bench, group, run } from "mitata"
-import { fromPbf } from "osmix"
+import { Osm } from "@osmix/core";
+import { getFixtureFile, PBFs } from "@osmix/shared/fixtures";
+import { bench, group, run } from "mitata";
+import { fromPbf } from "osmix";
 
-import { buildGraph } from "../src/index.ts"
-import { Router } from "../src/router.ts"
+import { buildGraph } from "../src/index.ts";
+import { Router } from "../src/router.ts";
 
 /**
  * Router Benchmark Suite using mitata
@@ -29,230 +29,214 @@ import { Router } from "../src/router.ts"
  * @param spacing - Spacing between nodes in degrees (~100m per 0.001)
  */
 function createSyntheticGrid(size: number, spacing: number): Osm {
-	const osm = new Osm({ id: "synthetic-grid" })
+  const osm = new Osm({ id: "synthetic-grid" });
 
-	// Create nodes in a grid pattern
-	for (let row = 0; row < size; row++) {
-		for (let col = 0; col < size; col++) {
-			const nodeId = row * size + col + 1
-			osm.nodes.addNode({
-				id: nodeId,
-				lat: row * spacing,
-				lon: col * spacing,
-			})
-		}
-	}
+  // Create nodes in a grid pattern
+  for (let row = 0; row < size; row++) {
+    for (let col = 0; col < size; col++) {
+      const nodeId = row * size + col + 1;
+      osm.nodes.addNode({
+        id: nodeId,
+        lat: row * spacing,
+        lon: col * spacing,
+      });
+    }
+  }
 
-	osm.nodes.buildIndex()
-	osm.nodes.buildSpatialIndex()
+  osm.nodes.buildIndex();
+  osm.nodes.buildSpatialIndex();
 
-	// Create horizontal ways (connecting nodes in each row)
-	let wayId = 1
-	for (let row = 0; row < size; row++) {
-		const refs: number[] = []
-		for (let col = 0; col < size; col++) {
-			refs.push(row * size + col + 1)
-		}
-		osm.ways.addWay({
-			id: wayId++,
-			refs,
-			tags: { highway: "residential" },
-		})
-	}
+  // Create horizontal ways (connecting nodes in each row)
+  let wayId = 1;
+  for (let row = 0; row < size; row++) {
+    const refs: number[] = [];
+    for (let col = 0; col < size; col++) {
+      refs.push(row * size + col + 1);
+    }
+    osm.ways.addWay({
+      id: wayId++,
+      refs,
+      tags: { highway: "residential" },
+    });
+  }
 
-	// Create vertical ways (connecting nodes in each column)
-	for (let col = 0; col < size; col++) {
-		const refs: number[] = []
-		for (let row = 0; row < size; row++) {
-			refs.push(row * size + col + 1)
-		}
-		osm.ways.addWay({
-			id: wayId++,
-			refs,
-			tags: { highway: "residential" },
-		})
-	}
+  // Create vertical ways (connecting nodes in each column)
+  for (let col = 0; col < size; col++) {
+    const refs: number[] = [];
+    for (let row = 0; row < size; row++) {
+      refs.push(row * size + col + 1);
+    }
+    osm.ways.addWay({
+      id: wayId++,
+      refs,
+      tags: { highway: "residential" },
+    });
+  }
 
-	osm.ways.buildIndex()
-	osm.ways.buildSpatialIndex()
-	osm.buildIndexes()
+  osm.ways.buildIndex();
+  osm.ways.buildSpatialIndex();
+  osm.buildIndexes();
 
-	return osm
+  return osm;
 }
 
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
 
-console.log("Setting up benchmark data...")
+console.log("Setting up benchmark data...");
 
 // Load Monaco PBF
-const monacoPbf = PBFs["monaco"]!
-const pbfData = await getFixtureFile(monacoPbf.url)
+const monacoPbf = PBFs["monaco"]!;
+const pbfData = await getFixtureFile(monacoPbf.url);
 const monacoOsm = await fromPbf(pbfData, {
-	buildSpatialIndexes: ["node", "way"],
-})
-const monacoGraph = buildGraph(monacoOsm)
-const monacoRouter = new Router(monacoOsm, monacoGraph)
+  buildSpatialIndexes: ["node", "way"],
+});
+const monacoGraph = buildGraph(monacoOsm);
+const monacoRouter = new Router(monacoOsm, monacoGraph);
 
 // Create synthetic grid
-const GRID_SIZE = 50
-const GRID_SPACING = 0.001
-const gridOsm = createSyntheticGrid(GRID_SIZE, GRID_SPACING)
-const gridGraph = buildGraph(gridOsm)
-const gridRouter = new Router(gridOsm, gridGraph)
+const GRID_SIZE = 50;
+const GRID_SPACING = 0.001;
+const gridOsm = createSyntheticGrid(GRID_SIZE, GRID_SPACING);
+const gridGraph = buildGraph(gridOsm);
+const gridRouter = new Router(gridOsm, gridGraph);
 
 // Pre-snap coordinates to node indexes for benchmarking
 const monacoShortFrom = monacoGraph.findNearestRoutableNode(
-	monacoOsm,
-	[7.42, 43.735],
-	500,
-)!.nodeIndex
+  monacoOsm,
+  [7.42, 43.735],
+  500,
+)!.nodeIndex;
 const monacoShortTo = monacoGraph.findNearestRoutableNode(
-	monacoOsm,
-	[7.425, 43.738],
-	500,
-)!.nodeIndex
+  monacoOsm,
+  [7.425, 43.738],
+  500,
+)!.nodeIndex;
 const monacoLongFrom = monacoGraph.findNearestRoutableNode(
-	monacoOsm,
-	[7.41, 43.725],
-	500,
-)!.nodeIndex
-const monacoLongTo = monacoGraph.findNearestRoutableNode(
-	monacoOsm,
-	[7.44, 43.745],
-	500,
-)!.nodeIndex
+  monacoOsm,
+  [7.41, 43.725],
+  500,
+)!.nodeIndex;
+const monacoLongTo = monacoGraph.findNearestRoutableNode(monacoOsm, [7.44, 43.745], 500)!.nodeIndex;
 
-const gridShortFrom = gridGraph.findNearestRoutableNode(
-	gridOsm,
-	[0.01, 0.01],
-	200,
-)!.nodeIndex
-const gridShortTo = gridGraph.findNearestRoutableNode(
-	gridOsm,
-	[0.015, 0.015],
-	200,
-)!.nodeIndex
-const gridLongFrom = gridGraph.findNearestRoutableNode(
-	gridOsm,
-	[0, 0],
-	200,
-)!.nodeIndex
+const gridShortFrom = gridGraph.findNearestRoutableNode(gridOsm, [0.01, 0.01], 200)!.nodeIndex;
+const gridShortTo = gridGraph.findNearestRoutableNode(gridOsm, [0.015, 0.015], 200)!.nodeIndex;
+const gridLongFrom = gridGraph.findNearestRoutableNode(gridOsm, [0, 0], 200)!.nodeIndex;
 const gridLongTo = gridGraph.findNearestRoutableNode(
-	gridOsm,
-	[(GRID_SIZE - 1) * GRID_SPACING, (GRID_SIZE - 1) * GRID_SPACING],
-	200,
-)!.nodeIndex
+  gridOsm,
+  [(GRID_SIZE - 1) * GRID_SPACING, (GRID_SIZE - 1) * GRID_SPACING],
+  200,
+)!.nodeIndex;
 
-console.log("Setup complete. Running benchmarks...\n")
+console.log("Setup complete. Running benchmarks...\n");
 
 // ---------------------------------------------------------------------------
 // Monaco PBF Benchmarks
 // ---------------------------------------------------------------------------
 
 group("Monaco - Short Distance (~500m)", () => {
-	bench("Dijkstra", () => {
-		monacoRouter.route(monacoShortFrom, monacoShortTo, {
-			algorithm: "dijkstra",
-		})
-	})
+  bench("Dijkstra", () => {
+    monacoRouter.route(monacoShortFrom, monacoShortTo, {
+      algorithm: "dijkstra",
+    });
+  });
 
-	bench("A*", () => {
-		monacoRouter.route(monacoShortFrom, monacoShortTo, {
-			algorithm: "astar",
-		})
-	})
+  bench("A*", () => {
+    monacoRouter.route(monacoShortFrom, monacoShortTo, {
+      algorithm: "astar",
+    });
+  });
 
-	bench("Bidirectional", () => {
-		monacoRouter.route(monacoShortFrom, monacoShortTo, {
-			algorithm: "bidirectional",
-		})
-	})
-})
+  bench("Bidirectional", () => {
+    monacoRouter.route(monacoShortFrom, monacoShortTo, {
+      algorithm: "bidirectional",
+    });
+  });
+});
 
 group("Monaco - Long Distance (~2km)", () => {
-	bench("Dijkstra", () => {
-		monacoRouter.route(monacoLongFrom, monacoLongTo, {
-			algorithm: "dijkstra",
-		})
-	})
+  bench("Dijkstra", () => {
+    monacoRouter.route(monacoLongFrom, monacoLongTo, {
+      algorithm: "dijkstra",
+    });
+  });
 
-	bench("A*", () => {
-		monacoRouter.route(monacoLongFrom, monacoLongTo, {
-			algorithm: "astar",
-		})
-	})
+  bench("A*", () => {
+    monacoRouter.route(monacoLongFrom, monacoLongTo, {
+      algorithm: "astar",
+    });
+  });
 
-	bench("Bidirectional", () => {
-		monacoRouter.route(monacoLongFrom, monacoLongTo, {
-			algorithm: "bidirectional",
-		})
-	})
-})
+  bench("Bidirectional", () => {
+    monacoRouter.route(monacoLongFrom, monacoLongTo, {
+      algorithm: "bidirectional",
+    });
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Synthetic Grid Benchmarks
 // ---------------------------------------------------------------------------
 
 group("Grid 50x50 - Short Path", () => {
-	bench("Dijkstra", () => {
-		gridRouter.route(gridShortFrom, gridShortTo, {
-			algorithm: "dijkstra",
-		})
-	})
+  bench("Dijkstra", () => {
+    gridRouter.route(gridShortFrom, gridShortTo, {
+      algorithm: "dijkstra",
+    });
+  });
 
-	bench("A*", () => {
-		gridRouter.route(gridShortFrom, gridShortTo, {
-			algorithm: "astar",
-		})
-	})
+  bench("A*", () => {
+    gridRouter.route(gridShortFrom, gridShortTo, {
+      algorithm: "astar",
+    });
+  });
 
-	bench("Bidirectional", () => {
-		gridRouter.route(gridShortFrom, gridShortTo, {
-			algorithm: "bidirectional",
-		})
-	})
-})
+  bench("Bidirectional", () => {
+    gridRouter.route(gridShortFrom, gridShortTo, {
+      algorithm: "bidirectional",
+    });
+  });
+});
 
 group("Grid 50x50 - Long Path (corner to corner)", () => {
-	bench("Dijkstra", () => {
-		gridRouter.route(gridLongFrom, gridLongTo, {
-			algorithm: "dijkstra",
-		})
-	})
+  bench("Dijkstra", () => {
+    gridRouter.route(gridLongFrom, gridLongTo, {
+      algorithm: "dijkstra",
+    });
+  });
 
-	bench("A*", () => {
-		gridRouter.route(gridLongFrom, gridLongTo, {
-			algorithm: "astar",
-		})
-	})
+  bench("A*", () => {
+    gridRouter.route(gridLongFrom, gridLongTo, {
+      algorithm: "astar",
+    });
+  });
 
-	bench("Bidirectional", () => {
-		gridRouter.route(gridLongFrom, gridLongTo, {
-			algorithm: "bidirectional",
-		})
-	})
-})
+  bench("Bidirectional", () => {
+    gridRouter.route(gridLongFrom, gridLongTo, {
+      algorithm: "bidirectional",
+    });
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Router Initialization Benchmarks
 // ---------------------------------------------------------------------------
 
 group("Router Initialization", () => {
-	bench("Monaco OSM (14k nodes, 3k ways)", () => {
-		new Router(monacoOsm, buildGraph(monacoOsm))
-	})
+  bench("Monaco OSM (14k nodes, 3k ways)", () => {
+    new Router(monacoOsm, buildGraph(monacoOsm));
+  });
 
-	bench("Grid 50x50 (2.5k nodes)", () => {
-		new Router(gridOsm, buildGraph(gridOsm))
-	})
-})
+  bench("Grid 50x50 (2.5k nodes)", () => {
+    new Router(gridOsm, buildGraph(gridOsm));
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Run benchmarks
 // ---------------------------------------------------------------------------
 
 await run({
-	colors: true,
-})
+  colors: true,
+});

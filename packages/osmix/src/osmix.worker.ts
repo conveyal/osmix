@@ -19,8 +19,8 @@
  * expose(new MyWorker())
  */
 
-import { expose } from "comlink"
+import { expose } from "comlink";
 
-import { OsmixWorker } from "./worker.ts"
+import { OsmixWorker } from "./worker.ts";
 
-expose(new OsmixWorker())
+expose(new OsmixWorker());

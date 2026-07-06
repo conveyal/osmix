@@ -1,21 +1,17 @@
-import { PbfReader } from "pbf"
+import { PbfReader } from "pbf";
 
-import { osmPbfBlobsToBlocksGenerator } from "./blobs-to-blocks.ts"
-import { createOsmPbfBlobGenerator } from "./pbf-to-blobs.ts"
+import { osmPbfBlobsToBlocksGenerator } from "./blobs-to-blocks.ts";
+import { createOsmPbfBlobGenerator } from "./pbf-to-blobs.ts";
 import {
-	type OsmPbfBlock,
-	type OsmPbfHeaderBlock,
-	readHeaderBlock,
-	readPrimitiveBlock,
-} from "./proto/osmformat.ts"
-import {
-	type AsyncGeneratorValue,
-	toAsyncGenerator,
-	webDecompress,
-} from "./utils.ts"
+  type OsmPbfBlock,
+  type OsmPbfHeaderBlock,
+  readHeaderBlock,
+  readPrimitiveBlock,
+} from "./proto/osmformat.ts";
+import { type AsyncGeneratorValue, toAsyncGenerator, webDecompress } from "./utils.ts";
 
 /** Number of bytes used to encode the BlobHeader length prefix (big-endian uint32). */
-export const HEADER_LENGTH_BYTES = 4
+export const HEADER_LENGTH_BYTES = 4;
 
 /**
  * Parse an OSM PBF file from various input sources.
@@ -46,27 +42,25 @@ export const HEADER_LENGTH_BYTES = 4
  * }
  * ```
  */
-export async function readOsmPbf(
-	data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
-) {
-	const generateBlobsFromChunk = createOsmPbfBlobGenerator()
-	const blocks = osmPbfBlobsToBlocksGenerator(
-		(async function* () {
-			for await (const chunk of toAsyncGenerator(data)) {
-				for (const blob of generateBlobsFromChunk(chunk)) {
-					yield blob
-				}
-			}
-		})(),
-	)
-	const header = (await blocks.next()).value
-	if (header == null || !("required_features" in header)) {
-		throw Error("OSM PBF header block not found")
-	}
-	return {
-		header,
-		blocks: blocks as AsyncGenerator<OsmPbfBlock>,
-	}
+export async function readOsmPbf(data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>) {
+  const generateBlobsFromChunk = createOsmPbfBlobGenerator();
+  const blocks = osmPbfBlobsToBlocksGenerator(
+    (async function* () {
+      for await (const chunk of toAsyncGenerator(data)) {
+        for (const blob of generateBlobsFromChunk(chunk)) {
+          yield blob;
+        }
+      }
+    })(),
+  );
+  const header = (await blocks.next()).value;
+  if (header == null || !("required_features" in header)) {
+    throw Error("OSM PBF header block not found");
+  }
+  return {
+    header,
+    blocks: blocks as AsyncGenerator<OsmPbfBlock>,
+  };
 }
 
 /**
@@ -90,29 +84,27 @@ export async function readOsmPbf(
  * ```
  */
 export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
-	Uint8Array<ArrayBufferLike>,
-	OsmPbfHeaderBlock | OsmPbfBlock
+  Uint8Array<ArrayBufferLike>,
+  OsmPbfHeaderBlock | OsmPbfBlock
 > {
-	generateBlobsFromChunk = createOsmPbfBlobGenerator()
-	header: OsmPbfHeaderBlock | null = null
-	constructor(
-		decompress: (
-			data: Uint8Array<ArrayBuffer>,
-		) => Promise<Uint8Array<ArrayBuffer>> = webDecompress,
-	) {
-		super({
-			transform: async (bytesChunk, controller) => {
-				for (const rawBlobs of this.generateBlobsFromChunk(bytesChunk)) {
-					const decompressed = await decompress(rawBlobs)
-					const pbf = new PbfReader(decompressed)
-					if (this.header == null) {
-						this.header = readHeaderBlock(pbf)
-						controller.enqueue(this.header)
-					} else {
-						controller.enqueue(readPrimitiveBlock(pbf))
-					}
-				}
-			},
-		})
-	}
+  generateBlobsFromChunk = createOsmPbfBlobGenerator();
+  header: OsmPbfHeaderBlock | null = null;
+  constructor(
+    decompress: (data: Uint8Array<ArrayBuffer>) => Promise<Uint8Array<ArrayBuffer>> = webDecompress,
+  ) {
+    super({
+      transform: async (bytesChunk, controller) => {
+        for (const rawBlobs of this.generateBlobsFromChunk(bytesChunk)) {
+          const decompressed = await decompress(rawBlobs);
+          const pbf = new PbfReader(decompressed);
+          if (this.header == null) {
+            this.header = readHeaderBlock(pbf);
+            controller.enqueue(this.header);
+          } else {
+            controller.enqueue(readPrimitiveBlock(pbf));
+          }
+        }
+      },
+    });
+  }
 }

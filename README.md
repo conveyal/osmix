@@ -26,60 +26,52 @@ pnpm add osmix
 ### Examples
 
 ```ts
-import {
-	fromPbf,
-	toPbfBuffer,
-	transformOsmPbfToJson,
-	merge,
-	isNode,
-} from "osmix"
+import { fromPbf, toPbfBuffer, transformOsmPbfToJson, merge, isNode } from "osmix";
 
 // Load a PBF file
-const osm = await fromPbf(Bun.file("./monaco.pbf").stream())
+const osm = await fromPbf(Bun.file("./monaco.pbf").stream());
 
 // Query entities by ID
-const node = osm.nodes.getById(123456)
-const way = osm.ways.getById(789012)
-const relation = osm.relations.getById(345678)
+const node = osm.nodes.getById(123456);
+const way = osm.ways.getById(789012);
+const relation = osm.relations.getById(345678);
 
 // Spatial queries with bounding box
-const bbox: [number, number, number, number] = [7.41, 43.72, 7.43, 43.74]
-const nodeResults = osm.nodes.withinBbox(bbox)
-const wayResults = osm.ways.withinBbox(bbox)
-console.log(
-	`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways`,
-)
+const bbox: [number, number, number, number] = [7.41, 43.72, 7.43, 43.74];
+const nodeResults = osm.nodes.withinBbox(bbox);
+const wayResults = osm.ways.withinBbox(bbox);
+console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways`);
 
 // Stream parse a PBF into JSON entities
-const stream = transformOsmPbfToJson(Bun.file("./monaco.pbf").stream())
+const stream = transformOsmPbfToJson(Bun.file("./monaco.pbf").stream());
 for await (const entity of stream) {
-	if ("id" in entity) {
-		console.log(entity.id, entity.tags)
-		if (isNode(entity)) {
-			console.log(entity.lon, entity.lat)
-		}
-	}
+  if ("id" in entity) {
+    console.log(entity.id, entity.tags);
+    if (isNode(entity)) {
+      console.log(entity.lon, entity.lat);
+    }
+  }
 }
 
 // Write the PBF
-await Bun.write("./new-monaco.pbf", await toPbfBuffer(osm))
+await Bun.write("./new-monaco.pbf", await toPbfBuffer(osm));
 
 // Merge two OSM PBF files
-const patchOsm = await fromPbf(Bun.file("./monaco-patch.pbf").stream())
-const mergedOsm = merge(osm, patchOsm)
+const patchOsm = await fromPbf(Bun.file("./monaco-patch.pbf").stream());
+const mergedOsm = merge(osm, patchOsm);
 ```
 
 ### Use in a Web Worker
 
 ```ts
-import { createRemote } from "osmix"
+import { createRemote } from "osmix";
 
 // main.ts
-const remote = await createRemote()
-const osm = await remote.fromPbf(monacoPbf) // Returns a dataset handle
+const remote = await createRemote();
+const osm = await remote.fromPbf(monacoPbf); // Returns a dataset handle
 
 // Operations run off the main thread
-const tile = await osm.getVectorTile([9372, 12535, 15])
+const tile = await osm.getVectorTile([9372, 12535, 15]);
 ```
 
 ## Monorepo Structure

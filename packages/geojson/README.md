@@ -20,48 +20,48 @@ pnpm add @osmix/geojson
 ### Export entities to GeoJSON
 
 ```ts
-import { nodeToFeature, wayToFeature, relationToFeature } from "@osmix/geojson"
+import { nodeToFeature, wayToFeature, relationToFeature } from "@osmix/geojson";
 
 // Convert individual entities
-const nodeFeature = nodeToFeature(osm.nodes.get({ id: 1 })!)
+const nodeFeature = nodeToFeature(osm.nodes.get({ id: 1 })!);
 const wayFeature = wayToFeature(osm.ways.get({ id: 10 })!, (ref) =>
-	osm.nodes.getNodeLonLat({ id: ref }),
-)
+  osm.nodes.getNodeLonLat({ id: ref }),
+);
 const relationFeature = relationToFeature(
-	osm.relations.get({ id: 50 })!,
-	(ref) => osm.nodes.getNodeLonLat({ id: ref }),
-	(wayId) => osm.ways.getById(wayId),
-)
+  osm.relations.get({ id: 50 })!,
+  (ref) => osm.nodes.getNodeLonLat({ id: ref }),
+  (wayId) => osm.ways.getById(wayId),
+);
 ```
 
 ### Export using the helper function
 
 ```ts
-import { osmEntityToGeoJSONFeature } from "@osmix/geojson"
+import { osmEntityToGeoJSONFeature } from "@osmix/geojson";
 
 // Convert any entity type with automatic coordinate resolution
-const features = []
+const features = [];
 for (const way of osm.ways) {
-	features.push(osmEntityToGeoJSONFeature(osm, way))
+  features.push(osmEntityToGeoJSONFeature(osm, way));
 }
 
 const featureCollection = {
-	type: "FeatureCollection",
-	features,
-}
+  type: "FeatureCollection",
+  features,
+};
 ```
 
 ### Import GeoJSON to Osm
 
 ```ts
-import { fromGeoJSON } from "@osmix/geojson"
+import { fromGeoJSON } from "@osmix/geojson";
 
-const geojsonFile = await Bun.file("./roads.geojson").json()
-const osm = await fromGeoJSON(geojsonFile, { id: "roads" })
+const geojsonFile = await Bun.file("./roads.geojson").json();
+const osm = await fromGeoJSON(geojsonFile, { id: "roads" });
 
 // Query imported data
-const highways = osm.ways.search("highway")
-console.log(`Imported ${osm.ways.size} ways`)
+const highways = osm.ways.search("highway");
+console.log(`Imported ${osm.ways.size} ways`);
 ```
 
 `fromGeoJSON` handles `Point`, `LineString`, `Polygon`, and `MultiPolygon` geometries. Polygons with holes automatically create multipolygon relations with separate ways for outer and inner rings.

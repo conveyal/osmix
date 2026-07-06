@@ -1,40 +1,40 @@
 {
-	"$schema": "https://json.schemastore.org/package.json",
-	"name": "osmix",
-	"version": "0.2.2",
-	"description": "Full OSM toolkit for JavaScript and TypeScript",
-	"license": "MIT",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/conveyal/osmix.git"
-	},
-	"type": "module",
-	"main": "./src/index.ts",
-	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-		"typecheck": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@osmix/change": "workspace:*",
-		"@osmix/core": "workspace:*",
-		"@osmix/geojson": "workspace:*",
-		"@osmix/geoparquet": "workspace:*",
-		"@osmix/gtfs": "workspace:*",
-		"@osmix/json": "workspace:*",
-		"@osmix/pbf": "workspace:*",
-		"@osmix/raster": "workspace:*",
-		"@osmix/router": "workspace:*",
-		"@osmix/shapefile": "workspace:*",
-		"@osmix/shared": "workspace:*",
-		"@osmix/vt": "workspace:*",
-		"comlink": "^4.4.2",
-		"dequal": "catalog:"
-	},
-	"devDependencies": {
-		"@mapbox/tilebelt": "^2.0.3",
-		"@types/geojson": "catalog:",
-		"typescript": "catalog:",
-		"vitest": "^4.1.9"
-	}
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "osmix",
+  "version": "0.2.2",
+  "description": "Full OSM toolkit for JavaScript and TypeScript",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@osmix/change": "workspace:*",
+    "@osmix/core": "workspace:*",
+    "@osmix/geojson": "workspace:*",
+    "@osmix/geoparquet": "workspace:*",
+    "@osmix/gtfs": "workspace:*",
+    "@osmix/json": "workspace:*",
+    "@osmix/pbf": "workspace:*",
+    "@osmix/raster": "workspace:*",
+    "@osmix/router": "workspace:*",
+    "@osmix/shapefile": "workspace:*",
+    "@osmix/shared": "workspace:*",
+    "@osmix/vt": "workspace:*",
+    "comlink": "^4.4.2",
+    "dequal": "catalog:"
+  },
+  "devDependencies": {
+    "@mapbox/tilebelt": "^2.0.3",
+    "@types/geojson": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "^4.1.9"
+  }
 }

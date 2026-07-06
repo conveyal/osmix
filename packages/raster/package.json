@@ -1,26 +1,26 @@
 {
-	"$schema": "https://json.schemastore.org/package.json",
-	"name": "@osmix/raster",
-	"version": "0.0.13",
-	"description": "An OSM raster tile generator",
-	"license": "MIT",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/conveyal/osmix.git"
-	},
-	"type": "module",
-	"main": "./src/index.ts",
-	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"bench": "vitest bench",
-		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-		"typecheck": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@osmix/shared": "workspace:*",
-		"@placemarkio/geojson-rewind": "catalog:"
-	},
-	"devDependencies": {
-		"typescript": "catalog:"
-	}
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/raster",
+  "version": "0.0.13",
+  "description": "An OSM raster tile generator",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "bench": "vitest bench",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@osmix/shared": "workspace:*",
+    "@placemarkio/geojson-rewind": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
 }

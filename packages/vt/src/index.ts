@@ -28,6 +28,6 @@
  * @module @osmix/vt
  */
 
-export { OsmixVtEncoder, projectToTile } from "./encode.ts"
-export * from "./types.ts"
-export { default as writeVtPbf } from "./write-vt-pbf.ts"
+export { OsmixVtEncoder, projectToTile } from "./encode.ts";
+export * from "./types.ts";
+export { default as writeVtPbf } from "./write-vt-pbf.ts";

@@ -1,33 +1,33 @@
 {
-	"$schema": "https://json.schemastore.org/tsconfig",
-	"display": "@osmix/tsconfig/base",
-	"compilerOptions": {
-		"declaration": true,
-		"declarationMap": true,
-		"sourceMap": true,
-		"noEmitOnError": true,
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "@osmix/tsconfig/base",
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noEmitOnError": true,
 
-		"lib": ["ESNext", "DOM"],
-		"types": ["node"],
-		"target": "es2024",
-		"module": "preserve",
-		"moduleDetection": "force",
+    "lib": ["ESNext", "DOM"],
+    "types": ["node"],
+    "target": "es2024",
+    "module": "preserve",
+    "moduleDetection": "force",
 
-		"moduleResolution": "bundler",
-		"allowImportingTsExtensions": true,
-		"rewriteRelativeImportExtensions": true,
-		"verbatimModuleSyntax": true,
-		"isolatedModules": true,
-		"erasableSyntaxOnly": true,
-		"skipLibCheck": true,
-		"forceConsistentCasingInFileNames": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "erasableSyntaxOnly": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
 
-		"strict": true,
-		"noFallthroughCasesInSwitch": true,
-		"noImplicitOverride": true,
-		"noUncheckedIndexedAccess": true,
-		"noUnusedLocals": true,
-		"noUnusedParameters": true,
-		"noPropertyAccessFromIndexSignature": true
-	}
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": true
+  }
 }

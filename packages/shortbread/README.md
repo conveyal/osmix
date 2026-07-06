@@ -11,17 +11,17 @@ pnpm add @osmix/shortbread
 ## Usage
 
 ```typescript
-import { fromPbf } from "osmix"
-import { ShortbreadVtEncoder } from "@osmix/shortbread"
+import { fromPbf } from "osmix";
+import { ShortbreadVtEncoder } from "@osmix/shortbread";
 
 // Load OSM data
-const osm = await fromPbf(pbfStream)
+const osm = await fromPbf(pbfStream);
 
 // Create encoder
-const encoder = new ShortbreadVtEncoder(osm)
+const encoder = new ShortbreadVtEncoder(osm);
 
 // Generate a tile
-const tile = encoder.getTile([z, x, y])
+const tile = encoder.getTile([z, x, y]);
 ```
 
 ## Layers

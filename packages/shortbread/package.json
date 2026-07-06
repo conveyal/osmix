@@ -1,29 +1,29 @@
 {
-	"$schema": "https://json.schemastore.org/package.json",
-	"name": "@osmix/shortbread",
-	"version": "0.0.13",
-	"description": "Shortbread schema vector tile encoder for Osmix",
-	"license": "MIT",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/conveyal/osmix.git"
-	},
-	"type": "module",
-	"main": "./src/index.ts",
-	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
-		"typecheck": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@osmix/core": "workspace:*",
-		"@osmix/shared": "workspace:*",
-		"@osmix/vt": "workspace:*"
-	},
-	"devDependencies": {
-		"@mapbox/tilebelt": "^2.0.3",
-		"@mapbox/vector-tile": "^3.0.0",
-		"pbf": "catalog:",
-		"typescript": "catalog:"
-	}
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/shortbread",
+  "version": "0.0.13",
+  "description": "Shortbread schema vector tile encoder for Osmix",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@osmix/core": "workspace:*",
+    "@osmix/shared": "workspace:*",
+    "@osmix/vt": "workspace:*"
+  },
+  "devDependencies": {
+    "@mapbox/tilebelt": "^2.0.3",
+    "@mapbox/vector-tile": "^3.0.0",
+    "pbf": "catalog:",
+    "typescript": "catalog:"
+  }
 }

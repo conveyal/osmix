@@ -11,15 +11,13 @@ pnpm add @osmix/geoparquet
 ## Usage
 
 ```typescript
-import { fromGeoParquet } from "@osmix/geoparquet"
+import { fromGeoParquet } from "@osmix/geoparquet";
 
 // From a local file buffer
-const osm = await fromGeoParquet(
-	await Bun.file("./monaco.parquet").arrayBuffer(),
-)
+const osm = await fromGeoParquet(await Bun.file("./monaco.parquet").arrayBuffer());
 
 // Query imported data
-const highways = osm.ways.search("highway")
+const highways = osm.ways.search("highway");
 ```
 
 ## Layercake Format
