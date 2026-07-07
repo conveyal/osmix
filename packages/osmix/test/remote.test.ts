@@ -21,7 +21,7 @@ describe("OsmixRemote", () => {
     it(
       "should load from PBF ArrayBuffer via worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const pbfData = await getFixtureFile(monacoPbf.url);
         const osm = await remote.fromPbf(pbfData.buffer);
         expect(osm.stats.nodes).toBe(monacoPbf.nodes);
@@ -34,7 +34,7 @@ describe("OsmixRemote", () => {
     it(
       "should load from GeoJSON via worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const geojson: FeatureCollection<Point> = {
           type: "FeatureCollection",
           features: [
@@ -65,7 +65,7 @@ describe("OsmixRemote", () => {
     it(
       "should load from GeoJSON ReadableStream via worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const geojson: FeatureCollection<LineString> = {
           type: "FeatureCollection",
           features: [
@@ -107,7 +107,7 @@ describe("OsmixRemote", () => {
     it(
       "should retrieve instance from worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const pbfData = await getFixtureFile(monacoPbf.url);
         const osmInfo = await remote.fromPbf(pbfData.buffer, {
           id: "remote-get",
@@ -127,7 +127,7 @@ describe("OsmixRemote", () => {
     it(
       "should set instance in worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const pbfData = await getFixtureFile(monacoPbf.url);
         const osmInfo = await remote.fromPbf(pbfData.buffer, {
           id: "original-remote",
@@ -149,7 +149,7 @@ describe("OsmixRemote", () => {
     it(
       "should remove instance from worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const pbfData = await getFixtureFile(monacoPbf.url);
         const osm1 = await remote.fromPbf(pbfData.buffer);
 
@@ -167,7 +167,7 @@ describe("OsmixRemote", () => {
     it(
       "should check readiness via worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const pbfData = await getFixtureFile(monacoPbf.url);
         const osm = await remote.fromPbf(pbfData.buffer);
 
@@ -183,7 +183,7 @@ describe("OsmixRemote", () => {
     it(
       "should search via worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const fileStream = getFixtureFileReadStream(monacoPbf.url);
         const osm = await remote.fromPbf(fileStream);
 
@@ -201,7 +201,7 @@ describe("OsmixRemote", () => {
     it(
       "should search by key and value via worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const fileStream = getFixtureFileReadStream(monacoPbf.url);
         const osm = await remote.fromPbf(fileStream);
 
@@ -220,7 +220,7 @@ describe("OsmixRemote", () => {
     it(
       "should generate vector tile via worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const fileStream = getFixtureFileReadStream(monacoPbf.url);
         const osm = await remote.fromPbf(fileStream);
 
@@ -240,7 +240,7 @@ describe("OsmixRemote", () => {
     it(
       "should generate raster tile via worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const fileStream = getFixtureFileReadStream(monacoPbf.url);
         const osm = await remote.fromPbf(fileStream);
 
@@ -256,7 +256,7 @@ describe("OsmixRemote", () => {
     it(
       "should generate raster tile with custom tile size via worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const fileStream = getFixtureFileReadStream(monacoPbf.url);
         const osm = await remote.fromPbf(fileStream);
 
@@ -276,7 +276,7 @@ describe("OsmixRemote", () => {
     it(
       "should expose instance methods without passing IDs",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const geojson: FeatureCollection<Point> = {
           type: "FeatureCollection",
           features: [
@@ -314,7 +314,7 @@ describe("OsmixRemote", () => {
     it(
       "should return a dataset handle from merge",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
         const point = (name: string, lon: number, lat: number): FeatureCollection<Point> => ({
           type: "FeatureCollection",
           features: [
@@ -348,9 +348,11 @@ describe("OsmixRemote", () => {
     beforeAll(() => getFixtureFile(monacoPbf.url));
 
     it(
-      "should work with single worker",
+      "should work with a single in-process worker",
       async () => {
-        using remote = await createRemote({ workerCount: 1 });
+        using remote = await createRemote({ inProcess: true });
+        expect(remote.mode).toBe("in-process");
+        expect(remote.workerCount).toBe(1);
         const pbfData = await getFixtureFile(monacoPbf.url);
         const osm = await remote.fromPbf(pbfData.buffer);
         expect(osm.stats.nodes).toBe(monacoPbf.nodes);
@@ -358,31 +360,25 @@ describe("OsmixRemote", () => {
       workerTestTimeout,
     );
 
-    it(
-      "should work with multiple workers",
-      async () => {
-        using remote = await createRemote({ workerCount: 3 });
-        const pbfData = await getFixtureFile(monacoPbf.url);
+    it("should throw without Web Worker support when inProcess is not set", async () => {
+      // Node has no global Worker, so spawning real workers must fail loudly.
+      await expect(createRemote()).rejects.toThrow(/Web Workers are not available/);
+      await expect(createRemote({ workerCount: 3 })).rejects.toThrow(
+        /Web Workers are not available/,
+      );
+    });
 
-        // Load multiple instances to test round-robin distribution
-        const osm1 = await remote.fromPbf(pbfData.buffer.slice(0), {
-          id: "multi-worker-1",
-        });
-        const osm2 = await remote.fromPbf(pbfData.buffer.slice(0), {
-          id: "multi-worker-2",
-        });
-        const osm3 = await remote.fromPbf(pbfData.buffer.slice(0), {
-          id: "multi-worker-3",
-        });
-
-        expect(osm1.id).toBe("multi-worker-1");
-        expect(osm2.id).toBe("multi-worker-2");
-        expect(osm3.id).toBe("multi-worker-3");
-        expect(osm1.stats.nodes).toBe(monacoPbf.nodes);
-        expect(osm2.stats.nodes).toBe(monacoPbf.nodes);
-        expect(osm3.stats.nodes).toBe(monacoPbf.nodes);
-      },
-      workerTestTimeout,
-    );
+    it("should reject invalid worker pool configurations", async () => {
+      await expect(createRemote({ workerCount: 0 })).rejects.toThrow(/at least 1/);
+      await expect(createRemote({ workerCount: 2, inProcess: true })).rejects.toThrow(
+        /only one worker/,
+      );
+      await expect(
+        createRemote({
+          inProcess: true,
+          workerUrl: new URL("./osmix.worker.ts", import.meta.url),
+        }),
+      ).rejects.toThrow(/cannot be used in in-process mode/);
+    });
   });
 });

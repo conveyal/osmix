@@ -19,10 +19,11 @@ export {
 export { OsmixWorker, type RouteResult, type WaySegment } from "./worker.ts";
 export { drawToRasterTile, type DrawToRasterTileOptions } from "./raster.ts";
 export {
-  DEFAULT_WORKER_COUNT,
-  SUPPORTS_SHARED_ARRAY_BUFFER,
-  SUPPORTS_STREAM_TRANSFER,
-} from "./settings.ts";
+  canShareArrayBuffers,
+  getOsmixCapabilities,
+  type OsmixCapabilities,
+  type OsmixMode,
+} from "./capabilities.ts";
 export {
   collectTransferables,
   supportsReadableStreamTransfer,

@@ -10,6 +10,10 @@
   },
   "type": "module",
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/osmix.worker.ts"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",

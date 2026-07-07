@@ -74,6 +74,13 @@ const osm = await remote.fromPbf(monacoPbf); // Returns a dataset handle
 const tile = await osm.getVectorTile([9372, 12535, 15]);
 ```
 
+`createRemote()` adapts to the runtime: cross-origin isolated browsers get a
+multi-worker pool sharing data via `SharedArrayBuffer`, other browsers get a
+fully supported single worker, and Node/test environments can opt into
+running on the calling thread with `inProcess: true`. See the
+[environment support matrix](packages/osmix/README.md#environment-support)
+for details, including the COOP/COEP headers required for multi-worker mode.
+
 ## Monorepo Structure
 
 See each package's README for full API and description.

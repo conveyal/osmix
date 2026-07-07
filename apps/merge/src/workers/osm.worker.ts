@@ -8,8 +8,8 @@
 
 import { expose } from "comlink";
 import { type DBSchema, type IDBPDatabase, openDB } from "idb";
-import type { OsmInfo, OsmTransferables } from "osmix";
-import { Osm } from "osmix";
+import type { BufferType, OsmInfo, OsmTransferables } from "osmix";
+import { canShareArrayBuffers, Osm } from "osmix";
 import { OsmixWorker } from "osmix";
 
 import { DB_NAME, DB_VERSION, OSM_STORE, STORAGE_CHANNEL } from "../settings";
@@ -284,9 +284,12 @@ function toArrayBuffer(buffer: ArrayBuffer | SharedArrayBuffer | ArrayBufferLike
 }
 
 /**
- * Convert an ArrayBuffer to a SharedArrayBuffer, for use in workers.
+ * Convert an ArrayBuffer to a SharedArrayBuffer for cross-worker sharing.
+ * Returns the buffer unchanged when SharedArrayBuffers cannot be shared
+ * (non-cross-origin-isolated contexts) — Osm accepts either buffer type.
  */
-function toSharedArrayBuffer(buffer: ArrayBuffer): SharedArrayBuffer {
+function toSharedArrayBuffer(buffer: ArrayBuffer): BufferType {
+  if (!canShareArrayBuffers()) return buffer;
   const copy = new SharedArrayBuffer(buffer.byteLength);
   new Uint8Array(copy).set(new Uint8Array(buffer));
   return copy;
@@ -365,11 +368,10 @@ function toStorableTransferables(t: OsmTransferables): OsmTransferables<ArrayBuf
 }
 
 /**
- * Convert stored OsmTransferables back to SharedArrayBuffers for use in workers.
+ * Convert stored OsmTransferables back to worker-ready buffers
+ * (SharedArrayBuffers when shareable, plain ArrayBuffers otherwise).
  */
-function fromStorableTransferables(
-  t: OsmTransferables<ArrayBuffer>,
-): OsmTransferables<SharedArrayBuffer> {
+function fromStorableTransferables(t: OsmTransferables<ArrayBuffer>): OsmTransferables<BufferType> {
   return {
     id: t.id,
     header: t.header,
