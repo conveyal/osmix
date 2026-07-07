@@ -95,34 +95,34 @@ for await (const entity of stream) {
 
 ### Loading and export
 
-| Export                    | Description                                                       |
-| ------------------------- | ----------------------------------------------------------------- |
-| `fromPbf(data, options?)` | Parse PBF into an `Osm` index with optional bbox/tag filters      |
-| `startCreateOsmFromPbf`   | Async generator variant that yields progress events during load   |
-| `readOsmPbfHeader(data)`  | Read only the PBF header block                                    |
-| `toPbfStream(osm)`        | Stream an `Osm` index to spec-compliant PBF bytes                 |
-| `toPbfBuffer(osm)`        | Collect streamed PBF bytes into a single `Uint8Array`           |
-| `transformOsmPbfToJson`   | Pipe PBF bytes to a stream of header + JSON entities              |
-| `createReadableEntityStreamFromOsm` | Emit header + sorted entities from an `Osm` index         |
+| Export                              | Description                                                     |
+| ----------------------------------- | --------------------------------------------------------------- |
+| `fromPbf(data, options?)`           | Parse PBF into an `Osm` index with optional bbox/tag filters    |
+| `startCreateOsmFromPbf`             | Async generator variant that yields progress events during load |
+| `readOsmPbfHeader(data)`            | Read only the PBF header block                                  |
+| `toPbfStream(osm)`                  | Stream an `Osm` index to spec-compliant PBF bytes               |
+| `toPbfBuffer(osm)`                  | Collect streamed PBF bytes into a single `Uint8Array`           |
+| `transformOsmPbfToJson`             | Pipe PBF bytes to a stream of header + JSON entities            |
+| `createReadableEntityStreamFromOsm` | Emit header + sorted entities from an `Osm` index               |
 
 ### Extraction
 
-| Export                                      | Description                                              |
-| ------------------------------------------- | -------------------------------------------------------- |
-| `createExtract(osm, bbox, strategy?)`       | Build a geographic extract from an existing `Osm` index  |
-| `ExtractStrategy`                           | `"simple"` \| `"complete_ways"` \| `"smart"`             |
+| Export                                | Description                                             |
+| ------------------------------------- | ------------------------------------------------------- |
+| `createExtract(osm, bbox, strategy?)` | Build a geographic extract from an existing `Osm` index |
+| `ExtractStrategy`                     | `"simple"` \| `"complete_ways"` \| `"smart"`            |
 
 ### Tag filters
 
-| Export                              | Description                                           |
-| ----------------------------------- | ----------------------------------------------------- |
-| `ExtractTagFilterRules`             | Per-entity-type tag rule lists (`nodes`, `ways`, `relations`) |
-| `CONVEYAL_EXTRACT_TAG_FILTERS`      | Default transit / routing-oriented tag rules            |
-| `normalizeTagFilterRules`           | Trim keys, drop blanks, normalize values              |
-| `hasExtractTagFilter`               | Whether any rule list is non-empty after normalization  |
-| `nodeMatchesExtractTagRules`        | Test a node against normalized rules                    |
-| `wayMatchesExtractTagRules`         | Test a way against normalized rules                     |
-| `relationMatchesExtractTagRules`    | Test a relation against normalized rules                |
+| Export                           | Description                                                   |
+| -------------------------------- | ------------------------------------------------------------- |
+| `ExtractTagFilterRules`          | Per-entity-type tag rule lists (`nodes`, `ways`, `relations`) |
+| `CONVEYAL_EXTRACT_TAG_FILTERS`   | Default transit / routing-oriented tag rules                  |
+| `normalizeTagFilterRules`        | Trim keys, drop blanks, normalize values                      |
+| `hasExtractTagFilter`            | Whether any rule list is non-empty after normalization        |
+| `nodeMatchesExtractTagRules`     | Test a node against normalized rules                          |
+| `wayMatchesExtractTagRules`      | Test a way against normalized rules                           |
+| `relationMatchesExtractTagRules` | Test a relation against normalized rules                      |
 
 ### Options
 
