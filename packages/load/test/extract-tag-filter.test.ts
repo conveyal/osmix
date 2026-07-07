@@ -7,7 +7,7 @@ import {
   relationMatchesExtractTagRules,
   tagRuleMatches,
   wayMatchesExtractTagRules,
-} from "../src/extract-tag-filter";
+} from "../src/extract-tag-filter.ts";
 
 describe("extract-tag-filter", () => {
   test("normalizeTagFilterRules trims and drops blank keys", () => {

@@ -22,6 +22,7 @@
     "@osmix/geoparquet": "workspace:*",
     "@osmix/gtfs": "workspace:*",
     "@osmix/json": "workspace:*",
+    "@osmix/load": "workspace:*",
     "@osmix/pbf": "workspace:*",
     "@osmix/raster": "workspace:*",
     "@osmix/router": "workspace:*",

@@ -84,6 +84,7 @@ See each package's README for full API and description.
 | [`@osmix/core`](packages/core/README.md)             | In-memory data structures for storing entities, building indexes, and spatial queries. |
 | [`@osmix/pbf`](packages/pbf/README.md)               | Low-level PBF protobuf parsing and writing.                                            |
 | [`@osmix/json`](packages/json/README.md)             | Streaming transforms: PBF bytes ↔ typed JSON entities.                                 |
+| [`@osmix/load`](packages/load/README.md)             | Load PBF into `Osm` indexes, geographic extracts, and PBF export.                      |
 | [`@osmix/geojson`](packages/geojson/README.md)       | Convert OSM entities to/from GeoJSON.                                                  |
 | [`@osmix/geoparquet`](packages/geoparquet/README.md) | GeoParquet import.                                                                     |
 | [`@osmix/gtfs`](packages/gtfs/README.md)             | GTFS feed import.                                                                      |

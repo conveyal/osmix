@@ -49,17 +49,17 @@ import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types";
 // Re-export types from router for backwards compatibility
 export type { RouteResult, WaySegment };
 
-import { OsmixVtEncoder } from "@osmix/vt";
-import * as Comlink from "comlink";
-import { dequal } from "dequal/lite";
-
 import {
   fromPbf,
   type OsmFromPbfOptions,
   readOsmPbfHeader,
   toPbfBuffer,
   toPbfStream,
-} from "./pbf.ts";
+} from "@osmix/load";
+import { OsmixVtEncoder } from "@osmix/vt";
+import * as Comlink from "comlink";
+import { dequal } from "dequal/lite";
+
 import { type DrawToRasterTileOptions, drawToRasterTile } from "./raster.ts";
 import { transfer } from "./utils.ts";
 

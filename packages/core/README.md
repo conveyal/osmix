@@ -155,6 +155,7 @@ const osm = new Osm(transferables);
 ## Related Packages
 
 - [`osmix`](../osmix/README.md) — High-level API for loading PBF files and worker orchestration.
+- [`@osmix/load`](../load/README.md) — PBF loading, geographic extracts, and export into `Osm` indexes.
 - [`@osmix/pbf`](../pbf/README.md) — Low-level PBF parsing and serialization.
 - [`@osmix/json`](../json/README.md) — JSON entity conversion.
 - [`@osmix/geojson`](../geojson/README.md) — Convert entities to GeoJSON features.

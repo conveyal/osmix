@@ -1,10 +1,8 @@
 import { Osm } from "@osmix/core";
+import { createExtract, fromPbf, toPbfBuffer, toPbfStream } from "@osmix/load";
 import { getFixtureFileReadStream } from "@osmix/shared/fixtures";
 import type { GeoBbox2D } from "@osmix/shared/types";
 import { describe, expect, test } from "vitest";
-
-import { createExtract } from "../src/extract";
-import { fromPbf, toPbfBuffer, toPbfStream } from "../src/pbf";
 
 const TEST_BBOX: GeoBbox2D = [-0.1, -0.1, 1, 1];
 const SEATTLE_BBOX: GeoBbox2D = [-122.463226, 47.469878, -122.180328, 47.82883];

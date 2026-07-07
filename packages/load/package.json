@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@osmix/router",
-  "version": "0.0.13",
-  "description": "A routing engine for OSM data built on top of @osmix/core",
+  "name": "@osmix/load",
+  "version": "0.0.1",
+  "description": "Load and export OSM data from PBF into Osm indexes",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -12,17 +12,16 @@
   "main": "./src/index.ts",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "bench": "node test/router.bench.ts",
     "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@osmix/core": "workspace:*",
+    "@osmix/json": "workspace:*",
+    "@osmix/pbf": "workspace:*",
     "@osmix/shared": "workspace:*"
   },
   "devDependencies": {
-    "@osmix/load": "workspace:*",
-    "mitata": "^1.0.34",
     "typescript": "catalog:"
   }
 }
