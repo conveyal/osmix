@@ -12,9 +12,9 @@ allowBuilds:
 catalog:
   "@placemarkio/geojson-rewind": ^1.0.3
   "@types/geojson": ^7946.0.16
-  "@types/node": ^22.15.0
+  "@types/node": ^24
   dequal: ^2.0.3
   maplibre-gl: ^5.24.0
   pbf: ^5.1.0
-  typescript: npm:typescript@rc
+  typescript: 7.0.1-rc
   vite: ^8.1.3
