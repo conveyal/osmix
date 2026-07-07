@@ -36,19 +36,152 @@ import { createRemote } from "osmix";
 
 const remote = await createRemote();
 const monaco = await remote.fromPbf(monacoPbf);
-const patch = await remote.fromPbf(Bun.file("patch.osm.pbf").stream(), {
-  id: "patch",
-});
+const patch = await remote.fromPbf(patchPbfStream, { id: "patch" });
 const merged = await monaco.merge(patch);
 const rasterTile = await merged.getRasterTile([10561, 22891, 16]);
 ```
 
-#### How?
+#### Which mode am I in?
 
-`OsmixRemote` automatically transfers typed arrays across workers (using
-`SharedArrayBuffer` when available) and exposes the same helpers exposed in the main import: `fromPbf`, `fromGeoJSON`, `getVectorTile`, `getRasterTile`,
-`search`, `merge`, `generateChangeset`, etc. Use `collectTransferables` +
-`transfer` when you need to post Osmix payloads through your own worker setup.
+`createRemote()` picks the best mode the current runtime supports and reports
+it via `remote.mode`. Use `getOsmixCapabilities()` to inspect the runtime
+before creating a remote:
+
+```ts
+import { createRemote, getOsmixCapabilities } from "osmix";
+
+console.log(getOsmixCapabilities());
+// { webWorkers: true, canShareArrayBuffers: false, maxWorkers: 1, recommendedMode: "single-worker", ... }
+
+const remote = await createRemote();
+console.log(remote.mode, remote.workerCount); // "single-worker", 1
+```
+
+#### Environment support
+
+| Environment                                       | Mode            | Behavior                                                           |
+| ------------------------------------------------- | --------------- | ------------------------------------------------------------------ |
+| Browser, [cross-origin isolated][coi]             | `multi-worker`  | One worker per core; datasets shared via `SharedArrayBuffer`       |
+| Browser, not isolated (no COOP/COEP headers)      | `single-worker` | One worker; data is transferred/copied instead of shared           |
+| No Web Workers (Node, restricted runtimes)        | throws          | Pass `inProcess: true` or use the main-thread API (`fromPbf`, ...) |
+| `createRemote({ inProcess: true })` (Node, tests) | `in-process`    | Same API on the calling thread; long operations block that thread  |
+
+[coi]: https://developer.mozilla.org/en-US/docs/Web/API/Window/crossOriginIsolated
+
+Single-worker mode is fully supported — everything works, just without
+parallelism. Multi-worker mode is a performance upgrade that requires
+cross-origin isolation (below). Explicitly requesting `workerCount > 1`
+without it throws.
+
+#### Enabling multi-worker mode
+
+Browsers only allow sharing `SharedArrayBuffer`s between workers in
+cross-origin isolated pages. Serve your app with these headers:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+Vite dev server ([apps/merge/vite.config.ts](../../apps/merge/vite.config.ts)):
+
+```ts
+export default defineConfig({
+  server: {
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp",
+    },
+  },
+});
+```
+
+Vercel ([apps/merge/vercel.json](../../apps/merge/vercel.json)):
+
+```json
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
+      ]
+    }
+  ]
+}
+```
+
+Note that `require-corp` blocks cross-origin resources (map tiles, fonts,
+images) unless they send `Cross-Origin-Resource-Policy` or CORS headers.
+
+#### Workers
+
+`createRemote()` spawns the default worker from a URL relative to the `osmix`
+module, which works when the package is loaded as plain ESM (Node, CDNs like
+esm.sh, no-bundler setups). Bundlers usually cannot resolve that relative URL —
+if the default worker fails to start, create a worker entry in your app and
+pass it explicitly. With Vite:
+
+```ts
+// osm.worker.ts
+import "osmix/worker";
+```
+
+```ts
+import { createRemote } from "osmix";
+import workerUrl from "./osm.worker.ts?worker&url";
+
+const remote = await createRemote({
+  workerUrl: new URL(workerUrl, import.meta.url),
+});
+```
+
+#### Custom workers
+
+Extend `OsmixWorker` to run your own methods next to the data:
+
+```ts
+// my.worker.ts
+import { expose } from "comlink";
+import { OsmixWorker } from "osmix";
+
+export class MyWorker extends OsmixWorker {
+  countCafes(osmId: string) {
+    return this.get(osmId).nodes.search("amenity", "cafe").length;
+  }
+}
+expose(new MyWorker());
+```
+
+```ts
+import { createRemote } from "osmix";
+import type { MyWorker } from "./my.worker.ts";
+import workerUrl from "./my.worker.ts?worker&url";
+
+const remote = await createRemote<MyWorker>({
+  workerUrl: new URL(workerUrl, import.meta.url),
+});
+const cafes = await remote.getWorker().countCafes(osmId);
+```
+
+See [`MergeWorker`](../../apps/merge/src/workers/osm.worker.ts) for a real
+example that adds IndexedDB storage.
+
+#### Behavior differences by mode
+
+- `remote.get(osmId)` reconstructs the dataset on the main thread: in
+  multi-worker mode it shares the underlying `SharedArrayBuffer`s; otherwise
+  the buffers are copied.
+- Loading and merging synchronize datasets across the pool in multi-worker
+  mode; in single-worker and in-process modes there is nothing to synchronize.
+- Streams are transferred to workers when the browser supports transferable
+  streams and buffered otherwise (`supportsReadableStreamTransfer()`).
+
+`OsmixRemote` exposes the same helpers as the main import: `fromPbf`,
+`fromGeoJSON`, `getVectorTile`, `getRasterTile`, `search`, `merge`,
+`generateChangeset`, etc. Use `collectTransferables` + `transfer` when you
+need to post Osmix payloads through your own worker setup.
 
 ### Routing with workers
 
@@ -127,6 +260,12 @@ spec-compliant without staging everything in memory.
 ### Workers (OsmixRemote)
 
 - `createRemote(options?)` - Create worker pool manager.
+  - `options.workerCount` - Number of workers (default: all cores when SABs are shareable, else 1).
+  - `options.workerUrl` - Custom worker entry (see [Workers](#workers)).
+  - `options.inProcess` - Run on the calling thread (Node, tests).
+- `getOsmixCapabilities()` - Inspect runtime support (workers, SAB sharing, max workers, recommended mode).
+- `canShareArrayBuffers()` - Whether `SharedArrayBuffer`s can be posted between threads.
+- `remote.mode` - Selected mode: `"multi-worker" | "single-worker" | "in-process"`.
 - `remote.fromPbf(data, options?)` - Load in worker.
 - `remote.fromGeoJSON(data, options?)` - Load in worker.
 - `remote.getVectorTile(osmId, tile)` - Generate MVT in worker.
@@ -166,8 +305,9 @@ spec-compliant without staging everything in memory.
 ## Environment and limitations
 
 - Requires runtimes that expose Web Streams plus modern typed array + compression
-  APIs (Node 20+, Bun, current browsers). `OsmixRemote` also requires `Worker`
-  support and, for multi-worker concurrency, `SharedArrayBuffer`.
+  APIs (Node 20+, Bun, current browsers). See
+  [Environment support](#environment-support) for how `OsmixRemote` behaves
+  with and without Web Workers and `SharedArrayBuffer`.
 - `fromPbf` expects dense-node blocks; sparse node encodings are not yet supported.
 - Raster helpers rely on `OffscreenCanvas` + `ImageData`.
 

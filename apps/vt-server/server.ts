@@ -1,5 +1,4 @@
 import { createReadStream, readFileSync } from "node:fs";
-import os from "node:os";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
@@ -14,16 +13,16 @@ const pbfPath = fileURLToPath(new URL(`../../fixtures/${filename}`, import.meta.
 const indexHtml = readFileSync(fileURLToPath(new URL("./index.html", import.meta.url)), "utf8");
 
 const log: string[] = [];
-const workerCount = os.cpus().length;
+// Node has no global Worker, so the remote runs in-process on this thread.
 const remote = await createRemote({
-  workerCount,
+  inProcess: true,
   onProgress: (event) => log.push(event.msg),
 });
 const dataset = await remote.fromPbf(Readable.toWeb(createReadStream(pbfPath)) as ReadableStream, {
   id: filename,
 });
 
-console.log(`Number of VT workers available: ${workerCount}`);
+console.log(`Osmix remote mode: ${remote.mode}`);
 
 const app = new Hono();
 

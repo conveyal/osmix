@@ -19,14 +19,10 @@ import { streamToBytes } from "@osmix/shared/stream-to-bytes";
 import type { LonLat, OsmEntityType, Tile } from "@osmix/types";
 import * as Comlink from "comlink";
 
+import { canShareArrayBuffers, getOsmixCapabilities, type OsmixMode } from "./capabilities.ts";
 import type { DrawToRasterTileOptions } from "./raster.ts";
-import {
-  DEFAULT_WORKER_COUNT,
-  SUPPORTS_SHARED_ARRAY_BUFFER,
-  SUPPORTS_STREAM_TRANSFER,
-} from "./settings.ts";
-import { transfer } from "./utils.ts";
-import type { OsmixWorker } from "./worker.ts";
+import { supportsReadableStreamTransfer, transfer } from "./utils.ts";
+import { OsmixWorker } from "./worker.ts";
 
 /** Identifier for an OSM dataset: string ID, Osm instance, or OsmInfo object. */
 export type OsmId = string | Osm | OsmInfo;
@@ -173,6 +169,11 @@ function createOsmRemoteDataset<T extends OsmixWorker = OsmixWorker>(
   }) as OsmRemoteDataset<T>;
 }
 export interface OsmixRemoteOptions {
+  /**
+   * Number of workers to create. Defaults to `getOsmixCapabilities().maxWorkers`:
+   * the hardware concurrency when `SharedArrayBuffer`s can be shared across
+   * threads (cross-origin isolated browsers, Node), otherwise 1.
+   */
   workerCount?: number;
   onProgress?: (progress: Progress) => void;
   /**
@@ -186,16 +187,30 @@ export interface OsmixRemoteOptions {
    * })
    */
   workerUrl?: URL;
+  /**
+   * Run the `OsmixWorker` on the calling thread instead of spawning a Web
+   * Worker. The API is identical but nothing runs in parallel and long
+   * operations will block the current thread. This is the supported path for
+   * environments without Web Workers (e.g. Node, vitest).
+   */
+  inProcess?: boolean;
 }
 
 /**
- * Create a new `OsmixRemote` instance and initialize worker pool.
- * Multiple workers are only supported when SharedArrayBuffer is available.
+ * Create a new `OsmixRemote` instance and initialize its worker pool.
  * Each worker receives the same progress listener proxy if provided.
+ *
+ * Mode selection (see `getOsmixCapabilities()` and `remote.mode`):
+ * - Cross-origin isolated browsers get one worker per core, sharing datasets
+ *   via `SharedArrayBuffer`.
+ * - Browsers without `SharedArrayBuffer` sharing get a single worker.
+ * - Environments without Web Workers throw; pass `inProcess: true` to run on
+ *   the calling thread instead.
  *
  * @example
  * // Default usage
  * const remote = await createRemote()
+ * console.log(remote.mode) // "multi-worker" | "single-worker"
  *
  * @example
  * // With custom worker for extended functionality
@@ -204,18 +219,48 @@ export interface OsmixRemoteOptions {
  * })
  */
 export async function createRemote<T extends OsmixWorker = OsmixWorker>({
-  workerCount = DEFAULT_WORKER_COUNT,
+  workerCount,
   onProgress,
   workerUrl,
+  inProcess = false,
 }: OsmixRemoteOptions = {}): Promise<OsmixRemote<T>> {
   const remote = new OsmixRemote<T>();
-  await remote.initializeWorkerPool(workerCount, workerUrl, onProgress);
+  const count = workerCount ?? (inProcess ? 1 : getOsmixCapabilities().maxWorkers);
+  await remote.initializeWorkerPool(count, workerUrl, onProgress, inProcess);
   return remote;
+}
+
+/**
+ * Resolve the URL of the default worker entry relative to this module.
+ * Matches the extension of the running module so it works both from
+ * TypeScript source (monorepo dev) and from the built `dist` output
+ * (published package in Node, CDNs, and unbundled ESM).
+ */
+export function defaultWorkerUrl(): URL {
+  const ext = import.meta.url.endsWith(".ts") ? "ts" : "js";
+  return new URL(`./osmix.worker.${ext}`, import.meta.url);
+}
+
+const NO_WORKER_SUPPORT_MESSAGE =
+  "Web Workers are not available in this environment. Use the main-thread API " +
+  "(fromPbf, fromGeoJSON, ...) or pass { inProcess: true } to createRemote() to " +
+  "run on the calling thread.";
+
+/**
+ * Create an `OsmixWorker` that runs on the calling thread, connected through a
+ * `MessageChannel` so it can be driven by the same Comlink RPC as a real
+ * worker. Used for environments without Web Workers (e.g. Node, vitest).
+ */
+function createInProcessOsmixWorker<T extends OsmixWorker = OsmixWorker>(): Comlink.Remote<T> {
+  const { port1, port2 } = new MessageChannel();
+  Comlink.expose(new OsmixWorker(), port1);
+  return Comlink.wrap<T>(port2);
 }
 
 /**
  * Create a single `OsmixWorker` instance wrapped with Comlink.
  * Spawns a new Web Worker and returns a proxy for cross-thread RPC.
+ * Throws in environments without Web Worker support.
  *
  * @param workerUrl - Optional URL to a custom worker file. If not provided,
  *                    uses the default `OsmixWorker`.
@@ -230,30 +275,22 @@ export async function createRemote<T extends OsmixWorker = OsmixWorker>({
  *   new URL("./my-custom.worker.ts", import.meta.url)
  * )
  */
-async function createInProcessOsmixWorker<T extends OsmixWorker = OsmixWorker>(): Promise<
-  Comlink.Remote<T>
-> {
-  const { MessageChannel } = await import("node:worker_threads");
-  const { expose } = await import("comlink");
-  const { OsmixWorker } = await import("./worker.ts");
-  const { port1, port2 } = new MessageChannel();
-  expose(new OsmixWorker(), port1 as Comlink.Endpoint);
-  return Comlink.wrap<T>(port2 as Comlink.Endpoint);
-}
-
 export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
   workerUrl?: URL,
 ): Promise<Comlink.Remote<T>> {
-  if (workerUrl && typeof Worker === "undefined") {
-    throw Error("Custom worker URLs require Web Worker support");
-  }
+  if (typeof Worker === "undefined") throw Error(NO_WORKER_SUPPORT_MESSAGE);
 
-  if (process.env["VITEST"] === "true" || typeof Worker === "undefined") {
-    return createInProcessOsmixWorker<T>();
+  const worker = new Worker(workerUrl ?? defaultWorkerUrl(), { type: "module" });
+  if (!workerUrl) {
+    worker.addEventListener("error", (event) => {
+      console.error(
+        "osmix: the default worker failed to start. Bundlers often cannot resolve " +
+          "the default worker URL; pass `workerUrl` to createRemote() using your " +
+          "bundler's worker pattern. See https://github.com/conveyal/osmix/tree/main/packages/osmix#workers",
+        event,
+      );
+    });
   }
-
-  const url = workerUrl ?? new URL("./osmix.worker.ts", import.meta.url);
-  const worker = new Worker(url, { type: "module" });
   return Comlink.wrap<T>(worker);
 }
 
@@ -274,29 +311,59 @@ export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
 export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   private workers: Comlink.Remote<T>[] = [];
   private changesetWorker: Comlink.Remote<T> | null = null;
+  private poolMode: OsmixMode | null = null;
+
+  /**
+   * How this remote runs its workload: `multi-worker`, `single-worker`, or
+   * `in-process`. Set by `initializeWorkerPool`.
+   */
+  get mode(): OsmixMode {
+    if (!this.poolMode) throw Error("Worker pool not initialized");
+    return this.poolMode;
+  }
+
+  /** Number of workers in the pool. */
+  get workerCount(): number {
+    return this.workers.length;
+  }
 
   /**
    * Initialize workers.
    * - Use a custom worker by passing a worker URL.
    * - Pass a progress listener to receive updates during long-running operations.
-   * - Multiple workers are only supported when SharedArrayBuffer is available.
+   * - Multiple workers require `SharedArrayBuffer` sharing (see `getOsmixCapabilities()`).
+   * - Pass `inProcess: true` to run a single `OsmixWorker` on the calling thread
+   *   (environments without Web Workers, e.g. Node and vitest).
    */
   async initializeWorkerPool(
     workerCount: number,
     workerUrl?: URL,
     onProgress?: (progress: Progress) => void,
+    inProcess = false,
   ) {
     if (workerCount < 1) throw Error("Worker count must be at least 1");
-    if (workerCount > 1 && !SUPPORTS_SHARED_ARRAY_BUFFER)
-      throw Error("SharedArrayBuffer not supported, cannot use multiple workers.");
+    if (workerCount > 1 && inProcess)
+      throw Error("In-process mode runs on the calling thread and supports only one worker.");
+    if (workerUrl && inProcess)
+      throw Error("Custom worker URLs cannot be used in in-process mode.");
+    if (workerCount > 1 && !canShareArrayBuffers())
+      throw Error(
+        "Multiple workers require SharedArrayBuffer sharing, which needs a cross-origin " +
+          "isolated context. Serve your app with COOP/COEP headers " +
+          "(Cross-Origin-Opener-Policy: same-origin, Cross-Origin-Embedder-Policy: require-corp) " +
+          "or omit workerCount. See https://github.com/conveyal/osmix/tree/main/packages/osmix#enabling-multi-worker-mode",
+      );
     for (let i = 0; i < workerCount; i++) {
-      const worker = await createOsmixWorker<T>(workerUrl);
+      const worker = inProcess
+        ? createInProcessOsmixWorker<T>()
+        : await createOsmixWorker<T>(workerUrl);
       if (onProgress) {
         await worker.addProgressListener(Comlink.proxy(onProgress));
       }
       this.workers.push(worker);
     }
     this.changesetWorker = this.workers[0]!;
+    this.poolMode = inProcess ? "in-process" : workerCount > 1 ? "multi-worker" : "single-worker";
   }
 
   /**
@@ -345,11 +412,11 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     if (data instanceof SharedArrayBuffer) return data;
     if (data instanceof Uint8Array) return data.buffer;
     if (data instanceof ReadableStream) {
-      if (SUPPORTS_STREAM_TRANSFER) return data;
+      if (supportsReadableStreamTransfer()) return data;
       return (await streamToBytes(data)).buffer;
     }
     if (data instanceof File) {
-      if (SUPPORTS_STREAM_TRANSFER) return data.stream();
+      if (supportsReadableStreamTransfer()) return data.stream();
       return data.arrayBuffer();
     }
     throw Error("Invalid data");
@@ -360,7 +427,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * No-op if SharedArrayBuffer is unsupported (single-worker mode).
    */
   protected async populateOtherWorkers(worker: Comlink.Remote<OsmixWorker>, osmId: OsmId) {
-    if (!SUPPORTS_SHARED_ARRAY_BUFFER) return;
+    if (this.workers.length <= 1) return;
+    if (!canShareArrayBuffers()) return;
     const transferables = await worker.getOsmBuffers(this.getId(osmId));
     await Promise.all(this.workers.map((worker) => worker.transferIn(transferables)));
   }
@@ -392,7 +460,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Requires browser support for transferable streams.
    */
   toPbfStream(osmId: OsmId, writeableStream: WritableStream<Uint8Array>) {
-    if (!SUPPORTS_STREAM_TRANSFER) throw Error("Stream transfer not supported");
+    if (!supportsReadableStreamTransfer()) throw Error("Stream transfer not supported");
     return this.nextWorker().toPbfStream(
       Comlink.transfer({ osmId: this.getId(osmId), writeableStream }, [writeableStream]),
     );
@@ -411,7 +479,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Automatically selects worker-based streaming or fallback based on browser support.
    */
   async toPbf(osmId: OsmId, stream: WritableStream<Uint8Array>) {
-    if (SUPPORTS_STREAM_TRANSFER) return this.toPbfStream(osmId, stream);
+    if (supportsReadableStreamTransfer()) return this.toPbfStream(osmId, stream);
     const osm = await this.get(osmId);
     return toPbfStream(osm).pipeTo(stream);
   }
@@ -770,7 +838,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     worker: Comlink.Remote<OsmixWorker>,
     osmId: OsmId,
   ) {
-    if (!SUPPORTS_SHARED_ARRAY_BUFFER) return;
+    if (this.workers.length <= 1) return;
+    if (!canShareArrayBuffers()) return;
     const transferables = await worker.getRoutingGraphTransferables(this.getId(osmId));
     await Promise.all(
       this.workers.map((w) => w.transferRoutingGraphIn(this.getId(osmId), transferables)),

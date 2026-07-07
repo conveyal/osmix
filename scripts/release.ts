@@ -60,6 +60,22 @@ async function isVersionPublished(name: string, version: string): Promise<boolea
   }
 }
 
+/**
+ * Rewrite a source exports entry (`./src/X.ts`) to its built dist form.
+ * Entries that already point elsewhere are returned unchanged.
+ */
+function rewriteExportsEntryForDist(
+  entry: string | { types: string; default: string },
+): string | { types: string; default: string } {
+  if (typeof entry !== "string") return entry;
+  const match = /^\.\/src\/(.+)\.ts$/.exec(entry);
+  if (!match) return entry;
+  return {
+    types: `./dist/${match[1]}.d.ts`,
+    default: `./dist/${match[1]}.js`,
+  };
+}
+
 function rewritePkgJsonForDist(pkgJson: PackageJson): PackageJson {
   if (pkgJson.name === "@osmix/shared") {
     return {
@@ -75,11 +91,20 @@ function rewritePkgJsonForDist(pkgJson: PackageJson): PackageJson {
   }
 
   if (pkgJson.main) {
-    return {
+    const rewritten: PackageJson = {
       ...pkgJson,
       main: "./dist/index.js",
       types: "./dist/index.d.ts",
     };
+    if (pkgJson.exports) {
+      rewritten.exports = Object.fromEntries(
+        Object.entries(pkgJson.exports).map(([key, entry]) => [
+          key,
+          rewriteExportsEntryForDist(entry),
+        ]),
+      );
+    }
+    return rewritten;
   }
 
   throw Error(`Cannot rewrite package.json for ${pkgJson.name}`);
