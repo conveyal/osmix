@@ -4,7 +4,8 @@ import mvp_worker from "@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?ur
 import duckdb_wasm_eh from "@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url";
 import duckdb_wasm from "@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url";
 import type { GeoBbox2D, OsmNode, OsmTags, OsmWay } from "@osmix/shared/types";
-import type * as arrow from "apache-arrow";
+
+type ArrowVector = { length: number; get(index: number): number | null };
 
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
   mvp: {
@@ -301,8 +302,8 @@ WHERE w.kind = 'way'
       if (!wayRow) continue;
 
       if (wayRow.lats.length >= 2 && wayRow.lons.length >= 2) {
-        const lats = wayRow.lats as arrow.Vector<arrow.Float64>;
-        const lons = wayRow.lons as arrow.Vector<arrow.Float64>;
+        const lats = wayRow.lats as ArrowVector;
+        const lons = wayRow.lons as ArrowVector;
 
         const coordinates: number[][] = [];
         for (let i = 0; i < lats.length; i++) {
