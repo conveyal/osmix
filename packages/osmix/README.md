@@ -3,7 +3,8 @@
 `osmix` is the high-level entrypoint for the Osmix toolkit. It layers ingestion,
 streaming, and worker orchestration utilities on top of the low-level
 `@osmix/core` index so you can load `.osm.pbf` files, convert GeoJSON, and
-request raster/vector tiles with a single import.
+request raster/vector tiles with a single import. PBF loading, extraction, and
+export live in [`@osmix/load`](../load/README.md) and are re-exported here.
 
 ## Installation
 
@@ -152,6 +153,7 @@ spec-compliant without staging everything in memory.
 ## Related Packages
 
 - [`@osmix/core`](../core/README.md) - In-memory OSM index with typed arrays and spatial queries.
+- [`@osmix/load`](../load/README.md) - PBF loading, geographic extracts, and export.
 - [`@osmix/pbf`](../pbf/README.md) - Low-level PBF reading and writing.
 - [`@osmix/json`](../json/README.md) - PBF to JSON entity conversion.
 - [`@osmix/geojson`](../geojson/README.md) - GeoJSON import/export.

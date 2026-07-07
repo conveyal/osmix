@@ -106,6 +106,7 @@ const pbfStream = entityStream
 ## Related Packages
 
 - [`@osmix/pbf`](../pbf/README.md) – Low-level block readers and writers used here.
+- [`@osmix/load`](../load/README.md) – Loads PBF into `Osm` indexes using these transforms.
 - [`@osmix/core`](../core/README.md) – In-memory index that consumes these JSON entities.
 - [`@osmix/change`](../change/README.md) – Dedupe and merge workflows.
 - [`@osmix/geojson`](../geojson/README.md) – Convert JSON entities to GeoJSON.

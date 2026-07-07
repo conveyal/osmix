@@ -12,13 +12,13 @@ import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change";
 import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core";
 import type { GeoParquetReadOptions } from "@osmix/geoparquet";
 import { type GtfsConversionOptions, isGtfsZip as isGtfsZipBytes } from "@osmix/gtfs";
+import { type OsmFromPbfOptions, toPbfStream } from "@osmix/load";
 import type { DefaultSpeeds, HighwayFilter, RouteOptions, RouteResult } from "@osmix/router";
 import type { Progress } from "@osmix/shared/progress";
 import { streamToBytes } from "@osmix/shared/stream-to-bytes";
 import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types";
 import * as Comlink from "comlink";
 
-import { type OsmFromPbfOptions, toPbfStream } from "./pbf.ts";
 import type { DrawToRasterTileOptions } from "./raster.ts";
 import {
   DEFAULT_WORKER_COUNT,

@@ -1,7 +1,6 @@
+import { fromPbf } from "@osmix/load";
 import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/shared/fixtures";
 import { beforeAll, describe, expect, it } from "vitest";
-
-import { fromPbf } from "../src/pbf";
 
 describe("read", () => {
   describe.each(Object.entries(PBFs))("%s", async (_name, pbf) => {

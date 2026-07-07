@@ -15,13 +15,13 @@
 ## Architecture in Brief
 
 - In-browser merge: Comlink workers host `@osmix/core`, `@osmix/change`, and `@osmix/raster` to keep the React UI responsive.
-- `@osmix/pbf` + `@osmix/json` stream PBF blocks to entities; `@osmix/core` indexes and ships transferables to dodge clone costs.
+- `@osmix/pbf` + `@osmix/json` stream PBF blocks to entities; `@osmix/load` builds `Osm` indexes from PBF; `@osmix/core` indexes and ships transferables to dodge clone costs.
 - MapLibre uses a custom raster protocol and renders vector overlays for node/way previews.
 
 ## Key Paths
 
 - UI: `apps/merge` (React 19 + Vite); worker wrapper at `apps/merge/src/workers/osm.worker.ts`.
-- Packages: `core`, `change`, `json`, `pbf`, `raster`, `test-utils`; shared fixtures in `fixtures/`.
+- Packages: `core`, `change`, `json`, `load`, `pbf`, `raster`, `test-utils`; shared fixtures in `fixtures/`.
 
 ## Commands
 

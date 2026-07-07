@@ -106,6 +106,7 @@ const dataBytes = await osmBlockToPbfBlobBytes(primitiveBlock);
 ## Related Packages
 
 - [`@osmix/json`](../json/README.md) – Converts parsed blocks into ergonomic JSON entities.
+- [`@osmix/load`](../load/README.md) – Loads PBF into `Osm` indexes and exports back to PBF.
 - [`@osmix/core`](../core/README.md) – In-memory storage using these readers/writers.
 - [`@osmix/change`](../change/README.md) – Changeset and merge workflows.
 

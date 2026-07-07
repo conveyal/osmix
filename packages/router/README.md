@@ -137,6 +137,7 @@ const router = new Router(osm, graph, { algorithm: "astar", metric: "time" });
 ## Related Packages
 
 - [`@osmix/core`](../core/README.md) - In-memory OSM index with spatial queries.
+- [`@osmix/load`](../load/README.md) - Load PBF data into `Osm` indexes (`fromPbf`).
 - [`@osmix/shared`](../shared/README.md) - Haversine distance and coordinate utilities.
 - [`osmix`](../osmix/README.md) - High-level API with worker support for routing.
 

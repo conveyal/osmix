@@ -92,6 +92,7 @@ The stepper resets selection state between actions, and you can jump backward or
 ## Related packages
 
 - [`@osmix/change`](../../packages/change/README.md) – Change and merge machinery powering the worker steps.
+- [`@osmix/load`](../../packages/load/README.md) – PBF loading, geographic extracts, and export.
 - [`@osmix/pbf`](../../packages/pbf/README.md) – Low-level PBF parsing and streaming primitives.
 - [`@osmix/json`](../../packages/json/README.md) – JSON ↔ PBF transforms and GeoJSON helpers.
 - [`@osmix/core`](../../packages/core/README.md) – Typed-array OSM index.
