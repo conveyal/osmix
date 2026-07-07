@@ -8,15 +8,15 @@
  * @module
  */
 
-import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip";
+import { clipPolygon, clipPolyline } from "@osmix/geo/lineclip";
 import {
   bboxToTilePx,
   clampAndRoundPx,
   llToTilePx,
   tilePxToLonLat,
   tileToBbox,
-} from "@osmix/shared/tile";
-import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types";
+} from "@osmix/geo/tile";
+import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/types";
 import { rewindGeometry } from "@placemarkio/geojson-rewind";
 
 import { compositeRGBA } from "./color.ts";

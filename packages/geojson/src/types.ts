@@ -3,7 +3,7 @@
  * @module
  */
 
-import type { OsmEntityType, OsmInfoParsed, OsmTags } from "@osmix/shared/types";
+import type { OsmEntityType, OsmInfoParsed, OsmTags } from "@osmix/types";
 import type {
   Feature,
   GeometryCollection,

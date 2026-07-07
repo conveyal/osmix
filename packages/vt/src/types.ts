@@ -7,7 +7,7 @@
  * @module
  */
 
-import type { OsmTags, XY } from "@osmix/shared/types";
+import type { OsmTags, XY } from "@osmix/types";
 
 /**
  * Geometry for a vector tile feature.

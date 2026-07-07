@@ -17,12 +17,14 @@
   },
   "dependencies": {
     "@osmix/core": "workspace:*",
-    "@osmix/shared": "workspace:*",
+    "@osmix/geo": "workspace:*",
+    "@osmix/types": "workspace:*",
     "@osmix/vt": "workspace:*"
   },
   "devDependencies": {
     "@mapbox/tilebelt": "^2.0.3",
     "@mapbox/vector-tile": "^3.0.0",
+    "@osmix/shared": "workspace:*",
     "pbf": "catalog:",
     "typescript": "catalog:"
   }

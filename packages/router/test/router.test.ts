@@ -1,6 +1,6 @@
 import { Osm } from "@osmix/core";
 import { fromPbf } from "@osmix/load";
-import { getFixtureFile, PBFs } from "@osmix/shared/fixtures";
+import { getFixtureFile, PBFs } from "@osmix/test-utils/fixtures";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { buildGraph, getTransferableBuffers, RoutingGraph } from "../src/index.ts";

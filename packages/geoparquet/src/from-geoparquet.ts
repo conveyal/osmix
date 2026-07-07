@@ -9,7 +9,7 @@
 
 import { Osm, type OsmOptions } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
-import type { OsmRelationMember, OsmTags } from "@osmix/shared/types";
+import type { OsmRelationMember, OsmTags } from "@osmix/types";
 import { rewindFeature } from "@placemarkio/geojson-rewind";
 import type { Geometry, LineString, MultiLineString, MultiPolygon, Point, Polygon } from "geojson";
 import {

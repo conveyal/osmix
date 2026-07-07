@@ -26,3 +26,4 @@
  */
 
 export * from "./raster-tile.ts";
+export * from "./hex-color.ts";

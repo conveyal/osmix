@@ -1,5 +1,5 @@
-import type { GeoBbox2D } from "@osmix/shared/types";
 import { useAtom, useSetAtom } from "jotai";
+import type { GeoBbox2D } from "osmix";
 import type { ExtractStrategy, ExtractTagFilterRules, OsmFileType, OsmInfo } from "osmix";
 import { useEffectEvent, useRef } from "react";
 

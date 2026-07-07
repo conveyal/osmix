@@ -1,5 +1,5 @@
-import type { Tile } from "@osmix/shared/types";
 import maplibre from "maplibre-gl";
+import type { Tile } from "osmix";
 
 import { RASTER_PROTOCOL_NAME } from "../settings";
 import { osmWorker } from "../state/worker";

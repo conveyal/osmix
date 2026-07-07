@@ -1,8 +1,8 @@
+import { microToDegrees, toMicroDegrees } from "@osmix/geo/coordinates";
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf";
 import { assertValue } from "@osmix/shared/assert";
 import type { ContentHasher } from "@osmix/shared/content-hasher";
-import { microToDegrees, toMicroDegrees } from "@osmix/shared/coordinates";
-import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/shared/types";
+import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/types";
 import { around as geoAround } from "geokdbush";
 import KDBush from "kdbush";
 

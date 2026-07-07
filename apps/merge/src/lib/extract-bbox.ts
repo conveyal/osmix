@@ -1,4 +1,4 @@
-import type { GeoBbox2D } from "@osmix/shared/types";
+import type { GeoBbox2D } from "osmix";
 
 /** Initial map viewport around default merge basemap (Yakima area). */
 export const DEFAULT_EXTRACT_BBOX: GeoBbox2D = [-121.65, 46.45, -120.35, 47.25];

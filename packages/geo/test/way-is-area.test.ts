@@ -1,6 +1,5 @@
+import { wayIsArea } from "@osmix/geo/way-is-area";
 import { describe, expect, it } from "vitest";
-
-import { wayIsArea } from "../src/way-is-area";
 
 describe("wayIsArea", () => {
   it("returns false for open ways", () => {

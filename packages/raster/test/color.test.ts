@@ -1,4 +1,4 @@
-import type { Rgba } from "@osmix/shared/types";
+import type { Rgba } from "@osmix/types";
 import { describe, expect, test } from "vitest";
 
 import { compositeRGBA } from "../src/color";

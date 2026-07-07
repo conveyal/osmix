@@ -1,6 +1,6 @@
-import type { RouteResult, WaySegment } from "@osmix/router";
-import type { LonLat } from "@osmix/shared/types";
 import { atom } from "jotai";
+import type { RouteResult, WaySegment } from "osmix";
+import type { LonLat } from "osmix";
 
 /** Snapped node info with distance from original click point. */
 export interface SnappedNode {

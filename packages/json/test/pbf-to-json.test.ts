@@ -1,7 +1,7 @@
 import { toAsyncGenerator } from "@osmix/pbf";
-import { getFixtureFileReadStream, PBFs } from "@osmix/shared/fixtures";
-import type { OsmEntity, OsmNode } from "@osmix/shared/types";
-import { isNode, isWay } from "@osmix/shared/utils";
+import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures";
+import type { OsmEntity, OsmNode } from "@osmix/types";
+import { isNode, isWay } from "@osmix/types/utils";
 import { describe, expect, it } from "vitest";
 
 import { osmPbfToJson } from "../src/pbf-to-json";

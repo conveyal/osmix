@@ -1,7 +1,7 @@
 import type { Osm } from "@osmix/core";
+import { haversineDistance } from "@osmix/geo/haversine-distance";
 import { nodeToFeature, type OsmGeoJSONFeature, wayToFeature } from "@osmix/geojson";
-import { haversineDistance } from "@osmix/shared/haversine-distance";
-import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/shared/types";
+import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/types";
 import * as Osmix from "osmix";
 
 import { calculateTestGeometriesFromBbox } from "../utils";

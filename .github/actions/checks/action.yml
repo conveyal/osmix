@@ -8,6 +8,10 @@ runs:
       shell: bash
       run: pnpm run typecheck
 
+    - name: Check workspace dependencies
+      shell: bash
+      run: pnpm run check:deps
+
     - name: Build packages
       shell: bash
       run: pnpm run build

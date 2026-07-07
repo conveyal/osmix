@@ -1,4 +1,4 @@
-import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/shared/types";
+import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/types";
 import { describe, expect, it } from "vitest";
 
 import {

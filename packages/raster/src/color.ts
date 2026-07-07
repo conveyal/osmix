@@ -8,7 +8,7 @@
  * @module
  */
 
-import type { Rgba } from "@osmix/shared/types";
+import type { Rgba } from "@osmix/types";
 
 /**
  * Convert an sRGB channel (0..255) to linear light (0..1).

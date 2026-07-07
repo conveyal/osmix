@@ -20,11 +20,7 @@
     "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@mapbox/tilebelt": "^2.0.3",
-    "dequal": "catalog:",
-    "lineclip": "^2.0.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:"

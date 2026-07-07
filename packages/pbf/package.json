@@ -10,6 +10,10 @@
   },
   "type": "module",
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./test/helpers": "./test/helpers.ts"
+  },
   "scripts": {
     "bench": "vitest bench",
     "build": "tsc -p tsconfig.build.json",
@@ -21,6 +25,7 @@
   },
   "devDependencies": {
     "@osmix/shared": "workspace:*",
+    "@osmix/test-utils": "workspace:*",
     "typescript": "catalog:"
   }
 }

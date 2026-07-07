@@ -14,6 +14,7 @@
     "test:apps": "VITEST_INCLUDE_APPS=1 vitest run '--project=@osmix/merge' '--project=@osmix/bench*'",
     "test:node-smoke": "node scripts/node-smoke.ts",
     "test:packages": "vitest run",
+    "check:deps": "node scripts/check-deps.ts",
     "typecheck": "pnpm -r typecheck",
     "version": "changeset version && pnpm install",
     "release": "node scripts/release.ts"

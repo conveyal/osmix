@@ -3,7 +3,7 @@
  * Based on https://shortbread-tiles.org/schema/1.0/
  */
 
-import type { OsmTags, XY } from "@osmix/shared/types";
+import type { OsmTags, XY } from "@osmix/types";
 
 export type ShortbreadLayerName =
   | "water"

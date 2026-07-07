@@ -10,6 +10,10 @@
   },
   "type": "module",
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "bench": "vitest bench",
@@ -17,10 +21,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@osmix/shared": "workspace:*",
+    "@osmix/geo": "workspace:*",
+    "@osmix/types": "workspace:*",
     "@placemarkio/geojson-rewind": "catalog:"
   },
   "devDependencies": {
+    "@osmix/shared": "workspace:*",
     "typescript": "catalog:"
   }
 }

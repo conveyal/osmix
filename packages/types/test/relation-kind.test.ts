@@ -11,8 +11,8 @@ import {
   isPointRelation,
   isSuperRelation,
   resolveRelationMembers,
-} from "../src/relation-kind";
-import type { LonLat, OsmRelation, OsmWay } from "../src/types";
+} from "../src/relation-kind.ts";
+import type { LonLat, OsmRelation, OsmWay } from "../src/types.ts";
 
 describe("relation-kind", () => {
   describe("getRelationKind", () => {

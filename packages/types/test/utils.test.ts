@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { OsmNode, OsmRelation, OsmRelationMember, OsmWay } from "../src/types";
+import type { OsmNode, OsmRelation, OsmRelationMember, OsmWay } from "../src/types.ts";
 import {
   entityPropertiesEqual,
   getEntityType,
@@ -11,7 +11,7 @@ import {
   isRelationEqual,
   isWay,
   isWayEqual,
-} from "../src/utils";
+} from "../src/utils.ts";
 
 describe("utils", () => {
   const node: OsmNode = {

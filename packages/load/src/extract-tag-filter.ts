@@ -4,7 +4,7 @@
  * @module
  */
 
-import type { OsmNode, OsmRelation, OsmTags, OsmWay } from "@osmix/shared/types";
+import type { OsmNode, OsmRelation, OsmTags, OsmWay } from "@osmix/types";
 
 /** A single tag key/value rule. Empty or omitted `value` matches any value for `key`. */
 export interface ExtractTagFilterRule {

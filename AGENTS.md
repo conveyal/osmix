@@ -5,35 +5,65 @@
 - For each changed package/app (and packages/apps that depend on the changed code): `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test` must be green.
 - Add or extend tests and documentation when behavior or public APIs change.
 - Only run root tests before committing.
+- `pnpm run check:deps` validates workspace import/dependency alignment.
 
 ## Testing Notes
 
 - Vitest with tests as `*.test.ts`.
-- Fixtures: prefer `fixtures/monaco.pbf` or synthetic data.
+- Fixtures: prefer `fixtures/monaco.pbf` via `@osmix/test-utils/fixtures` (devDependency in tests).
 - Cover parsing, serialization, spatial queries, merge workflows, and regressions.
+
+## Package Layout
+
+Layering (low → high):
+
+`@osmix/types` + `@osmix/geo` + `@osmix/shared` → `@osmix/pbf` + `@osmix/json` → `@osmix/load` → `@osmix/core` → converters (`geojson`, `geoparquet`, `gtfs`, `shapefile`, `change`, `router`, `vt`, `shortbread`, `raster`) → `osmix` facade → apps.
+
+| Package                                                | Role                                                                         |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `@osmix/types`                                         | OSM domain types, type guards, relation-kind, zigzag                         |
+| `@osmix/geo`                                           | Tile math, haversine, bbox, lineclip, multipolygon helpers                   |
+| `@osmix/shared`                                        | Generic plumbing (streams, assert, progress) + tsconfig presets              |
+| `@osmix/test-utils`                                    | Test fixtures (`monaco.pbf`, etc.) — devDependency only                      |
+| `@osmix/pbf`                                           | Low-level OSM PBF parse/write (leaf; no workspace runtime deps)              |
+| `@osmix/json`                                          | PBF blocks ↔ JSON entities                                                   |
+| `@osmix/load`                                          | PBF streams → `Osm` indexes; extract and export                              |
+| `@osmix/core`                                          | In-memory `Osm` with spatial indexes; `OsmReader`/`OsmWriter` contracts      |
+| `@osmix/change`                                        | Changesets, dedup, merge                                                     |
+| `@osmix/geojson` / `geoparquet` / `gtfs` / `shapefile` | Alternate import/export formats                                              |
+| `@osmix/raster` / `@osmix/vt` / `@osmix/shortbread`    | Tile encoders                                                                |
+| `@osmix/router`                                        | Routing graph and pathfinding                                                |
+| `osmix`                                                | Curated facade + worker/Comlink orchestration (`OsmixRemote`, `OsmixWorker`) |
+
+**App import rule:** apps import `osmix` for runtime APIs and re-exported types. Use granular `@osmix/*` packages only when a symbol is not exposed by the facade (e.g. benchmarks, servers, or tests).
+
+Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` entry).
 
 ## Architecture in Brief
 
-- In-browser merge: Comlink workers host `@osmix/core`, `@osmix/change`, and `@osmix/raster` to keep the React UI responsive.
+- In-browser merge: Comlink workers host `osmix` (`OsmixWorker`) to keep the React UI responsive.
 - `@osmix/pbf` + `@osmix/json` stream PBF blocks to entities; `@osmix/load` builds `Osm` indexes from PBF; `@osmix/core` indexes and ships transferables to dodge clone costs.
 - MapLibre uses a custom raster protocol and renders vector overlays for node/way previews.
 
 ## Key Paths
 
 - UI: `apps/merge` (React 19 + Vite); worker wrapper at `apps/merge/src/workers/osm.worker.ts`.
-- Packages: `core`, `change`, `json`, `load`, `pbf`, `raster`, `test-utils`; shared fixtures in `fixtures/`.
+- Worker API: `packages/osmix/src/worker.ts`, `packages/osmix/src/remote.ts`.
+- Fixtures: `fixtures/` at repo root; loaded via `@osmix/test-utils/fixtures`.
 
 ## Commands
 
 - `pnpm install` to bootstrap; `pnpm run dev` (filterable) for local dev; `pnpm run build` for production bundles.
 - `pnpm run check` runs `oxfmt` then type-aware `oxlint` in one pass.
+- `pnpm run check:deps` flags undeclared or unused workspace dependencies.
 
 ## Gotchas
 
 - `Nodes.addDenseNodes` only accepts dense encodings; malformed blocks fail fast.
-- Call `Osmix.buildIndexes` after changes before spatial queries.
+- Call `buildIndexes()` after changes before spatial queries.
 - MapLibre raster URLs: `<osmId>/<tileSize>/<z>/<x>/<y>.png`.
 - Use throttled logging when streaming worker progress.
+- `@osmix/pbf` must stay dependency-free at runtime (helpers inlined; test helpers in `test/helpers`).
 
 ## Style
 

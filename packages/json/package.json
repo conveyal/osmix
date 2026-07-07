@@ -18,9 +18,11 @@
   },
   "dependencies": {
     "@osmix/pbf": "workspace:*",
-    "@osmix/shared": "workspace:*"
+    "@osmix/shared": "workspace:*",
+    "@osmix/types": "workspace:*"
   },
   "devDependencies": {
+    "@osmix/test-utils": "workspace:*",
     "typescript": "catalog:"
   }
 }

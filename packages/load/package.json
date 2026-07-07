@@ -19,7 +19,8 @@
     "@osmix/core": "workspace:*",
     "@osmix/json": "workspace:*",
     "@osmix/pbf": "workspace:*",
-    "@osmix/shared": "workspace:*"
+    "@osmix/shared": "workspace:*",
+    "@osmix/types": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:"

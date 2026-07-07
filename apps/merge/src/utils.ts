@@ -1,5 +1,5 @@
-import type { Osm } from "@osmix/core";
-import type { OsmEntity } from "@osmix/shared/types";
+import type { Osm } from "osmix";
+import type { OsmEntity } from "osmix";
 
 export function getOsmixEntityByStringId(osm: Osm, eid: string): OsmEntity | null {
   const [type, sid] = eid.split("/");

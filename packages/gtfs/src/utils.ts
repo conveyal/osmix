@@ -1,5 +1,5 @@
-import { normalizeHexColor } from "@osmix/shared/color";
-import type { OsmTags } from "@osmix/shared/types";
+import { normalizeHexColor } from "@osmix/raster/hex-color";
+import type { OsmTags } from "@osmix/types";
 
 import {
   type GtfsRoute,

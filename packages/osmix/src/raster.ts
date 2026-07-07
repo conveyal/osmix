@@ -8,15 +8,15 @@
  */
 
 import type { Osm } from "@osmix/core";
+import { wayIsArea } from "@osmix/geo/way-is-area";
 import {
   DEFAULT_AREA_COLOR,
   DEFAULT_LINE_COLOR,
   DEFAULT_RASTER_TILE_SIZE,
   OsmixRasterTile,
 } from "@osmix/raster";
-import { hexColorToRgba } from "@osmix/shared/color";
-import type { Rgba, Tile } from "@osmix/shared/types";
-import { wayIsArea } from "@osmix/shared/way-is-area";
+import { hexColorToRgba } from "@osmix/raster/hex-color";
+import type { Rgba, Tile } from "@osmix/types";
 
 export interface DrawToRasterTileOptions {
   tileSize?: number;

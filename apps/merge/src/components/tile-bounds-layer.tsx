@@ -1,7 +1,7 @@
 import { pointToTile, tileToGeoJSON } from "@mapbox/tilebelt";
-import type { GeoBbox2D } from "@osmix/shared/types";
 import type { Feature, FeatureCollection } from "geojson";
 import type { GeoJSONSource, LineLayerSpecification, SymbolLayerSpecification } from "maplibre-gl";
+import type { GeoBbox2D } from "osmix";
 import { useEffect } from "react";
 import { Layer, Source } from "react-map-gl/maplibre";
 

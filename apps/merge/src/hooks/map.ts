@@ -1,6 +1,6 @@
-import type { Osm, OsmInfo } from "@osmix/core";
-import type { OsmEntity } from "@osmix/shared/types";
-import { isNode, isRelation, isWay } from "@osmix/shared/utils";
+import type { Osm, OsmInfo } from "osmix";
+import type { OsmEntity } from "osmix";
+import { isNode, isRelation, isWay } from "osmix";
 import { useEffectEvent } from "react";
 import { useMap as useMapCollection } from "react-map-gl/maplibre";
 

@@ -7,7 +7,7 @@
  * @module
  */
 
-import { haversineDistance } from "@osmix/shared/haversine-distance";
+import { haversineDistance } from "@osmix/geo/haversine-distance";
 
 import { BinaryHeap } from "../binary-heap.ts";
 import type { GraphEdge, PathSegment, RoutingAlgorithmFn } from "../types.ts";

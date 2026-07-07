@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 
-import { getFixturePath } from "@osmix/shared/fixtures";
+import { getFixturePath } from "@osmix/test-utils/fixtures";
 import { describe, expect, it } from "vitest";
 
 import { fromGeoParquet, GeoParquetOsmBuilder } from "../src";

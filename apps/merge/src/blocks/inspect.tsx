@@ -1,6 +1,6 @@
-import type { OsmInfo } from "@osmix/core";
 import { useAtom, useSetAtom } from "jotai";
 import { MergeIcon } from "lucide-react";
+import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
 import { Suspense, useMemo } from "react";
 

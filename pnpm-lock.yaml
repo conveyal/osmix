@@ -68,6 +68,9 @@ importers:
       '@osmix/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@osmix/geo':
+        specifier: workspace:*
+        version: link:../../packages/geo
       '@osmix/geojson':
         specifier: workspace:*
         version: link:../../packages/geojson
@@ -80,6 +83,9 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@osmix/vt':
         specifier: workspace:*
         version: link:../../packages/vt
@@ -132,36 +138,6 @@ importers:
       '@mapbox/tilebelt':
         specifier: ^2.0.3
         version: 2.0.3
-      '@osmix/change':
-        specifier: workspace:*
-        version: link:../../packages/change
-      '@osmix/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@osmix/geojson':
-        specifier: workspace:*
-        version: link:../../packages/geojson
-      '@osmix/geoparquet':
-        specifier: workspace:*
-        version: link:../../packages/geoparquet
-      '@osmix/json':
-        specifier: workspace:*
-        version: link:../../packages/json
-      '@osmix/pbf':
-        specifier: workspace:*
-        version: link:../../packages/pbf
-      '@osmix/raster':
-        specifier: workspace:*
-        version: link:../../packages/raster
-      '@osmix/router':
-        specifier: workspace:*
-        version: link:../../packages/router
-      '@osmix/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-      '@osmix/vt':
-        specifier: workspace:*
-        version: link:../../packages/vt
       '@turf/bbox-polygon':
         specifier: ^7.3.5
         version: 7.3.5
@@ -214,6 +190,9 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0
     devDependencies:
+      '@osmix/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1
@@ -256,6 +235,9 @@ importers:
       '@osmix/shortbread':
         specifier: workspace:*
         version: link:../../packages/shortbread
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@versatiles/style':
         specifier: ^5.13.0
         version: 5.13.0
@@ -290,6 +272,9 @@ importers:
       '@osmix/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@osmix/vt':
         specifier: workspace:*
         version: link:../../packages/vt
@@ -324,6 +309,12 @@ importers:
       '@osmix/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@osmix/geo':
+        specifier: workspace:*
+        version: link:../../packages/geo
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@shikijs/core':
         specifier: 4.3.1
         version: 4.3.1
@@ -367,9 +358,15 @@ importers:
       '@osmix/core':
         specifier: workspace:*
         version: link:../core
+      '@osmix/geo':
+        specifier: workspace:*
+        version: link:../geo
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
       dequal:
         specifier: 'catalog:'
         version: 2.0.3
@@ -386,9 +383,15 @@ importers:
 
   packages/core:
     dependencies:
+      '@osmix/geo':
+        specifier: workspace:*
+        version: link:../geo
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
       flatbush:
         specifier: ^4.6.2
         version: 4.6.2
@@ -409,17 +412,39 @@ importers:
         specifier: 'catalog:'
         version: 7.0.1-rc
 
+  packages/geo:
+    dependencies:
+      '@mapbox/tilebelt':
+        specifier: ^2.0.3
+        version: 2.0.3
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
+      lineclip:
+        specifier: ^2.0.0
+        version: 2.0.0
+    devDependencies:
+      '@osmix/shared':
+        specifier: workspace:*
+        version: link:../shared
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.1-rc
+
   packages/geojson:
     dependencies:
       '@osmix/core':
         specifier: workspace:*
         version: link:../core
-      '@osmix/pbf':
+      '@osmix/geo':
         specifier: workspace:*
-        version: link:../pbf
+        version: link:../geo
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
       '@placemarkio/geojson-rewind':
         specifier: 'catalog:'
         version: 1.0.3(@types/node@24.13.2)
@@ -442,6 +467,9 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
       '@placemarkio/geojson-rewind':
         specifier: 'catalog:'
         version: 1.0.3(@types/node@24.13.2)
@@ -449,6 +477,9 @@ importers:
         specifier: ^1.26.2
         version: 1.26.2
     devDependencies:
+      '@osmix/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       '@types/geojson':
         specifier: 'catalog:'
         version: 7946.0.16
@@ -461,9 +492,15 @@ importers:
       '@osmix/core':
         specifier: workspace:*
         version: link:../core
+      '@osmix/raster':
+        specifier: workspace:*
+        version: link:../raster
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
       but-unzip:
         specifier: ^0.1.10
         version: 0.1.10
@@ -483,7 +520,13 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
     devDependencies:
+      '@osmix/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       typescript:
         specifier: 'catalog:'
         version: 7.0.1-rc
@@ -502,6 +545,9 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -515,6 +561,9 @@ importers:
       '@osmix/core':
         specifier: workspace:*
         version: link:../core
+      '@osmix/geo':
+        specifier: workspace:*
+        version: link:../geo
       '@osmix/geojson':
         specifier: workspace:*
         version: link:../geojson
@@ -545,6 +594,9 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
       '@osmix/vt':
         specifier: workspace:*
         version: link:../vt
@@ -558,6 +610,9 @@ importers:
       '@mapbox/tilebelt':
         specifier: ^2.0.3
         version: 2.0.3
+      '@osmix/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       '@types/geojson':
         specifier: 'catalog:'
         version: 7946.0.16
@@ -577,19 +632,28 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       typescript:
         specifier: 'catalog:'
         version: 7.0.1-rc
 
   packages/raster:
     dependencies:
-      '@osmix/shared':
+      '@osmix/geo':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../geo
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
       '@placemarkio/geojson-rewind':
         specifier: 'catalog:'
         version: 1.0.3(@types/node@24.13.2)
     devDependencies:
+      '@osmix/shared':
+        specifier: workspace:*
+        version: link:../shared
       typescript:
         specifier: 'catalog:'
         version: 7.0.1-rc
@@ -599,13 +663,22 @@ importers:
       '@osmix/core':
         specifier: workspace:*
         version: link:../core
-      '@osmix/shared':
+      '@osmix/geo':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../geo
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
     devDependencies:
       '@osmix/load':
         specifier: workspace:*
         version: link:../load
+      '@osmix/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@osmix/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       mitata:
         specifier: ^1.0.34
         version: 1.0.34
@@ -621,6 +694,9 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
       '@placemarkio/geojson-rewind':
         specifier: 'catalog:'
         version: 1.0.3(@types/node@24.13.2)
@@ -636,16 +712,6 @@ importers:
         version: 7.0.1-rc
 
   packages/shared:
-    dependencies:
-      '@mapbox/tilebelt':
-        specifier: ^2.0.3
-        version: 2.0.3
-      dequal:
-        specifier: 'catalog:'
-        version: 2.0.3
-      lineclip:
-        specifier: ^2.0.0
-        version: 2.0.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -659,9 +725,12 @@ importers:
       '@osmix/core':
         specifier: workspace:*
         version: link:../core
-      '@osmix/shared':
+      '@osmix/geo':
         specifier: workspace:*
-        version: link:../shared
+        version: link:../geo
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
       '@osmix/vt':
         specifier: workspace:*
         version: link:../vt
@@ -672,6 +741,9 @@ importers:
       '@mapbox/vector-tile':
         specifier: ^3.0.0
         version: 3.0.0
+      '@osmix/shared':
+        specifier: workspace:*
+        version: link:../shared
       pbf:
         specifier: 'catalog:'
         version: 5.1.0
@@ -679,11 +751,42 @@ importers:
         specifier: 'catalog:'
         version: 7.0.1-rc
 
-  packages/vt:
-    dependencies:
+  packages/test-utils:
+    devDependencies:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.2
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.1-rc
+
+  packages/types:
+    dependencies:
+      dequal:
+        specifier: 'catalog:'
+        version: 2.0.3
+    devDependencies:
+      '@osmix/shared':
+        specifier: workspace:*
+        version: link:../shared
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.1-rc
+
+  packages/vt:
+    dependencies:
+      '@osmix/core':
+        specifier: workspace:*
+        version: link:../core
+      '@osmix/geo':
+        specifier: workspace:*
+        version: link:../geo
+      '@osmix/types':
+        specifier: workspace:*
+        version: link:../types
       pbf:
         specifier: 'catalog:'
         version: 5.1.0
@@ -694,9 +797,9 @@ importers:
       '@mapbox/vector-tile':
         specifier: ^3.0.0
         version: 3.0.0
-      '@osmix/core':
+      '@osmix/shared':
         specifier: workspace:*
-        version: link:../core
+        version: link:../shared
       typescript:
         specifier: 'catalog:'
         version: 7.0.1-rc

@@ -170,3 +170,11 @@ pnpm run lint packages/core
 ```
 
 Run `pnpm run check` at the repo root before publishing.
+
+## Test helpers
+
+Mock OSM datasets for tests are available via a separate entrypoint (not re-exported from the main package):
+
+```ts
+import { createMockBaseOsm, createMockPatchOsm } from "@osmix/core/mocks";
+```

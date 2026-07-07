@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CsvParseStream, type CsvParseStreamOptions } from "../src/csv-parse-stream";
+import { CsvParseStream, type CsvParseStreamOptions } from "../src/csv-parse-stream.ts";
 
 async function parseCsv(
   chunks: string[],

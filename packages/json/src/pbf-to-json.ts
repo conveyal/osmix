@@ -12,7 +12,7 @@ import {
   OsmPbfBytesToBlocksTransformStream,
   type OsmPbfHeaderBlock,
 } from "@osmix/pbf";
-import type { OsmEntity } from "@osmix/shared/types";
+import type { OsmEntity } from "@osmix/types";
 
 import { OsmPbfBlockParser } from "./osm-pbf-block-parser.ts";
 

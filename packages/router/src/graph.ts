@@ -12,8 +12,8 @@
  */
 
 import { BufferConstructor, type BufferType, type Osm } from "@osmix/core";
-import { haversineDistance } from "@osmix/shared/haversine-distance";
-import type { LonLat } from "@osmix/shared/types";
+import { haversineDistance } from "@osmix/geo/haversine-distance";
+import type { LonLat } from "@osmix/types";
 
 import type {
   DefaultSpeeds,

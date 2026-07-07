@@ -1,4 +1,3 @@
-import { changeStatsSummary } from "@osmix/change";
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   ArrowLeft,
@@ -16,6 +15,7 @@ import {
   StopCircleIcon,
   XIcon,
 } from "lucide-react";
+import { changeStatsSummary } from "osmix";
 import { Suspense, useMemo } from "react";
 
 import ActionButton from "../components/action-button";

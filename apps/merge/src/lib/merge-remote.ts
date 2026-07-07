@@ -5,7 +5,7 @@
  * methods, following the same pattern as the base OsmixRemote class.
  */
 
-import type { Progress } from "@osmix/shared/progress";
+import type { Progress } from "osmix";
 import { type OsmId, type OsmInfo, OsmixRemote } from "osmix";
 
 import type { MergeWorker, StoredFileInfo, StoredOsmEntry } from "../workers/osm.worker";

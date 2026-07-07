@@ -1,6 +1,6 @@
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/json";
 import type { OsmPbfHeaderBlock } from "@osmix/pbf";
-import type { GeoBbox2D, LonLat } from "@osmix/shared/types";
+import type { GeoBbox2D, LonLat } from "@osmix/types";
 import maplibregl, { type ControlPosition } from "maplibre-gl";
 
 import { nodesPaint, waysOutlinePaint, waysPaint } from "./map-style";

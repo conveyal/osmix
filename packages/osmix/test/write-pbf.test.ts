@@ -1,5 +1,5 @@
 import { fromPbf, toPbfStream } from "@osmix/load";
-import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/shared/fixtures";
+import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures";
 import { beforeAll, describe, expect, it } from "vitest";
 
 describe("write", () => {

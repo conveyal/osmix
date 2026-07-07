@@ -1,4 +1,4 @@
-import type { Osm } from "@osmix/core";
+import type { Osm } from "osmix";
 
 import { bytesSizeToHuman } from "../utils";
 import type { StoredFileInfo } from "../workers/osm.worker";

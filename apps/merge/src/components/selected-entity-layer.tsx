@@ -1,7 +1,7 @@
-import { osmEntityToGeoJSONFeature } from "@osmix/geojson";
-import { normalizeHexColor } from "@osmix/shared/color";
 import { useAtomValue } from "jotai";
 import type { ExpressionSpecification } from "maplibre-gl";
+import { osmEntityToGeoJSONFeature } from "osmix";
+import { normalizeHexColor } from "osmix";
 import { useEffect, useMemo } from "react";
 import {
   type CircleLayerSpecification,

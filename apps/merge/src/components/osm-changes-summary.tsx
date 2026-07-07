@@ -1,8 +1,8 @@
-import type { OsmChange } from "@osmix/change";
-import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from "@osmix/shared/types";
-import { getEntityType, isNode, isRelation, isWay } from "@osmix/shared/utils";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import type { OsmChange } from "osmix";
+import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from "osmix";
+import { getEntityType, isNode, isRelation, isWay } from "osmix";
 import { useTransition } from "react";
 
 import { cn } from "../lib/utils";

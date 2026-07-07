@@ -9,9 +9,9 @@
 
 import { Osm } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
-import { resolveRelationMembers } from "@osmix/shared/relation-kind";
-import type { GeoBbox2D, OsmRelation } from "@osmix/shared/types";
-import { isMultipolygonRelation } from "@osmix/shared/utils";
+import type { GeoBbox2D, OsmRelation } from "@osmix/types";
+import { resolveRelationMembers } from "@osmix/types/relation-kind";
+import { isMultipolygonRelation } from "@osmix/types/utils";
 
 /**
  * Strategy for handling entities at extract boundaries.

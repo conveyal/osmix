@@ -12,7 +12,7 @@
 
 import { Osm, type OsmOptions } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
-import type { OsmTags } from "@osmix/shared/types";
+import type { OsmTags } from "@osmix/types";
 
 import { GtfsArchive } from "./gtfs-archive.ts";
 import type { GtfsConversionOptions, GtfsShapePoint } from "./types.ts";

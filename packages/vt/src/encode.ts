@@ -8,14 +8,14 @@
  * @module
  */
 
-import type { Osm } from "@osmix/core";
-import { bboxContainsOrIntersects } from "@osmix/shared/bbox-intersects";
-import { normalizeHexColor } from "@osmix/shared/color";
-import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip";
-import { llToTilePx, tileToBbox } from "@osmix/shared/tile";
-import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types";
-import { wayIsArea } from "@osmix/shared/way-is-area";
+import type { OsmReader } from "@osmix/core/contracts";
+import { bboxContainsOrIntersects } from "@osmix/geo/bbox-intersects";
+import { clipPolygon, clipPolyline } from "@osmix/geo/lineclip";
+import { llToTilePx, tileToBbox } from "@osmix/geo/tile";
+import { wayIsArea } from "@osmix/geo/way-is-area";
+import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/types";
 
+import { normalizeHexColor } from "./hex-color.ts";
 import type { VtSimpleFeature, VtSimpleFeatureGeometry, VtSimpleFeatureType } from "./types.ts";
 import writeVtPbf from "./write-vt-pbf.ts";
 
@@ -60,7 +60,7 @@ export class OsmixVtEncoder {
   readonly nodeLayerName: string;
   readonly wayLayerName: string;
   readonly relationLayerName: string;
-  private readonly osm: Osm;
+  private readonly osm: OsmReader;
   private readonly extent: number;
   private readonly extentBbox: [number, number, number, number];
 
@@ -72,7 +72,7 @@ export class OsmixVtEncoder {
     };
   }
 
-  constructor(osm: Osm, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER) {
+  constructor(osm: OsmReader, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER) {
     this.osm = osm;
 
     const min = -buffer;

@@ -24,7 +24,7 @@ import type {
   OsmNode,
   OsmRelation,
   OsmWay,
-} from "@osmix/shared/types";
+} from "@osmix/types";
 
 import { createReadableEntityStreamFromOsm } from "./entity-stream.ts";
 import {
