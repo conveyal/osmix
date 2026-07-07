@@ -9,6 +9,7 @@ import type { Progress } from "@osmix/shared/progress";
 import { type OsmId, type OsmInfo, OsmixRemote } from "osmix";
 
 import type { MergeWorker, StoredFileInfo, StoredOsmEntry } from "../workers/osm.worker";
+// oxlint-disable-next-line import/default -- Vite ?worker&url resolves to a string URL
 import OsmWorkerUrl from "../workers/osm.worker.ts?worker&url";
 
 export interface MergeRemoteOptions {

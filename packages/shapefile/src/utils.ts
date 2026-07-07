@@ -1,9 +1,9 @@
+// oxlint-disable-next-line typescript/triple-slash-reference -- ambient module declaration for untyped package
 /// <reference path="./shpjs.d.ts" />
 /**
  * Utility functions for Shapefile data handling.
  * @module
  */
-
 import type { FeatureCollection } from "geojson";
 import shp from "shpjs";
 

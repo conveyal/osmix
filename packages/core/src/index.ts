@@ -22,8 +22,11 @@
  * @module @osmix/core
  */
 
+// oxlint-disable-next-line typescript/triple-slash-reference -- ambient module declarations for untyped packages
 /// <reference path="./types/kdbush.d.ts" />
+// oxlint-disable-next-line typescript/triple-slash-reference -- ambient module declarations for untyped packages
 /// <reference path="./types/geokdbush.d.ts" />
+// oxlint-disable-next-line typescript/triple-slash-reference -- ambient module declarations for untyped packages
 /// <reference path="./types/geoflatbush.d.ts" />
 
 export type { IdOrIndex } from "./ids.ts";

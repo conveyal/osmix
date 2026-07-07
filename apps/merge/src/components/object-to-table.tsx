@@ -1,10 +1,6 @@
 import { flattenValue } from "../utils";
 
-export default function ObjectToTableRows({
-  object,
-}: {
-  object: null | Record<string, string | number | boolean | unknown>;
-}) {
+export default function ObjectToTableRows({ object }: { object: null | Record<string, unknown> }) {
   if (!object) return null;
   return (
     <>

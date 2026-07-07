@@ -5,6 +5,7 @@ import maplibregl from "maplibre-gl";
 import { createRemote, type OsmRemoteDataset } from "osmix";
 
 import { codeToHtml } from "./shiki.bundle";
+// oxlint-disable-next-line import/default -- Vite ?worker&url resolves to a string URL
 import MergeWorkerUrl from "./worker.ts?worker&url";
 
 const MONACO_URL =
@@ -105,7 +106,7 @@ async function loadAction(msg: string, fn: () => Promise<void>) {
   try {
     await fn();
   } catch (e) {
-    if (status) status.textContent = `Error: ${e}`;
+    if (status) status.textContent = `Error: ${e instanceof Error ? e.message : String(e)}`;
   } finally {
     setEnabled(true);
   }

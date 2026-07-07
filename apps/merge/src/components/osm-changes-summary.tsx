@@ -267,6 +267,16 @@ function DiffRow({
   );
 }
 
+function tagValueToString(val: unknown): string {
+  if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") {
+    return String(val);
+  }
+  if (val == null) {
+    return "";
+  }
+  return JSON.stringify(val);
+}
+
 /**
  * Computes and displays a unified diff for tags.
  */
@@ -289,8 +299,8 @@ function TagsDiff({
   }> = [];
 
   for (const key of allKeys) {
-    const oldVal = old[key] !== undefined ? String(old[key]) : undefined;
-    const newVal = current[key] !== undefined ? String(current[key]) : undefined;
+    const oldVal = old[key] !== undefined ? tagValueToString(old[key]) : undefined;
+    const newVal = current[key] !== undefined ? tagValueToString(current[key]) : undefined;
 
     if (oldVal === undefined && newVal !== undefined) {
       rows.push({ key, status: "added", newValue: newVal });
@@ -607,7 +617,7 @@ function MembersDiff({
           <td className="align-top pl-4 text-muted-foreground">removed</td>
           <td>
             {deletes.map((op) => (
-              <span key={`del-${op.index}-${op.value}`} className="text-red-600">
+              <span key={`del-${op.index}-${formatMember(op.value)}`} className="text-red-600">
                 <span className="text-muted-foreground text-xs">[{op.index}]</span>
                 <span className="line-through">{formatMember(op.value)}</span>
                 {op !== deletes[deletes.length - 1] && ", "}
@@ -621,7 +631,7 @@ function MembersDiff({
           <td className="align-top pl-4 text-muted-foreground">added</td>
           <td>
             {inserts.map((op) => (
-              <span key={`ins-${op.index}-${op.value}`} className="text-green-600">
+              <span key={`ins-${op.index}-${formatMember(op.value)}`} className="text-green-600">
                 <span className="text-muted-foreground text-xs">[{op.index}]</span>
                 {formatMember(op.value)}
                 {op !== inserts[inserts.length - 1] && ", "}

@@ -12,7 +12,7 @@ export default function EntityLookup({
   const [, formAction] = useActionState<OsmEntity | null, FormData>((_state, formData) => {
     const fde = formData.get("entityId");
     if (!fde) return null;
-    return setSelectedEntity(fde.toString());
+    return setSelectedEntity(typeof fde === "string" ? fde : fde.name);
   }, null);
   return (
     <form action={formAction}>
