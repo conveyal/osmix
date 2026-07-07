@@ -70,7 +70,6 @@ export function connectWaysToRings(wayMembers: OsmWay[]): OsmWay[][] {
     const ring: OsmWay[] = [startWay];
     used.add(startWay.id);
 
-    let currentStart = startWay.refs[0]!;
     let currentEnd = startWay.refs[startWay.refs.length - 1]!;
 
     // Try to extend the ring forward
