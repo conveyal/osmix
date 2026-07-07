@@ -147,7 +147,7 @@ function DeviceMemory() {
   const [memory, setMemory] = useState("unknown");
 
   useEffect(() => {
-    setMemory("deviceMemory" in navigator ? `${navigator.deviceMemory}GiB` : "unknown");
+    setMemory("deviceMemory" in navigator ? `${String(navigator.deviceMemory)}GiB` : "unknown");
   }, []);
 
   return (

@@ -494,7 +494,7 @@ export class OsmChangeset {
         // Prefer the incoming way node, then the intersecting way node, then a new node.
         if (wayNodeId) {
           const wayNode = this.osm.nodes.getById(wayNodeId);
-          if (wayNode == null) throw Error(`Way node ${wayNodeId} not found`);
+          if (wayNode == null) throw Error(`Way node ${String(wayNodeId)} not found`);
           if (intersectingWayNodeId) {
             // Replace in intersecting way
             this.modify("way", intersectingWay.id, (way) => {
@@ -518,7 +518,7 @@ export class OsmChangeset {
         } else if (intersectingWayNodeId) {
           const intersectingWayNode = this.osm.nodes.getById(intersectingWayNodeId);
           if (intersectingWayNode == null)
-            throw Error(`Intersecting way node ${intersectingWayNodeId} not found`);
+            throw Error(`Intersecting way node ${String(intersectingWayNodeId)} not found`);
 
           this.spliceNodeIntoWay(way, intersectingWayNode);
           if (!entityHasTagValue(intersectingWayNode, "crossing", "yes")) {

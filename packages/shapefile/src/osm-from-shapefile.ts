@@ -367,8 +367,10 @@ function propertiesToTags(properties: Record<string, unknown> | null): OsmTags |
   for (const [key, value] of Object.entries(properties)) {
     if (typeof value === "string" || typeof value === "number") {
       tags[key] = value;
-    } else if (value != null) {
+    } else if (typeof value === "boolean") {
       tags[key] = String(value);
+    } else if (value != null && typeof value === "object") {
+      tags[key] = JSON.stringify(value);
     }
   }
   return Object.keys(tags).length > 0 ? tags : undefined;

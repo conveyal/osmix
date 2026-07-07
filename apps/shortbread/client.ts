@@ -113,7 +113,7 @@ async function waitForServerReady() {
       setTimeout(waitForServerReady, 1_000);
     }
   } catch (error) {
-    console.error(`Error loading map: ${error}`);
+    console.error("Error loading map:", error);
   }
 }
 

@@ -39,9 +39,7 @@ export function flattenValue(value: unknown): string {
   return "";
 }
 
-export function objectToHtmlTableString(
-  object?: Record<string, string | number | boolean | unknown>,
-) {
+export function objectToHtmlTableString(object?: Record<string, unknown>) {
   if (object == null) return "";
   return Object.entries(object)
     .filter(([_key, value]) => {
