@@ -1,26 +1,26 @@
 {
-	"$schema": "https://json.schemastore.org/package.json",
-	"name": "@osmix/shortbread-server",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev": "node --watch server.ts",
-		"start": "node server.ts",
-		"typecheck": "tsc --build --noEmit"
-	},
-	"dependencies": {
-		"@hono/node-server": "^2.0.8",
-		"@osmix/core": "workspace:*",
-		"@osmix/shortbread": "workspace:*",
-		"@versatiles/style": "^5.13.0",
-		"comlink": "^4.4.2",
-		"hono": "^4.8.3",
-		"maplibre-gl": "catalog:",
-		"osmix": "workspace:*"
-	},
-	"devDependencies": {
-		"@osmix/pbf": "workspace:*",
-		"@osmix/shared": "workspace:*",
-		"typescript": "catalog:"
-	}
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/shortbread-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.ts",
+    "start": "node server.ts",
+    "typecheck": "tsc --build --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.8",
+    "@osmix/core": "workspace:*",
+    "@osmix/shortbread": "workspace:*",
+    "@versatiles/style": "^5.13.0",
+    "comlink": "^4.4.2",
+    "hono": "^4.8.3",
+    "maplibre-gl": "catalog:",
+    "osmix": "workspace:*"
+  },
+  "devDependencies": {
+    "@osmix/pbf": "workspace:*",
+    "@osmix/shared": "workspace:*",
+    "typescript": "catalog:"
+  }
 }
