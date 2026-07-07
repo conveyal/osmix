@@ -10,8 +10,8 @@
  * @module
  */
 
-import { haversineDistance } from "@osmix/shared/haversine-distance";
-import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from "@osmix/shared/types";
+import { haversineDistance } from "@osmix/geo/haversine-distance";
+import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from "@osmix/types";
 import sweeplineIntersections from "sweepline-intersections";
 
 import type { OsmChangesetStats } from "./types.ts";

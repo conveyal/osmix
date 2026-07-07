@@ -19,10 +19,12 @@
   "dependencies": {
     "@osmix/core": "workspace:*",
     "@osmix/shared": "workspace:*",
+    "@osmix/types": "workspace:*",
     "@placemarkio/geojson-rewind": "catalog:",
     "hyparquet": "^1.26.2"
   },
   "devDependencies": {
+    "@osmix/test-utils": "workspace:*",
     "@types/geojson": "catalog:",
     "typescript": "catalog:"
   }

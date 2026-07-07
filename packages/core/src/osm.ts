@@ -1,6 +1,6 @@
 import type { OsmPbfHeaderBlock } from "@osmix/pbf";
 import { ContentHasher } from "@osmix/shared/content-hasher";
-import type { GeoBbox2D } from "@osmix/shared/types";
+import type { GeoBbox2D } from "@osmix/types";
 
 import { Nodes, type NodesTransferables } from "./nodes.ts";
 import { Relations, type RelationsTransferables } from "./relations.ts";

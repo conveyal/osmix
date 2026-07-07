@@ -8,7 +8,7 @@
  */
 
 import type { ContentHasher } from "@osmix/shared/content-hasher";
-import type { GeoBbox2D, OsmEntity, OsmEntityType, OsmTags } from "@osmix/shared/types";
+import type { GeoBbox2D, OsmEntity, OsmEntityType, OsmTags } from "@osmix/types";
 
 import type { IdOrIndex, Ids, IdsTransferables } from "./ids.ts";
 import type { Tags, TagsTransferables } from "./tags.ts";

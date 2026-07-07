@@ -101,15 +101,33 @@ function rewritePkgJsonForDist(pkgJson: PackageJson): PackageJson {
     };
   }
 
+  const rewritten: PackageJson = { ...pkgJson };
+
   if (pkgJson.main) {
-    return {
-      ...pkgJson,
-      main: "./dist/index.js",
-      types: "./dist/index.d.ts",
-    };
+    rewritten.main = "./dist/index.js";
+    rewritten.types = "./dist/index.d.ts";
   }
 
-  throw Error(`Cannot rewrite package.json for ${pkgJson.name}`);
+  if (pkgJson.exports) {
+    const exports: PackageJson["exports"] = {};
+    for (const [key, value] of Object.entries(pkgJson.exports)) {
+      if (typeof value !== "string" || !value.startsWith("./src/")) {
+        exports[key] = value;
+        continue;
+      }
+
+      const jsPath = value.replace("./src/", "./dist/").replace(/\.ts$/, ".js");
+      const typesPath = jsPath.replace(/\.js$/, ".d.ts");
+      exports[key] = { default: jsPath, types: typesPath };
+    }
+    rewritten.exports = exports;
+  }
+
+  if (!rewritten.main && !rewritten.exports) {
+    throw Error(`Cannot rewrite package.json for ${pkgJson.name}`);
+  }
+
+  return rewritten;
 }
 
 function serializePackageJson(pkgJson: PackageJson): string {

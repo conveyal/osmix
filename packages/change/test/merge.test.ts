@@ -1,5 +1,5 @@
 import type { Osm } from "@osmix/core";
-import { createMockBaseOsm, createMockPatchOsm } from "@osmix/core";
+import { createMockBaseOsm, createMockPatchOsm } from "@osmix/core/mocks";
 import { describe, expect, it } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset";

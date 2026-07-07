@@ -1,6 +1,6 @@
-import type { GeoBbox2D } from "@osmix/shared/types";
 import type { FeatureCollection } from "geojson";
 import type { FillLayerSpecification, LineLayerSpecification } from "maplibre-gl";
+import type { GeoBbox2D } from "osmix";
 import { Layer, Source } from "react-map-gl/maplibre";
 
 import { APPID } from "../settings";

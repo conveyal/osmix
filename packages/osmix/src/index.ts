@@ -1,60 +1,227 @@
 /**
  * osmix - High-level entrypoint for the Osmix toolkit.
  *
- * This package provides a unified API for loading, manipulating, and exporting
- * OpenStreetMap data. It layers ingestion, streaming, and worker orchestration
- * on top of the lower-level @osmix/* packages.
- *
- * Key capabilities:
- * - **Loading**: Load PBF files and GeoJSON into memory-efficient Osm indexes.
- * - **Streaming**: Convert between PBF and JSON entity streams.
- * - **Extraction**: Create geographic extracts with various strategies.
- * - **Tiles**: Generate raster and vector tiles from OSM data.
- * - **Workers**: Offload heavy operations to Web Workers with `OsmixRemote`.
- * - **Merging**: Combine datasets with deduplication and intersection creation.
- *
- * @example
- * ```ts
- * import { fromPbf, toPbfBuffer, createExtract } from "osmix"
- *
- * // Load from PBF
- * const osm = await fromPbf(pbfFile.stream())
- *
- * // Create extract
- * const downtown = createExtract(osm, [-122.35, 47.60, -122.32, 47.62])
- *
- * // Export to PBF
- * const pbfBytes = await toPbfBuffer(downtown)
- * ```
- *
- * @example
- * ```ts
- * // Use workers for off-thread processing
- * import { createRemote } from "osmix"
- *
- * const remote = await createRemote()
- * const osm = await remote.fromPbf(pbfFile)
- * const tile = await osm.getVectorTile([9372, 12535, 15])
- * ```
- *
  * @module osmix
  */
 
-// Re-export core libraries
-export * from "@osmix/change";
-export * from "@osmix/core";
-export * from "@osmix/geojson";
-export * from "@osmix/geoparquet";
-export * from "@osmix/json";
-export * from "@osmix/pbf";
-export * from "@osmix/raster";
-export * from "@osmix/router";
-export * from "@osmix/shapefile";
-export * from "@osmix/shared/types";
-export * from "@osmix/vt";
-export * from "@osmix/load";
-export * from "./raster.ts";
-export * from "./remote.ts";
-export * from "./settings.ts";
-export * from "./utils.ts";
-export * from "./worker.ts";
+// --- Facade orchestration ---
+export {
+  createOsmixWorker,
+  createRemote,
+  detectFileType,
+  OSM_FILE_TYPES,
+  OsmixRemote,
+  type OsmFileType,
+  type OsmId,
+  type OsmRemoteDataset,
+  type OsmixRemoteOptions,
+} from "./remote.ts";
+export { OsmixWorker, type RouteResult, type WaySegment } from "./worker.ts";
+export { drawToRasterTile, type DrawToRasterTileOptions } from "./raster.ts";
+export {
+  DEFAULT_WORKER_COUNT,
+  SUPPORTS_SHARED_ARRAY_BUFFER,
+  SUPPORTS_STREAM_TRANSFER,
+} from "./settings.ts";
+export {
+  collectTransferables,
+  supportsReadableStreamTransfer,
+  transfer,
+  type Transferables,
+} from "./utils.ts";
+
+// --- @osmix/change ---
+export {
+  applyChangesetToOsm,
+  generateChangeset,
+  generateOscChanges,
+  merge,
+  OsmChangeset,
+  camelCaseToSentenceCase,
+  changeStatsSummary,
+  cleanCoords,
+  entityHasTagValue,
+  getEntityVersion,
+  isWayIntersectionCandidate,
+  nearestNodeOnWay,
+  osmTagsToOscTags,
+  removeDuplicateAdjacentRelationMembers,
+  removeDuplicateAdjacentWayRefs,
+  waysIntersect,
+  waysShouldConnect,
+} from "@osmix/change";
+export type {
+  OscOptions,
+  OsmChange,
+  OsmChanges,
+  OsmChangesetStats,
+  OsmChangeTypes,
+  OsmEntityRef,
+  OsmMergeOptions,
+} from "@osmix/change";
+
+// --- @osmix/core ---
+export { BufferConstructor, Nodes, Osm, Relations, Tags, Ways } from "@osmix/core";
+export type {
+  IdOrIndex,
+  OsmInfo,
+  OsmOptions,
+  OsmReader,
+  OsmTransferables,
+  OsmWriter,
+  BufferType,
+} from "@osmix/core";
+
+// --- @osmix/geojson ---
+export {
+  fromGeoJSON,
+  nodeToFeature,
+  osmEntityToGeoJSONFeature,
+  relationToFeature,
+  startCreateOsmFromGeoJSON,
+  wayToFeature,
+} from "@osmix/geojson";
+export type { OsmGeoJSONFeature } from "@osmix/geojson";
+
+// --- @osmix/geoparquet ---
+export { fromGeoParquet, GeoParquetOsmBuilder } from "@osmix/geoparquet";
+export type { GeoParquetReadOptions, GeoParquetSource } from "@osmix/geoparquet";
+
+// --- @osmix/gtfs ---
+export {
+  fromGtfs,
+  GtfsArchive,
+  GtfsOsmBuilder,
+  isGtfsZip,
+  routeTypeToOsmRoute,
+  wheelchairBoardingToOsm,
+} from "@osmix/gtfs";
+export type { GtfsFileName, GtfsFileTypeMap } from "@osmix/gtfs";
+
+// --- @osmix/json ---
+export {
+  OsmBlocksToJsonTransformStream,
+  OsmJsonToBlocksTransformStream,
+  OsmPbfBlockBuilder,
+  OsmPbfBlockParser,
+  blocksToJsonEntities,
+  createOsmJsonReadableStream,
+  osmJsonToPbf,
+  osmPbfToJson,
+  OSM_ENTITY_TYPES,
+} from "@osmix/json";
+
+// --- @osmix/load ---
+export {
+  CONVEYAL_EXTRACT_TAG_FILTERS,
+  createExtract,
+  entityMatchesTagRules,
+  fromPbf,
+  hasExtractTagFilter,
+  nodeMatchesExtractTagRules,
+  normalizeTagFilterRules,
+  readOsmPbfHeader,
+  relationMatchesExtractTagRules,
+  startCreateOsmFromPbf,
+  tagRuleMatches,
+  toPbfBuffer,
+  toPbfStream,
+  transformOsmPbfToJson,
+  wayMatchesExtractTagRules,
+} from "@osmix/load";
+export type {
+  ExtractStrategy,
+  ExtractTagFilterRule,
+  ExtractTagFilterRules,
+  OsmFromPbfOptions,
+} from "@osmix/load";
+
+// --- @osmix/pbf ---
+export {
+  OsmBlocksToPbfBytesTransformStream,
+  OsmPbfBytesToBlocksTransformStream,
+  concatUint8,
+  createOsmEntityCounter,
+  readOsmPbf,
+  toAsyncGenerator,
+  uint32BE,
+  webCompress,
+  webDecompress,
+} from "@osmix/pbf";
+export type { OsmPbfBlock, OsmPbfGroup, OsmPbfHeaderBlock } from "@osmix/pbf";
+
+// --- @osmix/raster ---
+export { OsmixRasterTile, hexColorToRgba, normalizeHexColor } from "@osmix/raster";
+export { compositeRGBA } from "@osmix/raster/color";
+
+// --- @osmix/router ---
+export { Router, RoutingGraph, buildGraph, defaultHighwayFilter } from "@osmix/router";
+export type {
+  DefaultSpeeds,
+  HighwayFilter,
+  RouteOptions,
+  RoutingGraphTransferables,
+} from "@osmix/router";
+
+// --- @osmix/shapefile ---
+export { fromShapefile, startCreateOsmFromShapefile } from "@osmix/shapefile";
+
+// --- @osmix/types ---
+export type {
+  GeoBbox2D,
+  ILonLat,
+  LonLat,
+  LonLatToPixel,
+  LonLatToTilePixel,
+  OsmEntity,
+  OsmEntityType,
+  OsmInfoParsed,
+  OsmNode,
+  OsmRelation,
+  OsmRelationMember,
+  OsmTags,
+  OsmWay,
+  RelationKind,
+  RelationKindMetadata,
+  Rgba,
+  Tile,
+  TilePxBbox,
+  XY,
+} from "@osmix/types";
+export {
+  bboxFromLonLats,
+  entityPropertiesEqual,
+  getEntityType,
+  isMultipolygonRelation,
+  isNode,
+  isNodeEqual,
+  isRelation,
+  isRelationEqual,
+  isWay,
+  isWayEqual,
+} from "@osmix/types/utils";
+export {
+  buildRelationLineStrings,
+  collectRelationPoints,
+  getRelationKind,
+  getRelationKindMetadata,
+  isAreaRelation,
+  isLineRelation,
+  isLogicRelation,
+  isPointRelation,
+  isSuperRelation,
+  resolveRelationMembers,
+} from "@osmix/types/relation-kind";
+export { decodeZigzag, zigzag, zigzag32 } from "@osmix/types/zigzag";
+
+// --- @osmix/vt ---
+export { OsmixVtEncoder, projectToTile, writeVtPbf } from "@osmix/vt";
+
+// --- @osmix/shared (plumbing re-exported for apps) ---
+export {
+  logProgress,
+  progressEvent,
+  progressEventMessage,
+  type Progress,
+  type ProgressEvent,
+} from "@osmix/shared/progress";

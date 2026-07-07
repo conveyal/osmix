@@ -5,7 +5,7 @@
  * vector tiles with proper layer styling.
  */
 import type { OsmPbfHeaderBlock } from "@osmix/pbf";
-import type { GeoBbox2D, LonLat } from "@osmix/shared/types";
+import type { GeoBbox2D, LonLat } from "@osmix/types";
 import maplibregl, { type ControlPosition, type MapGeoJSONFeature } from "maplibre-gl";
 
 let map: maplibregl.Map | null = null;

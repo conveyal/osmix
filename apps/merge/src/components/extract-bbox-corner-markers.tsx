@@ -1,4 +1,4 @@
-import type { GeoBbox2D } from "@osmix/shared/types";
+import type { GeoBbox2D } from "osmix";
 import { useState } from "react";
 import type { MarkerDragEvent } from "react-map-gl/maplibre";
 import { Marker } from "react-map-gl/maplibre";

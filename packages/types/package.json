@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/types",
+  "version": "0.0.1",
+  "description": "OSM domain types and entity utilities for Osmix",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "type": "module",
+  "main": "./src/types.ts",
+  "exports": {
+    ".": "./src/types.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dequal": "catalog:"
+  },
+  "devDependencies": {
+    "@osmix/shared": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

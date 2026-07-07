@@ -4,12 +4,12 @@
  * Based on https://shortbread-tiles.org/schema/1.0/
  */
 
-import type { Osm } from "@osmix/core";
-import { bboxContainsOrIntersects } from "@osmix/shared/bbox-intersects";
-import { clipPolygon, clipPolyline } from "@osmix/shared/lineclip";
-import { llToTilePx, tileToBbox } from "@osmix/shared/tile";
-import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/shared/types";
-import { wayIsArea } from "@osmix/shared/way-is-area";
+import type { OsmReader } from "@osmix/core/contracts";
+import { bboxContainsOrIntersects } from "@osmix/geo/bbox-intersects";
+import { clipPolygon, clipPolyline } from "@osmix/geo/lineclip";
+import { llToTilePx, tileToBbox } from "@osmix/geo/tile";
+import { wayIsArea } from "@osmix/geo/way-is-area";
+import type { GeoBbox2D, LonLat, Tile, XY } from "@osmix/types";
 import {
   type VtSimpleFeature,
   type VtSimpleFeatureGeometry,
@@ -101,7 +101,7 @@ interface ClassifiedFeature {
  * Features are classified into appropriate layers based on their OSM tags.
  */
 export class ShortbreadVtEncoder {
-  private readonly osm: Osm;
+  private readonly osm: OsmReader;
   private readonly extent: number;
   private readonly extentBbox: [number, number, number, number];
 
@@ -111,7 +111,7 @@ export class ShortbreadVtEncoder {
    * @param extent - Tile extent (default 4096)
    * @param buffer - Buffer size for clipping (default 64)
    */
-  constructor(osm: Osm, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER) {
+  constructor(osm: OsmReader, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER) {
     this.osm = osm;
     this.extent = extent;
     const min = -buffer;

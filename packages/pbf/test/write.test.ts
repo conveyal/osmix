@@ -6,12 +6,12 @@ import {
   getFixtureFileWriteStream,
   getFixturePath,
   PBFs,
-} from "@osmix/shared/fixtures";
+} from "@osmix/test-utils/fixtures";
 import { describe, expect, it } from "vitest";
 
 import { OsmBlocksToPbfBytesTransformStream, osmBlockToPbfBlobBytes } from "../src/blocks-to-pbf";
 import { OsmPbfBytesToBlocksTransformStream, readOsmPbf } from "../src/pbf-to-blocks";
-import { testOsmPbfReader } from "../src/utils";
+import { testOsmPbfReader } from "./helpers";
 
 describe("write", () => {
   describe.each(Object.entries(PBFs))("%s", (name, pbf) => {

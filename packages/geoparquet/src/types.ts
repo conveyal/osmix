@@ -4,7 +4,7 @@
  * @module
  */
 
-import type { GeoBbox2D, OsmTags } from "@osmix/shared/types";
+import type { GeoBbox2D, OsmTags } from "@osmix/types";
 import type { AsyncBuffer, ParquetReadOptions } from "hyparquet";
 
 /**

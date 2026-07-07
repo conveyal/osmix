@@ -18,10 +18,13 @@
   },
   "dependencies": {
     "@osmix/core": "workspace:*",
-    "@osmix/shared": "workspace:*"
+    "@osmix/geo": "workspace:*",
+    "@osmix/types": "workspace:*"
   },
   "devDependencies": {
     "@osmix/load": "workspace:*",
+    "@osmix/shared": "workspace:*",
+    "@osmix/test-utils": "workspace:*",
     "mitata": "^1.0.34",
     "typescript": "catalog:"
   }

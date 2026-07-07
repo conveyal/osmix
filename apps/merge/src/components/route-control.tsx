@@ -1,8 +1,8 @@
-import type { Osm } from "@osmix/core";
-import type { LonLat } from "@osmix/shared/types";
-import { bboxFromLonLats } from "@osmix/shared/utils";
 import { useAtom, useAtomValue } from "jotai";
 import { NavigationIcon, XIcon } from "lucide-react";
+import type { Osm } from "osmix";
+import type { LonLat } from "osmix";
+import { bboxFromLonLats } from "osmix";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre";
 

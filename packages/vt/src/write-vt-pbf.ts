@@ -10,7 +10,7 @@
  * @module
  */
 
-import { zigzag, zigzag32 } from "@osmix/shared/zigzag";
+import { zigzag, zigzag32 } from "@osmix/types/zigzag";
 import { PbfWriter } from "pbf";
 
 import type { VtPbfLayer, VtSimpleFeature } from "./types.ts";

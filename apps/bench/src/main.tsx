@@ -1,4 +1,4 @@
-import type { GeoBbox2D } from "@osmix/shared/types";
+import type { GeoBbox2D } from "@osmix/types";
 import { StrictMode, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Layer, Map as MaplibreMap, Source } from "react-map-gl/maplibre";

@@ -7,9 +7,9 @@
  * @module
  */
 
-import { CsvParseStream } from "@osmix/shared/csv-parse-stream";
 import { unzip, type ZipItem } from "but-unzip";
 
+import { CsvParseStream } from "./csv-parse-stream.ts";
 import type {
   GtfsAgency,
   GtfsRoute,

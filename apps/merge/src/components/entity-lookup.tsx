@@ -1,5 +1,5 @@
-import type { OsmEntity } from "@osmix/shared/types";
 import { SearchIcon } from "lucide-react";
+import type { OsmEntity } from "osmix";
 import { useActionState } from "react";
 
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "./ui/input-group";

@@ -1,6 +1,15 @@
+import { buildRelationRings } from "@osmix/geo/relation-multipolygon";
 import type { OsmPbfRelation } from "@osmix/pbf";
 import { assertValue } from "@osmix/shared/assert";
 import type { ContentHasher } from "@osmix/shared/content-hasher";
+import type {
+  GeoBbox2D,
+  LonLat,
+  OsmEntityType,
+  OsmRelation,
+  OsmRelationMember,
+  OsmTags,
+} from "@osmix/types";
 import {
   buildRelationLineStrings,
   collectRelationPoints,
@@ -9,17 +18,8 @@ import {
   isPointRelation,
   isSuperRelation,
   resolveRelationMembers,
-} from "@osmix/shared/relation-kind";
-import { buildRelationRings } from "@osmix/shared/relation-multipolygon";
-import type {
-  GeoBbox2D,
-  LonLat,
-  OsmEntityType,
-  OsmRelation,
-  OsmRelationMember,
-  OsmTags,
-} from "@osmix/shared/types";
-import { bboxFromLonLats } from "@osmix/shared/utils";
+} from "@osmix/types/relation-kind";
+import { bboxFromLonLats } from "@osmix/types/utils";
 import Flatbush from "flatbush";
 import { around as geoAround } from "geoflatbush";
 

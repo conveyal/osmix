@@ -1,6 +1,6 @@
 import { Osm } from "@osmix/core";
 import { fromPbf } from "@osmix/load";
-import { getFixtureFile, PBFs } from "@osmix/shared/fixtures";
+import { getFixtureFile, PBFs } from "@osmix/test-utils/fixtures";
 import { bench, group, run } from "mitata";
 
 import { buildGraph } from "../src/index.ts";

@@ -1,11 +1,10 @@
-import { describe, expect, it } from "vitest";
-
 import {
   buildRelationRings,
   connectWaysToRings,
   getWayMembersByRole,
-} from "../src/relation-multipolygon";
-import type { OsmRelation, OsmWay } from "../src/types";
+} from "@osmix/geo/relation-multipolygon";
+import type { OsmRelation, OsmWay } from "@osmix/types";
+import { describe, expect, it } from "vitest";
 
 describe("relation-multipolygon", () => {
   describe("getWayMembersByRole", () => {

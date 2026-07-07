@@ -7,7 +7,7 @@
  * @module
  */
 
-import type { GeoBbox2D } from "./types.ts";
+import type { GeoBbox2D } from "@osmix/types";
 
 /**
  * Check if two bounding boxes intersect or contain each other.

@@ -1,6 +1,6 @@
-import type { Osm } from "@osmix/core";
 import { useAtom, useSetAtom } from "jotai";
 import { MaximizeIcon, XIcon } from "lucide-react";
+import type { Osm } from "osmix";
 
 import { useFlyToEntity } from "../hooks/map";
 import { MIN_PICKABLE_ZOOM } from "../settings";

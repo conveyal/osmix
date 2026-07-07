@@ -30,7 +30,7 @@
 /// <reference path="./types/geoflatbush.d.ts" />
 
 export type { IdOrIndex } from "./ids.ts";
-export * from "./mocks.ts";
+export type { OsmReader, OsmWriter } from "./contracts.ts";
 export * from "./nodes.ts";
 export * from "./osm.ts";
 export * from "./relations.ts";

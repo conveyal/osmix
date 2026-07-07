@@ -1,5 +1,5 @@
-import { bboxToTileRange } from "@osmix/shared/tile";
-import type { OsmTags, Tile } from "@osmix/shared/types";
+import { bboxToTileRange } from "@osmix/geo/tile";
+import type { OsmTags, Tile } from "@osmix/types";
 import * as idb from "idb-keyval";
 import maplibregl from "maplibre-gl";
 import { createRemote, type OsmRemoteDataset } from "osmix";

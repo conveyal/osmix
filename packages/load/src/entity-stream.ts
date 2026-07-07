@@ -6,7 +6,7 @@
 
 import type { Osm } from "@osmix/core";
 import type { OsmPbfHeaderBlock } from "@osmix/pbf";
-import type { OsmEntity } from "@osmix/shared/types";
+import type { OsmEntity } from "@osmix/types";
 
 function* getAllEntitiesSorted(osm: Osm): Generator<OsmEntity> {
   for (const node of osm.nodes.sorted()) {

@@ -1,4 +1,4 @@
-import { createMockBaseOsm, createMockPatchOsm } from "@osmix/core";
+import { createMockBaseOsm, createMockPatchOsm } from "@osmix/core/mocks";
 import { describe, expect, it } from "vitest";
 
 import { OsmChangeset } from "../src/changeset";

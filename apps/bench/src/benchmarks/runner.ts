@@ -1,4 +1,4 @@
-import type { GeoBbox2D } from "@osmix/shared/types";
+import type { GeoBbox2D } from "@osmix/types";
 import * as Osmix from "osmix";
 
 import type { BenchmarkResults, WorkerBenchmarkOptions } from "./types";

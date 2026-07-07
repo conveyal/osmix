@@ -10,6 +10,11 @@
   },
   "type": "module",
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contracts": "./src/contracts.ts",
+    "./mocks": "./src/mocks.ts"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "bench": "vitest bench",
@@ -17,7 +22,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
+    "@osmix/types": "workspace:*",
     "flatbush": "^4.6.2",
     "geoflatbush": "^2.2.1",
     "geokdbush": "^2.1.0",

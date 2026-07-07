@@ -1,7 +1,7 @@
 import { Osm } from "@osmix/core";
 import { createExtract, fromPbf, toPbfBuffer, toPbfStream } from "@osmix/load";
-import { getFixtureFileReadStream } from "@osmix/shared/fixtures";
-import type { GeoBbox2D } from "@osmix/shared/types";
+import { getFixtureFileReadStream } from "@osmix/test-utils/fixtures";
+import type { GeoBbox2D } from "@osmix/types";
 import { describe, expect, test } from "vitest";
 
 const TEST_BBOX: GeoBbox2D = [-0.1, -0.1, 1, 1];

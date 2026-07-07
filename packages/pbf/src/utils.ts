@@ -1,8 +1,4 @@
-import { assertValue as assert } from "@osmix/shared/assert";
-import type { PbfFixture } from "@osmix/shared/fixtures";
-import { transformBytes } from "@osmix/shared/transform-bytes";
-
-import type { OsmPbfBlock, OsmPbfGroup, OsmPbfHeaderBlock } from "./proto/osmformat.ts";
+import type { OsmPbfGroup } from "./proto/osmformat.ts";
 
 export type AsyncGeneratorValue<T> =
   | T
@@ -35,6 +31,44 @@ export async function* toAsyncGenerator<T>(v: AsyncGeneratorValue<T>): AsyncGene
   } else {
     yield v;
   }
+}
+
+function bytesToStream(bytes: Uint8Array<ArrayBuffer>) {
+  return new ReadableStream<Uint8Array<ArrayBuffer>>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
+async function streamToBytes(
+  stream: ReadableStream<Uint8Array<ArrayBuffer>>,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array<ArrayBuffer>[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value !== undefined) chunks.push(value);
+  }
+
+  const total = chunks.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(new ArrayBuffer(total));
+  let offset = 0;
+  for (const p of chunks) {
+    out.set(p, offset);
+    offset += p.length;
+  }
+  return out;
+}
+
+async function transformBytes(
+  bytes: Uint8Array<ArrayBuffer>,
+  transformStream: TransformStream<Uint8Array<ArrayBuffer>, Uint8Array<ArrayBuffer>>,
+): Promise<Uint8Array<ArrayBuffer>> {
+  return streamToBytes(bytesToStream(bytes).pipeThrough(transformStream));
 }
 
 /**
@@ -77,37 +111,6 @@ export function uint32BE(n: number): Uint8Array {
   out[2] = (n >>> 8) & 0xff;
   out[3] = n & 0xff;
   return out;
-}
-
-export async function testOsmPbfReader(
-  osm: {
-    header: OsmPbfHeaderBlock;
-    blocks: AsyncGenerator<OsmPbfBlock>;
-  },
-  pbf: PbfFixture,
-) {
-  assert(
-    JSON.stringify(osm.header.bbox) === JSON.stringify(pbf.bbox),
-    `Header bbox ${JSON.stringify(osm.header.bbox)} != ${JSON.stringify(pbf.bbox)}`,
-  );
-
-  const { onGroup, count } = createOsmEntityCounter();
-  for await (const block of osm.blocks) for (const group of block.primitivegroup) onGroup(group);
-
-  assert(count.nodes === pbf.nodes, `Expected nodes: ${pbf.nodes}, got: ${count.nodes}`);
-  assert(count.ways === pbf.ways, `Expected ways: ${pbf.ways}, got: ${count.ways}`);
-  assert(
-    count.relations === pbf.relations,
-    `Expected relations: ${pbf.relations}, got: ${count.relations}`,
-  );
-  assert(count.node0 === pbf.node0.id, `Expected node0: ${pbf.node0.id}, got: ${count.node0}`);
-  assert(count.way0 === pbf.way0, `Expected way0: ${pbf.way0}, got: ${count.way0}`);
-  assert(
-    count.relation0 === pbf.relation0,
-    `Expected relation0: ${pbf.relation0}, got: ${count.relation0}`,
-  );
-
-  return count;
 }
 
 export function createOsmEntityCounter() {

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/geo",
+  "version": "0.0.1",
+  "description": "Geospatial math utilities for Osmix",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "type": "module",
+  "main": "./src/tile.ts",
+  "exports": {
+    ".": "./src/tile.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mapbox/tilebelt": "^2.0.3",
+    "@osmix/types": "workspace:*",
+    "lineclip": "^2.0.0"
+  },
+  "devDependencies": {
+    "@osmix/shared": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

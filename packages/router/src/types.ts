@@ -4,7 +4,7 @@
  */
 
 import type { BufferType } from "@osmix/core";
-import type { LonLat, OsmTags } from "@osmix/shared/types";
+import type { LonLat, OsmTags } from "@osmix/types";
 
 /** Per-way segment with distance and time (consecutive same-name ways merged). */
 export interface WaySegment {

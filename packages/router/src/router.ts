@@ -8,7 +8,7 @@
  */
 
 import type { Osm } from "@osmix/core";
-import type { LonLat } from "@osmix/shared/types";
+import type { LonLat } from "@osmix/types";
 
 import { routingAlgorithms } from "./algorithms/index.ts";
 import type { RoutingGraph } from "./graph.ts";

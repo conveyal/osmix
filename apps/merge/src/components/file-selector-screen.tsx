@@ -1,4 +1,4 @@
-import type { OsmInfo } from "@osmix/core";
+import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
 
 import { BASE_OSM_KEY } from "../settings";

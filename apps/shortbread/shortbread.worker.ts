@@ -5,8 +5,8 @@
  * by subclassing and adding new methods.
  */
 
-import type { Tile } from "@osmix/shared/types";
 import { ShortbreadVtEncoder } from "@osmix/shortbread";
+import type { Tile } from "@osmix/types";
 import * as Comlink from "comlink";
 import { OsmixWorker } from "osmix";
 

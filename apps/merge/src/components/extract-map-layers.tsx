@@ -1,5 +1,5 @@
-import type { GeoBbox2D } from "@osmix/shared/types";
 import { useAtom, useAtomValue } from "jotai";
+import type { GeoBbox2D } from "osmix";
 import type { MapInstance } from "react-map-gl/maplibre";
 
 import { useMap } from "../hooks/map";

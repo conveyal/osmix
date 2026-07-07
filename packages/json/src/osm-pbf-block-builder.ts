@@ -15,7 +15,7 @@ import {
   type OsmPbfInfo,
   type OsmPbfStringTable,
 } from "@osmix/pbf";
-import type { OsmInfoParsed, OsmNode, OsmRelation, OsmTags, OsmWay } from "@osmix/shared/types";
+import type { OsmInfoParsed, OsmNode, OsmRelation, OsmTags, OsmWay } from "@osmix/types";
 
 import { OSM_ENTITY_TYPES } from "./constants.ts";
 

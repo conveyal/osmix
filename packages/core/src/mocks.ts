@@ -1,4 +1,4 @@
-import type { OsmNode } from "@osmix/shared/types";
+import type { OsmNode } from "@osmix/types";
 
 import { Osm } from "./osm.ts";
 

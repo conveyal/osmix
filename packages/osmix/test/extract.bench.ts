@@ -1,6 +1,6 @@
 import { createExtract, fromPbf } from "@osmix/load";
-import { getFixtureFile } from "@osmix/shared/fixtures";
-import type { GeoBbox2D } from "@osmix/shared/types";
+import { getFixtureFile } from "@osmix/test-utils/fixtures";
+import type { GeoBbox2D } from "@osmix/types";
 import { beforeAll, bench, describe } from "vitest";
 
 const MONACO_BBOX: GeoBbox2D = [7.4053929, 43.7232244, 7.4447259, 43.7543687];

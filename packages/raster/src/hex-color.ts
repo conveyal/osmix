@@ -1,4 +1,4 @@
-import type { Rgba } from "./types.ts";
+import type { Rgba } from "@osmix/types";
 
 const hexPattern = /^[0-9a-fA-F]+$/;
 

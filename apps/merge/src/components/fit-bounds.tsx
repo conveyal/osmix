@@ -1,5 +1,5 @@
-import type { GeoBbox2D } from "@osmix/shared/types";
 import { MaximizeIcon } from "lucide-react";
+import type { GeoBbox2D } from "osmix";
 
 import { useMap } from "../hooks/map";
 import { Button } from "./ui/button";

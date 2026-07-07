@@ -1,5 +1,5 @@
 import { Osm } from "@osmix/core";
-import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/shared/fixtures";
+import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures";
 import type { FeatureCollection, LineString, Point } from "geojson";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 

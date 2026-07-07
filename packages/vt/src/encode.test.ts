@@ -1,9 +1,9 @@
 import { pointToTile } from "@mapbox/tilebelt";
 import { VectorTile } from "@mapbox/vector-tile";
 import { Osm } from "@osmix/core";
-import { llToTilePx } from "@osmix/shared/tile";
-import type { GeoBbox2D, Tile } from "@osmix/shared/types";
-import { decodeZigzag } from "@osmix/shared/zigzag";
+import { llToTilePx } from "@osmix/geo/tile";
+import type { GeoBbox2D, Tile } from "@osmix/types";
+import { decodeZigzag } from "@osmix/types/zigzag";
 import { PbfReader } from "pbf";
 import { describe, expect, it } from "vitest";
 

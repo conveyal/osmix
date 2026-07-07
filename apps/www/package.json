@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@osmix/core": "workspace:*",
+    "@osmix/geo": "workspace:*",
+    "@osmix/types": "workspace:*",
     "@shikijs/core": "4.3.1",
     "@shikijs/engine-javascript": "4.3.1",
     "@shikijs/langs": "4.3.1",

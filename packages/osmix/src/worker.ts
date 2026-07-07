@@ -44,7 +44,7 @@ import {
 import { fromShapefile } from "@osmix/shapefile";
 import type { Progress, ProgressEvent } from "@osmix/shared/progress";
 import { streamToBytes } from "@osmix/shared/stream-to-bytes";
-import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types";
+import type { LonLat, OsmEntityType, Tile } from "@osmix/types";
 
 // Re-export types from router for backwards compatibility
 export type { RouteResult, WaySegment };

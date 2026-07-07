@@ -1,5 +1,3 @@
-import type { Osm } from "@osmix/core";
-import { decodeZigzag } from "@osmix/shared/zigzag";
 import { useSetAtom } from "jotai";
 import {
   type ExpressionSpecification,
@@ -8,6 +6,8 @@ import {
   type MapLayerMouseEvent,
   Popup,
 } from "maplibre-gl";
+import type { Osm } from "osmix";
+import { decodeZigzag } from "osmix";
 import { useEffect, useEffectEvent, useRef } from "react";
 import {
   type CircleLayerSpecification,

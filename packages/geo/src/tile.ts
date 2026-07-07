@@ -9,8 +9,7 @@
  */
 
 import { pointToTileFraction } from "@mapbox/tilebelt";
-
-import type { GeoBbox2D, LonLat, Tile, TilePxBbox, XY } from "./types.ts";
+import type { GeoBbox2D, LonLat, Tile, TilePxBbox, XY } from "@osmix/types";
 
 const RADIANS_TO_DEGREES = 180 / Math.PI;
 

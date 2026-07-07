@@ -7,9 +7,9 @@
  * @module
  */
 
-import { Osm, type OsmOptions } from "@osmix/core";
+import { Osm, type OsmOptions, type OsmWriter } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
-import type { OsmRelationMember, OsmTags } from "@osmix/shared/types";
+import type { OsmRelationMember, OsmTags } from "@osmix/types";
 import { rewindFeature } from "@placemarkio/geojson-rewind";
 import type { Feature, FeatureCollection, LineString, MultiPolygon, Point, Polygon } from "geojson";
 
@@ -94,7 +94,7 @@ export async function fromShapefile(
  * @yields Progress events during conversion.
  */
 export function* startCreateOsmFromShapefile(
-  osm: Osm,
+  osm: OsmWriter,
   geojson: FeatureCollection,
   name: string,
 ): Generator<ProgressEvent> {
@@ -263,7 +263,7 @@ export function* startCreateOsmFromShapefile(
  * Returns the created way IDs for use in multipolygon relations.
  */
 function processPolygonRings(
-  osm: Osm,
+  osm: OsmWriter,
   coordinates: number[][][],
   tags: OsmTags | undefined,
   featureId: number | undefined,

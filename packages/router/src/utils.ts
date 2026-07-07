@@ -6,7 +6,7 @@
  * @module
  */
 
-import type { OsmTags } from "@osmix/shared/types";
+import type { OsmTags } from "@osmix/types";
 
 import type { DefaultSpeeds } from "./types.ts";
 

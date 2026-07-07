@@ -4,7 +4,7 @@
  * Based on https://shortbread-tiles.org/schema/1.0/
  */
 
-import type { OsmTags } from "@osmix/shared/types";
+import type { OsmTags } from "@osmix/types";
 
 import type {
   AddressProperties,

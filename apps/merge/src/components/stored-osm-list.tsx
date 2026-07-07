@@ -3,7 +3,6 @@
  * Uses BroadcastChannel to receive updates from the worker.
  */
 
-import type { OsmInfo } from "@osmix/core";
 import { useAtom } from "jotai";
 import {
   CheckIcon,
@@ -15,6 +14,7 @@ import {
   Trash2Icon,
   XIcon,
 } from "lucide-react";
+import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
 import { useEffectEvent, useRef, useState } from "react";
 

@@ -8,7 +8,7 @@
  * @module
  */
 
-import type { GeoBbox2D } from "./types.ts";
+import type { GeoBbox2D } from "@osmix/types";
 
 /**
  * OSM coordinate scale: coordinates are stored as integer microdegrees.

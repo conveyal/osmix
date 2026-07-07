@@ -7,17 +7,17 @@
  * @module
  */
 
-import type { Osm } from "@osmix/core";
+import type { OsmReader } from "@osmix/core/contracts";
+import { buildRelationRings, getWayMembersByRole } from "@osmix/geo/relation-multipolygon";
+import { wayIsArea } from "@osmix/geo/way-is-area";
+import type { LonLat, OsmEntity, OsmNode, OsmRelation, OsmWay } from "@osmix/types";
 import {
   buildRelationLineStrings,
   collectRelationPoints,
   getRelationKind,
   isAreaRelation,
-} from "@osmix/shared/relation-kind";
-import { buildRelationRings, getWayMembersByRole } from "@osmix/shared/relation-multipolygon";
-import type { LonLat, OsmEntity, OsmNode, OsmRelation, OsmWay } from "@osmix/shared/types";
-import { isNode, isRelation, isWay } from "@osmix/shared/utils";
-import { wayIsArea } from "@osmix/shared/way-is-area";
+} from "@osmix/types/relation-kind";
+import { isNode, isRelation, isWay } from "@osmix/types/utils";
 import type {
   GeometryCollection,
   LineString,
@@ -381,7 +381,7 @@ export function relationToFeature(
  * ```
  */
 export function osmEntityToGeoJSONFeature(
-  osm: Osm,
+  osm: OsmReader,
   entity: OsmEntity,
 ): OsmGeoJSONFeature<
   | GeoJSON.Point

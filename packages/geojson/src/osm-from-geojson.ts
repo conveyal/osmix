@@ -7,9 +7,9 @@
  * @module
  */
 
-import { Osm, type OsmOptions } from "@osmix/core";
+import { Osm, type OsmOptions, type OsmWriter } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
-import type { OsmRelationMember, OsmTags } from "@osmix/shared/types";
+import type { OsmRelationMember, OsmTags } from "@osmix/types";
 import { rewindFeature } from "@placemarkio/geojson-rewind";
 import type { FeatureCollection, LineString, MultiPolygon, Point, Polygon } from "geojson";
 
@@ -79,7 +79,7 @@ export async function fromGeoJSON(
  * @yields Progress events during conversion.
  */
 export function* startCreateOsmFromGeoJSON(
-  osm: Osm,
+  osm: OsmWriter,
   geojson: FeatureCollection<Point | LineString | Polygon | MultiPolygon>,
 ): Generator<ProgressEvent> {
   yield progressEvent("Converting GeoJSON to Osmix...");

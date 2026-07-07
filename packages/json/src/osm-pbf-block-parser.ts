@@ -25,7 +25,7 @@ import type {
   OsmRelation,
   OsmRelationMember,
   OsmWay,
-} from "@osmix/shared/types";
+} from "@osmix/types";
 
 /**
  * Options for controlling entity parsing behavior.

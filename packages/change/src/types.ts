@@ -3,7 +3,7 @@
  * @module
  */
 
-import type { OsmEntity, OsmEntityType, OsmEntityTypeMap } from "@osmix/shared/types";
+import type { OsmEntity, OsmEntityType, OsmEntityTypeMap } from "@osmix/types";
 
 /**
  * Reference to an OSM entity with its origin dataset.

@@ -9,14 +9,8 @@
  */
 
 import type { IdOrIndex, Nodes, Osm, Ways } from "@osmix/core";
-import type {
-  OsmEntity,
-  OsmEntityType,
-  OsmEntityTypeMap,
-  OsmNode,
-  OsmWay,
-} from "@osmix/shared/types";
-import { entityPropertiesEqual, getEntityType, isWayEqual } from "@osmix/shared/utils";
+import type { OsmEntity, OsmEntityType, OsmEntityTypeMap, OsmNode, OsmWay } from "@osmix/types";
+import { entityPropertiesEqual, getEntityType, isWayEqual } from "@osmix/types/utils";
 import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 
 import type { OsmChange, OsmChanges, OsmChangesetStats, OsmEntityRef } from "./types.ts";

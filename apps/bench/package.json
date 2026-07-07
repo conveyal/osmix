@@ -13,10 +13,12 @@
   "dependencies": {
     "@duckdb/duckdb-wasm": "^1.32.0",
     "@osmix/core": "workspace:*",
+    "@osmix/geo": "workspace:*",
     "@osmix/geojson": "workspace:*",
     "@osmix/json": "workspace:*",
     "@osmix/pbf": "workspace:*",
     "@osmix/shared": "workspace:*",
+    "@osmix/types": "workspace:*",
     "@osmix/vt": "workspace:*",
     "comlink": "^4.4.2",
     "maplibre-gl": "catalog:",

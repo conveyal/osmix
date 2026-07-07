@@ -18,7 +18,9 @@
   },
   "dependencies": {
     "@osmix/core": "workspace:*",
+    "@osmix/raster": "workspace:*",
     "@osmix/shared": "workspace:*",
+    "@osmix/types": "workspace:*",
     "but-unzip": "^0.1.10"
   },
   "devDependencies": {

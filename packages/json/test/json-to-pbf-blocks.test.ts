@@ -1,5 +1,5 @@
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf";
-import type { OsmEntity } from "@osmix/shared/types";
+import type { OsmEntity } from "@osmix/types";
 import { describe, expect, it } from "vitest";
 
 import {

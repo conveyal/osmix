@@ -13,16 +13,6 @@
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@mapbox/tilebelt": "^2.0.3",
-    "@osmix/change": "workspace:*",
-    "@osmix/core": "workspace:*",
-    "@osmix/geojson": "workspace:*",
-    "@osmix/geoparquet": "workspace:*",
-    "@osmix/json": "workspace:*",
-    "@osmix/pbf": "workspace:*",
-    "@osmix/raster": "workspace:*",
-    "@osmix/router": "workspace:*",
-    "@osmix/shared": "workspace:*",
-    "@osmix/vt": "workspace:*",
     "@turf/bbox-polygon": "^7.3.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -42,6 +32,7 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@osmix/shared": "workspace:*",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.3.2",
     "@types/geojson": "catalog:",

@@ -6,10 +6,10 @@
  * the main thread of storage changes.
  */
 
-import type { OsmInfo, OsmTransferables } from "@osmix/core";
-import { Osm } from "@osmix/core";
 import { expose } from "comlink";
 import { type DBSchema, type IDBPDatabase, openDB } from "idb";
+import type { OsmInfo, OsmTransferables } from "osmix";
+import { Osm } from "osmix";
 import { OsmixWorker } from "osmix";
 
 import { DB_NAME, DB_VERSION, OSM_STORE, STORAGE_CHANNEL } from "../settings";

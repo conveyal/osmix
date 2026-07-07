@@ -16,7 +16,7 @@ import { type OsmFromPbfOptions, toPbfStream } from "@osmix/load";
 import type { DefaultSpeeds, HighwayFilter, RouteOptions, RouteResult } from "@osmix/router";
 import type { Progress } from "@osmix/shared/progress";
 import { streamToBytes } from "@osmix/shared/stream-to-bytes";
-import type { LonLat, OsmEntityType, Tile } from "@osmix/shared/types";
+import type { LonLat, OsmEntityType, Tile } from "@osmix/types";
 import * as Comlink from "comlink";
 
 import type { DrawToRasterTileOptions } from "./raster.ts";

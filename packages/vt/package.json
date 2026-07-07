@@ -16,13 +16,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@osmix/shared": "workspace:*",
+    "@osmix/core": "workspace:*",
+    "@osmix/geo": "workspace:*",
+    "@osmix/types": "workspace:*",
     "pbf": "catalog:"
   },
   "devDependencies": {
     "@mapbox/tilebelt": "^2.0.3",
     "@mapbox/vector-tile": "^3.0.0",
-    "@osmix/core": "workspace:*",
+    "@osmix/shared": "workspace:*",
     "typescript": "catalog:"
   }
 }
