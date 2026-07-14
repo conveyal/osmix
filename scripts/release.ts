@@ -142,7 +142,10 @@ async function publishPackage(workspacePackage: WorkspacePackage): Promise<void>
     const tarballToPublish = packOutput.split("\n").at(-1)?.trim();
     if (!tarballToPublish) throw Error(`No tarball generated for ${name}@${version}`);
 
-    run("npm", ["publish", `./${tarballToPublish}`, "--access=public", "--provenance=true"], dir);
+    const isCI = !!process.env.CI;
+    const publishArgs = ["publish", `./${tarballToPublish}`, "--access=public"];
+    if (isCI) publishArgs.push("--provenance=true");
+    run("npm", publishArgs, dir);
     await rm(join(dir, tarballToPublish), { force: true });
   });
 }
