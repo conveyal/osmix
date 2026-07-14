@@ -68,13 +68,13 @@ import { transfer } from "./utils.ts";
  * Exposes Comlink-wrapped methods for off-thread Osm data operations.
  */
 export class OsmixWorker extends EventTarget {
-  private osm: Record<string, Osm> = {};
-  private vtEncoders: Record<string, OsmixVtEncoder> = {};
-  private graphs: Record<string, RoutingGraph> = {};
-  private changesets: Record<string, OsmChangeset> = {};
+  private osm = new Map<string, Osm>();
+  private vtEncoders = new Map<string, OsmixVtEncoder>();
+  private graphs = new Map<string, RoutingGraph>();
+  private changesets = new Map<string, OsmChangeset>();
   private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"];
   private entityTypes: OsmEntityType[] = ["node", "way", "relation"];
-  private filteredChanges: Record<string, OsmChange[]> = {};
+  private filteredChanges = new Map<string, OsmChange[]>();
 
   private onProgress = (progress: ProgressEvent) => this.dispatchEvent(progress);
 
@@ -242,14 +242,14 @@ export class OsmixWorker extends EventTarget {
    * Check if an Osm instance with the given ID exists in this worker.
    */
   has(id: string): boolean {
-    return this.osm[id] != null;
+    return this.osm.has(id);
   }
 
   /**
    * Check if an Osm instance has completed index building and is ready for queries.
    */
   isReady(id: string): boolean {
-    return this.osm[id]?.isReady() ?? false;
+    return this.osm.get(id)?.isReady() ?? false;
   }
 
   /**
@@ -257,8 +257,9 @@ export class OsmixWorker extends EventTarget {
    * Protected to allow subclasses to access stored Osmix instances.
    */
   protected get(id: string) {
-    if (!this.osm[id]) throw Error(`OSM not found for id: ${id}`);
-    return this.osm[id];
+    const osm = this.osm.get(id);
+    if (!osm) throw Error(`OSM not found for id: ${id}`);
+    return osm;
   }
 
   /**
@@ -267,10 +268,11 @@ export class OsmixWorker extends EventTarget {
    * rebuild it.
    */
   protected set(id: string, osm: Osm) {
-    this.osm[id] = osm;
-    this.vtEncoders[id] = new OsmixVtEncoder(osm);
-    if (this.graphs[id]) {
-      this.buildRoutingGraph(id, this.graphs[id].filter, this.graphs[id].defaultSpeeds);
+    this.osm.set(id, osm);
+    this.vtEncoders.set(id, new OsmixVtEncoder(osm));
+    const graph = this.graphs.get(id);
+    if (graph) {
+      this.buildRoutingGraph(id, graph.filter, graph.defaultSpeeds);
     }
   }
 
@@ -278,9 +280,9 @@ export class OsmixWorker extends EventTarget {
    * Remove an Osm instance from this worker, freeing its memory.
    */
   delete(id: string) {
-    delete this.osm[id];
-    delete this.vtEncoders[id];
-    delete this.graphs[id];
+    this.osm.delete(id);
+    this.vtEncoders.delete(id);
+    this.graphs.delete(id);
   }
 
   // ---------------------------------------------------------------------------
@@ -299,7 +301,7 @@ export class OsmixWorker extends EventTarget {
   buildRoutingGraph(osmId: string, filter?: HighwayFilter, defaultSpeeds?: DefaultSpeeds) {
     const osm = this.get(osmId);
     const graph = new RoutingGraph(osm, filter, defaultSpeeds);
-    this.graphs[osmId] = graph;
+    this.graphs.set(osmId, graph);
     return { nodeCount: graph.size, edgeCount: graph.edges };
   }
 
@@ -307,7 +309,7 @@ export class OsmixWorker extends EventTarget {
    * Check if a routing graph exists for an Osm instance.
    */
   hasRoutingGraph(osmId: string): boolean {
-    return this.graphs[osmId] != null;
+    return this.graphs.has(osmId);
   }
 
   /**
@@ -316,11 +318,11 @@ export class OsmixWorker extends EventTarget {
    * @throws If the graph cannot be built.
    */
   protected getGraph(osmId: string): RoutingGraph {
-    let graph = this.graphs[osmId];
+    let graph = this.graphs.get(osmId);
     if (!graph) {
       // Auto-build on first access
       this.buildRoutingGraph(osmId);
-      graph = this.graphs[osmId];
+      graph = this.graphs.get(osmId);
     }
     if (!graph) throw Error(`Failed to build routing graph for: ${osmId}`);
     return graph;
@@ -343,7 +345,7 @@ export class OsmixWorker extends EventTarget {
    * @param transferables - Routing graph transferables.
    */
   transferRoutingGraphIn(osmId: string, transferables: RoutingGraphTransferables) {
-    this.graphs[osmId] = new RoutingGraph(transferables);
+    this.graphs.set(osmId, new RoutingGraph(transferables));
   }
 
   /**
@@ -390,7 +392,7 @@ export class OsmixWorker extends EventTarget {
    * Returns transferred MVT data suitable for MapLibre rendering.
    */
   getVectorTile(id: string, tile: Tile) {
-    const data = this.vtEncoders[id]?.getTile(tile);
+    const data = this.vtEncoders.get(id)?.getTile(tile);
     if (!data || data.byteLength === 0) return new ArrayBuffer(0);
     return Comlink.transfer(data, [data]);
   }
@@ -486,7 +488,7 @@ export class OsmixWorker extends EventTarget {
       options,
       this.onProgress,
     );
-    this.changesets[baseOsmId] = changeset;
+    this.changesets.set(baseOsmId, changeset);
     this.sortChangeset(baseOsmId, changeset);
     return changeset.stats;
   }
@@ -504,7 +506,7 @@ export class OsmixWorker extends EventTarget {
     this.entityTypes = entityTypes;
 
     // Sort all changesets with new filters
-    for (const [osmId, changeset] of Object.entries(this.changesets)) {
+    for (const [osmId, changeset] of this.changesets) {
       this.sortChangeset(osmId, changeset);
     }
   }
@@ -514,9 +516,9 @@ export class OsmixWorker extends EventTarget {
    * Returns changes for the specified page and the total number of pages.
    */
   getChangesetPage(osmId: string, page: number, pageSize: number) {
-    const changeset = this.changesets[osmId];
+    const changeset = this.changesets.get(osmId);
     if (!changeset) throw Error("No active changeset");
-    const filteredChanges = this.filteredChanges[osmId];
+    const filteredChanges = this.filteredChanges.get(osmId);
     const changes = filteredChanges?.slice(page * pageSize, (page + 1) * pageSize);
     return {
       changes,
@@ -529,12 +531,12 @@ export class OsmixWorker extends EventTarget {
    * Deletes the changeset after application.
    */
   applyChangesAndReplace(osmId: string) {
-    const changeset = this.changesets[osmId];
+    const changeset = this.changesets.get(osmId);
     if (!changeset) throw Error("No active changeset");
     const newOsm = applyChangesetToOsm(changeset);
     this.set(osmId, newOsm);
-    delete this.changesets[osmId];
-    delete this.filteredChanges[osmId];
+    this.changesets.delete(osmId);
+    this.filteredChanges.delete(osmId);
     return newOsm.id;
   }
 
@@ -565,6 +567,6 @@ export class OsmixWorker extends EventTarget {
         }
       }
     }
-    this.filteredChanges[osmId] = filteredChanges;
+    this.filteredChanges.set(osmId, filteredChanges);
   }
 }

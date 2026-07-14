@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { OsmPbfBlockBuilder } from "../src/osm-pbf-block-builder";
+import { OsmPbfBlockParser } from "../src/osm-pbf-block-parser";
 
 const decoder = new TextDecoder();
 
@@ -118,6 +119,120 @@ describe("OsmPbfBlockBuilder", () => {
     expect(group.relations[0].roles_sid).toHaveLength(2);
     expect(group.relations[0].types).toEqual([0, 1]);
   });
+
+  it.each([1_000, 250])(
+    "applies date granularity to ordinary and dense info timestamps (%d ms)",
+    (dateGranularity) => {
+      const builder = new OsmPbfBlockBuilder({
+        includeInfo: true,
+        date_granularity: dateGranularity,
+        granularity: 1,
+      });
+      const timestamp = 1_234;
+      const divisibleTimestamp = dateGranularity * 2;
+
+      builder.addNode({
+        id: 1,
+        lat: 10,
+        lon: 20,
+        info: {
+          version: 1,
+          timestamp,
+          changeset: 2,
+          uid: 3,
+          user: "node",
+          visible: true,
+        },
+      });
+      builder.addDenseNode({
+        id: 2,
+        lat: 11,
+        lon: 21,
+        info: {
+          version: 2,
+          timestamp,
+          changeset: 4,
+          uid: 5,
+          user_sid: 0,
+          visible: false,
+        },
+      });
+      builder.addWay({
+        id: 3,
+        refs: [1, 2],
+        info: {
+          version: 3,
+          timestamp: divisibleTimestamp,
+          changeset: 6,
+          uid: 7,
+          user: "way",
+          visible: true,
+        },
+      });
+      builder.addRelation({
+        id: 4,
+        members: [{ type: "node", ref: 1, role: "label" }],
+        info: {
+          version: 4,
+          timestamp,
+          changeset: 8,
+          uid: 9,
+          user: "relation",
+          visible: false,
+        },
+      });
+      builder.addNode({ id: 5, lat: 12, lon: 22 });
+
+      const group = builder.primitivegroup[0];
+      if (!group) throw new Error("group is undefined");
+      if (!group.nodes[0] || !group.dense || !group.ways[0] || !group.relations[0]) {
+        throw Error("expected all entity formats");
+      }
+      const expectedUnits = Math.floor(timestamp / dateGranularity);
+      const divisibleUnits = divisibleTimestamp / dateGranularity;
+      expect(group.nodes[0].info?.timestamp).toBe(expectedUnits);
+      expect(group.dense.denseinfo?.timestamp[0]).toBe(expectedUnits);
+      expect(group.ways[0].info?.timestamp).toBe(divisibleUnits);
+      expect(group.relations[0].info?.timestamp).toBe(expectedUnits);
+      expect(group.nodes[0].info?.timestamp).toSatisfy(Number.isInteger);
+      expect(group.ways[0].info?.timestamp).toSatisfy(Number.isInteger);
+      expect(group.relations[0].info?.timestamp).toSatisfy(Number.isInteger);
+
+      const parser = new OsmPbfBlockParser(builder, { includeInfo: true });
+      const node = parser.parseNode(group.nodes[0], { includeInfo: true });
+      const [denseNode] = parser.parseDenseNodes(group.dense, { includeInfo: true });
+      const way = parser.parseWay(group.ways[0], { includeInfo: true });
+      const relation = parser.parseRelation(group.relations[0], { includeInfo: true });
+      const expectedTimestamp = expectedUnits * dateGranularity;
+
+      expect(node.info?.timestamp).toBe(expectedTimestamp);
+      expect(denseNode?.info?.timestamp).toBe(expectedTimestamp);
+      expect(way.info?.timestamp).toBe(divisibleTimestamp);
+      expect(relation.info?.timestamp).toBe(expectedTimestamp);
+      expect(Math.abs(timestamp - expectedTimestamp)).toBeLessThan(dateGranularity);
+      expect(node.info).toMatchObject({ version: 1, changeset: 2, uid: 3, user: "node" });
+      expect(denseNode?.info).toMatchObject({
+        version: 2,
+        changeset: 4,
+        uid: 5,
+        user_sid: 0,
+        visible: false,
+      });
+      expect(way.info).toMatchObject({ version: 3, changeset: 6, uid: 7, user: "way" });
+      expect(relation.info).toMatchObject({
+        version: 4,
+        changeset: 8,
+        uid: 9,
+        user: "relation",
+      });
+      const missingInfoNode = builder.primitivegroup[0]?.nodes[1];
+      if (!missingInfoNode) throw new Error("missing-info node is undefined");
+      expect(missingInfoNode.info?.timestamp).toBe(0);
+      expect(
+        parser.parseNode(missingInfoNode, { includeInfo: true }).info?.timestamp,
+      ).toBeUndefined();
+    },
+  );
 
   it("reports block capacity", () => {
     const builder = new OsmPbfBlockBuilder({ maxEntitiesPerBlock: 2 });

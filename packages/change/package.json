@@ -21,8 +21,7 @@
     "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
-    "dequal": "catalog:",
-    "sweepline-intersections": "^2.0.1"
+    "dequal": "catalog:"
   },
   "devDependencies": {
     "@types/geojson": "catalog:",

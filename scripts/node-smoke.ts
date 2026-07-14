@@ -20,17 +20,47 @@ interface WorkspacePackage {
 const repoRoot = resolve(import.meta.dirname, "..");
 const packagesRoot = join(repoRoot, "packages");
 const smokeDependencies = ["@osmix/core", "osmix"] as const;
-const consumerSource = `import assert from "node:assert/strict"
-import { Osm } from "@osmix/core"
+const consumerSource = `import { Osm } from "@osmix/core"
 import { createRemote, fromPbf } from "osmix"
 
-const osm = new Osm({ id: "smoke" })
-assert.equal(osm.id, "smoke")
-assert.equal(typeof fromPbf, "function")
-assert.equal(typeof createRemote, "function")
+function assert(condition, message) {
+  if (!condition) throw new Error(message)
+}
 
-console.log("Node/npm smoke test passed")
+const osm = new Osm({ id: "smoke" })
+assert(osm.id === "smoke", "@osmix/core import failed")
+assert(typeof fromPbf === "function", "fromPbf import failed")
+assert(typeof createRemote === "function", "createRemote import failed")
+
+const remote = await createRemote({ inProcess: true })
+try {
+  const geojson = {
+    type: "FeatureCollection",
+    features: [{
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [7.4229, 43.7371] },
+      properties: { name: "Runtime smoke" },
+    }],
+  }
+  const data = new TextEncoder().encode(JSON.stringify(geojson))
+  const dataset = await remote.fromGeoJSON(data, { id: "runtime-smoke" })
+  assert(dataset.stats.nodes === 1, "GeoJSON point was not loaded")
+  assert(dataset.stats.ways === 0, "GeoJSON point unexpectedly created a way")
+  assert((await dataset.toPbfData()).byteLength > 0, "PBF serialization was empty")
+} finally {
+  remote[Symbol.dispose]()
+}
+
+console.log("Osmix runtime smoke test passed")
 `;
+
+type Runtime = "bun" | "deno" | "node";
+
+function getRuntime(): Runtime {
+  const runtime = process.argv.slice(2).find((argument) => argument !== "--") ?? "node";
+  if (runtime === "bun" || runtime === "deno" || runtime === "node") return runtime;
+  throw Error(`Unsupported smoke runtime: ${runtime}`);
+}
 
 function npmEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
@@ -139,13 +169,14 @@ async function withPublishedManifest<T>(
   callback: () => Promise<T>,
 ): Promise<T> {
   const packageJsonPath = getPackageJsonPath(dir);
+  const originalPackageJson = await readFile(packageJsonPath, "utf8");
 
   await writeFile(packageJsonPath, serializePackageJson(rewritePkgJsonForDist(manifest)));
 
   try {
     return await callback();
   } finally {
-    await writeFile(packageJsonPath, serializePackageJson(manifest));
+    await writeFile(packageJsonPath, originalPackageJson);
   }
 }
 
@@ -216,6 +247,7 @@ async function writeConsumerApp(
 }
 
 async function main(): Promise<void> {
+  const runtime = getRuntime();
   const workspacePackages = await listWorkspacePackages();
   const tempRoot = await mkdtemp(join(tmpdir(), "osmix-node-smoke-"));
 
@@ -240,8 +272,15 @@ async function main(): Promise<void> {
       cleanNpmEnv: true,
     });
 
-    console.log("Running Node.js import smoke test...");
-    run("node", ["./index.mjs"], consumerDir);
+    console.log(`Running ${runtime} import and data smoke test...`);
+    if (runtime === "deno") {
+      run("deno", ["run", "--allow-env", "--allow-read", "./index.mjs"], consumerDir);
+    } else {
+      const executable =
+        runtime === "node" ? (process.env["OSMIX_NODE_BINARY"] ?? runtime) : runtime;
+      run(executable, ["./index.mjs"], consumerDir);
+    }
+    if (runtime === "node") console.log("Node/npm smoke test passed");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }

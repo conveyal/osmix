@@ -21,3 +21,92 @@ jobs:
 
       - uses: ./.github/actions/setup
       - uses: ./.github/actions/checks
+
+  runtime-node:
+    name: Runtime smoke (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 24]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup consumer Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Capture consumer Node.js
+        run: echo "OSMIX_NODE_BINARY=$(command -v node)" >> "$GITHUB_ENV"
+
+      - name: Setup Node.js for package preparation
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run runtime smoke test
+        run: pnpm run test:node-smoke
+
+  runtime-bun:
+    name: Runtime smoke (Bun)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js for package preparation
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          standalone: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run runtime smoke test
+        run: pnpm run test:node-smoke -- bun
+
+  runtime-deno:
+    name: Runtime smoke (Deno)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js for package preparation
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          standalone: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run runtime smoke test
+        run: pnpm run test:node-smoke -- deno

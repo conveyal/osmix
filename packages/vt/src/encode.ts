@@ -152,7 +152,7 @@ export class OsmixVtEncoder {
   *wayFeatures(
     bbox: GeoBbox2D,
     proj: (ll: LonLat) => XY,
-    relationWayIds?: Set<number>,
+    relationWayIds?: ReadonlySet<number>,
   ): Generator<VtSimpleFeature> {
     const wayIndexes = this.osm.ways.intersects(bbox);
     for (let i = 0; i < wayIndexes.length; i++) {

@@ -85,21 +85,20 @@ describe("merge osm", () => {
       changeset = new OsmChangeset(baseOsm);
       changeset.createIntersectionsForWays(osm2.ways);
 
-      // The intersection detection correctly skips way modifications for shared endpoints
-      // (where both ways already share the same node), so fewer intersection points are
-      // "found" but the same number of new intersection nodes are created. However, we
-      // still add crossing tags to shared nodes, which increases nodeChanges.
+      // Pending intersection nodes are resolved from the changeset when a way is spliced
+      // again. This keeps every ref aligned with real geometry instead of aliasing a node
+      // from the base index, and can expose additional legitimate intersections.
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 9_464,
-        nodeChanges: 5_820,
-        wayChanges: 3_644,
+        totalChanges: 9_461,
+        nodeChanges: 5_824,
+        wayChanges: 3_637,
         relationChanges: 0,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
-        intersectionPointsFound: 3_185,
-        intersectionNodesCreated: 2_618,
+        intersectionPointsFound: 3_187,
+        intersectionNodesCreated: 2_623,
       });
 
       baseOsm = applyChangesetToOsm(changeset);
@@ -109,6 +108,11 @@ describe("merge osm", () => {
         ways: baseSizes.ways + patchSizes.ways,
         relations: baseSizes.relations + patchSizes.relations,
       });
+
+      const danglingWayRefs = Array.from(baseOsm.ways).flatMap((way) =>
+        way.refs.filter((ref) => !baseOsm.nodes.ids.has(ref)),
+      );
+      expect(danglingWayRefs).toEqual([]);
 
       expect(baseOsm.nodes.getById(2135545)).toEqual({
         ...testNode,

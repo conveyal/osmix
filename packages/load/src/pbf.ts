@@ -83,13 +83,15 @@ function composeWayIngestFilter(
   osm: Osm,
 ): ((way: OsmWay) => OsmWay | null) | undefined {
   const applyWayTags = tagRules !== null && tagRules.ways.length > 0;
-  if (!spatialFilter && !applyWayTags && !entityFilter) return undefined;
   return (way: OsmWay) => {
     let w: OsmWay | null = way;
     if (spatialFilter) {
       w = spatialFilter(way);
       if (w === null) return null;
     }
+    const refs = w.refs.filter((ref) => osm.nodes.ids.has(ref));
+    if (refs.length === 0) return null;
+    w = { ...w, refs };
     if (applyWayTags && !wayMatchesExtractTagRules(w, tagRules!)) return null;
     if (entityFilter && !entityFilter("way", w, osm)) return null;
     return w;
@@ -103,13 +105,19 @@ function composeRelationIngestFilter(
   osm: Osm,
 ): ((relation: OsmRelation) => OsmRelation | null) | undefined {
   const applyRelationTags = tagRules !== null && tagRules.relations.length > 0;
-  if (!spatialFilter && !applyRelationTags && !entityFilter) return undefined;
   return (relation: OsmRelation) => {
     let r: OsmRelation | null = relation;
     if (spatialFilter) {
       r = spatialFilter(relation);
       if (r === null) return null;
     }
+    const members = r.members.filter((member) => {
+      if (member.type === "node") return osm.nodes.ids.has(member.ref);
+      if (member.type === "way") return osm.ways.ids.has(member.ref);
+      return true;
+    });
+    if (members.length === 0) return null;
+    r = { ...r, members };
     if (applyRelationTags && !relationMatchesExtractTagRules(r, tagRules!)) return null;
     if (entityFilter && !entityFilter("relation", r, osm)) return null;
     return r;
@@ -266,15 +274,19 @@ export async function* startCreateOsmFromPbf(
   if (!Array.isArray(options.buildSpatialIndexes)) {
     yield progressEvent("Building all spatial indexes...");
     osm.buildSpatialIndexes();
-  } else if (options.buildSpatialIndexes.includes("node")) {
-    yield progressEvent("Building node spatial index...");
-    osm.nodes.buildSpatialIndex();
-  } else if (options.buildSpatialIndexes.includes("way")) {
-    yield progressEvent("Building way spatial index...");
-    osm.ways.buildSpatialIndex();
-  } else if (options.buildSpatialIndexes.includes("relation")) {
-    yield progressEvent("Building relation spatial index...");
-    osm.relations.buildSpatialIndex();
+  } else {
+    if (options.buildSpatialIndexes.includes("node")) {
+      yield progressEvent("Building node spatial index...");
+      osm.nodes.buildSpatialIndex();
+    }
+    if (options.buildSpatialIndexes.includes("way")) {
+      yield progressEvent("Building way spatial index...");
+      osm.ways.buildSpatialIndex();
+    }
+    if (options.buildSpatialIndexes.includes("relation")) {
+      yield progressEvent("Building relation spatial index...");
+      osm.relations.buildSpatialIndex();
+    }
   }
 
   if (

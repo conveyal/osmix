@@ -16,10 +16,11 @@ pnpm add osmix
 
 ### Load a PBF and inspect it
 
-```ts
+```ts check-docs
 import { fromPbf, fromGeoJSON, toPbfBuffer } from "osmix";
 
-const monacoPbf = await Bun.file("./monaco.pbf").arrayBuffer();
+const monacoResponse = await fetch("./monaco.pbf");
+const monacoPbf = new Uint8Array(await monacoResponse.arrayBuffer());
 const osm = await fromPbf(monacoPbf);
 
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size);
@@ -27,18 +28,20 @@ console.log(osm.nodes.size, osm.ways.size, osm.relations.size);
 const geojsonFile = await fetch("/fixtures/buildings.geojson").then((r) => r.arrayBuffer());
 const geoOsm = await fromGeoJSON(geojsonFile);
 const pbfBytes = await toPbfBuffer(geoOsm);
+console.log(pbfBytes.byteLength);
 ```
 
 ### Work off the main thread with `OsmixRemote`
 
-```ts
+```ts check-docs worker-pbf-inputs
 import { createRemote } from "osmix";
 
-const remote = await createRemote();
+using remote = await createRemote();
 const monaco = await remote.fromPbf(monacoPbf);
-const patch = await remote.fromPbf(patchPbfStream, { id: "patch" });
+const patch = await remote.fromPbf(patchPbf, { id: "patch" });
 const merged = await monaco.merge(patch);
 const rasterTile = await merged.getRasterTile([10561, 22891, 16]);
+console.log(rasterTile.byteLength);
 ```
 
 #### Which mode am I in?
@@ -47,13 +50,13 @@ const rasterTile = await merged.getRasterTile([10561, 22891, 16]);
 it via `remote.mode`. Use `getOsmixCapabilities()` to inspect the runtime
 before creating a remote:
 
-```ts
+```ts check-docs
 import { createRemote, getOsmixCapabilities } from "osmix";
 
 console.log(getOsmixCapabilities());
 // { webWorkers: true, canShareArrayBuffers: false, maxWorkers: 1, recommendedMode: "single-worker", ... }
 
-const remote = await createRemote();
+using remote = await createRemote();
 console.log(remote.mode, remote.workerCount); // "single-worker", 1
 ```
 
@@ -83,9 +86,9 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-Vite dev server ([apps/merge/vite.config.ts](../../apps/merge/vite.config.ts)):
+Vite dev server ([apps/merge/vite.config.ts](../../apps/merge/vite.config.ts)). This is a schematic configuration fragment:
 
-```ts
+```ts schematic
 export default defineConfig({
   server: {
     headers: {
@@ -123,12 +126,14 @@ esm.sh, no-bundler setups). Bundlers usually cannot resolve that relative URL â€
 if the default worker fails to start, create a worker entry in your app and
 pass it explicitly. With Vite:
 
-```ts
+```ts check-docs
 // osm.worker.ts
 import "osmix/worker";
 ```
 
-```ts
+This Vite-specific import is schematic because the `?worker&url` module is created by the bundler:
+
+```ts schematic
 import { createRemote } from "osmix";
 import workerUrl from "./osm.worker.ts?worker&url";
 
@@ -141,7 +146,9 @@ const remote = await createRemote({
 
 Extend `OsmixWorker` to run your own methods next to the data:
 
-```ts
+The custom worker entry is schematic application wiring:
+
+```ts schematic
 // my.worker.ts
 import { expose } from "comlink";
 import { OsmixWorker } from "osmix";
@@ -154,7 +161,9 @@ export class MyWorker extends OsmixWorker {
 expose(new MyWorker());
 ```
 
-```ts
+The matching Vite client wiring is also schematic:
+
+```ts schematic
 import { createRemote } from "osmix";
 import type { MyWorker } from "./my.worker.ts";
 import workerUrl from "./my.worker.ts?worker&url";
@@ -188,15 +197,15 @@ need to post Osmix payloads through your own worker setup.
 `OsmixRemote` provides off-thread routing via `@osmix/router`. The routing graph
 builds lazily on first use, so there's no upfront cost until you actually route.
 
-```ts
+```ts check-docs monaco-pbf
 import { createRemote } from "osmix";
 
-const remote = await createRemote();
+using remote = await createRemote();
 const osm = await remote.fromPbf(monacoPbf);
 
 // Find nearest routable nodes to coordinates
-const from = await osm.findNearestRoutableNode([7.42, 43.73], 0.5);
-const to = await osm.findNearestRoutableNode([7.43, 43.74], 0.5);
+const from = await osm.findNearestRoutableNode([7.42, 43.73], 500);
+const to = await osm.findNearestRoutableNode([7.43, 43.74], 500);
 
 if (from && to) {
   // Calculate route with statistics and path info
@@ -219,10 +228,12 @@ The routing graph is automatically shared across all workers when using
 
 ### Extract, stream, and write back to PBF
 
-```ts
+```ts check-docs pbf-output
 import { fromPbf, createExtract, toPbfStream } from "osmix";
 
-const osm = await fromPbf(Bun.file("./monaco.pbf").stream());
+const monacoResponse = await fetch("./monaco.pbf");
+const monacoPbf = new Uint8Array(await monacoResponse.arrayBuffer());
+const osm = await fromPbf(monacoPbf);
 const downtown = createExtract(osm, [-122.35, 47.6, -122.32, 47.62]);
 await toPbfStream(downtown).pipeTo(fileWritableStream);
 ```
@@ -279,7 +290,7 @@ spec-compliant without staging everything in memory.
 
 - `remote.buildRoutingGraph(osmId, filter?, speeds?)` - Explicitly build routing graph (optional, builds lazily on first use).
 - `remote.hasRoutingGraph(osmId)` - Check if routing graph exists.
-- `remote.findNearestRoutableNode(osmId, point, maxKm)` - Snap coordinate to nearest routable node.
+- `remote.findNearestRoutableNode(osmId, point, maxDistanceM)` - Snap coordinate to nearest routable node.
 - `remote.route(osmId, fromIndex, toIndex, options?)` - Calculate route between nodes.
   - `options.includeStats` - Include `distance` and `time` in result.
   - `options.includePathInfo` - Include `segments` and `turnPoints` in result.

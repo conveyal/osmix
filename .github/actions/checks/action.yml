@@ -28,6 +28,10 @@ runs:
       shell: bash
       run: pnpm run test:packages
 
-    - name: Run Node.js smoke test
+    - name: Install Chromium
       shell: bash
-      run: pnpm run test:node-smoke
+      run: pnpm --filter @osmix/merge exec playwright install --with-deps chromium
+
+    - name: Run browser worker tests
+      shell: bash
+      run: pnpm --filter @osmix/merge test:e2e

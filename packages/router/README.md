@@ -19,9 +19,8 @@ pnpm add @osmix/router
 
 ## Usage
 
-```ts
-import { RoutingGraph, Router, findNearestNodeOnGraph } from "@osmix/router";
-import { Osm } from "@osmix/core";
+```ts check-docs
+import { Osm, Router, RoutingGraph } from "osmix";
 
 const osm = new Osm();
 // ... load OSM data into osm ...
@@ -30,8 +29,8 @@ const osm = new Osm();
 const graph = new RoutingGraph(osm);
 
 // Snap coordinates to nearest routable nodes
-const from = findNearestNodeOnGraph(osm, graph, [-73.989, 40.733], 0.5);
-const to = findNearestNodeOnGraph(osm, graph, [-73.988, 40.734], 0.5);
+const from = graph.findNearestRoutableNode(osm, [-73.989, 40.733], 500);
+const to = graph.findNearestRoutableNode(osm, [-73.988, 40.734], 500);
 
 if (from && to) {
   const router = new Router(osm, graph);
@@ -52,26 +51,27 @@ if (from && to) {
 
 Build and manage a routing graph from OSM data. The graph uses a CSR (Compressed Sparse Row) format for efficient memory usage and cache locality.
 
-```ts
-import { RoutingGraph, defaultHighwayFilter } from "@osmix/router";
+```ts check-docs osm
+import { RoutingGraph, defaultHighwayFilter } from "osmix";
 
 // Build from OSM data
 const graph = new RoutingGraph(osm, defaultHighwayFilter);
+const nodeIndex = 0;
 
 // Properties
 graph.size; // Number of routable nodes
 graph.edges; // Total edge count
-graph.isRouteable(nodeIndex); // Check if node is routable
+graph.isRoutable(nodeIndex); // Check if node is routable
 graph.isIntersection(nodeIndex); // Check if node is an intersection
 graph.getEdges(nodeIndex); // Get outgoing edges from node
 ```
 
-#### `findNearestRoutableNode(osm, point, maxKm)`
+#### `findNearestRoutableNode(osm, point, maxDistanceM)`
 
 Snap a geographic coordinate to the nearest routable node.
 
-```ts
-const nearest = graph.findNearestRoutableNode(osm, [-73.989, 40.733], 0.5);
+```ts check-docs router-context
+const nearest = graph.findNearestRoutableNode(osm, [-73.989, 40.733], 500);
 if (nearest) {
   console.log(nearest.nodeIndex); // Internal node index
   console.log(nearest.coordinates); // Snapped [lon, lat]
@@ -89,16 +89,19 @@ if (nearest) {
 
 `RoutingGraph` can be serialized and transferred between Web Workers:
 
-```ts
-// Build graph and get transferables
-const graph = new RoutingGraph(osm);
-const transferables = graph.transferables();
+```ts check-docs router-transfer
+import { getTransferableBuffers, RoutingGraph } from "@osmix/router";
 
-// Transfer to worker (zero-copy with SharedArrayBuffer)
-worker.postMessage(transferables);
+// Build graph and get transferables
+const transferables = graph.transferables();
+const buffers = getTransferableBuffers(transferables);
+
+// Transfer to worker without cloning ArrayBuffers
+worker.postMessage(transferables, buffers);
 
 // Reconstruct in worker
 const reconstructed = new RoutingGraph(transferables);
+console.log(reconstructed.size);
 ```
 
 The `transferables()` method returns an object containing:
@@ -112,7 +115,9 @@ The `transferables()` method returns an object containing:
 
 High-level routing interface.
 
-```ts
+Schematic construction with route options:
+
+```ts schematic
 const router = new Router(osm, graph, { algorithm: "astar", metric: "time" });
 ```
 

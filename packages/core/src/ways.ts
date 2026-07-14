@@ -44,6 +44,12 @@ export class Ways extends Entities<OsmWay> {
   // Node reference index
   private nodes: Nodes;
 
+  private getNodeLonLat(id: number): [number, number] {
+    const coordinate = this.nodes.getNodeLonLat({ id });
+    if (!coordinate) throw Error(`Node ${id} not found for way geometry`);
+    return coordinate;
+  }
+
   /**
    * Create a new Ways index.
    */
@@ -96,15 +102,6 @@ export class Ways extends Entities<OsmWay> {
         prevRefId += refId;
         return prevRefId;
       });
-      const filteredWay = filter
-        ? filter({
-            id: way.id,
-            refs,
-            tags: this.tags.getTagsFromIndices(way.keys, way.vals),
-          })
-        : null;
-      if (filter && filteredWay === null) continue;
-
       const tagKeys: number[] = way.keys.map((key) => {
         const index = blockStringIndexMap[key];
         if (index === undefined) throw Error("Tag key not found");
@@ -115,6 +112,14 @@ export class Ways extends Entities<OsmWay> {
         if (index === undefined) throw Error("Tag value not found");
         return index;
       });
+      const filteredWay = filter
+        ? filter({
+            id: way.id,
+            refs,
+            tags: this.tags.getTagsFromIndices(tagKeys, tagValues),
+          })
+        : null;
+      if (filter && filteredWay === null) continue;
 
       this.addEntity(way.id, tagKeys, tagValues);
       this.refStart.push(this.refs.length);
@@ -168,7 +173,7 @@ export class Ways extends Entities<OsmWay> {
         const count = this.refCount.at(i);
         for (let j = start; j < start + count; j++) {
           const refId = this.refs.at(j);
-          const [lon, lat] = this.nodes.getNodeLonLat({ id: refId });
+          const [lon, lat] = this.getNodeLonLat(refId);
           if (lon < minX) minX = lon;
           if (lon > maxX) maxX = lon;
           if (lat < minY) minY = lat;
@@ -239,7 +244,7 @@ export class Ways extends Entities<OsmWay> {
     const line = new Float64Array(count * 2);
     for (let i = 0; i < count; i++) {
       const ref = this.refs.at(start + i);
-      const [lon, lat] = this.nodes.getNodeLonLat({ id: ref });
+      const [lon, lat] = this.getNodeLonLat(ref);
       line[i * 2] = lon;
       line[i * 2 + 1] = lat;
     }
@@ -255,13 +260,7 @@ export class Ways extends Entities<OsmWay> {
     const coords: [number, number][] = [];
     for (let refIndex = start; refIndex < start + count; refIndex++) {
       const ref = this.refs.at(refIndex);
-      const coord = this.nodes.getNodeLonLat({ id: ref });
-      if (coord === undefined || coord[0] === undefined || coord[1] === undefined) {
-        throw Error(
-          `Invalid coordinate for way id ${this.ids.at(index)}, index ${index}, node ref ${ref}, ref index ${refIndex}`,
-        );
-      }
-      coords.push(coord);
+      coords.push(this.getNodeLonLat(ref));
     }
     return coords;
   }

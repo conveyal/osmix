@@ -6,7 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run tests --project \"$npm_package_name\"",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },

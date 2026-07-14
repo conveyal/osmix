@@ -12,9 +12,26 @@
 
 import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from "@osmix/types";
-import sweeplineIntersections from "sweepline-intersections";
 
+import sweeplineIntersections from "./sweepline-intersections.ts";
 import type { OsmChangesetStats } from "./types.ts";
+
+const XML_ATTRIBUTE_ESCAPES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&apos;",
+};
+
+/**
+ * Escape a free-form string for use in a quoted XML attribute.
+ * @param value - The attribute value to escape.
+ * @returns The escaped XML attribute value.
+ */
+export function escapeXmlAttribute(value: string | number): string {
+  return String(value).replace(/[&<>"']/g, (character) => XML_ATTRIBUTE_ESCAPES[character]!);
+}
 
 /**
  * Convert OSM tags object to OSC XML tag elements.
@@ -24,7 +41,7 @@ import type { OsmChangesetStats } from "./types.ts";
 export function osmTagsToOscTags(tags: OsmTags): string {
   return Object.entries(tags)
     .map(([key, value]) => {
-      return `<tag k="${key}" v="${value}" />`;
+      return `<tag k="${escapeXmlAttribute(key)}" v="${escapeXmlAttribute(value)}" />`;
     })
     .join("");
 }
@@ -52,7 +69,13 @@ export function removeDuplicateAdjacentRelationMembers(relation: OsmRelation) {
   return {
     ...relation,
     members: relation.members.filter((member, index, array) => {
-      return member.ref !== array[index + 1]?.ref;
+      const next = array[index + 1];
+      return (
+        next === undefined ||
+        member.type !== next.type ||
+        member.ref !== next.ref ||
+        member.role !== next.role
+      );
     }),
   };
 }
@@ -142,7 +165,7 @@ export function changeStatsSummary(stats: OsmChangesetStats) {
 
 /**
  * Check if the coordinates of two ways produce intersections.
- * Uses `sweepline-intersections` for robust detection.
+ * Uses the internal typed `sweepline-intersections` runtime port for robust detection.
  * Returns unique intersection points as [lon, lat] tuples.
  */
 export function waysIntersect(

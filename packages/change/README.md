@@ -1,10 +1,10 @@
 # @osmix/change
 
-`@osmix/change` is the change-management companion to [`@osmix/core`](../core/README.md). It builds, inspects, and applies OpenStreetMap changesets on top of `Osmix` datasets, giving you tools to deduplicate entities, reconcile overlaps, generate stats, and orchestrate merge pipelines.
+`@osmix/change` is the change-management companion to [`@osmix/core`](../core/README.md). It builds, inspects, and applies OpenStreetMap changesets on top of `Osm` datasets, giving you tools to deduplicate entities, reconcile overlaps, generate stats, and orchestrate merge pipelines.
 
 ## Highlights
 
-- Construct repeatable `OsmixChangeset`s that track creates, modifies, and deletes with origin metadata and per-entity refs.
+- Construct repeatable `OsmChangeset`s that track creates, modifies, and deletes with origin metadata and per-entity refs.
 - **Augmented diffs**: Automatically captures both old and new entity states for modifications and deletions, following the [Overpass API Augmented Diffs](https://wiki.openstreetmap.org/wiki/Overpass_API/Augmented_Diffs) format.
 - Deduplicate coincident nodes or overlapping ways, replace references, and optionally create intersection points where geometry meets.
 - Generate summary stats and OSC-friendly XML fragments so downstream systems can audit each change step.
@@ -17,35 +17,35 @@
 pnpm add @osmix/change
 ```
 
-You will typically install this alongside [`@osmix/core`](../core/README.md), which supplies the `Osmix` datasets the changes operate on.
+Application code can import these APIs from the `osmix` facade. Install the granular package directly when building a lower-level package integration.
 
 ## Usage
 
 ### Build and apply a changeset
 
-```ts
-import { Osmix } from "osmix";
-import { OsmixChangeset, changeStatsSummary, applyChangesToOsm } from "@osmix/change";
+```ts check-docs pbf-pair
+import { OsmChangeset, applyChangesetToOsm, changeStatsSummary, fromPbf } from "osmix";
 
-const base = await Osmix.fromPbf(Bun.file("./monaco.pbf").stream());
-const patch = await Osmix.fromPbf(Bun.file("./monaco-changes.pbf").stream());
+const base = await fromPbf(monacoPbf);
+const patch = await fromPbf(patchPbf);
 
-const changeset = new OsmixChangeset(base);
+const changeset = new OsmChangeset(base);
 changeset.deduplicateNodes(base.nodes);
 changeset.deduplicateWays(base.ways);
 changeset.generateDirectChanges(patch);
 
 console.log(changeStatsSummary(changeset.stats));
 
-const merged = applyChangesToOsm(changeset);
+const merged = applyChangesetToOsm(changeset);
+console.log(merged.id);
 ```
 
-`OsmixChangeset` keeps track of creates/modifies/deletes per entity type. Call the helpers (`deduplicateNodes`, `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, etc.) in whatever order your workflow requires, then use `applyChangesToOsm()` to produce a new `Osm` instance with the edits applied.
+`OsmChangeset` keeps track of creates/modifies/deletes per entity type. Call the helpers (`deduplicateNodes`, `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, etc.) in whatever order your workflow requires, then use `applyChangesetToOsm()` to produce a new `Osm` instance with the edits applied.
 
 ### Run the bundled merge pipeline
 
-```ts
-import { merge } from "@osmix/change";
+```ts check-docs change-context
+import { merge } from "osmix";
 
 const combined = await merge(base, patch, {
   directMerge: true,
@@ -53,17 +53,20 @@ const combined = await merge(base, patch, {
   deduplicateWays: true,
   createIntersections: true,
 });
+console.log(combined.id);
 ```
 
 `merge` wraps a sequence of changesets that deduplicate each dataset, optionally create intersections, and (when `directMerge` is true) generate modifications that reconcile the patch into the base. All options default to `false`, so you can enable only the stages you need.
 
 ## API
 
-### `OsmixChangeset`
+### `OsmChangeset`
 
 Tracks and orchestrates changes against a base `Osm` dataset.
 
-```ts
+Schematic constructor signature:
+
+```ts schematic
 constructor(base: Osm)
 ```
 
@@ -87,7 +90,7 @@ Options:
 - `deduplicateWays` (boolean): Run way deduplication.
 - `createIntersections` (boolean): Split intersecting ways.
 
-### `applyChangesToOsm(changeset: OsmixChangeset): Osm`
+### `applyChangesetToOsm(changeset: OsmChangeset): Osm`
 
 Applies all pending changes in the changeset to produce a **new** `Osm` instance. The original `base` is immutable.
 
@@ -95,30 +98,35 @@ Applies all pending changes in the changeset to produce a **new** `Osm` instance
 
 By default, all `OsmChange` records include an `oldEntity` field for modifications and deletions, capturing the entity's state before the change. This follows the [Overpass API Augmented Diffs](https://wiki.openstreetmap.org/wiki/Overpass_API/Augmented_Diffs) format.
 
-```ts
-import { OsmChangeset } from "@osmix/change";
+```ts check-docs change-context
+import { OsmChangeset } from "osmix";
 
 const changeset = new OsmChangeset(base);
 changeset.generateDirectChanges(patch);
 
 // Access the old and new state for a modified entity
 const wayChange = changeset.wayChanges[wayId];
-console.log("Old tags:", wayChange.oldEntity?.tags);
-console.log("New tags:", wayChange.entity.tags);
+if (wayChange) {
+  console.log("Old tags:", wayChange.oldEntity?.tags);
+  console.log("New tags:", wayChange.entity.tags);
+}
 ```
 
 ### `generateOscChanges(changeset, options?)`
 
 Generates OSC (OSM Change) XML format from a changeset.
 
-```ts
-import { generateOscChanges } from "@osmix/change";
+```ts check-docs change-context
+import { generateOscChanges, OsmChangeset } from "osmix";
+
+const changeset = new OsmChangeset(base);
 
 // Generate standard OSC for API uploads (default)
 const osc = generateOscChanges(changeset);
 
 // Generate augmented diff with old/new sections
 const augmentedOsc = generateOscChanges(changeset, { augmented: true });
+console.log(osc.length, augmentedOsc.length);
 ```
 
 Options:
@@ -135,7 +143,7 @@ Options:
 ## Environment and limitations
 
 - Requires runtimes compatible with `@osmix/core` (Node 20+, Bun, or modern browsers) since the same typed-array data structures are used.
-- Deduplication helpers assume datasets store dense node blocks and rely on spatial indexes built via `Osmix.buildIndexes()`.
+- Deduplication helpers assume datasets store dense node blocks and rely on spatial indexes built via `Osm.buildIndexes()`.
 - Intersections are generated only for highway/footway-style features; polygonal ways are ignored.
 
 ## Development

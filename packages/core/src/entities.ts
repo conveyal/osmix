@@ -180,9 +180,7 @@ export abstract class Entities<T extends OsmEntity> {
    * Iterate over entities sorted by ID.
    */
   *sorted(): Generator<T> {
-    for (const id of this.ids.sorted) {
-      const index = this.ids.getIndexFromId(id);
-      if (index === -1) throw Error(`Entity not found at id ${id}`);
+    for (const [id, index] of this.ids.sortedEntries()) {
       yield this.getFullEntity(index, id, this.tags.getTags(index));
     }
   }

@@ -43,12 +43,17 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
 
   const { nodeChanges, wayChanges, relationChanges } = changeset;
 
+  // Work on shallow copies so applying a changeset never consumes its change
+  // records. The change entities are only read while indexing them below.
+  const pendingNodeChanges = { ...nodeChanges };
+  const pendingWayChanges = { ...wayChanges };
+  const pendingRelationChanges = { ...relationChanges };
+
   // Add nodes from base, modifying and deleting as needed
   for (const node of baseOsm.nodes) {
     const change = nodeChanges[node.id];
     if (change) {
-      // Remove the change from the changeset so we don't apply it twice
-      delete nodeChanges[node.id];
+      delete pendingNodeChanges[node.id];
       if (change.changeType === "delete") continue; // Don't add deleted nodes
       if (change.changeType === "create")
         throw Error("Changeset contains create changes for existing entities");
@@ -58,7 +63,7 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
 
   // All remaining node changes should be create
   // Add nodes from patch
-  for (const change of Object.values(nodeChanges)) {
+  for (const change of Object.values(pendingNodeChanges)) {
     if (change.changeType !== "create") {
       throw Error("Changeset still contains node changes in incorrect stage.");
     }
@@ -69,8 +74,7 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
   for (const way of baseOsm.ways) {
     const change = wayChanges[way.id];
     if (change) {
-      // Remove the change from the changeset so we don't apply it twice
-      delete wayChanges[way.id];
+      delete pendingWayChanges[way.id];
       if (change.changeType === "delete") continue; // Don't add deleted ways
       if (change.changeType === "create") {
         throw Error("Changeset contains create changes for existing entities");
@@ -82,7 +86,7 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
 
   // All remaining way changes should be create
   // Add ways from patch
-  for (const change of Object.values(wayChanges)) {
+  for (const change of Object.values(pendingWayChanges)) {
     if (change.changeType !== "create")
       throw Error("Changeset still contains way changes in incorrect stage.");
     osm.ways.addWay(change.entity);
@@ -92,8 +96,7 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
   for (const relation of baseOsm.relations) {
     const change = relationChanges[relation.id];
     if (change) {
-      // Remove the change from the changeset so we don't apply it twice
-      delete relationChanges[relation.id];
+      delete pendingRelationChanges[relation.id];
       if (change.changeType === "delete") continue; // Don't add deleted relations
       if (change.changeType === "create") {
         throw Error("Changeset contains create changes for existing entities");
@@ -103,7 +106,7 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
   }
 
   // Add relations from patch
-  for (const change of Object.values(relationChanges)) {
+  for (const change of Object.values(pendingRelationChanges)) {
     if (change.changeType !== "create")
       throw Error("Changeset still contains relation changes in incorrect stage.");
     osm.relations.addRelation(change.entity);

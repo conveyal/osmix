@@ -246,6 +246,10 @@ const NO_WORKER_SUPPORT_MESSAGE =
   "(fromPbf, fromGeoJSON, ...) or pass { inProcess: true } to createRemote() to " +
   "run on the calling thread.";
 
+type WorkerCleanup = () => void;
+
+const workerCleanup = new WeakMap<object, WorkerCleanup>();
+
 /**
  * Create an `OsmixWorker` that runs on the calling thread, connected through a
  * `MessageChannel` so it can be driven by the same Comlink RPC as a real
@@ -253,8 +257,19 @@ const NO_WORKER_SUPPORT_MESSAGE =
  */
 function createInProcessOsmixWorker<T extends OsmixWorker = OsmixWorker>(): Comlink.Remote<T> {
   const { port1, port2 } = new MessageChannel();
-  Comlink.expose(new OsmixWorker(), port1);
-  return Comlink.wrap<T>(port2);
+  try {
+    Comlink.expose(new OsmixWorker(), port1);
+    const remote = Comlink.wrap<T>(port2);
+    workerCleanup.set(remote, () => {
+      port1.close();
+      port2.close();
+    });
+    return remote;
+  } catch (error) {
+    port1.close();
+    port2.close();
+    throw error;
+  }
 }
 
 /**
@@ -281,17 +296,24 @@ export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
   if (typeof Worker === "undefined") throw Error(NO_WORKER_SUPPORT_MESSAGE);
 
   const worker = new Worker(workerUrl ?? defaultWorkerUrl(), { type: "module" });
-  if (!workerUrl) {
-    worker.addEventListener("error", (event) => {
-      console.error(
-        "osmix: the default worker failed to start. Bundlers often cannot resolve " +
-          "the default worker URL; pass `workerUrl` to createRemote() using your " +
-          "bundler's worker pattern. See https://github.com/conveyal/osmix/tree/main/packages/osmix#workers",
-        event,
-      );
-    });
+  try {
+    if (!workerUrl) {
+      worker.addEventListener("error", (event) => {
+        console.error(
+          "osmix: the default worker failed to start. Bundlers often cannot resolve " +
+            "the default worker URL; pass `workerUrl` to createRemote() using your " +
+            "bundler's worker pattern. See https://github.com/conveyal/osmix/tree/main/packages/osmix#workers",
+          event,
+        );
+      });
+    }
+    const remote = Comlink.wrap<T>(worker);
+    workerCleanup.set(remote, () => worker.terminate());
+    return remote;
+  } catch (error) {
+    worker.terminate();
+    throw error;
   }
-  return Comlink.wrap<T>(worker);
 }
 
 /**
@@ -353,14 +375,19 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
           "(Cross-Origin-Opener-Policy: same-origin, Cross-Origin-Embedder-Policy: require-corp) " +
           "or omit workerCount. See https://github.com/conveyal/osmix/tree/main/packages/osmix#enabling-multi-worker-mode",
       );
-    for (let i = 0; i < workerCount; i++) {
-      const worker = inProcess
-        ? createInProcessOsmixWorker<T>()
-        : await createOsmixWorker<T>(workerUrl);
-      if (onProgress) {
-        await worker.addProgressListener(Comlink.proxy(onProgress));
+    try {
+      for (let i = 0; i < workerCount; i++) {
+        const worker = inProcess
+          ? createInProcessOsmixWorker<T>()
+          : await createOsmixWorker<T>(workerUrl);
+        this.workers.push(worker);
+        if (onProgress) {
+          await worker.addProgressListener(Comlink.proxy(onProgress));
+        }
       }
-      this.workers.push(worker);
+    } catch (error) {
+      this.terminate();
+      throw error;
     }
     this.changesetWorker = this.workers[0]!;
     this.poolMode = inProcess ? "in-process" : workerCount > 1 ? "multi-worker" : "single-worker";
@@ -410,7 +437,12 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   private async getTransferableData(data: ArrayBufferLike | ReadableStream | Uint8Array | File) {
     if (data instanceof ArrayBuffer) return data;
     if (data instanceof SharedArrayBuffer) return data;
-    if (data instanceof Uint8Array) return data.buffer;
+    if (data instanceof Uint8Array) {
+      if (data.byteOffset === 0 && data.byteLength === data.buffer.byteLength) {
+        return data.buffer;
+      }
+      return new Uint8Array(data).buffer;
+    }
     if (data instanceof ReadableStream) {
       if (supportsReadableStreamTransfer()) return data;
       return (await streamToBytes(data)).buffer;
@@ -965,10 +997,16 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    */
   terminate() {
     for (const worker of this.workers) {
-      worker[Comlink.releaseProxy]();
+      try {
+        worker[Comlink.releaseProxy]();
+      } finally {
+        workerCleanup.get(worker)?.();
+        workerCleanup.delete(worker);
+      }
     }
     this.workers = [];
     this.changesetWorker = null;
+    this.poolMode = null;
   }
 
   [Symbol.dispose]() {

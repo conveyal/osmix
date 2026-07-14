@@ -25,16 +25,19 @@ pnpm add osmix
 
 ### Examples
 
-```ts
+```ts check-docs
 import { fromPbf, toPbfBuffer, transformOsmPbfToJson, merge, isNode } from "osmix";
 
 // Load a PBF file
-const osm = await fromPbf(Bun.file("./monaco.pbf").stream());
+const monacoResponse = await fetch("./monaco.pbf");
+const monacoPbf = new Uint8Array(await monacoResponse.arrayBuffer());
+const osm = await fromPbf(monacoPbf);
 
 // Query entities by ID
 const node = osm.nodes.getById(123456);
 const way = osm.ways.getById(789012);
 const relation = osm.relations.getById(345678);
+console.log(node, way, relation);
 
 // Spatial queries with bounding box
 const bbox: [number, number, number, number] = [7.41, 43.72, 7.43, 43.74];
@@ -43,7 +46,7 @@ const wayResults = osm.ways.withinBbox(bbox);
 console.log(`Found ${nodeResults.ids.length} nodes and ${wayResults.ids.length} ways`);
 
 // Stream parse a PBF into JSON entities
-const stream = transformOsmPbfToJson(Bun.file("./monaco.pbf").stream());
+const stream = transformOsmPbfToJson(monacoPbf.buffer);
 for await (const entity of stream) {
   if ("id" in entity) {
     console.log(entity.id, entity.tags);
@@ -53,25 +56,30 @@ for await (const entity of stream) {
   }
 }
 
-// Write the PBF
-await Bun.write("./new-monaco.pbf", await toPbfBuffer(osm));
+// Serialize the PBF for a download, upload, or file-system API
+const pbfBytes = await toPbfBuffer(osm);
+console.log(`Serialized ${pbfBytes.byteLength} bytes`);
 
 // Merge two OSM PBF files
-const patchOsm = await fromPbf(Bun.file("./monaco-patch.pbf").stream());
-const mergedOsm = merge(osm, patchOsm);
+const patchResponse = await fetch("./monaco-patch.pbf");
+const patchPbf = new Uint8Array(await patchResponse.arrayBuffer());
+const patchOsm = await fromPbf(patchPbf);
+const mergedOsm = await merge(osm, patchOsm);
+console.log(mergedOsm.id);
 ```
 
 ### Use in a Web Worker
 
-```ts
+```ts check-docs monaco-pbf
 import { createRemote } from "osmix";
 
 // main.ts
-const remote = await createRemote();
+using remote = await createRemote();
 const osm = await remote.fromPbf(monacoPbf); // Returns a dataset handle
 
 // Operations run off the main thread
 const tile = await osm.getVectorTile([9372, 12535, 15]);
+console.log(tile.byteLength);
 ```
 
 `createRemote()` adapts to the runtime: cross-origin isolated browsers get a
@@ -121,11 +129,28 @@ pnpm run test
 # Type check
 pnpm run typecheck
 
+# Type check complete public documentation examples
+pnpm run check:docs
+
 # Format and lint
 pnpm run check
+
+# Non-mutating format and lint checks
+pnpm run format:check
+pnpm run lint:check
+
+# Verify one workspace and its runtime dependents
+pnpm run verify:workspace -- @osmix/core
+
+# Verify all non-benchmark workspaces plus dependency and Node smoke checks
+pnpm run verify:all
 ```
 
 **Workspace commands** support filtering: `pnpm --filter @osmix/merge dev`
+
+`verify:workspace` accepts a package name or path such as `apps/vt-server`, follows runtime and development workspace dependencies to include dependents, and runs formatting, typechecking, and tests in dependency order. It is check-only by default; pass `--write` only when formatting changes are intentional. `verify:all` excludes the browser benchmark app, whose benchmark script is not a package test.
+
+Complete TypeScript examples are marked `check-docs` and compiled by `check:docs`; partial configuration and application-wiring fragments are labeled `schematic`.
 
 ## Apps
 

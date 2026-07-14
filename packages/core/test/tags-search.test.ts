@@ -6,6 +6,13 @@ import StringTable from "../src/stringtable";
 import { Ways } from "../src/ways";
 
 describe("Tags.search on Nodes", () => {
+  it("returns null for an unknown ID in an empty collection", () => {
+    const nodes = new Nodes(new StringTable());
+    nodes.buildIndex();
+
+    expect(nodes.getNodeLonLat({ id: 999 })).toBeNull();
+  });
+
   it("finds by key and key+value", () => {
     const st = new StringTable();
     const nodes = new Nodes(st);
@@ -16,6 +23,8 @@ describe("Tags.search on Nodes", () => {
     nodes.addNode(node2);
     nodes.addNode(node3);
     nodes.buildIndex();
+
+    expect(nodes.getNodeLonLat({ id: 999 })).toBeNull();
 
     const allCurb = nodes.search("curb");
     expect(allCurb).toEqual([node1, node2]);
@@ -29,6 +38,16 @@ describe("Tags.search on Nodes", () => {
 });
 
 describe("Tags.search on Ways", () => {
+  it("rejects block-local tag indexes missing from the string table map", () => {
+    const st = new StringTable();
+    const nodes = new Nodes(st);
+    const ways = new Ways(st, nodes);
+
+    expect(() =>
+      ways.addWays([{ id: 1, keys: [9], vals: [0], refs: [1] }], new Uint32Array()),
+    ).toThrow("Tag key not found");
+  });
+
   it("finds by key and key+value", () => {
     const st = new StringTable();
     const nodes = new Nodes(st);

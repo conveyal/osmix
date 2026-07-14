@@ -1,36 +1,53 @@
 import type { OsmPbfGroup } from "./proto/osmformat.ts";
+import { MAX_BLOB_SIZE_BYTES } from "./spec.ts";
 
-export type AsyncGeneratorValue<T> =
-  | T
-  | ReadableStream<T>
-  | AsyncGenerator<T>
-  | Promise<T>
-  | Promise<ReadableStream<T>>
-  | Promise<AsyncGenerator<T>>;
+type AsyncGeneratorSource<T> = T | ReadableStream<T> | Iterable<T> | AsyncIterable<T>;
+
+export type AsyncGeneratorValue<T> = AsyncGeneratorSource<T> | Promise<AsyncGeneratorSource<T>>;
 
 /**
- * Normalizes values, streams, and iterables into a unified async generator interface.
+ * Normalize supported values, streams, and iterables into one async generator.
  */
-export async function* toAsyncGenerator<T>(v: AsyncGeneratorValue<T>): AsyncGenerator<T> {
-  if (v instanceof Promise) return toAsyncGenerator(await v);
+export async function* toAsyncGenerator<T>(input: AsyncGeneratorValue<T>): AsyncGenerator<T> {
+  const value = await input;
+  if (value == null) throw Error("Value is null");
 
-  if (v == null) throw Error("Value is null");
-  if (v instanceof ReadableStream) {
-    const reader = v.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      yield value;
+  if (value instanceof ReadableStream) {
+    const reader = value.getReader();
+    let completed = false;
+    try {
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        if (done) {
+          completed = true;
+          break;
+        }
+        yield chunk;
+      }
+    } finally {
+      if (!completed) await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
     }
-    reader.releaseLock();
-  } else if (ArrayBuffer.isView(v) || v instanceof ArrayBuffer) {
-    // Treat ArrayBuffer and TypedArrays (like Uint8Array, Buffer) as single values
-    yield v as T;
-  } else if (typeof v === "object" && (Symbol.asyncIterator in v || Symbol.iterator in v)) {
-    return v;
-  } else {
-    yield v;
+    return;
   }
+
+  // Treat ArrayBuffer and typed arrays (like Uint8Array and Buffer) as single values.
+  if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) {
+    yield value as T;
+    return;
+  }
+
+  if (typeof value === "object" && Symbol.asyncIterator in value) {
+    for await (const item of value as AsyncIterable<T>) yield item;
+    return;
+  }
+
+  if (typeof value === "object" && Symbol.iterator in value) {
+    for (const item of value as Iterable<T>) yield item;
+    return;
+  }
+
+  yield value as T;
 }
 
 function bytesToStream(bytes: Uint8Array<ArrayBuffer>) {
@@ -44,17 +61,28 @@ function bytesToStream(bytes: Uint8Array<ArrayBuffer>) {
 
 async function streamToBytes(
   stream: ReadableStream<Uint8Array<ArrayBuffer>>,
+  maxBytes = Number.POSITIVE_INFINITY,
 ): Promise<Uint8Array<ArrayBuffer>> {
   const reader = stream.getReader();
   const chunks: Uint8Array<ArrayBuffer>[] = [];
+  let total = 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value !== undefined) chunks.push(value);
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value === undefined) continue;
+      if (value.byteLength > maxBytes - total) {
+        await reader.cancel("Decompressed output exceeds the maximum size");
+        throw Error(`Decompressed blob exceeds ${maxBytes} bytes`);
+      }
+      chunks.push(value);
+      total += value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
   }
 
-  const total = chunks.reduce((n, p) => n + p.length, 0);
   const out = new Uint8Array(new ArrayBuffer(total));
   let offset = 0;
   for (const p of chunks) {
@@ -67,8 +95,9 @@ async function streamToBytes(
 async function transformBytes(
   bytes: Uint8Array<ArrayBuffer>,
   transformStream: TransformStream<Uint8Array<ArrayBuffer>, Uint8Array<ArrayBuffer>>,
+  maxBytes = Number.POSITIVE_INFINITY,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  return streamToBytes(bytesToStream(bytes).pipeThrough(transformStream));
+  return streamToBytes(bytesToStream(bytes).pipeThrough(transformStream), maxBytes);
 }
 
 /**
@@ -76,8 +105,9 @@ async function transformBytes(
  */
 export async function webDecompress(
   data: Uint8Array<ArrayBuffer>,
+  maxBytes = MAX_BLOB_SIZE_BYTES,
 ): Promise<Uint8Array<ArrayBuffer>> {
-  return transformBytes(data, new DecompressionStream("deflate"));
+  return transformBytes(data, new DecompressionStream("deflate"), maxBytes);
 }
 
 /**

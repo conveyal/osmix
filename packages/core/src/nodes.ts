@@ -235,9 +235,13 @@ export class Nodes extends Entities<OsmNode> {
 
   /**
    * Get the longitude and latitude of a specific node.
+   * ID lookups return `null` when the node is not present; index lookups remain strict.
    */
-  getNodeLonLat(i: IdOrIndex): [number, number] {
+  getNodeLonLat(i: { index: number }): [number, number];
+  getNodeLonLat(i: { id: number }): [number, number] | null;
+  getNodeLonLat(i: IdOrIndex): [number, number] | null {
     const index = "index" in i ? i.index : this.ids.idOrIndex(i)[0];
+    if (index === -1) return null;
     return [microToDegrees(this.lons.at(index)), microToDegrees(this.lats.at(index))];
   }
 

@@ -66,7 +66,7 @@ export function nodeToFeature(node: OsmNode): OsmGeoJSONFeature<Point> {
  * area-indicating tags (building, landuse, etc.) and ring closure.
  *
  * @param way - OSM way with id, refs, and optional tags.
- * @param refToPosition - Function to resolve node ID to [lon, lat] coordinates.
+ * @param refToPosition - Function to resolve node ID to coordinates, or null for a missing node.
  * @returns GeoJSON LineString or Polygon Feature with OSM properties.
  *
  * @example
@@ -76,19 +76,25 @@ export function nodeToFeature(node: OsmNode): OsmGeoJSONFeature<Point> {
  */
 export function wayToFeature(
   way: OsmWay,
-  refToPosition: (id: number) => [number, number],
+  refToPosition: (id: number) => [number, number] | null | undefined,
 ): OsmGeoJSONFeature<LineString | Polygon> {
+  const resolvedCoordinates: [number, number][] = [];
+  for (const ref of way.refs) {
+    const position = refToPosition(ref);
+    if (!position) throw Error(`Node reference missing for way ${way.id}`);
+    resolvedCoordinates.push(position);
+  }
   return {
     type: "Feature",
     id: way.id,
     geometry: wayIsArea(way)
       ? {
           type: "Polygon",
-          coordinates: [way.refs.map((r) => refToPosition(r))],
+          coordinates: [resolvedCoordinates],
         }
       : {
           type: "LineString",
-          coordinates: way.refs.map((r) => refToPosition(r)),
+          coordinates: resolvedCoordinates,
         },
     properties: {
       id: way.id,
@@ -109,7 +115,7 @@ export function wayToFeature(
  * - **Other**: GeometryCollection (empty for logical relations)
  *
  * @param relation - OSM relation with id, members, and optional tags.
- * @param refToPosition - Function to resolve node ID to [lon, lat] coordinates.
+ * @param refToPosition - Function to resolve node ID to coordinates, or null for a missing node.
  * @param getWay - Optional function to resolve way ID to OsmWay (required for polygons/lines).
  * @returns GeoJSON Feature with appropriate geometry type.
  *
@@ -124,7 +130,7 @@ export function wayToFeature(
  */
 export function relationToFeature(
   relation: OsmRelation,
-  refToPosition: (id: number) => [number, number],
+  refToPosition: (id: number) => [number, number] | null | undefined,
   getWay?: (wayId: number) => OsmWay | null,
 ): OsmGeoJSONFeature<
   Polygon | MultiPolygon | LineString | MultiLineString | Point | MultiPoint | GeometryCollection
@@ -325,7 +331,10 @@ export function relationToFeature(
     const coordinates: [number, number][][][] = [];
 
     if (outer.length > 0) {
-      coordinates.push([outer.map((member) => refToPosition(member.ref))]);
+      const outerCoordinates = outer
+        .map((member) => refToPosition(member.ref))
+        .filter((position): position is [number, number] => position != null);
+      if (outerCoordinates.length > 0) coordinates.push([outerCoordinates]);
     }
 
     return {
@@ -396,12 +405,16 @@ export function osmEntityToGeoJSONFeature(
     return nodeToFeature(entity);
   }
   if (isWay(entity)) {
-    return wayToFeature(entity, (ref) => osm.nodes.getNodeLonLat({ id: ref }));
+    return wayToFeature(entity, (ref) => {
+      const coordinate = osm.nodes.getNodeLonLat({ id: ref });
+      if (!coordinate) throw Error(`Node ${ref} not found for way geometry`);
+      return coordinate;
+    });
   }
   if (isRelation(entity)) {
     return relationToFeature(
       entity,
-      (ref) => osm.nodes.getNodeLonLat({ id: ref }),
+      (ref) => osm.nodes.getNodeLonLat({ id: ref }) ?? undefined,
       (ref) => osm.ways.getById(ref),
     );
   }
