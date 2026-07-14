@@ -1,4 +1,5 @@
 import { flattenValue } from "../utils";
+import { TableCell, TableRow } from "./ui/table";
 
 export default function ObjectToTableRows({ object }: { object: null | Record<string, unknown> }) {
   if (!object) return null;
@@ -14,10 +15,10 @@ export default function ObjectToTableRows({ object }: { object: null | Record<st
               ? new Date(value).toLocaleString()
               : flattenValue(value);
           return (
-            <tr key={key}>
-              <td>{key}</td>
-              <td>{valueString}</td>
-            </tr>
+            <TableRow key={key}>
+              <TableCell>{key}</TableCell>
+              <TableCell>{valueString}</TableCell>
+            </TableRow>
           );
         })}
     </>

@@ -130,7 +130,7 @@ export default function ExtractBboxCornerMarkers({
             anchor="center"
           >
             <div
-              className="size-4 rounded-full border-2 border-white bg-blue-600 shadow-md cursor-grab active:cursor-grabbing ring-2 ring-blue-500/40 touch-none"
+              className="size-4 rounded-full border-2 border-white bg-info shadow-md cursor-grab active:cursor-grabbing ring-2 ring-info/40 touch-none"
               aria-label={label}
               role="button"
               tabIndex={0}

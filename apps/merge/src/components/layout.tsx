@@ -15,7 +15,7 @@ export function Sidebar({ children }: { children: ReactNode }) {
     <div className="flex h-full min-h-0 flex-row z-30 group/sidebar relative">
       <div
         className={cn(
-          "flex h-full min-h-0 flex-col w-3 overflow-hidden bg-slate-100",
+          "flex h-full min-h-0 flex-col w-3 overflow-hidden bg-muted",
           isOpen && "w-xs md:w-sm lg:w-md xl:w-lg",
         )}
       >
@@ -26,7 +26,7 @@ export function Sidebar({ children }: { children: ReactNode }) {
         onClick={() => setIsOpen((o) => !o)}
         className={cn(
           "absolute h-full right-[-3] w-3 flex items-center justify-center cursor-e-resize",
-          "bg-slate-100 hover:bg-slate-200",
+          "bg-muted hover:bg-accent",
           isOpen && "w-2 cursor-w-resize right-0",
         )}
         aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
@@ -38,5 +38,5 @@ export function Sidebar({ children }: { children: ReactNode }) {
 }
 
 export function MapContent({ children }: { children: ReactNode }) {
-  return <div className="relative grow-3 bg-slate-500">{children}</div>;
+  return <div className="relative grow-3 bg-muted-foreground">{children}</div>;
 }

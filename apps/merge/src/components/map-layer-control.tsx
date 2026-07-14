@@ -7,6 +7,7 @@ import { cn } from "../lib/utils";
 import { APPID } from "../settings";
 import { layerControlIsOpenAtom } from "../state/map";
 import CustomControl from "./custom-control";
+import { SectionTitle } from "./section";
 import { Button } from "./ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { Input } from "./ui/input";
@@ -120,7 +121,7 @@ export function MapLayers() {
       <CollapsibleTrigger className="flex h-8 cursor-pointer w-full items-center justify-between p-2">
         <div className="flex items-center gap-2">
           <Layers className="size-4" />
-          <span className="font-bold uppercase">Layers</span>
+          <SectionTitle>Layers</SectionTitle>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">{layers.length}</span>
@@ -135,7 +136,7 @@ export function MapLayers() {
           placeholder="Search layers..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="h-8 bg-slate-50 rounded-none shadow-inner"
+          className="h-8 bg-muted/50 rounded-none shadow-inner"
         />
 
         <div>

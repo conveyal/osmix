@@ -22,6 +22,9 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -39,6 +42,17 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out infinite;
+
+  @keyframes progress-indeterminate {
+    from {
+      translate: -100% 0;
+    }
+
+    to {
+      translate: 300% 0;
+    }
+  }
 }
 
 :root {
@@ -58,6 +72,9 @@
   --accent: oklch(0.968 0.007 247.896);
   --accent-foreground: oklch(0.208 0.042 265.755);
   --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.723 0.192 149.579);
+  --warning: oklch(0.769 0.188 70.08);
+  --info: oklch(0.623 0.214 259.815);
   --border: var(--color-slate-200);
   --input: oklch(0.929 0.013 255.508);
   --ring: oklch(0.704 0.04 256.788);
@@ -102,7 +119,7 @@
 
 nav {
   a {
-    color: var(--color-blue-600);
+    color: var(--info);
     text-underline-offset: 4px;
   }
 
@@ -118,35 +135,6 @@ nav {
 
 #root {
   min-height: 100vh;
-}
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-
-  td {
-    padding: 0.25rem 0.5rem;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-    user-select: all;
-
-    &:first-of-type {
-      border-left: none;
-    }
-
-    &:hover {
-      background-color: var(--color-slate-100);
-    }
-  }
-}
-
-.filters {
-  label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
 }
 
 .maplibregl-ctrl {
@@ -166,7 +154,7 @@ table {
 }
 
 .osmix-overlay-popup .maplibregl-popup-content {
-  background-color: white;
+  background-color: var(--background);
   border-radius: var(--radius);
   color: var(--foreground);
   font-family: var(--font-mono);

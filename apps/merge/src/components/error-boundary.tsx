@@ -41,7 +41,7 @@ export class ErrorBoundary extends React.Component<
     if (this.state.error) {
       // You can render any custom fallback UI
       return (
-        <pre className="p-8 border-2 mx-auto mt-8 w-md rounded shadow text-red-600">
+        <pre className="p-8 border-2 mx-auto mt-8 w-md rounded shadow text-destructive">
           Error: {this.state.error.message}
         </pre>
       );

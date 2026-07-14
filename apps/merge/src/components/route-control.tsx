@@ -12,6 +12,7 @@ import { selectedOsmAtom } from "../state/osm";
 import { routingStateAtom, type SnappedNode } from "../state/routing";
 import { osmWorker } from "../state/worker";
 import CustomControl from "./custom-control";
+import { SectionTitle } from "./section";
 import { Button } from "./ui/button";
 
 /** Maximum distance (m) to snap click point to nearest node. */
@@ -145,7 +146,7 @@ export function Routing({ osm }: { osm: Osm }) {
       <div className="flex items-center justify-between pl-2 border-b">
         <div className="flex items-center gap-2">
           <NavigationIcon className="size-4" />
-          <span className="font-bold">ROUTING</span>
+          <SectionTitle>Routing</SectionTitle>
         </div>
 
         <Button
@@ -172,7 +173,7 @@ export function Routing({ osm }: { osm: Osm }) {
       <div className="p-2 space-y-2">
         {/* No node nearby feedback */}
         {noNodeNearby && (
-          <div className="text-amber-500 font-medium text-center">
+          <div className="text-warning font-medium text-center">
             No road found nearby. Click closer to a road.
           </div>
         )}
@@ -196,7 +197,7 @@ export function Routing({ osm }: { osm: Osm }) {
         {/* From point info */}
         {hasFrom && routingState.fromPoint && routingState.fromNode && (
           <div className="space-y-1">
-            <div className="font-bold uppercase text-red-500">From</div>
+            <SectionTitle className="text-destructive">From</SectionTitle>
             <SnappedNodeInfo point={routingState.fromPoint} node={routingState.fromNode} />
           </div>
         )}
@@ -204,21 +205,21 @@ export function Routing({ osm }: { osm: Osm }) {
         {/* To point info */}
         {hasTo && routingState.toPoint && routingState.toNode && (
           <div className="space-y-1">
-            <div className="font-semibold text-red-500">To</div>
+            <SectionTitle className="text-destructive">To</SectionTitle>
             <SnappedNodeInfo point={routingState.toPoint} node={routingState.toNode} />
           </div>
         )}
 
         {/* Route result */}
         {hasTo && !hasRoute && !isRouting && (
-          <div className="text-destructive font-bold uppercase text-center">
+          <div className="text-destructive text-center font-bold">
             No route found between these points
           </div>
         )}
 
         {hasRoute && routingState.result && (
           <div className="space-y-2">
-            <div className="font-bold text-blue-500 uppercase">Route</div>
+            <SectionTitle className="text-info">Route</SectionTitle>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="text-muted-foreground uppercase">Distance</div>
@@ -240,7 +241,7 @@ export function Routing({ osm }: { osm: Osm }) {
                   {routingState.result.segments.map((seg, _i) => (
                     <div
                       key={`${seg.wayIds.join("-")}-${seg.distance}-${seg.time}`}
-                      className="border-l-2 border-blue-400 pl-2"
+                      className="border-l-2 border-info/60 pl-2"
                     >
                       <div className="font-medium" title={`Way IDs: ${seg.wayIds.join(", ")}`}>
                         {seg.name || `(${seg.highway})`}

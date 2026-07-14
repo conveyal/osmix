@@ -4,6 +4,8 @@ import { bytesSizeToHuman } from "../utils";
 import type { StoredFileInfo } from "../workers/osm.worker";
 import { Details, DetailsContent, DetailsSummary } from "./details";
 import ObjectToTableRows from "./object-to-table";
+import { SectionTitle } from "./section";
+import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 
 export default function OsmInfoTable({
   defaultOpen,
@@ -23,39 +25,41 @@ export default function OsmInfoTable({
   if (!osm || (!file && !fileInfo)) return null;
   return (
     <Details defaultOpen={defaultOpen}>
-      <DetailsSummary>FILE INFO</DetailsSummary>
+      <DetailsSummary>File info</DetailsSummary>
       <DetailsContent className="overflow-auto">
-        <table>
-          <tbody>
+        <Table>
+          <TableBody>
             {fileSize != null && (
-              <tr>
-                <td>size</td>
-                <td>{bytesSizeToHuman(fileSize)}</td>
-              </tr>
+              <TableRow>
+                <TableCell>size</TableCell>
+                <TableCell>{bytesSizeToHuman(fileSize)}</TableCell>
+              </TableRow>
             )}
-            <tr>
-              <td>nodes</td>
-              <td>{osm.nodes.size.toLocaleString()}</td>
-            </tr>
-            <tr>
-              <td>ways</td>
-              <td>{osm.ways.size.toLocaleString()}</td>
-            </tr>
-            <tr>
-              <td>relations</td>
-              <td>{osm.relations.size.toLocaleString()}</td>
-            </tr>
-            <tr>
-              <td>bbox</td>
-              <td>{osm.bbox()?.join(",")}</td>
-            </tr>
-            <tr>
-              <td className="font-bold">HEADER</td>
-              <td />
-            </tr>
+            <TableRow>
+              <TableCell>nodes</TableCell>
+              <TableCell>{osm.nodes.size.toLocaleString()}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>ways</TableCell>
+              <TableCell>{osm.ways.size.toLocaleString()}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>relations</TableCell>
+              <TableCell>{osm.relations.size.toLocaleString()}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>bbox</TableCell>
+              <TableCell>{osm.bbox()?.join(",")}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>
+                <SectionTitle>Header</SectionTitle>
+              </TableCell>
+              <TableCell />
+            </TableRow>
             <ObjectToTableRows object={osm.header} />
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </DetailsContent>
     </Details>
   );

@@ -25,7 +25,7 @@ import ActionButton from "./action-button";
 import { Details, DetailsContent, DetailsSummary } from "./details";
 import { OsmPbfOpenUrlButton, OsmPbfSelectFileButton } from "./osm-pbf-file-input";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemHeader, ItemTitle } from "./ui/item";
 
@@ -107,7 +107,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
   });
 
   return (
-    <Item className={isActive ? "bg-blue-50 border-blue-200" : ""}>
+    <Item className={isActive ? "bg-info/5 border-info/30" : ""}>
       <ItemHeader>
         {isRenaming ? (
           <Input
@@ -116,7 +116,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
             onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleConfirmRename}
-            className="h-7 text-sm font-bold"
+            className="h-7 font-bold"
           />
         ) : (
           <ItemTitle className="truncate">{entry.fileName}</ItemTitle>
@@ -190,10 +190,10 @@ export function StoredOsmList({ activeOsmId, osmKey, openOsmFile }: StoredOsmLis
   return (
     <Card>
       <CardHeader>
-        <div className="font-bold uppercase p-2 flex items-center gap-1">
+        <CardTitle>
           <FilesIcon className="size-3" />
-          FILES
-        </div>
+          Files
+        </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="flex flex-col lg:flex-row gap-2 p-2 items-stretch">

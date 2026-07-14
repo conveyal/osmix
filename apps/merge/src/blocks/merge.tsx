@@ -27,10 +27,12 @@ import ChangesSummary, {
   ChangesPagination,
 } from "../components/osm-changes-summary";
 import OsmInfoTable from "../components/osm-info-table";
+import { LoadingState } from "../components/section";
 import StoredOsmList from "../components/stored-osm-list";
+import TaskProgress from "../components/task-progress";
 import { Button } from "../components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "../components/ui/button-group";
-import { Card, CardContent, CardHeader } from "../components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import {
   Item,
   ItemActions,
@@ -39,7 +41,6 @@ import {
   ItemMedia,
   ItemTitle,
 } from "../components/ui/item";
-import { Spinner } from "../components/ui/spinner";
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
 import { showSaveFilePickerWithFallback } from "../lib/save-file-picker";
@@ -165,10 +166,10 @@ export default function MergeBlock() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Step step="select-osm-pbf-files" title="SELECT OSM FILES">
+      <Step step="select-osm-pbf-files" title="Select OSM files">
         <Card>
-          <CardHeader className="uppercase font-bold border-b px-2">MERGE STEPS</CardHeader>
-          <CardContent className="flex flex-col gap-2 p-2">
+          <CardHeader>Merge steps</CardHeader>
+          <CardContent className="flex flex-col gap-2">
             <ol className="list-decimal list-inside">
               <li>Deduplicate nodes and ways in base OSM</li>
               <li>Deduplicate nodes and ways in patch OSM</li>
@@ -185,29 +186,31 @@ export default function MergeBlock() {
 
         <Card>
           <CardHeader>
-            <div className="p-2">SELECT PATCH OSM TO MERGE</div>
+            <CardTitle>Select patch OSM to merge</CardTitle>
             {patch.osm && (
-              <ButtonGroup>
-                {!patch.isStored && (
+              <CardAction>
+                <ButtonGroup>
+                  {!patch.isStored && (
+                    <ActionButton
+                      icon={<SaveIcon />}
+                      title="Save to storage"
+                      variant="ghost"
+                      onAction={patch.saveToStorage}
+                    />
+                  )}
                   <ActionButton
-                    icon={<SaveIcon />}
-                    title="Save to storage"
+                    icon={<XIcon />}
+                    title="Clear patch OSM file"
                     variant="ghost"
-                    onAction={patch.saveToStorage}
+                    onAction={async () => {
+                      await patch.loadOsmFile(null);
+                    }}
                   />
-                )}
-                <ActionButton
-                  icon={<XIcon />}
-                  title="Clear patch OSM file"
-                  variant="ghost"
-                  onAction={async () => {
-                    await patch.loadOsmFile(null);
-                  }}
-                />
-              </ButtonGroup>
+                </ButtonGroup>
+              </CardAction>
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {!patch.osm ? (
               <StoredOsmList
                 osmKey={PATCH_OSM_KEY}
@@ -260,7 +263,7 @@ export default function MergeBlock() {
               <CheckCircle />
             </ItemMedia>
             <ItemContent>
-              <ItemTitle>OPTION 1. VERIFY EACH STEP</ItemTitle>
+              <ItemTitle>Option 1: Verify each step</ItemTitle>
               <ItemDescription>Verify changes before applying them.</ItemDescription>
             </ItemContent>
             <ItemActions>
@@ -328,7 +331,7 @@ export default function MergeBlock() {
               <FastForwardIcon />
             </ItemMedia>
             <ItemContent>
-              <ItemTitle>OPTION 2. RUN ALL MERGE STEPS</ItemTitle>
+              <ItemTitle>Option 2: Run all merge steps</ItemTitle>
               <ItemDescription>Run without stopping for verification.</ItemDescription>
             </ItemContent>
             <ItemActions>
@@ -338,8 +341,9 @@ export default function MergeBlock() {
         </div>
       </Step>
 
-      <Step step="run-all-steps" title="RUNNING ALL MERGE STEPS">
+      <Step step="run-all-steps" title="Running all merge steps">
         <p>Monitor the activity log below for progress. This may take a few minutes to complete.</p>
+        <TaskProgress />
         {mergeAbortController && (
           <Button
             variant="destructive"
@@ -355,7 +359,7 @@ export default function MergeBlock() {
         )}
       </Step>
 
-      <Step step="inspect-base-osm" title="INSPECT BASE OSM">
+      <Step step="inspect-base-osm" title="Inspect base OSM">
         <p>
           Each file is first scanned for duplicate entities inside the same dataset. We then look
           for duplicates that appear in both files.
@@ -370,8 +374,8 @@ export default function MergeBlock() {
           Review those proposals in the next step before applying them.
         </p>
         <Card>
-          <CardHeader className="p-2">BASE OSM PBF</CardHeader>
-          <CardContent>
+          <CardHeader>Base OSM PBF</CardHeader>
+          <CardContent className="p-0">
             <OsmInfoTable
               defaultOpen={false}
               osm={base.osm}
@@ -399,15 +403,15 @@ export default function MergeBlock() {
         </ActionButton>
       </Step>
 
-      <Step step="inspect-patch-osm" title="INSPECT PATCH OSM">
+      <Step step="inspect-patch-osm" title="Inspect patch OSM">
         <p>
           Generate a changeset that removes duplicate entities from the patch file before it is
           merged into the base data.
         </p>
 
         <Card>
-          <CardHeader className="p-2">PATCH OSM PBF</CardHeader>
-          <CardContent>
+          <CardHeader>Patch OSM PBF</CardHeader>
+          <CardContent className="p-0">
             <OsmInfoTable
               defaultOpen={false}
               osm={patch.osm}
@@ -435,7 +439,7 @@ export default function MergeBlock() {
         </ActionButton>
       </Step>
 
-      <Step step="direct-merge" title="DIRECT MERGE">
+      <Step step="direct-merge" title="Direct merge">
         <p>
           Add the patch entities to the base dataset and replace any base features that share the
           same IDs.
@@ -443,13 +447,14 @@ export default function MergeBlock() {
 
         <Card>
           <CardHeader>
-            <div className="p-2">BASE OSM PBF</div>
-
+            <CardTitle>Base OSM PBF</CardTitle>
             {base.osm && (
-              <ActionButton icon={<DownloadIcon />} onAction={base.downloadOsm} variant="ghost" />
+              <CardAction>
+                <ActionButton icon={<DownloadIcon />} onAction={base.downloadOsm} variant="ghost" />
+              </CardAction>
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <OsmInfoTable
               defaultOpen={false}
               osm={base.osm}
@@ -460,12 +465,18 @@ export default function MergeBlock() {
         </Card>
         <Card>
           <CardHeader>
-            <div className="p-2">PATCH OSM PBF</div>
+            <CardTitle>Patch OSM PBF</CardTitle>
             {patch.osm && (
-              <ActionButton icon={<DownloadIcon />} onAction={patch.downloadOsm} variant="ghost" />
+              <CardAction>
+                <ActionButton
+                  icon={<DownloadIcon />}
+                  onAction={patch.downloadOsm}
+                  variant="ghost"
+                />
+              </CardAction>
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <OsmInfoTable
               defaultOpen={false}
               osm={patch.osm}
@@ -501,7 +512,7 @@ export default function MergeBlock() {
         </ButtonGroup>
       </Step>
 
-      <Step step="review-changeset" title="REVIEW CHANGESET">
+      <Step step="review-changeset" title="Review changeset">
         <p>
           Review the proposed edits produced in the previous step. Apply the changes to update the
           base OSM before moving forward.
@@ -522,12 +533,12 @@ export default function MergeBlock() {
         </ButtonGroup>
         {changesetStats && base.osm && (
           <Card>
-            <CardHeader className="p-2">Changeset</CardHeader>
-            <CardContent>
+            <CardHeader>Changeset</CardHeader>
+            <CardContent className="p-0">
               <ChangesSummary />
-              <Suspense fallback={<div className="p-2">LOADING...</div>}>
+              <Suspense fallback={<LoadingState />}>
                 <Details>
-                  <DetailsSummary>ALL CHANGES</DetailsSummary>
+                  <DetailsSummary>All changes</DetailsSummary>
                   <DetailsContent>
                     <ChangesFilters />
                     <ChangesExpandableList />
@@ -566,7 +577,7 @@ export default function MergeBlock() {
         )}
       </Step>
 
-      <Step step="deduplicate-nodes" title="DE-DUPLICATE NODES">
+      <Step step="deduplicate-nodes" title="De-duplicate nodes">
         <p>
           Identify nodes that occupy the same location in both datasets and merge them, updating any
           way or relation references that point to those nodes.
@@ -574,12 +585,14 @@ export default function MergeBlock() {
 
         <Card>
           <CardHeader>
-            <div className="p-2">CURRENT OSM PBF</div>
+            <CardTitle>Current OSM PBF</CardTitle>
             {base.osm && (
-              <ActionButton icon={<DownloadIcon />} onAction={base.downloadOsm} variant="ghost" />
+              <CardAction>
+                <ActionButton icon={<DownloadIcon />} onAction={base.downloadOsm} variant="ghost" />
+              </CardAction>
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <OsmInfoTable
               defaultOpen={false}
               osm={base.osm}
@@ -618,8 +631,8 @@ export default function MergeBlock() {
         </ButtonGroup>
       </Step>
 
-      <Step step="create-intersections" title="CREATE INTERSECTIONS">
-        <div className="flex flex-col space-y-2">
+      <Step step="create-intersections" title="Create intersections">
+        <div className="flex flex-col gap-2">
           <p>
             Scan new ways for crossings with existing ways and flag the segments that should share
             intersection nodes based on their tags.
@@ -669,7 +682,7 @@ export default function MergeBlock() {
         </ButtonGroup>
       </Step>
 
-      <Step step="inspect-final-osm" title="INSPECT FINAL MERGED OSM">
+      <Step step="inspect-final-osm" title="Inspect final merged OSM">
         <p>
           Review the merged OSM dataset, explore the results on the map, and download the new PBF
           when ready. Zoom in to inspect individual entities and confirm the applied changes.
@@ -678,8 +691,8 @@ export default function MergeBlock() {
         {base.osm && (
           <>
             <Card>
-              <CardHeader className="p-2">NEW OSM PBF</CardHeader>
-              <CardContent>
+              <CardHeader>New OSM PBF</CardHeader>
+              <CardContent className="p-0">
                 <OsmInfoTable
                   defaultOpen={false}
                   osm={base.osm}
@@ -692,20 +705,22 @@ export default function MergeBlock() {
             {selectedEntity && (
               <Card>
                 <CardHeader>
-                  <div className="p-2">SELECTED ENTITY</div>
-                  <Button
-                    onClick={() => {
-                      if (!base.osm || !selectedEntity) return;
-                      flyToEntity(base.osm, selectedEntity);
-                    }}
-                    variant="ghost"
-                    size="icon-sm"
-                    title="Fit bounds to entity"
-                  >
-                    <MaximizeIcon />
-                  </Button>
+                  <CardTitle>Selected entity</CardTitle>
+                  <CardAction>
+                    <Button
+                      onClick={() => {
+                        if (!base.osm || !selectedEntity) return;
+                        flyToEntity(base.osm, selectedEntity);
+                      }}
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Fit bounds to entity"
+                    >
+                      <MaximizeIcon />
+                    </Button>
+                  </CardAction>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                   <EntityDetails entity={selectedEntity} defaultOpen={true} osm={base.osm} />
                 </CardContent>
               </Card>
@@ -742,17 +757,11 @@ function Step({
   const currentStep = useAtomValue(stepAtom);
   const stepIndex = useAtomValue(stepIndexAtom);
   if (step !== currentStep) return null;
-  if (isTransitioning === true)
-    return (
-      <div className="flex items-center gap-1">
-        <Spinner />
-        <div className="font-bold">PLEASE WAIT...</div>
-      </div>
-    );
+  if (isTransitioning === true) return <LoadingState>Please wait...</LoadingState>;
   return (
     <>
       <Card>
-        <CardHeader className="font-bold uppercase p-2 bg-white">
+        <CardHeader className="border-b-0">
           {stepIndex + 1}: {title}
         </CardHeader>
       </Card>

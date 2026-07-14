@@ -2,6 +2,7 @@ import { releaseProxy } from "comlink";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { createBrowserCheckWorker } from "../workers/browser-check.worker";
+import { StatusDot } from "./status-dot";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -84,7 +85,7 @@ export default function BrowserCheck() {
         <span className="inline-flex items-center gap-2">
           Check system
           {issues.length > 0 ? (
-            <span className="inline-block size-2 rounded-full bg-red-500" title={hoverText} />
+            <StatusDot className="inline-block" status="error" title={hoverText} />
           ) : null}
         </span>
       </DialogTrigger>
@@ -99,8 +100,8 @@ export default function BrowserCheck() {
         </DialogHeader>
         <div className="flex flex-col gap-2">
           {issues.length > 0 ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
-              <div className="font-semibold">Potential issues</div>
+            <div className="rounded-md border border-destructive/20 bg-destructive/10 p-2 text-destructive">
+              <div className="font-bold">Potential issues</div>
               <ul className="mt-1 list-disc pl-5">
                 {issues.map((issue) => (
                   <li key={issue.id}>

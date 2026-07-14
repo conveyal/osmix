@@ -3,6 +3,7 @@ import { ChevronUp } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "../lib/utils";
+import { SectionTitle } from "./section";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 
 export function Details({
@@ -39,7 +40,7 @@ export function DetailsSummary({
         className,
       )}
     >
-      <div className="font-bold uppercase">{children}</div>
+      <SectionTitle>{children}</SectionTitle>
       <ChevronUp className="size-4 group-data-[state=open]:rotate-180 transition-transform" />
     </CollapsibleTrigger>
   );

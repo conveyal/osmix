@@ -40,7 +40,7 @@ export default function ExtractList({
               href="https://slice.openstreetmap.us/#0/0/0"
               target="_blank"
               rel="noreferrer"
-              className="text-blue-500"
+              className="text-info"
             >
               SliceOSM
             </a>
@@ -51,7 +51,7 @@ export default function ExtractList({
               href="https://download.geofabrik.de"
               target="_blank"
               rel="noreferrer"
-              className="text-blue-500"
+              className="text-info"
             >
               Geofabrik Extracts
             </a>
