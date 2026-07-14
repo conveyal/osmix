@@ -1,10 +1,13 @@
-# @osmix/pbf
+# @osmix/test-utils
 
-## 0.0.10
+## 0.1.0
+
+### Minor Changes
+
+- 368d103: Introduce focused packages extracted from `@osmix/shared`.
 
 ### Patch Changes
 
-- 368d103: Split shared concerns into `@osmix/types`, `@osmix/geo`, and `@osmix/test-utils`. Add `OsmReader`/`OsmWriter` contracts, curated `osmix` facade exports, and dependency guardrails.
 - c7a5a35: Harden parsing, loading, changeset generation, worker orchestration, and package verification across Osmix.
 
   - `@osmix/pbf`, `@osmix/json`, and `@osmix/load` now validate PBF framing and decompression limits, normalize every supported input form, apply timestamp granularity consistently, translate tags before filtering, remove dangling filtered references, and build every requested spatial index.
@@ -15,57 +18,3 @@
   - `@osmix/gtfs` and `@osmix/router` documentation now uses the current archive, routing, transfer, and distance APIs.
   - `@osmix/shared` and `@osmix/test-utils` add executable package smoke coverage for byte streams and checked-in fixtures.
   - Public package examples are classified as compilable or schematic and are checked against current exports and argument types.
-
-## 0.0.9
-
-### Patch Changes
-
-- aba4bd8: Fix for nodejs package imports
-
-## 0.0.8
-
-### Patch Changes
-
-- 2a634cb: Fix publishing
-
-## 0.0.7
-
-### Patch Changes
-
-- 3c8ee95: Fix and simplify package exports
-
-## 0.0.6
-
-### Patch Changes
-
-- f32e4ee: General cleanup
-
-## 0.0.5
-
-### Patch Changes
-
-- f468db5: Fix publishing (2)
-
-## 0.0.4
-
-### Patch Changes
-
-- 68d6bd8: Fix publishing for packages.
-
-## 0.0.3
-
-### Patch Changes
-
-- d001d9a: Refactor to align around new main external API
-
-## 0.0.2
-
-### Patch Changes
-
-- 33d9c12: Modify types to take Uint8Array<ArrayBufferLike> for compatiblity
-
-## 0.0.1
-
-### Patch Changes
-
-- Initial release

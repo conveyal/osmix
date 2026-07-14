@@ -1,5 +1,44 @@
 # osmix
 
+## 0.3.0
+
+### Minor Changes
+
+- 368d103: Split shared concerns into `@osmix/types`, `@osmix/geo`, and `@osmix/test-utils`. Add `OsmReader`/`OsmWriter` contracts, curated `osmix` facade exports, and dependency guardrails.
+- c7a5a35: Harden parsing, loading, changeset generation, worker orchestration, and package verification across Osmix.
+
+  - `@osmix/pbf`, `@osmix/json`, and `@osmix/load` now validate PBF framing and decompression limits, normalize every supported input form, apply timestamp granularity consistently, translate tags before filtering, remove dangling filtered references, and build every requested spatial index.
+  - `@osmix/core` now returns `null` for unknown node-coordinate lookups, safely handles incomplete geometry, caches relation-to-way membership, and avoids repeated ID lookups and per-entity object allocation during sorted iteration.
+  - `@osmix/change` now preserves relation references during deduplication, escapes OSC XML attributes, applies changesets non-destructively, allocates collision-free IDs for empty or unsorted data, and resolves pending intersection geometry safely. Its intersection runtime is now vendored and strictly typed, removing the upstream test/build dependency graph.
+  - `osmix` now preserves sliced typed-array views during transfer, disposes and terminates owned workers reliably, uses collision-safe worker registries, and supports all documented PBF input forms across local and remote APIs.
+  - `@osmix/geojson`, `@osmix/vt`, and `@osmix/shortbread` now consume nullable or read-only geometry data without aliasing or mutation hazards.
+  - `@osmix/gtfs` and `@osmix/router` documentation now uses the current archive, routing, transfer, and distance APIs.
+  - `@osmix/shared` and `@osmix/test-utils` add executable package smoke coverage for byte streams and checked-in fixtures.
+  - Public package examples are classified as compilable or schematic and are checked against current exports and argument types.
+
+- 71cb9f8: Make worker initialization work out of the box and the SharedArrayBuffer story explicit. Add `getOsmixCapabilities()`, `canShareArrayBuffers()`, `remote.mode`, an `inProcess` option, and an `osmix/worker` subpath export. Fix the published default worker URL (pointed at a nonexistent `.ts` file in dist), a browser `process.env` ReferenceError, and a Node 20 crash on import. `createRemote()` now throws a clear error in environments without Web Workers instead of silently running on the calling thread. Removes `SUPPORTS_SHARED_ARRAY_BUFFER`, `DEFAULT_WORKER_COUNT`, and `SUPPORTS_STREAM_TRANSFER` exports.
+
+### Patch Changes
+
+- Updated dependencies [368d103]
+- Updated dependencies [368d103]
+- Updated dependencies [c7a5a35]
+  - @osmix/core@0.2.0
+  - @osmix/geojson@0.0.16
+  - @osmix/pbf@0.0.10
+  - @osmix/shared@0.1.0
+  - @osmix/geo@0.1.0
+  - @osmix/types@0.1.0
+  - @osmix/change@0.1.10
+  - @osmix/gtfs@0.0.11
+  - @osmix/json@0.0.16
+  - @osmix/load@0.0.2
+  - @osmix/router@0.0.14
+  - @osmix/vt@0.0.14
+  - @osmix/geoparquet@0.1.10
+  - @osmix/shapefile@0.0.12
+  - @osmix/raster@0.0.14
+
 ## 0.2.2
 
 ### Patch Changes
