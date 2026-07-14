@@ -162,8 +162,8 @@ export default function ExtractBlock() {
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <CardHeader className="p-2">1. Select bounding box</CardHeader>
-        <CardContent className="p-2 flex flex-col gap-2">
+        <CardHeader>1. Select bounding box</CardHeader>
+        <CardContent className="flex flex-col gap-2">
           <p className="text-muted-foreground">
             Search on the map (top right), or edit coordinates below. The rectangle updates on the
             map.
@@ -266,15 +266,15 @@ export default function ExtractBlock() {
       </Card>
 
       <Card>
-        <CardHeader className="p-2">2. Extract strategy</CardHeader>
-        <CardContent className="p-2 flex flex-col gap-2">
+        <CardHeader>2. Extract strategy</CardHeader>
+        <CardContent className="flex flex-col gap-2">
           <p className="text-muted-foreground">
             See the{" "}
             <a
               href="https://osmcode.org/osmium-tool/manual.html#creating-geographic-extracts"
               target="_blank"
               rel="noreferrer"
-              className="text-blue-500"
+              className="text-info"
             >
               Osmium Tool Manual
             </a>{" "}
@@ -308,15 +308,15 @@ export default function ExtractBlock() {
       </Card>
 
       <Card>
-        <CardHeader className="p-2">3. Tag filters</CardHeader>
-        <CardContent className="p-2">
+        <CardHeader>3. Tag filters</CardHeader>
+        <CardContent>
           <ExtractTagFilterEditor state={tagFilterEditor} onChange={setTagFilterEditor} />
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader className="p-2">4. OSM PBF file</CardHeader>
-        <CardContent className="p-2 flex gap-2 items-center">
+        <CardHeader>4. OSM PBF file</CardHeader>
+        <CardContent className="flex gap-2 items-center">
           <OsmPbfFileInput
             file={pendingFile}
             setFile={async (f) => {
@@ -331,7 +331,7 @@ export default function ExtractBlock() {
       </Card>
 
       <Card>
-        <CardContent className="p-2 flex flex-col gap-2">
+        <CardContent className="flex flex-col gap-2">
           <Button
             type="button"
             size="lg"

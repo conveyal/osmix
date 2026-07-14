@@ -1,6 +1,6 @@
 import { useLog } from "../hooks/log";
-import { cn } from "../lib/utils";
 import { formatTimestampMs } from "../utils";
+import { StatusDot } from "./status-dot";
 import { Spinner } from "./ui/spinner";
 
 export default function Status() {
@@ -15,14 +15,9 @@ export default function Status() {
       {activeTasks > 0 ? (
         <Spinner />
       ) : (
-        <div
-          className={cn(
-            "h-2 w-2 rounded-full bg-green-500 p-1",
-            status.type === "error" && "bg-red-500",
-          )}
-        />
+        <StatusDot status={status.type === "error" ? "error" : "ok"} />
       )}
-      <div className="text-slate-950 overflow-hidden whitespace-nowrap text-ellipsis shrink">
+      <div className="shrink overflow-hidden text-ellipsis whitespace-nowrap text-foreground">
         {status.message}
       </div>
     </div>

@@ -8,6 +8,7 @@ import { selectedEntityAtom, selectedOsmAtom } from "../state/osm";
 import { getOsmixEntityByStringId } from "../utils";
 import EntityDetails from "./entity-details";
 import EntityLookup from "./entity-lookup";
+import { SectionTitle } from "./section";
 import { Button } from "./ui/button";
 
 export default function EntityMapControl({ osm }: { osm: Osm }) {
@@ -35,7 +36,7 @@ export default function EntityMapControl({ osm }: { osm: Osm }) {
       ) : (
         <>
           <div className="flex items-center justify-between gap-2 border-b">
-            <div className="font-bold pl-2">SELECTED ENTITY</div>
+            <SectionTitle className="pl-2">Selected entity</SectionTitle>
             <div className="flex items-center">
               <Button
                 onClick={() => {

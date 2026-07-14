@@ -11,8 +11,8 @@ export default function LogContent() {
           key={`${message.timestamp}-${message.message}`}
           className={cn(
             "whitespace-nowrap",
-            "text-slate-600",
-            index === 0 && "text-slate-900 font-medium",
+            "text-muted-foreground",
+            index === 0 && "text-foreground font-medium",
           )}
           title={formatTimestampMs(message.timestamp)}
         >

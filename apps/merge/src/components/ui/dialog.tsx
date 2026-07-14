@@ -91,7 +91,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof BaseDi
   return (
     <BaseDialog.Title
       data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+      className={cn("text-sm leading-none font-bold uppercase tracking-wide", className)}
       {...props}
     />
   );
@@ -104,7 +104,7 @@ function DialogDescription({
   return (
     <BaseDialog.Description
       data-slot="dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-muted-foreground", className)}
       {...props}
     />
   );

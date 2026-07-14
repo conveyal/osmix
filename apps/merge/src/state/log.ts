@@ -18,10 +18,15 @@ function createLog() {
   const listeners = new Set<() => void>();
   let log: Status[] = [INITIAL_STATUS];
   let activeTasks = 0;
-  let state = { activeTasks, log };
+  let taskStartedAt: number | null = null;
+  let state: { activeTasks: number; log: Status[]; taskStartedAt: number | null } = {
+    activeTasks,
+    log,
+    taskStartedAt,
+  };
 
   const emitChange = () => {
-    state = { activeTasks, log };
+    state = { activeTasks, log, taskStartedAt };
     for (const listener of listeners) {
       listener();
     }
@@ -52,6 +57,7 @@ function createLog() {
   };
   const startTask = (message: string, type: Status["type"] = "info") => {
     activeTasks++;
+    if (activeTasks === 1) taskStartedAt = Date.now();
     const starTime = performance.now();
     addMessage(message, type);
     return {
@@ -60,6 +66,7 @@ function createLog() {
       },
       end: (message: string, type: Status["type"] = "info") => {
         activeTasks--;
+        if (activeTasks === 0) taskStartedAt = null;
         const durationMs = performance.now() - starTime;
         addMessage(message, type, durationMs);
       },

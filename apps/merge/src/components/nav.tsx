@@ -34,10 +34,7 @@ export default function Nav() {
             to="/"
             end
             className={({ isActive }) =>
-              cn(
-                "text-sm font-normal hover:underline",
-                isActive ? "text-blue-500" : "text-muted-foreground",
-              )
+              cn("font-normal hover:underline", isActive ? "text-info" : "text-muted-foreground")
             }
           >
             Merge
@@ -88,7 +85,7 @@ function ToggleButton({
   const [isOpen, setIsOpen] = useAtom(atom);
   return (
     <Button
-      className={cn(isOpen ? "text-blue-500" : "text-muted-foreground")}
+      className={cn(isOpen ? "text-info" : "text-muted-foreground")}
       size="icon-sm"
       variant="ghost"
       onClick={() => setIsOpen((o) => !o)}

@@ -48,6 +48,7 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 ## Key Paths
 
 - UI: `apps/merge` (React 19 + Vite); worker wrapper at `apps/merge/src/workers/osm.worker.ts`.
+- Merge app design conventions: `apps/merge/DESIGN.md` — read before UI changes.
 - Worker API: `packages/osmix/src/worker.ts`, `packages/osmix/src/remote.ts`.
 - Fixtures: `fixtures/` at repo root; loaded via `@osmix/test-utils/fixtures`.
 

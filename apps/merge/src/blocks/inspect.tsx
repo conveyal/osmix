@@ -12,6 +12,7 @@ import ChangesSummary, {
   ChangesList,
   ChangesPagination,
 } from "../components/osm-changes-summary";
+import { EmptyState, LoadingState } from "../components/section";
 import StoredOsmList from "../components/stored-osm-list";
 import { Card, CardContent, CardHeader } from "../components/ui/card";
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
@@ -53,9 +54,9 @@ export default function InspectBlock({
   if (!baseOsm.osm || !baseOsm.osmInfo || !baseOsm.fileInfo) {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-muted-foreground">
+        <EmptyState className="p-0">
           Select an OSM file to inspect, or extract a region on the Extract tab.
-        </p>
+        </EmptyState>
         <ExtractList
           openOsmFile={async (file) => {
             const osmInfo = await openOsmFile(file);
@@ -104,12 +105,12 @@ export default function InspectBlock({
       {changesetStats != null && (
         <>
           <Card>
-            <CardHeader className="p-2">Changeset</CardHeader>
-            <CardContent>
+            <CardHeader>Changeset</CardHeader>
+            <CardContent className="p-0">
               <ChangesSummary />
-              <Suspense fallback={<div className="py-1 px-2">LOADING...</div>}>
+              <Suspense fallback={<LoadingState />}>
                 <Details>
-                  <DetailsSummary>CHANGES</DetailsSummary>
+                  <DetailsSummary>Changes</DetailsSummary>
                   <DetailsContent>
                     <ChangesFilters />
                     <ChangesList

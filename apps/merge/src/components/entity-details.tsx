@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { Fragment } from "react/jsx-runtime";
 
 import { Details, DetailsContent, DetailsSummary } from "./details";
+import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 
 const noop = (_: OsmEntity) => undefined;
 
@@ -26,7 +27,7 @@ export default function EntityDetails({
       <WayDetails way={entity} defaultOpen={defaultOpen}>
         {osm && (
           <Details defaultOpen={false}>
-            <DetailsSummary>WAY NODES ({entity.refs.length})</DetailsSummary>
+            <DetailsSummary>Way nodes ({entity.refs.length})</DetailsSummary>
             <DetailsContent>
               <NodeListTable
                 nodes={entity.refs.map((ref) => osm.nodes.getById(ref)).filter((n) => n != null)}
@@ -42,7 +43,7 @@ export default function EntityDetails({
       <RelationDetails relation={entity} defaultOpen={defaultOpen}>
         {osm && (
           <Details defaultOpen={false}>
-            <DetailsSummary>RELATION MEMBERS ({entity.members.length})</DetailsSummary>
+            <DetailsSummary>Relation members ({entity.members.length})</DetailsSummary>
             <DetailsContent>
               <RelationMemberListTable members={entity.members} osm={osm} onSelect={onSelect} />
             </DetailsContent>
@@ -61,7 +62,7 @@ export function EntityContent({ entity }: { entity: OsmEntity }) {
 export function NodeDetails({ node, defaultOpen }: { node: OsmNode; defaultOpen?: boolean }) {
   return (
     <Details defaultOpen={defaultOpen}>
-      <DetailsSummary className="font-bold">NODE {node.id}</DetailsSummary>
+      <DetailsSummary>Node {node.id}</DetailsSummary>
       <DetailsContent>
         <NodeContent node={node} />
       </DetailsContent>
@@ -71,33 +72,33 @@ export function NodeDetails({ node, defaultOpen }: { node: OsmNode; defaultOpen?
 
 export function NodeContent({ node }: { node: OsmNode }) {
   return (
-    <table className="w-full">
-      <tbody>
-        <tr>
-          <td>lon</td>
-          <td>{node.lon}</td>
-        </tr>
-        <tr>
-          <td>lat</td>
-          <td>{node.lat}</td>
-        </tr>
+    <Table>
+      <TableBody>
+        <TableRow>
+          <TableCell>lon</TableCell>
+          <TableCell>{node.lon}</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>lat</TableCell>
+          <TableCell>{node.lat}</TableCell>
+        </TableRow>
         <TagList tags={node.tags} />
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
 export function WayContent({ way }: { way: OsmWay }) {
   return (
-    <table className="w-full">
-      <tbody>
-        <tr>
-          <td>refs</td>
-          <td>{way.refs.join(",")}</td>
-        </tr>
+    <Table>
+      <TableBody>
+        <TableRow>
+          <TableCell>refs</TableCell>
+          <TableCell>{way.refs.join(",")}</TableCell>
+        </TableRow>
         <TagList tags={way.tags} />
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -112,7 +113,7 @@ export function WayDetails({
 }) {
   return (
     <Details defaultOpen={defaultOpen}>
-      <DetailsSummary>WAY {way.id}</DetailsSummary>
+      <DetailsSummary>Way {way.id}</DetailsSummary>
       <DetailsContent>
         <WayContent way={way} />
         {children}
@@ -126,27 +127,27 @@ export function RelationContent({ relation }: { relation: OsmRelation }) {
   const relationMemberCount = relation.members.filter((m) => m.type === "relation").length;
 
   return (
-    <table className="w-full">
-      <tbody>
-        <tr>
-          <td>kind</td>
-          <td>{kindMetadata.kind}</td>
-        </tr>
+    <Table>
+      <TableBody>
+        <TableRow>
+          <TableCell>kind</TableCell>
+          <TableCell>{kindMetadata.kind}</TableCell>
+        </TableRow>
         {kindMetadata.description && (
-          <tr>
-            <td>description</td>
-            <td>{kindMetadata.description}</td>
-          </tr>
+          <TableRow>
+            <TableCell>description</TableCell>
+            <TableCell>{kindMetadata.description}</TableCell>
+          </TableRow>
         )}
         {relationMemberCount > 0 && (
-          <tr>
-            <td>nested relations</td>
-            <td>{relationMemberCount}</td>
-          </tr>
+          <TableRow>
+            <TableCell>nested relations</TableCell>
+            <TableCell>{relationMemberCount}</TableCell>
+          </TableRow>
         )}
         <TagList tags={relation.tags} />
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -161,7 +162,7 @@ export function RelationDetails({
 }) {
   return (
     <Details defaultOpen={defaultOpen}>
-      <DetailsSummary className="font-bold">RELATION {relation.id}</DetailsSummary>
+      <DetailsSummary>Relation {relation.id}</DetailsSummary>
       <DetailsContent>
         <RelationContent relation={relation} />
         {children}
@@ -176,10 +177,10 @@ export function TagList({ tags }: { tags?: Record<string, unknown> }) {
   return (
     <>
       {entries.map(([k, v]) => (
-        <tr key={k}>
-          <td>{k}</td>
-          <td>{String(v)}</td>
-        </tr>
+        <TableRow key={k}>
+          <TableCell>{k}</TableCell>
+          <TableCell>{String(v)}</TableCell>
+        </TableRow>
       ))}
     </>
   );
@@ -194,7 +195,7 @@ export function NodeListDetails({
 }) {
   return (
     <Details defaultOpen>
-      <DetailsSummary>NODES ({nodes.length})</DetailsSummary>
+      <DetailsSummary>Nodes ({nodes.length})</DetailsSummary>
       <DetailsContent className="max-h-48 overflow-y-scroll">
         <NodeListTable nodes={nodes} onSelect={onSelect} />
       </DetailsContent>
@@ -210,33 +211,33 @@ function NodeListTable({
   onSelect: (node: OsmNode) => void;
 }) {
   return (
-    <table className="table-auto">
-      <tbody>
+    <Table className="table-auto">
+      <TableBody>
         {nodes.map((node, i) => (
           <Fragment key={String(node.id)}>
-            <tr
+            <TableRow
               onClick={() => onSelect(node)}
               onKeyDown={() => onSelect(node)}
               className="cursor-pointer"
             >
-              <td>{i + 1}</td>
-              <td>{node.id}</td>
-              <td>
+              <TableCell>{i + 1}</TableCell>
+              <TableCell>{node.id}</TableCell>
+              <TableCell>
                 {node.lon}, {node.lat}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
             {node.tags &&
               Object.entries(node.tags).map(([k, v]) => (
-                <tr key={`${node.id}-${k}`}>
-                  <td />
-                  <td>{k}</td>
-                  <td>{String(v)}</td>
-                </tr>
+                <TableRow key={`${node.id}-${k}`}>
+                  <TableCell />
+                  <TableCell>{k}</TableCell>
+                  <TableCell>{String(v)}</TableCell>
+                </TableRow>
               ))}
           </Fragment>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -250,8 +251,8 @@ function RelationMemberListTable({
   onSelect: (entity: OsmEntity) => void;
 }) {
   return (
-    <table className="table-auto">
-      <tbody>
+    <Table className="table-auto">
+      <TableBody>
         {members.map((member, i) => {
           let entity: OsmEntity | null = null;
           if (member.type === "node") {
@@ -264,39 +265,41 @@ function RelationMemberListTable({
 
           return (
             <Fragment key={`${member.type}-${member.ref}-${member.role ?? ""}`}>
-              <tr
+              <TableRow
                 onClick={() => entity && onSelect(entity)}
                 onKeyDown={() => entity && onSelect(entity)}
                 className={entity ? "cursor-pointer" : ""}
               >
-                <td>{i + 1}</td>
-                <td>{member.type}</td>
-                <td>{member.ref}</td>
-                <td>{member.role || ""}</td>
+                <TableCell>{i + 1}</TableCell>
+                <TableCell>{member.type}</TableCell>
+                <TableCell>{member.ref}</TableCell>
+                <TableCell>{member.role || ""}</TableCell>
                 {member.type === "node" && entity && (
-                  <td>
+                  <TableCell>
                     {(entity as OsmNode).lon}, {(entity as OsmNode).lat}
-                  </td>
+                  </TableCell>
                 )}
-                {member.type === "way" && entity && <td>{(entity as OsmWay).refs.length} nodes</td>}
+                {member.type === "way" && entity && (
+                  <TableCell>{(entity as OsmWay).refs.length} nodes</TableCell>
+                )}
                 {member.type === "relation" && entity && (
-                  <td>{(entity as OsmRelation).members.length} members</td>
+                  <TableCell>{(entity as OsmRelation).members.length} members</TableCell>
                 )}
-                {!entity && <td className="text-gray-500">not found</td>}
-              </tr>
+                {!entity && <TableCell className="text-muted-foreground">not found</TableCell>}
+              </TableRow>
               {entity?.tags &&
                 Object.entries(entity.tags).map(([k, v]) => (
-                  <tr key={`${member.type}-${member.ref}-${k}`}>
-                    <td />
-                    <td />
-                    <td>{k}</td>
-                    <td colSpan={2}>{String(v)}</td>
-                  </tr>
+                  <TableRow key={`${member.type}-${member.ref}-${k}`}>
+                    <TableCell />
+                    <TableCell />
+                    <TableCell>{k}</TableCell>
+                    <TableCell colSpan={2}>{String(v)}</TableCell>
+                  </TableRow>
                 ))}
             </Fragment>
           );
         })}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }

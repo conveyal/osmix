@@ -39,22 +39,6 @@ export function flattenValue(value: unknown): string {
   return "";
 }
 
-export function objectToHtmlTableString(object?: Record<string, unknown>) {
-  if (object == null) return "";
-  return Object.entries(object)
-    .filter(([_key, value]) => {
-      return typeof value !== "undefined";
-    })
-    .map(([key, value]) => {
-      const valueString =
-        key.includes("timestamp") && typeof value === "number"
-          ? new Date(value).toLocaleString()
-          : flattenValue(value);
-      return `<tr><td>${key}</td><td>${valueString}</td></tr>`;
-    })
-    .join("");
-}
-
 const formatMmSsMs = new Intl.DateTimeFormat("en-US", {
   hour: "2-digit",
   minute: "2-digit",

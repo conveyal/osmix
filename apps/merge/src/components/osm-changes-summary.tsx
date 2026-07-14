@@ -16,12 +16,15 @@ import {
 } from "../state/changes";
 import { Details, DetailsContent, DetailsSummary } from "./details";
 import { EntityContent } from "./entity-details";
+import { EmptyState } from "./section";
 import { Button } from "./ui/button";
+import { Checkbox, CheckboxLabel } from "./ui/checkbox";
+import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 
 export default function ChangesSummary() {
   return (
     <Details>
-      <DetailsSummary>SUMMARY</DetailsSummary>
+      <DetailsSummary>Summary</DetailsSummary>
       <DetailsContent>
         <ChangesSummaryTable />
       </DetailsContent>
@@ -31,163 +34,106 @@ export default function ChangesSummary() {
 
 function ChangesSummaryTable() {
   const summary = useAtomValue(changesetStatsAtom);
-  if (!summary || summary.totalChanges === 0)
-    return <div className="py-1 px-2">NO CHANGES FOUND</div>;
+  if (!summary || summary.totalChanges === 0) return <EmptyState>No changes found</EmptyState>;
   return (
-    <table>
-      <tbody>
-        <tr>
-          <td>total changes</td>
-          <td>{summary.totalChanges.toLocaleString()}</td>
-        </tr>
-        <tr>
-          <td>node changes</td>
-          <td>{summary.nodeChanges.toLocaleString()}</td>
-        </tr>
-        <tr>
-          <td>way changes</td>
-          <td>{summary.wayChanges.toLocaleString()}</td>
-        </tr>
-        <tr>
-          <td>relation changes</td>
-          <td>{summary.relationChanges.toLocaleString()}</td>
-        </tr>
+    <Table>
+      <TableBody>
+        <TableRow>
+          <TableCell>total changes</TableCell>
+          <TableCell>{summary.totalChanges.toLocaleString()}</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>node changes</TableCell>
+          <TableCell>{summary.nodeChanges.toLocaleString()}</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>way changes</TableCell>
+          <TableCell>{summary.wayChanges.toLocaleString()}</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>relation changes</TableCell>
+          <TableCell>{summary.relationChanges.toLocaleString()}</TableCell>
+        </TableRow>
 
-        <tr>
-          <td>deduplicated nodes</td>
-          <td>{summary.deduplicatedNodes.toLocaleString()}</td>
-        </tr>
-        <tr>
-          <td>deduplicated nodes replaced</td>
-          <td>{summary.deduplicatedNodesReplaced.toLocaleString()}</td>
-        </tr>
-        <tr>
-          <td>intersection points found</td>
-          <td>{summary.intersectionPointsFound.toLocaleString()}</td>
-        </tr>
-      </tbody>
-    </table>
+        <TableRow>
+          <TableCell>deduplicated nodes</TableCell>
+          <TableCell>{summary.deduplicatedNodes.toLocaleString()}</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>deduplicated nodes replaced</TableCell>
+          <TableCell>{summary.deduplicatedNodesReplaced.toLocaleString()}</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>intersection points found</TableCell>
+          <TableCell>{summary.intersectionPointsFound.toLocaleString()}</TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
+  );
+}
+
+function FilterCheckbox<T extends string>({
+  value,
+  filter,
+  setFilter,
+}: {
+  value: T;
+  filter: T[];
+  setFilter: (filter: T[]) => void;
+}) {
+  const setPage = useSetAtom(pageAtom);
+  const [, startTransition] = useTransition();
+
+  return (
+    <CheckboxLabel>
+      <Checkbox
+        checked={filter.includes(value)}
+        onCheckedChange={(checked) => {
+          startTransition(() => {
+            setPage(0);
+            if (checked) {
+              setFilter([...filter, value]);
+            } else {
+              setFilter(filter.filter((type) => type !== value));
+            }
+          });
+        }}
+      />
+      {value}
+    </CheckboxLabel>
   );
 }
 
 export function ChangesFilters() {
   const [changeTypeFilter, setChangeTypeFilter] = useAtom(changeTypeFilterAtom);
   const [entityTypeFilter, setEntityTypeFilter] = useAtom(entityTypeFilterAtom);
-  const setPage = useSetAtom(pageAtom);
-  const [, startTransition] = useTransition();
 
   return (
-    <div className="filters flex justify-between px-2 py-2">
-      <label>
-        <input
-          type="checkbox"
-          checked={changeTypeFilter.includes("create")}
-          onChange={(e) => {
-            startTransition(() => {
-              setPage(0);
-              if (e.target.checked) {
-                setChangeTypeFilter([...changeTypeFilter, "create"]);
-              } else {
-                setChangeTypeFilter(changeTypeFilter.filter((type) => type !== "create"));
-              }
-            });
-          }}
-        />{" "}
-        create
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={changeTypeFilter.includes("modify")}
-          onChange={(e) => {
-            startTransition(() => {
-              setPage(0);
-              if (e.target.checked) {
-                setChangeTypeFilter([...changeTypeFilter, "modify"]);
-              } else {
-                setChangeTypeFilter(changeTypeFilter.filter((type) => type !== "modify"));
-              }
-            });
-          }}
-        />{" "}
-        modify
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={changeTypeFilter.includes("delete")}
-          onChange={(e) => {
-            startTransition(() => {
-              setPage(0);
-              if (e.target.checked) {
-                setChangeTypeFilter([...changeTypeFilter, "delete"]);
-              } else {
-                setChangeTypeFilter(changeTypeFilter.filter((type) => type !== "delete"));
-              }
-            });
-          }}
-        />{" "}
-        delete
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={entityTypeFilter.includes("node")}
-          onChange={(e) => {
-            startTransition(() => {
-              setPage(0);
-              if (e.target.checked) {
-                setEntityTypeFilter([...entityTypeFilter, "node"]);
-              } else {
-                setEntityTypeFilter(entityTypeFilter.filter((type) => type !== "node"));
-              }
-            });
-          }}
-        />{" "}
-        node
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={entityTypeFilter.includes("way")}
-          onChange={(e) => {
-            startTransition(() => {
-              setPage(0);
-              if (e.target.checked) {
-                setEntityTypeFilter([...entityTypeFilter, "way"]);
-              } else {
-                setEntityTypeFilter(entityTypeFilter.filter((type) => type !== "way"));
-              }
-            });
-          }}
-        />{" "}
-        way
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={entityTypeFilter.includes("relation")}
-          onChange={(e) => {
-            startTransition(() => {
-              setPage(0);
-              if (e.target.checked) {
-                setEntityTypeFilter([...entityTypeFilter, "relation"]);
-              } else {
-                setEntityTypeFilter(entityTypeFilter.filter((type) => type !== "relation"));
-              }
-            });
-          }}
-        />{" "}
-        relation
-      </label>
+    <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 px-2 py-2">
+      {(["create", "modify", "delete"] as const).map((value) => (
+        <FilterCheckbox
+          key={value}
+          value={value}
+          filter={changeTypeFilter}
+          setFilter={setChangeTypeFilter}
+        />
+      ))}
+      {(["node", "way", "relation"] as const).map((value) => (
+        <FilterCheckbox
+          key={value}
+          value={value}
+          filter={entityTypeFilter}
+          setFilter={setEntityTypeFilter}
+        />
+      ))}
     </div>
   );
 }
 
 const CHANGE_TYPE_COLOR = {
-  create: "text-green-600",
-  modify: "text-yellow-600",
-  delete: "text-red-600",
+  create: "text-success",
+  modify: "text-warning",
+  delete: "text-destructive",
 };
 
 export function ChangesList({
@@ -240,30 +186,30 @@ function DiffRow({
   status: DiffStatus;
 }) {
   return (
-    <tr
+    <TableRow
       className={cn(
-        status === "added" && "bg-green-50",
-        status === "removed" && "bg-red-50",
-        status === "modified" && "bg-yellow-50",
+        status === "added" && "bg-success/10",
+        status === "removed" && "bg-destructive/10",
+        status === "modified" && "bg-warning/10",
       )}
     >
-      <td className="align-top">{label}</td>
-      <td>
+      <TableCell>{label}</TableCell>
+      <TableCell>
         {status === "removed" ? (
-          <span className="text-red-600 line-through">{oldValue}</span>
+          <span className="text-destructive line-through">{oldValue}</span>
         ) : status === "added" ? (
-          <span className="text-green-600">{newValue}</span>
+          <span className="text-success">{newValue}</span>
         ) : status === "modified" ? (
           <>
-            <span className="text-red-600 line-through">{oldValue}</span>
+            <span className="text-destructive line-through">{oldValue}</span>
             <span className="mx-1">→</span>
-            <span className="text-green-600">{newValue}</span>
+            <span className="text-success">{newValue}</span>
           </>
         ) : (
           <span>{newValue}</span>
         )}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -345,8 +291,8 @@ function NodeDiff({ oldNode, newNode }: { oldNode: OsmNode; newNode: OsmNode }) 
   const latChanged = oldNode.lat !== newNode.lat;
 
   return (
-    <table className="w-full">
-      <tbody>
+    <Table>
+      <TableBody>
         <DiffRow
           label="lon"
           oldValue={String(oldNode.lon)}
@@ -360,8 +306,8 @@ function NodeDiff({ oldNode, newNode }: { oldNode: OsmNode; newNode: OsmNode }) 
           status={latChanged ? "modified" : "unchanged"}
         />
         <TagsDiff oldTags={oldNode.tags} newTags={newNode.tags} />
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -421,10 +367,10 @@ function RefsDiff({ oldRefs, newRefs }: { oldRefs: number[]; newRefs: number[] }
 
   if (oldRefsStr === newRefsStr) {
     return (
-      <tr>
-        <td className="align-top">refs</td>
-        <td className="text-muted-foreground">{newRefs.length} nodes (unchanged)</td>
-      </tr>
+      <TableRow>
+        <TableCell>refs</TableCell>
+        <TableCell className="text-muted-foreground">{newRefs.length} nodes (unchanged)</TableCell>
+      </TableRow>
     );
   }
 
@@ -437,55 +383,55 @@ function RefsDiff({ oldRefs, newRefs }: { oldRefs: number[]; newRefs: number[] }
   // For small arrays or when most elements changed, show full diff
   if (oldRefs.length <= 5 || newRefs.length <= 5) {
     return (
-      <tr className="bg-yellow-50">
-        <td className="align-top">refs</td>
-        <td>
-          <span className="text-red-600 line-through">{oldRefsStr}</span>
+      <TableRow className="bg-warning/10">
+        <TableCell>refs</TableCell>
+        <TableCell>
+          <span className="text-destructive line-through">{oldRefsStr}</span>
           <span className="mx-1">→</span>
-          <span className="text-green-600">{newRefsStr}</span>
-        </td>
-      </tr>
+          <span className="text-success">{newRefsStr}</span>
+        </TableCell>
+      </TableRow>
     );
   }
 
   // Show compact summary with inline changes
   return (
     <>
-      <tr className="bg-yellow-50">
-        <td className="align-top">refs</td>
-        <td>
+      <TableRow className="bg-warning/10">
+        <TableCell>refs</TableCell>
+        <TableCell>
           <span className="text-muted-foreground">
             {newRefs.length} nodes ({inserts.length} added, {deletes.length} removed)
           </span>
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
       {deletes.length > 0 && (
-        <tr className="bg-red-50">
-          <td className="align-top pl-4 text-muted-foreground">removed</td>
-          <td>
+        <TableRow className="bg-destructive/10">
+          <TableCell className="pl-4 text-muted-foreground">removed</TableCell>
+          <TableCell>
             {deletes.map((op) => (
-              <span key={`del-${op.index}-${op.value}`} className="text-red-600">
-                <span className="text-muted-foreground text-xs">[{op.index}]</span>
+              <span key={`del-${op.index}-${op.value}`} className="text-destructive">
+                <span className="text-muted-foreground">[{op.index}]</span>
                 <span className="line-through">{op.value}</span>
                 {op !== deletes[deletes.length - 1] && ", "}
               </span>
             ))}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
       {inserts.length > 0 && (
-        <tr className="bg-green-50">
-          <td className="align-top pl-4 text-muted-foreground">added</td>
-          <td>
+        <TableRow className="bg-success/10">
+          <TableCell className="pl-4 text-muted-foreground">added</TableCell>
+          <TableCell>
             {inserts.map((op) => (
-              <span key={`ins-${op.index}-${op.value}`} className="text-green-600">
-                <span className="text-muted-foreground text-xs">[{op.index}]</span>
+              <span key={`ins-${op.index}-${op.value}`} className="text-success">
+                <span className="text-muted-foreground">[{op.index}]</span>
                 {op.value}
                 {op !== inserts[inserts.length - 1] && ", "}
               </span>
             ))}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
     </>
   );
@@ -496,12 +442,12 @@ function RefsDiff({ oldRefs, newRefs }: { oldRefs: number[]; newRefs: number[] }
  */
 function WayDiff({ oldWay, newWay }: { oldWay: OsmWay; newWay: OsmWay }) {
   return (
-    <table className="w-full">
-      <tbody>
+    <Table>
+      <TableBody>
         <RefsDiff oldRefs={oldWay.refs} newRefs={newWay.refs} />
         <TagsDiff oldTags={oldWay.tags} newTags={newWay.tags} />
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -576,10 +522,12 @@ function MembersDiff({
 
   if (oldStr === newStr) {
     return (
-      <tr>
-        <td className="align-top">members</td>
-        <td className="text-muted-foreground">{newMembers.length} members (unchanged)</td>
-      </tr>
+      <TableRow>
+        <TableCell>members</TableCell>
+        <TableCell className="text-muted-foreground">
+          {newMembers.length} members (unchanged)
+        </TableCell>
+      </TableRow>
     );
   }
 
@@ -591,54 +539,54 @@ function MembersDiff({
   // For small arrays, show full diff
   if (oldMembers.length <= 3 || newMembers.length <= 3) {
     return (
-      <tr className="bg-yellow-50">
-        <td className="align-top">members</td>
-        <td>
-          <span className="text-red-600 line-through">{oldStr}</span>
+      <TableRow className="bg-warning/10">
+        <TableCell>members</TableCell>
+        <TableCell>
+          <span className="text-destructive line-through">{oldStr}</span>
           <span className="mx-1">→</span>
-          <span className="text-green-600">{newStr}</span>
-        </td>
-      </tr>
+          <span className="text-success">{newStr}</span>
+        </TableCell>
+      </TableRow>
     );
   }
 
   return (
     <>
-      <tr className="bg-yellow-50">
-        <td className="align-top">members</td>
-        <td>
+      <TableRow className="bg-warning/10">
+        <TableCell>members</TableCell>
+        <TableCell>
           <span className="text-muted-foreground">
             {newMembers.length} members ({inserts.length} added, {deletes.length} removed)
           </span>
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
       {deletes.length > 0 && (
-        <tr className="bg-red-50">
-          <td className="align-top pl-4 text-muted-foreground">removed</td>
-          <td>
+        <TableRow className="bg-destructive/10">
+          <TableCell className="pl-4 text-muted-foreground">removed</TableCell>
+          <TableCell>
             {deletes.map((op) => (
-              <span key={`del-${op.index}-${formatMember(op.value)}`} className="text-red-600">
-                <span className="text-muted-foreground text-xs">[{op.index}]</span>
+              <span key={`del-${op.index}-${formatMember(op.value)}`} className="text-destructive">
+                <span className="text-muted-foreground">[{op.index}]</span>
                 <span className="line-through">{formatMember(op.value)}</span>
                 {op !== deletes[deletes.length - 1] && ", "}
               </span>
             ))}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
       {inserts.length > 0 && (
-        <tr className="bg-green-50">
-          <td className="align-top pl-4 text-muted-foreground">added</td>
-          <td>
+        <TableRow className="bg-success/10">
+          <TableCell className="pl-4 text-muted-foreground">added</TableCell>
+          <TableCell>
             {inserts.map((op) => (
-              <span key={`ins-${op.index}-${formatMember(op.value)}`} className="text-green-600">
-                <span className="text-muted-foreground text-xs">[{op.index}]</span>
+              <span key={`ins-${op.index}-${formatMember(op.value)}`} className="text-success">
+                <span className="text-muted-foreground">[{op.index}]</span>
                 {formatMember(op.value)}
                 {op !== inserts[inserts.length - 1] && ", "}
               </span>
             ))}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
     </>
   );
@@ -655,12 +603,12 @@ function RelationDiff({
   newRelation: OsmRelation;
 }) {
   return (
-    <table className="w-full">
-      <tbody>
+    <Table>
+      <TableBody>
         <MembersDiff oldMembers={oldRelation.members} newMembers={newRelation.members} />
         <TagsDiff oldTags={oldRelation.tags} newTags={newRelation.tags} />
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -687,31 +635,31 @@ function EntityDiff({ oldEntity, newEntity }: { oldEntity: OsmEntity; newEntity:
 function DeletedEntityContent({ entity }: { entity: OsmEntity }) {
   if (isNode(entity)) {
     return (
-      <table className="w-full">
-        <tbody>
+      <Table>
+        <TableBody>
           <DiffRow label="lon" oldValue={String(entity.lon)} status="removed" />
           <DiffRow label="lat" oldValue={String(entity.lat)} status="removed" />
           {entity.tags &&
             Object.entries(entity.tags).map(([k, v]) => (
               <DiffRow key={k} label={k} oldValue={String(v)} status="removed" />
             ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     );
   }
   if (isWay(entity)) {
     const refsDisplay =
       entity.refs.length > 5 ? `${entity.refs.length} nodes` : entity.refs.join(",");
     return (
-      <table className="w-full">
-        <tbody>
+      <Table>
+        <TableBody>
           <DiffRow label="refs" oldValue={refsDisplay} status="removed" />
           {entity.tags &&
             Object.entries(entity.tags).map(([k, v]) => (
               <DiffRow key={k} label={k} oldValue={String(v)} status="removed" />
             ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     );
   }
   if (isRelation(entity)) {
@@ -720,15 +668,15 @@ function DeletedEntityContent({ entity }: { entity: OsmEntity }) {
         ? `${entity.members.length} members`
         : entity.members.map(formatMember).join(", ");
     return (
-      <table className="w-full">
-        <tbody>
+      <Table>
+        <TableBody>
           <DiffRow label="members" oldValue={membersDisplay} status="removed" />
           {entity.tags &&
             Object.entries(entity.tags).map(([k, v]) => (
               <DiffRow key={k} label={k} oldValue={String(v)} status="removed" />
             ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     );
   }
   return <EntityContent entity={entity} />;
@@ -740,31 +688,31 @@ function DeletedEntityContent({ entity }: { entity: OsmEntity }) {
 function CreatedEntityContent({ entity }: { entity: OsmEntity }) {
   if (isNode(entity)) {
     return (
-      <table className="w-full">
-        <tbody>
+      <Table>
+        <TableBody>
           <DiffRow label="lon" newValue={String(entity.lon)} status="added" />
           <DiffRow label="lat" newValue={String(entity.lat)} status="added" />
           {entity.tags &&
             Object.entries(entity.tags).map(([k, v]) => (
               <DiffRow key={k} label={k} newValue={String(v)} status="added" />
             ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     );
   }
   if (isWay(entity)) {
     const refsDisplay =
       entity.refs.length > 5 ? `${entity.refs.length} nodes` : entity.refs.join(",");
     return (
-      <table className="w-full">
-        <tbody>
+      <Table>
+        <TableBody>
           <DiffRow label="refs" newValue={refsDisplay} status="added" />
           {entity.tags &&
             Object.entries(entity.tags).map(([k, v]) => (
               <DiffRow key={k} label={k} newValue={String(v)} status="added" />
             ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     );
   }
   if (isRelation(entity)) {
@@ -773,15 +721,15 @@ function CreatedEntityContent({ entity }: { entity: OsmEntity }) {
         ? `${entity.members.length} members`
         : entity.members.map(formatMember).join(", ");
     return (
-      <table className="w-full">
-        <tbody>
+      <Table>
+        <TableBody>
           <DiffRow label="members" newValue={membersDisplay} status="added" />
           {entity.tags &&
             Object.entries(entity.tags).map(([k, v]) => (
               <DiffRow key={k} label={k} newValue={String(v)} status="added" />
             ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     );
   }
   return <EntityContent entity={entity} />;
@@ -862,7 +810,7 @@ export function ChangesPagination() {
       <Button variant="ghost" size="icon-sm" onClick={goToPrevPage} disabled={currentPage <= 0}>
         <ArrowLeft />
       </Button>
-      <span className="text-slate-500">
+      <span className="text-muted-foreground">
         {(totalPages === 0 ? 0 : currentPage + 1).toLocaleString()} of {totalPages.toLocaleString()}
       </span>
       <Button
