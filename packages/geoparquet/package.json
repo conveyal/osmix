@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@osmix/geoparquet",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Import OSM data from GeoParquet files.",
   "license": "MIT",
   "repository": {

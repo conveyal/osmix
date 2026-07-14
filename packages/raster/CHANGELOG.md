@@ -1,5 +1,13 @@
 # @osmix/raster
 
+## 0.0.14
+
+### Patch Changes
+
+- Updated dependencies [368d103]
+  - @osmix/geo@0.1.0
+  - @osmix/types@0.1.0
+
 ## 0.0.13
 
 ### Patch Changes
