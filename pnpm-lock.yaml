@@ -651,6 +651,9 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@types/geojson':
+        specifier: 'catalog:'
+        version: 7946.0.16
       typescript:
         specifier: 'catalog:'
         version: 7.0.1-rc

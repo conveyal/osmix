@@ -6,6 +6,7 @@ overrides:
   apache-arrow: ^18.1.0
 
 autoInstallPeers: true
+enableGlobalVirtualStore: true
 minimumReleaseAge: 0
 
 allowBuilds:
