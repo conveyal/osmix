@@ -22,10 +22,10 @@ The `osmix` package re-exports this API for convenience.
 
 ### Load a PBF file
 
-```ts
-import { fromPbf } from "@osmix/load";
+```ts check-docs monaco-pbf
+import { fromPbf } from "osmix";
 
-const osm = await fromPbf(Bun.file("./monaco.pbf").stream());
+const osm = await fromPbf(monacoPbf);
 
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size);
 ```
@@ -34,55 +34,65 @@ console.log(osm.nodes.size, osm.ways.size, osm.relations.size);
 
 Pass `extractBbox` to clip or extract while streaming. When `extractStrategy` is omitted, bbox loads default to `"simple"` in-stream filtering.
 
-```ts
-import { fromPbf } from "@osmix/load";
+```ts check-docs
+import { fromPbf } from "osmix";
 
-const downtown = await fromPbf(Bun.file("./region.pbf").stream(), {
+const regionResponse = await fetch("./region.pbf");
+const regionPbf = new Uint8Array(await regionResponse.arrayBuffer());
+const downtown = await fromPbf(regionPbf, {
   extractBbox: [-122.35, 47.6, -122.32, 47.62],
   extractStrategy: "complete_ways",
 });
+console.log(downtown.id);
 ```
 
 ### Create an extract from a loaded index
 
-```ts
-import { createExtract, fromPbf } from "@osmix/load";
+```ts check-docs monaco-pbf
+import { createExtract, fromPbf } from "osmix";
 
-const osm = await fromPbf(Bun.file("./monaco.pbf").stream());
+const osm = await fromPbf(monacoPbf);
 const clip = createExtract(osm, [7.41, 43.72, 7.43, 43.74], "smart");
+console.log(clip.id);
 ```
 
 ### Export to PBF
 
-```ts
-import { fromPbf, toPbfBuffer, toPbfStream } from "@osmix/load";
+```ts check-docs pbf-output
+import { fromPbf, toPbfBuffer, toPbfStream } from "osmix";
 
-const osm = await fromPbf(Bun.file("./monaco.pbf").stream());
+const monacoResponse = await fetch("./monaco.pbf");
+const monacoPbf = new Uint8Array(await monacoResponse.arrayBuffer());
+const osm = await fromPbf(monacoPbf);
 
 // Stream to a file (memory-efficient)
-await toPbfStream(osm).pipeTo(Bun.file("./out.pbf").writableStream());
+await toPbfStream(osm).pipeTo(fileWritableStream);
 
 // Or collect into a buffer
 const bytes = await toPbfBuffer(osm);
+console.log(bytes.byteLength);
 ```
 
 ### Tag filtering during load
 
-```ts
-import { CONVEYAL_EXTRACT_TAG_FILTERS, fromPbf } from "@osmix/load";
+```ts check-docs
+import { CONVEYAL_EXTRACT_TAG_FILTERS, fromPbf } from "osmix";
 
-const transit = await fromPbf(Bun.file("./region.pbf").stream(), {
+const regionResponse = await fetch("./region.pbf");
+const regionPbf = new Uint8Array(await regionResponse.arrayBuffer());
+const transit = await fromPbf(regionPbf, {
   extractBbox: [-122.5, 37.7, -122.3, 37.9],
   extractTagFilter: CONVEYAL_EXTRACT_TAG_FILTERS,
 });
+console.log(transit.id);
 ```
 
 ### Stream PBF to JSON entities
 
-```ts
-import { transformOsmPbfToJson } from "@osmix/load";
+```ts check-docs monaco-pbf
+import { transformOsmPbfToJson } from "osmix";
 
-const stream = transformOsmPbfToJson(Bun.file("./monaco.pbf").stream());
+const stream = transformOsmPbfToJson(monacoPbf.buffer);
 
 for await (const entity of stream) {
   if ("id" in entity) {

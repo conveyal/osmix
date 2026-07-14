@@ -254,7 +254,7 @@ export class ShortbreadVtEncoder {
   private *classifyWays(
     bbox: GeoBbox2D,
     proj: (ll: LonLat) => XY,
-    relationWayIds?: Set<number>,
+    relationWayIds?: ReadonlySet<number>,
   ): Generator<ClassifiedFeature> {
     const wayIndexes = this.osm.ways.intersects(bbox);
 

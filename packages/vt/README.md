@@ -12,12 +12,11 @@ pnpm add @osmix/vt
 
 ### Encode a single vector tile from an Osm dataset
 
-```ts
-import { Osm } from "@osmix/core";
-import { OsmixVtEncoder } from "@osmix/vt";
+```ts check-docs monaco-pbf
+import { OsmixVtEncoder, fromPbf } from "osmix";
 
 // Load your Osm dataset
-const osm = await Osmix.fromPbf(Bun.file("./monaco.pbf").stream());
+const osm = await fromPbf(monacoPbf);
 
 // Create an encoder. Defaults: extent=4096, buffer=64px
 const encoder = new OsmixVtEncoder(osm);
@@ -28,6 +27,7 @@ const tile: [number, number, number] = [9372, 12535, 15];
 // Returns an ArrayBuffer containing up to three layers:
 // "@osmix:<id>:ways", "@osmix:<id>:nodes", "@osmix:<id>:relations"
 const pbfBuffer = encoder.getTile(tile);
+console.log(pbfBuffer.byteLength);
 ```
 
 ### Displaying in a browser (manual Blob URL)
@@ -48,7 +48,9 @@ Most viewers expect tile URLs. To see a Maplibre implementation in the [example 
 
 The main class for encoding vector tiles.
 
-```ts
+Schematic constructor signature:
+
+```ts schematic
 constructor(osm: Osm, extent = 4096, buffer = 64)
 ```
 

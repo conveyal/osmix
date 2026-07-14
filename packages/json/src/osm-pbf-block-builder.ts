@@ -127,6 +127,14 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
   }
 
   /**
+   * Convert a millisecond timestamp to integer PBF timestamp units.
+   * Remainder milliseconds are intentionally lost at the configured granularity.
+   */
+  private toPbfTimestamp(timestamp?: number) {
+    return Math.floor((timestamp ?? 0) / this.date_granularity);
+  }
+
+  /**
    * Convert tags to string table indices.
    * @param tags - Tag key-value pairs.
    * @returns Object with `keys` and `vals` arrays of indices.
@@ -149,7 +157,7 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
   addInfo(info: OsmInfoParsed): OsmPbfInfo {
     return {
       ...info,
-      timestamp: Math.floor(info.timestamp ?? 0),
+      timestamp: this.toPbfTimestamp(info.timestamp),
       user_sid: this.getStringtableIndex(info.user ?? ""),
     };
   }
@@ -293,7 +301,7 @@ export class OsmPbfBlockBuilder implements OsmPbfBlock {
       // Version is not delta encoded
       version.push(node.info?.version ?? 0);
       // Delta encode timestamp, changeset, uid, user_sid
-      const t = Math.floor((node.info?.timestamp ?? 0) / this.date_granularity);
+      const t = this.toPbfTimestamp(node.info?.timestamp);
       timestamp.push(t - this.delta.timestamp);
       this.delta.timestamp = t;
       changeset.push((node.info?.changeset ?? 0) - this.delta.changeset);

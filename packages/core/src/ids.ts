@@ -141,23 +141,19 @@ export class Ids {
       this.idsSorted = new Float64Array(idsBuffer);
       this.sortedIdPositionToIndex = new Uint32Array(posBuffer);
 
-      // Fill and sort with positions.
-      for (let i = 0; i < this.size; i++) {
-        this.idsSorted[i] = this.ids.at(i);
-        this.sortedIdPositionToIndex[i] = i;
-      }
-
-      // Sort by id, carrying position; use native sort on chunks or a custom radix/merge for stability.
-      // For simplicity:
-      const tmp: { id: number; pos: number }[] = Array.from({ length: this.size }, (_, i) => ({
-        id: this.idsSorted[i] as number,
-        pos: this.sortedIdPositionToIndex[i] as number,
-      }));
-      tmp.sort((a, b) => a.id - b.id);
-      tmp.forEach(({ id, pos }, i) => {
-        this.idsSorted[i] = id;
-        this.sortedIdPositionToIndex[i] = pos;
+      // Sort positions by ID, using the original position as a deterministic
+      // tie-breaker for duplicate IDs.
+      const sortedPositions = new Uint32Array(this.size);
+      for (let i = 0; i < this.size; i++) sortedPositions[i] = i;
+      sortedPositions.sort((a, b) => {
+        const idDifference = this.ids.array[a]! - this.ids.array[b]!;
+        return idDifference === 0 ? a - b : idDifference;
       });
+      for (let i = 0; i < this.size; i++) {
+        const position = sortedPositions[i]!;
+        this.idsSorted[i] = this.ids.array[position]!;
+        this.sortedIdPositionToIndex[i] = position;
+      }
     } else {
       // Point to the same array
       this.idsSorted = this.ids.array;
@@ -237,6 +233,17 @@ export class Ids {
   /** Returns the sorted array of IDs for iteration. */
   get sorted() {
     return this.idsSorted;
+  }
+
+  /** @internal Iterate sorted IDs with their original storage positions. */
+  *sortedEntries(): Generator<readonly [id: number, index: number]> {
+    for (let i = 0; i < this.idsSorted.length; i++) {
+      const id = this.idsSorted[i];
+      const index = this.sortedIdPositionToIndex[i];
+      assertValue(id, "Sorted ID is undefined");
+      assertValue(index, "Sorted position is undefined");
+      yield [id, index];
+    }
   }
 
   /**

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["ES2024", "DOM", "DOM.Iterable", "ESNext.Disposable"],
+    "types": ["node"],
+    "typeRoots": ["../node_modules/@types"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "osmix": ["../packages/osmix/src/index.ts"],
+      "osmix/worker": ["../packages/osmix/src/worker.ts"],
+      "@osmix/change": ["../packages/change/src/index.ts"],
+      "@osmix/core": ["../packages/core/src/index.ts"],
+      "@osmix/core/mocks": ["../packages/core/src/mocks.ts"],
+      "@osmix/gtfs": ["../packages/gtfs/src/index.ts"],
+      "@osmix/load": ["../packages/load/src/index.ts"],
+      "@osmix/router": ["../packages/router/src/index.ts"],
+      "@osmix/vt": ["../packages/vt/src/index.ts"]
+    }
+  }
+}

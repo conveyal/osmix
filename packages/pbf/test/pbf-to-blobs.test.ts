@@ -2,9 +2,10 @@ import { PbfWriter } from "pbf";
 import { describe, expect, it } from "vitest";
 
 import { osmPbfBlobsToBlocksGenerator } from "../src/blobs-to-blocks";
-import { createOsmPbfBlobGenerator } from "../src/pbf-to-blobs";
+import { createOsmPbfBlobFrameGenerator, createOsmPbfBlobGenerator } from "../src/pbf-to-blobs";
 import { writeBlob, writeBlobHeader } from "../src/proto/fileformat";
 import { writeHeaderBlock } from "../src/proto/osmformat";
+import { MAX_BLOB_SIZE_BYTES, MAX_HEADER_SIZE_BYTES } from "../src/spec";
 import { concatUint8, uint32BE } from "../src/utils";
 import {
   createSampleHeader,
@@ -84,5 +85,72 @@ describe("createOsmPbfBlobGenerator", () => {
     const generate = createOsmPbfBlobGenerator();
     const iterator = generate(chunk);
     expect(() => iterator.next()).toThrow(/Blob has no zlib data/);
+  });
+
+  it.each([
+    ["zero", 0],
+    ["high-bit", 0x8000_0000],
+    ["over-limit", MAX_HEADER_SIZE_BYTES + 1],
+  ])("rejects %s header lengths", (_name, length) => {
+    const generate = createOsmPbfBlobGenerator();
+    expect(() => generate(uint32BE(length).buffer).next()).toThrow(/Invalid PBF frame/);
+  });
+
+  it.each([
+    ["zero", 0],
+    ["over-limit", MAX_BLOB_SIZE_BYTES + 1],
+  ])("rejects %s blob sizes", (_name, size) => {
+    const blobHeaderPbf = new PbfWriter();
+    writeBlobHeader({ type: "OSMHeader", datasize: size }, blobHeaderPbf);
+    const blobHeader = blobHeaderPbf.finish();
+    const generate = createOsmPbfBlobGenerator();
+
+    expect(() => generate(concatUint8(uint32BE(blobHeader.length), blobHeader)).next()).toThrow(
+      /Invalid PBF frame/,
+    );
+  });
+
+  it("rejects raw sizes over the decompression limit", () => {
+    const blobPbf = new PbfWriter();
+    writeBlob({ raw_size: MAX_BLOB_SIZE_BYTES + 1, zlib_data: Uint8Array.of(1) }, blobPbf);
+    const blob = blobPbf.finish();
+    const blobHeaderPbf = new PbfWriter();
+    writeBlobHeader({ type: "OSMData", datasize: blob.length }, blobHeaderPbf);
+    const blobHeader = blobHeaderPbf.finish();
+    const generate = createOsmPbfBlobGenerator();
+
+    expect(() =>
+      generate(concatUint8(uint32BE(blobHeader.length), blobHeader, blob)).next(),
+    ).toThrow(/raw size exceeds/);
+  });
+
+  it("rejects zero raw sizes", () => {
+    const blobPbf = new PbfWriter();
+    writeBlob({ raw_size: 0, zlib_data: Uint8Array.of(1) }, blobPbf);
+    const blob = blobPbf.finish();
+    const blobHeaderPbf = new PbfWriter();
+    writeBlobHeader({ type: "OSMData", datasize: blob.length }, blobHeaderPbf);
+    const blobHeader = blobHeaderPbf.finish();
+    const generate = createOsmPbfBlobGenerator();
+
+    expect(() =>
+      generate(concatUint8(uint32BE(blobHeader.length), blobHeader, blob)).next(),
+    ).toThrow(/raw size is zero/);
+  });
+
+  it("rejects incomplete framing at finish", async () => {
+    const { fileBytes } = await createSamplePbfFileBytes();
+    for (const cut of [1, 2, 3, 4, 5]) {
+      const parser = createOsmPbfBlobFrameGenerator();
+      const frames = [...parser.nextChunk(fileBytes.slice(0, cut))];
+      expect(frames).toBeDefined();
+      expect(() => parser.finish()).toThrow(/truncated/);
+    }
+    for (const end of [1, 2, 3]) {
+      const parser = createOsmPbfBlobFrameGenerator();
+      const frames = [...parser.nextChunk(fileBytes.slice(0, fileBytes.length - end))];
+      expect(frames).toBeDefined();
+      expect(() => parser.finish()).toThrow(/truncated/);
+    }
   });
 });

@@ -11,6 +11,10 @@ import { transfer as comlinkTransfer } from "comlink";
 /** Types that can be transferred between workers without copying. */
 export type Transferables = ArrayBufferLike | ReadableStream;
 
+function isSharedArrayBuffer(value: unknown): value is SharedArrayBuffer {
+  return typeof SharedArrayBuffer !== "undefined" && value instanceof SharedArrayBuffer;
+}
+
 /**
  * Recursively collect all transferable values from a nested object.
  * Searches for ArrayBuffers, TypedArray buffers, and ReadableStreams.
@@ -18,19 +22,40 @@ export type Transferables = ArrayBufferLike | ReadableStream;
  */
 export function collectTransferables(value: unknown): Transferables[] {
   const transferables: Transferables[] = [];
+  const seenTransferables = new Set<Transferables>();
+  const visited = new Set<object>();
 
-  if (value instanceof ArrayBuffer) transferables.push(value);
-  else if (value instanceof ReadableStream) transferables.push(value);
-  else if (ArrayBuffer.isView(value)) transferables.push(value.buffer);
-  else if (Array.isArray(value)) {
-    for (const item of value) {
-      transferables.push(...collectTransferables(item));
+  const addTransferable = (transferable: Transferables) => {
+    if (isSharedArrayBuffer(transferable) || seenTransferables.has(transferable)) return;
+    seenTransferables.add(transferable);
+    transferables.push(transferable);
+  };
+
+  const visit = (current: unknown): void => {
+    if (current instanceof ArrayBuffer) {
+      addTransferable(current);
+      return;
     }
-  } else if (value && typeof value === "object") {
-    for (const item of Object.values(value)) {
-      transferables.push(...collectTransferables(item));
+    if (isSharedArrayBuffer(current)) return;
+    if (current instanceof ReadableStream) {
+      addTransferable(current);
+      return;
     }
-  }
+    if (ArrayBuffer.isView(current)) {
+      if (current.buffer instanceof ArrayBuffer) addTransferable(current.buffer);
+      return;
+    }
+    if (!current || typeof current !== "object" || visited.has(current)) return;
+    visited.add(current);
+
+    if (Array.isArray(current)) {
+      for (const item of current) visit(item);
+      return;
+    }
+    for (const item of Object.values(current)) visit(item);
+  };
+
+  visit(value);
 
   return transferables;
 }

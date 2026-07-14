@@ -1,13 +1,14 @@
 import { PbfReader } from "pbf";
 
 import { osmPbfBlobsToBlocksGenerator } from "./blobs-to-blocks.ts";
-import { createOsmPbfBlobGenerator } from "./pbf-to-blobs.ts";
+import { createOsmPbfBlobFrameGenerator } from "./pbf-to-blobs.ts";
 import {
   type OsmPbfBlock,
   type OsmPbfHeaderBlock,
   readHeaderBlock,
   readPrimitiveBlock,
 } from "./proto/osmformat.ts";
+import { MAX_BLOB_SIZE_BYTES } from "./spec.ts";
 import { type AsyncGeneratorValue, toAsyncGenerator, webDecompress } from "./utils.ts";
 
 /** Number of bytes used to encode the BlobHeader length prefix (big-endian uint32). */
@@ -43,14 +44,15 @@ export const HEADER_LENGTH_BYTES = 4;
  * ```
  */
 export async function readOsmPbf(data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>) {
-  const generateBlobsFromChunk = createOsmPbfBlobGenerator();
+  const parser = createOsmPbfBlobFrameGenerator();
   const blocks = osmPbfBlobsToBlocksGenerator(
     (async function* () {
       for await (const chunk of toAsyncGenerator(data)) {
-        for (const blob of generateBlobsFromChunk(chunk)) {
-          yield blob;
+        for (const frame of parser.nextChunk(chunk)) {
+          yield frame;
         }
       }
+      parser.finish();
     })(),
   );
   const header = (await blocks.next()).value;
@@ -87,15 +89,26 @@ export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
   Uint8Array<ArrayBufferLike>,
   OsmPbfHeaderBlock | OsmPbfBlock
 > {
-  generateBlobsFromChunk = createOsmPbfBlobGenerator();
+  parser = createOsmPbfBlobFrameGenerator();
   header: OsmPbfHeaderBlock | null = null;
   constructor(
-    decompress: (data: Uint8Array<ArrayBuffer>) => Promise<Uint8Array<ArrayBuffer>> = webDecompress,
+    decompress: (
+      data: Uint8Array<ArrayBuffer>,
+      maxBytes?: number,
+    ) => Promise<Uint8Array<ArrayBuffer>> = webDecompress,
   ) {
     super({
       transform: async (bytesChunk, controller) => {
-        for (const rawBlobs of this.generateBlobsFromChunk(bytesChunk)) {
-          const decompressed = await decompress(rawBlobs);
+        for (const frame of this.parser.nextChunk(bytesChunk)) {
+          const decompressed = await decompress(frame.data, MAX_BLOB_SIZE_BYTES);
+          if (decompressed.byteLength > MAX_BLOB_SIZE_BYTES) {
+            throw Error(`Decompressed blob exceeds ${MAX_BLOB_SIZE_BYTES} bytes`);
+          }
+          if (frame.rawSize !== undefined && decompressed.byteLength !== frame.rawSize) {
+            throw Error(
+              `Decompressed blob size ${decompressed.byteLength} does not match declared raw size ${frame.rawSize}`,
+            );
+          }
           const pbf = new PbfReader(decompressed);
           if (this.header == null) {
             this.header = readHeaderBlock(pbf);
@@ -104,6 +117,10 @@ export class OsmPbfBytesToBlocksTransformStream extends TransformStream<
             controller.enqueue(readPrimitiveBlock(pbf));
           }
         }
+      },
+      flush: () => {
+        this.parser.finish();
+        if (this.header == null) throw Error("OSM PBF header block not found");
       },
     });
   }

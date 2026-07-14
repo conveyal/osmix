@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Osmix worker runtime harness</title>
+  </head>
+  <body>
+    <script type="module">
+      import { createRemote } from "osmix";
+
+      const occupiedTile = [17059, 11948, 15];
+      const tileSize = 64;
+
+      async function loadMonaco(remote, id) {
+        const response = await fetch("/monaco.pbf");
+        if (!response.ok) throw new Error(`Failed to fetch Monaco: ${response.status}`);
+        return remote.fromPbf(await response.arrayBuffer(), { id });
+      }
+
+      async function loadMonacoSubview(remote, id) {
+        const response = await fetch("/monaco.pbf");
+        if (!response.ok) throw new Error(`Failed to fetch Monaco: ${response.status}`);
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        const surrounding = new Uint8Array(bytes.byteLength + 2);
+        surrounding[0] = 0xff;
+        surrounding.set(bytes, 1);
+        surrounding[surrounding.length - 1] = 0xee;
+        return remote.fromPbf(surrounding.subarray(1, -1), { id });
+      }
+
+      async function runSingleWorker() {
+        const remote = await createRemote({ workerCount: 1 });
+        try {
+          const dataset = await loadMonaco(remote, "single-worker-monaco");
+          const counts = {
+            nodes: await dataset.nodes.size(),
+            ways: await dataset.ways.size(),
+            relations: await dataset.relations.size(),
+          };
+          const vectorTile = await dataset.getVectorTile(occupiedTile);
+          const rasterTile = await dataset.getRasterTile(occupiedTile, { tileSize });
+
+          return {
+            mode: remote.mode,
+            workerCount: remote.workerCount,
+            counts,
+            vectorByteLength: vectorTile.byteLength,
+            rasterByteLength: rasterTile.byteLength,
+            rasterHasNontransparentPixel: rasterTile.some(
+              (value, index) => index % 4 === 3 && value > 0,
+            ),
+          };
+        } finally {
+          remote[Symbol.dispose]();
+        }
+      }
+
+      async function runMultiWorker() {
+        const remote = await createRemote({ workerCount: 2 });
+        try {
+          const dataset = await loadMonaco(remote, "multi-worker-monaco");
+          const nodeCounts = [await dataset.nodes.size(), await dataset.nodes.size()];
+          const wayCounts = [await dataset.ways.size(), await dataset.ways.size()];
+          const relationCounts = [await dataset.relations.size(), await dataset.relations.size()];
+          const vectorByteLengths = [
+            (await dataset.getVectorTile(occupiedTile)).byteLength,
+            (await dataset.getVectorTile(occupiedTile)).byteLength,
+          ];
+
+          return {
+            crossOriginIsolated,
+            mode: remote.mode,
+            workerCount: remote.workerCount,
+            nodeCounts,
+            wayCounts,
+            relationCounts,
+            vectorByteLengths,
+          };
+        } finally {
+          remote[Symbol.dispose]();
+        }
+      }
+
+      async function runSingleWorkerTransfer() {
+        const remote = await createRemote({ workerCount: 1 });
+        try {
+          const dataset = await loadMonacoSubview(remote, "single-worker-transfer-monaco");
+          const osm = await dataset.transferOut();
+
+          return {
+            mode: remote.mode,
+            workerCount: remote.workerCount,
+            counts: {
+              nodes: osm.nodes.size,
+              ways: osm.ways.size,
+              relations: osm.relations.size,
+            },
+          };
+        } finally {
+          remote[Symbol.dispose]();
+        }
+      }
+
+      async function runReservedIds(workerCount) {
+        const remote = await createRemote({ workerCount });
+        const ids = ["__proto__", "constructor", "toString", "ordinary"];
+        try {
+          const datasets = [];
+          for (const id of ids) datasets.push(await loadMonaco(remote, id));
+          const beforeDelete = await Promise.all(datasets.map((dataset) => dataset.has()));
+          await datasets[1].delete();
+          const afterDelete = await Promise.all(datasets.map((dataset) => dataset.has()));
+          const survivorNodeCounts = await Promise.all(
+            datasets.map(async (dataset) => ((await dataset.has()) ? dataset.nodes.size() : 0)),
+          );
+
+          return {
+            mode: remote.mode,
+            workerCount: remote.workerCount,
+            ids,
+            beforeDelete,
+            afterDelete,
+            survivorNodeCounts,
+          };
+        } finally {
+          remote[Symbol.dispose]();
+        }
+      }
+
+      async function runDispose() {
+        const remote = await createRemote({ workerCount: 1 });
+        const worker = remote.getWorker();
+        remote.terminate();
+        remote[Symbol.dispose]();
+
+        let releasedProxyError = false;
+        try {
+          await worker.isReady("disposed");
+        } catch (error) {
+          releasedProxyError = String(error).includes("released");
+        }
+
+        let completedCycles = 0;
+        for (let i = 0; i < 3; i++) {
+          const cycleRemote = await createRemote({ workerCount: 1 });
+          cycleRemote[Symbol.dispose]();
+          completedCycles++;
+        }
+
+        return {
+          releasedProxyError,
+          workerCount: remote.workerCount,
+          completedCycles,
+        };
+      }
+
+      window.workerHarness = {
+        runDispose,
+        runMultiWorker,
+        runReservedIds,
+        runSingleWorker,
+        runSingleWorkerTransfer,
+      };
+    </script>
+  </body>
+</html>

@@ -56,7 +56,14 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 
 - `pnpm install` to bootstrap; `pnpm run dev` (filterable) for local dev; `pnpm run build` for production bundles.
 - `pnpm run check` runs `oxfmt` then type-aware `oxlint` in one pass.
+- `pnpm run format:check` and `pnpm run lint:check` run non-mutating formatting and lint checks.
 - `pnpm run check:deps` flags undeclared or unused workspace dependencies.
+- `pnpm run test:verify-workspace` tests the workspace selector and required-script checks.
+- `pnpm run verify:workspace -- @osmix/core` verifies a workspace and its runtime/development dependents in dependency order.
+- `pnpm run verify:workspace -- apps/vt-server` accepts an app path selector and verifies that app's runtime graph.
+- `pnpm run verify:all` verifies every non-benchmark workspace, then runs dependency and Node smoke checks.
+
+`verify:workspace` is check-only by default. Pass `--write` when an explicit formatting write is intended. The benchmark app is excluded from the all-workspace contract because its browser benchmark is not a package test; select it explicitly when working on that app.
 
 ## Gotchas
 

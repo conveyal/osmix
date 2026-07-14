@@ -13,7 +13,7 @@
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/types";
 
 import type { OsmChangeset } from "./changeset.ts";
-import { osmTagsToOscTags } from "./utils.ts";
+import { escapeXmlAttribute, osmTagsToOscTags } from "./utils.ts";
 
 /**
  * Generate a node XML element.
@@ -40,7 +40,7 @@ function relationToXml(relation: OsmRelation): string {
   const members = relation.members
     .map(
       (member) =>
-        `<member type="${member.type}" ref="${member.ref}"${member.role ? ` role="${member.role}"` : ""} />`,
+        `<member type="${member.type}" ref="${member.ref}"${member.role ? ` role="${escapeXmlAttribute(member.role)}"` : ""} />`,
     )
     .join("");
   return `<relation id="${relation.id}">${tags}${members}</relation>`;

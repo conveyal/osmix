@@ -74,6 +74,9 @@ export class Relations extends Entities<OsmRelation> {
   private nodes: Nodes;
   private ways: Ways;
 
+  // Lazily computed relation way membership. Invalidated whenever relations change.
+  private wayMemberIdsCache: ReadonlySet<number> | null = null;
+
   /**
    * Create a new Relations index.
    */
@@ -115,6 +118,7 @@ export class Relations extends Entities<OsmRelation> {
    * Add a single relation to the index.
    */
   addRelation(relation: OsmRelation) {
+    this.wayMemberIdsCache = null;
     const relationIndex = this.addEntity(relation.id, relation.tags ?? {});
     this.memberStart.push(this.memberRefs.length);
     this.memberCount.push(relation.members.length);
@@ -134,6 +138,7 @@ export class Relations extends Entities<OsmRelation> {
     blockStringIndexMap: Uint32Array,
     filter?: (relation: OsmRelation) => OsmRelation | null,
   ): number {
+    this.wayMemberIdsCache = null;
     const blockToStringTable = (k: number) => {
       const index = blockStringIndexMap[k];
       if (index === undefined) throw Error("Tag key not found");
@@ -370,7 +375,9 @@ export class Relations extends Entities<OsmRelation> {
    * Get all way IDs that are members of relations, including nested relations.
    * Used to exclude these ways from individual rendering.
    */
-  getWayMemberIds(): Set<number> {
+  getWayMemberIds(): ReadonlySet<number> {
+    if (this.wayMemberIdsCache !== null) return this.wayMemberIdsCache;
+
     const wayIds = new Set<number>();
     for (let i = 0; i < this.size; i++) {
       const relation = this.getByIndex(i);
@@ -387,7 +394,8 @@ export class Relations extends Entities<OsmRelation> {
         wayIds.add(wayId);
       }
     }
-    return wayIds;
+    this.wayMemberIdsCache = wayIds;
+    return this.wayMemberIdsCache;
   }
 
   /**
@@ -407,7 +415,7 @@ export class Relations extends Entities<OsmRelation> {
         rings: buildRelationRings(
           relation,
           (ref) => this.ways.getById(ref),
-          (id) => this.nodes.getNodeLonLat({ id }),
+          (id) => this.nodes.getNodeLonLat({ id }) ?? undefined,
         ),
       };
     }
@@ -415,7 +423,10 @@ export class Relations extends Entities<OsmRelation> {
     // Point relations
     if (isPointRelation(relation)) {
       return {
-        points: collectRelationPoints(relation, (id) => this.nodes.getNodeLonLat({ id })),
+        points: collectRelationPoints(
+          relation,
+          (id) => this.nodes.getNodeLonLat({ id }) ?? undefined,
+        ),
       };
     }
 
@@ -425,7 +436,7 @@ export class Relations extends Entities<OsmRelation> {
         lineStrings: buildRelationLineStrings(
           relation,
           (ref) => this.ways.getById(ref),
-          (id) => this.nodes.getNodeLonLat({ id }),
+          (id) => this.nodes.getNodeLonLat({ id }) ?? undefined,
         ),
       };
     }

@@ -1,16 +1,18 @@
 import { Osm } from "@osmix/core";
 import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures";
 import type { FeatureCollection, LineString, Point } from "geojson";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createRemote } from "../src/remote";
 
 const monacoPbf = PBFs["monaco"]!;
+const occupiedMonacoTile: [number, number, number] = [17059, 11948, 15];
 // Increase timeout for worker tests
 const workerTestTimeout = 30_000;
 
 describe("OsmixRemote", () => {
   afterEach(async () => {
+    vi.unstubAllGlobals();
     // Clean up workers between tests
     await new Promise((resolve) => setTimeout(resolve, 100));
   });
@@ -31,6 +33,83 @@ describe("OsmixRemote", () => {
   });
 
   describe("fromGeoJSON", () => {
+    it(
+      "should preserve a full Uint8Array view",
+      async () => {
+        using remote = await createRemote({ inProcess: true });
+        const geojson: FeatureCollection<Point> = {
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [-122.4194, 37.7749] },
+              properties: { name: "Full view" },
+            },
+          ],
+        };
+
+        const data = new TextEncoder().encode(JSON.stringify(geojson));
+        const dataset = await remote.fromGeoJSON(data);
+
+        expect(dataset.stats.nodes).toBe(1);
+      },
+      workerTestTimeout,
+    );
+
+    it(
+      "should parse only the bytes in a Uint8Array subview",
+      async () => {
+        using remote = await createRemote({ inProcess: true });
+        const geojson: FeatureCollection<Point> = {
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [-122.4194, 37.7749] },
+              properties: { name: "Subview" },
+            },
+          ],
+        };
+
+        const encoded = new TextEncoder().encode(JSON.stringify(geojson));
+        const surrounding = new Uint8Array(encoded.byteLength + 2);
+        surrounding[0] = 0xff;
+        surrounding.set(encoded, 1);
+        surrounding[surrounding.length - 1] = 0xee;
+        const dataset = await remote.fromGeoJSON(surrounding.subarray(1, -1));
+
+        expect(dataset.stats.nodes).toBe(1);
+      },
+      workerTestTimeout,
+    );
+
+    it(
+      "should copy Node Buffer subviews before transferring",
+      async () => {
+        using remote = await createRemote({ inProcess: true });
+        const geojson: FeatureCollection<Point> = {
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [-122.4194, 37.7749] },
+              properties: { name: "Buffer subview" },
+            },
+          ],
+        };
+
+        const encoded = Buffer.from(JSON.stringify(geojson));
+        const surrounding = Buffer.alloc(encoded.byteLength + 2);
+        surrounding[0] = 0xff;
+        encoded.copy(surrounding, 1);
+        surrounding[surrounding.length - 1] = 0xee;
+        const dataset = await remote.fromGeoJSON(surrounding.subarray(1, -1));
+
+        expect(dataset.stats.nodes).toBe(1);
+      },
+      workerTestTimeout,
+    );
+
     it(
       "should load from GeoJSON via worker",
       async () => {
@@ -224,11 +303,10 @@ describe("OsmixRemote", () => {
         const fileStream = getFixtureFileReadStream(monacoPbf.url);
         const osm = await remote.fromPbf(fileStream);
 
-        const tile: [number, number, number] = [7, 4, 3];
-        const tileData = await osm.getVectorTile(tile);
+        const tileData = await osm.getVectorTile(occupiedMonacoTile);
 
         expect(tileData).toBeInstanceOf(ArrayBuffer);
-        expect(tileData.byteLength).toBeGreaterThanOrEqual(0);
+        expect(tileData.byteLength).toBeGreaterThan(0);
       },
       workerTestTimeout,
     );
@@ -244,11 +322,11 @@ describe("OsmixRemote", () => {
         const fileStream = getFixtureFileReadStream(monacoPbf.url);
         const osm = await remote.fromPbf(fileStream);
 
-        const tile: [number, number, number] = [7, 4, 3];
-        const tileData = await osm.getRasterTile(tile);
+        const tileData = await osm.getRasterTile(occupiedMonacoTile);
 
         expect(tileData).toBeInstanceOf(Uint8ClampedArray);
-        expect(tileData.byteLength).toBeGreaterThanOrEqual(0);
+        expect(tileData.byteLength).toBe(256 * 256 * 4);
+        expect(tileData.some((value, index) => index % 4 === 3 && value > 0)).toBe(true);
       },
       workerTestTimeout,
     );
@@ -260,13 +338,13 @@ describe("OsmixRemote", () => {
         const fileStream = getFixtureFileReadStream(monacoPbf.url);
         const osm = await remote.fromPbf(fileStream);
 
-        const tile: [number, number, number] = [7, 4, 3];
-        const tileData = await osm.getRasterTile(tile, {
+        const tileData = await osm.getRasterTile(occupiedMonacoTile, {
           tileSize: 512,
         });
 
         expect(tileData).toBeInstanceOf(Uint8ClampedArray);
-        expect(tileData.byteLength).toBeGreaterThanOrEqual(0);
+        expect(tileData.byteLength).toBe(512 * 512 * 4);
+        expect(tileData.some((value, index) => index % 4 === 3 && value > 0)).toBe(true);
       },
       workerTestTimeout,
     );
@@ -379,6 +457,69 @@ describe("OsmixRemote", () => {
           workerUrl: new URL("./osmix.worker.ts", import.meta.url),
         }),
       ).rejects.toThrow(/cannot be used in in-process mode/);
+    });
+
+    it("terminates raw workers exactly once when disposed", async () => {
+      class MockWorker {
+        static instances: MockWorker[] = [];
+
+        readonly terminate = vi.fn();
+
+        constructor() {
+          MockWorker.instances.push(this);
+        }
+
+        addEventListener() {}
+
+        postMessage() {}
+      }
+
+      vi.stubGlobal("Worker", MockWorker);
+      const remote = await createRemote({ workerCount: 1 });
+
+      remote.terminate();
+      remote[Symbol.dispose]();
+
+      expect(MockWorker.instances).toHaveLength(1);
+      expect(MockWorker.instances[0]?.terminate).toHaveBeenCalledTimes(1);
+      expect(remote.workerCount).toBe(0);
+      expect(() => remote.mode).toThrow(/not initialized/);
+    });
+
+    it("cleans up workers created before initialization fails", async () => {
+      class MockWorker {
+        static instances: MockWorker[] = [];
+
+        readonly terminate = vi.fn();
+
+        constructor() {
+          if (MockWorker.instances.length === 1) throw Error("second worker failed");
+          MockWorker.instances.push(this);
+        }
+
+        addEventListener() {}
+
+        postMessage() {}
+      }
+
+      vi.stubGlobal("Worker", MockWorker);
+
+      await expect(createRemote({ workerCount: 2 })).rejects.toThrow("second worker failed");
+
+      expect(MockWorker.instances).toHaveLength(1);
+      expect(MockWorker.instances[0]?.terminate).toHaveBeenCalledTimes(1);
+    });
+
+    it("makes in-process disposal idempotent", async () => {
+      const remote = await createRemote({ inProcess: true });
+
+      expect(() => {
+        remote.terminate();
+        remote.terminate();
+        remote[Symbol.dispose]();
+      }).not.toThrow();
+      expect(remote.workerCount).toBe(0);
+      expect(() => remote.getWorker()).toThrow(/No worker available/);
     });
   });
 });

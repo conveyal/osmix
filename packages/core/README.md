@@ -22,10 +22,10 @@ pnpm add @osmix/core
 
 `@osmix/core` provides the in-memory data structures. To parse `.osm.pbf` files, use the high-level `osmix` package:
 
-```ts
+```ts check-docs monaco-pbf
 import { fromPbf } from "osmix";
 
-const osm = await fromPbf(Bun.file("./monaco.pbf").stream());
+const osm = await fromPbf(monacoPbf);
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size);
 ```
 
@@ -33,7 +33,7 @@ console.log(osm.nodes.size, osm.ways.size, osm.relations.size);
 
 For synthetic data or tests, instantiate `Osm` directly and call `buildIndexes()` / `buildSpatialIndexes()` before querying:
 
-```ts
+```ts check-docs
 import { Osm } from "@osmix/core";
 
 const osm = new Osm({ id: "fixture" });
@@ -57,7 +57,7 @@ osm.buildSpatialIndexes();
 
 ### Querying entities
 
-```ts
+```ts check-docs osm
 // Get by ID
 const node = osm.nodes.getById(123);
 const way = osm.ways.get({ id: 456 });
@@ -79,7 +79,7 @@ const cafes = osm.nodes.search("amenity", "cafe");
 
 ### Spatial queries
 
-```ts
+```ts check-docs osm
 // Bounding box query
 const bbox: [number, number, number, number] = [-122.34, 47.57, -122.3, 47.61];
 const { ids, positions } = osm.nodes.withinBbox(bbox);
@@ -98,10 +98,14 @@ const nearestWays = osm.ways.neighbors(-122.4, 47.6, 5, 10); // 5 results, 10km 
 
 ### Transferring between workers
 
-```ts
+The following is schematic worker wiring; use the facade's worker helpers for production orchestration:
+
+```ts schematic
+import { collectTransferables, Osm } from "osmix";
+
 // In the main thread
 const transferables = osm.transferables();
-worker.postMessage(transferables, Object.values(transferables).filter(ArrayBuffer.isView));
+worker.postMessage(transferables, collectTransferables(transferables));
 
 // In the worker
 const osm = new Osm(transferables);
@@ -175,6 +179,10 @@ Run `pnpm run check` at the repo root before publishing.
 
 Mock OSM datasets for tests are available via a separate entrypoint (not re-exported from the main package):
 
-```ts
+```ts check-docs
 import { createMockBaseOsm, createMockPatchOsm } from "@osmix/core/mocks";
+
+const base = createMockBaseOsm();
+const patch = createMockPatchOsm();
+console.log(base.id, patch.id);
 ```
