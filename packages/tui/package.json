@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/tui",
+  "version": "0.0.1",
+  "description": "Explore OSM PBF files in a terminal map viewer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "bin": {
+    "osmix": "./src/cli.ts"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "bun src/cli.ts",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.4.3",
+    "osmix": "workspace:*"
+  },
+  "devDependencies": {
+    "@osmix/shared": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
