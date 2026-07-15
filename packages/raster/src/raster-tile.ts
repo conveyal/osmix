@@ -18,6 +18,7 @@ import {
 } from "@osmix/geo/tile";
 import type { GeoBbox2D, LonLat, Rgba, Tile, XY } from "@osmix/types";
 import { rewindGeometry } from "@placemarkio/geojson-rewind";
+import type { Polygon } from "geojson";
 
 import { compositeRGBA } from "./color.ts";
 
@@ -252,7 +253,7 @@ export class OsmixRasterTile {
       const rewound = rewindGeometry({
         type: "Polygon",
         coordinates: [ring],
-      }) as GeoJSON.Polygon;
+      }) as Polygon;
       const firstRing = rewound.coordinates[0];
       if (!firstRing) return ring;
       return firstRing as LonLat[];

@@ -1,6 +1,6 @@
 import { type PrimitiveAtom, useAtom } from "jotai";
 import { FilesIcon, Layers, Navigation, SearchIcon } from "lucide-react";
-import { NavLink } from "react-router";
+import { NavLink, type NavLinkRenderProps } from "react-router";
 
 import CenterInfo from "../components/center-info";
 import ZoomInfo, { ZoomInButton, ZoomOutButton } from "../components/zoom-info";
@@ -33,7 +33,7 @@ export default function Nav() {
           <NavLink
             to="/"
             end
-            className={({ isActive }) =>
+            className={({ isActive }: NavLinkRenderProps) =>
               cn("font-normal hover:underline", isActive ? "text-info" : "text-muted-foreground")
             }
           >
