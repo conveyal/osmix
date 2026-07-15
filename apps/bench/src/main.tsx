@@ -1,7 +1,7 @@
 import type { GeoBbox2D } from "@osmix/types";
 import { StrictMode, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Layer, Map as MaplibreMap, Source } from "react-map-gl/maplibre";
+import { Layer, Map as MaplibreMap, type MapRef, Source } from "react-map-gl/maplibre";
 
 import { runDuckDBBenchmarks } from "./benchmarks/duckdb-bench";
 import { runOsmixBenchmarks } from "./benchmarks/osmix-bench";
@@ -303,7 +303,7 @@ export function MapView({ bbox, color, geojson }: MapViewProps) {
       }}
       mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
       style={{ width: "100%", height: "100%" }}
-      ref={(map) => {
+      ref={(map: MapRef | null) => {
         if (!map) return;
         map.on("mousemove", ["ways", "nodes"], (e) => {
           const feature = e.features?.[0];
