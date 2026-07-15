@@ -20,5 +20,5 @@ catalog:
   dequal: ^2.0.3
   maplibre-gl: ^5.24.0
   pbf: ^5.1.0
-  typescript: 7.0.1-rc
+  typescript: ^7
   vite: ^8.1.3
