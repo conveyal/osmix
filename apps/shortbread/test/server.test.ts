@@ -49,7 +49,6 @@ void test("shortbread server app serves readiness and tiles without opening a po
     remote: createRemote(dataset, (options) => runs.push(options)),
     state: { dataset, filename: "fixture.pbf", log: [] },
     indexHtml: "<html>fixture</html>",
-    port: 3001,
   });
 
   const ready = await app.request("/ready");
@@ -64,6 +63,12 @@ void test("shortbread server app serves readiness and tiles without opening a po
   assert.equal(runs[0]?.lane, "compute");
   assert.equal(runs[0]?.retry, "once");
   assert.ok(runs[0]?.signal instanceof AbortSignal);
+
+  const style = await app.request("https://shortbread.osmix.localhost/style.json");
+  assert.equal(style.status, 200);
+  const styleBody = (await style.json()) as { sources: Record<string, { tiles?: string[] }> };
+  const tileUrls = Object.values(styleBody.sources).flatMap((source) => source.tiles ?? []);
+  assert.ok(tileUrls.some((url) => url === "https://shortbread.osmix.localhost/tiles/{z}/{x}/{y}"));
 });
 
 void test("shortbread server app turns tile failures into a useful response", async () => {
@@ -78,7 +83,6 @@ void test("shortbread server app turns tile failures into a useful response", as
     remote,
     state: { dataset, filename: "fixture.pbf", log: [] },
     indexHtml: "",
-    port: 3001,
   });
 
   const originalError = console.error;

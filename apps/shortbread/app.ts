@@ -27,12 +27,10 @@ export function createShortbreadServerApp({
   remote,
   state,
   indexHtml,
-  port,
 }: {
   remote: ShortbreadServerRemote;
   state: ShortbreadServerState;
   indexHtml: string;
-  port: number;
 }) {
   const app = new Hono();
 
@@ -80,8 +78,9 @@ export function createShortbreadServerApp({
   });
 
   app.get("/style.json", (c) => {
+    const origin = new URL(c.req.url).origin;
     const style: StyleSpecification = Versatiles.colorful({
-      tiles: [`http://localhost:${port}/tiles/{z}/{x}/{y}`],
+      tiles: [`${origin}/tiles/{z}/{x}/{y}`],
       recolor: { gamma: 2, tint: 1, tintColor: "#3b82f6" },
     });
     style.layers = style.layers.filter((layer) => layer.id !== "background");

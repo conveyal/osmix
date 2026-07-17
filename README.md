@@ -118,7 +118,7 @@ See each package's README for full API and description.
 # Install dependencies
 pnpm install
 
-# Run all apps in watch mode
+# Run all apps through Portless
 pnpm run dev
 
 # Build all packages
@@ -148,6 +148,10 @@ pnpm run verify:all
 ```
 
 **Workspace commands** support filtering: `pnpm --filter @osmix/merge dev`
+
+Development servers use [Portless](https://github.com/vercel-labs/portless) and stable HTTPS URLs: `merge.osmix.localhost`, `bench.osmix.localhost`, `www.osmix.localhost`, `vt.osmix.localhost`, and `shortbread.osmix.localhost`. The first run creates and trusts a local certificate authority; run `pnpm exec portless trust` if trust setup was skipped. Branch-backed worktrees add the sanitized branch name as a prefix, while detached worktrees add their Git worktree ID, so concurrent checkouts do not compete for routes. Filtered commands retain the same naming convention.
+
+Set `PORTLESS=0` to bypass the proxy and run the underlying development command directly, for example `PORTLESS=0 pnpm --filter @osmix/merge dev`. Portless proxy and certificate state are user-level state and are not stored in this repository.
 
 `verify:workspace` accepts a package name or path such as `apps/vt-server`, follows runtime and development workspace dependencies to include dependents, and runs formatting, typechecking, and tests in dependency order. It is check-only by default; pass `--write` only when formatting changes are intentional. `verify:all` excludes the browser benchmark app, whose benchmark script is not a package test.
 

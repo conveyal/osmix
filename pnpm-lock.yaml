@@ -53,6 +53,9 @@ importers:
       oxlint-tsgolint:
         specifier: ^0.24.0
         version: 0.24.0
+      portless:
+        specifier: 0.15.4
+        version: 0.15.4
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -377,6 +380,34 @@ importers:
       '@types/geojson':
         specifier: 'catalog:'
         version: 7946.0.16
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
+  packages/cli:
+    dependencies:
+      '@opentui/core':
+        specifier: ^0.4.3
+        version: 0.4.3(typescript@7.0.2)(web-tree-sitter@0.25.10)
+      '@osmix/geo':
+        specifier: workspace:*
+        version: link:../geo
+      '@osmix/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@osmix/shortbread':
+        specifier: workspace:*
+        version: link:../shortbread
+      comlink:
+        specifier: ^4.4.2
+        version: 4.4.2
+      osmix:
+        specifier: workspace:*
+        version: link:../osmix
+    devDependencies:
+      '@osmix/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -771,34 +802,6 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.2
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-
-  packages/cli:
-    dependencies:
-      '@opentui/core':
-        specifier: ^0.4.3
-        version: 0.4.3(typescript@7.0.2)(web-tree-sitter@0.25.10)
-      '@osmix/geo':
-        specifier: workspace:*
-        version: link:../geo
-      '@osmix/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@osmix/shortbread':
-        specifier: workspace:*
-        version: link:../shortbread
-      comlink:
-        specifier: ^4.4.2
-        version: 4.4.2
-      osmix:
-        specifier: workspace:*
-        version: link:../osmix
-    devDependencies:
-      '@osmix/test-utils':
-        specifier: workspace:*
-        version: link:../test-utils
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -3083,6 +3086,12 @@ packages:
   pngjs@7.0.0:
     resolution: {integrity: sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==}
     engines: {node: '>=14.19.0'}
+
+  portless@0.15.4:
+    resolution: {integrity: sha512-tOxEsdlDGuPHO6DPkuK3c3mMV5ctXEgVFm53Sa8nfZ2RsRGTq4By424C6z5+JWfNbd3ktR5SOd1FJBOlB1Woqg==}
+    engines: {node: '>=24'}
+    os: [darwin, linux, win32]
+    hasBin: true
 
   postcss@8.5.16:
     resolution: {integrity: sha512-vuwillviilfKZsg0VGj5R/YwwcHx4SLsIOI/7K6mQkWx+l5cUHTjj5g0AasTBcyXsbfTgrwsUNmVUb5xVwyPwg==}
@@ -5650,6 +5659,8 @@ snapshots:
       fsevents: 2.3.2
 
   pngjs@7.0.0: {}
+
+  portless@0.15.4: {}
 
   postcss@8.5.16:
     dependencies:

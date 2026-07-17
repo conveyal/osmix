@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --import tsx --watch server.ts",
+    "dev": "node --experimental-strip-types ../../scripts/portless-dev.ts shortbread.osmix node --import tsx --watch server.ts",
+    "dev:app": "node --import tsx --watch server.ts",
     "start": "node --import tsx server.ts",
     "stress:regional": "node --import tsx test/regional-stress.ts",
     "test": "node --import tsx test/server.test.ts",

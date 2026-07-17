@@ -6,7 +6,8 @@
   "scripts": {
     "bench": "vitest bench",
     "build": "vite build",
-    "dev": "vite",
+    "dev": "node --experimental-strip-types ../../scripts/portless-dev.ts bench.osmix vite",
+    "dev:app": "vite",
     "test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run --project '@osmix/bench*'",
     "typecheck": "tsc --build --noEmit"
   },
