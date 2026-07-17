@@ -21,8 +21,30 @@ const osm = await fromPbf(pbfStream);
 const encoder = new ShortbreadVtEncoder(osm);
 
 // Generate a tile
-const tile = encoder.getTile([z, x, y]);
+const tile = encoder.getTile([x, y, z]);
 ```
+
+For repeated or concurrent tile generation, build the compact transferable classification index
+once and share its backing buffers with workers:
+
+```typescript
+import { ShortbreadFeatureIndex, ShortbreadVtEncoder } from "@osmix/shortbread";
+
+const featureIndex = ShortbreadFeatureIndex.build(osm);
+const encoder = new ShortbreadVtEncoder(osm, { featureIndex });
+```
+
+The existing positional `new ShortbreadVtEncoder(osm, extent, buffer, featureIndex)` form remains
+supported for compatibility.
+
+`featureIndex.transferables()` can be reconstructed with
+`ShortbreadFeatureIndex.fromTransferables()`. Its buffers use `SharedArrayBuffer` whenever the
+runtime supports it, so workers can share one index without cloning regional data.
+`featureIndex.query(bbox)` remains available, while the typed query form can prefilter records by
+entity kind, geometry mask, and Shortbread layer before materialization.
+Classified area relations suppress only the corresponding member-way layers they replace. Other
+independently classified layers on the same way remain available, and route membership never
+suppresses road geometry.
 
 ## Layers
 

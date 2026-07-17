@@ -9,10 +9,11 @@
  * import { ShortbreadVtEncoder } from "@osmix/shortbread"
  *
  * const encoder = new ShortbreadVtEncoder(osm)
- * const tile = encoder.getTile([z, x, y])
+ * const tile = encoder.getTile([x, y, z])
  * ```
  */
 
-export { ShortbreadVtEncoder } from "./encoder.ts";
+export { ShortbreadVtEncoder, type ShortbreadVtEncoderOptions } from "./encoder.ts";
+export * from "./feature-index.ts";
 export { getLayersForGeometryType, matchTags, SHORTBREAD_LAYERS } from "./layers.ts";
 export type * from "./types.ts";

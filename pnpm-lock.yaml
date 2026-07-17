@@ -734,6 +734,9 @@ importers:
       '@osmix/vt':
         specifier: workspace:*
         version: link:../vt
+      flatbush:
+        specifier: ^4.6.2
+        version: 4.6.2
     devDependencies:
       '@mapbox/tilebelt':
         specifier: ^2.0.3
@@ -741,9 +744,15 @@ importers:
       '@mapbox/vector-tile':
         specifier: ^3.0.0
         version: 3.0.0
+      '@osmix/load':
+        specifier: workspace:*
+        version: link:../load
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      '@osmix/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       pbf:
         specifier: 'catalog:'
         version: 5.1.0
