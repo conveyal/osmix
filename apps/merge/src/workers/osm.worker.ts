@@ -143,7 +143,11 @@ export class MergeWorker extends OsmixWorker {
    * Updates the lastAccessedAt timestamp.
    * Returns the OsmInfo if found, null otherwise.
    */
-  async loadFromStorage(storageId: string): Promise<{
+  async loadFromStorage(
+    storageId: string,
+    updateLastAccessed = true,
+    targetId?: string,
+  ): Promise<{
     entry: StoredOsmEntry;
     info: OsmInfo;
   } | null> {
@@ -151,19 +155,20 @@ export class MergeWorker extends OsmixWorker {
     const stored = await db.get(OSM_STORE, storageId);
     if (!stored) return null;
 
-    // Update lastAccessedAt timestamp
-    const now = Date.now();
-    stored.lastAccessedAt = now;
-    await db.put(OSM_STORE, stored);
-    this.notifyStorageChange();
+    const now = updateLastAccessed ? Date.now() : (stored.lastAccessedAt ?? stored.storedAt);
+    if (updateLastAccessed) {
+      stored.lastAccessedAt = now;
+      await db.put(OSM_STORE, stored);
+      this.notifyStorageChange();
+    }
 
     // Convert from storage format and reconstruct Osm
     const transferables = fromStorableTransferables(stored);
-    const osm = new Osm(transferables);
+    const osm = new Osm({ ...transferables, id: targetId ?? stored.fileHash });
     osm.buildSpatialIndexes();
 
     // Register in worker (this also creates VT encoder and rebuilds routing graph if exists)
-    this.set(stored.fileHash, osm);
+    this.set(osm.id, osm);
 
     return {
       entry: {

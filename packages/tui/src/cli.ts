@@ -4,6 +4,7 @@ import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import packageJson from "../package.json" with { type: "json" };
 import { parseCliArgs, USAGE } from "./args.ts";
 import { openPbfViewer } from "./viewer.ts";
 
@@ -24,6 +25,10 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   const parsed = parseCliArgs(args);
   if (parsed.kind === "help") {
     process.stdout.write(`${USAGE}\n`);
+    return;
+  }
+  if (parsed.kind === "version") {
+    process.stdout.write(`osmix ${packageJson.version}\n`);
     return;
   }
   await openPbfViewer(await validateFile(parsed.filePath));

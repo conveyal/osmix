@@ -10,9 +10,12 @@ import type { ShortbreadWorker } from "./shortbread.worker.ts";
 
 export type ShortbreadServerDataset = Pick<
   OsmRemoteDataset<ShortbreadWorker>,
-  "id" | "isReady" | "get" | "delete"
+  "id" | "bbox" | "header" | "stats" | "isReady" | "delete"
 >;
-export type ShortbreadServerRemote = Pick<OsmixRemote<ShortbreadWorker>, "fromPbf" | "getWorker">;
+export type ShortbreadServerRemote = Pick<
+  OsmixRemote<ShortbreadWorker>,
+  "fromPbf" | "runWithWorker"
+>;
 
 export interface ShortbreadServerState {
   dataset: ShortbreadServerDataset;
@@ -62,18 +65,17 @@ export function createShortbreadServerApp({
   });
 
   app.get("/meta.json", async (c) => {
-    const osm = await state.dataset.get();
-    const bbox = osm.bbox();
+    const { bbox, header, stats } = state.dataset;
     const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2];
     return c.json({
       filename: state.filename,
       bbox,
       center,
-      header: osm.header,
+      header,
       layerNames: ShortbreadVtEncoder.layerNames,
-      nodes: osm.nodes.size,
-      ways: osm.ways.size,
-      relations: osm.relations.size,
+      nodes: stats.nodes,
+      ways: stats.ways,
+      relations: stats.relations,
     });
   });
 
@@ -127,9 +129,14 @@ export function createShortbreadServerApp({
     console.time(url);
     try {
       const { x, y, z } = c.req.param();
-      const tile = await remote
-        .getWorker()
-        .getShortbreadTile(state.dataset.id, [+x, +y, +z] as Tile);
+      const tile = await remote.runWithWorker(
+        (worker) => worker.getShortbreadTile(state.dataset.id, [+x, +y, +z] as Tile),
+        {
+          lane: "compute",
+          retry: "once",
+          signal: c.req.raw.signal,
+        },
+      );
       return c.body(tile, 200, {
         "content-type": "application/vnd.mapbox-vector-tile",
         "access-control-allow-origin": "*",

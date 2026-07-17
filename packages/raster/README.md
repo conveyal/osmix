@@ -27,12 +27,16 @@ const tile = new OsmixRasterTile({
   tile: [9372, 12535, 15],
 });
 
-tile.drawPoint([-73.989, 40.733]);
-tile.drawLineString([
-  [-73.9892, 40.7326],
-  [-73.9887, 40.7331],
-  [-73.9883, 40.7336],
-]);
+tile.drawPoint([-73.989, 40.733], [255, 90, 90, 255], 2);
+tile.drawLineString(
+  [
+    [-73.9892, 40.7326],
+    [-73.9887, 40.7331],
+    [-73.9883, 40.7336],
+  ],
+  [255, 255, 255, 230],
+  3,
+);
 
 const canvas = new OffscreenCanvas(tile.tileSize, tile.tileSize);
 const ctx = canvas.getContext("2d");
@@ -63,8 +67,9 @@ constructor({ tile, tileSize = 256, imageData? })
 
 #### Drawing methods
 
-- `drawPoint(ll: [lon, lat], color?)`: Draw a single point.
-- `drawLineString(coords: [lon, lat][], color?)`: Draw a polyline.
+- `drawPoint(ll: [lon, lat], color?, radius = 0)`: Draw a point or filled circle.
+- `drawLine(px0, px1, color?, width = 1)`: Draw a pixel-space line with round caps and joins.
+- `drawLineString(coords: [lon, lat][], color?, width = 1)`: Draw a geographic polyline.
 - `drawPolygon(rings: [lon, lat][][], color?)`: Draw a filled polygon.
 - `drawRelation(polygons: [lon, lat][][][], color?)`: Draw a multipolygon relation.
 

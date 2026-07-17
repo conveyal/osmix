@@ -19,12 +19,15 @@
     "@osmix/core": "workspace:*",
     "@osmix/geo": "workspace:*",
     "@osmix/types": "workspace:*",
-    "@osmix/vt": "workspace:*"
+    "@osmix/vt": "workspace:*",
+    "flatbush": "^4.6.2"
   },
   "devDependencies": {
     "@mapbox/tilebelt": "^2.0.3",
     "@mapbox/vector-tile": "^3.0.0",
+    "@osmix/load": "workspace:*",
     "@osmix/shared": "workspace:*",
+    "@osmix/test-utils": "workspace:*",
     "pbf": "catalog:",
     "typescript": "catalog:"
   }

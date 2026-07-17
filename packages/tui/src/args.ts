@@ -17,12 +17,15 @@ export class CliUsageError extends Error {
   }
 }
 
-export type CliArgs = { kind: "help" } | { kind: "view"; filePath: string };
+export type CliArgs = { kind: "help" } | { kind: "version" } | { kind: "view"; filePath: string };
 
 /** Parse the single positional PBF path accepted by the CLI. */
 export function parseCliArgs(args: string[]): CliArgs {
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
     return { kind: "help" };
+  }
+  if (args.length === 1 && (args[0] === "--version" || args[0] === "-V")) {
+    return { kind: "version" };
   }
   if (args.length === 0) throw new CliUsageError("Missing OSM PBF file path.");
   if (args.length > 1) throw new CliUsageError("Expected exactly one OSM PBF file path.");

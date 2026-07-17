@@ -1,7 +1,7 @@
 /**
- * Web Worker implementation for OSM operations.
+ * Worker implementation for OSM operations.
  *
- * OsmixWorker runs inside a Web Worker and manages multiple Osm instances.
+ * OsmixWorker runs inside a browser Worker or Node worker thread and manages multiple Osm instances.
  * It exposes methods via Comlink for cross-thread RPC from OsmixRemote.
  *
  * Can be extended to add custom functionality:
@@ -64,7 +64,7 @@ import { type DrawToRasterTileOptions, drawToRasterTile } from "./raster.ts";
 import { transfer } from "./utils.ts";
 
 /**
- * Worker handler for managing multiple Osm instances within a Web Worker.
+ * Worker handler for managing multiple Osm instances off the calling thread.
  * Exposes Comlink-wrapped methods for off-thread Osm data operations.
  */
 export class OsmixWorker extends EventTarget {
@@ -77,6 +77,11 @@ export class OsmixWorker extends EventTarget {
   private filteredChanges = new Map<string, OsmChange[]>();
 
   private onProgress = (progress: ProgressEvent) => this.dispatchEvent(progress);
+
+  /** Confirm that the worker RPC endpoint is ready to receive operations. */
+  ping(): true {
+    return true;
+  }
 
   /**
    * Register a progress listener to receive updates during long-running operations.

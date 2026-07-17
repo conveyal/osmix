@@ -12,7 +12,8 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./worker": "./src/osmix.worker.ts"
+    "./worker": "./src/osmix.worker.ts",
+    "./worker-pool": "./src/worker-pool.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

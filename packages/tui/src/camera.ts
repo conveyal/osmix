@@ -25,6 +25,10 @@ function wrap(value: number): number {
   return ((value % 1) + 1) % 1;
 }
 
+function worldXToLon(x: number): number {
+  return x * 360 - 180;
+}
+
 export function lonLatToWorld([lon, lat]: LonLat): ScreenPoint {
   const limitedLat = clamp(lat, -MAX_MERCATOR_LATITUDE, MAX_MERCATOR_LATITUDE);
   const radians = (limitedLat * Math.PI) / 180;
@@ -85,6 +89,43 @@ export class MapCamera {
       x: Math.round(this.centerX * this.worldSize - viewport.width / 2),
       y: Math.round(this.centerY * this.worldSize - viewport.height / 2),
     };
+  }
+
+  /** Project a coordinate into viewport pixels, choosing the nearest wrapped world copy. */
+  project(coordinate: LonLat, viewport: MapViewport): ScreenPoint {
+    const world = lonLatToWorld(coordinate);
+    const origin = this.origin(viewport);
+    const viewportCenterX = origin.x + viewport.width / 2;
+    const unwrappedX = world.x * this.worldSize;
+    const nearestX =
+      unwrappedX + Math.round((viewportCenterX - unwrappedX) / this.worldSize) * this.worldSize;
+    return {
+      x: nearestX - origin.x,
+      y: world.y * this.worldSize - origin.y,
+    };
+  }
+
+  /** Return one or two geographic bboxes covering the viewport across the antimeridian. */
+  visibleBboxes(viewport: MapViewport): GeoBbox2D[] {
+    const origin = this.origin(viewport);
+    const northY = clamp(origin.y / this.worldSize, 0, 1);
+    const southY = clamp((origin.y + viewport.height) / this.worldSize, 0, 1);
+    const north = worldToLonLat({ x: 0, y: northY })[1];
+    const south = worldToLonLat({ x: 0, y: southY })[1];
+    if (viewport.width >= this.worldSize) return [[-180, south, 180, north]];
+
+    const west = origin.x / this.worldSize;
+    const east = (origin.x + viewport.width) / this.worldSize;
+    const westWorld = wrap(west);
+    const span = east - west;
+    const eastWorld = westWorld + span;
+    if (eastWorld <= 1) {
+      return [[worldXToLon(westWorld), south, worldXToLon(eastWorld), north]];
+    }
+    return [
+      [worldXToLon(westWorld), south, 180, north],
+      [-180, south, worldXToLon(eastWorld - 1), north],
+    ];
   }
 
   panPixels(deltaX: number, deltaY: number): void {

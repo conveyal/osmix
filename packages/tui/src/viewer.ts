@@ -1,5 +1,4 @@
-import { createReadStream } from "node:fs";
-import { basename } from "node:path";
+import { basename, resolve } from "node:path";
 
 import {
   createCliRenderer,
@@ -10,25 +9,63 @@ import {
   type MouseEvent,
   type OptimizedBuffer,
 } from "@opentui/core";
-import { fromPbf, progressEventMessage, type GeoBbox2D, type Osm, type ProgressEvent } from "osmix";
+import { type GeoBbox2D, type OsmInfo } from "osmix";
 
 import { MapCamera, type MapViewport } from "./camera.ts";
 import {
-  createOsmTileProvider,
+  layoutMapLabels,
+  truncateLabelText,
+  type MapLabelCandidate,
+  type MapLabelKind,
+  type MeasuredLabelText,
+  type PlacedMapLabel,
+} from "./map-labels.ts";
+import {
+  formatTileLoadingStatus,
+  isShimmerCell,
   MAP_BACKGROUND,
+  OsmTileLoader,
+  type PendingTileRegion,
   renderMapPixels,
-  type TileProvider,
+  TILE_LOADING_HIGHLIGHT,
 } from "./map-pixels.ts";
+import {
+  createStyledTileRenderer,
+  type StyledTileRenderer,
+  type TileRenderingMode,
+} from "./tile-renderer.ts";
 
 const BACKGROUND = RGBA.fromInts(...MAP_BACKGROUND, 255);
 const STATUS_BACKGROUND = RGBA.fromHex("#173c2c");
 const STATUS_FOREGROUND = RGBA.fromHex("#d6f5df");
 const ERROR_FOREGROUND = RGBA.fromHex("#ffb4ab");
+const LABEL_BACKGROUND = RGBA.fromHex("#101713");
+const SHIMMER_HIGHLIGHT = RGBA.fromInts(...TILE_LOADING_HIGHLIGHT, 255);
+const LABEL_COLORS = {
+  place: RGBA.fromHex("#f2ead3"),
+  road: RGBA.fromHex("#d6ded8"),
+  water: RGBA.fromHex("#9bcbe4"),
+  site: RGBA.fromHex("#b6d5b8"),
+  poi: RGBA.fromHex("#efd0a8"),
+} satisfies Record<MapLabelKind, RGBA>;
 const HALF_BLOCK = "▀";
+const ANIMATION_INTERVAL_MS = 100;
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
+
+type ViewerRenderer = Awaited<ReturnType<typeof createCliRenderer>>;
+
+interface ViewerTestHooks {
+  onStaticCompose?: () => void;
+}
 
 type ViewerState =
   | { kind: "loading"; message: string }
-  | { kind: "ready"; osm: Osm; getTile: TileProvider }
+  | {
+      info: OsmInfo;
+      kind: "ready";
+      tileRenderer: StyledTileRenderer;
+      tiles: OsmTileLoader;
+    }
   | { kind: "error"; message: string };
 
 function isValidBounds(bounds: GeoBbox2D): boolean {
@@ -41,9 +78,26 @@ function truncate(text: string, width: number): string {
   return `${text.slice(0, width - 1)}…`;
 }
 
-class TerminalMapViewer {
-  readonly renderer;
-  readonly canvas;
+export function animationPhase(now = performance.now()): number {
+  return Math.floor(now / ANIMATION_INTERVAL_MS);
+}
+
+export function viewerShouldAnimate(
+  stateKind: ViewerState["kind"],
+  pendingCount: number,
+  labelsPending = false,
+): boolean {
+  return stateKind === "loading" || (stateKind === "ready" && (pendingCount > 0 || labelsPending));
+}
+
+export function formatRenderingModeStatus(_mode: TileRenderingMode): string {
+  return "";
+}
+
+/** Interactive viewer whose OpenTUI thread only composes prepared pixels and text. */
+export class TerminalMapViewer {
+  readonly renderer: ViewerRenderer;
+  readonly canvas: FrameBufferRenderable;
   readonly fileName: string;
   readonly colors = new Map<number, RGBA>();
   camera = new MapCamera();
@@ -51,9 +105,41 @@ class TerminalMapViewer {
   dataBounds: GeoBbox2D | null = null;
   dragPoint: { x: number; y: number } | null = null;
 
-  private constructor(renderer: Awaited<ReturnType<typeof createCliRenderer>>, fileName: string) {
+  private animationLive = false;
+  private animationTimer: ReturnType<typeof setInterval> | null = null;
+  private cleanedUp = false;
+  private labelCandidates: MapLabelCandidate[] = [];
+  private labelLayoutDirty = false;
+  private labelQueryActive = false;
+  private labelQueryQueued: number | null = null;
+  private labels: PlacedMapLabel[] = [];
+  private pendingRegions: PendingTileRegion[] = [];
+  private staticDirty = true;
+  private readonly testHooks: ViewerTestHooks;
+  private viewportRevision = 0;
+  private readonly now: () => number;
+
+  private readonly frameCallback = async (): Promise<void> => {
+    if (this.renderer.isDestroyed) return;
+    if (this.staticDirty) this.composeStaticFrame();
+    this.pumpLabelQuery();
+  };
+
+  private readonly postProcess = (buffer: OptimizedBuffer): void => {
+    if (this.renderer.isDestroyed) return;
+    this.drawDynamicOverlay(buffer, animationPhase(this.now()));
+  };
+
+  constructor(
+    renderer: ViewerRenderer,
+    fileName: string,
+    now: () => number = () => performance.now(),
+    testHooks: ViewerTestHooks = {},
+  ) {
     this.renderer = renderer;
     this.fileName = fileName;
+    this.now = now;
+    this.testHooks = testHooks;
     this.canvas = new FrameBufferRenderable(renderer, {
       id: "osm-map",
       width: renderer.width,
@@ -67,7 +153,7 @@ class TerminalMapViewer {
         this.dragPoint = null;
       },
       onMouseScroll: (event) => this.handleMouseScroll(event),
-      onSizeChange: () => queueMicrotask(() => this.draw()),
+      onSizeChange: () => queueMicrotask(() => this.invalidateViewport()),
     });
     this.renderer.root.add(this.canvas);
     this.renderer.keyInput.on("keypress", (key: KeyEvent) => this.handleKey(key));
@@ -75,8 +161,12 @@ class TerminalMapViewer {
       this.canvas.width = width;
       this.canvas.height = height;
     });
+    this.renderer.setFrameCallback(this.frameCallback);
+    this.renderer.addPostProcessFn(this.postProcess);
+    this.renderer.once("destroy", () => this.cleanup());
     this.renderer.setTerminalTitle(`osmix — ${fileName}`);
-    this.draw();
+    this.requestStaticFrame();
+    this.updateAnimationState();
   }
 
   static async create(fileName: string): Promise<TerminalMapViewer> {
@@ -89,31 +179,57 @@ class TerminalMapViewer {
       enableMouseMovement: true,
       autoFocus: false,
       backgroundColor: BACKGROUND,
+      targetFps: 10,
+      maxFps: 30,
     });
     return new TerminalMapViewer(renderer, fileName);
   }
 
-  setProgress(event: ProgressEvent): void {
+  setProgress(message: string): void {
     if (this.renderer.isDestroyed) return;
-    this.state = { kind: "loading", message: progressEventMessage(event) };
-    this.draw();
+    if (this.state.kind !== "loading") return;
+    this.state = { kind: "loading", message };
+    this.canvas.requestRender();
+    this.updateAnimationState();
   }
 
-  setOsm(osm: Osm): void {
-    const bounds = osm.bbox();
-    if (!isValidBounds(bounds)) {
-      throw Error("The PBF contains no nodes to display.");
-    }
-    this.dataBounds = bounds;
-    this.state = { kind: "ready", osm, getTile: createOsmTileProvider(osm) };
+  setLoadingMessage(message: string): void {
+    this.setProgress(message);
+  }
+
+  setDataset(info: OsmInfo, tileRenderer: StyledTileRenderer): void {
+    if (!isValidBounds(info.bbox)) throw Error("The PBF contains no nodes to display.");
+    this.dataBounds = info.bbox;
+    const tiles = new OsmTileLoader({
+      maxConcurrentTiles: tileRenderer.workerCount,
+      onError: (error) => this.setError(error),
+      onGenerationChange: (generation) => tileRenderer.cancelBefore(generation),
+      onPendingChange: () => {
+        this.canvas.requestRender();
+        this.updateAnimationState();
+      },
+      onTileComplete: () => this.requestStaticFrame(),
+      renderTile: (tile, generation) => tileRenderer.renderTile(tile, generation),
+    });
+    this.state = { kind: "ready", info, tileRenderer, tiles };
     this.fitBounds();
   }
 
   setError(error: unknown): void {
     if (this.renderer.isDestroyed) return;
+    if (this.state.kind === "ready") {
+      this.state.tiles.dispose();
+      this.state.tileRenderer.dispose();
+    }
     const message = error instanceof Error ? error.message : String(error);
     this.state = { kind: "error", message };
-    this.draw();
+    this.pendingRegions = [];
+    this.labelCandidates = [];
+    this.labels = [];
+    this.labelQueryActive = false;
+    this.labelQueryQueued = null;
+    this.requestStaticFrame();
+    this.updateAnimationState();
   }
 
   waitUntilClosed(): Promise<void> {
@@ -131,11 +247,12 @@ class TerminalMapViewer {
   private fitBounds(): void {
     if (!this.dataBounds || this.state.kind !== "ready") return;
     this.camera = MapCamera.fitBounds(this.dataBounds, this.viewport());
-    this.draw();
+    this.invalidateViewport();
   }
 
   private handleKey(key: KeyEvent): void {
     if (key.name === "q" || key.name === "escape") {
+      this.cleanup();
       this.renderer.destroy();
       return;
     }
@@ -177,7 +294,7 @@ class TerminalMapViewer {
       default:
         return;
     }
-    this.draw();
+    this.invalidateViewport();
   }
 
   private handleMouseDown(event: MouseEvent): void {
@@ -194,7 +311,7 @@ class TerminalMapViewer {
     this.camera.panPixels(-deltaX, -deltaY * 2);
     event.preventDefault();
     event.stopPropagation();
-    this.draw();
+    this.invalidateViewport();
   }
 
   private handleMouseScroll(event: MouseEvent): void {
@@ -207,7 +324,7 @@ class TerminalMapViewer {
     });
     event.preventDefault();
     event.stopPropagation();
-    this.draw();
+    this.invalidateViewport();
   }
 
   private color(pixels: Uint8ClampedArray, offset: number): RGBA {
@@ -223,53 +340,213 @@ class TerminalMapViewer {
     return color;
   }
 
-  private drawMap(buffer: OptimizedBuffer, width: number, rows: number): void {
-    if (this.state.kind !== "ready" || rows === 0) {
-      buffer.fillRect(0, 0, width, rows, BACKGROUND);
-      return;
+  private cleanup(): void {
+    if (this.cleanedUp) return;
+    this.cleanedUp = true;
+    if (this.state.kind === "ready") {
+      this.state.tiles.dispose();
+      this.state.tileRenderer.dispose();
     }
-    const pixelHeight = rows * 2;
-    const pixels = renderMapPixels(this.camera, { width, height: pixelHeight }, this.state.getTile);
-    for (let row = 0; row < rows; row++) {
-      for (let column = 0; column < width; column++) {
-        const topOffset = (row * 2 * width + column) * 4;
-        const bottomOffset = ((row * 2 + 1) * width + column) * 4;
-        buffer.setCell(
-          column,
-          row,
-          HALF_BLOCK,
-          this.color(pixels, topOffset),
-          this.color(pixels, bottomOffset),
-        );
-      }
-    }
+    this.renderer.removeFrameCallback(this.frameCallback);
+    this.renderer.removePostProcessFn(this.postProcess);
+    if (this.animationTimer) clearInterval(this.animationTimer);
+    this.animationTimer = null;
+    if (this.animationLive && !this.renderer.isDestroyed) this.renderer.dropLive();
+    this.animationLive = false;
   }
 
-  private statusText(): string {
-    if (this.state.kind === "loading") return `${this.fileName}  ${this.state.message}`;
-    if (this.state.kind === "error") return `Error: ${this.state.message}  •  q quit`;
-    const [lon, lat] = this.camera.center;
-    const stats = this.state.osm.info().stats;
-    return `${this.fileName}  z${this.camera.zoom}  ${lat.toFixed(5)}, ${lon.toFixed(5)}  ${stats.nodes.toLocaleString()} nodes  •  arrows/hjkl pan  +/- zoom  drag/wheel  0 fit  q quit`;
-  }
-
-  private draw(): void {
+  private updateAnimationState(): void {
     if (this.renderer.isDestroyed) return;
+    const pendingCount = this.state.kind === "ready" ? this.state.tiles.pendingCount : 0;
+    const shouldAnimate = viewerShouldAnimate(
+      this.state.kind,
+      pendingCount,
+      this.labelQueryActive || this.labelQueryQueued !== null,
+    );
+    if (shouldAnimate && !this.animationLive) {
+      this.animationLive = true;
+      this.renderer.requestLive();
+      this.animationTimer = setInterval(() => {
+        if (!this.renderer.isDestroyed) this.canvas.requestRender();
+      }, ANIMATION_INTERVAL_MS);
+    } else if (!shouldAnimate && this.animationLive) {
+      this.animationLive = false;
+      if (this.animationTimer) clearInterval(this.animationTimer);
+      this.animationTimer = null;
+      this.renderer.dropLive();
+      this.canvas.requestRender();
+    }
+  }
+
+  private invalidateViewport(): void {
+    if (this.renderer.isDestroyed) return;
+    this.viewportRevision++;
+    this.labelCandidates = [];
+    this.labels = [];
+    this.labelLayoutDirty = false;
+    if (this.state.kind === "ready") this.labelQueryQueued = this.viewportRevision;
+    this.requestStaticFrame();
+  }
+
+  private requestStaticFrame(): void {
+    if (this.renderer.isDestroyed) return;
+    this.staticDirty = true;
+    this.canvas.requestRender();
+  }
+
+  private composeStaticFrame(): void {
+    this.testHooks.onStaticCompose?.();
+    this.staticDirty = false;
     const buffer = this.canvas.frameBuffer;
     const width = buffer.width;
     const height = buffer.height;
     if (width === 0 || height === 0) return;
     const mapRows = Math.max(0, height - 1);
-    this.drawMap(buffer, width, mapRows);
+    this.pendingRegions = [];
+    if (this.state.kind !== "ready" || mapRows === 0) {
+      buffer.fillRect(0, 0, width, mapRows, BACKGROUND);
+    } else {
+      const pixelHeight = mapRows * 2;
+      this.state.tiles.beginFrame(this.viewportRevision);
+      const pixels = renderMapPixels(
+        this.camera,
+        { width, height: pixelHeight },
+        this.state.tiles.getTile,
+        this.pendingRegions,
+      );
+      this.state.tiles.endFrame();
+      for (let row = 0; row < mapRows; row++) {
+        for (let column = 0; column < width; column++) {
+          const topOffset = (row * 2 * width + column) * 4;
+          const bottomOffset = ((row * 2 + 1) * width + column) * 4;
+          buffer.setCell(
+            column,
+            row,
+            HALF_BLOCK,
+            this.color(pixels, topOffset),
+            this.color(pixels, bottomOffset),
+          );
+        }
+      }
+    }
+    buffer.fillRect(0, mapRows, width, 1, STATUS_BACKGROUND);
+    this.updateAnimationState();
+  }
+
+  private pumpLabelQuery(): void {
+    if (this.labelQueryActive || this.labelQueryQueued === null || this.state.kind !== "ready")
+      return;
+    if (!this.state.tileRenderer.labelsConcurrent && this.state.tiles.pendingCount > 0) return;
+
+    const revision = this.labelQueryQueued;
+    this.labelQueryQueued = null;
+    const request = {
+      centerX: this.camera.centerX,
+      centerY: this.camera.centerY,
+      revision,
+      viewport: this.viewport(),
+      zoom: this.camera.zoom,
+    };
+    const tileRenderer = this.state.tileRenderer;
+    this.labelQueryActive = true;
+    this.updateAnimationState();
+    void tileRenderer
+      .queryLabels(request)
+      .then((result) => {
+        if (
+          this.renderer.isDestroyed ||
+          this.state.kind !== "ready" ||
+          result.revision !== this.viewportRevision
+        )
+          return;
+        this.labelCandidates = result.candidates;
+        this.labelLayoutDirty = true;
+        this.canvas.requestRender();
+      })
+      .catch((error: unknown) => this.setError(error))
+      .finally(() => {
+        this.labelQueryActive = false;
+        if (this.labelQueryQueued !== null) this.canvas.requestRender();
+        this.updateAnimationState();
+      });
+  }
+
+  private measureLabelText(
+    buffer: OptimizedBuffer,
+    text: string,
+    maxWidth: number,
+  ): MeasuredLabelText | null {
+    const encoded = buffer.encodeUnicode(text);
+    if (!encoded) return null;
+    try {
+      return truncateLabelText(
+        text,
+        encoded.data.map((character) => character.width),
+        maxWidth,
+      );
+    } finally {
+      buffer.freeUnicode(encoded);
+    }
+  }
+
+  private layoutLabels(buffer: OptimizedBuffer, width: number, mapRows: number): void {
+    if (!this.labelLayoutDirty) return;
+    this.labelLayoutDirty = false;
+    this.labels = layoutMapLabels(
+      this.labelCandidates,
+      { width, height: mapRows },
+      (text, maxWidth) => this.measureLabelText(buffer, text, maxWidth),
+    );
+  }
+
+  private drawDynamicOverlay(buffer: OptimizedBuffer, phase: number): void {
+    const width = buffer.width;
+    const height = buffer.height;
+    if (width === 0 || height === 0) return;
+    const mapRows = Math.max(0, height - 1);
+
+    for (const region of this.pendingRegions) {
+      const startX = Math.max(0, Math.floor(region.left));
+      const endX = Math.min(width, Math.ceil(region.right));
+      const startRow = Math.max(0, Math.floor(region.top / 2));
+      const endRow = Math.min(mapRows, Math.ceil(region.bottom / 2));
+      for (let row = startRow; row < endRow; row++) {
+        for (let column = startX; column < endX; column++) {
+          if (isShimmerCell(column, row, phase)) {
+            buffer.fillRect(column, row, 1, 1, SHIMMER_HIGHLIGHT);
+          }
+        }
+      }
+    }
+
+    this.layoutLabels(buffer, width, mapRows);
+    for (const label of this.labels) {
+      buffer.fillRect(label.backplateX, label.y, label.backplateWidth, 1, LABEL_BACKGROUND);
+      buffer.drawText(label.text, label.x, label.y, LABEL_COLORS[label.kind], LABEL_BACKGROUND);
+    }
+
     buffer.fillRect(0, mapRows, width, 1, STATUS_BACKGROUND);
     buffer.drawText(
-      truncate(this.statusText(), width),
+      truncate(this.statusText(phase), width),
       0,
       mapRows,
       this.state.kind === "error" ? ERROR_FOREGROUND : STATUS_FOREGROUND,
       STATUS_BACKGROUND,
     );
-    this.canvas.requestRender();
+  }
+
+  private statusText(phase: number): string {
+    const spinner = SPINNER_FRAMES[phase % SPINNER_FRAMES.length]!;
+    if (this.state.kind === "loading") return `${this.fileName}  ${spinner} ${this.state.message}`;
+    if (this.state.kind === "error") return `Error: ${this.state.message}  •  q quit`;
+    const [lon, lat] = this.camera.center;
+    let activity = "";
+    if (this.state.tiles.pendingCount > 0) {
+      activity = `  ${formatTileLoadingStatus(this.state.tiles.pendingCount, spinner)}`;
+    } else if (this.labelQueryActive) {
+      activity = `  ${spinner} Loading labels…`;
+    }
+    return `${this.fileName}${activity}  z${this.camera.zoom}  ${lat.toFixed(5)}, ${lon.toFixed(5)}  ${this.state.info.stats.nodes.toLocaleString()} nodes  •  arrows/hjkl pan  +/- zoom  drag/wheel  0 fit  q quit`;
   }
 }
 
@@ -279,21 +556,33 @@ export async function openPbfViewer(filePath: string): Promise<void> {
     throw Error("The osmix viewer requires an interactive terminal.");
   }
   const viewer = await TerminalMapViewer.create(basename(filePath));
-  const stream = createReadStream(filePath);
+  const resources: { tileRenderer?: StyledTileRenderer } = {};
   let loadError: unknown;
-  const loading = fromPbf(stream, { id: basename(filePath) }, (event) => viewer.setProgress(event))
-    .then((osm) => viewer.setOsm(osm))
+  void createStyledTileRenderer({
+    onProgress: (message) => viewer.setProgress(message),
+  })
+    .then(async (created) => {
+      resources.tileRenderer = created;
+      if (viewer.renderer.isDestroyed) {
+        created.dispose();
+        return;
+      }
+      viewer.setLoadingMessage("Loading file in workers…");
+      const info = await created.loadPbfFile(resolve(filePath), basename(filePath));
+      if (viewer.renderer.isDestroyed) return;
+      viewer.setDataset(info, created);
+    })
     .catch((error: unknown) => {
       if (viewer.renderer.isDestroyed) return;
       loadError = error;
+      resources.tileRenderer?.dispose();
       viewer.setError(error);
     });
 
   try {
     await viewer.waitUntilClosed();
   } finally {
-    stream.destroy();
-    await loading;
+    resources.tileRenderer?.dispose();
   }
   if (loadError !== undefined) throw loadError;
 }

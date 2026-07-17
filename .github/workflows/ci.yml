@@ -22,12 +22,30 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: ./.github/actions/checks
 
+  tui-executable:
+    name: TUI standalone executable
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Build and test the standalone executable
+        run: pnpm --filter @osmix/tui run test:executable
+
   runtime-node:
     name: Runtime smoke (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [24, 26]
+        node: [20, 22, 24]
 
     steps:
       - name: Checkout repository
@@ -44,7 +62,9 @@ jobs:
       - name: Setup Node.js for package preparation
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node }}
+          # pnpm 11 uses node:sqlite and therefore needs a newer preparation
+          # runtime than the oldest Node version supported by the packed API.
+          node-version: 24
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6

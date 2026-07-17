@@ -46,14 +46,43 @@ interface ReservedIdsResult {
   survivorNodeCounts: number[];
 }
 
+interface ManagedSchedulingResult {
+  abortedTaskRan: boolean;
+  completionOrder: string[];
+  computeIndex: number;
+  controlIndex: number;
+  slowResult: { index: number; nodes: number };
+  wasAborted: boolean;
+}
+
+interface WorkerDatasetInspection {
+  allShared: boolean;
+  bufferCount: number;
+  contentHash: string;
+  hasDataset: boolean;
+  index: number;
+  nodes: number;
+  sharedBufferCount: number;
+}
+
+interface TimeoutRecoveryAndSharingResult {
+  attempts: number;
+  compute: WorkerDatasetInspection;
+  control: WorkerDatasetInspection;
+  matchingContentHashes: boolean;
+  recovered: { index: number; nodes: number };
+}
+
 declare global {
   interface Window {
     workerHarness: {
       runDispose: () => Promise<DisposeResult>;
+      runManagedScheduling: () => Promise<ManagedSchedulingResult>;
       runSingleWorker: () => Promise<SingleWorkerResult>;
       runSingleWorkerTransfer: () => Promise<SingleWorkerTransferResult>;
       runMultiWorker: () => Promise<MultiWorkerResult>;
       runReservedIds: (workerCount: number) => Promise<ReservedIdsResult>;
+      runTimeoutRecoveryAndSharing: () => Promise<TimeoutRecoveryAndSharingResult>;
     };
   }
 }
@@ -84,6 +113,41 @@ test("multi-worker replicates Monaco in a cross-origin isolated page", async ({ 
   expect(result.relationCounts).toEqual([46, 46]);
   expect(result.vectorByteLengths).toHaveLength(2);
   expect(result.vectorByteLengths.every((length) => length > 0)).toBe(true);
+});
+
+test("managed scheduling prioritizes and cancels queued compute work", async ({ page }) => {
+  const result = await page.evaluate(() => window.workerHarness.runManagedScheduling());
+
+  expect(result.controlIndex).toBe(0);
+  expect(result.computeIndex).toBe(1);
+  expect(result.slowResult).toEqual({ index: 1, nodes: 14_286 });
+  expect(result.completionOrder).toEqual(["slow", "high", "low"]);
+  expect(result.wasAborted).toBe(true);
+  expect(result.abortedTaskRan).toBe(false);
+});
+
+test("timed-out compute workers restart with one shared Monaco dataset", async ({ page }) => {
+  const result = await page.evaluate(() => window.workerHarness.runTimeoutRecoveryAndSharing());
+
+  expect(result.attempts).toBe(2);
+  expect(result.recovered).toEqual({ index: 1, nodes: 14_286 });
+  expect(result.matchingContentHashes).toBe(true);
+  expect(result.control).toMatchObject({
+    allShared: true,
+    hasDataset: true,
+    index: 0,
+    nodes: 14_286,
+  });
+  expect(result.compute).toMatchObject({
+    allShared: true,
+    hasDataset: true,
+    index: 1,
+    nodes: 14_286,
+  });
+  expect(result.control.bufferCount).toBeGreaterThan(0);
+  expect(result.control.sharedBufferCount).toBe(result.control.bufferCount);
+  expect(result.compute.bufferCount).toBeGreaterThan(0);
+  expect(result.compute.sharedBufferCount).toBe(result.compute.bufferCount);
 });
 
 test("single worker transfers sorted Monaco IDs without cloning errors", async ({ page }) => {

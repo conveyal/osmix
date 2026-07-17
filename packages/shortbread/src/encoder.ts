@@ -17,11 +17,23 @@ import {
   writeVtPbf,
 } from "@osmix/vt";
 
+import {
+  shortbreadFeatureHasLayer,
+  type ShortbreadFeatureIndex,
+  type ShortbreadFeatureRecord,
+} from "./feature-index.ts";
 import { matchTags, SHORTBREAD_LAYERS } from "./layers.ts";
 import type { ShortbreadLayerName, ShortbreadProperties } from "./types.ts";
 
 const DEFAULT_EXTENT = 4096;
 const DEFAULT_BUFFER = 64;
+
+/** Named construction options for indexed or custom-extent Shortbread encoding. */
+export interface ShortbreadVtEncoderOptions {
+  buffer?: number;
+  extent?: number;
+  featureIndex?: ShortbreadFeatureIndex;
+}
 
 const SF_TYPE: VtSimpleFeatureType = {
   POINT: 1,
@@ -94,6 +106,15 @@ interface ClassifiedFeature {
   geometry: VtSimpleFeatureGeometry;
 }
 
+interface FeatureCandidate {
+  entityIndex: number;
+  layerMask?: number;
+}
+
+function* unindexedCandidates(indexes: Iterable<number>): Generator<FeatureCandidate> {
+  for (const entityIndex of [...indexes].sort((a, b) => a - b)) yield { entityIndex };
+}
+
 /**
  * Shortbread-compliant Vector Tile Encoder
  *
@@ -104,18 +125,40 @@ export class ShortbreadVtEncoder {
   private readonly osm: OsmReader;
   private readonly extent: number;
   private readonly extentBbox: [number, number, number, number];
+  private readonly featureIndex: ShortbreadFeatureIndex | undefined;
 
   /**
    * Create a new Shortbread encoder
    * @param osm - The OSM data source
    * @param extent - Tile extent (default 4096)
    * @param buffer - Buffer size for clipping (default 64)
+   * @param featureIndex - Optional preclassified, transferable spatial index
    */
-  constructor(osm: OsmReader, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER) {
+  constructor(osm: OsmReader, options?: ShortbreadVtEncoderOptions);
+  constructor(
+    osm: OsmReader,
+    extent?: number,
+    buffer?: number,
+    featureIndex?: ShortbreadFeatureIndex,
+  );
+  constructor(
+    osm: OsmReader,
+    extentOrOptions: number | ShortbreadVtEncoderOptions = DEFAULT_EXTENT,
+    buffer = DEFAULT_BUFFER,
+    featureIndex?: ShortbreadFeatureIndex,
+  ) {
+    const extent =
+      typeof extentOrOptions === "number"
+        ? extentOrOptions
+        : (extentOrOptions.extent ?? DEFAULT_EXTENT);
+    const resolvedBuffer =
+      typeof extentOrOptions === "number" ? buffer : (extentOrOptions.buffer ?? DEFAULT_BUFFER);
     this.osm = osm;
     this.extent = extent;
-    const min = -buffer;
-    const max = extent + buffer;
+    this.featureIndex =
+      typeof extentOrOptions === "number" ? featureIndex : extentOrOptions.featureIndex;
+    const min = -resolvedBuffer;
+    const max = extent + resolvedBuffer;
     this.extentBbox = [min, min, max, max];
   }
 
@@ -150,11 +193,19 @@ export class ShortbreadVtEncoder {
       featuresByLayer.set(layer.name, []);
     }
 
-    // Get way IDs that are part of relations
-    const relationWayIds = this.osm.relations.getWayMemberIds();
+    const indexedRecords = this.featureIndex?.query(bbox);
+    const nodeCandidates = this.candidates(indexedRecords, "node");
+    const wayCandidates = this.candidates(indexedRecords, "way");
+    const relationCandidates = this.candidates(indexedRecords, "relation");
+    const classifiedAreaMemberWayLayerMasks = this.featureIndex
+      ? null
+      : this.classifiedAreaMemberWayLayerMasks(bbox);
+    const suppressesWayLayer = (id: number, layer: ShortbreadLayerName): boolean =>
+      this.featureIndex?.suppressesWay(id, layer) ??
+      this.layerMaskHasLayer(classifiedAreaMemberWayLayerMasks?.get(id) ?? 0, layer);
 
     // Process nodes (points)
-    for (const feature of this.classifyNodes(bbox, proj)) {
+    for (const feature of this.classifyNodes(bbox, proj, nodeCandidates)) {
       const layerFeatures = featuresByLayer.get(feature.layer);
       if (layerFeatures) {
         layerFeatures.push(feature);
@@ -162,7 +213,7 @@ export class ShortbreadVtEncoder {
     }
 
     // Process ways (lines and polygons)
-    for (const feature of this.classifyWays(bbox, proj, relationWayIds)) {
+    for (const feature of this.classifyWays(bbox, proj, suppressesWayLayer, wayCandidates)) {
       const layerFeatures = featuresByLayer.get(feature.layer);
       if (layerFeatures) {
         layerFeatures.push(feature);
@@ -170,7 +221,7 @@ export class ShortbreadVtEncoder {
     }
 
     // Process relations
-    for (const feature of this.classifyRelations(bbox, proj)) {
+    for (const feature of this.classifyRelations(bbox, proj, relationCandidates)) {
       const layerFeatures = featuresByLayer.get(feature.layer);
       if (layerFeatures) {
         layerFeatures.push(feature);
@@ -222,10 +273,16 @@ export class ShortbreadVtEncoder {
   /**
    * Classify nodes into Shortbread layers
    */
-  private *classifyNodes(bbox: GeoBbox2D, proj: (ll: LonLat) => XY): Generator<ClassifiedFeature> {
-    const nodeIndexes = this.osm.nodes.findIndexesWithinBbox(bbox);
+  private *classifyNodes(
+    bbox: GeoBbox2D,
+    proj: (ll: LonLat) => XY,
+    indexedCandidates?: FeatureCandidate[],
+  ): Generator<ClassifiedFeature> {
+    const candidates =
+      indexedCandidates ?? unindexedCandidates(this.osm.nodes.findIndexesWithinBbox(bbox));
 
-    for (const nodeIndex of nodeIndexes) {
+    for (const candidate of candidates) {
+      const nodeIndex = candidate.entityIndex;
       const tags = this.osm.nodes.tags.getTags(nodeIndex);
       if (!tags || Object.keys(tags).length === 0) continue;
 
@@ -237,6 +294,12 @@ export class ShortbreadVtEncoder {
 
       const projected = proj(ll);
       for (const match of matches) {
+        if (
+          candidate.layerMask !== undefined &&
+          !shortbreadFeatureHasLayer({ layerMask: candidate.layerMask }, match.layer.name)
+        ) {
+          continue;
+        }
         yield {
           id,
           layer: match.layer.name,
@@ -254,14 +317,14 @@ export class ShortbreadVtEncoder {
   private *classifyWays(
     bbox: GeoBbox2D,
     proj: (ll: LonLat) => XY,
-    relationWayIds?: ReadonlySet<number>,
+    suppressesWayLayer: (id: number, layer: ShortbreadLayerName) => boolean,
+    indexedCandidates?: FeatureCandidate[],
   ): Generator<ClassifiedFeature> {
-    const wayIndexes = this.osm.ways.intersects(bbox);
+    const candidates = indexedCandidates ?? unindexedCandidates(this.osm.ways.intersects(bbox));
 
-    for (const wayIndex of wayIndexes) {
+    for (const candidate of candidates) {
+      const wayIndex = candidate.entityIndex;
       const id = this.osm.ways.ids.at(wayIndex);
-      // Skip ways that are part of relations
-      if (id !== undefined && relationWayIds?.has(id)) continue;
 
       const tags = this.osm.ways.tags.getTags(wayIndex);
       if (!tags || Object.keys(tags).length === 0) continue;
@@ -306,6 +369,13 @@ export class ShortbreadVtEncoder {
       if (geometry.length === 0) continue;
 
       for (const match of matches) {
+        if (isArea && suppressesWayLayer(id, match.layer.name)) continue;
+        if (
+          candidate.layerMask !== undefined &&
+          !shortbreadFeatureHasLayer({ layerMask: candidate.layerMask }, match.layer.name)
+        ) {
+          continue;
+        }
         yield {
           id,
           layer: match.layer.name,
@@ -323,10 +393,13 @@ export class ShortbreadVtEncoder {
   private *classifyRelations(
     bbox: GeoBbox2D,
     proj: (ll: LonLat) => XY,
+    indexedCandidates?: FeatureCandidate[],
   ): Generator<ClassifiedFeature> {
-    const relationIndexes = this.osm.relations.intersects(bbox);
+    const candidates =
+      indexedCandidates ?? unindexedCandidates(this.osm.relations.intersects(bbox));
 
-    for (const relIndex of relationIndexes) {
+    for (const candidate of candidates) {
+      const relIndex = candidate.entityIndex;
       const relation = this.osm.relations.getByIndex(relIndex);
       const relationGeometry = this.osm.relations.getRelationGeometry(relIndex);
       if (
@@ -364,6 +437,12 @@ export class ShortbreadVtEncoder {
           if (geometry.length === 0) continue;
 
           for (const match of matches) {
+            if (
+              candidate.layerMask !== undefined &&
+              !shortbreadFeatureHasLayer({ layerMask: candidate.layerMask }, match.layer.name)
+            ) {
+              continue;
+            }
             yield {
               id: relation.id,
               layer: match.layer.name,
@@ -397,6 +476,12 @@ export class ShortbreadVtEncoder {
           if (geometry.length === 0) continue;
 
           for (const match of matches) {
+            if (
+              candidate.layerMask !== undefined &&
+              !shortbreadFeatureHasLayer({ layerMask: candidate.layerMask }, match.layer.name)
+            ) {
+              continue;
+            }
             yield {
               id: relation.id,
               layer: match.layer.name,
@@ -424,6 +509,12 @@ export class ShortbreadVtEncoder {
         if (geometry.length === 0) continue;
 
         for (const match of matches) {
+          if (
+            candidate.layerMask !== undefined &&
+            !shortbreadFeatureHasLayer({ layerMask: candidate.layerMask }, match.layer.name)
+          ) {
+            continue;
+          }
           yield {
             id: relation.id,
             layer: match.layer.name,
@@ -434,6 +525,42 @@ export class ShortbreadVtEncoder {
         }
       }
     }
+  }
+
+  private candidates(
+    records: ShortbreadFeatureRecord[] | undefined,
+    entityType: ShortbreadFeatureRecord["entityType"],
+  ): FeatureCandidate[] | undefined {
+    return records
+      ?.filter((record) => record.entityType === entityType)
+      .map((record) => ({ entityIndex: record.entityIndex, layerMask: record.layerMask }));
+  }
+
+  /** Map members to only the layers supplied by classified area relations, never routes. */
+  private classifiedAreaMemberWayLayerMasks(bbox: GeoBbox2D): ReadonlyMap<number, number> {
+    const masks = new Map<number, number>();
+    for (const relationIndex of this.osm.relations.intersects(bbox)) {
+      const relation = this.osm.relations.getByIndex(relationIndex);
+      if (!relation.tags) continue;
+      const matches = matchTags(relation.tags, "Polygon");
+      if (matches.length === 0) continue;
+      const geometry = this.osm.relations.getRelationGeometry(relationIndex);
+      if (!geometry.rings || geometry.rings.length === 0) continue;
+      let relationLayerMask = 0;
+      for (const match of matches) {
+        const bit = SHORTBREAD_LAYERS.findIndex((layer) => layer.name === match.layer.name);
+        if (bit >= 0) relationLayerMask = (relationLayerMask | (1 << bit)) >>> 0;
+      }
+      for (const member of this.osm.relations.getMembersByIndex(relationIndex)) {
+        if (member.type !== "way") continue;
+        masks.set(member.ref, ((masks.get(member.ref) ?? 0) | relationLayerMask) >>> 0);
+      }
+    }
+    return masks;
+  }
+
+  private layerMaskHasLayer(mask: number, layer: ShortbreadLayerName): boolean {
+    return shortbreadFeatureHasLayer({ layerMask: mask }, layer);
   }
 
   private clipProjectedPolyline(points: XY[]): XY[][] {

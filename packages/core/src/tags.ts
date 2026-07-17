@@ -225,7 +225,12 @@ export class Tags {
    * Get all entity indexes that have a specific tag key.
    */
   hasKey(keyIndex: number): number[] {
-    if (keyIndex < 0) return [];
+    if (
+      keyIndex < 0 ||
+      keyIndex >= this.keyIndexStart.length ||
+      keyIndex >= this.keyIndexCount.length
+    )
+      return [];
     const start = this.keyIndexStart.at(keyIndex) ?? 0;
     const count = this.keyIndexCount.at(keyIndex) ?? 0;
     return Array.from(this.keyEntities.array.subarray(start, start + count));

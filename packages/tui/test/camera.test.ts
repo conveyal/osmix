@@ -48,4 +48,25 @@ describe("MapCamera", () => {
     expect(camera.centerX).toBeLessThan(1);
     expect(camera.centerY).toBe(1);
   });
+
+  it("projects the nearest world copy across the antimeridian", () => {
+    const center = lonLatToWorld([179.5, 0]);
+    const camera = new MapCamera(center.x, center.y, 4);
+    const projected = camera.project([-179.5, 0], { width: 100, height: 50 });
+
+    expect(projected.x).toBeGreaterThan(50);
+    expect(projected.x).toBeLessThan(70);
+    expect(projected.y).toBeCloseTo(25, 4);
+  });
+
+  it("splits visible geographic bounds at the antimeridian", () => {
+    const center = lonLatToWorld([179.5, 0]);
+    const camera = new MapCamera(center.x, center.y, 4);
+    const bboxes = camera.visibleBboxes({ width: 100, height: 50 });
+
+    expect(bboxes).toHaveLength(2);
+    expect(bboxes[0]![2]).toBe(180);
+    expect(bboxes[1]![0]).toBe(-180);
+    expect(bboxes[0]![1]).toBeLessThan(bboxes[0]![3]);
+  });
 });

@@ -10,20 +10,48 @@ export {
   createRemote,
   detectFileType,
   OSM_FILE_TYPES,
+  OsmixDatasetLossError,
   OsmixRemote,
+  OsmixRemoteStateError,
   type OsmFileType,
   type OsmId,
   type OsmRemoteDataset,
+  type OsmixRunWithWorkerOptions,
   type OsmixRemoteOptions,
+  type OsmixWorkerLane,
 } from "./remote.ts";
 export { OsmixWorker, type RouteResult, type WaySegment } from "./worker.ts";
 export { drawToRasterTile, type DrawToRasterTileOptions } from "./raster.ts";
 export {
   canShareArrayBuffers,
   getOsmixCapabilities,
+  getWorkerRuntime,
+  selectWorkerCount,
   type OsmixCapabilities,
   type OsmixMode,
+  type SelectWorkerCountOptions,
+  type WorkerRuntime,
 } from "./capabilities.ts";
+export {
+  createOsmixWorkerConnection,
+  createOsmixWorkerPool,
+  defaultOsmixWorkerUrl,
+  exposeOsmixWorker,
+  OsmixWorkerPool,
+  OsmixWorkerPoolDisposedError,
+  OsmixWorkerTaskTimeoutError,
+  OsmixWorkerUnavailableError,
+  type CreateOsmixWorkerConnectionOptions,
+  type OsmixWorkerConnection,
+  type OsmixWorkerPingTarget,
+  type OsmixWorkerPoolDiagnostics,
+  type OsmixWorkerPoolOptions,
+  type OsmixWorkerPoolRunOptions,
+  type OsmixWorkerPoolTask,
+  type OsmixWorkerPoolWorkerDiagnostics,
+  type WorkerConnectionRuntime,
+  type WorkerTaskRetry,
+} from "./worker-pool.ts";
 export {
   collectTransferables,
   supportsReadableStreamTransfer,

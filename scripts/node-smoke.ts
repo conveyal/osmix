@@ -19,9 +19,14 @@ interface WorkspacePackage {
 
 const repoRoot = resolve(import.meta.dirname, "..");
 const packagesRoot = join(repoRoot, "packages");
-const smokeDependencies = ["@osmix/core", "osmix"] as const;
+const smokeDependencies = ["@osmix/core", "@osmix/shared", "@osmix/shortbread", "osmix"] as const;
 const consumerSource = `import { Osm } from "@osmix/core"
-import { createRemote, fromPbf } from "osmix"
+import { inspectBackingBuffers } from "@osmix/shared/backing-buffers"
+import { runCooperatively } from "@osmix/shared/cooperative"
+import { GenerationGate } from "@osmix/shared/generation-gate"
+import { ShortbreadFeatureIndex, ShortbreadVtEncoder } from "@osmix/shortbread"
+import { createRemote, fromPbf, getOsmixCapabilities, getWorkerRuntime } from "osmix"
+import { createOsmixWorkerPool } from "osmix/worker-pool"
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -32,14 +37,23 @@ assert(osm.id === "smoke", "@osmix/core import failed")
 assert(typeof fromPbf === "function", "fromPbf import failed")
 assert(typeof createRemote === "function", "createRemote import failed")
 
-const remote = await createRemote({ inProcess: true })
+const workerRuntime = getWorkerRuntime()
+const capabilities = getOsmixCapabilities()
+assert(
+  workerRuntime === "node" || workerRuntime === "bun" || workerRuntime === "deno",
+  "unexpected worker runtime: " + workerRuntime,
+)
+assert(capabilities.workerRuntime === workerRuntime, "capability runtime mismatch")
+assert(capabilities.canShareArrayBuffers, workerRuntime + " cannot share array buffers")
+
+const remote = await createRemote({ workerCount: 2 })
 try {
   const geojson = {
     type: "FeatureCollection",
     features: [{
       type: "Feature",
       geometry: { type: "Point", coordinates: [7.4229, 43.7371] },
-      properties: { name: "Runtime smoke" },
+      properties: { amenity: "cafe", name: "Runtime smoke" },
     }],
   }
   const data = new TextEncoder().encode(JSON.stringify(geojson))
@@ -47,11 +61,114 @@ try {
   assert(dataset.stats.nodes === 1, "GeoJSON point was not loaded")
   assert(dataset.stats.ways === 0, "GeoJSON point unexpectedly created a way")
   assert((await dataset.toPbfData()).byteLength > 0, "PBF serialization was empty")
+
+  const localOsm = await dataset.get()
+  const featureIndex = ShortbreadFeatureIndex.build(localOsm)
+  const candidates = featureIndex.query({
+    bbox: localOsm.bbox(),
+    entityTypes: ["node"],
+    layers: ["pois"],
+  })
+  assert(candidates.length === 1, "Shortbread feature-index query failed")
+  assert(
+    inspectBackingBuffers(featureIndex.transferables()).unique > 0,
+    "shared backing-buffer inspection failed",
+  )
+  const encoded = new ShortbreadVtEncoder(localOsm, { featureIndex }).getTileForBbox(
+    localOsm.bbox(),
+    () => [2048, 2048],
+  )
+  assert(encoded.byteLength > 0, "indexed Shortbread encoding was empty")
 } finally {
-  remote[Symbol.dispose]()
+  await remote.dispose()
 }
 
-console.log("Osmix runtime smoke test passed")
+const generation = GenerationGate.create({ shared: false })
+generation.update(4)
+assert(generation.isCancelled(3), "generation gate failed")
+const cooperative = await runCooperatively((function* () {
+  yield
+  return "cooperative-ok"
+})())
+assert(
+  cooperative.status === "completed" && cooperative.value === "cooperative-ok",
+  "cooperative scheduler failed",
+)
+
+if (workerRuntime !== "none") {
+  const custom = await createRemote({
+    workerCount: 1,
+    workerUrl: new URL("./custom.worker.mjs", import.meta.url),
+  })
+  try {
+    const result = await custom.runWithWorker((worker) => worker.runtimeSmokePing(), {
+      retry: "once",
+    })
+    assert(result === "custom-worker-ok", "custom " + workerRuntime + " worker entry failed")
+
+    let timerFired = false
+    const timer = setTimeout(() => {
+      timerFired = true
+    }, 5)
+    await custom.runWithWorker((worker) => worker.runtimeSmokeBlock(50))
+    clearTimeout(timer)
+    assert(timerFired, workerRuntime + " worker blocked the caller event loop")
+  } finally {
+    await custom.dispose()
+  }
+
+  const pool = await createOsmixWorkerPool({
+    workerCount: 2,
+    workerUrl: new URL("./custom.worker.mjs", import.meta.url),
+  })
+  try {
+    const result = await pool.run((worker) => worker.runtimeSmokePing(), { retry: "once" })
+    assert(result === "custom-worker-ok", "worker-pool subpath failed")
+
+    const shared = new SharedArrayBuffer(4)
+    const local = new Uint8Array(shared)
+    await pool.broadcast((worker) => worker.runtimeSmokeInstallSharedBuffer(shared))
+    await pool.runOn(0, (worker) => worker.runtimeSmokeWriteSharedByte(0, 41))
+    const remoteByte = await pool.runOn(1, (worker) => worker.runtimeSmokeReadSharedByte(0))
+    assert(remoteByte === 41 && local[0] === 41, workerRuntime + " did not share one buffer")
+  } finally {
+    await pool.dispose()
+  }
+}
+
+console.log("Osmix " + workerRuntime + " worker smoke test passed")
+`;
+
+const customWorkerSource = `import { exposeOsmixWorker, OsmixWorker } from "osmix"
+
+class RuntimeSmokeWorker extends OsmixWorker {
+  shared
+
+  runtimeSmokePing() {
+    return "custom-worker-ok"
+  }
+
+  runtimeSmokeBlock(milliseconds) {
+    const end = performance.now() + milliseconds
+    while (performance.now() < end) {}
+    return true
+  }
+
+  runtimeSmokeInstallSharedBuffer(buffer) {
+    this.shared = new Uint8Array(buffer)
+    return buffer instanceof SharedArrayBuffer
+  }
+
+  runtimeSmokeWriteSharedByte(index, value) {
+    this.shared[index] = value
+  }
+
+  runtimeSmokeReadSharedByte(index) {
+    return this.shared?.[index]
+  }
+}
+
+await exposeOsmixWorker(new RuntimeSmokeWorker())
 `;
 
 type Runtime = "bun" | "deno" | "node";
@@ -62,13 +179,14 @@ function getRuntime(): Runtime {
   throw Error(`Unsupported smoke runtime: ${runtime}`);
 }
 
-function npmEnv(): NodeJS.ProcessEnv {
+function npmEnv(cacheDir?: string): NodeJS.ProcessEnv {
   const env = { ...process.env };
   for (const key of Object.keys(env)) {
     if (key.startsWith("npm_config_")) {
       delete env[key];
     }
   }
+  if (cacheDir) env["npm_config_cache"] = cacheDir;
   return env;
 }
 
@@ -76,13 +194,13 @@ function run(
   command: string,
   args: string[],
   cwd: string,
-  options: { captureOutput?: boolean; cleanNpmEnv?: boolean } = {},
+  options: { captureOutput?: boolean; cleanNpmEnv?: boolean; npmCacheDir?: string } = {},
 ): string {
-  const { captureOutput = false, cleanNpmEnv = false } = options;
+  const { captureOutput = false, cleanNpmEnv = false, npmCacheDir } = options;
   const result = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
-    env: cleanNpmEnv ? npmEnv() : process.env,
+    env: cleanNpmEnv ? npmEnv(npmCacheDir) : process.env,
     stdio: captureOutput ? ["ignore", "pipe", "inherit"] : "inherit",
   });
 
@@ -229,6 +347,7 @@ async function writeConsumerApp(
   await mkdir(consumerDir, { recursive: true });
 
   await writeFile(join(consumerDir, "index.mjs"), consumerSource);
+  await writeFile(join(consumerDir, "custom.worker.mjs"), customWorkerSource);
   await writeFile(
     join(consumerDir, "package.json"),
     JSON.stringify(
@@ -270,6 +389,7 @@ async function main(): Promise<void> {
     console.log("Installing local tarballs into npm consumer app...");
     run("npm", ["install", "--no-fund", "--no-audit"], consumerDir, {
       cleanNpmEnv: true,
+      npmCacheDir: join(tempRoot, "npm-cache"),
     });
 
     console.log(`Running ${runtime} import and data smoke test...`);
@@ -280,7 +400,7 @@ async function main(): Promise<void> {
         runtime === "node" ? (process.env["OSMIX_NODE_BINARY"] ?? runtime) : runtime;
       run(executable, ["./index.mjs"], consumerDir);
     }
-    if (runtime === "node") console.log("Node/npm smoke test passed");
+    console.log(`${runtime}/npm smoke test passed`);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }

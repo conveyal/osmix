@@ -36,3 +36,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
           NPM_TOKEN: "" # Workaround to support trusted publishing
+
+      - name: Setup Bun for standalone executables
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Check TUI release assets
+        id: tui-assets
+        run: bun packages/tui/scripts/release-executables.ts >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Build TUI release executables
+        if: steps.tui-assets.outputs.needed == 'true'
+        run: pnpm --filter @osmix/tui run build:executables
+
+      - name: Upload TUI release executables
+        if: steps.tui-assets.outputs.needed == 'true'
+        run: |
+          gh release upload "${{ steps.tui-assets.outputs.tag }}" \
+            packages/tui/dist/executables/release/* \
+            --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

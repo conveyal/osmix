@@ -12,6 +12,11 @@ describe("parseCliArgs", () => {
     expect(parseCliArgs(["-h"])).toEqual({ kind: "help" });
   });
 
+  it("recognizes version", () => {
+    expect(parseCliArgs(["--version"])).toEqual({ kind: "version" });
+    expect(parseCliArgs(["-V"])).toEqual({ kind: "version" });
+  });
+
   it.each([{ args: [] }, { args: ["one.pbf", "two.pbf"] }, { args: ["--unknown"] }])(
     "rejects invalid arguments: $args",
     ({ args }) => {
