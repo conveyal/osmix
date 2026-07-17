@@ -36,3 +36,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CHANGESETS_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
           NPM_TOKEN: "" # Workaround to support trusted publishing
+
+      - name: Setup Bun for standalone executables
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Check CLI release assets
+        id: cli-assets
+        run: bun packages/cli/scripts/release-executables.ts >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Build CLI release executables
+        if: steps.cli-assets.outputs.needed == 'true'
+        run: pnpm --filter @osmix/cli run build:executables
+
+      - name: Upload CLI release executables
+        if: steps.cli-assets.outputs.needed == 'true'
+        run: |
+          gh release upload "${{ steps.cli-assets.outputs.tag }}" \
+            packages/cli/dist/executables/release/* \
+            --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

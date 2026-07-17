@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/cli",
+  "version": "0.0.1",
+  "description": "Explore OSM PBF files in a terminal map viewer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/conveyal/osmix.git"
+  },
+  "bin": {
+    "osmix": "./src/cli.ts"
+  },
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:executable": "bun scripts/build-executables.ts --host",
+    "build:executables": "bun scripts/prepare-executable-dependencies.ts && bun scripts/build-executables.ts --all",
+    "run:executable": "bun scripts/run-executable.ts",
+    "start": "bun src/cli.ts",
+    "stress:regional": "bun test/regional-stress.ts",
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
+    "test:executable": "bun scripts/test-executable.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.4.3",
+    "@osmix/geo": "workspace:*",
+    "@osmix/shared": "workspace:*",
+    "@osmix/shortbread": "workspace:*",
+    "comlink": "^4.4.2",
+    "osmix": "workspace:*"
+  },
+  "devDependencies": {
+    "@osmix/test-utils": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
