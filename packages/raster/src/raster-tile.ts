@@ -130,8 +130,50 @@ export class OsmixRasterTile {
     return (px[1] * this.tileSize + px[0]) * 4;
   }
 
-  drawPoint(ll: LonLat, color: Rgba = DEFAULT_POINT_COLOR) {
+  /** Draw a geographic point, optionally as a filled circle with a pixel radius. */
+  drawPoint(ll: LonLat, color: Rgba = DEFAULT_POINT_COLOR, radius = 0) {
     const px = this.llToTilePx(ll);
+    if (radius <= 0) {
+      this.drawPixel(px, color);
+      return;
+    }
+    this.drawCircle(this.clampAndRoundPx(px), color, radius);
+  }
+
+  /** Draw a filled circle in tile pixel coordinates. */
+  private drawCircle(center: XY, color: Rgba, radius: number) {
+    const normalizedRadius = Math.max(0, Math.round(radius));
+    const radiusSquared = normalizedRadius * normalizedRadius;
+    for (let y = -normalizedRadius; y <= normalizedRadius; y++) {
+      for (let x = -normalizedRadius; x <= normalizedRadius; x++) {
+        if (x * x + y * y > radiusSquared) continue;
+        this.drawPixelWithinTile([center[0] + x, center[1] + y], color);
+      }
+    }
+  }
+
+  /** Stamp a round brush centered on a tile pixel. */
+  private drawBrush(center: XY, color: Rgba, width: number) {
+    const normalizedWidth = Math.max(1, Math.round(width));
+    if (normalizedWidth === 1) {
+      this.drawPixelWithinTile(center, color);
+      return;
+    }
+
+    const radius = normalizedWidth / 2;
+    const centerOffset = normalizedWidth % 2 === 0 ? 0.5 : 0;
+    const min = -Math.floor((normalizedWidth - 1) / 2);
+    const max = Math.ceil((normalizedWidth - 1) / 2);
+    for (let y = min; y <= max; y++) {
+      for (let x = min; x <= max; x++) {
+        if (Math.hypot(x - centerOffset, y - centerOffset) > radius) continue;
+        this.drawPixelWithinTile([center[0] + x, center[1] + y], color);
+      }
+    }
+  }
+
+  private drawPixelWithinTile(px: XY, color: Rgba) {
+    if (px[0] < 0 || px[0] >= this.tileSize || px[1] < 0 || px[1] >= this.tileSize) return;
     this.drawPixel(px, color);
   }
 
@@ -176,9 +218,9 @@ export class OsmixRasterTile {
 
   /**
    * Draw a line between two pixels.
-   * Uses Bresenham's line algorithm.
+   * Uses Bresenham's line algorithm with round brushes for strokes wider than one pixel.
    */
-  drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR) {
+  drawLine(px0: XY, px1: XY, color: Rgba = DEFAULT_LINE_COLOR, width = 1) {
     const tileSize = this.tileSize;
     const dx = Math.abs(px1[0] - px0[0]);
     const dy = Math.abs(px1[1] - px0[1]);
@@ -191,7 +233,7 @@ export class OsmixRasterTile {
     while (true) {
       // Only draw pixels within tile bounds
       if (x >= 0 && x < tileSize && y >= 0 && y < tileSize) {
-        this.drawPixel([x, y], color);
+        this.drawBrush([x, y], color, width);
       }
       if (x === px1[0] && y === px1[1]) break;
       const e2 = 2 * err;
@@ -207,9 +249,9 @@ export class OsmixRasterTile {
   }
 
   /**
-   * Split a line string into a series of line segments and draw each segment.
+   * Split a line string into a series of line segments and draw it at a pixel width.
    */
-  drawLineString(coords: LonLat[], color: Rgba = DEFAULT_LINE_COLOR) {
+  drawLineString(coords: LonLat[], color: Rgba = DEFAULT_LINE_COLOR, width = 1) {
     const projectedCoords = coords.map((ll) => this.llToTilePx(ll));
     const [clipped] = clipPolyline(projectedCoords, [0, 0, this.tileSize, this.tileSize]);
     if (clipped != null) {
@@ -222,7 +264,7 @@ export class OsmixRasterTile {
         const px0 = this.clampAndRoundPx(prev);
         const px1 = this.clampAndRoundPx(curr);
         if (px0[0] !== px1[0] || px0[1] !== px1[1]) {
-          this.drawLine(px0, px1, color);
+          this.drawLine(px0, px1, color, width);
         }
         prev = curr;
       }
