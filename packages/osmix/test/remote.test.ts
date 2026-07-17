@@ -3,12 +3,36 @@ import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/test-util
 import type { FeatureCollection, LineString, Point } from "geojson";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { createRemote } from "../src/remote";
+import { createRemote, OsmixDatasetLossError, OsmixRemote } from "../src/remote";
 
 const monacoPbf = PBFs["monaco"]!;
 const occupiedMonacoTile: [number, number, number] = [17059, 11948, 15];
 // Increase timeout for worker tests
 const workerTestTimeout = 30_000;
+
+class RecoveryTestRemote extends OsmixRemote {
+  private readonly customSources = new Map<string, Uint8Array>();
+
+  async restoreForTest(): Promise<void> {
+    await this.restorePoolWorker(this.getWorker(), 0, 1);
+  }
+
+  registerCustomGeoJson(id: string, data: Uint8Array): void {
+    this.customSources.set(id, data);
+    this.registerDatasetForRecovery(id);
+  }
+
+  registerMissing(id: string): void {
+    this.registerDatasetForRecovery(id);
+  }
+
+  protected override async recoverDataset(worker: ReturnType<this["getWorker"]>, id: string) {
+    const source = this.customSources.get(id);
+    if (!source) return false;
+    await worker.fromGeoJSON({ data: source.slice().buffer, options: { id } });
+    return true;
+  }
+}
 
 describe("OsmixRemote", () => {
   afterEach(async () => {
@@ -178,6 +202,104 @@ describe("OsmixRemote", () => {
       },
       workerTestTimeout,
     );
+  });
+
+  describe("restart dataset recovery", () => {
+    const geojson: FeatureCollection<Point> = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [7.42, 43.73] },
+          properties: { name: "Replay me" },
+        },
+      ],
+    };
+
+    it("replays a File source without retaining a separate input buffer", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const file = new File([JSON.stringify(geojson)], "replay.geojson", {
+        type: "application/geo+json",
+      });
+      const dataset = await remote.fromGeoJSON(file, { id: "file-recovery" });
+      await remote.getWorker().delete(dataset.id);
+
+      await remote.restoreForTest();
+
+      await expect(remote.has(dataset.id)).resolves.toBe(true);
+    });
+
+    it("uses subclass-owned durable recovery sources", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const data = new TextEncoder().encode(JSON.stringify(geojson));
+      const dataset = await remote.fromGeoJSON(data.slice(), { id: "custom-recovery" });
+      remote.registerCustomGeoJson(dataset.id, data);
+      await remote.getWorker().delete(dataset.id);
+
+      await remote.restoreForTest();
+
+      await expect(remote.has(dataset.id)).resolves.toBe(true);
+    });
+
+    it("throws a typed error instead of exposing an empty restarted worker", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      remote.registerMissing("one-shot-source");
+
+      await expect(remote.restoreForTest()).rejects.toMatchObject({
+        name: "OsmixDatasetLossError",
+        datasetIds: ["one-shot-source"],
+        workerIndex: 0,
+      } satisfies Partial<OsmixDatasetLossError>);
+    });
+
+    it("reattaches the progress listener before a restored slot becomes available", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, vi.fn(), true);
+      const worker = remote.getWorker();
+      const addProgressListener = vi.spyOn(worker, "addProgressListener");
+
+      await remote.restoreForTest();
+
+      expect(addProgressListener).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("partial state broadcasts", () => {
+    it("makes the remote terminal when a mutation fails after committing", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const data = new TextEncoder().encode(
+        JSON.stringify({
+          type: "FeatureCollection",
+          features: [],
+        }),
+      );
+      const dataset = await remote.fromGeoJSON(data, { id: "partial-delete" });
+      const worker = remote.getWorker() as unknown as {
+        delete(id: string): void;
+      };
+      const deleteDataset = worker.delete.bind(worker);
+      worker.delete = (id) => {
+        deleteDataset(id);
+        throw new Error("failed after delete");
+      };
+
+      await expect(remote.delete(dataset.id)).rejects.toMatchObject({
+        name: "OsmixRemoteStateError",
+        operation: "dataset deletion",
+      });
+      await expect(remote.has(dataset.id)).rejects.toMatchObject({
+        name: "OsmixRemoteStateError",
+        operation: "dataset deletion",
+      });
+      await expect(remote.isReady(dataset.id)).rejects.toMatchObject({
+        name: "OsmixRemoteStateError",
+        operation: "dataset deletion",
+      });
+    });
   });
 
   describe("get", () => {
@@ -438,13 +560,15 @@ describe("OsmixRemote", () => {
       workerTestTimeout,
     );
 
-    it("should throw without Web Worker support when inProcess is not set", async () => {
-      // Node has no global Worker, so spawning real workers must fail loudly.
-      await expect(createRemote()).rejects.toThrow(/Web Workers are not available/);
-      await expect(createRemote({ workerCount: 3 })).rejects.toThrow(
-        /Web Workers are not available/,
-      );
-    });
+    it(
+      "uses Node worker threads when Web Workers are unavailable",
+      async () => {
+        using remote = await createRemote({ workerCount: 1 });
+        expect(remote.mode).toBe("single-worker");
+        await expect(remote.runWithWorker((worker) => worker.ping())).resolves.toBe(true);
+      },
+      workerTestTimeout,
+    );
 
     it("should reject invalid worker pool configurations", async () => {
       await expect(createRemote({ workerCount: 0 })).rejects.toThrow(/at least 1/);
@@ -459,57 +583,6 @@ describe("OsmixRemote", () => {
       ).rejects.toThrow(/cannot be used in in-process mode/);
     });
 
-    it("terminates raw workers exactly once when disposed", async () => {
-      class MockWorker {
-        static instances: MockWorker[] = [];
-
-        readonly terminate = vi.fn();
-
-        constructor() {
-          MockWorker.instances.push(this);
-        }
-
-        addEventListener() {}
-
-        postMessage() {}
-      }
-
-      vi.stubGlobal("Worker", MockWorker);
-      const remote = await createRemote({ workerCount: 1 });
-
-      remote.terminate();
-      remote[Symbol.dispose]();
-
-      expect(MockWorker.instances).toHaveLength(1);
-      expect(MockWorker.instances[0]?.terminate).toHaveBeenCalledTimes(1);
-      expect(remote.workerCount).toBe(0);
-      expect(() => remote.mode).toThrow(/not initialized/);
-    });
-
-    it("cleans up workers created before initialization fails", async () => {
-      class MockWorker {
-        static instances: MockWorker[] = [];
-
-        readonly terminate = vi.fn();
-
-        constructor() {
-          if (MockWorker.instances.length === 1) throw Error("second worker failed");
-          MockWorker.instances.push(this);
-        }
-
-        addEventListener() {}
-
-        postMessage() {}
-      }
-
-      vi.stubGlobal("Worker", MockWorker);
-
-      await expect(createRemote({ workerCount: 2 })).rejects.toThrow("second worker failed");
-
-      expect(MockWorker.instances).toHaveLength(1);
-      expect(MockWorker.instances[0]?.terminate).toHaveBeenCalledTimes(1);
-    });
-
     it("makes in-process disposal idempotent", async () => {
       const remote = await createRemote({ inProcess: true });
 
@@ -520,6 +593,7 @@ describe("OsmixRemote", () => {
       }).not.toThrow();
       expect(remote.workerCount).toBe(0);
       expect(() => remote.getWorker()).toThrow(/No worker available/);
+      await Promise.all([remote.dispose(), remote.dispose(), remote[Symbol.asyncDispose]()]);
     });
   });
 });

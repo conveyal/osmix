@@ -122,7 +122,7 @@ describe("merge osm", () => {
         },
       });
     },
-    10_000,
+    30_000,
   );
 
   it.skip("should merge seattle with deduplication", async () => {

@@ -9,18 +9,16 @@
  * const remote = await createRemote()
  *
  * @example
- * // Custom worker - import from worker to avoid side effects
- * import { OsmixWorker } from "osmix"
- * import { expose } from "comlink"
+ * // Custom cross-runtime worker
+ * import { exposeOsmixWorker, OsmixWorker } from "osmix"
  *
  * class MyWorker extends OsmixWorker {
  *   myMethod() { ... }
  * }
- * expose(new MyWorker())
+ * void exposeOsmixWorker(new MyWorker())
  */
 
-import { expose } from "comlink";
-
+import { exposeOsmixWorker } from "./worker-runtime.ts";
 import { OsmixWorker } from "./worker.ts";
 
-expose(new OsmixWorker());
+void exposeOsmixWorker(new OsmixWorker());
