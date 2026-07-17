@@ -12,16 +12,31 @@ import { supportsReadableStreamTransfer } from "./utils.ts";
 
 /**
  * How an `OsmixRemote` runs its workload.
- * - `multi-worker`: a pool of Web Workers sharing datasets via `SharedArrayBuffer`.
- * - `single-worker`: one Web Worker; data is transferred/cloned instead of shared.
- * - `in-process`: no Web Worker; everything runs on the calling thread.
+ * - `multi-worker`: worker pool sharing datasets via `SharedArrayBuffer`.
+ * - `single-worker`: one browser, Bun, Deno, or Node worker.
+ * - `in-process`: no worker; everything runs on the calling thread.
  */
 export type OsmixMode = "multi-worker" | "single-worker" | "in-process";
 
+/** Worker implementation available in the current runtime. */
+export type WorkerRuntime = "web" | "bun" | "deno" | "node" | "none";
+
+/** Options for selecting a bounded worker count while reserving caller capacity. */
+export interface SelectWorkerCountOptions {
+  /** Available logical processors. Defaults to the current runtime capability. */
+  hardwareConcurrency?: number;
+  /** Logical processors to leave for the caller. Defaults to 0. */
+  reserveCores?: number;
+  /** Upper bound for the selected worker count. Defaults to no explicit bound. */
+  maxWorkers?: number;
+}
+
 /** Snapshot of the runtime capabilities that determine which `OsmixMode`s are available. */
 export interface OsmixCapabilities {
-  /** Web Workers are available (`typeof Worker !== "undefined"`). Always false in Node. */
+  /** The Web Worker API is available. Always false in Node. */
   webWorkers: boolean;
+  /** Worker runtime selected by Osmix (`worker_threads` in Node, Web Workers elsewhere). */
+  workerRuntime: WorkerRuntime;
   /** The `SharedArrayBuffer` constructor exists. */
   sharedArrayBuffer: boolean;
   /** `globalThis.crossOriginIsolated === true` (browser COOP/COEP signal). */
@@ -38,6 +53,43 @@ export interface OsmixCapabilities {
   recommendedMode: OsmixMode;
 }
 
+/** Detect the worker implementation available to Osmix. */
+export function getWorkerRuntime(): WorkerRuntime {
+  const bun = Reflect.get(globalThis, "Bun") as { version?: unknown } | undefined;
+  if (typeof bun?.version === "string") return "bun";
+
+  const deno = Reflect.get(globalThis, "Deno") as { version?: { deno?: unknown } } | undefined;
+  if (typeof deno?.version?.deno === "string") return "deno";
+
+  if (
+    typeof process !== "undefined" &&
+    process.release?.name === "node" &&
+    typeof process.versions?.node === "string"
+  ) {
+    return "node";
+  }
+  return typeof Worker !== "undefined" ? "web" : "none";
+}
+
+/**
+ * Select a worker count while reserving logical processors for the calling thread.
+ * Always returns at least one worker.
+ */
+export function selectWorkerCount({
+  hardwareConcurrency = getOsmixCapabilities().hardwareConcurrency,
+  reserveCores = 0,
+  maxWorkers = Number.POSITIVE_INFINITY,
+}: SelectWorkerCountOptions = {}): number {
+  const hardware = Number.isFinite(hardwareConcurrency)
+    ? Math.max(1, Math.floor(hardwareConcurrency))
+    : 1;
+  const reserve = Number.isFinite(reserveCores) ? Math.max(0, Math.floor(reserveCores)) : 0;
+  const maximum = Number.isFinite(maxWorkers)
+    ? Math.max(1, Math.floor(maxWorkers))
+    : Number.POSITIVE_INFINITY;
+  return Math.max(1, Math.min(maximum, hardware - reserve));
+}
+
 /**
  * Check whether `SharedArrayBuffer`s can be shared across threads.
  *
@@ -47,6 +99,7 @@ export interface OsmixCapabilities {
  */
 export function canShareArrayBuffers(): boolean {
   if (typeof SharedArrayBuffer === "undefined") return false;
+  if (getWorkerRuntime() === "node") return true;
   // Browsers gate postMessage of SharedArrayBuffers behind cross-origin isolation.
   if ("crossOriginIsolated" in globalThis) return globalThis.crossOriginIsolated === true;
   return true;
@@ -58,23 +111,22 @@ export function canShareArrayBuffers(): boolean {
  */
 export function getOsmixCapabilities(): OsmixCapabilities {
   const webWorkers = typeof Worker !== "undefined";
+  const workerRuntime = getWorkerRuntime();
   const sharedArrayBuffer = typeof SharedArrayBuffer !== "undefined";
   const crossOriginIsolated = globalThis.crossOriginIsolated === true;
   const canShare = canShareArrayBuffers();
   const hardwareConcurrency = globalThis.navigator?.hardwareConcurrency ?? 1;
-  const maxWorkers = webWorkers && canShare ? hardwareConcurrency : 1;
+  const maxWorkers = workerRuntime !== "none" && canShare ? hardwareConcurrency : 1;
   return {
     webWorkers,
+    workerRuntime,
     sharedArrayBuffer,
     crossOriginIsolated,
     canShareArrayBuffers: canShare,
     streamTransfer: supportsReadableStreamTransfer(),
     hardwareConcurrency,
     maxWorkers,
-    recommendedMode: webWorkers
-      ? maxWorkers > 1
-        ? "multi-worker"
-        : "single-worker"
-      : "in-process",
+    recommendedMode:
+      workerRuntime !== "none" ? (maxWorkers > 1 ? "multi-worker" : "single-worker") : "in-process",
   };
 }

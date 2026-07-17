@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [24, 26]
+        node: [20, 22, 24]
 
     steps:
       - name: Checkout repository
@@ -44,7 +44,9 @@ jobs:
       - name: Setup Node.js for package preparation
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node }}
+          # pnpm 11 uses node:sqlite and therefore needs a newer preparation
+          # runtime than the oldest Node version supported by the packed API.
+          node-version: 24
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6

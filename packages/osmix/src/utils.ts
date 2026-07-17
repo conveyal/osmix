@@ -76,9 +76,10 @@ export function supportsReadableStreamTransfer(): boolean {
   // Require the basics first
   if (typeof ReadableStream === "undefined" || typeof MessageChannel === "undefined") return false;
 
-  const { port1 } = new MessageChannel();
+  const { port1, port2 } = new MessageChannel();
   try {
-    const rs = new ReadableStream(); // empty is fine for feature test
+    // A closed stream exercises transferability without leaving a live stream resource in Deno.
+    const rs = new ReadableStream({ start: (controller) => controller.close() });
     // If transferable streams are unsupported, this line throws a DataCloneError
     port1.postMessage(rs, [rs]);
     return true;
@@ -86,5 +87,6 @@ export function supportsReadableStreamTransfer(): boolean {
     return false;
   } finally {
     port1.close();
+    port2.close();
   }
 }

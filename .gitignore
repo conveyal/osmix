@@ -6,6 +6,7 @@ apps/**/dist/
 
 # Dependencies
 node_modules/
+.pnpm-store/
 packages/**/node_modules/
 apps/**/node_modules/
 

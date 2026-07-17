@@ -54,7 +54,7 @@ before creating a remote:
 import { createRemote, getOsmixCapabilities } from "osmix";
 
 console.log(getOsmixCapabilities());
-// { webWorkers: true, canShareArrayBuffers: false, maxWorkers: 1, recommendedMode: "single-worker", ... }
+// { workerRuntime: "web", canShareArrayBuffers: false, maxWorkers: 1, recommendedMode: "single-worker", ... }
 
 using remote = await createRemote();
 console.log(remote.mode, remote.workerCount); // "single-worker", 1
@@ -62,12 +62,15 @@ console.log(remote.mode, remote.workerCount); // "single-worker", 1
 
 #### Environment support
 
-| Environment                                       | Mode            | Behavior                                                           |
-| ------------------------------------------------- | --------------- | ------------------------------------------------------------------ |
-| Browser, [cross-origin isolated][coi]             | `multi-worker`  | One worker per core; datasets shared via `SharedArrayBuffer`       |
-| Browser, not isolated (no COOP/COEP headers)      | `single-worker` | One worker; data is transferred/copied instead of shared           |
-| No Web Workers (Node, restricted runtimes)        | throws          | Pass `inProcess: true` or use the main-thread API (`fromPbf`, ...) |
-| `createRemote({ inProcess: true })` (Node, tests) | `in-process`    | Same API on the calling thread; long operations block that thread  |
+| Environment                                  | Mode            | Behavior                                                          |
+| -------------------------------------------- | --------------- | ----------------------------------------------------------------- |
+| Browser, [cross-origin isolated][coi]        | `multi-worker`  | One worker per core; datasets shared via `SharedArrayBuffer`      |
+| Browser, not isolated (no COOP/COEP headers) | `single-worker` | One worker; data is transferred/copied instead of shared          |
+| Bun                                          | Web Workers     | Runs off-thread; shared buffers enable multi-worker datasets      |
+| Deno                                         | Web Workers     | Runs off-thread; local worker entries require read permission     |
+| Node 20+                                     | worker threads  | Runs off-thread; shared buffers enable multi-worker datasets      |
+| No worker implementation                     | throws          | Pass `inProcess: true` or use the main-thread API                 |
+| `createRemote({ inProcess: true })`          | `in-process`    | Same API on the calling thread; long operations block that thread |
 
 [coi]: https://developer.mozilla.org/en-US/docs/Web/API/Window/crossOriginIsolated
 
@@ -150,15 +153,14 @@ The custom worker entry is schematic application wiring:
 
 ```ts schematic
 // my.worker.ts
-import { expose } from "comlink";
-import { OsmixWorker } from "osmix";
+import { exposeOsmixWorker, OsmixWorker } from "osmix";
 
 export class MyWorker extends OsmixWorker {
   countCafes(osmId: string) {
     return this.get(osmId).nodes.search("amenity", "cafe").length;
   }
 }
-expose(new MyWorker());
+void exposeOsmixWorker(new MyWorker());
 ```
 
 The matching Vite client wiring is also schematic:
@@ -171,8 +173,62 @@ import workerUrl from "./my.worker.ts?worker&url";
 const remote = await createRemote<MyWorker>({
   workerUrl: new URL(workerUrl, import.meta.url),
 });
-const cafes = await remote.getWorker().countCafes(osmId);
+const cafes = await remote.runWithWorker((worker) => worker.countCafes(osmId), {
+  lane: "compute",
+  retry: "once",
+});
 ```
+
+`runWithWorker()` reserves an available worker until the operation settles. Use
+the `control` lane for stateful sequences, and retry only read-only, replayable
+operations. `getWorker()` remains available for compatibility but does not
+participate in availability scheduling.
+
+Worker restart recovery never retains a second copy of input bytes. Shared
+datasets keep only their `SharedArrayBuffer` descriptors. In single-worker mode,
+datasets loaded from a `File` are replayed from that same file reference, and
+GeoParquet URLs or paths are reopened. Streams and raw buffers are one-shot
+sources: if their worker is lost, the next retry rejects with
+`OsmixDatasetLossError` instead of continuing against an empty worker. Custom
+`OsmixRemote` subclasses can implement `recoverDataset()` and call
+`registerDatasetForRecovery()` for application-owned durable sources such as
+IndexedDB or a filesystem path. Mutating operations are never retried.
+If a dataset transfer, rename, or deletion broadcast fails after only some
+workers may have committed it, the pool is disposed and later calls reject with
+`OsmixRemoteStateError` rather than reading divergent state.
+
+#### Low-level worker pools
+
+Applications with custom worker protocols can use the supported
+`osmix/worker-pool` entrypoint directly:
+
+```ts schematic
+import { createOsmixWorkerPool } from "osmix/worker-pool";
+import type { MyWorker } from "./my.worker.ts";
+
+const pool = await createOsmixWorkerPool<MyWorker>({
+  workerCount: 4,
+  workerUrl: new URL("./my.worker.js", import.meta.url),
+  restoreWorker: async (worker) => worker.restoreReadOnlyState(),
+});
+
+try {
+  const result = await pool.run((worker, workerIndex) => worker.read(workerIndex), {
+    priority: 10,
+    retry: "once",
+    signal: abortController.signal,
+  });
+} finally {
+  await pool.dispose();
+}
+```
+
+The pool provides stable priority/FIFO scheduling, worker affinity, bounded
+startup/restoration/operation timeouts, queued aborts, one restart per slot,
+opt-in retry-after-restart, and diagnostics. It does not know how to replicate
+application state; supply `restoreWorker` when restarted workers need datasets
+or derived indexes. A restoration error is preserved as the terminal slot error
+so queued work sees the actual cause.
 
 See [`MergeWorker`](../../apps/merge/src/workers/osm.worker.ts) for a real
 example that adds IndexedDB storage.
@@ -270,13 +326,17 @@ spec-compliant without staging everything in memory.
 
 ### Workers (OsmixRemote)
 
-- `createRemote(options?)` - Create worker pool manager.
+- `createRemote(options?)` - Create a browser, Bun, Deno, or Node worker pool manager.
   - `options.workerCount` - Number of workers (default: all cores when SABs are shareable, else 1).
   - `options.workerUrl` - Custom worker entry (see [Workers](#workers)).
-  - `options.inProcess` - Run on the calling thread (Node, tests).
+  - `options.inProcess` - Explicitly run on the calling thread (blocking; useful in tests).
+  - `options.restoreTimeoutMs` - Bound replacement-worker rehydration time.
+  - `options.workerRuntime` - Override automatic `"web" | "bun" | "deno" | "node"` selection.
 - `getOsmixCapabilities()` - Inspect runtime support (workers, SAB sharing, max workers, recommended mode).
 - `canShareArrayBuffers()` - Whether `SharedArrayBuffer`s can be posted between threads.
 - `remote.mode` - Selected mode: `"multi-worker" | "single-worker" | "in-process"`.
+- `await remote.dispose()` - Await worker shutdown; also available through `Symbol.asyncDispose`.
+- `remote.runWithWorker(task, options?)` - Lease a managed `any`, `control`, or `compute` lane.
 - `remote.fromPbf(data, options?)` - Load in worker.
 - `remote.fromGeoJSON(data, options?)` - Load in worker.
 - `remote.getVectorTile(osmId, tile)` - Generate MVT in worker.

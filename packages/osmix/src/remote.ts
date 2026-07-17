@@ -1,7 +1,7 @@
 /**
  * Worker-based remote API for OSM operations.
  *
- * OsmixRemote manages a pool of Web Workers and provides a high-level API
+ * OsmixRemote manages a pool of browser or Node workers and provides a high-level API
  * for loading, querying, and manipulating OSM data off the main thread.
  * Uses SharedArrayBuffer for efficient multi-worker data sharing when available.
  *
@@ -9,19 +9,38 @@
  */
 
 import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change";
-import { Osm, type OsmInfo, type OsmOptions } from "@osmix/core";
+import { Osm, type OsmInfo, type OsmOptions, type OsmTransferables } from "@osmix/core";
 import type { GeoParquetReadOptions } from "@osmix/geoparquet";
 import { type GtfsConversionOptions, isGtfsZip as isGtfsZipBytes } from "@osmix/gtfs";
 import { type OsmFromPbfOptions, toPbfStream } from "@osmix/load";
-import type { DefaultSpeeds, HighwayFilter, RouteOptions, RouteResult } from "@osmix/router";
+import type {
+  DefaultSpeeds,
+  HighwayFilter,
+  RouteOptions,
+  RouteResult,
+  RoutingGraphTransferables,
+} from "@osmix/router";
+import { inspectBackingBuffers } from "@osmix/shared/backing-buffers";
 import type { Progress } from "@osmix/shared/progress";
 import { streamToBytes } from "@osmix/shared/stream-to-bytes";
 import type { LonLat, OsmEntityType, Tile } from "@osmix/types";
 import * as Comlink from "comlink";
 
-import { canShareArrayBuffers, getOsmixCapabilities, type OsmixMode } from "./capabilities.ts";
+import {
+  canShareArrayBuffers,
+  getOsmixCapabilities,
+  type OsmixMode,
+  type WorkerRuntime,
+} from "./capabilities.ts";
 import type { DrawToRasterTileOptions } from "./raster.ts";
 import { supportsReadableStreamTransfer, transfer } from "./utils.ts";
+import {
+  createOsmixWorkerConnection,
+  createOsmixWorkerPool,
+  defaultOsmixWorkerUrl,
+  type OsmixWorkerPool,
+  type OsmixWorkerPoolDiagnostics,
+} from "./worker-pool.ts";
 import { OsmixWorker } from "./worker.ts";
 
 /** Identifier for an OSM dataset: string ID, Osm instance, or OsmInfo object. */
@@ -187,13 +206,69 @@ export interface OsmixRemoteOptions {
    * })
    */
   workerUrl?: URL;
+  /** Override automatic browser/Bun/Deno Web Worker or Node worker-thread selection. */
+  workerRuntime?: WorkerRuntime | "auto";
   /**
-   * Run the `OsmixWorker` on the calling thread instead of spawning a Web
+   * Run the `OsmixWorker` on the calling thread instead of spawning a
    * Worker. The API is identical but nothing runs in parallel and long
    * operations will block the current thread. This is the supported path for
-   * environments without Web Workers (e.g. Node, vitest).
+   * worker. This is useful for tests and explicitly blocking workflows.
    */
   inProcess?: boolean;
+  /** Maximum times a failed worker slot is recreated. Defaults to one. */
+  restartAttempts?: number;
+  /** Maximum time to rehydrate a replacement worker. Defaults to 10 seconds. */
+  restoreTimeoutMs?: number;
+}
+
+/** Worker lane used by {@link OsmixRemote.runWithWorker}. */
+export type OsmixWorkerLane = "any" | "compute" | "control";
+
+/** Scheduling controls for a managed custom-worker operation. */
+export interface OsmixRunWithWorkerOptions {
+  /** Cancel a queued operation. Running work must still cooperate to stop early. */
+  signal?: AbortSignal;
+  /** Prefer control worker zero, compute workers, or any available worker. */
+  lane?: OsmixWorkerLane;
+  /** Higher values run before lower-priority queued work; equal priorities stay FIFO. */
+  priority?: number;
+  /** Retry once after a successful worker restart and rehydration. Defaults to never. */
+  retry?: "never" | "once";
+  /** Reject and restart a worker when this operation exceeds the supplied duration. */
+  timeoutMs?: number;
+}
+
+/** A known worker dataset could not be reconstructed after its worker restarted. */
+export class OsmixDatasetLossError extends Error {
+  readonly datasetIds: readonly string[];
+  readonly workerIndex: number;
+  override readonly cause: unknown;
+
+  constructor(datasetIds: readonly string[], workerIndex: number, cause?: unknown) {
+    super(
+      `Worker ${workerIndex} restarted without a replayable source for dataset${
+        datasetIds.length === 1 ? "" : "s"
+      }: ${datasetIds.join(", ")}`,
+      { cause },
+    );
+    this.name = "OsmixDatasetLossError";
+    this.datasetIds = [...datasetIds];
+    this.workerIndex = workerIndex;
+    this.cause = cause;
+  }
+}
+
+/** A broadcast state change may have left worker slots with divergent state. */
+export class OsmixRemoteStateError extends Error {
+  readonly operation: string;
+  override readonly cause: unknown;
+
+  constructor(operation: string, cause: unknown) {
+    super(`The Osmix worker pool is unusable after a partial ${operation}`, { cause });
+    this.name = "OsmixRemoteStateError";
+    this.operation = operation;
+    this.cause = cause;
+  }
 }
 
 /**
@@ -201,10 +276,10 @@ export interface OsmixRemoteOptions {
  * Each worker receives the same progress listener proxy if provided.
  *
  * Mode selection (see `getOsmixCapabilities()` and `remote.mode`):
- * - Cross-origin isolated browsers get one worker per core, sharing datasets
+ * - Cross-origin isolated browsers, Bun, Deno, and Node get shared multi-worker datasets
  *   via `SharedArrayBuffer`.
  * - Browsers without `SharedArrayBuffer` sharing get a single worker.
- * - Environments without Web Workers throw; pass `inProcess: true` to run on
+ * - Environments without a worker implementation throw; pass `inProcess: true` to run on
  *   the calling thread instead.
  *
  * @example
@@ -222,11 +297,22 @@ export async function createRemote<T extends OsmixWorker = OsmixWorker>({
   workerCount,
   onProgress,
   workerUrl,
+  workerRuntime = "auto",
   inProcess = false,
+  restartAttempts = 1,
+  restoreTimeoutMs,
 }: OsmixRemoteOptions = {}): Promise<OsmixRemote<T>> {
   const remote = new OsmixRemote<T>();
   const count = workerCount ?? (inProcess ? 1 : getOsmixCapabilities().maxWorkers);
-  await remote.initializeWorkerPool(count, workerUrl, onProgress, inProcess);
+  await remote.initializeWorkerPool(
+    count,
+    workerUrl,
+    onProgress,
+    inProcess,
+    restartAttempts,
+    workerRuntime,
+    restoreTimeoutMs,
+  );
   return remote;
 }
 
@@ -237,45 +323,21 @@ export async function createRemote<T extends OsmixWorker = OsmixWorker>({
  * (published package in Node, CDNs, and unbundled ESM).
  */
 export function defaultWorkerUrl(): URL {
-  const ext = import.meta.url.endsWith(".ts") ? "ts" : "js";
-  return new URL(`./osmix.worker.${ext}`, import.meta.url);
+  return defaultOsmixWorkerUrl(import.meta.url);
 }
-
-const NO_WORKER_SUPPORT_MESSAGE =
-  "Web Workers are not available in this environment. Use the main-thread API " +
-  "(fromPbf, fromGeoJSON, ...) or pass { inProcess: true } to createRemote() to " +
-  "run on the calling thread.";
 
 type WorkerCleanup = () => void;
 
 const workerCleanup = new WeakMap<object, WorkerCleanup>();
 
-/**
- * Create an `OsmixWorker` that runs on the calling thread, connected through a
- * `MessageChannel` so it can be driven by the same Comlink RPC as a real
- * worker. Used for environments without Web Workers (e.g. Node, vitest).
- */
-function createInProcessOsmixWorker<T extends OsmixWorker = OsmixWorker>(): Comlink.Remote<T> {
-  const { port1, port2 } = new MessageChannel();
-  try {
-    Comlink.expose(new OsmixWorker(), port1);
-    const remote = Comlink.wrap<T>(port2);
-    workerCleanup.set(remote, () => {
-      port1.close();
-      port2.close();
-    });
-    return remote;
-  } catch (error) {
-    port1.close();
-    port2.close();
-    throw error;
-  }
+function hasOnlySharedBackingBuffers(value: unknown): boolean {
+  const inspection = inspectBackingBuffers(value);
+  return inspection.unique > 0 && inspection.arrayBuffers === 0;
 }
 
 /**
  * Create a single `OsmixWorker` instance wrapped with Comlink.
- * Spawns a new Web Worker and returns a proxy for cross-thread RPC.
- * Throws in environments without Web Worker support.
+ * Spawns a browser, Bun, or Deno Worker or a Node worker thread and returns a proxy.
  *
  * @param workerUrl - Optional URL to a custom worker file. If not provided,
  *                    uses the default `OsmixWorker`.
@@ -293,27 +355,11 @@ function createInProcessOsmixWorker<T extends OsmixWorker = OsmixWorker>(): Coml
 export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
   workerUrl?: URL,
 ): Promise<Comlink.Remote<T>> {
-  if (typeof Worker === "undefined") throw Error(NO_WORKER_SUPPORT_MESSAGE);
-
-  const worker = new Worker(workerUrl ?? defaultWorkerUrl(), { type: "module" });
-  try {
-    if (!workerUrl) {
-      worker.addEventListener("error", (event) => {
-        console.error(
-          "osmix: the default worker failed to start. Bundlers often cannot resolve " +
-            "the default worker URL; pass `workerUrl` to createRemote() using your " +
-            "bundler's worker pattern. See https://github.com/conveyal/osmix/tree/main/packages/osmix#workers",
-          event,
-        );
-      });
-    }
-    const remote = Comlink.wrap<T>(worker);
-    workerCleanup.set(remote, () => worker.terminate());
-    return remote;
-  } catch (error) {
-    worker.terminate();
-    throw error;
-  }
+  const connection = await createOsmixWorkerConnection<T>({
+    workerUrl: workerUrl ?? defaultWorkerUrl(),
+  });
+  workerCleanup.set(connection.remote, () => connection.terminate());
+  return connection.remote;
 }
 
 /**
@@ -330,10 +376,29 @@ export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
  * })
  * // remote.getWorker() returns Comlink.Remote<MyWorker>
  */
+interface ActiveChangesetState {
+  baseOsmId: string;
+  changeTypes: OsmChangeTypes[];
+  entityTypes: OsmEntityType[];
+  options: Partial<OsmMergeOptions>;
+  patchOsmId: string;
+}
+
+type DatasetRestorer<T extends OsmixWorker> = (
+  worker: Comlink.Remote<T>,
+  datasetId: string,
+) => Promise<unknown>;
+
 export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
-  private workers: Comlink.Remote<T>[] = [];
-  private changesetWorker: Comlink.Remote<T> | null = null;
+  private activeChangeset: ActiveChangesetState | null = null;
+  private readonly datasetRestorers = new Map<string, DatasetRestorer<T> | null>();
+  private readonly retainedDatasets = new Map<string, OsmTransferables>();
+  private readonly retainedRoutingGraphs = new Map<string, RoutingGraphTransferables>();
+  private onProgress: ((progress: Progress) => void) | undefined;
+  private disposal: Promise<void> | null = null;
   private poolMode: OsmixMode | null = null;
+  private terminalError: OsmixRemoteStateError | null = null;
+  private workerPool: OsmixWorkerPool<T> | null = null;
 
   /**
    * How this remote runs its workload: `multi-worker`, `single-worker`, or
@@ -346,7 +411,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 
   /** Number of workers in the pool. */
   get workerCount(): number {
-    return this.workers.length;
+    return this.workerPool?.workerCount ?? 0;
   }
 
   /**
@@ -354,15 +419,18 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * - Use a custom worker by passing a worker URL.
    * - Pass a progress listener to receive updates during long-running operations.
    * - Multiple workers require `SharedArrayBuffer` sharing (see `getOsmixCapabilities()`).
-   * - Pass `inProcess: true` to run a single `OsmixWorker` on the calling thread
-   *   (environments without Web Workers, e.g. Node and vitest).
+   * - Pass `inProcess: true` to run a single `OsmixWorker` on the calling thread.
    */
   async initializeWorkerPool(
     workerCount: number,
     workerUrl?: URL,
     onProgress?: (progress: Progress) => void,
     inProcess = false,
+    restartAttempts = 1,
+    workerRuntime: WorkerRuntime | "auto" = "auto",
+    restoreTimeoutMs?: number,
   ) {
+    if (this.disposal) await this.disposal;
     if (workerCount < 1) throw Error("Worker count must be at least 1");
     if (workerCount > 1 && inProcess)
       throw Error("In-process mode runs on the calling thread and supports only one worker.");
@@ -375,38 +443,125 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
           "(Cross-Origin-Opener-Policy: same-origin, Cross-Origin-Embedder-Policy: require-corp) " +
           "or omit workerCount. See https://github.com/conveyal/osmix/tree/main/packages/osmix#enabling-multi-worker-mode",
       );
+    this.onProgress = onProgress;
+    this.terminalError = null;
     try {
-      for (let i = 0; i < workerCount; i++) {
-        const worker = inProcess
-          ? createInProcessOsmixWorker<T>()
-          : await createOsmixWorker<T>(workerUrl);
-        this.workers.push(worker);
-        if (onProgress) {
-          await worker.addProgressListener(Comlink.proxy(onProgress));
-        }
+      this.workerPool = await createOsmixWorkerPool<T>({
+        createInProcessWorker: () => new OsmixWorker() as T,
+        inProcess,
+        restartAttempts,
+        restoreTimeoutMs,
+        runtime: workerRuntime,
+        restoreWorker: (worker, index, attempt) => this.restorePoolWorker(worker, index, attempt),
+        workerCount,
+        workerUrl: inProcess ? undefined : (workerUrl ?? defaultWorkerUrl()),
+      });
+      if (onProgress) {
+        await this.workerPool.broadcast((worker) =>
+          worker.addProgressListener(Comlink.proxy(onProgress)),
+        );
       }
     } catch (error) {
       this.terminate();
       throw error;
     }
-    this.changesetWorker = this.workers[0]!;
     this.poolMode = inProcess ? "in-process" : workerCount > 1 ? "multi-worker" : "single-worker";
   }
 
   /**
-   * Select the next available worker in a round-robin fashion.
-   * Cycles workers to balance load across the pool.
+   * Run a custom operation on a managed worker. The worker remains leased until
+   * the returned promise settles, allowing the pool to dispatch by availability.
    */
-  private nextWorker() {
-    const nextWorker = this.workers.shift();
-    if (!nextWorker) throw Error("No worker available");
-    this.workers.push(nextWorker);
-    return nextWorker;
+  runWithWorker<R>(
+    task: (worker: Comlink.Remote<T>, index: number) => R | Promise<R>,
+    options: OsmixRunWithWorkerOptions = {},
+  ): Promise<R> {
+    if (this.terminalError) return Promise.reject(this.terminalError);
+    const pool = this.getPool();
+    const { lane = "any", ...runOptions } = options;
+    const allIndexes = pool.workerIndexes;
+    const eligibleWorkerIndexes =
+      lane === "control"
+        ? [allIndexes[0]!]
+        : lane === "compute" && allIndexes.length > 1
+          ? allIndexes.slice(1)
+          : allIndexes;
+    return pool.run(task, { ...runOptions, eligibleWorkerIndexes });
+  }
+
+  /** Run an operation on every worker while respecting existing leases. */
+  protected broadcastToWorkers<R>(
+    task: (worker: Comlink.Remote<T>, index: number) => R | Promise<R>,
+    options: Omit<OsmixRunWithWorkerOptions, "lane"> = {},
+  ): Promise<R[]> {
+    return this.getPool().broadcast(task, options);
   }
 
   /**
-   * Get a worker proxy for calling custom methods on extended workers.
-   * Returns the next worker in the pool using round-robin selection.
+   * Broadcast state that must agree across every selected worker. A final
+   * failure is terminal because the caller cannot know which slots committed.
+   */
+  protected async broadcastStateChange<R>(
+    operation: string,
+    task: (worker: Comlink.Remote<T>, index: number) => R | Promise<R>,
+    options: {
+      eligibleWorkerIndexes?: readonly number[];
+      retry?: "never" | "once";
+    } = {},
+  ): Promise<R[]> {
+    const pool = this.getPool();
+    try {
+      return await pool.broadcast(task, options);
+    } catch (cause) {
+      const error = new OsmixRemoteStateError(operation, cause);
+      this.terminalError = error;
+      void pool.dispose();
+      throw error;
+    }
+  }
+
+  /** Run an operation on one stable worker index while respecting its lease. */
+  protected runOnWorker<R>(
+    index: number,
+    task: (worker: Comlink.Remote<T>, index: number) => R | Promise<R>,
+    options: Omit<OsmixRunWithWorkerOptions, "lane"> = {},
+  ): Promise<R> {
+    return this.getPool().runOn(index, task, options);
+  }
+
+  /** Inspect the managed pool without exposing raw worker proxies. */
+  protected workerPoolDiagnostics(): OsmixWorkerPoolDiagnostics {
+    return this.getPool().diagnostics();
+  }
+
+  /** Stable worker indexes for subclass lane and broadcast policies. */
+  protected workerIndexes(): readonly number[] {
+    return this.getPool().workerIndexes;
+  }
+
+  /**
+   * Send an out-of-band cooperative signal without acquiring worker leases.
+   * This is intentionally limited to idempotent notifications such as generation
+   * cancellation that must be observed by an async RPC already running in a slot.
+   */
+  protected notifyWorkers(
+    task: (worker: Comlink.Remote<T>, index: number) => void | Promise<void>,
+    workerIndexes: readonly number[] = this.workerIndexes(),
+  ): void {
+    const pool = this.getPool();
+    for (const index of workerIndexes) {
+      try {
+        void Promise.resolve(task(pool.getUnmanagedWorker(index), index)).catch(() => undefined);
+      } catch {
+        // Notifications are best-effort; managed work surfaces slot failures.
+      }
+    }
+  }
+
+  /**
+   * Get an unmanaged worker proxy for backwards compatibility.
+   * @deprecated Use {@link runWithWorker} so busy workers, cancellation, and
+   * recovery are tracked by the pool.
    *
    * @example
    * class ShortbreadWorker extends OsmixWorker {
@@ -418,25 +573,136 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * const tile = await remote.getWorker().getShortbreadVectorTile(osmId, tile)
    */
   getWorker(): Comlink.Remote<T> {
-    return this.nextWorker();
+    return this.getPool().getUnmanagedWorker();
   }
 
+  /** Restore application-specific state after base datasets and graphs are present. */
+  protected async rehydrateWorker(
+    _worker: Comlink.Remote<T>,
+    _index: number,
+    _restartAttempt: number,
+  ): Promise<void> {}
+
   /**
-   * Retrieve the dedicated changeset worker.
-   * Changesets must always be handled by the same worker to maintain consistency.
+   * Restore a known dataset from an application-owned replayable source.
+   *
+   * Subclasses can use this for sources such as IndexedDB or a filesystem path
+   * without retaining a second copy of the dataset bytes in `OsmixRemote`.
+   * Return `true` after installing `datasetId` in `worker`; the base class still
+   * verifies that the dataset exists before making the slot available.
    */
-  private getChangesetWorker() {
-    if (!this.changesetWorker) throw Error("No changeset worker available");
-    return this.changesetWorker;
+  protected async recoverDataset(
+    _worker: Comlink.Remote<T>,
+    _datasetId: string,
+    _workerIndex: number,
+    _restartAttempt: number,
+  ): Promise<boolean> {
+    return false;
+  }
+
+  /** Mark an application-loaded dataset as known so restart recovery is verified. */
+  protected registerDatasetForRecovery(osmId: OsmId): void {
+    const id = this.getId(osmId);
+    if (!this.datasetRestorers.has(id)) this.datasetRestorers.set(id, null);
+  }
+
+  /** Forget application-owned recovery metadata when a dataset is intentionally removed. */
+  protected unregisterDatasetForRecovery(osmId: OsmId): void {
+    const id = this.getId(osmId);
+    this.datasetRestorers.delete(id);
+    this.retainedDatasets.delete(id);
+    this.retainedRoutingGraphs.delete(id);
+  }
+
+  /** Mark changed data as known but not reproducible from its original source. */
+  private markDatasetUnrecoverable(osmId: OsmId): void {
+    const id = this.getId(osmId);
+    this.datasetRestorers.set(id, null);
+    this.retainedDatasets.delete(id);
+    this.retainedRoutingGraphs.delete(id);
+  }
+
+  private getPool(): OsmixWorkerPool<T> {
+    if (this.terminalError) throw this.terminalError;
+    if (!this.workerPool) throw Error("No worker available");
+    return this.workerPool;
+  }
+
+  protected async restorePoolWorker(
+    worker: Comlink.Remote<T>,
+    index: number,
+    restartAttempt: number,
+  ): Promise<void> {
+    if (this.onProgress) {
+      await worker.addProgressListener(Comlink.proxy(this.onProgress));
+    }
+    for (const transferables of this.retainedDatasets.values()) {
+      await worker.transferIn(transferables);
+    }
+
+    const recoveryFailures = new Map<string, unknown>();
+    for (const [datasetId, restorer] of this.datasetRestorers) {
+      if (await worker.has(datasetId)) continue;
+      if (restorer) {
+        try {
+          await restorer(worker, datasetId);
+        } catch (error) {
+          recoveryFailures.set(datasetId, error);
+        }
+      }
+      if (await worker.has(datasetId)) continue;
+      try {
+        await this.recoverDataset(worker, datasetId, index, restartAttempt);
+      } catch (error) {
+        recoveryFailures.set(datasetId, error);
+      }
+    }
+
+    try {
+      await this.rehydrateWorker(worker, index, restartAttempt);
+    } catch (error) {
+      const missing = await this.findMissingDatasets(worker);
+      if (missing.length > 0) {
+        throw new OsmixDatasetLossError(missing, index, error);
+      }
+      throw error;
+    }
+
+    const missing = await this.findMissingDatasets(worker);
+    if (missing.length > 0) {
+      const cause = missing.map((id) => recoveryFailures.get(id)).find(Boolean);
+      throw new OsmixDatasetLossError(missing, index, cause);
+    }
+
+    for (const [osmId, transferables] of this.retainedRoutingGraphs) {
+      await worker.transferRoutingGraphIn(osmId, transferables);
+    }
+    if (index === 0 && this.activeChangeset) {
+      const state = this.activeChangeset;
+      await worker.generateChangeset(state.baseOsmId, state.patchOsmId, state.options);
+      await worker.setChangesetFilters(state.changeTypes, state.entityTypes);
+    }
+  }
+
+  private async findMissingDatasets(worker: Comlink.Remote<T>): Promise<string[]> {
+    const missing: string[] = [];
+    for (const datasetId of this.datasetRestorers.keys()) {
+      if (!(await worker.has(datasetId))) missing.push(datasetId);
+    }
+    return missing;
   }
 
   /**
    * Convert various input types into a transferable format suitable for posting to workers.
    * Falls back to converting streams to buffers if stream transfer is unsupported.
    */
+  private isReplayableFile(value: unknown): value is File {
+    return typeof File !== "undefined" && value instanceof File;
+  }
+
   private async getTransferableData(data: ArrayBufferLike | ReadableStream | Uint8Array | File) {
     if (data instanceof ArrayBuffer) return data;
-    if (data instanceof SharedArrayBuffer) return data;
+    if (typeof SharedArrayBuffer !== "undefined" && data instanceof SharedArrayBuffer) return data;
     if (data instanceof Uint8Array) {
       if (data.byteOffset === 0 && data.byteLength === data.buffer.byteLength) {
         return data.buffer;
@@ -447,7 +713,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       if (supportsReadableStreamTransfer()) return data;
       return (await streamToBytes(data)).buffer;
     }
-    if (data instanceof File) {
+    if (this.isReplayableFile(data)) {
       if (supportsReadableStreamTransfer()) return data.stream();
       return data.arrayBuffer();
     }
@@ -459,10 +725,37 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * No-op if SharedArrayBuffer is unsupported (single-worker mode).
    */
   protected async populateOtherWorkers(worker: Comlink.Remote<OsmixWorker>, osmId: OsmId) {
-    if (this.workers.length <= 1) return;
-    if (!canShareArrayBuffers()) return;
+    const pool = this.getPool();
+    this.registerDatasetForRecovery(osmId);
+    if (pool.workerCount <= 1 && !canShareArrayBuffers()) return;
     const transferables = await worker.getOsmBuffers(this.getId(osmId));
-    await Promise.all(this.workers.map((worker) => worker.transferIn(transferables)));
+    const isShared = hasOnlySharedBackingBuffers(transferables);
+    if (pool.workerCount > 1 && !isShared) {
+      throw Error("Multiple workers require a SharedArrayBuffer-backed OSM dataset");
+    }
+    if (isShared) {
+      this.retainedDatasets.set(transferables.id, transferables);
+      // Shared descriptors are the recovery source. Do not also retain a File
+      // or URL that may reference the complete regional input.
+      this.datasetRestorers.set(transferables.id, null);
+    }
+    if (pool.workerCount <= 1) return;
+    await this.broadcastStateChange(
+      "dataset replication",
+      (target) => target.transferIn(transferables),
+      {
+        eligibleWorkerIndexes: pool.workerIndexes.slice(1),
+        retry: "once",
+      },
+    );
+  }
+
+  /** Replicate a control-worker dataset and retain its shared descriptors for recovery. */
+  protected async populateDatasetFromControl(osmId: OsmId): Promise<void> {
+    await this.runWithWorker((worker) => this.populateOtherWorkers(worker, osmId), {
+      lane: "control",
+      retry: "once",
+    });
   }
 
   private wrap(info: OsmInfo): OsmRemoteDataset<T> {
@@ -478,12 +771,24 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     data: ArrayBufferLike | ReadableStream | Uint8Array | File,
     options: Partial<OsmFromPbfOptions> = {},
   ) {
-    const workers = this.workers.slice();
-    const worker0 = workers.shift()!;
-    const osmInfo = await worker0.fromPbf(
-      transfer({ data: await this.getTransferableData(data), options }),
+    const transferableData = await this.getTransferableData(data);
+    const osmInfo = await this.runWithWorker(
+      (worker) => worker.fromPbf(transfer({ data: transferableData, options })),
+      { lane: "control", retry: "never" },
     );
-    await this.populateOtherWorkers(worker0, osmInfo.id);
+    const replayOptions = { ...options };
+    this.datasetRestorers.set(
+      osmInfo.id,
+      this.isReplayableFile(data)
+        ? async (worker, datasetId) => {
+            const replayData = await this.getTransferableData(data);
+            return worker.fromPbf(
+              transfer({ data: replayData, options: { ...replayOptions, id: datasetId } }),
+            );
+          }
+        : null,
+    );
+    await this.populateDatasetFromControl(osmInfo.id);
     return this.wrap(osmInfo);
   }
 
@@ -493,8 +798,12 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    */
   toPbfStream(osmId: OsmId, writeableStream: WritableStream<Uint8Array>) {
     if (!supportsReadableStreamTransfer()) throw Error("Stream transfer not supported");
-    return this.nextWorker().toPbfStream(
-      Comlink.transfer({ osmId: this.getId(osmId), writeableStream }, [writeableStream]),
+    return this.runWithWorker(
+      (worker) =>
+        worker.toPbfStream(
+          Comlink.transfer({ osmId: this.getId(osmId), writeableStream }, [writeableStream]),
+        ),
+      { lane: "any", retry: "never" },
     );
   }
 
@@ -503,7 +812,9 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Returns the buffer transferred from the worker.
    */
   toPbfData(osmId: OsmId) {
-    return this.nextWorker().toPbf(this.getId(osmId));
+    return this.runWithWorker((worker) => worker.toPbf(this.getId(osmId)), {
+      retry: "once",
+    });
   }
 
   /**
@@ -524,15 +835,30 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     data: ArrayBufferLike | ReadableStream | Uint8Array | File,
     options: Partial<OsmOptions> = {},
   ) {
-    const workers = this.workers.slice();
-    const worker0 = workers.shift()!;
-    const osmInfo = await worker0.fromGeoJSON(
-      transfer({
-        data: await this.getTransferableData(data),
-        options,
-      }),
+    const transferableData = await this.getTransferableData(data);
+    const osmInfo = await this.runWithWorker(
+      (worker) =>
+        worker.fromGeoJSON(
+          transfer({
+            data: transferableData,
+            options,
+          }),
+        ),
+      { lane: "control", retry: "never" },
     );
-    await this.populateOtherWorkers(worker0, osmInfo.id);
+    const replayOptions = { ...options };
+    this.datasetRestorers.set(
+      osmInfo.id,
+      this.isReplayableFile(data)
+        ? async (worker, datasetId) => {
+            const replayData = await this.getTransferableData(data);
+            return worker.fromGeoJSON(
+              transfer({ data: replayData, options: { ...replayOptions, id: datasetId } }),
+            );
+          }
+        : null,
+    );
+    await this.populateDatasetFromControl(osmInfo.id);
     return this.wrap(osmInfo);
   }
 
@@ -544,15 +870,30 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     data: ArrayBufferLike | ReadableStream | Uint8Array | File,
     options: Partial<OsmOptions> = {},
   ) {
-    const workers = this.workers.slice();
-    const worker0 = workers.shift()!;
-    const osmInfo = await worker0.fromShapefile(
-      transfer({
-        data: await this.getTransferableData(data),
-        options,
-      }),
+    const transferableData = await this.getTransferableData(data);
+    const osmInfo = await this.runWithWorker(
+      (worker) =>
+        worker.fromShapefile(
+          transfer({
+            data: transferableData,
+            options,
+          }),
+        ),
+      { lane: "control", retry: "never" },
     );
-    await this.populateOtherWorkers(worker0, osmInfo.id);
+    const replayOptions = { ...options };
+    this.datasetRestorers.set(
+      osmInfo.id,
+      this.isReplayableFile(data)
+        ? async (worker, datasetId) => {
+            const replayData = await this.getTransferableData(data);
+            return worker.fromShapefile(
+              transfer({ data: replayData, options: { ...replayOptions, id: datasetId } }),
+            );
+          }
+        : null,
+    );
+    await this.populateDatasetFromControl(osmInfo.id);
     return this.wrap(osmInfo);
   }
 
@@ -565,16 +906,36 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     options: Partial<OsmOptions> = {},
     gtfsOptions: GtfsConversionOptions = {},
   ) {
-    const workers = this.workers.slice();
-    const worker0 = workers.shift()!;
-    const osmInfo = await worker0.fromGtfs(
-      transfer({
-        data: await this.getTransferableData(data),
-        options,
-        gtfsOptions,
-      }),
+    const transferableData = await this.getTransferableData(data);
+    const osmInfo = await this.runWithWorker(
+      (worker) =>
+        worker.fromGtfs(
+          transfer({
+            data: transferableData,
+            options,
+            gtfsOptions,
+          }),
+        ),
+      { lane: "control", retry: "never" },
     );
-    await this.populateOtherWorkers(worker0, osmInfo.id);
+    const replayOptions = { ...options };
+    const replayGtfsOptions = { ...gtfsOptions };
+    this.datasetRestorers.set(
+      osmInfo.id,
+      this.isReplayableFile(data)
+        ? async (worker, datasetId) => {
+            const replayData = await this.getTransferableData(data);
+            return worker.fromGtfs(
+              transfer({
+                data: replayData,
+                options: { ...replayOptions, id: datasetId },
+                gtfsOptions: replayGtfsOptions,
+              }),
+            );
+          }
+        : null,
+    );
+    await this.populateDatasetFromControl(osmInfo.id);
     return this.wrap(osmInfo);
   }
 
@@ -672,17 +1033,44 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     options: Partial<OsmOptions> = {},
     readOptions: GeoParquetReadOptions = {},
   ) {
-    const workers = this.workers.slice();
-    const worker0 = workers.shift()!;
     const transferableData = await this.getGeoParquetTransferableData(data);
-    const osmInfo = await worker0.fromGeoParquet(
-      transfer({
-        data: transferableData,
-        options,
-        readOptions,
-      }),
+    const osmInfo = await this.runWithWorker(
+      (worker) =>
+        worker.fromGeoParquet(
+          transfer({
+            data: transferableData,
+            options,
+            readOptions,
+          }),
+        ),
+      { lane: "control", retry: "never" },
     );
-    await this.populateOtherWorkers(worker0, osmInfo.id);
+    const replayOptions = { ...options };
+    const replayReadOptions = { ...readOptions };
+    const replayableSource =
+      typeof data === "string"
+        ? data
+        : data instanceof URL
+          ? new URL(data.href)
+          : this.isReplayableFile(data)
+            ? data
+            : null;
+    this.datasetRestorers.set(
+      osmInfo.id,
+      replayableSource
+        ? async (worker, datasetId) => {
+            const replayData = await this.getGeoParquetTransferableData(replayableSource);
+            return worker.fromGeoParquet(
+              transfer({
+                data: replayData,
+                options: { ...replayOptions, id: datasetId },
+                readOptions: replayReadOptions,
+              }),
+            );
+          }
+        : null,
+    );
+    await this.populateDatasetFromControl(osmInfo.id);
     return this.wrap(osmInfo);
   }
 
@@ -696,7 +1084,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     if (typeof data === "string") return data;
     if (data instanceof URL) return data;
     if (data instanceof ArrayBuffer) return data;
-    if (data instanceof File) return data.arrayBuffer();
+    if (this.isReplayableFile(data)) return data.arrayBuffer();
     throw Error("Invalid GeoParquet data source");
   }
 
@@ -705,7 +1093,10 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Useful for previewing metadata before committing to a full load.
    */
   async readHeader(data: ArrayBuffer | ReadableStream | Uint8Array | File) {
-    return this.nextWorker().readHeader(await this.getTransferableData(data));
+    const transferableData = await this.getTransferableData(data);
+    return this.runWithWorker((worker) => worker.readHeader(transferableData), {
+      retry: "never",
+    });
   }
 
   /**
@@ -723,14 +1114,17 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Check if an Osm instance has completed index building and is ready for queries.
    */
   async isReady(osmId: OsmId) {
+    if (this.terminalError) throw this.terminalError;
     try {
-      await Promise.all(
-        this.workers.map(async (worker) => {
+      await this.getPool().broadcast(
+        async (worker) => {
           const isReady = await worker.isReady(this.getId(osmId));
           if (!isReady) throw Error("Osm instance is not ready");
-        }),
+        },
+        { retry: "once" },
       );
-    } catch {
+    } catch (error) {
+      if (error instanceof OsmixRemoteStateError) throw error;
       return false;
     }
     return true;
@@ -740,7 +1134,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Check if an `Osm` instance exists in any worker.
    */
   has(osmId: OsmId) {
-    return this.nextWorker().has(this.getId(osmId));
+    return this.runWithWorker((worker) => worker.has(this.getId(osmId)), { retry: "once" });
   }
 
   /**
@@ -748,7 +1142,10 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Useful for direct access when worker overhead is unnecessary.
    */
   async get(osmId: OsmId): Promise<Osm> {
-    const transferables = await this.nextWorker().getOsmBuffers(this.getId(osmId));
+    const transferables = await this.runWithWorker(
+      (worker) => worker.getOsmBuffers(this.getId(osmId)),
+      { retry: "once" },
+    );
     return new Osm(transferables);
   }
 
@@ -757,7 +1154,10 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Useful for final cleanup or moving data out of worker context.
    */
   async transferOut(osmId: OsmId): Promise<Osm> {
-    const transferables = await this.nextWorker().transferOut(this.getId(osmId));
+    const transferables = await this.runWithWorker(
+      (worker) => worker.transferOut(this.getId(osmId)),
+      { lane: "control", retry: "never" },
+    );
     await this.delete(osmId);
     return new Osm(transferables);
   }
@@ -767,8 +1167,15 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Distributes data across the worker pool for parallel operations.
    */
   async transferIn(osm: Osm): Promise<void> {
-    await Promise.all(
-      this.workers.map((worker) => worker.transferIn(transfer(osm.transferables()))),
+    const transferables = osm.transferables();
+    const isShared = hasOnlySharedBackingBuffers(transferables);
+    if (this.workerCount > 1 && !isShared) {
+      throw Error("Multiple workers require a SharedArrayBuffer-backed OSM dataset");
+    }
+    this.markDatasetUnrecoverable(transferables.id);
+    if (isShared) this.retainedDatasets.set(transferables.id, transferables);
+    await this.broadcastStateChange("dataset transfer", (worker) =>
+      worker.transferIn(transfer(transferables)),
     );
   }
 
@@ -776,7 +1183,15 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Remove an `Osm` instance from all workers, freeing its memory.
    */
   async delete(osmId: OsmId): Promise<void> {
-    await Promise.all(this.workers.map((worker) => worker.delete(this.getId(osmId))));
+    const id = this.getId(osmId);
+    this.unregisterDatasetForRecovery(id);
+    if (
+      this.activeChangeset &&
+      (this.activeChangeset.baseOsmId === id || this.activeChangeset.patchOsmId === id)
+    ) {
+      this.activeChangeset = null;
+    }
+    await this.broadcastStateChange("dataset deletion", (worker) => worker.delete(id));
   }
 
   /**
@@ -788,14 +1203,29 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     const from = this.getId(fromId);
     if (from === toId) return;
     // Get the osm from one worker, then re-register under the new ID
-    const worker0 = this.workers[0];
-    if (!worker0) throw Error("No worker available");
-    const transferables = await worker0.getOsmBuffers(from);
+    const transferables = await this.runWithWorker((worker) => worker.getOsmBuffers(from), {
+      lane: "control",
+      retry: "once",
+    });
     // Update the id in the transferables
     const updatedTransferables = { ...transferables, id: toId };
+    const restorer = this.datasetRestorers.get(from) ?? null;
+    this.unregisterDatasetForRecovery(from);
+    this.datasetRestorers.set(toId, restorer);
+    if (hasOnlySharedBackingBuffers(updatedTransferables)) {
+      this.retainedDatasets.set(toId, updatedTransferables);
+    }
+    if (
+      this.activeChangeset &&
+      (this.activeChangeset.baseOsmId === from || this.activeChangeset.patchOsmId === from)
+    ) {
+      this.activeChangeset = null;
+    }
     // Delete old entries and transfer in with new ID
-    await Promise.all(this.workers.map((w) => w.delete(from)));
-    await Promise.all(this.workers.map((w) => w.transferIn(updatedTransferables)));
+    await this.broadcastStateChange("dataset rename", async (worker) => {
+      await worker.delete(from);
+      await worker.transferIn(updatedTransferables);
+    });
   }
 
   /**
@@ -803,7 +1233,9 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Delegates to an available worker for off-thread rendering.
    */
   getVectorTile(osmId: OsmId, tile: Tile) {
-    return this.nextWorker().getVectorTile(this.getId(osmId), tile);
+    return this.runWithWorker((worker) => worker.getVectorTile(this.getId(osmId), tile), {
+      retry: "once",
+    });
   }
 
   /**
@@ -811,7 +1243,9 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Delegates to an available worker for off-thread rendering.
    */
   getRasterTile(osmId: OsmId, tile: Tile, opts?: DrawToRasterTileOptions) {
-    return this.nextWorker().getRasterTile(this.getId(osmId), tile, opts);
+    return this.runWithWorker((worker) => worker.getRasterTile(this.getId(osmId), tile, opts), {
+      retry: "once",
+    });
   }
 
   /**
@@ -819,43 +1253,63 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Delegates to an available worker for off-thread search.
    */
   search(osmId: OsmId, key: string, val?: string) {
-    return this.nextWorker().search(this.getId(osmId), key, val);
+    return this.runWithWorker((worker) => worker.search(this.getId(osmId), key, val), {
+      retry: "once",
+    });
   }
 
   nodesSize(osmId: OsmId) {
-    return this.nextWorker().nodesSize(this.getId(osmId));
+    return this.runWithWorker((worker) => worker.nodesSize(this.getId(osmId)), {
+      retry: "once",
+    });
   }
 
   nodesGetById(osmId: OsmId, nodeId: number) {
-    return this.nextWorker().nodesGetById(this.getId(osmId), nodeId);
+    return this.runWithWorker((worker) => worker.nodesGetById(this.getId(osmId), nodeId), {
+      retry: "once",
+    });
   }
 
   nodesSearch(osmId: OsmId, key: string, val?: string) {
-    return this.nextWorker().nodesSearch(this.getId(osmId), key, val);
+    return this.runWithWorker((worker) => worker.nodesSearch(this.getId(osmId), key, val), {
+      retry: "once",
+    });
   }
 
   waysSize(osmId: OsmId) {
-    return this.nextWorker().waysSize(this.getId(osmId));
+    return this.runWithWorker((worker) => worker.waysSize(this.getId(osmId)), {
+      retry: "once",
+    });
   }
 
   waysGetById(osmId: OsmId, wayId: number) {
-    return this.nextWorker().waysGetById(this.getId(osmId), wayId);
+    return this.runWithWorker((worker) => worker.waysGetById(this.getId(osmId), wayId), {
+      retry: "once",
+    });
   }
 
   waysSearch(osmId: OsmId, key: string, val?: string) {
-    return this.nextWorker().waysSearch(this.getId(osmId), key, val);
+    return this.runWithWorker((worker) => worker.waysSearch(this.getId(osmId), key, val), {
+      retry: "once",
+    });
   }
 
   relationsSize(osmId: OsmId) {
-    return this.nextWorker().relationsSize(this.getId(osmId));
+    return this.runWithWorker((worker) => worker.relationsSize(this.getId(osmId)), {
+      retry: "once",
+    });
   }
 
   relationsGetById(osmId: OsmId, relationId: number) {
-    return this.nextWorker().relationsGetById(this.getId(osmId), relationId);
+    return this.runWithWorker((worker) => worker.relationsGetById(this.getId(osmId), relationId), {
+      retry: "once",
+    });
   }
 
   relationsSearch(osmId: OsmId, key: string, val?: string) {
-    return this.nextWorker().relationsSearch(this.getId(osmId), key, val);
+    return this.runWithWorker((worker) => worker.relationsSearch(this.getId(osmId), key, val), {
+      retry: "once",
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -870,11 +1324,19 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     worker: Comlink.Remote<OsmixWorker>,
     osmId: OsmId,
   ) {
-    if (this.workers.length <= 1) return;
-    if (!canShareArrayBuffers()) return;
+    const pool = this.getPool();
+    if (pool.workerCount <= 1 && !canShareArrayBuffers()) return;
     const transferables = await worker.getRoutingGraphTransferables(this.getId(osmId));
-    await Promise.all(
-      this.workers.map((w) => w.transferRoutingGraphIn(this.getId(osmId), transferables)),
+    const isShared = hasOnlySharedBackingBuffers(transferables);
+    if (pool.workerCount > 1 && !isShared) {
+      throw Error("Multiple workers require a SharedArrayBuffer-backed routing graph");
+    }
+    if (isShared) this.retainedRoutingGraphs.set(this.getId(osmId), transferables);
+    if (pool.workerCount <= 1) return;
+    await this.broadcastStateChange(
+      "routing graph replication",
+      (target) => target.transferRoutingGraphIn(this.getId(osmId), transferables),
+      { eligibleWorkerIndexes: pool.workerIndexes.slice(1), retry: "once" },
     );
   }
 
@@ -888,17 +1350,23 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * @returns Graph statistics (node and edge counts).
    */
   async buildRoutingGraph(osmId: OsmId, filter?: HighwayFilter, defaultSpeeds?: DefaultSpeeds) {
-    const worker0 = this.nextWorker();
-    const stats = await worker0.buildRoutingGraph(this.getId(osmId), filter, defaultSpeeds);
-    await this.populateRoutingGraphToOtherWorkers(worker0, osmId);
-    return stats;
+    return this.runWithWorker(
+      async (worker) => {
+        const stats = await worker.buildRoutingGraph(this.getId(osmId), filter, defaultSpeeds);
+        await this.populateRoutingGraphToOtherWorkers(worker, osmId);
+        return stats;
+      },
+      { lane: "control", retry: "once" },
+    );
   }
 
   /**
    * Check if a routing graph exists for an Osm instance.
    */
   hasRoutingGraph(osmId: OsmId) {
-    return this.nextWorker().hasRoutingGraph(this.getId(osmId));
+    return this.runWithWorker((worker) => worker.hasRoutingGraph(this.getId(osmId)), {
+      retry: "once",
+    });
   }
 
   /**
@@ -911,7 +1379,10 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * @returns Nearest routable node info, or null if none found.
    */
   findNearestRoutableNode(osmId: OsmId, point: LonLat, maxDistanceM: number) {
-    return this.nextWorker().findNearestRoutableNode(this.getId(osmId), point, maxDistanceM);
+    return this.runWithWorker(
+      (worker) => worker.findNearestRoutableNode(this.getId(osmId), point, maxDistanceM),
+      { retry: "once" },
+    );
   }
 
   /**
@@ -930,7 +1401,10 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     toIndex: number,
     options?: Partial<RouteOptions>,
   ): Promise<RouteResult | null> {
-    return this.nextWorker().route(this.getId(osmId), fromIndex, toIndex, options);
+    return this.runWithWorker(
+      (worker) => worker.route(this.getId(osmId), fromIndex, toIndex, options),
+      { retry: "once" },
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -943,9 +1417,12 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Synchronizes the merged result across all workers.
    */
   async merge(baseOsmId: OsmId, patchOsmId: OsmId, options: Partial<OsmMergeOptions> = {}) {
-    const worker0 = this.nextWorker();
-    const osmId = await worker0.merge(this.getId(baseOsmId), this.getId(patchOsmId), options);
-    await this.populateOtherWorkers(worker0, osmId);
+    const osmId = await this.runWithWorker(
+      (worker) => worker.merge(this.getId(baseOsmId), this.getId(patchOsmId), options),
+      { lane: "control", retry: "never" },
+    );
+    this.markDatasetUnrecoverable(osmId);
+    await this.populateDatasetFromControl(osmId);
     await this.delete(patchOsmId);
     const merged = await this.get(osmId);
     return this.wrap(merged.info());
@@ -960,11 +1437,18 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     patchOsmId: OsmId,
     options: Partial<OsmMergeOptions> = {},
   ) {
-    return this.getChangesetWorker().generateChangeset(
-      this.getId(baseOsmId),
-      this.getId(patchOsmId),
-      options,
+    const result = await this.runWithWorker(
+      (worker) => worker.generateChangeset(this.getId(baseOsmId), this.getId(patchOsmId), options),
+      { lane: "control", retry: "never" },
     );
+    this.activeChangeset = {
+      baseOsmId: this.getId(baseOsmId),
+      changeTypes: ["create", "modify", "delete"],
+      entityTypes: ["node", "way", "relation"],
+      options,
+      patchOsmId: this.getId(patchOsmId),
+    };
+    return result;
   }
 
   /**
@@ -972,9 +1456,13 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Synchronizes the updated instance across all workers.
    */
   async applyChangesAndReplace(osmId: OsmId) {
-    const worker0 = this.getChangesetWorker();
-    await worker0.applyChangesAndReplace(this.getId(osmId));
-    await this.populateOtherWorkers(worker0, osmId);
+    await this.runWithWorker((worker) => worker.applyChangesAndReplace(this.getId(osmId)), {
+      lane: "control",
+      retry: "never",
+    });
+    this.markDatasetUnrecoverable(osmId);
+    await this.populateDatasetFromControl(osmId);
+    this.activeChangeset = null;
   }
 
   /**
@@ -982,34 +1470,59 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Filters control which change types and entity types are visible when paginating.
    */
   setChangesetFilters(changeTypes: OsmChangeTypes[], entityTypes: OsmEntityType[]) {
-    void this.getChangesetWorker().setChangesetFilters(changeTypes, entityTypes);
+    if (this.activeChangeset) {
+      this.activeChangeset.changeTypes = [...changeTypes];
+      this.activeChangeset.entityTypes = [...entityTypes];
+    }
+    void this.runWithWorker((worker) => worker.setChangesetFilters(changeTypes, entityTypes), {
+      lane: "control",
+      retry: "never",
+    });
   }
 
   /**
    * Retrieve a paginated subset of the filtered changeset from the changeset worker.
    */
   getChangesetPage(osmId: OsmId, page: number, pageSize: number) {
-    return this.getChangesetWorker().getChangesetPage(this.getId(osmId), page, pageSize);
+    return this.runWithWorker(
+      (worker) => worker.getChangesetPage(this.getId(osmId), page, pageSize),
+      { lane: "control", retry: "once" },
+    );
   }
 
   /**
-   * Terminate all workers and release their resources.
+   * Terminate all workers, await their shutdown, and release their resources.
    */
-  terminate() {
-    for (const worker of this.workers) {
-      try {
-        worker[Comlink.releaseProxy]();
-      } finally {
-        workerCleanup.get(worker)?.();
-        workerCleanup.delete(worker);
-      }
-    }
-    this.workers = [];
-    this.changesetWorker = null;
+  dispose(): Promise<void> {
+    if (this.disposal) return this.disposal;
+    const pool = this.workerPool;
+    this.workerPool = null;
+    this.activeChangeset = null;
+    this.datasetRestorers.clear();
+    this.retainedDatasets.clear();
+    this.retainedRoutingGraphs.clear();
     this.poolMode = null;
+    this.terminalError = null;
+    this.disposal = (async () => {
+      try {
+        await pool?.dispose();
+      } finally {
+        this.disposal = null;
+      }
+    })();
+    return this.disposal;
+  }
+
+  /** Start worker shutdown without waiting. Prefer {@link dispose} when shutdown ordering matters. */
+  terminate(): void {
+    void this.dispose();
   }
 
   [Symbol.dispose]() {
     this.terminate();
+  }
+
+  [Symbol.asyncDispose](): Promise<void> {
+    return this.dispose();
   }
 }
