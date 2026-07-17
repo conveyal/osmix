@@ -130,7 +130,10 @@
 
       async function runDispose() {
         const remote = await createRemote({ workerCount: 1 });
-        const worker = remote.getWorker();
+        let worker;
+        await remote.runWithWorker((candidate) => {
+          worker = candidate;
+        });
         remote.terminate();
         remote[Symbol.dispose]();
 
@@ -155,12 +158,149 @@
         };
       }
 
+      async function runManagedScheduling() {
+        const remote = await createRemote({ workerCount: 2 });
+        try {
+          const dataset = await loadMonaco(remote, "managed-scheduling-monaco");
+          const completionOrder = [];
+          const slow = remote.runWithWorker(
+            async (worker, index) => {
+              await new Promise((resolve) => setTimeout(resolve, 80));
+              completionOrder.push("slow");
+              return { index, nodes: await worker.nodesSize(dataset.id) };
+            },
+            { lane: "compute" },
+          );
+
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          const abortController = new AbortController();
+          let abortedTaskRan = false;
+          const aborted = remote
+            .runWithWorker(
+              () => {
+                abortedTaskRan = true;
+              },
+              { lane: "compute", signal: abortController.signal },
+            )
+            .then(
+              () => false,
+              () => true,
+            );
+          const low = remote.runWithWorker(() => completionOrder.push("low"), {
+            lane: "compute",
+            priority: 0,
+          });
+          const high = remote.runWithWorker(() => completionOrder.push("high"), {
+            lane: "compute",
+            priority: 10,
+          });
+          abortController.abort();
+
+          const [slowResult, wasAborted] = await Promise.all([slow, aborted, low, high]);
+          const controlIndex = await remote.runWithWorker((_worker, index) => index, {
+            lane: "control",
+          });
+          const computeIndex = await remote.runWithWorker((_worker, index) => index, {
+            lane: "compute",
+          });
+
+          return {
+            abortedTaskRan,
+            completionOrder,
+            computeIndex,
+            controlIndex,
+            slowResult,
+            wasAborted,
+          };
+        } finally {
+          remote[Symbol.dispose]();
+        }
+      }
+
+      function inspectBuffers(value) {
+        const buffers = new Set();
+        const visited = new WeakSet();
+        const visit = (candidate) => {
+          if (
+            candidate instanceof ArrayBuffer ||
+            (typeof SharedArrayBuffer !== "undefined" && candidate instanceof SharedArrayBuffer)
+          ) {
+            buffers.add(candidate);
+            return;
+          }
+          if (ArrayBuffer.isView(candidate)) {
+            buffers.add(candidate.buffer);
+            return;
+          }
+          if (!candidate || (typeof candidate !== "object" && typeof candidate !== "function")) {
+            return;
+          }
+          if (visited.has(candidate)) return;
+          visited.add(candidate);
+          for (const child of Object.values(candidate)) visit(child);
+        };
+        visit(value);
+        const sharedBufferCount = [...buffers].filter(
+          (buffer) => buffer instanceof SharedArrayBuffer,
+        ).length;
+        return {
+          allShared: buffers.size > 0 && sharedBufferCount === buffers.size,
+          bufferCount: buffers.size,
+          sharedBufferCount,
+        };
+      }
+
+      async function runTimeoutRecoveryAndSharing() {
+        const remote = await createRemote({ workerCount: 2 });
+        try {
+          const dataset = await loadMonaco(remote, "recovery-sharing-monaco");
+          let attempts = 0;
+          const recovered = await remote.runWithWorker(
+            async (worker, index) => {
+              attempts++;
+              if (attempts === 1) return new Promise(() => {});
+              return { index, nodes: await worker.nodesSize(dataset.id) };
+            },
+            { lane: "compute", retry: "once", timeoutMs: 250 },
+          );
+
+          const inspectWorker = async (worker, index) => {
+            const [hasDataset, nodes, transferables] = await Promise.all([
+              worker.has(dataset.id),
+              worker.nodesSize(dataset.id),
+              worker.getOsmBuffers(dataset.id),
+            ]);
+            return {
+              ...inspectBuffers(transferables),
+              contentHash: transferables.contentHash,
+              hasDataset,
+              index,
+              nodes,
+            };
+          };
+          const control = await remote.runWithWorker(inspectWorker, { lane: "control" });
+          const compute = await remote.runWithWorker(inspectWorker, { lane: "compute" });
+
+          return {
+            attempts,
+            compute,
+            control,
+            matchingContentHashes: control.contentHash === compute.contentHash,
+            recovered,
+          };
+        } finally {
+          remote[Symbol.dispose]();
+        }
+      }
+
       window.workerHarness = {
         runDispose,
+        runManagedScheduling,
         runMultiWorker,
         runReservedIds,
         runSingleWorker,
         runSingleWorkerTransfer,
+        runTimeoutRecoveryAndSharing,
       };
     </script>
   </body>

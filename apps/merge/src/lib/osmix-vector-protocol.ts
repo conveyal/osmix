@@ -21,7 +21,12 @@ export function addOsmixVectorProtocol() {
       if (!match) throw new Error(`Bad @osmix/vector URL: ${req.url}`);
       const [, osmId, zStr, xStr, yStr] = match;
       const tileIndex: Tile = [+xStr, +yStr, +zStr];
-      const data = await osmWorker.getVectorTile(decodeURIComponent(osmId), tileIndex);
+      const id = decodeURIComponent(osmId);
+      const data = await osmWorker.runWithWorker((worker) => worker.getVectorTile(id, tileIndex), {
+        lane: "compute",
+        retry: "once",
+        signal: abortController.signal,
+      });
 
       return {
         data: abortController.signal.aborted ? null : data,

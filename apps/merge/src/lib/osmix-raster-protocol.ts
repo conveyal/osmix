@@ -16,7 +16,7 @@ export function osmixIdToTileUrl(osmId: string, tileSize: number) {
 export function addOsmixRasterProtocol() {
   maplibre.addProtocol(
     RASTER_PROTOCOL_NAME,
-    async (req): Promise<maplibregl.GetResourceResponse<ArrayBuffer>> => {
+    async (req, abortController): Promise<maplibregl.GetResourceResponse<ArrayBuffer>> => {
       // @osmix/raster://<osmId>/<tileSize>/<z>/<x>/<y>.png
       const m = /^@osmix\/raster:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(req.url);
       if (!m) throw new Error(`Bad ${RASTER_PROTOCOL_NAME} URL: ${req.url}`);
@@ -24,9 +24,15 @@ export function addOsmixRasterProtocol() {
 
       const tileSize = +sizeStr;
       const tileIndex: Tile = [+xStr, +yStr, +zStr];
-      const rasterTile = await osmWorker.getRasterTile(decodeURIComponent(osmId), tileIndex, {
-        tileSize,
-      });
+      const id = decodeURIComponent(osmId);
+      const rasterTile = await osmWorker.runWithWorker(
+        (worker) => worker.getRasterTile(id, tileIndex, { tileSize }),
+        {
+          lane: "compute",
+          retry: "once",
+          signal: abortController.signal,
+        },
+      );
       const data = await rasterTileToImageBuffer(rasterTile, tileSize);
       return {
         data,

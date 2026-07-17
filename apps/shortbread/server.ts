@@ -1,14 +1,14 @@
 import { createReadStream, readFileSync } from "node:fs";
-import os from "node:os";
+import { availableParallelism } from "node:os";
 import { Readable } from "node:stream";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { serve } from "@hono/node-server";
 import type { Progress } from "@osmix/shared/progress";
-import { createRemote } from "osmix";
+import { selectWorkerCount } from "osmix";
 
 import { createShortbreadServerApp } from "./app.ts";
-import type { ShortbreadWorker } from "./shortbread.worker.ts";
+import { createShortbreadRemote } from "./remote.ts";
 
 export async function startShortbreadServer() {
   const filename = "monaco.pbf";
@@ -16,8 +16,12 @@ export async function startShortbreadServer() {
   const pbfPath = fileURLToPath(new URL(`../../fixtures/${filename}`, import.meta.url));
   const indexHtml = readFileSync(fileURLToPath(new URL("./index.html", import.meta.url)), "utf8");
   const log: Progress[] = [];
-  const remote = await createRemote<ShortbreadWorker>({
-    workerCount: os.cpus().length,
+  const workerCount = selectWorkerCount({
+    hardwareConcurrency: availableParallelism(),
+    reserveCores: 1,
+  });
+  const remote = await createShortbreadRemote({
+    workerCount,
     workerUrl: new URL("./shortbread.worker.ts", import.meta.url),
     onProgress: (event) => log.push(event),
   });
@@ -30,7 +34,7 @@ export async function startShortbreadServer() {
   const state = { dataset, filename, log };
   const app = createShortbreadServerApp({ remote, state, indexHtml, port });
 
-  console.log(`Number of workers available: ${os.cpus().length}`);
+  console.log(`Number of workers available: ${remote.workerCount}`);
   serve({ fetch: app.fetch, port }, (info) => {
     console.log(`Shortbread vector tile server running at http://localhost:${info.port}`);
     console.log("Osmix initialized with Shortbread encoder");

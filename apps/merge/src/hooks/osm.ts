@@ -59,7 +59,7 @@ export function useOsmFile(osmKey: string) {
         // Check after file read
         if (signal?.aborted) throw new LoadCancelledError();
 
-        const fileHash = await osmWorker.hashBuffer(buffer);
+        const fileHash = await osmWorker.hashBuffer(buffer, signal);
 
         // Check after hashing
         if (signal?.aborted) throw new LoadCancelledError();
@@ -72,14 +72,14 @@ export function useOsmFile(osmKey: string) {
         setFileInfo(storedFileInfo);
 
         // Check if we already have this file stored (in worker)
-        const existing = await osmWorker.findByHash(fileHash);
+        const existing = await osmWorker.findByHash(fileHash, signal);
 
         // Check after cache lookup
         if (signal?.aborted) throw new LoadCancelledError();
 
         if (existing) {
           taskLog.update("Found cached version, loading from storage...");
-          const stored = await osmWorker.loadFromStorage(existing.fileHash);
+          const stored = await osmWorker.loadFromStorage(existing.fileHash, signal);
 
           // Check after loading from storage
           if (signal?.aborted) throw new LoadCancelledError();
@@ -120,7 +120,7 @@ export function useOsmFile(osmKey: string) {
         taskLog.end(`${file.name} loaded.`);
         return osmInfo;
       } catch (e) {
-        if (e instanceof LoadCancelledError) {
+        if (signal?.aborted || e instanceof LoadCancelledError) {
           // Only reset state if this is still the current load
           // (prevents stale cancellations from clearing newer load state)
           if (loadId === currentLoadIdRef.current) {
@@ -164,7 +164,7 @@ export function useOsmFile(osmKey: string) {
         const buffer = await file.arrayBuffer();
         if (signal?.aborted) throw new LoadCancelledError();
 
-        const fileHash = await osmWorker.hashBuffer(buffer);
+        const fileHash = await osmWorker.hashBuffer(buffer, signal);
         if (signal?.aborted) throw new LoadCancelledError();
 
         const storedFileInfo: StoredFileInfo = {
@@ -199,7 +199,7 @@ export function useOsmFile(osmKey: string) {
         taskLog.end(`${file.name} extracted.`);
         return osmInfo;
       } catch (e) {
-        if (e instanceof LoadCancelledError) {
+        if (signal?.aborted || e instanceof LoadCancelledError) {
           if (loadId === currentLoadIdRef.current) {
             setFile(null);
             setFileInfo(null);
@@ -225,7 +225,7 @@ export function useOsmFile(osmKey: string) {
       if (signal?.aborted) throw new LoadCancelledError();
 
       // Load from IndexedDB in the worker
-      const stored = await osmWorker.loadFromStorage(storageId);
+      const stored = await osmWorker.loadFromStorage(storageId, signal);
 
       // Check after loading from storage
       if (signal?.aborted) throw new LoadCancelledError();
@@ -258,7 +258,7 @@ export function useOsmFile(osmKey: string) {
       taskLog.end(`${stored.entry.fileName} loaded from storage.`);
       return osmInfo;
     } catch (e) {
-      if (e instanceof LoadCancelledError) {
+      if (signal?.aborted || e instanceof LoadCancelledError) {
         // Only reset state if this is still the current load
         // (prevents stale cancellations from clearing newer load state)
         if (loadId === currentLoadIdRef.current) {
