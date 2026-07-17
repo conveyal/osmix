@@ -106,7 +106,7 @@ See each package's README for full API and description.
 | [`@osmix/shapefile`](packages/shapefile/README.md)   | Shapefile import.                                                                      |
 | [`@osmix/change`](packages/change/README.md)         | Deduplication, merging, and changeset workflows.                                       |
 | [`@osmix/raster`](packages/raster/README.md)         | Render OSM entities as raster bitmaps.                                                 |
-| [`@osmix/tui`](packages/tui/README.md)               | Explore OSM PBF files in an interactive terminal map.                                  |
+| [`@osmix/cli`](packages/cli/README.md)               | Explore OSM PBF files in an interactive terminal map.                                  |
 | [`@osmix/vt`](packages/vt/README.md)                 | Encode OSM entities as Mapbox Vector Tiles (MVT).                                      |
 | [`@osmix/shortbread`](packages/shortbread/README.md) | Shortbread schema vector tiles.                                                        |
 | [`@osmix/shared`](packages/shared/README.md)         | Utility functions and geometry helpers.                                                |

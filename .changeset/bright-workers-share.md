@@ -1,7 +1,7 @@
 ---
 "@osmix/shared": minor
 "@osmix/shortbread": minor
-"@osmix/tui": patch
+"@osmix/cli": patch
 "@osmix/core": patch
 "osmix": minor
 ---

@@ -11,7 +11,7 @@ import {
   selectTileWorkerCount,
   tileWorkerUrl,
 } from "../src/tile-renderer.ts";
-import { TuiTileWorker } from "../src/tile-worker.ts";
+import { CliTileWorker } from "../src/tile-worker.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -45,7 +45,7 @@ function denselyIndexedOsm(id: string, tile: Tile, wayCount: number): Osm {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("TUI tile workers", () => {
+describe("CLI tile workers", () => {
   it("uses shared worker-count selection while reserving one logical core", () => {
     expect(selectTileWorkerCount(1)).toBe(1);
     expect(selectTileWorkerCount(2)).toBe(1);
@@ -54,18 +54,18 @@ describe("TUI tile workers", () => {
   });
 
   it("resolves a source or built worker beside the renderer module", () => {
-    expect(tileWorkerUrl().pathname).toMatch(/\/tui\.worker\.(?:ts|js)$/);
+    expect(tileWorkerUrl().pathname).toMatch(/\/cli\.worker\.(?:ts|js)$/);
     expect(tileWorkerUrl("file:///app/tile-renderer.ts?worker_file&type=module").pathname).toBe(
-      "/app/tui.worker.ts",
+      "/app/cli.worker.ts",
     );
     expect(tileWorkerUrl("file:///app/tile-renderer.js#bundled").pathname).toBe(
-      "/app/tui.worker.js",
+      "/app/cli.worker.js",
     );
   });
 
   it("renders styled pixel buffers through the custom worker method", () => {
     const osm = indexedOsm("direct-worker");
-    const worker = new TuiTileWorker();
+    const worker = new CliTileWorker();
     worker.transferIn(osm.transferables());
 
     const data = worker.getStyledRasterTile(osm.id, [0, 0, 0]);
@@ -78,7 +78,7 @@ describe("TUI tile workers", () => {
 
   it("cooperatively cancels stale shared-buffer tile generations", () => {
     const osm = indexedOsm("cancelled-worker");
-    const worker = new TuiTileWorker();
+    const worker = new CliTileWorker();
     worker.transferIn(osm.transferables());
     const cancellation = GenerationGate.create({ initialGeneration: 4, shared: true });
 
@@ -93,7 +93,7 @@ describe("TUI tile workers", () => {
 
   it("cooperatively cancels stale generations without shared buffers", async () => {
     const osm = indexedOsm("message-cancelled-worker");
-    const worker = new TuiTileWorker();
+    const worker = new CliTileWorker();
     worker.transferIn(osm.transferables());
     worker.cancelTilesBefore(4);
 
@@ -107,7 +107,7 @@ describe("TUI tile workers", () => {
   it("services a cancellation update while a non-shared tile is rendering", async () => {
     const tile: Tile = [4_096, 4_096, 13];
     const osm = denselyIndexedOsm("yielded-message-cancel-worker", tile, 2_000);
-    const worker = new TuiTileWorker();
+    const worker = new CliTileWorker();
     worker.transferIn(osm.transferables());
     setTimeout(() => worker.cancelTilesBefore(2), 0);
 
@@ -117,7 +117,7 @@ describe("TUI tile workers", () => {
 
   it("returns dataset metadata rather than a main-thread Osm instance", async () => {
     const fixture = fileURLToPath(new URL("../../../fixtures/monaco.pbf", import.meta.url));
-    const worker = new TuiTileWorker();
+    const worker = new CliTileWorker();
     const info = await worker.fromPbfFile(fixture, {
       id: "metadata-worker",
       buildSpatialIndexes: ["way", "relation"],

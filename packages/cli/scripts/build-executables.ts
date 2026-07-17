@@ -41,7 +41,7 @@ interface BunRuntime {
 
 const entrypoints = [
   resolve(import.meta.dirname, "../src/cli.ts"),
-  resolve(import.meta.dirname, "../src/tui.worker.ts"),
+  resolve(import.meta.dirname, "../src/cli.worker.ts"),
 ];
 
 function bunRuntime(): BunRuntime {

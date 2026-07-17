@@ -15,9 +15,9 @@ import type { MapLabelCandidate } from "./map-labels.ts";
 import type { TileImage } from "./map-pixels.ts";
 import type { SemanticNodeIndexTransferables } from "./semantic-node-index.ts";
 import type { SemanticRenderIndexTransferables } from "./semantic-render-index.ts";
-import type { MapLabelQueryRequest, MapLabelQueryResult, TuiTileWorker } from "./tile-worker.ts";
+import type { MapLabelQueryRequest, MapLabelQueryResult, CliTileWorker } from "./tile-worker.ts";
 
-const MAX_TUI_WORKERS = 4;
+const MAX_CLI_WORKERS = 4;
 const WORKER_RPC_TIMEOUT_MS = 60_000;
 const DATASET_LOAD_TIMEOUT_MS = 10 * 60_000;
 
@@ -73,16 +73,16 @@ function backingBufferDiagnostics(value: unknown): BackingBufferDiagnostics {
 
 export function tileWorkerUrl(moduleUrl: string | URL = import.meta.url): URL {
   const extension = new URL(moduleUrl).pathname.endsWith(".ts") ? "ts" : "js";
-  return new URL(`./tui.worker.${extension}`, moduleUrl);
+  return new URL(`./cli.worker.${extension}`, moduleUrl);
 }
 
 /** Reserve one logical core for OpenTUI and cap the worker set at four. */
 export function selectTileWorkerCount(hardwareConcurrency: number): number {
-  return selectWorkerCount({ hardwareConcurrency, reserveCores: 1, maxWorkers: MAX_TUI_WORKERS });
+  return selectWorkerCount({ hardwareConcurrency, reserveCores: 1, maxWorkers: MAX_CLI_WORKERS });
 }
 
-/** TUI-specific state layered on the shared Osmix worker scheduler. */
-class TuiStyledTileRemote extends OsmixRemote<TuiTileWorker> {
+/** CLI-specific state layered on the shared Osmix worker scheduler. */
+class CliStyledTileRemote extends OsmixRemote<CliTileWorker> {
   private readonly canShareArrayBuffers: boolean;
   private datasetBuffers: OsmTransferables | null = null;
   private datasetInfo: OsmInfo | null = null;
@@ -226,7 +226,7 @@ class TuiStyledTileRemote extends OsmixRemote<TuiTileWorker> {
   }
 
   protected override async rehydrateWorker(
-    worker: Remote<TuiTileWorker>,
+    worker: Remote<CliTileWorker>,
     index: number,
   ): Promise<void> {
     if (!this.datasetInfo || !this.loadSource) return;
@@ -264,7 +264,7 @@ class TuiStyledTileRemote extends OsmixRemote<TuiTileWorker> {
       return;
     }
 
-    if (index !== 0) throw Error("Unable to restore a TUI worker without a shared dataset");
+    if (index !== 0) throw Error("Unable to restore a CLI worker without a shared dataset");
     this.progressReporter?.("Reloading the map after a worker restart…");
     this.datasetInfo = await worker.fromPbfFile(this.loadSource.filePath, {
       id: this.loadSource.id,
@@ -290,9 +290,9 @@ class TuiStyledTileRemote extends OsmixRemote<TuiTileWorker> {
 
 class WorkerBackedStyledTileRenderer implements StyledTileRenderer {
   readonly mode = "workers" as const;
-  private readonly remote: TuiStyledTileRemote;
+  private readonly remote: CliStyledTileRemote;
 
-  constructor(remote: TuiStyledTileRemote) {
+  constructor(remote: CliStyledTileRemote) {
     this.remote = remote;
   }
 
@@ -329,7 +329,7 @@ class WorkerBackedStyledTileRenderer implements StyledTileRenderer {
   }
 }
 
-/** Create the required off-main-thread TUI worker pool. */
+/** Create the required off-main-thread CLI worker pool. */
 export async function createStyledTileRenderer(
   options: StyledTileRendererOptions = {},
 ): Promise<StyledTileRenderer> {
@@ -340,7 +340,7 @@ export async function createStyledTileRenderer(
   const count = capabilities.canShareArrayBuffers
     ? selectTileWorkerCount(capabilities.hardwareConcurrency)
     : 1;
-  const remote = new TuiStyledTileRemote(capabilities.canShareArrayBuffers, options.onProgress);
+  const remote = new CliStyledTileRemote(capabilities.canShareArrayBuffers, options.onProgress);
   try {
     // The runtime adapter selects Bun's Web Worker API instead of its Node compatibility layer.
     await remote.initializeWorkerPool(

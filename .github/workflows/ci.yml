@@ -22,8 +22,8 @@ jobs:
       - uses: ./.github/actions/setup
       - uses: ./.github/actions/checks
 
-  tui-executable:
-    name: TUI standalone executable
+  cli-executable:
+    name: CLI standalone executable
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +38,7 @@ jobs:
           bun-version: 1.3.14
 
       - name: Build and test the standalone executable
-        run: pnpm --filter @osmix/tui run test:executable
+        run: pnpm --filter @osmix/cli run test:executable
 
   runtime-node:
     name: Runtime smoke (Node ${{ matrix.node }})

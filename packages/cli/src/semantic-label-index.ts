@@ -120,7 +120,7 @@ class EntityLabelIndex {
   }
 }
 
-/** Worker-owned TUI label metadata over the shared Shortbread feature index. */
+/** Worker-owned CLI label metadata over the shared Shortbread feature index. */
 export class SemanticLabelIndex {
   readonly relationCount: number;
   readonly wayCount: number;

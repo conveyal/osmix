@@ -70,14 +70,14 @@ function positiveInteger(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
-const filePath = process.env["OSMIX_TUI_STRESS_PBF"];
+const filePath = process.env["OSMIX_CLI_STRESS_PBF"];
 if (!filePath) {
-  console.log("Set OSMIX_TUI_STRESS_PBF to run the regional TUI stress harness.");
+  console.log("Set OSMIX_CLI_STRESS_PBF to run the regional CLI stress harness.");
   process.exit(0);
 }
 
 const stageTimeoutMs = positiveInteger(
-  process.env["OSMIX_TUI_STRESS_TIMEOUT_MS"],
+  process.env["OSMIX_CLI_STRESS_TIMEOUT_MS"],
   DEFAULT_STAGE_TIMEOUT_MS,
 );
 const file = await stat(filePath);

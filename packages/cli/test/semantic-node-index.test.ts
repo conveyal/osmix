@@ -2,7 +2,7 @@ import { Osm } from "osmix";
 import { describe, expect, it, vi } from "vitest";
 
 import { SemanticNodeIndex } from "../src/semantic-node-index.ts";
-import { TuiTileWorker } from "../src/tile-worker.ts";
+import { CliTileWorker } from "../src/tile-worker.ts";
 
 function semanticNodeOsm(id: string): Osm {
   const osm = new Osm({ id });
@@ -49,7 +49,7 @@ describe("SemanticNodeIndex", () => {
 
   it("returns revisioned candidates through the worker without querying node KDBush", () => {
     const osm = semanticNodeOsm("worker-labels");
-    const worker = new TuiTileWorker();
+    const worker = new CliTileWorker();
     worker.transferIn(osm.transferables());
 
     const result = worker.getMapLabelCandidates(osm.id, {
@@ -72,7 +72,7 @@ describe("SemanticNodeIndex", () => {
 
   it("retains a semantic index when the same shared dataset is transferred again", () => {
     const osm = semanticNodeOsm("worker-shared-labels");
-    const worker = new TuiTileWorker();
+    const worker = new CliTileWorker();
     worker.transferIn(osm.transferables());
     worker.buildSemanticNodeIndex(osm.id);
     const build = vi.spyOn(SemanticNodeIndex, "build");

@@ -26,7 +26,7 @@ function sharedIndexes(values: number[]): Uint32Array {
   return result;
 }
 
-/** TUI point-style and label metadata over the shared Shortbread spatial candidate index. */
+/** CLI point-style and label metadata over the shared Shortbread spatial candidate index. */
 export class SemanticNodeIndex {
   readonly labelCount: number;
   readonly size: number;

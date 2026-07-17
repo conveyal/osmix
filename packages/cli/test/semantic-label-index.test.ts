@@ -2,7 +2,7 @@ import { Osm } from "osmix";
 import { describe, expect, it, vi } from "vitest";
 
 import { SemanticLabelIndex } from "../src/semantic-label-index.ts";
-import { TuiTileWorker } from "../src/tile-worker.ts";
+import { CliTileWorker } from "../src/tile-worker.ts";
 
 function addWay(osm: Osm, id: number, refs: number[], tags: Record<string, string>): void {
   osm.ways.addWay({ id, refs, tags });
@@ -29,7 +29,7 @@ function semanticLabelOsm(id: string): Osm {
   return osm;
 }
 
-class ExposedTuiTileWorker extends TuiTileWorker {
+class ExposedCliTileWorker extends CliTileWorker {
   getOsm(id: string): Osm {
     return this.get(id);
   }
@@ -50,7 +50,7 @@ describe("SemanticLabelIndex", () => {
 
   it("keeps worker label queries off the raw way and relation spatial indexes", () => {
     const osm = semanticLabelOsm("worker-semantic-labels");
-    const worker = new ExposedTuiTileWorker();
+    const worker = new ExposedCliTileWorker();
     worker.transferIn(osm.transferables());
     const workerOsm = worker.getOsm(osm.id);
     const waySearch = vi.spyOn(workerOsm.ways, "intersects");
@@ -74,7 +74,7 @@ describe("SemanticLabelIndex", () => {
 
   it("retains preclassification when the same shared dataset is transferred again", () => {
     const osm = semanticLabelOsm("shared-semantic-labels");
-    const worker = new ExposedTuiTileWorker();
+    const worker = new ExposedCliTileWorker();
     worker.transferIn(osm.transferables());
     worker.buildSemanticLabelIndex(osm.id);
     const build = vi.spyOn(SemanticLabelIndex, "build");

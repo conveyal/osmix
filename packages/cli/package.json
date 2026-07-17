@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@osmix/tui",
+  "name": "@osmix/cli",
   "version": "0.0.1",
   "description": "Explore OSM PBF files in a terminal map viewer",
   "license": "MIT",

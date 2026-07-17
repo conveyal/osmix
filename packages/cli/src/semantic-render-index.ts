@@ -48,7 +48,7 @@ function buildMinimumZooms(
   return result;
 }
 
-/** TUI minimum-zoom metadata over the shared Shortbread spatial candidate index. */
+/** CLI minimum-zoom metadata over the shared Shortbread spatial candidate index. */
 export class SemanticRenderIndex {
   readonly relationCount: number;
   readonly wayCount: number;

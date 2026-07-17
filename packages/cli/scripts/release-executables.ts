@@ -8,7 +8,7 @@ function capture(command: string, args: string[]): string | null {
   return result.status === 0 ? result.stdout.trim() : null;
 }
 
-const tag = `@osmix/tui@${packageJson.version}`;
+const tag = `@osmix/cli@${packageJson.version}`;
 const releaseAssets = capture("gh", [
   "release",
   "view",

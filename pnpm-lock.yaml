@@ -775,7 +775,7 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
 
-  packages/tui:
+  packages/cli:
     dependencies:
       '@opentui/core':
         specifier: ^0.4.3

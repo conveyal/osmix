@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SemanticRenderIndex } from "../src/semantic-render-index.ts";
 import { drawStyledMapTile } from "../src/styled-tile.ts";
-import { TuiTileWorker } from "../src/tile-worker.ts";
+import { CliTileWorker } from "../src/tile-worker.ts";
 
 function renderIndexOsm(): Osm {
   const osm = new Osm();
@@ -60,12 +60,12 @@ describe("SemanticRenderIndex", () => {
 
   it("shares one Shortbread candidate index across worker-owned overlays", () => {
     const osm = renderIndexOsm();
-    const source = new TuiTileWorker();
+    const source = new CliTileWorker();
     source.transferIn(osm.transferables());
     source.buildShortbreadFeatureIndex(osm.id);
     const transferables = source.getShortbreadFeatureIndexTransferables(osm.id);
 
-    const target = new TuiTileWorker();
+    const target = new CliTileWorker();
     target.transferIn(osm.transferables());
     target.setShortbreadFeatureIndex(osm.id, osm.contentHash(), transferables);
     const build = vi.spyOn(ShortbreadFeatureIndex, "build");

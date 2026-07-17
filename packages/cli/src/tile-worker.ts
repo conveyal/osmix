@@ -58,8 +58,8 @@ interface CachedShortbreadFeatureIndex {
   index: ShortbreadFeatureIndex;
 }
 
-/** Osmix worker extension for the TUI's private semantic raster style. */
-export class TuiTileWorker extends OsmixWorker {
+/** Osmix worker extension for the CLI's private semantic raster style. */
+export class CliTileWorker extends OsmixWorker {
   private readonly tileGenerationGate = GenerationGate.create({ shared: false });
   private readonly semanticLabelIndexes = new Map<string, CachedSemanticLabelIndex>();
   private readonly semanticNodeIndexes = new Map<string, CachedSemanticNodeIndex>();
