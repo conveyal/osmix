@@ -35,6 +35,19 @@ describe("Tags.search on Nodes", () => {
     const none = nodes.search("highway");
     expect(none).toEqual([]);
   });
+
+  it("returns no matches for a shared string-table key absent from the collection", () => {
+    const st = new StringTable();
+    const nodes = new Nodes(st);
+    nodes.addNode({ id: 1, lon: -1, lat: 1, tags: { curb: "yes" } });
+    nodes.buildIndex();
+
+    const ways = new Ways(st, nodes);
+    ways.addWay({ id: 10, refs: [1], tags: { highway: "residential" } });
+    ways.buildIndex();
+
+    expect(nodes.search("highway")).toEqual([]);
+  });
 });
 
 describe("Tags.search on Ways", () => {
