@@ -30,10 +30,10 @@ const BLOCK_SIZE = 256;
 export interface IdsTransferables<T extends BufferType = BufferType> {
   /** Entity IDs in insertion order. */
   ids: T;
-  /** Sorted IDs for binary search (aliases `ids` if already sorted). */
-  sortedIds: T;
-  /** Maps sorted position → original insertion index. */
-  sortedIdPositionToIndex: T;
+  /** Sorted IDs for binary search. Omitted when `idsAreSorted` is true. */
+  sortedIds?: T;
+  /** Maps sorted position → original insertion index. Omitted for sorted IDs. */
+  sortedIdPositionToIndex?: T;
   /** Anchor array: every BLOCK_SIZE-th sorted ID. */
   anchors: T;
   /** True if IDs were inserted in ascending order. */
@@ -67,8 +67,16 @@ export class Ids {
   constructor(transferables?: IdsTransferables) {
     if (transferables) {
       this.ids = RTA.from(Float64Array, transferables.ids);
-      this.idsSorted = new Float64Array(transferables.sortedIds);
-      this.sortedIdPositionToIndex = new Uint32Array(transferables.sortedIdPositionToIndex);
+      if (transferables.idsAreSorted) {
+        this.idsSorted = this.ids.array;
+        this.sortedIdPositionToIndex = new Uint32Array(new BufferConstructor(0));
+      } else {
+        if (!transferables.sortedIds || !transferables.sortedIdPositionToIndex) {
+          throw Error("Unsorted IDs require sorted lookup buffers.");
+        }
+        this.idsSorted = new Float64Array(transferables.sortedIds);
+        this.sortedIdPositionToIndex = new Uint32Array(transferables.sortedIdPositionToIndex);
+      }
       this.anchors = new Float64Array(transferables.anchors);
       this.idsAreSorted = transferables.idsAreSorted;
       this.indexBuilt = true;
@@ -157,12 +165,8 @@ export class Ids {
     } else {
       // Point to the same array
       this.idsSorted = this.ids.array;
-      // Create the sortedIdPositionToIndex array
-      const posBuffer = new BufferConstructor(this.size * Uint32Array.BYTES_PER_ELEMENT);
-      this.sortedIdPositionToIndex = new Uint32Array(posBuffer);
-      for (let i = 0; i < this.size; i++) {
-        this.sortedIdPositionToIndex[i] = i;
-      }
+      // Sorted position is already the insertion index; no identity map is needed.
+      this.sortedIdPositionToIndex = new Uint32Array(new BufferConstructor(0));
     }
 
     // Build anchors (every blockSize-th key)
@@ -239,10 +243,14 @@ export class Ids {
   *sortedEntries(): Generator<readonly [id: number, index: number]> {
     for (let i = 0; i < this.idsSorted.length; i++) {
       const id = this.idsSorted[i];
-      const index = this.sortedIdPositionToIndex[i];
       assertValue(id, "Sorted ID is undefined");
-      assertValue(index, "Sorted position is undefined");
-      yield [id, index];
+      if (this.idsAreSorted) {
+        yield [id, i];
+      } else {
+        const index = this.sortedIdPositionToIndex[i];
+        assertValue(index, "Sorted position is undefined");
+        yield [id, index];
+      }
     }
   }
 
@@ -251,24 +259,29 @@ export class Ids {
    * @returns Serializable representation of this index.
    */
   transferables(): IdsTransferables {
-    return {
+    const base: IdsTransferables = {
       ids: this.ids.array.buffer,
-      sortedIds: this.idsSorted.buffer,
-      sortedIdPositionToIndex: this.sortedIdPositionToIndex.buffer,
       anchors: this.anchors.buffer,
       idsAreSorted: this.idsAreSorted,
+    };
+    if (this.idsAreSorted) return base;
+    return {
+      ...base,
+      sortedIds: this.idsSorted.buffer,
+      sortedIdPositionToIndex: this.sortedIdPositionToIndex.buffer,
     };
   }
 
   /**
    * Get the approximate memory requirements for a given number of IDs in bytes.
    */
-  static getBytesRequired(count: number) {
+  static getBytesRequired(count: number, idsAreSorted = true) {
     if (count === 0) return 0;
     return (
       count * Float64Array.BYTES_PER_ELEMENT + // ids
-      count * Float64Array.BYTES_PER_ELEMENT + // sortedIds
-      count * Uint32Array.BYTES_PER_ELEMENT + // sortedIdPositionToIndex
+      (idsAreSorted
+        ? 0
+        : count * (Float64Array.BYTES_PER_ELEMENT + Uint32Array.BYTES_PER_ELEMENT)) + // sort index
       Math.ceil(count / BLOCK_SIZE) * Float64Array.BYTES_PER_ELEMENT // anchors
     );
   }

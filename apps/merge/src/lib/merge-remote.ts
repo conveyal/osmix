@@ -6,16 +6,22 @@
  */
 
 import type { Remote } from "comlink";
-import type { Progress } from "osmix";
+import type { OsmFromPbfOptions, Progress } from "osmix";
 import {
   getOsmixCapabilities,
   type OsmId,
   type OsmInfo,
   OsmixRemote,
   selectWorkerCount,
+  transfer,
 } from "osmix";
 
-import type { MergeWorker, StoredFileInfo, StoredOsmEntry } from "../workers/osm.worker";
+import type {
+  MergeWorker,
+  PbfUrlLoadResult,
+  StoredFileInfo,
+  StoredOsmEntry,
+} from "../workers/osm.worker";
 // oxlint-disable-next-line import/default -- Vite ?worker&url resolves to a string URL
 import OsmWorkerUrl from "../workers/osm.worker.ts?worker&url";
 
@@ -67,6 +73,59 @@ export class MergeRemote extends OsmixRemote<MergeWorker> {
       retry: "once",
       signal,
     });
+  }
+
+  /** Hash a File incrementally in the worker. */
+  hashFile(file: File, taskId?: string, signal?: AbortSignal): Promise<string> {
+    return this.runWithWorker((worker) => worker.hashFile(file, taskId), {
+      lane: "control",
+      retry: "once",
+      signal,
+    });
+  }
+
+  /** Hash a transferred byte stream incrementally in the worker. */
+  hashStream(
+    stream: ReadableStream<Uint8Array>,
+    taskId?: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    return this.runWithWorker((worker) => worker.hashStream(transfer(stream), taskId), {
+      lane: "control",
+      retry: "never",
+      signal,
+    });
+  }
+
+  /** Cancel a hash by its caller-supplied task ID. */
+  cancelHash(taskId: string): void {
+    const controlWorker = this.workerIndexes()[0];
+    if (controlWorker === undefined) return;
+    this.notifyWorkers((worker) => worker.cancelHash(taskId), [controlWorker]);
+  }
+
+  /** Exact buffer payload that would be written to IndexedDB for a dataset. */
+  getStorableByteLength(osmId: string): Promise<number> {
+    return this.runWithWorker((worker) => worker.getStorableByteLength(this.getId(osmId)), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
+  /** Fetch, hash, and parse a PBF once without materializing a browser File. */
+  async fromPbfUrl(
+    url: string,
+    options: Partial<OsmFromPbfOptions> = {},
+    signal?: AbortSignal,
+  ): Promise<PbfUrlLoadResult> {
+    return this.runWithWorker(
+      async (worker) => {
+        const result = await worker.fromPbfUrl({ url, options });
+        await this.populateOtherWorkers(worker, result.info.id);
+        return result;
+      },
+      { lane: "control", retry: "never", signal },
+    );
   }
 
   /**

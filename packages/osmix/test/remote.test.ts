@@ -17,6 +17,22 @@ class RecoveryTestRemote extends OsmixRemote {
     await this.restorePoolWorker(this.getWorker(), 0, 1);
   }
 
+  decisionsForTest(id: string) {
+    return this.broadcastToWorkers((worker) => worker.getLoadDecision(id));
+  }
+
+  hasForTest(id: string) {
+    return this.broadcastToWorkers((worker) => worker.has(id));
+  }
+
+  deleteFromWorkerForTest(index: number, id: string) {
+    return this.runOnWorker(index, (worker) => worker.delete(id));
+  }
+
+  restoreWorkerForTest(index: number): Promise<void> {
+    return this.runOnWorker(index, (worker) => this.restorePoolWorker(worker, index, 1));
+  }
+
   registerCustomGeoJson(id: string, data: Uint8Array): void {
     this.customSources.set(id, data);
     this.registerDatasetForRecovery(id);
@@ -51,6 +67,37 @@ describe("OsmixRemote", () => {
         const pbfData = await getFixtureFile(monacoPbf.url);
         const osm = await remote.fromPbf(pbfData.buffer);
         expect(osm.stats.nodes).toBe(monacoPbf.nodes);
+      },
+      workerTestTimeout,
+    );
+
+    it(
+      "replicates load decisions, restores them after restart, and preserves them on rename",
+      async () => {
+        using remote = new RecoveryTestRemote();
+        await remote.initializeWorkerPool(2);
+        const pbfData = await getFixtureFile(monacoPbf.url);
+        const dataset = await remote.fromPbf(pbfData.buffer, {
+          id: "managed-load-decision",
+          loadProfile: "view",
+        });
+
+        expect(
+          (await remote.decisionsForTest(dataset.id)).map((decision) => decision?.resolvedProfile),
+        ).toEqual(["view", "view"]);
+
+        await remote.deleteFromWorkerForTest(1, dataset.id);
+        expect(await remote.hasForTest(dataset.id)).toEqual([true, false]);
+        await remote.restoreWorkerForTest(1);
+        expect(
+          (await remote.decisionsForTest(dataset.id)).map((decision) => decision?.resolvedProfile),
+        ).toEqual(["view", "view"]);
+
+        await dataset.rename("renamed-load-decision");
+        expect(await remote.hasForTest("managed-load-decision")).toEqual([false, false]);
+        expect(
+          (await remote.decisionsForTest(dataset.id)).map((decision) => decision?.resolvedProfile),
+        ).toEqual(["view", "view"]);
       },
       workerTestTimeout,
     );

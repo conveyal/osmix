@@ -9,19 +9,22 @@ import { type IdOrIndex, Ids } from "./ids.ts";
 import type { Nodes } from "./nodes.ts";
 import type StringTable from "./stringtable.ts";
 import { Tags } from "./tags.ts";
-import {
-  BufferConstructor,
-  type BufferType,
-  IdArrayType,
-  ResizeableTypedArray as RTA,
-} from "./typed-arrays.ts";
+import { BufferConstructor, type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts";
+
+const MISSING_NODE_INDEX = 0xffffffff;
+const HASH_REF_CHUNK_SIZE = 8192;
 
 export interface WaysTransferables<
   T extends BufferType = BufferType,
 > extends EntitiesTransferables<T> {
   refStart: T;
   refCount: T;
+  /** Node indexes, with `0xffffffff` marking an unresolved reference. */
   refs: T;
+  /** Sorted positions in `refs` whose node ID could not be resolved. */
+  missingRefPositions: T;
+  /** OSM node IDs parallel to `missingRefPositions`. */
+  missingRefIds: T;
   bbox: T;
   /** Optional - can be rebuilt via buildSpatialIndex() */
   spatialIndex?: T;
@@ -35,8 +38,13 @@ export class Ways extends Entities<OsmWay> {
   private refStart: RTA<Uint32Array>;
   private refCount: RTA<Uint16Array>; // Maximum 2,000 nodes per way
 
-  // Node IDs
-  private refs: RTA<Float64Array>;
+  // Node indexes. Missing node IDs are preserved in sparse parallel arrays.
+  private refs: RTA<Uint32Array>;
+  private missingRefPositions: RTA<Uint32Array>;
+  private missingRefIds: RTA<Float64Array>;
+
+  // Temporary OSM node IDs used when nodes are not indexed during ingestion.
+  private pendingRefIds: RTA<Float64Array> | null;
 
   // Bounding box of the way in geographic coordinates
   private bbox: RTA<Float64Array>;
@@ -44,7 +52,12 @@ export class Ways extends Entities<OsmWay> {
   // Node reference index
   private nodes: Nodes;
 
-  private getNodeLonLat(id: number): [number, number] {
+  private getNodeLonLat(refPosition: number): [number, number] {
+    const nodeIndex = this.refs.at(refPosition);
+    if (nodeIndex !== MISSING_NODE_INDEX) {
+      return this.nodes.getNodeLonLat({ index: nodeIndex });
+    }
+    const id = this.getMissingRefId(refPosition);
     const coordinate = this.nodes.getNodeLonLat({ id });
     if (!coordinate) throw Error(`Node ${id} not found for way geometry`);
     return coordinate;
@@ -58,7 +71,10 @@ export class Ways extends Entities<OsmWay> {
       super("way", new Ids(transferables), new Tags(stringTable, transferables));
       this.refStart = RTA.from(Uint32Array, transferables.refStart);
       this.refCount = RTA.from(Uint16Array, transferables.refCount);
-      this.refs = RTA.from(IdArrayType, transferables.refs);
+      this.refs = RTA.from(Uint32Array, transferables.refs);
+      this.missingRefPositions = RTA.from(Uint32Array, transferables.missingRefPositions);
+      this.missingRefIds = RTA.from(Float64Array, transferables.missingRefIds);
+      this.pendingRefIds = null;
       this.bbox = RTA.from(Float64Array, transferables.bbox);
       // Only load spatial index if provided (not stored in IndexedDB)
       if (transferables.spatialIndex?.byteLength) {
@@ -70,7 +86,10 @@ export class Ways extends Entities<OsmWay> {
       super("way", new Ids(), new Tags(stringTable));
       this.refStart = new RTA(Uint32Array);
       this.refCount = new RTA(Uint16Array);
-      this.refs = new RTA(IdArrayType);
+      this.refs = new RTA(Uint32Array);
+      this.missingRefPositions = new RTA(Uint32Array);
+      this.missingRefIds = new RTA(Float64Array);
+      this.pendingRefIds = new RTA(Float64Array);
       this.bbox = new RTA(Float64Array);
     }
     this.nodes = nodes;
@@ -81,9 +100,9 @@ export class Ways extends Entities<OsmWay> {
    */
   addWay(way: OsmWay) {
     const wayIndex = this.addEntity(way.id, way.tags ?? {});
-    this.refStart.push(this.refs.length);
+    this.refStart.push(this.refLength);
     this.refCount.push(way.refs.length);
-    for (const ref of way.refs) this.refs.push(ref);
+    this.appendRefIds(way.refs);
     return wayIndex;
   }
 
@@ -94,6 +113,7 @@ export class Ways extends Entities<OsmWay> {
     ways: OsmPbfWay[],
     blockStringIndexMap: Uint32Array,
     filter?: (way: OsmWay) => OsmWay | null,
+    nodeIdToIndex?: (nodeId: number) => number,
   ) {
     let added = 0;
     for (const way of ways) {
@@ -122,9 +142,10 @@ export class Ways extends Entities<OsmWay> {
       if (filter && filteredWay === null) continue;
 
       this.addEntity(way.id, tagKeys, tagValues);
-      this.refStart.push(this.refs.length);
-      this.refCount.push(filteredWay?.refs.length ?? refs.length);
-      this.refs.pushMany(filteredWay?.refs ?? refs);
+      const addedRefs = filteredWay?.refs ?? refs;
+      this.refStart.push(this.refLength);
+      this.refCount.push(addedRefs.length);
+      this.appendRefIds(addedRefs, nodeIdToIndex);
       added++;
     }
     return added;
@@ -136,7 +157,23 @@ export class Ways extends Entities<OsmWay> {
   buildEntityIndex() {
     this.refStart.compact();
     this.refCount.compact();
+    if (this.pendingRefIds && this.pendingRefIds.length > 0) {
+      if (this.refs.length > 0) throw Error("Mixed pending and indexed way references.");
+      const refsBuffer = new BufferConstructor(
+        this.pendingRefIds.length * Uint32Array.BYTES_PER_ELEMENT,
+      );
+      this.refs = RTA.from(Uint32Array, refsBuffer);
+      const canResolveNodes = this.nodes.ids.isReady();
+      for (let i = 0; i < this.pendingRefIds.length; i++) {
+        const refId = this.pendingRefIds.at(i);
+        const nodeIndex = canResolveNodes ? this.nodes.ids.getIndexFromId(refId) : -1;
+        this.setIndexedRef(i, refId, nodeIndex);
+      }
+    }
+    this.pendingRefIds = null;
     this.refs.compact();
+    this.missingRefPositions.compact();
+    this.missingRefIds.compact();
   }
 
   /**
@@ -145,7 +182,10 @@ export class Ways extends Entities<OsmWay> {
    */
   buildSpatialIndex() {
     if (!this.nodes.isReady()) throw Error("Node index is not ready.");
-    if (this.size === 0) return this.spatialIndex;
+    if (this.size === 0) {
+      this.spatialIndexBuilt = true;
+      return this.spatialIndex;
+    }
 
     this.spatialIndex = new Flatbush(this.size, 128, Float64Array, BufferConstructor);
 
@@ -172,8 +212,7 @@ export class Ways extends Entities<OsmWay> {
         const start = this.refStart.at(i);
         const count = this.refCount.at(i);
         for (let j = start; j < start + count; j++) {
-          const refId = this.refs.at(j);
-          const [lon, lat] = this.getNodeLonLat(refId);
+          const [lon, lat] = this.getNodeLonLat(j);
           if (lon < minX) minX = lon;
           if (lon > maxX) maxX = lon;
           if (lat < minY) minY = lat;
@@ -219,7 +258,9 @@ export class Ways extends Entities<OsmWay> {
   getRefIds(index: number): number[] {
     const start = this.refStart.at(index);
     const count = this.refCount.at(index);
-    return Array.from(this.refs.slice(start, start + count));
+    const refs = Array.from<number>({ length: count });
+    for (let i = 0; i < count; i++) refs[i] = this.getRefId(start + i);
+    return refs;
   }
 
   /**
@@ -243,8 +284,7 @@ export class Ways extends Entities<OsmWay> {
     const start = this.refStart.at(index);
     const line = new Float64Array(count * 2);
     for (let i = 0; i < count; i++) {
-      const ref = this.refs.at(start + i);
-      const [lon, lat] = this.getNodeLonLat(ref);
+      const [lon, lat] = this.getNodeLonLat(start + i);
       line[i * 2] = lon;
       line[i * 2 + 1] = lat;
     }
@@ -259,8 +299,7 @@ export class Ways extends Entities<OsmWay> {
     const start = this.refStart.at(index);
     const coords: [number, number][] = [];
     for (let refIndex = start; refIndex < start + count; refIndex++) {
-      const ref = this.refs.at(refIndex);
-      coords.push(this.getNodeLonLat(ref));
+      coords.push(this.getNodeLonLat(refIndex));
     }
     return coords;
   }
@@ -338,6 +377,8 @@ export class Ways extends Entities<OsmWay> {
       refStart: this.refStart.array.buffer,
       refCount: this.refCount.array.buffer,
       refs: this.refs.array.buffer,
+      missingRefPositions: this.missingRefPositions.array.buffer,
+      missingRefIds: this.missingRefIds.array.buffer,
       bbox: this.bbox.array.buffer,
     };
     // Only include spatial index if it was built
@@ -350,7 +391,7 @@ export class Ways extends Entities<OsmWay> {
   /**
    * Get the approximate memory requirements for a given number of ways in bytes.
    */
-  static getBytesRequired(count: number) {
+  static getBytesRequired(count: number, refCount = 0, missingRefCount = 0) {
     if (count === 0) return 0;
     // Approximate nodes per way
     let numNodes = count;
@@ -368,6 +409,8 @@ export class Ways extends Entities<OsmWay> {
       Tags.getBytesRequired(count) +
       count * Uint32Array.BYTES_PER_ELEMENT + // refStart
       count * Uint16Array.BYTES_PER_ELEMENT + // refCount
+      refCount * Uint32Array.BYTES_PER_ELEMENT + // node indexes
+      missingRefCount * (Uint32Array.BYTES_PER_ELEMENT + Float64Array.BYTES_PER_ELEMENT) + // missing refs
       count * 4 * Float64Array.BYTES_PER_ELEMENT + // bbox
       spatialIndexBytes
     );
@@ -377,10 +420,76 @@ export class Ways extends Entities<OsmWay> {
    * Update a ContentHasher with way-specific data (node references).
    */
   override updateHash(hasher: ContentHasher): ContentHasher {
-    return super
-      .updateHash(hasher)
-      .update(this.refStart.array)
-      .update(this.refCount.array)
-      .update(this.refs.array);
+    super.updateHash(hasher).update(this.refCount.array);
+    const chunk = new Float64Array(Math.min(HASH_REF_CHUNK_SIZE, this.refs.length));
+    let chunkLength = 0;
+    for (let i = 0; i < this.refs.length; i++) {
+      chunk[chunkLength++] = this.getRefId(i);
+      if (chunkLength === chunk.length) {
+        hasher.update(chunk);
+        chunkLength = 0;
+      }
+    }
+    if (chunkLength > 0) hasher.update(chunk.subarray(0, chunkLength));
+    return hasher;
+  }
+
+  /** Logical reference length during either pending-ID or indexed ingestion. */
+  private get refLength(): number {
+    return this.pendingRefIds?.length ?? this.refs.length;
+  }
+
+  /** Append OSM node IDs, optionally resolving them directly to node indexes. */
+  private appendRefIds(refIds: number[], nodeIdToIndex?: (nodeId: number) => number) {
+    if (nodeIdToIndex) {
+      if ((this.pendingRefIds?.length ?? 0) > 0) {
+        throw Error("Cannot mix unresolved and directly indexed way references.");
+      }
+      this.pendingRefIds = null;
+      for (const refId of refIds) {
+        this.setIndexedRef(this.refs.length, refId, nodeIdToIndex(refId));
+      }
+      return;
+    }
+    if (!this.pendingRefIds) {
+      throw Error("Directly indexed way references require a node ID resolver.");
+    }
+    this.pendingRefIds.pushMany(refIds);
+  }
+
+  /** Store one resolved or losslessly preserved missing reference. */
+  private setIndexedRef(position: number, refId: number, nodeIndex: number) {
+    if (nodeIndex < 0) {
+      this.refs.set(position, MISSING_NODE_INDEX);
+      this.missingRefPositions.push(position);
+      this.missingRefIds.push(refId);
+      return;
+    }
+    if (!Number.isInteger(nodeIndex) || nodeIndex >= MISSING_NODE_INDEX) {
+      throw Error(`Invalid node index ${nodeIndex} for reference ${refId}`);
+    }
+    this.refs.set(position, nodeIndex);
+  }
+
+  /** Reconstruct the public OSM node ID for one internal reference position. */
+  private getRefId(position: number): number {
+    const nodeIndex = this.refs.at(position);
+    return nodeIndex === MISSING_NODE_INDEX
+      ? this.getMissingRefId(position)
+      : this.nodes.ids.at(nodeIndex);
+  }
+
+  /** Find the OSM node ID for a sentinel reference position. */
+  private getMissingRefId(position: number): number {
+    let low = 0;
+    let high = this.missingRefPositions.length - 1;
+    while (low <= high) {
+      const middle = (low + high) >>> 1;
+      const candidate = this.missingRefPositions.at(middle);
+      if (candidate === position) return this.missingRefIds.at(middle);
+      if (candidate < position) low = middle + 1;
+      else high = middle - 1;
+    }
+    throw Error(`Missing node ID not found for way reference position ${position}`);
   }
 }

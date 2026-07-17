@@ -3,7 +3,7 @@ import { VectorTile } from "@mapbox/vector-tile";
 import { Osm } from "@osmix/core";
 import type { GeoBbox2D, Tile } from "@osmix/types";
 import { PbfReader } from "pbf";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ShortbreadVtEncoder } from "./encoder.ts";
 
@@ -20,6 +20,26 @@ function bboxToTile(bbox: GeoBbox2D, z = 8): Tile {
 }
 
 describe("ShortbreadVtEncoder", () => {
+  it("classifies nodes from a tagged-only spatial index", () => {
+    const osm = new Osm();
+    osm.nodes.addNode({
+      id: 1,
+      lat: 40.7,
+      lon: -74,
+      tags: { amenity: "restaurant", name: "Tagged" },
+    });
+    osm.nodes.addNode({ id: 2, lat: 40.71, lon: -74.01 });
+    osm.buildIndexes();
+    osm.nodes.buildSpatialIndex("tagged");
+    const allNodeQuery = vi.spyOn(osm.nodes, "findIndexesWithinBbox");
+    const encoder = new ShortbreadVtEncoder(osm);
+
+    const features = Array.from(encoder["classifyNodes"](osm.bbox(), ([lon, lat]) => [lon, lat]));
+
+    expect(features.map(({ id }) => id)).toEqual([1]);
+    expect(allNodeQuery).not.toHaveBeenCalled();
+  });
+
   it("encodes a restaurant POI to the pois layer", () => {
     const osm = new Osm();
     osm.nodes.addNode({

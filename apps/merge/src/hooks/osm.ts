@@ -1,11 +1,18 @@
 import { useAtom, useSetAtom } from "jotai";
 import type { GeoBbox2D } from "osmix";
-import type { ExtractStrategy, ExtractTagFilterRules, OsmFileType, OsmInfo } from "osmix";
-import { useEffectEvent, useRef } from "react";
+import type {
+  ExtractStrategy,
+  ExtractTagFilterRules,
+  OsmFileType,
+  OsmInfo,
+  OsmLoadProfile,
+} from "osmix";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
+import { getBrowserLoadCapabilities } from "../lib/browser-capabilities";
 import { ensureOsmPbfDownloadName } from "../lib/osm-pbf-download-name";
 import { showSaveFilePickerWithFallback } from "../lib/save-file-picker";
-import { canStoreFile } from "../lib/storage-utils";
+import { canStoreBytes } from "../lib/storage-utils";
 import { isStreamCloneable } from "../lib/stream-transfer";
 import { Log } from "../state/log";
 import {
@@ -13,6 +20,7 @@ import {
   osmFileAtomFamily,
   osmFileInfoAtomFamily,
   osmInfoAtomFamily,
+  osmLoadProfileAtomFamily,
   osmStoredAtomFamily,
   selectedOsmAtom,
 } from "../state/osm";
@@ -26,6 +34,28 @@ export class LoadCancelledError extends Error {
   }
 }
 
+async function hashFileWithCancellation(file: File, signal?: AbortSignal): Promise<string> {
+  if (signal?.aborted) throw new LoadCancelledError();
+  const taskId = crypto.randomUUID();
+  const cancel = () => {
+    osmWorker.cancelHash(taskId);
+  };
+  signal?.addEventListener("abort", cancel, { once: true });
+  try {
+    return await osmWorker.hashFile(file, taskId, signal);
+  } catch (error) {
+    if (signal?.aborted) throw new LoadCancelledError();
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+  }
+}
+
+function isPbfFile(file: File, fileType?: OsmFileType): boolean {
+  if (fileType !== undefined) return fileType === "pbf";
+  return file.name.toLowerCase().endsWith(".pbf");
+}
+
 export type UseOsmFileReturn = ReturnType<typeof useOsmFile>;
 
 export function useOsmFile(osmKey: string) {
@@ -34,13 +64,47 @@ export function useOsmFile(osmKey: string) {
   const [osm, setOsm] = useAtom(osmAtomFamily(osmKey));
   const [osmInfo, setOsmInfo] = useAtom(osmInfoAtomFamily(osmKey));
   const [isStored, setIsStored] = useAtom(osmStoredAtomFamily(osmKey));
+  const [loadProfile, setLoadProfile] = useAtom(osmLoadProfileAtomFamily(osmKey));
+  const [storageCheckResult, setStorageCheckResult] = useState<{
+    osmId: string;
+    check: Awaited<ReturnType<typeof canStoreBytes>>;
+  } | null>(null);
   const setSelectedOsm = useSetAtom(selectedOsmAtom);
 
   // Track current load to prevent stale cancellations from clearing newer load state
   const currentLoadIdRef = useRef(0);
 
+  useEffect(() => {
+    if (isStored || !osmInfo) return;
+    let disposed = false;
+    void (async () => {
+      try {
+        const storableBytes =
+          osmInfo.loadDiagnostics?.bytes.storageBytes ??
+          (await osmWorker.getStorableByteLength(osmInfo.id));
+        const check = await canStoreBytes(storableBytes);
+        if (!disposed) setStorageCheckResult({ osmId: osmInfo.id, check });
+      } catch {
+        // The dataset may be replaced while this asynchronous estimate is running.
+      }
+    })();
+    return () => {
+      disposed = true;
+    };
+  }, [isStored, osmInfo]);
+
+  const storageCheck =
+    !isStored && storageCheckResult && storageCheckResult.osmId === osmInfo?.id
+      ? storageCheckResult.check
+      : null;
+
   const loadOsmFile = useEffectEvent(
-    async (file: File | null, fileType?: OsmFileType, signal?: AbortSignal) => {
+    async (
+      file: File | null,
+      fileType?: OsmFileType,
+      signal?: AbortSignal,
+      profileOverride?: OsmLoadProfile,
+    ) => {
       const loadId = ++currentLoadIdRef.current;
       setFile(file);
       setOsm(null);
@@ -54,12 +118,7 @@ export function useOsmFile(osmKey: string) {
 
         // Hash the file in the worker to avoid blocking UI
         taskLog.update("Hashing file...");
-        const buffer = await file.arrayBuffer();
-
-        // Check after file read
-        if (signal?.aborted) throw new LoadCancelledError();
-
-        const fileHash = await osmWorker.hashBuffer(buffer, signal);
+        const fileHash = await hashFileWithCancellation(file, signal);
 
         // Check after hashing
         if (signal?.aborted) throw new LoadCancelledError();
@@ -77,7 +136,10 @@ export function useOsmFile(osmKey: string) {
         // Check after cache lookup
         if (signal?.aborted) throw new LoadCancelledError();
 
-        if (existing) {
+        const requestedProfile = profileOverride ?? loadProfile;
+        const cachedProfileIsUsable =
+          requestedProfile !== "full" || existing?.info.spatialIndexes.nodes.all === true;
+        if (existing && cachedProfileIsUsable) {
           taskLog.update("Found cached version, loading from storage...");
           const stored = await osmWorker.loadFromStorage(existing.fileHash, signal);
 
@@ -103,7 +165,16 @@ export function useOsmFile(osmKey: string) {
 
         // Parse the file normally in the worker with explicit file type
         taskLog.update("Parsing file...");
-        const osmInfo: OsmInfo = await osmWorker.fromFile(file, { id: fileHash }, fileType);
+        const pbfInput = isPbfFile(file, fileType);
+        const loadCapabilities = pbfInput ? await getBrowserLoadCapabilities() : undefined;
+        const osmInfo: OsmInfo = await osmWorker.fromFile(
+          file,
+          {
+            id: fileHash,
+            ...(pbfInput ? { loadProfile: requestedProfile, loadCapabilities } : {}),
+          },
+          fileType,
+        );
 
         // Check after parsing
         if (signal?.aborted) throw new LoadCancelledError();
@@ -161,10 +232,7 @@ export function useOsmFile(osmKey: string) {
         if (signal?.aborted) throw new LoadCancelledError();
 
         taskLog.update("Hashing file…");
-        const buffer = await file.arrayBuffer();
-        if (signal?.aborted) throw new LoadCancelledError();
-
-        const fileHash = await osmWorker.hashBuffer(buffer, signal);
+        const fileHash = await hashFileWithCancellation(file, signal);
         if (signal?.aborted) throw new LoadCancelledError();
 
         const storedFileInfo: StoredFileInfo = {
@@ -175,6 +243,7 @@ export function useOsmFile(osmKey: string) {
         setFileInfo(storedFileInfo);
 
         taskLog.update("Reading PBF and applying extract…");
+        const loadCapabilities = await getBrowserLoadCapabilities();
         const osmInfo: OsmInfo = await osmWorker.fromFile(
           file,
           {
@@ -182,6 +251,8 @@ export function useOsmFile(osmKey: string) {
             extractBbox: extract.extractBbox,
             extractStrategy: extract.extractStrategy,
             extractTagFilter: extract.extractTagFilter,
+            loadProfile: extract.extractStrategy === "simple" ? loadProfile : "full",
+            loadCapabilities,
           },
           "pbf",
         );
@@ -216,6 +287,68 @@ export function useOsmFile(osmKey: string) {
       }
     },
   );
+
+  const loadOsmPbfUrl = useEffectEvent(
+    async (url: string, signal?: AbortSignal, profileOverride?: OsmLoadProfile) => {
+      const loadId = ++currentLoadIdRef.current;
+      setFile(null);
+      setOsm(null);
+      setFileInfo(null);
+      setIsStored(false);
+      const taskLog = Log.startTask(`Streaming PBF from ${url}...`);
+      try {
+        if (signal?.aborted) throw new LoadCancelledError();
+        const loadCapabilities = await getBrowserLoadCapabilities();
+        const requestedProfile = profileOverride ?? loadProfile;
+        const result = await osmWorker.fromPbfUrl(
+          url,
+          {
+            loadProfile: requestedProfile,
+            loadCapabilities,
+          },
+          signal,
+        );
+        if (signal?.aborted) throw new LoadCancelledError();
+        const loadedOsm = await osmWorker.get(result.info.id);
+        if (signal?.aborted) throw new LoadCancelledError();
+        setFileInfo(result.fileInfo);
+        setOsmInfo(result.info);
+        setOsm(loadedOsm);
+        setSelectedOsm(loadedOsm);
+        const cachedProfileIsUsable =
+          requestedProfile !== "full" || result.existing?.info.spatialIndexes.nodes.all === true;
+        setIsStored(result.existing !== null && cachedProfileIsUsable);
+        taskLog.end(`${result.fileInfo.fileName} loaded from URL.`);
+        return result.info;
+      } catch (error) {
+        if (error instanceof LoadCancelledError) {
+          if (loadId === currentLoadIdRef.current) {
+            setFileInfo(null);
+            setOsm(null);
+            setOsmInfo(null);
+            setIsStored(false);
+          }
+          taskLog.end("URL loading cancelled.");
+          return null;
+        }
+        taskLog.end(`Failed to load PBF from ${url}.`, "error");
+        throw error;
+      }
+    },
+  );
+
+  const reloadWithFullProfile = useEffectEvent(async () => {
+    setLoadProfile("full");
+    if (file) return loadOsmFile(file, "pbf", undefined, "full");
+    if (fileInfo?.sourceUrl) {
+      return loadOsmPbfUrl(fileInfo.sourceUrl, undefined, "full");
+    }
+    Log.addMessage(
+      "The original PBF is not available in this session. Select it again and choose Full.",
+      "error",
+    );
+    return null;
+  });
 
   const loadFromStorage = useEffectEvent(async (storageId: string, signal?: AbortSignal) => {
     const loadId = ++currentLoadIdRef.current;
@@ -316,7 +449,10 @@ export function useOsmFile(osmKey: string) {
     if (!osmInfo || !fileInfo || isStored) return;
 
     // Check storage availability
-    const storageCheck = await canStoreFile(fileInfo.fileSize);
+    const storableBytes =
+      osmInfo.loadDiagnostics?.bytes.storageBytes ??
+      (await osmWorker.getStorableByteLength(osmInfo.id));
+    const storageCheck = await canStoreBytes(storableBytes);
     if (!storageCheck.canStore) {
       Log.addMessage(
         `Insufficient storage: need ${Math.ceil(storageCheck.requiredBytes / 1024 / 1024)}MB, ` +
@@ -417,17 +553,23 @@ export function useOsmFile(osmKey: string) {
 
   return {
     copyStateFrom,
+    canStore: storageCheck?.canStore === true,
     downloadOsm,
     file,
     fileInfo,
     isStored,
+    loadProfile,
     loadExtractFromPbf,
     loadFromStorage,
     loadOsmFile,
+    loadOsmPbfUrl,
     osm,
     osmInfo,
+    reloadWithFullProfile,
     saveToStorage,
+    setLoadProfile,
     setMergedOsm,
     setOsm,
+    storageCheck,
   };
 }

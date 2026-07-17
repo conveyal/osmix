@@ -159,6 +159,9 @@ importers:
       dequal:
         specifier: 'catalog:'
         version: 2.0.3
+      hash-wasm:
+        specifier: ^4.12.0
+        version: 4.12.0
       idb:
         specifier: ^8.0.3
         version: 8.0.3
@@ -429,12 +432,6 @@ importers:
       geoflatbush:
         specifier: ^2.2.1
         version: 2.2.1
-      geokdbush:
-        specifier: ^2.1.0
-        version: 2.1.0
-      kdbush:
-        specifier: ^4.1.0
-        version: 4.1.0
     devDependencies:
       '@osmix/pbf':
         specifier: workspace:*
@@ -2649,6 +2646,9 @@ packages:
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
+
+  hash-wasm@4.12.0:
+    resolution: {integrity: sha512-+/2B2rYLb48I/evdOIhP+K/DD2ca2fgBjp6O+GBEnCDk2e4rpeXIK8GvIyRPjTezgmWn9gmKwkQjjx6BtqDHVQ==}
 
   hast-util-to-html@9.0.5:
     resolution: {integrity: sha512-OguPdidb+fbHQSU4Q4ZiLKnzWo8Wwsf5bZfbvu7//a9oTYoqD/fWpe96NuHkoS9h0ccGOTe0C4NGXdtS0iObOw==}
@@ -5243,6 +5243,8 @@ snapshots:
     optional: true
 
   has-flag@4.0.0: {}
+
+  hash-wasm@4.12.0: {}
 
   hast-util-to-html@9.0.5:
     dependencies:

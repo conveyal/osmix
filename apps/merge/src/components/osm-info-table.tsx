@@ -23,6 +23,14 @@ export default function OsmInfoTable({
   const fileSize = file?.size ?? fileInfo?.fileSize;
 
   if (!osm || (!file && !fileInfo)) return null;
+  const info = osm.info();
+  const diagnostics = info.loadDiagnostics;
+  const nodeIndexes = [
+    info.spatialIndexes.nodes.tagged ? "tagged" : null,
+    info.spatialIndexes.nodes.all ? "all" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
   return (
     <Details defaultOpen={defaultOpen}>
       <DetailsSummary>File info</DetailsSummary>
@@ -51,6 +59,66 @@ export default function OsmInfoTable({
               <TableCell>bbox</TableCell>
               <TableCell>{osm.bbox()?.join(",")}</TableCell>
             </TableRow>
+            <TableRow>
+              <TableCell>load profile</TableCell>
+              <TableCell>
+                {diagnostics
+                  ? `${diagnostics.selectedProfile} (requested ${diagnostics.requestedProfile})`
+                  : "not recorded"}
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>node indexes</TableCell>
+              <TableCell>{nodeIndexes || "none"}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>way / relation indexes</TableCell>
+              <TableCell>
+                {info.spatialIndexes.ways ? "yes" : "no"} /{" "}
+                {info.spatialIndexes.relations ? "yes" : "no"}
+              </TableCell>
+            </TableRow>
+            {diagnostics ? (
+              <>
+                <TableRow>
+                  <TableCell>resident typed buffers</TableCell>
+                  <TableCell>{bytesSizeToHuman(diagnostics.bytes.residentTypedBuffers)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>projected peak</TableCell>
+                  <TableCell>
+                    {bytesSizeToHuman(diagnostics.bytes.projectedTypedBufferPeak)}
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>largest planned allocation</TableCell>
+                  <TableCell>
+                    {bytesSizeToHuman(diagnostics.bytes.largestPlannedAllocation)}
+                  </TableCell>
+                </TableRow>
+                {diagnostics.bytes.storageBytes !== undefined ? (
+                  <TableRow>
+                    <TableCell>storable transfer</TableCell>
+                    <TableCell>{bytesSizeToHuman(diagnostics.bytes.storageBytes)}</TableCell>
+                  </TableRow>
+                ) : null}
+                {diagnostics.reasons.map((reason) => (
+                  <TableRow key={`${reason.code}:${reason.message}`}>
+                    <TableCell>
+                      {reason.level === "warning" ? "load warning" : "selection"}
+                    </TableCell>
+                    <TableCell>{reason.message}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell>
+                    <SectionTitle>Phase timings (ms)</SectionTitle>
+                  </TableCell>
+                  <TableCell />
+                </TableRow>
+                <ObjectToTableRows object={diagnostics.phaseTimingsMs} />
+              </>
+            ) : null}
             <TableRow>
               <TableCell>
                 <SectionTitle>Header</SectionTitle>

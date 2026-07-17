@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
-import type { OsmFileType } from "osmix";
-import { useState } from "react";
+import type { OsmFileType, OsmLoadProfile } from "osmix";
+import { useId, useState } from "react";
 
 import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file";
 import { Log } from "../state/log";
@@ -60,18 +60,94 @@ const FILE_TYPE_OPTIONS: {
 export default function OsmPbfFileInput({
   disabled,
   file,
+  loadProfile,
+  onLoadProfileChange,
   pbfOnly,
   setFile,
 }: {
   disabled?: boolean;
   file?: File | null;
+  loadProfile?: OsmLoadProfile;
+  onLoadProfileChange?: (profile: OsmLoadProfile) => void;
   pbfOnly?: boolean;
   setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>;
 }) {
-  return !file ? (
-    <OsmPbfSelectFileButton disabled={disabled} pbfOnly={pbfOnly} setFile={setFile} />
-  ) : (
-    <OsmPbfClearFileButton disabled={disabled} clearFile={() => setFile(null)} />
+  return (
+    <div className="flex flex-1 flex-col gap-2">
+      <div className="flex items-center gap-2">
+        {!file ? (
+          <OsmPbfSelectFileButton disabled={disabled} pbfOnly={pbfOnly} setFile={setFile} />
+        ) : (
+          <OsmPbfClearFileButton disabled={disabled} clearFile={() => setFile(null)} />
+        )}
+      </div>
+      {loadProfile && onLoadProfileChange ? (
+        <OsmLoadProfileSelector
+          disabled={disabled}
+          value={loadProfile}
+          onChange={onLoadProfileChange}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+const LOAD_PROFILE_OPTIONS: Array<{
+  value: OsmLoadProfile;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "auto",
+    label: "Auto",
+    description: "Choose Full when it fits; otherwise use View.",
+  },
+  {
+    value: "full",
+    label: "Full",
+    description: "Build every index for merge, complete extracts, and routing.",
+  },
+  {
+    value: "view",
+    label: "View",
+    description: "Skip the all-node index to reduce memory use.",
+  },
+];
+
+export function OsmLoadProfileSelector({
+  disabled,
+  onChange,
+  value,
+}: {
+  disabled?: boolean;
+  onChange: (profile: OsmLoadProfile) => void;
+  value: OsmLoadProfile;
+}) {
+  const id = useId();
+  const selected = LOAD_PROFILE_OPTIONS.find((option) => option.value === value)!;
+  return (
+    <div className="flex flex-col gap-1 rounded border bg-muted/50 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={id} className="font-medium">
+          Advanced load profile
+        </label>
+        <select
+          id={id}
+          aria-label="PBF load profile"
+          className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+          disabled={disabled}
+          value={value}
+          onChange={(event) => onChange(event.target.value as OsmLoadProfile)}
+        >
+          {LOAD_PROFILE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="text-muted-foreground">{selected.description}</div>
+    </div>
   );
 }
 
@@ -158,9 +234,11 @@ export function OsmPbfSelectFileButton({
 
 export function OsmPbfOpenUrlButton({
   disabled,
+  openPbfUrl,
   setFile,
 }: {
   disabled?: boolean;
+  openPbfUrl?: (url: string) => Promise<unknown>;
   setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -235,6 +313,11 @@ export function OsmPbfOpenUrlButton({
             disabled={disabled || url.trim().length === 0}
             icon={<LinkIcon />}
             onAction={async () => {
+              if (selectedFileType === "pbf" && openPbfUrl) {
+                await openPbfUrl(url);
+                setOpen(false);
+                return;
+              }
               const task = Log.startTask("Downloading file from URL...");
               try {
                 const file = await fetchOsmFileFromUrl(url);

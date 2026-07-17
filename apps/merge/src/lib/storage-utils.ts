@@ -9,17 +9,14 @@ export interface StorageCheck {
 }
 
 /**
- * Check if there is sufficient storage space to save a file.
- * Adds a 10% buffer for serialization overhead.
+ * Check whether the remaining quota can hold the exact storable-transfer bytes.
  */
-export async function canStoreFile(fileSize: number): Promise<StorageCheck> {
+export async function canStoreBytes(requiredBytes: number): Promise<StorageCheck> {
   const estimate = await navigator.storage.estimate();
   const available = (estimate.quota ?? 0) - (estimate.usage ?? 0);
-  // Add 10% buffer for serialization overhead
-  const required = Math.ceil(fileSize * 1.1);
   return {
-    canStore: available >= required,
+    canStore: available >= requiredBytes,
     availableBytes: available,
-    requiredBytes: required,
+    requiredBytes,
   };
 }

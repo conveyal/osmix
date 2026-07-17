@@ -5,7 +5,7 @@
  *
  * Features:
  * - **Memory-efficient**: Uses typed arrays and Int32Array microdegrees.
- * - **Spatial indexing**: KDBush (points) and Flatbush (bboxes) for fast geographic queries.
+ * - **Spatial indexing**: Compact indirect KD trees (points) and Flatbush (bboxes).
  * - **Worker-ready**: Zero-copy transfer via `transferables()`.
  * - **Tag indexing**: Fast reverse lookup by tag key.
  *
@@ -22,10 +22,6 @@
  * @module @osmix/core
  */
 
-// oxlint-disable-next-line typescript/triple-slash-reference -- ambient module declarations for untyped packages
-/// <reference path="./types/kdbush.d.ts" />
-// oxlint-disable-next-line typescript/triple-slash-reference -- ambient module declarations for untyped packages
-/// <reference path="./types/geokdbush.d.ts" />
 // oxlint-disable-next-line typescript/triple-slash-reference -- ambient module declarations for untyped packages
 /// <reference path="./types/geoflatbush.d.ts" />
 

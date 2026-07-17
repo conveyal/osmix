@@ -2,7 +2,6 @@ import { FilesIcon } from "lucide-react";
 import type { OsmInfo } from "osmix";
 import { useEffectEvent } from "react";
 
-import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file";
 import { Log } from "../state/log";
 import ActionButton from "./action-button";
 import { Card, CardContent } from "./ui/card";
@@ -11,16 +10,14 @@ const EXAMPLE_MONACO_PBF_URL =
   "https://trevorgerhardt.github.io/files/487218b69358-1f24d3e4e476/monaco.pbf";
 
 export default function ExtractList({
-  openOsmFile,
+  openOsmPbfUrl,
 }: {
-  openOsmFile: (file: File) => Promise<OsmInfo | null>;
+  openOsmPbfUrl: (url: string) => Promise<OsmInfo | null>;
 }) {
-  const useExample = useEffectEvent(async () => {
-    const task = Log.startTask("Downloading Monaco.pbf example...");
+  const useExample = useEffectEvent(async (): Promise<OsmInfo | null> => {
+    const task = Log.startTask("Opening Monaco.pbf example...");
     try {
-      const exampleFile = await fetchOsmFileFromUrl(EXAMPLE_MONACO_PBF_URL);
-      task.update("Opening file...");
-      const osmInfo = await openOsmFile(exampleFile);
+      const osmInfo = await openOsmPbfUrl(EXAMPLE_MONACO_PBF_URL);
       task.end("Example loaded");
       return osmInfo;
     } catch (e) {

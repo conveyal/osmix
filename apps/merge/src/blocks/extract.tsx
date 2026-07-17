@@ -98,6 +98,12 @@ export default function ExtractBlock() {
     setBboxInputs([String(w), String(s), String(e), String(n)]);
   }, [bbox]);
 
+  useEffect(() => {
+    if (strategy !== "simple" && extract.loadProfile !== "full") {
+      extract.setLoadProfile("full");
+    }
+  }, [extract.loadProfile, extract.setLoadProfile, strategy, extract]);
+
   const canExtract = !!pendingFile && isValidBbox(bbox) && !isExtracting;
   const hasExtractResult = !!extract.osm && !!extract.osmInfo;
 
@@ -304,6 +310,12 @@ export default function ExtractBlock() {
               </div>
             );
           })}
+          {strategy !== "simple" ? (
+            <p className="text-muted-foreground">
+              Complete ways and Smart require the Full node index, so this extract will load in Full
+              mode.
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -319,6 +331,8 @@ export default function ExtractBlock() {
         <CardContent className="flex gap-2 items-center">
           <OsmPbfFileInput
             file={pendingFile}
+            loadProfile={extract.loadProfile}
+            onLoadProfileChange={extract.setLoadProfile}
             setFile={async (f) => {
               setPendingFile(f);
               return;
@@ -350,7 +364,7 @@ export default function ExtractBlock() {
           >
             Download extracted PBF
           </Button>
-          {hasExtractResult && !extract.isStored ? (
+          {hasExtractResult && !extract.isStored && extract.canStore ? (
             <Button
               type="button"
               disabled={isExtracting}

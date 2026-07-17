@@ -7,8 +7,18 @@ declare global {
   }
 }
 
+const BLOCK_PROGRESS_INTERVAL_MS = 250;
+let lastBlockProgressAt = Number.NEGATIVE_INFINITY;
+
 export const osmWorker = await createMergeRemote({
-  onProgress: (progress) => Log.addMessage(progress.msg),
+  onProgress: (progress) => {
+    if (progress.msg.startsWith("Processed ")) {
+      const now = performance.now();
+      if (now - lastBlockProgressAt < BLOCK_PROGRESS_INTERVAL_MS) return;
+      lastBlockProgressAt = now;
+    }
+    Log.addMessage(progress.msg);
+  },
 });
 
 window.osmWorker = osmWorker;

@@ -12,7 +12,7 @@ import type { OsmChangeTypes, OsmMergeOptions } from "@osmix/change";
 import { Osm, type OsmInfo, type OsmOptions, type OsmTransferables } from "@osmix/core";
 import type { GeoParquetReadOptions } from "@osmix/geoparquet";
 import { type GtfsConversionOptions, isGtfsZip as isGtfsZipBytes } from "@osmix/gtfs";
-import { type OsmFromPbfOptions, toPbfStream } from "@osmix/load";
+import { type OsmFromPbfOptions, type OsmLoadDecision, toPbfStream } from "@osmix/load";
 import type {
   DefaultSpeeds,
   HighwayFilter,
@@ -32,6 +32,7 @@ import {
   type OsmixMode,
   type WorkerRuntime,
 } from "./capabilities.ts";
+import { installStructuredComlinkErrorTransferHandler } from "./comlink-errors.ts";
 import type { DrawToRasterTileOptions } from "./raster.ts";
 import { supportsReadableStreamTransfer, transfer } from "./utils.ts";
 import {
@@ -42,6 +43,8 @@ import {
   type OsmixWorkerPoolDiagnostics,
 } from "./worker-pool.ts";
 import { OsmixWorker } from "./worker.ts";
+
+installStructuredComlinkErrorTransferHandler();
 
 /** Identifier for an OSM dataset: string ID, Osm instance, or OsmInfo object. */
 export type OsmId = string | Osm | OsmInfo;
@@ -78,6 +81,7 @@ type BoundDatasetMethod<F> = F extends (osmId: OsmId, ...args: infer Args) => in
 
 type DatasetProxyMethodName =
   | "get"
+  | "getLoadDecision"
   | "has"
   | "isReady"
   | "search"
@@ -127,6 +131,8 @@ class OsmRemoteDatasetBase<T extends OsmixWorker = OsmixWorker> implements OsmIn
   readonly bbox: OsmInfo["bbox"];
   readonly header: OsmInfo["header"];
   readonly stats: OsmInfo["stats"];
+  readonly spatialIndexes: OsmInfo["spatialIndexes"];
+  readonly loadDiagnostics: OsmInfo["loadDiagnostics"];
   readonly nodes: OsmRemoteDatasetMemberMethods<T, "nodes">;
   readonly ways: OsmRemoteDatasetMemberMethods<T, "ways">;
   readonly relations: OsmRemoteDatasetMemberMethods<T, "relations">;
@@ -137,6 +143,8 @@ class OsmRemoteDatasetBase<T extends OsmixWorker = OsmixWorker> implements OsmIn
     this.bbox = info.bbox;
     this.header = info.header;
     this.stats = info.stats;
+    this.spatialIndexes = info.spatialIndexes;
+    this.loadDiagnostics = info.loadDiagnostics;
     this.nodes = this.createMemberProxy("nodes");
     this.ways = this.createMemberProxy("ways");
     this.relations = this.createMemberProxy("relations");
@@ -393,6 +401,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   private activeChangeset: ActiveChangesetState | null = null;
   private readonly datasetRestorers = new Map<string, DatasetRestorer<T> | null>();
   private readonly retainedDatasets = new Map<string, OsmTransferables>();
+  private readonly retainedLoadDecisions = new Map<string, OsmLoadDecision | null>();
   private readonly retainedRoutingGraphs = new Map<string, RoutingGraphTransferables>();
   private onProgress: ((progress: Progress) => void) | undefined;
   private disposal: Promise<void> | null = null;
@@ -611,6 +620,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     const id = this.getId(osmId);
     this.datasetRestorers.delete(id);
     this.retainedDatasets.delete(id);
+    this.retainedLoadDecisions.delete(id);
     this.retainedRoutingGraphs.delete(id);
   }
 
@@ -619,6 +629,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     const id = this.getId(osmId);
     this.datasetRestorers.set(id, null);
     this.retainedDatasets.delete(id);
+    this.retainedLoadDecisions.delete(id);
     this.retainedRoutingGraphs.delete(id);
   }
 
@@ -636,8 +647,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     if (this.onProgress) {
       await worker.addProgressListener(Comlink.proxy(this.onProgress));
     }
-    for (const transferables of this.retainedDatasets.values()) {
-      await worker.transferIn(transferables);
+    for (const [id, transferables] of this.retainedDatasets) {
+      await worker.transferIn(transferables, this.retainedLoadDecisions.get(id) ?? null);
     }
 
     const recoveryFailures = new Map<string, unknown>();
@@ -729,12 +740,14 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     this.registerDatasetForRecovery(osmId);
     if (pool.workerCount <= 1 && !canShareArrayBuffers()) return;
     const transferables = await worker.getOsmBuffers(this.getId(osmId));
+    const loadDecision = await worker.getLoadDecision(this.getId(osmId));
     const isShared = hasOnlySharedBackingBuffers(transferables);
     if (pool.workerCount > 1 && !isShared) {
       throw Error("Multiple workers require a SharedArrayBuffer-backed OSM dataset");
     }
     if (isShared) {
       this.retainedDatasets.set(transferables.id, transferables);
+      this.retainedLoadDecisions.set(transferables.id, loadDecision);
       // Shared descriptors are the recovery source. Do not also retain a File
       // or URL that may reference the complete regional input.
       this.datasetRestorers.set(transferables.id, null);
@@ -742,7 +755,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     if (pool.workerCount <= 1) return;
     await this.broadcastStateChange(
       "dataset replication",
-      (target) => target.transferIn(transferables),
+      (target) => target.transferIn(transferables, loadDecision),
       {
         eligibleWorkerIndexes: pool.workerIndexes.slice(1),
         retry: "once",
@@ -1137,6 +1150,13 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     return this.runWithWorker((worker) => worker.has(this.getId(osmId)), { retry: "once" });
   }
 
+  /** Return the load-profile decision recorded for a PBF dataset. */
+  getLoadDecision(osmId: OsmId) {
+    return this.runWithWorker((worker) => worker.getLoadDecision(this.getId(osmId)), {
+      retry: "once",
+    });
+  }
+
   /**
    * Retrieve an `Osm` instance from a worker and reconstruct it on the main thread.
    * Useful for direct access when worker overhead is unnecessary.
@@ -1173,7 +1193,10 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       throw Error("Multiple workers require a SharedArrayBuffer-backed OSM dataset");
     }
     this.markDatasetUnrecoverable(transferables.id);
-    if (isShared) this.retainedDatasets.set(transferables.id, transferables);
+    if (isShared) {
+      this.retainedDatasets.set(transferables.id, transferables);
+      this.retainedLoadDecisions.set(transferables.id, null);
+    }
     await this.broadcastStateChange("dataset transfer", (worker) =>
       worker.transferIn(transfer(transferables)),
     );
@@ -1203,10 +1226,13 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     const from = this.getId(fromId);
     if (from === toId) return;
     // Get the osm from one worker, then re-register under the new ID
-    const transferables = await this.runWithWorker((worker) => worker.getOsmBuffers(from), {
-      lane: "control",
-      retry: "once",
-    });
+    const { loadDecision, transferables } = await this.runWithWorker(
+      async (worker) => ({
+        loadDecision: await worker.getLoadDecision(from),
+        transferables: await worker.getOsmBuffers(from),
+      }),
+      { lane: "control", retry: "once" },
+    );
     // Update the id in the transferables
     const updatedTransferables = { ...transferables, id: toId };
     const restorer = this.datasetRestorers.get(from) ?? null;
@@ -1214,6 +1240,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     this.datasetRestorers.set(toId, restorer);
     if (hasOnlySharedBackingBuffers(updatedTransferables)) {
       this.retainedDatasets.set(toId, updatedTransferables);
+      this.retainedLoadDecisions.set(toId, loadDecision);
     }
     if (
       this.activeChangeset &&
@@ -1224,7 +1251,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     // Delete old entries and transfer in with new ID
     await this.broadcastStateChange("dataset rename", async (worker) => {
       await worker.delete(from);
-      await worker.transferIn(updatedTransferables);
+      await worker.transferIn(updatedTransferables, loadDecision);
     });
   }
 
@@ -1500,6 +1527,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     this.activeChangeset = null;
     this.datasetRestorers.clear();
     this.retainedDatasets.clear();
+    this.retainedLoadDecisions.clear();
     this.retainedRoutingGraphs.clear();
     this.poolMode = null;
     this.terminalError = null;

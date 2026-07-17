@@ -5,6 +5,7 @@ Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PB
 ## Highlights
 
 - Load “base” and “patch” `.osm.pbf` files, preview differences, and step through merge tasks (direct merge, node/way deduplication, intersection creation).
+- Select Auto, Full, or View loading according to the dataset and available browser memory.
 - Visualize both datasets with raster previews produced on the worker thread plus interactive vector overlays for selected entities.
 - Inspect individual OSM files, find duplicate entities, and apply the generated changes back into the in-memory index.
 - Built-in Nominatim search, entity lookups, and task logging keep large merges manageable.
@@ -50,6 +51,26 @@ Tests load sample fixtures from `fixtures/monaco.pbf` and exercise both Merge an
 
 ## Core workflow
 
+### Loading profiles
+
+The PBF input's Advanced selector defaults to **Auto**:
+
+- **Full** builds all-node and tagged-node indexes plus way and relation indexes.
+- **View** omits the all-node index but retains tagged-node, way, and relation indexes for map rendering,
+  tag search, and node/way/relation inspection.
+- **Auto** selects Full only when its all-node index is at most 256 MiB, its projected typed-buffer peak is
+  within the smaller of 4 GiB and 40% of the reported device-memory class, and each allocation is below 80%
+  of the tested active-buffer ceiling. It otherwise selects View.
+
+File information shows the requested and selected profiles, available spatial capabilities, memory
+projections, storage estimate, budgets, and selection reasons. Check System distinguishes the reported device
+memory class from separately tested `ArrayBuffer` and `SharedArrayBuffer` ceilings; typed-array element counts
+are derived from those tested byte ceilings.
+
+When View omits the all-node index, merge, node/way deduplication, complete/smart extraction, routing, and
+other all-node-dependent controls are disabled with an explanation and a **Reload using Full** action. Simple
+in-stream extraction remains available. The app does not build the large index synchronously on first use.
+
 ### Merge view (default route)
 
 1. **Select OSM PBF files** – Upload base + patch files and review metadata. The files stay local thanks to the File System Access API.
@@ -76,20 +97,31 @@ The stepper resets selection state between actions, and you can jump backward or
 - Stateful loading, IndexedDB writes, and changesets stay on the control worker. Read-only tiles and queries use available compute workers, with queued MapLibre tile requests cancelled when the map no longer needs them.
 - Workers cache `Osmix` instances keyed by dataset id, share their backing buffers, expose change pagination, and return transferable typed arrays whenever possible.
 - If a single non-shared worker restarts, datasets previously loaded from IndexedDB are reconstructed with a read-only replay before the slot accepts more work. One-shot mutations and IndexedDB writes are never retried.
+- Local PBF files are hashed incrementally from `File.stream()` in a worker, avoiding a second whole-file
+  input buffer. PBF URLs are hashed while the parser consumes a single response, then re-keyed to the final
+  lowercase SHA-256 without copying the dataset buffers.
 - Logs from the worker are proxied back through `Log.addMessage` so long-running operations surface status updates.
 
 ## Data loading tips
 
 - Upload local `.osm.pbf` / `.geojson` / `.json` / `.zip` (Shapefile) files, or use **Open from URL** for hosted files (the host must allow browser downloads via CORS).
 - Adjust the defaults in `src/settings.ts` if you want the app to reference local dev fixtures by URL.
-- Large extracts work best when the browser has several gigabytes of free memory; use the “Check system” dialog to see current limits.
+- Large extracts work best in a cross-origin-isolated Chromium browser with `SharedArrayBuffer`. Use Check
+  System to inspect the reported memory class and tested buffer ceilings before loading.
+- IndexedDB uses schema version 3. Upgrading intentionally recreates the OSM store and clears incompatible
+  version 1/2 datasets. Persistence is offered only when the exact storable transfer size fits the available
+  quota; the compressed PBF file size is not used as a proxy.
 - Changes and temporary files never leave the browser unless you explicitly download them.
+
+See [Australia-scale manual verification](./AUSTRALIA-PBF-CHECKLIST.md) for the large-file acceptance run.
 
 ## Troubleshooting
 
 - **Secure context warnings** – If the system check reports a missing secure context, make sure you’re on `https://` (or `localhost`) and disable extensions that inject insecure content.
 - **File picker errors** – Exports try native `showSaveFilePicker` first, then automatically fall back to browser download when picker APIs are unavailable/restricted.
 - **Raster tiles missing** – Cross-origin isolation is required for OffscreenCanvas. Confirm the dev server sent the COOP/COEP headers listed in `vite.config.ts`.
+- **A control requires Full** – The dataset was loaded without an all-node index. Use the offered reload action
+  and select Full; the app does not construct that index lazily.
 
 ## Related packages
 

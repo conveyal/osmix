@@ -45,6 +45,36 @@ const subsets: SpatialIndexType[][] = [
 const subsetCases = subsets.map((subset) => [subset] as const);
 
 describe("buildSpatialIndexes selection", () => {
+  it("gives an explicit spatialIndexes selection highest precedence and deduplicates kinds", async () => {
+    const osm = await fromPbf(
+      await createPbf(),
+      {
+        spatialIndexes: { nodes: ["tagged", "tagged"], ways: false, relations: false },
+        loadProfile: "full",
+        buildSpatialIndexes: ["way"],
+      },
+      () => {},
+    );
+
+    expect(osm.nodes.hasSpatialIndex("tagged")).toBe(true);
+    expect(osm.nodes.hasSpatialIndex("all")).toBe(false);
+    expect(osm.ways.hasSpatialIndex()).toBe(false);
+    expect(osm.relations.hasSpatialIndex()).toBe(false);
+  });
+
+  it("gives an explicit load profile precedence over the deprecated selector", async () => {
+    const osm = await fromPbf(
+      await createPbf(),
+      { loadProfile: "view", buildSpatialIndexes: ["node"] },
+      () => {},
+    );
+
+    expect(osm.nodes.hasSpatialIndex("tagged")).toBe(true);
+    expect(osm.nodes.hasSpatialIndex("all")).toBe(false);
+    expect(osm.ways.hasSpatialIndex()).toBe(true);
+    expect(osm.relations.hasSpatialIndex()).toBe(true);
+  });
+
   it.each(subsetCases)("builds exactly the requested indexes: %s", async (requested) => {
     const osm = await fromPbf(await createPbf(), { buildSpatialIndexes: [...requested] }, () => {});
 
@@ -70,5 +100,16 @@ describe("buildSpatialIndexes selection", () => {
     expect(osm.nodes.hasSpatialIndex()).toBe(true);
     expect(osm.ways.hasSpatialIndex()).toBe(true);
     expect(osm.relations.hasSpatialIndex()).toBe(true);
+    expect(osm.info().loadDiagnostics?.phaseTimingsMs).toEqual({
+      parse: expect.any(Number),
+      entityIndexes: expect.any(Number),
+      taggedNodeSpatialIndex: expect.any(Number),
+      allNodeSpatialIndex: expect.any(Number),
+      waySpatialIndex: expect.any(Number),
+      relationSpatialIndex: expect.any(Number),
+      spatialIndexes: expect.any(Number),
+      total: expect.any(Number),
+    });
+    expect(osm.info().loadDiagnostics?.bytes.storageBytes).toBeGreaterThan(0);
   });
 });

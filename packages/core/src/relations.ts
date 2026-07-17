@@ -225,7 +225,10 @@ export class Relations extends Entities<OsmRelation> {
   buildSpatialIndex() {
     if (!this.nodes.isReady()) throw Error("Node index is not ready.");
     if (!this.ways.isReady()) throw Error("Way index is not ready.");
-    if (this.size === 0) return this.spatialIndex;
+    if (this.size === 0) {
+      this.spatialIndexBuilt = true;
+      return this.spatialIndex;
+    }
     console.time("RelationIndex.buildSpatialIndex");
 
     this.spatialIndex = new Flatbush(this.size, 128, Float64Array, BufferConstructor);

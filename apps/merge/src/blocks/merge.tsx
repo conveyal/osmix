@@ -21,6 +21,7 @@ import { Suspense, useMemo } from "react";
 import ActionButton from "../components/action-button";
 import { Details, DetailsContent, DetailsSummary } from "../components/details";
 import EntityDetails from "../components/entity-details";
+import { FullIndexRequired, hasFullNodeIndex } from "../components/full-index-required";
 import ChangesSummary, {
   ChangesExpandableList,
   ChangesFilters,
@@ -164,6 +165,17 @@ export default function MergeBlock() {
     return changesetStats.totalChanges === 0;
   }, [changesetStats]);
 
+  const baseNeedsFull = base.osmInfo !== null && !hasFullNodeIndex(base.osmInfo);
+  const patchNeedsFull = patch.osmInfo !== null && !hasFullNodeIndex(patch.osmInfo);
+  if (baseNeedsFull || patchNeedsFull) {
+    return (
+      <div className="flex flex-col gap-4">
+        <FullIndexRequired operation="Merge and duplicate detection" osmFile={base} />
+        <FullIndexRequired operation="Merge and duplicate detection" osmFile={patch} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <Step step="select-osm-pbf-files" title="Select OSM files">
@@ -190,7 +202,7 @@ export default function MergeBlock() {
             {patch.osm && (
               <CardAction>
                 <ButtonGroup>
-                  {!patch.isStored && (
+                  {!patch.isStored && patch.canStore && (
                     <ActionButton
                       icon={<SaveIcon />}
                       title="Save to storage"
@@ -214,6 +226,20 @@ export default function MergeBlock() {
             {!patch.osm ? (
               <StoredOsmList
                 osmKey={PATCH_OSM_KEY}
+                openOsmPbfUrl={async (url) => {
+                  const abortController = new AbortController();
+                  setLoadingState({
+                    controller: abortController,
+                    osmKey: PATCH_OSM_KEY,
+                  });
+                  try {
+                    const osmInfo = await patch.loadOsmPbfUrl(url, abortController.signal);
+                    flyToOsmBounds(osmInfo);
+                    return osmInfo;
+                  } finally {
+                    setLoadingState(null);
+                  }
+                }}
                 openOsmFile={async (file) => {
                   const abortController = new AbortController();
                   setLoadingState({
@@ -730,7 +756,7 @@ export default function MergeBlock() {
               <ActionButton icon={<DownloadIcon />} onAction={() => base.downloadOsm()}>
                 Download merged OSM PBF
               </ActionButton>
-              {!base.isStored && (
+              {!base.isStored && base.canStore && (
                 <ActionButton icon={<SaveIcon />} onAction={base.saveToStorage}>
                   Save to storage
                 </ActionButton>

@@ -13,6 +13,7 @@ const info: OsmInfo = {
   bbox: [7.4, 43.7, 7.5, 43.8],
   header: { optional_features: [], required_features: [] },
   stats: { nodes: 1_000, ways: 100, relations: 10 },
+  spatialIndexes: { nodes: { all: true, tagged: true }, ways: true, relations: true },
 };
 
 function delay(milliseconds: number): Promise<void> {

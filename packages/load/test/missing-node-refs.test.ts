@@ -1,3 +1,4 @@
+import { Osm } from "@osmix/core";
 import { osmBlockToPbfBlobBytes, concatUint8 } from "@osmix/pbf";
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf";
 import { describe, expect, it } from "vitest";
@@ -61,7 +62,38 @@ async function createFilteredPbf() {
 }
 
 describe("missing node references", () => {
-  it("prunes filtered refs and dangling relation members", async () => {
+  it("preserves missing refs at the first, middle, and last positions across transfer", async () => {
+    const missingRefsBlock: OsmPbfBlock = {
+      stringtable: [new TextEncoder().encode("")],
+      primitivegroup: [
+        {
+          nodes: [],
+          dense: { id: [1, 1], lat: [0, 1], lon: [0, 1], keys_vals: [0, 0] },
+          ways: [{ id: 300, keys: [], vals: [], refs: [99, -98, 97, -96, 95] }],
+          relations: [],
+        },
+      ],
+    };
+    const data = concatUint8(
+      await osmBlockToPbfBlobBytes(header),
+      await osmBlockToPbfBlobBytes(missingRefsBlock),
+    );
+    const osm = await fromPbf(
+      data,
+      { spatialIndexes: { nodes: [], ways: false, relations: false } },
+      () => {},
+    );
+
+    expect(osm.ways.getById(300)?.refs).toEqual([99, 1, 98, 2, 97]);
+    const transferables = osm.transferables();
+    expect(Array.from(new Uint32Array(transferables.ways.missingRefPositions))).toEqual([0, 2, 4]);
+    expect(Array.from(new Float64Array(transferables.ways.missingRefIds))).toEqual([99, 98, 97]);
+
+    const roundTripped = new Osm(transferables);
+    expect(roundTripped.ways.getById(300)?.refs).toEqual([99, 1, 98, 2, 97]);
+  });
+
+  it("preserves refs and members when tag filtering drops their targets", async () => {
     const osm = await fromPbf(
       await createFilteredPbf(),
       {
@@ -70,22 +102,24 @@ describe("missing node references", () => {
           ways: [],
           relations: [],
         },
+        spatialIndexes: { nodes: [], ways: false, relations: false },
       },
       () => {},
     );
 
     expect(osm.nodes.size).toBe(2);
-    expect(osm.ways.size).toBe(3);
-    expect(osm.ways.getFullEntity(0, 100).refs).toEqual([1, 2]);
-    expect(osm.ways.getFullEntity(1, 102).refs).toEqual([1, 2]);
-    expect(osm.ways.getFullEntity(2, 103).refs).toEqual([1]);
-    expect(osm.ways.getCoordinates(2)).toEqual([[0, 0]]);
-    expect(osm.relations.size).toBe(1);
+    expect(osm.ways.size).toBe(4);
+    expect(osm.ways.getFullEntity(0, 100).refs).toEqual([1, 2, 3]);
+    expect(osm.ways.getFullEntity(1, 102).refs).toEqual([1, 3, 2]);
+    expect(osm.ways.getFullEntity(2, 103).refs).toEqual([3, 1]);
+    expect(osm.ways.getFullEntity(3, 101).refs).toEqual([3]);
+    expect(osm.relations.size).toBe(2);
     expect(osm.relations.getFullEntity(0, 200).members).toEqual([
+      { type: "node", ref: 3, role: "" },
       { type: "way", ref: 100, role: "" },
     ]);
-
-    osm.buildSpatialIndexes();
-    expect(osm.ways.intersects([9, 9, 11, 11])).toEqual([]);
+    expect(osm.relations.getFullEntity(1, 201).members).toEqual([
+      { type: "way", ref: 101, role: "" },
+    ]);
   });
 });
