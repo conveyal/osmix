@@ -11,7 +11,7 @@ Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PB
 
 ## Prerequisites
 
-- Bun `1.3.x`
+- Node.js 20+ and pnpm
 - Modern Chromium-based browser (Chrome/Edge ≥ 119 recommended). Safari/Firefox lack the `showSaveFilePicker` API and stable OffscreenCanvas transfer support.
 - Running over `https://` or `http://localhost` so COOP/COEP headers can enable `crossOriginIsolated` mode for the worker raster pipeline.
 
@@ -72,8 +72,10 @@ The stepper resets selection state between actions, and you can jump backward or
 
 ## Worker architecture
 
-- All heavy operations (PBF ingest, change generation, raster rendering) happen inside `src/workers/osm.worker.ts`, keeping the main thread responsive.
-- The worker caches `Osmix` instances keyed by dataset id, exposes change pagination, and returns transferable typed arrays whenever possible.
+- All heavy operations (PBF ingest, change generation, routing, and tile rendering) run in a managed worker pool, keeping the main thread responsive. Cross-origin-isolated browsers reserve one logical core for the UI and use up to four workers.
+- Stateful loading, IndexedDB writes, and changesets stay on the control worker. Read-only tiles and queries use available compute workers, with queued MapLibre tile requests cancelled when the map no longer needs them.
+- Workers cache `Osmix` instances keyed by dataset id, share their backing buffers, expose change pagination, and return transferable typed arrays whenever possible.
+- If a single non-shared worker restarts, datasets previously loaded from IndexedDB are reconstructed with a read-only replay before the slot accepts more work. One-shot mutations and IndexedDB writes are never retried.
 - Logs from the worker are proxied back through `Log.addMessage` so long-running operations surface status updates.
 
 ## Data loading tips

@@ -4,14 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch server.ts",
-    "start": "node server.ts",
-    "test": "node --experimental-strip-types test/server.test.ts",
+    "dev": "node --import tsx --watch server.ts",
+    "start": "node --import tsx server.ts",
+    "stress:regional": "node --import tsx test/regional-stress.ts",
+    "test": "node --import tsx test/server.test.ts",
     "typecheck": "tsc --build --noEmit"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.8",
     "@osmix/core": "workspace:*",
+    "@osmix/shared": "workspace:*",
     "@osmix/shortbread": "workspace:*",
     "@osmix/types": "workspace:*",
     "@versatiles/style": "^5.13.0",
@@ -22,7 +24,7 @@
   },
   "devDependencies": {
     "@osmix/pbf": "workspace:*",
-    "@osmix/shared": "workspace:*",
+    "tsx": "^4.23.0",
     "typescript": "catalog:"
   }
 }
