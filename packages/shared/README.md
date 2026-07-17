@@ -29,7 +29,7 @@ pnpm add @osmix/shared
 | Module                                | Description                                              |
 | ------------------------------------- | -------------------------------------------------------- |
 | `@osmix/shared/assert`                | Tiny invariant helpers that throw typed errors.          |
-| `@osmix/shared/backing-buffers`       | Inspect shared, unique, and referenced backing bytes.    |
+| `@osmix/shared/backing-buffers`       | Detect and inspect shared and ordinary backing buffers.  |
 | `@osmix/shared/bbox-intersects`       | Bounding-box intersection + containment checks.          |
 | `@osmix/shared/bytes-to-stream`       | Create a ReadableStream from a Uint8Array.               |
 | `@osmix/shared/coordinates`           | Utilities for coordinate precision (7 decimal places).   |

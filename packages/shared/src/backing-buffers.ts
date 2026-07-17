@@ -15,11 +15,13 @@ export interface BackingBufferInspection {
 
 type BackingBuffer = ArrayBuffer | SharedArrayBuffer;
 
+/** Check for SharedArrayBuffer without assuming the constructor exists in this runtime. */
+export function isSharedArrayBuffer(value: unknown): value is SharedArrayBuffer {
+  return typeof SharedArrayBuffer !== "undefined" && value instanceof SharedArrayBuffer;
+}
+
 function isBackingBuffer(value: unknown): value is BackingBuffer {
-  return (
-    value instanceof ArrayBuffer ||
-    (typeof SharedArrayBuffer !== "undefined" && value instanceof SharedArrayBuffer)
-  );
+  return value instanceof ArrayBuffer || isSharedArrayBuffer(value);
 }
 
 /** Inspect backing-buffer identity and byte usage in an arbitrarily nested value. */
@@ -69,7 +71,7 @@ export function inspectBackingBuffers(value: unknown): BackingBufferInspection {
   let uniqueBytes = 0;
   for (const buffer of uniqueBuffers) {
     uniqueBytes += buffer.byteLength;
-    if (typeof SharedArrayBuffer !== "undefined" && buffer instanceof SharedArrayBuffer) shared++;
+    if (isSharedArrayBuffer(buffer)) shared++;
     else arrayBuffers++;
   }
   return {

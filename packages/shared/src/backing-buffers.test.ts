@@ -1,6 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { inspectBackingBuffers } from "./backing-buffers.ts";
+import { inspectBackingBuffers, isSharedArrayBuffer } from "./backing-buffers.ts";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("isSharedArrayBuffer", () => {
+  it("detects shared buffers when the constructor is available", () => {
+    if (typeof SharedArrayBuffer === "undefined") return;
+
+    expect(isSharedArrayBuffer(new SharedArrayBuffer(8))).toBe(true);
+    expect(isSharedArrayBuffer(new ArrayBuffer(8))).toBe(false);
+  });
+
+  it("returns false when the constructor is unavailable", () => {
+    vi.stubGlobal("SharedArrayBuffer", undefined);
+
+    expect(isSharedArrayBuffer(new ArrayBuffer(8))).toBe(false);
+  });
+});
 
 describe("inspectBackingBuffers", () => {
   it("distinguishes references, identities, shared buffers, and bytes", () => {

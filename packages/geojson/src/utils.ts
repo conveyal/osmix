@@ -3,6 +3,8 @@
  * @module
  */
 
+import { isSharedArrayBuffer } from "@osmix/shared/backing-buffers";
+
 import type { ImportableGeoJSON, ReadOsmDataTypes } from "./types.ts";
 
 /**
@@ -42,7 +44,7 @@ export async function readDataAsGeoJSON(data: ReadOsmDataTypes): Promise<Importa
     }
     return JSON.parse(result) as ImportableGeoJSON;
   }
-  if (data instanceof ArrayBuffer || data instanceof SharedArrayBuffer) {
+  if (data instanceof ArrayBuffer || isSharedArrayBuffer(data)) {
     const decoder = new TextDecoder();
     const text = decoder.decode(new Uint8Array(data));
     return JSON.parse(text) as ImportableGeoJSON;

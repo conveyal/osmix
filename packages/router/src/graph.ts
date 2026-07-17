@@ -385,7 +385,5 @@ export function getTransferableBuffers(t: RoutingGraphTransferables): ArrayBuffe
     t.intersectionBits,
   ];
   // Only ArrayBuffers need to be transferred; SharedArrayBuffers are shared automatically
-  return buffers.filter(
-    (b): b is ArrayBuffer => b instanceof ArrayBuffer && !(b instanceof SharedArrayBuffer),
-  );
+  return buffers.filter((b): b is ArrayBuffer => b instanceof ArrayBuffer);
 }

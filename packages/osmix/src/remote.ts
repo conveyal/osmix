@@ -20,7 +20,7 @@ import type {
   RouteResult,
   RoutingGraphTransferables,
 } from "@osmix/router";
-import { inspectBackingBuffers } from "@osmix/shared/backing-buffers";
+import { inspectBackingBuffers, isSharedArrayBuffer } from "@osmix/shared/backing-buffers";
 import type { Progress } from "@osmix/shared/progress";
 import { streamToBytes } from "@osmix/shared/stream-to-bytes";
 import type { LonLat, OsmEntityType, Tile } from "@osmix/types";
@@ -702,7 +702,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 
   private async getTransferableData(data: ArrayBufferLike | ReadableStream | Uint8Array | File) {
     if (data instanceof ArrayBuffer) return data;
-    if (typeof SharedArrayBuffer !== "undefined" && data instanceof SharedArrayBuffer) return data;
+    if (isSharedArrayBuffer(data)) return data;
     if (data instanceof Uint8Array) {
       if (data.byteOffset === 0 && data.byteLength === data.buffer.byteLength) {
         return data.buffer;
