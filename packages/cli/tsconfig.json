@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@osmix/shared/tsconfig/base.json",
+  "exclude": ["node_modules", "dist"],
+  "include": ["scripts", "src", "test"],
+  "compilerOptions": {
+    "outDir": "./dist",
+    "resolveJsonModule": true
+  }
+}
