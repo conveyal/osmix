@@ -7,6 +7,8 @@
  * @module
  */
 
+import { isSharedArrayBuffer } from "@osmix/shared/backing-buffers";
+
 /**
  * Use SharedArrayBuffer if the runtime supports it, otherwise fall back to ArrayBuffer.
  * SharedArrayBuffer enables zero-copy transfer between workers.
@@ -103,7 +105,7 @@ export class ResizeableTypedArray<TA extends TypedArray> {
   static from<TA extends TypedArray>(ArrayType: TypedArrayConstructor<TA>, buffer: BufferType) {
     const rta = new ResizeableTypedArray<TA>(
       ArrayType,
-      buffer instanceof SharedArrayBuffer ? SharedArrayBuffer : ArrayBuffer,
+      isSharedArrayBuffer(buffer) ? SharedArrayBuffer : ArrayBuffer,
     );
     rta.buffer = buffer;
     rta.array = new ArrayType(buffer);
@@ -156,7 +158,7 @@ export class ResizeableTypedArray<TA extends TypedArray> {
       this.array = newArray;
     } else {
       // Can grow/resize the existing buffer in place
-      if (this.buffer instanceof SharedArrayBuffer && this.buffer.growable) {
+      if (isSharedArrayBuffer(this.buffer) && this.buffer.growable) {
         this.buffer.grow(this.bufferSize);
       } else if (this.buffer instanceof ArrayBuffer && this.buffer.resizable) {
         this.buffer.resize(this.bufferSize);
@@ -226,7 +228,7 @@ export class ResizeableTypedArray<TA extends TypedArray> {
    * Buffer becomes fixed-length after compacting.
    */
   compact() {
-    if (this.buffer instanceof SharedArrayBuffer) {
+    if (isSharedArrayBuffer(this.buffer)) {
       // SharedArrayBuffer uses slice() to create a new fixed-size buffer
       this.buffer = this.buffer.slice(0, this.length * this.ArrayType.BYTES_PER_ELEMENT);
     } else {

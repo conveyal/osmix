@@ -4,6 +4,7 @@
  * Utility functions for Shapefile data handling.
  * @module
  */
+import { isSharedArrayBuffer } from "@osmix/shared/backing-buffers";
 import type { FeatureCollection } from "geojson";
 import shp from "shpjs";
 
@@ -37,7 +38,7 @@ export async function parseShapefile(
   // Convert ReadableStream to ArrayBuffer
   if (data instanceof ReadableStream) {
     input = await streamToArrayBuffer(data);
-  } else if (data instanceof SharedArrayBuffer) {
+  } else if (isSharedArrayBuffer(data)) {
     // shpjs expects ArrayBuffer, not SharedArrayBuffer
     const copy = new ArrayBuffer(data.byteLength);
     new Uint8Array(copy).set(new Uint8Array(data));

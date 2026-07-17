@@ -6,14 +6,11 @@
  * @module
  */
 
+import { isSharedArrayBuffer } from "@osmix/shared/backing-buffers";
 import { transfer as comlinkTransfer } from "comlink";
 
 /** Types that can be transferred between workers without copying. */
 export type Transferables = ArrayBufferLike | ReadableStream;
-
-function isSharedArrayBuffer(value: unknown): value is SharedArrayBuffer {
-  return typeof SharedArrayBuffer !== "undefined" && value instanceof SharedArrayBuffer;
-}
 
 /**
  * Recursively collect all transferable values from a nested object.
