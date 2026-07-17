@@ -23,6 +23,22 @@ describe("@osmix/raster: OsmixRasterTile", () => {
     expect(Array.from(tile.imageData.slice(idx, idx + 4))).toEqual(Array.from(DEFAULT_POINT_COLOR));
   });
 
+  it("preserves one-pixel point rendering by default and supports a radius", () => {
+    const tileIndex: Tile = [6, 7, 4];
+    const tileSize = 32;
+    const onePixel = new OsmixRasterTile({ tile: tileIndex, tileSize });
+    const circle = new OsmixRasterTile({ tile: tileIndex, tileSize });
+    const point = onePixel.tilePxToLonLat([16, 16]);
+
+    onePixel.drawPoint(point);
+    circle.drawPoint(point, DEFAULT_POINT_COLOR, 1);
+
+    expect(onePixel.imageData.filter((value, index) => index % 4 === 3 && value > 0)).toHaveLength(
+      1,
+    );
+    expect(circle.imageData.filter((value, index) => index % 4 === 3 && value > 0)).toHaveLength(5);
+  });
+
   it("draws clipped ways using Bresenham line rendering", () => {
     const tileIndex: Tile = [10, 11, 5];
     const tileSize = DEFAULT_RASTER_TILE_SIZE;
@@ -48,6 +64,40 @@ describe("@osmix/raster: OsmixRasterTile", () => {
     expect(Array.from(tile.imageData.slice(endIdx, endIdx + 3))).toEqual(
       Array.from(DEFAULT_LINE_COLOR.slice(0, -1)),
     );
+  });
+
+  it("preserves one-pixel line rendering and supports round thick strokes", () => {
+    const tileIndex: Tile = [10, 11, 5];
+    const tileSize = 64;
+    const defaultLine = new OsmixRasterTile({ tile: tileIndex, tileSize });
+    const explicitLine = new OsmixRasterTile({ tile: tileIndex, tileSize });
+    const thickLine = new OsmixRasterTile({ tile: tileIndex, tileSize });
+    const start: XY = [10, 20];
+    const end: XY = [30, 20];
+
+    defaultLine.drawLine(start, end);
+    explicitLine.drawLine(start, end, DEFAULT_LINE_COLOR, 1);
+    thickLine.drawLine(start, end, DEFAULT_LINE_COLOR, 3);
+
+    expect(explicitLine.imageData).toEqual(defaultLine.imageData);
+    for (const y of [19, 20, 21]) {
+      expect(thickLine.imageData[thickLine.getIndex([20, y]) + 3]).toBeGreaterThan(0);
+    }
+    expect(thickLine.imageData[thickLine.getIndex([9, 20]) + 3]).toBeGreaterThan(0);
+    expect(thickLine.imageData[thickLine.getIndex([31, 20]) + 3]).toBeGreaterThan(0);
+  });
+
+  it("clips thick strokes and composites overlapping alpha", () => {
+    const tile = new OsmixRasterTile({ tile: [10, 11, 5], tileSize: 16 });
+    const color: Rgba = [120, 160, 200, 96];
+
+    tile.drawLine([-4, 0], [4, 0], color, 5);
+    const alphaAfterFirstStroke = tile.imageData[tile.getIndex([2, 0]) + 3]!;
+    tile.drawLine([-4, 0], [4, 0], color, 5);
+
+    expect(tile.imageData.length).toBe(16 * 16 * 4);
+    expect(tile.imageData[tile.getIndex([2, 0]) + 3]).toBeGreaterThan(alphaAfterFirstStroke);
+    expect(tile.imageData[tile.getIndex([2, 4]) + 3]).toBe(0);
   });
 
   it("fills polygons using scanline algorithm", () => {
