@@ -173,6 +173,7 @@ describe("selectOsmLoadProfile", () => {
       code: "OSM_LOAD_CAPACITY_EXCEEDED",
       requiredBytes: 1_700 * MIB,
       availableBytes: 1.6 * GIB,
+      suggestedProfile: "view",
     });
   });
 });

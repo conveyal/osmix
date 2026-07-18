@@ -94,20 +94,25 @@ export {
   BufferConstructor,
   Nodes,
   Osm,
+  OsmEntityIndexBuildError,
   Relations,
   SpatialIndexNotBuiltError,
   Tags,
+  TypedBufferAllocationError,
   Ways,
 } from "@osmix/core";
 export type {
+  BufferType,
   NodeSpatialIndexKind,
   IdOrIndex,
+  OsmEntityIndexComponent,
   OsmInfo,
   OsmOptions,
   OsmReader,
   OsmTransferables,
   OsmWriter,
-  BufferType,
+  TypedBufferAllocationOperation,
+  TypedBufferType,
 } from "@osmix/core";
 
 // --- @osmix/geojson ---

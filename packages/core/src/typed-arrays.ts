@@ -42,6 +42,52 @@ export type TypedArray<B extends BufferType = BufferType> =
 export interface TypedArrayConstructor<T extends TypedArray<BufferType> = TypedArray<BufferType>> {
   new (buffer: BufferType): T;
   readonly BYTES_PER_ELEMENT: number;
+  readonly name: string;
+}
+
+export type TypedBufferAllocationOperation = "create" | "grow" | "compact";
+export type TypedBufferType = "array-buffer" | "shared-array-buffer";
+
+/** Structured allocation failure suitable for transport across worker boundaries. */
+export class TypedBufferAllocationError extends Error {
+  readonly code = "TYPED_BUFFER_ALLOCATION_FAILED";
+  readonly stage = "typed-buffer-allocation";
+  readonly operation: TypedBufferAllocationOperation;
+  readonly typedArray: string;
+  readonly bufferType: TypedBufferType;
+  readonly elementCount: number;
+  readonly bytesPerElement: number;
+  readonly requiredBytes: number;
+
+  constructor(
+    args: {
+      operation: TypedBufferAllocationOperation;
+      typedArray: string;
+      bufferType: TypedBufferType;
+      elementCount: number;
+      bytesPerElement: number;
+      requiredBytes: number;
+    },
+    cause: unknown,
+  ) {
+    super(
+      `${args.typedArray} ${args.operation} requires ${args.requiredBytes.toLocaleString()} bytes in a single ${args.bufferType === "shared-array-buffer" ? "SharedArrayBuffer" : "ArrayBuffer"}.`,
+      { cause },
+    );
+    this.name = "TypedBufferAllocationError";
+    this.operation = args.operation;
+    this.typedArray = args.typedArray;
+    this.bufferType = args.bufferType;
+    this.elementCount = args.elementCount;
+    this.bytesPerElement = args.bytesPerElement;
+    this.requiredBytes = args.requiredBytes;
+  }
+}
+
+function getBufferType(BC: SharedArrayBufferConstructor | ArrayBufferConstructor): TypedBufferType {
+  return typeof SharedArrayBuffer !== "undefined" && BC === SharedArrayBuffer
+    ? "shared-array-buffer"
+    : "array-buffer";
 }
 
 /**
@@ -127,10 +173,32 @@ export class ResizeableTypedArray<TA extends TypedArray> {
     this.bufferSize = DEFAULT_BUFFER_SIZE;
     this.maxByteLength = DEFAULT_BUFFER_SIZE * 2;
     this.BC = BC;
-    this.buffer = new BC(this.bufferSize, {
-      maxByteLength: this.maxByteLength,
-    });
+    try {
+      this.buffer = new BC(this.bufferSize, {
+        maxByteLength: this.maxByteLength,
+      });
+    } catch (cause) {
+      throw this.allocationError("create", this.bufferSize, cause);
+    }
     this.array = new this.ArrayType(this.buffer);
+  }
+
+  private allocationError(
+    operation: TypedBufferAllocationOperation,
+    requiredBytes: number,
+    cause: unknown,
+  ): TypedBufferAllocationError {
+    return new TypedBufferAllocationError(
+      {
+        operation,
+        typedArray: this.ArrayType.name,
+        bufferType: getBufferType(this.BC),
+        elementCount: Math.ceil(requiredBytes / this.ArrayType.BYTES_PER_ELEMENT),
+        bytesPerElement: this.ArrayType.BYTES_PER_ELEMENT,
+        requiredBytes,
+      },
+      cause,
+    );
   }
 
   /**
@@ -146,25 +214,29 @@ export class ResizeableTypedArray<TA extends TypedArray> {
    */
   expandArray() {
     this.bufferSize *= 2;
-    if (this.bufferSize > this.buffer.maxByteLength) {
-      // Need a completely new buffer with larger maxByteLength
-      this.maxByteLength *= 2;
-      const newBuffer = new this.BC(this.bufferSize, {
-        maxByteLength: this.maxByteLength,
-      });
-      const newArray = new this.ArrayType(newBuffer);
-      newArray.set(this.array);
-      this.buffer = newBuffer;
-      this.array = newArray;
-    } else {
-      // Can grow/resize the existing buffer in place
-      if (isSharedArrayBuffer(this.buffer) && this.buffer.growable) {
-        this.buffer.grow(this.bufferSize);
-      } else if (this.buffer instanceof ArrayBuffer && this.buffer.resizable) {
-        this.buffer.resize(this.bufferSize);
+    try {
+      if (this.bufferSize > this.buffer.maxByteLength) {
+        // Need a completely new buffer with larger maxByteLength
+        this.maxByteLength *= 2;
+        const newBuffer = new this.BC(this.bufferSize, {
+          maxByteLength: this.maxByteLength,
+        });
+        const newArray = new this.ArrayType(newBuffer);
+        newArray.set(this.array);
+        this.buffer = newBuffer;
+        this.array = newArray;
       } else {
-        throw Error("Buffer is not growable or resizable");
+        // Can grow/resize the existing buffer in place
+        if (isSharedArrayBuffer(this.buffer) && this.buffer.growable) {
+          this.buffer.grow(this.bufferSize);
+        } else if (this.buffer instanceof ArrayBuffer && this.buffer.resizable) {
+          this.buffer.resize(this.bufferSize);
+        } else {
+          throw Error("Buffer is not growable or resizable");
+        }
       }
+    } catch (cause) {
+      throw this.allocationError("grow", this.bufferSize, cause);
     }
   }
 
@@ -228,14 +300,17 @@ export class ResizeableTypedArray<TA extends TypedArray> {
    * Buffer becomes fixed-length after compacting.
    */
   compact() {
-    if (isSharedArrayBuffer(this.buffer)) {
-      // SharedArrayBuffer uses slice() to create a new fixed-size buffer
-      this.buffer = this.buffer.slice(0, this.length * this.ArrayType.BYTES_PER_ELEMENT);
-    } else {
-      // ArrayBuffer uses transferToFixedLength() to detach and resize
-      this.buffer = this.buffer.transferToFixedLength(
-        this.length * this.ArrayType.BYTES_PER_ELEMENT,
-      );
+    const requiredBytes = this.length * this.ArrayType.BYTES_PER_ELEMENT;
+    try {
+      if (isSharedArrayBuffer(this.buffer)) {
+        // SharedArrayBuffer uses slice() to create a new fixed-size buffer
+        this.buffer = this.buffer.slice(0, requiredBytes);
+      } else {
+        // ArrayBuffer uses transferToFixedLength() to detach and resize
+        this.buffer = this.buffer.transferToFixedLength(requiredBytes);
+      }
+    } catch (cause) {
+      throw this.allocationError("compact", requiredBytes, cause);
     }
     this.array = new this.ArrayType(this.buffer);
     return this.array;

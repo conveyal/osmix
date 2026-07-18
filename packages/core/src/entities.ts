@@ -12,7 +12,44 @@ import type { GeoBbox2D, OsmEntity, OsmEntityType, OsmTags } from "@osmix/types"
 
 import type { IdOrIndex, Ids, IdsTransferables } from "./ids.ts";
 import type { Tags, TagsTransferables } from "./tags.ts";
-import type { BufferType } from "./typed-arrays.ts";
+import {
+  TypedBufferAllocationError,
+  type BufferType,
+  type TypedBufferAllocationOperation,
+  type TypedBufferType,
+} from "./typed-arrays.ts";
+
+export type OsmEntityIndexComponent = "ids" | "tags" | "entity-data";
+
+/** Structured entity-finalization failure suitable for actionable load diagnostics. */
+export class OsmEntityIndexBuildError extends Error {
+  readonly code = "OSM_ENTITY_INDEX_BUILD_FAILED";
+  readonly stage = "entity-index-finalization";
+  readonly entityType: OsmEntityType;
+  readonly component: OsmEntityIndexComponent;
+  readonly operation?: TypedBufferAllocationOperation;
+  readonly typedArray?: string;
+  readonly bufferType?: TypedBufferType;
+  readonly elementCount?: number;
+  readonly bytesPerElement?: number;
+  readonly requiredBytes?: number;
+
+  constructor(entityType: OsmEntityType, component: OsmEntityIndexComponent, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    super(`Failed to finalize ${entityType} ${component}: ${detail}`, { cause });
+    this.name = "OsmEntityIndexBuildError";
+    this.entityType = entityType;
+    this.component = component;
+    if (cause instanceof TypedBufferAllocationError) {
+      this.operation = cause.operation;
+      this.typedArray = cause.typedArray;
+      this.bufferType = cause.bufferType;
+      this.elementCount = cause.elementCount;
+      this.bytesPerElement = cause.bytesPerElement;
+      this.requiredBytes = cause.requiredBytes;
+    }
+  }
+}
 
 /**
  * Serializable representation of an Entities collection for worker transfer.
@@ -88,11 +125,20 @@ export abstract class Entities<T extends OsmEntity> {
   buildIndex() {
     if (this.indexBuilt) return;
     console.time(`${this.indexType}Index.buildIndex`);
-    this.ids.buildIndex();
-    this.tags.buildIndex();
-    this.buildEntityIndex();
+    this.buildIndexComponent("ids", () => this.ids.buildIndex());
+    this.buildIndexComponent("tags", () => this.tags.buildIndex());
+    this.buildIndexComponent("entity-data", () => this.buildEntityIndex());
     this.indexBuilt = true;
     console.timeEnd(`${this.indexType}Index.buildIndex`);
+  }
+
+  private buildIndexComponent(component: OsmEntityIndexComponent, build: () => void): void {
+    try {
+      build();
+    } catch (cause) {
+      if (cause instanceof OsmEntityIndexBuildError) throw cause;
+      throw new OsmEntityIndexBuildError(this.indexType, component, cause);
+    }
   }
 
   /**

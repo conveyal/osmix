@@ -88,6 +88,12 @@ still attempts the load. A planned allocation above the hard active-buffer budge
 capability later throws `SpatialIndexNotBuiltError`; both errors expose structured fields suitable for worker
 transport.
 
+That preflight applies to planned spatial indexes. Mandatory entity columns are finalized before profile
+selection and remain present in Auto, Full, and View. If one of those columns cannot fit in a single browser
+buffer, core throws `OsmEntityIndexBuildError` with nested `TypedBufferAllocationError` details including the
+entity/component, element count, buffer type, and exact required bytes. Changing profiles cannot avoid such a
+core-storage failure.
+
 `Osm.info()` reports selected spatial capabilities and optional load diagnostics: the requested and selected
 profiles, selection reasons, resident and projected typed-buffer bytes, largest planned allocation, storage
 bytes, budgets, phase timings, and tag/reference/member counters.

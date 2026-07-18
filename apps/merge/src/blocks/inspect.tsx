@@ -67,6 +67,9 @@ export default function InspectBlock({
         />
         <StoredOsmList
           osmKey={BASE_OSM_KEY}
+          loadFailure={baseOsm.loadFailure}
+          onDismissLoadFailure={baseOsm.clearLoadFailure}
+          onReloadView={baseOsm.reloadWithViewProfile}
           openOsmPbfUrl={async (url) => {
             const abortController = new AbortController();
             setLoadingState({ controller: abortController, osmKey: BASE_OSM_KEY });

@@ -101,6 +101,9 @@ The stepper resets selection state between actions, and you can jump backward or
   input buffer. PBF URLs are hashed while the parser consumes a single response, then re-keyed to the final
   lowercase SHA-256 without copying the dataset buffers.
 - Logs from the worker are proxied back through `Log.addMessage` so long-running operations surface status updates.
+- Failed dataset loads remain visible beside their source controls and in Activity. The inline panel explains
+  the failing phase, required and tested buffer sizes when available, an actionable next step, and expandable
+  technical details; handled load failures do not leave an unhandled UI rejection.
 
 ## Data loading tips
 
@@ -122,6 +125,9 @@ See [Australia-scale manual verification](./AUSTRALIA-PBF-CHECKLIST.md) for the 
 - **Raster tiles missing** – Cross-origin isolation is required for OffscreenCanvas. Confirm the dev server sent the COOP/COEP headers listed in `vite.config.ts`.
 - **A control requires Full** – The dataset was loaded without an all-node index. Use the offered reload action
   and select Full; the app does not construct that index lazily.
+- **A core typed-array allocation failed** – The panel identifies the mandatory entity column and compares its
+  single-buffer requirement with the current browser's tested ceiling. Auto, Full, and View retain core entity
+  columns, so use a smaller regional extract when the panel says changing profiles cannot help.
 
 ## Related packages
 

@@ -226,6 +226,9 @@ export default function MergeBlock() {
             {!patch.osm ? (
               <StoredOsmList
                 osmKey={PATCH_OSM_KEY}
+                loadFailure={patch.loadFailure}
+                onDismissLoadFailure={patch.clearLoadFailure}
+                onReloadView={patch.reloadWithViewProfile}
                 openOsmPbfUrl={async (url) => {
                   const abortController = new AbortController();
                   setLoadingState({
@@ -234,7 +237,7 @@ export default function MergeBlock() {
                   });
                   try {
                     const osmInfo = await patch.loadOsmPbfUrl(url, abortController.signal);
-                    flyToOsmBounds(osmInfo);
+                    if (osmInfo) flyToOsmBounds(osmInfo);
                     return osmInfo;
                   } finally {
                     setLoadingState(null);
@@ -251,7 +254,7 @@ export default function MergeBlock() {
                       typeof file === "string"
                         ? await patch.loadFromStorage(file, abortController.signal)
                         : await patch.loadOsmFile(file, undefined, abortController.signal);
-                    flyToOsmBounds(osmInfo);
+                    if (osmInfo) flyToOsmBounds(osmInfo);
                     return osmInfo;
                   } finally {
                     setLoadingState(null);

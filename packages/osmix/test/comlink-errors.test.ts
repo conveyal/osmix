@@ -1,4 +1,8 @@
-import { SpatialIndexNotBuiltError } from "@osmix/core";
+import {
+  OsmEntityIndexBuildError,
+  SpatialIndexNotBuiltError,
+  TypedBufferAllocationError,
+} from "@osmix/core";
 import { OsmLoadCapacityError } from "@osmix/load";
 import * as Comlink from "comlink";
 import { describe, expect, it } from "vitest";
@@ -78,6 +82,47 @@ describe("structured Comlink errors", () => {
         ways: true,
         relations: true,
       },
+    });
+  });
+
+  it("preserves entity allocation details and its original cause", async () => {
+    installStructuredComlinkErrorTransferHandler();
+    const allocationError = new TypedBufferAllocationError(
+      {
+        operation: "compact",
+        typedArray: "Float64Array",
+        bufferType: "shared-array-buffer",
+        elementCount: 273_574_591,
+        bytesPerElement: 8,
+        requiredBytes: 2_188_596_728,
+      },
+      new RangeError("Array buffer allocation failed"),
+    );
+    const error = await roundTripError(
+      new OsmEntityIndexBuildError("node", "ids", allocationError),
+    );
+
+    expect(error).toMatchObject({
+      name: "OsmEntityIndexBuildError",
+      code: "OSM_ENTITY_INDEX_BUILD_FAILED",
+      stage: "entity-index-finalization",
+      entityType: "node",
+      component: "ids",
+      operation: "compact",
+      typedArray: "Float64Array",
+      bufferType: "shared-array-buffer",
+      elementCount: 273_574_591,
+      bytesPerElement: 8,
+      requiredBytes: 2_188_596_728,
+    });
+    expect((error as Error).cause).toMatchObject({
+      name: "TypedBufferAllocationError",
+      code: "TYPED_BUFFER_ALLOCATION_FAILED",
+      operation: "compact",
+    });
+    expect(((error as Error).cause as Error).cause).toMatchObject({
+      name: "RangeError",
+      message: "Array buffer allocation failed",
     });
   });
 });

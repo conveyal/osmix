@@ -27,10 +27,17 @@
 
 export type { IdOrIndex } from "./ids.ts";
 export type { OsmReader, OsmWriter } from "./contracts.ts";
+export { OsmEntityIndexBuildError, type OsmEntityIndexComponent } from "./entities.ts";
 export * from "./nodes.ts";
 export * from "./osm.ts";
 export * from "./relations.ts";
 export * from "./stringtable.ts";
 export * from "./tags.ts";
-export { BufferConstructor, type BufferType } from "./typed-arrays.ts";
+export {
+  BufferConstructor,
+  TypedBufferAllocationError,
+  type BufferType,
+  type TypedBufferAllocationOperation,
+  type TypedBufferType,
+} from "./typed-arrays.ts";
 export * from "./ways.ts";

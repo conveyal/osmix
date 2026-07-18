@@ -19,11 +19,13 @@ import type { OsmFileType } from "osmix";
 import { useEffectEvent, useRef, useState } from "react";
 
 import { type StoredOsmEntry, useStoredOsm } from "../hooks/storage-broadcast";
+import type { OsmLoadFailure } from "../lib/osm-load-failure";
 import { osmLoadProfileAtomFamily } from "../state/osm";
 import { osmLoadingAbortControllerAtom } from "../state/status";
 import { osmWorker } from "../state/worker";
 import ActionButton from "./action-button";
 import { Details, DetailsContent, DetailsSummary } from "./details";
+import { OsmLoadFailurePanel } from "./osm-load-failure";
 import {
   OsmLoadProfileSelector,
   OsmPbfOpenUrlButton,
@@ -183,6 +185,9 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
 
 interface StoredOsmListProps {
   activeOsmId?: string;
+  loadFailure?: OsmLoadFailure | null;
+  onDismissLoadFailure?: () => void;
+  onReloadView?: () => unknown;
   osmKey?: string;
   openOsmFile: (file: File | string, fileType?: OsmFileType) => Promise<OsmInfo | null>;
   openOsmPbfUrl?: (url: string) => Promise<OsmInfo | null>;
@@ -190,6 +195,9 @@ interface StoredOsmListProps {
 
 export function StoredOsmList({
   activeOsmId,
+  loadFailure,
+  onDismissLoadFailure,
+  onReloadView,
   osmKey,
   openOsmFile,
   openOsmPbfUrl,
@@ -243,6 +251,13 @@ export function StoredOsmList({
           <div className="px-2 pb-2">
             <OsmLoadProfileSelector value={loadProfile} onChange={setLoadProfile} />
           </div>
+        ) : null}
+        {loadFailure && onDismissLoadFailure ? (
+          <OsmLoadFailurePanel
+            failure={loadFailure}
+            onDismiss={onDismissLoadFailure}
+            onReloadView={onReloadView}
+          />
         ) : null}
         {entries.length > 0 && (
           <Details>

@@ -101,6 +101,8 @@ export class OsmLoadCapacityError extends Error {
   /** @deprecated Use availableBytes. */
   readonly limitBytes: number;
   readonly spatialIndexes: OsmSpatialIndexSelection;
+  /** A lower-memory profile that satisfies the same tested allocation limit. */
+  readonly suggestedProfile?: "view";
 
   constructor(args: {
     requestedProfile: OsmLoadProfile;
@@ -108,6 +110,7 @@ export class OsmLoadCapacityError extends Error {
     requiredBytes: number;
     limitBytes: number;
     spatialIndexes: OsmSpatialIndexSelection;
+    suggestedProfile?: "view";
   }) {
     super(
       `The largest ${args.resolvedProfile} profile allocation requires ${formatMib(args.requiredBytes)}, exceeding the active-buffer safety limit of ${formatMib(args.limitBytes)}.`,
@@ -119,6 +122,7 @@ export class OsmLoadCapacityError extends Error {
     this.availableBytes = args.limitBytes;
     this.limitBytes = args.limitBytes;
     this.spatialIndexes = normalizeOsmSpatialIndexSelection(args.spatialIndexes);
+    this.suggestedProfile = args.suggestedProfile;
   }
 }
 
@@ -419,6 +423,11 @@ export function selectOsmLoadProfile(
       requiredBytes: selectedPeak.largestPlannedAllocationBytes,
       limitBytes: allocationLimit,
       spatialIndexes,
+      suggestedProfile:
+        resolvedProfile === "full" &&
+        projection.profilePeaks.view.largestPlannedAllocationBytes <= allocationLimit
+          ? "view"
+          : undefined,
     });
   }
 
@@ -480,6 +489,11 @@ export function selectOsmSpatialIndexes(
       requiredBytes: selectedPeak.largestPlannedAllocationBytes,
       limitBytes: allocationLimit,
       spatialIndexes,
+      suggestedProfile:
+        resolvedProfile === "full" &&
+        projection.profilePeaks.view.largestPlannedAllocationBytes <= allocationLimit
+          ? "view"
+          : undefined,
     });
   }
   return {

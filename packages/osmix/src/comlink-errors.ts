@@ -8,6 +8,7 @@ interface StructuredSerializedError {
   message: string;
   name: string;
   stack?: string;
+  cause?: StructuredSerializedError;
   fields: Record<string, unknown>;
 }
 
@@ -36,12 +37,16 @@ function serializeError(error: Error): StructuredSerializedError {
     message: error.message,
     name: error.name,
     stack: error.stack,
+    ...(error.cause instanceof Error ? { cause: serializeError(error.cause) } : {}),
     fields,
   };
 }
 
 function deserializeError(serialized: StructuredSerializedError): Error {
-  const error = new Error(serialized.message);
+  const error = new Error(
+    serialized.message,
+    serialized.cause ? { cause: deserializeError(serialized.cause) } : {},
+  );
   error.name = serialized.name;
   if (serialized.stack !== undefined) error.stack = serialized.stack;
   for (const [key, value] of Object.entries(serialized.fields)) {
