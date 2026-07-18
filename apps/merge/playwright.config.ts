@@ -8,7 +8,7 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:4173",
   },
   webServer: {
-    command: "pnpm dev --host 127.0.0.1 --port 4173",
+    command: "pnpm dev:app --host 127.0.0.1 --port 4173",
     url: "http://127.0.0.1:4173/e2e/worker-harness.html",
     reuseExistingServer: false,
     timeout: 120_000,
