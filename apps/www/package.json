@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "node --experimental-strip-types ../../scripts/portless-dev.ts www.osmix vite dev",
+    "dev:app": "vite dev",
     "start": "vite",
     "test": "vite build",
     "typecheck": "tsc --build --noEmit"

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite",
+    "dev": "node --experimental-strip-types ../../scripts/portless-dev.ts merge.osmix vite",
+    "dev:app": "vite",
     "test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run tests --project \"$npm_package_name\"",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"

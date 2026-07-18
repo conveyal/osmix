@@ -1,0 +1,10 @@
+{
+  "turbo": false,
+  "apps": {
+    "apps/bench": { "name": "bench.osmix", "script": "dev:app" },
+    "apps/merge": { "name": "merge.osmix", "script": "dev:app" },
+    "apps/shortbread": { "name": "shortbread.osmix", "script": "dev:app" },
+    "apps/vt-server": { "name": "vt.osmix", "script": "dev:app" },
+    "apps/www": { "name": "www.osmix", "script": "dev:app" }
+  }
+}

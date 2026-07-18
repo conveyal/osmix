@@ -123,7 +123,7 @@ async function loadNewOsmMap() {
     const beforeId = map.getLayersOrder().find((id) => map.getLayer(id)?.type === "symbol");
     map.addSource(sourceId, {
       type: "vector",
-      tiles: ["http://localhost:3000/tiles/{z}/{x}/{y}"],
+      tiles: [`${window.location.origin}/tiles/{z}/{x}/{y}`],
       minzoom: 0,
       maxzoom: 22,
       bounds: meta.bbox,

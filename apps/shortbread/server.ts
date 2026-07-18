@@ -12,6 +12,7 @@ import { createShortbreadRemote } from "./remote.ts";
 
 export async function startShortbreadServer() {
   const filename = "monaco.pbf";
+  const hostname = process.env.HOST ?? "127.0.0.1";
   const port = process.env.PORT ? Number(process.env.PORT) : 3001;
   const pbfPath = fileURLToPath(new URL(`../../fixtures/${filename}`, import.meta.url));
   const indexHtml = readFileSync(fileURLToPath(new URL("./index.html", import.meta.url)), "utf8");
@@ -32,11 +33,12 @@ export async function startShortbreadServer() {
     },
   );
   const state = { dataset, filename, log };
-  const app = createShortbreadServerApp({ remote, state, indexHtml, port });
+  const app = createShortbreadServerApp({ remote, state, indexHtml });
 
   console.log(`Number of workers available: ${remote.workerCount}`);
-  serve({ fetch: app.fetch, port }, (info) => {
-    console.log(`Shortbread vector tile server running at http://localhost:${info.port}`);
+  serve({ fetch: app.fetch, hostname, port }, (info) => {
+    const url = process.env.PORTLESS_URL ?? `http://${hostname}:${info.port}`;
+    console.log(`Shortbread vector tile server running at ${url}`);
     console.log("Osmix initialized with Shortbread encoder");
   });
 }

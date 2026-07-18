@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch server.ts",
+    "dev": "node --experimental-strip-types ../../scripts/portless-dev.ts vt.osmix node --watch server.ts",
+    "dev:app": "node --watch server.ts",
     "start": "node server.ts",
     "test": "node --experimental-strip-types test/server.test.ts",
     "typecheck": "tsc --build --noEmit"

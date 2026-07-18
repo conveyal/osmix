@@ -29,7 +29,7 @@ Fixture PBF files live in `fixtures/` at the repository root. During development
 pnpm run --filter @osmix/merge dev
 ```
 
-Vite runs on `http://localhost:5173` by default. Open the “Check system” dialog in the top navigation to confirm the page is secure and cross-origin isolated; polished raster rendering and large array allocations depend on it.
+Vite runs through Portless at `https://merge.osmix.localhost`. Worktrees add a unique prefix to that hostname. Open the “Check system” dialog in the top navigation to confirm the page is secure and cross-origin isolated; polished raster rendering and large array allocations depend on it. Set `PORTLESS=0` to bypass Portless and run Vite directly.
 
 ## Build for production
 
