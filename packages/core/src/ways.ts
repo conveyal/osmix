@@ -183,6 +183,7 @@ export class Ways extends Entities<OsmWay> {
   buildSpatialIndex() {
     if (!this.nodes.isReady()) throw Error("Node index is not ready.");
     if (this.size === 0) {
+      this.spatialIndex = new Flatbush(1, 128, Float64Array, BufferConstructor);
       this.spatialIndexBuilt = true;
       return this.spatialIndex;
     }

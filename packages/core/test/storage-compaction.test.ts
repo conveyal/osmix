@@ -1,3 +1,4 @@
+import { inspectBackingBuffers } from "@osmix/shared/backing-buffers";
 import { describe, expect, it } from "vitest";
 
 import { OSM_CONTENT_HASH_VERSION, OSM_TRANSFER_VERSION, Osm } from "../src/osm.ts";
@@ -247,5 +248,13 @@ describe("empty spatial capabilities", () => {
       ways: true,
       relations: true,
     });
+
+    const transferables = osm.transferables();
+    const inspection = inspectBackingBuffers(transferables);
+    expect(inspection.arrayBuffers).toBe(0);
+
+    const restored = new Osm(transferables);
+    expect(restored.ways.hasSpatialIndex()).toBe(true);
+    expect(restored.relations.hasSpatialIndex()).toBe(true);
   });
 });
