@@ -1,6 +1,7 @@
 import { Osm } from "@osmix/core";
 import { osmBlockToPbfBlobBytes, concatUint8 } from "@osmix/pbf";
 import type { OsmPbfBlock, OsmPbfHeaderBlock } from "@osmix/pbf";
+import type { ProgressEvent } from "@osmix/shared/progress";
 import { describe, expect, it } from "vitest";
 
 import { fromPbf } from "../src/pbf";
@@ -106,7 +107,11 @@ describe("missing node references", () => {
             // Every ref is dangling: bbox must stay inverted and unmatchable.
             { id: 301, keys: [], vals: [], refs: [500, 1] },
           ],
-          relations: [{ id: 400, keys: [], vals: [], memids: [300], roles_sid: [0], types: [1] }],
+          relations: [
+            { id: 400, keys: [], vals: [], memids: [300], roles_sid: [0], types: [1] },
+            // Way 301 has no resolvable geometry, so this relation does not either.
+            { id: 401, keys: [], vals: [], memids: [301], roles_sid: [0], types: [1] },
+          ],
         },
       ],
     };
@@ -115,13 +120,19 @@ describe("missing node references", () => {
       await osmBlockToPbfBlobBytes(danglingRefsBlock),
     );
     // The default Full profile builds every spatial index.
-    const osm = await fromPbf(data, {}, () => {});
+    const progressEvents: ProgressEvent[] = [];
+    const osm = await fromPbf(data, {}, (event) => progressEvents.push(event));
 
     expect(osm.ways.hasSpatialIndex()).toBe(true);
     expect(osm.relations.hasSpatialIndex()).toBe(true);
     // Way 300's bbox comes from its two resolvable nodes; way 301 has none.
     expect(osm.ways.intersects([-1, -1, 1, 1])).toEqual([0]);
     expect(osm.relations.intersects([-1, -1, 1, 1])).toEqual([0]);
+    expect(osm.ways.neighbors(0, 0, 10, 1)).toEqual([0]);
+    expect(osm.relations.neighbors(0, 0, 10, 1)).toEqual([0]);
+    expect(progressEvents).toContainEqual(
+      expect.objectContaining({ detail: expect.objectContaining({ throttle: true }) }),
+    );
     // Strict geometry access still fails for unresolvable refs.
     expect(() => osm.ways.getCoordinates(0)).toThrow(/not found for way geometry/);
     expect(osm.ways.getResolvedCoordinates(0)).toEqual([

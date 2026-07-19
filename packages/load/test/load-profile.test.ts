@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   selectOsmLoadProfile,
+  selectOsmSpatialIndexes,
   type OsmLoadCapabilities,
   type OsmLoadProjection,
 } from "../src/load-profile.ts";
@@ -175,5 +176,31 @@ describe("selectOsmLoadProfile", () => {
       availableBytes: 1.6 * GIB,
       suggestedProfile: "view",
     });
+  });
+
+  it("treats a measured buffer ceiling of zero as an empty allocation budget", () => {
+    const zeroCeiling = { ...capabilities, arrayBufferMaxBytes: 0 };
+    const selections = [
+      () => selectOsmLoadProfile("view", projection(), zeroCeiling),
+      () =>
+        selectOsmSpatialIndexes(
+          { nodes: ["tagged"], ways: true, relations: true },
+          projection(),
+          zeroCeiling,
+        ),
+    ];
+
+    for (const select of selections) {
+      let error: unknown;
+      try {
+        select();
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toMatchObject({
+        code: "OSM_LOAD_CAPACITY_EXCEEDED",
+        availableBytes: 0,
+      });
+    }
   });
 });

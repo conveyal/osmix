@@ -2,9 +2,18 @@ import { inspectBackingBuffers } from "@osmix/shared/backing-buffers";
 import { describe, expect, it } from "vitest";
 
 import { OSM_CONTENT_HASH_VERSION, OSM_TRANSFER_VERSION, Osm } from "../src/osm.ts";
+import StringTable from "../src/stringtable.ts";
 import { Tags } from "../src/tags.ts";
 
 describe("sparse tag storage", () => {
+  it("rejects duplicate and out-of-order tagged entity indexes", () => {
+    const tags = new Tags(new StringTable());
+    tags.addTagKeysAndValues(2, [0], [1]);
+
+    expect(() => tags.addTagKeysAndValues(2, [0], [1])).toThrow(/added out of order/);
+    expect(() => tags.addTagKeysAndValues(1, [0], [1])).toThrow(/added out of order/);
+  });
+
   it("preserves tags across rank boundaries and supports more than 255 tags", () => {
     const osm = new Osm({ id: "sparse-tags" });
     const manyTags = Object.fromEntries(

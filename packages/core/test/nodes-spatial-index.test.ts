@@ -184,6 +184,18 @@ describe("indirect node spatial indexes", () => {
       Array.from({ length: 256 }, (_, index) => index),
     );
   });
+
+  it("includes a stored microdegree coordinate on its exact floating-point boundary", () => {
+    const osm = new Osm();
+    const lon = -179.9382715;
+    osm.nodes.addNode({ id: 1, lon, lat: 0 });
+    osm.buildIndexes();
+    osm.nodes.buildSpatialIndex("all");
+
+    // This degree value does not multiply back to its stored integer exactly.
+    expect((lon * 1e7) % 1).not.toBe(0);
+    expect(osm.nodes.findIndexesWithinBbox([lon, 0, lon, 0])).toEqual([0]);
+  });
 });
 
 function randomOsm(

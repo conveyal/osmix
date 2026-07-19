@@ -21,6 +21,16 @@ import {
 
 export type OsmEntityIndexComponent = "ids" | "tags" | "entity-data";
 
+/** Whether bbox coordinates describe a non-inverted spatial item. */
+export function isValidSpatialBbox(
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+): boolean {
+  return minX <= maxX && minY <= maxY;
+}
+
 /** Structured entity-finalization failure suitable for actionable load diagnostics. */
 export class OsmEntityIndexBuildError extends Error {
   readonly code = "OSM_ENTITY_INDEX_BUILD_FAILED";
