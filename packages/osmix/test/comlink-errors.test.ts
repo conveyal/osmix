@@ -58,7 +58,7 @@ describe("structured Comlink errors", () => {
         requestedProfile: "auto",
         resolvedProfile: "view",
         requiredBytes: 2_000,
-        limitBytes: 1_000,
+        availableBytes: 1_000,
         spatialIndexes: {
           nodes: ["tagged"],
           ways: true,
@@ -76,7 +76,6 @@ describe("structured Comlink errors", () => {
       resolvedProfile: "view",
       requiredBytes: 2_000,
       availableBytes: 1_000,
-      limitBytes: 1_000,
       spatialIndexes: {
         nodes: ["tagged"],
         ways: true,

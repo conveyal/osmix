@@ -433,54 +433,50 @@ function toSharedArrayBuffer(buffer: ArrayBuffer): BufferType {
   return copy;
 }
 
-type RuntimeEntityTransferables =
-  | OsmTransferables["nodes"]
-  | OsmTransferables["ways"]
-  | OsmTransferables["relations"];
-type StoredEntityTransferables =
-  | OsmTransferables<ArrayBuffer>["nodes"]
-  | OsmTransferables<ArrayBuffer>["ways"]
-  | OsmTransferables<ArrayBuffer>["relations"];
-
-function toStorableEntityTransferables(t: RuntimeEntityTransferables) {
-  return {
-    ids: toArrayBuffer(t.ids),
-    ...(t.sortedIds !== undefined ? { sortedIds: toArrayBuffer(t.sortedIds) } : {}),
-    ...(t.sortedIdPositionToIndex !== undefined
-      ? { sortedIdPositionToIndex: toArrayBuffer(t.sortedIdPositionToIndex) }
-      : {}),
-    anchors: toArrayBuffer(t.anchors),
-    idsAreSorted: t.idsAreSorted,
-    tagEntityCount: t.tagEntityCount,
-    taggedEntityBits: toArrayBuffer(t.taggedEntityBits),
-    tagRankCheckpoints: toArrayBuffer(t.tagRankCheckpoints),
-    tagOffsets: toArrayBuffer(t.tagOffsets),
-    tagKeys: toArrayBuffer(t.tagKeys),
-    tagVals: toArrayBuffer(t.tagVals),
-    keyEntities: toArrayBuffer(t.keyEntities),
-    keyIndexStart: toArrayBuffer(t.keyIndexStart),
-    keyIndexCount: toArrayBuffer(t.keyIndexCount),
-  };
+/** The ID and tag buffers shared by every entity collection's transferables. */
+interface SharedEntityTransferables<B> {
+  ids: B;
+  sortedIds?: B;
+  sortedIdPositionToIndex?: B;
+  anchors: B;
+  idsAreSorted: boolean;
+  tagEntityCount: number;
+  taggedEntityBits: B;
+  tagRankCheckpoints: B;
+  tagOffsets: B;
+  tagKeys: B;
+  tagVals: B;
+  keyEntities: B;
+  keyIndexStart: B;
+  keyIndexCount: B;
 }
 
-function fromStorableEntityTransferables(t: StoredEntityTransferables) {
+/**
+ * Map the buffers shared by node, way, and relation transferables through one
+ * converter. Keeping a single field list prevents the storable and runtime
+ * conversions from drifting apart when the transfer schema changes.
+ */
+function convertEntityTransferables<In, Out>(
+  t: SharedEntityTransferables<In>,
+  convert: (buffer: In) => Out,
+): SharedEntityTransferables<Out> {
   return {
-    ids: toSharedArrayBuffer(t.ids),
-    ...(t.sortedIds !== undefined ? { sortedIds: toSharedArrayBuffer(t.sortedIds) } : {}),
+    ids: convert(t.ids),
+    ...(t.sortedIds !== undefined ? { sortedIds: convert(t.sortedIds) } : {}),
     ...(t.sortedIdPositionToIndex !== undefined
-      ? { sortedIdPositionToIndex: toSharedArrayBuffer(t.sortedIdPositionToIndex) }
+      ? { sortedIdPositionToIndex: convert(t.sortedIdPositionToIndex) }
       : {}),
-    anchors: toSharedArrayBuffer(t.anchors),
+    anchors: convert(t.anchors),
     idsAreSorted: t.idsAreSorted,
     tagEntityCount: t.tagEntityCount,
-    taggedEntityBits: toSharedArrayBuffer(t.taggedEntityBits),
-    tagRankCheckpoints: toSharedArrayBuffer(t.tagRankCheckpoints),
-    tagOffsets: toSharedArrayBuffer(t.tagOffsets),
-    tagKeys: toSharedArrayBuffer(t.tagKeys),
-    tagVals: toSharedArrayBuffer(t.tagVals),
-    keyEntities: toSharedArrayBuffer(t.keyEntities),
-    keyIndexStart: toSharedArrayBuffer(t.keyIndexStart),
-    keyIndexCount: toSharedArrayBuffer(t.keyIndexCount),
+    taggedEntityBits: convert(t.taggedEntityBits),
+    tagRankCheckpoints: convert(t.tagRankCheckpoints),
+    tagOffsets: convert(t.tagOffsets),
+    tagKeys: convert(t.tagKeys),
+    tagVals: convert(t.tagVals),
+    keyEntities: convert(t.keyEntities),
+    keyIndexStart: convert(t.keyIndexStart),
+    keyIndexCount: convert(t.keyIndexCount),
   };
 }
 
@@ -502,13 +498,13 @@ function toStorableTransferables(t: OsmTransferables): OsmTransferables<ArrayBuf
       count: toArrayBuffer(t.stringTable.count),
     },
     nodes: {
-      ...toStorableEntityTransferables(t.nodes),
+      ...convertEntityTransferables(t.nodes, toArrayBuffer),
       lons: toArrayBuffer(t.nodes.lons),
       lats: toArrayBuffer(t.nodes.lats),
       bbox: t.nodes.bbox,
     },
     ways: {
-      ...toStorableEntityTransferables(t.ways),
+      ...convertEntityTransferables(t.ways, toArrayBuffer),
       refStart: toArrayBuffer(t.ways.refStart),
       refCount: toArrayBuffer(t.ways.refCount),
       refs: toArrayBuffer(t.ways.refs),
@@ -517,7 +513,7 @@ function toStorableTransferables(t: OsmTransferables): OsmTransferables<ArrayBuf
       bbox: toArrayBuffer(t.ways.bbox),
     },
     relations: {
-      ...toStorableEntityTransferables(t.relations),
+      ...convertEntityTransferables(t.relations, toArrayBuffer),
       memberStart: toArrayBuffer(t.relations.memberStart),
       memberCount: toArrayBuffer(t.relations.memberCount),
       memberRefs: toArrayBuffer(t.relations.memberRefs),
@@ -546,13 +542,13 @@ function fromStorableTransferables(t: OsmTransferables<ArrayBuffer>): OsmTransfe
       count: toSharedArrayBuffer(t.stringTable.count),
     },
     nodes: {
-      ...fromStorableEntityTransferables(t.nodes),
+      ...convertEntityTransferables(t.nodes, toSharedArrayBuffer),
       lons: toSharedArrayBuffer(t.nodes.lons),
       lats: toSharedArrayBuffer(t.nodes.lats),
       bbox: t.nodes.bbox,
     },
     ways: {
-      ...fromStorableEntityTransferables(t.ways),
+      ...convertEntityTransferables(t.ways, toSharedArrayBuffer),
       refStart: toSharedArrayBuffer(t.ways.refStart),
       refCount: toSharedArrayBuffer(t.ways.refCount),
       refs: toSharedArrayBuffer(t.ways.refs),
@@ -561,7 +557,7 @@ function fromStorableTransferables(t: OsmTransferables<ArrayBuffer>): OsmTransfe
       bbox: toSharedArrayBuffer(t.ways.bbox),
     },
     relations: {
-      ...fromStorableEntityTransferables(t.relations),
+      ...convertEntityTransferables(t.relations, toSharedArrayBuffer),
       memberStart: toSharedArrayBuffer(t.relations.memberStart),
       memberCount: toSharedArrayBuffer(t.relations.memberCount),
       memberRefs: toSharedArrayBuffer(t.relations.memberRefs),

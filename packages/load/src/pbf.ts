@@ -354,6 +354,8 @@ export async function* startCreateOsmFromPbf(
     blockCount++;
     yield progressEvent(
       `Processed ${blockCount.toLocaleString()} blocks, ${osm.nodes.size.toLocaleString()} nodes, ${osm.ways.size.toLocaleString()} ways, and ${osm.relations.size.toLocaleString()} relations added.`,
+      "info",
+      true,
     );
   }
 

@@ -7,15 +7,15 @@ declare global {
   }
 }
 
-const BLOCK_PROGRESS_INTERVAL_MS = 250;
-let lastBlockProgressAt = Number.NEGATIVE_INFINITY;
+const THROTTLED_PROGRESS_INTERVAL_MS = 250;
+let lastThrottledProgressAt = Number.NEGATIVE_INFINITY;
 
 export const osmWorker = await createMergeRemote({
   onProgress: (progress) => {
-    if (progress.msg.startsWith("Processed ")) {
+    if (progress.throttle) {
       const now = performance.now();
-      if (now - lastBlockProgressAt < BLOCK_PROGRESS_INTERVAL_MS) return;
-      lastBlockProgressAt = now;
+      if (now - lastThrottledProgressAt < THROTTLED_PROGRESS_INTERVAL_MS) return;
+      lastThrottledProgressAt = now;
     }
     Log.addMessage(progress.msg);
   },

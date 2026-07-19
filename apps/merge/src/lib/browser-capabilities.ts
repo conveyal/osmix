@@ -64,13 +64,12 @@ export function getBrowserLoadCapabilities(): Promise<BrowserLoadCapabilities> {
       globalThis.crossOriginIsolated && sharedArrayBufferMaxBytes !== null
         ? "shared-array-buffer"
         : "array-buffer";
+    const deviceMemoryBytes = reportedDeviceMemoryBytes();
     return {
       activeBufferType,
       arrayBufferMaxBytes,
       ...(sharedArrayBufferMaxBytes === null ? {} : { sharedArrayBufferMaxBytes }),
-      ...(reportedDeviceMemoryBytes() === undefined
-        ? {}
-        : { deviceMemoryBytes: reportedDeviceMemoryBytes() }),
+      ...(deviceMemoryBytes === undefined ? {} : { deviceMemoryBytes }),
     };
   })();
   capabilitiesPromise = pending;

@@ -93,6 +93,43 @@ describe("missing node references", () => {
     expect(roundTripped.ways.getById(300)?.refs).toEqual([99, 1, 98, 2, 97]);
   });
 
+  it("builds way and relation spatial indexes over dangling refs", async () => {
+    const danglingRefsBlock: OsmPbfBlock = {
+      stringtable: [new TextEncoder().encode("")],
+      primitivegroup: [
+        {
+          nodes: [],
+          dense: { id: [1, 1], lat: [0, 1], lon: [0, 1], keys_vals: [0, 0] },
+          ways: [
+            // Nodes 1 and 2 resolve; 99, 98, and 97 are dangling.
+            { id: 300, keys: [], vals: [], refs: [99, -98, 97, -96, 95] },
+            // Every ref is dangling: bbox must stay inverted and unmatchable.
+            { id: 301, keys: [], vals: [], refs: [500, 1] },
+          ],
+          relations: [{ id: 400, keys: [], vals: [], memids: [300], roles_sid: [0], types: [1] }],
+        },
+      ],
+    };
+    const data = concatUint8(
+      await osmBlockToPbfBlobBytes(header),
+      await osmBlockToPbfBlobBytes(danglingRefsBlock),
+    );
+    // The default Full profile builds every spatial index.
+    const osm = await fromPbf(data, {}, () => {});
+
+    expect(osm.ways.hasSpatialIndex()).toBe(true);
+    expect(osm.relations.hasSpatialIndex()).toBe(true);
+    // Way 300's bbox comes from its two resolvable nodes; way 301 has none.
+    expect(osm.ways.intersects([-1, -1, 1, 1])).toEqual([0]);
+    expect(osm.relations.intersects([-1, -1, 1, 1])).toEqual([0]);
+    // Strict geometry access still fails for unresolvable refs.
+    expect(() => osm.ways.getCoordinates(0)).toThrow(/not found for way geometry/);
+    expect(osm.ways.getResolvedCoordinates(0)).toEqual([
+      [0, 0],
+      [1e-7, 1e-7],
+    ]);
+  });
+
   it("preserves refs and members when tag filtering drops their targets", async () => {
     const osm = await fromPbf(
       await createFilteredPbf(),

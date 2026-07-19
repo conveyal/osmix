@@ -274,6 +274,11 @@ export class Ids {
 
   /**
    * Get the approximate memory requirements for a given number of IDs in bytes.
+   *
+   * `idsAreSorted` defaults to true because PBF entity collections arrive in
+   * ascending ID order and retain no separate sort buffers. Pass false when
+   * estimating a programmatically built (unsorted) collection, which also
+   * retains sorted IDs plus a position map.
    */
   static getBytesRequired(count: number, idsAreSorted = true) {
     if (count === 0) return 0;

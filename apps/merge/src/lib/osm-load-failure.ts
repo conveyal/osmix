@@ -99,12 +99,24 @@ function technicalDetails(error: unknown): OsmLoadFailureTechnicalDetails {
     elementCount: numberField(record, "elementCount"),
     bytesPerElement: numberField(record, "bytesPerElement"),
     requiredBytes: numberField(record, "requiredBytes"),
-    availableBytes: numberField(record, "availableBytes") ?? numberField(record, "limitBytes"),
+    availableBytes: numberField(record, "availableBytes"),
     stack: error instanceof Error ? error.stack : stringField(record, "stack"),
   };
 }
 
-/** Convert worker and browser failures into stable, actionable Merge UI copy. */
+/**
+ * Convert worker and browser failures into stable, actionable Merge UI copy.
+ *
+ * Recognized structured error codes (matched by `code`, not `instanceof`,
+ * because Comlink deserializes worker errors as plain `Error`s):
+ * - `OSM_ENTITY_INDEX_BUILD_FAILED` — `OsmEntityIndexBuildError` (@osmix/core entities)
+ * - `TYPED_BUFFER_ALLOCATION_FAILED` — `TypedBufferAllocationError` (@osmix/core typed-arrays)
+ * - `OSM_LOAD_CAPACITY_EXCEEDED` — `OsmLoadCapacityError` (@osmix/load load-profile)
+ * - `OSM_SPATIAL_INDEX_BUILD_FAILED` — `OsmSpatialIndexBuildError` (@osmix/load load-profile)
+ * Anything else falls through to a generic description. When adding a new
+ * structured error, add its code here and keep the enumerable fields in sync
+ * with `technicalDetails()`.
+ */
 export function describeOsmLoadFailure(
   error: unknown,
   context: OsmLoadFailureContext,

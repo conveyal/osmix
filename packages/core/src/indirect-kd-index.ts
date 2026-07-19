@@ -54,6 +54,13 @@ export class IndirectKdIndex {
     return this.indexes.buffer as BufferType;
   }
 
+  /**
+   * Find entity indexes within an inclusive bounding box.
+   *
+   * Bounds are **integer microdegrees** (the units of the underlying Int32
+   * coordinate columns), not degrees. `Nodes.findIndexesWithinBbox` performs
+   * the degree → microdegree conversion.
+   */
   range(minLon: number, minLat: number, maxLon: number, maxLat: number): number[] {
     const stack = [0, this.indexes.length - 1, 0];
     const result: number[] = [];
@@ -62,22 +69,16 @@ export class IndirectKdIndex {
       const axis = stack.pop();
       const right = stack.pop();
       const left = stack.pop();
-      if (axis === undefined || right === undefined || left === undefined) break;
+      if (axis === undefined || right === undefined || left === undefined) {
+        throw new Error("Indirect KD index traversal stack is corrupt");
+      }
 
       if (right - left <= this.nodeSize) {
         for (let i = left; i <= right; i++) {
-          const entityIndex = this.indexes[i];
-          if (entityIndex === undefined) continue;
-          const lon = this.lons[entityIndex];
-          const lat = this.lats[entityIndex];
-          if (
-            lon !== undefined &&
-            lat !== undefined &&
-            lon >= minLon &&
-            lon <= maxLon &&
-            lat >= minLat &&
-            lat <= maxLat
-          ) {
+          const entityIndex = entityAt(this.indexes, i);
+          const lon = coordinate(this.lons, this.lats, entityIndex, 0);
+          const lat = coordinate(this.lons, this.lats, entityIndex, 1);
+          if (lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat) {
             result.push(entityIndex);
           }
         }
@@ -85,21 +86,19 @@ export class IndirectKdIndex {
       }
 
       const middle = (left + right) >> 1;
-      const entityIndex = this.indexes[middle];
-      if (entityIndex === undefined) continue;
-      const lon = this.lons[entityIndex];
-      const lat = this.lats[entityIndex];
-      if (lon === undefined || lat === undefined) continue;
+      const entityIndex = entityAt(this.indexes, middle);
+      const lon = coordinate(this.lons, this.lats, entityIndex, 0);
+      const lat = coordinate(this.lons, this.lats, entityIndex, 1);
 
       if (lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat) {
         result.push(entityIndex);
       }
 
-      const coordinate = axis === 0 ? lon : lat;
+      const splitCoordinate = axis === 0 ? lon : lat;
       const minimum = axis === 0 ? minLon : minLat;
       const maximum = axis === 0 ? maxLon : maxLat;
-      if (minimum <= coordinate) stack.push(left, middle - 1, 1 - axis);
-      if (maximum >= coordinate) stack.push(middle + 1, right, 1 - axis);
+      if (minimum <= splitCoordinate) stack.push(left, middle - 1, 1 - axis);
+      if (maximum >= splitCoordinate) stack.push(middle + 1, right, 1 - axis);
     }
 
     return result;
@@ -147,18 +146,13 @@ function select(
       select(indexes, lons, lats, k, newLeft, newRight, axis);
     }
 
-    const pivotIndex = indexes[k];
-    if (pivotIndex === undefined) return;
+    const pivotIndex = entityAt(indexes, k);
     const pivot = coordinate(lons, lats, pivotIndex, axis);
     let i = left;
     let j = right;
 
     swap(indexes, left, k);
-    const rightIndex = indexes[right];
-    if (
-      rightIndex !== undefined &&
-      compareCoordinate(lons, lats, rightIndex, pivotIndex, axis) > 0
-    ) {
+    if (compareCoordinate(lons, lats, entityAt(indexes, right), pivotIndex, axis) > 0) {
       swap(indexes, left, right);
     }
 
@@ -166,20 +160,11 @@ function select(
       swap(indexes, i, j);
       i++;
       j--;
-      while (i <= right) {
-        const index = indexes[i];
-        if (index === undefined || coordinate(lons, lats, index, axis) >= pivot) break;
-        i++;
-      }
-      while (j >= left) {
-        const index = indexes[j];
-        if (index === undefined || coordinate(lons, lats, index, axis) <= pivot) break;
-        j--;
-      }
+      while (i <= right && coordinate(lons, lats, entityAt(indexes, i), axis) < pivot) i++;
+      while (j >= left && coordinate(lons, lats, entityAt(indexes, j), axis) > pivot) j--;
     }
 
-    const leftIndex = indexes[left];
-    if (leftIndex !== undefined && coordinate(lons, lats, leftIndex, axis) === pivot) {
+    if (coordinate(lons, lats, entityAt(indexes, left), axis) === pivot) {
       swap(indexes, left, j);
     } else {
       j++;
@@ -189,6 +174,19 @@ function select(
     if (j <= k) left = j + 1;
     if (k <= j) right = j - 1;
   }
+}
+
+/**
+ * Read the permutation entry at `position`, throwing on an out-of-bounds read.
+ * A silent skip here would leave the permutation subtly unsorted and produce
+ * wrong query results, so fail loudly instead.
+ */
+function entityAt(indexes: Uint32Array, position: number): number {
+  const value = indexes[position];
+  if (value === undefined) {
+    throw new Error(`Indirect KD index read out of bounds at position ${position}`);
+  }
+  return value;
 }
 
 function coordinate(lons: Int32Array, lats: Int32Array, entityIndex: number, axis: number): number {
@@ -208,8 +206,7 @@ function compareCoordinate(
 }
 
 function swap(indexes: Uint32Array, a: number, b: number) {
-  const value = indexes[a];
-  if (value === undefined) return;
-  indexes[a] = indexes[b] ?? value;
-  indexes[b] = value;
+  const valueA = entityAt(indexes, a);
+  indexes[a] = entityAt(indexes, b);
+  indexes[b] = valueA;
 }

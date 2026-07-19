@@ -86,6 +86,9 @@ export class Tags {
   /** Tagged entity indexes collected during ingestion and released on finalization. */
   private taggedEntityIndexBuilder: RTA<Uint32Array> | null;
 
+  /** Largest tagged entity index seen so far; enforces ascending ingestion order. */
+  private lastTaggedEntityIndex = -1;
+
   /** Whether buildIndex() has been called */
   private indexBuilt = false;
 
@@ -140,6 +143,12 @@ export class Tags {
 
   /**
    * Add tags to an entity using key and value indexes.
+   *
+   * Tagged entities must be added in strictly ascending entity-index order and
+   * at most once per entity: the rank/popcount lookup orders tagged entities by
+   * index while `tagOffsets` records them in call order, so an out-of-order or
+   * repeated tagged index would silently misalign every later entity's tags.
+   * `Entities.addEntity` (append-only) satisfies this naturally.
    */
   addTagKeysAndValues(index: number, keys: number[], values: number[]) {
     if (this.indexBuilt) throw Error("Tag index already built.");
@@ -148,6 +157,12 @@ export class Tags {
     this.entityCount = Math.max(this.entityCount, index + 1);
     if (keys.length === 0) return;
 
+    if (index <= this.lastTaggedEntityIndex) {
+      throw Error(
+        `Tagged entity ${index} added out of order (last tagged entity: ${this.lastTaggedEntityIndex}). Tagged entities must be added once, in ascending index order.`,
+      );
+    }
+    this.lastTaggedEntityIndex = index;
     this.taggedEntityIndexBuilder?.push(index);
     this.tagOffsets.push(this.tagKeys.length);
     this.tagKeys.pushMany(keys);
@@ -377,7 +392,14 @@ export class Tags {
       .update(this.tagVals.array);
   }
 
-  /** Return the compact tagged-entity ordinal, or -1 when the entity has no tags. */
+  /**
+   * Return the compact tagged-entity ordinal, or -1 when the entity has no tags.
+   *
+   * The ordinal is the entity's rank among tagged entities: read the cached
+   * prefix count at the nearest 256-entity checkpoint, popcount the presence
+   * words between the checkpoint and the entity's word, then popcount the bits
+   * below the entity within its own word. The result indexes `tagOffsets`.
+   */
   private getTaggedEntityIndex(index: number): number {
     if (index < 0 || index >= this.entityCount) return -1;
     const wordIndex = index >>> 5;

@@ -446,32 +446,45 @@ export class Nodes extends Entities<OsmNode> {
   }
 }
 
+/**
+ * Round-trip float error tolerance for degree → microdegree conversion.
+ * `microToDegrees(x) * OSM_COORD_SCALE` can differ from `x` by a few ulps
+ * (~1e-6 at ±1.8e9), so ceil/floor without a tolerance could exclude a node
+ * whose exact stored coordinate sits on the query boundary.
+ */
+const MICRO_EPSILON = 1e-5;
+
+/** Smallest microdegree integer inside an inclusive degree lower bound. */
+function microLowerBound(degrees: number): number {
+  return Math.ceil(degrees * OSM_COORD_SCALE - MICRO_EPSILON);
+}
+
+/** Largest microdegree integer inside an inclusive degree upper bound. */
+function microUpperBound(degrees: number): number {
+  return Math.floor(degrees * OSM_COORD_SCALE + MICRO_EPSILON);
+}
+
 function findIndexesWithinBbox(index: IndirectKdIndex, bbox: GeoBbox2D): number[] {
   const [minLon, minLat, maxLon, maxLat] = bbox;
   if (minLat > maxLat) return [];
 
-  const microMinLat = Math.ceil(minLat * OSM_COORD_SCALE);
-  const microMaxLat = Math.floor(maxLat * OSM_COORD_SCALE);
+  const microMinLat = microLowerBound(minLat);
+  const microMaxLat = microUpperBound(maxLat);
   if (microMinLat > microMaxLat) return [];
 
   let result: number[];
   if (minLon <= maxLon) {
     result = index.range(
-      Math.ceil(minLon * OSM_COORD_SCALE),
+      microLowerBound(minLon),
       microMinLat,
-      Math.floor(maxLon * OSM_COORD_SCALE),
+      microUpperBound(maxLon),
       microMaxLat,
     );
   } else {
     result = index
-      .range(Math.ceil(minLon * OSM_COORD_SCALE), microMinLat, 180 * OSM_COORD_SCALE, microMaxLat)
+      .range(microLowerBound(minLon), microMinLat, 180 * OSM_COORD_SCALE, microMaxLat)
       .concat(
-        index.range(
-          -180 * OSM_COORD_SCALE,
-          microMinLat,
-          Math.floor(maxLon * OSM_COORD_SCALE),
-          microMaxLat,
-        ),
+        index.range(-180 * OSM_COORD_SCALE, microMinLat, microUpperBound(maxLon), microMaxLat),
       );
   }
   return result;

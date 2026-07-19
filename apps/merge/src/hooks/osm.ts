@@ -78,6 +78,14 @@ function isPbfFile(file: File, fileType?: OsmFileType): boolean {
   return file.name.toLowerCase().endsWith(".pbf");
 }
 
+/** A cached dataset satisfies the request unless Full needs a missing all-node index. */
+function cachedProfileIsUsable(
+  requestedProfile: OsmLoadProfile,
+  cachedInfo: OsmInfo | undefined,
+): boolean {
+  return requestedProfile !== "full" || cachedInfo?.spatialIndexes.nodes.all === true;
+}
+
 export type UseOsmFileReturn = ReturnType<typeof useOsmFile>;
 
 export function useOsmFile(osmKey: string) {
@@ -164,9 +172,7 @@ export function useOsmFile(osmKey: string) {
         if (signal?.aborted) throw new LoadCancelledError();
 
         const requestedProfile = profileOverride ?? loadProfile;
-        const cachedProfileIsUsable =
-          requestedProfile !== "full" || existing?.info.spatialIndexes.nodes.all === true;
-        if (existing && cachedProfileIsUsable) {
+        if (existing && cachedProfileIsUsable(requestedProfile, existing.info)) {
           taskLog.update("Found cached version, loading from storage...");
           const stored = await osmWorker.loadFromStorage(existing.fileHash, signal);
 
@@ -358,9 +364,9 @@ export function useOsmFile(osmKey: string) {
         setOsmInfo(result.info);
         setOsm(loadedOsm);
         setSelectedOsm(loadedOsm);
-        const cachedProfileIsUsable =
-          requestedProfile !== "full" || result.existing?.info.spatialIndexes.nodes.all === true;
-        setIsStored(result.existing !== null && cachedProfileIsUsable);
+        setIsStored(
+          result.existing !== null && cachedProfileIsUsable(requestedProfile, result.existing.info),
+        );
         taskLog.end(`${result.fileInfo.fileName} loaded from URL.`);
         return result.info;
       } catch (error) {
@@ -387,33 +393,23 @@ export function useOsmFile(osmKey: string) {
     },
   );
 
-  const reloadWithFullProfile = useEffectEvent(async () => {
-    setLoadProfile("full");
-    if (file) return loadOsmFile(file, "pbf", undefined, "full");
+  const reloadWithProfile = useEffectEvent(async (profile: "full" | "view") => {
+    setLoadProfile(profile);
+    if (file) return loadOsmFile(file, "pbf", undefined, profile);
     const sourceUrl = fileInfo?.sourceUrl ?? sourceUrlRef.current;
     if (sourceUrl) {
-      return loadOsmPbfUrl(sourceUrl, undefined, "full");
+      return loadOsmPbfUrl(sourceUrl, undefined, profile);
     }
+    const profileName = profile === "full" ? "Full" : "View";
     Log.addMessage(
-      "The original PBF is not available in this session. Select it again and choose Full.",
+      `The original PBF is not available in this session. Select it again and choose ${profileName}.`,
       "error",
     );
     return null;
   });
 
-  const reloadWithViewProfile = useEffectEvent(async () => {
-    setLoadProfile("view");
-    if (file) return loadOsmFile(file, "pbf", undefined, "view");
-    const sourceUrl = fileInfo?.sourceUrl ?? sourceUrlRef.current;
-    if (sourceUrl) {
-      return loadOsmPbfUrl(sourceUrl, undefined, "view");
-    }
-    Log.addMessage(
-      "The original PBF is not available in this session. Select it again and choose View.",
-      "error",
-    );
-    return null;
-  });
+  const reloadWithFullProfile = useEffectEvent(() => reloadWithProfile("full"));
+  const reloadWithViewProfile = useEffectEvent(() => reloadWithProfile("view"));
 
   const loadFromStorage = useEffectEvent(async (storageId: string, signal?: AbortSignal) => {
     const loadId = ++currentLoadIdRef.current;

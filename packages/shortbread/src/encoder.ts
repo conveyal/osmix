@@ -278,10 +278,14 @@ export class ShortbreadVtEncoder {
     proj: (ll: LonLat) => XY,
     indexedCandidates?: FeatureCandidate[],
   ): Generator<ClassifiedFeature> {
-    const nodeIndexes = this.osm.nodes.hasSpatialIndex("tagged")
-      ? this.osm.nodes.findTaggedIndexesWithinBbox(bbox)
-      : this.osm.nodes.findIndexesWithinBbox(bbox);
-    const candidates = indexedCandidates ?? unindexedCandidates(nodeIndexes);
+    // Only run the spatial query when candidates were not supplied.
+    const candidates =
+      indexedCandidates ??
+      unindexedCandidates(
+        this.osm.nodes.hasSpatialIndex("tagged")
+          ? this.osm.nodes.findTaggedIndexesWithinBbox(bbox)
+          : this.osm.nodes.findIndexesWithinBbox(bbox),
+      );
 
     for (const candidate of candidates) {
       const nodeIndex = candidate.entityIndex;

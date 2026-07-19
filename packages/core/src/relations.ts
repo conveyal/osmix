@@ -304,11 +304,12 @@ export class Relations extends Entities<OsmRelation> {
       if (ll) lls.push(ll);
     }
 
-    // Collect coordinates from resolved ways
+    // Collect coordinates from resolved ways. Member ways may reference nodes
+    // outside a referentially incomplete extract, so skip unresolvable refs.
     for (const wayId of resolved.ways) {
       const wayIndex = this.ways.ids.getIndexFromId(wayId);
       if (wayIndex === -1) continue;
-      const wayPositions = this.ways.getCoordinates(wayIndex);
+      const wayPositions = this.ways.getResolvedCoordinates(wayIndex);
       lls.push(...wayPositions);
     }
 
@@ -461,7 +462,13 @@ export class Relations extends Entities<OsmRelation> {
    */
   intersects(bbox: GeoBbox2D, filterFn?: (index: number) => boolean): number[] {
     if (this.size === 0) return [];
-    return this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3], filterFn);
+    // A relation with no resolvable member geometry stores an inverted bbox.
+    // Flatbush's contained-node fast path skips per-leaf intersection tests,
+    // so filter inverted boxes out explicitly.
+    return this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3], (index, x0, _y0, x1) => {
+      if (x0 > x1) return false;
+      return filterFn ? filterFn(index) : true;
+    });
   }
 
   /**

@@ -98,8 +98,6 @@ export class OsmLoadCapacityError extends Error {
   readonly requiredBytes: number;
   /** Active allocation budget after reserving 20% headroom. */
   readonly availableBytes: number;
-  /** @deprecated Use availableBytes. */
-  readonly limitBytes: number;
   readonly spatialIndexes: OsmSpatialIndexSelection;
   /** A lower-memory profile that satisfies the same tested allocation limit. */
   readonly suggestedProfile?: "view";
@@ -108,19 +106,18 @@ export class OsmLoadCapacityError extends Error {
     requestedProfile: OsmLoadProfile;
     resolvedProfile: ResolvedOsmLoadProfile;
     requiredBytes: number;
-    limitBytes: number;
+    availableBytes: number;
     spatialIndexes: OsmSpatialIndexSelection;
     suggestedProfile?: "view";
   }) {
     super(
-      `The largest ${args.resolvedProfile} profile allocation requires ${formatMib(args.requiredBytes)}, exceeding the active-buffer safety limit of ${formatMib(args.limitBytes)}.`,
+      `The largest ${args.resolvedProfile} profile allocation requires ${formatMib(args.requiredBytes)}, exceeding the active-buffer safety limit of ${formatMib(args.availableBytes)}.`,
     );
     this.name = "OsmLoadCapacityError";
     this.requestedProfile = args.requestedProfile;
     this.resolvedProfile = args.resolvedProfile;
     this.requiredBytes = args.requiredBytes;
-    this.availableBytes = args.limitBytes;
-    this.limitBytes = args.limitBytes;
+    this.availableBytes = args.availableBytes;
     this.spatialIndexes = normalizeOsmSpatialIndexSelection(args.spatialIndexes);
     this.suggestedProfile = args.suggestedProfile;
   }
@@ -200,16 +197,23 @@ function nextPowerOfTwoBytes(bytes: number): number {
   return 2 ** Math.ceil(Math.log2(bytes));
 }
 
-function collectUniqueBufferBytes(value: unknown, buffers = new Set<ArrayBufferLike>()): number {
+function collectUniqueBuffers(value: unknown, buffers: Set<ArrayBufferLike>): void {
   if (
     value instanceof ArrayBuffer ||
     (typeof SharedArrayBuffer !== "undefined" && value instanceof SharedArrayBuffer)
   ) {
     buffers.add(value);
   } else if (value !== null && typeof value === "object") {
-    for (const child of Object.values(value)) collectUniqueBufferBytes(child, buffers);
+    for (const child of Object.values(value)) collectUniqueBuffers(child, buffers);
   }
-  return Array.from(buffers).reduce((total, buffer) => total + buffer.byteLength, 0);
+}
+
+function collectUniqueBufferBytes(value: unknown): number {
+  const buffers = new Set<ArrayBufferLike>();
+  collectUniqueBuffers(value, buffers);
+  let total = 0;
+  for (const buffer of buffers) total += buffer.byteLength;
+  return total;
 }
 
 /** Count unique typed-array backing buffers currently retained by an Osm dataset. */
@@ -340,18 +344,93 @@ function formatMib(bytes: number): string {
   return `${(bytes / MIB).toFixed(0)} MiB`;
 }
 
+interface OsmLoadLimits {
+  typedPeakLimit: number;
+  allocationLimit?: number;
+}
+
+/** Derive this runtime's advisory peak and hard single-allocation limits. */
+function computeOsmLoadLimits(capabilities: OsmLoadCapabilities): OsmLoadLimits {
+  const devicePeakLimit = capabilities.deviceMemoryBytes
+    ? capabilities.deviceMemoryBytes * DEVICE_MEMORY_FRACTION
+    : Number.POSITIVE_INFINITY;
+  const typedPeakLimit = Math.min(ABSOLUTE_TYPED_ARRAY_PEAK_LIMIT, devicePeakLimit);
+  const bufferCeiling = activeBufferCeiling(capabilities);
+  // A measured ceiling of 0 is a real (empty) budget, not an unknown one; only
+  // an unmeasured runtime skips the hard single-allocation check.
+  const allocationLimit =
+    bufferCeiling !== undefined ? bufferCeiling * BUFFER_HEADROOM_FRACTION : undefined;
+  return { typedPeakLimit, allocationLimit };
+}
+
+/**
+ * Apply the selected-peak warning and hard single-allocation budget shared by
+ * profile-based and explicit-selection decisions, then assemble the decision.
+ * Throws `OsmLoadCapacityError` when the largest planned allocation cannot fit
+ * the tested active-buffer budget.
+ */
+function finalizeOsmLoadDecision(args: {
+  requestedProfile: OsmLoadProfile;
+  resolvedProfile: ResolvedOsmLoadProfile;
+  spatialIndexes: OsmSpatialIndexSelection;
+  /** Subject used in the selected-peak warning, e.g. "the selected Full profile". */
+  peakWarningSubject: string;
+  selectedPeak: OsmLoadProfilePeak;
+  projection: OsmLoadProjection;
+  capabilities: OsmLoadCapabilities;
+  limits: OsmLoadLimits;
+  diagnostics: OsmLoadDiagnostic[];
+}): OsmLoadDecision {
+  const { typedPeakLimit, allocationLimit } = args.limits;
+  const { selectedPeak, spatialIndexes, resolvedProfile, diagnostics } = args;
+  if (selectedPeak.projectedTypedArrayPeakBytes > typedPeakLimit) {
+    diagnostics.push({
+      code: "selected-typed-array-peak-limit",
+      level: "warning",
+      message: `${args.peakWarningSubject} may peak at ${formatMib(selectedPeak.projectedTypedArrayPeakBytes)}, above the ${formatMib(typedPeakLimit)} working-set guideline. The load will still be attempted.`,
+    });
+  }
+  if (
+    allocationLimit !== undefined &&
+    selectedPeak.largestPlannedAllocationBytes > allocationLimit
+  ) {
+    throw new OsmLoadCapacityError({
+      requestedProfile: args.requestedProfile,
+      resolvedProfile,
+      requiredBytes: selectedPeak.largestPlannedAllocationBytes,
+      availableBytes: allocationLimit,
+      spatialIndexes,
+      suggestedProfile:
+        resolvedProfile === "full" &&
+        args.projection.profilePeaks.view.largestPlannedAllocationBytes <= allocationLimit
+          ? "view"
+          : undefined,
+    });
+  }
+  return {
+    requestedProfile: args.requestedProfile,
+    resolvedProfile,
+    spatialIndexes,
+    projection: args.projection,
+    selectedPeak,
+    capabilities: args.capabilities,
+    limits: {
+      allNodeSpatialIndexBytes: ALL_NODE_SPATIAL_INDEX_LIMIT,
+      projectedTypedArrayPeakBytes: typedPeakLimit,
+      largestPlannedAllocationBytes: allocationLimit,
+    },
+    diagnostics,
+  };
+}
+
 /** Resolve Auto conservatively; an explicit Full or View request always wins. */
 export function selectOsmLoadProfile(
   requestedProfile: OsmLoadProfile,
   projection: OsmLoadProjection,
   capabilities: OsmLoadCapabilities = {},
 ): OsmLoadDecision {
-  const devicePeakLimit = capabilities.deviceMemoryBytes
-    ? capabilities.deviceMemoryBytes * DEVICE_MEMORY_FRACTION
-    : Number.POSITIVE_INFINITY;
-  const typedPeakLimit = Math.min(ABSOLUTE_TYPED_ARRAY_PEAK_LIMIT, devicePeakLimit);
-  const bufferCeiling = activeBufferCeiling(capabilities);
-  const allocationLimit = bufferCeiling ? bufferCeiling * BUFFER_HEADROOM_FRACTION : undefined;
+  const limits = computeOsmLoadLimits(capabilities);
+  const { typedPeakLimit, allocationLimit } = limits;
   const checks: Array<{ diagnostic: OsmLoadDiagnostic; passes: boolean }> = [
     {
       passes: projection.allNodeSpatialIndexBytes <= ALL_NODE_SPATIAL_INDEX_LIMIT,
@@ -405,46 +484,17 @@ export function selectOsmLoadProfile(
   const spatialIndexes = normalizeOsmSpatialIndexSelection(
     resolvedProfile === "full" ? FULL_SPATIAL_INDEX_SELECTION : VIEW_SPATIAL_INDEX_SELECTION,
   );
-  const selectedPeak = projection.profilePeaks[resolvedProfile];
-  if (selectedPeak.projectedTypedArrayPeakBytes > typedPeakLimit) {
-    diagnostics.push({
-      code: "selected-typed-array-peak-limit",
-      level: "warning",
-      message: `The selected ${resolvedProfile === "full" ? "Full" : "View"} profile may peak at ${formatMib(selectedPeak.projectedTypedArrayPeakBytes)}, above the ${formatMib(typedPeakLimit)} working-set guideline. The load will still be attempted.`,
-    });
-  }
-  if (
-    allocationLimit !== undefined &&
-    selectedPeak.largestPlannedAllocationBytes > allocationLimit
-  ) {
-    throw new OsmLoadCapacityError({
-      requestedProfile,
-      resolvedProfile,
-      requiredBytes: selectedPeak.largestPlannedAllocationBytes,
-      limitBytes: allocationLimit,
-      spatialIndexes,
-      suggestedProfile:
-        resolvedProfile === "full" &&
-        projection.profilePeaks.view.largestPlannedAllocationBytes <= allocationLimit
-          ? "view"
-          : undefined,
-    });
-  }
-
-  return {
+  return finalizeOsmLoadDecision({
     requestedProfile,
     resolvedProfile,
     spatialIndexes,
+    peakWarningSubject: `The selected ${resolvedProfile === "full" ? "Full" : "View"} profile`,
+    selectedPeak: projection.profilePeaks[resolvedProfile],
     projection,
-    selectedPeak,
     capabilities,
-    limits: {
-      allNodeSpatialIndexBytes: ALL_NODE_SPATIAL_INDEX_LIMIT,
-      projectedTypedArrayPeakBytes: typedPeakLimit,
-      largestPlannedAllocationBytes: allocationLimit,
-    },
+    limits,
     diagnostics,
-  };
+  });
 }
 
 /** Create a decision for an exact caller-supplied spatial-index selection. */
@@ -457,59 +507,24 @@ export function selectOsmSpatialIndexes(
   const resolvedProfile: ResolvedOsmLoadProfile = spatialIndexes.nodes.includes("all")
     ? "full"
     : "view";
-  const selectedPeak = projectSelectionPeak(projection, spatialIndexes);
-  const devicePeakLimit = capabilities.deviceMemoryBytes
-    ? capabilities.deviceMemoryBytes * DEVICE_MEMORY_FRACTION
-    : Number.POSITIVE_INFINITY;
-  const typedPeakLimit = Math.min(ABSOLUTE_TYPED_ARRAY_PEAK_LIMIT, devicePeakLimit);
-  const bufferCeiling = activeBufferCeiling(capabilities);
-  const allocationLimit = bufferCeiling ? bufferCeiling * BUFFER_HEADROOM_FRACTION : undefined;
-  const diagnostics: OsmLoadDiagnostic[] = [
-    {
-      code: "explicit-spatial-index-selection",
-      level: "info",
-      message:
-        "An explicit spatial-index selection was supplied; profile defaults were not applied.",
-    },
-  ];
-  if (selectedPeak.projectedTypedArrayPeakBytes > typedPeakLimit) {
-    diagnostics.push({
-      code: "selected-typed-array-peak-limit",
-      level: "warning",
-      message: `The selected indexes may peak at ${formatMib(selectedPeak.projectedTypedArrayPeakBytes)}, above the ${formatMib(typedPeakLimit)} working-set guideline. The load will still be attempted.`,
-    });
-  }
-  if (
-    allocationLimit !== undefined &&
-    selectedPeak.largestPlannedAllocationBytes > allocationLimit
-  ) {
-    throw new OsmLoadCapacityError({
-      requestedProfile: resolvedProfile,
-      resolvedProfile,
-      requiredBytes: selectedPeak.largestPlannedAllocationBytes,
-      limitBytes: allocationLimit,
-      spatialIndexes,
-      suggestedProfile:
-        resolvedProfile === "full" &&
-        projection.profilePeaks.view.largestPlannedAllocationBytes <= allocationLimit
-          ? "view"
-          : undefined,
-    });
-  }
-  return {
+  return finalizeOsmLoadDecision({
     requestedProfile: resolvedProfile,
     resolvedProfile,
     spatialIndexes,
+    peakWarningSubject: "The selected indexes",
+    selectedPeak: projectSelectionPeak(projection, spatialIndexes),
     projection,
-    selectedPeak,
     capabilities,
-    limits: {
-      allNodeSpatialIndexBytes: ALL_NODE_SPATIAL_INDEX_LIMIT,
-      projectedTypedArrayPeakBytes: typedPeakLimit,
-      largestPlannedAllocationBytes: allocationLimit,
-    },
-    diagnostics,
-  };
+    limits: computeOsmLoadLimits(capabilities),
+    diagnostics: [
+      {
+        code: "explicit-spatial-index-selection",
+        level: "info",
+        message:
+          "An explicit spatial-index selection was supplied; profile defaults were not applied.",
+      },
+    ],
+  });
 }
 
 const loadDecisions = new WeakMap<Osm, OsmLoadDecision>();

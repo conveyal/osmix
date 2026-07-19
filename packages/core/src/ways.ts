@@ -53,14 +53,21 @@ export class Ways extends Entities<OsmWay> {
   private nodes: Nodes;
 
   private getNodeLonLat(refPosition: number): [number, number] {
+    const coordinate = this.tryGetNodeLonLat(refPosition);
+    if (!coordinate) {
+      throw Error(`Node ${this.getMissingRefId(refPosition)} not found for way geometry`);
+    }
+    return coordinate;
+  }
+
+  /** Resolve a reference position to coordinates, or null when the node is absent. */
+  private tryGetNodeLonLat(refPosition: number): [number, number] | null {
     const nodeIndex = this.refs.at(refPosition);
     if (nodeIndex !== MISSING_NODE_INDEX) {
       return this.nodes.getNodeLonLat({ index: nodeIndex });
     }
-    const id = this.getMissingRefId(refPosition);
-    const coordinate = this.nodes.getNodeLonLat({ id });
-    if (!coordinate) throw Error(`Node ${id} not found for way geometry`);
-    return coordinate;
+    // A missing ref may still resolve if the node was added after finalization.
+    return this.nodes.getNodeLonLat({ id: this.getMissingRefId(refPosition) });
   }
 
   /**
@@ -153,6 +160,11 @@ export class Ways extends Entities<OsmWay> {
 
   /**
    * Compact the internal arrays to free up memory.
+   *
+   * Must run after the node ID index is built (`Osm.buildIndexes()` orders
+   * nodes before ways) so pending OSM node IDs resolve to compact `Uint32`
+   * node indexes. If the node index is not ready, every pending ref degrades
+   * to the larger missing-ref representation (sentinel + sorted ID lookup).
    */
   buildEntityIndex() {
     this.refStart.compact();
@@ -164,6 +176,11 @@ export class Ways extends Entities<OsmWay> {
       );
       this.refs = RTA.from(Uint32Array, refsBuffer);
       const canResolveNodes = this.nodes.ids.isReady();
+      if (!canResolveNodes) {
+        console.warn(
+          "Ways.buildEntityIndex ran before the node index was ready; all way references will use the missing-ref representation.",
+        );
+      }
       for (let i = 0; i < this.pendingRefIds.length; i++) {
         const refId = this.pendingRefIds.at(i);
         const nodeIndex = canResolveNodes ? this.nodes.ids.getIndexFromId(refId) : -1;
@@ -205,7 +222,9 @@ export class Ways extends Entities<OsmWay> {
         maxX = this.bbox.at(i * 4 + 2);
         maxY = this.bbox.at(i * 4 + 3);
       } else {
-        // Calculate bbox from node coordinates
+        // Calculate bbox from resolvable node coordinates. Missing refs are
+        // preserved losslessly in storage but contribute no geometry; a way
+        // with no resolvable refs keeps an inverted bbox that never matches.
         minX = Number.POSITIVE_INFINITY;
         minY = Number.POSITIVE_INFINITY;
         maxX = Number.NEGATIVE_INFINITY;
@@ -213,7 +232,9 @@ export class Ways extends Entities<OsmWay> {
         const start = this.refStart.at(i);
         const count = this.refCount.at(i);
         for (let j = start; j < start + count; j++) {
-          const [lon, lat] = this.getNodeLonLat(j);
+          const coordinate = this.tryGetNodeLonLat(j);
+          if (!coordinate) continue;
+          const [lon, lat] = coordinate;
           if (lon < minX) minX = lon;
           if (lon > maxX) maxX = lon;
           if (lat < minY) minY = lat;
@@ -294,6 +315,8 @@ export class Ways extends Entities<OsmWay> {
 
   /**
    * Get the coordinates of a way as an array of [lon, lat] pairs.
+   * Throws when a referenced node cannot be resolved; use
+   * `getResolvedCoordinates()` for tolerant consumers such as bbox building.
    */
   getCoordinates(index: number): LonLat[] {
     const count = this.refCount.at(index);
@@ -306,11 +329,33 @@ export class Ways extends Entities<OsmWay> {
   }
 
   /**
+   * Get the resolvable coordinates of a way, skipping missing node refs.
+   * Preferred over `getCoordinates()` when partial geometry is acceptable,
+   * e.g. computing bounding boxes over referentially incomplete extracts.
+   */
+  getResolvedCoordinates(index: number): LonLat[] {
+    const count = this.refCount.at(index);
+    const start = this.refStart.at(index);
+    const coords: [number, number][] = [];
+    for (let refIndex = start; refIndex < start + count; refIndex++) {
+      const coordinate = this.tryGetNodeLonLat(refIndex);
+      if (coordinate) coords.push(coordinate);
+    }
+    return coords;
+  }
+
+  /**
    * Find way indexes that intersect a bounding box.
    */
   intersects(bbox: GeoBbox2D, filterFn?: (index: number) => boolean): number[] {
     if (this.size === 0) return [];
-    return this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3], filterFn);
+    // A way with no resolvable refs stores an inverted bbox. Flatbush's
+    // contained-node fast path skips per-leaf intersection tests, so filter
+    // inverted boxes out explicitly.
+    return this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3], (index, x0, _y0, x1) => {
+      if (x0 > x1) return false;
+      return filterFn ? filterFn(index) : true;
+    });
   }
 
   /**
