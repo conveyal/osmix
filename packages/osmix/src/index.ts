@@ -90,15 +90,29 @@ export type {
 } from "@osmix/change";
 
 // --- @osmix/core ---
-export { BufferConstructor, Nodes, Osm, Relations, Tags, Ways } from "@osmix/core";
+export {
+  BufferConstructor,
+  Nodes,
+  Osm,
+  OsmEntityIndexBuildError,
+  Relations,
+  SpatialIndexNotBuiltError,
+  Tags,
+  TypedBufferAllocationError,
+  Ways,
+} from "@osmix/core";
 export type {
+  BufferType,
+  NodeSpatialIndexKind,
   IdOrIndex,
+  OsmEntityIndexComponent,
   OsmInfo,
   OsmOptions,
   OsmReader,
   OsmTransferables,
   OsmWriter,
-  BufferType,
+  TypedBufferAllocationOperation,
+  TypedBufferType,
 } from "@osmix/core";
 
 // --- @osmix/geojson ---
@@ -144,14 +158,25 @@ export {
 export {
   CONVEYAL_EXTRACT_TAG_FILTERS,
   createExtract,
+  buildOsmSpatialIndexesForProfile,
+  buildSelectedOsmSpatialIndexes,
   entityMatchesTagRules,
   fromPbf,
+  getOsmLoadDecision,
+  getOsmStorableBufferBytes,
+  getOsmTypedBufferBytes,
   hasExtractTagFilter,
   nodeMatchesExtractTagRules,
   normalizeTagFilterRules,
+  OSM_LOAD_PROFILES,
+  OsmLoadCapacityError,
+  OsmSpatialIndexBuildError,
+  projectOsmLoad,
   readOsmPbfHeader,
   relationMatchesExtractTagRules,
   startCreateOsmFromPbf,
+  selectOsmLoadProfile,
+  selectOsmSpatialIndexes,
   tagRuleMatches,
   toPbfBuffer,
   toPbfStream,
@@ -162,7 +187,15 @@ export type {
   ExtractStrategy,
   ExtractTagFilterRule,
   ExtractTagFilterRules,
+  OsmLoadCapabilities,
+  OsmLoadDecision,
+  OsmLoadDiagnostic,
+  OsmLoadProfile,
+  OsmLoadProjection,
+  OsmLoadProfilePeak,
+  OsmSpatialIndexSelection,
   OsmFromPbfOptions,
+  ResolvedOsmLoadProfile,
 } from "@osmix/load";
 
 // --- @osmix/pbf ---

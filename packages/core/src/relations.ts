@@ -23,7 +23,7 @@ import { bboxFromLonLats } from "@osmix/types/utils";
 import Flatbush from "flatbush";
 import { around as geoAround } from "geoflatbush";
 
-import { Entities, type EntitiesTransferables } from "./entities.ts";
+import { Entities, type EntitiesTransferables, isValidSpatialBbox } from "./entities.ts";
 import { type IdOrIndex, Ids } from "./ids.ts";
 import type { Nodes } from "./nodes.ts";
 import type StringTable from "./stringtable.ts";
@@ -225,7 +225,11 @@ export class Relations extends Entities<OsmRelation> {
   buildSpatialIndex() {
     if (!this.nodes.isReady()) throw Error("Node index is not ready.");
     if (!this.ways.isReady()) throw Error("Way index is not ready.");
-    if (this.size === 0) return this.spatialIndex;
+    if (this.size === 0) {
+      this.spatialIndex = new Flatbush(1, 128, Float64Array, BufferConstructor);
+      this.spatialIndexBuilt = true;
+      return this.spatialIndex;
+    }
     console.time("RelationIndex.buildSpatialIndex");
 
     this.spatialIndex = new Flatbush(this.size, 128, Float64Array, BufferConstructor);
@@ -300,11 +304,12 @@ export class Relations extends Entities<OsmRelation> {
       if (ll) lls.push(ll);
     }
 
-    // Collect coordinates from resolved ways
+    // Collect coordinates from resolved ways. Member ways may reference nodes
+    // outside a referentially incomplete extract, so skip unresolvable refs.
     for (const wayId of resolved.ways) {
       const wayIndex = this.ways.ids.getIndexFromId(wayId);
       if (wayIndex === -1) continue;
-      const wayPositions = this.ways.getCoordinates(wayIndex);
+      const wayPositions = this.ways.getResolvedCoordinates(wayIndex);
       lls.push(...wayPositions);
     }
 
@@ -457,7 +462,13 @@ export class Relations extends Entities<OsmRelation> {
    */
   intersects(bbox: GeoBbox2D, filterFn?: (index: number) => boolean): number[] {
     if (this.size === 0) return [];
-    return this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3], filterFn);
+    // A relation with no resolvable member geometry stores an inverted bbox.
+    // Flatbush's contained-node fast path skips per-leaf intersection tests,
+    // so filter inverted boxes out explicitly.
+    return this.spatialIndex.search(bbox[0], bbox[1], bbox[2], bbox[3], (index, x0, y0, x1, y1) => {
+      if (!isValidSpatialBbox(x0, y0, x1, y1)) return false;
+      return filterFn ? filterFn(index) : true;
+    });
   }
 
   /**
@@ -471,7 +482,15 @@ export class Relations extends Entities<OsmRelation> {
   neighbors(lon: number, lat: number, maxResults?: number, maxDistanceKm?: number): number[] {
     if (this.size === 0) return [];
     // Use geoflatbush for proper geographic distance calculations
-    return geoAround(this.spatialIndex, lon, lat, maxResults, maxDistanceKm);
+    return geoAround(this.spatialIndex, lon, lat, maxResults, maxDistanceKm, (index) => {
+      const offset = index * 4;
+      return isValidSpatialBbox(
+        this.bbox.at(offset),
+        this.bbox.at(offset + 1),
+        this.bbox.at(offset + 2),
+        this.bbox.at(offset + 3),
+      );
+    });
   }
 
   /**

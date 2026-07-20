@@ -17,6 +17,11 @@ export type Progress = {
   msg: string;
   timestamp: number;
   level: ProgressLevel;
+  /**
+   * True when this message is one of a rapidly repeating series (e.g. per-block
+   * parse updates). Consumers may drop or rate-limit throttleable messages.
+   */
+  throttle?: boolean;
 };
 
 /** CustomEvent carrying progress details. */
@@ -26,11 +31,12 @@ export interface ProgressEvent extends CustomEvent<Progress> {}
  * Create a Progress payload with current timestamp.
  * @param msg - The progress message.
  */
-export function progress(msg: string, level: ProgressLevel = "info"): Progress {
+export function progress(msg: string, level: ProgressLevel = "info", throttle = false): Progress {
   return {
     msg,
     timestamp: Date.now(),
     level,
+    ...(throttle ? { throttle } : {}),
   };
 }
 
@@ -38,8 +44,12 @@ export function progress(msg: string, level: ProgressLevel = "info"): Progress {
  * Create a ProgressEvent with the given message.
  * @param msg - The progress message.
  */
-export function progressEvent(msg: string, level: ProgressLevel = "info"): ProgressEvent {
-  return new CustomEvent("progress", { detail: progress(msg, level) });
+export function progressEvent(
+  msg: string,
+  level: ProgressLevel = "info",
+  throttle = false,
+): ProgressEvent {
+  return new CustomEvent("progress", { detail: progress(msg, level, throttle) });
 }
 
 /**

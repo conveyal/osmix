@@ -66,7 +66,7 @@ export default function Merge() {
       void osmWorker.getMostRecentlyUsed().then((mostRecent) => {
         if (mostRecent) {
           void base.loadFromStorage(mostRecent.fileHash).then((osmInfo) => {
-            flyToOsmBounds(osmInfo);
+            if (osmInfo) flyToOsmBounds(osmInfo);
           });
         }
       });
@@ -104,7 +104,7 @@ export default function Merge() {
         typeof file === "string"
           ? await base.loadFromStorage(file, abortController.signal)
           : await base.loadOsmFile(file, fileType, abortController.signal);
-      flyToOsmBounds(osmInfo);
+      if (osmInfo) flyToOsmBounds(osmInfo);
       return osmInfo;
     } finally {
       setLoadingState(null);

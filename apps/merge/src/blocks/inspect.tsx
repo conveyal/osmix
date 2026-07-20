@@ -7,6 +7,7 @@ import { Suspense, useMemo } from "react";
 import ActionButton from "../components/action-button";
 import { Details, DetailsContent, DetailsSummary } from "../components/details";
 import ExtractList from "../components/extract-list";
+import { FullIndexRequired, hasFullNodeIndex } from "../components/full-index-required";
 import ChangesSummary, {
   ChangesFilters,
   ChangesList,
@@ -58,13 +59,28 @@ export default function InspectBlock({
           Select an OSM file to inspect, or extract a region on the Extract tab.
         </EmptyState>
         <ExtractList
-          openOsmFile={async (file) => {
-            const osmInfo = await openOsmFile(file);
+          openOsmPbfUrl={async (url) => {
+            const osmInfo = await baseOsm.loadOsmPbfUrl(url);
+            if (osmInfo) flyToOsmBounds(osmInfo);
             return osmInfo;
           }}
         />
         <StoredOsmList
           osmKey={BASE_OSM_KEY}
+          loadFailure={baseOsm.loadFailure}
+          onDismissLoadFailure={baseOsm.clearLoadFailure}
+          onReloadView={baseOsm.reloadWithViewProfile}
+          openOsmPbfUrl={async (url) => {
+            const abortController = new AbortController();
+            setLoadingState({ controller: abortController, osmKey: BASE_OSM_KEY });
+            try {
+              const osmInfo = await baseOsm.loadOsmPbfUrl(url, abortController.signal);
+              if (osmInfo) flyToOsmBounds(osmInfo);
+              return osmInfo;
+            } finally {
+              setLoadingState(null);
+            }
+          }}
           openOsmFile={async (file) => {
             const abortController = new AbortController();
             setLoadingState({
@@ -89,7 +105,9 @@ export default function InspectBlock({
 
   return (
     <div className="flex flex-1 flex-col gap-4">
+      <FullIndexRequired operation="Duplicate detection" osmFile={baseOsm} />
       <ActionButton
+        disabled={!hasFullNodeIndex(baseOsm.osmInfo)}
         onAction={async () => {
           if (!baseOsm.osm) throw Error("Osm has not been loaded.");
           const changes = await osmWorker.generateChangeset(baseOsm.osm.id, baseOsm.osm.id, {

@@ -85,7 +85,7 @@ function OsmFileCard({ osmFile, onClear }: OsmFileCardProps) {
           >
             {layersVisible ? <EyeIcon /> : <EyeOffIcon />}
           </Button>
-          {!osmFile.isStored && (
+          {!osmFile.isStored && osmFile.canStore && (
             <ActionButton
               onAction={osmFile.saveToStorage}
               variant="ghost"

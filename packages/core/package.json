@@ -26,9 +26,7 @@
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
     "flatbush": "^4.6.2",
-    "geoflatbush": "^2.2.1",
-    "geokdbush": "^2.1.0",
-    "kdbush": "^4.1.0"
+    "geoflatbush": "^2.2.1"
   },
   "devDependencies": {
     "@osmix/pbf": "workspace:*",

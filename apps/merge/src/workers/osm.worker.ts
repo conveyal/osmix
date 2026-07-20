@@ -7,29 +7,53 @@
  */
 
 import { expose } from "comlink";
+import { createSHA256 } from "hash-wasm";
 import { type DBSchema, type IDBPDatabase, openDB } from "idb";
-import type { BufferType, OsmInfo, OsmTransferables } from "osmix";
-import { canShareArrayBuffers, Osm } from "osmix";
+import type {
+  BufferType,
+  OsmFromPbfOptions,
+  OsmInfo,
+  OsmLoadDecision,
+  OsmTransferables,
+} from "osmix";
+import {
+  buildOsmSpatialIndexesForProfile,
+  buildSelectedOsmSpatialIndexes,
+  canShareArrayBuffers,
+  getOsmStorableBufferBytes,
+  Osm,
+} from "osmix";
 import { OsmixWorker } from "osmix";
 
 import { DB_NAME, DB_VERSION, OSM_STORE, STORAGE_CHANNEL } from "../settings";
+import { hashStreamIncrementally } from "./incremental-hash";
+import { type OsmSchemaUpgradeDatabase, upgradeOsmStore } from "./storage-schema";
 
 /** File metadata stored alongside Osm data */
 export interface StoredFileInfo {
   fileHash: string;
   fileName: string;
   fileSize: number;
+  sourceUrl?: string;
 }
 
 export interface StoredOsmEntry extends StoredFileInfo {
   info: OsmInfo;
   storedAt: number;
   lastAccessedAt: number;
+  loadDecision: OsmLoadDecision | null;
+  storedBytes: number;
 }
 
 export interface StoredOsm extends StoredOsmEntry, OsmTransferables<ArrayBuffer> {}
 
-interface OsmixDB extends DBSchema {
+export interface PbfUrlLoadResult {
+  info: OsmInfo;
+  fileInfo: StoredFileInfo;
+  existing: StoredOsmEntry | null;
+}
+
+export interface OsmixDB extends DBSchema {
   [OSM_STORE]: {
     key: string;
     value: StoredOsm;
@@ -41,6 +65,27 @@ interface OsmixDB extends DBSchema {
   };
 }
 
+function pbfFileName(response: Response, inputUrl: string): string {
+  const disposition = response.headers.get("content-disposition");
+  const dispositionMatch = disposition?.match(/filename\*?=(?:UTF-8''|["'])?([^"';]+)/i);
+  let name = dispositionMatch?.[1];
+  if (name) {
+    try {
+      name = decodeURIComponent(name);
+    } catch {
+      // Keep the server-provided spelling when it is not URI encoded.
+    }
+  }
+  if (!name) {
+    const segment = new URL(inputUrl).pathname.split("/").filter(Boolean).at(-1);
+    name = segment ? decodeURIComponent(segment) : "download.osm.pbf";
+  }
+  if (!name.toLowerCase().endsWith(".pbf")) {
+    throw new Error(`URL must resolve to an OSM PBF file (got "${name}").`);
+  }
+  return name;
+}
+
 /**
  * Extended worker with IndexedDB storage capabilities.
  * All heavy operations (hashing, storage, loading) run off the main thread.
@@ -48,6 +93,7 @@ interface OsmixDB extends DBSchema {
 export class MergeWorker extends OsmixWorker {
   private dbPromise: Promise<IDBPDatabase<OsmixDB>> | null = null;
   private broadcastChannel = new BroadcastChannel(STORAGE_CHANNEL);
+  private hashControllers = new Map<string, AbortController>();
 
   constructor() {
     super();
@@ -61,20 +107,8 @@ export class MergeWorker extends OsmixWorker {
   private async getDB(): Promise<IDBPDatabase<OsmixDB>> {
     if (!this.dbPromise) {
       this.dbPromise = openDB<OsmixDB>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, _newVersion, transaction) {
-          if (oldVersion < 1) {
-            // Fresh install: create store with all indexes
-            const store = db.createObjectStore(OSM_STORE, {
-              keyPath: "fileHash",
-            });
-            store.createIndex("by-stored-at", "storedAt");
-            store.createIndex("by-hash", "fileHash");
-            store.createIndex("by-last-accessed", "lastAccessedAt");
-          } else if (oldVersion < 2) {
-            // Upgrade from v1: add lastAccessedAt index
-            const store = transaction.objectStore(OSM_STORE);
-            store.createIndex("by-last-accessed", "lastAccessedAt");
-          }
+        upgrade(db, oldVersion) {
+          upgradeOsmStore(db as unknown as OsmSchemaUpgradeDatabase, oldVersion);
         },
       });
     }
@@ -96,6 +130,81 @@ export class MergeWorker extends OsmixWorker {
       .join("");
   }
 
+  /** Compute SHA-256 incrementally without materializing the complete input. */
+  async hashStream(stream: ReadableStream<Uint8Array>, taskId?: string): Promise<string> {
+    const controller = new AbortController();
+    if (taskId) {
+      this.hashControllers.get(taskId)?.abort();
+      this.hashControllers.set(taskId, controller);
+    }
+    try {
+      return await hashStreamIncrementally(stream, { signal: controller.signal });
+    } finally {
+      if (taskId && this.hashControllers.get(taskId) === controller) {
+        this.hashControllers.delete(taskId);
+      }
+    }
+  }
+
+  /** Hash a browser File by consuming File.stream() inside the worker. */
+  hashFile(file: File, taskId?: string): Promise<string> {
+    return this.hashStream(file.stream(), taskId);
+  }
+
+  /** Cancel an in-flight incremental hash operation. */
+  cancelHash(taskId: string): void {
+    this.hashControllers.get(taskId)?.abort();
+  }
+
+  /** Fetch, hash, and parse a PBF in one streaming pass inside this worker. */
+  async fromPbfUrl({
+    url,
+    options = {},
+  }: {
+    url: string;
+    options?: Partial<OsmFromPbfOptions>;
+  }): Promise<PbfUrlLoadResult> {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch (${response.status}) ${response.statusText}`);
+    }
+    if (!response.body) throw new Error("The PBF response did not include a readable body.");
+    const fileName = pbfFileName(response, url);
+    const hasher = await createSHA256();
+    hasher.init();
+    let fileSize = 0;
+    const hashingStream = new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        hasher.update(chunk);
+        fileSize += chunk.byteLength;
+        controller.enqueue(chunk);
+      },
+    });
+    const provisionalId = `pbf-url-${crypto.randomUUID()}`;
+    try {
+      await super.fromPbf({
+        data: response.body.pipeThrough(hashingStream),
+        options: { ...options, id: provisionalId },
+      });
+      const fileHash = hasher.digest("hex");
+      const provisional = this.get(provisionalId);
+      const loadDecision = this.getLoadDecision(provisionalId);
+      const osm = new Osm({ ...provisional.transferables(), id: fileHash });
+      this.delete(provisionalId);
+      this.set(fileHash, osm);
+      this.setLoadDecision(fileHash, loadDecision);
+      const existing = await this.findByHash(fileHash);
+      return {
+        info: osm.info(),
+        fileInfo: { fileHash, fileName, fileSize, sourceUrl: url },
+        existing,
+      };
+    } catch (error) {
+      this.delete(provisionalId);
+      throw error;
+    }
+  }
+
   /**
    * Find a stored entry by file hash.
    * Returns the stored entry metadata if found, null otherwise.
@@ -111,6 +220,9 @@ export class MergeWorker extends OsmixWorker {
       fileHash: stored.fileHash,
       fileName: stored.fileName,
       fileSize: stored.fileSize,
+      sourceUrl: stored.sourceUrl,
+      loadDecision: stored.loadDecision ?? null,
+      storedBytes: stored.storedBytes,
     };
   }
 
@@ -122,6 +234,8 @@ export class MergeWorker extends OsmixWorker {
     const osm = this.get(osmId);
     const transferables = osm.transferables();
     const info = osm.info();
+    const loadDecision = this.getLoadDecision(osmId);
+    const storedBytes = getOsmStorableBufferBytes(osm);
     const db = await this.getDB();
     const now = Date.now();
 
@@ -133,6 +247,9 @@ export class MergeWorker extends OsmixWorker {
       fileHash: fileInfo.fileHash,
       fileName: fileInfo.fileName,
       fileSize: fileInfo.fileSize,
+      sourceUrl: fileInfo.sourceUrl,
+      loadDecision,
+      storedBytes,
     });
     this.notifyStorageChange();
   }
@@ -164,22 +281,30 @@ export class MergeWorker extends OsmixWorker {
 
     // Convert from storage format and reconstruct Osm
     const transferables = fromStorableTransferables(stored);
-    const osm = new Osm({ ...transferables, id: targetId ?? stored.fileHash });
-    osm.buildSpatialIndexes();
+    const osmId = targetId ?? stored.fileHash;
+    const osm = new Osm({ ...transferables, id: osmId });
+    const loadDecision = stored.loadDecision ?? null;
+    if (loadDecision) buildSelectedOsmSpatialIndexes(osm, loadDecision.spatialIndexes);
+    else buildOsmSpatialIndexesForProfile(osm, "full");
 
     // Register in worker (this also creates VT encoder and rebuilds routing graph if exists)
-    this.set(osm.id, osm);
+    this.set(osmId, osm);
+    this.setLoadDecision(osmId, loadDecision);
+    const info = osm.info();
 
     return {
       entry: {
-        info: stored.info,
+        info,
         storedAt: stored.storedAt,
         lastAccessedAt: now,
         fileHash: stored.fileHash,
         fileName: stored.fileName,
         fileSize: stored.fileSize,
+        sourceUrl: stored.sourceUrl,
+        loadDecision,
+        storedBytes: stored.storedBytes,
       },
-      info: stored.info,
+      info,
     };
   }
 
@@ -198,6 +323,9 @@ export class MergeWorker extends OsmixWorker {
         fileHash: stored.fileHash,
         fileName: stored.fileName,
         fileSize: stored.fileSize,
+        sourceUrl: stored.sourceUrl,
+        loadDecision: stored.loadDecision ?? null,
+        storedBytes: stored.storedBytes,
       }))
       .sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
   }
@@ -232,11 +360,13 @@ export class MergeWorker extends OsmixWorker {
   async getStorageStats(): Promise<{ count: number; estimatedBytes: number }> {
     const db = await this.getDB();
     const all = await db.getAll(OSM_STORE);
-    let estimatedBytes = 0;
-    for (const t of all) {
-      estimatedBytes += collectBuffers(t).reduce((acc, buffer) => acc + buffer.byteLength, 0);
-    }
+    const estimatedBytes = all.reduce((total, stored) => total + stored.storedBytes, 0);
     return { count: all.length, estimatedBytes };
+  }
+
+  /** Exact buffer payload that would be persisted, excluding rebuildable spatial indexes. */
+  getStorableByteLength(osmId: string): number {
+    return getOsmStorableBufferBytes(this.get(osmId));
   }
 
   /**
@@ -266,6 +396,9 @@ export class MergeWorker extends OsmixWorker {
       fileHash: mostRecent.fileHash,
       fileName: mostRecent.fileName,
       fileSize: mostRecent.fileSize,
+      sourceUrl: mostRecent.sourceUrl,
+      loadDecision: mostRecent.loadDecision ?? null,
+      storedBytes: mostRecent.storedBytes,
     };
   }
 }
@@ -300,68 +433,87 @@ function toSharedArrayBuffer(buffer: ArrayBuffer): BufferType {
   return copy;
 }
 
+/** The ID and tag buffers shared by every entity collection's transferables. */
+interface SharedEntityTransferables<B> {
+  ids: B;
+  sortedIds?: B;
+  sortedIdPositionToIndex?: B;
+  anchors: B;
+  idsAreSorted: boolean;
+  tagEntityCount: number;
+  taggedEntityBits: B;
+  tagRankCheckpoints: B;
+  tagOffsets: B;
+  tagKeys: B;
+  tagVals: B;
+  keyEntities: B;
+  keyIndexStart: B;
+  keyIndexCount: B;
+}
+
+/**
+ * Map the buffers shared by node, way, and relation transferables through one
+ * converter. Keeping a single field list prevents the storable and runtime
+ * conversions from drifting apart when the transfer schema changes.
+ */
+function convertEntityTransferables<In, Out>(
+  t: SharedEntityTransferables<In>,
+  convert: (buffer: In) => Out,
+): SharedEntityTransferables<Out> {
+  return {
+    ids: convert(t.ids),
+    ...(t.sortedIds !== undefined ? { sortedIds: convert(t.sortedIds) } : {}),
+    ...(t.sortedIdPositionToIndex !== undefined
+      ? { sortedIdPositionToIndex: convert(t.sortedIdPositionToIndex) }
+      : {}),
+    anchors: convert(t.anchors),
+    idsAreSorted: t.idsAreSorted,
+    tagEntityCount: t.tagEntityCount,
+    taggedEntityBits: convert(t.taggedEntityBits),
+    tagRankCheckpoints: convert(t.tagRankCheckpoints),
+    tagOffsets: convert(t.tagOffsets),
+    tagKeys: convert(t.tagKeys),
+    tagVals: convert(t.tagVals),
+    keyEntities: convert(t.keyEntities),
+    keyIndexStart: convert(t.keyIndexStart),
+    keyIndexCount: convert(t.keyIndexCount),
+  };
+}
+
 /**
  * Convert OsmTransferables to a storable format with regular ArrayBuffers.
  * Spatial indexes are excluded since they can be rebuilt from the data.
  */
 function toStorableTransferables(t: OsmTransferables): OsmTransferables<ArrayBuffer> {
   return {
+    transferVersion: t.transferVersion,
+    contentHashVersion: t.contentHashVersion,
     id: t.id,
     header: t.header,
     contentHash: t.contentHash,
+    ...(t.loadDiagnostics ? { loadDiagnostics: t.loadDiagnostics } : {}),
     stringTable: {
       bytes: toArrayBuffer(t.stringTable.bytes),
       start: toArrayBuffer(t.stringTable.start),
       count: toArrayBuffer(t.stringTable.count),
     },
     nodes: {
-      ids: toArrayBuffer(t.nodes.ids),
-      sortedIds: toArrayBuffer(t.nodes.sortedIds),
-      sortedIdPositionToIndex: toArrayBuffer(t.nodes.sortedIdPositionToIndex),
-      anchors: toArrayBuffer(t.nodes.anchors),
-      idsAreSorted: t.nodes.idsAreSorted,
-      tagStart: toArrayBuffer(t.nodes.tagStart),
-      tagCount: toArrayBuffer(t.nodes.tagCount),
-      tagKeys: toArrayBuffer(t.nodes.tagKeys),
-      tagVals: toArrayBuffer(t.nodes.tagVals),
-      keyEntities: toArrayBuffer(t.nodes.keyEntities),
-      keyIndexStart: toArrayBuffer(t.nodes.keyIndexStart),
-      keyIndexCount: toArrayBuffer(t.nodes.keyIndexCount),
+      ...convertEntityTransferables(t.nodes, toArrayBuffer),
       lons: toArrayBuffer(t.nodes.lons),
       lats: toArrayBuffer(t.nodes.lats),
       bbox: t.nodes.bbox,
     },
     ways: {
-      ids: toArrayBuffer(t.ways.ids),
-      sortedIds: toArrayBuffer(t.ways.sortedIds),
-      sortedIdPositionToIndex: toArrayBuffer(t.ways.sortedIdPositionToIndex),
-      anchors: toArrayBuffer(t.ways.anchors),
-      idsAreSorted: t.ways.idsAreSorted,
-      tagStart: toArrayBuffer(t.ways.tagStart),
-      tagCount: toArrayBuffer(t.ways.tagCount),
-      tagKeys: toArrayBuffer(t.ways.tagKeys),
-      tagVals: toArrayBuffer(t.ways.tagVals),
-      keyEntities: toArrayBuffer(t.ways.keyEntities),
-      keyIndexStart: toArrayBuffer(t.ways.keyIndexStart),
-      keyIndexCount: toArrayBuffer(t.ways.keyIndexCount),
+      ...convertEntityTransferables(t.ways, toArrayBuffer),
       refStart: toArrayBuffer(t.ways.refStart),
       refCount: toArrayBuffer(t.ways.refCount),
       refs: toArrayBuffer(t.ways.refs),
+      missingRefPositions: toArrayBuffer(t.ways.missingRefPositions),
+      missingRefIds: toArrayBuffer(t.ways.missingRefIds),
       bbox: toArrayBuffer(t.ways.bbox),
     },
     relations: {
-      ids: toArrayBuffer(t.relations.ids),
-      sortedIds: toArrayBuffer(t.relations.sortedIds),
-      sortedIdPositionToIndex: toArrayBuffer(t.relations.sortedIdPositionToIndex),
-      anchors: toArrayBuffer(t.relations.anchors),
-      idsAreSorted: t.relations.idsAreSorted,
-      tagStart: toArrayBuffer(t.relations.tagStart),
-      tagCount: toArrayBuffer(t.relations.tagCount),
-      tagKeys: toArrayBuffer(t.relations.tagKeys),
-      tagVals: toArrayBuffer(t.relations.tagVals),
-      keyEntities: toArrayBuffer(t.relations.keyEntities),
-      keyIndexStart: toArrayBuffer(t.relations.keyIndexStart),
-      keyIndexCount: toArrayBuffer(t.relations.keyIndexCount),
+      ...convertEntityTransferables(t.relations, toArrayBuffer),
       memberStart: toArrayBuffer(t.relations.memberStart),
       memberCount: toArrayBuffer(t.relations.memberCount),
       memberRefs: toArrayBuffer(t.relations.memberRefs),
@@ -378,62 +530,34 @@ function toStorableTransferables(t: OsmTransferables): OsmTransferables<ArrayBuf
  */
 function fromStorableTransferables(t: OsmTransferables<ArrayBuffer>): OsmTransferables<BufferType> {
   return {
+    transferVersion: t.transferVersion,
+    contentHashVersion: t.contentHashVersion,
     id: t.id,
     header: t.header,
     contentHash: t.contentHash,
+    ...(t.loadDiagnostics ? { loadDiagnostics: t.loadDiagnostics } : {}),
     stringTable: {
       bytes: toSharedArrayBuffer(t.stringTable.bytes),
       start: toSharedArrayBuffer(t.stringTable.start),
       count: toSharedArrayBuffer(t.stringTable.count),
     },
     nodes: {
-      ids: toSharedArrayBuffer(t.nodes.ids),
-      sortedIds: toSharedArrayBuffer(t.nodes.sortedIds),
-      sortedIdPositionToIndex: toSharedArrayBuffer(t.nodes.sortedIdPositionToIndex),
-      anchors: toSharedArrayBuffer(t.nodes.anchors),
-      idsAreSorted: t.nodes.idsAreSorted,
-      tagStart: toSharedArrayBuffer(t.nodes.tagStart),
-      tagCount: toSharedArrayBuffer(t.nodes.tagCount),
-      tagKeys: toSharedArrayBuffer(t.nodes.tagKeys),
-      tagVals: toSharedArrayBuffer(t.nodes.tagVals),
-      keyEntities: toSharedArrayBuffer(t.nodes.keyEntities),
-      keyIndexStart: toSharedArrayBuffer(t.nodes.keyIndexStart),
-      keyIndexCount: toSharedArrayBuffer(t.nodes.keyIndexCount),
+      ...convertEntityTransferables(t.nodes, toSharedArrayBuffer),
       lons: toSharedArrayBuffer(t.nodes.lons),
       lats: toSharedArrayBuffer(t.nodes.lats),
       bbox: t.nodes.bbox,
     },
     ways: {
-      ids: toSharedArrayBuffer(t.ways.ids),
-      sortedIds: toSharedArrayBuffer(t.ways.sortedIds),
-      sortedIdPositionToIndex: toSharedArrayBuffer(t.ways.sortedIdPositionToIndex),
-      anchors: toSharedArrayBuffer(t.ways.anchors),
-      idsAreSorted: t.ways.idsAreSorted,
-      tagStart: toSharedArrayBuffer(t.ways.tagStart),
-      tagCount: toSharedArrayBuffer(t.ways.tagCount),
-      tagKeys: toSharedArrayBuffer(t.ways.tagKeys),
-      tagVals: toSharedArrayBuffer(t.ways.tagVals),
-      keyEntities: toSharedArrayBuffer(t.ways.keyEntities),
-      keyIndexStart: toSharedArrayBuffer(t.ways.keyIndexStart),
-      keyIndexCount: toSharedArrayBuffer(t.ways.keyIndexCount),
+      ...convertEntityTransferables(t.ways, toSharedArrayBuffer),
       refStart: toSharedArrayBuffer(t.ways.refStart),
       refCount: toSharedArrayBuffer(t.ways.refCount),
       refs: toSharedArrayBuffer(t.ways.refs),
+      missingRefPositions: toSharedArrayBuffer(t.ways.missingRefPositions),
+      missingRefIds: toSharedArrayBuffer(t.ways.missingRefIds),
       bbox: toSharedArrayBuffer(t.ways.bbox),
     },
     relations: {
-      ids: toSharedArrayBuffer(t.relations.ids),
-      sortedIds: toSharedArrayBuffer(t.relations.sortedIds),
-      sortedIdPositionToIndex: toSharedArrayBuffer(t.relations.sortedIdPositionToIndex),
-      anchors: toSharedArrayBuffer(t.relations.anchors),
-      idsAreSorted: t.relations.idsAreSorted,
-      tagStart: toSharedArrayBuffer(t.relations.tagStart),
-      tagCount: toSharedArrayBuffer(t.relations.tagCount),
-      tagKeys: toSharedArrayBuffer(t.relations.tagKeys),
-      tagVals: toSharedArrayBuffer(t.relations.tagVals),
-      keyEntities: toSharedArrayBuffer(t.relations.keyEntities),
-      keyIndexStart: toSharedArrayBuffer(t.relations.keyIndexStart),
-      keyIndexCount: toSharedArrayBuffer(t.relations.keyIndexCount),
+      ...convertEntityTransferables(t.relations, toSharedArrayBuffer),
       memberStart: toSharedArrayBuffer(t.relations.memberStart),
       memberCount: toSharedArrayBuffer(t.relations.memberCount),
       memberRefs: toSharedArrayBuffer(t.relations.memberRefs),
@@ -442,20 +566,6 @@ function fromStorableTransferables(t: OsmTransferables<ArrayBuffer>): OsmTransfe
       bbox: toSharedArrayBuffer(t.relations.bbox),
     },
   };
-}
-
-/**
- * Collect all ArrayBuffer objects from a structure for size estimation.
- */
-function collectBuffers(t: unknown): ArrayBuffer[] {
-  const buffers: ArrayBuffer[] = [];
-  if (t instanceof ArrayBuffer) return [t];
-  if (t != null && typeof t === "object") {
-    for (const item of Object.values(t)) {
-      buffers.push(...collectBuffers(item));
-    }
-  }
-  return buffers;
 }
 
 expose(new MergeWorker());

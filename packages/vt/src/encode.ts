@@ -132,7 +132,9 @@ export class OsmixVtEncoder {
   }
 
   *nodeFeatures(bbox: GeoBbox2D, proj: (ll: LonLat) => XY): Generator<VtSimpleFeature> {
-    const nodeIndexes = this.osm.nodes.findIndexesWithinBbox(bbox);
+    const nodeIndexes = this.osm.nodes.hasSpatialIndex("tagged")
+      ? this.osm.nodes.findTaggedIndexesWithinBbox(bbox)
+      : this.osm.nodes.findIndexesWithinBbox(bbox);
     for (let i = 0; i < nodeIndexes.length; i++) {
       const nodeIndex = nodeIndexes[i];
       if (nodeIndex === undefined) continue;

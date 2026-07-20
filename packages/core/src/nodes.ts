@@ -1,16 +1,32 @@
-import { microToDegrees, toMicroDegrees } from "@osmix/geo/coordinates";
+import { microToDegrees, OSM_COORD_SCALE, toMicroDegrees } from "@osmix/geo/coordinates";
 import type { OsmPbfBlock, OsmPbfDenseNodes } from "@osmix/pbf";
 import { assertValue } from "@osmix/shared/assert";
 import type { ContentHasher } from "@osmix/shared/content-hasher";
 import type { GeoBbox2D, OsmNode, OsmTags } from "@osmix/types";
-import { around as geoAround } from "geokdbush";
-import KDBush from "kdbush";
 
 import { Entities, type EntitiesTransferables } from "./entities.ts";
 import { type IdOrIndex, Ids } from "./ids.ts";
+import { IndirectKdIndex } from "./indirect-kd-index.ts";
 import type StringTable from "./stringtable.ts";
 import { Tags } from "./tags.ts";
-import { BufferConstructor, type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts";
+import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts";
+
+const EARTH_RADIUS_KM = 6371.0088;
+const COORDINATE_PADDING_DEGREES = 1 / OSM_COORD_SCALE;
+
+export type NodeSpatialIndexKind = "all" | "tagged";
+
+export class SpatialIndexNotBuiltError extends Error {
+  readonly code = "SPATIAL_INDEX_NOT_BUILT";
+  readonly entityType = "node";
+  readonly indexKind: NodeSpatialIndexKind;
+
+  constructor(indexKind: NodeSpatialIndexKind) {
+    super(`The ${indexKind} node spatial index has not been built.`);
+    this.name = "SpatialIndexNotBuiltError";
+    this.indexKind = indexKind;
+  }
+}
 
 export interface NodesTransferables<
   T extends BufferType = BufferType,
@@ -18,8 +34,10 @@ export interface NodesTransferables<
   lons: T;
   lats: T;
   bbox: GeoBbox2D;
-  /** Optional - can be rebuilt via buildSpatialIndex() */
-  spatialIndex?: T;
+  /** Optional all-node Uint32 permutation; can be rebuilt via buildSpatialIndex("all"). */
+  allSpatialIndex?: T;
+  /** Optional tagged-node Uint32 permutation; can be rebuilt via buildSpatialIndex("tagged"). */
+  taggedSpatialIndex?: T;
 }
 
 export interface AddNodeOptions {
@@ -33,17 +51,15 @@ export class Nodes extends Entities<OsmNode> {
    */
   private lons: RTA<Int32Array>;
   private lats: RTA<Int32Array>;
-  // Bbox stored in microdegrees internally
+  // Bounding box is exposed and transferred in degrees.
   private bbox: [minLon: number, minLat: number, maxLon: number, maxLat: number] = [
     Number.MAX_SAFE_INTEGER,
     Number.MAX_SAFE_INTEGER,
     Number.MIN_SAFE_INTEGER,
     Number.MIN_SAFE_INTEGER,
   ];
-  // Spatial index stores coordinates in degrees (Float64Array) for geokdbush compatibility
-  private spatialIndex: KDBush = new KDBush(0, 128, Float64Array, BufferConstructor);
-  // Track if spatial index was properly built (vs default empty)
-  private spatialIndexBuilt = false;
+  private allSpatialIndex?: IndirectKdIndex;
+  private taggedSpatialIndex?: IndirectKdIndex;
 
   /**
    * Create a new Nodes index.
@@ -53,10 +69,19 @@ export class Nodes extends Entities<OsmNode> {
       super("node", new Ids(transferables), new Tags(stringTable, transferables));
       this.lons = RTA.from(Int32Array, transferables.lons);
       this.lats = RTA.from(Int32Array, transferables.lats);
-      // Only load spatial index if provided (not stored in IndexedDB)
-      if (transferables.spatialIndex?.byteLength) {
-        this.spatialIndex = KDBush.from(transferables.spatialIndex);
-        this.spatialIndexBuilt = true;
+      if (transferables.allSpatialIndex !== undefined) {
+        this.allSpatialIndex = IndirectKdIndex.from(
+          this.lons.array,
+          this.lats.array,
+          transferables.allSpatialIndex,
+        );
+      }
+      if (transferables.taggedSpatialIndex !== undefined) {
+        this.taggedSpatialIndex = IndirectKdIndex.from(
+          this.lons.array,
+          this.lats.array,
+          transferables.taggedSpatialIndex,
+        );
       }
       this.bbox = transferables.bbox;
       this.indexBuilt = true;
@@ -64,8 +89,6 @@ export class Nodes extends Entities<OsmNode> {
       super("node", new Ids(), new Tags(stringTable));
       this.lons = new RTA(Int32Array);
       this.lats = new RTA(Int32Array);
-      // Spatial index uses Float64Array with degrees for geokdbush compatibility
-      this.spatialIndex = new KDBush(0, 128, Float64Array, BufferConstructor);
     }
   }
 
@@ -191,29 +214,54 @@ export class Nodes extends Entities<OsmNode> {
   }
 
   /**
-   * Build the spatial index for nodes.
-   * Spatial index stores degrees (Float64Array) for geokdbush compatibility.
+   * Build one of the independent node spatial indexes.
    */
-  buildSpatialIndex() {
-    console.time("NodeIndex.buildSpatialIndex");
-    // Use Float64Array with degrees for geokdbush geographic queries
-    this.spatialIndex = new KDBush(this.size, 64, Float64Array, BufferConstructor);
-    for (let i = 0; i < this.size; i++) {
-      // Convert microdegrees to degrees for spatial index
-      const lon = microToDegrees(this.lons.at(i));
-      const lat = microToDegrees(this.lats.at(i));
-      this.spatialIndex.add(lon, lat);
+  buildSpatialIndex(kind: NodeSpatialIndexKind = "all") {
+    if (this.hasSpatialIndex(kind)) return;
+
+    console.time(`NodeIndex.buildSpatialIndex.${kind}`);
+    if (kind === "all") {
+      this.allSpatialIndex = IndirectKdIndex.build(
+        this.lons.array,
+        this.lats.array,
+        this.size,
+        (indexes) => {
+          for (let i = 0; i < indexes.length; i++) indexes[i] = i;
+        },
+      );
+    } else {
+      this.taggedSpatialIndex = IndirectKdIndex.build(
+        this.lons.array,
+        this.lats.array,
+        this.taggedSize,
+        (indexes) => {
+          let position = 0;
+          for (const entityIndex of this.tags.taggedEntityIndexes()) {
+            indexes[position++] = entityIndex;
+          }
+          if (position !== indexes.length) {
+            throw new Error(
+              `Expected ${indexes.length} tagged nodes while building index, received ${position}`,
+            );
+          }
+        },
+      );
     }
-    this.spatialIndex.finish();
-    this.spatialIndexBuilt = true;
-    console.timeEnd("NodeIndex.buildSpatialIndex");
+    console.timeEnd(`NodeIndex.buildSpatialIndex.${kind}`);
   }
 
   /**
    * Check if the spatial index has been built.
    */
-  hasSpatialIndex(): boolean {
-    return this.spatialIndexBuilt;
+  hasSpatialIndex(kind: NodeSpatialIndexKind = "all"): boolean {
+    return kind === "all"
+      ? this.allSpatialIndex !== undefined
+      : this.taggedSpatialIndex !== undefined;
+  }
+
+  /** Number of nodes that carry at least one tag. */
+  get taggedSize(): number {
+    return this.tags.taggedEntityCount;
   }
 
   /**
@@ -270,21 +318,42 @@ export class Nodes extends Entities<OsmNode> {
    * Find node indexes within a bounding box.
    */
   findIndexesWithinBbox(bbox: GeoBbox2D): number[] {
-    // Spatial index stores degrees, so query with degrees directly
-    return this.spatialIndex.range(bbox[0], bbox[1], bbox[2], bbox[3]);
+    return findIndexesWithinBbox(this.getSpatialIndex("all"), bbox);
+  }
+
+  /** Find tagged node indexes within a bounding box. */
+  findTaggedIndexesWithinBbox(bbox: GeoBbox2D): number[] {
+    return findIndexesWithinBbox(this.getSpatialIndex("tagged"), bbox);
   }
 
   /**
    * Find node indexes within a radius of a point.
-   * Uses geokdbush for proper great-circle distance calculations.
+   * Uses an exact haversine-distance filter over a conservative KD bbox query.
    * @param lon - Longitude in degrees.
    * @param lat - Latitude in degrees.
    * @param radiusKm - Radius in kilometers.
    * @returns Array of node indexes within the radius.
    */
   findIndexesWithinRadius(lon: number, lat: number, radiusKm: number): number[] {
-    // Use geokdbush for proper geographic distance calculations
-    return geoAround(this.spatialIndex, lon, lat, Number.POSITIVE_INFINITY, radiusKm);
+    const spatialIndex = this.getSpatialIndex("all");
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+      throw new RangeError("Longitude and latitude must be finite numbers");
+    }
+    if (lat < -90 || lat > 90) throw new RangeError("Latitude must be between -90 and 90");
+    if (Number.isNaN(radiusKm) || radiusKm < 0) return [];
+
+    const normalizedLon = normalizeLongitude(lon);
+    const bbox = radiusBoundingBox(normalizedLon, lat, radiusKm);
+    const candidates = findIndexesWithinBbox(spatialIndex, bbox);
+    const matches: { distance: number; index: number }[] = [];
+    for (const index of candidates) {
+      const nodeLon = microToDegrees(this.lons.at(index));
+      const nodeLat = microToDegrees(this.lats.at(index));
+      const distance = haversineDistanceKm(normalizedLon, lat, nodeLon, nodeLat);
+      if (distance <= radiusKm) matches.push({ distance, index });
+    }
+    matches.sort((a, b) => a.distance - b.distance || a.index - b.index);
+    return matches.map(({ index }) => index);
   }
 
   /**
@@ -326,7 +395,7 @@ export class Nodes extends Entities<OsmNode> {
 
   /**
    * Get transferable objects for passing to another thread.
-   * Only includes spatialIndex if it has been built.
+   * Only includes spatial indexes that have been built.
    */
   override transferables(): NodesTransferables {
     const base = {
@@ -335,31 +404,32 @@ export class Nodes extends Entities<OsmNode> {
       lats: this.lats.array.buffer,
       bbox: this.bbox,
     };
-    // Only include spatial index if it was built
-    if (this.spatialIndexBuilt) {
-      return { ...base, spatialIndex: this.spatialIndex.data };
-    }
-    return base;
+    return {
+      ...base,
+      ...(this.allSpatialIndex ? { allSpatialIndex: this.allSpatialIndex.buffer } : {}),
+      ...(this.taggedSpatialIndex ? { taggedSpatialIndex: this.taggedSpatialIndex.buffer } : {}),
+    };
   }
 
   /**
    * Get the approximate memory requirements for a given number of nodes in bytes.
    */
-  static getBytesRequired(count: number) {
+  static getBytesRequired(count: number, taggedCount = count) {
     if (count === 0) return 0;
-    const indexBytes = (count < 65536 ? 2 : 4) * count;
-    // Spatial index stores coordinates in degrees (Float64Array)
-    const coordsBytes = count * 2 * Float64Array.BYTES_PER_ELEMENT;
-    const padding = (8 - (indexBytes % 8)) % 8;
-    const spatialIndexBytes = 8 + indexBytes + coordsBytes + padding;
 
     return (
       Ids.getBytesRequired(count) +
-      Tags.getBytesRequired(count) +
+      Tags.getBytesRequired(count, taggedCount) +
       count * Int32Array.BYTES_PER_ELEMENT + // lons (stored in microdegrees)
       count * Int32Array.BYTES_PER_ELEMENT + // lats (stored in microdegrees)
-      spatialIndexBytes
+      Nodes.getSpatialIndexBytesRequired(count) +
+      Nodes.getSpatialIndexBytesRequired(taggedCount)
     );
+  }
+
+  /** Exact bytes in an indirect node spatial-index permutation. */
+  static getSpatialIndexBytesRequired(count: number): number {
+    return count * Uint32Array.BYTES_PER_ELEMENT;
   }
 
   /**
@@ -368,4 +438,106 @@ export class Nodes extends Entities<OsmNode> {
   override updateHash(hasher: ContentHasher): ContentHasher {
     return super.updateHash(hasher).update(this.lons.array).update(this.lats.array);
   }
+
+  private getSpatialIndex(kind: NodeSpatialIndexKind): IndirectKdIndex {
+    const index = kind === "all" ? this.allSpatialIndex : this.taggedSpatialIndex;
+    if (!index) throw new SpatialIndexNotBuiltError(kind);
+    return index;
+  }
+}
+
+/**
+ * Round-trip float error tolerance for degree → microdegree conversion.
+ * `microToDegrees(x) * OSM_COORD_SCALE` can differ from `x` by a few ulps
+ * (~1e-6 at ±1.8e9), so ceil/floor without a tolerance could exclude a node
+ * whose exact stored coordinate sits on the query boundary.
+ */
+const MICRO_EPSILON = 1e-5;
+
+/** Smallest microdegree integer inside an inclusive degree lower bound. */
+function microLowerBound(degrees: number): number {
+  return Math.ceil(degrees * OSM_COORD_SCALE - MICRO_EPSILON);
+}
+
+/** Largest microdegree integer inside an inclusive degree upper bound. */
+function microUpperBound(degrees: number): number {
+  return Math.floor(degrees * OSM_COORD_SCALE + MICRO_EPSILON);
+}
+
+function findIndexesWithinBbox(index: IndirectKdIndex, bbox: GeoBbox2D): number[] {
+  const [minLon, minLat, maxLon, maxLat] = bbox;
+  if (minLat > maxLat) return [];
+
+  const microMinLat = microLowerBound(minLat);
+  const microMaxLat = microUpperBound(maxLat);
+  if (microMinLat > microMaxLat) return [];
+
+  let result: number[];
+  if (minLon <= maxLon) {
+    result = index.range(
+      microLowerBound(minLon),
+      microMinLat,
+      microUpperBound(maxLon),
+      microMaxLat,
+    );
+  } else {
+    result = index
+      .range(microLowerBound(minLon), microMinLat, 180 * OSM_COORD_SCALE, microMaxLat)
+      .concat(
+        index.range(-180 * OSM_COORD_SCALE, microMinLat, microUpperBound(maxLon), microMaxLat),
+      );
+  }
+  return result;
+}
+
+function radiusBoundingBox(lon: number, lat: number, radiusKm: number): GeoBbox2D {
+  if (!Number.isFinite(radiusKm)) return [-180, -90, 180, 90];
+  const angularRadius = radiusKm / EARTH_RADIUS_KM;
+  if (angularRadius >= Math.PI) return [-180, -90, 180, 90];
+
+  const latRadians = degreesToRadians(lat);
+  const minLatRadians = Math.max(-Math.PI / 2, latRadians - angularRadius);
+  const maxLatRadians = Math.min(Math.PI / 2, latRadians + angularRadius);
+  const minLat = Math.max(-90, radiansToDegrees(minLatRadians) - COORDINATE_PADDING_DEGREES);
+  const maxLat = Math.min(90, radiansToDegrees(maxLatRadians) + COORDINATE_PADDING_DEGREES);
+
+  if (
+    angularRadius >= Math.PI / 2 ||
+    minLatRadians <= -Math.PI / 2 ||
+    maxLatRadians >= Math.PI / 2
+  ) {
+    return [-180, minLat, 180, maxLat];
+  }
+
+  const ratio = Math.sin(angularRadius) / Math.cos(latRadians);
+  const deltaLon =
+    radiansToDegrees(Math.asin(Math.min(1, Math.max(-1, ratio)))) + COORDINATE_PADDING_DEGREES;
+  const rawMinLon = lon - deltaLon;
+  const rawMaxLon = lon + deltaLon;
+  return [normalizeLongitude(rawMinLon), minLat, normalizeLongitude(rawMaxLon), maxLat];
+}
+
+function haversineDistanceKm(lon1: number, lat1: number, lon2: number, lat2: number): number {
+  const latDelta = degreesToRadians(lat2 - lat1);
+  const lonDelta = degreesToRadians(lon2 - lon1);
+  const lat1Radians = degreesToRadians(lat1);
+  const lat2Radians = degreesToRadians(lat2);
+  const a =
+    Math.sin(latDelta / 2) ** 2 +
+    Math.sin(lonDelta / 2) ** 2 * Math.cos(lat1Radians) * Math.cos(lat2Radians);
+  return 2 * EARTH_RADIUS_KM * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+}
+
+function normalizeLongitude(lon: number): number {
+  if (lon >= -180 && lon <= 180) return lon;
+  const normalized = ((((lon + 180) % 360) + 360) % 360) - 180;
+  return normalized === -180 && lon > 0 ? 180 : normalized;
+}
+
+function degreesToRadians(value: number): number {
+  return value * (Math.PI / 180);
+}
+
+function radiansToDegrees(value: number): number {
+  return value * (180 / Math.PI);
 }

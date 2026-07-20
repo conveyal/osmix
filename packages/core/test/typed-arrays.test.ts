@@ -1,6 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { BufferConstructor, ResizeableTypedArray } from "../src/typed-arrays";
+import {
+  BufferConstructor,
+  ResizeableTypedArray,
+  TypedBufferAllocationError,
+} from "../src/typed-arrays";
+
+class FailingCreateArrayBuffer extends ArrayBuffer {
+  constructor() {
+    super(0);
+    throw new RangeError("create failed");
+  }
+}
+
+class FailingGrowArrayBuffer extends ArrayBuffer {
+  constructor(byteLength: number, options?: { maxByteLength?: number }) {
+    if (byteLength > 16) throw new RangeError("grow failed");
+    super(byteLength, options);
+  }
+}
+
+class FailingCompactArrayBuffer extends ArrayBuffer {
+  override transferToFixedLength(): ArrayBuffer {
+    throw new RangeError("compact failed");
+  }
+}
 
 describe("typed array helpers", () => {
   it("selects the appropriate buffer constructor", () => {
@@ -12,6 +36,69 @@ describe("typed array helpers", () => {
   });
 
   describe("ResizeableTypedArray", () => {
+    it("reports structured create allocation failures", () => {
+      expect(
+        () =>
+          new ResizeableTypedArray(
+            Float64Array,
+            FailingCreateArrayBuffer as unknown as ArrayBufferConstructor,
+          ),
+      ).toThrowError(
+        expect.objectContaining({
+          name: "TypedBufferAllocationError",
+          code: "TYPED_BUFFER_ALLOCATION_FAILED",
+          operation: "create",
+          typedArray: "Float64Array",
+          bufferType: "array-buffer",
+          elementCount: 131_072,
+          bytesPerElement: 8,
+          requiredBytes: 2 ** 20,
+        }),
+      );
+    });
+
+    it("reports structured grow allocation failures", () => {
+      const arr = new ResizeableTypedArray(Uint8Array, ArrayBuffer);
+      arr.BC = FailingGrowArrayBuffer as unknown as ArrayBufferConstructor;
+      arr.bufferSize = 16;
+      arr.maxByteLength = 16;
+      arr.buffer = new FailingGrowArrayBuffer(16);
+      arr.array = new Uint8Array(arr.buffer);
+      arr.items = 16;
+
+      expect(() => arr.push(17)).toThrowError(
+        expect.objectContaining({
+          operation: "grow",
+          typedArray: "Uint8Array",
+          elementCount: 32,
+          requiredBytes: 32,
+        }),
+      );
+    });
+
+    it("reports structured compact allocation failures", () => {
+      const arr = new ResizeableTypedArray(
+        Float64Array,
+        FailingCompactArrayBuffer as unknown as ArrayBufferConstructor,
+      );
+      arr.items = 3;
+
+      try {
+        arr.compact();
+        expect.unreachable("Expected compact to fail");
+      } catch (error) {
+        expect(error).toBeInstanceOf(TypedBufferAllocationError);
+        expect(error).toMatchObject({
+          operation: "compact",
+          typedArray: "Float64Array",
+          elementCount: 3,
+          bytesPerElement: 8,
+          requiredBytes: 24,
+        });
+        expect((error as Error).cause).toBeInstanceOf(RangeError);
+      }
+    });
+
     it("push stores values and returns the index", () => {
       const arr = new ResizeableTypedArray(Float64Array);
 

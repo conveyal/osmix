@@ -4,8 +4,8 @@ In-memory OSM entity storage with spatial indexing. Provides core data structure
 
 ## Highlights
 
-- **Memory-efficient**: Typed arrays and microdegree coordinates (`Int32Array`) minimize memory while maintaining precision.
-- **Spatial indexing**: KDBush (points) and Flatbush (bboxes) for fast geographic queries. Supports bbox and radius searches via geokdbush/geoflatbush.
+- **Memory-efficient**: Sorted IDs reuse their primary column, tags use sparse rank metadata, and ways store compact node indexes instead of duplicate OSM IDs.
+- **Spatial indexing**: Compact indirect KD indexes for nodes and Flatbush indexes for entity bounding boxes. Supports bbox and great-circle radius searches without copying node coordinates.
 - **Worker-ready**: Serialize to `ArrayBuffer`/`SharedArrayBuffer` for zero-copy transfer via `transferables()`.
 - **Tag search**: Reverse-index lookup for fast entity searches by tag key.
 - **Streaming**: Iterate entities or sorted-by-ID without materializing full arrays.
@@ -88,6 +88,13 @@ const { ids: wayIds, positions: wayCoords, startIndices } = osm.ways.withinBbox(
 // Radius query (uses great-circle distance)
 const nearbyIndexes = osm.nodes.findIndexesWithinRadius(-122.4, 47.6, 10); // 10km
 
+// Renderers can build/query only tagged nodes when an all-node index is unnecessary
+osm.nodes.buildSpatialIndex("tagged");
+const taggedIndexes = osm.nodes.findTaggedIndexesWithinBbox(bbox);
+
+console.log(osm.nodes.hasSpatialIndex("all"));
+console.log(osm.nodes.hasSpatialIndex("tagged"));
+
 // Get entities from indexes
 const nearbyNodes = nearbyIndexes.map((i) => osm.nodes.getByIndex(i));
 
@@ -112,6 +119,24 @@ const osm = new Osm(transferables);
 // Index is already built, ready for queries
 ```
 
+`OsmTransferables` uses `transferVersion: 2` and `contentHashVersion: 2`. Version 2 is an
+intentional format break: version 1 transfers are rejected rather than upgraded in memory, and version 1/2
+hash values are not interchangeable. Within version 2, hashes remain representation-independent because they
+use reconstructed OSM IDs, tags, references, and members rather than derived rank or spatial-index data.
+
+### Compact storage layout
+
+- Sorted entity collections keep the primary ID column and sparse search anchors. Unsorted collections also
+  keep the derived sorted-ID and sorted-position columns needed for lookup.
+- Tag presence uses one bit per entity, rank checkpoints every 256 entities, and offsets only for tagged
+  entities. An entity may have more than 255 tags.
+- Way references are stored as `Uint32Array` node indexes. Unresolved references retain their original OSM
+  IDs in sparse parallel arrays, so reading `OsmWay.refs` is lossless. Geometry construction still throws when
+  a referenced node is unavailable.
+- Node spatial indexes are indirect permutations over the existing microdegree coordinate columns. The
+  all-node capability uses exactly four bytes per node; the tagged-node capability uses exactly four bytes per
+  tagged node.
+
 ## API
 
 ### Classes
@@ -119,7 +144,7 @@ const osm = new Osm(transferables);
 | Class         | Description                                                         |
 | ------------- | ------------------------------------------------------------------- |
 | `Osm`         | Main container with nodes, ways, relations, and shared string table |
-| `Nodes`       | Node storage with KDBush spatial index                              |
+| `Nodes`       | Node storage with independent all-node and tagged-node KD indexes   |
 | `Ways`        | Way storage with Flatbush spatial index                             |
 | `Relations`   | Relation storage with Flatbush spatial index                        |
 | `StringTable` | Deduplicated UTF-8 string storage for tags                          |
@@ -150,11 +175,30 @@ const osm = new Osm(transferables);
 | `neighbors(lon, lat, max, maxKm)`       | Find nearest entities (ways/relations)          |
 | `sorted()`                              | Iterator over entities sorted by ID             |
 
+`Osm.info()` reports each spatial capability independently at
+`spatialIndexes.nodes.all`, `spatialIndexes.nodes.tagged`, `spatialIndexes.ways`, and
+`spatialIndexes.relations`. Loader-provided memory decisions and phase timings may also be present in
+`loadDiagnostics`.
+
+Node queries require the corresponding capability. All-node bbox and radius methods require `"all"`, while
+`findTaggedIndexesWithinBbox` requires `"tagged"`. A missing capability throws
+`SpatialIndexNotBuiltError`; queries never return an artificial empty result or build a large index
+synchronously.
+
+Typed-buffer allocation failures expose structured diagnostics. `TypedBufferAllocationError` reports the
+operation, typed-array and buffer types, element count, element width, and required bytes.
+`OsmEntityIndexBuildError` adds the entity type and the failing `ids`, `tags`, or entity-data component while
+preserving the allocation error as its cause. Worker clients can use these fields to distinguish a mandatory
+core-storage limit from an optional spatial-index failure.
+
 ## Environment and Limitations
 
 - Requires Web Streams, `TextEncoder`/`TextDecoder`, `CompressionStream`/`DecompressionStream` (Bun, Node 20+, modern browsers).
 - Uses ES2024 resizable `ArrayBuffer` and growable `SharedArrayBuffer` when available.
+- Every individual typed-array column must still fit in one fixed buffer when entity indexes are finalized.
 - Coordinates stored as `Int32Array` microdegrees (1e-7 degree precision, ~1cm at equator); converted to degrees at API boundaries.
+- Algorithms that need arbitrary untagged-node lookup require the all-node spatial capability. Build it
+  explicitly or load with the Full profile from `@osmix/load`.
 
 ## Related Packages
 

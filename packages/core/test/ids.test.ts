@@ -66,6 +66,32 @@ describe("Ids sorted entries", () => {
     ]);
   });
 
+  it("omits redundant sorted buffers for ascending IDs", () => {
+    const transferables = buildIds([1, 2, 3]).transferables();
+
+    expect(transferables.idsAreSorted).toBe(true);
+    expect(transferables.sortedIds).toBeUndefined();
+    expect(transferables.sortedIdPositionToIndex).toBeUndefined();
+    expect(Ids.getBytesRequired(3)).toBe(
+      3 * Float64Array.BYTES_PER_ELEMENT + Float64Array.BYTES_PER_ELEMENT,
+    );
+    expect(Array.from(new Ids(transferables).sortedEntries())).toEqual([
+      [1, 0],
+      [2, 1],
+      [3, 2],
+    ]);
+  });
+
+  it("retains derived lookup buffers for unsorted IDs", () => {
+    const transferables = buildIds([3, 1, 2]).transferables();
+
+    expect(transferables.idsAreSorted).toBe(false);
+    expect(transferables.sortedIds?.byteLength).toBe(3 * Float64Array.BYTES_PER_ELEMENT);
+    expect(transferables.sortedIdPositionToIndex?.byteLength).toBe(
+      3 * Uint32Array.BYTES_PER_ELEMENT,
+    );
+  });
+
   it("streams sorted entities without looking up each ID again", () => {
     const osm = new Osm();
     osm.nodes.addNode({ id: 2, lon: 20, lat: 20 });

@@ -8,7 +8,7 @@
  * @module
  */
 
-import { Osm, type OsmOptions } from "@osmix/core";
+import { Osm, type OsmLoadDiagnostics, type OsmOptions } from "@osmix/core";
 import { OsmBlocksToJsonTransformStream, OsmJsonToBlocksTransformStream } from "@osmix/json";
 import {
   type AsyncGeneratorValue,
@@ -36,6 +36,19 @@ import {
   wayMatchesExtractTagRules,
 } from "./extract-tag-filter.ts";
 import { createExtract, type ExtractStrategy } from "./extract.ts";
+import {
+  buildSelectedOsmSpatialIndexes,
+  getOsmStorableBufferBytes,
+  getOsmTypedBufferBytes,
+  projectOsmLoad,
+  selectOsmLoadProfile,
+  selectOsmSpatialIndexes,
+  setOsmLoadDecision,
+  type OsmLoadCapabilities,
+  type OsmLoadDecision,
+  type OsmLoadProfile,
+  type OsmSpatialIndexSelection,
+} from "./load-profile.ts";
 
 /** When `extractBbox` is set but `extractStrategy` is omitted, default to in-stream simple extract. */
 function resolveEffectiveExtractStrategy(
@@ -56,7 +69,81 @@ export interface OsmFromPbfOptions extends OsmOptions {
   /** Optional tag-filter rules (worker-safe). Omitted => no tag filtering. */
   extractTagFilter?: ExtractTagFilterRules;
   filter<T extends OsmEntityType>(type: T, entity: OsmEntityTypeMap[T], osmix: Osm): boolean;
+  /**
+   * Spatial-index profile. Defaults to Full for library compatibility; the merge
+   * app passes Auto so large datasets can use its reduced-memory View profile.
+   */
+  loadProfile: OsmLoadProfile;
+  /** Runtime memory limits used when resolving the Auto profile. */
+  loadCapabilities: OsmLoadCapabilities;
+  /** Exact spatial indexes to build. Takes precedence over all profile options. */
+  spatialIndexes: OsmSpatialIndexSelection;
+  /** @deprecated Prefer loadProfile. Preserved for exact entity-type selection. */
   buildSpatialIndexes: OsmEntityType[];
+}
+
+/** A direct-reference PBF load requires standard nodes-before-ways ordering. */
+export class OsmPbfEntityOrderError extends Error {
+  readonly code = "OSM_PBF_ENTITY_ORDER";
+  readonly stage = "pbf-ingest";
+  readonly expectedOrder = "nodes-before-ways";
+
+  constructor() {
+    super(
+      "This PBF contains nodes after way ingestion began. Direct way-reference indexing requires standard Type_then_ID ordering (all nodes before ways).",
+    );
+    this.name = "OsmPbfEntityOrderError";
+  }
+}
+
+function toCoreLoadDiagnostics(
+  osm: Osm,
+  decision: OsmLoadDecision,
+  phaseTimingsMs: Record<string, number>,
+): OsmLoadDiagnostics {
+  const transferables = osm.transferables();
+  const finiteBudget = (value: number | undefined) =>
+    value !== undefined && Number.isFinite(value) ? value : undefined;
+  return {
+    requestedProfile: decision.requestedProfile,
+    selectedProfile: decision.resolvedProfile,
+    reasons: decision.diagnostics,
+    bytes: {
+      residentTypedBuffers: getOsmTypedBufferBytes(osm),
+      projectedTypedBufferPeak: decision.selectedPeak.projectedTypedArrayPeakBytes,
+      largestPlannedAllocation: decision.selectedPeak.largestPlannedAllocationBytes,
+      storageBytes: getOsmStorableBufferBytes(osm),
+    },
+    budgets: {
+      ...(finiteBudget(decision.limits.projectedTypedArrayPeakBytes) !== undefined
+        ? { workingSet: decision.limits.projectedTypedArrayPeakBytes }
+        : {}),
+      ...(finiteBudget(decision.limits.largestPlannedAllocationBytes) !== undefined
+        ? { singleAllocation: decision.limits.largestPlannedAllocationBytes }
+        : {}),
+      allNodeSpatialIndex: decision.limits.allNodeSpatialIndexBytes,
+      ...(decision.capabilities.arrayBufferMaxBytes !== undefined
+        ? { arrayBufferCeiling: decision.capabilities.arrayBufferMaxBytes }
+        : {}),
+      ...(decision.capabilities.sharedArrayBufferMaxBytes !== undefined
+        ? { sharedArrayBufferCeiling: decision.capabilities.sharedArrayBufferMaxBytes }
+        : {}),
+    },
+    phaseTimingsMs,
+    counters: {
+      taggedNodes: osm.nodes.tags.taggedEntityCount,
+      taggedWays: osm.ways.tags.taggedEntityCount,
+      taggedRelations: osm.relations.tags.taggedEntityCount,
+      nodeTagPairs: transferables.nodes.tagKeys.byteLength / Uint32Array.BYTES_PER_ELEMENT,
+      wayTagPairs: transferables.ways.tagKeys.byteLength / Uint32Array.BYTES_PER_ELEMENT,
+      relationTagPairs: transferables.relations.tagKeys.byteLength / Uint32Array.BYTES_PER_ELEMENT,
+      wayReferences: transferables.ways.refs.byteLength / Uint32Array.BYTES_PER_ELEMENT,
+      missingWayReferences:
+        transferables.ways.missingRefIds.byteLength / Float64Array.BYTES_PER_ELEMENT,
+      relationMembers:
+        transferables.relations.memberRefs.byteLength / Float64Array.BYTES_PER_ELEMENT,
+    },
+  };
 }
 
 function composeNodeIngestFilter(
@@ -83,15 +170,13 @@ function composeWayIngestFilter(
   osm: Osm,
 ): ((way: OsmWay) => OsmWay | null) | undefined {
   const applyWayTags = tagRules !== null && tagRules.ways.length > 0;
+  if (!spatialFilter && !applyWayTags && !entityFilter) return undefined;
   return (way: OsmWay) => {
     let w: OsmWay | null = way;
     if (spatialFilter) {
       w = spatialFilter(way);
       if (w === null) return null;
     }
-    const refs = w.refs.filter((ref) => osm.nodes.ids.has(ref));
-    if (refs.length === 0) return null;
-    w = { ...w, refs };
     if (applyWayTags && !wayMatchesExtractTagRules(w, tagRules!)) return null;
     if (entityFilter && !entityFilter("way", w, osm)) return null;
     return w;
@@ -105,19 +190,13 @@ function composeRelationIngestFilter(
   osm: Osm,
 ): ((relation: OsmRelation) => OsmRelation | null) | undefined {
   const applyRelationTags = tagRules !== null && tagRules.relations.length > 0;
+  if (!spatialFilter && !applyRelationTags && !entityFilter) return undefined;
   return (relation: OsmRelation) => {
     let r: OsmRelation | null = relation;
     if (spatialFilter) {
       r = spatialFilter(relation);
       if (r === null) return null;
     }
-    const members = r.members.filter((member) => {
-      if (member.type === "node") return osm.nodes.ids.has(member.ref);
-      if (member.type === "way") return osm.ways.ids.has(member.ref);
-      return true;
-    });
-    if (members.length === 0) return null;
-    r = { ...r, members };
     if (applyRelationTags && !relationMatchesExtractTagRules(r, tagRules!)) return null;
     if (entityFilter && !entityFilter("relation", r, osm)) return null;
     return r;
@@ -160,6 +239,8 @@ export async function* startCreateOsmFromPbf(
   data: AsyncGeneratorValue<Uint8Array<ArrayBufferLike>>,
   options: Partial<OsmFromPbfOptions> = {},
 ): AsyncGenerator<ProgressEvent, Osm> {
+  const totalStartedAt = performance.now();
+  let entityIndexesMs = 0;
   const { extractBbox, extractStrategy } = options;
   const effectiveExtractStrategy = resolveEffectiveExtractStrategy(extractBbox, extractStrategy);
   const tagRules = options.extractTagFilter
@@ -201,6 +282,7 @@ export async function* startCreateOsmFromPbf(
   );
 
   let blockCount = 0;
+  let wayIngestionStarted = false;
   for await (const block of blocks) {
     const blockStringIndexMap = osm.stringTable.createBlockIndexMap(block.stringtable);
 
@@ -208,13 +290,19 @@ export async function* startCreateOsmFromPbf(
       const { nodes, ways, relations, dense } = group;
       if (nodes && nodes.length > 0) throw Error("Nodes must be dense!");
 
-      if (dense) {
+      if (dense && dense.id.length > 0) {
+        if (wayIngestionStarted) throw new OsmPbfEntityOrderError();
         osm.nodes.addDenseNodes(dense, block, blockStringIndexMap, nodeIngestFilter);
       }
 
       if (ways.length > 0) {
         // Nodes are finished, build their index.
-        if (!osm.nodes.isReady()) osm.nodes.buildIndex();
+        if (!osm.nodes.isReady()) {
+          const startedAt = performance.now();
+          osm.nodes.buildIndex();
+          entityIndexesMs += performance.now() - startedAt;
+        }
+        wayIngestionStarted = true;
         const simpleWaySpatial =
           extractBbox && effectiveExtractStrategy === "simple"
             ? (way: OsmWay) => {
@@ -230,11 +318,16 @@ export async function* startCreateOsmFromPbf(
           ways,
           blockStringIndexMap,
           composeWayIngestFilter(simpleWaySpatial, tagRulesActive, entityFilter, osm),
+          (id) => osm.nodes.ids.getIndexFromId(id),
         );
       }
 
       if (relations.length > 0) {
-        if (!osm.ways.isReady()) osm.ways.buildIndex();
+        if (!osm.ways.isReady()) {
+          const startedAt = performance.now();
+          osm.ways.buildIndex();
+          entityIndexesMs += performance.now() - startedAt;
+        }
         const simpleRelationSpatial =
           extractBbox && effectiveExtractStrategy === "simple"
             ? (relation: OsmRelation) => {
@@ -261,33 +354,63 @@ export async function* startCreateOsmFromPbf(
     blockCount++;
     yield progressEvent(
       `Processed ${blockCount.toLocaleString()} blocks, ${osm.nodes.size.toLocaleString()} nodes, ${osm.ways.size.toLocaleString()} ways, and ${osm.relations.size.toLocaleString()} relations added.`,
+      "info",
+      true,
     );
   }
 
   yield progressEvent(
     `${osm.nodes.size.toLocaleString()} nodes, ${osm.ways.size.toLocaleString()} ways, and ${osm.relations.size.toLocaleString()} relations added.`,
   );
+  const parseFinishedAt = performance.now();
+  const parseMs = parseFinishedAt - totalStartedAt - entityIndexesMs;
   yield progressEvent("Building ID and tag indexes...");
+  const entityIndexesStartedAt = performance.now();
   osm.buildIndexes();
+  entityIndexesMs += performance.now() - entityIndexesStartedAt;
 
-  // By default, build all spatial indexes.
-  if (!Array.isArray(options.buildSpatialIndexes)) {
-    yield progressEvent("Building all spatial indexes...");
-    osm.buildSpatialIndexes();
+  const projection = projectOsmLoad(osm);
+  let decision: OsmLoadDecision;
+  if (options.spatialIndexes !== undefined) {
+    decision = selectOsmSpatialIndexes(
+      options.spatialIndexes,
+      projection,
+      options.loadCapabilities,
+    );
+  } else if (options.loadProfile !== undefined) {
+    decision = selectOsmLoadProfile(options.loadProfile, projection, options.loadCapabilities);
+  } else if (Array.isArray(options.buildSpatialIndexes)) {
+    decision = selectOsmSpatialIndexes(
+      {
+        nodes: options.buildSpatialIndexes.includes("node") ? ["all"] : [],
+        ways: options.buildSpatialIndexes.includes("way"),
+        relations: options.buildSpatialIndexes.includes("relation"),
+      },
+      projection,
+      options.loadCapabilities,
+    );
   } else {
-    if (options.buildSpatialIndexes.includes("node")) {
-      yield progressEvent("Building node spatial index...");
-      osm.nodes.buildSpatialIndex();
-    }
-    if (options.buildSpatialIndexes.includes("way")) {
-      yield progressEvent("Building way spatial index...");
-      osm.ways.buildSpatialIndex();
-    }
-    if (options.buildSpatialIndexes.includes("relation")) {
-      yield progressEvent("Building relation spatial index...");
-      osm.relations.buildSpatialIndex();
-    }
+    decision = selectOsmLoadProfile("full", projection, options.loadCapabilities);
   }
+  setOsmLoadDecision(osm, decision);
+  yield progressEvent(
+    `Using ${decision.resolvedProfile === "full" ? "Full" : "View"} load profile${decision.requestedProfile === "auto" ? " (selected automatically)" : ""}.`,
+    decision.resolvedProfile === "view" ? "warn" : "info",
+  );
+  for (const diagnostic of decision.diagnostics) {
+    yield progressEvent(diagnostic.message, diagnostic.level === "warning" ? "warn" : "info");
+  }
+  yield progressEvent("Building selected spatial indexes...");
+  const spatialIndexesStartedAt = performance.now();
+  const spatialIndexPhaseTimingsMs: Record<string, number> = {};
+  buildSelectedOsmSpatialIndexes(osm, decision.spatialIndexes, spatialIndexPhaseTimingsMs);
+  const spatialIndexesMs = performance.now() - spatialIndexesStartedAt;
+  const phaseTimingsMs: Record<string, number> = {
+    parse: parseMs,
+    entityIndexes: entityIndexesMs,
+    ...spatialIndexPhaseTimingsMs,
+    spatialIndexes: spatialIndexesMs,
+  };
 
   if (
     extractBbox &&
@@ -295,11 +418,28 @@ export async function* startCreateOsmFromPbf(
     effectiveExtractStrategy !== "simple"
   ) {
     yield progressEvent(`Creating extract using strategy ${effectiveExtractStrategy}...`);
+    const extractStartedAt = performance.now();
     const extractedOsm = createExtract(osm, extractBbox, effectiveExtractStrategy);
+    phaseTimingsMs["extract"] = performance.now() - extractStartedAt;
+    phaseTimingsMs["total"] = performance.now() - totalStartedAt;
+    const extractedDiagnostics = toCoreLoadDiagnostics(extractedOsm, decision, phaseTimingsMs);
+    extractedDiagnostics.reasons = [
+      ...extractedDiagnostics.reasons,
+      {
+        code: "extract-inherits-source-load-decision",
+        level: "info",
+        message:
+          "Extract diagnostics inherit the source PBF profile decision and capabilities; resident and storage bytes describe the completed extract.",
+      },
+    ];
+    extractedOsm.setLoadDiagnostics(extractedDiagnostics);
+    setOsmLoadDecision(extractedOsm, decision);
     yield progressEvent(`Finished creating extract. Loaded ${osm.id} PBF data into Osmix.`);
     return extractedOsm;
   }
 
+  phaseTimingsMs["total"] = performance.now() - totalStartedAt;
+  osm.setLoadDiagnostics(toCoreLoadDiagnostics(osm, decision, phaseTimingsMs));
   yield progressEvent(`Finished loading ${osm.id} PBF data into Osmix.`);
   return osm;
 }

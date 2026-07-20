@@ -12,16 +12,23 @@ import type { ContentHasher } from "@osmix/shared/content-hasher";
 import type { OsmTags } from "@osmix/types";
 
 import StringTable from "./stringtable.ts";
-import { type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts";
+import { BufferConstructor, type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts";
+
+const TAG_RANK_BLOCK_SIZE = 256;
+const TAG_BITS_PER_WORD = 32;
 
 /**
  * Serializable state for worker transfer.
  */
 export interface TagsTransferables<T extends BufferType = BufferType> {
-  /** Maps entity index → start position in tagKeys/tagVals. */
-  tagStart: T;
-  /** Maps entity index → number of tags. */
-  tagCount: T;
+  /** Exact number of entities represented by this tag index. */
+  tagEntityCount: number;
+  /** One presence bit per entity. */
+  taggedEntityBits: T;
+  /** Tagged-entity prefix count at each 256-entity boundary. */
+  tagRankCheckpoints: T;
+  /** Tag offsets for tagged entities, including a final sentinel. */
+  tagOffsets: T;
   /** Flattened tag key indices. */
   tagKeys: T;
   /** Flattened tag value indices. */
@@ -38,7 +45,6 @@ export interface TagsTransferables<T extends BufferType = BufferType> {
 /**
  * Bidirectional tag storage.
  *
- * Limits: Max 255 tags per entity.
  * Note: String indices reference a shared `StringTable`.
  */
 export class Tags {
@@ -46,10 +52,14 @@ export class Tags {
   private stringTable: StringTable = new StringTable();
 
   // ─── Entity → Tag Lookup ───────────────────────────────────────────────────
-  /** Maps entity index → start position in tagKeys/tagVals */
-  private tagStart: RTA<Uint32Array>;
-  /** Maps entity index → number of tags (max 255) */
-  private tagCount: RTA<Uint8Array>;
+  /** Exact number of entities represented by this tag index. */
+  private entityCount = 0;
+  /** One presence bit per entity. */
+  private taggedEntityBits: Uint32Array;
+  /** Tagged-entity prefix count at each 256-entity boundary. */
+  private tagRankCheckpoints: Uint32Array;
+  /** Tag offsets for tagged entities, including a final sentinel. */
+  private tagOffsets: RTA<Uint32Array>;
   /** All tag key string indices, concatenated */
   private tagKeys: RTA<Uint32Array>;
   /** All tag value string indices, concatenated (parallel to tagKeys) */
@@ -73,6 +83,12 @@ export class Tags {
    */
   private keyEntityIndexBuilder = new Map<number, number[]>();
 
+  /** Tagged entity indexes collected during ingestion and released on finalization. */
+  private taggedEntityIndexBuilder: RTA<Uint32Array> | null;
+
+  /** Largest tagged entity index seen so far; enforces ascending ingestion order. */
+  private lastTaggedEntityIndex = -1;
+
   /** Whether buildIndex() has been called */
   private indexBuilt = false;
 
@@ -82,22 +98,27 @@ export class Tags {
   constructor(stringTable: StringTable, transferables?: TagsTransferables) {
     this.stringTable = stringTable;
     if (transferables) {
-      this.tagStart = RTA.from(Uint32Array, transferables.tagStart);
-      this.tagCount = RTA.from(Uint8Array, transferables.tagCount);
+      this.entityCount = transferables.tagEntityCount;
+      this.taggedEntityBits = new Uint32Array(transferables.taggedEntityBits);
+      this.tagRankCheckpoints = new Uint32Array(transferables.tagRankCheckpoints);
+      this.tagOffsets = RTA.from(Uint32Array, transferables.tagOffsets);
       this.tagKeys = RTA.from(Uint32Array, transferables.tagKeys);
       this.tagVals = RTA.from(Uint32Array, transferables.tagVals);
       this.keyEntities = RTA.from(Uint32Array, transferables.keyEntities);
       this.keyIndexStart = RTA.from(Uint32Array, transferables.keyIndexStart);
       this.keyIndexCount = RTA.from(Uint32Array, transferables.keyIndexCount);
+      this.taggedEntityIndexBuilder = null;
       this.indexBuilt = true;
     } else {
-      this.tagStart = new RTA(Uint32Array);
-      this.tagCount = new RTA(Uint8Array);
+      this.taggedEntityBits = new Uint32Array(new BufferConstructor(0));
+      this.tagRankCheckpoints = new Uint32Array(new BufferConstructor(0));
+      this.tagOffsets = new RTA(Uint32Array);
       this.tagKeys = new RTA(Uint32Array);
       this.tagVals = new RTA(Uint32Array);
       this.keyEntities = new RTA(Uint32Array);
       this.keyIndexStart = new RTA(Uint32Array);
       this.keyIndexCount = new RTA(Uint32Array);
+      this.taggedEntityIndexBuilder = new RTA(Uint32Array);
     }
   }
 
@@ -122,10 +143,28 @@ export class Tags {
 
   /**
    * Add tags to an entity using key and value indexes.
+   *
+   * Tagged entities must be added in strictly ascending entity-index order and
+   * at most once per entity: the rank/popcount lookup orders tagged entities by
+   * index while `tagOffsets` records them in call order, so an out-of-order or
+   * repeated tagged index would silently misalign every later entity's tags.
+   * `Entities.addEntity` (append-only) satisfies this naturally.
    */
   addTagKeysAndValues(index: number, keys: number[], values: number[]) {
-    this.tagStart.set(index, this.tagKeys.length);
-    this.tagCount.set(index, keys.length);
+    if (this.indexBuilt) throw Error("Tag index already built.");
+    if (keys.length !== values.length) throw Error("Tag keys and values must have equal length.");
+    if (index < 0) throw Error(`Invalid entity index: ${index}`);
+    this.entityCount = Math.max(this.entityCount, index + 1);
+    if (keys.length === 0) return;
+
+    if (index <= this.lastTaggedEntityIndex) {
+      throw Error(
+        `Tagged entity ${index} added out of order (last tagged entity: ${this.lastTaggedEntityIndex}). Tagged entities must be added once, in ascending index order.`,
+      );
+    }
+    this.lastTaggedEntityIndex = index;
+    this.taggedEntityIndexBuilder?.push(index);
+    this.tagOffsets.push(this.tagKeys.length);
     this.tagKeys.pushMany(keys);
     this.tagVals.pushMany(values);
 
@@ -146,8 +185,39 @@ export class Tags {
    * Must be called before `hasKey()`.
    */
   buildIndex() {
-    this.tagStart.compact();
-    this.tagCount.compact();
+    if (this.indexBuilt) return;
+
+    const taggedEntityIndexes = this.taggedEntityIndexBuilder;
+    if (!taggedEntityIndexes) throw Error("Tagged entity builder is unavailable.");
+    const bitWordCount = Math.ceil(this.entityCount / TAG_BITS_PER_WORD);
+    this.taggedEntityBits = new Uint32Array(
+      new BufferConstructor(bitWordCount * Uint32Array.BYTES_PER_ELEMENT),
+    );
+    for (let i = 0; i < taggedEntityIndexes.length; i++) {
+      const entityIndex = taggedEntityIndexes.at(i);
+      const wordIndex = entityIndex >>> 5;
+      this.taggedEntityBits[wordIndex] =
+        (this.taggedEntityBits[wordIndex] ?? 0) | (1 << (entityIndex & 31));
+    }
+
+    const checkpointCount = Math.ceil(this.entityCount / TAG_RANK_BLOCK_SIZE) + 1;
+    this.tagRankCheckpoints = new Uint32Array(
+      new BufferConstructor(checkpointCount * Uint32Array.BYTES_PER_ELEMENT),
+    );
+    let taggedIndex = 0;
+    for (let checkpoint = 0; checkpoint < checkpointCount; checkpoint++) {
+      const entityBoundary = checkpoint * TAG_RANK_BLOCK_SIZE;
+      while (
+        taggedIndex < taggedEntityIndexes.length &&
+        taggedEntityIndexes.at(taggedIndex) < entityBoundary
+      ) {
+        taggedIndex++;
+      }
+      this.tagRankCheckpoints[checkpoint] = taggedIndex;
+    }
+
+    this.tagOffsets.push(this.tagKeys.length);
+    this.tagOffsets.compact();
     this.tagKeys.compact();
     this.tagVals.compact();
 
@@ -158,9 +228,11 @@ export class Tags {
       this.keyEntities.pushMany(entityIndexes);
     }
 
+    this.keyEntities.compact();
     this.keyIndexStart.compact();
     this.keyIndexCount.compact();
     this.keyEntityIndexBuilder.clear();
+    this.taggedEntityIndexBuilder = null;
 
     this.indexBuilt = true;
   }
@@ -176,16 +248,41 @@ export class Tags {
    * Get the number of tags for an entity.
    */
   cardinality(index: number): number {
-    return this.tagCount.at(index) ?? 0;
+    const taggedIndex = this.getTaggedEntityIndex(index);
+    if (taggedIndex === -1) return 0;
+    return this.tagOffsets.at(taggedIndex + 1) - this.tagOffsets.at(taggedIndex);
+  }
+
+  /** Number of entities that have at least one tag. */
+  get taggedEntityCount(): number {
+    return this.indexBuilt
+      ? Math.max(0, this.tagOffsets.length - 1)
+      : (this.taggedEntityIndexBuilder?.length ?? 0);
+  }
+
+  /** Iterate tagged entity indexes without allocating an intermediate array. */
+  *taggedEntityIndexes(): Generator<number> {
+    if (!this.indexBuilt) throw Error("Tag index not built.");
+    for (let wordIndex = 0; wordIndex < this.taggedEntityBits.length; wordIndex++) {
+      let word = this.taggedEntityBits[wordIndex] ?? 0;
+      while (word !== 0) {
+        const lowestBit = word & -word;
+        const bit = 31 - Math.clz32(lowestBit);
+        const entityIndex = wordIndex * TAG_BITS_PER_WORD + bit;
+        if (entityIndex < this.entityCount) yield entityIndex;
+        word = (word & (word - 1)) >>> 0;
+      }
+    }
   }
 
   /**
    * Get the tags for an entity.
    */
   getTags(index: number): OsmTags | undefined {
-    const tagCount = this.tagCount.at(index) ?? 0;
-    if (tagCount === 0) return;
-    const tagStart = this.tagStart.at(index) ?? 0;
+    const taggedIndex = this.getTaggedEntityIndex(index);
+    if (taggedIndex === -1) return;
+    const tagStart = this.tagOffsets.at(taggedIndex);
+    const tagCount = this.tagOffsets.at(taggedIndex + 1) - tagStart;
     const tagKeyIndexes = this.tagKeys.array.slice(tagStart, tagStart + tagCount);
     const tagValIndexes = this.tagVals.array.slice(tagStart, tagStart + tagCount);
     const tags: OsmTags = {};
@@ -250,8 +347,10 @@ export class Tags {
    */
   transferables(): TagsTransferables {
     return {
-      tagStart: this.tagStart.array.buffer,
-      tagCount: this.tagCount.array.buffer,
+      tagEntityCount: this.entityCount,
+      taggedEntityBits: this.taggedEntityBits.buffer,
+      tagRankCheckpoints: this.tagRankCheckpoints.buffer,
+      tagOffsets: this.tagOffsets.array.buffer,
       tagKeys: this.tagKeys.array.buffer,
       tagVals: this.tagVals.array.buffer,
       keyEntities: this.keyEntities.array.buffer,
@@ -263,10 +362,11 @@ export class Tags {
   /**
    * Get the approximate memory requirements for a given number of tags in bytes.
    */
-  static getBytesRequired(count: number) {
+  static getBytesRequired(entityCount: number, taggedEntityCount = entityCount) {
     return (
-      count * Uint32Array.BYTES_PER_ELEMENT + // tagStart
-      count * Uint8Array.BYTES_PER_ELEMENT // tagCount
+      Math.ceil(entityCount / TAG_BITS_PER_WORD) * Uint32Array.BYTES_PER_ELEMENT +
+      (Math.ceil(entityCount / TAG_RANK_BLOCK_SIZE) + 1) * Uint32Array.BYTES_PER_ELEMENT +
+      (taggedEntityCount + 1) * Uint32Array.BYTES_PER_ELEMENT
     );
   }
 
@@ -285,9 +385,42 @@ export class Tags {
    */
   updateHash(hasher: ContentHasher): ContentHasher {
     return hasher
-      .update(this.tagStart.array)
-      .update(this.tagCount.array)
+      .updateNumber(this.entityCount)
+      .update(this.taggedEntityBits)
+      .update(this.tagOffsets.array)
       .update(this.tagKeys.array)
       .update(this.tagVals.array);
   }
+
+  /**
+   * Return the compact tagged-entity ordinal, or -1 when the entity has no tags.
+   *
+   * The ordinal is the entity's rank among tagged entities: read the cached
+   * prefix count at the nearest 256-entity checkpoint, popcount the presence
+   * words between the checkpoint and the entity's word, then popcount the bits
+   * below the entity within its own word. The result indexes `tagOffsets`.
+   */
+  private getTaggedEntityIndex(index: number): number {
+    if (index < 0 || index >= this.entityCount) return -1;
+    const wordIndex = index >>> 5;
+    const word = this.taggedEntityBits[wordIndex] ?? 0;
+    const bit = index & 31;
+    if ((word & (1 << bit)) === 0) return -1;
+
+    const checkpoint = index >>> 8;
+    let rank = this.tagRankCheckpoints[checkpoint] ?? 0;
+    const checkpointWord = checkpoint * (TAG_RANK_BLOCK_SIZE / TAG_BITS_PER_WORD);
+    for (let i = checkpointWord; i < wordIndex; i++) {
+      rank += popcount(this.taggedEntityBits[i] ?? 0);
+    }
+    const lowerBitMask = bit === 0 ? 0 : 0xffffffff >>> (TAG_BITS_PER_WORD - bit);
+    return rank + popcount(word & lowerBitMask);
+  }
+}
+
+/** Count set bits in an unsigned 32-bit integer. */
+function popcount(value: number): number {
+  const pairs = value - ((value >>> 1) & 0x55555555);
+  const nibbles = (pairs & 0x33333333) + ((pairs >>> 2) & 0x33333333);
+  return (((nibbles + (nibbles >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
 }

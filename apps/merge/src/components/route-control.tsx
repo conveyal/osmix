@@ -7,11 +7,14 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre";
 
 import { useMap } from "../hooks/map";
+import { useOsmFile } from "../hooks/osm";
+import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import { routingControlIsOpenAtom } from "../state/map";
 import { selectedOsmAtom } from "../state/osm";
 import { routingStateAtom, type SnappedNode } from "../state/routing";
 import { osmWorker } from "../state/worker";
 import CustomControl from "./custom-control";
+import { FullIndexRequired } from "./full-index-required";
 import { SectionTitle } from "./section";
 import { Button } from "./ui/button";
 
@@ -43,7 +46,32 @@ function formatTime(seconds: number): string {
 export default function RouteMapControl() {
   const isOpen = useAtomValue(routingControlIsOpenAtom);
   const osm = useAtomValue(selectedOsmAtom);
+  const baseOsm = useOsmFile(BASE_OSM_KEY);
+  const patchOsm = useOsmFile(PATCH_OSM_KEY);
+  const extractOsm = useOsmFile(EXTRACT_OSM_KEY);
   if (!isOpen || !osm) return null;
+  if (!osm.info().spatialIndexes.nodes.all) {
+    const selectedOsmFile = [baseOsm, patchOsm, extractOsm].find(
+      (osmFile) => osmFile.osmInfo?.id === osm.id,
+    );
+    return (
+      <CustomControl position="bottom-left">
+        {selectedOsmFile ? (
+          <div className="max-w-72 p-2">
+            <FullIndexRequired operation="Routing" osmFile={selectedOsmFile} />
+          </div>
+        ) : (
+          <div className="flex max-w-64 flex-col gap-2 p-2">
+            <SectionTitle>Routing unavailable</SectionTitle>
+            <p>
+              Routing requires the all-node spatial index. Reload this PBF using Full under Advanced
+              load profile.
+            </p>
+          </div>
+        )}
+      </CustomControl>
+    );
+  }
   return (
     <CustomControl position="bottom-left">
       <Routing osm={osm} />

@@ -24,9 +24,10 @@ export class ContentHasher {
   /**
    * Update the hash with a typed array's underlying bytes.
    */
-  update(data: ArrayBufferView | ArrayBuffer): this {
-    const buffer = data instanceof ArrayBuffer ? data : data.buffer;
-    const bytes = new Uint8Array(buffer);
+  update(data: ArrayBufferView | ArrayBufferLike): this {
+    const bytes = ArrayBuffer.isView(data)
+      ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+      : new Uint8Array(data);
     this.hash = fnv1aHash(bytes, this.hash);
     return this;
   }
@@ -59,7 +60,7 @@ export class ContentHasher {
  * Create a content hash from multiple typed arrays.
  * Returns a hex string suitable for use as a content identifier.
  */
-export function hashBuffers(...buffers: (ArrayBufferView | ArrayBuffer)[]): string {
+export function hashBuffers(...buffers: (ArrayBufferView | ArrayBufferLike)[]): string {
   const hasher = new ContentHasher();
   for (const buffer of buffers) {
     hasher.update(buffer);

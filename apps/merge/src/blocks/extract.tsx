@@ -9,6 +9,7 @@ import ExtractTagFilterEditor, {
   rulesFromEditorState,
   type TagFilterEditorState,
 } from "../components/extract-tag-filter-editor";
+import { OsmLoadFailurePanel } from "../components/osm-load-failure";
 import OsmPbfFileInput from "../components/osm-pbf-file-input";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader } from "../components/ui/card";
@@ -97,6 +98,12 @@ export default function ExtractBlock() {
     const [w, s, e, n] = bbox;
     setBboxInputs([String(w), String(s), String(e), String(n)]);
   }, [bbox]);
+
+  useEffect(() => {
+    if (strategy !== "simple" && extract.loadProfile !== "full") {
+      extract.setLoadProfile("full");
+    }
+  }, [extract.loadProfile, extract.setLoadProfile, strategy, extract]);
 
   const canExtract = !!pendingFile && isValidBbox(bbox) && !isExtracting;
   const hasExtractResult = !!extract.osm && !!extract.osmInfo;
@@ -304,6 +311,12 @@ export default function ExtractBlock() {
               </div>
             );
           })}
+          {strategy !== "simple" ? (
+            <p className="text-muted-foreground">
+              Complete ways and Smart require the Full node index, so this extract will load in Full
+              mode.
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -316,17 +329,27 @@ export default function ExtractBlock() {
 
       <Card>
         <CardHeader>4. OSM PBF file</CardHeader>
-        <CardContent className="flex gap-2 items-center">
-          <OsmPbfFileInput
-            file={pendingFile}
-            setFile={async (f) => {
-              setPendingFile(f);
-              return;
-            }}
-            pbfOnly
-            disabled={isExtracting}
-          />
-          {pendingFile?.name}
+        <CardContent className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <OsmPbfFileInput
+              file={pendingFile}
+              loadProfile={extract.loadProfile}
+              onLoadProfileChange={extract.setLoadProfile}
+              setFile={async (f) => {
+                setPendingFile(f);
+                return;
+              }}
+              pbfOnly
+              disabled={isExtracting}
+            />
+            {pendingFile?.name}
+          </div>
+          {extract.loadFailure ? (
+            <OsmLoadFailurePanel
+              failure={extract.loadFailure}
+              onDismiss={extract.clearLoadFailure}
+            />
+          ) : null}
         </CardContent>
       </Card>
 
@@ -350,7 +373,7 @@ export default function ExtractBlock() {
           >
             Download extracted PBF
           </Button>
-          {hasExtractResult && !extract.isStored ? (
+          {hasExtractResult && !extract.isStored && extract.canStore ? (
             <Button
               type="button"
               disabled={isExtracting}

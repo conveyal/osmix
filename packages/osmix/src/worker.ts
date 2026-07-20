@@ -51,6 +51,8 @@ export type { RouteResult, WaySegment };
 
 import {
   fromPbf,
+  getOsmLoadDecision as getStoredOsmLoadDecision,
+  type OsmLoadDecision,
   type OsmFromPbfOptions,
   readOsmPbfHeader,
   toPbfBuffer,
@@ -60,8 +62,11 @@ import { OsmixVtEncoder } from "@osmix/vt";
 import * as Comlink from "comlink";
 import { dequal } from "dequal/lite";
 
+import { installStructuredComlinkErrorTransferHandler } from "./comlink-errors.ts";
 import { type DrawToRasterTileOptions, drawToRasterTile } from "./raster.ts";
 import { transfer } from "./utils.ts";
+
+installStructuredComlinkErrorTransferHandler();
 
 /**
  * Worker handler for managing multiple Osm instances off the calling thread.
@@ -69,6 +74,7 @@ import { transfer } from "./utils.ts";
  */
 export class OsmixWorker extends EventTarget {
   private osm = new Map<string, Osm>();
+  private loadDecisions = new Map<string, OsmLoadDecision>();
   private vtEncoders = new Map<string, OsmixVtEncoder>();
   private graphs = new Map<string, RoutingGraph>();
   private changesets = new Map<string, OsmChangeset>();
@@ -116,6 +122,8 @@ export class OsmixWorker extends EventTarget {
       this.onProgress,
     );
     this.set(osm.id, osm);
+    const decision = getStoredOsmLoadDecision(osm);
+    this.setLoadDecision(osm.id, decision);
     return osm.info();
   }
 
@@ -221,8 +229,9 @@ export class OsmixWorker extends EventTarget {
    * Accept transferables from another worker or main thread and reconstruct an Osm instance.
    * Used when SharedArrayBuffer is supported to share data across workers.
    */
-  transferIn(transferables: OsmTransferables) {
+  transferIn(transferables: OsmTransferables, loadDecision?: OsmLoadDecision | null) {
     this.set(transferables.id, new Osm(transferables));
+    this.setLoadDecision(transferables.id, loadDecision ?? null);
   }
 
   /**
@@ -241,6 +250,11 @@ export class OsmixWorker extends EventTarget {
    */
   getOsmBuffers(id: string) {
     return this.get(id).transferables();
+  }
+
+  /** Return the profile decision recorded while loading a PBF dataset. */
+  getLoadDecision(id: string): OsmLoadDecision | null {
+    return this.loadDecisions.get(id) ?? null;
   }
 
   /**
@@ -274,6 +288,7 @@ export class OsmixWorker extends EventTarget {
    */
   protected set(id: string, osm: Osm) {
     this.osm.set(id, osm);
+    this.loadDecisions.delete(id);
     this.vtEncoders.set(id, new OsmixVtEncoder(osm));
     const graph = this.graphs.get(id);
     if (graph) {
@@ -281,11 +296,18 @@ export class OsmixWorker extends EventTarget {
     }
   }
 
+  /** Record load-profile diagnostics for datasets reconstructed by subclasses. */
+  protected setLoadDecision(id: string, decision: OsmLoadDecision | null): void {
+    if (decision) this.loadDecisions.set(id, decision);
+    else this.loadDecisions.delete(id);
+  }
+
   /**
    * Remove an Osm instance from this worker, freeing its memory.
    */
   delete(id: string) {
     this.osm.delete(id);
+    this.loadDecisions.delete(id);
     this.vtEncoders.delete(id);
     this.graphs.delete(id);
   }

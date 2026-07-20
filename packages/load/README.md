@@ -5,6 +5,8 @@ Load OpenStreetMap PBF data into `@osmix/core` indexes, create geographic extrac
 ## Highlights
 
 - **Load** PBF buffers or streams into an in-memory `Osm` index with ID, tag, and spatial indexes.
+- **Profile** spatial indexing as Auto, Full, or View, or select individual index capabilities explicitly.
+- **Diagnose** projected typed-buffer peaks and allocation ceilings before constructing large spatial indexes.
 - **Extract** subsets by bounding box during load or from an existing index (`simple`, `complete_ways`, `smart`).
 - **Filter** entities by tag rules while parsing (worker-safe, serializable rules).
 - **Export** indexes to PBF via streaming (`toPbfStream`) or a single buffer (`toPbfBuffer`).
@@ -29,6 +31,72 @@ const osm = await fromPbf(monacoPbf);
 
 console.log(osm.nodes.size, osm.ways.size, osm.relations.size);
 ```
+
+`@osmix/load` defaults to the Full profile for compatibility with existing callers. Applications that can
+operate without an all-node spatial index can request Auto:
+
+```ts check-docs monaco-pbf
+import { fromPbf } from "osmix";
+
+const osm = await fromPbf(monacoPbf, {
+  loadProfile: "auto",
+  loadCapabilities: {
+    deviceMemoryBytes: 16 * 2 ** 30,
+    arrayBufferMaxBytes: 2_144_777_216,
+    sharedArrayBufferMaxBytes: 2_144_777_216,
+    activeBufferType: "shared-array-buffer",
+  },
+});
+
+console.log(osm.info().spatialIndexes);
+```
+
+For deterministic control, an explicit spatial-index selection takes precedence over `loadProfile`:
+
+```ts check-docs monaco-pbf
+import { fromPbf } from "osmix";
+
+const osm = await fromPbf(monacoPbf, {
+  loadProfile: "full",
+  spatialIndexes: {
+    nodes: ["tagged"],
+    ways: true,
+    relations: true,
+  },
+});
+
+console.log(osm.info().spatialIndexes.nodes.all); // false
+```
+
+### Load profiles
+
+| Profile | Node indexes                                    | Way index | Relation index | Intended use                                  |
+| ------- | ----------------------------------------------- | --------- | -------------- | --------------------------------------------- |
+| Full    | all and tagged                                  | yes       | yes            | Complete algorithms and arbitrary node lookup |
+| View    | tagged only                                     | yes       | yes            | Rendering, tag search, and entity inspection  |
+| Auto    | Full when within memory budgets; otherwise View | —         | —              | Runtime-selected browser loading              |
+
+Auto selects Full only when all three checks pass:
+
+- the all-node index is at most 256 MiB;
+- the projected typed-buffer peak is within the smaller of 4 GiB and 40% of reported device memory; and
+- every planned allocation is below 80% of the tested ceiling for the active buffer type.
+
+Reported device memory is advisory. A View working-set estimate above its guideline produces a warning and
+still attempts the load. A planned allocation above the hard active-buffer budget throws
+`OsmLoadCapacityError` before construction, with required and available byte counts. A missing node
+capability later throws `SpatialIndexNotBuiltError`; both errors expose structured fields suitable for worker
+transport.
+
+That preflight applies to planned spatial indexes. Mandatory entity columns are finalized before profile
+selection and remain present in Auto, Full, and View. If one of those columns cannot fit in a single browser
+buffer, core throws `OsmEntityIndexBuildError` with nested `TypedBufferAllocationError` details including the
+entity/component, element count, buffer type, and exact required bytes. Changing profiles cannot avoid such a
+core-storage failure.
+
+`Osm.info()` reports selected spatial capabilities and optional load diagnostics: the requested and selected
+profiles, selection reasons, resident and projected typed-buffer bytes, largest planned allocation, storage
+bytes, budgets, phase timings, and tag/reference/member counters.
 
 ### Load with bbox extraction during parse
 
@@ -142,7 +210,10 @@ for await (const entity of stream) {
 - `extractStrategy` – how boundary ways and relations are handled
 - `extractTagFilter` – serializable tag rules applied during ingestion
 - `filter` – custom per-entity predicate
-- `buildSpatialIndexes` – which spatial indexes to build (`"node"`, `"way"`, `"relation"`)
+- `loadProfile` – `"auto"`, `"full"`, or `"view"`; defaults to `"full"`
+- `loadCapabilities` – advisory device-memory and tested buffer-ceiling inputs used by Auto
+- `spatialIndexes` – explicit `OsmSpatialIndexSelection`; takes precedence over `loadProfile`
+- `buildSpatialIndexes` – deprecated compatibility alias for entity-type selection
 
 ## Related Packages
 
@@ -157,6 +228,9 @@ for await (const entity of stream) {
 - `fromPbf` expects dense-node blocks; sparse node encodings throw.
 - `"simple"` in-stream bbox filtering may leave incomplete way geometry at boundaries; prefer `"complete_ways"` or `"smart"` for topology-safe extracts.
 - Tag filtering on dense nodes may drop refs when nodes precede ways in a block; use post-load `createExtract` when reference completeness matters.
+- View supports simple in-stream extraction. Complete/smart extraction, deduplication, routing, and other
+  arbitrary-node spatial operations require Full; callers must reload or explicitly build the all-node
+  capability.
 
 ## Development
 

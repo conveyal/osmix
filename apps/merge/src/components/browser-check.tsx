@@ -1,7 +1,10 @@
-import { releaseProxy } from "comlink";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { createBrowserCheckWorker } from "../workers/browser-check.worker";
+import {
+  type BrowserLoadCapabilities,
+  getBrowserLoadCapabilities,
+} from "../lib/browser-capabilities";
+import { bytesSizeToHuman } from "../utils";
 import { StatusDot } from "./status-dot";
 import { Button } from "./ui/button";
 import {
@@ -153,7 +156,7 @@ function DeviceMemory() {
 
   return (
     <div>
-      <div className="font-bold">Device memory available</div>
+      <div className="font-bold">Reported device memory class</div>
       <div>{memory}</div>
     </div>
   );
@@ -179,7 +182,10 @@ function StorageEstimate() {
       <div className="font-bold">Storage</div>
       <div>Usage: {(storage.usage / 1024 / 1024).toFixed(2)} MB</div>
       <div>Quota: {(storage.quota / 1024 / 1024).toFixed(2)} MB</div>
-      <div>Percentage: {((storage.usage / storage.quota) * 100).toFixed(2)}%</div>
+      <div>
+        Percentage:{" "}
+        {storage.quota === 0 ? "unknown" : `${((storage.usage / storage.quota) * 100).toFixed(2)}%`}
+      </div>
     </div>
   );
 }
@@ -194,31 +200,58 @@ const TypedArrays = [
   Uint8Array,
   Int8Array,
 ];
-const START_SIZE_BYTES = 2 ** 24;
-
 function MaxArraySizes() {
-  const [maxByteSize, setMaxByteSize] = useState(START_SIZE_BYTES);
-  const [calculated, setCalculated] = useState(false);
-  const [, startTransition] = useTransition();
+  const [capabilities, setCapabilities] = useState<BrowserLoadCapabilities | null>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
 
   useEffect(() => {
-    startTransition(async () => {
-      const browserCheckWorker = createBrowserCheckWorker();
-      setMaxByteSize(await browserCheckWorker.getMaxArraySize());
-      setCalculated(true);
-      browserCheckWorker[releaseProxy]();
-    });
+    let disposed = false;
+    void getBrowserLoadCapabilities().then(
+      (result) => {
+        if (!disposed) setCapabilities(result);
+      },
+      (error: unknown) => {
+        if (!disposed) setProbeError(error instanceof Error ? error.message : String(error));
+      },
+    );
+    return () => {
+      disposed = true;
+    };
   }, []);
+
+  const activeCeiling =
+    capabilities?.activeBufferType === "shared-array-buffer"
+      ? capabilities.sharedArrayBufferMaxBytes
+      : capabilities?.arrayBufferMaxBytes;
 
   return (
     <div>
-      <div className="font-bold">Max array sizes</div>
-      {calculated ? (
-        TypedArrays.map((a) => (
-          <div key={a.name}>
-            {a.name}: {(maxByteSize / a.BYTES_PER_ELEMENT).toLocaleString()}
+      <div className="font-bold">Tested buffer ceilings</div>
+      {capabilities ? (
+        <>
+          <div>ArrayBuffer: {bytesSizeToHuman(capabilities.arrayBufferMaxBytes)}</div>
+          <div>
+            SharedArrayBuffer:{" "}
+            {capabilities.sharedArrayBufferMaxBytes === undefined
+              ? "unavailable"
+              : bytesSizeToHuman(capabilities.sharedArrayBufferMaxBytes)}
           </div>
-        ))
+          <div>
+            Active storage:{" "}
+            {capabilities.activeBufferType === "shared-array-buffer"
+              ? "SharedArrayBuffer"
+              : "ArrayBuffer"}
+          </div>
+          <div className="font-bold">Derived active-buffer element counts</div>
+          {TypedArrays.map((arrayType) => (
+            <div key={arrayType.name}>
+              {arrayType.name}:{" "}
+              {Math.floor((activeCeiling ?? 0) / arrayType.BYTES_PER_ELEMENT).toLocaleString()}
+            </div>
+          ))}
+        </>
+      ) : probeError ? (
+        <div className="text-destructive">Probe failed: {probeError}</div>
       ) : (
         <Spinner />
       )}
