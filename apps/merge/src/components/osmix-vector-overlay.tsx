@@ -233,6 +233,7 @@ export default function OsmixVectorOverlay({ osm }: { osm: Osm }) {
 
   return (
     <Source
+      key={sourceId}
       id={sourceId}
       type="vector"
       tiles={[osmixIdToTileUrl(osm.id)]}

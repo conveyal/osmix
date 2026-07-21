@@ -17,6 +17,10 @@ export default function OsmixRasterSource({
   const id = `${APPID}:${osmId}:${tileSize}:raster`;
   return (
     <Source
+      // react-map-gl treats a source ID as immutable. Merging replaces the base
+      // dataset ID, so key the source by that ID to remount it instead of asking
+      // the existing MapLibre source to change identity.
+      key={id}
       id={id}
       type="raster"
       tiles={[osmixIdToTileUrl(osmId, tileSize)]}

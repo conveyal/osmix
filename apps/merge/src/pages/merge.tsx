@@ -14,8 +14,7 @@ import EntityDetailsMapControl from "../components/entity-details-map-control";
 import ExtractMapLayers from "../components/extract-map-layers";
 import { Main, MapContent, Sidebar } from "../components/layout";
 import OsmFileMapControl from "../components/osm-file-map-control";
-import OsmixRasterSource from "../components/osmix-raster-source";
-import OsmixVectorOverlay from "../components/osmix-vector-overlay";
+import { OsmixMapSources } from "../components/osmix-map-sources";
 import SelectedEntityLayer from "../components/selected-entity-layer";
 import SidebarLog from "../components/sidebar-log";
 import { buttonVariants } from "../components/ui/button";
@@ -187,16 +186,12 @@ export default function Merge() {
       </Sidebar>
       <MapContent>
         <Basemap initialViewState={initialViewState}>
-          {base.osm && <OsmixRasterSource osmId={base.osm.id} />}
-          {patch.osm && <OsmixRasterSource osmId={patch.osm.id} />}
-          {base.osm && <OsmixVectorOverlay osm={base.osm} />}
-          {patch.osm && <OsmixVectorOverlay osm={patch.osm} />}
-          {activeTab === "Extract" && extract.osm ? (
-            <>
-              <OsmixRasterSource osmId={extract.osm.id} />
-              <OsmixVectorOverlay osm={extract.osm} />
-            </>
-          ) : null}
+          <OsmixMapSources
+            activeTab={activeTab}
+            baseOsm={base.osm}
+            extractOsm={extract.osm}
+            patchOsm={patch.osm}
+          />
 
           {activeTab === "Extract" ? <ExtractMapLayers /> : null}
 
