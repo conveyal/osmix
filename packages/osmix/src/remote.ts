@@ -657,6 +657,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
 
   private invalidateConflationsForDataset(osmId: OsmId): void {
     const id = this.getId(osmId);
+    // Dataset IDs are logical keys and loaders may replace the contents under one.
+    // Candidate evidence and decisions are invalid as soon as either input changes.
     for (const [baseOsmId, state] of this.activeConflations) {
       if (baseOsmId === id || state.patchOsmId === id) {
         this.activeConflations.delete(baseOsmId);
@@ -747,6 +749,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     }
     if (index === 0) {
       for (const state of this.activeConflations.values()) {
+        // Recovery reproduces review state by rediscovering from restored untouched
+        // inputs, then replaying stable ID-based decisions and filters.
         await worker.discoverConflation(state.baseOsmId, state.patchOsmId, state.options);
         await worker.setConflationFilter(state.baseOsmId, state.filter);
         await worker.setConflationDecisions(state.baseOsmId, state.decisions);
@@ -1303,6 +1307,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       }),
       { lane: "control", retry: "once" },
     );
+    // Invalidate sessions using either key: rename removes the source and may
+    // overwrite a different dataset already registered at the destination.
     this.invalidateConflationsForDataset(from);
     this.invalidateConflationsForDataset(toId);
     // Update the id in the transferables
@@ -1509,6 +1515,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   async discoverConflation(baseOsmId: OsmId, patchOsmId: OsmId, options: OsmConflationOptions) {
     const baseId = this.getId(baseOsmId);
     const patchId = this.getId(patchOsmId);
+    // Recovery state must not share mutable decisions or option arrays with callers.
     const storedOptions = structuredClone(options);
     const result = await this.runWithWorker(
       (worker) => worker.discoverConflation(baseId, patchId, storedOptions),

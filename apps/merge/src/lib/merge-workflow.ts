@@ -130,6 +130,8 @@ export async function runConflationAllSteps({
   onGenerated?.(generation);
   if (isCancelled()) return { generation, status: "cancelled", summary };
 
+  // This is the first irreversible stage. After it succeeds, finish or explicitly
+  // expose the intersection retry state instead of pretending cancellation rolled back.
   await worker.applyChangesAndReplace(generation.stats.osmId);
   onBaseApplied?.();
 

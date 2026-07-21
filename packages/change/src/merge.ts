@@ -78,6 +78,8 @@ export async function merge(
       throw Error("Fuzzy conflation requires directMerge to preserve unmatched patch entities");
     }
     log(`Discovering imported-data matches from ${patch.id} against ${base.id}...`);
+    // Fuzzy discovery always sees untouched inputs. The ordinary result is only the
+    // application baseline, preventing transitive matches through imported entities.
     const discovery = discoverConflationCandidates(base, patch, options.conflation);
     const ordinaryBaseline = modifiedBase;
     const changeset = generateConflationApplicationChangeset(
@@ -94,7 +96,8 @@ export async function merge(
     );
   }
 
-  // Create intersections
+  // Intersections run after conflation so accepted patch attachments participate in
+  // crossing insertion, while candidate discovery remains based on untouched inputs.
   if (options.createIntersections) {
     log("Creating intersections in final dataset...");
     const changeset = new OsmChangeset(modifiedBase);
