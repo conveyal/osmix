@@ -10,6 +10,27 @@ const occupiedMonacoTile: [number, number, number] = [17059, 11948, 15];
 // Increase timeout for worker tests
 const workerTestTimeout = 30_000;
 
+function createParallelFootway(
+  id: string,
+  nodeId: number,
+  wayId: number,
+  lat: number,
+  name: string,
+) {
+  const osm = new Osm({ id });
+  osm.nodes.addNode({ id: nodeId, lon: 0, lat });
+  osm.nodes.addNode({ id: nodeId + 1, lon: 0.001, lat });
+  osm.nodes.buildIndex();
+  osm.ways.addWay({
+    id: wayId,
+    refs: [nodeId, nodeId + 1],
+    tags: { highway: "footway", name },
+  });
+  osm.buildIndexes();
+  osm.buildSpatialIndexes();
+  return osm;
+}
+
 class RecoveryTestRemote extends OsmixRemote {
   private readonly customSources = new Map<string, Uint8Array>();
 
@@ -311,6 +332,116 @@ describe("OsmixRemote", () => {
       await remote.restoreForTest();
 
       expect(addProgressListener).toHaveBeenCalledOnce();
+    });
+
+    it("restores conflation discovery, review decisions, filters, and generated changes", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const base = createParallelFootway("recovery-base", 1, 10, 0, "Base path");
+      const patch = createParallelFootway("recovery-patch", 11, 20, 0.000004, "Imported path");
+      await remote.transferIn(base);
+      await remote.transferIn(patch);
+      await remote.discoverConflation(base.id, patch.id, {
+        propertyKeys: ["name"],
+        attachNetwork: false,
+      });
+      const wayCandidate = (await remote.getConflationPage(base.id, 0, 100)).candidates.find(
+        (candidate) => candidate.entityType === "way",
+      );
+      if (!wayCandidate) throw Error("Expected a way conflation candidate");
+      await remote.setConflationDecision(base.id, {
+        candidateId: wayCandidate.id,
+        action: "reject",
+      });
+      await expect(
+        remote.setConflationDecision(base.id, {
+          candidateId: wayCandidate.id,
+          action: "invalid",
+        } as never),
+      ).rejects.toThrow(`Invalid conflation decision action for ${wayCandidate.id}`);
+      await remote.setConflationFilter(base.id, { status: "rejected" });
+      await remote.generateConflationChangeset(base.id, {
+        directMerge: true,
+        deduplicateNodes: true,
+        deduplicateWays: true,
+      });
+
+      await remote.getWorker().clearConflation(base.id);
+      await remote.restoreForTest();
+
+      const restoredPage = await remote.getConflationPage(base.id, 0, 100);
+      expect(restoredPage.totalCandidates).toBe(1);
+      expect(restoredPage.candidates[0]?.decision).toEqual({
+        candidateId: wayCandidate.id,
+        action: "reject",
+      });
+      expect((await remote.getChangesetPage(base.id, 0, 100)).changes?.length).toBeGreaterThan(0);
+    });
+
+    it("does not replay conflation state after a loader replaces an input ID", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const base = createParallelFootway("loader-base", 1, 10, 0, "Base path");
+      const patch = createParallelFootway("loader-patch", 11, 20, 0.000004, "Imported path");
+      await remote.transferIn(base);
+      await remote.transferIn(patch);
+      await remote.discoverConflation(base.id, patch.id, {
+        propertyKeys: ["name"],
+        attachNetwork: false,
+      });
+      const candidate = (await remote.getConflationPage(base.id, 0, 100)).candidates.find(
+        (row) => row.entityType === "way",
+      )!;
+      await remote.setConflationDecision(base.id, {
+        candidateId: candidate.id,
+        action: "reject",
+      });
+
+      const replacement: FeatureCollection<Point> = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [1, 1] },
+            properties: { name: "Replacement" },
+          },
+        ],
+      };
+      await remote.fromGeoJSON(new TextEncoder().encode(JSON.stringify(replacement)), {
+        id: patch.id,
+      });
+
+      await expect(remote.restoreForTest()).resolves.toBeUndefined();
+      await expect(remote.getConflationSummary(base.id)).rejects.toThrow(
+        "No active conflation session",
+      );
+    });
+
+    it("invalidates sessions for both sides of an overwriting rename", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const from = createParallelFootway("rename-from", 1, 10, 0, "From");
+      const fromPatch = createParallelFootway("rename-from-patch", 11, 20, 0.000004, "Patch");
+      const otherBase = createParallelFootway("rename-other-base", 21, 30, 0, "Other");
+      const to = createParallelFootway("rename-to", 31, 40, 0.000004, "Destination");
+      for (const osm of [from, fromPatch, otherBase, to]) await remote.transferIn(osm);
+      await remote.discoverConflation(from.id, fromPatch.id, {
+        propertyKeys: ["name"],
+        attachNetwork: false,
+      });
+      await remote.discoverConflation(otherBase.id, to.id, {
+        propertyKeys: ["name"],
+        attachNetwork: false,
+      });
+
+      await remote.rename(from.id, to.id);
+      await expect(remote.restoreForTest()).resolves.toBeUndefined();
+      await expect(remote.getConflationSummary(from.id)).rejects.toThrow(
+        "No active conflation session",
+      );
+      await expect(remote.getConflationSummary(otherBase.id)).rejects.toThrow(
+        "No active conflation session",
+      );
     });
   });
 

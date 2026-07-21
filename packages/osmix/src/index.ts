@@ -20,7 +20,17 @@ export {
   type OsmixRemoteOptions,
   type OsmixWorkerLane,
 } from "./remote.ts";
-export { OsmixWorker, type RouteResult, type WaySegment } from "./worker.ts";
+export {
+  OsmixWorker,
+  type OsmConflationCandidateView,
+  type OsmConflationGenerationResult,
+  type OsmConflationPage,
+  type OsmConflationRoutingDelta,
+  type OsmConflationRoutingDiagnostics,
+  type OsmConflationRoutingGraphStats,
+  type RouteResult,
+  type WaySegment,
+} from "./worker.ts";
 export { drawToRasterTile, type DrawToRasterTileOptions } from "./raster.ts";
 export {
   canShareArrayBuffers,
@@ -62,7 +72,12 @@ export {
 // --- @osmix/change ---
 export {
   applyChangesetToOsm,
+  conflationEffectiveStatus,
+  discoverConflationCandidates,
+  filterConflationCandidates,
   generateChangeset,
+  generateConflationApplicationChangeset,
+  generateConflationChangeset,
   generateOscChanges,
   merge,
   OsmChangeset,
@@ -76,6 +91,8 @@ export {
   osmTagsToOscTags,
   removeDuplicateAdjacentRelationMembers,
   removeDuplicateAdjacentWayRefs,
+  summarizeConflationCandidates,
+  validateConflationDecisions,
   waysIntersect,
   waysShouldConnect,
 } from "@osmix/change";
@@ -85,6 +102,22 @@ export type {
   OsmChanges,
   OsmChangesetStats,
   OsmChangeTypes,
+  OsmConflationActionAssessment,
+  OsmConflationAutomatic,
+  OsmConflationCandidate,
+  OsmConflationCandidateFilter,
+  OsmConflationDecision,
+  OsmConflationDiscovery,
+  OsmConflationEffectiveStatus,
+  OsmConflationEntityType,
+  OsmConflationEvidence,
+  OsmConflationOptions,
+  OsmConflationReasonCode,
+  OsmConflationRoutingFamily,
+  OsmConflationStatus,
+  OsmConflationSummary,
+  OsmConflationTagDiff,
+  ResolvedOsmConflationOptions,
   OsmEntityRef,
   OsmMergeOptions,
 } from "@osmix/change";

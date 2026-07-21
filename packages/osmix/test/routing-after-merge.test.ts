@@ -7,6 +7,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { fromPbf, merge, Osm, type OsmEntity, toPbfBuffer } from "../src/index.ts";
 import {
   MONACO_ROUTING_CASES,
+  SYNTHETIC_CONFLATION_ATTACHED_CASES,
+  SYNTHETIC_CONFLATION_DISCONNECTED_CASES,
   SYNTHETIC_ROUTING_CASES,
   type RoutingTestCase,
 } from "./fixtures/routing-cases.ts";
@@ -20,6 +22,7 @@ import {
 import {
   createMonacoRoutingPatch,
   createMergedSyntheticRoutingOsm,
+  createSyntheticConflationRoutingVariants,
   roundTripRoutingOsm,
 } from "./synthetic-routing-fixture.ts";
 
@@ -40,6 +43,14 @@ function canonicalOsmDigest(osm: Osm): string {
   updateEntities("ways", osm.ways.sorted());
   updateEntities("relations", osm.relations.sorted());
   return hash.digest("hex");
+}
+
+function topologyFingerprint(osm: Osm): string {
+  return JSON.stringify({
+    nodes: [...osm.nodes.sorted()].map(({ id, lat, lon }) => ({ id, lat, lon })),
+    ways: [...osm.ways.sorted()].map(({ id, refs }) => ({ id, refs })),
+    relations: [...osm.relations.sorted()].map(({ id, members }) => ({ id, members })),
+  });
 }
 
 function expectReportToMatchCase(report: RoutingCaseReport, testCase: RoutingTestCase): void {
@@ -321,6 +332,142 @@ describe("routing on a synthetic merged network", () => {
     expectReportsToMatchCases(roundTripReports, SYNTHETIC_ROUTING_CASES);
     expect(stableReports(roundTripReports, SYNTHETIC_ROUTING_CASES)).toEqual(
       stableReports(mergedReports, SYNTHETIC_ROUTING_CASES),
+    );
+  });
+});
+
+describe("routing after explicit fuzzy conflation", () => {
+  let ordinary: Osm;
+  let propertyTransfer: Osm;
+  let networkAttachment: Osm;
+  let propertyRoundTrip: Osm;
+  let attachmentRoundTrip: Osm;
+  let ordinaryReports: RoutingCaseReport[];
+  let propertyReports: RoutingCaseReport[];
+  let attachmentReports: RoutingCaseReport[];
+  let propertyRoundTripReports: RoutingCaseReport[];
+  let attachmentRoundTripReports: RoutingCaseReport[];
+
+  beforeAll(async () => {
+    ({ ordinary, propertyTransfer, networkAttachment } =
+      await createSyntheticConflationRoutingVariants());
+    [propertyRoundTrip, attachmentRoundTrip] = await Promise.all([
+      roundTripRoutingOsm(propertyTransfer, "synthetic-conflation-property-roundtrip"),
+      roundTripRoutingOsm(networkAttachment, "synthetic-conflation-attachment-roundtrip"),
+    ]);
+
+    ordinaryReports = new RoutingTestHarness(ordinary).runAll(
+      SYNTHETIC_CONFLATION_DISCONNECTED_CASES,
+    );
+    propertyReports = new RoutingTestHarness(propertyTransfer).runAll(
+      SYNTHETIC_CONFLATION_DISCONNECTED_CASES,
+    );
+    attachmentReports = new RoutingTestHarness(networkAttachment).runAll(
+      SYNTHETIC_CONFLATION_ATTACHED_CASES,
+    );
+    propertyRoundTripReports = new RoutingTestHarness(propertyRoundTrip).runAll(
+      SYNTHETIC_CONFLATION_DISCONNECTED_CASES,
+    );
+    attachmentRoundTripReports = new RoutingTestHarness(attachmentRoundTrip).runAll(
+      SYNTHETIC_CONFLATION_ATTACHED_CASES,
+    );
+
+    const r5OracleDirectory = process.env["OSMIX_ROUTING_ORACLE_DIR"];
+    if (r5OracleDirectory) {
+      await Promise.all([
+        writeR5OracleArtifacts(
+          [
+            { id: "synthetic-conflation-ordinary", osm: ordinary, reports: ordinaryReports },
+            {
+              id: "synthetic-conflation-property",
+              osm: propertyTransfer,
+              reports: propertyReports,
+            },
+            {
+              id: "synthetic-conflation-property-roundtrip",
+              osm: propertyRoundTrip,
+              reports: propertyRoundTripReports,
+            },
+          ],
+          SYNTHETIC_CONFLATION_DISCONNECTED_CASES,
+          join(r5OracleDirectory, "conflation-property"),
+        ),
+        writeR5OracleArtifacts(
+          [
+            {
+              id: "synthetic-conflation-attachment",
+              osm: networkAttachment,
+              reports: attachmentReports,
+            },
+            {
+              id: "synthetic-conflation-attachment-roundtrip",
+              osm: attachmentRoundTrip,
+              reports: attachmentRoundTripReports,
+            },
+          ],
+          SYNTHETIC_CONFLATION_ATTACHED_CASES,
+          join(r5OracleDirectory, "conflation-attachment"),
+        ),
+      ]);
+    }
+  });
+
+  it("leaves property-only topology and routing unchanged", () => {
+    expect(propertyTransfer.nodes.getById(802)?.tags?.["name"]).toBe("Imported endpoint");
+    expect(propertyTransfer.nodes.getById(901)?.tags).toMatchObject({
+      name: "Imported endpoint",
+      source: "synthetic survey",
+    });
+    expect(propertyTransfer.ways.getById(810)?.refs.at(0)).toBe(801);
+    expect(propertyTransfer.ways.getById(849)?.refs.at(-1)).toBe(802);
+    expect(propertyTransfer.ways.getById(910)?.refs.at(0)).toBe(901);
+    expect(propertyTransfer.ways.getById(949)?.refs.at(-1)).toBe(902);
+    expect(topologyFingerprint(propertyTransfer)).toBe(topologyFingerprint(ordinary));
+    expectReportsToMatchCases(ordinaryReports, SYNTHETIC_CONFLATION_DISCONNECTED_CASES);
+    expectReportsToMatchCases(propertyReports, SYNTHETIC_CONFLATION_DISCONNECTED_CASES);
+    expect(stableReports(propertyReports, SYNTHETIC_CONFLATION_DISCONNECTED_CASES)).toEqual(
+      stableReports(ordinaryReports, SYNTHETIC_CONFLATION_DISCONNECTED_CASES),
+    );
+  });
+
+  it("attaches the WALK network while preserving the CAR graph", () => {
+    expect(networkAttachment.nodes.getById(802)).toMatchObject({ lon: 0, lat: 0 });
+    expect(networkAttachment.ways.getById(810)?.refs.at(0)).toBe(801);
+    expect(networkAttachment.ways.getById(849)?.refs.at(-1)).toBe(802);
+    expect(networkAttachment.ways.getById(910)?.refs.at(0)).toBe(802);
+    expect(networkAttachment.ways.getById(949)?.refs.at(-1)).toBe(902);
+    expect(networkAttachment.nodes.getById(901)).not.toBeNull();
+    expectReportsToMatchCases(attachmentReports, SYNTHETIC_CONFLATION_ATTACHED_CASES);
+
+    const ordinaryCar = ordinaryReports.find(
+      (report) => report.caseId === "synthetic-conflation-car",
+    );
+    const attachedCar = attachmentReports.find(
+      (report) => report.caseId === "synthetic-conflation-car",
+    );
+    expect(attachedCar?.graph).toEqual(ordinaryCar?.graph);
+
+    const ordinaryWalk = ordinaryReports.find(
+      (report) => report.caseId === "synthetic-conflation-walk",
+    );
+    const attachedWalk = attachmentReports.find(
+      (report) => report.caseId === "synthetic-conflation-walk",
+    );
+    expect(attachedWalk?.graph.edges).toBe(ordinaryWalk?.graph.edges);
+    expect(attachedWalk?.graph.weakComponents).toBe(1);
+    expect(ordinaryWalk?.graph.weakComponents).toBe(2);
+  });
+
+  it("preserves both conflation variants through PBF serialization", () => {
+    expect(topologyFingerprint(propertyRoundTrip)).toBe(topologyFingerprint(propertyTransfer));
+    expect(topologyFingerprint(attachmentRoundTrip)).toBe(topologyFingerprint(networkAttachment));
+    expectReportsToMatchCases(propertyRoundTripReports, SYNTHETIC_CONFLATION_DISCONNECTED_CASES);
+    expectReportsToMatchCases(attachmentRoundTripReports, SYNTHETIC_CONFLATION_ATTACHED_CASES);
+    expect(
+      stableReports(propertyRoundTripReports, SYNTHETIC_CONFLATION_DISCONNECTED_CASES),
+    ).toEqual(stableReports(propertyReports, SYNTHETIC_CONFLATION_DISCONNECTED_CASES));
+    expect(stableReports(attachmentRoundTripReports, SYNTHETIC_CONFLATION_ATTACHED_CASES)).toEqual(
+      stableReports(attachmentReports, SYNTHETIC_CONFLATION_ATTACHED_CASES),
     );
   });
 });

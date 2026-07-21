@@ -383,3 +383,51 @@ export const SYNTHETIC_ROUTING_CASES = [
     },
   },
 ] as const satisfies readonly RoutingTestCase[];
+
+/** The offset sidewalk inputs before fuzzy attachment remain separate WALK components. */
+export const SYNTHETIC_CONFLATION_DISCONNECTED_CASES = [
+  {
+    id: "synthetic-conflation-walk",
+    description: "The imported sidewalk is disconnected before fuzzy network attachment",
+    mode: "walk",
+    metric: "distance",
+    from: { nodeId: 801 },
+    to: { nodeId: 902 },
+    expect: { reachable: false },
+  },
+  {
+    id: "synthetic-conflation-car",
+    description: "Pedestrian-only source and target geometry is unavailable to cars",
+    mode: "car",
+    metric: "distance",
+    from: { nodeId: 801 },
+    to: { nodeId: 902 },
+    expect: { reachable: false },
+  },
+] as const satisfies readonly RoutingTestCase[];
+
+/** The same sidewalk pair after accepting its high-confidence pedestrian attachment. */
+export const SYNTHETIC_CONFLATION_ATTACHED_CASES = [
+  {
+    id: "synthetic-conflation-walk",
+    description: "Fuzzy attachment joins the aligned imported and base sidewalks",
+    mode: "walk",
+    metric: "distance",
+    from: { nodeId: 801 },
+    to: { nodeId: 902 },
+    expect: {
+      reachable: true,
+      distanceMeters: { min: 215, max: 230 },
+      requiredWayIds: [810, 910],
+    },
+  },
+  {
+    id: "synthetic-conflation-car",
+    description: "A pedestrian attachment does not introduce a car route",
+    mode: "car",
+    metric: "distance",
+    from: { nodeId: 801 },
+    to: { nodeId: 902 },
+    expect: { reachable: false },
+  },
+] as const satisfies readonly RoutingTestCase[];

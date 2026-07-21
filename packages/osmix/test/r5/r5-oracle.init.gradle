@@ -19,6 +19,22 @@ gradle.afterProject { project, state ->
     def oracleSourceDirectory = requiredProperty('osmixOracleSourceDir')
     def oracleManifest = requiredProperty('osmixOracleManifest')
     def oracleOutputDirectory = requiredProperty('osmixOracleOutputDir')
+    def defaultOracleDatasets = [
+            'monaco-raw',
+            'monaco-empty-merge',
+            'monaco-empty-merge-roundtrip',
+            'monaco-synthetic-patch',
+            'monaco-synthetic-patch-roundtrip'
+    ]
+    def configuredDatasets = project.findProperty('osmixOracleDatasets')
+    def oracleDatasets = configuredDatasets == null
+            ? defaultOracleDatasets
+            : configuredDatasets.toString().split(',')
+                    .collect { it.trim() }
+                    .findAll { !it.isBlank() }
+    if (oracleDatasets.isEmpty()) {
+        throw new GradleException('The -PosmixOracleDatasets list must not be empty')
+    }
 
     def oracleSourceSet = project.sourceSets.create('osmixRoutingOracle') {
         java.srcDir(oracleSourceDirectory)
@@ -35,13 +51,7 @@ gradle.afterProject { project, state ->
         classpath = oracleSourceSet.runtimeClasspath
         mainClass = 'R5RoutingOracle'
         args(oracleManifest, oracleOutputDirectory)
-        [
-                'monaco-raw',
-                'monaco-empty-merge',
-                'monaco-empty-merge-roundtrip',
-                'monaco-synthetic-patch',
-                'monaco-synthetic-patch-roundtrip'
-        ].each { datasetId ->
+        oracleDatasets.each { datasetId ->
             args(datasetId, new File(oracleOutputDirectory, "${datasetId}.osm.pbf").absolutePath)
         }
     }

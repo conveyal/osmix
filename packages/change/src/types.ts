@@ -51,6 +51,143 @@ export interface OsmMergeOptions {
   deduplicateNodes: boolean;
   deduplicateWays: boolean;
   createIntersections: boolean;
+
+  /** Optional, explicitly configured cross-dataset proximity conflation. */
+  conflation?: OsmConflationOptions;
+}
+
+/** Entity kinds supported by fuzzy conflation. */
+export type OsmConflationEntityType = "node" | "way";
+
+/** Whether high-confidence candidates should be accepted without a review decision. */
+export type OsmConflationAutomatic = "high-confidence" | "none";
+
+/** Intrinsic classification of a discovered source/target match. */
+export type OsmConflationStatus = "automatic" | "review" | "blocked" | "unmatched";
+
+/** Candidate status after applying an optional user decision. */
+export type OsmConflationEffectiveStatus = OsmConflationStatus | "rejected";
+
+/** Stable, machine-readable explanations for a conflation classification. */
+export type OsmConflationReasonCode =
+  | "bearing-mismatch"
+  | "drivable-network"
+  | "exact-match"
+  | "geometry-mismatch"
+  | "grade-conflict"
+  | "length-mismatch"
+  | "many-to-one"
+  | "multiple-targets"
+  | "no-transferable-properties"
+  | "node-context-conflict"
+  | "non-routing-target"
+  | "protected-tag"
+  | "relation-member"
+  | "routing-family-conflict"
+  | "routing-property"
+  | "same-id"
+  | "unsupported-way-chain"
+  | "would-collapse-way";
+
+/** A selected patch tag and the value it would replace on the base entity. */
+export interface OsmConflationTagDiff {
+  key: string;
+  patchValue: string | number;
+  baseValue?: string | number;
+  protected: boolean;
+  routing: boolean;
+}
+
+/** Serializable matching evidence used by the UI and deterministic tests. */
+export interface OsmConflationEvidence {
+  distanceMeters: number;
+  sourceRoutingFamilies: OsmConflationRoutingFamily[];
+  targetRoutingFamilies: OsmConflationRoutingFamily[];
+  tagDiff: OsmConflationTagDiff[];
+  patchWayIds?: number[];
+  bearingDifferenceDegrees?: number;
+  endpointDistancesMeters?: [number, number];
+  lengthDifferenceRatio?: number;
+  maxGeometryDistanceMeters?: number;
+}
+
+/** Normalized routing contexts used to compare imported and base geometry. */
+export type OsmConflationRoutingFamily =
+  | "bicycle-shared"
+  | "motor-road"
+  | "non-routable"
+  | "pedestrian";
+
+/** Classification for one independently selectable conflation action. */
+export interface OsmConflationActionAssessment {
+  status: OsmConflationStatus;
+  reasons: OsmConflationReasonCode[];
+}
+
+/** One stable source/target candidate. Ambiguous sources have one row per target. */
+export interface OsmConflationCandidate {
+  id: string;
+  entityType: OsmConflationEntityType;
+  sourceId: number;
+  targetId: number | null;
+  status: OsmConflationStatus;
+  reasons: OsmConflationReasonCode[];
+  propertyTransfer: OsmConflationActionAssessment;
+  networkAttachment: OsmConflationActionAssessment | null;
+  evidence: OsmConflationEvidence;
+}
+
+/** Explicit fuzzy-conflation configuration. Property transfer is disabled by an empty key list. */
+export interface OsmConflationOptions {
+  propertyKeys: string[];
+  attachNetwork: boolean;
+  maxDistanceMeters?: number;
+  automatic?: OsmConflationAutomatic;
+  decisions?: OsmConflationDecision[];
+}
+
+/** Fully defaulted options captured with a deterministic discovery result. */
+export interface ResolvedOsmConflationOptions {
+  propertyKeys: string[];
+  attachNetwork: boolean;
+  maxDistanceMeters: number;
+  automatic: OsmConflationAutomatic;
+}
+
+/** A user's explicit choice for a discovered source/target pair. */
+export interface OsmConflationDecision {
+  candidateId: string;
+  action: "accept" | "reject";
+  transferProperties?: boolean;
+  attachNetwork?: boolean;
+}
+
+/** Counts used to present discovery and review progress. */
+export interface OsmConflationSummary {
+  total: number;
+  automatic: number;
+  review: number;
+  blocked: number;
+  unmatched: number;
+  rejected: number;
+}
+
+/** Deterministic discovery result produced only from untouched inputs. */
+export interface OsmConflationDiscovery {
+  baseOsmId: string;
+  patchOsmId: string;
+  options: ResolvedOsmConflationOptions;
+  candidates: OsmConflationCandidate[];
+  summary: OsmConflationSummary;
+}
+
+/** Serializable filters used by paged worker APIs. */
+export interface OsmConflationCandidateFilter {
+  entityType?: OsmConflationEntityType;
+  status?: OsmConflationEffectiveStatus;
+  reason?: OsmConflationReasonCode;
+  sourceId?: number;
+  targetId?: number | null;
 }
 
 /**

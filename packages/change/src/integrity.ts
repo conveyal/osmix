@@ -238,3 +238,67 @@ export function assertNoNewRoutingIntegrityIssues(baselineKeys: ReadonlySet<stri
   const suffix = omitted > 0 ? `; and ${omitted} more` : "";
   throw Error(`Merge introduced routing-integrity problems: ${descriptions.join("; ")}${suffix}`);
 }
+
+/**
+ * Ensure fuzzy conflation did not rewrite geometry or relation topology that already existed in
+ * the base. Same-ID patch updates are compared at the ordinary-merge baseline, not the raw base.
+ */
+export function assertConflationPreservesBaseTopology(
+  originalBase: Osm,
+  ordinaryBaseline: Osm,
+  conflated: Osm,
+) {
+  const violations: string[] = [];
+  for (const original of originalBase.nodes) {
+    const baseline = ordinaryBaseline.nodes.getById(original.id);
+    const result = conflated.nodes.getById(original.id);
+    if (!baseline || !result) {
+      violations.push(`base node ${original.id} was removed`);
+      continue;
+    }
+    if (baseline.lon !== result.lon || baseline.lat !== result.lat) {
+      violations.push(`base node ${original.id} coordinates changed`);
+    }
+  }
+  for (const original of originalBase.ways) {
+    const baseline = ordinaryBaseline.ways.getById(original.id);
+    const result = conflated.ways.getById(original.id);
+    if (!baseline || !result) {
+      violations.push(`base way ${original.id} was removed`);
+      continue;
+    }
+    if (
+      baseline.refs.length !== result.refs.length ||
+      baseline.refs.some((ref, index) => ref !== result.refs[index])
+    ) {
+      violations.push(`base way ${original.id} references changed`);
+    }
+  }
+  for (const original of originalBase.relations) {
+    const baseline = ordinaryBaseline.relations.getById(original.id);
+    const result = conflated.relations.getById(original.id);
+    if (!baseline || !result) {
+      violations.push(`base relation ${original.id} was removed`);
+      continue;
+    }
+    if (
+      baseline.members.length !== result.members.length ||
+      baseline.members.some((member, index) => {
+        const resultMember = result.members[index];
+        return (
+          !resultMember ||
+          member.type !== resultMember.type ||
+          member.ref !== resultMember.ref ||
+          member.role !== resultMember.role
+        );
+      })
+    ) {
+      violations.push(`base relation ${original.id} members changed`);
+    }
+  }
+  if (violations.length === 0) return;
+  const descriptions = violations.slice(0, 10);
+  const omitted = violations.length - descriptions.length;
+  const suffix = omitted > 0 ? `; and ${omitted} more` : "";
+  throw Error(`Conflation changed protected base topology: ${descriptions.join("; ")}${suffix}`);
+}

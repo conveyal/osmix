@@ -39,6 +39,10 @@ This opt-in command writes:
 - `oracle-matrix.json`: current Osmix raw, merged, and PBF-reloaded reports.
 - Per-dataset JSON and GeoJSON diagnostics for visual review.
 - `synthetic/`: generated merged and PBF-reloaded synthetic networks and reports.
+- `conflation-property/`: ordinary, property-only, and property-only-reloaded PBFs. Their
+  disconnected WALK topology must remain identical.
+- `conflation-attachment/`: attached and attached-reloaded pedestrian PBFs. Both must expose the
+  newly connected WALK route.
 
 Normal tests never write these files and no command auto-updates checked-in expectations.
 
@@ -60,6 +64,30 @@ gradle --no-daemon --init-script \
 
 Use `--offline` when the R5 Gradle dependencies are already cached. The runner produces
 one TSV per Monaco dataset in `ORACLE_DIR`.
+
+The init script accepts a comma-separated `osmixOracleDatasets` override for the generated
+conflation variants. Run the property-only matrix and attachment matrix separately so each uses its
+matching endpoint expectations:
+
+```sh
+gradle --offline --no-daemon --init-script \
+  "$OSMIX_DIR/packages/osmix/test/r5/r5-oracle.init.gradle" \
+  -PosmixOracleBuildDir="$R5_ORACLE_BUILD" \
+  -PosmixOracleSourceDir="$OSMIX_DIR/packages/osmix/test/r5" \
+  -PosmixOracleManifest="$ORACLE_DIR/conflation-property/routing-cases.tsv" \
+  -PosmixOracleOutputDir="$ORACLE_DIR/conflation-property" \
+  -PosmixOracleDatasets=synthetic-conflation-ordinary,synthetic-conflation-property,synthetic-conflation-property-roundtrip \
+  runOsmixRoutingOracle
+
+gradle --offline --no-daemon --init-script \
+  "$OSMIX_DIR/packages/osmix/test/r5/r5-oracle.init.gradle" \
+  -PosmixOracleBuildDir="$R5_ORACLE_BUILD" \
+  -PosmixOracleSourceDir="$OSMIX_DIR/packages/osmix/test/r5" \
+  -PosmixOracleManifest="$ORACLE_DIR/conflation-attachment/routing-cases.tsv" \
+  -PosmixOracleOutputDir="$ORACLE_DIR/conflation-attachment" \
+  -PosmixOracleDatasets=synthetic-conflation-attachment,synthetic-conflation-attachment-roundtrip \
+  runOsmixRoutingOracle
+```
 
 The primary result columns use normal R5 coordinate-to-edge linking. For node-ID cases, the runner
 also reports an exact-vertex result when both OSM nodes survive as unambiguous R5 topological
@@ -107,3 +135,23 @@ The last two cases deliberately assert Osmix node-to-node topology. R5 collapses
 each case into an intermediate shape point, then normal coordinate linking can snap to a different
 nearby level. Their R5 distance is therefore not compared with the Osmix node-ID golden; raw versus
 merged equality remains the valid R5 check for those witnesses.
+
+## Observed synthetic conflation matrix
+
+The same 2026-07-21 R5 checkout was also used for the explicit 1-meter conflation variants. The
+ordinary fixture contains two aligned footway components whose endpoints are about 0.56 meters
+apart. Property transfer changes only a selected `name`; network attachment rewrites the first
+imported way reference to the preserved base endpoint.
+
+| Variant                             | WALK reachable | Coordinate result | Exact-vertex result |
+| ----------------------------------- | -------------- | ----------------: | ------------------: |
+| ordinary direct merge               | no             |               n/a |                 n/a |
+| property transfer                   | no             |               n/a |                 n/a |
+| property transfer after PBF reload  | no             |               n/a |                 n/a |
+| network attachment                  | yes            | 222.244 m / 237 s |   222.245 m / 240 s |
+| network attachment after PBF reload | yes            | 222.244 m / 237 s |   222.245 m / 240 s |
+
+The three property-side TSVs were byte-identical, as were the two attachment-side TSVs. Osmix
+separately asserts that the attachment changes WALK from two components to one while its CAR graph
+is unchanged. `osmium check-refs` reported zero missing way-node references for the generated and
+reloaded conflation PBFs.

@@ -12,7 +12,12 @@ import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/pr
 
 import { applyChangesetToOsm } from "./apply-changeset.ts";
 import { OsmChangeset } from "./changeset.ts";
+import {
+  discoverConflationCandidates,
+  generateConflationApplicationChangeset,
+} from "./conflation.ts";
 import { generateChangeset } from "./generate-changeset.ts";
+import { assertConflationPreservesBaseTopology } from "./integrity.ts";
 import type { OsmMergeOptions } from "./types.ts";
 import { changeStatsSummary } from "./utils.ts";
 
@@ -66,6 +71,27 @@ export async function merge(
     );
     log(changeStatsSummary(changeset.stats));
     modifiedBase = applyChangesetToOsm(changeset);
+  }
+
+  if (options.conflation) {
+    if (!options.directMerge) {
+      throw Error("Fuzzy conflation requires directMerge to preserve unmatched patch entities");
+    }
+    log(`Discovering imported-data matches from ${patch.id} against ${base.id}...`);
+    const discovery = discoverConflationCandidates(base, patch, options.conflation);
+    const ordinaryBaseline = modifiedBase;
+    const changeset = generateConflationApplicationChangeset(
+      ordinaryBaseline,
+      patch,
+      discovery,
+      base,
+      options.conflation.decisions,
+    );
+    modifiedBase = applyChangesetToOsm(changeset);
+    assertConflationPreservesBaseTopology(base, ordinaryBaseline, modifiedBase);
+    log(
+      `Conflation candidates: ${discovery.summary.automatic.toLocaleString()} automatic, ${discovery.summary.review.toLocaleString()} review, ${discovery.summary.blocked.toLocaleString()} blocked, ${discovery.summary.unmatched.toLocaleString()} unmatched`,
+    );
   }
 
   // Create intersections

@@ -8,6 +8,7 @@ import ExtractBlock from "../blocks/extract";
 import InspectBlock from "../blocks/inspect";
 import MergeBlock from "../blocks/merge";
 import Basemap, { type MapInitialViewState } from "../components/basemap";
+import { ConflationComparisonLayer } from "../components/conflation-comparison-layer";
 import CustomControl from "../components/custom-control";
 import EntityDetailsMapControl from "../components/entity-details-map-control";
 import ExtractMapLayers from "../components/extract-map-layers";
@@ -199,6 +200,7 @@ export default function Merge() {
 
           {activeTab === "Extract" ? <ExtractMapLayers /> : null}
 
+          {activeTab === "Merge" ? <ConflationComparisonLayer /> : null}
           <SelectedEntityLayer />
 
           <OsmFileMapControl
