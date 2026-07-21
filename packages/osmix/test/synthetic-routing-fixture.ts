@@ -186,3 +186,89 @@ export async function createMergedSyntheticRoutingOsm(): Promise<Osm> {
     directMerge: true,
   });
 }
+
+/**
+ * A pair of offset pedestrian networks used to verify explicit fuzzy attachment. The imported
+ * endpoint is about 0.56 meters from the base endpoint: close enough for the recommended 1-meter
+ * conflation radius, but still disconnected in an ordinary direct merge.
+ */
+export function createSyntheticConflationRoutingInputs(): { base: Osm; patch: Osm } {
+  const base = new Osm({ id: "synthetic-conflation-base" });
+  const baseRefs = Array.from({ length: 41 }, (_, step) => {
+    const id = step === 0 ? 801 : step === 40 ? 802 : 8_000 + step;
+    base.nodes.addNode({
+      id,
+      lon: -0.001 + (step * 0.001) / 40,
+      lat: 0,
+      ...(step === 40 ? { tags: { name: "Base endpoint" } } : {}),
+    });
+    return id;
+  });
+  for (let step = 0; step < baseRefs.length - 1; step++) {
+    base.ways.addWay({
+      id: 810 + step,
+      refs: [baseRefs[step]!, baseRefs[step + 1]!],
+      tags: { highway: "footway", name: `Base sidewalk ${step + 1}` },
+    });
+  }
+
+  const patch = new Osm({ id: "synthetic-conflation-patch" });
+  const patchRefs = Array.from({ length: 41 }, (_, step) => {
+    const id = step === 0 ? 901 : step === 40 ? 902 : 9_000 + step;
+    patch.nodes.addNode({
+      id,
+      lon: 0.000005 + (step * 0.000995) / 40,
+      lat: 0,
+      ...(step === 0 ? { tags: { name: "Imported endpoint", source: "synthetic survey" } } : {}),
+    });
+    return id;
+  });
+  for (let step = 0; step < patchRefs.length - 1; step++) {
+    patch.ways.addWay({
+      id: 910 + step,
+      refs: [patchRefs[step]!, patchRefs[step + 1]!],
+      tags: { highway: "footway", name: `Imported sidewalk ${step + 1}` },
+    });
+  }
+
+  return { base: complete(base), patch: complete(patch) };
+}
+
+/** Build ordinary, property-only, and network-attached results from the same PBF-decoded inputs. */
+export async function createSyntheticConflationRoutingVariants(): Promise<{
+  ordinary: Osm;
+  propertyTransfer: Osm;
+  networkAttachment: Osm;
+}> {
+  const inputs = createSyntheticConflationRoutingInputs();
+  const [base, patch] = await Promise.all([
+    roundTripRoutingOsm(inputs.base, "synthetic-conflation-base-pbf"),
+    roundTripRoutingOsm(inputs.patch, "synthetic-conflation-patch-pbf"),
+  ]);
+  const ordinary = await merge(base, patch, { directMerge: true }, () => undefined);
+  const propertyTransfer = await merge(
+    base,
+    patch,
+    {
+      directMerge: true,
+      conflation: {
+        propertyKeys: ["name"],
+        attachNetwork: false,
+      },
+    },
+    () => undefined,
+  );
+  const networkAttachment = await merge(
+    base,
+    patch,
+    {
+      directMerge: true,
+      conflation: {
+        propertyKeys: [],
+        attachNetwork: true,
+      },
+    },
+    () => undefined,
+  );
+  return { ordinary, propertyTransfer, networkAttachment };
+}

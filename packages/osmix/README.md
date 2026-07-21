@@ -48,6 +48,44 @@ High-level merges leave the original inputs intact and reconcile only compatible
 base matches. Regenerate PBFs created by older releases from their original inputs if automatic within-file
 deduplication may already have rewritten routing topology.
 
+Proximity matching for independently created imports is available as a separate opt-in review session. The
+recommended defaults use a 1-meter radius and automatically apply only high-confidence candidates:
+
+```ts check-docs worker-pbf-inputs
+import { createRemote } from "osmix";
+
+using remote = await createRemote();
+const base = await remote.fromPbf(monacoPbf);
+const patch = await remote.fromPbf(patchPbf, { id: "imported-data" });
+
+const summary = await remote.discoverConflation(base.id, patch.id, {
+  propertyKeys: ["name", "operator", "surface"],
+  attachNetwork: true,
+});
+const page = await remote.getConflationPage(base.id, 0, 100);
+
+for (const candidate of page.candidates) {
+  if (candidate.status !== "review") continue;
+  await remote.setConflationDecision(base.id, {
+    candidateId: candidate.id,
+    action: "reject",
+  });
+}
+
+const generated = await remote.generateConflationChangeset(base.id, {
+  directMerge: true,
+  deduplicateNodes: true,
+  deduplicateWays: true,
+});
+console.log(summary, generated.routing.car, generated.routing.walk);
+await remote.applyChangesAndReplace(base.id);
+```
+
+Property transfer changes only explicitly selected tags. Network attachment rewrites only patch-created way
+references. The worker preserves discovery settings, filters, decisions, and generated changes across worker
+restarts, and reports CAR/WALK node, edge, and component deltas before the changeset is applied. Automatic
+pedestrian attachments are rejected if they alter routable CAR topology.
+
 #### Which mode am I in?
 
 `createRemote()` picks the best mode the current runtime supports and reports
@@ -347,6 +385,15 @@ spec-compliant without staging everything in memory.
 - `remote.getRasterTile(osmId, tile, tileSize?)` - Generate raster in worker.
 - `remote.merge(baseId, patchId, options?)` - Merge datasets in worker (legacy).
 - `dataset.merge(patch, options?)` - Merge datasets via dataset handles.
+- `remote.discoverConflation(baseId, patchId, options)` - Start a non-mutating imported-data match session.
+- `remote.getConflationSummary(baseId)` - Retrieve decision-aware candidate counts.
+- `remote.setConflationFilter(baseId, filter)` / `remote.getConflationPage(...)` - Page through candidate
+  evidence and review state.
+- `remote.setConflationDecision(baseId, decision)` / `remote.setConflationDecisions(...)` - Persist individual
+  or batch review decisions.
+- `remote.generateConflationChangeset(baseId, mergeOptions)` - Build one cumulative direct, exact, and fuzzy
+  changeset and return routing diagnostics.
+- `remote.clearConflation(baseId)` - Discard the active review session and any generated changeset.
 - `remote.search(osmId, key, val?)` - Search by tag.
 - `remote.toPbf(osmId, stream)` - Export to PBF.
 

@@ -1,4 +1,10 @@
-import type { OsmMergeOptions } from "osmix";
+import type {
+  OsmChangesetStats,
+  OsmConflationGenerationResult,
+  OsmConflationOptions,
+  OsmConflationSummary,
+  OsmMergeOptions,
+} from "osmix";
 
 export type ChangesetReviewPurpose = "apply" | "diagnostic" | "preview";
 
@@ -38,6 +44,122 @@ export const COMPLETE_MERGE_OPTIONS = {
   ...verifiedBaseMergeOptions(true),
   ...INTERSECTION_OPTIONS,
 } as const satisfies Partial<OsmMergeOptions>;
+
+/** Add explicit fuzzy conflation without changing the exact-only default object. */
+export function completeMergeOptions(conflation?: OsmConflationOptions): Partial<OsmMergeOptions> {
+  return conflation ? { ...COMPLETE_MERGE_OPTIONS, conflation } : COMPLETE_MERGE_OPTIONS;
+}
+
+/** Build the cumulative direct, exact, and reviewed-fuzzy verified merge options. */
+export function verifiedConflationMergeOptions(
+  reconcile: boolean,
+  conflation: OsmConflationOptions,
+): Partial<OsmMergeOptions> {
+  return {
+    ...verifiedBaseMergeOptions(reconcile),
+    conflation,
+  };
+}
+
+interface ConflationRunAllWorker {
+  discoverConflation(
+    baseOsmId: string,
+    patchOsmId: string,
+    options: OsmConflationOptions,
+  ): Promise<OsmConflationSummary>;
+  generateConflationChangeset(
+    baseOsmId: string,
+    options: Partial<OsmMergeOptions>,
+  ): Promise<OsmConflationGenerationResult>;
+  generateChangeset(
+    baseOsmId: string,
+    patchOsmId: string,
+    options: Partial<OsmMergeOptions>,
+  ): Promise<OsmChangesetStats>;
+  applyChangesAndReplace(osmId: string): Promise<void>;
+}
+
+interface RunConflationAllStepsOptions {
+  baseOsmId: string;
+  conflation: OsmConflationOptions;
+  isCancelled: () => boolean;
+  onBaseApplied?: () => void;
+  onDiscovered?: (summary: OsmConflationSummary) => void;
+  onGenerated?: (result: OsmConflationGenerationResult) => void;
+  patchOsmId: string;
+  worker: ConflationRunAllWorker;
+}
+
+export type RunConflationAllStepsResult =
+  | {
+      generation: OsmConflationGenerationResult | null;
+      status: "cancelled";
+      summary: OsmConflationSummary;
+    }
+  | {
+      generation: OsmConflationGenerationResult;
+      intersections: OsmChangesetStats;
+      status: "completed";
+      summary: OsmConflationSummary;
+    };
+
+/**
+ * Run explicit conflation from untouched inputs, then create intersections on the applied result.
+ *
+ * Cancellation is honored until the first apply. Once the base changes, the intersection stage is
+ * completed before returning so callers never expose an incomplete result as a successful merge.
+ */
+export async function runConflationAllSteps({
+  baseOsmId,
+  conflation,
+  isCancelled,
+  onBaseApplied,
+  onDiscovered,
+  onGenerated,
+  patchOsmId,
+  worker,
+}: RunConflationAllStepsOptions): Promise<RunConflationAllStepsResult> {
+  const summary = await worker.discoverConflation(baseOsmId, patchOsmId, conflation);
+  onDiscovered?.(summary);
+  if (isCancelled()) return { generation: null, status: "cancelled", summary };
+
+  const generation = await worker.generateConflationChangeset(
+    baseOsmId,
+    verifiedBaseMergeOptions(true),
+  );
+  onGenerated?.(generation);
+  if (isCancelled()) return { generation, status: "cancelled", summary };
+
+  await worker.applyChangesAndReplace(generation.stats.osmId);
+  onBaseApplied?.();
+
+  const intersections = await worker.generateChangeset(baseOsmId, patchOsmId, INTERSECTION_OPTIONS);
+  await worker.applyChangesAndReplace(intersections.osmId);
+
+  return { generation, intersections, status: "completed", summary };
+}
+
+/**
+ * Restore any available candidate state, then leave the progress-only screen after a failed run.
+ * Showing the review in a `finally` block keeps discovery failures themselves retryable.
+ */
+export async function recoverConflationRunAllFailure({
+  restoreReview,
+  showReview,
+}: {
+  restoreReview?: () => Promise<void>;
+  showReview: () => void;
+}): Promise<{ error: unknown } | null> {
+  let restoreFailure: { error: unknown } | null = null;
+  try {
+    await restoreReview?.();
+  } catch (error) {
+    restoreFailure = { error };
+  } finally {
+    showReview();
+  }
+  return restoreFailure;
+}
 
 export function canApplyChangeset(purpose: ChangesetReviewPurpose): boolean {
   return purpose === "apply";

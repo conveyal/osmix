@@ -8,6 +8,7 @@ Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PB
 - Select Auto, Full, or View loading according to the dataset and available browser memory.
 - Visualize both datasets with raster previews produced on the worker thread plus interactive vector overlays for selected entities.
 - Inspect individual OSM files for possible duplicate entities without mutating the source data.
+- Opt in to reviewed, one-meter proximity matching for importing selected properties or attaching compatible imported networks without rewriting base geometry.
 - Built-in Nominatim search, entity lookups, and task logging keep large merges manageable.
 
 ## Prerequisites
@@ -78,8 +79,9 @@ in-stream extraction remains available. The app does not build the large index s
    them. Nearby roads can be intentionally separate because of topology, access, or grade separation.
 3. **Review changeset** – Merge steps run on the worker (`osm.worker.ts`) using `@osmix/core` and
    `@osmix/change`. Logs stream into the sidebar while progress indicators update the UI.
-4. **Inspect intermediary results** – Toggle MapLibre vector overlays to compare base/patch rasters, click features to see details, and jump the map to selected entities.
-5. **Apply actions** – Merge same-ID entities, reconcile compatible matches across the two inputs, create
+4. **Match imported data (optional)** – Discover nearby cross-dataset candidates, compare imported and base geometry on the map, and review ambiguous or routing-affecting matches.
+5. **Inspect intermediary results** – Toggle MapLibre vector overlays to compare base/patch rasters, click features to see details, and jump the map to selected entities.
+6. **Apply actions** – Merge same-ID entities, reconcile compatible matches across the two inputs, create
    intersections, and download the resulting change list as JSON. Applying the final changes replaces the
    in-memory base dataset.
 
@@ -88,6 +90,36 @@ In verified mode, the direct merge is first shown as a preview. The app then reg
 cumulative direct-merge plus optional reconciliation changeset from the untouched source inputs. Intersection
 changes are generated only after that merged base has been rebuilt and indexed, so newly added patch ways are
 included in the crossing scan.
+
+### Safe imported-data matching
+
+The original Merge tool used a one-meter proximity search to combine datasets whose independently created
+entities do not have identical OSM coordinates. That remains useful for GeoJSON, Shapefile, and other
+non-OSM sources, but proximity alone is unsafe for road topology: nearby surface and tunnel roads, parallel
+paths, school boundaries, and ambiguous intersections must remain separate.
+
+**Match imported data** restores that workflow as an explicit opt-in conflation stage:
+
+- **Property transfer** preserves the base entity ID, coordinates, references, and relation membership while
+  copying only the tag keys entered in the form. Patch values win for those selected keys; missing patch
+  values never delete base values. Structural keys are blocked, and routing-affecting keys require review.
+- **Network attachment** preserves the base node and rewrites only accepted references in imported patch
+  ways. Automatic matches must be unique and agree on routing family, grade context, and local bearing.
+  Restrictions, relation-member rewrites, way collapse, and other integrity hazards remain blocked.
+
+The default radius is one meter. High-confidence matches are automatic; review, blocked, unmatched, and
+rejected candidates remain visible through paged status, entity, and reason filters. Selecting a candidate
+draws the imported source and proposed base target together on the map and shows its geometry evidence and
+property diff. Review decisions are stable candidate-ID records and are restored with the worker session.
+
+In verified mode, discovery happens against the untouched base and patch before either dataset is changed.
+The app then generates one cumulative direct, exact-reconciliation, and accepted-conflation changeset,
+reports CAR and WALK graph-count/component deltas, and applies it atomically. Intersection creation remains a
+separate final stage. **Run all steps** stays exact-only unless matching was explicitly enabled; when enabled,
+it accepts only automatic candidates and reports unresolved counts without silently approving them. The
+enabled fast path uses the same session generation and CAR safety gate, applies the cumulative result, then
+creates intersections against that indexed base. The patch is cleared only after both stages and merged-file
+metadata refresh complete.
 
 ### Inspect view (`/inspect`)
 
@@ -106,6 +138,7 @@ included in the crossing scan.
 - Stateful loading, IndexedDB writes, and changesets stay on the control worker. Read-only tiles and queries use available compute workers, with queued MapLibre tile requests cancelled when the map no longer needs them.
 - Workers cache `Osmix` instances keyed by dataset id, share their backing buffers, expose change pagination, and return transferable typed arrays whenever possible.
 - If a single non-shared worker restarts, datasets previously loaded from IndexedDB are reconstructed with a read-only replay before the slot accepts more work. One-shot mutations and IndexedDB writes are never retried.
+- Active imported-data discovery options, filters, and review decisions are replayed after a recoverable control-worker restart while both untouched inputs still exist. Applying the cumulative merge invalidates that review session.
 - Local PBF files are hashed incrementally from `File.stream()` in a worker, avoiding a second whole-file
   input buffer. PBF URLs are hashed while the parser consumes a single response, then re-keyed to the final
   lowercase SHA-256 without copying the dataset buffers.
@@ -143,6 +176,9 @@ See [Australia-scale manual verification](./AUSTRALIA-PBF-CHECKLIST.md) for the 
 - **A merge reports new routing-integrity problems** – The result was rejected before replacing the base.
   Inspect the reported entity IDs for missing references, degenerate highways, or detached turn restrictions,
   then correct the source data rather than discarding the affected restriction.
+- **A proximity candidate is blocked** – Review its reason code and map comparison. Grade conflicts,
+  restrictions, relation membership, and changes that would collapse a way cannot be overridden. Multiple
+  targets and other uncertain candidates require an explicit accepted target or can be left unchanged.
 
 ## Related packages
 

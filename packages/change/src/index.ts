@@ -34,6 +34,7 @@
 
 export * from "./apply-changeset.ts";
 export * from "./changeset.ts";
+export * from "./conflation.ts";
 export * from "./generate-changeset.ts";
 export * from "./merge.ts";
 export * from "./osc.ts";

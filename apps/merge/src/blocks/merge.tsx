@@ -19,6 +19,9 @@ import { changeStatsSummary } from "osmix";
 import { Suspense, useMemo } from "react";
 
 import ActionButton from "../components/action-button";
+import { ConflationConfig } from "../components/conflation-config";
+import { ConflationReview } from "../components/conflation-review";
+import { ConflationRoutingDiagnostics } from "../components/conflation-routing-diagnostics";
 import { Details, DetailsContent, DetailsSummary } from "../components/details";
 import EntityDetails from "../components/entity-details";
 import { FullIndexRequired, hasFullNodeIndex } from "../components/full-index-required";
@@ -44,11 +47,14 @@ import {
 } from "../components/ui/item";
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
+import { toOsmConflationOptions, validateConflationForm } from "../lib/conflation-workflow";
 import {
   type ChangesetReviewPurpose,
-  COMPLETE_MERGE_OPTIONS,
+  completeMergeOptions,
   finalizeVerifiedMerge,
   INTERSECTION_OPTIONS,
+  recoverConflationRunAllFailure,
+  runConflationAllSteps,
   verifiedBaseMergeOptions,
   WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
 } from "../lib/merge-workflow";
@@ -56,6 +62,17 @@ import { showSaveFilePickerWithFallback } from "../lib/save-file-picker";
 import { cn } from "../lib/utils";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import { changesetStatsAtom } from "../state/changes";
+import {
+  conflationCandidateFilterAtom,
+  conflationCandidatePageAtom,
+  conflationCandidatePageIndexAtom,
+  conflationComparisonAtom,
+  conflationDecisionsAtom,
+  conflationFormAtom,
+  conflationRoutingDiagnosticsAtom,
+  conflationSummaryAtom,
+  resetConflationReviewAtom,
+} from "../state/conflation";
 import { Log } from "../state/log";
 import { selectedEntityAtom, selectOsmEntityAtom } from "../state/osm";
 import { mergeAbortControllerAtom, osmLoadingAbortControllerAtom } from "../state/status";
@@ -69,6 +86,7 @@ const STEPS = [
   "review-changeset",
   "direct-merge",
   "review-changeset",
+  "match-imported-data",
   "deduplicate-nodes",
   "review-changeset",
   "create-intersections",
@@ -79,6 +97,7 @@ const STEPS = [
 
 const stepIndexAtom = atom<number>(0);
 const changesetReviewPurposeAtom = atom<ChangesetReviewPurpose>("apply");
+const CONFLATION_PAGE_SIZE = 10;
 const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
   const stepIndex = get(stepIndexAtom);
   return STEPS[stepIndex];
@@ -108,6 +127,23 @@ export default function MergeBlock() {
   const patch = useOsmFile(PATCH_OSM_KEY);
   const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom);
   const [changesetReviewPurpose, setChangesetReviewPurpose] = useAtom(changesetReviewPurposeAtom);
+  const [conflationForm] = useAtom(conflationFormAtom);
+  const [conflationSummary, setConflationSummary] = useAtom(conflationSummaryAtom);
+  const [conflationCandidatePage, setConflationCandidatePage] = useAtom(
+    conflationCandidatePageAtom,
+  );
+  const [conflationCandidatePageIndex, setConflationCandidatePageIndex] = useAtom(
+    conflationCandidatePageIndexAtom,
+  );
+  const [conflationCandidateFilter, setConflationCandidateFilter] = useAtom(
+    conflationCandidateFilterAtom,
+  );
+  const [conflationDecisions, setConflationDecisions] = useAtom(conflationDecisionsAtom);
+  const [conflationRoutingDiagnostics, setConflationRoutingDiagnostics] = useAtom(
+    conflationRoutingDiagnosticsAtom,
+  );
+  const resetConflationReview = useSetAtom(resetConflationReviewAtom);
+  const setConflationComparison = useSetAtom(conflationComparisonAtom);
   const flyToEntity = useFlyToEntity();
   const flyToOsmBounds = useFlyToOsmBounds();
   const selectedEntity = useAtomValue(selectedEntityAtom);
@@ -116,17 +152,27 @@ export default function MergeBlock() {
   const [mergeAbortController, setMergeAbortController] = useAtom(mergeAbortControllerAtom);
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
 
-  const prevStep = () => {
+  const moveStep = (direction: -1 | 1) => {
     selectEntity(null, null);
-    setStepIndex((s) => s - 1);
+    setConflationComparison({ type: "FeatureCollection", features: [] });
+    setStepIndex((current) => {
+      let next = current + direction;
+      if (STEPS[next] === "match-imported-data" && !conflationForm.enabled) {
+        next += direction;
+      }
+      return next;
+    });
+  };
+  const prevStep = () => {
+    moveStep(-1);
   };
   const nextStep = () => {
-    selectEntity(null, null);
-    setStepIndex((s) => s + 1);
+    moveStep(1);
   };
   const goToStep = (step: number | (typeof STEPS)[number]) => {
     const stepIndex = typeof step === "number" ? step : STEPS.indexOf(step);
     selectEntity(null, null);
+    setConflationComparison({ type: "FeatureCollection", features: [] });
     setStepIndex(stepIndex);
   };
   const showVerifiedMergeResult = () =>
@@ -144,6 +190,74 @@ export default function MergeBlock() {
     } catch (error) {
       task.end(`Task failed: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
     }
+  };
+  const conflationValidationMessage = validateConflationForm(conflationForm);
+  const conflationOptions = conflationValidationMessage
+    ? undefined
+    : toOsmConflationOptions(conflationForm);
+
+  const loadConflationPage = async (page: number) => {
+    if (!base.osm) throw Error("Base OSM is not loaded");
+    const result = await osmWorker.getConflationPage(base.osm.id, page, CONFLATION_PAGE_SIZE);
+    setConflationCandidatePageIndex(page);
+    setConflationCandidatePage(result);
+  };
+
+  const updateConflationFilter = async (filter: typeof conflationCandidateFilter) => {
+    if (!base.osm) throw Error("Base OSM is not loaded");
+    await osmWorker.setConflationFilter(base.osm.id, filter);
+    setConflationCandidateFilter(filter);
+    await loadConflationPage(0);
+  };
+
+  const updateConflationDecision = async (decision: (typeof conflationDecisions)[number]) => {
+    if (!base.osm) throw Error("Base OSM is not loaded");
+    const summary = await osmWorker.setConflationDecision(base.osm.id, decision);
+    setConflationDecisions((current) => [
+      ...current.filter((existing) => existing.candidateId !== decision.candidateId),
+      decision,
+    ]);
+    setConflationSummary(summary);
+    await loadConflationPage(conflationCandidatePageIndex);
+  };
+
+  const updateConflationDecisions = async (decisions: typeof conflationDecisions) => {
+    if (!base.osm) throw Error("Base OSM is not loaded");
+    const changedIds = new Set(decisions.map((decision) => decision.candidateId));
+    const next = [
+      ...conflationDecisions.filter((decision) => !changedIds.has(decision.candidateId)),
+      ...decisions,
+    ];
+    const summary = await osmWorker.setConflationDecisions(base.osm.id, next);
+    setConflationDecisions(next);
+    setConflationSummary(summary);
+    await loadConflationPage(conflationCandidatePageIndex);
+  };
+
+  const generateVerifiedChangeset = async (reconcile: boolean) => {
+    if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
+    setChangesetReviewPurpose("apply");
+    if (conflationOptions) {
+      if (!conflationSummary) {
+        throw Error("Discover and review imported-data match candidates first");
+      }
+      const result = await osmWorker.generateConflationChangeset(
+        base.osm.id,
+        verifiedBaseMergeOptions(reconcile),
+      );
+      setChangesetStats(result.stats);
+      setConflationRoutingDiagnostics(result.routing);
+      return changeStatsSummary(result.stats);
+    }
+
+    setConflationRoutingDiagnostics(null);
+    const result = await osmWorker.generateChangeset(
+      base.osm.id,
+      patch.osm.id,
+      verifiedBaseMergeOptions(reconcile),
+    );
+    setChangesetStats(result);
+    return changeStatsSummary(result);
   };
 
   const downloadJsonChanges = async () => {
@@ -214,6 +328,8 @@ export default function MergeBlock() {
             </p>
           </CardContent>
         </Card>
+
+        <ConflationConfig />
 
         <Card>
           <CardHeader>
@@ -294,15 +410,19 @@ export default function MergeBlock() {
         <div
           className={cn(
             "flex flex-col gap-4",
-            !base.osm || !patch.osm ? "opacity-50 pointer-events-none" : "",
+            !base.osm || !patch.osm || conflationValidationMessage
+              ? "opacity-50 pointer-events-none"
+              : "",
           )}
         >
           <Item
             render={
               <button
                 type="button"
+                disabled={!base.osm || !patch.osm || Boolean(conflationValidationMessage)}
                 onClick={() => {
                   setChangesetStats(null);
+                  resetConflationReview();
                   nextStep();
                 }}
               />
@@ -323,6 +443,7 @@ export default function MergeBlock() {
             render={
               <button
                 type="button"
+                disabled={!base.osm || !patch.osm || Boolean(conflationValidationMessage)}
                 onClick={async () => {
                   goToStep("run-all-steps");
 
@@ -332,13 +453,68 @@ export default function MergeBlock() {
                   const task = Log.startTask("Running all merge steps, please wait...");
                   if (!base.osm) throw Error("Base OSM is not loaded");
                   if (!patch.osm) throw Error("Patch OSM is not loaded");
+                  const baseOsmId = base.osm.id;
+                  const patchOsmId = patch.osm.id;
+                  const mergedName = makeMergedDownloadName(
+                    base.fileInfo?.fileName,
+                    patch.fileInfo?.fileName,
+                  );
+                  let conflationDiscoveryCompleted = false;
+                  let conflationBaseApplied = false;
+                  let conflationPipelineCompleted = false;
 
                   try {
                     setChangesetStats(null);
+                    resetConflationReview();
+                    if (conflationOptions) {
+                      const result = await runConflationAllSteps({
+                        baseOsmId,
+                        conflation: conflationOptions,
+                        isCancelled: () => abortController.signal.aborted,
+                        onBaseApplied: () => {
+                          conflationBaseApplied = true;
+                        },
+                        onDiscovered: (summary) => {
+                          conflationDiscoveryCompleted = true;
+                          setConflationSummary(summary);
+                          const unresolved = summary.review + summary.blocked + summary.unmatched;
+                          Log.addMessage(
+                            `Imported-data matching found ${summary.automatic.toLocaleString()} automatic and ${unresolved.toLocaleString()} unresolved candidates`,
+                          );
+                        },
+                        onGenerated: (generation) => {
+                          setConflationRoutingDiagnostics(generation.routing);
+                          Log.addMessage(
+                            `Verified imported-data changes: ${changeStatsSummary(generation.stats)}`,
+                          );
+                        },
+                        patchOsmId,
+                        worker: osmWorker,
+                      });
+
+                      if (result.status === "cancelled") {
+                        await osmWorker.clearConflation(baseOsmId);
+                        task.end("Merge cancelled by user");
+                        goToStep("select-osm-pbf-files");
+                        return;
+                      }
+
+                      conflationPipelineCompleted = true;
+                      await base.setMergedOsm(result.generation.stats.osmId, mergedName);
+                      setChangesetStats(null);
+                      task.end(
+                        `All merge steps completed; intersections: ${changeStatsSummary(result.intersections)}`,
+                      );
+                      finalizeVerifiedMerge(
+                        () => patch.setOsm(null),
+                        () => goToStep("inspect-final-osm"),
+                      );
+                      return;
+                    }
                     const merged = await osmWorker.merge(
-                      base.osm.id,
-                      patch.osm.id,
-                      COMPLETE_MERGE_OPTIONS,
+                      baseOsmId,
+                      patchOsmId,
+                      completeMergeOptions(),
                     );
 
                     // Check if cancelled before applying results
@@ -349,17 +525,41 @@ export default function MergeBlock() {
                     }
 
                     // Use setMergedOsm to properly update file info for the new merged result
-                    const mergedName = makeMergedDownloadName(
-                      base.fileInfo?.fileName,
-                      patch.fileInfo?.fileName,
-                    );
                     await base.setMergedOsm(merged.id, mergedName);
                     patch.setOsm(null);
 
                     task.end("All merge steps completed");
                     goToStep("inspect-final-osm");
                   } catch (error) {
-                    if (abortController.signal.aborted) {
+                    if (conflationPipelineCompleted) {
+                      try {
+                        await base.setMergedOsm(baseOsmId, mergedName);
+                        setChangesetStats(null);
+                        task.end("All merge steps completed after refreshing the merged dataset");
+                        finalizeVerifiedMerge(
+                          () => patch.setOsm(null),
+                          () => goToStep("inspect-final-osm"),
+                        );
+                      } catch (refreshError) {
+                        task.end(
+                          `All merge stages completed, but the merged dataset could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`,
+                          "error",
+                        );
+                      }
+                    } else if (conflationBaseApplied) {
+                      try {
+                        await base.setMergedOsm(baseOsmId, mergedName);
+                      } catch (refreshError) {
+                        Log.addMessage(
+                          `Could not refresh the partially merged base: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`,
+                        );
+                      }
+                      task.end(
+                        `Imported-data changes were applied, but intersection creation failed: ${error instanceof Error ? error.message : "Unknown error"}. The patch remains loaded so the intersection step can be retried.`,
+                        "error",
+                      );
+                      goToStep("create-intersections");
+                    } else if (abortController.signal.aborted) {
                       task.end("Merge cancelled by user");
                       goToStep("select-osm-pbf-files");
                     } else {
@@ -367,6 +567,27 @@ export default function MergeBlock() {
                         `Merge failed: ${error instanceof Error ? error.message : "Unknown error"}`,
                         "error",
                       );
+                      if (conflationOptions) {
+                        const restoreFailure = await recoverConflationRunAllFailure({
+                          restoreReview: conflationDiscoveryCompleted
+                            ? async () => {
+                                const [summary, page] = await Promise.all([
+                                  osmWorker.getConflationSummary(baseOsmId),
+                                  osmWorker.getConflationPage(baseOsmId, 0, CONFLATION_PAGE_SIZE),
+                                ]);
+                                setConflationSummary(summary);
+                                setConflationCandidatePageIndex(0);
+                                setConflationCandidatePage(page);
+                              }
+                            : undefined,
+                          showReview: () => goToStep("match-imported-data"),
+                        });
+                        if (restoreFailure) {
+                          Log.addMessage(
+                            `Could not restore candidate details after the failed merge: ${restoreFailure.error instanceof Error ? restoreFailure.error.message : "Unknown error"}`,
+                          );
+                        }
+                      }
                     }
                   } finally {
                     setMergeAbortController(null);
@@ -546,6 +767,7 @@ export default function MergeBlock() {
               startStepTask("Generating changeset", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
                 setChangesetReviewPurpose("preview");
+                setConflationRoutingDiagnostics(null);
                 const results = await osmWorker.generateChangeset(
                   base.osm.id,
                   patch.osm.id,
@@ -614,6 +836,9 @@ export default function MergeBlock() {
             </CardContent>
           </Card>
         )}
+        {conflationRoutingDiagnostics ? (
+          <ConflationRoutingDiagnostics diagnostics={conflationRoutingDiagnostics} />
+        ) : null}
 
         {changesetReviewPurpose === "diagnostic" ? (
           <ActionButton
@@ -673,6 +898,78 @@ export default function MergeBlock() {
         )}
       </Step>
 
+      <Step step="match-imported-data" title="Match imported data">
+        <p>
+          Discover non-exact imported entities near the untouched base. Automatic matches must be
+          unique and structurally compatible; ambiguous or routing-affecting candidates stay here
+          for review.
+        </p>
+        <p>
+          The base IDs, geometry, way references, and relation membership remain authoritative.
+          Accepted network attachments rewrite only imported patch references.
+        </p>
+
+        <ActionButton
+          disabled={!base.osm || !patch.osm || !conflationOptions}
+          icon={<SearchCodeIcon />}
+          onAction={async () => {
+            if (!base.osm || !patch.osm || !conflationOptions) {
+              throw Error("Valid proximity-matching options and both inputs are required");
+            }
+            const task = Log.startTask("Discovering imported-data match candidates");
+            try {
+              resetConflationReview();
+              const summary = await osmWorker.discoverConflation(
+                base.osm.id,
+                patch.osm.id,
+                conflationOptions,
+              );
+              setConflationSummary(summary);
+              const page = await osmWorker.getConflationPage(base.osm.id, 0, CONFLATION_PAGE_SIZE);
+              setConflationCandidatePage(page);
+              task.end(`Found ${summary.total.toLocaleString()} imported-data match candidates`);
+            } catch (error) {
+              task.end(
+                `Candidate discovery failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+                "error",
+              );
+              throw error;
+            }
+          }}
+        >
+          {conflationSummary ? "Run candidate discovery again" : "Discover match candidates"}
+        </ActionButton>
+
+        {conflationSummary && conflationCandidatePage && base.osm && patch.osm ? (
+          <ConflationReview
+            base={base.osm}
+            patch={patch.osm}
+            summary={conflationSummary}
+            page={conflationCandidatePage}
+            filter={conflationCandidateFilter}
+            onDecision={updateConflationDecision}
+            onDecisions={updateConflationDecisions}
+            onFilterChange={updateConflationFilter}
+            onPageChange={loadConflationPage}
+          />
+        ) : null}
+
+        <ButtonGroup className="w-full">
+          <ActionButton className="flex-1" icon={<ArrowLeft />} onAction={async () => prevStep()}>
+            Back
+          </ActionButton>
+          <ButtonGroupSeparator />
+          <ActionButton
+            className="flex-1"
+            disabled={!conflationSummary}
+            icon={<ArrowRightIcon />}
+            onAction={async () => nextStep()}
+          >
+            Continue with reviewed matches
+          </ActionButton>
+        </ButtonGroup>
+      </Step>
+
       <Step step="deduplicate-nodes" title="Reconcile matching entities">
         <p>
           Regenerate the direct merge from the untouched inputs, identify uniquely matching and
@@ -705,15 +1002,7 @@ export default function MergeBlock() {
             icon={<SkipForwardIcon />}
             onAction={() =>
               startStepTask("Preparing direct merge changeset", async () => {
-                if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                setChangesetReviewPurpose("apply");
-                const results = await osmWorker.generateChangeset(
-                  base.osm.id,
-                  patch.osm.id,
-                  verifiedBaseMergeOptions(false),
-                );
-                setChangesetStats(results);
-                return changeStatsSummary(results);
+                return generateVerifiedChangeset(false);
               })
             }
           >
@@ -725,15 +1014,7 @@ export default function MergeBlock() {
             icon={<FileDiff />}
             onAction={() =>
               startStepTask("Reconciling matching nodes and ways", async () => {
-                if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                setChangesetReviewPurpose("apply");
-                const results = await osmWorker.generateChangeset(
-                  base.osm.id,
-                  patch.osm.id,
-                  verifiedBaseMergeOptions(true),
-                );
-                setChangesetStats(results);
-                return changeStatsSummary(results);
+                return generateVerifiedChangeset(true);
               })
             }
           >
@@ -779,6 +1060,7 @@ export default function MergeBlock() {
               startStepTask("Generating changeset", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
                 setChangesetReviewPurpose("apply");
+                setConflationRoutingDiagnostics(null);
                 const results = await osmWorker.generateChangeset(
                   base.osm.id,
                   patch.osm.id,
@@ -813,6 +1095,10 @@ export default function MergeBlock() {
                 />
               </CardContent>
             </Card>
+
+            {conflationRoutingDiagnostics ? (
+              <ConflationRoutingDiagnostics diagnostics={conflationRoutingDiagnostics} />
+            ) : null}
 
             {selectedEntity && (
               <Card>
@@ -868,13 +1154,16 @@ function Step({
 }) {
   const currentStep = useAtomValue(stepAtom);
   const stepIndex = useAtomValue(stepIndexAtom);
+  const conflationEnabled = useAtomValue(conflationFormAtom).enabled;
+  const hiddenConflationStepBeforeCurrent =
+    !conflationEnabled && STEPS.slice(0, stepIndex + 1).includes("match-imported-data") ? 1 : 0;
   if (step !== currentStep) return null;
   if (isTransitioning === true) return <LoadingState>Please wait...</LoadingState>;
   return (
     <>
       <Card>
         <CardHeader className="border-b-0">
-          {stepIndex + 1}: {title}
+          {stepIndex + 1 - hiddenConflationStepBeforeCurrent}: {title}
         </CardHeader>
       </Card>
       {children}
