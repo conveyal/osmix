@@ -64,6 +64,14 @@ const summary = await remote.discoverConflation(base.id, patch.id, {
 });
 const page = await remote.getConflationPage(base.id, 0, 100);
 
+// Page previews cover every candidate matching the worker's current filter, not
+// just the rows returned on this page.
+console.log(page.bulkActions["transfer-properties"]);
+await remote.applyConflationBulkDecision(base.id, {
+  action: "transfer-properties",
+  filter: { status: "review" },
+});
+
 for (const candidate of page.candidates) {
   if (candidate.status !== "review") continue;
   await remote.setConflationDecision(base.id, {
@@ -85,6 +93,12 @@ Property transfer changes only explicitly selected tags. Network attachment rewr
 references. The worker preserves discovery settings, filters, decisions, and generated changes across worker
 restarts, and reports CAR/WALK node, edge, and component deltas before the changeset is applied. Automatic
 pedestrian attachments are rejected if they alter routable CAR topology.
+
+Filter-wide decisions are computed and committed atomically in the worker. Property and network actions
+accept eligible automatic and review candidates while skipping blocked, unmatched, ambiguous, or structurally
+invalid matches. Reject includes every filtered candidate that is not already rejected. Each result returns the
+complete decision snapshot for restart recovery, and accepted candidates can be queried with
+`{ status: "accepted" }`.
 
 #### Which mode am I in?
 
@@ -391,6 +405,8 @@ spec-compliant without staging everything in memory.
   evidence and review state.
 - `remote.setConflationDecision(baseId, decision)` / `remote.setConflationDecisions(...)` - Persist individual
   or batch review decisions.
+- `remote.applyConflationBulkDecision(baseId, request)` - Atomically apply an action to all candidates matching
+  the request's filter and return preview counts, the updated summary, and the complete decision snapshot.
 - `remote.generateConflationChangeset(baseId, mergeOptions)` - Build one cumulative direct, exact, and fuzzy
   changeset and return routing diagnostics.
 - `remote.clearConflation(baseId)` - Discard the active review session and any generated changeset.

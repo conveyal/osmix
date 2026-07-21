@@ -203,6 +203,61 @@ describe("OsmixWorker registries", () => {
     expect(worker.getChangesetPage(base.id, 0, 100).changes).toEqual(generatedChanges);
   });
 
+  it("applies filtered bulk decisions across pages and invalidates generated changes", () => {
+    const worker = new TestWorker();
+    const base = createMixedParallelNetwork("bulk-base", 1, 10, 0, "Base");
+    const patch = createMixedParallelNetwork("bulk-patch", 11, 20, 0.000004, "Imported");
+    worker.setOsm(base.id, base);
+    worker.setOsm(patch.id, patch);
+    worker.discoverConflation(base.id, patch.id, {
+      propertyKeys: ["name"],
+      attachNetwork: false,
+    });
+    worker.setConflationFilter(base.id, { entityType: "way" });
+
+    const firstPage = worker.getConflationPage(base.id, 0, 1);
+    expect(firstPage.totalPages).toBe(2);
+    expect(firstPage.bulkActions["transfer-properties"]).toMatchObject({
+      filteredCandidates: 2,
+      eligibleCandidates: 2,
+      changedCandidates: 2,
+    });
+
+    worker.generateConflationChangeset(base.id, {
+      directMerge: true,
+      deduplicateNodes: true,
+      deduplicateWays: true,
+    });
+    const accepted = worker.applyConflationBulkDecision(base.id, {
+      action: "transfer-properties",
+      filter: { entityType: "way" },
+    });
+    expect(accepted.decisions).toHaveLength(2);
+    expect(accepted.summary.accepted).toBe(2);
+    expect(() => worker.getChangesetPage(base.id, 0, 100)).toThrow("No active changeset");
+
+    worker.setConflationFilter(base.id, { status: "accepted" });
+    expect(worker.getConflationPage(base.id, 0, 100).totalCandidates).toBe(2);
+    const rejected = worker.applyConflationBulkDecision(base.id, {
+      action: "reject",
+      filter: { status: "accepted" },
+    });
+    expect(rejected.preview).toMatchObject({
+      filteredCandidates: 2,
+      changedCandidates: 2,
+      overriddenDecisions: 2,
+    });
+    expect(rejected.summary.rejected).toBe(2);
+    expect(worker.getConflationPage(base.id, 0, 100).totalCandidates).toBe(0);
+    expect(() =>
+      worker.applyConflationBulkDecision(base.id, {
+        action: "invalid",
+        filter: {},
+      } as never),
+    ).toThrow("Invalid conflation bulk action");
+    expect(worker.getConflationSummary(base.id).rejected).toBe(2);
+  });
+
   it("generates diagnostics when way candidates have no network action", () => {
     const worker = new TestWorker();
     const base = createParallelFootway("footway-base", 1, 10, 0, "Base path");
@@ -254,7 +309,7 @@ describe("OsmixWorker registries", () => {
       transferProperties: true,
     });
 
-    const filter: Parameters<typeof worker.setConflationFilter>[1] = { status: "automatic" };
+    const filter: Parameters<typeof worker.setConflationFilter>[1] = { status: undefined };
     worker.setConflationFilter(base.id, filter);
     filter.status = "blocked";
     const page = worker.getConflationPage(base.id, 0, 100);
@@ -269,6 +324,7 @@ describe("OsmixWorker registries", () => {
     way.decision!.action = "reject";
     node.networkAttachment!.reasons.push("grade-conflict");
     node.evidence.patchWayIds!.push(999);
+    page.bulkActions.reject.changedCandidates = 0;
     summary.total = 0;
 
     const freshPage = worker.getConflationPage(base.id, 0, 100);
@@ -284,6 +340,7 @@ describe("OsmixWorker registries", () => {
     expect(freshWay.decision?.action).toBe("accept");
     expect(freshNode.networkAttachment?.reasons).not.toContain("grade-conflict");
     expect(freshNode.evidence.patchWayIds).not.toContain(999);
+    expect(freshPage.bulkActions.reject.changedCandidates).toBeGreaterThan(0);
     expect(worker.getConflationSummary(base.id).total).toBeGreaterThan(0);
 
     worker.generateConflationChangeset(base.id, {

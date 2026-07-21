@@ -1,11 +1,13 @@
-import type { OsmConflationCandidateView } from "osmix";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { ConflationBulkActions } from "../src/components/conflation-review";
 import {
+  conflationBulkActionCopy,
   DEFAULT_CONFLATION_FORM_STATE,
   DEFAULT_CONFLATION_PROPERTY_KEYS,
   parseConflationPropertyKeys,
-  toAutomaticPropertyOnlyDecision,
   toOsmConflationOptions,
   validateConflationForm,
 } from "../src/lib/conflation-workflow";
@@ -94,74 +96,59 @@ describe("conflation workflow configuration", () => {
     ).toBe("Match distance must be greater than zero.");
   });
 
-  it("bulk-confirms only automatic non-routing property-only candidates", () => {
-    const candidate: OsmConflationCandidateView = {
-      id: "node:-1->1",
-      entityType: "node",
-      sourceId: -1,
-      targetId: 1,
-      status: "automatic",
-      reasons: [],
-      propertyTransfer: { status: "automatic", reasons: [] },
-      networkAttachment: null,
-      evidence: {
-        distanceMeters: 0.5,
-        sourceRoutingFamilies: ["non-routable"],
-        targetRoutingFamilies: ["non-routable"],
-        tagDiff: [
-          {
-            key: "name",
-            patchValue: "Imported name",
-            protected: false,
-            routing: false,
-          },
-        ],
-      },
-    };
-
-    expect(toAutomaticPropertyOnlyDecision(candidate)).toEqual({
-      candidateId: candidate.id,
-      action: "accept",
-      transferProperties: true,
-      attachNetwork: false,
+  it("uses action-specific labels and explicit filter-wide confirmation wording", () => {
+    expect(conflationBulkActionCopy("transfer-properties")).toMatchObject({
+      buttonLabel: "Transfer properties",
+      title: "Transfer properties to filtered matches?",
     });
-    expect(
-      toAutomaticPropertyOnlyDecision({
-        ...candidate,
-        networkAttachment: { status: "automatic", reasons: [] },
-      }),
-    ).toBeNull();
+    expect(conflationBulkActionCopy("attach-network")).toMatchObject({
+      buttonLabel: "Attach network",
+      title: "Attach the filtered imported network?",
+    });
+    expect(conflationBulkActionCopy("reject")).toEqual({
+      buttonLabel: "Reject filtered",
+      confirmLabel: "Reject filtered matches",
+      description:
+        "Reject every filtered match that is not already rejected, including blocked and unmatched rows.",
+      title: "Reject all filtered matches?",
+    });
   });
 
-  it.each(["accept", "reject"] as const)(
-    "does not bulk-confirm a candidate with an existing %s decision",
-    (action) => {
-      const candidate: OsmConflationCandidateView = {
-        id: "node:-1->1",
-        entityType: "node",
-        sourceId: -1,
-        targetId: 1,
-        status: "automatic",
-        reasons: [],
-        propertyTransfer: { status: "automatic", reasons: [] },
-        networkAttachment: null,
-        evidence: {
-          distanceMeters: 0.5,
-          sourceRoutingFamilies: ["non-routable"],
-          targetRoutingFamilies: ["non-routable"],
-          tagDiff: [
-            {
-              key: "name",
-              patchValue: "Imported name",
-              protected: false,
-              routing: false,
-            },
-          ],
+  it("renders filter-wide counts and disables actions with no decisions to change", () => {
+    const preview = {
+      action: "transfer-properties" as const,
+      filteredCandidates: 145,
+      eligibleCandidates: 145,
+      changedCandidates: 145,
+      skippedCandidates: 0,
+      automaticCandidates: 145,
+      reviewCandidates: 0,
+      overriddenDecisions: 0,
+    };
+    const html = renderToStaticMarkup(
+      createElement(ConflationBulkActions, {
+        bulkActions: {
+          "transfer-properties": preview,
+          "attach-network": {
+            ...preview,
+            action: "attach-network",
+            changedCandidates: 12,
+          },
+          reject: {
+            ...preview,
+            action: "reject",
+            changedCandidates: 0,
+          },
         },
-        decision: { candidateId: "node:-1->1", action },
-      };
+        filter: { status: "automatic" },
+        onBulkDecision: async () => {},
+      }),
+    );
 
-      expect(toAutomaticPropertyOnlyDecision(candidate)).toBeNull();
-    },
-  );
+    expect(html).toContain("every match in the current filters across all pages");
+    expect(html).toContain("Automatic matches already apply unless rejected");
+    expect(html).toContain("Transfer properties (145)");
+    expect(html).toContain("Attach network (12)");
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Reject filtered \(0\)<\/button>/);
+  });
 });

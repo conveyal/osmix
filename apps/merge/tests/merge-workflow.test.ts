@@ -29,6 +29,7 @@ const changesetStats = (osmId: string, totalChanges: number): OsmChangesetStats 
 });
 
 const summary: OsmConflationSummary = {
+  accepted: 0,
   automatic: 1,
   blocked: 0,
   rejected: 0,

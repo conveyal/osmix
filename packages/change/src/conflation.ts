@@ -10,6 +10,8 @@ import { generateChangeset } from "./generate-changeset.ts";
 import { assertConflationPreservesBaseTopology } from "./integrity.ts";
 import type {
   OsmConflationActionAssessment,
+  OsmConflationBulkDecisionRequest,
+  OsmConflationBulkDecisionResult,
   OsmConflationCandidate,
   OsmConflationCandidateFilter,
   OsmConflationDecision,
@@ -1032,9 +1034,10 @@ export function conflationEffectiveStatus(
   candidate: OsmConflationCandidate,
   decisions: readonly OsmConflationDecision[] = [],
 ): OsmConflationEffectiveStatus {
-  return decisionMap(decisions).get(candidate.id)?.action === "reject"
-    ? "rejected"
-    : candidate.status;
+  const action = decisionMap(decisions).get(candidate.id)?.action;
+  if (action === "accept") return "accepted";
+  if (action === "reject") return "rejected";
+  return candidate.status;
 }
 
 /** Recompute review counts after lightweight decisions without rerunning discovery. */
@@ -1042,18 +1045,21 @@ export function summarizeConflationCandidates(
   candidates: readonly OsmConflationCandidate[],
   decisions: readonly OsmConflationDecision[] = [],
 ): OsmConflationSummary {
+  const decisionsById = validatedDecisionMap(candidates, decisions);
   const summary: OsmConflationSummary = {
     total: candidates.length,
+    accepted: 0,
     automatic: 0,
     review: 0,
     blocked: 0,
     unmatched: 0,
     rejected: 0,
   };
-  const decisionsById = validatedDecisionMap(candidates, decisions);
   for (const candidate of candidates) {
-    if (decisionsById.get(candidate.id)?.action === "reject") summary.rejected++;
-    else summary[candidate.status]++;
+    const action = decisionsById.get(candidate.id)?.action;
+    const status =
+      action === "accept" ? "accepted" : action === "reject" ? "rejected" : candidate.status;
+    summary[status]++;
   }
   return summary;
 }
@@ -1064,12 +1070,13 @@ export function filterConflationCandidates(
   filter: OsmConflationCandidateFilter,
   decisions: readonly OsmConflationDecision[] = [],
 ) {
+  const decisionsById = decisionMap(decisions);
   return candidates.filter((candidate) => {
     if (filter.entityType != null && candidate.entityType !== filter.entityType) return false;
-    if (
-      filter.status != null &&
-      conflationEffectiveStatus(candidate, decisions) !== filter.status
-    ) {
+    const action = decisionsById.get(candidate.id)?.action;
+    const status =
+      action === "accept" ? "accepted" : action === "reject" ? "rejected" : candidate.status;
+    if (filter.status != null && status !== filter.status) {
       return false;
     }
     if (filter.reason != null && !candidate.reasons.includes(filter.reason)) return false;
@@ -1077,6 +1084,134 @@ export function filterConflationCandidates(
     if ("targetId" in filter && candidate.targetId !== filter.targetId) return false;
     return true;
   });
+}
+
+const BULK_AMBIGUITY_REASONS = new Set<OsmConflationReasonCode>([
+  "many-to-one",
+  "multiple-targets",
+  "unsupported-way-chain",
+]);
+
+function bulkActionAssessment(
+  candidate: OsmConflationCandidate,
+  action: OsmConflationBulkDecisionRequest["action"],
+) {
+  if (action === "transfer-properties") return candidate.propertyTransfer;
+  if (action === "attach-network") return candidate.networkAttachment;
+  return null;
+}
+
+function bulkActionEligible(
+  candidate: OsmConflationCandidate,
+  action: OsmConflationBulkDecisionRequest["action"],
+) {
+  if (action === "reject") return true;
+  if (candidate.status === "blocked" || candidate.status === "unmatched") return false;
+  if (candidate.targetId == null) return false;
+  if (candidate.reasons.some((reason) => BULK_AMBIGUITY_REASONS.has(reason))) return false;
+  const assessment = bulkActionAssessment(candidate, action);
+  if (!assessment || assessment.status === "blocked" || assessment.status === "unmatched") {
+    return false;
+  }
+  return action !== "transfer-properties" || candidate.evidence.tagDiff.length > 0;
+}
+
+function bulkAcceptDecision(
+  candidate: OsmConflationCandidate,
+  current: OsmConflationDecision | undefined,
+  action: Exclude<OsmConflationBulkDecisionRequest["action"], "reject">,
+): OsmConflationDecision {
+  const preserveCurrentActions = current?.action !== "reject";
+  const transferProperties =
+    action === "transfer-properties" ||
+    (preserveCurrentActions && acceptedAction(candidate, "propertyTransfer", current));
+  const attachNetwork =
+    action === "attach-network" ||
+    (preserveCurrentActions && acceptedAction(candidate, "networkAttachment", current));
+  return {
+    candidateId: candidate.id,
+    action: "accept",
+    transferProperties,
+    attachNetwork,
+  };
+}
+
+function decisionsHaveSameEffect(
+  candidate: OsmConflationCandidate,
+  current: OsmConflationDecision | undefined,
+  next: OsmConflationDecision,
+) {
+  if (!current || current.action !== next.action) return false;
+  if (current.action === "reject") return true;
+  return (
+    acceptedAction(candidate, "propertyTransfer", current) ===
+      acceptedAction(candidate, "propertyTransfer", next) &&
+    acceptedAction(candidate, "networkAttachment", current) ===
+      acceptedAction(candidate, "networkAttachment", next)
+  );
+}
+
+/** Build one atomic decision update for every candidate matching a filter. */
+export function buildConflationBulkDecisionResult(
+  candidates: readonly OsmConflationCandidate[],
+  decisions: readonly OsmConflationDecision[],
+  request: OsmConflationBulkDecisionRequest,
+): OsmConflationBulkDecisionResult {
+  if (request == null || typeof request !== "object") {
+    throw Error("Conflation bulk decision request must be an object");
+  }
+  if (!new Set(["transfer-properties", "attach-network", "reject"]).has(request.action)) {
+    throw Error(`Invalid conflation bulk action: ${String(request.action)}`);
+  }
+  if (request.filter == null || typeof request.filter !== "object") {
+    throw Error("Conflation bulk decision filter must be an object");
+  }
+
+  const currentById = validatedDecisionMap(candidates, decisions);
+  const nextById = new Map(currentById);
+  const filtered = filterConflationCandidates(candidates, request.filter, decisions);
+  let eligibleCandidates = 0;
+  let changedCandidates = 0;
+  let automaticCandidates = 0;
+  let reviewCandidates = 0;
+  let overriddenDecisions = 0;
+
+  for (const candidate of filtered) {
+    if (!bulkActionEligible(candidate, request.action)) continue;
+    eligibleCandidates++;
+    if (candidate.status === "automatic") automaticCandidates++;
+    if (candidate.status === "review") reviewCandidates++;
+
+    const current = currentById.get(candidate.id);
+    const next =
+      request.action === "reject"
+        ? ({ candidateId: candidate.id, action: "reject" } as const)
+        : bulkAcceptDecision(candidate, current, request.action);
+    if (decisionsHaveSameEffect(candidate, current, next)) continue;
+    changedCandidates++;
+    if (current) overriddenDecisions++;
+    nextById.set(candidate.id, next);
+  }
+
+  const nextDecisions = [...nextById.values()].toSorted((a, b) =>
+    a.candidateId.localeCompare(b.candidateId),
+  );
+  validateConflationDecisions(candidates, nextDecisions);
+  const preview = {
+    action: request.action,
+    filteredCandidates: filtered.length,
+    eligibleCandidates,
+    changedCandidates,
+    skippedCandidates: filtered.length - eligibleCandidates,
+    automaticCandidates,
+    reviewCandidates,
+    overriddenDecisions,
+  };
+  return {
+    decisions: nextDecisions,
+    preview,
+    summary: summarizeConflationCandidates(candidates, nextDecisions),
+  };
 }
 
 function currentEntity<T extends "node" | "way">(changeset: OsmChangeset, type: T, id: number) {

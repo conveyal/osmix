@@ -20,6 +20,7 @@
 
 import {
   applyChangesetToOsm,
+  buildConflationBulkDecisionResult,
   discoverConflationCandidates,
   generateChangeset,
   generateConflationApplicationChangeset,
@@ -29,6 +30,10 @@ import {
   type OsmChange,
   type OsmChangeset,
   type OsmChangeTypes,
+  type OsmConflationBulkAction,
+  type OsmConflationBulkDecisionPreview,
+  type OsmConflationBulkDecisionRequest,
+  type OsmConflationBulkDecisionResult,
   type OsmConflationCandidate,
   type OsmConflationCandidateFilter,
   type OsmConflationDecision,
@@ -69,6 +74,7 @@ export interface OsmConflationCandidateView extends OsmConflationCandidate {
 
 /** A stable, paginated view of the active conflation candidates. */
 export interface OsmConflationPage {
+  bulkActions: Record<OsmConflationBulkAction, OsmConflationBulkDecisionPreview>;
   candidates: OsmConflationCandidateView[];
   page: number;
   pageSize: number;
@@ -149,7 +155,12 @@ function conflationCandidateMatches(
   decision: OsmConflationDecision | undefined,
   filter: OsmConflationCandidateFilter,
 ) {
-  const status = decision?.action === "reject" ? "rejected" : candidate.status;
+  const status =
+    decision?.action === "accept"
+      ? "accepted"
+      : decision?.action === "reject"
+        ? "rejected"
+        : candidate.status;
   if (filter.entityType != null && candidate.entityType !== filter.entityType) return false;
   if (filter.status != null && status !== filter.status) return false;
   if (filter.reason != null && !candidate.reasons.includes(filter.reason)) return false;
@@ -757,7 +768,18 @@ export class OsmixWorker extends EventTarget {
       conflationCandidateMatches(candidate, session.decisions.get(candidate.id), session.filter),
     );
     const start = page * pageSize;
+    const decisions = [...session.decisions.values()];
+    const bulkActions = Object.fromEntries(
+      (["transfer-properties", "attach-network", "reject"] as const).map((action) => [
+        action,
+        buildConflationBulkDecisionResult(session.discovery.candidates, decisions, {
+          action,
+          filter: session.filter,
+        }).preview,
+      ]),
+    ) as Record<OsmConflationBulkAction, OsmConflationBulkDecisionPreview>;
     return {
+      bulkActions,
       candidates: candidates
         .slice(start, start + pageSize)
         .map((candidate) =>
@@ -792,6 +814,30 @@ export class OsmixWorker extends EventTarget {
     this.invalidateGeneratedConflationChangeset(baseOsmId, session);
     session.decisions = next;
     return this.getConflationSummary(baseOsmId);
+  }
+
+  /** Apply one action to every eligible candidate matching the supplied filter. */
+  applyConflationBulkDecision(
+    baseOsmId: string,
+    request: OsmConflationBulkDecisionRequest,
+  ): OsmConflationBulkDecisionResult {
+    const session = this.getConflationSession(baseOsmId);
+    const result = buildConflationBulkDecisionResult(
+      session.discovery.candidates,
+      [...session.decisions.values()],
+      request,
+    );
+    if (result.preview.changedCandidates > 0) {
+      this.invalidateGeneratedConflationChangeset(baseOsmId, session);
+      session.decisions = new Map(
+        result.decisions.map((decision) => [decision.candidateId, { ...decision }]),
+      );
+    }
+    return {
+      decisions: result.decisions.map((decision) => ({ ...decision })),
+      preview: { ...result.preview },
+      summary: { ...result.summary },
+    };
   }
 
   /**

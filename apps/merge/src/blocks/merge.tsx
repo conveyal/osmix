@@ -15,7 +15,11 @@ import {
   StopCircleIcon,
   XIcon,
 } from "lucide-react";
-import { changeStatsSummary } from "osmix";
+import {
+  changeStatsSummary,
+  type OsmConflationBulkDecisionRequest,
+  type OsmConflationDecision,
+} from "osmix";
 import { Suspense, useMemo } from "react";
 
 import ActionButton from "../components/action-button";
@@ -138,7 +142,7 @@ export default function MergeBlock() {
   const [conflationCandidateFilter, setConflationCandidateFilter] = useAtom(
     conflationCandidateFilterAtom,
   );
-  const [conflationDecisions, setConflationDecisions] = useAtom(conflationDecisionsAtom);
+  const setConflationDecisions = useSetAtom(conflationDecisionsAtom);
   const [conflationRoutingDiagnostics, setConflationRoutingDiagnostics] = useAtom(
     conflationRoutingDiagnosticsAtom,
   );
@@ -210,7 +214,7 @@ export default function MergeBlock() {
     await loadConflationPage(0);
   };
 
-  const updateConflationDecision = async (decision: (typeof conflationDecisions)[number]) => {
+  const updateConflationDecision = async (decision: OsmConflationDecision) => {
     if (!base.osm) throw Error("Base OSM is not loaded");
     const summary = await osmWorker.setConflationDecision(base.osm.id, decision);
     setConflationDecisions((current) => [
@@ -221,17 +225,15 @@ export default function MergeBlock() {
     await loadConflationPage(conflationCandidatePageIndex);
   };
 
-  const updateConflationDecisions = async (decisions: typeof conflationDecisions) => {
+  const updateConflationBulkDecision = async (request: OsmConflationBulkDecisionRequest) => {
     if (!base.osm) throw Error("Base OSM is not loaded");
-    const changedIds = new Set(decisions.map((decision) => decision.candidateId));
-    const next = [
-      ...conflationDecisions.filter((decision) => !changedIds.has(decision.candidateId)),
-      ...decisions,
-    ];
-    const summary = await osmWorker.setConflationDecisions(base.osm.id, next);
-    setConflationDecisions(next);
-    setConflationSummary(summary);
-    await loadConflationPage(conflationCandidatePageIndex);
+    const result = await osmWorker.applyConflationBulkDecision(base.osm.id, request);
+    setConflationDecisions(result.decisions);
+    setConflationSummary(result.summary);
+    await loadConflationPage(0);
+    Log.addMessage(
+      `Updated ${result.preview.changedCandidates.toLocaleString()} filtered conflation decisions`,
+    );
   };
 
   const generateVerifiedChangeset = async (reconcile: boolean) => {
@@ -955,7 +957,7 @@ export default function MergeBlock() {
             page={conflationCandidatePage}
             filter={conflationCandidateFilter}
             onDecision={updateConflationDecision}
-            onDecisions={updateConflationDecisions}
+            onBulkDecision={updateConflationBulkDecision}
             onFilterChange={updateConflationFilter}
             onPageChange={loadConflationPage}
           />

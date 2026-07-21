@@ -66,7 +66,7 @@ export type OsmConflationAutomatic = "high-confidence" | "none";
 export type OsmConflationStatus = "automatic" | "review" | "blocked" | "unmatched";
 
 /** Candidate status after applying an optional user decision. */
-export type OsmConflationEffectiveStatus = OsmConflationStatus | "rejected";
+export type OsmConflationEffectiveStatus = OsmConflationStatus | "accepted" | "rejected";
 
 /** Stable, machine-readable explanations for a conflation classification. */
 export type OsmConflationReasonCode =
@@ -162,9 +162,38 @@ export interface OsmConflationDecision {
   attachNetwork?: boolean;
 }
 
+/** A filter-wide review operation performed atomically in the conflation worker. */
+export type OsmConflationBulkAction = "transfer-properties" | "attach-network" | "reject";
+
+/** Stable input for applying one bulk decision to all candidates matching a filter. */
+export interface OsmConflationBulkDecisionRequest {
+  action: OsmConflationBulkAction;
+  filter: OsmConflationCandidateFilter;
+}
+
+/** Counts shown before confirming a filter-wide decision. */
+export interface OsmConflationBulkDecisionPreview {
+  action: OsmConflationBulkAction;
+  filteredCandidates: number;
+  eligibleCandidates: number;
+  changedCandidates: number;
+  skippedCandidates: number;
+  automaticCandidates: number;
+  reviewCandidates: number;
+  overriddenDecisions: number;
+}
+
+/** Atomic result returned after a filter-wide decision is applied. */
+export interface OsmConflationBulkDecisionResult {
+  decisions: OsmConflationDecision[];
+  preview: OsmConflationBulkDecisionPreview;
+  summary: OsmConflationSummary;
+}
+
 /** Counts used to present discovery and review progress. */
 export interface OsmConflationSummary {
   total: number;
+  accepted: number;
   automatic: number;
   review: number;
   blocked: number;
