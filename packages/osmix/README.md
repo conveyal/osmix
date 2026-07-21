@@ -44,6 +44,10 @@ const rasterTile = await merged.getRasterTile([10561, 22891, 16]);
 console.log(rasterTile.byteLength);
 ```
 
+High-level merges leave the original inputs intact and reconcile only compatible patch entities with unique
+base matches. Regenerate PBFs created by older releases from their original inputs if automatic within-file
+deduplication may already have rewritten routing topology.
+
 #### Which mode am I in?
 
 `createRemote()` picks the best mode the current runtime supports and reports

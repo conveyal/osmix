@@ -1,8 +1,8 @@
 /**
  * High-level merge pipeline for OSM datasets.
  *
- * Orchestrates a complete merge workflow including deduplication of nodes and ways
- * in both datasets, direct change generation, and optional intersection creation.
+ * Orchestrates direct change generation, conservative cross-dataset reconciliation,
+ * and optional intersection creation.
  *
  * @module
  */
@@ -12,6 +12,7 @@ import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/pr
 
 import { applyChangesetToOsm } from "./apply-changeset.ts";
 import { OsmChangeset } from "./changeset.ts";
+import { generateChangeset } from "./generate-changeset.ts";
 import type { OsmMergeOptions } from "./types.ts";
 import { changeStatsSummary } from "./utils.ts";
 
@@ -19,10 +20,10 @@ import { changeStatsSummary } from "./utils.ts";
  * Run a full merge pipeline on two OSM datasets.
  *
  * Executes a multi-stage merge process:
- * 1. Deduplicates nodes and ways in both base and patch datasets
- * 2. Optionally generates direct changes from patch to base (`directMerge`)
- * 3. Optionally deduplicates nodes/ways in the final merged dataset
- * 4. Optionally creates intersection nodes where ways cross
+ * 1. Optionally generates direct changes from patch to base (`directMerge`)
+ * 2. Optionally reconciles coincident patch nodes/ways with base entities
+ * 3. Optionally creates intersection nodes where ways cross
+ * 4. Verifies that the merge introduced no new routing-integrity problems
  *
  * @param base - The base OSM dataset to merge into.
  * @param patch - The patch OSM dataset to merge from.
@@ -47,52 +48,22 @@ export async function merge(
   onProgress: (progress: ProgressEvent) => void = logProgress,
 ) {
   const log = (msg: string) => onProgress(progressEvent(msg));
-  // De-duplicate nodes and ways in original datasets
-  log("Deduplicating ways in base OSM...");
-  let changeset = new OsmChangeset(base);
-  changeset.deduplicateWays(base.ways);
-  log(changeStatsSummary(changeset.stats));
-  let modifiedBase = applyChangesetToOsm(changeset);
+  let modifiedBase = base;
 
-  log("Deduplicating nodes in base OSM...");
-  changeset = new OsmChangeset(modifiedBase);
-  changeset.deduplicateNodes(modifiedBase.nodes);
-  log(changeStatsSummary(changeset.stats));
-  modifiedBase = applyChangesetToOsm(changeset);
-
-  log("Deduplicating ways in patch OSM...");
-  changeset = new OsmChangeset(patch);
-  changeset.deduplicateWays(patch.ways);
-  log(changeStatsSummary(changeset.stats));
-  let modifiedPatch = applyChangesetToOsm(changeset);
-
-  log("Deduplicating nodes in patch OSM...");
-  changeset = new OsmChangeset(modifiedPatch);
-  changeset.deduplicateNodes(modifiedPatch.nodes);
-  log(changeStatsSummary(changeset.stats));
-  modifiedPatch = applyChangesetToOsm(changeset);
-
-  // Generate direct changes
-  if (options.directMerge) {
-    log("Generating direct changes from patch OSM to base OSM...");
-    changeset = new OsmChangeset(modifiedBase);
-    changeset.generateDirectChanges(modifiedPatch);
-    log(changeStatsSummary(changeset.stats));
-    modifiedBase = applyChangesetToOsm(changeset);
-  }
-
-  // De-duplicate nodes and ways in final dataset
-  if (options.deduplicateWays) {
-    log("Deduplicating ways in final dataset...");
-    changeset = new OsmChangeset(modifiedBase);
-    changeset.deduplicateWays(modifiedPatch.ways);
-    log(changeStatsSummary(changeset.stats));
-    modifiedBase = applyChangesetToOsm(changeset);
-  }
-  if (options.deduplicateNodes) {
-    log("Deduplicating nodes in final dataset...");
-    changeset = new OsmChangeset(modifiedBase);
-    changeset.deduplicateNodes(modifiedPatch.nodes);
+  // Generate direct changes and reconcile against the original, immutable base in
+  // one changeset. This keeps patch entities out of the base candidate pool.
+  if (options.directMerge || options.deduplicateNodes || options.deduplicateWays) {
+    const changeset = generateChangeset(
+      base,
+      patch,
+      {
+        directMerge: options.directMerge ?? false,
+        deduplicateNodes: options.deduplicateNodes ?? false,
+        deduplicateWays: options.deduplicateWays ?? false,
+        createIntersections: false,
+      },
+      onProgress,
+    );
     log(changeStatsSummary(changeset.stats));
     modifiedBase = applyChangesetToOsm(changeset);
   }
@@ -100,8 +71,8 @@ export async function merge(
   // Create intersections
   if (options.createIntersections) {
     log("Creating intersections in final dataset...");
-    changeset = new OsmChangeset(modifiedBase);
-    changeset.createIntersectionsForWays(modifiedPatch.ways);
+    const changeset = new OsmChangeset(modifiedBase);
+    changeset.createIntersectionsForWays(patch.ways);
     log(changeStatsSummary(changeset.stats));
     modifiedBase = applyChangesetToOsm(changeset);
   }

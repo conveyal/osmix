@@ -106,11 +106,30 @@ const isFootish = (t: OsmTags) =>
   ["footway", "path", "cycleway", "bridleway", "steps"].includes(String(t["highway"]));
 const isPolygonish = (t: OsmTags) => !!(t["building"] || t["landuse"] || t["natural"]);
 
+function normalizedGradeValue(value: number | string | undefined, defaultValue: string) {
+  const normalized = String(value ?? "");
+  if (normalized === "" || normalized === "0" || normalized === "false" || normalized === "no") {
+    return defaultValue;
+  }
+  return normalized;
+}
+
+/** Normalize the routing-relevant vertical context of a way for safe comparisons. */
+export function routingGradeSignature(tags?: OsmTags) {
+  return [
+    `layer=${String(tags?.["layer"] ?? "0")}`,
+    `level=${String(tags?.["level"] ?? "")}`,
+    `bridge=${normalizedGradeValue(tags?.["bridge"], "no")}`,
+    `tunnel=${normalizedGradeValue(tags?.["tunnel"], "no")}`,
+    `covered=${normalizedGradeValue(tags?.["covered"], "no")}`,
+  ].join("|");
+}
+
 /**
  * Determine if two ways should be connected based on their tags.
  * Connection logic:
  * - Never connect if either is an area (building, landuse, etc).
- * - Never connect if separated by bridge/tunnel/layer.
+ * - Never connect if layer, level, bridge, tunnel, or covered context differs.
  * - Connect highway-highway, highway-footway, footway-footway.
  */
 export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
@@ -118,9 +137,7 @@ export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
   const b = tagsB || {};
   if (isPolygonish(a) || isPolygonish(b)) return false;
 
-  const isSeparated = !!(a["bridge"] || a["tunnel"] || b["bridge"] || b["tunnel"]);
-  const diffLayer = (a["layer"] ?? "0") !== (b["layer"] ?? "0");
-  if (isSeparated || diffLayer) return false;
+  if (routingGradeSignature(a) !== routingGradeSignature(b)) return false;
 
   if (isHighway(a) && isHighway(b)) return true;
   if (isHighway(a) && isFootish(b)) return true;

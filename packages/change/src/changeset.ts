@@ -9,15 +9,16 @@
  */
 
 import type { IdOrIndex, Nodes, Osm, Ways } from "@osmix/core";
+import { toMicroDegrees } from "@osmix/geo/coordinates";
 import type { OsmEntity, OsmEntityType, OsmEntityTypeMap, OsmNode, OsmWay } from "@osmix/types";
-import { entityPropertiesEqual, getEntityType, isWayEqual } from "@osmix/types/utils";
+import { entityPropertiesEqual, getEntityType } from "@osmix/types/utils";
 import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 
+import { inheritedRoutingIntegrityIssueKeys, routingIntegrityIssueKeys } from "./integrity.ts";
 import type { OsmChange, OsmChanges, OsmChangesetStats, OsmEntityRef } from "./types.ts";
 import {
   cleanCoords,
   entityHasTagValue,
-  getEntityVersion,
   isWayIntersectionCandidate,
   nearestNodeOnWay,
   removeDuplicateAdjacentRelationMembers,
@@ -30,6 +31,137 @@ type ReplacementMap = Map<number, number>;
 type IdIndex = Nodes["ids"];
 
 const EMPTY_ID = -1;
+const DESCRIPTIVE_WAY_TAGS = new Set([
+  "alt_name",
+  "int_name",
+  "loc_name",
+  "name",
+  "note",
+  "official_name",
+  "old_name",
+  "operator",
+  "ref",
+  "short_name",
+  "source",
+  "wikidata",
+  "wikipedia",
+]);
+const DESCRIPTIVE_WAY_TAG_PREFIXES = [
+  "alt_name:",
+  "name:",
+  "note:",
+  "official_name:",
+  "old_name:",
+  "operator:",
+  "source:",
+] as const;
+const GRADE_AND_ACCESS_TAGS = [
+  "access",
+  "barrier",
+  "bicycle",
+  "foot",
+  "horse",
+  "motor_vehicle",
+  "motorcar",
+  "vehicle",
+] as const;
+const GRADE_TAG_DEFAULTS = {
+  bridge: "no",
+  covered: "no",
+  layer: "0",
+  level: "",
+  tunnel: "no",
+} as const;
+const NODE_ROUTING_CRITICAL_TAGS = [
+  "access",
+  "barrier",
+  "bicycle",
+  "foot",
+  "ford",
+  "highway",
+  "horse",
+  "motor_vehicle",
+  "motorcar",
+  "vehicle",
+] as const;
+
+function sameOsmCoordinate(a: OsmNode, b: OsmNode) {
+  return (
+    toMicroDegrees(a.lon) === toMicroDegrees(b.lon) &&
+    toMicroDegrees(a.lat) === toMicroDegrees(b.lat)
+  );
+}
+
+function hasAnyTagConflict(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
+  if (!a || !b) return false;
+  return Object.entries(a).some(([key, value]) => b[key] != null && b[key] !== value);
+}
+
+function isDescriptiveWayTag(key: string) {
+  return (
+    DESCRIPTIVE_WAY_TAGS.has(key) ||
+    DESCRIPTIVE_WAY_TAG_PREFIXES.some((prefix) => key.startsWith(prefix))
+  );
+}
+
+function routingSemanticTagsEqual(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
+  const keys = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
+  return [...keys].every((key) => isDescriptiveWayTag(key) || a?.[key] === b?.[key]);
+}
+
+function hasConflictingGradeOrAccessTags(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
+  if (GRADE_AND_ACCESS_TAGS.some((key) => String(a?.[key] ?? "") !== String(b?.[key] ?? ""))) {
+    return true;
+  }
+  return Object.entries(GRADE_TAG_DEFAULTS).some(
+    ([key, defaultValue]) => String(a?.[key] ?? defaultValue) !== String(b?.[key] ?? defaultValue),
+  );
+}
+
+function withNonConflictingTags<T extends OsmEntity>(base: T, patch: T): T {
+  if (!patch.tags) return base;
+  const tags = { ...base.tags };
+  let changed = false;
+  for (const [key, value] of Object.entries(patch.tags)) {
+    if (tags[key] != null) continue;
+    tags[key] = value;
+    changed = true;
+  }
+  return changed ? { ...base, tags } : base;
+}
+
+function withNonConflictingDescriptiveTags<T extends OsmEntity>(base: T, patch: T): T {
+  if (!patch.tags) return base;
+  const tags = { ...base.tags };
+  let changed = false;
+  for (const [key, value] of Object.entries(patch.tags)) {
+    if (!isDescriptiveWayTag(key) || tags[key] != null) continue;
+    tags[key] = value;
+    changed = true;
+  }
+  return changed ? { ...base, tags } : base;
+}
+
+function nodeRoutingTagCount(node: OsmNode) {
+  return NODE_ROUTING_CRITICAL_TAGS.reduce(
+    (count, key) => count + (node.tags?.[key] == null ? 0 : 1),
+    0,
+  );
+}
+
+function wayBbox(coordinates: [number, number][]): [number, number, number, number] {
+  let minLon = Number.POSITIVE_INFINITY;
+  let minLat = Number.POSITIVE_INFINITY;
+  let maxLon = Number.NEGATIVE_INFINITY;
+  let maxLat = Number.NEGATIVE_INFINITY;
+  for (const [lon, lat] of coordinates) {
+    minLon = Math.min(minLon, lon);
+    minLat = Math.min(minLat, lat);
+    maxLon = Math.max(maxLon, lon);
+    maxLat = Math.max(maxLat, lat);
+  }
+  return [minLon, minLat, maxLon, maxLat];
+}
 
 /** Return the true maximum ID regardless of insertion order. */
 function maximumId(ids: IdIndex): number | null {
@@ -88,6 +220,8 @@ export class OsmChangeset {
   relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]>> = {};
 
   osm: Osm;
+  /** @internal Integrity issues inherited from merge inputs rather than introduced by changes. */
+  routingIntegrityBaselineKeys: Set<string>;
 
   // Next node ID tracker for generating new IDs during intersection creation
   currentNodeId: number;
@@ -109,6 +243,7 @@ export class OsmChangeset {
   constructor(base: Osm) {
     this.osm = base;
     this.currentNodeId = maximumId(base.nodes.ids) ?? EMPTY_ID;
+    this.routingIntegrityBaselineKeys = routingIntegrityIssueKeys(base);
   }
 
   get stats(): OsmChangesetStats {
@@ -221,92 +356,139 @@ export class OsmChangeset {
     };
   }
 
+  private currentWays() {
+    const ways = new Map<number, OsmWay>();
+    for (const way of this.osm.ways) {
+      const current = this.getCurrentWay(way);
+      if (current) ways.set(current.id, current);
+    }
+    for (const change of Object.values(this.wayChanges)) {
+      if (change.changeType === "delete") ways.delete(change.entity.id);
+      else ways.set(change.entity.id, change.entity);
+    }
+    return ways.values();
+  }
+
+  private currentRelations() {
+    const relations = new Map<number, OsmEntityTypeMap["relation"]>();
+    for (const relation of this.osm.relations) {
+      const change = this.relationChanges[relation.id];
+      if (change?.changeType === "delete") continue;
+      relations.set(relation.id, change?.entity ?? relation);
+    }
+    for (const change of Object.values(this.relationChanges)) {
+      if (change.changeType === "delete") relations.delete(change.entity.id);
+      else relations.set(change.entity.id, change.entity);
+    }
+    return relations.values();
+  }
+
+  private nodeContextsCompatible(patchNode: OsmNode, baseNode: OsmNode) {
+    if (hasAnyTagConflict(patchNode.tags, baseNode.tags)) return false;
+    if (hasConflictingGradeOrAccessTags(patchNode.tags, baseNode.tags)) return false;
+
+    const patchWays: OsmWay[] = [];
+    const baseWays: OsmWay[] = [];
+    for (const way of this.currentWays()) {
+      if (way.refs.includes(patchNode.id)) patchWays.push(way);
+      if (way.refs.includes(baseNode.id)) baseWays.push(way);
+    }
+    if (patchWays.length === 0 || baseWays.length === 0) return true;
+
+    return patchWays.every((patchWay) =>
+      baseWays.every(
+        (baseWay) =>
+          !hasConflictingGradeOrAccessTags(patchWay.tags, baseWay.tags) &&
+          (patchWay.tags?.["highway"] == null) === (baseWay.tags?.["highway"] == null),
+      ),
+    );
+  }
+
+  private removeUnsafeNodeReplacements(replacementMap: ReplacementMap) {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const way of this.currentWays()) {
+        if (way.tags?.["highway"] == null || new Set(way.refs).size < 2) continue;
+        const replacedRefs = way.refs.map((ref) => replacementMap.get(ref) ?? ref);
+        if (new Set(replacedRefs).size >= 2) continue;
+        for (const ref of way.refs) {
+          if (!replacementMap.delete(ref)) continue;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  private reconcileNodeTags(patchNode: OsmNode, baseNodeId: number) {
+    const baseNode = this.getCurrentNode(baseNodeId);
+    if (!baseNode) return;
+    const mergedNode = withNonConflictingTags(baseNode, patchNode);
+    if (mergedNode !== baseNode) this.modify("node", baseNodeId, () => mergedNode);
+  }
+
+  private deleteReconciledNode(node: OsmNode, survivorId: number) {
+    const pendingChange = this.nodeChanges[node.id];
+    if (pendingChange?.changeType === "create") {
+      delete this.nodeChanges[node.id];
+    } else {
+      const storedNode = this.osm.nodes.getById(node.id);
+      if (!storedNode) return;
+      this.delete(storedNode, [{ type: "node", id: survivorId, osmId: this.osm.id }]);
+    }
+    this.deduplicatedNodes++;
+  }
+
   /**
-   * Check nodes for duplicates and consolidate them within this OSM dataset.
-   * This process helps merge disparate datasets that share common geometry.
-   *
-   * The algorithm:
-   * 1. Find all pairs of nodes at the same geographic location (within a tiny radius).
-   * 2. For each pair, determine which node to keep:
-   *    - Prefer higher version number.
-   *    - If versions are equal, prefer the node with more tags.
-   *    - If tags are equal, prefer the higher ID (deterministic tie-breaker).
-   * 3. Build a replacement map (deleted ID -> kept ID).
-   * 4. Flatten chains (e.g., if A->B and B->C, then A->C).
-   * 5. Schedule duplicate nodes for deletion.
-   * 6. Update all ways and relations to reference the kept nodes.
+   * Reconcile incoming nodes with unambiguous base nodes at the exact OSM coordinate.
+   * Cross-dataset reconciliation always preserves the base ID. Same-dataset diagnostic
+   * scans use the highest compatible ID as a deterministic candidate survivor.
    */
   deduplicateNodes(nodes: Nodes) {
-    const checkedIdPairs = new IdPairs();
-    const replacementMap = new Map<number, number>();
+    const patchNodes = [...nodes];
+    const sameDataset = nodes === this.osm.nodes;
+    const replacementMap: ReplacementMap = new Map();
 
-    // Find overlapping nodes and determine which to keep
-    for (const node of nodes) {
-      if (!this.osm.nodes.ids.has(node.id)) continue;
-      if (this.nodeChanges[node.id]?.changeType === "delete") continue;
+    for (const patchNode of patchNodes) {
+      if (this.nodeChanges[patchNode.id]?.changeType === "delete") continue;
+      if (!sameDataset && this.nodeChanges[patchNode.id]?.changeType !== "create") continue;
+      const currentPatchNode = this.getCurrentNode(patchNode.id);
+      if (!currentPatchNode) continue;
 
-      // Use a tiny radius (1 meter = 0.001 km) to find nodes at effectively the same location
-      const existingNodes = this.osm.nodes.findIndexesWithinRadius(node.lon, node.lat, 0.001);
-      const existingNodeIds = existingNodes
-        .map((index) => ({ id: this.osm.nodes.ids.at(index), index }))
-        .filter((n) => n.id !== node.id && !checkedIdPairs.has(n.id, node.id));
+      // Keep the indexed radius query as the scalability gate, then require exact
+      // equality at OSM's seven-decimal coordinate precision.
+      const candidateNodes = this.osm.nodes
+        .findIndexesWithinRadius(patchNode.lon, patchNode.lat, 0.001)
+        .map((index) => this.osm.nodes.getByIndex(index))
+        .map((baseNode) => this.getCurrentNode(baseNode.id) ?? baseNode)
+        .filter(
+          (baseNode) =>
+            baseNode.id !== patchNode.id &&
+            (!sameDataset || baseNode.id > patchNode.id) &&
+            this.nodeChanges[baseNode.id]?.changeType !== "delete" &&
+            sameOsmCoordinate(currentPatchNode, baseNode) &&
+            this.nodeContextsCompatible(currentPatchNode, baseNode),
+        );
 
-      for (const { index: existingNodeIndex } of existingNodeIds) {
-        const existingNode = this.osm.nodes.getByIndex(existingNodeIndex);
-        if (existingNode == null) continue;
-
-        checkedIdPairs.add(existingNode.id, node.id);
-
-        // Determine which node to keep using version/tags logic (same as deduplicateWay)
-        const nodeVersion = getEntityVersion(node);
-        const existingNodeVersion = getEntityVersion(existingNode);
-
-        let nodeToKeep: number = node.id;
-        let nodeToDelete: number = existingNode.id;
-
-        // Check version - prefer higher version
-        if (existingNodeVersion > nodeVersion) {
-          // Existing node has higher version, keep existing node
-          nodeToKeep = existingNode.id;
-          nodeToDelete = node.id;
-        } else if (nodeVersion === existingNodeVersion) {
-          // Same version, keep node with more tags (>= comparison to match deduplicateWay)
-          const nodeTagCount = Object.keys(node.tags ?? {}).length;
-          const existingNodeTagCount = Object.keys(existingNode.tags ?? {}).length;
-          if (existingNodeTagCount >= nodeTagCount) {
-            // Existing node has same or more tags, keep existing node
-            // If equal tags, use higher ID for normalization
-            if (existingNodeTagCount === nodeTagCount) {
-              nodeToKeep = Math.max(node.id, existingNode.id);
-              nodeToDelete = Math.min(node.id, existingNode.id);
-            } else {
-              nodeToKeep = existingNode.id;
-              nodeToDelete = node.id;
-            }
-          }
-        }
-
-        // Add to replacement map (deleted node -> kept node)
-        replacementMap.set(nodeToDelete, nodeToKeep);
-      }
+      if (candidateNodes.length === 0 || (!sameDataset && candidateNodes.length !== 1)) continue;
+      const baseNode = sameDataset
+        ? candidateNodes.toSorted((a, b) => b.id - a.id)[0]
+        : candidateNodes[0];
+      replacementMap.set(patchNode.id, baseNode!.id);
     }
 
-    // Flatten deletion chains before updating higher-layer references.
-    const flattenedMap = flattenReplacementMap(replacementMap);
-    this.applyNodeReplacementsToWays(flattenedMap);
-    this.applyNodeReplacementsToRelations(flattenedMap);
+    this.removeUnsafeNodeReplacements(replacementMap);
+    this.applyNodeReplacementsToWays(replacementMap);
+    this.applyNodeReplacementsToRelations(replacementMap);
 
-    // Schedule nodes for deletion only after all references are updated.
-    for (const fromId of flattenedMap.keys()) {
-      const nodeToDelete = this.osm.nodes.getById(fromId);
-      if (nodeToDelete) {
-        this.deduplicatedNodes++;
-        this.delete(nodeToDelete, [
-          { type: "node", id: flattenedMap.get(fromId)!, osmId: this.osm.id },
-        ]);
-      }
+    for (const [patchNodeId, baseNodeId] of replacementMap) {
+      const patchNode =
+        this.getCurrentNode(patchNodeId) ?? patchNodes.find((node) => node.id === patchNodeId);
+      if (!patchNode) continue;
+      this.reconcileNodeTags(patchNode, baseNodeId);
+      this.deleteReconciledNode(patchNode, baseNodeId);
     }
-    return flattenedMap;
+    return replacementMap;
   }
 
   /**
@@ -316,9 +498,7 @@ export class OsmChangeset {
   private applyNodeReplacementsToWays(replacementMap: Map<number, number>): number {
     let replacedCount = 0;
 
-    for (let wayIndex = 0; wayIndex < this.osm.ways.size; wayIndex++) {
-      const way = this.osm.ways.getByIndex(wayIndex);
-      if (this.wayChanges[way.id]?.changeType === "delete") continue;
+    for (const way of this.currentWays()) {
       let hasReplacement = false;
       const newRefs = way.refs.map((ref) => {
         const replacement = replacementMap.get(ref);
@@ -351,12 +531,7 @@ export class OsmChangeset {
   private applyNodeReplacementsToRelations(replacementMap: Map<number, number>): number {
     let replacedCount = 0;
 
-    for (let relationIndex = 0; relationIndex < this.osm.relations.size; relationIndex++) {
-      const baseRelation = this.osm.relations.getByIndex(relationIndex);
-      const relation =
-        (this.relationChanges[baseRelation.id]?.entity as
-          | OsmEntityTypeMap["relation"]
-          | undefined) ?? baseRelation;
+    for (const relation of this.currentRelations()) {
       let hasReplacement = false;
       const newMembers = relation.members.map((member) => {
         if (member.type !== "node") return member;
@@ -369,7 +544,7 @@ export class OsmChangeset {
         return member;
       });
 
-      if (hasReplacement && this.relationChanges[relation.id]?.changeType !== "delete") {
+      if (hasReplacement) {
         this.modify("relation", relation.id, (relation) =>
           removeDuplicateAdjacentRelationMembers({
             ...relation,
@@ -383,15 +558,80 @@ export class OsmChangeset {
     return replacedCount;
   }
 
+  private replaceRestrictionViaNode(fromId: number, toId: number) {
+    for (const relation of this.currentRelations()) {
+      if (
+        relation.tags?.["type"] !== "restriction" ||
+        !relation.members.some(
+          (member) => member.type === "node" && member.role === "via" && member.ref === fromId,
+        )
+      ) {
+        continue;
+      }
+      this.modify("relation", relation.id, (relation) =>
+        removeDuplicateAdjacentRelationMembers({
+          ...relation,
+          members: relation.members.map((member) =>
+            member.type === "node" && member.role === "via" && member.ref === fromId
+              ? { ...member, ref: toId }
+              : member,
+          ),
+        }),
+      );
+    }
+  }
+
+  private chooseIntersectionNode(
+    wayNode: OsmNode,
+    intersectingWayNode: OsmNode,
+    wayIsPatch: boolean,
+    intersectingWayIsPatch: boolean,
+  ) {
+    if (hasAnyTagConflict(wayNode.tags, intersectingWayNode.tags)) return null;
+
+    const wayRoutingTags = nodeRoutingTagCount(wayNode);
+    const intersectingRoutingTags = nodeRoutingTagCount(intersectingWayNode);
+    let keepWayNode: boolean;
+    if (wayIsPatch !== intersectingWayIsPatch) {
+      keepWayNode = !wayIsPatch;
+    } else if (wayRoutingTags !== intersectingRoutingTags) {
+      keepWayNode = wayRoutingTags > intersectingRoutingTags;
+    } else {
+      const wayTagCount = Object.keys(wayNode.tags ?? {}).length;
+      const intersectingTagCount = Object.keys(intersectingWayNode.tags ?? {}).length;
+      keepWayNode = wayTagCount >= intersectingTagCount;
+    }
+
+    const survivor = keepWayNode ? wayNode : intersectingWayNode;
+    const replaced = keepWayNode ? intersectingWayNode : wayNode;
+    return { keepWayNode, replaced, survivor };
+  }
+
+  private mergeNodeTags(survivor: OsmNode, replaced: OsmNode) {
+    const merged = withNonConflictingTags(survivor, replaced);
+    if (merged !== survivor) this.modify("node", survivor.id, () => merged);
+    return merged;
+  }
+
+  private markNodeAsCrossing(nodeId: number) {
+    const node = this.getCurrentNode(nodeId);
+    if (!node || entityHasTagValue(node, "crossing", "yes")) return;
+    this.modify("node", node.id, (node) => ({
+      ...node,
+      tags: { ...node.tags, crossing: "yes" },
+    }));
+  }
+
   /**
    * De-duplicate the ways within this OSM changeset.
    */
   *deduplicateWaysGenerator(ways: Ways, replacementMap: ReplacementMap = new Map()) {
     const dedupedIdPairs = new IdPairs();
-    for (const way of ways) {
-      if (!this.osm.ways.ids.has(way.id)) continue;
+    const patchWays = [...ways];
+    const sameDataset = ways === this.osm.ways;
+    for (const way of patchWays) {
       if (this.wayChanges[way.id]?.changeType === "delete") continue;
-      yield this.deduplicateWay(way, dedupedIdPairs, replacementMap);
+      yield this.deduplicateWayAgainstBase(way, sameDataset, dedupedIdPairs, replacementMap);
     }
   }
 
@@ -408,12 +648,7 @@ export class OsmChangeset {
   private applyWayReplacementsToRelations(replacementMap: ReplacementMap): number {
     let replacedCount = 0;
 
-    for (let relationIndex = 0; relationIndex < this.osm.relations.size; relationIndex++) {
-      const baseRelation = this.osm.relations.getByIndex(relationIndex);
-      const relation =
-        (this.relationChanges[baseRelation.id]?.entity as
-          | OsmEntityTypeMap["relation"]
-          | undefined) ?? baseRelation;
+    for (const relation of this.currentRelations()) {
       let hasReplacement = false;
       const newMembers = relation.members.map((member) => {
         if (member.type !== "way") return member;
@@ -426,7 +661,7 @@ export class OsmChangeset {
         return member;
       });
 
-      if (hasReplacement && this.relationChanges[relation.id]?.changeType !== "delete") {
+      if (hasReplacement) {
         this.modify("relation", relation.id, (relation) =>
           removeDuplicateAdjacentRelationMembers({
             ...relation,
@@ -439,75 +674,73 @@ export class OsmChangeset {
     return replacedCount;
   }
 
-  /**
-   * Deduplicate a way by comparing it with existing ways in the OSM dataset.
-   * When a duplicate way is found, the patch way is deleted and references point to the kept way.
-   *
-   * Duplication criteria:
-   * - Geometrically identical (same coordinates).
-   * - Properties (except ID) must be roughly compatible.
-   * - Keeps the way with the higher version or more tags.
-   *
-   */
+  private deleteReconciledWay(way: OsmWay, survivorId: number) {
+    const pendingChange = this.wayChanges[way.id];
+    if (pendingChange?.changeType === "create") {
+      delete this.wayChanges[way.id];
+    } else {
+      const storedWay = this.osm.ways.getById(way.id);
+      if (!storedWay) return;
+      this.delete(storedWay, [{ type: "way", id: survivorId, osmId: this.osm.id }]);
+    }
+    this.deduplicatedWays++;
+  }
+
+  private deduplicateWayAgainstBase(
+    patchWay: OsmWay,
+    sameDataset: boolean,
+    dedupedIdPairs: IdPairs,
+    replacementMap: ReplacementMap,
+  ) {
+    if (!this.osm.ways.ids.has(patchWay.id) && this.wayChanges[patchWay.id] == null) return 0;
+    if (!sameDataset && this.wayChanges[patchWay.id]?.changeType !== "create") return 0;
+    const currentPatchWay =
+      this.getCurrentWay(patchWay) ?? this.wayChanges[patchWay.id]?.entity ?? patchWay;
+    const wayCoords = this.getWayCoordinates(currentPatchWay);
+    if (!wayCoords || wayCoords.length < 2) return 0;
+
+    const closeWayIndexes = this.osm.ways.intersects(wayBbox(wayCoords));
+    const candidates = closeWayIndexes
+      .map((index) => this.osm.ways.getByIndex(index))
+      .filter((baseWay) => {
+        if (baseWay.id === patchWay.id) return false;
+        if (sameDataset) {
+          if (baseWay.id < patchWay.id) return false;
+        }
+        if (dedupedIdPairs.has(patchWay.id, baseWay.id)) return false;
+        dedupedIdPairs.add(patchWay.id, baseWay.id);
+        const currentBaseWay = this.getCurrentWay(baseWay);
+        if (!currentBaseWay) return false;
+        if (!dequal(currentPatchWay.refs, currentBaseWay.refs)) return false;
+        return routingSemanticTagsEqual(currentPatchWay.tags, currentBaseWay.tags);
+      });
+
+    if (candidates.length === 0 || (!sameDataset && candidates.length !== 1)) return 0;
+    const baseWay = sameDataset ? candidates.toSorted((a, b) => b.id - a.id)[0] : candidates[0];
+    const currentBaseWay = this.getCurrentWay(baseWay!);
+    if (!currentBaseWay) return 0;
+
+    const mergedWay = withNonConflictingDescriptiveTags(currentBaseWay, currentPatchWay);
+    if (mergedWay !== currentBaseWay) this.modify("way", currentBaseWay.id, () => mergedWay);
+
+    replacementMap.set(patchWay.id, currentBaseWay.id);
+    this.applyWayReplacementsToRelations(replacementMap);
+    this.deleteReconciledWay(patchWay, currentBaseWay.id);
+    return 1;
+  }
+
+  /** Reconcile one incoming way with a unique, equivalent base way. */
   deduplicateWay(
     patchWay: OsmWay,
     dedupedIdPairs: IdPairs,
     replacementMap: ReplacementMap = new Map(),
   ) {
-    const wayIndex = this.osm.ways.ids.getIndexFromId(patchWay.id);
-    const wayCoords = this.osm.ways.getCoordinates(wayIndex);
-
-    // Look for duplicate ways in OSM index
-    const closeWayIndexes = this.osm.ways.intersects(this.osm.ways.getEntityBbox(patchWay));
-    const wayVersion = getEntityVersion(patchWay);
-    const wayTagCount = Object.keys(patchWay.tags ?? {}).length;
-    const candidateDuplicateWays: OsmWay[] = closeWayIndexes
-      .map((index) => {
-        const otherWay = this.osm.ways.getByIndex(index);
-        if (otherWay.id === patchWay.id) return null;
-
-        // Has this pair been deduped or checked already?
-        if (dedupedIdPairs.has(patchWay.id, otherWay.id)) return null;
-        dedupedIdPairs.add(patchWay.id, otherWay.id);
-
-        // Check if all way properties other than the ID are equal
-        if (isWayEqual(patchWay, otherWay)) return otherWay;
-
-        // Check geometry
-        const coords = this.osm.ways.getCoordinates(index);
-        if (!dequal(wayCoords, coords)) return null;
-
-        // Check version
-        const otherWayVersion = getEntityVersion(otherWay);
-        if (otherWayVersion < wayVersion) return null;
-        if (otherWayVersion > wayVersion) return otherWay;
-
-        // Ways are geometrically equal, with same version. Keep the way with more tags
-        const tagCount = Object.keys(otherWay.tags ?? {}).length;
-        return tagCount >= wayTagCount ? otherWay : null;
-      })
-      .filter((way) => way != null);
-
-    if (candidateDuplicateWays.length === 0) return 0;
-
-    const survivorIds = candidateDuplicateWays
-      .map((way) => resolveReplacement(way.id, replacementMap))
-      .filter((id, index, ids) => ids.indexOf(id) === index);
-    if (survivorIds.length === 0) return 0;
-    const survivorId = survivorIds.length === 1 ? survivorIds[0]! : Math.min(...survivorIds);
-    const finalSurvivorId = resolveReplacement(survivorId, replacementMap);
-    if (finalSurvivorId === patchWay.id) {
-      throw Error(`Replacement cycle detected at way ${patchWay.id}`);
-    }
-    replacementMap.set(patchWay.id, finalSurvivorId);
-    const flattenedMap = flattenReplacementMap(replacementMap);
-    this.applyWayReplacementsToRelations(flattenedMap);
-
-    // Delete this way
-    this.delete(patchWay, [{ type: "way", id: finalSurvivorId, osmId: this.osm.id }]);
-    this.deduplicatedWays++;
-
-    return candidateDuplicateWays.length;
+    return this.deduplicateWayAgainstBase(
+      patchWay,
+      this.osm.ways.ids.has(patchWay.id),
+      dedupedIdPairs,
+      replacementMap,
+    );
   }
 
   /**
@@ -519,9 +752,10 @@ export class OsmChangeset {
    */
   *createIntersectionsForWaysGenerator(ways: Ways) {
     const wayIdPairs = new IdPairs();
+    const patchWayIds = new Set([...ways].map((way) => way.id));
     for (const way of ways) {
       if (!this.osm.ways.ids.has(way.id)) continue;
-      yield this.createIntersectionsForWay({ id: way.id }, wayIdPairs);
+      yield this.createIntersectionsForWayInternal({ id: way.id }, wayIdPairs, patchWayIds);
     }
   }
 
@@ -563,39 +797,57 @@ export class OsmChangeset {
    * - Inserts existing nodes or creates new intersection nodes at the crossing points.
    */
   createIntersectionsForWay(wayIdOrIndex: IdOrIndex, wayIdPairs: IdPairs) {
+    return this.createIntersectionsForWayInternal(wayIdOrIndex, wayIdPairs, null);
+  }
+
+  private createIntersectionsForWayInternal(
+    wayIdOrIndex: IdOrIndex,
+    wayIdPairs: IdPairs,
+    patchWayIds: ReadonlySet<number> | null,
+  ) {
     let intersectionsFound = 0;
     let intersectionsCreated = 0;
 
     // Get the actual way from the OSM data (which may have been modified by deduplication)
     const [wayIndex] = this.osm.ways.ids.idOrIndex(wayIdOrIndex);
-    const way = this.getCurrentWay(this.osm.ways.getByIndex(wayIndex));
-    if (!way) return;
-    if (!isWayIntersectionCandidate(way)) return;
+    const baseWay = this.osm.ways.getByIndex(wayIndex);
+    const initialWay = this.getCurrentWay(baseWay);
+    if (!initialWay) return;
+    if (!isWayIntersectionCandidate(initialWay)) return;
 
-    const wayCoordinates = this.getWayCoordinates(way);
-    if (!wayCoordinates || wayCoordinates.length < 2) return;
+    const initialWayCoordinates = this.getWayCoordinates(initialWay);
+    if (!initialWayCoordinates || initialWayCoordinates.length < 2) return;
 
     // Check for intersecting ways. Since the way exists in the base OSM, there will always be at least one way.
     const bbox = this.osm.ways.getEntityBbox({ index: wayIndex });
     const intersectingWayIndexes = this.osm.ways.intersects(bbox);
     if (intersectingWayIndexes.length <= 1) return; // No candidates
 
-    const coordinates = cleanCoords(wayCoordinates);
     for (const intersectingWayIndex of intersectingWayIndexes) {
       const intersectingWayId = this.osm.ways.ids.at(intersectingWayIndex);
 
       // Skip self and null ways
-      if (intersectingWayId == null || intersectingWayId === way.id) continue;
-      if (wayIdPairs.has(way.id, intersectingWayId)) continue;
-      wayIdPairs.add(way.id, intersectingWayId);
+      if (intersectingWayId == null || intersectingWayId === initialWay.id) continue;
+      if (wayIdPairs.has(initialWay.id, intersectingWayId)) continue;
+      wayIdPairs.add(initialWay.id, intersectingWayId);
 
       // Skip ways that aren't applicable for connecting
+      const way = this.getCurrentWay(baseWay);
       const intersectingWay = this.getCurrentWay(this.osm.ways.getByIndex(intersectingWayIndex));
-      if (!intersectingWay) continue;
+      if (!way || !intersectingWay) continue;
       if (!waysShouldConnect(way.tags, intersectingWay.tags)) continue;
 
+      const wayCoordinates = this.getWayCoordinates(way);
       const intersectingWayCoordinates = this.getWayCoordinates(intersectingWay);
-      if (!intersectingWayCoordinates || intersectingWayCoordinates.length < 2) continue;
+      if (
+        !wayCoordinates ||
+        wayCoordinates.length < 2 ||
+        !intersectingWayCoordinates ||
+        intersectingWayCoordinates.length < 2
+      ) {
+        continue;
+      }
+      const coordinates = cleanCoords(wayCoordinates);
       const intersectingWayCoords = cleanCoords(intersectingWayCoordinates);
 
       // Skip ways that are geometrically equal
@@ -603,68 +855,83 @@ export class OsmChangeset {
 
       const intersectingPoints = waysIntersect(coordinates, intersectingWayCoords);
       for (const pt of intersectingPoints) {
+        const currentWay = this.getCurrentWay(baseWay);
+        const currentIntersectingWay = this.getCurrentWay(
+          this.osm.ways.getByIndex(intersectingWayIndex),
+        );
+        if (!currentWay || !currentIntersectingWay) continue;
+        const currentWayCoordinates = this.getWayCoordinates(currentWay);
+        const currentIntersectingWayCoordinates = this.getWayCoordinates(currentIntersectingWay);
+        if (!currentWayCoordinates || !currentIntersectingWayCoordinates) continue;
+
         const intersectingWayNodeId = nearestNodeOnWay(
-          intersectingWay,
-          intersectingWayCoords,
+          currentIntersectingWay,
+          currentIntersectingWayCoordinates,
           pt,
         ).nodeId;
-        const wayNodeId = nearestNodeOnWay(way, coordinates, pt).nodeId;
+        const wayNodeId = nearestNodeOnWay(currentWay, currentWayCoordinates, pt).nodeId;
 
         // If both ways already share the same node at this intersection,
         // just add the crossing tag (if needed) but don't count as an intersection.
-        if (wayNodeId && intersectingWayNodeId && wayNodeId === intersectingWayNodeId) {
-          const sharedNode = this.getCurrentNode(wayNodeId);
-          if (sharedNode && !entityHasTagValue(sharedNode, "crossing", "yes")) {
-            this.modify("node", sharedNode.id, (node) => {
-              return {
-                ...node,
-                tags: { ...node.tags, crossing: "yes" },
-              };
-            });
-          }
+        if (
+          wayNodeId != null &&
+          intersectingWayNodeId != null &&
+          wayNodeId === intersectingWayNodeId
+        ) {
+          this.markNodeAsCrossing(wayNodeId);
           continue;
+        }
+
+        let endpointResolution: ReturnType<OsmChangeset["chooseIntersectionNode"]> | undefined;
+        if (wayNodeId != null && intersectingWayNodeId != null) {
+          const wayNode = this.getCurrentNode(wayNodeId);
+          const intersectingWayNode = this.getCurrentNode(intersectingWayNodeId);
+          if (!wayNode || !intersectingWayNode) continue;
+          endpointResolution = this.chooseIntersectionNode(
+            wayNode,
+            intersectingWayNode,
+            patchWayIds?.has(currentWay.id) ?? false,
+            patchWayIds?.has(currentIntersectingWay.id) ?? false,
+          );
+          if (!endpointResolution) continue;
         }
 
         intersectionsFound++;
 
-        // Prefer the incoming way node, then the intersecting way node, then a new node.
-        if (wayNodeId) {
+        if (endpointResolution) {
+          const survivor = this.mergeNodeTags(
+            endpointResolution.survivor,
+            endpointResolution.replaced,
+          );
+          if (endpointResolution.keepWayNode) {
+            this.modify("way", currentIntersectingWay.id, (way) => ({
+              ...way,
+              refs: way.refs.map((ref) =>
+                ref === endpointResolution!.replaced.id ? survivor.id : ref,
+              ),
+            }));
+          } else {
+            this.modify("way", currentWay.id, (way) => ({
+              ...way,
+              refs: way.refs.map((ref) =>
+                ref === endpointResolution!.replaced.id ? survivor.id : ref,
+              ),
+            }));
+          }
+          this.replaceRestrictionViaNode(endpointResolution.replaced.id, survivor.id);
+          this.markNodeAsCrossing(survivor.id);
+        } else if (wayNodeId != null) {
           const wayNode = this.getCurrentNode(wayNodeId);
           if (wayNode == null) throw Error(`Way node ${String(wayNodeId)} not found`);
-          if (intersectingWayNodeId) {
-            // Replace in intersecting way
-            this.modify("way", intersectingWay.id, (way) => {
-              return {
-                ...way,
-                refs: way.refs.map((ref) => (ref === intersectingWayNodeId ? wayNodeId : ref)),
-              };
-            });
-          } else {
-            this.spliceNodeIntoWay(intersectingWay, wayNode);
-          }
-
-          if (!entityHasTagValue(wayNode, "crossing", "yes")) {
-            this.modify("node", wayNode.id, (node) => {
-              return {
-                ...node,
-                tags: { ...node.tags, crossing: "yes" },
-              };
-            });
-          }
-        } else if (intersectingWayNodeId) {
+          this.spliceNodeIntoWay(currentIntersectingWay, wayNode);
+          this.markNodeAsCrossing(wayNode.id);
+        } else if (intersectingWayNodeId != null) {
           const intersectingWayNode = this.getCurrentNode(intersectingWayNodeId);
           if (intersectingWayNode == null)
             throw Error(`Intersecting way node ${String(intersectingWayNodeId)} not found`);
 
-          this.spliceNodeIntoWay(way, intersectingWayNode);
-          if (!entityHasTagValue(intersectingWayNode, "crossing", "yes")) {
-            this.modify("node", intersectingWayNode.id, (node) => {
-              return {
-                ...node,
-                tags: { ...node.tags, crossing: "yes" },
-              };
-            });
-          }
+          this.spliceNodeIntoWay(currentWay, intersectingWayNode);
+          this.markNodeAsCrossing(intersectingWayNode.id);
         } else {
           intersectionsCreated++;
 
@@ -677,13 +944,13 @@ export class OsmChangeset {
             },
           };
           this.create(newIntersectionNode, this.osm.id, [
-            { type: "way", id: way.id, osmId: this.osm.id },
-            { type: "way", id: intersectingWay.id, osmId: this.osm.id },
+            { type: "way", id: currentWay.id, osmId: this.osm.id },
+            { type: "way", id: currentIntersectingWay.id, osmId: this.osm.id },
           ]);
 
           // Splice into the existing ways
-          this.spliceNodeIntoWay(way, newIntersectionNode);
-          this.spliceNodeIntoWay(intersectingWay, newIntersectionNode);
+          this.spliceNodeIntoWay(currentWay, newIntersectionNode);
+          this.spliceNodeIntoWay(currentIntersectingWay, newIntersectionNode);
         }
       }
     }
@@ -704,32 +971,46 @@ export class OsmChangeset {
     const currentWay = this.getCurrentWay(way);
     if (!currentWay) return;
     const coordinates = this.getWayCoordinates(currentWay);
-    if (!coordinates || coordinates.length === 0) return;
-    const { refIndex } = nearestNodeOnWay(
-      currentWay,
-      coordinates,
-      [node.lon, node.lat],
-      Number.POSITIVE_INFINITY,
-    );
-    if (refIndex < 0) return;
+    if (!coordinates || coordinates.length < 2 || currentWay.refs.includes(node.id)) return;
+
+    let closestSegment = -1;
+    let closestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < coordinates.length - 1; index++) {
+      const start = coordinates[index]!;
+      const end = coordinates[index + 1]!;
+      const dx = end[0] - start[0];
+      const dy = end[1] - start[1];
+      const lengthSquared = dx * dx + dy * dy;
+      if (lengthSquared === 0) continue;
+      const projection = ((node.lon - start[0]) * dx + (node.lat - start[1]) * dy) / lengthSquared;
+      const parameter = Math.max(0, Math.min(1, projection));
+      const projectedLon = start[0] + parameter * dx;
+      const projectedLat = start[1] + parameter * dy;
+      const distance = (node.lon - projectedLon) ** 2 + (node.lat - projectedLat) ** 2;
+      if (distance >= closestDistance) continue;
+      closestDistance = distance;
+      closestSegment = index;
+    }
+    if (closestSegment < 0) return;
     this.modify("way", way.id, (way) => ({
       ...way,
-      refs: way.refs.toSpliced(refIndex, 0, node.id),
+      refs: way.refs.toSpliced(closestSegment + 1, 0, node.id),
     }));
   }
 
   /**
-   * Create changes to merge nodes, ways, and relations from a patch OSM file into the base OSM.
-   * - Check for duplicate nodes in the patch, replace the existing nodes where appropriate.
-   * - Check for duplicate incoming ways, only add single instances of geometrically equal ways.
+   * Create direct same-ID modifications and new-entity changes from a patch OSM file.
    *
    * Implementation notes:
-   * - Ways are processed before nodes to improve node deduplication accuracy (see comment on line 633).
-   * - Node replacements in relations are handled by `applyNodeReplacementsToRelations()` when
-   *   deduplicating nodes, but relation member updates during direct merge are not automatically
-   *   handled. Use `deduplicateNodes()` after `generateDirectChanges()` if relation updates are needed.
+   * - Ways are processed before nodes so subsequent node reconciliation can inspect pending ways.
+   * - Call `deduplicateNodes()` and `deduplicateWays()` afterward for conservative cross-dataset
+   *   reconciliation and relation-member rewrites.
    */
   generateDirectChanges(patch: Osm) {
+    for (const key of inheritedRoutingIntegrityIssueKeys(this.osm, patch)) {
+      this.routingIntegrityBaselineKeys.add(key);
+    }
+
     // Reset the current node ID to the highest node ID in the base or patch.
     const maximums = [maximumId(this.osm.nodes.ids), maximumId(patch.nodes.ids)].filter(
       (id): id is number => id !== null,
