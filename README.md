@@ -68,6 +68,10 @@ const mergedOsm = await merge(osm, patchOsm);
 console.log(mergedOsm.id);
 ```
 
+The high-level merge preserves each source dataset and only reconciles compatible entities across the base
+and patch. If a PBF was produced by an older release that automatically deduplicated within each input,
+regenerate it from the original source files rather than trying to repair rewritten routing topology.
+
 ### Use in a Web Worker
 
 ```ts check-docs monaco-pbf

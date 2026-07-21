@@ -165,6 +165,59 @@ describe("Router", () => {
     }
   });
 
+  it("treats roundabouts as one-way unless explicitly overridden", () => {
+    const createRoundabout = (oneway?: string) => {
+      const osm = new Osm({ id: `roundabout-${oneway ?? "implicit"}` });
+      osm.nodes.addNode({ id: 1, lat: 0, lon: 0 });
+      osm.nodes.addNode({ id: 2, lat: 0, lon: 0.001 });
+      osm.nodes.addNode({ id: 3, lat: 0.001, lon: 0.001 });
+      osm.ways.addWay({
+        id: 10,
+        refs: [1, 2, 3, 1],
+        tags: {
+          highway: "residential",
+          junction: "roundabout",
+          ...(oneway === undefined ? {} : { oneway }),
+        },
+      });
+      osm.buildIndexes();
+      osm.buildSpatialIndexes();
+      return osm;
+    };
+
+    const implicit = createRoundabout();
+    const implicitRoute = new Router(implicit, buildGraph(implicit)).route(1, 0);
+    expect(implicitRoute?.map((segment) => implicit.nodes.ids.at(segment.nodeIndex))).toEqual([
+      2, 3, 1,
+    ]);
+
+    const overridden = createRoundabout("no");
+    const overriddenRoute = new Router(overridden, buildGraph(overridden)).route(1, 0);
+    expect(overriddenRoute?.map((segment) => overridden.nodes.ids.at(segment.nodeIndex))).toEqual([
+      2, 1,
+    ]);
+  });
+
+  it("creates reverse-only edges for oneway=-1", () => {
+    const osm = new Osm({ id: "reverse-oneway" });
+    osm.nodes.addNode({ id: 1, lat: 0, lon: 0 });
+    osm.nodes.addNode({ id: 2, lat: 0, lon: 0.001 });
+    osm.nodes.addNode({ id: 3, lat: 0, lon: 0.002 });
+    osm.ways.addWay({
+      id: 10,
+      refs: [1, 2, 3],
+      tags: { highway: "residential", oneway: "-1" },
+    });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+    const router = new Router(osm, buildGraph(osm));
+
+    expect(router.route(0, 2)).toBeNull();
+    expect(router.route(2, 0)?.map((segment) => osm.nodes.ids.at(segment.nodeIndex))).toEqual([
+      3, 2, 1,
+    ]);
+  });
+
   it("should handle same start and end node", () => {
     const osm = createTestOsm();
     const graph = buildGraph(osm);
@@ -241,8 +294,8 @@ describe("Router with Monaco PBF", () => {
     const graph = buildGraph(monacoOsm);
     const router = new Router(monacoOsm, graph);
     expect(router).toBeDefined();
-    // 11,414 total edges in the graph (bidirectional edges counted separately)
-    expect(graph.edges).toBe(11_414);
+    // Directed edges are counted separately; roundabout and reverse-oneway edges are directional.
+    expect(graph.edges).toBe(10_831);
   });
 
   it("should find routes between points in Monaco", () => {

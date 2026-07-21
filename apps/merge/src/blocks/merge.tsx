@@ -44,6 +44,14 @@ import {
 } from "../components/ui/item";
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
+import {
+  type ChangesetReviewPurpose,
+  COMPLETE_MERGE_OPTIONS,
+  finalizeVerifiedMerge,
+  INTERSECTION_OPTIONS,
+  verifiedBaseMergeOptions,
+  WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
+} from "../lib/merge-workflow";
 import { showSaveFilePickerWithFallback } from "../lib/save-file-picker";
 import { cn } from "../lib/utils";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
@@ -70,6 +78,7 @@ const STEPS = [
 ] as const;
 
 const stepIndexAtom = atom<number>(0);
+const changesetReviewPurposeAtom = atom<ChangesetReviewPurpose>("apply");
 const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
   const stepIndex = get(stepIndexAtom);
   return STEPS[stepIndex];
@@ -98,11 +107,12 @@ export default function MergeBlock() {
   const base = useOsmFile(BASE_OSM_KEY);
   const patch = useOsmFile(PATCH_OSM_KEY);
   const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom);
+  const [changesetReviewPurpose, setChangesetReviewPurpose] = useAtom(changesetReviewPurposeAtom);
   const flyToEntity = useFlyToEntity();
   const flyToOsmBounds = useFlyToOsmBounds();
   const selectedEntity = useAtomValue(selectedEntityAtom);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
-  const setStepIndex = useSetAtom(stepIndexAtom);
+  const [stepIndex, setStepIndex] = useAtom(stepIndexAtom);
   const [mergeAbortController, setMergeAbortController] = useAtom(mergeAbortControllerAtom);
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
 
@@ -119,11 +129,21 @@ export default function MergeBlock() {
     selectEntity(null, null);
     setStepIndex(stepIndex);
   };
+  const showVerifiedMergeResult = () =>
+    finalizeVerifiedMerge(
+      () => patch.setOsm(null),
+      () => goToStep("inspect-final-osm"),
+    );
+  const completesVerifiedMerge = STEPS[stepIndex - 1] === "create-intersections";
   const startStepTask = async (message: string, fn: () => Promise<string>) => {
     const task = Log.startTask(message);
-    const endMessage = await fn();
-    task.end(endMessage);
-    nextStep();
+    try {
+      const endMessage = await fn();
+      task.end(endMessage);
+      nextStep();
+    } catch (error) {
+      task.end(`Task failed: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+    }
   };
 
   const downloadJsonChanges = async () => {
@@ -155,9 +175,8 @@ export default function MergeBlock() {
   const applyChanges = async () => {
     if (!changesetStats) throw Error("Changeset stats are not loaded");
     await osmWorker.applyChangesAndReplace(changesetStats.osmId);
-    const osm = await osmWorker.get(changesetStats.osmId);
     setChangesetStats(null);
-    return osm;
+    return changesetStats.osmId;
   };
 
   const hasZeroChanges = useMemo(() => {
@@ -183,15 +202,15 @@ export default function MergeBlock() {
           <CardHeader>Merge steps</CardHeader>
           <CardContent className="flex flex-col gap-2">
             <ol className="list-decimal list-inside">
-              <li>Deduplicate nodes and ways in base OSM</li>
-              <li>Deduplicate nodes and ways in patch OSM</li>
-              <li>Merge patch OSM onto base OSM.</li>
-              <li>Deduplicate nodes and ways in newly merged OSM</li>
+              <li>Inspect each input for possible internal duplicates</li>
+              <li>Merge patch OSM onto base OSM</li>
+              <li>Reconcile compatible nodes and ways across the two inputs</li>
               <li>Create new intersections in merged data where ways cross</li>
             </ol>
             <p>
-              Note: entities from the patch file are prioritized over matching entities in the base
-              file.
+              Internal duplicate scans are diagnostic only. The merge preserves both original
+              inputs, prioritizes same-ID patch entities, and only reconciles safe cross-dataset
+              matches.
             </p>
           </CardContent>
         </Card>
@@ -283,6 +302,7 @@ export default function MergeBlock() {
               <button
                 type="button"
                 onClick={() => {
+                  setChangesetStats(null);
                   nextStep();
                 }}
               />
@@ -293,7 +313,7 @@ export default function MergeBlock() {
             </ItemMedia>
             <ItemContent>
               <ItemTitle>Option 1: Verify each step</ItemTitle>
-              <ItemDescription>Verify changes before applying them.</ItemDescription>
+              <ItemDescription>Review cumulative changes before applying them.</ItemDescription>
             </ItemContent>
             <ItemActions>
               <ChevronRightIcon />
@@ -315,12 +335,11 @@ export default function MergeBlock() {
 
                   try {
                     setChangesetStats(null);
-                    const merged = await osmWorker.merge(base.osm.id, patch.osm.id, {
-                      deduplicateNodes: true,
-                      deduplicateWays: true,
-                      directMerge: true,
-                      createIntersections: true,
-                    });
+                    const merged = await osmWorker.merge(
+                      base.osm.id,
+                      patch.osm.id,
+                      COMPLETE_MERGE_OPTIONS,
+                    );
 
                     // Check if cancelled before applying results
                     if (abortController.signal.aborted) {
@@ -390,17 +409,13 @@ export default function MergeBlock() {
 
       <Step step="inspect-base-osm" title="Inspect base OSM">
         <p>
-          Each file is first scanned for duplicate entities inside the same dataset. We then look
-          for duplicates that appear in both files.
+          Scan the base file for possible duplicate entities inside this dataset. The results are
+          diagnostic only and cannot be applied from this workflow.
         </p>
         <p>
-          Duplicates are features that share an ID or occupy the same geometry. We prefer entities
-          with newer version metadata; if that information is missing we keep the feature with more
-          tags.
-        </p>
-        <p>
-          When a duplicate is detected we draft a changeset entry that removes the extra copy.
-          Review those proposals in the next step before applying them.
+          Nearby geometry alone is not enough to safely combine OSM entities because roads at
+          different layers, restrictions, and other topology may intentionally be close together.
+          Review any candidates in the next step; continuing leaves the base unchanged.
         </p>
         <Card>
           <CardHeader>Base OSM PBF</CardHeader>
@@ -419,23 +434,25 @@ export default function MergeBlock() {
           onAction={() =>
             startStepTask("Inspecting base OSM for duplicate entities", async () => {
               if (!base.osm) throw Error("Base OSM is not loaded");
-              const changes = await osmWorker.generateChangeset(base.osm.id, base.osm.id, {
-                deduplicateNodes: true,
-                deduplicateWays: true,
-              });
+              setChangesetReviewPurpose("diagnostic");
+              const changes = await osmWorker.generateChangeset(
+                base.osm.id,
+                base.osm.id,
+                WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
+              );
               setChangesetStats(changes);
               return changeStatsSummary(changes);
             })
           }
         >
-          Deduplicate base OSM
+          Scan base for duplicate candidates
         </ActionButton>
       </Step>
 
       <Step step="inspect-patch-osm" title="Inspect patch OSM">
         <p>
-          Generate a changeset that removes duplicate entities from the patch file before it is
-          merged into the base data.
+          Scan the patch for possible internal duplicates. These candidates are for review only; the
+          patch is not normalized or otherwise changed before merging.
         </p>
 
         <Card>
@@ -455,23 +472,25 @@ export default function MergeBlock() {
           onAction={() =>
             startStepTask("Inspecting patch OSM for duplicate entities", async () => {
               if (!patch.osm) throw Error("Patch OSM is not loaded");
-              const patchChanges = await osmWorker.generateChangeset(patch.osm.id, patch.osm.id, {
-                deduplicateNodes: true,
-                deduplicateWays: true,
-              });
+              setChangesetReviewPurpose("diagnostic");
+              const patchChanges = await osmWorker.generateChangeset(
+                patch.osm.id,
+                patch.osm.id,
+                WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
+              );
               setChangesetStats(patchChanges);
               return changeStatsSummary(patchChanges);
             })
           }
         >
-          Deduplicate patch OSM
+          Scan patch for duplicate candidates
         </ActionButton>
       </Step>
 
       <Step step="direct-merge" title="Direct merge">
         <p>
-          Add the patch entities to the base dataset and replace any base features that share the
-          same IDs.
+          Preview the patch entities that will be added to the base and the same-ID base features
+          they will replace. The uploaded inputs remain unchanged during this review.
         </p>
 
         <Card>
@@ -526,11 +545,12 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Generating changeset", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                const results = await osmWorker.generateChangeset(base.osm.id, patch.osm.id, {
-                  directMerge: true,
-                  deduplicateNodes: false,
-                  createIntersections: false,
-                });
+                setChangesetReviewPurpose("preview");
+                const results = await osmWorker.generateChangeset(
+                  base.osm.id,
+                  patch.osm.id,
+                  verifiedBaseMergeOptions(false),
+                );
                 setChangesetStats(results);
                 return changeStatsSummary(results);
               })
@@ -542,10 +562,22 @@ export default function MergeBlock() {
       </Step>
 
       <Step step="review-changeset" title="Review changeset">
-        <p>
-          Review the proposed edits produced in the previous step. Apply the changes to update the
-          base OSM before moving forward.
-        </p>
+        {changesetReviewPurpose === "apply" ? (
+          <p>
+            Review the proposed edits produced in the previous step. Apply the changes to update the
+            base OSM before moving forward.
+          </p>
+        ) : changesetReviewPurpose === "diagnostic" ? (
+          <p>
+            Review these possible duplicates as diagnostics. They are not automatically safe to
+            merge, and continuing will leave the input file unchanged.
+          </p>
+        ) : (
+          <p>
+            Review this cumulative merge preview. Approving the step keeps the uploaded base
+            unchanged while the next preview is regenerated from the original base and patch.
+          </p>
+        )}
         <ButtonGroup className="w-full">
           <ActionButton className="flex-1" icon={<DownloadIcon />} onAction={downloadJsonChanges}>
             Download JSON changes
@@ -562,7 +594,11 @@ export default function MergeBlock() {
         </ButtonGroup>
         {changesetStats && base.osm && (
           <Card>
-            <CardHeader>Changeset</CardHeader>
+            <CardHeader>
+              {changesetReviewPurpose === "diagnostic"
+                ? "Diagnostic candidates"
+                : "Merge changeset"}
+            </CardHeader>
             <CardContent className="p-0">
               <ChangesSummary />
               <Suspense fallback={<LoadingState />}>
@@ -579,8 +615,34 @@ export default function MergeBlock() {
           </Card>
         )}
 
-        {changesetStats == null || hasZeroChanges ? (
-          <ActionButton onAction={async () => nextStep()} icon={<ArrowRightIcon />}>
+        {changesetReviewPurpose === "diagnostic" ? (
+          <ActionButton
+            onAction={async () => {
+              setChangesetStats(null);
+              nextStep();
+            }}
+            icon={<ArrowRightIcon />}
+          >
+            Continue without applying
+          </ActionButton>
+        ) : changesetReviewPurpose === "preview" ? (
+          <ActionButton
+            onAction={async () => {
+              setChangesetStats(null);
+              nextStep();
+            }}
+            icon={<ArrowRightIcon />}
+          >
+            Approve step and continue
+          </ActionButton>
+        ) : changesetStats == null || hasZeroChanges ? (
+          <ActionButton
+            onAction={async () => {
+              if (completesVerifiedMerge) showVerifiedMergeResult();
+              else nextStep();
+            }}
+            icon={<ArrowRightIcon />}
+          >
             No changes, go to next step
           </ActionButton>
         ) : (
@@ -589,14 +651,19 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Applying changes to OSM", async () => {
                 if (!changesetStats) throw Error("Changes are not loaded");
-                const newOsm = await applyChanges();
+                const changedOsmId = await applyChanges();
                 if (changesetStats.osmId === base.osm?.id) {
-                  base.setOsm(newOsm);
+                  const mergedName = makeMergedDownloadName(
+                    base.fileInfo?.fileName,
+                    patch.fileInfo?.fileName,
+                  );
+                  await base.setMergedOsm(changedOsmId, mergedName);
                 } else if (changesetStats.osmId === patch.osm?.id) {
-                  patch.setOsm(newOsm);
+                  await patch.setMergedOsm(changedOsmId);
                 } else {
                   throw Error("Changeset OSM ID does not match base or patch OSM ID");
                 }
+                if (completesVerifiedMerge) patch.setOsm(null);
                 return "Changes applied";
               })
             }
@@ -606,10 +673,11 @@ export default function MergeBlock() {
         )}
       </Step>
 
-      <Step step="deduplicate-nodes" title="De-duplicate nodes">
+      <Step step="deduplicate-nodes" title="Reconcile matching entities">
         <p>
-          Identify nodes that occupy the same location in both datasets and merge them, updating any
-          way or relation references that point to those nodes.
+          Regenerate the direct merge from the untouched inputs, identify uniquely matching and
+          compatible patch entities in the base, then reconcile their references. Ambiguous
+          proximity matches and routing-critical tag conflicts are left unchanged.
         </p>
 
         <Card>
@@ -635,27 +703,41 @@ export default function MergeBlock() {
           <ActionButton
             className="flex-1"
             icon={<SkipForwardIcon />}
-            onAction={async () => goToStep("inspect-final-osm")}
+            onAction={() =>
+              startStepTask("Preparing direct merge changeset", async () => {
+                if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
+                setChangesetReviewPurpose("apply");
+                const results = await osmWorker.generateChangeset(
+                  base.osm.id,
+                  patch.osm.id,
+                  verifiedBaseMergeOptions(false),
+                );
+                setChangesetStats(results);
+                return changeStatsSummary(results);
+              })
+            }
           >
-            Skip
+            Skip reconciliation
           </ActionButton>
           <ButtonGroupSeparator />
           <ActionButton
             className="flex-1"
             icon={<FileDiff />}
             onAction={() =>
-              startStepTask("De-duplicating nodes and ways", async () => {
+              startStepTask("Reconciling matching nodes and ways", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                const results = await osmWorker.generateChangeset(base.osm.id, patch.osm.id, {
-                  deduplicateNodes: true,
-                  deduplicateWays: true,
-                });
+                setChangesetReviewPurpose("apply");
+                const results = await osmWorker.generateChangeset(
+                  base.osm.id,
+                  patch.osm.id,
+                  verifiedBaseMergeOptions(true),
+                );
                 setChangesetStats(results);
                 return changeStatsSummary(results);
               })
             }
           >
-            De-duplicate nodes
+            Reconcile matching entities
           </ActionButton>
         </ButtonGroup>
       </Step>
@@ -668,12 +750,12 @@ export default function MergeBlock() {
           </p>
           <p>
             We quickly search for nearby ways and keep only those whose tags allow an intersection:
-            both must be linear, share the same `layer` value if present, include a `highway` tag,
-            and avoid bridge or tunnel tags.
+            both must be linear, include a `highway` tag, and have compatible layer, level, bridge,
+            tunnel, and covered context.
           </p>
           <p>
             For each candidate we locate the precise crossover point. Existing nodes at that point
-            are reused, favoring nodes introduced by the patch; otherwise we create a new node.
+            on either way are reused; otherwise we create a new node.
           </p>
           <p>
             Finally, we update the way geometries so they reference the chosen intersection node.
@@ -685,7 +767,7 @@ export default function MergeBlock() {
           <ActionButton
             className="flex-1"
             icon={<SkipForwardIcon />}
-            onAction={async () => goToStep("inspect-final-osm")}
+            onAction={async () => showVerifiedMergeResult()}
           >
             Skip
           </ActionButton>
@@ -696,11 +778,12 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Generating changeset", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                const results = await osmWorker.generateChangeset(base.osm.id, patch.osm.id, {
-                  directMerge: false,
-                  deduplicateNodes: false,
-                  createIntersections: true,
-                });
+                setChangesetReviewPurpose("apply");
+                const results = await osmWorker.generateChangeset(
+                  base.osm.id,
+                  patch.osm.id,
+                  INTERSECTION_OPTIONS,
+                );
                 setChangesetStats(results);
                 return changeStatsSummary(results);
               })

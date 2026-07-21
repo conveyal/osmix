@@ -7,7 +7,7 @@ Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PB
 - Load “base” and “patch” `.osm.pbf` files, preview differences, and step through merge tasks (direct merge, node/way deduplication, intersection creation).
 - Select Auto, Full, or View loading according to the dataset and available browser memory.
 - Visualize both datasets with raster previews produced on the worker thread plus interactive vector overlays for selected entities.
-- Inspect individual OSM files, find duplicate entities, and apply the generated changes back into the in-memory index.
+- Inspect individual OSM files for possible duplicate entities without mutating the source data.
 - Built-in Nominatim search, entity lookups, and task logging keep large merges manageable.
 
 ## Prerequisites
@@ -74,17 +74,26 @@ in-stream extraction remains available. The app does not build the large index s
 ### Merge view (default route)
 
 1. **Select OSM PBF files** – Upload base + patch files and review metadata. The files stay local thanks to the File System Access API.
-2. **Review changeset** – Each step runs an operation on the worker (`osm.worker.ts`) that uses `@osmix/core` and `@osmix/change` to generate or update an `OsmixChangeset`. Logs stream into the sidebar while progress indicators update the UI.
-3. **Inspect intermediary results** – Toggle MapLibre vector overlays to compare base/patch rasters, click features to see details, and jump the map to selected entities.
-4. **Apply actions** – Deduplicate nodes or ways, generate direct changes, create intersections, and download the resulting change list as JSON. Applying the final changes replaces the in-memory base dataset.
+2. **Review diagnostics** – The optional within-file scans report possible duplicate entities but never apply
+   them. Nearby roads can be intentionally separate because of topology, access, or grade separation.
+3. **Review changeset** – Merge steps run on the worker (`osm.worker.ts`) using `@osmix/core` and
+   `@osmix/change`. Logs stream into the sidebar while progress indicators update the UI.
+4. **Inspect intermediary results** – Toggle MapLibre vector overlays to compare base/patch rasters, click features to see details, and jump the map to selected entities.
+5. **Apply actions** – Merge same-ID entities, reconcile compatible matches across the two inputs, create
+   intersections, and download the resulting change list as JSON. Applying the final changes replaces the
+   in-memory base dataset.
 
 The stepper resets selection state between actions, and you can jump backward or forward if you need to rerun a task.
+In verified mode, the direct merge is first shown as a preview. The app then regenerates and applies one
+cumulative direct-merge plus optional reconciliation changeset from the untouched source inputs. Intersection
+changes are generated only after that merged base has been rebuilt and indexed, so newly added patch ways are
+included in the crossing scan.
 
 ### Inspect view (`/inspect`)
 
-- Load a single PBF, run duplicate detection, and page through the resulting change list.
+- Load a single PBF, run diagnostic duplicate detection, and page through the resulting candidate list.
 - Fit to the file’s bounding box, search for entities, and drill into their tags and relations.
-- Apply deduplications directly to the dataset and immediately preview the updated geometry.
+- Investigate candidates against the source data; the Inspect view does not apply proximity-based changes.
 
 ## Map & rendering stack
 
@@ -128,6 +137,12 @@ See [Australia-scale manual verification](./AUSTRALIA-PBF-CHECKLIST.md) for the 
 - **A core typed-array allocation failed** – The panel identifies the mandatory entity column and compares its
   single-buffer requirement with the current browser's tested ceiling. Auto, Full, and View retain core entity
   columns, so use a smaller regional extract when the panel says changing profiles cannot help.
+- **A file was merged with an older Osmix release** – Older merges may have normalized each input before
+  combining them, which can change routing topology. Regenerate the output from the original base and patch
+  PBFs; the resulting file cannot be repaired reliably after references have been rewritten.
+- **A merge reports new routing-integrity problems** – The result was rejected before replacing the base.
+  Inspect the reported entity IDs for missing references, degenerate highways, or detached turn restrictions,
+  then correct the source data rather than discarding the affected restriction.
 
 ## Related packages
 

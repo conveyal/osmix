@@ -18,8 +18,8 @@
  *
  * // Manual changeset workflow
  * const changeset = new OsmChangeset(baseOsm)
- * changeset.deduplicateNodes(baseOsm.nodes)
  * changeset.generateDirectChanges(patchOsm)
+ * changeset.deduplicateNodes(patchOsm.nodes)
  * const merged = applyChangesToOsm(changeset)
  *
  * // Or use the high-level merge function

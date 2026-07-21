@@ -9,7 +9,7 @@
  * - **Graph construction**: Build routing graphs from OSM ways with highway filtering.
  * - **Multiple algorithms**: Dijkstra, A*, and bidirectional search.
  * - **Time-based routing**: Uses maxspeed tags and default speeds by highway type.
- * - **One-way support**: Respects oneway=yes/1 tags.
+ * - **One-way support**: Respects explicit one-way tags and implicit roundabout direction.
  * - **Snapping**: Find nearest routable node from arbitrary coordinates.
  *
  * @example

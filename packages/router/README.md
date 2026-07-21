@@ -5,6 +5,7 @@
 ## Highlights
 
 - Builds a directed graph from OSM ways and nodes
+- Respects explicit one-way tags and the one-way direction implied by `junction=roundabout`
 - Configurable highway type filtering
 - Multiple routing algorithms (Dijkstra, A\*, bidirectional search)
 - Support for both distance and time-based routing
@@ -84,6 +85,10 @@ if (nearest) {
 - `osm` - The `@osmix/core` dataset.
 - `filter` - Optional function `(tags?) => boolean` to select routable ways. Default: common vehicle highways.
 - `defaultSpeeds` - Optional speed limits (km/h) by highway type.
+
+Way directionality is currently graph-wide: custom filters can select pedestrian ways, but they
+do not disable `oneway` or implicit roundabout direction. Use a policy-aware router such as R5
+when authoritative pedestrian access and direction rules are required.
 
 #### Serialization (Web Worker support)
 

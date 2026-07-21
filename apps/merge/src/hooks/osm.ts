@@ -10,6 +10,7 @@ import type {
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { getBrowserLoadCapabilities } from "../lib/browser-capabilities";
+import { prepareMergedOsmState } from "../lib/merged-osm-state";
 import { describeOsmLoadFailure, type OsmLoadFailureContext } from "../lib/osm-load-failure";
 import { ensureOsmPbfDownloadName } from "../lib/osm-pbf-download-name";
 import { showSaveFilePickerWithFallback } from "../lib/save-file-picker";
@@ -566,56 +567,35 @@ export function useOsmFile(osmKey: string) {
    * If the content hasn't changed (same content hash as original), keeps original file info.
    */
   const setMergedOsm = useEffectEvent(async (newOsmId: string, mergedFileName?: string) => {
-    // Get the new Osm instance from the worker
-    const newOsm = await osmWorker.get(newOsmId);
-    const newOsmInfo = newOsm.info();
+    const prepared = await prepareMergedOsmState({
+      currentFileInfo: fileInfo,
+      currentOsm: osm,
+      mergedFileName,
+      newOsmId,
+      worker: osmWorker,
+    });
 
     // Check if anything actually changed using isEqual
-    if (newOsm.isEqual(osm) && fileInfo) {
+    if (prepared.kind === "unchanged") {
       // No changes - keep the original file info and stored state
-      setOsm(newOsm);
-      setOsmInfo(newOsmInfo);
-      setSelectedOsm(newOsm);
+      setOsm(prepared.osm);
+      setOsmInfo(prepared.osmInfo);
+      setSelectedOsm(prepared.osm);
       setLoadFailure(null);
-      return newOsm;
+      return prepared.osm;
     }
 
-    // Generate a new file name based on merge context (fallback to timestamp)
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, "-");
-    const newFileName = mergedFileName ?? `osmix-merged-${timestamp}.pbf`;
-
-    // File size is estimated from entity counts (will be accurate after serialization)
-    const estimatedSize =
-      newOsmInfo.stats.nodes * 20 + newOsmInfo.stats.ways * 100 + newOsmInfo.stats.relations * 200;
-
-    // Use content hash as the new ID to keep worker ID and storage key in sync
-    const newFileHash = newOsm.contentHash();
-    const newFileInfo: StoredFileInfo = {
-      fileHash: newFileHash,
-      fileName: newFileName,
-      fileSize: estimatedSize,
-    };
-
-    // Re-register the Osm in the worker under the new fileHash so that
-    // downloadOsm, storeCurrentOsm, and other calls that use osmInfo.id
-    // will find the correct worker entry after saving/loading from storage.
-    if (newOsmId !== newFileHash) {
-      await osmWorker.rename(newOsmId, newFileHash);
-    }
-
-    // Update osmInfo.id to match the new fileHash (worker registration key)
-    const updatedOsmInfo = { ...newOsmInfo, id: newFileHash };
-
-    // Update all state
+    // The helper has refreshed the content-addressed worker instance and metadata.
+    sourceUrlRef.current = null;
     setFile(null); // No actual File object for merged results
-    setFileInfo(newFileInfo);
-    setOsm(newOsm);
-    setOsmInfo(updatedOsmInfo);
+    setFileInfo(prepared.fileInfo);
+    setOsm(prepared.osm);
+    setOsmInfo(prepared.osmInfo);
     setIsStored(false); // New file, not stored yet
-    setSelectedOsm(newOsm);
+    setSelectedOsm(prepared.osm);
     setLoadFailure(null);
 
-    return newOsm;
+    return prepared.osm;
   });
 
   const clearLoadFailure = useEffectEvent(() => setLoadFailure(null));
