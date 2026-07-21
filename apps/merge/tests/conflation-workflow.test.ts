@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_CONFLATION_FORM_STATE,
+  DEFAULT_CONFLATION_PROPERTY_KEYS,
   parseConflationPropertyKeys,
   toAutomaticPropertyOnlyDecision,
   toOsmConflationOptions,
@@ -14,10 +15,13 @@ describe("conflation workflow configuration", () => {
     expect(DEFAULT_CONFLATION_FORM_STATE).toEqual({
       enabled: false,
       transferProperties: true,
-      propertyKeys: "",
+      propertyKeys: "barrier, crossing, kerb, tactile_paving",
       attachNetwork: false,
       maxDistanceMeters: 1,
     });
+    expect(parseConflationPropertyKeys(DEFAULT_CONFLATION_FORM_STATE.propertyKeys)).toEqual([
+      ...DEFAULT_CONFLATION_PROPERTY_KEYS,
+    ]);
     expect(validateConflationForm(DEFAULT_CONFLATION_FORM_STATE)).toBeNull();
   });
 
@@ -40,9 +44,13 @@ describe("conflation workflow configuration", () => {
   });
 
   it("requires explicit property keys when property transfer is enabled", () => {
-    expect(validateConflationForm({ ...DEFAULT_CONFLATION_FORM_STATE, enabled: true })).toBe(
-      "Enter at least one property key to transfer.",
-    );
+    expect(
+      validateConflationForm({
+        ...DEFAULT_CONFLATION_FORM_STATE,
+        enabled: true,
+        propertyKeys: "",
+      }),
+    ).toBe("Enter at least one property key to transfer.");
   });
 
   it("accepts network-only matching without property keys", () => {

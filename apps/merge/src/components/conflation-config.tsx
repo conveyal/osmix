@@ -61,7 +61,8 @@ export function ConflationConfig() {
                 }}
               />
               <span className="text-muted-foreground">
-                Comma- or whitespace-separated. Patch values win only for these keys.
+                Recommended defaults target imported crossing and kerb accessibility data. Patch
+                values win only for these keys.
               </span>
             </label>
 

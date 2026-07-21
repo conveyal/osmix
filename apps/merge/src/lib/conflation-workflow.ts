@@ -12,10 +12,19 @@ export interface ConflationFormState {
   maxDistanceMeters: number;
 }
 
+// These node-level accessibility tags produced useful Yakima matches without the
+// thousands of unmatched way candidates introduced by broad surface/geometry keys.
+export const DEFAULT_CONFLATION_PROPERTY_KEYS = [
+  "barrier",
+  "crossing",
+  "kerb",
+  "tactile_paving",
+] as const;
+
 export const DEFAULT_CONFLATION_FORM_STATE: ConflationFormState = {
   enabled: false,
   transferProperties: true,
-  propertyKeys: "",
+  propertyKeys: DEFAULT_CONFLATION_PROPERTY_KEYS.join(", "),
   attachNetwork: false,
   maxDistanceMeters: 1,
 };
