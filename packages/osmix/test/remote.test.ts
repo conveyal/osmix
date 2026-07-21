@@ -349,7 +349,11 @@ describe("OsmixRemote", () => {
         (candidate) => candidate.entityType === "way",
       );
       if (!wayCandidate) throw Error("Expected a way conflation candidate");
-      await remote.setConflationDecision(base.id, {
+      const bulkResult = await remote.applyConflationBulkDecision(base.id, {
+        action: "reject",
+        filter: { entityType: "way" },
+      });
+      expect(bulkResult.decisions).toContainEqual({
         candidateId: wayCandidate.id,
         action: "reject",
       });
@@ -365,6 +369,11 @@ describe("OsmixRemote", () => {
         deduplicateNodes: true,
         deduplicateWays: true,
       });
+      const unchanged = await remote.applyConflationBulkDecision(base.id, {
+        action: "reject",
+        filter: { entityType: "way" },
+      });
+      expect(unchanged.preview.changedCandidates).toBe(0);
 
       await remote.getWorker().clearConflation(base.id);
       await remote.restoreForTest();

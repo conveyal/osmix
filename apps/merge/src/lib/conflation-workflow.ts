@@ -1,8 +1,4 @@
-import type {
-  OsmConflationCandidateView,
-  OsmConflationDecision,
-  OsmConflationOptions,
-} from "osmix";
+import type { OsmConflationBulkAction, OsmConflationOptions } from "osmix";
 
 export interface ConflationFormState {
   enabled: boolean;
@@ -71,21 +67,40 @@ export function toOsmConflationOptions(
   };
 }
 
-/** Build the safe bulk-review decision for an automatic, non-routing property-only match. */
-export function toAutomaticPropertyOnlyDecision(
-  candidate: OsmConflationCandidateView,
-): OsmConflationDecision | null {
-  // Any existing accept or reject records user intent; a bulk action must not
-  // reinterpret or overwrite an individually reviewed candidate.
-  if (candidate.decision !== undefined) return null;
-  if (candidate.propertyTransfer.status !== "automatic") return null;
-  if (candidate.networkAttachment?.status === "automatic") return null;
-  if (candidate.evidence.tagDiff.length === 0) return null;
-  if (candidate.evidence.tagDiff.some((diff) => diff.routing || diff.protected)) return null;
+export interface ConflationBulkActionCopy {
+  buttonLabel: string;
+  confirmLabel: string;
+  description: string;
+  title: string;
+}
+
+/** Keep filter-wide action wording consistent between the toolbar and confirmation dialog. */
+export function conflationBulkActionCopy(
+  action: OsmConflationBulkAction,
+): ConflationBulkActionCopy {
+  if (action === "transfer-properties") {
+    return {
+      buttonLabel: "Transfer properties",
+      confirmLabel: "Transfer properties",
+      description:
+        "Transfer the selected patch properties to every eligible base match in the current filters.",
+      title: "Transfer properties to filtered matches?",
+    };
+  }
+  if (action === "attach-network") {
+    return {
+      buttonLabel: "Attach network",
+      confirmLabel: "Attach network",
+      description:
+        "Attach imported way references to every eligible base match in the current filters.",
+      title: "Attach the filtered imported network?",
+    };
+  }
   return {
-    candidateId: candidate.id,
-    action: "accept",
-    transferProperties: true,
-    attachNetwork: false,
+    buttonLabel: "Reject filtered",
+    confirmLabel: "Reject filtered matches",
+    description:
+      "Reject every filtered match that is not already rejected, including blocked and unmatched rows.",
+    title: "Reject all filtered matches?",
   };
 }

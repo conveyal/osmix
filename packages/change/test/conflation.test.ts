@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset.ts";
 import {
+  buildConflationBulkDecisionResult,
   discoverConflationCandidates,
   filterConflationCandidates,
   generateConflationApplicationChangeset,
@@ -13,7 +14,11 @@ import {
 } from "../src/conflation.ts";
 import { generateChangeset } from "../src/generate-changeset.ts";
 import { merge } from "../src/merge.ts";
-import type { OsmConflationDecision, OsmConflationOptions } from "../src/types.ts";
+import type {
+  OsmConflationCandidate,
+  OsmConflationDecision,
+  OsmConflationOptions,
+} from "../src/types.ts";
 
 function createOsm(
   id: string,
@@ -195,6 +200,138 @@ describe("safe fuzzy conflation discovery", () => {
     expect(
       filterConflationCandidates(discovery.candidates, { status: "rejected" }, decisions),
     ).toHaveLength(1);
+
+    const accepted = [{ candidateId: "node:101->1", action: "accept" as const }];
+    expect(summarizeConflationCandidates(discovery.candidates, accepted)).toMatchObject({
+      total: 1,
+      accepted: 1,
+      automatic: 0,
+    });
+    expect(
+      filterConflationCandidates(discovery.candidates, { status: "accepted" }, accepted),
+    ).toHaveLength(1);
+  });
+
+  it("builds filter-wide action-specific decisions and skips ambiguous candidates", () => {
+    const automatic: OsmConflationCandidate = {
+      id: "node:101->1",
+      entityType: "node",
+      sourceId: 101,
+      targetId: 1,
+      status: "automatic",
+      reasons: [],
+      propertyTransfer: { status: "automatic", reasons: [] },
+      networkAttachment: { status: "automatic", reasons: [] },
+      evidence: {
+        distanceMeters: 0.5,
+        sourceRoutingFamilies: ["pedestrian"],
+        targetRoutingFamilies: ["pedestrian"],
+        tagDiff: [{ key: "name", patchValue: "Imported", protected: false, routing: false }],
+      },
+    };
+    const review: OsmConflationCandidate = {
+      ...structuredClone(automatic),
+      id: "node:102->2",
+      sourceId: 102,
+      targetId: 2,
+      status: "review",
+      reasons: ["routing-property"],
+      propertyTransfer: { status: "review", reasons: ["routing-property"] },
+    };
+    const ambiguous: OsmConflationCandidate = {
+      ...structuredClone(review),
+      id: "node:103->3",
+      sourceId: 103,
+      targetId: 3,
+      reasons: ["multiple-targets"],
+      propertyTransfer: { status: "review", reasons: ["multiple-targets"] },
+      networkAttachment: { status: "review", reasons: ["multiple-targets"] },
+    };
+    const blocked: OsmConflationCandidate = {
+      ...structuredClone(automatic),
+      id: "node:104->4",
+      sourceId: 104,
+      targetId: 4,
+      status: "blocked",
+      reasons: ["grade-conflict"],
+      propertyTransfer: { status: "blocked", reasons: ["grade-conflict"] },
+      networkAttachment: { status: "blocked", reasons: ["grade-conflict"] },
+    };
+    const candidates = [automatic, review, ambiguous, blocked];
+    const initialDecisions: OsmConflationDecision[] = [
+      { candidateId: review.id, action: "reject" },
+    ];
+
+    const propertyResult = buildConflationBulkDecisionResult(candidates, initialDecisions, {
+      action: "transfer-properties",
+      filter: { entityType: "node" },
+    });
+    expect(propertyResult.preview).toEqual({
+      action: "transfer-properties",
+      filteredCandidates: 4,
+      eligibleCandidates: 2,
+      changedCandidates: 2,
+      skippedCandidates: 2,
+      automaticCandidates: 1,
+      reviewCandidates: 1,
+      overriddenDecisions: 1,
+    });
+    expect(propertyResult.decisions).toEqual([
+      {
+        candidateId: automatic.id,
+        action: "accept",
+        transferProperties: true,
+        attachNetwork: true,
+      },
+      {
+        candidateId: review.id,
+        action: "accept",
+        transferProperties: true,
+        attachNetwork: false,
+      },
+    ]);
+    expect(propertyResult.summary).toMatchObject({ accepted: 2, blocked: 1, review: 1 });
+
+    const networkResult = buildConflationBulkDecisionResult(candidates, propertyResult.decisions, {
+      action: "attach-network",
+      filter: { status: "accepted" },
+    });
+    expect(networkResult.preview).toMatchObject({
+      filteredCandidates: 2,
+      eligibleCandidates: 2,
+      changedCandidates: 1,
+      skippedCandidates: 0,
+      overriddenDecisions: 1,
+    });
+    expect(networkResult.decisions.find((decision) => decision.candidateId === review.id)).toEqual({
+      candidateId: review.id,
+      action: "accept",
+      transferProperties: true,
+      attachNetwork: true,
+    });
+
+    const rejectResult = buildConflationBulkDecisionResult(candidates, networkResult.decisions, {
+      action: "reject",
+      filter: { status: "accepted" },
+    });
+    expect(rejectResult.preview).toMatchObject({
+      filteredCandidates: 2,
+      eligibleCandidates: 2,
+      changedCandidates: 2,
+      skippedCandidates: 0,
+      overriddenDecisions: 2,
+    });
+    expect(rejectResult.summary).toMatchObject({ rejected: 2, blocked: 1, review: 1 });
+
+    const scopedResult = buildConflationBulkDecisionResult(
+      candidates,
+      [...networkResult.decisions, { candidateId: blocked.id, action: "reject" }],
+      { action: "reject", filter: { sourceId: automatic.sourceId } },
+    );
+    expect(scopedResult.decisions).toContainEqual({
+      candidateId: blocked.id,
+      action: "reject",
+    });
   });
 
   it("validates required configuration fields for untyped callers", () => {

@@ -17,3 +17,8 @@ while routing properties, motor roads, ambiguity, relation involvement, and unce
 Grade conflicts, restrictions, protected tags, dangling references, way collapse, and base-topology rewrites
 remain blocked. Add public candidate/evidence/decision APIs, restart-safe worker review sessions, CAR/WALK
 topology diagnostics, and a dedicated Merge-app review step.
+
+Add atomic, filter-wide conflation decisions with worker-computed previews. The Merge app can transfer
+properties, attach networks, or reject every candidate matching the current filters across all pages, while
+showing skipped ambiguity and overwritten decisions before confirmation. Accepted candidates now have a stable
+summary and filter status, and complete bulk decision snapshots remain restart-safe.

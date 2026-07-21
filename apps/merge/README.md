@@ -107,10 +107,16 @@ paths, school boundaries, and ambiguous intersections must remain separate.
   ways. Automatic matches must be unique and agree on routing family, grade context, and local bearing.
   Restrictions, relation-member rewrites, way collapse, and other integrity hazards remain blocked.
 
-The default radius is one meter. High-confidence matches are automatic; review, blocked, unmatched, and
-rejected candidates remain visible through paged status, entity, and reason filters. Selecting a candidate
+The default radius is one meter. High-confidence matches are automatic; accepted, review, blocked, unmatched,
+and rejected candidates remain visible through paged status, entity, and reason filters. Selecting a candidate
 draws the imported source and proposed base target together on the map and shows its geometry evidence and
 property diff. Review decisions are stable candidate-ID records and are restored with the worker session.
+
+The **Filtered matches** toolbar applies property transfer, network attachment, or rejection to every candidate
+matching the current filters across all pages. Automatic matches already apply unless rejected. Before changing
+decisions, the app shows how many automatic and review candidates are eligible, how many blocked or ambiguous
+matches will be skipped, and how many prior decisions will be replaced. Accepted and rejected rows may leave the
+active status filter, so the list returns to its first page after a successful action.
 
 In verified mode, discovery happens against the untouched base and patch before either dataset is changed.
 The app then generates one cumulative direct, exact-reconciliation, and accepted-conflation changeset,

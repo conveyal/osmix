@@ -10,6 +10,7 @@
 
 import type {
   OsmChangeTypes,
+  OsmConflationBulkDecisionRequest,
   OsmConflationCandidateFilter,
   OsmConflationDecision,
   OsmConflationOptions,
@@ -107,6 +108,7 @@ type DatasetProxyMethodName =
   | "getChangesetPage";
 
 type ConflationDatasetProxyMethodName =
+  | "applyConflationBulkDecision"
   | "discoverConflation"
   | "getConflationSummary"
   | "setConflationFilter"
@@ -1594,6 +1596,27 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     state.changesetGenerated = false;
     state.mergeOptions = {};
     return result;
+  }
+
+  /** Apply one action to all eligible candidates matching a filter across every page. */
+  async applyConflationBulkDecision(baseOsmId: OsmId, request: OsmConflationBulkDecisionRequest) {
+    const baseId = this.getId(baseOsmId);
+    const state = this.getActiveConflation(baseId);
+    const storedRequest = structuredClone(request);
+    const result = await this.runWithWorker(
+      (worker) => worker.applyConflationBulkDecision(baseId, storedRequest),
+      { lane: "control", retry: "never" },
+    );
+    state.decisions = result.decisions.map((decision) => ({ ...decision }));
+    if (result.preview.changedCandidates > 0) {
+      state.changesetGenerated = false;
+      state.mergeOptions = {};
+    }
+    return {
+      decisions: result.decisions.map((decision) => ({ ...decision })),
+      preview: { ...result.preview },
+      summary: { ...result.summary },
+    };
   }
 
   /**

@@ -2,6 +2,9 @@ import { useSetAtom } from "jotai";
 import { LocateFixedIcon } from "lucide-react";
 import type {
   Osm,
+  OsmConflationBulkAction,
+  OsmConflationBulkDecisionPreview,
+  OsmConflationBulkDecisionRequest,
   OsmConflationCandidateFilter,
   OsmConflationCandidateView,
   OsmConflationDecision,
@@ -11,9 +14,10 @@ import type {
   OsmConflationSummary,
 } from "osmix";
 import { osmEntityToGeoJSONFeature } from "osmix";
+import { useState } from "react";
 
 import { useMap } from "../hooks/map";
-import { toAutomaticPropertyOnlyDecision } from "../lib/conflation-workflow";
+import { conflationBulkActionCopy } from "../lib/conflation-workflow";
 import { cn } from "../lib/utils";
 import { conflationComparisonAtom } from "../state/conflation";
 import ActionButton from "./action-button";
@@ -23,6 +27,14 @@ import { StatusDot, type StatusDotStatus } from "./status-dot";
 import { Button } from "./ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group";
 import { Card, CardContent, CardHeader } from "./ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "./ui/item";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 
@@ -47,7 +59,7 @@ const REASON_CODES = [
   "would-collapse-way",
 ] as const satisfies readonly OsmConflationReasonCode[];
 
-const STATUS_DOT: Record<OsmConflationEffectiveStatus | "accepted", StatusDotStatus> = {
+const STATUS_DOT: Record<OsmConflationEffectiveStatus, StatusDotStatus> = {
   accepted: "ok",
   automatic: "ok",
   blocked: "error",
@@ -63,7 +75,7 @@ export interface ConflationReviewProps {
   page: OsmConflationPage;
   filter: OsmConflationCandidateFilter;
   onDecision: (decision: OsmConflationDecision) => Promise<void>;
-  onDecisions: (decisions: OsmConflationDecision[]) => Promise<void>;
+  onBulkDecision: (request: OsmConflationBulkDecisionRequest) => Promise<void>;
   onFilterChange: (filter: OsmConflationCandidateFilter) => Promise<void>;
   onPageChange: (page: number) => Promise<void>;
 }
@@ -105,16 +117,118 @@ function SummaryTable({ summary }: { summary: OsmConflationSummary }) {
   return (
     <Table>
       <TableBody>
-        {(["total", "automatic", "review", "blocked", "unmatched", "rejected"] as const).map(
-          (key) => (
-            <TableRow key={key}>
-              <TableCell>{key}</TableCell>
-              <TableCell>{summary[key].toLocaleString()}</TableCell>
-            </TableRow>
-          ),
-        )}
+        {(
+          ["total", "accepted", "automatic", "review", "blocked", "unmatched", "rejected"] as const
+        ).map((key) => (
+          <TableRow key={key}>
+            <TableCell>{key}</TableCell>
+            <TableCell>{summary[key].toLocaleString()}</TableCell>
+          </TableRow>
+        ))}
       </TableBody>
     </Table>
+  );
+}
+
+const BULK_ACTIONS = ["transfer-properties", "attach-network", "reject"] as const;
+
+function BulkPreviewTable({ preview }: { preview: OsmConflationBulkDecisionPreview }) {
+  const rows = [
+    ["filtered matches", preview.filteredCandidates],
+    ["will change", preview.changedCandidates],
+    ["eligible", preview.eligibleCandidates],
+    ["automatic", preview.automaticCandidates],
+    ["review", preview.reviewCandidates],
+    ["blocked, ambiguous, or ineligible skipped", preview.skippedCandidates],
+    ["existing decisions replaced", preview.overriddenDecisions],
+  ] as const;
+  return (
+    <Table>
+      <TableBody>
+        {rows.map(([label, count]) => (
+          <TableRow key={label}>
+            <TableCell>{label}</TableCell>
+            <TableCell>{count.toLocaleString()}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+export function ConflationBulkActions({
+  bulkActions,
+  filter,
+  onBulkDecision,
+}: {
+  bulkActions: OsmConflationPage["bulkActions"];
+  filter: OsmConflationCandidateFilter;
+  onBulkDecision: (request: OsmConflationBulkDecisionRequest) => Promise<void>;
+}) {
+  const [selectedAction, setSelectedAction] = useState<OsmConflationBulkAction | null>(null);
+  const selectedPreview = selectedAction ? bulkActions[selectedAction] : null;
+  const selectedCopy = selectedAction ? conflationBulkActionCopy(selectedAction) : null;
+
+  return (
+    <>
+      <div className="flex flex-col gap-2 border-b bg-muted/50 p-2">
+        <p className="text-muted-foreground">
+          Bulk decisions apply to every match in the current filters across all pages. Automatic
+          matches already apply unless rejected.
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {BULK_ACTIONS.map((action) => {
+            const preview = bulkActions[action];
+            const copy = conflationBulkActionCopy(action);
+            return (
+              <Button
+                key={action}
+                disabled={preview.changedCandidates === 0}
+                size="sm"
+                variant={action === "reject" ? "destructive" : "outline"}
+                onClick={() => setSelectedAction(action)}
+              >
+                {copy.buttonLabel} ({preview.changedCandidates.toLocaleString()})
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Dialog
+        open={selectedAction !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedAction(null);
+        }}
+      >
+        {selectedAction && selectedPreview && selectedCopy ? (
+          <DialogContent showCloseButton={false}>
+            <DialogHeader>
+              <DialogTitle>{selectedCopy.title}</DialogTitle>
+              <DialogDescription>
+                {selectedCopy.description} This applies across every filtered page and replaces
+                prior decisions shown below.
+              </DialogDescription>
+            </DialogHeader>
+            <BulkPreviewTable preview={selectedPreview} />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedAction(null)}>
+                Cancel
+              </Button>
+              <ActionButton
+                variant={selectedAction === "reject" ? "destructive" : "default"}
+                onAction={async () => {
+                  await onBulkDecision({ action: selectedAction, filter: { ...filter } });
+                  setSelectedAction(null);
+                }}
+              >
+                {selectedCopy.confirmLabel} ({selectedPreview.changedCandidates.toLocaleString()})
+              </ActionButton>
+            </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+    </>
   );
 }
 
@@ -216,7 +330,7 @@ function CandidateActions({
             })
           }
         >
-          Accept properties
+          Transfer properties
         </ActionButton>
       ) : null}
       {canAttachNetwork ? (
@@ -247,7 +361,7 @@ function CandidateActions({
             })
           }
         >
-          Accept both
+          Use both
         </ActionButton>
       ) : null}
       <ActionButton
@@ -255,7 +369,7 @@ function CandidateActions({
         variant="ghost"
         onAction={() => onDecision({ candidateId: candidate.id, action: "reject" })}
       >
-        Reject match
+        Reject
       </ActionButton>
     </div>
   );
@@ -268,16 +382,12 @@ export function ConflationReview({
   page,
   filter,
   onDecision,
-  onDecisions,
+  onBulkDecision,
   onFilterChange,
   onPageChange,
 }: ConflationReviewProps) {
   const map = useMap();
   const setComparison = useSetAtom(conflationComparisonAtom);
-  const automaticPropertyDecisions = page.candidates
-    .map(toAutomaticPropertyOnlyDecision)
-    .filter((decision): decision is OsmConflationDecision => decision !== null);
-
   const showCandidate = (candidate: OsmConflationCandidateView) => {
     const sourceFeature = entityFeature(patch, candidate, "source");
     const targetFeature = entityFeature(base, candidate, "target");
@@ -336,13 +446,13 @@ export function ConflationReview({
               }}
             >
               <option value="">all</option>
-              {(["automatic", "review", "blocked", "unmatched", "rejected"] as const).map(
-                (status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ),
-              )}
+              {(
+                ["accepted", "automatic", "review", "blocked", "unmatched", "rejected"] as const
+              ).map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -386,21 +496,13 @@ export function ConflationReview({
       </Card>
 
       <Card>
-        <CardHeader>
-          Candidates {page.totalCandidates > 0 ? `(${page.totalCandidates.toLocaleString()})` : ""}
-        </CardHeader>
+        <CardHeader>Filtered matches ({page.totalCandidates.toLocaleString()})</CardHeader>
         <CardContent className="p-0">
-          {automaticPropertyDecisions.length > 0 ? (
-            <div className="p-2 border-b">
-              <ActionButton
-                size="sm"
-                variant="outline"
-                onAction={() => onDecisions(automaticPropertyDecisions)}
-              >
-                Confirm automatic property-only matches on this page
-              </ActionButton>
-            </div>
-          ) : null}
+          <ConflationBulkActions
+            bulkActions={page.bulkActions}
+            filter={filter}
+            onBulkDecision={onBulkDecision}
+          />
           {page.candidates.length === 0 ? (
             <EmptyState>No candidates match these filters</EmptyState>
           ) : (

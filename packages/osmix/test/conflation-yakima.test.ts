@@ -100,6 +100,7 @@ describe("Yakima fuzzy conflation", () => {
       });
       expect(discovery.summary).toEqual({
         total: 11_689,
+        accepted: 0,
         automatic: 145,
         review: 212,
         blocked: 88,
