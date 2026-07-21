@@ -26,6 +26,8 @@ import type {
 } from "./types.ts";
 import { routingGradeSignature } from "./utils.ts";
 
+// Preserve the historical one-meter matching radius, but only inside this explicit,
+// cross-dataset workflow. Proximity alone never authorizes a topology change.
 const DEFAULT_MAX_DISTANCE_METERS = 1;
 const MAX_BEARING_DIFFERENCE_DEGREES = 30;
 const MAX_LENGTH_DIFFERENCE_RATIO = 0.05;
@@ -34,6 +36,8 @@ const SAMPLE_INTERVAL_METERS = 5;
 const PEDESTRIAN_HIGHWAYS = new Set(["corridor", "footway", "path", "pedestrian", "steps"]);
 const BICYCLE_HIGHWAYS = new Set(["cycleway"]);
 const NON_MOTOR_HIGHWAYS = new Set([...PEDESTRIAN_HIGHWAYS, ...BICYCLE_HIGHWAYS, "bridleway"]);
+// Access and routing checks also recognize namespaced variants (for example
+// `access:conditional` and `maxspeed:forward`) so they cannot bypass review.
 const ACCESS_KEYS = [
   "access",
   "agricultural",
@@ -197,6 +201,8 @@ function wayRoutingFamily(way: OsmWay): OsmConflationRoutingFamily {
     return "bicycle-shared";
   }
   if (PEDESTRIAN_HIGHWAYS.has(highway)) return "pedestrian";
+  // Unknown highway values stay in the motor family. Treating a potentially
+  // drivable way as non-routable would make an unsafe attachment look harmless.
   if (!NON_MOTOR_HIGHWAYS.has(highway)) return "motor-road";
   return "non-routable";
 }
@@ -224,6 +230,8 @@ function accessSignature(tags: OsmTags | undefined) {
     .join("|");
 }
 
+// These signatures intentionally compare both presence and value. Rewriting a
+// patch reference must not strand node-level routing semantics on the discarded node.
 function barrierSignature(tags: OsmTags | undefined) {
   return Object.keys(tags ?? {})
     .filter((key) => key === "barrier" || key.startsWith("barrier:"))
@@ -286,6 +294,8 @@ function wayRoutingSemanticsCompatible(source: OsmWay, target: OsmWay, targetRev
   );
   if (
     targetReversed &&
+    // Reversed geometry is safe only when no remaining routing tag has a direction
+    // whose meaning would also need to be inverted or swapped.
     [...routingKeys].some(
       (key) =>
         key.startsWith("oneway:") ||
@@ -552,6 +562,8 @@ function nodeAttachmentAssessment(
     };
   }
 
+  // Hard reasons describe invariants a manual decision cannot override. Review
+  // reasons are plausible matches whose routing intent still needs a person.
   const hardReasons: OsmConflationReasonCode[] = [];
   const reviewReasons: OsmConflationReasonCode[] = [];
   if (routingGradeSignature(source.tags) !== routingGradeSignature(target.tags)) {
@@ -617,6 +629,8 @@ function nodeAttachmentAssessment(
   const sourceSegments = nodeSegments(context.patch, source.id, sourceWays);
   const targetSegments = nodeSegments(context.base, target.id, targetWays);
   let maximumMinimumBearingDifference = 0;
+  // Every imported incident segment needs at least one compatible base segment.
+  // Taking the worst best-match prevents one aligned arm from hiding another.
   for (const sourceSegment of sourceSegments) {
     const compatibleTargets = targetSegments.filter((targetSegment) =>
       wayContextsCompatible(sourceSegment.way, targetSegment.way),
@@ -696,6 +710,8 @@ function addReviewReason(candidate: OsmConflationCandidate, reason: OsmConflatio
 function discoverNodeCandidates(context: DiscoveryContext) {
   const candidates: OsmConflationCandidate[] = [];
   for (const source of context.patch.nodes.sorted()) {
+    // Same-ID entities belong to ordinary merge semantics; fuzzy matching must not
+    // reinterpret an authoritative patch update.
     if (context.base.nodes.ids.has(source.id)) continue;
     const patchWays = context.patchWaysByNode.get(source.id) ?? [];
     const eligible =
@@ -707,6 +723,8 @@ function discoverNodeCandidates(context: DiscoveryContext) {
     const nearby = context.base.nodes
       .findIndexesWithinRadius(source.lon, source.lat, context.options.maxDistanceMeters / 1_000)
       .map((index) => context.base.nodes.getByIndex(index));
+    // A base ID also present in the patch is mutable under direct merge, so it is
+    // not an immutable target for a different imported entity.
     const targets = nearby.filter((target) => !context.patch.nodes.ids.has(target.id));
     if (targets.length === 0) {
       candidates.push({
@@ -819,6 +837,8 @@ function discoverWayCandidates(context: DiscoveryContext) {
       const maxGeometryDistanceMeters = symmetricLineDistance(sourceCoordinates, targetCoordinates);
       if (maxGeometryDistanceMeters > context.options.maxDistanceMeters) continue;
       const reasons: OsmConflationReasonCode[] = [];
+      // Keep geometrically plausible conflicts as blocked candidate rows. Users need
+      // to see why a nearby way was rejected instead of seeing it as merely unmatched.
       if (isAreaWay(source) !== isAreaWay(target)) reasons.push("geometry-mismatch");
       if (lengthDifferenceRatio > MAX_LENGTH_DIFFERENCE_RATIO) reasons.push("length-mismatch");
       if (routingGradeSignature(source.tags) !== routingGradeSignature(target.tags)) {
@@ -844,6 +864,8 @@ function discoverWayCandidates(context: DiscoveryContext) {
     }
 
     if (matches.length === 0) {
+      // Multiple nearby base ways may represent a segmented equivalent. This version
+      // deliberately reports that case instead of guessing a one-to-many mapping.
       const reasons: OsmConflationReasonCode[] =
         nearbyIndexes.length > 1 ? ["unsupported-way-chain"] : [];
       candidates.push({
@@ -906,6 +928,8 @@ function discoverWayCandidates(context: DiscoveryContext) {
 }
 
 function applyManyToOneClassification(candidates: OsmConflationCandidate[]) {
+  // Candidate discovery is local to each source. Enforce the batch-wide one-to-one
+  // invariant only after all otherwise plausible pairs are known.
   const sourcesByTarget = new Map<string, Set<number>>();
   for (const candidate of candidates) {
     if (candidate.targetId == null) continue;
@@ -1101,6 +1125,8 @@ function acceptedAction(
 ) {
   if (decision?.action === "reject") return false;
   const assessment = candidate[action];
+  // Manual review can select among reviewable actions, but it cannot override a
+  // blocked invariant or manufacture a match for an unmatched candidate.
   if (!assessment || assessment.status === "blocked" || assessment.status === "unmatched")
     return false;
   const selected =
@@ -1166,6 +1192,8 @@ function cleanupUnreferencedPatchNodes(
   originalBase: Osm,
   cleanupCandidateIds: ReadonlySet<number>,
 ) {
+  // Cleanup is intentionally limited to nodes from a suppressed matched patch way.
+  // Removing every orphan patch node would violate direct merge preservation.
   const referenced = new Set<number>();
   for (const way of currentWays(changeset)) for (const ref of way.refs) referenced.add(ref);
   for (const relation of currentRelations(changeset)) {
@@ -1206,6 +1234,8 @@ function applyDiscoveredConflation(
     for (const wayId of candidate.evidence.patchWayIds ?? []) patchWayIds.add(wayId);
   }
   for (const wayId of patchWayIds) {
+    // Only patch-created ways are listed in attachment evidence. Base way refs are
+    // never rewritten, even when the nearby patch node is accepted.
     const way = currentEntity(changeset, "way", wayId);
     if (!way) continue;
     const refs = way.refs.map((ref) => attachments.get(ref) ?? ref);
@@ -1239,6 +1269,8 @@ function applyDiscoveredConflation(
     }
     const current = currentEntity(changeset, "way", candidate.sourceId);
     if (current) {
+      // An equivalent one-to-one patch way is suppressed after property transfer.
+      // Its nodes become cleanup candidates, not unconditional deletions.
       for (const ref of current.refs) cleanupCandidateNodeIds.add(ref);
       removeCurrentEntity(changeset, current);
     }
@@ -1262,6 +1294,8 @@ export function generateConflationApplicationChangeset(
       `Conflation discovery base ${discovery.baseOsmId} does not match ${originalBase.id}`,
     );
   }
+  // Recompute from untouched entities before applying. Candidate records returned
+  // to callers are review data, not trusted instructions for mutating topology.
   const canonicalDiscovery = discoverConflationCandidates(originalBase, patch, discovery.options);
   const changeset = new OsmChangeset(baseline);
   applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions, originalBase);
@@ -1289,6 +1323,8 @@ export function generateConflationChangeset(
       "generateConflationChangeset cannot create intersections in the cumulative changeset",
     );
   }
+  // Generation never trusts possibly stale or caller-mutated candidate evidence.
+  // Stable decisions are replayed against a fresh discovery from untouched inputs.
   const canonicalDiscovery = discoverConflationCandidates(base, patch, options.conflation);
   const suppliedDiscovery = discovery ?? canonicalDiscovery;
   if (suppliedDiscovery.baseOsmId !== base.id || suppliedDiscovery.patchOsmId !== patch.id) {
@@ -1312,6 +1348,8 @@ export function generateConflationChangeset(
     deduplicateWays: options.deduplicateWays ?? false,
     createIntersections: false,
   };
+  // Compare fuzzy output with the ordinary merge, not the raw base. This preserves
+  // authoritative same-ID patch updates while forbidding fuzzy geometry rewrites.
   const ordinaryBaseline = applyChangesetToOsm(generateChangeset(base, patch, ordinaryOptions));
   const changeset = generateChangeset(base, patch, ordinaryOptions);
   applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions, base);

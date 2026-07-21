@@ -66,6 +66,8 @@ export function toOsmConflationOptions(
 export function toAutomaticPropertyOnlyDecision(
   candidate: OsmConflationCandidateView,
 ): OsmConflationDecision | null {
+  // Any existing accept or reject records user intent; a bulk action must not
+  // reinterpret or overwrite an individually reviewed candidate.
   if (candidate.decision !== undefined) return null;
   if (candidate.propertyTransfer.status !== "automatic") return null;
   if (candidate.networkAttachment?.status === "automatic") return null;

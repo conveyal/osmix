@@ -459,6 +459,8 @@ export default function MergeBlock() {
                     base.fileInfo?.fileName,
                     patch.fileInfo?.fileName,
                   );
+                  // Track transaction boundaries separately: each failure state has a different
+                  // safe recovery path and we cannot roll back an applied worker changeset.
                   let conflationDiscoveryCompleted = false;
                   let conflationBaseApplied = false;
                   let conflationPipelineCompleted = false;
@@ -532,6 +534,7 @@ export default function MergeBlock() {
                     goToStep("inspect-final-osm");
                   } catch (error) {
                     if (conflationPipelineCompleted) {
+                      // The worker finished every mutation; only refreshing React state failed.
                       try {
                         await base.setMergedOsm(baseOsmId, mergedName);
                         setChangesetStats(null);
@@ -547,6 +550,8 @@ export default function MergeBlock() {
                         );
                       }
                     } else if (conflationBaseApplied) {
+                      // Preserve both datasets so the user can retry intersection creation without
+                      // rediscovering or reapplying imported-data matches.
                       try {
                         await base.setMergedOsm(baseOsmId, mergedName);
                       } catch (refreshError) {
@@ -568,6 +573,8 @@ export default function MergeBlock() {
                         "error",
                       );
                       if (conflationOptions) {
+                        // Discovery is read-only, so returning to candidate review is safe even when
+                        // generation failed partway through validation.
                         const restoreFailure = await recoverConflationRunAllFailure({
                           restoreReview: conflationDiscoveryCompleted
                             ? async () => {

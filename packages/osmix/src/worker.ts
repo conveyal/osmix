@@ -111,6 +111,8 @@ interface ConflationSession {
   patchOsmId: string;
 }
 
+// Comlink normally clones return values, but tests and in-process remotes can expose
+// direct references. Clone every nested collection so UI code cannot mutate discovery.
 function cloneConflationCandidateView(
   candidate: OsmConflationCandidate,
   decision: OsmConflationDecision | undefined,
@@ -771,6 +773,7 @@ export class OsmixWorker extends EventTarget {
   /** Record or replace one candidate decision and invalidate any generated changeset. */
   setConflationDecision(baseOsmId: string, decision: OsmConflationDecision) {
     const session = this.getConflationSession(baseOsmId);
+    // Validate before touching session state so malformed RPC input is atomic.
     validateConflationDecisions(session.discovery.candidates, [decision]);
     this.invalidateGeneratedConflationChangeset(baseOsmId, session);
     session.decisions.set(decision.candidateId, { ...decision });
@@ -780,6 +783,7 @@ export class OsmixWorker extends EventTarget {
   /** Replace every candidate decision and invalidate any generated changeset. */
   setConflationDecisions(baseOsmId: string, decisions: OsmConflationDecision[]) {
     const session = this.getConflationSession(baseOsmId);
+    // Build and validate the replacement set before discarding reviewed output.
     validateConflationDecisions(session.discovery.candidates, decisions);
     const next = new Map<string, OsmConflationDecision>();
     for (const decision of decisions) {
@@ -837,6 +841,8 @@ export class OsmixWorker extends EventTarget {
     const ordinaryBaseline = applyChangesetToOsm(baselineChangeset);
     const conflated = applyChangesetToOsm(changeset);
     const diagnostics = routingDiagnostics(ordinaryBaseline, conflated);
+    // The full result may contain manually reviewed motor-network changes. Project
+    // automatic attachments alone so the automatic WALK-only CAR invariant is exact.
     let hasAutomaticNetworkAttachment = false;
     const automaticAttachmentDecisions = session.discovery.candidates.map((candidate) => {
       const decision = session.decisions.get(candidate.id);
@@ -974,6 +980,8 @@ export class OsmixWorker extends EventTarget {
 
   private invalidateGeneratedConflationChangeset(baseOsmId: string, session: ConflationSession) {
     if (!session.changesetGenerated) return;
+    // A reviewed changeset is a snapshot of its decisions. Never allow a later
+    // decision edit to apply that stale snapshot.
     this.changesets.delete(baseOsmId);
     this.filteredChanges.delete(baseOsmId);
     session.changesetGenerated = false;
