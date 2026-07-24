@@ -233,8 +233,8 @@ importers:
   apps/shortbread:
     dependencies:
       '@hono/node-server':
-        specifier: ^2.0.8
-        version: 2.0.8(hono@4.12.28)
+        specifier: ^2.0.10
+        version: 2.0.10(hono@4.12.28)
       '@osmix/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -276,8 +276,8 @@ importers:
   apps/vt-server:
     dependencies:
       '@hono/node-server':
-        specifier: ^2.0.8
-        version: 2.0.8(hono@4.12.28)
+        specifier: ^2.0.10
+        version: 2.0.10(hono@4.12.28)
       '@osmix/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -1190,8 +1190,8 @@ packages:
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
 
-  '@hono/node-server@2.0.8':
-    resolution: {integrity: sha512-GuCWzLxwg218fy1JaHculFsdcuY12hxit83V+algozTPnwhNjLrRL/Alg9OYjLZLoUZ1rw/S4CdTMsnkSKCmFA==}
+  '@hono/node-server@2.0.10':
+    resolution: {integrity: sha512-ZcnNVhKTmyDJeg0UlnZjvM73JBsTAuhrH/J4fjwGOw59PwOW51r4J+p6CsKZWXdKSme4MFqU62CZMOsdDrU4CA==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4
@@ -2610,9 +2610,6 @@ packages:
   geoflatbush@2.2.1:
     resolution: {integrity: sha512-WTbb/WmGS1Rl0RDVP9ikjPQLUsVsXbFtistoJWDK5Zf2JEcXRI2IAmdJN9n04PO1ak2zpi9uj9Mb6xssvKfD5g==}
 
-  geokdbush@2.1.0:
-    resolution: {integrity: sha512-bMc7mu+SeUxtHwRpVvZ36qnZa/x8YAGuaPNeGDxd9bxp/jYuJ5GrUirUPz6UNiT+nn/79IQ4gCNan0y4alEUxw==}
-
   get-east-asian-width@1.6.0:
     resolution: {integrity: sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA==}
     engines: {node: '>=18'}
@@ -4021,7 +4018,7 @@ snapshots:
 
   '@floating-ui/utils@0.2.11': {}
 
-  '@hono/node-server@2.0.8(hono@4.12.28)':
+  '@hono/node-server@2.0.10(hono@4.12.28)':
     dependencies:
       hono: 4.12.28
 
@@ -5200,10 +5197,6 @@ snapshots:
     optional: true
 
   geoflatbush@2.2.1: {}
-
-  geokdbush@2.1.0:
-    dependencies:
-      tinyqueue: 3.0.0
 
   get-east-asian-width@1.6.0: {}
 
