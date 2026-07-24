@@ -1,5 +1,28 @@
 # @osmix/shortbread
 
+## 0.1.0
+
+### Minor Changes
+
+- df04f92: Add a cross-runtime managed worker pool with browser, Bun, Deno, and Node worker support,
+  cooperative cancellation utilities, a transferable Shortbread feature index, and worker-backed
+  consumer integrations.
+
+### Patch Changes
+
+- e4785fe: Enable memory-aware loading of Australia-scale PBF data. Core storage and transfers now use the compact
+  version 2 representation, node spatial queries use independent indirect all-node and tagged-node indexes, and
+  loaders expose Auto, Full, View, and explicit spatial-index selection with structured capacity diagnostics.
+  Vector-tile encoders use the tagged-node capability without requiring an all-node index.
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [e4785fe]
+- Updated dependencies [8be5c80]
+  - @osmix/core@0.3.0
+  - @osmix/vt@0.0.15
+  - @osmix/geo@0.1.0
+  - @osmix/types@0.1.0
+
 ## 0.0.14
 
 ### Patch Changes
