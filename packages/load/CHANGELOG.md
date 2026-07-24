@@ -1,5 +1,28 @@
 # @osmix/load
 
+## 0.1.0
+
+### Minor Changes
+
+- e4785fe: Enable memory-aware loading of Australia-scale PBF data. Core storage and transfers now use the compact
+  version 2 representation, node spatial queries use independent indirect all-node and tagged-node indexes, and
+  loaders expose Auto, Full, View, and explicit spatial-index selection with structured capacity diagnostics.
+  Vector-tile encoders use the tagged-node capability without requiring an all-node index.
+- e4785fe: Expose structured typed-buffer and entity-finalization failures across workers, identify safe View-profile
+  retries for spatial capacity errors, and show persistent actionable dataset-load diagnostics in Merge.
+
+### Patch Changes
+
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [e4785fe]
+- Updated dependencies [8be5c80]
+  - @osmix/shared@0.2.0
+  - @osmix/core@0.3.0
+  - @osmix/json@0.0.17
+  - @osmix/pbf@0.0.10
+  - @osmix/types@0.1.0
+
 ## 0.0.2
 
 ### Patch Changes
