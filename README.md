@@ -68,6 +68,16 @@ const mergedOsm = await merge(osm, patchOsm);
 console.log(mergedOsm.id);
 ```
 
+The high-level merge preserves each source dataset and only reconciles compatible entities across the base
+and patch. If a PBF was produced by an older release that automatically deduplicated within each input,
+regenerate it from the original source files rather than trying to repair rewritten routing topology.
+
+Imported datasets with sub-meter coordinate offsets can opt into safe fuzzy conflation. The explicit
+`conflation` configuration restores the historical 1-meter search while separating selected-property
+transfer from patch-network attachment. High-confidence matches may apply automatically; ambiguous,
+routing-affecting, relation-involved, or structurally uncertain candidates are reviewable or blocked. Exact
+merge behavior and empty-merge identity remain unchanged when conflation is not configured.
+
 ### Use in a Web Worker
 
 ```ts check-docs monaco-pbf

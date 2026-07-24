@@ -18,8 +18,8 @@
  *
  * // Manual changeset workflow
  * const changeset = new OsmChangeset(baseOsm)
- * changeset.deduplicateNodes(baseOsm.nodes)
  * changeset.generateDirectChanges(patchOsm)
+ * changeset.deduplicateNodes(patchOsm.nodes)
  * const merged = applyChangesToOsm(changeset)
  *
  * // Or use the high-level merge function
@@ -34,6 +34,7 @@
 
 export * from "./apply-changeset.ts";
 export * from "./changeset.ts";
+export * from "./conflation.ts";
 export * from "./generate-changeset.ts";
 export * from "./merge.ts";
 export * from "./osc.ts";

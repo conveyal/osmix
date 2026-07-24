@@ -85,20 +85,19 @@ describe("merge osm", () => {
       changeset = new OsmChangeset(baseOsm);
       changeset.createIntersectionsForWays(osm2.ways);
 
-      // Pending intersection nodes are resolved from the changeset when a way is spliced
-      // again. This keeps every ref aligned with real geometry instead of aliasing a node
-      // from the base index, and can expose additional legitimate intersections.
+      // Intersections are grouped by their containing segment and inserted in geometric
+      // order. These fixture-derived counts lock down that deterministic behavior.
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 9_461,
-        nodeChanges: 5_824,
+        totalChanges: 9_499,
+        nodeChanges: 5_862,
         wayChanges: 3_637,
         relationChanges: 0,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
-        intersectionPointsFound: 3_187,
-        intersectionNodesCreated: 2_623,
+        intersectionPointsFound: 3_105,
+        intersectionNodesCreated: 2_602,
       });
 
       baseOsm = applyChangesetToOsm(changeset);

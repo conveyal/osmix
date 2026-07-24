@@ -25,6 +25,9 @@ import type { OsmMergeOptions } from "./types.ts";
  * @param options - Options controlling which operations to run.
  * @param onProgress - Callback for progress updates (throttled for way operations).
  * @returns The populated OsmChangeset ready for application or inspection.
+ * @throws When direct merge and intersection creation are requested together. Newly created
+ * patch ways are not spatially indexed until the direct changeset is applied; use `merge()` or
+ * apply the direct changes before generating an intersection-only changeset.
  *
  * @example
  * ```ts
@@ -42,6 +45,12 @@ export function generateChangeset(
   options: Partial<OsmMergeOptions> = {},
   onProgress: (progress: ProgressEvent) => void = logProgress,
 ) {
+  if (options.directMerge && options.createIntersections) {
+    throw Error(
+      "generateChangeset cannot combine directMerge with createIntersections because new patch ways are not indexed; use merge() or apply direct changes before generating intersections",
+    );
+  }
+
   const patchId = patch.id;
   const baseId = base.id;
 
@@ -55,25 +64,25 @@ export function generateChangeset(
     changeset.generateDirectChanges(patch);
   }
 
-  if (options.deduplicateWays) {
-    let checkedWays = 0;
-    let dedpulicatedWays = 0;
-    log(`Deduplicating ways from ${patchId}...`);
-    for (const wayStats of changeset.deduplicateWaysGenerator(patch.ways)) {
-      checkedWays++;
-      dedpulicatedWays += wayStats;
-      logEverySecond(
-        `Deduplicating ways: ${checkedWays.toLocaleString()} ways checked, ${dedpulicatedWays.toLocaleString()} ways deduplicated`,
-      );
-    }
-  }
-
   if (options.deduplicateNodes) {
-    log(`Deduplicating nodes from ${patchId}...`);
+    log(`Reconciling nodes from ${patchId} with ${baseId}...`);
     changeset.deduplicateNodes(patch.nodes);
     log(
       `Node deduplication results: ${changeset.deduplicatedNodes} de-duplicated nodes, ${changeset.deduplicatedNodesReplaced} nodes replaced`,
     );
+  }
+
+  if (options.deduplicateWays) {
+    let checkedWays = 0;
+    let dedpulicatedWays = 0;
+    log(`Reconciling ways from ${patchId} with ${baseId}...`);
+    for (const wayStats of changeset.deduplicateWaysGenerator(patch.ways)) {
+      checkedWays++;
+      dedpulicatedWays += wayStats;
+      logEverySecond(
+        `Way reconciliation: ${checkedWays.toLocaleString()} ways checked, ${dedpulicatedWays.toLocaleString()} ways reconciled`,
+      );
+    }
   }
 
   if (options.createIntersections) {

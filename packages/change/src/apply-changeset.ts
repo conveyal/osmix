@@ -10,6 +10,7 @@
 import { Osm } from "@osmix/core";
 
 import type { OsmChangeset } from "./changeset.ts";
+import { assertNoNewRoutingIntegrityIssues } from "./integrity.ts";
 
 /**
  * Apply a changeset to an Osm index, producing a new Osm index.
@@ -30,7 +31,8 @@ import type { OsmChangeset } from "./changeset.ts";
  * @example
  * ```ts
  * const changeset = new OsmChangeset(baseOsm)
- * changeset.deduplicateNodes(baseOsm.nodes)
+ * changeset.generateDirectChanges(patchOsm)
+ * changeset.deduplicateNodes(patchOsm.nodes)
  * const newOsm = applyChangesetToOsm(changeset)
  * ```
  */
@@ -117,6 +119,8 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
 
   // Build spatial indexes
   osm.buildSpatialIndexes();
+
+  assertNoNewRoutingIntegrityIssues(changeset.routingIntegrityBaselineKeys, osm);
 
   return osm;
 }
