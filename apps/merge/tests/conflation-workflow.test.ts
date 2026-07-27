@@ -2,7 +2,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { ConflationBulkActions } from "../src/components/conflation-review";
+import {
+  ConflationBulkActions,
+  ConflationResultsHeader,
+} from "../src/components/conflation-review";
 import {
   conflationBulkActionCopy,
   DEFAULT_CONFLATION_FORM_STATE,
@@ -150,5 +153,19 @@ describe("conflation workflow configuration", () => {
     expect(html).toContain("Transfer properties (145)");
     expect(html).toContain("Attach network (12)");
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Reject filtered \(0\)<\/button>/);
+  });
+
+  it("marks previous filtered results stale while the worker refreshes them", () => {
+    const html = renderToStaticMarkup(
+      createElement(ConflationResultsHeader, {
+        isFilterPending: true,
+        totalCandidates: 987_654,
+      }),
+    );
+
+    expect(html).toContain("Filtered matches (987,654, stale)");
+    expect(html).toContain("Updating filters…");
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
   });
 });

@@ -20,7 +20,7 @@ import {
   type OsmConflationBulkDecisionRequest,
   type OsmConflationDecision,
 } from "osmix";
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 
 import ActionButton from "../components/action-button";
 import { ConflationConfig } from "../components/conflation-config";
@@ -142,6 +142,7 @@ export default function MergeBlock() {
   const [conflationCandidateFilter, setConflationCandidateFilter] = useAtom(
     conflationCandidateFilterAtom,
   );
+  const [isConflationFilterPending, setIsConflationFilterPending] = useState(false);
   const setConflationDecisions = useSetAtom(conflationDecisionsAtom);
   const [conflationRoutingDiagnostics, setConflationRoutingDiagnostics] = useAtom(
     conflationRoutingDiagnosticsAtom,
@@ -209,9 +210,26 @@ export default function MergeBlock() {
 
   const updateConflationFilter = async (filter: typeof conflationCandidateFilter) => {
     if (!base.osm) throw Error("Base OSM is not loaded");
-    await osmWorker.setConflationFilter(base.osm.id, filter);
+    const previousFilter = conflationCandidateFilter;
     setConflationCandidateFilter(filter);
-    await loadConflationPage(0);
+    setIsConflationFilterPending(true);
+    try {
+      await osmWorker.setConflationFilter(base.osm.id, filter);
+      await loadConflationPage(0);
+    } catch (error) {
+      // Keep the visible controls aligned with the still-displayed page when a
+      // worker failure prevents the requested filter from being applied.
+      try {
+        await osmWorker.setConflationFilter(base.osm.id, previousFilter);
+      } catch {
+        // Preserve the original refresh error; a later page request will surface
+        // any worker recovery failure through the ordinary error channel.
+      }
+      setConflationCandidateFilter(previousFilter);
+      throw error;
+    } finally {
+      setIsConflationFilterPending(false);
+    }
   };
 
   const updateConflationDecision = async (decision: OsmConflationDecision) => {
@@ -919,7 +937,7 @@ export default function MergeBlock() {
         </p>
 
         <ActionButton
-          disabled={!base.osm || !patch.osm || !conflationOptions}
+          disabled={!base.osm || !patch.osm || !conflationOptions || isConflationFilterPending}
           icon={<SearchCodeIcon />}
           onAction={async () => {
             if (!base.osm || !patch.osm || !conflationOptions) {
@@ -956,6 +974,7 @@ export default function MergeBlock() {
             summary={conflationSummary}
             page={conflationCandidatePage}
             filter={conflationCandidateFilter}
+            isFilterPending={isConflationFilterPending}
             onDecision={updateConflationDecision}
             onBulkDecision={updateConflationBulkDecision}
             onFilterChange={updateConflationFilter}
@@ -964,13 +983,18 @@ export default function MergeBlock() {
         ) : null}
 
         <ButtonGroup className="w-full">
-          <ActionButton className="flex-1" icon={<ArrowLeft />} onAction={async () => prevStep()}>
+          <ActionButton
+            className="flex-1"
+            disabled={isConflationFilterPending}
+            icon={<ArrowLeft />}
+            onAction={async () => prevStep()}
+          >
             Back
           </ActionButton>
           <ButtonGroupSeparator />
           <ActionButton
             className="flex-1"
-            disabled={!conflationSummary}
+            disabled={!conflationSummary || isConflationFilterPending}
             icon={<ArrowRightIcon />}
             onAction={async () => nextStep()}
           >
