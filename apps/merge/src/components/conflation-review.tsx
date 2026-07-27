@@ -26,7 +26,7 @@ import { EmptyState } from "./section";
 import { StatusDot, type StatusDotStatus } from "./status-dot";
 import { Button } from "./ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group";
-import { Card, CardContent, CardHeader } from "./ui/card";
+import { Card, CardAction, CardContent, CardHeader } from "./ui/card";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "./ui/item";
+import { Spinner } from "./ui/spinner";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 
 const REASON_CODES = [
@@ -74,6 +75,7 @@ export interface ConflationReviewProps {
   summary: OsmConflationSummary;
   page: OsmConflationPage;
   filter: OsmConflationCandidateFilter;
+  isFilterPending: boolean;
   onDecision: (decision: OsmConflationDecision) => Promise<void>;
   onBulkDecision: (request: OsmConflationBulkDecisionRequest) => Promise<void>;
   onFilterChange: (filter: OsmConflationCandidateFilter) => Promise<void>;
@@ -158,10 +160,12 @@ function BulkPreviewTable({ preview }: { preview: OsmConflationBulkDecisionPrevi
 
 export function ConflationBulkActions({
   bulkActions,
+  disabled = false,
   filter,
   onBulkDecision,
 }: {
   bulkActions: OsmConflationPage["bulkActions"];
+  disabled?: boolean;
   filter: OsmConflationCandidateFilter;
   onBulkDecision: (request: OsmConflationBulkDecisionRequest) => Promise<void>;
 }) {
@@ -183,7 +187,7 @@ export function ConflationBulkActions({
             return (
               <Button
                 key={action}
-                disabled={preview.changedCandidates === 0}
+                disabled={disabled || preview.changedCandidates === 0}
                 size="sm"
                 variant={action === "reject" ? "destructive" : "outline"}
                 onClick={() => setSelectedAction(action)}
@@ -216,6 +220,7 @@ export function ConflationBulkActions({
                 Cancel
               </Button>
               <ActionButton
+                disabled={disabled}
                 variant={selectedAction === "reject" ? "destructive" : "default"}
                 onAction={async () => {
                   await onBulkDecision({ action: selectedAction, filter: { ...filter } });
@@ -375,12 +380,34 @@ function CandidateActions({
   );
 }
 
+export function ConflationResultsHeader({
+  isFilterPending,
+  totalCandidates,
+}: {
+  isFilterPending: boolean;
+  totalCandidates: number;
+}) {
+  return (
+    <CardHeader className={cn(isFilterPending && "bg-warning/10")}>
+      Filtered matches ({totalCandidates.toLocaleString()}
+      {isFilterPending ? ", stale" : ""})
+      {isFilterPending ? (
+        <CardAction className="text-warning" aria-live="polite">
+          <Spinner />
+          Updating filters…
+        </CardAction>
+      ) : null}
+    </CardHeader>
+  );
+}
+
 export function ConflationReview({
   base,
   patch,
   summary,
   page,
   filter,
+  isFilterPending,
   onDecision,
   onBulkDecision,
   onFilterChange,
@@ -439,6 +466,7 @@ export function ConflationReview({
             <select
               id="conflation-status-filter"
               className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              disabled={isFilterPending}
               value={filter.status ?? ""}
               onChange={(event) => {
                 const status = event.target.value as OsmConflationEffectiveStatus | "";
@@ -461,6 +489,7 @@ export function ConflationReview({
             <select
               id="conflation-entity-filter"
               className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              disabled={isFilterPending}
               value={filter.entityType ?? ""}
               onChange={(event) => {
                 const entityType = event.target.value as "node" | "way" | "";
@@ -478,6 +507,7 @@ export function ConflationReview({
             <select
               id="conflation-reason-filter"
               className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              disabled={isFilterPending}
               value={filter.reason ?? ""}
               onChange={(event) => {
                 const reason = event.target.value as OsmConflationReasonCode | "";
@@ -495,11 +525,15 @@ export function ConflationReview({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>Filtered matches ({page.totalCandidates.toLocaleString()})</CardHeader>
-        <CardContent className="p-0">
+      <Card aria-busy={isFilterPending}>
+        <ConflationResultsHeader
+          isFilterPending={isFilterPending}
+          totalCandidates={page.totalCandidates}
+        />
+        <CardContent className={cn("p-0", isFilterPending && "opacity-60")} inert={isFilterPending}>
           <ConflationBulkActions
             bulkActions={page.bulkActions}
+            disabled={isFilterPending}
             filter={filter}
             onBulkDecision={onBulkDecision}
           />
@@ -551,7 +585,7 @@ export function ConflationReview({
       <ButtonGroup className="w-full">
         <Button
           className="flex-1"
-          disabled={page.page <= 0}
+          disabled={isFilterPending || page.page <= 0}
           variant="outline"
           onClick={() => void onPageChange(page.page - 1)}
         >
@@ -564,7 +598,7 @@ export function ConflationReview({
         <ButtonGroupSeparator />
         <Button
           className="flex-1"
-          disabled={page.page + 1 >= page.totalPages}
+          disabled={isFilterPending || page.page + 1 >= page.totalPages}
           variant="outline"
           onClick={() => void onPageChange(page.page + 1)}
         >
