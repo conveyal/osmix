@@ -241,6 +241,13 @@ export abstract class Entities<T extends OsmEntity> {
     }
   }
 
+  /** @internal Iterate entities in canonical OSM file order. */
+  *osmSorted(): Generator<T> {
+    for (const [id, index] of this.ids.osmSortedEntries()) {
+      yield this.getFullEntity(index, id, this.tags.getTags(index));
+    }
+  }
+
   /**
    * Search for entities with a specific tag key and optional value.
    */

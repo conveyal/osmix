@@ -11,7 +11,6 @@ import type { Osm } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
 
 import { applyChangesetToOsm } from "./apply-changeset.ts";
-import { OsmChangeset } from "./changeset.ts";
 import {
   discoverConflationCandidates,
   generateConflationApplicationChangeset,
@@ -99,9 +98,12 @@ export async function merge(
   // Intersections run after conflation so accepted patch attachments participate in
   // crossing insertion, while candidate discovery remains based on untouched inputs.
   if (options.createIntersections) {
-    log("Creating intersections in final dataset...");
-    const changeset = new OsmChangeset(modifiedBase);
-    changeset.createIntersectionsForWays(patch.ways);
+    const changeset = generateChangeset(
+      modifiedBase,
+      patch,
+      { createIntersections: true },
+      onProgress,
+    );
     log(changeStatsSummary(changeset.stats));
     modifiedBase = applyChangesetToOsm(changeset);
   }

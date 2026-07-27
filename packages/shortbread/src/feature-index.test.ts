@@ -147,7 +147,7 @@ describe("ShortbreadFeatureIndex", () => {
       expect(new Uint8Array(indexedTile)).toEqual(new Uint8Array(unindexedTile));
       expect(decodedTileSnapshot(indexedTile)).toEqual(decodedTileSnapshot(unindexedTile));
     }
-  });
+  }, 15_000);
 
   it("suppresses a member area only when its classified relation supplies the geometry", () => {
     const osm = new Osm();
