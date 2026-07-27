@@ -607,6 +607,21 @@ export class OsmChangeset {
     return { keepWayNode, replaced, survivor };
   }
 
+  /**
+   * Endpoint reuse is a local rewrite of exactly one of the intersecting ways.
+   * Reject it before mutation when snapping two nearby crossings to the same
+   * endpoint would create invalid topology.
+   */
+  private intersectionReplacementIsUnsafe(
+    way: OsmWay,
+    replacedNodeId: number,
+    survivorNodeId: number,
+  ) {
+    const refs = way.refs.map((ref) => (ref === replacedNodeId ? survivorNodeId : ref));
+    if (refs.some((ref, index) => index > 0 && ref === refs[index - 1])) return true;
+    return new Set(refs).size < 2;
+  }
+
   private mergeNodeTags(survivor: OsmNode, replaced: OsmNode) {
     const merged = withNonConflictingTags(survivor, replaced);
     if (merged !== survivor) this.modify("node", survivor.id, () => merged);
@@ -754,7 +769,12 @@ export class OsmChangeset {
     const wayIdPairs = new IdPairs();
     const patchWayIds = new Set([...ways].map((way) => way.id));
     for (const way of ways) {
-      if (!this.osm.ways.ids.has(way.id)) continue;
+      // Yield once per input way so callers can report complete progress even
+      // when exact reconciliation already removed an equivalent patch way.
+      if (!this.osm.ways.ids.has(way.id)) {
+        yield;
+        continue;
+      }
       yield this.createIntersectionsForWayInternal({ id: way.id }, wayIdPairs, patchWayIds);
     }
   }
@@ -883,6 +903,7 @@ export class OsmChangeset {
         }
 
         let endpointResolution: ReturnType<OsmChangeset["chooseIntersectionNode"]> | undefined;
+        let createDedicatedIntersection = false;
         if (wayNodeId != null && intersectingWayNodeId != null) {
           const wayNode = this.getCurrentNode(wayNodeId);
           const intersectingWayNode = this.getCurrentNode(intersectingWayNodeId);
@@ -894,6 +915,17 @@ export class OsmChangeset {
             patchWayIds?.has(currentIntersectingWay.id) ?? false,
           );
           if (!endpointResolution) continue;
+          const rewrittenWay = endpointResolution.keepWayNode ? currentIntersectingWay : currentWay;
+          if (
+            this.intersectionReplacementIsUnsafe(
+              rewrittenWay,
+              endpointResolution.replaced.id,
+              endpointResolution.survivor.id,
+            )
+          ) {
+            endpointResolution = undefined;
+            createDedicatedIntersection = true;
+          }
         }
 
         intersectionsFound++;
@@ -920,6 +952,15 @@ export class OsmChangeset {
           }
           this.replaceRestrictionViaNode(endpointResolution.replaced.id, survivor.id);
           this.markNodeAsCrossing(survivor.id);
+        } else if (createDedicatedIntersection) {
+          intersectionsCreated++;
+          const newIntersectionNode = this.createIntersectionNode(
+            currentWay,
+            currentIntersectingWay,
+            pt,
+          );
+          this.spliceNodeIntoWay(currentWay, newIntersectionNode);
+          this.spliceNodeIntoWay(currentIntersectingWay, newIntersectionNode);
         } else if (wayNodeId != null) {
           const wayNode = this.getCurrentNode(wayNodeId);
           if (wayNode == null) throw Error(`Way node ${String(wayNodeId)} not found`);
@@ -934,21 +975,11 @@ export class OsmChangeset {
           this.markNodeAsCrossing(intersectingWayNode.id);
         } else {
           intersectionsCreated++;
-
-          const newIntersectionNode: OsmNode = {
-            id: this.nextNodeId(),
-            lon: pt[0],
-            lat: pt[1],
-            tags: {
-              crossing: "yes",
-            },
-          };
-          this.create(newIntersectionNode, this.osm.id, [
-            { type: "way", id: currentWay.id, osmId: this.osm.id },
-            { type: "way", id: currentIntersectingWay.id, osmId: this.osm.id },
-          ]);
-
-          // Splice into the existing ways
+          const newIntersectionNode = this.createIntersectionNode(
+            currentWay,
+            currentIntersectingWay,
+            pt,
+          );
           this.spliceNodeIntoWay(currentWay, newIntersectionNode);
           this.spliceNodeIntoWay(currentIntersectingWay, newIntersectionNode);
         }
@@ -962,6 +993,26 @@ export class OsmChangeset {
       intersectionsFound,
       intersectionsCreated,
     };
+  }
+
+  private createIntersectionNode(
+    way: OsmWay,
+    intersectingWay: OsmWay,
+    point: [number, number],
+  ): OsmNode {
+    const node: OsmNode = {
+      id: this.nextNodeId(),
+      lon: point[0],
+      lat: point[1],
+      tags: {
+        crossing: "yes",
+      },
+    };
+    this.create(node, this.osm.id, [
+      { type: "way", id: way.id, osmId: this.osm.id },
+      { type: "way", id: intersectingWay.id, osmId: this.osm.id },
+    ]);
+    return node;
   }
 
   /**

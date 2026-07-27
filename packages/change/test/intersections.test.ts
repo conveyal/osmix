@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset.ts";
 import { OsmChangeset } from "../src/changeset.ts";
+import { merge } from "../src/merge.ts";
 import { waysShouldConnect } from "../src/utils.ts";
 
 function crossingWays() {
@@ -181,6 +182,72 @@ describe("intersection geometry integrity", () => {
     expect(result.ways.getById(11)?.refs).toEqual([2, 3]);
     expect(result.ways.getById(20)?.refs).toEqual([2, 6]);
     expect(result.nodes.getById(2)?.tags).toEqual({ barrier: "gate", crossing: "yes" });
+  });
+
+  it("creates a dedicated node when endpoint reuse would collapse a short patch way", async () => {
+    const base = new Osm({ id: "short-crossing-base" });
+    for (const node of [
+      { id: 1, lon: -120.5618765, lat: 46.5963651 },
+      { id: 2, lon: -120.5618635, lat: 46.5963706 },
+      { id: 3, lon: -120.5618787, lat: 46.5963832 },
+    ]) {
+      base.nodes.addNode(node);
+    }
+    base.ways.addWay({ id: 10, refs: [1, 2, 3], tags: { highway: "footway" } });
+    base.buildIndexes();
+    base.buildSpatialIndexes();
+
+    const patch = new Osm({ id: "short-crossing-patch" });
+    patch.nodes.addNode({ id: 101, lon: -120.561871, lat: 46.5963653 });
+    patch.nodes.addNode({ id: 102, lon: -120.5618605, lat: 46.5963786 });
+    patch.ways.addWay({ id: 20, refs: [101, 102], tags: { highway: "footway" } });
+    patch.buildIndexes();
+
+    const progress: string[] = [];
+    const result = await merge(
+      base,
+      patch,
+      { createIntersections: true, directMerge: true },
+      (event) => progress.push(event.detail.msg),
+    );
+
+    const baseWay = result.ways.getById(10)!;
+    const patchWay = result.ways.getById(20)!;
+    const generatedRefs = patchWay.refs.filter((ref) => ref > 102);
+
+    expect(patchWay.refs).toContain(2);
+    expect(generatedRefs).toHaveLength(1);
+    expect(baseWay.refs).toContain(generatedRefs[0]!);
+    expect(new Set(patchWay.refs).size).toBe(patchWay.refs.length);
+    expect(progress).toContain("Intersection creation progress: 1 of 1 ways checked");
+  });
+
+  it("reports every patch way after exact reconciliation removes an equivalent way", async () => {
+    const base = new Osm({ id: "progress-base" });
+    base.nodes.addNode({ id: 1, lon: 0, lat: 0 });
+    base.nodes.addNode({ id: 2, lon: 1, lat: 0 });
+    base.ways.addWay({ id: 10, refs: [1, 2], tags: { highway: "service" } });
+    base.buildIndexes();
+    base.buildSpatialIndexes();
+
+    const patch = new Osm({ id: "progress-patch" });
+    patch.ways.addWay({ id: 20, refs: [1, 2], tags: { highway: "service" } });
+    patch.buildIndexes();
+
+    const progress: string[] = [];
+    const result = await merge(
+      base,
+      patch,
+      {
+        createIntersections: true,
+        deduplicateWays: true,
+        directMerge: true,
+      },
+      (event) => progress.push(event.detail.msg),
+    );
+
+    expect(result.ways.ids.has(20)).toBe(false);
+    expect(progress).toContain("Intersection creation progress: 1 of 1 ways checked");
   });
 
   it("declines endpoint reuse when node tags conflict", () => {

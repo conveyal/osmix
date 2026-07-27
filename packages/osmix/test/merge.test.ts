@@ -86,18 +86,19 @@ describe("merge osm", () => {
       changeset.createIntersectionsForWays(osm2.ways);
 
       // Intersections are grouped by their containing segment and inserted in geometric
-      // order. These fixture-derived counts lock down that deterministic behavior.
+      // order. Endpoint reuse that would create duplicate or degenerate refs falls back
+      // to a dedicated exact intersection node.
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 9_499,
-        nodeChanges: 5_862,
-        wayChanges: 3_637,
+        totalChanges: 9_508,
+        nodeChanges: 5_869,
+        wayChanges: 3_639,
         relationChanges: 0,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
         intersectionPointsFound: 3_105,
-        intersectionNodesCreated: 2_602,
+        intersectionNodesCreated: 2_609,
       });
 
       baseOsm = applyChangesetToOsm(changeset);
