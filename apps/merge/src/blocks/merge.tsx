@@ -840,25 +840,40 @@ export default function MergeBlock() {
             />
           </CardContent>
         </Card>
-        <ActionButton
-          disabled={!base.osm}
-          icon={<SearchCodeIcon />}
-          onAction={() =>
-            startStepTask("Inspecting base OSM for duplicate entities", async () => {
-              if (!base.osm) throw Error("Base OSM is not loaded");
-              setChangesetReviewContext({ kind: "base-diagnostic" });
-              const changes = await osmWorker.generateChangeset(
-                base.osm.id,
-                base.osm.id,
-                WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
-              );
-              setChangesetStats(changes);
-              return changeStatsSummary(changes);
-            })
-          }
-        >
-          Scan base for duplicate candidates
-        </ActionButton>
+        <ButtonGroup className="w-full" orientation="vertical">
+          <ActionButton
+            className="w-full"
+            disabled={!base.osm}
+            icon={<SearchCodeIcon />}
+            onAction={() =>
+              startStepTask("Inspecting base OSM for duplicate entities", async () => {
+                if (!base.osm) throw Error("Base OSM is not loaded");
+                setChangesetReviewContext({ kind: "base-diagnostic" });
+                const changes = await osmWorker.generateChangeset(
+                  base.osm.id,
+                  base.osm.id,
+                  WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
+                );
+                setChangesetStats(changes);
+                return changeStatsSummary(changes);
+              })
+            }
+          >
+            Scan base for duplicate candidates
+          </ActionButton>
+          <ActionButton
+            className="w-full"
+            icon={<SkipForwardIcon />}
+            onAction={async () => {
+              setChangesetStats(null);
+              Log.addMessage("Skipped base duplicate diagnostic");
+              goToStep("inspect-patch-osm");
+            }}
+            variant="outline"
+          >
+            Skip base diagnostic
+          </ActionButton>
+        </ButtonGroup>
       </Step>
 
       <Step step="inspect-patch-osm" title="Inspect patch OSM" guideId="inspect-patch">
@@ -873,25 +888,40 @@ export default function MergeBlock() {
             />
           </CardContent>
         </Card>
-        <ActionButton
-          disabled={!patch.osm}
-          icon={<SearchCodeIcon />}
-          onAction={() =>
-            startStepTask("Inspecting patch OSM for duplicate entities", async () => {
-              if (!patch.osm) throw Error("Patch OSM is not loaded");
-              setChangesetReviewContext({ kind: "patch-diagnostic" });
-              const patchChanges = await osmWorker.generateChangeset(
-                patch.osm.id,
-                patch.osm.id,
-                WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
-              );
-              setChangesetStats(patchChanges);
-              return changeStatsSummary(patchChanges);
-            })
-          }
-        >
-          Scan patch for duplicate candidates
-        </ActionButton>
+        <ButtonGroup className="w-full" orientation="vertical">
+          <ActionButton
+            className="w-full"
+            disabled={!patch.osm}
+            icon={<SearchCodeIcon />}
+            onAction={() =>
+              startStepTask("Inspecting patch OSM for duplicate entities", async () => {
+                if (!patch.osm) throw Error("Patch OSM is not loaded");
+                setChangesetReviewContext({ kind: "patch-diagnostic" });
+                const patchChanges = await osmWorker.generateChangeset(
+                  patch.osm.id,
+                  patch.osm.id,
+                  WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
+                );
+                setChangesetStats(patchChanges);
+                return changeStatsSummary(patchChanges);
+              })
+            }
+          >
+            Scan patch for duplicate candidates
+          </ActionButton>
+          <ActionButton
+            className="w-full"
+            icon={<SkipForwardIcon />}
+            onAction={async () => {
+              setChangesetStats(null);
+              Log.addMessage("Skipped patch duplicate diagnostic");
+              goToStep("direct-merge");
+            }}
+            variant="outline"
+          >
+            Skip patch diagnostic
+          </ActionButton>
+        </ButtonGroup>
       </Step>
 
       <Step step="direct-merge" title="Direct merge" guideId="direct">
