@@ -78,4 +78,53 @@ test("loads both inputs on Merge and skips optional diagnostic scans", async ({ 
   await page.getByRole("button", { name: "Skip patch diagnostic" }).click();
   await expect(page.getByText(/6: Direct merge/i)).toBeVisible();
   await expect(page.getByRole("button", { name: "Preview direct merge" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Preview direct merge" }).click();
+  await expect(page.getByText(/Review direct merge/i)).toBeVisible();
+  await page.getByRole("button", { name: "Continue to matching and reconciliation" }).click();
+  await expect(page.getByText(/Reconcile matching entities/i)).toBeVisible();
+
+  const reconciliationActions = page.getByRole("group", {
+    name: "Exact reconciliation actions",
+  });
+  const withoutExact = reconciliationActions.getByRole("button", {
+    name: "Preview without exact reconciliation",
+  });
+  const withExact = reconciliationActions.getByRole("button", {
+    name: "Preview with exact reconciliation",
+  });
+
+  for (const viewportWidth of [320, 1280]) {
+    await page.setViewportSize({ width: viewportWidth, height: 720 });
+    const measurements = await reconciliationActions.evaluate((group) => {
+      const groupBounds = group.getBoundingClientRect();
+      const buttons = [...group.querySelectorAll<HTMLElement>('[data-slot="button"]')].map(
+        (button) => button.getBoundingClientRect(),
+      );
+      return {
+        buttons: buttons.map((bounds) => ({
+          bottom: bounds.bottom,
+          left: bounds.left,
+          right: bounds.right,
+          top: bounds.top,
+        })),
+        clientWidth: group.clientWidth,
+        groupLeft: groupBounds.left,
+        groupRight: groupBounds.right,
+        scrollWidth: group.scrollWidth,
+      };
+    });
+
+    expect(measurements.scrollWidth).toBeLessThanOrEqual(measurements.clientWidth);
+    expect(measurements.buttons[0].left).toBeGreaterThanOrEqual(measurements.groupLeft);
+    expect(measurements.buttons[0].right).toBeLessThanOrEqual(measurements.groupRight);
+    expect(measurements.buttons[1].left).toBeGreaterThanOrEqual(measurements.groupLeft);
+    expect(measurements.buttons[1].right).toBeLessThanOrEqual(measurements.groupRight);
+    expect(measurements.buttons[1].top).toBeGreaterThan(measurements.buttons[0].bottom);
+  }
+
+  await withoutExact.focus();
+  await expect(withoutExact).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(withExact).toBeFocused();
 });

@@ -8,6 +8,8 @@ import {
 } from "../src/components/automatic-merge-progress";
 import { InfoTooltip } from "../src/components/info-tooltip";
 import { MergeStepGuide } from "../src/components/merge-step-guide";
+import { StepActions } from "../src/components/step-actions";
+import { Button } from "../src/components/ui/button";
 
 interface HarnessState {
   decision: string;
@@ -78,6 +80,21 @@ function GuidanceHarness() {
           <dt>Decision</dt>
           <dd>{harnessState.decision}</dd>
         </dl>
+
+        <div className="mt-2 flex flex-col gap-2">
+          <StepActions aria-label="Reconciliation step actions">
+            <Button variant="outline">Preview without exact reconciliation</Button>
+            <Button>Preview with exact reconciliation</Button>
+          </StepActions>
+          <StepActions aria-label="Imported-data matching step actions">
+            <Button variant="outline">Back</Button>
+            <Button>Continue with current decisions</Button>
+          </StepActions>
+          <StepActions aria-label="Intersection step actions">
+            <Button variant="outline">Skip intersections and finish</Button>
+            <Button>Preview intersection changes</Button>
+          </StepActions>
+        </div>
 
         <button
           className="mt-2 border p-1"
