@@ -63,7 +63,7 @@ function renderWithStore(
 }
 
 describe("merge inline guidance", () => {
-  it("describes proximity controls and connects the help with aria-describedby", () => {
+  it("keeps proximity labels visible and moves detailed help into info tooltips", () => {
     const html = renderWithStore(createElement(ConflationConfig), (store) => {
       store.set(conflationFormAtom, {
         enabled: true,
@@ -76,15 +76,17 @@ describe("merge inline guidance", () => {
 
     expect(html).toContain("OSM tag keys to transfer");
     expect(html).toContain("Candidate search radius (meters)");
-    expect(html).toContain('aria-describedby="conflation-property-transfer-help"');
-    expect(html).toContain('aria-describedby="conflation-property-keys-help"');
-    expect(html).toContain('aria-describedby="conflation-network-attachment-help"');
-    expect(html).toContain('aria-describedby="conflation-distance-help"');
-    expect(html).toContain("Distance alone never guarantees acceptance");
-    expect(html).toContain("routing-affecting tags require review");
-    expect(html).toContain("equivalent one-to-one imported");
-    expect(html).toContain("tagless nodes");
-    expect(html).toContain("referenced by any way or relation");
+    expect(html).toContain('aria-label="About proximity matching"');
+    expect(html).toContain('aria-label="About property transfer"');
+    expect(html).toContain('aria-label="About transferable OSM tags"');
+    expect(html).toContain('aria-label="About network attachment"');
+    expect(html).toContain('aria-label="About candidate search radius"');
+    expect(html).toContain('aria-label="About automatic matching decisions"');
+    expect(html).not.toContain("Distance alone never guarantees acceptance");
+    expect(html).not.toContain("routing-affecting tags require review");
+    expect(html).not.toContain("equivalent one-to-one imported");
+    expect(html).not.toContain("tagless nodes");
+    expect(html).not.toContain("referenced by any way or relation");
   });
 
   it("humanizes candidate statuses, reasons, evidence, and actions", () => {
