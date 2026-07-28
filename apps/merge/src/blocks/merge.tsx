@@ -43,9 +43,10 @@ import ChangesSummary, {
 } from "../components/osm-changes-summary";
 import OsmInfoTable from "../components/osm-info-table";
 import { LoadingState } from "../components/section";
+import { StepActions } from "../components/step-actions";
 import StoredOsmList from "../components/stored-osm-list";
 import { Button } from "../components/ui/button";
-import { ButtonGroup, ButtonGroupSeparator } from "../components/ui/button-group";
+import { ButtonGroup } from "../components/ui/button-group";
 import {
   Card,
   CardAction,
@@ -891,9 +892,19 @@ export default function MergeBlock() {
             />
           </CardContent>
         </Card>
-        <ButtonGroup className="w-full" orientation="vertical">
+        <StepActions aria-label="Base diagnostic actions">
           <ActionButton
-            className="w-full"
+            icon={<SkipForwardIcon />}
+            onAction={async () => {
+              setChangesetStats(null);
+              Log.addMessage("Skipped base duplicate diagnostic");
+              goToStep("inspect-patch-osm");
+            }}
+            variant="outline"
+          >
+            Skip base diagnostic
+          </ActionButton>
+          <ActionButton
             disabled={!base.osm}
             icon={<SearchCodeIcon />}
             onAction={() =>
@@ -912,19 +923,7 @@ export default function MergeBlock() {
           >
             Scan base for duplicate candidates
           </ActionButton>
-          <ActionButton
-            className="w-full"
-            icon={<SkipForwardIcon />}
-            onAction={async () => {
-              setChangesetStats(null);
-              Log.addMessage("Skipped base duplicate diagnostic");
-              goToStep("inspect-patch-osm");
-            }}
-            variant="outline"
-          >
-            Skip base diagnostic
-          </ActionButton>
-        </ButtonGroup>
+        </StepActions>
       </Step>
 
       <Step step="inspect-patch-osm" title="Inspect patch OSM" guideId="inspect-patch">
@@ -939,9 +938,19 @@ export default function MergeBlock() {
             />
           </CardContent>
         </Card>
-        <ButtonGroup className="w-full" orientation="vertical">
+        <StepActions aria-label="Patch diagnostic actions">
           <ActionButton
-            className="w-full"
+            icon={<SkipForwardIcon />}
+            onAction={async () => {
+              setChangesetStats(null);
+              Log.addMessage("Skipped patch duplicate diagnostic");
+              goToStep("direct-merge");
+            }}
+            variant="outline"
+          >
+            Skip patch diagnostic
+          </ActionButton>
+          <ActionButton
             disabled={!patch.osm}
             icon={<SearchCodeIcon />}
             onAction={() =>
@@ -960,19 +969,7 @@ export default function MergeBlock() {
           >
             Scan patch for duplicate candidates
           </ActionButton>
-          <ActionButton
-            className="w-full"
-            icon={<SkipForwardIcon />}
-            onAction={async () => {
-              setChangesetStats(null);
-              Log.addMessage("Skipped patch duplicate diagnostic");
-              goToStep("direct-merge");
-            }}
-            variant="outline"
-          >
-            Skip patch diagnostic
-          </ActionButton>
-        </ButtonGroup>
+        </StepActions>
       </Step>
 
       <Step step="direct-merge" title="Direct merge" guideId="direct">
@@ -1017,13 +1014,11 @@ export default function MergeBlock() {
           </CardContent>
         </Card>
 
-        <ButtonGroup className="w-full">
-          <ActionButton className="flex-1" onAction={async () => prevStep()} icon={<ArrowLeft />}>
+        <StepActions aria-label="Direct merge actions">
+          <ActionButton icon={<ArrowLeft />} onAction={async () => prevStep()} variant="outline">
             Back
           </ActionButton>
-          <ButtonGroupSeparator />
           <ActionButton
-            className="flex-1"
             icon={<FileDiff />}
             onAction={() =>
               startStepTask("Generating direct-merge preview", async () => {
@@ -1042,7 +1037,7 @@ export default function MergeBlock() {
           >
             Preview direct merge
           </ActionButton>
-        </ButtonGroup>
+        </StepActions>
       </Step>
 
       <Step
@@ -1075,66 +1070,68 @@ export default function MergeBlock() {
           <ConflationRoutingDiagnostics diagnostics={conflationRoutingDiagnostics} />
         ) : null}
 
-        {isDiagnosticReview ? (
-          <ActionButton
-            onAction={async () => {
-              setChangesetStats(null);
-              nextStep();
-            }}
-            icon={<ArrowRightIcon />}
-          >
-            Continue without applying
-          </ActionButton>
-        ) : isDirectPreviewReview ? (
-          <ActionButton
-            onAction={async () => {
-              setChangesetStats(null);
-              nextStep();
-            }}
-            icon={<ArrowRightIcon />}
-          >
-            Continue to matching and reconciliation
-          </ActionButton>
-        ) : changesetStats == null || hasZeroChanges ? (
-          <ActionButton
-            onAction={async () => {
-              if (completesVerifiedMerge) showVerifiedMergeResult();
-              else nextStep();
-            }}
-            icon={<ArrowRightIcon />}
-          >
-            {changesetReviewContext.kind === "intersections"
-              ? "No intersections, finish merge"
-              : "No changes, go to next step"}
-          </ActionButton>
-        ) : (
-          <ActionButton
-            icon={<MergeIcon />}
-            onAction={() =>
-              startStepTask("Applying changes to OSM", async () => {
-                if (!changesetStats) throw Error("Changes are not loaded");
-                const changedOsmId = await applyChanges();
-                if (changesetStats.osmId === base.osm?.id) {
-                  const mergedName = makeMergedDownloadName(
-                    base.fileInfo?.fileName,
-                    patch.fileInfo?.fileName,
-                  );
-                  await base.setMergedOsm(changedOsmId, mergedName);
-                } else if (changesetStats.osmId === patch.osm?.id) {
-                  await patch.setMergedOsm(changedOsmId);
-                } else {
-                  throw Error("Changeset OSM ID does not match base or patch OSM ID");
-                }
-                if (completesVerifiedMerge) patch.setOsm(null);
-                return "Changes applied";
-              })
-            }
-          >
-            {changesetReviewContext.kind === "intersections"
-              ? "Apply intersections and finish"
-              : "Apply cumulative merge"}
-          </ActionButton>
-        )}
+        <StepActions aria-label="Changeset review actions">
+          {isDiagnosticReview ? (
+            <ActionButton
+              onAction={async () => {
+                setChangesetStats(null);
+                nextStep();
+              }}
+              icon={<ArrowRightIcon />}
+            >
+              Continue without applying
+            </ActionButton>
+          ) : isDirectPreviewReview ? (
+            <ActionButton
+              onAction={async () => {
+                setChangesetStats(null);
+                nextStep();
+              }}
+              icon={<ArrowRightIcon />}
+            >
+              Continue to matching and reconciliation
+            </ActionButton>
+          ) : changesetStats == null || hasZeroChanges ? (
+            <ActionButton
+              onAction={async () => {
+                if (completesVerifiedMerge) showVerifiedMergeResult();
+                else nextStep();
+              }}
+              icon={<ArrowRightIcon />}
+            >
+              {changesetReviewContext.kind === "intersections"
+                ? "No intersections, finish merge"
+                : "No changes, go to next step"}
+            </ActionButton>
+          ) : (
+            <ActionButton
+              icon={<MergeIcon />}
+              onAction={() =>
+                startStepTask("Applying changes to OSM", async () => {
+                  if (!changesetStats) throw Error("Changes are not loaded");
+                  const changedOsmId = await applyChanges();
+                  if (changesetStats.osmId === base.osm?.id) {
+                    const mergedName = makeMergedDownloadName(
+                      base.fileInfo?.fileName,
+                      patch.fileInfo?.fileName,
+                    );
+                    await base.setMergedOsm(changedOsmId, mergedName);
+                  } else if (changesetStats.osmId === patch.osm?.id) {
+                    await patch.setMergedOsm(changedOsmId);
+                  } else {
+                    throw Error("Changeset OSM ID does not match base or patch OSM ID");
+                  }
+                  if (completesVerifiedMerge) patch.setOsm(null);
+                  return "Changes applied";
+                })
+              }
+            >
+              {changesetReviewContext.kind === "intersections"
+                ? "Apply intersections and finish"
+                : "Apply cumulative merge"}
+            </ActionButton>
+          )}
+        </StepActions>
       </Step>
 
       <Step step="match-imported-data" title="Match imported data" guideId="match-imported">
@@ -1184,25 +1181,23 @@ export default function MergeBlock() {
           />
         ) : null}
 
-        <ButtonGroup className="w-full">
+        <StepActions aria-label="Imported-data matching actions">
           <ActionButton
-            className="flex-1"
             disabled={isConflationFilterPending}
             icon={<ArrowLeft />}
             onAction={async () => prevStep()}
+            variant="outline"
           >
             Back
           </ActionButton>
-          <ButtonGroupSeparator />
           <ActionButton
-            className="flex-1"
             disabled={!conflationSummary || isConflationFilterPending}
             icon={<ArrowRightIcon />}
             onAction={async () => nextStep()}
           >
             Continue with current decisions
           </ActionButton>
-        </ButtonGroup>
+        </StepActions>
       </Step>
 
       <Step step="deduplicate-nodes" title="Reconcile matching entities" guideId="reconcile">
@@ -1225,9 +1220,8 @@ export default function MergeBlock() {
           </CardContent>
         </Card>
 
-        <ButtonGroup className="w-full">
+        <StepActions aria-label="Exact reconciliation actions">
           <ActionButton
-            className="flex-1"
             icon={<SkipForwardIcon />}
             onAction={() =>
               startStepTask(
@@ -1237,12 +1231,11 @@ export default function MergeBlock() {
                 },
               )
             }
+            variant="outline"
           >
             Preview without exact reconciliation
           </ActionButton>
-          <ButtonGroupSeparator />
           <ActionButton
-            className="flex-1"
             icon={<FileDiff />}
             onAction={() =>
               startStepTask("Generating cumulative preview with exact reconciliation", async () => {
@@ -1252,21 +1245,19 @@ export default function MergeBlock() {
           >
             Preview with exact reconciliation
           </ActionButton>
-        </ButtonGroup>
+        </StepActions>
       </Step>
 
       <Step step="create-intersections" title="Create intersections" guideId="intersections">
-        <ButtonGroup className="w-full">
+        <StepActions aria-label="Intersection actions">
           <ActionButton
-            className="flex-1"
             icon={<SkipForwardIcon />}
             onAction={async () => showVerifiedMergeResult()}
+            variant="outline"
           >
             Skip intersections and finish
           </ActionButton>
-          <ButtonGroupSeparator />
           <ActionButton
-            className="flex-1"
             icon={<FileDiff />}
             onAction={() =>
               startStepTask("Generating intersection preview", async () => {
@@ -1285,7 +1276,7 @@ export default function MergeBlock() {
           >
             Preview intersection changes
           </ActionButton>
-        </ButtonGroup>
+        </StepActions>
       </Step>
 
       <Step step="inspect-final-osm" title="Inspect final merged OSM" guideId="final">
@@ -1331,16 +1322,16 @@ export default function MergeBlock() {
               </Card>
             )}
 
-            <div className="flex flex-col gap-2">
-              <ActionButton icon={<DownloadIcon />} onAction={() => base.downloadOsm()}>
-                Download merged OSM PBF
-              </ActionButton>
+            <StepActions aria-label="Final merged OSM actions">
               {!base.isStored && base.canStore && (
-                <ActionButton icon={<SaveIcon />} onAction={base.saveToStorage}>
+                <ActionButton icon={<SaveIcon />} onAction={base.saveToStorage} variant="outline">
                   Save to storage
                 </ActionButton>
               )}
-            </div>
+              <ActionButton icon={<DownloadIcon />} onAction={() => base.downloadOsm()}>
+                Download merged OSM PBF
+              </ActionButton>
+            </StepActions>
           </>
         )}
       </Step>

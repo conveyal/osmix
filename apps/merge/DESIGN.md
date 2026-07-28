@@ -98,6 +98,8 @@ App-level helpers (`src/components/`):
   values visible.
 - `MergeStepGuide` — the standard layered explanation at the top of each
   numbered merge stage.
+- `StepActions` — the full-width vertical action footer for Merge workflow
+  stages. It keeps long decision labels contained in the narrow sidebar.
 - `ActionButton` — async button with spinner/transition handling.
 
 When to use what:
@@ -109,6 +111,20 @@ When to use what:
 - **Item/ItemGroup** for selectable list rows with actions (stored files,
   wizard options).
 - **Card** for titled sections in the sidebar blocks.
+
+### Merge step actions
+
+Use `StepActions` for navigation and processing choices at the bottom of a
+Merge workflow stage. Step footers remain vertical at every sidebar width:
+buttons fill the available width, labels may wrap, and long OSM terminology
+must not force horizontal scrolling.
+
+Place secondary actions first and the primary forward action last. Back, skip,
+and "without" alternatives use the outline variant; preview, continue, apply,
+and download actions use the default variant. Keep compact header actions,
+candidate toolbars, and other non-footer controls in their existing horizontal
+groups. Do not relax the global button primitive's single-line behavior to fix
+a workflow-footer layout.
 
 ## Merge workflow guidance
 

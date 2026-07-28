@@ -101,6 +101,56 @@ test("automatic merge progress advances completed, running, and remaining steps"
 });
 
 for (const width of [320, 512]) {
+  test(`workflow step actions remain contained at a ${width}px sidebar width`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const actionGroups = page.getByRole("group", { name: /step actions$/i });
+    await expect(actionGroups).toHaveCount(3);
+
+    for (const actionGroup of await actionGroups.all()) {
+      const measurements = await actionGroup.evaluate((group) => {
+        const groupBounds = group.getBoundingClientRect();
+        const buttons = [...group.querySelectorAll<HTMLElement>('[data-slot="button"]')];
+        const buttonBounds = buttons.map((button) => button.getBoundingClientRect());
+        return {
+          buttons: buttonBounds.map((bounds) => ({
+            bottom: bounds.bottom,
+            left: bounds.left,
+            right: bounds.right,
+            top: bounds.top,
+          })),
+          clientWidth: group.clientWidth,
+          groupLeft: groupBounds.left,
+          groupRight: groupBounds.right,
+          scrollWidth: group.scrollWidth,
+        };
+      });
+
+      expect(measurements.scrollWidth).toBeLessThanOrEqual(measurements.clientWidth);
+      expect(measurements.buttons).toHaveLength(2);
+      expect(measurements.buttons[0].left).toBeGreaterThanOrEqual(measurements.groupLeft);
+      expect(measurements.buttons[0].right).toBeLessThanOrEqual(measurements.groupRight);
+      expect(measurements.buttons[1].left).toBeGreaterThanOrEqual(measurements.groupLeft);
+      expect(measurements.buttons[1].right).toBeLessThanOrEqual(measurements.groupRight);
+      expect(measurements.buttons[1].top).toBeGreaterThan(measurements.buttons[0].bottom);
+    }
+
+    const reconciliationActions = page.getByRole("group", {
+      name: "Reconciliation step actions",
+    });
+    const secondaryAction = reconciliationActions.getByRole("button", {
+      name: "Preview without exact reconciliation",
+    });
+    const primaryAction = reconciliationActions.getByRole("button", {
+      name: "Preview with exact reconciliation",
+    });
+    await expect(secondaryAction).toHaveClass(/border/);
+    await expect(primaryAction).toHaveClass(/bg-primary/);
+    await secondaryAction.focus();
+    await expect(secondaryAction).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(primaryAction).toBeFocused();
+  });
+
   test(`guidance and diagrams remain contained at a ${width}px sidebar width`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
     const trigger = page.getByRole("button", { name: "How this step works" });
