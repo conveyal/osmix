@@ -4,7 +4,8 @@ Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PB
 
 ## Highlights
 
-- Load “base” and “patch” `.osm.pbf` files, preview differences, and step through merge tasks (direct merge, node/way deduplication, intersection creation).
+- Load authoritative base and imported patch `.osm.pbf` files, preview differences, and step through direct
+  merge, exact reconciliation, optional imported-data matching, and intersection creation.
 - Select Auto, Full, or View loading according to the dataset and available browser memory.
 - Visualize both datasets with raster previews produced on the worker thread plus interactive vector overlays for selected entities.
 - Inspect individual OSM files for possible duplicate entities without mutating the source data.
@@ -48,7 +49,8 @@ pnpm exec playwright install --with-deps   # first run
 pnpm run --filter @osmix/merge test:e2e
 ```
 
-Tests load sample fixtures from `fixtures/monaco.pbf` and exercise both Merge and Inspect flows.
+The worker harness loads `fixtures/monaco.pbf`; the guidance harness renders the real merge-step disclosure
+components and checks keyboard interaction, state isolation, and narrow-sidebar layout.
 
 ## Core workflow
 
@@ -68,28 +70,44 @@ projections, storage estimate, budgets, and selection reasons. Check System dist
 memory class from separately tested `ArrayBuffer` and `SharedArrayBuffer` ceilings; typed-array element counts
 are derived from those tested byte ceilings.
 
-When View omits the all-node index, merge, node/way deduplication, complete/smart extraction, routing, and
+When View omits the all-node index, merge, exact node/way reconciliation, complete/smart extraction, routing, and
 other all-node-dependent controls are disabled with an explanation and a **Reload using Full** action. Simple
 in-stream extraction remains available. The app does not build the large index synchronously on first use.
 
 ### Merge view (default route)
 
-1. **Select OSM PBF files** – Upload base + patch files and review metadata. The files stay local thanks to the File System Access API.
-2. **Review diagnostics** – The optional within-file scans report possible duplicate entities but never apply
-   them. Nearby roads can be intentionally separate because of topology, access, or grade separation.
-3. **Review changeset** – Merge steps run on the worker (`osm.worker.ts`) using `@osmix/core` and
-   `@osmix/change`. Logs stream into the sidebar while progress indicators update the UI.
-4. **Match imported data (optional)** – Discover nearby cross-dataset candidates, compare imported and base geometry on the map, and review ambiguous or routing-affecting matches.
-5. **Inspect intermediary results** – Toggle MapLibre vector overlays to compare base/patch rasters, click features to see details, and jump the map to selected entities.
-6. **Apply actions** – Merge same-ID entities, reconcile compatible matches across the two inputs, create
-   intersections, and download the resulting change list as JSON. Applying the final changes replaces the
-   in-memory base dataset.
+1. **Select merge inputs** – Choose `Base OSM — authoritative existing dataset` and
+   `Patch OSM — imported additions and updates`. Both files stay local. Select **Review each merge stage** for
+   previews and checkpoints or **Run automatic merge** to use the configured automatic path.
+2. **Review diagnostics** – Optional base and patch scans report possible within-file duplicates without
+   mutating either input. Nearby roads can be intentionally separate because of topology, access, or grade
+   separation.
+3. **Preview the direct merge** – Patch-only entities are added, same-ID patch updates take precedence, and
+   base-only entities remain. In the reviewed workflow this is a preview until the cumulative merge is
+   accepted.
+4. **Match imported data (optional)** – Discover nearby cross-dataset candidates. Property transfer copies
+   selected tags onto preserved base entities; network attachment rewrites only accepted references in
+   patch-created ways. Ambiguous and routing-affecting candidates remain reviewable.
+5. **Reconcile exact matches** – Combine compatible entities with different IDs only when coordinates or
+   ordered geometry agree at OSM precision. Base IDs are preserved and patch references are rewritten.
+6. **Create intersections** – Connect compatible same-grade crossings. Unsafe endpoint reuse, ambiguous
+   crossings, and grade-separated roads remain separate.
+7. **Inspect and download** – Compare the result on the map and download the merged PBF or change summary.
+   The result stays in memory until downloaded, and the original input files are never modified.
 
-The stepper resets selection state between actions, and you can jump backward or forward if you need to rerun a task.
+Each numbered stage includes a concise summary and a collapsed **How this step works** explanation of its
+inputs, possible changes, safety guarantees, and output. The stepper resets selection state between actions,
+and you can jump backward or forward if you need to rerun a task.
 In verified mode, the direct merge is first shown as a preview. The app then regenerates and applies one
 cumulative direct-merge plus optional reconciliation changeset from the untouched source inputs. Intersection
 changes are generated only after that merged base has been rebuilt and indexed, so newly added patch ways are
 included in the crossing scan.
+
+The automatic workflow skips diagnostic scans and intermediate checkpoints. Imported-data matching remains
+off unless configured explicitly; when enabled, automatic mode applies only high-confidence automatic
+candidates and reports unresolved candidates without accepting them. Once the first generated changeset is
+applied, cancellation cannot restore the prior in-memory workflow state, though the source files remain
+untouched and can be loaded again.
 
 ### Safe imported-data matching
 
@@ -121,7 +139,7 @@ active status filter, so the list returns to its first page after a successful a
 In verified mode, discovery happens against the untouched base and patch before either dataset is changed.
 The app then generates one cumulative direct, exact-reconciliation, and accepted-conflation changeset,
 reports CAR and WALK graph-count/component deltas, and applies it atomically. Intersection creation remains a
-separate final stage. **Run all steps** stays exact-only unless matching was explicitly enabled; when enabled,
+separate final stage. **Run automatic merge** stays exact-only unless matching was explicitly enabled; when enabled,
 it accepts only automatic candidates and reports unresolved counts without silently approving them. The
 enabled fast path uses the same session generation and CAR safety gate, applies the cumulative result, then
 creates intersections against that indexed base. The patch is cleared only after both stages and merged-file

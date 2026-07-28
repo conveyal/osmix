@@ -93,6 +93,8 @@ App-level helpers (`src/components/`):
   long worker tasks.
 - `Details`/`DetailsSummary`/`DetailsContent` — collapsible section; the
   standard way to make a titled, togglable region.
+- `MergeStepGuide` — the standard layered explanation at the top of each
+  numbered merge stage.
 - `ActionButton` — async button with spinner/transition handling.
 
 When to use what:
@@ -104,6 +106,67 @@ When to use what:
 - **Item/ItemGroup** for selectable list rows with actions (stored files,
   wizard options).
 - **Card** for titled sections in the sidebar blocks.
+
+## Merge workflow guidance
+
+Every merge stage must explain itself where the user makes the decision. Keep
+the explanation layered so that experienced users can scan the workflow while
+new users can inspect the consequences before applying anything:
+
+1. Show one plain-language summary at the top of the numbered step card, before
+   controls or results.
+2. Follow it with a collapsed **How this step works** disclosure using
+   `MergeStepGuide`. Do not duplicate these disclosures at individual call
+   sites; add or revise the app-private guide registry instead.
+3. In the expanded content, identify the inputs being read, changes that may
+   occur, invariants the step preserves, and its output. Include a warning only
+   when the user can make an irreversible or topology-affecting choice.
+4. Reset the disclosure when moving between steps. Opening help must never
+   change a form value, review decision, workflow state, or worker operation.
+
+Use the merge terms consistently:
+
+- **Base OSM** is the authoritative existing dataset whose identity and
+  untouched geometry are preserved unless a same-ID patch update explicitly
+  replaces them.
+- **Patch OSM** contains imported additions and updates.
+- **Direct merge** adds patch-only entities and applies same-ID updates.
+- **Exact reconciliation** combines different IDs only when their serialized
+  coordinates or ordered geometry and routing context agree.
+- **Imported-data matching** is the optional proximity workflow. **Property
+  transfer** copies only selected tag values; **network attachment** rewrites
+  only accepted references in patch-created ways.
+- **Intersection creation** connects compatible same-grade crossings while
+  leaving ambiguous and grade-separated crossings disconnected.
+- **Review each merge stage** exposes previews and checkpoints. **Run automatic
+  merge** skips those checkpoints and uses only behavior explicitly configured
+  for the automatic path.
+
+Labels must state what a control changes instead of relying on a placeholder.
+Put concise supporting text next to unfamiliar controls and connect it with
+`aria-describedby`. Humanize internal status and reason-code values in visible
+copy, but do not change the stable values used by workers or saved decisions.
+
+`Details` is the shared disclosure primitive. Its open-state styles target Base
+UI's `data-panel-open` attribute. Disclosure triggers remain keyboard
+accessible, and decorative chevrons are hidden from assistive technology.
+
+### Explanatory diagrams
+
+Use a compact SVG only when topology or data flow is materially clearer as a
+picture. Merge diagrams follow these constraints:
+
+- Provide a fixed `viewBox` and responsive `width: 100%`; never give the SVG a
+  fixed rendered width that can overflow the sidebar.
+- Give each diagram an accessible name and description with React
+  `useId()`-backed `<title>` and `<desc>` elements.
+- Use semantic foreground, muted, info, success, warning, destructive, and
+  border tokens. Never encode meaning by color alone: pair colors with labels,
+  shapes, or solid/dashed line styles.
+- Set connector strokes to `vector-effect="non-scaling-stroke"` so they remain
+  legible at narrow widths.
+- Avoid animation and `<foreignObject>`. SVG text must remain understandable at
+  both 320 px and 512 px sidebar widths.
 
 ## Loading, progress & status
 

@@ -29,13 +29,14 @@ import { ConflationRoutingDiagnostics } from "../components/conflation-routing-d
 import { Details, DetailsContent, DetailsSummary } from "../components/details";
 import EntityDetails from "../components/entity-details";
 import { FullIndexRequired, hasFullNodeIndex } from "../components/full-index-required";
+import { MergeStepGuide, type MergeStepGuideId } from "../components/merge-step-guide";
 import ChangesSummary, {
   ChangesExpandableList,
   ChangesFilters,
   ChangesPagination,
 } from "../components/osm-changes-summary";
 import OsmInfoTable from "../components/osm-info-table";
-import { LoadingState } from "../components/section";
+import { EmptyState, LoadingState } from "../components/section";
 import StoredOsmList from "../components/stored-osm-list";
 import TaskProgress from "../components/task-progress";
 import { Button } from "../components/ui/button";
@@ -53,7 +54,6 @@ import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
 import { toOsmConflationOptions, validateConflationForm } from "../lib/conflation-workflow";
 import {
-  type ChangesetReviewPurpose,
   completeMergeOptions,
   finalizeVerifiedMerge,
   INTERSECTION_OPTIONS,
@@ -100,7 +100,18 @@ const STEPS = [
 ] as const;
 
 const stepIndexAtom = atom<number>(0);
-const changesetReviewPurposeAtom = atom<ChangesetReviewPurpose>("apply");
+
+type ChangesetReviewContext =
+  | { kind: "base-diagnostic" }
+  | { kind: "patch-diagnostic" }
+  | { kind: "direct-preview" }
+  | { kind: "cumulative"; exactReconciliation: boolean }
+  | { kind: "intersections" };
+
+const changesetReviewContextAtom = atom<ChangesetReviewContext>({
+  kind: "cumulative",
+  exactReconciliation: true,
+});
 const CONFLATION_PAGE_SIZE = 10;
 const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
   const stepIndex = get(stepIndexAtom);
@@ -126,11 +137,62 @@ const makeMergedDownloadName = (baseName?: string | null, patchName?: string | n
   return `${combined.slice(0, 120)}.pbf`;
 };
 
+function reviewGuideId(context: ChangesetReviewContext): MergeStepGuideId {
+  switch (context.kind) {
+    case "base-diagnostic":
+      return "review-base-diagnostic";
+    case "patch-diagnostic":
+      return "review-patch-diagnostic";
+    case "direct-preview":
+      return "review-direct";
+    case "cumulative":
+      return context.exactReconciliation
+        ? "review-cumulative-exact"
+        : "review-cumulative-without-exact";
+    case "intersections":
+      return "review-intersections";
+  }
+}
+
+function reviewStepTitle(context: ChangesetReviewContext): string {
+  switch (context.kind) {
+    case "base-diagnostic":
+      return "Review base diagnostic";
+    case "patch-diagnostic":
+      return "Review patch diagnostic";
+    case "direct-preview":
+      return "Review direct merge";
+    case "cumulative":
+      return context.exactReconciliation
+        ? "Review cumulative merge"
+        : "Review merge without exact reconciliation";
+    case "intersections":
+      return "Review intersections";
+  }
+}
+
+function reviewChangesetTitle(context: ChangesetReviewContext): string {
+  switch (context.kind) {
+    case "base-diagnostic":
+      return "Base diagnostic candidates";
+    case "patch-diagnostic":
+      return "Patch diagnostic candidates";
+    case "direct-preview":
+      return "Direct-merge preview";
+    case "cumulative":
+      return context.exactReconciliation
+        ? "Cumulative merge changeset"
+        : "Merge changeset without exact reconciliation";
+    case "intersections":
+      return "Intersection changeset";
+  }
+}
+
 export default function MergeBlock() {
   const base = useOsmFile(BASE_OSM_KEY);
   const patch = useOsmFile(PATCH_OSM_KEY);
   const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom);
-  const [changesetReviewPurpose, setChangesetReviewPurpose] = useAtom(changesetReviewPurposeAtom);
+  const [changesetReviewContext, setChangesetReviewContext] = useAtom(changesetReviewContextAtom);
   const [conflationForm] = useAtom(conflationFormAtom);
   const [conflationSummary, setConflationSummary] = useAtom(conflationSummaryAtom);
   const [conflationCandidatePage, setConflationCandidatePage] = useAtom(
@@ -256,7 +318,7 @@ export default function MergeBlock() {
 
   const generateVerifiedChangeset = async (reconcile: boolean) => {
     if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-    setChangesetReviewPurpose("apply");
+    setChangesetReviewContext({ kind: "cumulative", exactReconciliation: reconcile });
     if (conflationOptions) {
       if (!conflationSummary) {
         throw Error("Discover and review imported-data match candidates first");
@@ -317,6 +379,10 @@ export default function MergeBlock() {
     if (!changesetStats) return true;
     return changesetStats.totalChanges === 0;
   }, [changesetStats]);
+  const isDiagnosticReview =
+    changesetReviewContext.kind === "base-diagnostic" ||
+    changesetReviewContext.kind === "patch-diagnostic";
+  const isDirectPreviewReview = changesetReviewContext.kind === "direct-preview";
 
   const baseNeedsFull = base.osmInfo !== null && !hasFullNodeIndex(base.osmInfo);
   const patchNeedsFull = patch.osmInfo !== null && !hasFullNodeIndex(patch.osmInfo);
@@ -331,29 +397,56 @@ export default function MergeBlock() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Step step="select-osm-pbf-files" title="Select OSM files">
+      <Step step="select-osm-pbf-files" title="Select merge inputs and options" guideId="select">
         <Card>
-          <CardHeader>Merge steps</CardHeader>
+          <CardHeader>Merge pipeline</CardHeader>
           <CardContent className="flex flex-col gap-2">
             <ol className="list-decimal list-inside">
-              <li>Inspect each input for possible internal duplicates</li>
-              <li>Merge patch OSM onto base OSM</li>
-              <li>Reconcile compatible nodes and ways across the two inputs</li>
-              <li>Create new intersections in merged data where ways cross</li>
+              <li>Optionally inspect each input for possible internal duplicates</li>
+              <li>Add patch entities and apply same-ID patch updates</li>
+              <li>Optionally match nearby imported entities</li>
+              <li>Optionally reconcile exact, compatible entities across the inputs</li>
+              <li>Create safe intersections where eligible ways cross</li>
+              <li>Validate topology before exposing the merged result</li>
             </ol>
             <p>
-              Internal duplicate scans are diagnostic only. The merge preserves both original
-              inputs, prioritizes same-ID patch entities, and only reconciles safe cross-dataset
-              matches.
+              The reviewed workflow pauses at diagnostic and changeset checkpoints. The automatic
+              workflow skips those checkpoints but uses the same safety validation.
             </p>
           </CardContent>
         </Card>
 
-        <ConflationConfig />
+        <Card>
+          <CardHeader>
+            <CardTitle>Base OSM — authoritative existing dataset</CardTitle>
+            {base.osm ? (
+              <CardAction>
+                <ActionButton
+                  icon={<DownloadIcon />}
+                  title="Download base OSM"
+                  onAction={base.downloadOsm}
+                  variant="ghost"
+                />
+              </CardAction>
+            ) : null}
+          </CardHeader>
+          <CardContent className="p-0">
+            {base.osm ? (
+              <OsmInfoTable
+                defaultOpen={false}
+                osm={base.osm}
+                file={base.file}
+                fileInfo={base.fileInfo}
+              />
+            ) : (
+              <EmptyState>Load the base OSM on the Inspect tab before merging.</EmptyState>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Select patch OSM to merge</CardTitle>
+            <CardTitle>Patch OSM — imported additions and updates</CardTitle>
             {patch.osm && (
               <CardAction>
                 <ButtonGroup>
@@ -427,6 +520,8 @@ export default function MergeBlock() {
           </CardContent>
         </Card>
 
+        <ConflationConfig />
+
         <div
           className={cn(
             "flex flex-col gap-4",
@@ -452,8 +547,10 @@ export default function MergeBlock() {
               <CheckCircle />
             </ItemMedia>
             <ItemContent>
-              <ItemTitle>Option 1: Verify each step</ItemTitle>
-              <ItemDescription>Review cumulative changes before applying them.</ItemDescription>
+              <ItemTitle>Review each merge stage</ItemTitle>
+              <ItemDescription>
+                Inspect diagnostics and approve each changeset before the in-memory base changes.
+              </ItemDescription>
             </ItemContent>
             <ItemActions>
               <ChevronRightIcon />
@@ -470,7 +567,7 @@ export default function MergeBlock() {
                   const abortController = new AbortController();
                   setMergeAbortController(abortController);
 
-                  const task = Log.startTask("Running all merge steps, please wait...");
+                  const task = Log.startTask("Running automatic merge, please wait...");
                   if (!base.osm) throw Error("Base OSM is not loaded");
                   if (!patch.osm) throw Error("Patch OSM is not loaded");
                   const baseOsmId = base.osm.id;
@@ -525,7 +622,7 @@ export default function MergeBlock() {
                       await base.setMergedOsm(result.generation.stats.osmId, mergedName);
                       setChangesetStats(null);
                       task.end(
-                        `All merge steps completed; intersections: ${changeStatsSummary(result.intersections)}`,
+                        `Automatic merge completed; intersections: ${changeStatsSummary(result.intersections)}`,
                       );
                       finalizeVerifiedMerge(
                         () => patch.setOsm(null),
@@ -539,9 +636,12 @@ export default function MergeBlock() {
                       completeMergeOptions(),
                     );
 
-                    // Check if cancelled before applying results
+                    // The worker merge is atomic and cannot stop mid-stage. If cancellation arrived
+                    // while it ran, do not present the completed result as an ordinary success.
                     if (abortController.signal.aborted) {
-                      task.end("Merge cancelled by user");
+                      task.end(
+                        "Cancellation was requested after the worker stage completed; reload the original inputs to restart",
+                      );
                       goToStep("select-osm-pbf-files");
                       return;
                     }
@@ -550,7 +650,7 @@ export default function MergeBlock() {
                     await base.setMergedOsm(merged.id, mergedName);
                     patch.setOsm(null);
 
-                    task.end("All merge steps completed");
+                    task.end("Automatic merge completed");
                     goToStep("inspect-final-osm");
                   } catch (error) {
                     if (conflationPipelineCompleted) {
@@ -558,7 +658,7 @@ export default function MergeBlock() {
                       try {
                         await base.setMergedOsm(baseOsmId, mergedName);
                         setChangesetStats(null);
-                        task.end("All merge steps completed after refreshing the merged dataset");
+                        task.end("Automatic merge completed after refreshing the merged dataset");
                         finalizeVerifiedMerge(
                           () => patch.setOsm(null),
                           () => goToStep("inspect-final-osm"),
@@ -627,8 +727,11 @@ export default function MergeBlock() {
               <FastForwardIcon />
             </ItemMedia>
             <ItemContent>
-              <ItemTitle>Option 2: Run all merge steps</ItemTitle>
-              <ItemDescription>Run without stopping for verification.</ItemDescription>
+              <ItemTitle>Run automatic merge</ItemTitle>
+              <ItemDescription>
+                Skip diagnostics and review screens; apply direct merge, exact reconciliation, safe
+                intersections, and only high-confidence fuzzy matches when enabled.
+              </ItemDescription>
             </ItemContent>
             <ItemActions>
               <ChevronRightIcon />
@@ -637,7 +740,7 @@ export default function MergeBlock() {
         </div>
       </Step>
 
-      <Step step="run-all-steps" title="Running all merge steps">
+      <Step step="run-all-steps" title="Merge in progress" guideId="run-all">
         <p>Monitor the activity log below for progress. This may take a few minutes to complete.</p>
         <TaskProgress />
         {mergeAbortController && (
@@ -650,21 +753,12 @@ export default function MergeBlock() {
             }}
           >
             <StopCircleIcon className="mr-2 h-4 w-4" />
-            Cancel Merge
+            Request cancellation
           </Button>
         )}
       </Step>
 
-      <Step step="inspect-base-osm" title="Inspect base OSM">
-        <p>
-          Scan the base file for possible duplicate entities inside this dataset. The results are
-          diagnostic only and cannot be applied from this workflow.
-        </p>
-        <p>
-          Nearby geometry alone is not enough to safely combine OSM entities because roads at
-          different layers, restrictions, and other topology may intentionally be close together.
-          Review any candidates in the next step; continuing leaves the base unchanged.
-        </p>
+      <Step step="inspect-base-osm" title="Inspect base OSM" guideId="inspect-base">
         <Card>
           <CardHeader>Base OSM PBF</CardHeader>
           <CardContent className="p-0">
@@ -682,7 +776,7 @@ export default function MergeBlock() {
           onAction={() =>
             startStepTask("Inspecting base OSM for duplicate entities", async () => {
               if (!base.osm) throw Error("Base OSM is not loaded");
-              setChangesetReviewPurpose("diagnostic");
+              setChangesetReviewContext({ kind: "base-diagnostic" });
               const changes = await osmWorker.generateChangeset(
                 base.osm.id,
                 base.osm.id,
@@ -697,12 +791,7 @@ export default function MergeBlock() {
         </ActionButton>
       </Step>
 
-      <Step step="inspect-patch-osm" title="Inspect patch OSM">
-        <p>
-          Scan the patch for possible internal duplicates. These candidates are for review only; the
-          patch is not normalized or otherwise changed before merging.
-        </p>
-
+      <Step step="inspect-patch-osm" title="Inspect patch OSM" guideId="inspect-patch">
         <Card>
           <CardHeader>Patch OSM PBF</CardHeader>
           <CardContent className="p-0">
@@ -720,7 +809,7 @@ export default function MergeBlock() {
           onAction={() =>
             startStepTask("Inspecting patch OSM for duplicate entities", async () => {
               if (!patch.osm) throw Error("Patch OSM is not loaded");
-              setChangesetReviewPurpose("diagnostic");
+              setChangesetReviewContext({ kind: "patch-diagnostic" });
               const patchChanges = await osmWorker.generateChangeset(
                 patch.osm.id,
                 patch.osm.id,
@@ -735,12 +824,7 @@ export default function MergeBlock() {
         </ActionButton>
       </Step>
 
-      <Step step="direct-merge" title="Direct merge">
-        <p>
-          Preview the patch entities that will be added to the base and the same-ID base features
-          they will replace. The uploaded inputs remain unchanged during this review.
-        </p>
-
+      <Step step="direct-merge" title="Direct merge" guideId="direct">
         <Card>
           <CardHeader>
             <CardTitle>Base OSM PBF</CardTitle>
@@ -791,9 +875,9 @@ export default function MergeBlock() {
             className="flex-1"
             icon={<FileDiff />}
             onAction={() =>
-              startStepTask("Generating changeset", async () => {
+              startStepTask("Generating direct-merge preview", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                setChangesetReviewPurpose("preview");
+                setChangesetReviewContext({ kind: "direct-preview" });
                 setConflationRoutingDiagnostics(null);
                 const results = await osmWorker.generateChangeset(
                   base.osm.id,
@@ -805,49 +889,22 @@ export default function MergeBlock() {
               })
             }
           >
-            Generate direct changes
+            Preview direct merge
           </ActionButton>
         </ButtonGroup>
       </Step>
 
-      <Step step="review-changeset" title="Review changeset">
-        {changesetReviewPurpose === "apply" ? (
-          <p>
-            Review the proposed edits produced in the previous step. Apply the changes to update the
-            base OSM before moving forward.
-          </p>
-        ) : changesetReviewPurpose === "diagnostic" ? (
-          <p>
-            Review these possible duplicates as diagnostics. They are not automatically safe to
-            merge, and continuing will leave the input file unchanged.
-          </p>
-        ) : (
-          <p>
-            Review this cumulative merge preview. Approving the step keeps the uploaded base
-            unchanged while the next preview is regenerated from the original base and patch.
-          </p>
-        )}
-        <ButtonGroup className="w-full">
-          <ActionButton className="flex-1" icon={<DownloadIcon />} onAction={downloadJsonChanges}>
-            Download JSON changes
-          </ActionButton>
-          <ButtonGroupSeparator />
-          <ActionButton
-            className="flex-1"
-            disabled
-            icon={<DownloadIcon />}
-            onAction={async () => {}}
-          >
-            Download .osc changes
-          </ActionButton>
-        </ButtonGroup>
+      <Step
+        step="review-changeset"
+        title={reviewStepTitle(changesetReviewContext)}
+        guideId={reviewGuideId(changesetReviewContext)}
+      >
+        <ActionButton icon={<DownloadIcon />} onAction={downloadJsonChanges}>
+          Download JSON changes
+        </ActionButton>
         {changesetStats && base.osm && (
           <Card>
-            <CardHeader>
-              {changesetReviewPurpose === "diagnostic"
-                ? "Diagnostic candidates"
-                : "Merge changeset"}
-            </CardHeader>
+            <CardHeader>{reviewChangesetTitle(changesetReviewContext)}</CardHeader>
             <CardContent className="p-0">
               <ChangesSummary />
               <Suspense fallback={<LoadingState />}>
@@ -867,7 +924,7 @@ export default function MergeBlock() {
           <ConflationRoutingDiagnostics diagnostics={conflationRoutingDiagnostics} />
         ) : null}
 
-        {changesetReviewPurpose === "diagnostic" ? (
+        {isDiagnosticReview ? (
           <ActionButton
             onAction={async () => {
               setChangesetStats(null);
@@ -877,7 +934,7 @@ export default function MergeBlock() {
           >
             Continue without applying
           </ActionButton>
-        ) : changesetReviewPurpose === "preview" ? (
+        ) : isDirectPreviewReview ? (
           <ActionButton
             onAction={async () => {
               setChangesetStats(null);
@@ -885,7 +942,7 @@ export default function MergeBlock() {
             }}
             icon={<ArrowRightIcon />}
           >
-            Approve step and continue
+            Continue to matching and reconciliation
           </ActionButton>
         ) : changesetStats == null || hasZeroChanges ? (
           <ActionButton
@@ -895,7 +952,9 @@ export default function MergeBlock() {
             }}
             icon={<ArrowRightIcon />}
           >
-            No changes, go to next step
+            {changesetReviewContext.kind === "intersections"
+              ? "No intersections, finish merge"
+              : "No changes, go to next step"}
           </ActionButton>
         ) : (
           <ActionButton
@@ -920,22 +979,14 @@ export default function MergeBlock() {
               })
             }
           >
-            Apply all changes
+            {changesetReviewContext.kind === "intersections"
+              ? "Apply intersections and finish"
+              : "Apply cumulative merge"}
           </ActionButton>
         )}
       </Step>
 
-      <Step step="match-imported-data" title="Match imported data">
-        <p>
-          Discover non-exact imported entities near the untouched base. Automatic matches must be
-          unique and structurally compatible; ambiguous or routing-affecting candidates stay here
-          for review.
-        </p>
-        <p>
-          The base IDs, geometry, way references, and relation membership remain authoritative.
-          Accepted network attachments rewrite only imported patch references.
-        </p>
-
+      <Step step="match-imported-data" title="Match imported data" guideId="match-imported">
         <ActionButton
           disabled={!base.osm || !patch.osm || !conflationOptions || isConflationFilterPending}
           icon={<SearchCodeIcon />}
@@ -998,18 +1049,12 @@ export default function MergeBlock() {
             icon={<ArrowRightIcon />}
             onAction={async () => nextStep()}
           >
-            Continue with reviewed matches
+            Continue with current decisions
           </ActionButton>
         </ButtonGroup>
       </Step>
 
-      <Step step="deduplicate-nodes" title="Reconcile matching entities">
-        <p>
-          Regenerate the direct merge from the untouched inputs, identify uniquely matching and
-          compatible patch entities in the base, then reconcile their references. Ambiguous
-          proximity matches and routing-critical tag conflicts are left unchanged.
-        </p>
-
+      <Step step="deduplicate-nodes" title="Reconcile matching entities" guideId="reconcile">
         <Card>
           <CardHeader>
             <CardTitle>Current OSM PBF</CardTitle>
@@ -1034,65 +1079,48 @@ export default function MergeBlock() {
             className="flex-1"
             icon={<SkipForwardIcon />}
             onAction={() =>
-              startStepTask("Preparing direct merge changeset", async () => {
-                return generateVerifiedChangeset(false);
-              })
+              startStepTask(
+                "Generating cumulative preview without exact reconciliation",
+                async () => {
+                  return generateVerifiedChangeset(false);
+                },
+              )
             }
           >
-            Skip reconciliation
+            Preview without exact reconciliation
           </ActionButton>
           <ButtonGroupSeparator />
           <ActionButton
             className="flex-1"
             icon={<FileDiff />}
             onAction={() =>
-              startStepTask("Reconciling matching nodes and ways", async () => {
+              startStepTask("Generating cumulative preview with exact reconciliation", async () => {
                 return generateVerifiedChangeset(true);
               })
             }
           >
-            Reconcile matching entities
+            Preview with exact reconciliation
           </ActionButton>
         </ButtonGroup>
       </Step>
 
-      <Step step="create-intersections" title="Create intersections">
-        <div className="flex flex-col gap-2">
-          <p>
-            Scan new ways for crossings with existing ways and flag the segments that should share
-            intersection nodes based on their tags.
-          </p>
-          <p>
-            We quickly search for nearby ways and keep only those whose tags allow an intersection:
-            both must be linear, include a `highway` tag, and have compatible layer, level, bridge,
-            tunnel, and covered context.
-          </p>
-          <p>
-            For each candidate we locate the precise crossover point. Existing nodes at that point
-            on either way are reused; otherwise we create a new node.
-          </p>
-          <p>
-            Finally, we update the way geometries so they reference the chosen intersection node.
-            You can review and apply those edits in the next screen.
-          </p>
-        </div>
-
+      <Step step="create-intersections" title="Create intersections" guideId="intersections">
         <ButtonGroup className="w-full">
           <ActionButton
             className="flex-1"
             icon={<SkipForwardIcon />}
             onAction={async () => showVerifiedMergeResult()}
           >
-            Skip
+            Skip intersections and finish
           </ActionButton>
           <ButtonGroupSeparator />
           <ActionButton
             className="flex-1"
             icon={<FileDiff />}
             onAction={() =>
-              startStepTask("Generating changeset", async () => {
+              startStepTask("Generating intersection preview", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                setChangesetReviewPurpose("apply");
+                setChangesetReviewContext({ kind: "intersections" });
                 setConflationRoutingDiagnostics(null);
                 const results = await osmWorker.generateChangeset(
                   base.osm.id,
@@ -1104,21 +1132,16 @@ export default function MergeBlock() {
               })
             }
           >
-            Create intersections
+            Preview intersection changes
           </ActionButton>
         </ButtonGroup>
       </Step>
 
-      <Step step="inspect-final-osm" title="Inspect final merged OSM">
-        <p>
-          Review the merged OSM dataset, explore the results on the map, and download the new PBF
-          when ready. Zoom in to inspect individual entities and confirm the applied changes.
-        </p>
-
+      <Step step="inspect-final-osm" title="Inspect final merged OSM" guideId="final">
         {base.osm && (
           <>
             <Card>
-              <CardHeader>New OSM PBF</CardHeader>
+              <CardHeader>Merged OSM — in-memory result</CardHeader>
               <CardContent className="p-0">
                 <OsmInfoTable
                   defaultOpen={false}
@@ -1177,11 +1200,13 @@ export default function MergeBlock() {
 function Step({
   step,
   title,
+  guideId,
   isTransitioning,
   children,
 }: {
   step: (typeof STEPS)[number];
   title: string;
+  guideId: MergeStepGuideId;
   isTransitioning?: boolean;
   children: React.ReactNode;
 }) {
@@ -1195,9 +1220,14 @@ function Step({
   return (
     <>
       <Card>
-        <CardHeader className="border-b-0">
-          {stepIndex + 1 - hiddenConflationStepBeforeCurrent}: {title}
+        <CardHeader>
+          {step === "run-all-steps"
+            ? `Automatic workflow: ${title}`
+            : `${stepIndex + 1 - hiddenConflationStepBeforeCurrent}: ${title}`}
         </CardHeader>
+        <CardContent className="p-0">
+          <MergeStepGuide guideId={guideId} />
+        </CardContent>
       </Card>
       {children}
     </>

@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { OsmChange } from "osmix";
 import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from "osmix";
 import { getEntityType, isNode, isRelation, isWay } from "osmix";
-import { useTransition } from "react";
+import { useId, useTransition } from "react";
 
 import { cn } from "../lib/utils";
 import {
@@ -34,41 +34,57 @@ export default function ChangesSummary() {
 
 function ChangesSummaryTable() {
   const summary = useAtomValue(changesetStatsAtom);
+  const reconciliationHelpId = useId();
   if (!summary || summary.totalChanges === 0) return <EmptyState>No changes found</EmptyState>;
   return (
-    <Table>
-      <TableBody>
-        <TableRow>
-          <TableCell>total changes</TableCell>
-          <TableCell>{summary.totalChanges.toLocaleString()}</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell>node changes</TableCell>
-          <TableCell>{summary.nodeChanges.toLocaleString()}</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell>way changes</TableCell>
-          <TableCell>{summary.wayChanges.toLocaleString()}</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell>relation changes</TableCell>
-          <TableCell>{summary.relationChanges.toLocaleString()}</TableCell>
-        </TableRow>
+    <>
+      <Table aria-describedby={reconciliationHelpId}>
+        <TableBody>
+          <TableRow>
+            <TableCell>Total changes</TableCell>
+            <TableCell>{summary.totalChanges.toLocaleString()}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell>Node changes</TableCell>
+            <TableCell>{summary.nodeChanges.toLocaleString()}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell>Way changes</TableCell>
+            <TableCell>{summary.wayChanges.toLocaleString()}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell>Relation changes</TableCell>
+            <TableCell>{summary.relationChanges.toLocaleString()}</TableCell>
+          </TableRow>
 
-        <TableRow>
-          <TableCell>deduplicated nodes</TableCell>
-          <TableCell>{summary.deduplicatedNodes.toLocaleString()}</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell>deduplicated nodes replaced</TableCell>
-          <TableCell>{summary.deduplicatedNodesReplaced.toLocaleString()}</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell>intersection points found</TableCell>
-          <TableCell>{summary.intersectionPointsFound.toLocaleString()}</TableCell>
-        </TableRow>
-      </TableBody>
-    </Table>
+          <TableRow>
+            <TableCell>Reconciled nodes</TableCell>
+            <TableCell>{summary.deduplicatedNodes.toLocaleString()}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell>Node references rewritten</TableCell>
+            <TableCell>{summary.deduplicatedNodesReplaced.toLocaleString()}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell>Reconciled ways</TableCell>
+            <TableCell>{summary.deduplicatedWays.toLocaleString()}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell>Intersection points found</TableCell>
+            <TableCell>{summary.intersectionPointsFound.toLocaleString()}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell>Intersection nodes created</TableCell>
+            <TableCell>{summary.intersectionNodesCreated.toLocaleString()}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+      <p className="border-t p-2 text-muted-foreground" id={reconciliationHelpId}>
+        Reconciliation resolves equivalent entities to one surviving entity instead of retaining
+        both. Node references rewritten counts way node references and relation node members changed
+        from a reconciled node ID to its surviving node ID.
+      </p>
+    </>
   );
 }
 
@@ -110,22 +126,28 @@ export function ChangesFilters() {
 
   return (
     <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 px-2 py-2">
-      {(["create", "modify", "delete"] as const).map((value) => (
-        <FilterCheckbox
-          key={value}
-          value={value}
-          filter={changeTypeFilter}
-          setFilter={setChangeTypeFilter}
-        />
-      ))}
-      {(["node", "way", "relation"] as const).map((value) => (
-        <FilterCheckbox
-          key={value}
-          value={value}
-          filter={entityTypeFilter}
-          setFilter={setEntityTypeFilter}
-        />
-      ))}
+      <fieldset className="flex flex-wrap items-center gap-2">
+        <legend className="font-bold">Change type</legend>
+        {(["create", "modify", "delete"] as const).map((value) => (
+          <FilterCheckbox
+            key={value}
+            value={value}
+            filter={changeTypeFilter}
+            setFilter={setChangeTypeFilter}
+          />
+        ))}
+      </fieldset>
+      <fieldset className="flex flex-wrap items-center gap-2">
+        <legend className="font-bold">Entity type</legend>
+        {(["node", "way", "relation"] as const).map((value) => (
+          <FilterCheckbox
+            key={value}
+            value={value}
+            filter={entityTypeFilter}
+            setFilter={setEntityTypeFilter}
+          />
+        ))}
+      </fieldset>
     </div>
   );
 }

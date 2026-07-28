@@ -37,7 +37,7 @@ import {
 } from "./ui/dialog";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "./ui/item";
 import { Spinner } from "./ui/spinner";
-import { Table, TableBody, TableCell, TableRow } from "./ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 
 const REASON_CODES = [
   "bearing-mismatch",
@@ -68,6 +68,68 @@ const STATUS_DOT: Record<OsmConflationEffectiveStatus, StatusDotStatus> = {
   review: "warn",
   unmatched: "error",
 };
+
+const STATUS_LABEL: Record<OsmConflationEffectiveStatus, string> = {
+  accepted: "Accepted",
+  automatic: "Automatic",
+  blocked: "Blocked",
+  rejected: "Rejected",
+  review: "Needs review",
+  unmatched: "Unmatched",
+};
+
+const STATUS_HELP: Record<OsmConflationEffectiveStatus, string> = {
+  accepted: "an explicit decision will apply the selected fuzzy action",
+  automatic: "at least one high-confidence action applies unless rejected",
+  blocked: "at least one action is prevented by a structural safety rule",
+  rejected: "fuzzy actions are disabled by an explicit decision",
+  review: "at least one action needs a decision; another action may already be automatic",
+  unmatched: "no compatible base target was found",
+};
+
+const REASON_LABEL: Record<OsmConflationReasonCode, string> = {
+  "bearing-mismatch": "Direction does not align",
+  "drivable-network": "Drivable network requires review",
+  "exact-match": "Handled by exact reconciliation",
+  "geometry-mismatch": "Geometry differs",
+  "grade-conflict": "Grade separation conflicts",
+  "length-mismatch": "Lengths differ",
+  "many-to-one": "Multiple imported entities share one base target",
+  "multiple-targets": "Multiple possible base targets",
+  "no-transferable-properties": "No selected properties differ",
+  "node-context-conflict": "Connected-way context conflicts",
+  "non-routing-target": "Base target is not routable",
+  "protected-tag": "Protected structural property differs",
+  "relation-member": "Entity participates in a relation",
+  "routing-family-conflict": "Routing uses are incompatible",
+  "routing-property": "Routing property requires review",
+  "same-id": "Handled as a same-ID update",
+  "unsupported-way-chain": "One-to-many way matching is unsupported",
+  "would-collapse-way": "Attachment would collapse a way",
+};
+
+const ROUTING_FAMILY_LABEL = {
+  "bicycle-shared": "Bicycle or shared-use",
+  "motor-road": "Motor road",
+  "non-routable": "Non-routable",
+  pedestrian: "Pedestrian",
+} as const;
+
+export function conflationStatusLabel(status: OsmConflationEffectiveStatus) {
+  return STATUS_LABEL[status];
+}
+
+export function conflationReasonLabel(reason: OsmConflationReasonCode) {
+  return REASON_LABEL[reason];
+}
+
+export function conflationCandidateTitle(candidate: OsmConflationCandidateView) {
+  const target =
+    candidate.targetId == null
+      ? "No compatible base target"
+      : `Base ${candidate.entityType} ${candidate.targetId}`;
+  return `Imported ${candidate.entityType} ${candidate.sourceId} → ${target}`;
+}
 
 export interface ConflationReviewProps {
   base: Osm;
@@ -123,12 +185,52 @@ function SummaryTable({ summary }: { summary: OsmConflationSummary }) {
           ["total", "accepted", "automatic", "review", "blocked", "unmatched", "rejected"] as const
         ).map((key) => (
           <TableRow key={key}>
-            <TableCell>{key}</TableCell>
+            <TableCell>{key === "total" ? "Total" : conflationStatusLabel(key)}</TableCell>
             <TableCell>{summary[key].toLocaleString()}</TableCell>
           </TableRow>
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+export function ConflationStatusLegend() {
+  return (
+    <div className="grid gap-1 border-t p-2 text-muted-foreground" id="conflation-status-help">
+      <p>
+        Overall status summarizes the candidate. Each row shows the independent property-transfer
+        and network-attachment assessments.
+      </p>
+      {(["automatic", "review", "blocked", "unmatched", "accepted", "rejected"] as const).map(
+        (status) => (
+          <p key={status}>
+            <span className="font-bold text-foreground">{conflationStatusLabel(status)}:</span>{" "}
+            {STATUS_HELP[status]}.
+          </p>
+        ),
+      )}
+    </div>
+  );
+}
+
+export function CandidateActionStatuses({ candidate }: { candidate: OsmConflationCandidateView }) {
+  return (
+    <div className="flex flex-wrap gap-x-3 text-muted-foreground" aria-label="Action statuses">
+      <span>
+        Property transfer:{" "}
+        <span className="font-bold text-foreground">
+          {conflationStatusLabel(candidate.propertyTransfer.status)}
+        </span>
+      </span>
+      {candidate.networkAttachment ? (
+        <span>
+          Network attachment:{" "}
+          <span className="font-bold text-foreground">
+            {conflationStatusLabel(candidate.networkAttachment.status)}
+          </span>
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -237,41 +339,60 @@ export function ConflationBulkActions({
   );
 }
 
-function CandidateEvidence({ candidate }: { candidate: OsmConflationCandidateView }) {
+export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandidateView }) {
   const { evidence } = candidate;
   return (
     <Details>
       <DetailsSummary>Evidence and property diff</DetailsSummary>
       <DetailsContent>
-        <Table>
+        <p className="p-2 text-muted-foreground" id={`conflation-evidence-help-${candidate.id}`}>
+          Distance finds nearby candidates. Routing families describe allowed network use; bearing
+          compares direction, length difference compares total geometry length, and maximum geometry
+          distance measures the worst sampled separation.
+        </p>
+        <Table aria-describedby={`conflation-evidence-help-${candidate.id}`}>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Evidence</TableHead>
+              <TableHead>Measured value</TableHead>
+            </TableRow>
+          </TableHeader>
           <TableBody>
             <TableRow>
-              <TableCell>distance</TableCell>
+              <TableCell>Candidate distance</TableCell>
               <TableCell>{evidence.distanceMeters.toFixed(3)} m</TableCell>
             </TableRow>
             <TableRow>
-              <TableCell>source routing</TableCell>
-              <TableCell>{evidence.sourceRoutingFamilies.join(", ") || "none"}</TableCell>
+              <TableCell>Imported routing family</TableCell>
+              <TableCell>
+                {evidence.sourceRoutingFamilies
+                  .map((family) => ROUTING_FAMILY_LABEL[family])
+                  .join(", ") || "None"}
+              </TableCell>
             </TableRow>
             <TableRow>
-              <TableCell>target routing</TableCell>
-              <TableCell>{evidence.targetRoutingFamilies.join(", ") || "none"}</TableCell>
+              <TableCell>Base routing family</TableCell>
+              <TableCell>
+                {evidence.targetRoutingFamilies
+                  .map((family) => ROUTING_FAMILY_LABEL[family])
+                  .join(", ") || "None"}
+              </TableCell>
             </TableRow>
             {evidence.bearingDifferenceDegrees !== undefined ? (
               <TableRow>
-                <TableCell>bearing difference</TableCell>
+                <TableCell>Bearing difference</TableCell>
                 <TableCell>{evidence.bearingDifferenceDegrees.toFixed(1)}°</TableCell>
               </TableRow>
             ) : null}
             {evidence.lengthDifferenceRatio !== undefined ? (
               <TableRow>
-                <TableCell>length difference</TableCell>
+                <TableCell>Length difference</TableCell>
                 <TableCell>{(evidence.lengthDifferenceRatio * 100).toFixed(1)}%</TableCell>
               </TableRow>
             ) : null}
             {evidence.maxGeometryDistanceMeters !== undefined ? (
               <TableRow>
-                <TableCell>maximum geometry distance</TableCell>
+                <TableCell>Maximum geometry distance</TableCell>
                 <TableCell>{evidence.maxGeometryDistanceMeters.toFixed(3)} m</TableCell>
               </TableRow>
             ) : null}
@@ -280,6 +401,13 @@ function CandidateEvidence({ candidate }: { candidate: OsmConflationCandidateVie
 
         {evidence.tagDiff.length > 0 ? (
           <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Property</TableHead>
+                <TableHead>Base value</TableHead>
+                <TableHead>Imported value</TableHead>
+              </TableRow>
+            </TableHeader>
             <TableBody>
               {evidence.tagDiff.map((diff) => (
                 <TableRow
@@ -291,7 +419,7 @@ function CandidateEvidence({ candidate }: { candidate: OsmConflationCandidateVie
                 >
                   <TableCell>{diff.key}</TableCell>
                   <TableCell>{String(diff.baseValue ?? "not set")}</TableCell>
-                  <TableCell>→ {String(diff.patchValue)}</TableCell>
+                  <TableCell>{String(diff.patchValue)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -304,7 +432,7 @@ function CandidateEvidence({ candidate }: { candidate: OsmConflationCandidateVie
   );
 }
 
-function CandidateActions({
+export function CandidateActions({
   candidate,
   onDecision,
 }: {
@@ -366,7 +494,7 @@ function CandidateActions({
             })
           }
         >
-          Use both
+          Transfer + attach
         </ActionButton>
       ) : null}
       <ActionButton
@@ -455,6 +583,7 @@ export function ConflationReview({
         <CardHeader>Candidate summary</CardHeader>
         <CardContent className="p-0">
           <SummaryTable summary={summary} />
+          <ConflationStatusLegend />
         </CardContent>
       </Card>
 
@@ -462,8 +591,9 @@ export function ConflationReview({
         <CardHeader>Candidate filters</CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <label className="flex items-center gap-1" htmlFor="conflation-status-filter">
-            Status
+            Match status
             <select
+              aria-describedby="conflation-status-help"
               id="conflation-status-filter"
               className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               disabled={isFilterPending}
@@ -473,19 +603,19 @@ export function ConflationReview({
                 void onFilterChange({ ...filter, status: status || undefined });
               }}
             >
-              <option value="">all</option>
+              <option value="">All statuses</option>
               {(
                 ["accepted", "automatic", "review", "blocked", "unmatched", "rejected"] as const
               ).map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {conflationStatusLabel(status)}
                 </option>
               ))}
             </select>
           </label>
 
           <label className="flex items-center gap-1" htmlFor="conflation-entity-filter">
-            Entity
+            Entity type
             <select
               id="conflation-entity-filter"
               className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
@@ -496,17 +626,20 @@ export function ConflationReview({
                 void onFilterChange({ ...filter, entityType: entityType || undefined });
               }}
             >
-              <option value="">all</option>
-              <option value="node">node</option>
-              <option value="way">way</option>
+              <option value="">All entity types</option>
+              <option value="node">Node</option>
+              <option value="way">Way</option>
             </select>
           </label>
 
-          <label className="flex items-center gap-1" htmlFor="conflation-reason-filter">
-            Reason
+          <label
+            className="flex w-full min-w-0 items-center gap-1"
+            htmlFor="conflation-reason-filter"
+          >
+            <span className="shrink-0">Match reason</span>
             <select
               id="conflation-reason-filter"
-              className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              className="h-7 min-w-0 max-w-full flex-1 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               disabled={isFilterPending}
               value={filter.reason ?? ""}
               onChange={(event) => {
@@ -514,10 +647,10 @@ export function ConflationReview({
                 void onFilterChange({ ...filter, reason: reason || undefined });
               }}
             >
-              <option value="">all</option>
+              <option value="">All reasons</option>
               {REASON_CODES.map((reason) => (
                 <option key={reason} value={reason}>
-                  {reason}
+                  {conflationReasonLabel(reason)}
                 </option>
               ))}
             </select>
@@ -549,22 +682,21 @@ export function ConflationReview({
                       <div className="flex items-start gap-2 p-2">
                         <StatusDot className="mt-1" status={STATUS_DOT[status]} />
                         <div className="min-w-0 flex-1">
-                          <ItemTitle>
-                            {candidate.entityType} {candidate.sourceId} →{" "}
-                            {candidate.targetId ?? "no target"}
-                          </ItemTitle>
+                          <ItemTitle>{conflationCandidateTitle(candidate)}</ItemTitle>
                           <ItemDescription>
-                            {status}; {candidate.evidence.distanceMeters.toFixed(3)} m
+                            {conflationStatusLabel(status)};{" "}
+                            {candidate.evidence.distanceMeters.toFixed(3)} m
                             {candidate.reasons.length > 0
-                              ? `; ${candidate.reasons.join(", ")}`
+                              ? `; ${candidate.reasons.map(conflationReasonLabel).join(", ")}`
                               : ""}
                           </ItemDescription>
+                          <CandidateActionStatuses candidate={candidate} />
                         </div>
                         <ItemActions>
                           <Button
                             size="icon-sm"
                             variant="ghost"
-                            title="Compare source and target on map"
+                            title="Compare imported entity and base target on map"
                             onClick={() => showCandidate(candidate)}
                           >
                             <LocateFixedIcon />
@@ -609,6 +741,10 @@ export function ConflationReview({
       <p className="text-muted-foreground">
         Map comparison: <span className="text-destructive">imported source</span> and{" "}
         <span className="text-info">base target</span>.
+      </p>
+      <p className="text-muted-foreground">
+        Rejecting a match disables its fuzzy property transfer and network attachment. It does not
+        remove the imported entity from the ordinary direct merge.
       </p>
     </div>
   );
