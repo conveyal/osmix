@@ -46,7 +46,14 @@ import { LoadingState } from "../components/section";
 import StoredOsmList from "../components/stored-osm-list";
 import { Button } from "../components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "../components/ui/button-group";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 import {
   Item,
   ItemActions,
@@ -193,6 +200,22 @@ function reviewChangesetTitle(context: ChangesetReviewContext): string {
   }
 }
 
+function OsmInputHeading({ fileName, title }: { fileName?: string; title: string }) {
+  return (
+    <div className="min-w-0 flex-1">
+      <CardTitle className="leading-tight">{title}</CardTitle>
+      {fileName ? (
+        <CardDescription
+          className="mt-1 truncate font-normal normal-case tracking-normal"
+          title={fileName}
+        >
+          {fileName}
+        </CardDescription>
+      ) : null}
+    </div>
+  );
+}
+
 export default function MergeBlock() {
   const base = useOsmFile(BASE_OSM_KEY);
   const patch = useOsmFile(PATCH_OSM_KEY);
@@ -269,6 +292,24 @@ export default function MergeBlock() {
   const conflationOptions = conflationValidationMessage
     ? undefined
     : toOsmConflationOptions(conflationForm);
+  const baseFileName = base.file?.name ?? base.fileInfo?.fileName;
+  const patchFileName = patch.file?.name ?? patch.fileInfo?.fileName;
+
+  const resetMergeDerivedState = () => {
+    setChangesetStats(null);
+    resetConflationReview();
+    selectEntity(null, null);
+  };
+
+  const clearBaseOsm = async () => {
+    resetMergeDerivedState();
+    await base.loadOsmFile(null);
+  };
+
+  const clearPatchOsm = async () => {
+    resetMergeDerivedState();
+    await patch.loadOsmFile(null);
+  };
 
   const loadConflationPage = async (page: number) => {
     if (!base.osm) throw Error("Base OSM is not loaded");
@@ -424,16 +465,27 @@ export default function MergeBlock() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Base OSM — authoritative existing dataset</CardTitle>
+          <CardHeader className="items-start">
+            <OsmInputHeading
+              fileName={baseFileName}
+              title="Base OSM — authoritative existing dataset"
+            />
             {base.osm ? (
               <CardAction>
-                <ActionButton
-                  icon={<DownloadIcon />}
-                  title="Download base OSM"
-                  onAction={base.downloadOsm}
-                  variant="ghost"
-                />
+                <ButtonGroup aria-label="Base OSM file actions">
+                  <ActionButton
+                    icon={<DownloadIcon />}
+                    title="Download base OSM"
+                    onAction={base.downloadOsm}
+                    variant="ghost"
+                  />
+                  <ActionButton
+                    icon={<XIcon />}
+                    title="Clear base OSM file"
+                    onAction={clearBaseOsm}
+                    variant="ghost"
+                  />
+                </ButtonGroup>
               </CardAction>
             ) : null}
           </CardHeader>
@@ -494,26 +546,25 @@ export default function MergeBlock() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Patch OSM — imported additions and updates</CardTitle>
+          <CardHeader className="items-start">
+            <OsmInputHeading
+              fileName={patchFileName}
+              title="Patch OSM — imported additions and updates"
+            />
             {patch.osm && (
               <CardAction>
-                <ButtonGroup>
-                  {!patch.isStored && patch.canStore && (
-                    <ActionButton
-                      icon={<SaveIcon />}
-                      title="Save to storage"
-                      variant="ghost"
-                      onAction={patch.saveToStorage}
-                    />
-                  )}
+                <ButtonGroup aria-label="Patch OSM file actions">
+                  <ActionButton
+                    icon={<DownloadIcon />}
+                    title="Download patch OSM"
+                    onAction={patch.downloadOsm}
+                    variant="ghost"
+                  />
                   <ActionButton
                     icon={<XIcon />}
                     title="Clear patch OSM file"
+                    onAction={clearPatchOsm}
                     variant="ghost"
-                    onAction={async () => {
-                      await patch.loadOsmFile(null);
-                    }}
                   />
                 </ButtonGroup>
               </CardAction>

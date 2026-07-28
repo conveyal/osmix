@@ -1,4 +1,13 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+
+async function loadFromUrl(card: Locator, page: Page, url: string) {
+  await card.getByRole("button", { name: "Open from URL" }).click();
+  await page.getByRole("textbox", { name: "URL" }).fill(url);
+  await page.getByRole("button", { name: "Download and open" }).click();
+  await expect(card.getByRole("button", { name: "File info" })).toBeVisible({
+    timeout: 120_000,
+  });
+}
 
 test("loads both inputs on Merge and skips optional diagnostic scans", async ({ page }) => {
   await page.goto("/");
@@ -16,22 +25,46 @@ test("loads both inputs on Merge and skips optional diagnostic scans", async ({ 
   await expect(baseCard.getByRole("button", { name: "Open from URL" })).toBeVisible();
   await expect(patchCard.getByRole("button", { name: "Open from URL" })).toBeVisible();
 
-  await baseCard.getByRole("button", { name: "Open from URL" }).click();
-  await page.getByRole("textbox", { name: "URL" }).fill("http://127.0.0.1:4173/monaco.pbf");
-  await page.getByRole("button", { name: "Download and open" }).click();
-
+  await loadFromUrl(baseCard, page, "http://127.0.0.1:4173/monaco.pbf");
+  await expect(baseCard.locator('[data-slot="card-description"]')).toHaveText("monaco.pbf");
+  await expect(baseCard.getByRole("button", { name: "Download base OSM" })).toBeVisible();
+  await expect(baseCard.getByRole("button", { name: "Clear base OSM file" })).toBeVisible();
   const fileInfo = baseCard.getByRole("button", { name: "File info" });
-  await expect(fileInfo).toBeVisible({
-    timeout: 120_000,
-  });
   await fileInfo.click();
+  await expect(baseCard.getByRole("row").filter({ hasText: "file name" })).toContainText(
+    "monaco.pbf",
+  );
   await expect(baseCard).toContainText("14,286");
-  await patchCard.getByRole("button", { name: "Open from URL" }).click();
-  await page.getByRole("textbox", { name: "URL" }).fill("http://127.0.0.1:4173/monaco.test.pbf");
-  await page.getByRole("button", { name: "Download and open" }).click();
-  await expect(patchCard.getByRole("button", { name: "File info" })).toBeVisible({
-    timeout: 120_000,
+
+  await loadFromUrl(patchCard, page, "http://127.0.0.1:4173/monaco.test.pbf");
+  await expect(patchCard.locator('[data-slot="card-description"]')).toHaveText("monaco.test.pbf");
+  await expect(patchCard.getByRole("button", { name: "Download patch OSM" })).toBeVisible();
+  await expect(patchCard.getByRole("button", { name: "Clear patch OSM file" })).toBeVisible();
+  await expect(patchCard.getByRole("button", { name: "Save to storage" })).toHaveCount(0);
+  await patchCard.getByRole("button", { name: "File info" }).click();
+  await expect(patchCard.getByRole("row").filter({ hasText: "file name" })).toContainText(
+    "monaco.test.pbf",
+  );
+
+  await page.setViewportSize({ width: 320, height: 720 });
+  await baseCard.locator('[data-slot="card-description"]').evaluate((element) => {
+    element.textContent =
+      "an-extremely-long-base-osm-filename-that-must-not-push-actions-outside-the-card.pbf";
   });
+  await expect
+    .poll(() => baseCard.evaluate((element) => element.scrollWidth <= element.clientWidth))
+    .toBe(true);
+
+  await baseCard.getByRole("button", { name: "Clear base OSM file" }).click();
+  await expect(baseCard.getByRole("button", { name: "Open from URL" })).toBeVisible();
+  await expect(baseCard.locator('[data-slot="card-description"]')).toHaveCount(0);
+  await loadFromUrl(baseCard, page, "http://127.0.0.1:4173/monaco.pbf");
+
+  await patchCard.getByRole("button", { name: "Clear patch OSM file" }).click();
+  await expect(patchCard.getByRole("button", { name: "Open from URL" })).toBeVisible();
+  await expect(patchCard.locator('[data-slot="card-description"]')).toHaveCount(0);
+  await loadFromUrl(patchCard, page, "http://127.0.0.1:4173/monaco.test.pbf");
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   await page.getByRole("button", { name: /Review each merge stage/ }).click();
   await expect(page.getByText(/2: Inspect base OSM/i)).toBeVisible();
