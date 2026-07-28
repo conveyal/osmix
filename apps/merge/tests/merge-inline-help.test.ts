@@ -99,11 +99,12 @@ describe("merge inline guidance", () => {
       createElement(CandidateActionStatuses, { candidate: CANDIDATE }),
     );
 
-    expect(legend).toContain("Needs review");
-    expect(legend).toContain("at least one action needs a decision");
-    expect(legend).toContain("another action may already be automatic");
+    expect(legend).toContain('aria-label="About candidate statuses"');
+    expect(legend).not.toContain("at least one action needs a decision");
     expect(conflationReasonLabel("would-collapse-way")).toBe("Attachment would collapse a way");
     expect(conflationCandidateTitle(CANDIDATE)).toBe("Imported node 11 → Base node 22");
+    expect(evidence).toContain('aria-label="About candidate evidence metrics"');
+    expect(evidence).not.toContain("Distance finds nearby candidates");
     expect(evidence).toContain("Imported routing family");
     expect(evidence).toContain("Base routing family");
     expect(evidence).toContain("Property");

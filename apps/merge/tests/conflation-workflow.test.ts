@@ -148,8 +148,9 @@ describe("conflation workflow configuration", () => {
       }),
     );
 
-    expect(html).toContain("every match in the current filters across all pages");
-    expect(html).toContain("Automatic matches already apply unless rejected");
+    expect(html).toContain("Bulk decisions");
+    expect(html).toContain('aria-label="About bulk decisions"');
+    expect(html).not.toContain("every match in the current filters across all pages");
     expect(html).toContain("Transfer properties (145)");
     expect(html).toContain("Attach network (12)");
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Reject filtered \(0\)<\/button>/);

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import "../src/main.css";
+import { InfoTooltip } from "../src/components/info-tooltip";
 import { MergeStepGuide } from "../src/components/merge-step-guide";
 
 interface HarnessState {
@@ -26,6 +27,12 @@ function GuidanceHarness() {
     <main className="w-full max-w-[512px] p-2" data-testid="guidance-sidebar">
       <section className="min-w-0 overflow-hidden border bg-card p-2">
         <MergeStepGuide guideId="direct" />
+        <div className="mt-2 flex items-center gap-1">
+          Candidate statuses
+          <InfoTooltip label="About candidate statuses" side="bottom" align="start">
+            Automatic matches apply unless rejected. Review matches need a decision.
+          </InfoTooltip>
+        </div>
 
         <label className="mt-2 flex min-w-0 flex-col gap-1" htmlFor="property-keys">
           OSM tag keys to transfer
