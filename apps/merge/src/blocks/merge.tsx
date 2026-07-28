@@ -24,10 +24,10 @@ import { Suspense, useMemo, useState } from "react";
 
 import ActionButton from "../components/action-button";
 import {
-  AutomaticMergeProgress,
   type AutomaticMergeProgressState,
   CONFLATION_AUTOMATIC_MERGE_STEPS,
   EXACT_AUTOMATIC_MERGE_STEPS,
+  LiveAutomaticMergeProgress,
 } from "../components/automatic-merge-progress";
 import { ConflationConfig } from "../components/conflation-config";
 import { ConflationReview } from "../components/conflation-review";
@@ -44,7 +44,6 @@ import ChangesSummary, {
 import OsmInfoTable from "../components/osm-info-table";
 import { LoadingState } from "../components/section";
 import StoredOsmList from "../components/stored-osm-list";
-import TaskProgress from "../components/task-progress";
 import { Button } from "../components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "../components/ui/button-group";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -813,8 +812,7 @@ export default function MergeBlock() {
 
       <Step step="run-all-steps" title="Merge in progress" guideId="run-all">
         <p>The active step may take a few minutes. Detailed worker messages remain in the log.</p>
-        {automaticMergeProgress ? <AutomaticMergeProgress {...automaticMergeProgress} /> : null}
-        <TaskProgress />
+        {automaticMergeProgress ? <LiveAutomaticMergeProgress {...automaticMergeProgress} /> : null}
         {mergeAbortController && (
           <Button
             variant="destructive"

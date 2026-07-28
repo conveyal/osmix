@@ -1,5 +1,7 @@
 import { CheckIcon, CircleIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
+import { useLog } from "../hooks/log";
 import { cn } from "../lib/utils";
 import { Spinner } from "./ui/spinner";
 
@@ -55,7 +57,22 @@ export interface AutomaticMergeProgressState {
   steps: readonly AutomaticMergeStep[];
 }
 
-export function AutomaticMergeProgress({ currentStepId, steps }: AutomaticMergeProgressState) {
+function formatElapsed(ms: number) {
+  const totalSeconds = Math.floor(ms / 1_000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+export function AutomaticMergeProgress({
+  currentStepId,
+  elapsedMs = 0,
+  latestMessage,
+  steps,
+}: AutomaticMergeProgressState & {
+  elapsedMs?: number;
+  latestMessage?: string;
+}) {
   const currentIndex = steps.findIndex((step) => step.id === currentStepId);
   if (currentIndex === -1) {
     throw Error(`Unknown automatic merge step: ${currentStepId}`);
@@ -66,7 +83,12 @@ export function AutomaticMergeProgress({ currentStepId, steps }: AutomaticMergeP
 
   return (
     <div className="rounded-md border bg-card">
-      <div className="border-b px-2 py-1.5 font-bold uppercase tracking-wide">Merge progress</div>
+      <div className="flex items-center justify-between gap-2 border-b px-2 py-1.5 font-bold uppercase tracking-wide">
+        <span>Merge progress</span>
+        <span className="shrink-0 tabular-nums" data-slot="automatic-merge-elapsed">
+          {formatElapsed(Math.max(0, elapsedMs))}
+        </span>
+      </div>
       <p className="sr-only" role="status" aria-live="polite">
         {currentStep.label} is running. {completedCount} of {steps.length} steps completed.
       </p>
@@ -85,7 +107,7 @@ export function AutomaticMergeProgress({ currentStepId, steps }: AutomaticMergeP
               data-status={status}
               key={step.id}
             >
-              <span className="flex size-4 items-center justify-center">
+              <span className="flex size-4 items-center justify-center self-start">
                 {status === "completed" ? (
                   <CheckIcon aria-hidden="true" className="size-4 text-success" />
                 ) : status === "running" ? (
@@ -94,7 +116,7 @@ export function AutomaticMergeProgress({ currentStepId, steps }: AutomaticMergeP
                   <CircleIcon aria-hidden="true" className="size-3" />
                 )}
               </span>
-              <span className={cn("min-w-0", status === "running" && "font-bold")}>
+              <span className={cn("min-w-0 leading-4", status === "running" && "font-bold")}>
                 {step.label}
               </span>
               <span className="text-[0.65rem] uppercase tracking-wide">
@@ -104,10 +126,36 @@ export function AutomaticMergeProgress({ currentStepId, steps }: AutomaticMergeP
                     ? "Running"
                     : "Remaining"}
               </span>
+              {status === "running" && latestMessage ? (
+                <p
+                  className="col-span-2 col-start-2 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground"
+                  data-slot="automatic-merge-latest-message"
+                  title={latestMessage}
+                >
+                  {latestMessage}
+                </p>
+              ) : null}
             </li>
           );
         })}
       </ol>
     </div>
   );
+}
+
+export function LiveAutomaticMergeProgress(props: AutomaticMergeProgressState) {
+  const { activeTasks, log, taskStartedAt } = useLog();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (taskStartedAt == null) return;
+    setNow(Date.now());
+    const interval = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(interval);
+  }, [taskStartedAt]);
+
+  const latestMessage = activeTasks > 0 ? log[log.length - 1]?.message : undefined;
+  const elapsedMs = taskStartedAt == null ? 0 : Math.max(0, now - taskStartedAt);
+
+  return <AutomaticMergeProgress {...props} elapsedMs={elapsedMs} latestMessage={latestMessage} />;
 }

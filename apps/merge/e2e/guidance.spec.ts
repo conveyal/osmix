@@ -77,10 +77,15 @@ test("automatic merge progress advances completed, running, and remaining steps"
 }) => {
   const progress = page.getByRole("list", { name: "Automatic merge progress" });
 
+  await expect(page.locator('[data-slot="automatic-merge-elapsed"]')).toHaveText("9:42");
+  await expect(page.getByRole("progressbar")).toHaveCount(0);
   await expect(progress.locator('[data-status="completed"]')).toHaveCount(0);
   await expect(progress.locator('[data-status="running"]')).toContainText(
     "Discover imported-data matches",
   );
+  await expect(
+    progress.locator('[data-status="running"] [data-slot="automatic-merge-latest-message"]'),
+  ).toContainText("Worker message for Discover imported-data matches");
   await expect(progress.locator('[data-status="remaining"]')).toHaveCount(4);
 
   await page.getByRole("button", { name: "Advance automatic merge" }).click();
@@ -89,6 +94,9 @@ test("automatic merge progress advances completed, running, and remaining steps"
   await expect(progress.locator('[data-status="running"]')).toContainText(
     "Generate and validate merge changes",
   );
+  await expect(
+    progress.locator('[data-status="running"] [data-slot="automatic-merge-latest-message"]'),
+  ).toContainText("Worker message for Generate and validate merge changes");
   await expect(page.getByRole("status")).toContainText("1 of 5 steps completed");
 });
 

@@ -42,6 +42,8 @@ function GuidanceHarness() {
         <div className="mt-2">
           <AutomaticMergeProgress
             currentStepId={CONFLATION_AUTOMATIC_MERGE_STEPS[automaticStepIndex].id}
+            elapsedMs={582_000}
+            latestMessage={`Worker message for ${CONFLATION_AUTOMATIC_MERGE_STEPS[automaticStepIndex].label}`}
             steps={CONFLATION_AUTOMATIC_MERGE_STEPS}
           />
           <button

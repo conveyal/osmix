@@ -29,6 +29,8 @@ describe("automatic merge progress", () => {
     const html = renderToStaticMarkup(
       createElement(AutomaticMergeProgress, {
         currentStepId: "apply-verified-merge",
+        elapsedMs: 582_000,
+        latestMessage: "Applying verified imported-data changes",
         steps: CONFLATION_AUTOMATIC_MERGE_STEPS,
       }),
     );
@@ -38,5 +40,8 @@ describe("automatic merge progress", () => {
     expect(html.match(/data-status="remaining"/g)).toHaveLength(2);
     expect(html).toContain("Apply verified merge changes is running");
     expect(html).toContain("2 of 5 steps completed");
+    expect(html).toContain("9:42");
+    expect(html).toContain("Applying verified imported-data changes");
+    expect(html).not.toContain('role="progressbar"');
   });
 });
