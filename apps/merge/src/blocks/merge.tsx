@@ -23,6 +23,12 @@ import {
 import { Suspense, useMemo, useState } from "react";
 
 import ActionButton from "../components/action-button";
+import {
+  AutomaticMergeProgress,
+  type AutomaticMergeProgressState,
+  CONFLATION_AUTOMATIC_MERGE_STEPS,
+  EXACT_AUTOMATIC_MERGE_STEPS,
+} from "../components/automatic-merge-progress";
 import { ConflationConfig } from "../components/conflation-config";
 import { ConflationReview } from "../components/conflation-review";
 import { ConflationRoutingDiagnostics } from "../components/conflation-routing-diagnostics";
@@ -36,7 +42,7 @@ import ChangesSummary, {
   ChangesPagination,
 } from "../components/osm-changes-summary";
 import OsmInfoTable from "../components/osm-info-table";
-import { EmptyState, LoadingState } from "../components/section";
+import { LoadingState } from "../components/section";
 import StoredOsmList from "../components/stored-osm-list";
 import TaskProgress from "../components/task-progress";
 import { Button } from "../components/ui/button";
@@ -205,6 +211,8 @@ export default function MergeBlock() {
     conflationCandidateFilterAtom,
   );
   const [isConflationFilterPending, setIsConflationFilterPending] = useState(false);
+  const [automaticMergeProgress, setAutomaticMergeProgress] =
+    useState<AutomaticMergeProgressState | null>(null);
   const setConflationDecisions = useSetAtom(conflationDecisionsAtom);
   const [conflationRoutingDiagnostics, setConflationRoutingDiagnostics] = useAtom(
     conflationRoutingDiagnosticsAtom,
@@ -431,15 +439,57 @@ export default function MergeBlock() {
             ) : null}
           </CardHeader>
           <CardContent className="p-0">
-            {base.osm ? (
+            {!base.osm ? (
+              <StoredOsmList
+                osmKey={BASE_OSM_KEY}
+                loadFailure={base.loadFailure}
+                onDismissLoadFailure={base.clearLoadFailure}
+                onReloadView={base.reloadWithViewProfile}
+                openOsmPbfUrl={async (url) => {
+                  const abortController = new AbortController();
+                  setLoadingState({
+                    controller: abortController,
+                    osmKey: BASE_OSM_KEY,
+                  });
+                  setChangesetStats(null);
+                  resetConflationReview();
+                  selectEntity(null, null);
+                  try {
+                    const osmInfo = await base.loadOsmPbfUrl(url, abortController.signal);
+                    if (osmInfo) flyToOsmBounds(osmInfo);
+                    return osmInfo;
+                  } finally {
+                    setLoadingState(null);
+                  }
+                }}
+                openOsmFile={async (file, fileType) => {
+                  const abortController = new AbortController();
+                  setLoadingState({
+                    controller: abortController,
+                    osmKey: BASE_OSM_KEY,
+                  });
+                  setChangesetStats(null);
+                  resetConflationReview();
+                  selectEntity(null, null);
+                  try {
+                    const osmInfo =
+                      typeof file === "string"
+                        ? await base.loadFromStorage(file, abortController.signal)
+                        : await base.loadOsmFile(file, fileType, abortController.signal);
+                    if (osmInfo) flyToOsmBounds(osmInfo);
+                    return osmInfo;
+                  } finally {
+                    setLoadingState(null);
+                  }
+                }}
+              />
+            ) : (
               <OsmInfoTable
                 defaultOpen={false}
                 osm={base.osm}
                 file={base.file}
                 fileInfo={base.fileInfo}
               />
-            ) : (
-              <EmptyState>Load the base OSM on the Inspect tab before merging.</EmptyState>
             )}
           </CardContent>
         </Card>
@@ -562,6 +612,13 @@ export default function MergeBlock() {
                 type="button"
                 disabled={!base.osm || !patch.osm || Boolean(conflationValidationMessage)}
                 onClick={async () => {
+                  const automaticSteps = conflationOptions
+                    ? CONFLATION_AUTOMATIC_MERGE_STEPS
+                    : EXACT_AUTOMATIC_MERGE_STEPS;
+                  setAutomaticMergeProgress({
+                    currentStepId: automaticSteps[0].id,
+                    steps: automaticSteps,
+                  });
                   goToStep("run-all-steps");
 
                   const abortController = new AbortController();
@@ -607,6 +664,11 @@ export default function MergeBlock() {
                             `Verified imported-data changes: ${changeStatsSummary(generation.stats)}`,
                           );
                         },
+                        onStageChange: (currentStepId) => {
+                          setAutomaticMergeProgress((current) =>
+                            current ? { ...current, currentStepId } : current,
+                          );
+                        },
                         patchOsmId,
                         worker: osmWorker,
                       });
@@ -619,6 +681,9 @@ export default function MergeBlock() {
                       }
 
                       conflationPipelineCompleted = true;
+                      setAutomaticMergeProgress((current) =>
+                        current ? { ...current, currentStepId: "refresh-result" } : current,
+                      );
                       await base.setMergedOsm(result.generation.stats.osmId, mergedName);
                       setChangesetStats(null);
                       task.end(
@@ -630,6 +695,9 @@ export default function MergeBlock() {
                       );
                       return;
                     }
+                    setAutomaticMergeProgress((current) =>
+                      current ? { ...current, currentStepId: "merge-exact" } : current,
+                    );
                     const merged = await osmWorker.merge(
                       baseOsmId,
                       patchOsmId,
@@ -647,6 +715,9 @@ export default function MergeBlock() {
                     }
 
                     // Use setMergedOsm to properly update file info for the new merged result
+                    setAutomaticMergeProgress((current) =>
+                      current ? { ...current, currentStepId: "refresh-result" } : current,
+                    );
                     await base.setMergedOsm(merged.id, mergedName);
                     patch.setOsm(null);
 
@@ -741,7 +812,8 @@ export default function MergeBlock() {
       </Step>
 
       <Step step="run-all-steps" title="Merge in progress" guideId="run-all">
-        <p>Monitor the activity log below for progress. This may take a few minutes to complete.</p>
+        <p>The active step may take a few minutes. Detailed worker messages remain in the log.</p>
+        {automaticMergeProgress ? <AutomaticMergeProgress {...automaticMergeProgress} /> : null}
         <TaskProgress />
         {mergeAbortController && (
           <Button

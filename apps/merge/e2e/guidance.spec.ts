@@ -72,6 +72,26 @@ test("info tooltips reveal long guidance on hover and keyboard activation", asyn
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
 });
 
+test("automatic merge progress advances completed, running, and remaining steps", async ({
+  page,
+}) => {
+  const progress = page.getByRole("list", { name: "Automatic merge progress" });
+
+  await expect(progress.locator('[data-status="completed"]')).toHaveCount(0);
+  await expect(progress.locator('[data-status="running"]')).toContainText(
+    "Discover imported-data matches",
+  );
+  await expect(progress.locator('[data-status="remaining"]')).toHaveCount(4);
+
+  await page.getByRole("button", { name: "Advance automatic merge" }).click();
+
+  await expect(progress.locator('[data-status="completed"]')).toHaveCount(1);
+  await expect(progress.locator('[data-status="running"]')).toContainText(
+    "Generate and validate merge changes",
+  );
+  await expect(page.getByRole("status")).toContainText("1 of 5 steps completed");
+});
+
 for (const width of [320, 512]) {
   test(`guidance and diagrams remain contained at a ${width}px sidebar width`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });

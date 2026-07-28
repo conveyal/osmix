@@ -86,9 +86,16 @@ interface RunConflationAllStepsOptions {
   onBaseApplied?: () => void;
   onDiscovered?: (summary: OsmConflationSummary) => void;
   onGenerated?: (result: OsmConflationGenerationResult) => void;
+  onStageChange?: (stage: ConflationRunAllStage) => void;
   patchOsmId: string;
   worker: ConflationRunAllWorker;
 }
+
+export type ConflationRunAllStage =
+  | "apply-verified-merge"
+  | "create-intersections"
+  | "discover-imported-data"
+  | "generate-verified-merge";
 
 export type RunConflationAllStepsResult =
   | {
@@ -116,13 +123,16 @@ export async function runConflationAllSteps({
   onBaseApplied,
   onDiscovered,
   onGenerated,
+  onStageChange,
   patchOsmId,
   worker,
 }: RunConflationAllStepsOptions): Promise<RunConflationAllStepsResult> {
+  onStageChange?.("discover-imported-data");
   const summary = await worker.discoverConflation(baseOsmId, patchOsmId, conflation);
   onDiscovered?.(summary);
   if (isCancelled()) return { generation: null, status: "cancelled", summary };
 
+  onStageChange?.("generate-verified-merge");
   const generation = await worker.generateConflationChangeset(
     baseOsmId,
     verifiedBaseMergeOptions(true),
@@ -132,9 +142,11 @@ export async function runConflationAllSteps({
 
   // This is the first irreversible stage. After it succeeds, finish or explicitly
   // expose the intersection retry state instead of pretending cancellation rolled back.
+  onStageChange?.("apply-verified-merge");
   await worker.applyChangesAndReplace(generation.stats.osmId);
   onBaseApplied?.();
 
+  onStageChange?.("create-intersections");
   const intersections = await worker.generateChangeset(baseOsmId, patchOsmId, INTERSECTION_OPTIONS);
   await worker.applyChangesAndReplace(intersections.osmId);
 

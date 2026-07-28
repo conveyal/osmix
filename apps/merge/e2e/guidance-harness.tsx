@@ -2,6 +2,10 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import "../src/main.css";
+import {
+  AutomaticMergeProgress,
+  CONFLATION_AUTOMATIC_MERGE_STEPS,
+} from "../src/components/automatic-merge-progress";
 import { InfoTooltip } from "../src/components/info-tooltip";
 import { MergeStepGuide } from "../src/components/merge-step-guide";
 
@@ -22,6 +26,7 @@ const harnessState: HarnessState = {
 function GuidanceHarness() {
   const [propertyKeys, setPropertyKeys] = useState(harnessState.propertyKeys);
   const [workerCalls, setWorkerCalls] = useState(harnessState.workerCalls);
+  const [automaticStepIndex, setAutomaticStepIndex] = useState(0);
 
   return (
     <main className="w-full max-w-[512px] p-2" data-testid="guidance-sidebar">
@@ -32,6 +37,24 @@ function GuidanceHarness() {
           <InfoTooltip label="About candidate statuses" side="bottom" align="start">
             Automatic matches apply unless rejected. Review matches need a decision.
           </InfoTooltip>
+        </div>
+
+        <div className="mt-2">
+          <AutomaticMergeProgress
+            currentStepId={CONFLATION_AUTOMATIC_MERGE_STEPS[automaticStepIndex].id}
+            steps={CONFLATION_AUTOMATIC_MERGE_STEPS}
+          />
+          <button
+            className="mt-2 border p-1"
+            type="button"
+            onClick={() => {
+              setAutomaticStepIndex((current) =>
+                Math.min(current + 1, CONFLATION_AUTOMATIC_MERGE_STEPS.length - 1),
+              );
+            }}
+          >
+            Advance automatic merge
+          </button>
         </div>
 
         <label className="mt-2 flex min-w-0 flex-col gap-1" htmlFor="property-keys">
