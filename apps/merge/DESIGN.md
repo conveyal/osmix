@@ -93,6 +93,9 @@ App-level helpers (`src/components/`):
   long worker tasks.
 - `Details`/`DetailsSummary`/`DetailsContent` — collapsible section; the
   standard way to make a titled, togglable region.
+- `InfoTooltip` — moves optional explanatory prose behind a compact,
+  keyboard-accessible information trigger. Keep essential labels and current
+  values visible.
 - `MergeStepGuide` — the standard layered explanation at the top of each
   numbered merge stage.
 - `ActionButton` — async button with spinner/transition handling.

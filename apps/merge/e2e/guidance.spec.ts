@@ -51,6 +51,27 @@ test("opening help leaves merge inputs, decisions, workflow state, and worker ca
   expect(await readState()).toEqual(before);
 });
 
+test("info tooltips reveal long guidance on hover and keyboard activation", async ({ page }) => {
+  const trigger = page.getByRole("button", { name: "About candidate statuses" });
+  const tooltip = page.locator('[data-slot="info-tooltip-content"]');
+
+  await expect(tooltip).toBeHidden();
+  await trigger.hover();
+  await expect(tooltip).toContainText("Automatic matches apply unless rejected");
+
+  await page.mouse.move(0, 0);
+  await expect(tooltip).toBeHidden();
+
+  await trigger.focus();
+  await trigger.press("Enter");
+  await expect(tooltip).toBeVisible();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+  await page.keyboard.press("Escape");
+  await expect(tooltip).toBeHidden();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+});
+
 for (const width of [320, 512]) {
   test(`guidance and diagrams remain contained at a ${width}px sidebar width`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });

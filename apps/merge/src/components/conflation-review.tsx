@@ -22,6 +22,7 @@ import { cn } from "../lib/utils";
 import { conflationComparisonAtom } from "../state/conflation";
 import ActionButton from "./action-button";
 import { Details, DetailsContent, DetailsSummary } from "./details";
+import { InfoTooltip } from "./info-tooltip";
 import { EmptyState } from "./section";
 import { StatusDot, type StatusDotStatus } from "./status-dot";
 import { Button } from "./ui/button";
@@ -196,20 +197,22 @@ function SummaryTable({ summary }: { summary: OsmConflationSummary }) {
 
 export function ConflationStatusLegend() {
   return (
-    <div className="grid gap-1 border-t p-2 text-muted-foreground" id="conflation-status-help">
-      <p>
-        Overall status summarizes the candidate. Each row shows the independent property-transfer
-        and network-attachment assessments.
-      </p>
-      {(["automatic", "review", "blocked", "unmatched", "accepted", "rejected"] as const).map(
-        (status) => (
-          <p key={status}>
-            <span className="font-bold text-foreground">{conflationStatusLabel(status)}:</span>{" "}
-            {STATUS_HELP[status]}.
-          </p>
-        ),
-      )}
-    </div>
+    <InfoTooltip label="About candidate statuses" side="bottom" align="end">
+      <div className="grid gap-1">
+        <p>
+          Overall status summarizes the candidate. Property transfer and network attachment are
+          assessed independently.
+        </p>
+        {(["automatic", "review", "blocked", "unmatched", "accepted", "rejected"] as const).map(
+          (status) => (
+            <p key={status}>
+              <span className="font-bold">{conflationStatusLabel(status)}:</span>{" "}
+              {STATUS_HELP[status]}.
+            </p>
+          ),
+        )}
+      </div>
+    </InfoTooltip>
   );
 }
 
@@ -278,10 +281,13 @@ export function ConflationBulkActions({
   return (
     <>
       <div className="flex flex-col gap-2 border-b bg-muted/50 p-2">
-        <p className="text-muted-foreground">
-          Bulk decisions apply to every match in the current filters across all pages. Automatic
-          matches already apply unless rejected.
-        </p>
+        <div className="flex items-center gap-1 font-bold uppercase tracking-wide">
+          Bulk decisions
+          <InfoTooltip label="About bulk decisions" side="right" align="start">
+            Bulk decisions apply to every match in the current filters across all pages. Automatic
+            matches already apply unless rejected.
+          </InfoTooltip>
+        </div>
         <div className="flex flex-wrap gap-1">
           {BULK_ACTIONS.map((action) => {
             const preview = bulkActions[action];
@@ -345,15 +351,19 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
     <Details>
       <DetailsSummary>Evidence and property diff</DetailsSummary>
       <DetailsContent>
-        <p className="p-2 text-muted-foreground" id={`conflation-evidence-help-${candidate.id}`}>
-          Distance finds nearby candidates. Routing families describe allowed network use; bearing
-          compares direction, length difference compares total geometry length, and maximum geometry
-          distance measures the worst sampled separation.
-        </p>
-        <Table aria-describedby={`conflation-evidence-help-${candidate.id}`}>
+        <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Evidence</TableHead>
+              <TableHead>
+                <span className="flex items-center gap-1">
+                  Evidence
+                  <InfoTooltip label="About candidate evidence metrics" side="right" align="start">
+                    Distance finds nearby candidates. Routing families describe allowed network use;
+                    bearing compares direction, length difference compares total geometry length,
+                    and maximum geometry distance measures the worst sampled separation.
+                  </InfoTooltip>
+                </span>
+              </TableHead>
               <TableHead>Measured value</TableHead>
             </TableRow>
           </TableHeader>
@@ -580,10 +590,14 @@ export function ConflationReview({
   return (
     <div className="flex flex-col gap-2">
       <Card>
-        <CardHeader>Candidate summary</CardHeader>
+        <CardHeader>
+          Candidate summary
+          <CardAction>
+            <ConflationStatusLegend />
+          </CardAction>
+        </CardHeader>
         <CardContent className="p-0">
           <SummaryTable summary={summary} />
-          <ConflationStatusLegend />
         </CardContent>
       </Card>
 
@@ -593,7 +607,6 @@ export function ConflationReview({
           <label className="flex items-center gap-1" htmlFor="conflation-status-filter">
             Match status
             <select
-              aria-describedby="conflation-status-help"
               id="conflation-status-filter"
               className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               disabled={isFilterPending}
@@ -738,14 +751,22 @@ export function ConflationReview({
         </Button>
       </ButtonGroup>
 
-      <p className="text-muted-foreground">
-        Map comparison: <span className="text-destructive">imported source</span> and{" "}
-        <span className="text-info">base target</span>.
-      </p>
-      <p className="text-muted-foreground">
-        Rejecting a match disables its fuzzy property transfer and network attachment. It does not
-        remove the imported entity from the ordinary direct merge.
-      </p>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+        <span className="flex items-center gap-1">
+          Map comparison
+          <InfoTooltip label="About map comparison colors" side="top" align="start">
+            The imported source is shown in destructive red and the proposed base target in
+            informational blue.
+          </InfoTooltip>
+        </span>
+        <span className="flex items-center gap-1">
+          Reject behavior
+          <InfoTooltip label="About rejecting a match" side="top" align="start">
+            Rejecting disables fuzzy property transfer and network attachment. It does not remove
+            the imported entity from the ordinary direct merge.
+          </InfoTooltip>
+        </span>
+      </div>
     </div>
   );
 }
