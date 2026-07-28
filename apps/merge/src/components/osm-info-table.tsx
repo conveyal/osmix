@@ -19,7 +19,9 @@ export default function OsmInfoTable({
   /** Alternative to file - used when loading from storage */
   fileInfo?: StoredFileInfo | null;
 }) {
-  // Get file name and size from either file or fileInfo
+  // Local files retain their browser-provided name. Stored and URL-loaded files
+  // use the metadata captured when the worker registered the dataset.
+  const fileName = file?.name ?? fileInfo?.fileName;
   const fileSize = file?.size ?? fileInfo?.fileSize;
 
   if (!osm || (!file && !fileInfo)) return null;
@@ -37,6 +39,12 @@ export default function OsmInfoTable({
       <DetailsContent className="overflow-auto">
         <Table>
           <TableBody>
+            {fileName ? (
+              <TableRow>
+                <TableCell>file name</TableCell>
+                <TableCell>{fileName}</TableCell>
+              </TableRow>
+            ) : null}
             {fileSize != null && (
               <TableRow>
                 <TableCell>size</TableCell>

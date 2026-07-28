@@ -142,6 +142,7 @@ export function useOsmFile(osmKey: string) {
       setFile(file);
       sourceUrlRef.current = null;
       setOsm(null);
+      setOsmInfo(null);
       setFileInfo(null);
       setIsStored(false);
       setLoadFailure(null);
