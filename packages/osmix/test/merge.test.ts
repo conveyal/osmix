@@ -122,7 +122,10 @@ describe("merge osm", () => {
         },
       });
     },
-    30_000,
+    // This optional integration fixture loads and indexes nearly one million
+    // entities before creating intersections. Keep enough headroom for a full
+    // workspace run where other Vitest projects compete for CPU and memory.
+    120_000,
   );
 
   it.skip("should merge seattle with deduplication", async () => {
