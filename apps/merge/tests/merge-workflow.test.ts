@@ -121,6 +121,7 @@ describe("merge workflow policy", () => {
 
   it("runs enabled run-all through session generation before intersections", async () => {
     const calls: string[] = [];
+    const stages: string[] = [];
     const intersections = changesetStats("base", 2);
     const conflation = {
       propertyKeys: ["name"],
@@ -150,6 +151,7 @@ describe("merge workflow policy", () => {
       baseOsmId: "base",
       conflation,
       isCancelled: () => false,
+      onStageChange: (stage) => stages.push(stage),
       patchOsmId: "patch",
       worker,
     });
@@ -166,6 +168,12 @@ describe("merge workflow policy", () => {
       "apply",
       "generate-intersections",
       "apply",
+    ]);
+    expect(stages).toEqual([
+      "discover-imported-data",
+      "generate-verified-merge",
+      "apply-verified-merge",
+      "create-intersections",
     ]);
     expect(worker.discoverConflation).toHaveBeenCalledWith("base", "patch", conflation);
     expect(worker.generateConflationChangeset).toHaveBeenCalledWith(
