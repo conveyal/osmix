@@ -18,7 +18,7 @@ catalog:
   "@types/geojson": ^7946.0.16
   "@types/node": ^24
   dequal: ^2.0.3
-  maplibre-gl: ^5.24.0
+  maplibre-gl: ^6.0.0
   pbf: ^5.1.0
   typescript: ^7
   vite: ^8.1.3
