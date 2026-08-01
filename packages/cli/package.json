@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@opentui/core": "^0.4.3",
+    "@opentui/core": "^0.4.5",
     "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/shortbread": "workspace:*",
