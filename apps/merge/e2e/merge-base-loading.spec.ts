@@ -19,9 +19,6 @@ async function loadPbf(card: Locator, page: Page, path: string) {
 }
 
 const MONACO_PBF = fileURLToPath(new URL("../../../fixtures/monaco.pbf", import.meta.url));
-const MONACO_TEST_PBF = fileURLToPath(
-  new URL("../../../fixtures/monaco.test.pbf", import.meta.url),
-);
 
 test("loads both inputs once and reaches exact reconciliation", async ({ page }) => {
   // Keep this worker-backed journey to one load per input. Input-card actions,
@@ -62,14 +59,16 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   );
   await expect(baseCard).toContainText("14,286");
 
-  await loadPbf(patchCard, page, MONACO_TEST_PBF);
-  await expect(patchCard.locator('[data-slot="card-description"]')).toHaveText("monaco.test.pbf");
+  // Use the one Monaco PBF tracked by Git for both roles. The guidance harness
+  // covers distinct displayed filenames without depending on local-only files.
+  await loadPbf(patchCard, page, MONACO_PBF);
+  await expect(patchCard.locator('[data-slot="card-description"]')).toHaveText("monaco.pbf");
   await expect(patchCard.getByRole("button", { name: "Download patch OSM" })).toBeVisible();
   await expect(patchCard.getByRole("button", { name: "Clear patch OSM file" })).toBeVisible();
   await expect(patchCard.getByRole("button", { name: "Save to storage" })).toHaveCount(0);
   await patchCard.getByRole("button", { name: "File info" }).click();
   await expect(patchCard.getByRole("row").filter({ hasText: "file name" })).toContainText(
-    "monaco.test.pbf",
+    "monaco.pbf",
   );
 
   await page.getByRole("button", { name: /Review each merge stage/ }).click();
