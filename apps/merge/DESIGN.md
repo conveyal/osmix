@@ -197,11 +197,12 @@ harness.
 
 Use that harness for responsive geometry, long-label and long-filename
 containment, accessible control names, and controlled action-state transitions.
-Worker lifecycle and restart tests run after Merge UI tests so their intensive
-Web Worker activity cannot compete with MapLibre rendering or PBF parsing on a
-small CI runner. The Playwright app server uses one worker for the real Merge
-journey; the dedicated worker-runtime project retains single-worker,
-multi-worker, replication, recovery, and disposal coverage.
+Run the real Merge journey, guidance harness, and worker-runtime coverage as
+ordered Playwright projects. This prevents additional Chromium contexts or
+intensive Web Worker activity from competing with MapLibre rendering and PBF
+parsing on a small CI runner. The real journey uses one app worker; the
+dedicated worker-runtime project retains single-worker, multi-worker,
+replication, recovery, and disposal coverage.
 
 ## Loading, progress & status
 

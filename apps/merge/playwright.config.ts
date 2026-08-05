@@ -15,15 +15,23 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "merge-ui",
-      testMatch: ["guidance.spec.ts", "merge-base-loading.spec.ts"],
+      name: "merge-integration",
+      testMatch: ["merge-base-loading.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
     {
-      // Worker restart and multi-worker tests deliberately run after the UI
-      // tests so they cannot starve MapLibre or PBF parsing on small CI runners.
+      // Keep even the lightweight browser harness off the runner while the real
+      // Merge journey is parsing PBFs and rendering MapLibre.
+      name: "guidance",
+      dependencies: ["merge-integration"],
+      testMatch: ["guidance.spec.ts"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // Worker restart and multi-worker tests run last so their nested workers
+      // cannot starve either UI project on small CI runners.
       name: "worker-runtime",
-      dependencies: ["merge-ui"],
+      dependencies: ["guidance"],
       testMatch: ["worker-runtime.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
