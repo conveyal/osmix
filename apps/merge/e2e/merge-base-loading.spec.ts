@@ -1,19 +1,42 @@
+import { fileURLToPath } from "node:url";
+
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-async function loadFromUrl(card: Locator, page: Page, url: string) {
-  await card.getByRole("button", { name: "Open from URL" }).click();
-  await page.getByRole("textbox", { name: "URL" }).fill(url);
-  await page.getByRole("button", { name: "Download and open" }).click();
-  await expect(card.getByRole("button", { name: "File info" })).toBeVisible({
+async function loadPbf(card: Locator, page: Page, path: string) {
+  await card.getByRole("button", { name: "Open file" }).click();
+  const fileChooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("menuitem", { name: /^OSM PBF/ }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(path);
+  const fileInfo = card.getByRole("button", { name: "File info" });
+  const loadFailure = card.getByRole("alert");
+  await expect(fileInfo.or(loadFailure)).toBeVisible({
     timeout: 120_000,
   });
+  if (await loadFailure.isVisible()) {
+    throw new Error(`OSM load failed: ${await loadFailure.innerText()}`);
+  }
 }
+
+const MONACO_PBF = fileURLToPath(new URL("../../../fixtures/monaco.pbf", import.meta.url));
+const MONACO_TEST_PBF = fileURLToPath(
+  new URL("../../../fixtures/monaco.test.pbf", import.meta.url),
+);
 
 test("loads both inputs once and reaches exact reconciliation", async ({ page }) => {
   // Keep this worker-backed journey to one load per input. Input-card actions,
   // clearing, and responsive geometry run against the production header in the
   // guidance harness instead of repeating PBF parsing and MapLibre resizing here.
+  // Multi-worker replication has dedicated coverage in worker-runtime.spec.ts;
+  // keeping this UI journey to one app worker avoids duplicating both inputs.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "hardwareConcurrency", {
+      configurable: true,
+      get: () => 1,
+    });
+  });
   await page.goto("/");
+  await expect.poll(() => page.evaluate(() => window.osmWorker.workerCount)).toBe(1);
   await page.getByRole("tab", { name: "Merge" }).click();
 
   const baseCard = page
@@ -25,10 +48,10 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
     .filter({ hasText: "Patch OSM — imported additions and updates" })
     .first();
 
-  await expect(baseCard.getByRole("button", { name: "Open from URL" })).toBeVisible();
-  await expect(patchCard.getByRole("button", { name: "Open from URL" })).toBeVisible();
+  await expect(baseCard.getByRole("button", { name: "Open file" })).toBeVisible();
+  await expect(patchCard.getByRole("button", { name: "Open file" })).toBeVisible();
 
-  await loadFromUrl(baseCard, page, "http://127.0.0.1:4173/monaco.pbf");
+  await loadPbf(baseCard, page, MONACO_PBF);
   await expect(baseCard.locator('[data-slot="card-description"]')).toHaveText("monaco.pbf");
   await expect(baseCard.getByRole("button", { name: "Download base OSM" })).toBeVisible();
   await expect(baseCard.getByRole("button", { name: "Clear base OSM file" })).toBeVisible();
@@ -39,7 +62,7 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   );
   await expect(baseCard).toContainText("14,286");
 
-  await loadFromUrl(patchCard, page, "http://127.0.0.1:4173/monaco.test.pbf");
+  await loadPbf(patchCard, page, MONACO_TEST_PBF);
   await expect(patchCard.locator('[data-slot="card-description"]')).toHaveText("monaco.test.pbf");
   await expect(patchCard.getByRole("button", { name: "Download patch OSM" })).toBeVisible();
   await expect(patchCard.getByRole("button", { name: "Clear patch OSM file" })).toBeVisible();
