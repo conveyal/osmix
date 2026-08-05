@@ -36,7 +36,7 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
     });
   });
   await page.goto("/");
-  await expect.poll(() => page.evaluate(() => window.osmWorker.workerCount)).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.osmWorker?.workerCount ?? 0)).toBe(1);
   await page.getByRole("tab", { name: "Merge" }).click();
 
   const baseCard = page
