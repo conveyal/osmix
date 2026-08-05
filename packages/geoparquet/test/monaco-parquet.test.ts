@@ -1,7 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 
 import { getFixturePath } from "@osmix/test-utils/fixtures";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { fromGeoParquet, GeoParquetOsmBuilder } from "../src";
 
@@ -22,11 +22,25 @@ import { fromGeoParquet, GeoParquetOsmBuilder } from "../src";
 
 describe("@osmix/geoparquet: Monaco highways fixture", () => {
   const fixturePath = () => getFixturePath("monaco.parquet");
-  const readFixture = async (): Promise<ArrayBuffer> => {
-    const buffer = await readFile(fixturePath());
-    return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+  let fixturePromise: Promise<ArrayBuffer> | undefined;
+  let osmPromise: ReturnType<typeof fromGeoParquet> | undefined;
+  const readFixture = (): Promise<ArrayBuffer> => {
+    fixturePromise ??= readFile(fixturePath()).then((buffer) =>
+      buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+    );
+    return fixturePromise;
   };
-  const getOsm = async () => fromGeoParquet(await readFixture());
+  const getOsm = () => {
+    osmPromise ??= readFixture().then((fixture) => fromGeoParquet(fixture));
+    return osmPromise;
+  };
+
+  // Conversion is the expensive integration boundary and the resulting OSM is
+  // read-only in this suite. Build it once instead of repeating the same 5,308-
+  // feature conversion in every behavioral assertion.
+  beforeAll(async () => {
+    await getOsm();
+  });
 
   it("should load the monaco.parquet fixture", async () => {
     const { size } = await stat(fixturePath());
