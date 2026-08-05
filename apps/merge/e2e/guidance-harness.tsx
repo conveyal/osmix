@@ -8,11 +8,21 @@ import {
 } from "../src/components/automatic-merge-progress";
 import { InfoTooltip } from "../src/components/info-tooltip";
 import { MergeStepGuide } from "../src/components/merge-step-guide";
+import { OsmInputCardHeader } from "../src/components/osm-input-card-header";
 import { StepActions } from "../src/components/step-actions";
 import { Button } from "../src/components/ui/button";
+import { Card, CardContent } from "../src/components/ui/card";
+
+interface InputHarnessState {
+  baseDownloads: number;
+  baseLoaded: boolean;
+  patchDownloads: number;
+  patchLoaded: boolean;
+}
 
 interface HarnessState {
   decision: string;
+  inputs: InputHarnessState;
   propertyKeys: string;
   workerCalls: number;
   workflowStep: string;
@@ -20,6 +30,12 @@ interface HarnessState {
 
 const harnessState: HarnessState = {
   decision: "pending",
+  inputs: {
+    baseDownloads: 0,
+    baseLoaded: true,
+    patchDownloads: 0,
+    patchLoaded: true,
+  },
   propertyKeys: "name surface kerb",
   workerCalls: 0,
   workflowStep: "direct",
@@ -29,9 +45,69 @@ function GuidanceHarness() {
   const [propertyKeys, setPropertyKeys] = useState(harnessState.propertyKeys);
   const [workerCalls, setWorkerCalls] = useState(harnessState.workerCalls);
   const [automaticStepIndex, setAutomaticStepIndex] = useState(0);
+  const [inputs, setInputs] = useState(harnessState.inputs);
+  const updateInputs = (update: (current: InputHarnessState) => InputHarnessState) => {
+    setInputs((current) => {
+      const next = update(current);
+      harnessState.inputs = next;
+      return next;
+    });
+  };
 
   return (
     <main className="w-full max-w-[512px] p-2" data-testid="guidance-sidebar">
+      <section className="mb-2 flex min-w-0 flex-col gap-2" data-testid="input-card-harness">
+        <Card>
+          <OsmInputCardHeader
+            fileName={
+              inputs.baseLoaded
+                ? "an-extremely-long-base-osm-filename-that-must-not-push-actions-outside-the-card.pbf"
+                : undefined
+            }
+            kind="base"
+            loaded={inputs.baseLoaded}
+            onClear={async () => {
+              updateInputs((current) => ({ ...current, baseLoaded: false }));
+            }}
+            onDownload={async () => {
+              updateInputs((current) => ({
+                ...current,
+                baseDownloads: current.baseDownloads + 1,
+              }));
+            }}
+            title="Base OSM — authoritative existing dataset"
+          />
+          {inputs.baseLoaded ? null : (
+            <CardContent>
+              <Button>Open base OSM</Button>
+            </CardContent>
+          )}
+        </Card>
+
+        <Card>
+          <OsmInputCardHeader
+            fileName={inputs.patchLoaded ? "monaco.test.pbf" : undefined}
+            kind="patch"
+            loaded={inputs.patchLoaded}
+            onClear={async () => {
+              updateInputs((current) => ({ ...current, patchLoaded: false }));
+            }}
+            onDownload={async () => {
+              updateInputs((current) => ({
+                ...current,
+                patchDownloads: current.patchDownloads + 1,
+              }));
+            }}
+            title="Patch OSM — imported additions and updates"
+          />
+          {inputs.patchLoaded ? null : (
+            <CardContent>
+              <Button>Open patch OSM</Button>
+            </CardContent>
+          )}
+        </Card>
+      </section>
+
       <section className="min-w-0 overflow-hidden border bg-card p-2">
         <MergeStepGuide guideId="direct" />
         <div className="mt-2 flex items-center gap-1">
@@ -112,7 +188,7 @@ function GuidanceHarness() {
 }
 
 window.guidanceHarness = {
-  readState: () => ({ ...harnessState }),
+  readState: () => ({ ...harnessState, inputs: { ...harnessState.inputs } }),
 };
 
 createRoot(document.getElementById("root")!).render(<GuidanceHarness />);

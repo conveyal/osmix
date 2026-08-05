@@ -13,7 +13,6 @@ import {
   SearchCodeIcon,
   SkipForwardIcon,
   StopCircleIcon,
-  XIcon,
 } from "lucide-react";
 import {
   changeStatsSummary,
@@ -42,19 +41,12 @@ import ChangesSummary, {
   ChangesPagination,
 } from "../components/osm-changes-summary";
 import OsmInfoTable from "../components/osm-info-table";
+import { OsmInputCardHeader } from "../components/osm-input-card-header";
 import { LoadingState } from "../components/section";
 import { StepActions } from "../components/step-actions";
 import StoredOsmList from "../components/stored-osm-list";
 import { Button } from "../components/ui/button";
-import { ButtonGroup } from "../components/ui/button-group";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import {
   Item,
   ItemActions,
@@ -199,22 +191,6 @@ function reviewChangesetTitle(context: ChangesetReviewContext): string {
     case "intersections":
       return "Intersection changeset";
   }
-}
-
-function OsmInputHeading({ fileName, title }: { fileName?: string; title: string }) {
-  return (
-    <div className="min-w-0 flex-1">
-      <CardTitle className="leading-tight">{title}</CardTitle>
-      {fileName ? (
-        <CardDescription
-          className="mt-1 truncate font-normal normal-case tracking-normal"
-          title={fileName}
-        >
-          {fileName}
-        </CardDescription>
-      ) : null}
-    </div>
-  );
 }
 
 export default function MergeBlock() {
@@ -466,30 +442,14 @@ export default function MergeBlock() {
         </Card>
 
         <Card>
-          <CardHeader className="items-start">
-            <OsmInputHeading
-              fileName={baseFileName}
-              title="Base OSM — authoritative existing dataset"
-            />
-            {base.osm ? (
-              <CardAction>
-                <ButtonGroup aria-label="Base OSM file actions">
-                  <ActionButton
-                    icon={<DownloadIcon />}
-                    title="Download base OSM"
-                    onAction={base.downloadOsm}
-                    variant="ghost"
-                  />
-                  <ActionButton
-                    icon={<XIcon />}
-                    title="Clear base OSM file"
-                    onAction={clearBaseOsm}
-                    variant="ghost"
-                  />
-                </ButtonGroup>
-              </CardAction>
-            ) : null}
-          </CardHeader>
+          <OsmInputCardHeader
+            fileName={baseFileName}
+            kind="base"
+            loaded={Boolean(base.osm)}
+            onClear={clearBaseOsm}
+            onDownload={base.downloadOsm}
+            title="Base OSM — authoritative existing dataset"
+          />
           <CardContent className="p-0">
             {!base.osm ? (
               <StoredOsmList
@@ -547,30 +507,14 @@ export default function MergeBlock() {
         </Card>
 
         <Card>
-          <CardHeader className="items-start">
-            <OsmInputHeading
-              fileName={patchFileName}
-              title="Patch OSM — imported additions and updates"
-            />
-            {patch.osm && (
-              <CardAction>
-                <ButtonGroup aria-label="Patch OSM file actions">
-                  <ActionButton
-                    icon={<DownloadIcon />}
-                    title="Download patch OSM"
-                    onAction={patch.downloadOsm}
-                    variant="ghost"
-                  />
-                  <ActionButton
-                    icon={<XIcon />}
-                    title="Clear patch OSM file"
-                    onAction={clearPatchOsm}
-                    variant="ghost"
-                  />
-                </ButtonGroup>
-              </CardAction>
-            )}
-          </CardHeader>
+          <OsmInputCardHeader
+            fileName={patchFileName}
+            kind="patch"
+            loaded={Boolean(patch.osm)}
+            onClear={clearPatchOsm}
+            onDownload={patch.downloadOsm}
+            title="Patch OSM — imported additions and updates"
+          />
           <CardContent className="p-0">
             {!patch.osm ? (
               <StoredOsmList

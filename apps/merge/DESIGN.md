@@ -187,6 +187,20 @@ picture. Merge diagrams follow these constraints:
 - Avoid animation and `<foreignObject>`. SVG text must remain understandable at
   both 320 px and 512 px sidebar widths.
 
+### Browser test boundaries
+
+Keep the real Monaco Merge journey focused on integration behavior that needs
+an actual parsed OSM and worker-backed merge. Load each input once, verify its
+real metadata, and advance through the workflow without repeating presentation
+checks that can run against production components in the lightweight guidance
+harness.
+
+Use that harness for responsive geometry, long-label and long-filename
+containment, accessible control names, and controlled action-state transitions.
+Worker lifecycle and restart tests run after Merge UI tests so their intensive
+Web Worker activity cannot compete with MapLibre rendering or PBF parsing on a
+small CI runner.
+
 ## Loading, progress & status
 
 - Quick/inline waits: `Spinner`.
