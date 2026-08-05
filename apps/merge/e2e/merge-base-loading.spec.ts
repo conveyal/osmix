@@ -9,7 +9,10 @@ async function loadFromUrl(card: Locator, page: Page, url: string) {
   });
 }
 
-test("loads both inputs on Merge and skips optional diagnostic scans", async ({ page }) => {
+test("loads both inputs once and reaches exact reconciliation", async ({ page }) => {
+  // Keep this worker-backed journey to one load per input. Input-card actions,
+  // clearing, and responsive geometry run against the production header in the
+  // guidance harness instead of repeating PBF parsing and MapLibre resizing here.
   await page.goto("/");
   await page.getByRole("tab", { name: "Merge" }).click();
 
@@ -46,26 +49,6 @@ test("loads both inputs on Merge and skips optional diagnostic scans", async ({ 
     "monaco.test.pbf",
   );
 
-  await page.setViewportSize({ width: 320, height: 720 });
-  await baseCard.locator('[data-slot="card-description"]').evaluate((element) => {
-    element.textContent =
-      "an-extremely-long-base-osm-filename-that-must-not-push-actions-outside-the-card.pbf";
-  });
-  await expect
-    .poll(() => baseCard.evaluate((element) => element.scrollWidth <= element.clientWidth))
-    .toBe(true);
-
-  await baseCard.getByRole("button", { name: "Clear base OSM file" }).click();
-  await expect(baseCard.getByRole("button", { name: "Open from URL" })).toBeVisible();
-  await expect(baseCard.locator('[data-slot="card-description"]')).toHaveCount(0);
-  await loadFromUrl(baseCard, page, "http://127.0.0.1:4173/monaco.pbf");
-
-  await patchCard.getByRole("button", { name: "Clear patch OSM file" }).click();
-  await expect(patchCard.getByRole("button", { name: "Open from URL" })).toBeVisible();
-  await expect(patchCard.locator('[data-slot="card-description"]')).toHaveCount(0);
-  await loadFromUrl(patchCard, page, "http://127.0.0.1:4173/monaco.test.pbf");
-  await page.setViewportSize({ width: 1280, height: 720 });
-
   await page.getByRole("button", { name: /Review each merge stage/ }).click();
   await expect(page.getByText(/2: Inspect base OSM/i)).toBeVisible();
   await expect(page.getByRole("button", { name: "Skip base diagnostic" })).toBeVisible();
@@ -93,35 +76,6 @@ test("loads both inputs on Merge and skips optional diagnostic scans", async ({ 
   const withExact = reconciliationActions.getByRole("button", {
     name: "Preview with exact reconciliation",
   });
-
-  for (const viewportWidth of [320, 1280]) {
-    await page.setViewportSize({ width: viewportWidth, height: 720 });
-    const measurements = await reconciliationActions.evaluate((group) => {
-      const groupBounds = group.getBoundingClientRect();
-      const buttons = [...group.querySelectorAll<HTMLElement>('[data-slot="button"]')].map(
-        (button) => button.getBoundingClientRect(),
-      );
-      return {
-        buttons: buttons.map((bounds) => ({
-          bottom: bounds.bottom,
-          left: bounds.left,
-          right: bounds.right,
-          top: bounds.top,
-        })),
-        clientWidth: group.clientWidth,
-        groupLeft: groupBounds.left,
-        groupRight: groupBounds.right,
-        scrollWidth: group.scrollWidth,
-      };
-    });
-
-    expect(measurements.scrollWidth).toBeLessThanOrEqual(measurements.clientWidth);
-    expect(measurements.buttons[0].left).toBeGreaterThanOrEqual(measurements.groupLeft);
-    expect(measurements.buttons[0].right).toBeLessThanOrEqual(measurements.groupRight);
-    expect(measurements.buttons[1].left).toBeGreaterThanOrEqual(measurements.groupLeft);
-    expect(measurements.buttons[1].right).toBeLessThanOrEqual(measurements.groupRight);
-    expect(measurements.buttons[1].top).toBeGreaterThan(measurements.buttons[0].bottom);
-  }
 
   await withoutExact.focus();
   await expect(withoutExact).toBeFocused();

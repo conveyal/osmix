@@ -15,7 +15,16 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "chromium",
+      name: "merge-ui",
+      testMatch: ["guidance.spec.ts", "merge-base-loading.spec.ts"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // Worker restart and multi-worker tests deliberately run after the UI
+      // tests so they cannot starve MapLibre or PBF parsing on small CI runners.
+      name: "worker-runtime",
+      dependencies: ["merge-ui"],
+      testMatch: ["worker-runtime.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
   ],

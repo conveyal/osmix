@@ -2,6 +2,12 @@ import { expect, test } from "@playwright/test";
 
 interface HarnessState {
   decision: string;
+  inputs: {
+    baseDownloads: number;
+    baseLoaded: boolean;
+    patchDownloads: number;
+    patchLoaded: boolean;
+  };
   propertyKeys: string;
   workerCalls: number;
   workflowStep: string;
@@ -100,8 +106,50 @@ test("automatic merge progress advances completed, running, and remaining steps"
   await expect(page.getByRole("status")).toContainText("1 of 5 steps completed");
 });
 
-for (const width of [320, 512]) {
-  test(`workflow step actions remain contained at a ${width}px sidebar width`, async ({ page }) => {
+test("loaded input cards remain usable and contained without loading a PBF", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  const harness = page.getByTestId("input-card-harness");
+  const baseCard = harness
+    .locator('[data-slot="card"]')
+    .filter({ hasText: "Base OSM — authoritative existing dataset" });
+  const patchCard = harness
+    .locator('[data-slot="card"]')
+    .filter({ hasText: "Patch OSM — imported additions and updates" });
+  const longBaseName =
+    "an-extremely-long-base-osm-filename-that-must-not-push-actions-outside-the-card.pbf";
+
+  await expect(baseCard.locator('[data-slot="card-description"]')).toHaveText(longBaseName);
+  await expect(baseCard.locator('[data-slot="card-description"]')).toHaveAttribute(
+    "title",
+    longBaseName,
+  );
+  await expect(baseCard.getByRole("button", { name: "Download base OSM" })).toBeVisible();
+  await expect(baseCard.getByRole("button", { name: "Clear base OSM file" })).toBeVisible();
+  await expect(patchCard.getByRole("button", { name: "Download patch OSM" })).toBeVisible();
+  await expect(patchCard.getByRole("button", { name: "Clear patch OSM file" })).toBeVisible();
+  await expect(patchCard.getByRole("button", { name: "Save to storage" })).toHaveCount(0);
+  await expect
+    .poll(() => harness.evaluate((element) => element.scrollWidth <= element.clientWidth))
+    .toBe(true);
+
+  await baseCard.getByRole("button", { name: "Download base OSM" }).click();
+  await patchCard.getByRole("button", { name: "Download patch OSM" }).click();
+  await expect
+    .poll(async () => (await page.evaluate(() => window.guidanceHarness.readState())).inputs)
+    .toMatchObject({ baseDownloads: 1, patchDownloads: 1 });
+
+  await baseCard.getByRole("button", { name: "Clear base OSM file" }).click();
+  await expect(baseCard.getByRole("button", { name: "Open base OSM" })).toBeVisible();
+  await expect(baseCard.locator('[data-slot="card-description"]')).toHaveCount(0);
+  await expect(patchCard.locator('[data-slot="card-description"]')).toHaveText("monaco.test.pbf");
+
+  await patchCard.getByRole("button", { name: "Clear patch OSM file" }).click();
+  await expect(patchCard.getByRole("button", { name: "Open patch OSM" })).toBeVisible();
+  await expect(patchCard.locator('[data-slot="card-description"]')).toHaveCount(0);
+});
+
+test("workflow step actions remain contained at supported sidebar widths", async ({ page }) => {
+  for (const width of [320, 512]) {
     await page.setViewportSize({ width, height: 900 });
     const actionGroups = page.getByRole("group", { name: /step actions$/i });
     await expect(actionGroups).toHaveCount(3);
@@ -149,12 +197,14 @@ for (const width of [320, 512]) {
     await expect(secondaryAction).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(primaryAction).toBeFocused();
-  });
+  }
+});
 
-  test(`guidance and diagrams remain contained at a ${width}px sidebar width`, async ({ page }) => {
+test("guidance and diagrams remain contained at supported sidebar widths", async ({ page }) => {
+  for (const width of [320, 512]) {
     await page.setViewportSize({ width, height: 800 });
     const trigger = page.getByRole("button", { name: "How this step works" });
-    await trigger.click();
+    if ((await trigger.getAttribute("aria-expanded")) === "false") await trigger.click();
 
     const diagram = page.locator('[data-slot="merge-step-guide"] svg[data-diagram]');
     await expect(diagram).toHaveCount(1);
@@ -189,5 +239,5 @@ for (const width of [320, 512]) {
     expect(measurements.svgHeight).toBeLessThanOrEqual(330);
     expect(measurements.svgLeft).toBeGreaterThanOrEqual(measurements.sidebarLeft);
     expect(measurements.svgRight).toBeLessThanOrEqual(measurements.sidebarRight);
-  });
-}
+  }
+});
