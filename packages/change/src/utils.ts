@@ -13,7 +13,7 @@
 import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from "@osmix/types";
 
-import sweeplineIntersections from "./sweepline-intersections.ts";
+import { sweeplineLineIntersections } from "./sweepline-intersections.ts";
 import type { OsmChangesetStats } from "./types.ts";
 
 const XML_ATTRIBUTE_ESCAPES: Record<string, string> = {
@@ -150,8 +150,13 @@ export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
 /**
  * Determine if a way is a candidate for connecting to another way
  */
+export function areWayTagsIntersectionCandidate(tags?: OsmTags) {
+  return !!tags && (isHighway(tags) || isFootish(tags)) && !isPolygonish(tags);
+}
+
+/** Determine if a complete way is a candidate for connecting to another way. */
 export function isWayIntersectionCandidate(way: OsmWay) {
-  return way.tags && (isHighway(way.tags) || isFootish(way.tags)) && !isPolygonish(way.tags);
+  return areWayTagsIntersectionCandidate(way.tags);
 }
 
 /**
@@ -189,30 +194,7 @@ export function waysIntersect(
   wayA: [number, number][],
   wayB: [number, number][],
 ): [number, number][] {
-  const intersections = sweeplineIntersections(
-    {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: wayA,
-          },
-          properties: {},
-        },
-        {
-          type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: wayB,
-          },
-          properties: {},
-        },
-      ],
-    },
-    true,
-  );
+  const intersections = sweeplineLineIntersections(wayA, wayB);
 
   const uniqueFeatures: [number, number][] = [];
   const seen = new Set<string>();

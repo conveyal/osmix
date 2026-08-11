@@ -21,10 +21,7 @@
 import {
   applyChangesetToOsm,
   buildConflationBulkDecisionResult,
-  discoverConflationCandidates,
   generateChangeset,
-  generateConflationApplicationChangeset,
-  generateConflationChangeset,
   merge,
   summarizeConflationCandidates,
   type OsmChange,
@@ -43,6 +40,11 @@ import {
   type OsmMergeOptions,
   validateConflationDecisions,
 } from "@osmix/change";
+import {
+  discoverConflationCandidatesForTrustedMerge,
+  generateConflationApplicationArtifactsFromTrustedDiscovery,
+  generateConflationArtifactsFromTrustedDiscovery,
+} from "@osmix/change/src/internal/conflation.ts";
 import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core";
 import { fromGeoJSON } from "@osmix/geojson";
 import { fromGeoParquet, type GeoParquetReadOptions } from "@osmix/geoparquet";
@@ -114,7 +116,10 @@ interface ConflationSession {
   decisions: Map<string, OsmConflationDecision>;
   discovery: OsmConflationDiscovery;
   filter: OsmConflationCandidateFilter;
+  generatedChangeset?: OsmChangeset;
+  generatedResult?: Osm;
   patchOsmId: string;
+  summary: OsmConflationSummary;
 }
 
 // Comlink normally clones return values, but tests and in-process remotes can expose
@@ -247,12 +252,8 @@ function routingDiagnostics(baseline: Osm, conflated: Osm): OsmConflationRouting
   };
 }
 
-function carTopologyChanged(diagnostics: OsmConflationRoutingDiagnostics) {
-  return (
-    diagnostics.car.delta.routableNodes !== 0 ||
-    diagnostics.car.delta.edges !== 0 ||
-    diagnostics.car.delta.components !== 0
-  );
+function carTopologyChanged(delta: OsmConflationRoutingDelta) {
+  return delta.delta.routableNodes !== 0 || delta.delta.edges !== 0 || delta.delta.components !== 0;
 }
 
 import {
@@ -714,7 +715,7 @@ export class OsmixWorker extends EventTarget {
     patchOsmId: string,
     options: OsmConflationOptions,
   ): OsmConflationSummary {
-    const discovery = discoverConflationCandidates(
+    const discovery = discoverConflationCandidatesForTrustedMerge(
       this.get(baseOsmId),
       this.get(patchOsmId),
       options,
@@ -730,26 +731,24 @@ export class OsmixWorker extends EventTarget {
       this.changesets.delete(baseOsmId);
       this.filteredChanges.delete(baseOsmId);
     }
+    const summary =
+      decisions.size === 0
+        ? discovery.summary
+        : summarizeConflationCandidates(discovery.candidates, [...decisions.values()]);
     this.conflations.set(baseOsmId, {
       changesetGenerated: false,
       decisions,
       discovery,
       filter: {},
       patchOsmId,
+      summary,
     });
-    return {
-      ...summarizeConflationCandidates(discovery.candidates, [...decisions.values()]),
-    };
+    return { ...summary };
   }
 
   /** Return the decision-aware summary for an active conflation session. */
   getConflationSummary(baseOsmId: string): OsmConflationSummary {
-    const session = this.getConflationSession(baseOsmId);
-    return {
-      ...summarizeConflationCandidates(session.discovery.candidates, [
-        ...session.decisions.values(),
-      ]),
-    };
+    return { ...this.getConflationSession(baseOsmId).summary };
   }
 
   /** Replace the active candidate filter used by {@link getConflationPage}. */
@@ -799,7 +798,10 @@ export class OsmixWorker extends EventTarget {
     validateConflationDecisions(session.discovery.candidates, [decision]);
     this.invalidateGeneratedConflationChangeset(baseOsmId, session);
     session.decisions.set(decision.candidateId, { ...decision });
-    return this.getConflationSummary(baseOsmId);
+    session.summary = summarizeConflationCandidates(session.discovery.candidates, [
+      ...session.decisions.values(),
+    ]);
+    return { ...session.summary };
   }
 
   /** Replace every candidate decision and invalidate any generated changeset. */
@@ -813,7 +815,11 @@ export class OsmixWorker extends EventTarget {
     }
     this.invalidateGeneratedConflationChangeset(baseOsmId, session);
     session.decisions = next;
-    return this.getConflationSummary(baseOsmId);
+    session.summary =
+      next.size === 0
+        ? session.discovery.summary
+        : summarizeConflationCandidates(session.discovery.candidates, [...next.values()]);
+    return { ...session.summary };
   }
 
   /** Apply one action to every eligible candidate matching the supplied filter. */
@@ -833,6 +839,7 @@ export class OsmixWorker extends EventTarget {
         result.decisions.map((decision) => [decision.candidateId, { ...decision }]),
       );
     }
+    session.summary = { ...result.summary };
     return {
       decisions: result.decisions.map((decision) => ({ ...decision })),
       preview: { ...result.preview },
@@ -866,67 +873,74 @@ export class OsmixWorker extends EventTarget {
       createIntersections: false,
       conflation,
     };
-    const changeset = generateConflationChangeset(
+    const artifacts = generateConflationArtifactsFromTrustedDiscovery(
       base,
       patch,
       options,
       decisions,
       session.discovery,
-    );
-    const baselineChangeset = generateChangeset(
-      base,
-      patch,
-      {
-        directMerge: mergeOptions.directMerge ?? false,
-        deduplicateNodes: mergeOptions.deduplicateNodes ?? false,
-        deduplicateWays: mergeOptions.deduplicateWays ?? false,
-        createIntersections: false,
-      },
       this.onProgress,
     );
-    const ordinaryBaseline = applyChangesetToOsm(baselineChangeset);
-    const conflated = applyChangesetToOsm(changeset);
-    const diagnostics = routingDiagnostics(ordinaryBaseline, conflated);
+    const diagnostics = routingDiagnostics(artifacts.ordinaryBaseline, artifacts.result);
     // The full result may contain manually reviewed motor-network changes. Project
     // automatic attachments alone so the automatic WALK-only CAR invariant is exact.
     let hasAutomaticNetworkAttachment = false;
-    const automaticAttachmentDecisions = session.discovery.candidates.map((candidate) => {
+    const automaticAttachmentDecisions: OsmConflationDecision[] = [];
+    for (const candidate of session.discovery.candidates) {
       const decision = session.decisions.get(candidate.id);
       const attachNetwork =
         candidate.networkAttachment?.status === "automatic" &&
         decision?.action !== "reject" &&
         decision?.attachNetwork !== false;
       hasAutomaticNetworkAttachment ||= attachNetwork;
-      return {
-        candidateId: candidate.id,
-        action: attachNetwork ? ("accept" as const) : ("reject" as const),
-        transferProperties: false,
-        attachNetwork,
-      };
-    });
+      if (attachNetwork) {
+        automaticAttachmentDecisions.push({
+          candidateId: candidate.id,
+          action: "accept",
+          transferProperties: false,
+          attachNetwork: true,
+        });
+      } else if (
+        candidate.propertyTransfer.status === "automatic" ||
+        candidate.networkAttachment?.status === "automatic"
+      ) {
+        // A missing decision enables automatic actions. Explicitly reject only
+        // automatic candidates that must be absent from this attachment-only
+        // projection; review, blocked, and unmatched rows already apply nothing.
+        automaticAttachmentDecisions.push({
+          candidateId: candidate.id,
+          action: "reject",
+        });
+      }
+    }
     if (hasAutomaticNetworkAttachment) {
-      const automaticAttachmentChangeset = generateConflationApplicationChangeset(
-        ordinaryBaseline,
+      const automaticAttachment = generateConflationApplicationArtifactsFromTrustedDiscovery(
+        artifacts.ordinaryBaseline,
         patch,
         session.discovery,
         base,
         automaticAttachmentDecisions,
       );
-      const automaticDiagnostics = routingDiagnostics(
-        ordinaryBaseline,
-        applyChangesetToOsm(automaticAttachmentChangeset),
+      const automaticCarDelta = routingDelta(
+        diagnostics.car.before,
+        routingGraphStats(automaticAttachment.result, defaultHighwayFilter),
       );
-      if (carTopologyChanged(automaticDiagnostics)) {
+      if (carTopologyChanged(automaticCarDelta)) {
         throw Error(
           "Automatic walk-only conflation changed the CAR graph; review the candidate instead",
         );
       }
     }
 
-    this.changesets.set(baseOsmId, changeset);
-    this.sortChangeset(baseOsmId, changeset);
+    this.changesets.set(baseOsmId, artifacts.changeset);
+    // Candidate review does not imply changeset review. Defer the large filtered
+    // change list until a caller actually opens a changeset page; automatic runs
+    // apply the already validated materialized result without building it.
+    this.filteredChanges.delete(baseOsmId);
     session.changesetGenerated = true;
-    return { stats: changeset.stats, routing: diagnostics };
+    session.generatedChangeset = artifacts.changeset;
+    session.generatedResult = artifacts.result;
+    return { stats: artifacts.changeset.stats, routing: diagnostics };
   }
 
   /** Clear an active conflation session and its generated changeset, if present. */
@@ -967,7 +981,7 @@ export class OsmixWorker extends EventTarget {
       this.onProgress,
     );
     this.changesets.set(baseOsmId, changeset);
-    this.sortChangeset(baseOsmId, changeset);
+    this.filteredChanges.delete(baseOsmId);
     return changeset.stats;
   }
 
@@ -996,6 +1010,7 @@ export class OsmixWorker extends EventTarget {
   getChangesetPage(osmId: string, page: number, pageSize: number) {
     const changeset = this.changesets.get(osmId);
     if (!changeset) throw Error("No active changeset");
+    if (!this.filteredChanges.has(osmId)) this.sortChangeset(osmId, changeset);
     const filteredChanges = this.filteredChanges.get(osmId);
     const changes = filteredChanges?.slice(page * pageSize, (page + 1) * pageSize);
     return {
@@ -1011,7 +1026,12 @@ export class OsmixWorker extends EventTarget {
   applyChangesAndReplace(osmId: string) {
     const changeset = this.changesets.get(osmId);
     if (!changeset) throw Error("No active changeset");
-    const newOsm = applyChangesetToOsm(changeset);
+    const session = this.conflations.get(osmId);
+    const newOsm =
+      session?.changesetGenerated && session.generatedChangeset === changeset
+        ? session.generatedResult
+        : applyChangesetToOsm(changeset);
+    if (!newOsm) throw Error("Generated conflation result is missing");
     this.set(osmId, newOsm);
     this.changesets.delete(osmId);
     this.filteredChanges.delete(osmId);
@@ -1031,6 +1051,8 @@ export class OsmixWorker extends EventTarget {
     this.changesets.delete(baseOsmId);
     this.filteredChanges.delete(baseOsmId);
     session.changesetGenerated = false;
+    session.generatedChangeset = undefined;
+    session.generatedResult = undefined;
   }
 
   /**

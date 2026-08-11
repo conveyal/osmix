@@ -48,6 +48,42 @@ High-level merges leave the original inputs intact and reconcile only compatible
 base matches. Regenerate PBFs created by older releases from their original inputs if automatic within-file
 deduplication may already have rewritten routing topology.
 
+### Profile merge performance
+
+The test-only merge profiler runs the reviewed merge stages in their production order and reports per-stage
+wall time, CPU time, RSS, heap use, operation counts, and output fingerprints as JSON. The PBF fingerprint
+normalizes the export header's current timestamp; all entity bytes still use the production serializer. Monaco
+is checked into the repository and is the safe default:
+
+```sh
+pnpm --filter osmix profile:merge -- --scenario monaco --runs 5 --output /tmp/monaco-merge.json
+```
+
+Two larger profiles use ignored local fixtures. They never download data and fail with the required path when
+a fixture is absent:
+
+```sh
+# Recommended Yakima property keys, 1-meter matching, network attachment, and all merge stages.
+pnpm --filter osmix profile:merge -- --scenario yakima --runs 3 --output /tmp/yakima-merge.json
+
+# Direct merge, exact reconciliation, and intersections for the reported full-merge regression.
+pnpm --filter osmix profile:merge -- --scenario eastern-washington --runs 1 \
+  --output /tmp/eastern-washington-merge.json
+```
+
+The Yakima scenario uses `OsmixWorker.generateConflationChangeset`. Its generation stage includes CAR/WALK
+routing diagnostics and the automatic network-attachment CAR safety projection.
+
+Yakima requires `fixtures/yakima-full.osm.pbf` and `fixtures/yakima.osw.pbf`. Eastern Washington requires
+`fixtures/osmix-e_wa_osm.pbf` and `fixtures/east_washington_sidewalk_proviso_1.pbf`. The existing Eastern
+Washington correctness test remains opt-in with `OSMIX_EASTERN_WASHINGTON_INTEGRATION=1`.
+
+`OSMIX_MERGE_PROFILE_SCENARIO`, `OSMIX_MERGE_PROFILE_RUNS`, and `OSMIX_MERGE_PROFILE_OUTPUT` are equivalent
+to the command-line flags. Compare reports produced with the same commit, Node version, hardware, and idle
+system. `processPeakRssBytes` is the process-lifetime high-water mark, so later repetitions can retain an
+earlier run's peak. CI verifies operation counts and semantic fingerprints, but intentionally has no timing
+threshold or compressed-PBF byte golden.
+
 Proximity matching for independently created imports is available as a separate opt-in review session. The
 recommended defaults use a 1-meter radius and automatically apply only high-confidence candidates:
 

@@ -1,6 +1,6 @@
 import { Osm } from "@osmix/core";
 import { createMockBaseOsm, createMockPatchOsm } from "@osmix/core/mocks";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { OsmixWorker } from "../src/worker";
 
@@ -288,6 +288,36 @@ describe("OsmixWorker registries", () => {
     });
   });
 
+  it("installs the validated conflation result without rebuilding it", () => {
+    const worker = new TestWorker();
+    const base = createParallelFootway("materialized-base", 1, 10, 0, "Base path");
+    const patch = createParallelFootway("materialized-patch", 11, 20, 0.000004, "Imported path");
+    worker.setOsm(base.id, base);
+    worker.setOsm(patch.id, patch);
+    worker.discoverConflation(base.id, patch.id, {
+      propertyKeys: ["name"],
+      attachNetwork: false,
+    });
+    const buildIndexes = vi.spyOn(Osm.prototype, "buildIndexes");
+
+    try {
+      worker.generateConflationChangeset(base.id, {
+        directMerge: true,
+        deduplicateNodes: true,
+        deduplicateWays: true,
+      });
+      const buildsAfterGeneration = buildIndexes.mock.calls.length;
+      expect(buildsAfterGeneration).toBe(2);
+
+      worker.applyChangesAndReplace(base.id);
+
+      expect(buildIndexes).toHaveBeenCalledTimes(buildsAfterGeneration);
+      expect(worker.getOsm(base.id).ways.getById(10)?.tags?.["name"]).toBe("Imported path");
+    } finally {
+      buildIndexes.mockRestore();
+    }
+  });
+
   it("returns defensive candidate, decision, filter, and summary snapshots", () => {
     const worker = new TestWorker();
     const base = createParallelFootway("snapshot-base", 1, 10, 0, "Base path");
@@ -362,19 +392,25 @@ describe("OsmixWorker registries", () => {
       propertyKeys: ["name"],
       attachNetwork: true,
     });
+    const buildIndexes = vi.spyOn(Osm.prototype, "buildIndexes");
 
-    const result = worker.generateConflationChangeset(base.id, {
-      directMerge: true,
-      deduplicateNodes: true,
-      deduplicateWays: true,
-    });
+    try {
+      const result = worker.generateConflationChangeset(base.id, {
+        directMerge: true,
+        deduplicateNodes: true,
+        deduplicateWays: true,
+      });
 
-    expect(result.routing.car.delta).toMatchObject({
-      routableNodes: 0,
-      edges: 0,
-      components: 0,
-    });
-    expect(result.routing.walk.delta.components).toBeLessThan(0);
+      expect(buildIndexes).toHaveBeenCalledTimes(3);
+      expect(result.routing.car.delta).toMatchObject({
+        routableNodes: 0,
+        edges: 0,
+        components: 0,
+      });
+      expect(result.routing.walk.delta.components).toBeLessThan(0);
+    } finally {
+      buildIndexes.mockRestore();
+    }
   });
 
   it("isolates the automatic WALK guard from unrelated CAR way property suppression", () => {

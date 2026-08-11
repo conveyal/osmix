@@ -8,19 +8,24 @@ type IntegrityIssue = {
   description: string;
 };
 
+type IncidentHighway = {
+  way: OsmWay;
+  gradeSignature: string;
+  interior: boolean;
+  endpoint: boolean;
+};
+
+// Finalized Osm indexes are immutable. Keep their ordered analysis by object
+// identity so adjacent merge stages do not rescan the same million-entity
+// dataset. Never key this cache by the user-facing OSM ID: an ID may be reused
+// for a newly merged dataset with different contents.
+const routingIntegrityIssuesByOsm = new WeakMap<Osm, readonly IntegrityIssue[]>();
+
 const SURFACE_GRADE_SIGNATURE = "layer=0|level=|bridge=no|tunnel=no|covered=no";
 
 function sharesNode(a: OsmWay, b: OsmWay) {
   const aRefs = new Set(a.refs);
   return b.refs.some((ref) => aRefs.has(ref));
-}
-
-function isInteriorNode(way: OsmWay, nodeId: number) {
-  return way.refs.some((ref, index) => ref === nodeId && index > 0 && index < way.refs.length - 1);
-}
-
-function isEndpointNode(way: OsmWay, nodeId: number) {
-  return way.refs[0] === nodeId || way.refs.at(-1) === nodeId;
 }
 
 /**
@@ -30,27 +35,24 @@ function isEndpointNode(way: OsmWay, nodeId: number) {
  * surface side, not spliced into the grade-separated segment.
  */
 function hasSameGradeEndpointContinuation(
-  ways: readonly OsmWay[],
-  left: OsmWay,
-  right: OsmWay,
-  nodeId: number,
+  ways: readonly IncidentHighway[],
+  left: IncidentHighway,
+  right: IncidentHighway,
 ) {
-  const leftInterior = isInteriorNode(left, nodeId);
-  const rightInterior = isInteriorNode(right, nodeId);
-  if (leftInterior === rightInterior) return false;
+  if (left.interior === right.interior) return false;
 
-  const interiorWay = leftInterior ? left : right;
-  const interiorSignature = routingGradeSignature(interiorWay.tags);
+  const interiorWay = left.interior ? left : right;
+  const interiorSignature = interiorWay.gradeSignature;
   // A continuation only proves a normal portal when the interior way is on the
   // default surface level. It must not legitimize a new surface endpoint spliced
   // into the middle of a tunnel or bridge.
   if (interiorSignature !== SURFACE_GRADE_SIGNATURE) return false;
   return ways.some(
     (candidate) =>
-      candidate.id !== left.id &&
-      candidate.id !== right.id &&
-      isEndpointNode(candidate, nodeId) &&
-      routingGradeSignature(candidate.tags) === interiorSignature,
+      candidate.way.id !== left.way.id &&
+      candidate.way.id !== right.way.id &&
+      candidate.endpoint &&
+      candidate.gradeSignature === interiorSignature,
   );
 }
 
@@ -129,9 +131,12 @@ function restrictionIssues(osm: Osm, relation: OsmRelation): IntegrityIssue[] {
   return issues;
 }
 
-function collectRoutingIntegrityIssues(osm: Osm): IntegrityIssue[] {
+function collectRoutingIntegrityIssues(osm: Osm): readonly IntegrityIssue[] {
+  const cachedIssues = routingIntegrityIssuesByOsm.get(osm);
+  if (cachedIssues) return cachedIssues;
+
   const issues: IntegrityIssue[] = [];
-  const highwayWaysByNode = new Map<number, OsmWay[]>();
+  const highwayWaysByNode = new Map<number, IncidentHighway[]>();
 
   for (const way of osm.ways) {
     for (const ref of way.refs) {
@@ -141,16 +146,25 @@ function collectRoutingIntegrityIssues(osm: Osm): IntegrityIssue[] {
         description: `way ${way.id} references missing node ${ref}`,
       });
     }
-    if (way.tags?.["highway"] != null && new Set(way.refs).size < 2) {
+    const distinctRefs = new Set(way.refs);
+    if (way.tags?.["highway"] != null && distinctRefs.size < 2) {
       issues.push({
         key: `way:${way.id}:degenerate-highway`,
         description: `highway way ${way.id} has fewer than two distinct nodes`,
       });
     }
     if (way.tags?.["highway"] != null) {
-      for (const ref of new Set(way.refs)) {
+      const gradeSignature = routingGradeSignature(way.tags);
+      const interiorRefs = new Set(way.refs.slice(1, -1));
+      const endpointRefs = new Set([way.refs[0], way.refs.at(-1)]);
+      for (const ref of distinctRefs) {
         const incidentWays = highwayWaysByNode.get(ref) ?? [];
-        incidentWays.push(way);
+        incidentWays.push({
+          way,
+          gradeSignature,
+          interior: interiorRefs.has(ref),
+          endpoint: endpointRefs.has(ref),
+        });
         highwayWaysByNode.set(ref, incidentWays);
       }
     }
@@ -161,10 +175,10 @@ function collectRoutingIntegrityIssues(osm: Osm): IntegrityIssue[] {
       for (let rightIndex = leftIndex + 1; rightIndex < ways.length; rightIndex++) {
         const left = ways[leftIndex]!;
         const right = ways[rightIndex]!;
-        if (routingGradeSignature(left.tags) === routingGradeSignature(right.tags)) continue;
-        if (!isInteriorNode(left, nodeId) && !isInteriorNode(right, nodeId)) continue;
-        if (hasSameGradeEndpointContinuation(ways, left, right, nodeId)) continue;
-        const [firstWayId, secondWayId] = [left.id, right.id].toSorted((a, b) => a - b);
+        if (left.gradeSignature === right.gradeSignature) continue;
+        if (!left.interior && !right.interior) continue;
+        if (hasSameGradeEndpointContinuation(ways, left, right)) continue;
+        const [firstWayId, secondWayId] = [left.way.id, right.way.id].toSorted((a, b) => a - b);
         issues.push({
           key: `node:${nodeId}:incompatible-grade:${firstWayId}:${secondWayId}`,
           description: `node ${nodeId} newly connects grade-separated highways ${firstWayId} and ${secondWayId}`,
@@ -190,6 +204,7 @@ function collectRoutingIntegrityIssues(osm: Osm): IntegrityIssue[] {
     issues.push(...restrictionIssues(osm, relation));
   }
 
+  if (osm.isReady()) routingIntegrityIssuesByOsm.set(osm, issues);
   return issues;
 }
 
@@ -197,12 +212,22 @@ export function routingIntegrityIssueKeys(osm: Osm) {
   return new Set(collectRoutingIntegrityIssues(osm).map((issue) => issue.key));
 }
 
+/** Reuse analysis only when two finalized wrappers reference identical entity buffers. */
+export function reuseRoutingIntegrityAnalysis(source: Osm, target: Osm) {
+  const issues = collectRoutingIntegrityIssues(source);
+  if (target.isReady()) routingIntegrityIssuesByOsm.set(target, issues);
+}
+
 /**
  * Combine inherited issues from both inputs while treating same-ID patch entities as
  * modifications that must remain valid when their base counterpart was valid.
  */
-export function inheritedRoutingIntegrityIssueKeys(base: Osm, patch: Osm) {
-  const keys = routingIntegrityIssueKeys(base);
+export function inheritedRoutingIntegrityIssueKeys(
+  base: Osm,
+  patch: Osm,
+  baseKeys: ReadonlySet<string> = routingIntegrityIssueKeys(base),
+) {
+  const keys = new Set(baseKeys);
   for (const issue of collectRoutingIntegrityIssues(patch)) {
     // Missing references and degenerate highways in a patch are never inherited:
     // accepting them would allow malformed input to pass through unchanged.

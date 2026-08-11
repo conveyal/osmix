@@ -67,6 +67,33 @@ function serializeEntities(osm: OsmType) {
 }
 
 describe("applyChangesetToOsm", () => {
+  it("reuses immutable buffers for an empty changeset while returning a fresh wrapper", () => {
+    const base = createBaseOsm();
+    base.buildSpatialIndexes();
+    const changeset = new OsmChangeset(base);
+
+    const result = applyChangesetToOsm(changeset, "empty-result");
+
+    expect(result).not.toBe(base);
+    expect(result.id).toBe("empty-result");
+    expect(result.contentHash()).toBe(base.contentHash());
+    expect(result.hasSpatialIndexes()).toBe(true);
+    expect(serializeEntities(result)).toEqual(serializeEntities(base));
+    expect(result.nodes.transferables().ids).toBe(base.nodes.transferables().ids);
+    expect(result.ways.transferables().refs).toBe(base.ways.transferables().refs);
+  });
+
+  it("builds missing spatial indexes when an empty base is not fully indexed", () => {
+    const base = createBaseOsm();
+    const changeset = new OsmChangeset(base);
+
+    const result = applyChangesetToOsm(changeset);
+
+    expect(base.hasSpatialIndexes()).toBe(false);
+    expect(result.hasSpatialIndexes()).toBe(true);
+    expect(serializeEntities(result)).toEqual(serializeEntities(base));
+  });
+
   it("preserves changeset records and supports applying the same object twice", () => {
     const base = createBaseOsm();
     const changeset = createChangeset(base);
@@ -161,5 +188,19 @@ describe("applyChangesetToOsm", () => {
     applyChangesetToOsm(changeset);
 
     expect(JSON.stringify(way)).toBe(before);
+  });
+
+  it("preserves the invalid-stage error for a change whose ID is absent from the base", () => {
+    const base = createBaseOsm();
+    const changeset = new OsmChangeset(base);
+    changeset.nodeChanges[999] = {
+      changeType: "modify",
+      entity: { id: 999, lon: -120, lat: 46 },
+      osmId: base.id,
+    };
+
+    expect(() => applyChangesetToOsm(changeset)).toThrow(
+      "Changeset still contains node changes in incorrect stage.",
+    );
   });
 });

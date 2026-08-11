@@ -2,6 +2,7 @@
 
 import type { Osm } from "@osmix/core";
 import { haversineDistance } from "@osmix/geo/haversine-distance";
+import type { ProgressEvent } from "@osmix/shared/progress";
 import type { LonLat, OsmEntity, OsmNode, OsmRelation, OsmTags, OsmWay } from "@osmix/types";
 
 import { applyChangesetToOsm } from "./apply-changeset.ts";
@@ -111,6 +112,14 @@ type DiscoveryContext = {
   baseRelations: EntityRelationContext;
   patchRelations: EntityRelationContext;
 };
+
+// Trusted merge orchestrators keep untouched Osm objects and canonical discovery
+// in the same module instance. This weak registry lets that internal path reuse an
+// expensive discovery without weakening the public generation boundary, which
+// still recomputes candidates before it accepts caller-provided review data.
+const trustedDiscoveries = new WeakMap<OsmConflationDiscovery, { base: Osm; patch: Osm }>();
+const trustedCandidateCollections = new WeakSet<readonly OsmConflationCandidate[]>();
+const trustedCandidateIds = new WeakMap<readonly OsmConflationCandidate[], ReadonlySet<string>>();
 
 function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOptions {
   if (!Array.isArray(options.propertyKeys)) {
@@ -983,6 +992,24 @@ export function discoverConflationCandidates(
   };
 }
 
+/**
+ * Discover canonical candidates for an in-process merge orchestrator.
+ *
+ * @internal This capability must stay inside a same-call merge path. Unlike the
+ * public generation functions, its companion generators trust the object
+ * identity registered here instead of rediscovering candidates from scratch.
+ */
+export function discoverConflationCandidatesForTrustedMerge(
+  base: Osm,
+  patch: Osm,
+  options: OsmConflationOptions,
+) {
+  const discovery = discoverConflationCandidates(base, patch, options);
+  trustedDiscoveries.set(discovery, { base, patch });
+  trustedCandidateCollections.add(discovery.candidates);
+  return discovery;
+}
+
 function decisionMap(decisions: readonly OsmConflationDecision[]) {
   return new Map(decisions.map((decision) => [decision.candidateId, decision]));
 }
@@ -992,7 +1019,16 @@ function validatedDecisionMap(
   decisions: readonly OsmConflationDecision[],
 ) {
   if (!Array.isArray(decisions)) throw Error("Conflation decisions must be an array");
-  const candidateIds = new Set(candidates.map((candidate) => candidate.id));
+  if (decisions.length === 0) return new Map<string, OsmConflationDecision>();
+  let candidateIds = trustedCandidateIds.get(candidates);
+  if (!candidateIds) {
+    candidateIds = new Set(candidates.map((candidate) => candidate.id));
+    // General callers may mutate their candidate arrays between validations.
+    // Cache IDs only for canonical collections retained by a trusted merge path.
+    if (trustedCandidateCollections.has(candidates)) {
+      trustedCandidateIds.set(candidates, candidateIds);
+    }
+  }
   const result = new Map<string, OsmConflationDecision>();
   for (const decision of decisions) {
     if (decision == null || typeof decision !== "object") {
@@ -1413,6 +1449,30 @@ function applyDiscoveredConflation(
   cleanupUnreferencedPatchNodes(changeset, patch, originalBase, cleanupCandidateNodeIds);
 }
 
+function generateConflationApplicationArtifacts(
+  baseline: Osm,
+  patch: Osm,
+  canonicalDiscovery: OsmConflationDiscovery,
+  originalBase: Osm,
+  decisions: readonly OsmConflationDecision[] = [],
+) {
+  if (patch.id !== canonicalDiscovery.patchOsmId) {
+    throw Error(
+      `Conflation discovery patch ${canonicalDiscovery.patchOsmId} does not match ${patch.id}`,
+    );
+  }
+  if (originalBase.id !== canonicalDiscovery.baseOsmId) {
+    throw Error(
+      `Conflation discovery base ${canonicalDiscovery.baseOsmId} does not match ${originalBase.id}`,
+    );
+  }
+  const changeset = new OsmChangeset(baseline);
+  applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions, originalBase);
+  const result = applyChangesetToOsm(changeset);
+  assertConflationPreservesBaseTopology(originalBase, baseline, result);
+  return { changeset, result };
+}
+
 /** Generate fuzzy-only changes over an already applied ordinary direct/exact merge baseline. */
 export function generateConflationApplicationChangeset(
   baseline: Osm,
@@ -1421,6 +1481,9 @@ export function generateConflationApplicationChangeset(
   originalBase: Osm,
   decisions: readonly OsmConflationDecision[] = [],
 ) {
+  // Reject review data from another merge session before rediscovery. The
+  // candidate evidence is deliberately untrusted, but its input IDs are still
+  // part of the public API's stale-session guard.
   if (patch.id !== discovery.patchOsmId) {
     throw Error(`Conflation discovery patch ${discovery.patchOsmId} does not match ${patch.id}`);
   }
@@ -1432,11 +1495,70 @@ export function generateConflationApplicationChangeset(
   // Recompute from untouched entities before applying. Candidate records returned
   // to callers are review data, not trusted instructions for mutating topology.
   const canonicalDiscovery = discoverConflationCandidates(originalBase, patch, discovery.options);
-  const changeset = new OsmChangeset(baseline);
-  applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions, originalBase);
+  return generateConflationApplicationArtifacts(
+    baseline,
+    patch,
+    canonicalDiscovery,
+    originalBase,
+    decisions,
+  ).changeset;
+}
+
+function validateCumulativeConflationOptions(
+  base: Osm,
+  patch: Osm,
+  options: Partial<OsmMergeOptions>,
+  discovery: OsmConflationDiscovery,
+) {
+  if (!options.conflation) throw Error("generateConflationChangeset requires conflation options");
+  if (!options.directMerge)
+    throw Error("Fuzzy conflation requires directMerge to preserve unmatched patch entities");
+  if (options.createIntersections) {
+    throw Error(
+      "generateConflationChangeset cannot create intersections in the cumulative changeset",
+    );
+  }
+  if (discovery.baseOsmId !== base.id || discovery.patchOsmId !== patch.id) {
+    throw Error("Conflation discovery does not match the untouched merge inputs");
+  }
+  const expectedOptions = resolvedOptions(options.conflation);
+  if (
+    discovery.options.attachNetwork !== expectedOptions.attachNetwork ||
+    discovery.options.automatic !== expectedOptions.automatic ||
+    discovery.options.maxDistanceMeters !== expectedOptions.maxDistanceMeters ||
+    discovery.options.propertyKeys.length !== expectedOptions.propertyKeys.length ||
+    discovery.options.propertyKeys.some((key, index) => key !== expectedOptions.propertyKeys[index])
+  ) {
+    throw Error("Conflation discovery options do not match generation options");
+  }
+}
+
+function generateCumulativeConflationArtifacts(
+  base: Osm,
+  patch: Osm,
+  options: Partial<OsmMergeOptions>,
+  decisions: readonly OsmConflationDecision[],
+  canonicalDiscovery: OsmConflationDiscovery,
+  onProgress?: (progress: ProgressEvent) => void,
+) {
+  validateCumulativeConflationOptions(base, patch, options, canonicalDiscovery);
+  const ordinaryOptions = {
+    directMerge: true,
+    deduplicateNodes: options.deduplicateNodes ?? false,
+    deduplicateWays: options.deduplicateWays ?? false,
+    createIntersections: false,
+  };
+  // Applying does not consume a changeset. Build the ordinary changes once, use
+  // them to materialize the comparison baseline, then add fuzzy changes to that
+  // same cumulative changeset.
+  const changeset = onProgress
+    ? generateChangeset(base, patch, ordinaryOptions, onProgress)
+    : generateChangeset(base, patch, ordinaryOptions);
+  const ordinaryBaseline = applyChangesetToOsm(changeset);
+  applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions, base);
   const result = applyChangesetToOsm(changeset);
-  assertConflationPreservesBaseTopology(originalBase, baseline, result);
-  return changeset;
+  assertConflationPreservesBaseTopology(base, ordinaryBaseline, result);
+  return { changeset, ordinaryBaseline, result };
 }
 
 /**
@@ -1462,33 +1584,62 @@ export function generateConflationChangeset(
   // Stable decisions are replayed against a fresh discovery from untouched inputs.
   const canonicalDiscovery = discoverConflationCandidates(base, patch, options.conflation);
   const suppliedDiscovery = discovery ?? canonicalDiscovery;
-  if (suppliedDiscovery.baseOsmId !== base.id || suppliedDiscovery.patchOsmId !== patch.id) {
-    throw Error("Conflation discovery does not match the untouched merge inputs");
+  // Validate the supplied review snapshot even though the fresh canonical
+  // discovery remains the only source of mutation instructions.
+  validateCumulativeConflationOptions(base, patch, options, suppliedDiscovery);
+  return generateCumulativeConflationArtifacts(base, patch, options, decisions, canonicalDiscovery)
+    .changeset;
+}
+
+/**
+ * Generate cumulative artifacts from a canonical same-process discovery.
+ *
+ * @internal Public generation must use {@link generateConflationChangeset}, which
+ * deliberately rediscovers candidates before applying caller-supplied decisions.
+ */
+export function generateConflationArtifactsFromTrustedDiscovery(
+  base: Osm,
+  patch: Osm,
+  options: Partial<OsmMergeOptions>,
+  decisions: readonly OsmConflationDecision[],
+  discovery: OsmConflationDiscovery,
+  onProgress: (progress: ProgressEvent) => void,
+) {
+  const inputs = trustedDiscoveries.get(discovery);
+  if (inputs?.base !== base || inputs.patch !== patch) {
+    throw Error("Conflation discovery is not owned by this trusted merge session");
   }
-  const expectedOptions = resolvedOptions(options.conflation);
-  if (
-    suppliedDiscovery.options.attachNetwork !== expectedOptions.attachNetwork ||
-    suppliedDiscovery.options.automatic !== expectedOptions.automatic ||
-    suppliedDiscovery.options.maxDistanceMeters !== expectedOptions.maxDistanceMeters ||
-    suppliedDiscovery.options.propertyKeys.length !== expectedOptions.propertyKeys.length ||
-    suppliedDiscovery.options.propertyKeys.some(
-      (key, index) => key !== expectedOptions.propertyKeys[index],
-    )
-  ) {
-    throw Error("Conflation discovery options do not match generation options");
+  return generateCumulativeConflationArtifacts(
+    base,
+    patch,
+    options,
+    decisions,
+    discovery,
+    onProgress,
+  );
+}
+
+/**
+ * Generate fuzzy-only artifacts from a canonical same-process discovery.
+ *
+ * @internal Used for the automatic network-attachment CAR safety projection.
+ */
+export function generateConflationApplicationArtifactsFromTrustedDiscovery(
+  baseline: Osm,
+  patch: Osm,
+  discovery: OsmConflationDiscovery,
+  originalBase: Osm,
+  decisions: readonly OsmConflationDecision[],
+) {
+  const inputs = trustedDiscoveries.get(discovery);
+  if (inputs?.base !== originalBase || inputs.patch !== patch) {
+    throw Error("Conflation discovery is not owned by this trusted merge session");
   }
-  const ordinaryOptions = {
-    directMerge: true,
-    deduplicateNodes: options.deduplicateNodes ?? false,
-    deduplicateWays: options.deduplicateWays ?? false,
-    createIntersections: false,
-  };
-  // Compare fuzzy output with the ordinary merge, not the raw base. This preserves
-  // authoritative same-ID patch updates while forbidding fuzzy geometry rewrites.
-  const ordinaryBaseline = applyChangesetToOsm(generateChangeset(base, patch, ordinaryOptions));
-  const changeset = generateChangeset(base, patch, ordinaryOptions);
-  applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions, base);
-  const result = applyChangesetToOsm(changeset);
-  assertConflationPreservesBaseTopology(base, ordinaryBaseline, result);
-  return changeset;
+  return generateConflationApplicationArtifacts(
+    baseline,
+    patch,
+    discovery,
+    originalBase,
+    decisions,
+  );
 }

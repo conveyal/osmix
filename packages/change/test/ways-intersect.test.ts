@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import sweeplineIntersections, {
+  sweeplineLineIntersections,
+} from "../src/sweepline-intersections.ts";
 import { waysIntersect } from "../src/utils.ts";
 
 type Point = [number, number];
@@ -115,5 +118,28 @@ describe("waysIntersect", () => {
 
   it.each(cases)("matches pinned behavior for %s", (_name, wayA, wayB, expected) => {
     expect(waysIntersect(wayA, wayB)).toEqual(expected);
+  });
+
+  it.each(cases)("keeps the direct line entry point equivalent for %s", (_name, wayA, wayB) => {
+    const wrapped = sweeplineIntersections(
+      {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "LineString", coordinates: wayA },
+            properties: {},
+          },
+          {
+            type: "Feature",
+            geometry: { type: "LineString", coordinates: wayB },
+            properties: {},
+          },
+        ],
+      },
+      true,
+    );
+
+    expect(sweeplineLineIntersections(wayA, wayB)).toEqual(wrapped);
   });
 });
