@@ -11,12 +11,11 @@ import type { Osm } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
 
 import { applyChangesetToOsm } from "./apply-changeset.ts";
-import {
-  discoverConflationCandidates,
-  generateConflationApplicationChangeset,
-} from "./conflation.ts";
 import { generateChangeset } from "./generate-changeset.ts";
-import { assertConflationPreservesBaseTopology } from "./integrity.ts";
+import {
+  discoverConflationCandidatesForTrustedMerge,
+  generateConflationApplicationArtifactsFromTrustedDiscovery,
+} from "./internal/conflation.ts";
 import type { OsmMergeOptions } from "./types.ts";
 import { changeStatsSummary } from "./utils.ts";
 
@@ -79,17 +78,18 @@ export async function merge(
     log(`Discovering imported-data matches from ${patch.id} against ${base.id}...`);
     // Fuzzy discovery always sees untouched inputs. The ordinary result is only the
     // application baseline, preventing transitive matches through imported entities.
-    const discovery = discoverConflationCandidates(base, patch, options.conflation);
+    const discovery = discoverConflationCandidatesForTrustedMerge(base, patch, options.conflation);
     const ordinaryBaseline = modifiedBase;
-    const changeset = generateConflationApplicationChangeset(
+    const conflation = generateConflationApplicationArtifactsFromTrustedDiscovery(
       ordinaryBaseline,
       patch,
       discovery,
       base,
-      options.conflation.decisions,
+      options.conflation.decisions ?? [],
     );
-    modifiedBase = applyChangesetToOsm(changeset);
-    assertConflationPreservesBaseTopology(base, ordinaryBaseline, modifiedBase);
+    // Generation already materialized and validated this exact result. Installing
+    // it directly avoids a second full decode, index build, and integrity pass.
+    modifiedBase = conflation.result;
     log(
       `Conflation candidates: ${discovery.summary.automatic.toLocaleString()} automatic, ${discovery.summary.review.toLocaleString()} review, ${discovery.summary.blocked.toLocaleString()} blocked, ${discovery.summary.unmatched.toLocaleString()} unmatched`,
     );

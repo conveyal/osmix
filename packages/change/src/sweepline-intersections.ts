@@ -253,35 +253,43 @@ function processFeature(
 
   for (let i = 0; i < coords.length; i++) {
     for (let ii = 0; ii < coords[i]!.length; ii++) {
-      const ring = coords[i]![ii]!;
-      let currentP = ring[0]!;
-      let nextP: Position | null = null;
-      ringId = ringId + 1;
-      for (let iii = 0; iii < ring.length - 1; iii++) {
-        nextP = ring[iii + 1]!;
-
-        const e1 = new Event(currentP, featureId, ringId, eventId);
-        const e2 = new Event(nextP, featureId, ringId, eventId + 1);
-
-        e1.otherEvent = e2;
-        e2.otherEvent = e1;
-
-        if (checkWhichEventIsLeft(e1, e2) > 0) {
-          e2.isLeftEndpoint = true;
-          e1.isLeftEndpoint = false;
-        } else {
-          e1.isLeftEndpoint = true;
-          e2.isLeftEndpoint = false;
-        }
-        eventQueue.push(e1);
-        eventQueue.push(e2);
-
-        currentP = nextP;
-        eventId = eventId + 1;
-      }
+      fillLineEventQueue(coords[i]![ii]!, eventQueue);
     }
   }
   featureId = featureId + 1;
+}
+
+/**
+ * Add one line to the same event queue used by the GeoJSON-compatible entry point.
+ * Keeping this as the single event-construction path lets the merge hot path avoid
+ * temporary GeoJSON wrappers without changing the robust intersection kernel.
+ */
+function fillLineEventQueue(line: readonly Position[], eventQueue: TinyQueue<Event>): void {
+  let currentP = line[0]!;
+  let nextP: Position | null = null;
+  ringId = ringId + 1;
+  for (let index = 0; index < line.length - 1; index++) {
+    nextP = line[index + 1]!;
+
+    const e1 = new Event(currentP, featureId, ringId, eventId);
+    const e2 = new Event(nextP, featureId, ringId, eventId + 1);
+
+    e1.otherEvent = e2;
+    e2.otherEvent = e1;
+
+    if (checkWhichEventIsLeft(e1, e2) > 0) {
+      e2.isLeftEndpoint = true;
+      e1.isLeftEndpoint = false;
+    } else {
+      e1.isLeftEndpoint = true;
+      e2.isLeftEndpoint = false;
+    }
+    eventQueue.push(e1);
+    eventQueue.push(e2);
+
+    currentP = nextP;
+    eventId = eventId + 1;
+  }
 }
 
 class Segment {
@@ -694,4 +702,23 @@ export default function sweeplineIntersections(
   ignoreSelfIntersections = false,
 ): [number, number][] {
   return sweeplineIntersectionsRuntime(geojson, ignoreSelfIntersections);
+}
+
+/**
+ * Check two lines with the same event ordering and robust predicates as the
+ * GeoJSON-compatible runtime, but without allocating wrapper features.
+ *
+ * This intentionally remains internal to `@osmix/change`: callers that need
+ * general GeoJSON support should use the default entry point above.
+ */
+export function sweeplineLineIntersections(
+  lineA: readonly Point[],
+  lineB: readonly Point[],
+): [number, number][] {
+  const eventQueue = new TinyQueue<Event>([], checkWhichEventIsLeft);
+  fillLineEventQueue(lineA, eventQueue);
+  featureId++;
+  fillLineEventQueue(lineB, eventQueue);
+  featureId++;
+  return runCheck(eventQueue, true);
 }

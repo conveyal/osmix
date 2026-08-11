@@ -1,6 +1,6 @@
 import { Osm } from "@osmix/core";
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/types";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset.ts";
 import {
@@ -13,6 +13,7 @@ import {
   validateConflationDecisions,
 } from "../src/conflation.ts";
 import { generateChangeset } from "../src/generate-changeset.ts";
+import * as publicChangeApi from "../src/index.ts";
 import { merge } from "../src/merge.ts";
 import type {
   OsmConflationCandidate,
@@ -43,6 +44,14 @@ const attachmentOptions: OsmConflationOptions = {
 };
 
 describe("safe fuzzy conflation discovery", () => {
+  it("keeps trusted generation capabilities out of the public package API", () => {
+    expect(publicChangeApi).not.toHaveProperty("discoverConflationCandidatesForTrustedMerge");
+    expect(publicChangeApi).not.toHaveProperty("generateConflationArtifactsFromTrustedDiscovery");
+    expect(publicChangeApi).not.toHaveProperty(
+      "generateConflationApplicationArtifactsFromTrustedDiscovery",
+    );
+  });
+
   it("automatically attaches a unique aligned imported sidewalk without moving the base", async () => {
     const base = createOsm(
       "base",
@@ -71,12 +80,19 @@ describe("safe fuzzy conflation discovery", () => {
     expect(match?.evidence.distanceMeters).toBeGreaterThan(0.5);
     expect(match?.evidence.distanceMeters).toBeLessThan(0.6);
 
-    const result = await merge(
-      base,
-      patch,
-      { directMerge: true, conflation: attachmentOptions },
-      silent,
-    );
+    const buildIndexes = vi.spyOn(Osm.prototype, "buildIndexes");
+    let result!: Osm;
+    try {
+      result = await merge(
+        base,
+        patch,
+        { directMerge: true, conflation: attachmentOptions },
+        silent,
+      );
+      expect(buildIndexes).toHaveBeenCalledTimes(2);
+    } finally {
+      buildIndexes.mockRestore();
+    }
     expect(result.nodes.getById(1)).toMatchObject({ lon: 0, lat: 0 });
     expect(result.nodes.ids.has(101)).toBe(true);
     expect(result.ways.getById(10)?.refs).toEqual([2, 1]);
@@ -406,6 +422,21 @@ describe("safe fuzzy conflation discovery", () => {
         },
       }),
     ).toThrow("Unknown conflation candidate: node:stale->1");
+  });
+
+  it("rejects a fuzzy-only discovery from another merge session", () => {
+    const base = createOsm("base", [{ id: 1, lon: 0, lat: 0 }]);
+    const patch = createOsm("patch", [{ id: 101, lon: 0.000005, lat: 0 }]);
+    const otherBase = createOsm("other-base", [{ id: 2, lon: 0, lat: 0 }]);
+    const otherPatch = createOsm("other-patch", [{ id: 102, lon: 0.000005, lat: 0 }]);
+    const discovery = discoverConflationCandidates(otherBase, otherPatch, {
+      propertyKeys: ["name"],
+      attachNetwork: false,
+    });
+
+    expect(() => generateConflationApplicationChangeset(base, patch, discovery, base)).toThrow(
+      "Conflation discovery patch other-patch does not match patch",
+    );
   });
 
   it("rejects unknown decisions through the high-level merge API", async () => {

@@ -261,6 +261,49 @@ describe("routing-safe merge reconciliation", () => {
     });
   });
 
+  it("checks complete way semantics when exact-index hashes collide", async () => {
+    const base = createOsm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 1, lat: 0 },
+      ],
+      [
+        {
+          id: 10,
+          refs: [1, 2],
+          tags: { highway: "residential", surface: "1ugdp92ail" },
+        },
+        {
+          id: 11,
+          refs: [1, 2],
+          tags: { highway: "residential", surface: "c9n7431ir0" },
+        },
+      ],
+    );
+    const patch = createOsm(
+      "patch",
+      [],
+      [
+        {
+          id: 20,
+          refs: [1, 2],
+          tags: {
+            highway: "residential",
+            name: "Matching target",
+            surface: "c9n7431ir0",
+          },
+        },
+      ],
+    );
+
+    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, silent);
+
+    expect(result.ways.ids.has(20)).toBe(false);
+    expect(result.ways.getById(10)?.tags?.["name"]).toBeUndefined();
+    expect(result.ways.getById(11)?.tags?.["name"]).toBe("Matching target");
+  });
+
   it("rejects patch dangling refs even when they already exist in the patch", async () => {
     const base = createOsm("base", []);
     const patch = createOsm(
