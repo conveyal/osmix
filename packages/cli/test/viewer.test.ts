@@ -4,7 +4,13 @@ import { promisify } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
-import { animationPhase, formatRenderingModeStatus, viewerShouldAnimate } from "../src/viewer.ts";
+import {
+  animationPhase,
+  formatRenderingModeStatus,
+  initializeRenderBackend,
+  requestedRenderBackend,
+  viewerShouldAnimate,
+} from "../src/viewer.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -46,6 +52,7 @@ describe("viewer loading animation lifecycle", () => {
       resumedAtClockPhase: boolean;
       staticCompositionsAfterAnimation: number;
       staticCompositionsBeforeAnimation: number;
+      vectorResizeHandled: boolean;
       zoomHandled: boolean;
     };
     expect(result).toMatchObject({
@@ -55,6 +62,7 @@ describe("viewer loading animation lifecycle", () => {
       quitHandled: true,
       resizeHandled: true,
       resumedAtClockPhase: true,
+      vectorResizeHandled: true,
       zoomHandled: true,
     });
     expect(result.animationFrameCount).toBeGreaterThanOrEqual(8);
@@ -74,5 +82,39 @@ describe("viewer loading animation lifecycle", () => {
 describe("viewer tile rendering status", () => {
   it("does not add a status suffix for worker rendering", () => {
     expect(formatRenderingModeStatus("workers")).toBe("");
+  });
+});
+
+describe("viewer render backend selection", () => {
+  it("uses auto unless raster or vector is explicitly requested", () => {
+    expect(requestedRenderBackend({})).toBe("auto");
+    expect(requestedRenderBackend({ OSMIX_CLI_RENDERER: "vector" })).toBe("vector");
+    expect(requestedRenderBackend({ OSMIX_CLI_RENDERER: "raster" })).toBe("raster");
+    expect(requestedRenderBackend({ OSMIX_CLI_RENDERER: "unknown" })).toBe("auto");
+  });
+
+  it("selects vector in auto mode when initialization succeeds", async () => {
+    await expect(initializeRenderBackend("auto", async () => "vector")).resolves.toBe("vector");
+  });
+
+  it("falls back only in auto mode", async () => {
+    const failure = Error("WebGPU unavailable");
+    await expect(
+      initializeRenderBackend("auto", async () => Promise.reject(failure)),
+    ).resolves.toBe(null);
+    await expect(
+      initializeRenderBackend("vector", async () => Promise.reject(failure)),
+    ).rejects.toBe(failure);
+  });
+
+  it("does not initialize WebGPU in raster mode", async () => {
+    let initialized = false;
+    await expect(
+      initializeRenderBackend("raster", async () => {
+        initialized = true;
+        return "vector";
+      }),
+    ).resolves.toBeNull();
+    expect(initialized).toBe(false);
   });
 });
