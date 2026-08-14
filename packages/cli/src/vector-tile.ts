@@ -1,5 +1,6 @@
 import { clipPolygon, clipPolyline } from "@osmix/geo/lineclip";
 import { wayIsArea } from "@osmix/geo/way-is-area";
+import { runCooperatively } from "@osmix/shared/cooperative";
 import type { ShortbreadGeometryType } from "@osmix/shortbread";
 import earcut from "earcut";
 import { OsmixRasterTile, type LonLat, type Osm, type Rgba, type Tile, type XY } from "osmix";
@@ -22,6 +23,13 @@ export interface VectorGeometryGroup {
 export interface VectorTilePacket {
   tile: Tile;
   groups: VectorGeometryGroup[];
+}
+
+/** Internal scheduling hooks used by the fallback worker and deterministic tests. */
+export interface VectorTileAsyncOptions {
+  chunkBudgetMs?: number;
+  now?: () => number;
+  yieldToEventLoop?: () => Promise<void>;
 }
 
 interface MutableGeometryGroup {
@@ -52,6 +60,7 @@ function addQuad(group: MutableGeometryGroup, a: XY, b: XY, c: XY, d: XY): void 
 }
 
 const ROUND_STROKE_SEGMENTS = 8;
+const GEOMETRY_STEP_SIZE = 256;
 
 function addRoundStrokePoint(group: MutableGeometryGroup, center: XY, radius: number): void {
   const centerIndex = addVertex(group, center);
@@ -84,25 +93,26 @@ function cleanRing(ring: XY[]): XY[] {
   return cleaned.length >= 3 ? cleaned : [];
 }
 
-function projectedRings(tile: OsmixRasterTile, rings: LonLat[][]): XY[][] {
-  const result: XY[][] = [];
-  for (const ring of rings) {
-    const projected = ring.map((point) => tile.llToTilePx(point));
-    const clipped = cleanRing(clipPolygon(projected, [0, 0, tile.tileSize, tile.tileSize]));
-    if (clipped.length > 0) result.push(clipped);
-  }
-  return result;
-}
-
-function addPolygon(
+function* addPolygonSteps(
   groups: Map<string, MutableGeometryGroup>,
   tile: OsmixRasterTile,
   rings: LonLat[][],
   style: Extract<MapFeatureStyle, { kind: "fill" }>,
   category: MutableGeometryGroup["category"],
   entityId: number,
-): void {
-  const clipped = projectedRings(tile, rings);
+  cooperative: boolean,
+): Generator<void, void> {
+  const clipped: XY[][] = [];
+  for (const ring of rings) {
+    const projected: XY[] = [];
+    for (let index = 0; index < ring.length; index++) {
+      projected.push(tile.llToTilePx(ring[index]!));
+      if (cooperative && (index + 1) % GEOMETRY_STEP_SIZE === 0) yield;
+    }
+    const clippedRing = cleanRing(clipPolygon(projected, [0, 0, tile.tileSize, tile.tileSize]));
+    if (clippedRing.length > 0) clipped.push(clippedRing);
+    if (cooperative) yield;
+  }
   const outer = clipped[0];
   if (!outer) return;
 
@@ -111,9 +121,14 @@ function addPolygon(
   for (let ringIndex = 0; ringIndex < clipped.length; ringIndex++) {
     const ring = clipped[ringIndex]!;
     if (ringIndex > 0) holes.push(data.length / 2);
-    for (const point of ring) data.push(point[0], point[1]);
+    for (let pointIndex = 0; pointIndex < ring.length; pointIndex++) {
+      const point = ring[pointIndex]!;
+      data.push(point[0], point[1]);
+      if (cooperative && (pointIndex + 1) % GEOMETRY_STEP_SIZE === 0) yield;
+    }
   }
   const triangles = earcut(data, holes);
+  if (cooperative) yield;
   if (triangles.length === 0) return;
 
   const key = `fill:${category}:${style.order}:${colorKey(style.color)}`;
@@ -129,12 +144,16 @@ function addPolygon(
   const offset = group.positions.length / 3;
   for (let index = 0; index < data.length; index += 2) {
     group.positions.push(data[index]!, data[index + 1]!, 0);
+    if (cooperative && (index / 2 + 1) % GEOMETRY_STEP_SIZE === 0) yield;
   }
-  for (const index of triangles) group.indices.push(offset + index);
+  for (let triangleIndex = 0; triangleIndex < triangles.length; triangleIndex++) {
+    group.indices.push(offset + triangles[triangleIndex]!);
+    if (cooperative && (triangleIndex + 1) % (GEOMETRY_STEP_SIZE * 3) === 0) yield;
+  }
   groups.set(key, group);
 }
 
-function addLine(
+function* addLineSteps(
   groups: Map<string, MutableGeometryGroup>,
   tile: OsmixRasterTile,
   line: LonLat[],
@@ -143,9 +162,15 @@ function addLine(
   order: number,
   category: MutableGeometryGroup["category"],
   entityId: number,
-): void {
-  const projected = line.map((point) => tile.llToTilePx(point));
+  cooperative: boolean,
+): Generator<void, void> {
+  const projected: XY[] = [];
+  for (let index = 0; index < line.length; index++) {
+    projected.push(tile.llToTilePx(line[index]!));
+    if (cooperative && (index + 1) % GEOMETRY_STEP_SIZE === 0) yield;
+  }
   const clipped = clipPolyline(projected, [0, 0, tile.tileSize, tile.tileSize]);
+  if (cooperative) yield;
   const key = `line:${category}:${order}:${colorKey(color)}:${width}`;
   const group = groups.get(key) ?? {
     category,
@@ -178,11 +203,16 @@ function addLine(
         [b[0] - nx, b[1] - ny],
         [a[0] - nx, a[1] - ny],
       );
+      if (cooperative && index % GEOMETRY_STEP_SIZE === 0) yield;
     }
     // Independent quads leave pinholes at bends and blunt, visibly broken road ends. A small
     // triangle fan at each retained vertex creates continuous round joins and caps while keeping
     // every stroke in the same batched material group.
-    for (const point of strokePoints) addRoundStrokePoint(group, point, halfWidth);
+    for (let index = 0; index < strokePoints.length; index++) {
+      addRoundStrokePoint(group, strokePoints[index]!, halfWidth);
+      if (cooperative && (index + 1) % GEOMETRY_STEP_SIZE === 0) yield;
+    }
+    if (cooperative) yield;
   }
   if (group.indices.length > indexCountBefore) group.sourceEntityIds.add(entityId);
   groups.set(key, group);
@@ -277,7 +307,7 @@ function addPoint(
   groups.set(key, group);
 }
 
-function addStyles(
+function* addStylesSteps(
   groups: Map<string, MutableGeometryGroup>,
   tile: OsmixRasterTile,
   geometryType: ShortbreadGeometryType,
@@ -285,14 +315,15 @@ function addStyles(
   styles: MapFeatureStyle[],
   category: MutableGeometryGroup["category"],
   entityId: number,
-): void {
+  cooperative: boolean,
+): Generator<void, void> {
   for (const style of styles) {
     if (style.kind === "fill" && geometry.rings) {
       for (const polygon of geometry.rings) {
-        addPolygon(groups, tile, polygon, style, category, entityId);
+        yield* addPolygonSteps(groups, tile, polygon, style, category, entityId, cooperative);
         if (style.outlineColor && style.outlineWidth) {
           for (const ring of polygon)
-            addLine(
+            yield* addLineSteps(
               groups,
               tile,
               ring,
@@ -301,6 +332,7 @@ function addStyles(
               style.order,
               category,
               entityId,
+              cooperative,
             );
         }
       }
@@ -311,7 +343,7 @@ function addStyles(
           : (geometry.rings ?? []).flat();
       for (const line of lines) {
         if (style.casingColor && style.casingWidth)
-          addLine(
+          yield* addLineSteps(
             groups,
             tile,
             line,
@@ -320,23 +352,38 @@ function addStyles(
             style.order,
             category,
             entityId,
+            cooperative,
           );
-        addLine(groups, tile, line, style.color, style.width, style.order, category, entityId);
+        yield* addLineSteps(
+          groups,
+          tile,
+          line,
+          style.color,
+          style.width,
+          style.order,
+          category,
+          entityId,
+          cooperative,
+        );
       }
     } else if (style.kind === "point" && geometry.points) {
-      for (const point of geometry.points) addPoint(groups, tile, point, style, category, entityId);
+      for (const point of geometry.points) {
+        addPoint(groups, tile, point, style, category, entityId);
+        if (cooperative) yield;
+      }
     }
+    if (cooperative) yield;
   }
 }
 
-/** Build one transferable Three.js geometry packet from a visible OSM tile. */
-export function buildVectorTile(
+function* buildVectorTileSteps(
   osm: Osm,
   tileIndex: Tile,
   nodeIndexProvider: StyledTileNodeIndexProvider | undefined,
   featureIndexes: StyledTileFeatureIndexProviders,
-  isCancelled: () => boolean = () => false,
-): VectorTilePacket | null {
+  isCancelled: () => boolean,
+  cooperative: boolean,
+): Generator<void, VectorTilePacket | null> {
   const tile = new OsmixRasterTile({ tile: tileIndex, tileSize: 256 });
   const groups = new Map<string, MutableGeometryGroup>();
   const suppressedAreaWayIds = new Set<number>();
@@ -350,7 +397,7 @@ export function buildVectorTile(
     const relation = osm.relations.getRelationGeometry(relationIndex);
     if (relation.rings) {
       const styles = resolveFeatureStyles(tags ?? {}, "Polygon", tileIndex[2]);
-      addStyles(
+      yield* addStylesSteps(
         groups,
         tile,
         "Polygon",
@@ -358,13 +405,14 @@ export function buildVectorTile(
         styles,
         "relation",
         osm.relations.ids.at(relationIndex),
+        cooperative,
       );
       for (const member of osm.relations.getMembersByIndex(relationIndex)) {
         if (member.type === "way") suppressedAreaWayIds.add(member.ref);
       }
     }
     if (relation.lineStrings)
-      addStyles(
+      yield* addStylesSteps(
         groups,
         tile,
         "LineString",
@@ -372,9 +420,10 @@ export function buildVectorTile(
         resolveFeatureStyles(tags ?? {}, "LineString", tileIndex[2]),
         "relation",
         osm.relations.ids.at(relationIndex),
+        cooperative,
       );
     if (relation.points)
-      addStyles(
+      yield* addStylesSteps(
         groups,
         tile,
         "Point",
@@ -382,7 +431,9 @@ export function buildVectorTile(
         resolveFeatureStyles(tags ?? {}, "Point", tileIndex[2]),
         "relation",
         osm.relations.ids.at(relationIndex),
+        cooperative,
       );
+    if (cooperative) yield;
   }
 
   const wayIndexes = [...(featureIndexes.ways ?? osm.ways).intersects(tile.bbox())].sort(
@@ -391,14 +442,20 @@ export function buildVectorTile(
   for (const wayIndex of wayIndexes) {
     if (isCancelled()) return null;
     const tags = osm.ways.tags.getTags(wayIndex);
-    if (!tags) continue;
+    if (!tags) {
+      if (cooperative) yield;
+      continue;
+    }
     const id = osm.ways.ids.at(wayIndex);
     const coordinates = osm.ways.getCoordinates(wayIndex);
     const isArea = wayIsArea({ id, refs: osm.ways.getRefIds(wayIndex), tags });
-    if (isArea && id !== undefined && suppressedAreaWayIds.has(id)) continue;
+    if (isArea && id !== undefined && suppressedAreaWayIds.has(id)) {
+      if (cooperative) yield;
+      continue;
+    }
     const geometryType = isArea ? "Polygon" : "LineString";
     const styles = resolveFeatureStyles(tags, geometryType, tileIndex[2]);
-    addStyles(
+    yield* addStylesSteps(
       groups,
       tile,
       geometryType,
@@ -406,7 +463,9 @@ export function buildVectorTile(
       styles,
       "way",
       id,
+      cooperative,
     );
+    if (cooperative) yield;
   }
 
   if (tileIndex[2] >= 14) {
@@ -418,7 +477,7 @@ export function buildVectorTile(
       const tags = osm.nodes.tags.getTags(nodeIndex);
       const styles = resolveFeatureStyles(tags ?? {}, "Point", tileIndex[2]);
       if (styles.length > 0)
-        addStyles(
+        yield* addStylesSteps(
           groups,
           tile,
           "Point",
@@ -426,22 +485,86 @@ export function buildVectorTile(
           styles,
           "node",
           osm.nodes.ids.at(nodeIndex),
+          cooperative,
         );
+      if (cooperative) yield;
     }
+  }
+
+  const completedGroups: VectorGeometryGroup[] = [];
+  const orderedGroups = [...groups.values()]
+    .filter((group) => group.indices.length > 0)
+    .sort((a, b) => a.order - b.order);
+  for (const group of orderedGroups) {
+    if (isCancelled()) return null;
+    const indices = new Uint32Array(group.indices.length);
+    for (let index = 0; index < group.indices.length; index++) {
+      indices[index] = group.indices[index]!;
+      if (cooperative && (index + 1) % (GEOMETRY_STEP_SIZE * 3) === 0) yield;
+    }
+    const positions = new Float32Array(group.positions.length);
+    for (let index = 0; index < group.positions.length; index++) {
+      positions[index] = group.positions[index]!;
+      if (cooperative && (index + 1) % (GEOMETRY_STEP_SIZE * 3) === 0) yield;
+    }
+    completedGroups.push({
+      category: group.category,
+      color: group.color,
+      indices: indices.buffer,
+      order: group.order,
+      positions: positions.buffer,
+      sourceEntityIds: [...group.sourceEntityIds],
+    });
+    if (cooperative) yield;
   }
 
   return {
     tile: tileIndex,
-    groups: [...groups.values()]
-      .filter((group) => group.indices.length > 0)
-      .sort((a, b) => a.order - b.order)
-      .map((group) => ({
-        category: group.category,
-        color: group.color,
-        indices: Uint32Array.from(group.indices).buffer,
-        order: group.order,
-        positions: Float32Array.from(group.positions).buffer,
-        sourceEntityIds: [...group.sourceEntityIds],
-      })),
+    groups: completedGroups,
   };
+}
+
+/** Build one transferable Three.js geometry packet from a visible OSM tile. */
+export function buildVectorTile(
+  osm: Osm,
+  tileIndex: Tile,
+  nodeIndexProvider: StyledTileNodeIndexProvider | undefined,
+  featureIndexes: StyledTileFeatureIndexProviders,
+  isCancelled: () => boolean = () => false,
+): VectorTilePacket | null {
+  const steps = buildVectorTileSteps(
+    osm,
+    tileIndex,
+    nodeIndexProvider,
+    featureIndexes,
+    isCancelled,
+    false,
+  );
+  while (!isCancelled()) {
+    const step = steps.next();
+    if (step.done) return step.value;
+  }
+  steps.return(null);
+  return null;
+}
+
+/** Build a vector tile in bounded slices so non-shared cancellation messages can run. */
+export async function buildVectorTileAsync(
+  osm: Osm,
+  tileIndex: Tile,
+  nodeIndexProvider: StyledTileNodeIndexProvider | undefined,
+  featureIndexes: StyledTileFeatureIndexProviders,
+  isCancelled: () => boolean = () => false,
+  options: VectorTileAsyncOptions = {},
+): Promise<VectorTilePacket | null> {
+  const result = await runCooperatively(
+    buildVectorTileSteps(osm, tileIndex, nodeIndexProvider, featureIndexes, isCancelled, true),
+    {
+      isCancelled,
+      now: options.now,
+      timeSliceMs: options.chunkBudgetMs,
+      yieldToEventLoop: options.yieldToEventLoop,
+    },
+  );
+  return result.status === "cancelled" ? null : result.value;
 }

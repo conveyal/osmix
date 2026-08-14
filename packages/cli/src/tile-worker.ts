@@ -24,7 +24,7 @@ import {
   type SemanticRenderIndexTransferables,
 } from "./semantic-render-index.ts";
 import { drawStyledMapTile, drawStyledMapTileAsync } from "./styled-tile.ts";
-import { buildVectorTile, type VectorTilePacket } from "./vector-tile.ts";
+import { buildVectorTile, buildVectorTileAsync, type VectorTilePacket } from "./vector-tile.ts";
 
 export interface MapLabelQueryRequest {
   centerX: number;
@@ -347,7 +347,7 @@ export class CliTileWorker extends OsmixWorker {
     const osm = this.get(id);
     const renderIndex = this.getSemanticRenderIndex(id);
     const nodeIndex = tile[2] >= 14 ? this.getSemanticNodeIndex(id) : undefined;
-    const packet = buildVectorTile(
+    const packet = await buildVectorTileAsync(
       osm,
       tile,
       nodeIndex,

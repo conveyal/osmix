@@ -2,7 +2,7 @@ import { pointToTileFraction } from "@osmix/geo/tile";
 import { Osm, OsmixRasterTile, type Tile, type XY } from "osmix";
 import { describe, expect, it } from "vitest";
 
-import { buildVectorTile } from "../src/vector-tile.ts";
+import { buildVectorTile, buildVectorTileAsync } from "../src/vector-tile.ts";
 
 function tileAt(lon: number, lat: number, zoom: number): Tile {
   const [x, y] = pointToTileFraction(lon, lat, zoom);
@@ -121,5 +121,68 @@ describe("buildVectorTile", () => {
     const packet = build(osm, tileIndex);
     expect(packet?.groups.some((group) => group.sourceEntityIds.includes(4))).toBe(true);
     expect(packet?.groups.some((group) => group.sourceEntityIds.includes(3))).toBe(false);
+  });
+
+  it("preserves synchronous packets while yielding geometry construction in chunks", async () => {
+    const tileIndex = tileAt(0, 0, 14);
+    const projector = new OsmixRasterTile({ tile: tileIndex, tileSize: 256 });
+    const osm = new Osm();
+    addWayAtPixels(
+      osm,
+      projector,
+      5,
+      [
+        [8, 128],
+        [128, 32],
+        [248, 128],
+      ],
+      { highway: "primary" },
+    );
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+    let yields = 0;
+
+    const synchronous = buildVectorTile(osm, tileIndex, undefined, {});
+    const cooperative = await buildVectorTileAsync(osm, tileIndex, undefined, {}, () => false, {
+      chunkBudgetMs: 0,
+      yieldToEventLoop: () => {
+        yields++;
+        return Promise.resolve();
+      },
+    });
+
+    expect(yields).toBeGreaterThan(0);
+    expect(cooperative).toEqual(synchronous);
+  });
+
+  it("yields a macrotask so message cancellation can stop vector construction", async () => {
+    const tileIndex = tileAt(0, 0, 14);
+    const projector = new OsmixRasterTile({ tile: tileIndex, tileSize: 256 });
+    const osm = new Osm();
+    for (let index = 0; index < 500; index++) {
+      addWayAtPixels(
+        osm,
+        projector,
+        1_000 + index,
+        [
+          [4, 1 + (index % 254)],
+          [252, 1 + (index % 254)],
+        ],
+        { highway: "primary" },
+      );
+    }
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+    let cancelled = false;
+    setTimeout(() => {
+      cancelled = true;
+    }, 0);
+
+    const packet = await buildVectorTileAsync(osm, tileIndex, undefined, {}, () => cancelled, {
+      chunkBudgetMs: 0,
+    });
+
+    expect(cancelled).toBe(true);
+    expect(packet).toBeNull();
   });
 });
