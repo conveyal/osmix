@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import {
   discoverConflationCandidatesForTrustedMerge,
   generateConflationApplicationArtifactsFromTrustedDiscovery,
-} from "@osmix/change/src/internal/conflation.ts";
+} from "@osmix/change/internal/conflation";
 import type { Osm } from "@osmix/core";
 import type { OsmEntity } from "@osmix/types";
 
