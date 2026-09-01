@@ -1,5 +1,16 @@
 # @osmix/json
 
+## 0.0.17
+
+### Patch Changes
+
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [8be5c80]
+  - @osmix/shared@0.2.0
+  - @osmix/pbf@0.0.10
+  - @osmix/types@0.1.0
+
 ## 0.0.16
 
 ### Patch Changes
