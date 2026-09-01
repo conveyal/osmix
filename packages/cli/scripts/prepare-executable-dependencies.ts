@@ -6,7 +6,9 @@ import { executableDependencyRoot } from "./executable-targets.ts";
 
 const packageRoot = resolve(import.meta.dirname, "..");
 const corePackagePath = resolve(packageRoot, "node_modules/@opentui/core/package.json");
+const threePackagePath = resolve(packageRoot, "node_modules/@opentui/three/package.json");
 const corePackage = JSON.parse(await readFile(corePackagePath, "utf8")) as { version: string };
+const threePackage = JSON.parse(await readFile(threePackagePath, "utf8")) as { version: string };
 
 await rm(executableDependencyRoot, { force: true, recursive: true });
 await mkdir(executableDependencyRoot, { recursive: true });
@@ -17,9 +19,18 @@ await writeFile(
 
 const install = spawnSync(
   process.execPath,
-  ["install", "--no-save", "--os=*", "--cpu=*", `@opentui/core@${corePackage.version}`],
+  [
+    "install",
+    "--no-save",
+    "--os=*",
+    "--cpu=*",
+    `@opentui/core@${corePackage.version}`,
+    `@opentui/three@${threePackage.version}`,
+  ],
   { cwd: executableDependencyRoot, stdio: "inherit" },
 );
 if (install.status !== 0) throw Error("Unable to prepare OpenTUI native packages.");
 
-process.stdout.write(`Prepared OpenTUI ${corePackage.version} native packages.\n`);
+process.stdout.write(
+  `Prepared OpenTUI core ${corePackage.version} and three ${threePackage.version} native packages.\n`,
+);

@@ -19,11 +19,11 @@ export interface PendingTileRegion {
   top: number;
 }
 
-export type TileProvider = (tile: Tile) => TileImage | null;
-export type TileRenderer = (
+export type TileProvider<T = TileImage> = (tile: Tile) => T | null;
+export type TileRenderer<T = TileImage> = (
   tile: Tile,
   generation: number,
-) => TileImage | null | Promise<TileImage | null>;
+) => T | null | Promise<T | null>;
 
 export function formatTileLoadingStatus(pendingCount: number, spinner: string): string {
   return `${spinner} Rendering ${pendingCount} ${pendingCount === 1 ? "tile" : "tiles"}…`;
@@ -34,15 +34,17 @@ interface PendingTile {
   tile: Tile;
 }
 
-interface OsmTileLoaderOptions {
+interface OsmTileLoaderOptions<T> {
   maxCachedTiles?: number;
   maxConcurrentTiles?: number;
   onError?: (error: unknown) => void;
   onGenerationChange?: (generation: number) => void;
   onPendingChange?: (pendingCount: number) => void;
   onTileComplete?: () => void;
-  renderTile: TileRenderer;
+  renderTile: TileRenderer<T>;
 }
+
+type PreventInference<T> = [T][T extends unknown ? 0 : never];
 
 function modulo(value: number, divisor: number): number {
   return ((value % divisor) + divisor) % divisor;
@@ -161,9 +163,9 @@ export function renderMapPixels(
 }
 
 /** Queue cache misses while serving completed tiles from a bounded LRU cache. */
-export class OsmTileLoader {
-  readonly getTile: TileProvider;
-  private readonly cache = new Map<string, TileImage>();
+export class OsmTileLoader<T = TileImage> {
+  readonly getTile: TileProvider<T>;
+  private readonly cache = new Map<string, T>();
   private readonly inFlight = new Map<string, PendingTile>();
   private readonly maxCachedTiles: number;
   private readonly maxConcurrentTiles: number;
@@ -172,12 +174,12 @@ export class OsmTileLoader {
   private readonly onPendingChange: (pendingCount: number) => void;
   private readonly onTileComplete: () => void;
   private readonly pending = new Map<string, PendingTile>();
-  private readonly renderTile: TileRenderer;
+  private readonly renderTile: TileRenderer<T>;
   private disposed = false;
   private failed = false;
   private generation = 0;
 
-  constructor(options: OsmTileLoaderOptions) {
+  constructor(options: OsmTileLoaderOptions<PreventInference<T>>) {
     this.maxCachedTiles = options.maxCachedTiles ?? MAX_CACHED_TILES;
     this.maxConcurrentTiles = Math.max(1, options.maxConcurrentTiles ?? 1);
     this.onError = options.onError ?? (() => undefined);
@@ -248,7 +250,7 @@ export class OsmTileLoader {
     this.onPendingChange(0);
   }
 
-  private completeTile(key: string, pending: PendingTile, rendered: TileImage | null): void {
+  private completeTile(key: string, pending: PendingTile, rendered: T | null): void {
     if (this.disposed || this.failed) return;
     this.inFlight.delete(key);
     if (!rendered) {
@@ -278,7 +280,7 @@ export class OsmTileLoader {
     this.onError(error);
   }
 
-  private requestTile(tile: Tile): TileImage | null {
+  private requestTile(tile: Tile): T | null {
     if (this.disposed) return null;
     const key = tile.join("/");
     const cached = this.cache.get(key);

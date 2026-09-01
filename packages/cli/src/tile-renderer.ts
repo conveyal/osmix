@@ -16,6 +16,7 @@ import type { TileImage } from "./map-pixels.ts";
 import type { SemanticNodeIndexTransferables } from "./semantic-node-index.ts";
 import type { SemanticRenderIndexTransferables } from "./semantic-render-index.ts";
 import type { MapLabelQueryRequest, MapLabelQueryResult, CliTileWorker } from "./tile-worker.ts";
+import type { VectorTilePacket } from "./vector-tile.ts";
 
 const MAX_CLI_WORKERS = 4;
 const WORKER_RPC_TIMEOUT_MS = 60_000;
@@ -51,6 +52,7 @@ export interface StyledTileRenderer {
     revision: number;
   }>;
   renderTile(tile: Tile, generation: number): Promise<TileImage | null>;
+  renderVectorTile(tile: Tile, generation: number): Promise<VectorTilePacket | null>;
 }
 
 interface StyledTileRendererOptions {
@@ -225,6 +227,23 @@ class CliStyledTileRemote extends OsmixRemote<CliTileWorker> {
     return data ? { data } : null;
   }
 
+  async renderVectorTile(tile: Tile, generation: number): Promise<VectorTilePacket | null> {
+    this.assertReady();
+    if (this.generationGate.isCancelled(generation)) return null;
+    const cancellation = this.generationGate.transferables();
+    const data = await this.runWithWorker(
+      (worker) => {
+        if (this.generationGate.isCancelled(generation)) return null;
+        if (!this.generationGate.hasSharedState) {
+          return worker.getCliVectorTileCooperatively(this.datasetInfo!.id, tile, generation);
+        }
+        return worker.getCliVectorTile(this.datasetInfo!.id, tile, generation, cancellation);
+      },
+      { lane: "compute", retry: "once", timeoutMs: WORKER_RPC_TIMEOUT_MS },
+    );
+    return data;
+  }
+
   protected override async rehydrateWorker(
     worker: Remote<CliTileWorker>,
     index: number,
@@ -326,6 +345,10 @@ class WorkerBackedStyledTileRenderer implements StyledTileRenderer {
 
   renderTile(tile: Tile, generation: number): Promise<TileImage | null> {
     return this.remote.renderTile(tile, generation);
+  }
+
+  renderVectorTile(tile: Tile, generation: number): Promise<VectorTilePacket | null> {
+    return this.remote.renderVectorTile(tile, generation);
   }
 }
 

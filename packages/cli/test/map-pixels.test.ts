@@ -10,6 +10,7 @@ import {
   renderMapPixels,
   SHIMMER_PERIOD,
   TILE_LOADING_BASE,
+  type TileImage,
 } from "../src/map-pixels.ts";
 
 function solidTile(red: number, green: number, blue: number, alpha: number) {
@@ -101,7 +102,7 @@ describe("OsmTileLoader", () => {
   it("self-starts cache misses and exposes completed tiles progressively", async () => {
     const rendered: string[] = [];
     const resolvers = new Map<string, (tile: ReturnType<typeof tinyTile>) => void>();
-    const loader = new OsmTileLoader({
+    const loader = new OsmTileLoader<TileImage>({
       renderTile: (tile, generation) => {
         const key = tile.join("/");
         rendered.push(`${key}@${generation}`);
@@ -134,7 +135,7 @@ describe("OsmTileLoader", () => {
   it("drops queued work that is not requested by the latest viewport", async () => {
     const rendered: string[] = [];
     let resolveBlocker!: (tile: ReturnType<typeof tinyTile>) => void;
-    const loader = new OsmTileLoader({
+    const loader = new OsmTileLoader<TileImage>({
       renderTile: (tile) => {
         rendered.push(tile.join("/"));
         if (tile[0] === 0) return new Promise((resolve) => (resolveBlocker = resolve));
@@ -162,7 +163,7 @@ describe("OsmTileLoader", () => {
 
   it("starts center-most viewport tiles first", async () => {
     const started: Array<{ generation: number; tile: Tile }> = [];
-    const loader = new OsmTileLoader({
+    const loader = new OsmTileLoader<TileImage>({
       renderTile: (tile, generation) => {
         started.push({ generation, tile });
         return new Promise(() => undefined);
@@ -182,7 +183,7 @@ describe("OsmTileLoader", () => {
   it("reorders overlapping queued tiles for the latest viewport", async () => {
     const started: number[] = [];
     let releaseBlocker!: (tile: ReturnType<typeof tinyTile>) => void;
-    const loader = new OsmTileLoader({
+    const loader = new OsmTileLoader<TileImage>({
       renderTile: (tile) => {
         started.push(tile[0]);
         if (tile[0] === 0) return new Promise((resolve) => (releaseBlocker = resolve));
@@ -208,7 +209,7 @@ describe("OsmTileLoader", () => {
   });
 
   it("keeps the default cache bounded to 64 least-recently-used tiles", async () => {
-    const loader = new OsmTileLoader({
+    const loader = new OsmTileLoader<TileImage>({
       renderTile: (tile) => tinyTile(tile[0]),
     });
     for (let index = 0; index < 65; index++) {
@@ -229,7 +230,7 @@ describe("OsmTileLoader", () => {
   it("renders concurrently and refills slots as jobs finish out of order", async () => {
     const resolvers = new Map<number, (tile: ReturnType<typeof tinyTile>) => void>();
     const started: number[] = [];
-    const loader = new OsmTileLoader({
+    const loader = new OsmTileLoader<TileImage>({
       maxConcurrentTiles: 2,
       renderTile: (tile) => {
         started.push(tile[0]);
@@ -258,7 +259,7 @@ describe("OsmTileLoader", () => {
   it("does not redraw stale completions but reuses their cached result", async () => {
     let resolveOld!: (tile: ReturnType<typeof tinyTile>) => void;
     let completions = 0;
-    const loader = new OsmTileLoader({
+    const loader = new OsmTileLoader<TileImage>({
       onTileComplete: () => completions++,
       renderTile: () => new Promise((resolve) => (resolveOld = resolve)),
     });
@@ -282,7 +283,7 @@ describe("OsmTileLoader", () => {
   });
 
   it("stops work after disposal and propagates rendering errors", async () => {
-    const disposed = new OsmTileLoader({ renderTile: () => tinyTile(1) });
+    const disposed = new OsmTileLoader<TileImage>({ renderTile: () => tinyTile(1) });
     disposed.beginFrame();
     disposed.getTile([1, 1, 1]);
     disposed.endFrame();
@@ -293,7 +294,7 @@ describe("OsmTileLoader", () => {
     expect(disposed.pendingCount).toBe(0);
 
     let failure: unknown;
-    const failing = new OsmTileLoader({
+    const failing = new OsmTileLoader<TileImage>({
       onError: (error) => (failure = error),
       renderTile: () => {
         throw Error("tile failed");

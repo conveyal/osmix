@@ -1,6 +1,6 @@
 # @osmix/cli
 
-`@osmix/cli` provides the `osmix` command for exploring a local OSM PBF file in an interactive terminal map. It parses and indexes the file with the `osmix` facade, renders styled XYZ raster tiles, and displays them through an OpenTUI framebuffer.
+`@osmix/cli` provides the `osmix` command for exploring a local OSM PBF file in an interactive terminal map. It parses and indexes the file with the `osmix` facade, and renders a Shortbread-styled map with an OpenTUI Three.js vector backend when WebGPU is available. The existing raster renderer remains available as a compatibility fallback.
 
 ## Installation
 
@@ -25,7 +25,7 @@ against the release's `SHA256SUMS` file. Minimal Alpine installations may also n
 
 ### Bun package
 
-The native OpenTUI renderer requires [Bun](https://bun.sh/).
+The native OpenTUI renderer requires [Bun](https://bun.sh/). The vector backend also requires a Bun runtime with WebGPU support. The default `auto` mode initializes Three.js once and falls back to raster if WebGPU initialization fails.
 
 ```sh
 bun add --global @osmix/cli
@@ -37,9 +37,21 @@ bun add --global @osmix/cli
 osmix monaco.pbf
 ```
 
+Set `OSMIX_CLI_RENDERER=raster` to force the compatibility renderer, or
+`OSMIX_CLI_RENDERER=vector` to require the WebGPU vector backend and report initialization errors
+instead of falling back.
+
+On terminals with Kitty Graphics or Sixel support, the vector backend presents the WebGPU map at
+the terminal's reported pixel resolution. This avoids the Unicode 2-by-2 quadrant conversion used
+by `@opentui/three` while OpenTUI text labels and controls remain regular terminal cells above the
+map. Other terminals use the quadrant output as a compatibility fallback. The status bar reports
+`vector/kitty`, `vector/sixel`, or `vector/quadrants`. OpenTUI's
+`OPENTUI_IMAGE_PROTOCOL=kitty|sixel|blocks` override can force a presentation protocol, and
+`OPENTUI_GRAPHICS=false` disables pixel graphics.
+
 The viewer opens immediately and reports parsing progress in its status bar. PBF streaming, semantic indexing, label queries, and missing map tiles stay in Web Workers so the spinner and controls remain responsive throughout loading. One logical core remains available for OpenTUI and input. The shared Osmix worker runtime supplies availability scheduling, timeouts, retry-once recovery, and diagnostics; the CLI adds a control lane for labels and compute lanes for tiles. Runtimes without shared buffers use one worker without copying the dataset onto the main thread.
 
-The main thread retains only dataset metadata and prepared pixels. Labels arrive asynchronously for the latest camera revision, and stale results are discarded after a pan, zoom, or resize. Pending tiles use a sparse diagonal shimmer drawn during OpenTUI post-processing, while cached portions remain unchanged. Tile work is dispatched independently of successful terminal frames, so output backpressure cannot stall the queue. Shared-buffer workers cancel stale tiles through the common atomic generation gate; the single-worker fallback yields between rendering chunks so an out-of-band cancellation notification can run without moving work onto the main thread. A failed worker is restarted and rehydrated once; the viewer reports a repeated failure instead of falling back to blocking local parsing or rendering.
+The main thread retains only dataset metadata and prepared geometry packets. Labels arrive asynchronously for the latest camera revision, and stale results are discarded after a pan, zoom, or resize. Vector tile packets contain transferable CPU geometry; Three.js objects and WebGPU resources are created only on the main thread and are disposed when tiles leave the scene. Pending tiles use a sparse diagonal shimmer drawn during OpenTUI post-processing, while cached portions remain unchanged. Tile work is dispatched independently of successful terminal frames, so output backpressure cannot stall the queue. Shared-buffer workers cancel stale tiles through the common atomic generation gate; the single-worker fallback yields between rendering chunks so an out-of-band cancellation notification can run without moving work onto the main thread. A failed worker is restarted and rehydrated once; the viewer reports a repeated failure instead of falling back to blocking local parsing or rendering.
 
 The built-in dark basemap classifies OSM features with the Shortbread schema. Water, land use, buildings, boundaries, transportation, and selected points use distinct, high-contrast colors and a stable layer order. Road colors and widths follow their highway class, with tunnels below surface streets and bridges above them. Overview zooms show major roads from zoom 7, secondary roads from zoom 8, tertiary and residential streets from zoom 9, and service streets from zoom 10. These additional overview streets use thin uncased strokes until their normal detail zoom. Buildings appear from zoom 13, while paths and point symbols appear from zoom 14.
 
@@ -60,7 +72,10 @@ Named places, roads, water, parks, sites, and selected points of interest appear
 | `0`                    | Fit the dataset         |
 | `q`, Escape, or Ctrl+C | Quit                    |
 
-The terminal can be resized while the viewer is open. Horizontal panning wraps around the antimeridian; vertical panning is limited to the Web Mercator world bounds.
+The terminal can be resized while the viewer is open. The vector texture and image placement are
+recomputed from the new cell and pixel dimensions so the map keeps its scale and aspect ratio.
+Horizontal panning wraps around the antimeridian; vertical panning is limited to the Web Mercator
+world bounds.
 
 ## Programmatic usage
 

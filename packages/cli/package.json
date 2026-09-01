@@ -28,11 +28,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@opentui/core": "^0.4.3",
+    "@opentui/core": "^0.5.1",
+    "@opentui/three": "^0.5.1",
     "@osmix/geo": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/shortbread": "workspace:*",
     "comlink": "^4.4.2",
+    "earcut": "^3.2.3",
     "osmix": "workspace:*"
   },
   "devDependencies": {

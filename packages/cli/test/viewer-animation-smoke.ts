@@ -2,6 +2,7 @@ import { createTestRenderer } from "@opentui/core/testing";
 import type { OsmInfo } from "osmix";
 
 import type { StyledTileRenderer } from "../src/tile-renderer.ts";
+import type { VectorMapSurface } from "../src/vector-renderer.ts";
 import { animationPhase, TerminalMapViewer } from "../src/viewer.ts";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
@@ -72,6 +73,7 @@ const pendingTileRenderer: StyledTileRenderer = {
     renderCalls++;
     return never();
   },
+  renderVectorTile: () => never(),
 };
 const pendingViewer = new TerminalMapViewer(
   pending.renderer,
@@ -172,6 +174,7 @@ const backpressureTileRenderer: StyledTileRenderer = {
     completedTiles++;
     return { data: new Uint8ClampedArray(TILE_PIXEL_BYTES) };
   },
+  renderVectorTile: () => never(),
 };
 const backpressureViewer = new TerminalMapViewer(
   backpressured.renderer,
@@ -204,6 +207,49 @@ const previousSpinner =
   ];
 backpressured.renderer.destroy();
 
+const vectorResize = await createTestRenderer({ width: 48, height: 8 });
+const preparedVectorFrames: Array<{ generation: number; height: number; width: number }> = [];
+const vectorSurface = {
+  pendingCount: 0,
+  pendingRegions: [],
+  view: {} as Record<string, unknown>,
+  dispose: () => undefined,
+  prepareFrame: (
+    _camera: unknown,
+    viewport: { height: number; width: number },
+    generation: number,
+  ) => preparedVectorFrames.push({ generation, ...viewport }),
+  resize: () => undefined,
+  setCallbacks: () => undefined,
+  setTileRenderer: () => undefined,
+} as unknown as VectorMapSurface;
+const vectorViewer = new TerminalMapViewer(
+  vectorResize.renderer,
+  "resize.pbf",
+  () => performance.now(),
+  {},
+  vectorSurface,
+);
+const vectorTileRenderer: StyledTileRenderer = {
+  ...pendingTileRenderer,
+  queryLabels: () => never(),
+};
+vectorViewer.setDataset(info, vectorTileRenderer);
+await (vectorViewer as unknown as { frameCallback: () => Promise<void> }).frameCallback();
+const vectorViewportBeforeResize = preparedVectorFrames.at(-1)!;
+vectorResize.resize(60, 10);
+await waitFor(() => vectorResize.renderer.width === 60 && vectorResize.renderer.height === 10);
+await Promise.resolve();
+await (vectorViewer as unknown as { frameCallback: () => Promise<void> }).frameCallback();
+const vectorViewportAfterResize = preparedVectorFrames.at(-1)!;
+const vectorResizeHandled =
+  vectorViewportBeforeResize.width === 48 &&
+  vectorViewportBeforeResize.height === 14 &&
+  vectorViewportAfterResize.width === 60 &&
+  vectorViewportAfterResize.height === 18 &&
+  vectorViewportAfterResize.generation > vectorViewportBeforeResize.generation;
+vectorResize.renderer.destroy();
+
 console.log(
   JSON.stringify({
     animationFrameCount: animationTimestamps.length,
@@ -224,6 +270,7 @@ console.log(
     resumedAtClockPhase: resumedSpinner === expectedSpinner || resumedSpinner === previousSpinner,
     staticCompositionsAfterAnimation,
     staticCompositionsBeforeAnimation,
+    vectorResizeHandled,
     zoomHandled: zoomHandledAt < 250 && zoomLatencyMs < 250,
   }),
 );

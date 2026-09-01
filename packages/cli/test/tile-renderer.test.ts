@@ -115,6 +115,17 @@ describe("CLI tile workers", () => {
     worker.delete(osm.id);
   });
 
+  it("services a cancellation update while a non-shared vector tile is building", async () => {
+    const tile: Tile = [4_096, 4_096, 13];
+    const osm = denselyIndexedOsm("yielded-vector-message-cancel-worker", tile, 2_000);
+    const worker = new CliTileWorker();
+    worker.transferIn(osm.transferables());
+    setTimeout(() => worker.cancelTilesBefore(2), 0);
+
+    await expect(worker.getCliVectorTileCooperatively(osm.id, tile, 1)).resolves.toBeNull();
+    worker.delete(osm.id);
+  });
+
   it("returns dataset metadata rather than a main-thread Osm instance", async () => {
     const fixture = fileURLToPath(new URL("../../../fixtures/monaco.pbf", import.meta.url));
     const worker = new CliTileWorker();

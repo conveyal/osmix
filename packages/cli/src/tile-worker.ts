@@ -24,6 +24,7 @@ import {
   type SemanticRenderIndexTransferables,
 } from "./semantic-render-index.ts";
 import { drawStyledMapTile, drawStyledMapTileAsync } from "./styled-tile.ts";
+import { buildVectorTile, buildVectorTileAsync, type VectorTilePacket } from "./vector-tile.ts";
 
 export interface MapLabelQueryRequest {
   centerX: number;
@@ -282,6 +283,33 @@ export class CliTileWorker extends OsmixWorker {
     return isCancelled() ? null : transfer(imageData);
   }
 
+  getCliVectorTile(
+    id: string,
+    tile: Tile,
+    generation = 0,
+    cancellationState?: GenerationGateTransferables,
+  ): VectorTilePacket | null {
+    const osm = this.get(id);
+    const renderIndex = this.getSemanticRenderIndex(id);
+    const nodeIndex = tile[2] >= 14 ? this.getSemanticNodeIndex(id) : undefined;
+    const cancellation = cancellationState
+      ? GenerationGate.fromTransferables(cancellationState)
+      : null;
+    const isCancelled = () => cancellation?.isCancelled(generation) ?? false;
+    if (isCancelled()) return null;
+    const packet = buildVectorTile(
+      osm,
+      tile,
+      nodeIndex,
+      {
+        relations: renderIndex.relations(osm.relations, tile[2]),
+        ways: renderIndex.ways(osm.ways, tile[2]),
+      },
+      isCancelled,
+    );
+    return isCancelled() || !packet ? null : transfer(packet);
+  }
+
   /** Render without SharedArrayBuffer while yielding often enough to service cancel RPCs. */
   async getStyledRasterTileCooperatively(
     id: string,
@@ -307,6 +335,29 @@ export class CliTileWorker extends OsmixWorker {
       )
     ).imageData;
     return isCancelled() ? null : transfer(imageData);
+  }
+
+  async getCliVectorTileCooperatively(
+    id: string,
+    tile: Tile,
+    generation = 0,
+  ): Promise<VectorTilePacket | null> {
+    const isCancelled = () => this.tileGenerationGate.isCancelled(generation);
+    if (isCancelled()) return null;
+    const osm = this.get(id);
+    const renderIndex = this.getSemanticRenderIndex(id);
+    const nodeIndex = tile[2] >= 14 ? this.getSemanticNodeIndex(id) : undefined;
+    const packet = await buildVectorTileAsync(
+      osm,
+      tile,
+      nodeIndex,
+      {
+        relations: renderIndex.relations(osm.relations, tile[2]),
+        ways: renderIndex.ways(osm.ways, tile[2]),
+      },
+      isCancelled,
+    );
+    return isCancelled() || !packet ? null : transfer(packet);
   }
 
   private getSemanticNodeIndex(id: string): SemanticNodeIndex {

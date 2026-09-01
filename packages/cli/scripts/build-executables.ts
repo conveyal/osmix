@@ -101,6 +101,36 @@ async function assertNativePackages(): Promise<void> {
       missing.push(nativePackage);
     }
   }
+
+  const stagedPackageRoot = resolve(executableDependencyRoot, "node_modules");
+  for (const packageName of ["@opentui/core", "@opentui/three"]) {
+    try {
+      await stat(resolve(stagedPackageRoot, packageName, "package.json"));
+    } catch {
+      missing.push(packageName);
+    }
+  }
+  try {
+    const threePackage = JSON.parse(
+      await readFile(resolve(stagedPackageRoot, "@opentui/three/package.json"), "utf8"),
+    ) as {
+      dependencies?: Record<string, string>;
+      optionalDependencies?: Record<string, string>;
+    };
+    const dependencies = {
+      ...threePackage.dependencies,
+      ...threePackage.optionalDependencies,
+    };
+    for (const dependency of Object.keys(dependencies)) {
+      try {
+        await stat(resolve(stagedPackageRoot, dependency, "package.json"));
+      } catch {
+        missing.push(dependency);
+      }
+    }
+  } catch {
+    // The missing @opentui/three package is reported by the check above.
+  }
   if (missing.length === 0) return;
 
   const corePackagePath = resolve(

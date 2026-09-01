@@ -34,6 +34,7 @@ import {
   type StyledTileRenderer,
   type TileRenderingMode,
 } from "./tile-renderer.ts";
+import type { VectorMapSurface } from "./vector-renderer.ts";
 
 const BACKGROUND = RGBA.fromInts(...MAP_BACKGROUND, 255);
 const STATUS_BACKGROUND = RGBA.fromHex("#173c2c");
@@ -64,7 +65,7 @@ type ViewerState =
       info: OsmInfo;
       kind: "ready";
       tileRenderer: StyledTileRenderer;
-      tiles: OsmTileLoader;
+      tiles: OsmTileLoader | null;
     }
   | { kind: "error"; message: string };
 
@@ -94,16 +95,41 @@ export function formatRenderingModeStatus(_mode: TileRenderingMode): string {
   return "";
 }
 
+export type CliRenderBackend = "auto" | "vector" | "raster";
+
+export function requestedRenderBackend(
+  environment: Record<string, string | undefined> = process.env,
+): CliRenderBackend {
+  const value = environment["OSMIX_CLI_RENDERER"];
+  if (value === "vector" || value === "raster") return value;
+  return "auto";
+}
+
+export async function initializeRenderBackend<T>(
+  backend: CliRenderBackend,
+  initializeVector: () => Promise<T>,
+): Promise<T | null> {
+  if (backend === "raster") return null;
+  try {
+    return await initializeVector();
+  } catch (error) {
+    if (backend === "vector") throw error;
+    return null;
+  }
+}
+
 /** Interactive viewer whose OpenTUI thread only composes prepared pixels and text. */
 export class TerminalMapViewer {
   readonly renderer: ViewerRenderer;
   readonly canvas: FrameBufferRenderable;
   readonly fileName: string;
   readonly colors = new Map<number, RGBA>();
+  readonly renderBackend: "raster" | "vector";
   camera = new MapCamera();
   state: ViewerState = { kind: "loading", message: "Opening file…" };
   dataBounds: GeoBbox2D | null = null;
   dragPoint: { x: number; y: number } | null = null;
+  readonly vectorSurface: VectorMapSurface | null;
 
   private animationLive = false;
   private animationTimer: ReturnType<typeof setInterval> | null = null;
@@ -135,13 +161,17 @@ export class TerminalMapViewer {
     fileName: string,
     now: () => number = () => performance.now(),
     testHooks: ViewerTestHooks = {},
+    vectorSurface: VectorMapSurface | null = null,
   ) {
     this.renderer = renderer;
     this.fileName = fileName;
     this.now = now;
     this.testHooks = testHooks;
+    this.vectorSurface = vectorSurface;
+    this.renderBackend = vectorSurface ? "vector" : "raster";
     this.canvas = new FrameBufferRenderable(renderer, {
       id: "osm-map",
+      respectAlpha: Boolean(vectorSurface),
       width: renderer.width,
       height: renderer.height,
       onMouseDown: (event) => this.handleMouseDown(event),
@@ -155,11 +185,38 @@ export class TerminalMapViewer {
       onMouseScroll: (event) => this.handleMouseScroll(event),
       onSizeChange: () => queueMicrotask(() => this.invalidateViewport()),
     });
-    this.renderer.root.add(this.canvas);
+    if (vectorSurface) {
+      vectorSurface.view.onMouseDown = (event) => this.handleMouseDown(event);
+      vectorSurface.view.onMouseUp = () => {
+        this.dragPoint = null;
+      };
+      vectorSurface.view.onMouseDrag = (event) => this.handleMouseDrag(event);
+      vectorSurface.view.onMouseDragEnd = () => {
+        this.dragPoint = null;
+      };
+      vectorSurface.view.onMouseScroll = (event) => this.handleMouseScroll(event);
+    } else {
+      this.renderer.root.add(this.canvas);
+    }
+    this.vectorSurface?.setCallbacks({
+      onError: (error) => this.setError(error),
+      onPendingChange: () => {
+        this.canvas.requestRender();
+        this.updateAnimationState();
+      },
+      onTileComplete: () => this.requestStaticFrame(),
+    });
     this.renderer.keyInput.on("keypress", (key: KeyEvent) => this.handleKey(key));
     this.renderer.on("resize", (width, height) => {
       this.canvas.width = width;
       this.canvas.height = height;
+      if (this.vectorSurface) {
+        this.vectorSurface.resize(width, Math.max(0, height - 1));
+        // The raster canvas normally invalidates the camera through onSizeChange. It is not in the
+        // render tree for the vector backend, so resize the map camera explicitly after both
+        // surfaces have adopted the new terminal dimensions.
+        queueMicrotask(() => this.invalidateViewport());
+      }
     });
     this.renderer.setFrameCallback(this.frameCallback);
     this.renderer.addPostProcessFn(this.postProcess);
@@ -182,7 +239,19 @@ export class TerminalMapViewer {
       targetFps: 10,
       maxFps: 30,
     });
-    return new TerminalMapViewer(renderer, fileName);
+    const backend = requestedRenderBackend();
+    let vectorSurface: VectorMapSurface | null;
+    try {
+      vectorSurface = await initializeRenderBackend(backend, async () => {
+        const { VectorMapSurface } = await import("./vector-renderer.ts");
+        return VectorMapSurface.create(renderer);
+      });
+    } catch (error) {
+      renderer.destroy();
+      const message = error instanceof Error ? error.message : String(error);
+      throw Error(`Unable to initialize the vector renderer: ${message}`);
+    }
+    return new TerminalMapViewer(renderer, fileName, undefined, {}, vectorSurface);
   }
 
   setProgress(message: string): void {
@@ -200,17 +269,20 @@ export class TerminalMapViewer {
   setDataset(info: OsmInfo, tileRenderer: StyledTileRenderer): void {
     if (!isValidBounds(info.bbox)) throw Error("The PBF contains no nodes to display.");
     this.dataBounds = info.bbox;
-    const tiles = new OsmTileLoader({
-      maxConcurrentTiles: tileRenderer.workerCount,
-      onError: (error) => this.setError(error),
-      onGenerationChange: (generation) => tileRenderer.cancelBefore(generation),
-      onPendingChange: () => {
-        this.canvas.requestRender();
-        this.updateAnimationState();
-      },
-      onTileComplete: () => this.requestStaticFrame(),
-      renderTile: (tile, generation) => tileRenderer.renderTile(tile, generation),
-    });
+    const tiles = this.vectorSurface
+      ? null
+      : new OsmTileLoader({
+          maxConcurrentTiles: tileRenderer.workerCount,
+          onError: (error) => this.setError(error),
+          onGenerationChange: (generation) => tileRenderer.cancelBefore(generation),
+          onPendingChange: () => {
+            this.canvas.requestRender();
+            this.updateAnimationState();
+          },
+          onTileComplete: () => this.requestStaticFrame(),
+          renderTile: (tile, generation) => tileRenderer.renderTile(tile, generation),
+        });
+    this.vectorSurface?.setTileRenderer(tileRenderer);
     this.state = { kind: "ready", info, tileRenderer, tiles };
     this.fitBounds();
   }
@@ -218,9 +290,10 @@ export class TerminalMapViewer {
   setError(error: unknown): void {
     if (this.renderer.isDestroyed) return;
     if (this.state.kind === "ready") {
-      this.state.tiles.dispose();
+      this.state.tiles?.dispose();
       this.state.tileRenderer.dispose();
     }
+    this.vectorSurface?.dispose();
     const message = error instanceof Error ? error.message : String(error);
     this.state = { kind: "error", message };
     this.pendingRegions = [];
@@ -239,8 +312,11 @@ export class TerminalMapViewer {
 
   private viewport(): MapViewport {
     return {
-      width: this.canvas.frameBuffer.width,
-      height: Math.max(0, (this.canvas.frameBuffer.height - 1) * 2),
+      width: this.vectorSurface ? this.renderer.width : this.canvas.frameBuffer.width,
+      height: Math.max(
+        0,
+        ((this.vectorSurface ? this.renderer.height : this.canvas.frameBuffer.height) - 1) * 2,
+      ),
     };
   }
 
@@ -298,7 +374,8 @@ export class TerminalMapViewer {
   }
 
   private handleMouseDown(event: MouseEvent): void {
-    if (event.button !== MouseButton.LEFT || event.y >= this.canvas.frameBuffer.height - 1) return;
+    const height = this.vectorSurface ? this.renderer.height : this.canvas.frameBuffer.height;
+    if (event.button !== MouseButton.LEFT || event.y >= height - 1) return;
     event.preventDefault();
     this.dragPoint = { x: event.x, y: event.y };
   }
@@ -344,9 +421,10 @@ export class TerminalMapViewer {
     if (this.cleanedUp) return;
     this.cleanedUp = true;
     if (this.state.kind === "ready") {
-      this.state.tiles.dispose();
+      this.state.tiles?.dispose();
       this.state.tileRenderer.dispose();
     }
+    this.vectorSurface?.dispose();
     this.renderer.removeFrameCallback(this.frameCallback);
     this.renderer.removePostProcessFn(this.postProcess);
     if (this.animationTimer) clearInterval(this.animationTimer);
@@ -357,7 +435,10 @@ export class TerminalMapViewer {
 
   private updateAnimationState(): void {
     if (this.renderer.isDestroyed) return;
-    const pendingCount = this.state.kind === "ready" ? this.state.tiles.pendingCount : 0;
+    const pendingCount =
+      this.state.kind === "ready"
+        ? (this.vectorSurface?.pendingCount ?? this.state.tiles?.pendingCount ?? 0)
+        : 0;
     const shouldAnimate = viewerShouldAnimate(
       this.state.kind,
       pendingCount,
@@ -398,23 +479,30 @@ export class TerminalMapViewer {
     this.testHooks.onStaticCompose?.();
     this.staticDirty = false;
     const buffer = this.canvas.frameBuffer;
-    const width = buffer.width;
-    const height = buffer.height;
+    const width = this.vectorSurface ? this.renderer.width : buffer.width;
+    const height = this.vectorSurface ? this.renderer.height : buffer.height;
     if (width === 0 || height === 0) return;
     const mapRows = Math.max(0, height - 1);
     this.pendingRegions = [];
     if (this.state.kind !== "ready" || mapRows === 0) {
-      buffer.fillRect(0, 0, width, mapRows, BACKGROUND);
+      if (!this.vectorSurface) buffer.fillRect(0, 0, width, mapRows, BACKGROUND);
+    } else if (this.vectorSurface) {
+      this.vectorSurface.prepareFrame(
+        this.camera,
+        { width, height: mapRows * 2 },
+        this.viewportRevision,
+      );
+      this.pendingRegions = [...this.vectorSurface.pendingRegions];
     } else {
       const pixelHeight = mapRows * 2;
-      this.state.tiles.beginFrame(this.viewportRevision);
+      this.state.tiles!.beginFrame(this.viewportRevision);
       const pixels = renderMapPixels(
         this.camera,
         { width, height: pixelHeight },
-        this.state.tiles.getTile,
+        this.state.tiles!.getTile,
         this.pendingRegions,
       );
-      this.state.tiles.endFrame();
+      this.state.tiles!.endFrame();
       for (let row = 0; row < mapRows; row++) {
         for (let column = 0; column < width; column++) {
           const topOffset = (row * 2 * width + column) * 4;
@@ -429,14 +517,15 @@ export class TerminalMapViewer {
         }
       }
     }
-    buffer.fillRect(0, mapRows, width, 1, STATUS_BACKGROUND);
+    if (!this.vectorSurface) buffer.fillRect(0, mapRows, width, 1, STATUS_BACKGROUND);
     this.updateAnimationState();
   }
 
   private pumpLabelQuery(): void {
     if (this.labelQueryActive || this.labelQueryQueued === null || this.state.kind !== "ready")
       return;
-    if (!this.state.tileRenderer.labelsConcurrent && this.state.tiles.pendingCount > 0) return;
+    const pendingTiles = this.vectorSurface?.pendingCount ?? this.state.tiles?.pendingCount ?? 0;
+    if (!this.state.tileRenderer.labelsConcurrent && pendingTiles > 0) return;
 
     const revision = this.labelQueryQueued;
     this.labelQueryQueued = null;
@@ -541,12 +630,16 @@ export class TerminalMapViewer {
     if (this.state.kind === "error") return `Error: ${this.state.message}  •  q quit`;
     const [lon, lat] = this.camera.center;
     let activity = "";
-    if (this.state.tiles.pendingCount > 0) {
-      activity = `  ${formatTileLoadingStatus(this.state.tiles.pendingCount, spinner)}`;
+    const pendingTiles = this.vectorSurface?.pendingCount ?? this.state.tiles?.pendingCount ?? 0;
+    if (pendingTiles > 0) {
+      activity = `  ${formatTileLoadingStatus(pendingTiles, spinner)}`;
     } else if (this.labelQueryActive) {
       activity = `  ${spinner} Loading labels…`;
     }
-    return `${this.fileName}${activity}  z${this.camera.zoom}  ${lat.toFixed(5)}, ${lon.toFixed(5)}  ${this.state.info.stats.nodes.toLocaleString()} nodes  •  arrows/hjkl pan  +/- zoom  drag/wheel  0 fit  q quit`;
+    const rendererStatus = this.vectorSurface
+      ? `vector/${this.vectorSurface.outputMode}`
+      : this.renderBackend;
+    return `${this.fileName}${activity}  ${rendererStatus}  z${this.camera.zoom}  ${lat.toFixed(5)}, ${lon.toFixed(5)}  ${this.state.info.stats.nodes.toLocaleString()} nodes  •  arrows/hjkl pan  +/- zoom  drag/wheel  0 fit  q quit`;
   }
 }
 
