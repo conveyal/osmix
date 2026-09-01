@@ -44,7 +44,7 @@ import {
   discoverConflationCandidatesForTrustedMerge,
   generateConflationApplicationArtifactsFromTrustedDiscovery,
   generateConflationArtifactsFromTrustedDiscovery,
-} from "@osmix/change/src/internal/conflation.ts";
+} from "@osmix/change/internal/conflation";
 import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core";
 import { fromGeoJSON } from "@osmix/geojson";
 import { fromGeoParquet, type GeoParquetReadOptions } from "@osmix/geoparquet";

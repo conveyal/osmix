@@ -10,6 +10,10 @@
   },
   "type": "module",
   "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./internal/conflation": "./src/internal/conflation.ts"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "bench": "vitest bench",
