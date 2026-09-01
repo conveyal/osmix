@@ -66,6 +66,18 @@ describe("Ids sorted entries", () => {
     ]);
   });
 
+  it("orders negative IDs canonically for OSM serialization", () => {
+    expect(Array.from(buildIds([3, -3, -1, 2, -2, 1, -2]).osmSortedEntries())).toEqual([
+      [-1, 2],
+      [-2, 4],
+      [-2, 6],
+      [-3, 1],
+      [1, 5],
+      [2, 3],
+      [3, 0],
+    ]);
+  });
+
   it("omits redundant sorted buffers for ascending IDs", () => {
     const transferables = buildIds([1, 2, 3]).transferables();
 

@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { MergeWorker } from "../src/workers/osm.worker";
+
 vi.mock("comlink", async (importOriginal) => ({
   ...(await importOriginal<typeof import("comlink")>()),
   expose: vi.fn(),
@@ -12,11 +14,8 @@ class MockBroadcastChannel {
 }
 
 describe("MergeWorker streaming hashing", () => {
-  let MergeWorker: typeof import("../src/workers/osm.worker").MergeWorker;
-
-  beforeAll(async () => {
+  beforeAll(() => {
     vi.stubGlobal("BroadcastChannel", MockBroadcastChannel);
-    ({ MergeWorker } = await import("../src/workers/osm.worker"));
   });
 
   afterAll(() => {

@@ -85,20 +85,20 @@ describe("merge osm", () => {
       changeset = new OsmChangeset(baseOsm);
       changeset.createIntersectionsForWays(osm2.ways);
 
-      // Pending intersection nodes are resolved from the changeset when a way is spliced
-      // again. This keeps every ref aligned with real geometry instead of aliasing a node
-      // from the base index, and can expose additional legitimate intersections.
+      // Intersections are grouped by their containing segment and inserted in geometric
+      // order. Endpoint reuse that would create duplicate or degenerate refs falls back
+      // to a dedicated exact intersection node.
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 9_461,
-        nodeChanges: 5_824,
-        wayChanges: 3_637,
+        totalChanges: 9_508,
+        nodeChanges: 5_869,
+        wayChanges: 3_639,
         relationChanges: 0,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
-        intersectionPointsFound: 3_187,
-        intersectionNodesCreated: 2_623,
+        intersectionPointsFound: 3_105,
+        intersectionNodesCreated: 2_609,
       });
 
       baseOsm = applyChangesetToOsm(changeset);
@@ -122,7 +122,10 @@ describe("merge osm", () => {
         },
       });
     },
-    30_000,
+    // This optional integration fixture loads and indexes nearly one million
+    // entities before creating intersections. Keep enough headroom for a full
+    // workspace run where other Vitest projects compete for CPU and memory.
+    120_000,
   );
 
   it.skip("should merge seattle with deduplication", async () => {

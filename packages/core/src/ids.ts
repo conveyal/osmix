@@ -242,16 +242,48 @@ export class Ids {
   /** @internal Iterate sorted IDs with their original storage positions. */
   *sortedEntries(): Generator<readonly [id: number, index: number]> {
     for (let i = 0; i < this.idsSorted.length; i++) {
-      const id = this.idsSorted[i];
-      assertValue(id, "Sorted ID is undefined");
-      if (this.idsAreSorted) {
-        yield [id, i];
-      } else {
-        const index = this.sortedIdPositionToIndex[i];
-        assertValue(index, "Sorted position is undefined");
-        yield [id, index];
-      }
+      yield this.sortedEntry(i);
     }
+  }
+
+  /**
+   * Iterate in canonical OSM file order: negative IDs first by increasing
+   * absolute value, followed by non-negative IDs in ascending order.
+   *
+   * @internal
+   */
+  *osmSortedEntries(): Generator<readonly [id: number, index: number]> {
+    let firstNonNegative = 0;
+    while (firstNonNegative < this.idsSorted.length && this.idsSorted[firstNonNegative]! < 0) {
+      firstNonNegative++;
+    }
+
+    // Numeric sorting places negative IDs in the opposite of canonical OSM
+    // order. Reverse ID groups while preserving duplicate insertion order.
+    let groupEnd = firstNonNegative;
+    while (groupEnd > 0) {
+      const id = this.idsSorted[groupEnd - 1];
+      assertValue(id, "Sorted ID is undefined");
+      let groupStart = groupEnd - 1;
+      while (groupStart > 0 && this.idsSorted[groupStart - 1] === id) groupStart--;
+      for (let position = groupStart; position < groupEnd; position++) {
+        yield this.sortedEntry(position);
+      }
+      groupEnd = groupStart;
+    }
+
+    for (let position = firstNonNegative; position < this.idsSorted.length; position++) {
+      yield this.sortedEntry(position);
+    }
+  }
+
+  private sortedEntry(position: number): readonly [id: number, index: number] {
+    const id = this.idsSorted[position];
+    assertValue(id, "Sorted ID is undefined");
+    if (this.idsAreSorted) return [id, position];
+    const index = this.sortedIdPositionToIndex[position];
+    assertValue(index, "Sorted position is undefined");
+    return [id, index];
   }
 
   /**

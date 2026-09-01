@@ -13,7 +13,7 @@
 import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from "@osmix/types";
 
-import sweeplineIntersections from "./sweepline-intersections.ts";
+import { sweeplineLineIntersections } from "./sweepline-intersections.ts";
 import type { OsmChangesetStats } from "./types.ts";
 
 const XML_ATTRIBUTE_ESCAPES: Record<string, string> = {
@@ -106,11 +106,30 @@ const isFootish = (t: OsmTags) =>
   ["footway", "path", "cycleway", "bridleway", "steps"].includes(String(t["highway"]));
 const isPolygonish = (t: OsmTags) => !!(t["building"] || t["landuse"] || t["natural"]);
 
+function normalizedGradeValue(value: number | string | undefined, defaultValue: string) {
+  const normalized = String(value ?? "");
+  if (normalized === "" || normalized === "0" || normalized === "false" || normalized === "no") {
+    return defaultValue;
+  }
+  return normalized;
+}
+
+/** Normalize the routing-relevant vertical context of a way for safe comparisons. */
+export function routingGradeSignature(tags?: OsmTags) {
+  return [
+    `layer=${String(tags?.["layer"] ?? "0")}`,
+    `level=${String(tags?.["level"] ?? "")}`,
+    `bridge=${normalizedGradeValue(tags?.["bridge"], "no")}`,
+    `tunnel=${normalizedGradeValue(tags?.["tunnel"], "no")}`,
+    `covered=${normalizedGradeValue(tags?.["covered"], "no")}`,
+  ].join("|");
+}
+
 /**
  * Determine if two ways should be connected based on their tags.
  * Connection logic:
  * - Never connect if either is an area (building, landuse, etc).
- * - Never connect if separated by bridge/tunnel/layer.
+ * - Never connect if layer, level, bridge, tunnel, or covered context differs.
  * - Connect highway-highway, highway-footway, footway-footway.
  */
 export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
@@ -118,9 +137,7 @@ export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
   const b = tagsB || {};
   if (isPolygonish(a) || isPolygonish(b)) return false;
 
-  const isSeparated = !!(a["bridge"] || a["tunnel"] || b["bridge"] || b["tunnel"]);
-  const diffLayer = (a["layer"] ?? "0") !== (b["layer"] ?? "0");
-  if (isSeparated || diffLayer) return false;
+  if (routingGradeSignature(a) !== routingGradeSignature(b)) return false;
 
   if (isHighway(a) && isHighway(b)) return true;
   if (isHighway(a) && isFootish(b)) return true;
@@ -133,8 +150,13 @@ export function waysShouldConnect(tagsA?: OsmTags, tagsB?: OsmTags) {
 /**
  * Determine if a way is a candidate for connecting to another way
  */
+export function areWayTagsIntersectionCandidate(tags?: OsmTags) {
+  return !!tags && (isHighway(tags) || isFootish(tags)) && !isPolygonish(tags);
+}
+
+/** Determine if a complete way is a candidate for connecting to another way. */
 export function isWayIntersectionCandidate(way: OsmWay) {
-  return way.tags && (isHighway(way.tags) || isFootish(way.tags)) && !isPolygonish(way.tags);
+  return areWayTagsIntersectionCandidate(way.tags);
 }
 
 /**
@@ -172,30 +194,7 @@ export function waysIntersect(
   wayA: [number, number][],
   wayB: [number, number][],
 ): [number, number][] {
-  const intersections = sweeplineIntersections(
-    {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: wayA,
-          },
-          properties: {},
-        },
-        {
-          type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: wayB,
-          },
-          properties: {},
-        },
-      ],
-    },
-    true,
-  );
+  const intersections = sweeplineLineIntersections(wayA, wayB);
 
   const uniqueFeatures: [number, number][] = [];
   const seen = new Set<string>();

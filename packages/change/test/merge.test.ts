@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset";
 import { OsmChangeset } from "../src/changeset";
+import { generateChangeset } from "../src/generate-changeset";
 
 const sizes = (osm: Osm) => ({
   nodes: osm.nodes.size,
@@ -15,6 +16,7 @@ describe("merge osm", () => {
   it("should generate and apply osm changes", () => {
     const base = createMockBaseOsm();
     const patch = createMockPatchOsm();
+    base.buildSpatialIndexes();
 
     expect(sizes(base)).toEqual({
       nodes: 2,
@@ -59,25 +61,28 @@ describe("merge osm", () => {
       },
     });
 
-    changeset = new OsmChangeset(directResult);
-    changeset.deduplicateWays(patch.ways);
-    changeset.deduplicateNodes(patch.nodes);
+    changeset = generateChangeset(base, patch, {
+      directMerge: true,
+      deduplicateNodes: true,
+      deduplicateWays: true,
+    });
     const deduplicatedResult = applyChangesetToOsm(changeset, "deduplicated");
 
-    // Node 0 is deleted because node 2 has more tags (version/tags logic)
-    expect(deduplicatedResult.nodes.ids.has(0)).toBe(false);
+    // The immutable base node survives and receives non-conflicting patch tags.
+    expect(deduplicatedResult.nodes.ids.has(0)).toBe(true);
+    expect(deduplicatedResult.nodes.ids.has(2)).toBe(false);
     expect(deduplicatedResult.ways.getById(1)).toEqual({
       id: 1,
-      refs: [2, 1], // Node 0 replaced with node 2
+      refs: [0, 1],
       tags: {
         highway: "primary",
         version: "2",
       },
     });
+    expect(deduplicatedResult.ways.getById(2)?.refs).toEqual([0, 3]);
 
-    // Node 2 is kept because it has tags
-    expect(deduplicatedResult.nodes.getById(2)).toEqual({
-      id: 2,
+    expect(deduplicatedResult.nodes.getById(0)).toEqual({
+      id: 0,
       lat: 46.60207,
       lon: -120.505898,
       tags: {

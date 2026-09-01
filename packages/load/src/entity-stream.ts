@@ -9,20 +9,20 @@ import type { OsmPbfHeaderBlock } from "@osmix/pbf";
 import type { OsmEntity } from "@osmix/types";
 
 function* getAllEntitiesSorted(osm: Osm): Generator<OsmEntity> {
-  for (const node of osm.nodes.sorted()) {
+  for (const node of osm.nodes.osmSorted()) {
     yield node;
   }
-  for (const way of osm.ways.sorted()) {
+  for (const way of osm.ways.osmSorted()) {
     yield way;
   }
-  for (const relation of osm.relations.sorted()) {
+  for (const relation of osm.relations.osmSorted()) {
     yield relation;
   }
 }
 
 /**
  * Convert the `Osm` index to a `ReadableStream` of header and entity objects.
- * Header is emitted first, followed by all entities in sorted order.
+ * Header is emitted first, followed by all entities in canonical OSM order.
  * Stream can be piped through transform streams for further processing.
  */
 export function createReadableEntityStreamFromOsm(

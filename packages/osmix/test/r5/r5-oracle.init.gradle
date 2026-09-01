@@ -1,0 +1,58 @@
+gradle.beforeProject { project ->
+    def oracleBuildDirectory = gradle.startParameter.projectProperties['osmixOracleBuildDir']
+    if (oracleBuildDirectory != null) {
+        project.layout.buildDirectory.set(new File(oracleBuildDirectory, project.name))
+    }
+}
+
+gradle.afterProject { project, state ->
+    if (project != project.rootProject || state.failure != null) return
+
+    def requiredProperty = { String name ->
+        def value = project.findProperty(name)
+        if (value == null || value.toString().isBlank()) {
+            throw new GradleException("Missing required -P${name}=... property")
+        }
+        return value.toString()
+    }
+
+    def oracleSourceDirectory = requiredProperty('osmixOracleSourceDir')
+    def oracleManifest = requiredProperty('osmixOracleManifest')
+    def oracleOutputDirectory = requiredProperty('osmixOracleOutputDir')
+    def defaultOracleDatasets = [
+            'monaco-raw',
+            'monaco-empty-merge',
+            'monaco-empty-merge-roundtrip',
+            'monaco-synthetic-patch',
+            'monaco-synthetic-patch-roundtrip'
+    ]
+    def configuredDatasets = project.findProperty('osmixOracleDatasets')
+    def oracleDatasets = configuredDatasets == null
+            ? defaultOracleDatasets
+            : configuredDatasets.toString().split(',')
+                    .collect { it.trim() }
+                    .findAll { !it.isBlank() }
+    if (oracleDatasets.isEmpty()) {
+        throw new GradleException('The -PosmixOracleDatasets list must not be empty')
+    }
+
+    def oracleSourceSet = project.sourceSets.create('osmixRoutingOracle') {
+        java.srcDir(oracleSourceDirectory)
+        compileClasspath += project.sourceSets.main.output + project.configurations.runtimeClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+
+    project.tasks.named(oracleSourceSet.compileJavaTaskName) {
+        dependsOn(project.tasks.named('classes'))
+    }
+
+    project.tasks.register('runOsmixRoutingOracle', JavaExec) {
+        dependsOn(project.tasks.named(oracleSourceSet.classesTaskName))
+        classpath = oracleSourceSet.runtimeClasspath
+        mainClass = 'R5RoutingOracle'
+        args(oracleManifest, oracleOutputDirectory)
+        oracleDatasets.each { datasetId ->
+            args(datasetId, new File(oracleOutputDirectory, "${datasetId}.osm.pbf").absolutePath)
+        }
+    }
+}

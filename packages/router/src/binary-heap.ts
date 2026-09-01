@@ -115,12 +115,14 @@ export class BinaryHeap {
       const leftIndex = (index << 1) + 1;
       const rightIndex = leftIndex + 1;
       let smallest = index;
+      let smallestPriority = priority;
 
-      if (leftIndex < length && this.priorities[leftIndex]! < this.priorities[smallest]!) {
+      if (leftIndex < length && this.priorities[leftIndex]! < smallestPriority) {
         smallest = leftIndex;
+        smallestPriority = this.priorities[leftIndex]!;
       }
 
-      if (rightIndex < length && this.priorities[rightIndex]! < this.priorities[smallest]!) {
+      if (rightIndex < length && this.priorities[rightIndex]! < smallestPriority) {
         smallest = rightIndex;
       }
 

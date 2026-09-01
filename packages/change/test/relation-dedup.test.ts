@@ -21,7 +21,7 @@ function createOsm(nodes: OsmNode[], ways: OsmWay[], relations: OsmRelation[]) {
 }
 
 describe("relation-safe deduplication", () => {
-  it("returns flattened node maps and rewrites node members before deletion", () => {
+  it("does not collapse merely nearby nodes or rewrite their relation members", () => {
     const nodes: OsmNode[] = [
       { id: 1, lat: 0, lon: 0 },
       { id: 2, lat: 0.000007, lon: 0 },
@@ -41,18 +41,14 @@ describe("relation-safe deduplication", () => {
 
     const replacements = changeset.deduplicateNodes(osm.nodes);
 
-    expect(replacements).toEqual(
-      new Map([
-        [1, 3],
-        [2, 3],
-      ]),
-    );
+    expect(replacements).toEqual(new Map());
     const result = applyChangesetToOsm(changeset);
-    expect(result.nodes.ids.has(1)).toBe(false);
-    expect(result.nodes.ids.has(2)).toBe(false);
-    expect(result.ways.getById(10)?.refs).toEqual([3]);
+    expect(result.nodes.ids.has(1)).toBe(true);
+    expect(result.nodes.ids.has(2)).toBe(true);
+    expect(result.ways.getById(10)?.refs).toEqual([1, 3]);
     expect(result.relations.getById(20)?.members).toEqual([
-      { type: "node", ref: 3, role: "stop" },
+      { type: "node", ref: 1, role: "stop" },
+      { type: "node", ref: 2, role: "stop" },
       { type: "node", ref: 3, role: "platform" },
     ]);
   });

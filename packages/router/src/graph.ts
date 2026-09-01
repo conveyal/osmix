@@ -127,8 +127,18 @@ export class RoutingGraph {
       const refs = osm.ways.getRefIds(wayIndex);
       if (refs.length < 2) continue;
 
-      // Create bidirectional edges between consecutive nodes (respecting one-way)
-      const oneway = tags?.["oneway"] === "yes" || tags?.["oneway"] === "1";
+      // Create directed edges between consecutive nodes (respecting one-way direction).
+      const onewayTag = String(tags?.["oneway"] ?? "").toLowerCase();
+      const explicitlyForward = onewayTag === "yes" || onewayTag === "1" || onewayTag === "true";
+      const explicitlyReverse = onewayTag === "-1" || onewayTag === "reverse";
+      const explicitlyBidirectional =
+        onewayTag === "no" || onewayTag === "0" || onewayTag === "false";
+      // OSM roundabouts are one-way by implication unless explicitly overridden.
+      const direction = explicitlyReverse
+        ? "reverse"
+        : explicitlyForward || (tags?.["junction"] === "roundabout" && !explicitlyBidirectional)
+          ? "forward"
+          : "both";
       const speedKph = getSpeedLimit(tags, defaultSpeeds);
       const speedMps = (speedKph * 1_000) / 60 / 60;
       const nodes = refs.map((ref) => osm.nodes.ids.getIndexFromId(ref));
@@ -142,17 +152,17 @@ export class RoutingGraph {
         const distanceM = haversineDistance(fromCoord, targetCoord);
         const time = distanceM / speedMps;
 
-        // Forward edge
-        addEdgeToNode(nodeIndex, {
-          targetNodeIndex: targetNodeIndex,
-          wayIndex,
-          distance: distanceM,
-          time,
-        });
-        this.edgeCount++;
+        if (direction !== "reverse") {
+          addEdgeToNode(nodeIndex, {
+            targetNodeIndex,
+            wayIndex,
+            distance: distanceM,
+            time,
+          });
+          this.edgeCount++;
+        }
 
-        // Reverse edge (unless one-way)
-        if (!oneway) {
+        if (direction !== "forward") {
           addEdgeToNode(targetNodeIndex, {
             targetNodeIndex: nodeIndex,
             wayIndex,

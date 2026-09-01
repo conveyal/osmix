@@ -1,8 +1,7 @@
 import { useAtom, useSetAtom } from "jotai";
-import { MergeIcon } from "lucide-react";
 import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
-import { Suspense, useMemo } from "react";
+import { Suspense } from "react";
 
 import ActionButton from "../components/action-button";
 import { Details, DetailsContent, DetailsSummary } from "../components/details";
@@ -18,9 +17,9 @@ import StoredOsmList from "../components/stored-osm-list";
 import { Card, CardContent, CardHeader } from "../components/ui/card";
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
+import { WITHIN_DATASET_DIAGNOSTIC_OPTIONS } from "../lib/merge-workflow";
 import { BASE_OSM_KEY } from "../settings";
 import { changesetStatsAtom } from "../state/changes";
-import { Log } from "../state/log";
 import { selectOsmEntityAtom } from "../state/osm";
 import { osmLoadingAbortControllerAtom } from "../state/status";
 import { osmWorker } from "../state/worker";
@@ -36,21 +35,6 @@ export default function InspectBlock({
   const selectEntity = useSetAtom(selectOsmEntityAtom);
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
   const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom);
-
-  const applyChanges = async () => {
-    if (!baseOsm.osm) throw Error("Osm has not been loaded.");
-    const task = Log.startTask("Applying changes to OSM...");
-    await osmWorker.applyChangesAndReplace(baseOsm.osm.id);
-    task.update("Refreshing OSM index...");
-    const newOsm = await osmWorker.get(baseOsm.osm.id);
-    baseOsm.setOsm(newOsm);
-    setChangesetStats(null);
-    task.end("Changes applied!");
-  };
-
-  const hasZeroChanges = useMemo(() => {
-    return changesetStats == null || changesetStats.totalChanges === 0;
-  }, [changesetStats]);
 
   if (!baseOsm.osm || !baseOsm.osmInfo || !baseOsm.fileInfo) {
     return (
@@ -106,14 +90,20 @@ export default function InspectBlock({
   return (
     <div className="flex flex-1 flex-col gap-4">
       <FullIndexRequired operation="Duplicate detection" osmFile={baseOsm} />
+      <p>
+        Scan for possible duplicates without changing the dataset. Nearby OSM entities may belong to
+        different roads, layers, or restrictions, so candidates must be investigated against the
+        source data instead of applied automatically.
+      </p>
       <ActionButton
         disabled={!hasFullNodeIndex(baseOsm.osmInfo)}
         onAction={async () => {
           if (!baseOsm.osm) throw Error("Osm has not been loaded.");
-          const changes = await osmWorker.generateChangeset(baseOsm.osm.id, baseOsm.osm.id, {
-            deduplicateNodes: true,
-            deduplicateWays: true,
-          });
+          const changes = await osmWorker.generateChangeset(
+            baseOsm.osm.id,
+            baseOsm.osm.id,
+            WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
+          );
           setChangesetStats(changes);
         }}
       >
@@ -123,7 +113,7 @@ export default function InspectBlock({
       {changesetStats != null && (
         <>
           <Card>
-            <CardHeader>Changeset</CardHeader>
+            <CardHeader>Diagnostic candidates</CardHeader>
             <CardContent className="p-0">
               <ChangesSummary />
               <Suspense fallback={<LoadingState />}>
@@ -144,12 +134,6 @@ export default function InspectBlock({
               </Suspense>
             </CardContent>
           </Card>
-
-          {!hasZeroChanges && (
-            <ActionButton className="w-full" onAction={applyChanges} icon={<MergeIcon />}>
-              Apply changes
-            </ActionButton>
-          )}
         </>
       )}
     </div>

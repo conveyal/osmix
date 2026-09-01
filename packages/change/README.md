@@ -6,7 +6,7 @@
 
 - Construct repeatable `OsmChangeset`s that track creates, modifies, and deletes with origin metadata and per-entity refs.
 - **Augmented diffs**: Automatically captures both old and new entity states for modifications and deletions, following the [Overpass API Augmented Diffs](https://wiki.openstreetmap.org/wiki/Overpass_API/Augmented_Diffs) format.
-- Deduplicate coincident nodes or overlapping ways, replace references, and optionally create intersection points where geometry meets.
+- Conservatively reconcile compatible nodes or overlapping ways, replace references, and optionally create intersection points where geometry meets.
 - Generate summary stats and OSC-friendly XML fragments so downstream systems can audit each change step.
 - Run `merge(base, patch, options)` to execute the full dedupe/merge workflow with a single call.
 - Export lightweight utilities for measuring distances, pruning duplicate refs, and deciding when ways should connect.
@@ -30,8 +30,6 @@ const base = await fromPbf(monacoPbf);
 const patch = await fromPbf(patchPbf);
 
 const changeset = new OsmChangeset(base);
-changeset.deduplicateNodes(base.nodes);
-changeset.deduplicateWays(base.ways);
 changeset.generateDirectChanges(patch);
 
 console.log(changeStatsSummary(changeset.stats));
@@ -40,7 +38,11 @@ const merged = applyChangesetToOsm(changeset);
 console.log(merged.id);
 ```
 
-`OsmChangeset` keeps track of creates/modifies/deletes per entity type. Call the helpers (`deduplicateNodes`, `deduplicateWays`, `generateDirectChanges`, `createIntersectionsForWays`, etc.) in whatever order your workflow requires, then use `applyChangesetToOsm()` to produce a new `Osm` instance with the edits applied.
+`OsmChangeset` keeps track of creates/modifies/deletes per entity type. Prefer `merge()` for the complete
+pipeline. When composing it manually, generate direct changes and then reconcile patch nodes before patch
+ways in one changeset rooted in the original base. Apply that changeset before creating intersections so the
+new patch ways are present in the rebuilt spatial index. For that reason, `generateChangeset()` rejects
+`directMerge: true` combined with `createIntersections: true`; use `merge()` for the staged pipeline.
 
 ### Run the bundled merge pipeline
 
@@ -56,7 +58,60 @@ const combined = await merge(base, patch, {
 console.log(combined.id);
 ```
 
-`merge` wraps a sequence of changesets that deduplicate each dataset, optionally create intersections, and (when `directMerge` is true) generate modifications that reconcile the patch into the base. All options default to `false`, so you can enable only the stages you need.
+`merge` preserves the two source datasets and uses deduplication only to reconcile compatible patch entities
+with the base. It optionally creates intersections and, when `directMerge` is true, generates modifications
+that merge the patch into the base. All options default to `false`, so you can enable only the stages you need.
+An empty patch is therefore an identity operation; the high-level pipeline does not normalize either input as
+a hidden preliminary step.
+
+### Match imported data within one meter
+
+Exact reconciliation remains the default. For imported GeoJSON, Shapefile, OSW, or other independently
+created data, opt into proximity conflation with explicit property keys and an explicit network-attachment
+choice. The historical radius is one meter unless `maxDistanceMeters` is supplied.
+
+```ts check-docs change-context
+import {
+  applyChangesetToOsm,
+  discoverConflationCandidates,
+  generateConflationChangeset,
+} from "osmix";
+
+const conflation = {
+  propertyKeys: ["name", "operator", "surface"],
+  attachNetwork: true,
+};
+const discovery = discoverConflationCandidates(base, patch, conflation);
+
+// Review discovery.candidates and persist decisions by stable candidate ID.
+const decisions = discovery.candidates
+  .filter((candidate) => candidate.status === "review")
+  .map((candidate) => ({ candidateId: candidate.id, action: "reject" as const }));
+
+const changeset = generateConflationChangeset(
+  base,
+  patch,
+  {
+    directMerge: true,
+    deduplicateNodes: true,
+    deduplicateWays: true,
+    conflation,
+  },
+  decisions,
+  discovery,
+);
+const conflated = applyChangesetToOsm(changeset);
+```
+
+Discovery compares only the untouched patch with the immutable original base. High-confidence candidates
+apply automatically by default; set `automatic: "none"` when every match should require a decision. Property
+transfer changes only selected tags on the base entity. Network attachment changes only patch-created way
+references. Base IDs, coordinates, ordered way references, and ordered relation members stay authoritative.
+
+Structural properties cannot transfer. Routing-affecting properties, motor-road attachments, ambiguous
+targets, relation membership, and uncertain geometry require review. Grade conflicts, restrictions, dangling
+references, and way collapse remain blocked even when an accept decision is supplied. Equivalent one-to-one
+patch ways may be suppressed after property transfer; segmented way chains are reported but unsupported.
 
 ## API
 
@@ -72,8 +127,8 @@ constructor(base: Osm)
 
 #### Core methods
 
-- `deduplicateNodes(nodes: Nodes)`: Check a set of nodes (usually from the base or patch) for duplicates against the base dataset. Deletes duplicates and maps their IDs to the surviving node.
-- `deduplicateWays(ways: Ways)`: Check a set of ways for geometric duplicates. Deletes duplicates and preserves the one with more tags/metadata.
+- `deduplicateNodes(nodes: Nodes)`: Check candidate nodes (normally from a patch) against the base dataset and map safe duplicates to the surviving base node. Proximity alone is not sufficient.
+- `deduplicateWays(ways: Ways)`: Check candidate ways against the base and reconcile only matching geometry with compatible routing and grade-separation tags.
 - `generateDirectChanges(patch: Osm)`: Merge a patch dataset into the changeset. Handles creates and updates.
 - `createIntersectionsForWays(ways: Ways)`: Checks provided ways for intersections with existing ways in the base dataset. Splits ways and inserts nodes where they cross.
 - `applyNodeReplacementsToWays(replacementMap)`: Updates way references based on a map of replaced node IDs (generated by `deduplicateNodes`).
@@ -86,13 +141,32 @@ High-level pipeline to merge `patch` into `base`. Returns a new `Osm` instance.
 Options:
 
 - `directMerge` (boolean): Apply creates/updates from patch.
-- `deduplicateNodes` (boolean): Run node deduplication.
-- `deduplicateWays` (boolean): Run way deduplication.
+- `deduplicateNodes` (boolean): Reconcile compatible patch nodes with unique base matches.
+- `deduplicateWays` (boolean): Reconcile compatible patch ways with matching base geometry.
 - `createIntersections` (boolean): Split intersecting ways.
+- `conflation` (optional): Explicit imported-data matching configuration. `propertyKeys` and
+  `attachNetwork` are required when supplied; `maxDistanceMeters` defaults to `1`, and `automatic` defaults
+  to `"high-confidence"`.
+
+### Conflation discovery and generation
+
+- `discoverConflationCandidates(base, patch, options)`: Return deterministic node and one-to-one-way
+  candidates with action-specific status, evidence, tag diffs, and reason codes.
+- `filterConflationCandidates(candidates, filter, decisions?)`: Filter discovery rows without rerunning the
+  spatial search.
+- `summarizeConflationCandidates(candidates, decisions?)`: Count automatic, review, blocked, unmatched, and
+  rejected rows.
+- `generateConflationChangeset(base, patch, mergeOptions, decisions?, discovery?)`: Generate one cumulative
+  direct, exact, and fuzzy changeset from untouched inputs.
+- `generateConflationApplicationChangeset(baseline, patch, discovery, originalBase, decisions?)`: Apply only
+  reviewed fuzzy actions to an already materialized ordinary-merge baseline. The immutable original base is
+  required so generation can rediscover and validate candidates instead of trusting mutable review records.
 
 ### `applyChangesetToOsm(changeset: OsmChangeset): Osm`
 
 Applies all pending changes in the changeset to produce a **new** `Osm` instance. The original `base` is immutable.
+Application rejects new dangling references, degenerate highways, and detached turn-restriction topology
+before returning the result.
 
 ### Augmented Diffs
 
@@ -145,6 +219,11 @@ Options:
 - Requires runtimes compatible with `@osmix/core` (Node 20+, Bun, or modern browsers) since the same typed-array data structures are used.
 - Deduplication helpers assume datasets store dense node blocks and rely on spatial indexes built via `Osm.buildIndexes()`.
 - Intersections are generated only for highway/footway-style features; polygonal ways are ignored.
+- A scan that compares a dataset with itself is useful for diagnostics, but its proposed proximity matches
+  should not be applied automatically. Use the high-level cross-dataset merge for reconciliation.
+- PBFs produced by older Osmix versions may already contain topology changes caused by automatic
+  within-input deduplication. Those files cannot be repaired reliably without their source inputs and should
+  be regenerated from the original base and patch files.
 
 ## Development
 
