@@ -1,5 +1,45 @@
 # osmix
 
+## 0.4.0
+
+### Minor Changes
+
+- e4785fe: Enable memory-aware loading of Australia-scale PBF data. Core storage and transfers now use the compact
+  version 2 representation, node spatial queries use independent indirect all-node and tagged-node indexes, and
+  loaders expose Auto, Full, View, and explicit spatial-index selection with structured capacity diagnostics.
+  Vector-tile encoders use the tagged-node capability without requiring an all-node index.
+- df04f92: Add a cross-runtime managed worker pool with browser, Bun, Deno, and Node worker support,
+  cooperative cancellation utilities, a transferable Shortbread feature index, and worker-backed
+  consumer integrations.
+- e4785fe: Expose structured typed-buffer and entity-finalization failures across workers, identify safe View-profile
+  retries for spatial capacity errors, and show persistent actionable dataset-load diagnostics in Merge.
+
+### Patch Changes
+
+- 8be5c80: Allow Osmix to use its ArrayBuffer fallback when SharedArrayBuffer is unavailable, so browser
+  applications no longer need to install a global SharedArrayBuffer shim.
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [5c624d5]
+- Updated dependencies [e4785fe]
+- Updated dependencies [e938749]
+- Updated dependencies [8be5c80]
+  - @osmix/shared@0.2.0
+  - @osmix/core@0.3.0
+  - @osmix/load@0.1.0
+  - @osmix/vt@0.0.15
+  - @osmix/raster@0.1.0
+  - @osmix/geojson@0.0.17
+  - @osmix/router@0.0.15
+  - @osmix/shapefile@0.0.13
+  - @osmix/change@0.1.11
+  - @osmix/geo@0.1.0
+  - @osmix/geoparquet@0.1.11
+  - @osmix/gtfs@0.0.12
+  - @osmix/json@0.0.17
+  - @osmix/pbf@0.0.10
+  - @osmix/types@0.1.0
+
 ## 0.3.0
 
 ### Minor Changes

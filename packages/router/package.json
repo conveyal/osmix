@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@osmix/router",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "description": "A routing engine for OSM data built on top of @osmix/core",
   "license": "MIT",
   "repository": {

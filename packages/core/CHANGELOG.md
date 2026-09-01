@@ -1,5 +1,30 @@
 # @osmix/core
 
+## 0.3.0
+
+### Minor Changes
+
+- e4785fe: Enable memory-aware loading of Australia-scale PBF data. Core storage and transfers now use the compact
+  version 2 representation, node spatial queries use independent indirect all-node and tagged-node indexes, and
+  loaders expose Auto, Full, View, and explicit spatial-index selection with structured capacity diagnostics.
+  Vector-tile encoders use the tagged-node capability without requiring an all-node index.
+- e4785fe: Expose structured typed-buffer and entity-finalization failures across workers, identify safe View-profile
+  retries for spatial capacity errors, and show persistent actionable dataset-load diagnostics in Merge.
+
+### Patch Changes
+
+- df04f92: Add a cross-runtime managed worker pool with browser, Bun, Deno, and Node worker support,
+  cooperative cancellation utilities, a transferable Shortbread feature index, and worker-backed
+  consumer integrations.
+- 8be5c80: Allow Osmix to use its ArrayBuffer fallback when SharedArrayBuffer is unavailable, so browser
+  applications no longer need to install a global SharedArrayBuffer shim.
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [8be5c80]
+  - @osmix/shared@0.2.0
+  - @osmix/geo@0.1.0
+  - @osmix/types@0.1.0
+
 ## 0.2.0
 
 ### Minor Changes

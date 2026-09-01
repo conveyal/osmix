@@ -1,5 +1,17 @@
 # @osmix/raster
 
+## 0.1.0
+
+### Minor Changes
+
+- 5c624d5: Add configurable point radii and variable-width raster line drawing with round caps and joins.
+
+### Patch Changes
+
+- e938749: Fix TypeScript issue
+  - @osmix/geo@0.1.0
+  - @osmix/types@0.1.0
+
 ## 0.0.14
 
 ### Patch Changes
