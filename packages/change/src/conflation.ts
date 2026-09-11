@@ -22,6 +22,7 @@ import type {
   OsmConflationEvidence,
   OsmConflationOptions,
   OsmConflationReasonCode,
+  OsmConflationResolvedActions,
   OsmConflationRoutingFamily,
   OsmConflationSummary,
   OsmConflationTagDiff,
@@ -1077,10 +1078,8 @@ function effectiveStatusForDecision(
 ): OsmConflationEffectiveStatus {
   if (decision?.action === "reject") return "rejected";
   if (decision?.action === "accept") {
-    if (
-      acceptedAction(candidate, "propertyTransfer", decision) ||
-      acceptedAction(candidate, "networkAttachment", decision)
-    ) {
+    const actions = resolveConflationActions(candidate, decision);
+    if (actions.transferProperties || actions.attachNetwork) {
       return "accepted";
     }
     // A saved acceptance cannot make a blocked action applicable. Keep its
@@ -1088,6 +1087,7 @@ function effectiveStatusForDecision(
     if (decision.transferProperties !== false || decision.attachNetwork !== false) {
       return candidate.status === "unmatched" ? "unmatched" : "blocked";
     }
+    return "rejected";
   }
   return candidate.status;
 }
@@ -1175,23 +1175,19 @@ function bulkActionEligible(
   return action !== "transfer-properties" || candidate.evidence.tagDiff.length > 0;
 }
 
-function bulkAcceptDecision(
+/** Change one action while preserving the other currently scheduled choice. */
+export function buildConflationActionDecision(
   candidate: OsmConflationCandidate,
   current: OsmConflationDecision | undefined,
   action: Exclude<OsmConflationBulkDecisionRequest["action"], "reject">,
+  selected: boolean,
 ): OsmConflationDecision {
-  const preserveCurrentActions = current?.action !== "reject";
-  const transferProperties =
-    action === "transfer-properties" ||
-    (preserveCurrentActions && acceptedAction(candidate, "propertyTransfer", current));
-  const attachNetwork =
-    action === "attach-network" ||
-    (preserveCurrentActions && acceptedAction(candidate, "networkAttachment", current));
+  const actions = resolveConflationActions(candidate, current);
   return {
     candidateId: candidate.id,
     action: "accept",
-    transferProperties,
-    attachNetwork,
+    transferProperties: action === "transfer-properties" ? selected : actions.transferProperties,
+    attachNetwork: action === "attach-network" ? selected : actions.attachNetwork,
   };
 }
 
@@ -1202,11 +1198,11 @@ function decisionsHaveSameEffect(
 ) {
   if (!current || current.action !== next.action) return false;
   if (current.action === "reject") return true;
+  const currentActions = resolveConflationActions(candidate, current);
+  const nextActions = resolveConflationActions(candidate, next);
   return (
-    acceptedAction(candidate, "propertyTransfer", current) ===
-      acceptedAction(candidate, "propertyTransfer", next) &&
-    acceptedAction(candidate, "networkAttachment", current) ===
-      acceptedAction(candidate, "networkAttachment", next)
+    currentActions.transferProperties === nextActions.transferProperties &&
+    currentActions.attachNetwork === nextActions.attachNetwork
   );
 }
 
@@ -1245,7 +1241,7 @@ export function buildConflationBulkDecisionResult(
     const next =
       request.action === "reject"
         ? ({ candidateId: candidate.id, action: "reject" } as const)
-        : bulkAcceptDecision(candidate, current, request.action);
+        : buildConflationActionDecision(candidate, current, request.action, true);
     if (decisionsHaveSameEffect(candidate, current, next)) continue;
     changedCandidates++;
     if (current) overriddenDecisions++;
@@ -1296,6 +1292,17 @@ function acceptedAction(
   return assessment.status === "automatic";
 }
 
+/** Resolve scheduled actions without changing discovery eligibility or overriding hard blockers. */
+export function resolveConflationActions(
+  candidate: OsmConflationCandidate,
+  decision?: OsmConflationDecision,
+): OsmConflationResolvedActions {
+  return {
+    transferProperties: acceptedAction(candidate, "propertyTransfer", decision),
+    attachNetwork: acceptedAction(candidate, "networkAttachment", decision),
+  };
+}
+
 function transferSelectedProperties(
   changeset: OsmChangeset,
   candidate: OsmConflationCandidate,
@@ -1322,8 +1329,10 @@ function validateAcceptedMappings(
   const wayTargets = new Set<number>();
   for (const candidate of candidates) {
     const decision = decisions.get(candidate.id);
-    const transfer = acceptedAction(candidate, "propertyTransfer", decision);
-    const attach = acceptedAction(candidate, "networkAttachment", decision);
+    const { transferProperties: transfer, attachNetwork: attach } = resolveConflationActions(
+      candidate,
+      decision,
+    );
     if (!transfer && !attach) continue;
     const sourceKey = `${candidate.entityType}:${candidate.sourceId}`;
     if (sourceActions.has(sourceKey)) {
@@ -1363,7 +1372,10 @@ function applyDiscoveredConflation(
   const patchWayIds = new Set<number>();
   for (const candidate of discovery.candidates) {
     const decision = decisionsById.get(candidate.id);
-    if (!acceptedAction(candidate, "networkAttachment", decision) || candidate.targetId == null) {
+    if (
+      !resolveConflationActions(candidate, decision).attachNetwork ||
+      candidate.targetId == null
+    ) {
       continue;
     }
     attachments.set(candidate.sourceId, candidate.targetId);
@@ -1386,7 +1398,10 @@ function applyDiscoveredConflation(
 
   for (const candidate of discovery.candidates) {
     const decision = decisionsById.get(candidate.id);
-    if (!acceptedAction(candidate, "propertyTransfer", decision) || candidate.targetId == null) {
+    if (
+      !resolveConflationActions(candidate, decision).transferProperties ||
+      candidate.targetId == null
+    ) {
       continue;
     }
     const source =

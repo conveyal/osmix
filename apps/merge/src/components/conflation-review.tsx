@@ -13,14 +13,19 @@ import type {
   OsmConflationReasonCode,
   OsmConflationSummary,
 } from "osmix";
-import { conflationEffectiveStatus, osmEntityToGeoJSONFeature } from "osmix";
-import { useState } from "react";
+import {
+  buildConflationActionDecision,
+  conflationEffectiveStatus,
+  osmEntityToGeoJSONFeature,
+  resolveConflationActions,
+} from "osmix";
+import { useId, useState } from "react";
 
 import { useMap } from "../hooks/map";
 import { conflationBulkActionCopy } from "../lib/conflation-workflow";
 import { cn } from "../lib/utils";
 import { conflationComparisonAtom } from "../state/conflation";
-import ActionButton from "./action-button";
+import ActionButton, { useAction } from "./action-button";
 import { Details, DetailsContent, DetailsSummary } from "./details";
 import { InfoTooltip } from "./info-tooltip";
 import { EmptyState } from "./section";
@@ -28,6 +33,7 @@ import { StatusDot, type StatusDotStatus } from "./status-dot";
 import { Button } from "./ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group";
 import { Card, CardAction, CardContent, CardHeader } from "./ui/card";
+import { Checkbox, CheckboxLabel } from "./ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -72,19 +78,20 @@ const STATUS_DOT: Record<OsmConflationEffectiveStatus, StatusDotStatus> = {
 
 const STATUS_LABEL: Record<OsmConflationEffectiveStatus, string> = {
   accepted: "Accepted",
-  automatic: "Automatic",
+  automatic: "Scheduled automatically",
   blocked: "Blocked",
-  rejected: "Rejected",
+  rejected: "Skipped",
   review: "Needs review",
   unmatched: "Unmatched",
 };
 
 const STATUS_HELP: Record<OsmConflationEffectiveStatus, string> = {
-  accepted: "an explicit decision will apply the selected fuzzy action",
-  automatic: "at least one high-confidence action applies unless rejected",
+  accepted: "your selected matching actions are scheduled for the next preview",
+  automatic:
+    "matching rules scheduled at least one action for the next preview; nothing has been applied yet",
   blocked: "no enabled action can run; accepting cannot override a blocked action",
-  rejected: "fuzzy actions are disabled by an explicit decision",
-  review: "at least one action needs a decision; another action may already be automatic",
+  rejected: "no matching actions are scheduled; ordinary imported additions are kept",
+  review: "at least one action needs a decision; check the scheduled actions shown on each row",
   unmatched: "no compatible base target was found",
 };
 
@@ -140,6 +147,7 @@ export interface ConflationReviewProps {
   filter: OsmConflationCandidateFilter;
   isFilterPending: boolean;
   onDecision: (decision: OsmConflationDecision) => Promise<void>;
+  onResetDecision: (candidateId: string) => Promise<void>;
   onBulkDecision: (request: OsmConflationBulkDecisionRequest) => Promise<void>;
   onFilterChange: (filter: OsmConflationCandidateFilter) => Promise<void>;
   onPageChange: (page: number) => Promise<void>;
@@ -215,23 +223,47 @@ export function ConflationStatusLegend() {
   );
 }
 
+const MATCHING_ACTIONS = [
+  {
+    action: "transfer-properties",
+    assessment: "propertyTransfer",
+    selected: "transferProperties",
+    label: "Copy tags",
+  },
+  {
+    action: "attach-network",
+    assessment: "networkAttachment",
+    selected: "attachNetwork",
+    label: "Connect network",
+  },
+] as const;
+
+function actionStatus(
+  candidate: OsmConflationCandidateView,
+  action: (typeof MATCHING_ACTIONS)[number],
+) {
+  const assessment = candidate[action.assessment];
+  if (!assessment) return "Unavailable";
+  if (assessment.status === "blocked") return "Blocked";
+  if (assessment.status === "unmatched") return "Unavailable";
+  const scheduled = resolveConflationActions(candidate, candidate.decision)[action.selected];
+  if (scheduled) return candidate.decision ? "Scheduled" : "Scheduled automatically";
+  return "Not selected";
+}
+
 export function CandidateActionStatuses({ candidate }: { candidate: OsmConflationCandidateView }) {
   return (
-    <div className="flex flex-wrap gap-x-3 text-muted-foreground" aria-label="Action statuses">
-      <span>
-        Property transfer:{" "}
-        <span className="font-bold text-foreground">
-          {conflationStatusLabel(candidate.propertyTransfer.status)}
+    <div
+      className="flex flex-wrap gap-x-3 text-muted-foreground"
+      aria-label="Scheduled matching actions"
+      aria-live="polite"
+    >
+      {MATCHING_ACTIONS.filter((action) => candidate[action.assessment]).map((action) => (
+        <span key={action.action}>
+          {action.label}:{" "}
+          <span className="font-bold text-foreground">{actionStatus(candidate, action)}</span>
         </span>
-      </span>
-      {candidate.networkAttachment ? (
-        <span>
-          Network attachment:{" "}
-          <span className="font-bold text-foreground">
-            {conflationStatusLabel(candidate.networkAttachment.status)}
-          </span>
-        </span>
-      ) : null}
+      ))}
     </div>
   );
 }
@@ -283,8 +315,8 @@ export function ConflationBulkActions({
         <div className="flex items-center gap-1 font-bold uppercase tracking-wide">
           Bulk decisions
           <InfoTooltip label="About bulk decisions" side="right" align="start">
-            Bulk decisions apply to every match in the current filters across all pages. Automatic
-            matches already apply unless rejected.
+            Bulk choices affect every match in the current filters across all pages. Automatic
+            actions are already scheduled; preview changes before applying them.
           </InfoTooltip>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -317,8 +349,7 @@ export function ConflationBulkActions({
             <DialogHeader>
               <DialogTitle>{selectedCopy.title}</DialogTitle>
               <DialogDescription>
-                {selectedCopy.description} This applies across every filtered page and replaces
-                prior decisions shown below.
+                {selectedCopy.description} This applies across every filtered page.
               </DialogDescription>
             </DialogHeader>
             <BulkPreviewTable preview={selectedPreview} />
@@ -444,76 +475,81 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
 export function CandidateActions({
   candidate,
   onDecision,
+  onResetDecision,
 }: {
   candidate: OsmConflationCandidateView;
   onDecision: (decision: OsmConflationDecision) => Promise<void>;
+  onResetDecision?: (candidateId: string) => Promise<void>;
 }) {
-  const canTransferProperties =
-    candidate.propertyTransfer.status !== "blocked" &&
-    candidate.propertyTransfer.status !== "unmatched" &&
-    candidate.evidence.tagDiff.length > 0;
-  const canAttachNetwork =
-    candidate.networkAttachment !== null &&
-    candidate.networkAttachment.status !== "blocked" &&
-    candidate.networkAttachment.status !== "unmatched";
-
+  const { isPending, runAction } = useAction();
+  const descriptionId = useId();
+  const scheduled = resolveConflationActions(candidate, candidate.decision);
   return (
-    <div className="flex flex-wrap gap-1 p-2 border-t">
-      {canTransferProperties ? (
+    <fieldset
+      className="flex min-w-0 flex-col gap-2 border-t p-2"
+      disabled={isPending}
+      aria-label={`Matching actions for imported ${candidate.entityType} ${candidate.sourceId}`}
+    >
+      {MATCHING_ACTIONS.map((action) => {
+        const assessment = candidate[action.assessment];
+        if (!assessment) return null;
+        const eligible =
+          assessment.status !== "blocked" &&
+          assessment.status !== "unmatched" &&
+          (action.assessment !== "propertyTransfer" || candidate.evidence.tagDiff.length > 0);
+        const reasons = assessment.reasons.map(conflationReasonLabel).join(", ");
+        const helpId = `${descriptionId}-${action.action}`;
+        return (
+          <div key={action.action} className="flex flex-col gap-1">
+            <CheckboxLabel>
+              <Checkbox
+                checked={scheduled[action.selected]}
+                disabled={isPending || !eligible}
+                aria-describedby={!eligible ? helpId : undefined}
+                onCheckedChange={(checked) =>
+                  runAction(() =>
+                    onDecision(
+                      buildConflationActionDecision(
+                        candidate,
+                        candidate.decision,
+                        action.action,
+                        checked,
+                      ),
+                    ),
+                  )
+                }
+              />
+              {action.label}
+            </CheckboxLabel>
+            {!eligible ? (
+              <p id={helpId} className="text-muted-foreground">
+                {actionStatus(candidate, action)}: {reasons || "No eligible matching action"}.
+              </p>
+            ) : null}
+          </div>
+        );
+      })}
+      {!scheduled.transferProperties && !scheduled.attachNetwork ? (
+        <p className="text-muted-foreground">
+          No matching actions scheduled. Ordinary imported additions are kept.
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-1">
         <ActionButton
           size="sm"
-          variant="outline"
-          onAction={() =>
-            onDecision({
-              candidateId: candidate.id,
-              action: "accept",
-              transferProperties: true,
-              attachNetwork: false,
-            })
-          }
+          variant="ghost"
+          disabled={effectiveStatus(candidate) === "rejected"}
+          onAction={() => onDecision({ candidateId: candidate.id, action: "reject" })}
         >
-          Transfer properties
+          Skip match
         </ActionButton>
-      ) : null}
-      {canAttachNetwork ? (
-        <ActionButton
-          size="sm"
-          variant="outline"
-          onAction={() =>
-            onDecision({
-              candidateId: candidate.id,
-              action: "accept",
-              transferProperties: false,
-              attachNetwork: true,
-            })
-          }
-        >
-          Attach network
-        </ActionButton>
-      ) : null}
-      {canTransferProperties && canAttachNetwork ? (
-        <ActionButton
-          size="sm"
-          onAction={() =>
-            onDecision({
-              candidateId: candidate.id,
-              action: "accept",
-              transferProperties: true,
-              attachNetwork: true,
-            })
-          }
-        >
-          Transfer + attach
-        </ActionButton>
-      ) : null}
-      <ActionButton
-        size="sm"
-        variant="ghost"
-        onAction={() => onDecision({ candidateId: candidate.id, action: "reject" })}
-      >
-        Reject
-      </ActionButton>
-    </div>
+        {candidate.decision && onResetDecision ? (
+          <ActionButton size="sm" variant="outline" onAction={() => onResetDecision(candidate.id)}>
+            Use automatic choices
+          </ActionButton>
+        ) : null}
+      </div>
+    </fieldset>
   );
 }
 
@@ -546,10 +582,13 @@ export function ConflationReview({
   filter,
   isFilterPending,
   onDecision,
+  onResetDecision,
   onBulkDecision,
   onFilterChange,
   onPageChange,
 }: ConflationReviewProps) {
+  const { isPending, runAction } = useAction();
+  const isReviewPending = isFilterPending || isPending;
   const map = useMap();
   const setComparison = useSetAtom(conflationComparisonAtom);
   const showCandidate = (candidate: OsmConflationCandidateView) => {
@@ -596,6 +635,11 @@ export function ConflationReview({
           </CardAction>
         </CardHeader>
         <CardContent className="p-0">
+          <p className="p-2 border-b">
+            A match proposes how imported data corresponds to a base feature. OSM tags are feature
+            attributes, such as a surface type. Choose actions independently; selections enter the
+            next preview and update the dataset only when you apply it.
+          </p>
           <SummaryTable summary={summary} />
         </CardContent>
       </Card>
@@ -608,7 +652,7 @@ export function ConflationReview({
             <select
               id="conflation-status-filter"
               className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-              disabled={isFilterPending}
+              disabled={isReviewPending}
               value={filter.status ?? ""}
               onChange={(event) => {
                 const status = event.target.value as OsmConflationEffectiveStatus | "";
@@ -631,7 +675,7 @@ export function ConflationReview({
             <select
               id="conflation-entity-filter"
               className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-              disabled={isFilterPending}
+              disabled={isReviewPending}
               value={filter.entityType ?? ""}
               onChange={(event) => {
                 const entityType = event.target.value as "node" | "way" | "";
@@ -652,7 +696,7 @@ export function ConflationReview({
             <select
               id="conflation-reason-filter"
               className="h-7 min-w-0 max-w-full flex-1 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-              disabled={isFilterPending}
+              disabled={isReviewPending}
               value={filter.reason ?? ""}
               onChange={(event) => {
                 const reason = event.target.value as OsmConflationReasonCode | "";
@@ -670,7 +714,7 @@ export function ConflationReview({
         </CardContent>
       </Card>
 
-      <Card aria-busy={isFilterPending}>
+      <Card aria-busy={isReviewPending}>
         <ConflationResultsHeader
           isFilterPending={isFilterPending}
           totalCandidates={page.totalCandidates}
@@ -678,7 +722,7 @@ export function ConflationReview({
         <CardContent className={cn("p-0", isFilterPending && "opacity-60")} inert={isFilterPending}>
           <ConflationBulkActions
             bulkActions={page.bulkActions}
-            disabled={isFilterPending}
+            disabled={isReviewPending}
             filter={filter}
             onBulkDecision={onBulkDecision}
           />
@@ -716,7 +760,11 @@ export function ConflationReview({
                         </ItemActions>
                       </div>
                       <CandidateEvidence candidate={candidate} />
-                      <CandidateActions candidate={candidate} onDecision={onDecision} />
+                      <CandidateActions
+                        candidate={candidate}
+                        onDecision={onDecision}
+                        onResetDecision={onResetDecision}
+                      />
                     </ItemContent>
                   </Item>
                 );
@@ -729,9 +777,9 @@ export function ConflationReview({
       <ButtonGroup className="w-full">
         <Button
           className="flex-1"
-          disabled={isFilterPending || page.page <= 0}
+          disabled={isReviewPending || page.page <= 0}
           variant="outline"
-          onClick={() => void onPageChange(page.page - 1)}
+          onClick={() => runAction(() => onPageChange(page.page - 1))}
         >
           Previous
         </Button>
@@ -742,9 +790,9 @@ export function ConflationReview({
         <ButtonGroupSeparator />
         <Button
           className="flex-1"
-          disabled={isFilterPending || page.page + 1 >= page.totalPages}
+          disabled={isReviewPending || page.page + 1 >= page.totalPages}
           variant="outline"
-          onClick={() => void onPageChange(page.page + 1)}
+          onClick={() => runAction(() => onPageChange(page.page + 1))}
         >
           Next
         </Button>
@@ -759,10 +807,10 @@ export function ConflationReview({
           </InfoTooltip>
         </span>
         <span className="flex items-center gap-1">
-          Reject behavior
-          <InfoTooltip label="About rejecting a match" side="top" align="start">
-            Rejecting disables fuzzy property transfer and network attachment. It does not remove
-            the imported entity from the ordinary direct merge.
+          Skipping a match
+          <InfoTooltip label="About skipping a match" side="top" align="start">
+            Skipping schedules neither copying tags nor connecting networks. Ordinary imported
+            additions remain in the merge.
           </InfoTooltip>
         </span>
       </div>

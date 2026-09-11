@@ -45,7 +45,7 @@ describe("conflation workflow configuration", () => {
         enabled: true,
         transferProperties: false,
       }),
-    ).toBe("Enable property transfer, network attachment, or both.");
+    ).toBe("Select Copy tags, Connect network, or both.");
   });
 
   it("requires explicit property keys when property transfer is enabled", () => {
@@ -55,7 +55,7 @@ describe("conflation workflow configuration", () => {
         enabled: true,
         propertyKeys: "",
       }),
-    ).toBe("Enter at least one property key to transfer.");
+    ).toBe("Enter at least one OSM tag key to copy.");
   });
 
   it("accepts network-only matching without property keys", () => {
@@ -101,19 +101,19 @@ describe("conflation workflow configuration", () => {
 
   it("uses action-specific labels and explicit filter-wide confirmation wording", () => {
     expect(conflationBulkActionCopy("transfer-properties")).toMatchObject({
-      buttonLabel: "Transfer properties",
-      title: "Transfer properties to filtered matches?",
+      buttonLabel: "Copy tags",
+      title: "Copy tags for filtered matches?",
     });
     expect(conflationBulkActionCopy("attach-network")).toMatchObject({
-      buttonLabel: "Attach network",
-      title: "Attach the filtered imported network?",
+      buttonLabel: "Connect network",
+      title: "Connect the filtered imported network?",
     });
     expect(conflationBulkActionCopy("reject")).toEqual({
-      buttonLabel: "Reject filtered",
-      confirmLabel: "Reject filtered matches",
+      buttonLabel: "Skip filtered",
+      confirmLabel: "Skip filtered matches",
       description:
-        "Reject every filtered match that is not already rejected, including blocked and unmatched rows.",
-      title: "Reject all filtered matches?",
+        "Schedule no matching actions for the filtered matches. Keep ordinary imported additions, including blocked and unmatched features.",
+      title: "Skip all filtered matches?",
     });
   });
 
@@ -151,9 +151,9 @@ describe("conflation workflow configuration", () => {
     expect(html).toContain("Bulk decisions");
     expect(html).toContain('aria-label="About bulk decisions"');
     expect(html).not.toContain("every match in the current filters across all pages");
-    expect(html).toContain("Transfer properties (145)");
-    expect(html).toContain("Attach network (12)");
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Reject filtered \(0\)<\/button>/);
+    expect(html).toContain("Copy tags (145)");
+    expect(html).toContain("Connect network (12)");
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Skip filtered \(0\)<\/button>/);
   });
 
   it("marks previous filtered results stale while the worker refreshes them", () => {

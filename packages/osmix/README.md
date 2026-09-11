@@ -90,7 +90,8 @@ earlier run's peak. CI verifies operation counts and semantic fingerprints, but 
 threshold or compressed-PBF byte golden.
 
 Proximity matching for independently created imports is available as a separate opt-in review session. The
-recommended defaults use a 1-meter radius and automatically apply only high-confidence candidates:
+recommended defaults use a 1-meter radius and schedule high-confidence actions automatically. Discovery and
+decision changes do not update the base dataset:
 
 ```ts check-docs worker-pbf-inputs
 import { createRemote } from "osmix";
@@ -113,14 +114,6 @@ await remote.applyConflationBulkDecision(base.id, {
   filter: { status: "review" },
 });
 
-for (const candidate of page.candidates) {
-  if (candidate.status !== "review") continue;
-  await remote.setConflationDecision(base.id, {
-    candidateId: candidate.id,
-    action: "reject",
-  });
-}
-
 const generated = await remote.generateConflationChangeset(base.id, {
   directMerge: true,
   deduplicateNodes: true,
@@ -130,17 +123,55 @@ console.log(summary, generated.routing.car, generated.routing.walk);
 await remote.applyChangesAndReplace(base.id);
 ```
 
-Property transfer changes only explicitly selected tags and retains imported geometry, including matched ways
+OSM tags are feature attributes, such as `surface=asphalt` or `kerb=lowered`. **Copy tags** (property transfer
+in the API) changes only explicitly selected tags and retains imported geometry, including matched ways
 and their connecting nodes. Relative to the same direct/exact merge without property transfer, it never adds or
 removes entities or changes coordinates, way references, or relation members. This applies to automatic,
-individual, and filter-wide decisions. Network attachment separately rewrites only patch-created way
+individual, and filter-wide decisions. **Connect network** (network attachment in the API) separately rewrites only patch-created way
 references. The worker preserves discovery settings, filters, decisions, and generated changes across worker
 restarts, and reports CAR/WALK node, edge, and component deltas before the changeset is applied. Automatic
 pedestrian attachments are rejected if they alter routable CAR topology.
 
+Copy tags and Connect network are independent choices. Review controls show which actions are currently
+scheduled, separately from whether discovery considers each action eligible. Changing one choice preserves
+the other. The shared `resolveConflationActions(candidate, decision?)` helper returns the scheduled
+`transferProperties` and `attachNetwork` flags. Use `buildConflationActionDecision()` to build a row update:
+
+```ts check-docs
+import {
+  buildConflationActionDecision,
+  type OsmConflationCandidate,
+  type OsmConflationDecision,
+} from "osmix";
+
+function chooseCopyTags(
+  candidate: OsmConflationCandidate,
+  current: OsmConflationDecision | undefined,
+  selected: boolean,
+) {
+  return buildConflationActionDecision(candidate, current, "transfer-properties", selected);
+}
+```
+
+Persist the returned decision with `setConflationDecision()`. The `"attach-network"` action works the same
+way for Connect network. The helper writes both flags explicitly. For backward compatibility, omitted flags
+on a manually constructed accept decision select every eligible action.
+
+Skipping a match, including turning both choices off, schedules neither action and retains ordinary
+imported additions under the direct/exact merge rules. Removing a saved decision with
+`setConflationDecisions()` restores that candidate's discovery defaults; the Merge app calls this
+**Use automatic choices**.
+
+`generateConflationChangeset()` stages the selected actions in a preview. **Automatic** means scheduled by
+the matching rules, not already applied. Inspect the preview before calling `applyChangesAndReplace()` to
+update the base dataset. Saved choices survive navigation and worker recovery, and regenerated previews use
+the current choices. Updating or clearing decisions invalidates their dependent matching preview.
+
 Filter-wide decisions are computed and committed atomically in the worker. Property and network actions
 accept eligible automatic and review candidates while skipping blocked, unmatched, ambiguous, or structurally
-invalid matches. Reject includes every filtered candidate that is not already rejected. Each result returns the
+invalid matches. Each action preserves the other current choice, using the same decision resolution as an
+individual control. Reject schedules neither action for every filtered candidate that is not already rejected;
+the Merge app labels this **Skip filtered**. Each result returns the
 complete decision snapshot for restart recovery, and accepted candidates can be queried with
 `{ status: "accepted" }`.
 

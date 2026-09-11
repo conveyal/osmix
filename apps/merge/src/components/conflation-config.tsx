@@ -39,6 +39,10 @@ export function ConflationConfig() {
 
         {form.enabled ? (
           <div className="flex flex-col gap-2 border-t pt-2">
+            <p>
+              OSM tags are feature attributes, such as surface type or kerb height. Choose copying,
+              connecting, or both.
+            </p>
             <div className="flex items-center gap-1">
               <CheckboxLabel>
                 <Checkbox
@@ -48,7 +52,7 @@ export function ConflationConfig() {
                     updateForm((current) => ({ ...current, transferProperties }));
                   }}
                 />
-                Transfer selected properties
+                Copy tags
               </CheckboxLabel>
               <InfoTooltip label="About property transfer" side="right" align="start">
                 Copy only the selected OSM tags from an accepted imported match onto its base
@@ -60,7 +64,7 @@ export function ConflationConfig() {
 
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1">
-                <label htmlFor="conflation-property-keys">OSM tag keys to transfer</label>
+                <label htmlFor="conflation-property-keys">OSM tag keys to copy</label>
                 <InfoTooltip label="About transferable OSM tags" side="right" align="start">
                   Separate keys with commas or spaces. The defaults focus on crossing and kerb
                   accessibility data. Imported values replace base values only for these keys;
@@ -91,7 +95,7 @@ export function ConflationConfig() {
                     updateForm((current) => ({ ...current, attachNetwork }));
                   }}
                 />
-                Attach compatible imported network nodes
+                Connect network
               </CheckboxLabel>
               <InfoTooltip label="About network attachment" side="right" align="start">
                 Connect accepted imported ways by rewriting only patch-created way references to
@@ -127,8 +131,9 @@ export function ConflationConfig() {
             <div className="flex items-center gap-1 text-muted-foreground">
               Automatic decisions
               <InfoTooltip label="About automatic matching decisions" side="right" align="start">
-                High-confidence matches apply automatically. Ambiguous, routing-affecting, and
-                structurally uncertain candidates remain available for review.
+                High-confidence actions are scheduled for the next preview. The dataset changes when
+                you apply that preview. Ambiguous, routing-affecting, and structurally uncertain
+                candidates remain available for review.
               </InfoTooltip>
             </div>
 

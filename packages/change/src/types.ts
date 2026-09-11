@@ -155,12 +155,22 @@ export interface ResolvedOsmConflationOptions {
   automatic: OsmConflationAutomatic;
 }
 
-/** A user's explicit choice for a discovered source/target pair. */
+/**
+ * A user's explicit choice for a discovered source/target pair.
+ * Accepted decisions select eligible actions when their flags are omitted.
+ * Two false flags skip the match; rejection ignores both action flags.
+ */
 export interface OsmConflationDecision {
   candidateId: string;
   action: "accept" | "reject";
   transferProperties?: boolean;
   attachNetwork?: boolean;
+}
+
+/** Eligible matching actions scheduled by a decision or automatic discovery defaults. */
+export interface OsmConflationResolvedActions {
+  transferProperties: boolean;
+  attachNetwork: boolean;
 }
 
 /** A filter-wide review operation performed atomically in the conflation worker. */
