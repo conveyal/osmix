@@ -376,7 +376,6 @@ function nodePropertyAssessment(
   tagDiff: readonly OsmConflationTagDiff[],
 ) {
   const assessment = propertyAssessment(tagDiff, context.options);
-  if (assessment.status === "blocked") return assessment;
 
   const patchAreaOnly = patchWays.length > 0 && patchWays.every(isAreaWay);
   const baseAreaOnly = baseWays.length > 0 && baseWays.every(isAreaWay);
@@ -708,9 +707,7 @@ function overallAssessment(
 
 function addReviewReason(candidate: OsmConflationCandidate, reason: OsmConflationReasonCode) {
   for (const assessment of [candidate.propertyTransfer, candidate.networkAttachment]) {
-    if (!assessment || assessment.status === "blocked" || assessment.status === "unmatched") {
-      continue;
-    }
+    if (!assessment) continue;
     if (assessment.status === "automatic") assessment.status = "review";
     assessment.reasons = uniqueReasons([...assessment.reasons, reason]);
   }
@@ -915,7 +912,8 @@ function discoverWayCandidates(context: DiscoveryContext) {
         context.baseRelations.restrictionWays.has(match.target.id);
       if (sourceRelation || targetRelation) {
         property.reasons = uniqueReasons([...property.reasons, "relation-member"]);
-        property.status = restriction ? "blocked" : "review";
+        if (restriction) property.status = "blocked";
+        else if (property.status === "automatic") property.status = "review";
       }
       candidates.push({
         id: candidateId("way", source.id, match.target.id),
@@ -1065,15 +1063,36 @@ export function validateConflationDecisions(
   validatedDecisionMap(candidates, decisions);
 }
 
-/** Return a candidate's effective status without rerunning spatial discovery. */
+function effectiveStatusForDecision(
+  candidate: OsmConflationCandidate,
+  decision: OsmConflationDecision | undefined,
+): OsmConflationEffectiveStatus {
+  if (decision?.action === "reject") return "rejected";
+  if (decision?.action === "accept") {
+    if (
+      acceptedAction(candidate, "propertyTransfer", decision) ||
+      acceptedAction(candidate, "networkAttachment", decision)
+    ) {
+      return "accepted";
+    }
+    // A saved acceptance cannot make a blocked action applicable. Keep its
+    // blocked/unmatched status visible in summaries, paging, and restored reviews.
+    if (decision.transferProperties !== false || decision.attachNetwork !== false) {
+      return candidate.status === "unmatched" ? "unmatched" : "blocked";
+    }
+  }
+  return candidate.status;
+}
+
+/** Return a candidate's applicable decision status without rerunning spatial discovery. */
 export function conflationEffectiveStatus(
   candidate: OsmConflationCandidate,
   decisions: readonly OsmConflationDecision[] = [],
 ): OsmConflationEffectiveStatus {
-  const action = decisionMap(decisions).get(candidate.id)?.action;
-  if (action === "accept") return "accepted";
-  if (action === "reject") return "rejected";
-  return candidate.status;
+  return effectiveStatusForDecision(
+    candidate,
+    decisions.findLast((decision) => decision.candidateId === candidate.id),
+  );
 }
 
 /** Recompute review counts after lightweight decisions without rerunning discovery. */
@@ -1092,9 +1111,7 @@ export function summarizeConflationCandidates(
     rejected: 0,
   };
   for (const candidate of candidates) {
-    const action = decisionsById.get(candidate.id)?.action;
-    const status =
-      action === "accept" ? "accepted" : action === "reject" ? "rejected" : candidate.status;
+    const status = effectiveStatusForDecision(candidate, decisionsById.get(candidate.id));
     summary[status]++;
   }
   return summary;
@@ -1109,9 +1126,7 @@ export function filterConflationCandidates(
   const decisionsById = decisionMap(decisions);
   return candidates.filter((candidate) => {
     if (filter.entityType != null && candidate.entityType !== filter.entityType) return false;
-    const action = decisionsById.get(candidate.id)?.action;
-    const status =
-      action === "accept" ? "accepted" : action === "reject" ? "rejected" : candidate.status;
+    const status = effectiveStatusForDecision(candidate, decisionsById.get(candidate.id));
     if (filter.status != null && status !== filter.status) {
       return false;
     }

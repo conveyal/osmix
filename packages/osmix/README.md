@@ -144,6 +144,11 @@ invalid matches. Reject includes every filtered candidate that is not already re
 complete decision snapshot for restart recovery, and accepted candidates can be queried with
 `{ status: "accepted" }`.
 
+Review and acceptance cannot override an action's hard safety block. Ordinary relation membership or
+ambiguity adds review context without making an already blocked action eligible. Property transfer and network
+attachment retain separate eligibility, including after worker recovery; an eligible action can proceed while
+the other remains blocked. Filter-wide decisions skip the blocked action and count it as ineligible.
+
 #### Which mode am I in?
 
 `createRemote()` picks the best mode the current runtime supports and reports

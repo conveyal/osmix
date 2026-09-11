@@ -239,6 +239,7 @@ export const MERGE_STEP_GUIDES = {
       "Fuzzy matching preserves original base IDs, coordinates, ordered way references, and relation membership; ordinary same-ID patch updates remain authoritative in the direct-merge baseline.",
       "Property transfer keeps imported geometry, including matched ways and the nodes connecting them to other imported ways. Direct merge and exact reconciliation apply their own rules separately.",
       "Protected structural tags cannot transfer fuzzily, and routing-affecting properties require review.",
+      "Review and acceptance cannot override a blocked action. Relation membership and ambiguity add reasons without lifting existing safety blocks; property transfer and network attachment keep separate eligibility.",
       "Ambiguous, many-to-one, grade-conflicting, restricted, or structurally invalid candidates are not accepted automatically.",
     ],
     output:

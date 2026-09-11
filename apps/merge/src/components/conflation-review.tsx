@@ -13,7 +13,7 @@ import type {
   OsmConflationReasonCode,
   OsmConflationSummary,
 } from "osmix";
-import { osmEntityToGeoJSONFeature } from "osmix";
+import { conflationEffectiveStatus, osmEntityToGeoJSONFeature } from "osmix";
 import { useState } from "react";
 
 import { useMap } from "../hooks/map";
@@ -82,7 +82,7 @@ const STATUS_LABEL: Record<OsmConflationEffectiveStatus, string> = {
 const STATUS_HELP: Record<OsmConflationEffectiveStatus, string> = {
   accepted: "an explicit decision will apply the selected fuzzy action",
   automatic: "at least one high-confidence action applies unless rejected",
-  blocked: "at least one action is prevented by a structural safety rule",
+  blocked: "no enabled action can run; accepting cannot override a blocked action",
   rejected: "fuzzy actions are disabled by an explicit decision",
   review: "at least one action needs a decision; another action may already be automatic",
   unmatched: "no compatible base target was found",
@@ -146,9 +146,7 @@ export interface ConflationReviewProps {
 }
 
 function effectiveStatus(candidate: OsmConflationCandidateView) {
-  if (candidate.decision?.action === "accept") return "accepted" as const;
-  if (candidate.decision?.action === "reject") return "rejected" as const;
-  return candidate.status;
+  return conflationEffectiveStatus(candidate, candidate.decision ? [candidate.decision] : []);
 }
 
 function entityFeature(
@@ -201,7 +199,8 @@ export function ConflationStatusLegend() {
       <div className="grid gap-1">
         <p>
           Overall status summarizes the candidate. Property transfer and network attachment are
-          assessed independently.
+          assessed independently. Review reasons never lift a safety block. An eligible action can
+          still run while the other action remains blocked.
         </p>
         {(["automatic", "review", "blocked", "unmatched", "accepted", "rejected"] as const).map(
           (status) => (

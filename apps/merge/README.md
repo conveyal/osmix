@@ -138,6 +138,12 @@ and rejected candidates remain visible through paged status, entity, and reason 
 draws the imported source and proposed base target together on the map and shows its geometry evidence and
 property diff. Review decisions are stable candidate-ID records and are restored with the worker session.
 
+Check the status of each action: property transfer and network attachment are assessed separately. **Needs
+review** allows a decision about an eligible action; it does not override **Blocked** on the other action.
+An ordinary relation membership or an additional review reason never lifts an existing safety block. For
+example, a bridge in a walking-route relation remains blocked from transferring tags to a ground-level path
+when their grade contexts conflict.
+
 The **Filtered matches** toolbar applies property transfer, network attachment, or rejection to every candidate
 matching the current filters across all pages. Automatic matches already apply unless rejected. Before changing
 decisions, the app shows how many automatic and review candidates are eligible, how many blocked or ambiguous
