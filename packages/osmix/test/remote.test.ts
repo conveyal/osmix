@@ -3,7 +3,9 @@ import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/test-util
 import type { FeatureCollection, LineString, Point } from "geojson";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { merge } from "../src/index";
 import { createRemote, OsmixDatasetLossError, OsmixRemote } from "../src/remote";
+import { createBlockedBridgeFixture, entitySnapshot } from "./conflation-blocked-fixture";
 
 const monacoPbf = PBFs["monaco"]!;
 const occupiedMonacoTile: [number, number, number] = [17059, 11948, 15];
@@ -385,6 +387,55 @@ describe("OsmixRemote", () => {
         action: "reject",
       });
       expect((await remote.getChangesetPage(base.id, 0, 100)).changes?.length).toBeGreaterThan(0);
+    });
+
+    it("restores hard blockers without turning an ignored acceptance into a tag transfer", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const { base, patch } = createBlockedBridgeFixture();
+      const options = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
+      const baseline = entitySnapshot(await merge(base, patch, options, () => {}));
+      await remote.transferIn(base);
+      await remote.transferIn(patch);
+      await remote.discoverConflation(base.id, patch.id, {
+        propertyKeys: ["name"],
+        attachNetwork: false,
+      });
+      const decision = {
+        candidateId: "way:20->10",
+        action: "accept" as const,
+        transferProperties: true,
+        attachNetwork: false,
+      };
+      await remote.setConflationDecision(base.id, decision);
+      await remote.setConflationFilter(base.id, { status: "blocked" });
+      await remote.generateConflationChangeset(base.id, options);
+      const changes = (await remote.getChangesetPage(base.id, 0, 100)).changes;
+
+      await remote.getWorker().clearConflation(base.id);
+      await remote.restoreForTest();
+
+      const page = await remote.getConflationPage(base.id, 0, 1);
+      expect(page.totalCandidates).toBe(1);
+      expect(page.candidates[0]).toMatchObject({
+        status: "blocked",
+        propertyTransfer: { status: "blocked" },
+        decision,
+      });
+      expect(page.bulkActions["transfer-properties"]).toMatchObject({
+        filteredCandidates: 1,
+        eligibleCandidates: 0,
+        skippedCandidates: 1,
+      });
+      await expect(remote.getConflationSummary(base.id)).resolves.toMatchObject({
+        blocked: 1,
+        accepted: 0,
+      });
+      expect((await remote.getChangesetPage(base.id, 0, 100)).changes).toEqual(changes);
+      await remote.setConflationFilter(base.id, { status: "accepted" });
+      expect((await remote.getConflationPage(base.id, 0, 1)).totalCandidates).toBe(0);
+      await remote.applyChangesAndReplace(base.id);
+      expect(entitySnapshot(await remote.transferOut(base.id))).toEqual(baseline);
     });
 
     it("does not replay conflation state after a loader replaces an input ID", async () => {

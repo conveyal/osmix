@@ -21,6 +21,7 @@
 import {
   applyChangesetToOsm,
   buildConflationBulkDecisionResult,
+  conflationEffectiveStatus,
   generateChangeset,
   merge,
   summarizeConflationCandidates,
@@ -160,12 +161,7 @@ function conflationCandidateMatches(
   decision: OsmConflationDecision | undefined,
   filter: OsmConflationCandidateFilter,
 ) {
-  const status =
-    decision?.action === "accept"
-      ? "accepted"
-      : decision?.action === "reject"
-        ? "rejected"
-        : candidate.status;
+  const status = conflationEffectiveStatus(candidate, decision ? [decision] : []);
   if (filter.entityType != null && candidate.entityType !== filter.entityType) return false;
   if (filter.status != null && status !== filter.status) return false;
   if (filter.reason != null && !candidate.reasons.includes(filter.reason)) return false;

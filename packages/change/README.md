@@ -119,9 +119,11 @@ separate action that changes only patch-created way references. Base IDs, coordi
 and ordered relation members stay authoritative.
 
 Structural properties cannot transfer. Routing-affecting properties, motor-road attachments, ambiguous
-targets, relation membership, and uncertain geometry require review. Grade conflicts, restrictions, dangling
-references, and way collapse remain blocked even when an accept decision is supplied. Equivalent one-to-one
-patch ways remain after property transfer, including the nodes that connect them to other imported ways.
+targets, ordinary relation membership, and uncertain geometry require review when otherwise eligible. Adding
+a review reason never weakens an existing block: hard grade, access, geometry, restriction, or reference
+conflicts still prevent the affected action, even when an accept decision is supplied. Property transfer and
+network attachment are assessed independently, so blocking one does not disable an otherwise eligible action.
+Equivalent one-to-one patch ways remain after property transfer, including the nodes that connect them to other imported ways.
 Exact reconciliation remains a separate operation; segmented way chains are reported but unsupported.
 
 ## API
