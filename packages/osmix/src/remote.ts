@@ -406,20 +406,15 @@ export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
  */
 interface ActiveChangesetState {
   baseOsmId: string;
-  changeTypes: OsmChangeTypes[];
-  entityTypes: OsmEntityType[];
+  kind: "ordinary" | "conflation";
   options: Partial<OsmMergeOptions>;
   patchOsmId: string;
 }
 
 interface ActiveConflationState {
   baseOsmId: string;
-  changeTypes: OsmChangeTypes[];
-  changesetGenerated: boolean;
   decisions: OsmConflationDecision[];
-  entityTypes: OsmEntityType[];
   filter: OsmConflationCandidateFilter;
-  mergeOptions: Partial<OsmMergeOptions>;
   options: OsmConflationOptions;
   patchOsmId: string;
 }
@@ -430,7 +425,9 @@ type DatasetRestorer<T extends OsmixWorker> = (
 ) => Promise<unknown>;
 
 export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
-  private activeChangeset: ActiveChangesetState | null = null;
+  private readonly activeChangesets = new Map<string, ActiveChangesetState>();
+  private changesetChangeTypes: OsmChangeTypes[] = ["create", "modify", "delete"];
+  private changesetEntityTypes: OsmEntityType[] = ["node", "way", "relation"];
   private readonly activeConflations = new Map<string, ActiveConflationState>();
   private readonly datasetRestorers = new Map<string, DatasetRestorer<T> | null>();
   private readonly retainedDatasets = new Map<string, OsmTransferables>();
@@ -657,7 +654,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     this.retainedRoutingGraphs.delete(id);
   }
 
-  private invalidateConflationsForDataset(osmId: OsmId): void {
+  private invalidateMergeStateForDataset(osmId: OsmId): void {
     const id = this.getId(osmId);
     // Dataset IDs are logical keys and loaders may replace the contents under one.
     // Candidate evidence and decisions are invalid as soon as either input changes.
@@ -666,11 +663,14 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
         this.activeConflations.delete(baseOsmId);
       }
     }
-    if (
-      this.activeChangeset &&
-      (this.activeChangeset.baseOsmId === id || this.activeChangeset.patchOsmId === id)
-    ) {
-      this.activeChangeset = null;
+    for (const [baseOsmId, state] of this.activeChangesets) {
+      if (baseOsmId === id || state.patchOsmId === id) this.activeChangesets.delete(baseOsmId);
+    }
+  }
+
+  private invalidateGeneratedConflationChangeset(baseOsmId: string) {
+    if (this.activeChangesets.get(baseOsmId)?.kind === "conflation") {
+      this.activeChangesets.delete(baseOsmId);
     }
   }
 
@@ -744,11 +744,6 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     for (const [osmId, transferables] of this.retainedRoutingGraphs) {
       await worker.transferRoutingGraphIn(osmId, transferables);
     }
-    if (index === 0 && this.activeChangeset) {
-      const state = this.activeChangeset;
-      await worker.generateChangeset(state.baseOsmId, state.patchOsmId, state.options);
-      await worker.setChangesetFilters(state.changeTypes, state.entityTypes);
-    }
     if (index === 0) {
       for (const state of this.activeConflations.values()) {
         // Recovery reproduces review state by rediscovering from restored untouched
@@ -756,11 +751,17 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
         await worker.discoverConflation(state.baseOsmId, state.patchOsmId, state.options);
         await worker.setConflationFilter(state.baseOsmId, state.filter);
         await worker.setConflationDecisions(state.baseOsmId, state.decisions);
-        if (state.changesetGenerated) {
-          await worker.generateConflationChangeset(state.baseOsmId, state.mergeOptions);
-          await worker.setChangesetFilters(state.changeTypes, state.entityTypes);
+      }
+      // Candidate review and generated output have independent lifetimes. Only
+      // the latest successful generation for each base may replace its preview.
+      for (const state of this.activeChangesets.values()) {
+        if (state.kind === "conflation") {
+          await worker.generateConflationChangeset(state.baseOsmId, state.options);
+        } else {
+          await worker.generateChangeset(state.baseOsmId, state.patchOsmId, state.options);
         }
       }
+      await worker.setChangesetFilters(this.changesetChangeTypes, this.changesetEntityTypes);
     }
   }
 
@@ -858,7 +859,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       (worker) => worker.fromPbf(transfer({ data: transferableData, options })),
       { lane: "control", retry: "never" },
     );
-    this.invalidateConflationsForDataset(osmInfo.id);
+    this.invalidateMergeStateForDataset(osmInfo.id);
     const replayOptions = { ...options };
     this.datasetRestorers.set(
       osmInfo.id,
@@ -929,7 +930,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
         ),
       { lane: "control", retry: "never" },
     );
-    this.invalidateConflationsForDataset(osmInfo.id);
+    this.invalidateMergeStateForDataset(osmInfo.id);
     const replayOptions = { ...options };
     this.datasetRestorers.set(
       osmInfo.id,
@@ -965,7 +966,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
         ),
       { lane: "control", retry: "never" },
     );
-    this.invalidateConflationsForDataset(osmInfo.id);
+    this.invalidateMergeStateForDataset(osmInfo.id);
     const replayOptions = { ...options };
     this.datasetRestorers.set(
       osmInfo.id,
@@ -1003,7 +1004,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
         ),
       { lane: "control", retry: "never" },
     );
-    this.invalidateConflationsForDataset(osmInfo.id);
+    this.invalidateMergeStateForDataset(osmInfo.id);
     const replayOptions = { ...options };
     const replayGtfsOptions = { ...gtfsOptions };
     this.datasetRestorers.set(
@@ -1131,7 +1132,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
         ),
       { lane: "control", retry: "never" },
     );
-    this.invalidateConflationsForDataset(osmInfo.id);
+    this.invalidateMergeStateForDataset(osmInfo.id);
     const replayOptions = { ...options };
     const replayReadOptions = { ...readOptions };
     const replayableSource =
@@ -1266,7 +1267,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     if (this.workerCount > 1 && !isShared) {
       throw Error("Multiple workers require a SharedArrayBuffer-backed OSM dataset");
     }
-    this.invalidateConflationsForDataset(transferables.id);
+    this.invalidateMergeStateForDataset(transferables.id);
     this.markDatasetUnrecoverable(transferables.id);
     if (isShared) {
       this.retainedDatasets.set(transferables.id, transferables);
@@ -1282,14 +1283,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    */
   async delete(osmId: OsmId): Promise<void> {
     const id = this.getId(osmId);
-    this.invalidateConflationsForDataset(id);
+    this.invalidateMergeStateForDataset(id);
     this.unregisterDatasetForRecovery(id);
-    if (
-      this.activeChangeset &&
-      (this.activeChangeset.baseOsmId === id || this.activeChangeset.patchOsmId === id)
-    ) {
-      this.activeChangeset = null;
-    }
     await this.broadcastStateChange("dataset deletion", (worker) => worker.delete(id));
   }
 
@@ -1311,8 +1306,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     );
     // Invalidate sessions using either key: rename removes the source and may
     // overwrite a different dataset already registered at the destination.
-    this.invalidateConflationsForDataset(from);
-    this.invalidateConflationsForDataset(toId);
+    this.invalidateMergeStateForDataset(from);
+    this.invalidateMergeStateForDataset(toId);
     // Update the id in the transferables
     const updatedTransferables = { ...transferables, id: toId };
     const restorer = this.datasetRestorers.get(from) ?? null;
@@ -1523,14 +1518,11 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       (worker) => worker.discoverConflation(baseId, patchId, storedOptions),
       { lane: "control", retry: "never" },
     );
+    this.invalidateGeneratedConflationChangeset(baseId);
     this.activeConflations.set(baseId, {
       baseOsmId: baseId,
-      changeTypes: ["create", "modify", "delete"],
-      changesetGenerated: false,
       decisions: storedOptions.decisions ?? [],
-      entityTypes: ["node", "way", "relation"],
       filter: {},
-      mergeOptions: {},
       options: storedOptions,
       patchOsmId: patchId,
     });
@@ -1578,8 +1570,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       ...state.decisions.filter((existing) => existing.candidateId !== storedDecision.candidateId),
       storedDecision,
     ];
-    state.changesetGenerated = false;
-    state.mergeOptions = {};
+    this.invalidateGeneratedConflationChangeset(baseId);
     return result;
   }
 
@@ -1593,8 +1584,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       { lane: "control", retry: "never" },
     );
     state.decisions = storedDecisions;
-    state.changesetGenerated = false;
-    state.mergeOptions = {};
+    this.invalidateGeneratedConflationChangeset(baseId);
     return result;
   }
 
@@ -1609,8 +1599,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     );
     state.decisions = result.decisions.map((decision) => ({ ...decision }));
     if (result.preview.changedCandidates > 0) {
-      state.changesetGenerated = false;
-      state.mergeOptions = {};
+      this.invalidateGeneratedConflationChangeset(baseId);
     }
     return {
       decisions: result.decisions.map((decision) => ({ ...decision })),
@@ -1626,24 +1615,28 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   async generateConflationChangeset(baseOsmId: OsmId, mergeOptions: Partial<OsmMergeOptions> = {}) {
     const baseId = this.getId(baseOsmId);
     const state = this.getActiveConflation(baseId);
-    const storedOptions = { ...mergeOptions, conflation: undefined };
+    const storedOptions = structuredClone({ ...mergeOptions, conflation: undefined });
     const result = await this.runWithWorker(
       (worker) => worker.generateConflationChangeset(baseId, storedOptions),
       { lane: "control", retry: "never" },
     );
-    state.changesetGenerated = true;
-    state.mergeOptions = storedOptions;
-    this.activeChangeset = null;
+    this.activeChangesets.set(baseId, {
+      baseOsmId: baseId,
+      kind: "conflation",
+      patchOsmId: state.patchOsmId,
+      options: storedOptions,
+    });
     return result;
   }
 
-  /** Cancel a conflation session and discard any generated changeset. */
+  /** Cancel a review session and discard only a preview generated from that session. */
   async clearConflation(baseOsmId: OsmId) {
     const baseId = this.getId(baseOsmId);
     await this.runWithWorker((worker) => worker.clearConflation(baseId), {
       lane: "control",
       retry: "never",
     });
+    this.invalidateGeneratedConflationChangeset(baseId);
     this.activeConflations.delete(baseId);
   }
 
@@ -1657,8 +1650,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       (worker) => worker.merge(this.getId(baseOsmId), this.getId(patchOsmId), options),
       { lane: "control", retry: "never" },
     );
-    this.invalidateConflationsForDataset(baseOsmId);
-    this.invalidateConflationsForDataset(patchOsmId);
+    this.invalidateMergeStateForDataset(baseOsmId);
+    this.invalidateMergeStateForDataset(patchOsmId);
     this.markDatasetUnrecoverable(osmId);
     await this.populateDatasetFromControl(osmId);
     await this.delete(patchOsmId);
@@ -1675,17 +1668,19 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     patchOsmId: OsmId,
     options: Partial<OsmMergeOptions> = {},
   ) {
+    const baseId = this.getId(baseOsmId);
+    const patchId = this.getId(patchOsmId);
+    const storedOptions = structuredClone(options);
     const result = await this.runWithWorker(
-      (worker) => worker.generateChangeset(this.getId(baseOsmId), this.getId(patchOsmId), options),
+      (worker) => worker.generateChangeset(baseId, patchId, storedOptions),
       { lane: "control", retry: "never" },
     );
-    this.activeChangeset = {
-      baseOsmId: this.getId(baseOsmId),
-      changeTypes: ["create", "modify", "delete"],
-      entityTypes: ["node", "way", "relation"],
-      options,
-      patchOsmId: this.getId(patchOsmId),
-    };
+    this.activeChangesets.set(baseId, {
+      baseOsmId: baseId,
+      kind: "ordinary",
+      options: storedOptions,
+      patchOsmId: patchId,
+    });
     return result;
   }
 
@@ -1698,10 +1693,9 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       lane: "control",
       retry: "never",
     });
-    this.invalidateConflationsForDataset(osmId);
+    this.invalidateMergeStateForDataset(osmId);
     this.markDatasetUnrecoverable(osmId);
     await this.populateDatasetFromControl(osmId);
-    this.activeChangeset = null;
   }
 
   /**
@@ -1709,19 +1703,14 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Filters control which change types and entity types are visible when paginating.
    */
   setChangesetFilters(changeTypes: OsmChangeTypes[], entityTypes: OsmEntityType[]) {
-    if (this.activeChangeset) {
-      this.activeChangeset.changeTypes = [...changeTypes];
-      this.activeChangeset.entityTypes = [...entityTypes];
-    }
-    for (const state of this.activeConflations.values()) {
-      if (!state.changesetGenerated) continue;
-      state.changeTypes = [...changeTypes];
-      state.entityTypes = [...entityTypes];
-    }
-    void this.runWithWorker((worker) => worker.setChangesetFilters(changeTypes, entityTypes), {
-      lane: "control",
-      retry: "never",
-    });
+    const storedChangeTypes = [...changeTypes];
+    const storedEntityTypes = [...entityTypes];
+    this.changesetChangeTypes = storedChangeTypes;
+    this.changesetEntityTypes = storedEntityTypes;
+    void this.runWithWorker(
+      (worker) => worker.setChangesetFilters(storedChangeTypes, storedEntityTypes),
+      { lane: "control", retry: "never" },
+    );
   }
 
   /**
@@ -1741,7 +1730,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     if (this.disposal) return this.disposal;
     const pool = this.workerPool;
     this.workerPool = null;
-    this.activeChangeset = null;
+    this.activeChangesets.clear();
     this.activeConflations.clear();
     this.datasetRestorers.clear();
     this.retainedDatasets.clear();

@@ -275,6 +275,40 @@ describe("OsmixRemote", () => {
   });
 
   describe("restart dataset recovery", () => {
+    const ordinaryOptions = { directMerge: true };
+    const propertyOptions = { propertyKeys: ["name"], attachNetwork: false };
+
+    async function reviewedInputs(remote: RecoveryTestRemote, id: string) {
+      const base = createParallelFootway(`${id}-base`, 1, 10, 0, "Base path");
+      const patch = createParallelFootway(`${id}-patch`, 11, 20, 0.000004, "Imported path");
+      const decision = {
+        candidateId: "way:20->10",
+        action: "accept" as const,
+        transferProperties: true,
+        attachNetwork: false,
+      };
+      const ordinaryResult = entitySnapshot(await merge(base, patch, ordinaryOptions, () => {}));
+      const conflationResult = entitySnapshot(
+        await merge(
+          base,
+          patch,
+          { ...ordinaryOptions, conflation: { ...propertyOptions, decisions: [decision] } },
+          () => {},
+        ),
+      );
+      await remote.transferIn(base);
+      await remote.transferIn(patch);
+      await remote.discoverConflation(base.id, patch.id, propertyOptions);
+      await remote.setConflationDecision(base.id, decision);
+      await remote.setConflationFilter(base.id, { status: "accepted" });
+      return { base, patch, decision, ordinaryResult, conflationResult };
+    }
+
+    async function restartInputs(remote: RecoveryTestRemote, ids: string[]) {
+      for (const id of ids) await remote.getWorker().delete(id);
+      await remote.restoreForTest();
+    }
+
     const geojson: FeatureCollection<Point> = {
       type: "FeatureCollection",
       features: [
@@ -437,6 +471,245 @@ describe("OsmixRemote", () => {
       await remote.applyChangesAndReplace(base.id);
       expect(entitySnapshot(await remote.transferOut(base.id))).toEqual(baseline);
     });
+
+    it.each(["ordinary", "conflation"] as const)(
+      "restores the latest %s preview with its filters and retained review decisions",
+      async (latest) => {
+        using remote = new RecoveryTestRemote();
+        await remote.initializeWorkerPool(1, undefined, undefined, true);
+        const { base, patch, decision, ordinaryResult, conflationResult } = await reviewedInputs(
+          remote,
+          `latest-${latest}`,
+        );
+        if (latest === "ordinary") {
+          await remote.generateConflationChangeset(base.id, ordinaryOptions);
+          await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
+        } else {
+          await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
+          await remote.generateConflationChangeset(base.id, ordinaryOptions);
+        }
+        const preview = await remote.getChangesetPage(base.id, 0, 100);
+        expect(preview.changes?.some((change) => change.changeType === "modify")).toBe(
+          latest === "conflation",
+        );
+        remote.setChangesetFilters(["modify"], ["way"]);
+        const filteredPreview = await remote.getChangesetPage(base.id, 0, 100);
+
+        await restartInputs(remote, [base.id, patch.id]);
+
+        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(filteredPreview);
+        remote.setChangesetFilters(["create", "modify", "delete"], ["node", "way", "relation"]);
+        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
+        const reviewedPage = await remote.getConflationPage(base.id, 0, 100);
+        expect(reviewedPage.totalCandidates).toBe(1);
+        expect(reviewedPage.candidates[0]?.decision).toEqual(decision);
+        await remote.applyChangesAndReplace(base.id);
+        expect(entitySnapshot(await remote.get(base.id))).toEqual(
+          latest === "ordinary" ? ordinaryResult : conflationResult,
+        );
+      },
+    );
+
+    it.each(["ordinary", "conflation"] as const)(
+      "keeps the prior preview recoverable when replacing it with %s generation fails",
+      async (replacementKind) => {
+        using remote = new RecoveryTestRemote();
+        await remote.initializeWorkerPool(1, undefined, undefined, true);
+        const { base, patch, ordinaryResult, conflationResult } = await reviewedInputs(
+          remote,
+          `failed-${replacementKind}`,
+        );
+        if (replacementKind === "ordinary") {
+          await remote.generateConflationChangeset(base.id, ordinaryOptions);
+        } else {
+          await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
+        }
+        const preview = await remote.getChangesetPage(base.id, 0, 100);
+
+        if (replacementKind === "ordinary") {
+          await expect(
+            remote.generateChangeset(base.id, "missing-patch", ordinaryOptions),
+          ).rejects.toThrow("OSM not found for id: missing-patch");
+        } else {
+          await expect(
+            remote.generateConflationChangeset(base.id, { createIntersections: true }),
+          ).rejects.toThrow("createIntersections must be false");
+        }
+        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
+
+        await restartInputs(remote, [base.id, patch.id]);
+
+        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
+        await remote.applyChangesAndReplace(base.id);
+        expect(entitySnapshot(await remote.get(base.id))).toEqual(
+          replacementKind === "ordinary" ? conflationResult : ordinaryResult,
+        );
+      },
+    );
+
+    it.each(["ordinary", "conflation"] as const)(
+      "recovers filters selected before replacement %s generation",
+      async (latest) => {
+        using remote = new RecoveryTestRemote();
+        await remote.initializeWorkerPool(1, undefined, undefined, true);
+        const { base, patch, ordinaryResult, conflationResult } = await reviewedInputs(
+          remote,
+          `prior-filter-${latest}`,
+        );
+        if (latest === "ordinary") {
+          await remote.generateConflationChangeset(base.id, ordinaryOptions);
+        } else {
+          await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
+        }
+        remote.setChangesetFilters(["modify"], ["way"]);
+        if (latest === "ordinary") {
+          await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
+        } else {
+          await remote.generateConflationChangeset(base.id, ordinaryOptions);
+        }
+        const filteredPreview = await remote.getChangesetPage(base.id, 0, 100);
+        expect(filteredPreview.changes).toHaveLength(latest === "ordinary" ? 0 : 1);
+        expect(filteredPreview.changes?.every((change) => change.changeType === "modify")).toBe(
+          true,
+        );
+
+        await restartInputs(remote, [base.id, patch.id]);
+
+        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(filteredPreview);
+        await remote.applyChangesAndReplace(base.id);
+        expect(entitySnapshot(await remote.get(base.id))).toEqual(
+          latest === "ordinary" ? ordinaryResult : conflationResult,
+        );
+      },
+    );
+
+    it.each(["single decision", "all decisions", "bulk decision", "clear session"] as const)(
+      "preserves the latest ordinary preview when changing %s before recovery",
+      async (mutation) => {
+        using remote = new RecoveryTestRemote();
+        await remote.initializeWorkerPool(1, undefined, undefined, true);
+        const { base, patch, ordinaryResult, decision } = await reviewedInputs(
+          remote,
+          `ordinary-${mutation}`,
+        );
+        await remote.generateConflationChangeset(base.id, ordinaryOptions);
+        await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
+        const preview = await remote.getChangesetPage(base.id, 0, 100);
+        const rejected = { ...decision, action: "reject" as const };
+
+        if (mutation === "single decision") {
+          await remote.setConflationDecision(base.id, rejected);
+        } else if (mutation === "all decisions") {
+          await remote.setConflationDecisions(base.id, [rejected]);
+        } else if (mutation === "bulk decision") {
+          await remote.applyConflationBulkDecision(base.id, {
+            action: "reject",
+            filter: { entityType: "way" },
+          });
+        } else {
+          await remote.clearConflation(base.id);
+        }
+        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
+
+        await restartInputs(remote, [base.id, patch.id]);
+
+        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
+        if (mutation === "clear session") {
+          await expect(remote.getConflationSummary(base.id)).rejects.toThrow(
+            "No active conflation session",
+          );
+        } else {
+          await remote.setConflationFilter(base.id, { status: "rejected" });
+          const page = await remote.getConflationPage(base.id, 0, 100);
+          expect(page.totalCandidates).toBe(1);
+          expect(page.candidates[0]?.decision?.action).toBe("reject");
+        }
+        await remote.applyChangesAndReplace(base.id);
+        expect(entitySnapshot(await remote.get(base.id))).toEqual(ordinaryResult);
+      },
+    );
+
+    it.each(["ordinary", "conflation"] as const)(
+      "recovers independent base previews when the second generation is %s",
+      async (secondKind) => {
+        using remote = new RecoveryTestRemote();
+        await remote.initializeWorkerPool(1, undefined, undefined, true);
+        const first = await reviewedInputs(remote, "first");
+        const second = await reviewedInputs(remote, "second");
+        await remote.generateChangeset(first.base.id, first.patch.id, ordinaryOptions);
+        const firstPreview = await remote.getChangesetPage(first.base.id, 0, 100);
+        if (secondKind === "ordinary") {
+          await remote.generateChangeset(second.base.id, second.patch.id, ordinaryOptions);
+        } else {
+          await remote.generateConflationChangeset(second.base.id, ordinaryOptions);
+        }
+        const secondPreview = await remote.getChangesetPage(second.base.id, 0, 100);
+
+        await restartInputs(remote, [
+          first.base.id,
+          first.patch.id,
+          second.base.id,
+          second.patch.id,
+        ]);
+
+        expect(await remote.getChangesetPage(first.base.id, 0, 100)).toEqual(firstPreview);
+        expect(await remote.getChangesetPage(second.base.id, 0, 100)).toEqual(secondPreview);
+        await remote.applyChangesAndReplace(second.base.id);
+        expect(entitySnapshot(await remote.get(second.base.id))).toEqual(
+          secondKind === "ordinary" ? second.ordinaryResult : second.conflationResult,
+        );
+        // Applying one dataset must not forget another dataset's pending generation.
+        await restartInputs(remote, [first.base.id, first.patch.id]);
+        expect(await remote.getChangesetPage(first.base.id, 0, 100)).toEqual(firstPreview);
+        await remote.applyChangesAndReplace(first.base.id);
+        expect(entitySnapshot(await remote.get(first.base.id))).toEqual(first.ordinaryResult);
+      },
+    );
+
+    it.each([
+      { action: "replace", input: "base" },
+      { action: "replace", input: "patch" },
+      { action: "delete", input: "base" },
+      { action: "delete", input: "patch" },
+      { action: "rename", input: "base" },
+      { action: "rename", input: "patch" },
+    ] as const)(
+      "does not revive previews after $action of the $input input",
+      async ({ action, input }) => {
+        using remote = new RecoveryTestRemote();
+        await remote.initializeWorkerPool(1, undefined, undefined, true);
+        const { base, patch } = await reviewedInputs(remote, `invalidate-${action}-${input}`);
+        await remote.generateConflationChangeset(base.id, ordinaryOptions);
+        await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
+        expect((await remote.getChangesetPage(base.id, 0, 100)).changes?.length).toBeGreaterThan(0);
+        const changedId = input === "base" ? base.id : patch.id;
+
+        if (action === "replace") {
+          await remote.transferIn(createParallelFootway(changedId, 101, 110, 0.01, "Replacement"));
+        } else if (action === "delete") {
+          await remote.delete(changedId);
+        } else {
+          await remote.rename(changedId, `${changedId}-renamed`);
+        }
+        await expect(remote.getChangesetPage(base.id, 0, 100)).rejects.toThrow(
+          "No active changeset",
+        );
+
+        await remote.restoreForTest();
+
+        await expect(remote.getChangesetPage(base.id, 0, 100)).rejects.toThrow(
+          "No active changeset",
+        );
+        await expect(remote.getConflationSummary(base.id)).rejects.toThrow(
+          "No active conflation session",
+        );
+        if (action === "rename" && input === "base") {
+          await expect(remote.getChangesetPage(`${base.id}-renamed`, 0, 100)).rejects.toThrow(
+            "No active changeset",
+          );
+        }
+      },
+    );
 
     it("does not replay conflation state after a loader replaces an input ID", async () => {
       using remote = new RecoveryTestRemote();

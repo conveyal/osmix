@@ -302,6 +302,19 @@ If a dataset transfer, rename, or deletion broadcast fails after only some
 workers may have committed it, the pool is disposed and later calls reject with
 `OsmixRemoteStateError` rather than reading divergent state.
 
+Each base dataset has one active generated changeset. The latest successful call to `generateChangeset()`
+or `generateConflationChangeset()` replaces that base's previous preview. After recovering the inputs, a
+restarted control worker restores that latest preview and the current changeset filters; it does not replay
+an older generation over it. Other base datasets retain their own previews. Changeset filters apply to all
+active previews; candidate filters remain specific to their matching session.
+
+Candidate review is independent of the active preview. Generating an ordinary changeset retains an otherwise
+valid matching session and its decisions. Editing or clearing those decisions, starting a replacement matching
+session, or calling `clearConflation()` invalidates only a preview generated from that session; a newer ordinary
+preview remains available. Replacing, deleting, or renaming an input invalidates the review sessions and
+generated previews that depend on it, including a dataset overwritten by a rename. Rerun discovery or
+generation against the new inputs; recovery never revives the invalidated state.
+
 #### Low-level worker pools
 
 Applications with custom worker protocols can use the supported
@@ -456,9 +469,13 @@ spec-compliant without staging everything in memory.
   or batch review decisions.
 - `remote.applyConflationBulkDecision(baseId, request)` - Atomically apply an action to all candidates matching
   the request's filter and return preview counts, the updated summary, and the complete decision snapshot.
+- `remote.generateChangeset(baseId, patchId, options)` - Build an ordinary changeset that replaces the active
+  preview for this base while retaining an otherwise valid matching session.
 - `remote.generateConflationChangeset(baseId, mergeOptions)` - Build one cumulative direct, exact, and fuzzy
-  changeset and return routing diagnostics.
-- `remote.clearConflation(baseId)` - Discard the active review session and any generated changeset.
+  changeset, replace the active preview for this base, and return routing diagnostics.
+- `remote.clearConflation(baseId)` - Discard the active review session and any preview generated from it;
+  retain a newer ordinary preview.
+- `remote.applyChangesAndReplace(baseId)` - Apply the latest active preview and replace its base dataset.
 - `remote.search(osmId, key, val?)` - Search by tag.
 - `remote.toPbf(osmId, stream)` - Export to PBF.
 

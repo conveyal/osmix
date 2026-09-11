@@ -113,15 +113,17 @@ export interface OsmConflationGenerationResult {
 }
 
 interface ConflationSession {
-  changesetGenerated: boolean;
   decisions: Map<string, OsmConflationDecision>;
   discovery: OsmConflationDiscovery;
   filter: OsmConflationCandidateFilter;
-  generatedChangeset?: OsmChangeset;
-  generatedResult?: Osm;
   patchOsmId: string;
   summary: OsmConflationSummary;
 }
+
+type GeneratedChangeset = {
+  changeset: OsmChangeset;
+  patchOsmId: string;
+} & ({ kind: "ordinary" } | { kind: "conflation"; result: Osm });
 
 // Comlink normally clones return values, but tests and in-process remotes can expose
 // direct references. Clone every nested collection so UI code cannot mutate discovery.
@@ -280,7 +282,7 @@ export class OsmixWorker extends EventTarget {
   private loadDecisions = new Map<string, OsmLoadDecision>();
   private vtEncoders = new Map<string, OsmixVtEncoder>();
   private graphs = new Map<string, RoutingGraph>();
-  private changesets = new Map<string, OsmChangeset>();
+  private changesets = new Map<string, GeneratedChangeset>();
   private conflations = new Map<string, ConflationSession>();
   private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"];
   private entityTypes: OsmEntityType[] = ["node", "way", "relation"];
@@ -491,7 +493,7 @@ export class OsmixWorker extends EventTarget {
    * rebuild it.
    */
   protected set(id: string, osm: Osm) {
-    this.invalidateConflationsForDataset(id);
+    this.invalidateMergeStateForDataset(id);
     this.osm.set(id, osm);
     this.loadDecisions.delete(id);
     this.vtEncoders.set(id, new OsmixVtEncoder(osm));
@@ -511,7 +513,7 @@ export class OsmixWorker extends EventTarget {
    * Remove an Osm instance from this worker, freeing its memory.
    */
   delete(id: string) {
-    this.invalidateConflationsForDataset(id);
+    this.invalidateMergeStateForDataset(id);
     this.osm.delete(id);
     this.loadDecisions.delete(id);
     this.vtEncoders.delete(id);
@@ -520,11 +522,13 @@ export class OsmixWorker extends EventTarget {
     this.filteredChanges.delete(id);
   }
 
-  private invalidateConflationsForDataset(osmId: string) {
+  private invalidateMergeStateForDataset(osmId: string) {
     for (const [baseOsmId, session] of this.conflations) {
       if (baseOsmId !== osmId && session.patchOsmId !== osmId) continue;
       this.conflations.delete(baseOsmId);
-      if (session.changesetGenerated) {
+    }
+    for (const [baseOsmId, generated] of this.changesets) {
+      if (baseOsmId === osmId || generated.patchOsmId === osmId) {
         this.changesets.delete(baseOsmId);
         this.filteredChanges.delete(baseOsmId);
       }
@@ -722,17 +726,12 @@ export class OsmixWorker extends EventTarget {
     for (const decision of initialDecisions) {
       decisions.set(decision.candidateId, { ...decision });
     }
-    const previous = this.conflations.get(baseOsmId);
-    if (previous?.changesetGenerated) {
-      this.changesets.delete(baseOsmId);
-      this.filteredChanges.delete(baseOsmId);
-    }
+    this.invalidateGeneratedConflationChangeset(baseOsmId);
     const summary =
       decisions.size === 0
         ? discovery.summary
         : summarizeConflationCandidates(discovery.candidates, [...decisions.values()]);
     this.conflations.set(baseOsmId, {
-      changesetGenerated: false,
       decisions,
       discovery,
       filter: {},
@@ -792,7 +791,7 @@ export class OsmixWorker extends EventTarget {
     const session = this.getConflationSession(baseOsmId);
     // Validate before touching session state so malformed RPC input is atomic.
     validateConflationDecisions(session.discovery.candidates, [decision]);
-    this.invalidateGeneratedConflationChangeset(baseOsmId, session);
+    this.invalidateGeneratedConflationChangeset(baseOsmId);
     session.decisions.set(decision.candidateId, { ...decision });
     session.summary = summarizeConflationCandidates(session.discovery.candidates, [
       ...session.decisions.values(),
@@ -809,7 +808,7 @@ export class OsmixWorker extends EventTarget {
     for (const decision of decisions) {
       next.set(decision.candidateId, { ...decision });
     }
-    this.invalidateGeneratedConflationChangeset(baseOsmId, session);
+    this.invalidateGeneratedConflationChangeset(baseOsmId);
     session.decisions = next;
     session.summary =
       next.size === 0
@@ -830,7 +829,7 @@ export class OsmixWorker extends EventTarget {
       request,
     );
     if (result.preview.changedCandidates > 0) {
-      this.invalidateGeneratedConflationChangeset(baseOsmId, session);
+      this.invalidateGeneratedConflationChangeset(baseOsmId);
       session.decisions = new Map(
         result.decisions.map((decision) => [decision.candidateId, { ...decision }]),
       );
@@ -928,22 +927,22 @@ export class OsmixWorker extends EventTarget {
       }
     }
 
-    this.changesets.set(baseOsmId, artifacts.changeset);
+    this.changesets.set(baseOsmId, {
+      kind: "conflation",
+      patchOsmId: session.patchOsmId,
+      changeset: artifacts.changeset,
+      result: artifacts.result,
+    });
     // Candidate review does not imply changeset review. Defer the large filtered
     // change list until a caller actually opens a changeset page; automatic runs
     // apply the already validated materialized result without building it.
     this.filteredChanges.delete(baseOsmId);
-    session.changesetGenerated = true;
-    session.generatedChangeset = artifacts.changeset;
-    session.generatedResult = artifacts.result;
     return { stats: artifacts.changeset.stats, routing: diagnostics };
   }
 
-  /** Clear an active conflation session and its generated changeset, if present. */
+  /** Clear a review session and discard only a preview generated from that session. */
   clearConflation(baseOsmId: string) {
-    const session = this.conflations.get(baseOsmId);
-    if (!session) return;
-    this.invalidateGeneratedConflationChangeset(baseOsmId, session);
+    this.invalidateGeneratedConflationChangeset(baseOsmId);
     this.conflations.delete(baseOsmId);
   }
 
@@ -976,7 +975,7 @@ export class OsmixWorker extends EventTarget {
       options,
       this.onProgress,
     );
-    this.changesets.set(baseOsmId, changeset);
+    this.changesets.set(baseOsmId, { kind: "ordinary", patchOsmId, changeset });
     this.filteredChanges.delete(baseOsmId);
     return changeset.stats;
   }
@@ -994,8 +993,8 @@ export class OsmixWorker extends EventTarget {
     this.entityTypes = entityTypes;
 
     // Sort all changesets with new filters
-    for (const [osmId, changeset] of this.changesets) {
-      this.sortChangeset(osmId, changeset);
+    for (const [osmId, generated] of this.changesets) {
+      this.sortChangeset(osmId, generated.changeset);
     }
   }
 
@@ -1004,9 +1003,9 @@ export class OsmixWorker extends EventTarget {
    * Returns changes for the specified page and the total number of pages.
    */
   getChangesetPage(osmId: string, page: number, pageSize: number) {
-    const changeset = this.changesets.get(osmId);
-    if (!changeset) throw Error("No active changeset");
-    if (!this.filteredChanges.has(osmId)) this.sortChangeset(osmId, changeset);
+    const generated = this.changesets.get(osmId);
+    if (!generated) throw Error("No active changeset");
+    if (!this.filteredChanges.has(osmId)) this.sortChangeset(osmId, generated.changeset);
     const filteredChanges = this.filteredChanges.get(osmId);
     const changes = filteredChanges?.slice(page * pageSize, (page + 1) * pageSize);
     return {
@@ -1020,14 +1019,10 @@ export class OsmixWorker extends EventTarget {
    * Deletes the changeset after application.
    */
   applyChangesAndReplace(osmId: string) {
-    const changeset = this.changesets.get(osmId);
-    if (!changeset) throw Error("No active changeset");
-    const session = this.conflations.get(osmId);
+    const generated = this.changesets.get(osmId);
+    if (!generated) throw Error("No active changeset");
     const newOsm =
-      session?.changesetGenerated && session.generatedChangeset === changeset
-        ? session.generatedResult
-        : applyChangesetToOsm(changeset);
-    if (!newOsm) throw Error("Generated conflation result is missing");
+      generated.kind === "conflation" ? generated.result : applyChangesetToOsm(generated.changeset);
     this.set(osmId, newOsm);
     this.changesets.delete(osmId);
     this.filteredChanges.delete(osmId);
@@ -1040,15 +1035,12 @@ export class OsmixWorker extends EventTarget {
     return session;
   }
 
-  private invalidateGeneratedConflationChangeset(baseOsmId: string, session: ConflationSession) {
-    if (!session.changesetGenerated) return;
+  private invalidateGeneratedConflationChangeset(baseOsmId: string) {
+    if (this.changesets.get(baseOsmId)?.kind !== "conflation") return;
     // A reviewed changeset is a snapshot of its decisions. Never allow a later
     // decision edit to apply that stale snapshot.
     this.changesets.delete(baseOsmId);
     this.filteredChanges.delete(baseOsmId);
-    session.changesetGenerated = false;
-    session.generatedChangeset = undefined;
-    session.generatedResult = undefined;
   }
 
   /**
