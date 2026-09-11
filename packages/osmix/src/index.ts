@@ -72,6 +72,7 @@ export {
 // --- @osmix/change ---
 export {
   applyChangesetToOsm,
+  buildConflationActionDecision,
   conflationEffectiveStatus,
   discoverConflationCandidates,
   filterConflationCandidates,
@@ -91,6 +92,7 @@ export {
   osmTagsToOscTags,
   removeDuplicateAdjacentRelationMembers,
   removeDuplicateAdjacentWayRefs,
+  resolveConflationActions,
   summarizeConflationCandidates,
   validateConflationDecisions,
   waysIntersect,
@@ -120,6 +122,7 @@ export type {
   OsmConflationEvidence,
   OsmConflationOptions,
   OsmConflationReasonCode,
+  OsmConflationResolvedActions,
   OsmConflationRoutingFamily,
   OsmConflationStatus,
   OsmConflationSummary,

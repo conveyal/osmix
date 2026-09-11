@@ -23,19 +23,26 @@ The comparison of nearby patch and base features to propose correspondences desp
 _Avoid_: Proximity deduplication
 
 **Candidate**:
-A proposed correspondence between an imported feature and a base feature, with evidence and any reasons it needs review or cannot be accepted.
+A proposed correspondence between an imported feature and a base feature, with evidence and separate eligibility for copying tags and connecting networks. A candidate does not by itself select either action.
 _Avoid_: Confirmed match
+
+**OSM tags**:
+Key-value feature attributes, such as `surface=asphalt` or `kerb=lowered`.
+_Avoid_: Labels, annotations
 
 **Copy tags**:
 An attribute-only update that copies selected imported tag values onto a matched base feature while preserving the geometry and shared-node connections produced by the ordinary direct/exact merge. Missing imported values leave base values unchanged. Reviewed routing tags can still change which journeys are permitted.
 _Avoid_: Replace feature, remove duplicate geometry
 
 **Property transfer**:
-The existing API and interface term for copying tags; it has the same attribute-only meaning.
+The API term for copying tags; it has the same attribute-only meaning.
 
-**Network attachment**:
+**Connect network**:
 A connectivity change that connects imported ways to preserved base nodes through accepted reference changes.
 _Avoid_: Copy tags, property transfer
+
+**Network attachment**:
+The API term for connecting the imported network to the base network. Selecting this action is independent of selecting Copy tags.
 
 **Shared junction**:
 A node referenced by multiple ways that already connects those ways, including a bridge or tunnel entrance where the connected ways can have different grade tags.
@@ -47,9 +54,13 @@ The addition of a shared node at a compatible crossing, with existing junction c
 **Geometry removal**:
 The removal of imported entities deemed redundant, with consequences for any connected ways or relations; it is distinct from copying their tags.
 
-**Automatic match**:
-A candidate whose eligible actions are scheduled without an individual review decision; it is not evidence that those actions have already been applied.
+**Scheduled action**:
+An eligible matching action that the current automatic rules or saved choices select for inclusion in the next matching preview. Eligibility alone does not mean an action is scheduled. Applying the preview is a separate step.
+
+**Automatic action**:
+A matching action scheduled by the configured rules without an individual selection. A saved choice can turn it off, and skipping the match schedules neither action. Automatic does not mean already applied.
+_Avoid_: Applied automatically, completed match
 
 **Skip match**:
-A decision to leave a proposed correspondence unused while retaining the imported feature under the ordinary direct/exact merge rules.
+A decision to schedule neither Copy tags nor Connect network for a proposed correspondence while retaining the imported feature under the ordinary direct/exact merge rules.
 _Avoid_: Delete imported feature

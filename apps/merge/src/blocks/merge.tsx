@@ -110,12 +110,13 @@ type ChangesetReviewContext =
   | { kind: "base-diagnostic" }
   | { kind: "patch-diagnostic" }
   | { kind: "direct-preview" }
-  | { kind: "cumulative"; exactReconciliation: boolean }
+  | { kind: "cumulative"; exactReconciliation: boolean; matching: boolean }
   | { kind: "intersections" };
 
 const changesetReviewContextAtom = atom<ChangesetReviewContext>({
   kind: "cumulative",
   exactReconciliation: true,
+  matching: false,
 });
 const CONFLATION_PAGE_SIZE = 10;
 const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
@@ -212,7 +213,7 @@ export default function MergeBlock() {
   const [isConflationFilterPending, setIsConflationFilterPending] = useState(false);
   const [automaticMergeProgress, setAutomaticMergeProgress] =
     useState<AutomaticMergeProgressState | null>(null);
-  const setConflationDecisions = useSetAtom(conflationDecisionsAtom);
+  const [conflationDecisions, setConflationDecisions] = useAtom(conflationDecisionsAtom);
   const [conflationRoutingDiagnostics, setConflationRoutingDiagnostics] = useAtom(
     conflationRoutingDiagnosticsAtom,
   );
@@ -319,6 +320,13 @@ export default function MergeBlock() {
     }
   };
 
+  const invalidateMatchingPreview = () => {
+    if (changesetReviewContext.kind === "cumulative" && changesetReviewContext.matching) {
+      setChangesetStats(null);
+    }
+    setConflationRoutingDiagnostics(null);
+  };
+
   const updateConflationDecision = async (decision: OsmConflationDecision) => {
     if (!base.osm) throw Error("Base OSM is not loaded");
     const summary = await osmWorker.setConflationDecision(base.osm.id, decision);
@@ -327,6 +335,19 @@ export default function MergeBlock() {
       decision,
     ]);
     setConflationSummary(summary);
+    invalidateMatchingPreview();
+    await loadConflationPage(conflationCandidatePageIndex);
+  };
+
+  const resetConflationDecision = async (candidateId: string) => {
+    if (!base.osm) throw Error("Base OSM is not loaded");
+    const decisions = conflationDecisions.filter(
+      (decision) => decision.candidateId !== candidateId,
+    );
+    const summary = await osmWorker.setConflationDecisions(base.osm.id, decisions);
+    setConflationDecisions(decisions);
+    setConflationSummary(summary);
+    invalidateMatchingPreview();
     await loadConflationPage(conflationCandidatePageIndex);
   };
 
@@ -335,6 +356,7 @@ export default function MergeBlock() {
     const result = await osmWorker.applyConflationBulkDecision(base.osm.id, request);
     setConflationDecisions(result.decisions);
     setConflationSummary(result.summary);
+    if (result.preview.changedCandidates > 0) invalidateMatchingPreview();
     await loadConflationPage(0);
     Log.addMessage(
       `Updated ${result.preview.changedCandidates.toLocaleString()} filtered conflation decisions`,
@@ -343,7 +365,6 @@ export default function MergeBlock() {
 
   const generateVerifiedChangeset = async (reconcile: boolean) => {
     if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-    setChangesetReviewContext({ kind: "cumulative", exactReconciliation: reconcile });
     if (conflationOptions) {
       if (!conflationSummary) {
         throw Error("Discover and review imported-data match candidates first");
@@ -352,17 +373,27 @@ export default function MergeBlock() {
         base.osm.id,
         verifiedBaseMergeOptions(reconcile),
       );
+      setChangesetReviewContext({
+        kind: "cumulative",
+        exactReconciliation: reconcile,
+        matching: true,
+      });
       setChangesetStats(result.stats);
       setConflationRoutingDiagnostics(result.routing);
       return changeStatsSummary(result.stats);
     }
 
-    setConflationRoutingDiagnostics(null);
     const result = await osmWorker.generateChangeset(
       base.osm.id,
       patch.osm.id,
       verifiedBaseMergeOptions(reconcile),
     );
+    setChangesetReviewContext({
+      kind: "cumulative",
+      exactReconciliation: reconcile,
+      matching: false,
+    });
+    setConflationRoutingDiagnostics(null);
     setChangesetStats(result);
     return changeStatsSummary(result);
   };
@@ -854,12 +885,12 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Inspecting base OSM for duplicate entities", async () => {
                 if (!base.osm) throw Error("Base OSM is not loaded");
-                setChangesetReviewContext({ kind: "base-diagnostic" });
                 const changes = await osmWorker.generateChangeset(
                   base.osm.id,
                   base.osm.id,
                   WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
                 );
+                setChangesetReviewContext({ kind: "base-diagnostic" });
                 setChangesetStats(changes);
                 return changeStatsSummary(changes);
               })
@@ -900,12 +931,12 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Inspecting patch OSM for duplicate entities", async () => {
                 if (!patch.osm) throw Error("Patch OSM is not loaded");
-                setChangesetReviewContext({ kind: "patch-diagnostic" });
                 const patchChanges = await osmWorker.generateChangeset(
                   patch.osm.id,
                   patch.osm.id,
                   WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
                 );
+                setChangesetReviewContext({ kind: "patch-diagnostic" });
                 setChangesetStats(patchChanges);
                 return changeStatsSummary(patchChanges);
               })
@@ -967,13 +998,13 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Generating direct-merge preview", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                setChangesetReviewContext({ kind: "direct-preview" });
-                setConflationRoutingDiagnostics(null);
                 const results = await osmWorker.generateChangeset(
                   base.osm.id,
                   patch.osm.id,
                   verifiedBaseMergeOptions(false),
                 );
+                setChangesetReviewContext({ kind: "direct-preview" });
+                setConflationRoutingDiagnostics(null);
                 setChangesetStats(results);
                 return changeStatsSummary(results);
               })
@@ -1119,6 +1150,7 @@ export default function MergeBlock() {
             filter={conflationCandidateFilter}
             isFilterPending={isConflationFilterPending}
             onDecision={updateConflationDecision}
+            onResetDecision={resetConflationDecision}
             onBulkDecision={updateConflationBulkDecision}
             onFilterChange={updateConflationFilter}
             onPageChange={loadConflationPage}
@@ -1206,13 +1238,13 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Generating intersection preview", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                setChangesetReviewContext({ kind: "intersections" });
-                setConflationRoutingDiagnostics(null);
                 const results = await osmWorker.generateChangeset(
                   base.osm.id,
                   patch.osm.id,
                   INTERSECTION_OPTIONS,
                 );
+                setChangesetReviewContext({ kind: "intersections" });
+                setConflationRoutingDiagnostics(null);
                 setChangesetStats(results);
                 return changeStatsSummary(results);
               })

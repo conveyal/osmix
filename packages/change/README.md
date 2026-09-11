@@ -124,12 +124,13 @@ const changeset = generateConflationChangeset(
 const conflated = applyChangesetToOsm(changeset);
 ```
 
-Discovery compares only the untouched patch with the immutable original base. High-confidence candidates
-apply automatically by default; set `automatic: "none"` when every match should require a decision. Property
-transfer copies only selected tag values onto the base entity and retains the imported geometry. Compared with
+Discovery compares only the untouched patch with the immutable original base. High-confidence actions are
+scheduled by default; set `automatic: "none"` when every action should require a decision. Discovery does not
+apply changes. OSM tags are feature attributes, such as `surface=asphalt` or `kerb=lowered`. **Copy tags**
+(property transfer in the API) copies only selected tag values onto the base entity and retains the imported geometry. Compared with
 the same direct/exact merge without property transfer, it never adds or removes entities or changes coordinates,
-way references, or relation members. Missing patch values leave base tags unchanged. Network attachment is a
-separate action that changes only patch-created way references. Base IDs, coordinates, ordered way references,
+way references, or relation members. Missing patch values leave base tags unchanged. **Connect network**
+(network attachment in the API) is a separate choice that changes only patch-created way references. Base IDs, coordinates, ordered way references,
 and ordered relation members stay authoritative.
 
 Structural properties cannot transfer. Routing-affecting properties, motor-road attachments, ambiguous
@@ -139,6 +140,12 @@ conflicts still prevent the affected action, even when an accept decision is sup
 network attachment are assessed independently, so blocking one does not disable an otherwise eligible action.
 Equivalent one-to-one patch ways remain after property transfer, including the nodes that connect them to other imported ways.
 Exact reconciliation remains a separate operation; segmented way chains are reported but unsupported.
+
+The current decision selects Copy tags, Connect network, both, or neither. An action can be eligible without
+being selected. Changing one choice preserves the other, including a choice that was scheduled automatically.
+Skipping a match schedules neither action; imported additions still follow the ordinary direct/exact merge
+rules. Clearing a saved decision restores discovery defaults, which may schedule high-confidence actions
+again. Automatic describes the current schedule, not a completed change.
 
 ## API
 
@@ -223,15 +230,28 @@ Options:
 
 - `discoverConflationCandidates(base, patch, options)`: Return deterministic node and one-to-one-way
   candidates with action-specific status, evidence, tag diffs, and reason codes.
+- `resolveConflationActions(candidate, decision?)`: Return the eligible actions currently scheduled as
+  `{ transferProperties, attachNetwork }`. Use this result for selected control states and action labels.
+- `buildConflationActionDecision(candidate, current, action, selected)`: Change `"transfer-properties"` or
+  `"attach-network"` while preserving the other resolved choice. Returns an accept decision with both flags
+  explicit; eligibility checks still govern whether either action can be scheduled.
 - `filterConflationCandidates(candidates, filter, decisions?)`: Filter discovery rows without rerunning the
   spatial search.
-- `summarizeConflationCandidates(candidates, decisions?)`: Count automatic, review, blocked, unmatched, and
+- `summarizeConflationCandidates(candidates, decisions?)`: Count accepted, automatic, review, blocked, unmatched, and
   rejected rows.
 - `generateConflationChangeset(base, patch, mergeOptions, decisions?, discovery?)`: Generate one cumulative
   direct, exact, and fuzzy changeset from untouched inputs.
 - `generateConflationApplicationChangeset(baseline, patch, discovery, originalBase, decisions?)`: Apply only
   reviewed fuzzy actions to an already materialized ordinary-merge baseline. The immutable original base is
   required so generation can rediscover and validate candidates instead of trusting mutable review records.
+
+An `OsmConflationDecision` uses `transferProperties` for Copy tags and `attachNetwork` for Connect network.
+With no decision, only actions classified `automatic` are scheduled. An accept decision honors explicit
+flags; omitted flags retain the legacy behavior of selecting every eligible action. New controls should use
+`buildConflationActionDecision()` so changing one choice does not accidentally select the other. Reject
+decisions schedule neither action. An accept decision with both flags `false` also resolves to the effective
+`rejected` status, shown as **Skipped** in Merge. Blocked and unmatched actions remain unscheduled regardless
+of requested flags.
 
 ### `applyChangesetToOsm(changeset: OsmChangeset): Osm`
 

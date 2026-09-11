@@ -74,7 +74,7 @@ describe("merge inline guidance", () => {
       });
     });
 
-    expect(html).toContain("OSM tag keys to transfer");
+    expect(html).toContain("OSM tag keys to copy");
     expect(html).toContain("Candidate search radius (meters)");
     expect(html).toContain('aria-label="About proximity matching"');
     expect(html).toContain('aria-label="About property transfer"');
@@ -112,18 +112,20 @@ describe("merge inline guidance", () => {
     expect(evidence).toContain("Property");
     expect(evidence).toContain("Base value");
     expect(evidence).toContain("Imported value");
-    expect(actions).toContain("Transfer + attach");
-    expect(actionStatuses).toContain("Property transfer");
-    expect(actionStatuses).toContain("Needs review");
-    expect(actionStatuses).toContain("Network attachment");
-    expect(actionStatuses).toContain("Automatic");
+    expect(actions).toContain("Copy tags");
+    expect(actions).toContain("Connect network");
+    expect(actions.match(/role="checkbox"/g)).toHaveLength(2);
+    expect(actionStatuses).toContain("Copy tags");
+    expect(actionStatuses).toContain("Not selected");
+    expect(actionStatuses).toContain("Connect network");
+    expect(actionStatuses).toContain("Scheduled automatically");
 
     const wayStatuses = renderToStaticMarkup(
       createElement(CandidateActionStatuses, {
         candidate: { ...CANDIDATE, entityType: "way", networkAttachment: null },
       }),
     );
-    expect(wayStatuses).not.toContain("Network attachment");
+    expect(wayStatuses).not.toContain("Connect network");
   });
 
   it("defines the routing baseline, metrics, signed deltas, and mode invariants", () => {

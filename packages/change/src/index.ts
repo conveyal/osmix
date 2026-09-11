@@ -35,12 +35,14 @@
 export * from "./apply-changeset.ts";
 export * from "./changeset.ts";
 export {
+  buildConflationActionDecision,
   buildConflationBulkDecisionResult,
   conflationEffectiveStatus,
   discoverConflationCandidates,
   filterConflationCandidates,
   generateConflationApplicationChangeset,
   generateConflationChangeset,
+  resolveConflationActions,
   summarizeConflationCandidates,
   validateConflationDecisions,
 } from "./conflation.ts";

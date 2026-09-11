@@ -24,6 +24,7 @@ import {
   conflationEffectiveStatus,
   generateChangeset,
   merge,
+  resolveConflationActions,
   summarizeConflationCandidates,
   type OsmChange,
   type OsmChangeset,
@@ -885,8 +886,7 @@ export class OsmixWorker extends EventTarget {
       const decision = session.decisions.get(candidate.id);
       const attachNetwork =
         candidate.networkAttachment?.status === "automatic" &&
-        decision?.action !== "reject" &&
-        decision?.attachNetwork !== false;
+        resolveConflationActions(candidate, decision).attachNetwork;
       hasAutomaticNetworkAttachment ||= attachNetwork;
       if (attachNetwork) {
         automaticAttachmentDecisions.push({

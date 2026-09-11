@@ -12,6 +12,7 @@ import { OsmInputCardHeader } from "../src/components/osm-input-card-header";
 import { StepActions } from "../src/components/step-actions";
 import { Button } from "../src/components/ui/button";
 import { Card, CardContent } from "../src/components/ui/card";
+import { ConflationReviewHarness } from "./conflation-review-harness";
 
 interface InputHarnessState {
   baseDownloads: number;
@@ -183,6 +184,9 @@ function GuidanceHarness() {
           Simulate worker action ({workerCalls})
         </button>
       </section>
+      {new URLSearchParams(window.location.search).has("conflation") ? (
+        <ConflationReviewHarness />
+      ) : null}
     </main>
   );
 }

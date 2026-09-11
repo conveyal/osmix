@@ -152,10 +152,22 @@ Use the merge terms consistently:
 - **Direct merge** adds patch-only entities and applies same-ID updates.
 - **Exact reconciliation** combines different IDs only when their serialized
   coordinates or ordered geometry and routing context agree.
-- **Imported-data matching** is the optional proximity workflow. **Property
-  transfer** copies only selected tag values and preserves imported geometry,
-  including matched ways and their connecting nodes; **network attachment** rewrites
-  only accepted references in patch-created ways.
+- **Imported-data matching** is the optional proximity workflow. A **candidate**
+  proposes a correspondence; it does not select every eligible action.
+- **OSM tags** are feature attributes, such as `surface=asphalt` or
+  `kerb=lowered`. Use **Copy tags** in controls; **property transfer** is the API
+  term. Copying tags preserves imported geometry, including matched ways and
+  their connecting nodes.
+- **Connect network** is an independent choice that changes connectivity by
+  rewriting accepted references in patch-created ways. **Network attachment**
+  is the API term. Changing either action must preserve the other choice.
+- **Scheduled** describes what the current choices include in the next
+  matching preview. Applying that preview is a separate step. **Automatic** means scheduled by the matching rules; it
+  never means already applied. Keep discovery eligibility distinct from the
+  actions currently scheduled, and show blocked actions with their reasons.
+- **Skip match** schedules neither matching action. Imported additions remain
+  subject to the ordinary direct/exact merge rules. Use **Skipped** for the
+  user-facing status while retaining `rejected` in saved decisions and APIs.
 - **Intersection creation** connects compatible same-grade crossings while
   preserving existing shared junctions, including bridge and tunnel entrances.
   New grade-separated interior crossings remain disconnected, and unsafe

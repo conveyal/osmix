@@ -44,10 +44,10 @@ export function validateConflationForm(state: ConflationFormState): string | nul
     return "Match distance must be greater than zero.";
   }
   if (!state.transferProperties && !state.attachNetwork) {
-    return "Enable property transfer, network attachment, or both.";
+    return "Select Copy tags, Connect network, or both.";
   }
   if (state.transferProperties && parseConflationPropertyKeys(state.propertyKeys).length === 0) {
-    return "Enter at least one property key to transfer.";
+    return "Enter at least one OSM tag key to copy.";
   }
   return null;
 }
@@ -80,27 +80,27 @@ export function conflationBulkActionCopy(
 ): ConflationBulkActionCopy {
   if (action === "transfer-properties") {
     return {
-      buttonLabel: "Transfer properties",
-      confirmLabel: "Transfer properties",
+      buttonLabel: "Copy tags",
+      confirmLabel: "Copy tags",
       description:
-        "Transfer the selected patch properties to every eligible base match in the current filters.",
-      title: "Transfer properties to filtered matches?",
+        "Schedule copying selected imported attributes to every eligible base match in the current filters. Keep each network connection choice unchanged.",
+      title: "Copy tags for filtered matches?",
     };
   }
   if (action === "attach-network") {
     return {
-      buttonLabel: "Attach network",
-      confirmLabel: "Attach network",
+      buttonLabel: "Connect network",
+      confirmLabel: "Connect network",
       description:
-        "Attach imported way references to every eligible base match in the current filters.",
-      title: "Attach the filtered imported network?",
+        "Schedule connecting imported ways to every eligible base match in the current filters. Keep each tag-copying choice unchanged.",
+      title: "Connect the filtered imported network?",
     };
   }
   return {
-    buttonLabel: "Reject filtered",
-    confirmLabel: "Reject filtered matches",
+    buttonLabel: "Skip filtered",
+    confirmLabel: "Skip filtered matches",
     description:
-      "Reject every filtered match that is not already rejected, including blocked and unmatched rows.",
-    title: "Reject all filtered matches?",
+      "Schedule no matching actions for the filtered matches. Keep ordinary imported additions, including blocked and unmatched features.",
+    title: "Skip all filtered matches?",
   };
 }

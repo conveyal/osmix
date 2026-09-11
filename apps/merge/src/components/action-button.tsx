@@ -6,6 +6,26 @@ import { Spinner } from "./ui/spinner";
 
 const actionPendingAtom = atom(false);
 
+/** Share the pending state across async buttons and other review controls. */
+export function useAction() {
+  const [isPending, setIsPending] = useAtom(actionPendingAtom);
+  const [isTransitioning, startTransition] = useTransition();
+  return {
+    isPending: isPending || isTransitioning,
+    isTransitioning,
+    runAction: (action: () => Promise<unknown>) => {
+      setIsPending(true);
+      startTransition(async () => {
+        try {
+          await action();
+        } finally {
+          setIsPending(false);
+        }
+      });
+    },
+  };
+}
+
 export default function ActionButton({
   children,
   disabled,
@@ -16,21 +36,13 @@ export default function ActionButton({
   icon?: React.ReactNode;
   onAction: () => Promise<unknown>;
 }) {
-  const [isPending, setIsPending] = useAtom(actionPendingAtom);
-  const [isTransitioning, startTransition] = useTransition();
+  const { isPending, isTransitioning, runAction } = useAction();
   return (
     <Button
-      disabled={disabled || isTransitioning || isPending}
+      disabled={disabled || isPending}
       onClick={(e) => {
         e.preventDefault();
-        setIsPending(true);
-        startTransition(async () => {
-          try {
-            await onAction();
-          } finally {
-            setIsPending(false);
-          }
-        });
+        runAction(onAction);
       }}
       size={children ? "default" : "icon-sm"}
       {...props}

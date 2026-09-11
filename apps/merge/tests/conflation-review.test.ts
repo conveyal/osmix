@@ -76,6 +76,7 @@ describe("conflation review safety status", () => {
           filter: { status: "blocked" },
           isFilterPending: false,
           onDecision: async () => {},
+          onResetDecision: async () => {},
           onBulkDecision: async () => {},
           onFilterChange: async () => {},
           onPageChange: async () => {},
@@ -89,8 +90,8 @@ describe("conflation review safety status", () => {
     )?.[1];
     expect(rowDescription).toContain("Blocked; 0.500 m");
     expect(rowDescription).not.toContain("Accepted");
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Transfer properties \(0\)<\/button>/);
-    expect(html).not.toMatch(/<button[^>]*>Transfer properties<\/button>/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Copy tags \(0\)<\/button>/);
+    expect(html).not.toMatch(/<button[^>]*>Copy tags<\/button>/);
     expect(html).not.toContain("Transfer + attach");
   });
 });

@@ -223,8 +223,7 @@ export const MERGE_STEP_GUIDES = {
     diagram: "intersections",
   },
   "match-imported": {
-    summary:
-      "Review safe nearby matches for selected property transfer, imported-network attachment, or both.",
+    summary: "Review nearby matches and independently choose Copy tags, Connect network, or both.",
     inputs: [
       "The untouched patch compared only against the immutable original base.",
       "Explicit tag keys, network-attachment choice, and candidate search radius.",
@@ -243,9 +242,9 @@ export const MERGE_STEP_GUIDES = {
       "Ambiguous, many-to-one, grade-conflicting, restricted, or structurally invalid candidates are not accepted automatically.",
     ],
     output:
-      "Saved automatic, accepted, rejected, review, blocked, and unmatched candidate decisions for cumulative generation.",
+      "Saved Copy tags and Connect network choices, plus candidate eligibility and evidence for the next preview.",
     warning:
-      "Rejecting a proposed match rejects only conflation. It does not delete the imported entity, which still proceeds through ordinary direct merge when otherwise unmatched.",
+      "Skipping a match schedules neither copying tags nor connecting networks. Ordinary imported additions remain in the merge.",
     diagram: "fuzzy-conflation",
   },
   reconcile: {
