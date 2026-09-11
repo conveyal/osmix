@@ -315,6 +315,7 @@ export {
   resolveRelationMembers,
 } from "@osmix/types/relation-kind";
 export { decodeZigzag, zigzag, zigzag32 } from "@osmix/types/zigzag";
+export { normalizedWayDirection, type OsmWayDirection } from "@osmix/types/way-direction";
 
 // --- @osmix/vt ---
 export { OsmixVtEncoder, projectToTile, writeVtPbf } from "@osmix/vt";

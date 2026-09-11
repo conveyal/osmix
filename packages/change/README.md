@@ -71,6 +71,20 @@ of a shared-junction substitution is unsafe, that crossing is skipped and its or
 Only an isolated endpoint with no affected restriction can use the dedicated crossing-node fallback when
 replacement would degenerate its way. New grade-separated interior crossings remain disconnected.
 
+Exact reconciliation and fuzzy way matching use the same [one-way normalization as routing](../router/README.md#way-direction).
+Supported aliases such as `yes`/`true`/`1` and `no`/`false`/`0` compare by travel direction. An explicit
+`no`, `false`, or `0` overrides a roundabout's implied forward direction. Exact reconciliation still requires
+the same ordered node references and compatible remaining tags; fuzzy matching accounts for reversed
+geometry when comparing direction. Unsupported nonempty values, including `reversible` and `alternating`,
+prevent way matching even when their text is identical. Input tag values are retained rather than rewritten
+to a canonical spelling.
+
+Fuzzy matching cannot establish orientation when the endpoints fit equally well in both orders. It blocks
+such candidates if either way is one-way or has recognized direction-sensitive routing tags, such as
+`maxspeed:forward` or `oneway:bicycle`. This includes closed one-way roundabouts even when their tag values
+and apparent winding agree. Bidirectional ways without those direction-sensitive tags can still match.
+Exact reconciliation continues to compare ordered node references directly.
+
 ### Match imported data within one meter
 
 Exact reconciliation remains the default. For imported GeoJSON, Shapefile, OSW, or other independently
