@@ -105,13 +105,17 @@ const conflated = applyChangesetToOsm(changeset);
 
 Discovery compares only the untouched patch with the immutable original base. High-confidence candidates
 apply automatically by default; set `automatic: "none"` when every match should require a decision. Property
-transfer changes only selected tags on the base entity. Network attachment changes only patch-created way
-references. Base IDs, coordinates, ordered way references, and ordered relation members stay authoritative.
+transfer copies only selected tag values onto the base entity and retains the imported geometry. Compared with
+the same direct/exact merge without property transfer, it never adds or removes entities or changes coordinates,
+way references, or relation members. Missing patch values leave base tags unchanged. Network attachment is a
+separate action that changes only patch-created way references. Base IDs, coordinates, ordered way references,
+and ordered relation members stay authoritative.
 
 Structural properties cannot transfer. Routing-affecting properties, motor-road attachments, ambiguous
 targets, relation membership, and uncertain geometry require review. Grade conflicts, restrictions, dangling
 references, and way collapse remain blocked even when an accept decision is supplied. Equivalent one-to-one
-patch ways may be suppressed after property transfer; segmented way chains are reported but unsupported.
+patch ways remain after property transfer, including the nodes that connect them to other imported ways.
+Exact reconciliation remains a separate operation; segmented way chains are reported but unsupported.
 
 ## API
 

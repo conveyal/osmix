@@ -234,10 +234,10 @@ export const MERGE_STEP_GUIDES = {
       "Discovery and decisions do not mutate OSM data.",
       "Property transfer can overwrite only selected base tag values; an absent patch value never deletes a base value.",
       "Network attachment can later rewrite only patch-created way references to a preserved base node.",
-      "An equivalent one-to-one patch way can be suppressed after transfer; only newly imported tagless nodes left unreferenced by every way and relation are cleaned up.",
     ],
     invariants: [
       "Fuzzy matching preserves original base IDs, coordinates, ordered way references, and relation membership; ordinary same-ID patch updates remain authoritative in the direct-merge baseline.",
+      "Property transfer keeps imported geometry, including matched ways and the nodes connecting them to other imported ways. Direct merge and exact reconciliation apply their own rules separately.",
       "Protected structural tags cannot transfer fuzzily, and routing-affecting properties require review.",
       "Ambiguous, many-to-one, grade-conflicting, restricted, or structurally invalid candidates are not accepted automatically.",
     ],

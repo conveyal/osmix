@@ -153,7 +153,8 @@ Use the merge terms consistently:
 - **Exact reconciliation** combines different IDs only when their serialized
   coordinates or ordered geometry and routing context agree.
 - **Imported-data matching** is the optional proximity workflow. **Property
-  transfer** copies only selected tag values; **network attachment** rewrites
+  transfer** copies only selected tag values and preserves imported geometry,
+  including matched ways and their connecting nodes; **network attachment** rewrites
   only accepted references in patch-created ways.
 - **Intersection creation** connects compatible same-grade crossings while
   leaving ambiguous and grade-separated crossings disconnected.
