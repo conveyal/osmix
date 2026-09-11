@@ -22,12 +22,25 @@ import { entityPropertiesEqual, getEntityType } from "@osmix/types/utils";
 import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 
 import {
+  assertChangesetInputIdentity,
+  changesetInputIdentity,
+  requireChangesetInputIdentity,
+} from "./changeset-inputs.ts";
+import {
+  assertNoNewRoutingIntegrityIssues,
   inheritedRoutingIntegrityIssueKeys,
   junctionHasIncompatibleGrades,
   restrictionTopologyIssues,
   routingIntegrityIssueKeys,
 } from "./integrity.ts";
-import type { OsmChange, OsmChanges, OsmChangesetStats, OsmEntityRef } from "./types.ts";
+import type {
+  OsmChange,
+  OsmChanges,
+  OsmChangesetInputIdentity,
+  OsmChangesetRestoreContext,
+  OsmChangesetStats,
+  OsmEntityRef,
+} from "./types.ts";
 import {
   areWayTagsIntersectionCandidate,
   cleanCoords,
@@ -292,8 +305,10 @@ export class OsmChangeset {
   relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]>> = {};
 
   osm: Osm;
-  /** @internal Integrity issues inherited from merge inputs rather than introduced by changes. */
-  routingIntegrityBaselineKeys: Set<string>;
+  private readonly routingIntegrityBaselineKeys: Set<string>;
+  private readonly baseInputIdentity: OsmChangesetInputIdentity | undefined;
+  private readonly patchInputIdentities: (OsmChangesetInputIdentity | undefined)[] = [];
+  private restoredWithoutInputContext = false;
 
   // Next node ID tracker for generating new IDs during intersection creation
   currentNodeId: number;
@@ -311,11 +326,49 @@ export class OsmChangeset {
   private readonly pendingWayRefs = new Map<number, readonly number[]>();
   private readonly wayCoordinateCache = new Map<number, WayCoordinateCacheEntry>();
 
-  static fromJson(base: Osm, json: OsmChanges) {
+  /** Restore changes and recompute integrity allowances from the recorded original inputs. */
+  static fromJson(base: Osm, json: OsmChanges, context?: OsmChangesetRestoreContext) {
+    if (json.osmId !== base.id)
+      throw Error("Changeset base input context mismatch: dataset ID differs");
     const changeset = new OsmChangeset(base);
-    changeset.nodeChanges = json.nodes;
-    changeset.wayChanges = json.ways;
-    changeset.relationChanges = json.relations;
+    const validation = json.validationContext;
+    if (validation === undefined) {
+      if (context) {
+        throw Error(
+          "Changes-only JSON has no verifiable original input context; regenerate from the original inputs and export with toJSON()",
+        );
+      }
+      changeset.restoredWithoutInputContext = true;
+    } else {
+      if (validation?.version !== 1 || !Array.isArray(validation.patches)) {
+        throw Error(
+          "Unsupported changeset validation context version or format; regenerate and export with toJSON()",
+        );
+      }
+      assertChangesetInputIdentity(base, validation.base, "base");
+      const patches = context?.patches ?? [];
+      if (patches.length !== validation.patches.length) {
+        throw Error(
+          "Changeset original patch input context is missing or has the wrong count; pass { patches } in generation order to fromJson()",
+        );
+      }
+      for (const [index, patch] of patches.entries()) {
+        assertChangesetInputIdentity(patch, validation.patches[index]!, `patch ${index + 1}`);
+        changeset.inheritPatchIntegrity(patch);
+      }
+    }
+    const snapshot = structuredClone(json);
+    changeset.nodeChanges = snapshot.nodes;
+    changeset.wayChanges = snapshot.ways;
+    changeset.relationChanges = snapshot.relations;
+    for (const change of Object.values(snapshot.nodes)) {
+      changeset.currentNodeId = Math.max(changeset.currentNodeId, change.entity.id);
+    }
+    changeset.deduplicatedNodes = snapshot.stats.deduplicatedNodes;
+    changeset.deduplicatedNodesReplaced = snapshot.stats.deduplicatedNodesReplaced;
+    changeset.deduplicatedWays = snapshot.stats.deduplicatedWays;
+    changeset.intersectionPointsFound = snapshot.stats.intersectionPointsFound;
+    changeset.intersectionNodesCreated = snapshot.stats.intersectionNodesCreated;
     // Serialized node changes may move, delete, or supply a previously missing
     // ref. Conservatively disable packed base-coordinate reuse for this instance.
     if (Object.keys(json.nodes).length > 0) changeset.nodeCoordinateRevision++;
@@ -326,6 +379,57 @@ export class OsmChangeset {
     this.osm = base;
     this.currentNodeId = maximumId(base.nodes.ids) ?? EMPTY_ID;
     this.routingIntegrityBaselineKeys = routingIntegrityIssueKeys(base);
+    this.baseInputIdentity = changesetInputIdentity(base);
+  }
+
+  /** Export a detached JSON snapshot. Keep the original inputs for verified restoration. */
+  toJSON(): OsmChanges {
+    return structuredClone({
+      osmId: this.osm.id,
+      nodes: this.nodeChanges,
+      ways: this.wayChanges,
+      relations: this.relationChanges,
+      stats: this.stats,
+      ...(this.restoredWithoutInputContext
+        ? {}
+        : {
+            validationContext: {
+              version: 1 as const,
+              base: requireChangesetInputIdentity(this.baseInputIdentity, "base"),
+              patches: this.patchInputIdentities.map((identity, index) =>
+                requireChangesetInputIdentity(identity, `patch ${index + 1}`),
+              ),
+            },
+          }),
+    });
+  }
+
+  /** @internal Apply the same verified integrity policy to live and restored changesets. */
+  assertValidResult(result: Osm): void {
+    try {
+      assertNoNewRoutingIntegrityIssues(this.routingIntegrityBaselineKeys, result);
+    } catch (cause) {
+      if (!this.restoredWithoutInputContext) throw cause;
+      const message = cause instanceof Error ? cause.message : String(cause);
+      throw Error(
+        `${message}. Changes-only JSON has no original patch input context; only inherited base issues can be verified. To preserve inherited patch issues, regenerate from the original inputs and export with toJSON()`,
+        { cause },
+      );
+    }
+  }
+
+  private inheritPatchIntegrity(patch: Osm) {
+    for (const key of inheritedRoutingIntegrityIssueKeys(
+      this.osm,
+      patch,
+      this.routingIntegrityBaselineKeys,
+    )) {
+      this.routingIntegrityBaselineKeys.add(key);
+    }
+    this.patchInputIdentities.push(changesetInputIdentity(patch));
+    // Legacy restoration grants only base allowances. Once a real patch is added,
+    // base plus these recorded patches fully describes the current policy too.
+    this.restoredWithoutInputContext = false;
   }
 
   get stats(): OsmChangesetStats {
@@ -1420,13 +1524,7 @@ export class OsmChangeset {
    *   reconciliation and relation-member rewrites.
    */
   generateDirectChanges(patch: Osm) {
-    for (const key of inheritedRoutingIntegrityIssueKeys(
-      this.osm,
-      patch,
-      this.routingIntegrityBaselineKeys,
-    )) {
-      this.routingIntegrityBaselineKeys.add(key);
-    }
+    this.inheritPatchIntegrity(patch);
 
     // Reset the current node ID to the highest node ID in the base or patch.
     const maximums = [maximumId(this.osm.nodes.ids), maximumId(patch.nodes.ids)].filter(

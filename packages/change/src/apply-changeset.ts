@@ -10,7 +10,7 @@
 import { Osm } from "@osmix/core";
 
 import type { OsmChangeset } from "./changeset.ts";
-import { assertNoNewRoutingIntegrityIssues, reuseRoutingIntegrityAnalysis } from "./integrity.ts";
+import { reuseRoutingIntegrityAnalysis } from "./integrity.ts";
 
 function hasOwnChanges(changes: Record<number, unknown>) {
   for (const key in changes) {
@@ -65,7 +65,7 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
     // The wrapper above references the exact same finalized entity buffers.
     // Carry the source analysis forward so the next merge stage can reuse it.
     reuseRoutingIntegrityAnalysis(baseOsm, osm);
-    assertNoNewRoutingIntegrityIssues(changeset.routingIntegrityBaselineKeys, osm);
+    changeset.assertValidResult(osm);
     return osm;
   }
 
@@ -159,7 +159,7 @@ export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) 
   // Build spatial indexes
   osm.buildSpatialIndexes();
 
-  assertNoNewRoutingIntegrityIssues(changeset.routingIntegrityBaselineKeys, osm);
+  changeset.assertValidResult(osm);
 
   return osm;
 }
