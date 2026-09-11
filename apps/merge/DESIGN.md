@@ -154,13 +154,23 @@ Use the merge terms consistently:
   coordinates or ordered geometry and routing context agree.
 - **Imported-data matching** is the optional proximity workflow. A **candidate**
   proposes a correspondence; it does not select every eligible action.
+- **Alternative targets** belong together under their imported feature. Show
+  at most one selected target and an explicit **Leave unmatched** choice.
+  Choosing a target selects its eligible configured actions; independent action
+  controls can refine that choice. Keep eligible actions available on unselected
+  alternatives: selecting one switches the target using that action choice.
+  Replacing a target preserves other imported features' decisions. Use the group's
+  **Leave unmatched** control to clear its choice, rather than per-alternative
+  **Skip match** controls. Keep alternatives outside current filters visible as
+  labeled context; bulk actions still apply only to matching rows.
 - **OSM tags** are feature attributes, such as `surface=asphalt` or
   `kerb=lowered`. Use **Copy tags** in controls; **property transfer** is the API
   term. Copying tags preserves imported geometry, including matched ways and
   their connecting nodes.
 - **Connect network** is an independent choice that changes connectivity by
   rewriting accepted references in patch-created ways. **Network attachment**
-  is the API term. Changing either action must preserve the other choice.
+  is the API term. Changing either action must preserve the other choice on the
+  same target.
 - **Scheduled** describes what the current choices include in the next
   matching preview. Applying that preview is a separate step. **Automatic** means scheduled by the matching rules; it
   never means already applied. Keep discovery eligibility distinct from the
@@ -180,6 +190,12 @@ Labels must state what a control changes instead of relying on a placeholder.
 Put concise supporting text next to unfamiliar controls and connect it with
 `aria-describedby`. Humanize internal status and reason-code values in visible
 copy, but do not change the stable values used by workers or saved decisions.
+
+Provide **Back to matching** from reconciliation, failed cumulative generation,
+and the cumulative matching preview before application. Returning preserves the
+loaded original inputs, options, and saved decisions. Show the affected imported
+feature when a decision conflict needs correction. After changes are applied,
+intersection recovery must not imply a return to the original matching state.
 
 `Details` is the shared disclosure primitive. Its open-state styles target Base
 UI's `data-panel-open` attribute. Disclosure triggers remain keyboard

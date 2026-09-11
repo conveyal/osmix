@@ -173,6 +173,14 @@ export interface OsmConflationResolvedActions {
   attachNetwork: boolean;
 }
 
+/** A recoverable selection conflict attached to validation errors as `error.conflict`. */
+export interface OsmConflationDecisionConflict {
+  entityType: OsmConflationEntityType;
+  sourceId: number;
+  candidateIds: string[];
+  message: string;
+}
+
 /** A filter-wide review operation performed atomically in the conflation worker. */
 export type OsmConflationBulkAction = "transfer-properties" | "attach-network" | "reject";
 

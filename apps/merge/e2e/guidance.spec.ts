@@ -286,8 +286,9 @@ test.describe("matching action review", () => {
     await expect
       .poll(async () => (await readState(page)).requests.at(-1))
       .toEqual({
-        kind: "decision",
-        decision: {
+        kind: "source",
+        source: { entityType: "node", sourceId: 101 },
+        selected: {
           candidateId: "node:101->1",
           action: "accept",
           transferProperties: copy,
@@ -312,7 +313,7 @@ test.describe("matching action review", () => {
       .click();
     await expect.poll(async () => (await readState(page)).generations).toBe(before.generations + 1);
     expect((await readState(page)).preview).toEqual(before.preview);
-    await harness(page).getByRole("button", { name: "Back to match review", exact: true }).click();
+    await harness(page).getByRole("button", { name: "Back to matching", exact: true }).click();
   }
 
   test("independent choices, skipping, and resetting agree with worker previews", async ({
@@ -359,7 +360,11 @@ test.describe("matching action review", () => {
     await expectChoices(page, false, false);
     await expect
       .poll(async () => (await readState(page)).requests.at(-1))
-      .toEqual({ kind: "decision", decision: { candidateId: "node:101->1", action: "reject" } });
+      .toEqual({
+        kind: "source",
+        source: { entityType: "node", sourceId: 101 },
+        selected: { candidateId: "node:101->1", action: "reject" },
+      });
     await expectPreview(page, false, false);
     await actions(page).getByRole("button", { name: "Use automatic choices", exact: true }).click();
     await expectChoices(page, true, true);
@@ -484,5 +489,233 @@ test.describe("matching action review", () => {
         .info()
         .attach(`Matching actions at ${width}px`, { path, contentType: "image/png" });
     }
+  });
+
+  const sourceGroup = (page: Page, id = 101) =>
+    harness(page).getByRole("region", { name: `Imported node ${id}`, exact: true });
+  const target = (page: Page, id: number) =>
+    sourceGroup(page).getByRole("radio", { name: new RegExp(`^Base node ${id}(?: \\(|$)`) });
+
+  async function expectAlternativePreview(
+    page: Page,
+    selected: number | null,
+    connected = selected,
+  ) {
+    await harness(page)
+      .getByRole("button", { name: "Preview current choices", exact: true })
+      .click();
+    await expect(harness(page).getByTestId("preview-refs")).toHaveText(`${connected ?? 101}, 103`);
+    const before = await readState(page);
+    for (const id of [1, 2, 3]) {
+      const change = before.preview?.changes?.find(
+        (entry) => entry.entity.id === id && "lon" in entry.entity,
+      );
+      if (id === selected)
+        expect(change).toMatchObject({
+          changeType: "modify",
+          entity: { tags: { name: "Imported entrance" } },
+        });
+      else expect(change).toBeUndefined();
+    }
+    expect(before.preview?.changes?.find((entry) => entry.entity.id === 20)).toMatchObject({
+      changeType: "create",
+      entity: { refs: [connected ?? 101, 103] },
+    });
+    await harness(page)
+      .getByRole("button", { name: "Regenerate current preview", exact: true })
+      .click();
+    await expect.poll(async () => (await readState(page)).generations).toBe(before.generations + 1);
+    expect((await readState(page)).preview).toEqual(before.preview);
+    await harness(page).getByRole("button", { name: "Back to matching", exact: true }).click();
+  }
+
+  test("alternative targets stay together through paging, filtering, replacement, and leaving unmatched", async ({
+    page,
+  }) => {
+    await harness(page)
+      .getByRole("button", { name: "Load alternative target fixture", exact: true })
+      .click();
+    await expect(
+      sourceGroup(page).getByRole("radio", { name: "Leave unmatched", exact: true }),
+    ).not.toBeChecked();
+    await expect(sourceGroup(page)).toContainText("No target selected");
+    await sourceGroup(page).getByRole("radio", { name: "Leave unmatched", exact: true }).click();
+    await expect(
+      sourceGroup(page).getByRole("radio", { name: "Leave unmatched", exact: true }),
+    ).toBeChecked();
+    expect((await readState(page)).decisions).toEqual([
+      { candidateId: "node:101->1", action: "reject" },
+      { candidateId: "node:101->2", action: "reject" },
+    ]);
+    await harness(page)
+      .getByRole("button", { name: "Load alternative target fixture", exact: true })
+      .click();
+    await expect(sourceGroup(page)).toContainText("No target selected");
+    await expect(target(page, 1)).toBeVisible();
+    await expect(target(page, 2)).toBeVisible();
+    expect((await readState(page)).workerPage.groups?.[0]?.candidateIds).toEqual([
+      "node:101->1",
+      "node:101->2",
+    ]);
+    await expect(
+      harness(page).getByRole("button", { name: "Page 1 of 3", exact: true }),
+    ).toBeVisible();
+    await harness(page).getByRole("button", { name: "Next", exact: true }).click();
+    await sourceGroup(page, 102).getByRole("button", { name: "Skip match", exact: true }).click();
+    await harness(page).getByRole("button", { name: "Previous", exact: true }).click();
+    await target(page, 1).click();
+    await expect(target(page, 1)).toBeChecked();
+    await expect(target(page, 2)).not.toBeChecked();
+    const unrelatedChoice = (await readState(page)).decisions.find(
+      (decision) => decision.candidateId === "node:102->3",
+    );
+    expect(unrelatedChoice).toEqual({ candidateId: "node:102->3", action: "reject" });
+    await expectAlternativePreview(page, 1);
+
+    await harness(page)
+      .getByRole("combobox", { name: "Match status", exact: true })
+      .selectOption("accepted");
+    await expect(target(page, 2)).toHaveAccessibleName("Base node 2 (outside current filters)");
+    const filtered = (await readState(page)).workerPage;
+    expect(filtered).toMatchObject({ totalCandidates: 1, totalSources: 1, totalPages: 1 });
+    expect(
+      filtered.candidates.map((candidate) => [candidate.targetId, candidate.matchesFilter]),
+    ).toEqual([
+      [1, true],
+      [2, false],
+    ]);
+    await expect(
+      harness(page).getByRole("button", { name: "Copy tags (0)", exact: true }),
+    ).toBeDisabled();
+    const secondRow = sourceGroup(page)
+      .locator('[data-slot="item"]')
+      .filter({ hasText: "Imported node 101 → Base node 2" });
+    await secondRow.getByRole("checkbox", { name: "Copy tags", exact: true }).click();
+    await expect(secondRow.getByRole("checkbox", { name: "Copy tags", exact: true })).toBeChecked();
+    await expect(target(page, 2)).toBeChecked();
+    await expect(target(page, 1)).not.toBeChecked();
+    expect(
+      (await readState(page)).decisions.find((decision) => decision.candidateId === "node:102->3"),
+    ).toEqual(unrelatedChoice);
+    expect((await readState(page)).requests.at(-1)).toEqual({
+      kind: "source",
+      source: { entityType: "node", sourceId: 101 },
+      selected: {
+        candidateId: "node:101->2",
+        action: "accept",
+        transferProperties: true,
+        attachNetwork: false,
+      },
+    });
+    await expectAlternativePreview(page, 2, null);
+    await secondRow.getByRole("checkbox", { name: "Connect network", exact: true }).click();
+    await expect(
+      secondRow.getByRole("checkbox", { name: "Connect network", exact: true }),
+    ).toBeChecked();
+    await expectAlternativePreview(page, 2);
+    await sourceGroup(page).getByRole("radio", { name: "Leave unmatched", exact: true }).click();
+    await expect(harness(page)).toContainText("No candidates match these filters");
+    await harness(page)
+      .getByRole("combobox", { name: "Match status", exact: true })
+      .selectOption("");
+    await expect(
+      sourceGroup(page).getByRole("radio", { name: "Leave unmatched", exact: true }),
+    ).toBeChecked();
+    expect((await readState(page)).decisions).toEqual(
+      expect.arrayContaining([
+        { candidateId: "node:101->1", action: "reject" },
+        { candidateId: "node:101->2", action: "reject" },
+        unrelatedChoice,
+      ]),
+    );
+    await expectAlternativePreview(page, null);
+  });
+
+  test("a blocked alternative explains its disabled target while an eligible target remains selectable", async ({
+    page,
+  }) => {
+    await harness(page)
+      .getByRole("button", { name: "Load blocked target fixture", exact: true })
+      .click();
+    await expect(target(page, 2)).toBeDisabled();
+    await expect(target(page, 2)).toHaveAccessibleDescription(
+      /Unavailable: .*Routing uses are incompatible/,
+    );
+    await expect(target(page, 1)).toBeEnabled();
+    await target(page, 1).click();
+    await expect(target(page, 1)).toBeChecked();
+    await expect(target(page, 2)).not.toBeChecked();
+    // Preserve the unrelated feature's original name when generating this focused choice.
+    await harness(page).getByRole("button", { name: "Next", exact: true }).click();
+    await sourceGroup(page, 102).getByRole("button", { name: "Skip match", exact: true }).click();
+    await harness(page).getByRole("button", { name: "Previous", exact: true }).click();
+    await expectAlternativePreview(page, 1);
+  });
+
+  test("a failed legacy review can return to the affected source, correct it, and regenerate without losing inputs", async ({
+    page,
+  }) => {
+    await harness(page)
+      .getByRole("button", { name: "Load conflicting saved review", exact: true })
+      .click();
+    await expect(sourceGroup(page).getByRole("alert")).toContainText(
+      "More than one target is selected",
+    );
+    await harness(page)
+      .getByRole("combobox", { name: "Match status", exact: true })
+      .selectOption("rejected");
+    await expect(sourceGroup(page, 102)).toBeVisible();
+    const before = await readState(page);
+    await harness(page)
+      .getByRole("button", { name: "Preview current choices", exact: true })
+      .click();
+    const preview = harness(page).getByTestId("matching-preview");
+    await expect(preview.getByRole("alert")).toContainText(
+      "Multiple targets are scheduled for imported node 101",
+    );
+    await expect(preview).toContainText(
+      "Your loaded inputs, options, and saved choices are retained",
+    );
+    await preview.getByRole("button", { name: "Regenerate current preview", exact: true }).click();
+    expect((await readState(page)).generationAttempts).toBe(2);
+    expect((await readState(page)).generations).toBe(0);
+    expect((await readState(page)).decisions).toEqual(before.decisions);
+    await preview.getByRole("button", { name: "Back to matching", exact: true }).click();
+    await expect(harness(page)).toContainText("Showing imported node 101");
+    await expect(sourceGroup(page)).toBeVisible();
+    const returned = await readState(page);
+    expect(returned.filter).toEqual({ entityType: "node", sourceId: 101 });
+    expect(returned.inputs).toEqual(before.inputs);
+    expect(returned.options).toEqual(before.options);
+    expect(returned.decisions).toEqual(before.decisions);
+    expect(returned.workerPage.validationConflict?.sourceId).toBe(101);
+
+    const artifactDirectory = resolve(
+      import.meta.dirname,
+      "../../../output/playwright/pr-218-ticket08",
+    );
+    await mkdir(artifactDirectory, { recursive: true });
+    for (const width of [320, 512]) {
+      await page.setViewportSize({ width, height: 1000 });
+      const panel = harness(page).getByTestId("conflation-review-panel");
+      await expect
+        .poll(() => panel.evaluate((element) => element.scrollWidth <= element.clientWidth))
+        .toBe(true);
+      const path = resolve(artifactDirectory, `matching-correction-${width}.png`);
+      await panel.screenshot({ path, animations: "disabled" });
+      await test
+        .info()
+        .attach(`Correcting alternative targets at ${width}px`, { path, contentType: "image/png" });
+    }
+
+    await target(page, 2).click();
+    await expect(target(page, 2)).toBeChecked();
+    await expect(harness(page)).not.toContainText("Matching preview needs attention");
+    expect(
+      (await readState(page)).decisions.find((decision) => decision.candidateId === "node:102->3"),
+    ).toEqual({ candidateId: "node:102->3", action: "reject" });
+    await expectAlternativePreview(page, 2);
+    expect((await readState(page)).inputs).toEqual(before.inputs);
+    expect((await readState(page)).options).toEqual(before.options);
   });
 });

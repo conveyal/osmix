@@ -18,6 +18,7 @@ import {
   changeStatsSummary,
   type OsmConflationBulkDecisionRequest,
   type OsmConflationDecision,
+  type OsmConflationCandidateView,
 } from "osmix";
 import { Suspense, useMemo, useState } from "react";
 
@@ -34,6 +35,7 @@ import { ConflationRoutingDiagnostics } from "../components/conflation-routing-d
 import { Details, DetailsContent, DetailsSummary } from "../components/details";
 import EntityDetails from "../components/entity-details";
 import { FullIndexRequired, hasFullNodeIndex } from "../components/full-index-required";
+import { BackToMatching, MatchingReviewProblem } from "../components/matching-review-recovery";
 import { MergeStepGuide, type MergeStepGuideId } from "../components/merge-step-guide";
 import ChangesSummary, {
   ChangesExpandableList,
@@ -58,6 +60,11 @@ import {
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
 import { toOsmConflationOptions, validateConflationForm } from "../lib/conflation-workflow";
+import {
+  matchingReviewIssue,
+  returnToMatchingReview,
+  type MatchingReviewIssue,
+} from "../lib/matching-review";
 import {
   completeMergeOptions,
   finalizeVerifiedMerge,
@@ -211,6 +218,7 @@ export default function MergeBlock() {
     conflationCandidateFilterAtom,
   );
   const [isConflationFilterPending, setIsConflationFilterPending] = useState(false);
+  const [matchingIssue, setMatchingIssue] = useState<MatchingReviewIssue | null>(null);
   const [automaticMergeProgress, setAutomaticMergeProgress] =
     useState<AutomaticMergeProgressState | null>(null);
   const [conflationDecisions, setConflationDecisions] = useAtom(conflationDecisionsAtom);
@@ -274,6 +282,7 @@ export default function MergeBlock() {
   const patchFileName = patch.file?.name ?? patch.fileInfo?.fileName;
 
   const resetMergeDerivedState = () => {
+    setMatchingIssue(null);
     setChangesetStats(null);
     resetConflationReview();
     selectEntity(null, null);
@@ -291,8 +300,16 @@ export default function MergeBlock() {
 
   const loadConflationPage = async (page: number) => {
     if (!base.osm) throw Error("Base OSM is not loaded");
-    const result = await osmWorker.getConflationPage(base.osm.id, page, CONFLATION_PAGE_SIZE);
-    setConflationCandidatePageIndex(page);
+    let result = await osmWorker.getConflationPage(base.osm.id, page, CONFLATION_PAGE_SIZE, {
+      groupBySource: true,
+    });
+    const lastPage = Math.max(0, result.totalPages - 1);
+    if (page > lastPage) {
+      result = await osmWorker.getConflationPage(base.osm.id, lastPage, CONFLATION_PAGE_SIZE, {
+        groupBySource: true,
+      });
+    }
+    setConflationCandidatePageIndex(result.page);
     setConflationCandidatePage(result);
   };
 
@@ -327,60 +344,109 @@ export default function MergeBlock() {
     setConflationRoutingDiagnostics(null);
   };
 
+  const withMatchingReviewError = async (action: () => Promise<void>) => {
+    try {
+      await action();
+    } catch (error) {
+      setMatchingIssue(matchingReviewIssue(error));
+    }
+  };
+
+  const saveConflationSourceChoice = (
+    source: Pick<OsmConflationCandidateView, "entityType" | "sourceId">,
+    decision: OsmConflationDecision | null,
+  ) =>
+    withMatchingReviewError(async () => {
+      if (!base.osm) throw Error("Base OSM is not loaded");
+      const result = await osmWorker.setConflationSourceDecision(
+        base.osm.id,
+        { entityType: source.entityType, sourceId: source.sourceId },
+        decision,
+      );
+      setConflationDecisions(result.decisions);
+      setConflationSummary(result.summary);
+      setMatchingIssue(null);
+      invalidateMatchingPreview();
+      await loadConflationPage(conflationCandidatePageIndex);
+    });
+
   const updateConflationDecision = async (decision: OsmConflationDecision) => {
-    if (!base.osm) throw Error("Base OSM is not loaded");
-    const summary = await osmWorker.setConflationDecision(base.osm.id, decision);
-    setConflationDecisions((current) => [
-      ...current.filter((existing) => existing.candidateId !== decision.candidateId),
-      decision,
-    ]);
-    setConflationSummary(summary);
-    invalidateMatchingPreview();
-    await loadConflationPage(conflationCandidatePageIndex);
+    const candidate = conflationCandidatePage?.candidates.find(
+      (candidate) => candidate.id === decision.candidateId,
+    );
+    if (!candidate) {
+      setMatchingIssue({
+        message: "This match is no longer on the current page. Refresh the candidates.",
+      });
+      return;
+    }
+    await saveConflationSourceChoice(candidate, decision);
   };
 
-  const resetConflationDecision = async (candidateId: string) => {
-    if (!base.osm) throw Error("Base OSM is not loaded");
-    const decisions = conflationDecisions.filter(
-      (decision) => decision.candidateId !== candidateId,
+  const returnToMatching = () =>
+    withMatchingReviewError(() =>
+      returnToMatchingReview({
+        filter: conflationCandidateFilter,
+        page: conflationCandidatePageIndex,
+        issue: matchingIssue,
+        onFilterChange: updateConflationFilter,
+        onPageChange: loadConflationPage,
+        onReturn: () => goToStep("match-imported-data"),
+      }),
     );
-    const summary = await osmWorker.setConflationDecisions(base.osm.id, decisions);
-    setConflationDecisions(decisions);
-    setConflationSummary(summary);
-    invalidateMatchingPreview();
-    await loadConflationPage(conflationCandidatePageIndex);
-  };
 
-  const updateConflationBulkDecision = async (request: OsmConflationBulkDecisionRequest) => {
-    if (!base.osm) throw Error("Base OSM is not loaded");
-    const result = await osmWorker.applyConflationBulkDecision(base.osm.id, request);
-    setConflationDecisions(result.decisions);
-    setConflationSummary(result.summary);
-    if (result.preview.changedCandidates > 0) invalidateMatchingPreview();
-    await loadConflationPage(0);
-    Log.addMessage(
-      `Updated ${result.preview.changedCandidates.toLocaleString()} filtered conflation decisions`,
-    );
-  };
+  const resetConflationDecision = (candidateId: string) =>
+    withMatchingReviewError(async () => {
+      if (!base.osm) throw Error("Base OSM is not loaded");
+      const decisions = conflationDecisions.filter(
+        (decision) => decision.candidateId !== candidateId,
+      );
+      const summary = await osmWorker.setConflationDecisions(base.osm.id, decisions);
+      setConflationDecisions(decisions);
+      setConflationSummary(summary);
+      setMatchingIssue(null);
+      invalidateMatchingPreview();
+      await loadConflationPage(conflationCandidatePageIndex);
+    });
+
+  const updateConflationBulkDecision = (request: OsmConflationBulkDecisionRequest) =>
+    withMatchingReviewError(async () => {
+      if (!base.osm) throw Error("Base OSM is not loaded");
+      const result = await osmWorker.applyConflationBulkDecision(base.osm.id, request);
+      setConflationDecisions(result.decisions);
+      setConflationSummary(result.summary);
+      if (result.preview.changedCandidates > 0) invalidateMatchingPreview();
+      await loadConflationPage(0);
+      Log.addMessage(
+        `Updated ${result.preview.changedCandidates.toLocaleString()} filtered conflation decisions`,
+      );
+      setMatchingIssue(null);
+    });
 
   const generateVerifiedChangeset = async (reconcile: boolean) => {
     if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
     if (conflationOptions) {
-      if (!conflationSummary) {
-        throw Error("Discover and review imported-data match candidates first");
+      setMatchingIssue(null);
+      try {
+        if (!conflationSummary) {
+          throw Error("Discover and review imported-data match candidates first");
+        }
+        const result = await osmWorker.generateConflationChangeset(
+          base.osm.id,
+          verifiedBaseMergeOptions(reconcile),
+        );
+        setChangesetReviewContext({
+          kind: "cumulative",
+          exactReconciliation: reconcile,
+          matching: true,
+        });
+        setChangesetStats(result.stats);
+        setConflationRoutingDiagnostics(result.routing);
+        return changeStatsSummary(result.stats);
+      } catch (error) {
+        setMatchingIssue(matchingReviewIssue(error));
+        throw error;
       }
-      const result = await osmWorker.generateConflationChangeset(
-        base.osm.id,
-        verifiedBaseMergeOptions(reconcile),
-      );
-      setChangesetReviewContext({
-        kind: "cumulative",
-        exactReconciliation: reconcile,
-        matching: true,
-      });
-      setChangesetStats(result.stats);
-      setConflationRoutingDiagnostics(result.routing);
-      return changeStatsSummary(result.stats);
     }
 
     const result = await osmWorker.generateChangeset(
@@ -790,14 +856,22 @@ export default function MergeBlock() {
                         "error",
                       );
                       if (conflationOptions) {
+                        const issue = matchingReviewIssue(error);
+                        setMatchingIssue(issue);
                         // Discovery is read-only, so returning to candidate review is safe even when
                         // generation failed partway through validation.
                         const restoreFailure = await recoverConflationRunAllFailure({
                           restoreReview: conflationDiscoveryCompleted
                             ? async () => {
+                                if (issue.source) {
+                                  await osmWorker.setConflationFilter(baseOsmId, issue.source);
+                                  setConflationCandidateFilter(issue.source);
+                                }
                                 const [summary, page] = await Promise.all([
                                   osmWorker.getConflationSummary(baseOsmId),
-                                  osmWorker.getConflationPage(baseOsmId, 0, CONFLATION_PAGE_SIZE),
+                                  osmWorker.getConflationPage(baseOsmId, 0, CONFLATION_PAGE_SIZE, {
+                                    groupBySource: true,
+                                  }),
                                 ]);
                                 setConflationSummary(summary);
                                 setConflationCandidatePageIndex(0);
@@ -1045,7 +1119,18 @@ export default function MergeBlock() {
           <ConflationRoutingDiagnostics diagnostics={conflationRoutingDiagnostics} />
         ) : null}
 
+        {changesetReviewContext.kind === "cumulative" && changesetReviewContext.matching ? (
+          <MatchingReviewProblem issue={matchingIssue} />
+        ) : null}
+
         <StepActions aria-label="Changeset review actions">
+          {changesetReviewContext.kind === "cumulative" &&
+          changesetReviewContext.matching &&
+          changesetStats !== null &&
+          base.osm &&
+          patch.osm ? (
+            <BackToMatching onBack={returnToMatching} />
+          ) : null}
           {isDiagnosticReview ? (
             <ActionButton
               onAction={async () => {
@@ -1110,6 +1195,7 @@ export default function MergeBlock() {
       </Step>
 
       <Step step="match-imported-data" title="Match imported data" guideId="match-imported">
+        <MatchingReviewProblem issue={matchingIssue} />
         <ActionButton
           disabled={!base.osm || !patch.osm || !conflationOptions || isConflationFilterPending}
           icon={<SearchCodeIcon />}
@@ -1120,13 +1206,16 @@ export default function MergeBlock() {
             const task = Log.startTask("Discovering imported-data match candidates");
             try {
               resetConflationReview();
+              setMatchingIssue(null);
               const summary = await osmWorker.discoverConflation(
                 base.osm.id,
                 patch.osm.id,
                 conflationOptions,
               );
               setConflationSummary(summary);
-              const page = await osmWorker.getConflationPage(base.osm.id, 0, CONFLATION_PAGE_SIZE);
+              const page = await osmWorker.getConflationPage(base.osm.id, 0, CONFLATION_PAGE_SIZE, {
+                groupBySource: true,
+              });
               setConflationCandidatePage(page);
               task.end(`Found ${summary.total.toLocaleString()} imported-data match candidates`);
             } catch (error) {
@@ -1151,6 +1240,7 @@ export default function MergeBlock() {
             isFilterPending={isConflationFilterPending}
             onDecision={updateConflationDecision}
             onResetDecision={resetConflationDecision}
+            onLeaveUnmatched={(source) => saveConflationSourceChoice(source, null)}
             onBulkDecision={updateConflationBulkDecision}
             onFilterChange={updateConflationFilter}
             onPageChange={loadConflationPage}
@@ -1177,6 +1267,7 @@ export default function MergeBlock() {
       </Step>
 
       <Step step="deduplicate-nodes" title="Reconcile matching entities" guideId="reconcile">
+        <MatchingReviewProblem issue={matchingIssue} />
         <Card>
           <CardHeader>
             <CardTitle>Current OSM PBF</CardTitle>
@@ -1197,6 +1288,9 @@ export default function MergeBlock() {
         </Card>
 
         <StepActions aria-label="Exact reconciliation actions">
+          {conflationOptions && conflationSummary ? (
+            <BackToMatching onBack={returnToMatching} />
+          ) : null}
           <ActionButton
             icon={<SkipForwardIcon />}
             onAction={() =>

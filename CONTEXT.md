@@ -26,6 +26,16 @@ _Avoid_: Proximity deduplication
 A proposed correspondence between an imported feature and a base feature, with evidence and separate eligibility for copying tags and connecting networks. A candidate does not by itself select either action.
 _Avoid_: Confirmed match
 
+**Alternative targets**:
+Possible base counterparts proposed for the same imported feature. They are reviewed together because that feature can have matching actions scheduled for at most one target.
+
+**Selected target**:
+The base counterpart for which at least one matching action is scheduled. Choosing a target selects its eligible configured actions; Copy tags and Connect network can then be adjusted independently. Scheduling an action for another counterpart replaces the prior target. Turning both off leaves no selected target.
+
+**Leave unmatched**:
+An explicit choice to schedule no matching actions for any alternative target of an imported feature. Ordinary imported additions still follow the direct/exact merge rules. This choice can be made even when discovery found possible targets.
+_Avoid_: Discard imported feature
+
 **OSM tags**:
 Key-value feature attributes, such as `surface=asphalt` or `kerb=lowered`.
 _Avoid_: Labels, annotations

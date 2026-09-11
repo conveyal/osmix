@@ -142,10 +142,18 @@ Equivalent one-to-one patch ways remain after property transfer, including the n
 Exact reconciliation remains a separate operation; segmented way chains are reported but unsupported.
 
 The current decision selects Copy tags, Connect network, both, or neither. An action can be eligible without
-being selected. Changing one choice preserves the other, including a choice that was scheduled automatically.
+being selected. Changing one choice preserves the other on the same target, including a choice that was scheduled automatically.
 Skipping a match schedules neither action; imported additions still follow the ordinary direct/exact merge
 rules. Clearing a saved decision restores discovery defaults, which may schedule high-confidence actions
 again. Automatic describes the current schedule, not a completed change.
+
+Several candidates can propose different base targets for one imported feature. Matching actions may be
+scheduled for only one of those targets: copying tags to one target while connecting to another is also a
+conflict. Choosing a replacement must clear the prior target's actions while preserving other imported
+features' decisions. In Merge, selecting an action on another alternative replaces the target using that
+action choice, so a user can switch targets and copy tags without also connecting the network.
+Leaving the feature unmatched schedules neither action for any target and retains
+ordinary imported additions under the direct/exact merge rules.
 
 ## API
 
@@ -235,6 +243,10 @@ Options:
 - `buildConflationActionDecision(candidate, current, action, selected)`: Change `"transfer-properties"` or
   `"attach-network"` while preserving the other resolved choice. Returns an accept decision with both flags
   explicit; eligibility checks still govern whether either action can be scheduled.
+- `buildConflationSourceDecision(candidates, decisions, source, selected)`: Replace the choices for one
+  `{ entityType, sourceId }`. Pass a candidate decision as `selected` to retain its action flags and reject
+  every sibling target, or `null` to leave the imported feature unmatched. Returns the complete decision
+  snapshot with unrelated sources preserved.
 - `filterConflationCandidates(candidates, filter, decisions?)`: Filter discovery rows without rerunning the
   spatial search.
 - `summarizeConflationCandidates(candidates, decisions?)`: Count accepted, automatic, review, blocked, unmatched, and
@@ -252,6 +264,18 @@ flags; omitted flags retain the legacy behavior of selecting every eligible acti
 decisions schedule neither action. An accept decision with both flags `false` also resolves to the effective
 `rejected` status, shown as **Skipped** in Merge. Blocked and unmatched actions remain unscheduled regardless
 of requested flags.
+
+Use `buildConflationSourceDecision()` when changing targets. It validates the replacement and explicitly
+rejects sibling targets so automatic defaults cannot select them again. Older reviews can be corrected one
+imported feature at a time: existing conflicts for other sources remain unchanged, but the replacement cannot
+introduce a new source conflict or bypass checks for competing uses of a base target. Generation, raw
+single-decision or full-set updates, and bulk actions still require a fully valid decision set. Supply the
+full discovery candidate collection and complete decision snapshot; a single page cannot validate decisions
+for other sources. Multiple-target validation
+errors identify the imported feature and expose `error.conflict` as an `OsmConflationDecisionConflict` with
+`entityType`, `sourceId`, `candidateIds`, and `message`. Hard blockers still prevent the affected action. Bulk actions conservatively
+skip ambiguous and many-to-one candidates, including an already selected alternative; use individual
+target and action controls to resolve those features.
 
 ### `applyChangesetToOsm(changeset: OsmChangeset): Osm`
 

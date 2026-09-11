@@ -17,6 +17,7 @@ import type {
   OsmConflationCandidate,
   OsmConflationCandidateFilter,
   OsmConflationDecision,
+  OsmConflationDecisionConflict,
   OsmConflationDiscovery,
   OsmConflationEffectiveStatus,
   OsmConflationEvidence,
@@ -1064,12 +1065,81 @@ function validatedDecisionMap(
   return result;
 }
 
-/** Validate review decisions against canonical candidates without mutating either input. */
+/** Validate a complete effective decision set without mutating candidates or decisions. */
 export function validateConflationDecisions(
   candidates: readonly OsmConflationCandidate[],
   decisions: readonly OsmConflationDecision[],
 ) {
-  validatedDecisionMap(candidates, decisions);
+  const decisionsById = validatedDecisionMap(candidates, decisions);
+  validateAcceptedMappings(candidates, decisionsById);
+}
+
+/**
+ * Restore a retained review for correction, including legacy source conflicts.
+ * This internal recovery capability never authorizes generation or application.
+ * Candidate IDs, decision structure, and every target-collision guard remain strict.
+ * @internal
+ */
+export function validateRetainedConflationReview(
+  candidates: readonly OsmConflationCandidate[],
+  decisions: readonly OsmConflationDecision[],
+) {
+  const decisionsById = validatedDecisionMap(candidates, decisions);
+  const retainedSourceConflicts = findPreservedSourceConflicts(candidates, decisionsById);
+  validateAcceptedMappings(candidates, decisionsById, retainedSourceConflicts);
+}
+
+/**
+ * Replace one imported feature's target choice using the complete discovery and decision snapshot.
+ * Sibling targets are explicitly rejected so their automatic defaults cannot become scheduled.
+ * A null selection skips every target for this source. Existing unrelated source conflicts are
+ * preserved so legacy reviews can be corrected one feature at a time. This cannot introduce new
+ * source conflicts or bypass target-collision guards; generation still requires a fully valid set.
+ */
+export function buildConflationSourceDecision(
+  candidates: readonly OsmConflationCandidate[],
+  decisions: readonly OsmConflationDecision[],
+  source: Pick<OsmConflationCandidate, "entityType" | "sourceId">,
+  selected: OsmConflationDecision | null,
+): OsmConflationDecision[] {
+  const currentById = validatedDecisionMap(candidates, decisions);
+  if (
+    source == null ||
+    (source.entityType !== "node" && source.entityType !== "way") ||
+    !Number.isSafeInteger(source.sourceId)
+  ) {
+    throw Error("A valid imported entity type and ID are required");
+  }
+  const alternatives = candidates.filter(
+    (candidate) =>
+      candidate.entityType === source.entityType && candidate.sourceId === source.sourceId,
+  );
+  if (alternatives.length === 0) {
+    throw Error(`No conflation candidates for imported ${source.entityType} ${source.sourceId}`);
+  }
+  if (selected !== null) {
+    validatedDecisionMap(candidates, [selected]);
+    if (!alternatives.some((candidate) => candidate.id === selected.candidateId)) {
+      throw Error(
+        `Candidate ${selected.candidateId} does not match imported ${source.entityType} ${source.sourceId}`,
+      );
+    }
+  }
+  const preservedSourceConflicts = findPreservedSourceConflicts(candidates, currentById, source);
+  const nextById = new Map(currentById);
+  for (const candidate of alternatives) {
+    nextById.set(
+      candidate.id,
+      selected?.candidateId === candidate.id
+        ? { ...selected }
+        : { candidateId: candidate.id, action: "reject" },
+    );
+  }
+  const next = [...nextById.values()]
+    .map((decision) => ({ ...decision }))
+    .toSorted((a, b) => a.candidateId.localeCompare(b.candidateId));
+  validateAcceptedMappings(candidates, nextById, preservedSourceConflicts);
+  return next;
 }
 
 function effectiveStatusForDecision(
@@ -1223,6 +1293,7 @@ export function buildConflationBulkDecisionResult(
   }
 
   const currentById = validatedDecisionMap(candidates, decisions);
+  validateAcceptedMappings(candidates, currentById);
   const nextById = new Map(currentById);
   const filtered = filterConflationCandidates(candidates, request.filter, decisions);
   let eligibleCandidates = 0;
@@ -1320,11 +1391,72 @@ function transferSelectedProperties(
   });
 }
 
+/** Identify existing source conflicts for scoped correction or retained-review restoration. */
+function findPreservedSourceConflicts(
+  candidates: readonly OsmConflationCandidate[],
+  decisions: ReadonlyMap<string, OsmConflationDecision>,
+  changedSource?: Pick<OsmConflationCandidate, "entityType" | "sourceId">,
+) {
+  const scheduledSources = new Set<string>();
+  const preservedConflicts = new Set<string>();
+  for (const candidate of candidates) {
+    if (
+      changedSource &&
+      candidate.entityType === changedSource.entityType &&
+      candidate.sourceId === changedSource.sourceId
+    )
+      continue;
+    const actions = resolveConflationActions(candidate, decisions.get(candidate.id));
+    if (!actions.transferProperties && !actions.attachNetwork) continue;
+    const sourceKey = `${candidate.entityType}:${candidate.sourceId}`;
+    if (scheduledSources.has(sourceKey)) preservedConflicts.add(sourceKey);
+    scheduledSources.add(sourceKey);
+  }
+  return preservedConflicts;
+}
+
+function findDecisionConflict(
+  candidates: readonly OsmConflationCandidate[],
+  decisions: ReadonlyMap<string, OsmConflationDecision>,
+  preservedSourceConflicts?: ReadonlySet<string>,
+): OsmConflationDecisionConflict | null {
+  const scheduledSources = new Set<string>();
+  for (const candidate of candidates) {
+    const actions = resolveConflationActions(candidate, decisions.get(candidate.id));
+    if (!actions.transferProperties && !actions.attachNetwork) continue;
+    const sourceKey = `${candidate.entityType}:${candidate.sourceId}`;
+    if (preservedSourceConflicts?.has(sourceKey)) continue;
+    if (!scheduledSources.has(sourceKey)) {
+      scheduledSources.add(sourceKey);
+      continue;
+    }
+    const { entityType, sourceId } = candidate;
+    const candidateIds = candidates
+      .filter((alternative) => {
+        if (alternative.entityType !== entityType || alternative.sourceId !== sourceId)
+          return false;
+        const selected = resolveConflationActions(alternative, decisions.get(alternative.id));
+        return selected.transferProperties || selected.attachNetwork;
+      })
+      .map((alternative) => alternative.id)
+      .toSorted();
+    return {
+      entityType,
+      sourceId,
+      candidateIds,
+      message: `Multiple targets are scheduled for imported ${entityType} ${sourceId}: ${candidateIds.join(", ")}. Choose one target or skip this imported feature.`,
+    };
+  }
+  return null;
+}
+
 function validateAcceptedMappings(
   candidates: readonly OsmConflationCandidate[],
   decisions: ReadonlyMap<string, OsmConflationDecision>,
+  preservedSourceConflicts?: ReadonlySet<string>,
 ) {
-  const sourceActions = new Set<string>();
+  const conflict = findDecisionConflict(candidates, decisions, preservedSourceConflicts);
+  if (conflict) throw Object.assign(Error(conflict.message), { conflict });
   const attachmentTargets = new Set<number>();
   const wayTargets = new Set<number>();
   for (const candidate of candidates) {
@@ -1334,11 +1466,6 @@ function validateAcceptedMappings(
       decision,
     );
     if (!transfer && !attach) continue;
-    const sourceKey = `${candidate.entityType}:${candidate.sourceId}`;
-    if (sourceActions.has(sourceKey)) {
-      throw Error(`Conflation accepted multiple targets for ${sourceKey}`);
-    }
-    sourceActions.add(sourceKey);
     if (candidate.targetId == null)
       throw Error(`Conflation accepted unmatched candidate ${candidate.id}`);
     if (attach) {
@@ -1507,6 +1634,7 @@ function generateCumulativeConflationArtifacts(
   onProgress?: (progress: ProgressEvent) => void,
 ) {
   validateCumulativeConflationOptions(base, patch, options, canonicalDiscovery);
+  validateConflationDecisions(canonicalDiscovery.candidates, decisions);
   const ordinaryOptions = {
     directMerge: true,
     deduplicateNodes: options.deduplicateNodes ?? false,

@@ -37,6 +37,7 @@ export * from "./changeset.ts";
 export {
   buildConflationActionDecision,
   buildConflationBulkDecisionResult,
+  buildConflationSourceDecision,
   conflationEffectiveStatus,
   discoverConflationCandidates,
   filterConflationCandidates,

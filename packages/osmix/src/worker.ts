@@ -21,6 +21,7 @@
 import {
   applyChangesetToOsm,
   buildConflationBulkDecisionResult,
+  buildConflationSourceDecision,
   conflationEffectiveStatus,
   generateChangeset,
   merge,
@@ -36,6 +37,7 @@ import {
   type OsmConflationCandidate,
   type OsmConflationCandidateFilter,
   type OsmConflationDecision,
+  type OsmConflationDecisionConflict,
   type OsmConflationDiscovery,
   type OsmConflationOptions,
   type OsmConflationSummary,
@@ -46,6 +48,7 @@ import {
   discoverConflationCandidatesForTrustedMerge,
   generateConflationApplicationArtifactsFromTrustedDiscovery,
   generateConflationArtifactsFromTrustedDiscovery,
+  validateRetainedConflationReview,
 } from "@osmix/change/internal/conflation";
 import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core";
 import { fromGeoJSON } from "@osmix/geojson";
@@ -74,6 +77,21 @@ export type { RouteResult, WaySegment };
 /** A conflation candidate together with the user's current review decision, if any. */
 export interface OsmConflationCandidateView extends OsmConflationCandidate {
   decision?: OsmConflationDecision;
+  /** Whether this alternative matches the active filter; present only in source-grouped pages. */
+  matchesFilter?: boolean;
+}
+
+/** Optional paging behavior; flat candidate pagination remains the default. */
+export interface OsmConflationPageOptions {
+  /** Count pages and pageSize in imported features, retaining every alternative for each feature. */
+  groupBySource?: boolean;
+}
+
+/** All candidate alternatives for one imported feature included in a grouped page. */
+export interface OsmConflationSourceGroup {
+  entityType: OsmConflationCandidate["entityType"];
+  sourceId: number;
+  candidateIds: string[];
 }
 
 /** A stable, paginated view of the active conflation candidates. */
@@ -84,6 +102,18 @@ export interface OsmConflationPage {
   pageSize: number;
   totalCandidates: number;
   totalPages: number;
+  /** Present in grouped mode; totalCandidates still counts only candidates matching the filter. */
+  groups?: OsmConflationSourceGroup[];
+  /** Number of imported features with at least one alternative matching the filter. */
+  totalSources?: number;
+  /** A legacy conflicting decision set remains reviewable; bulk actions are disabled until corrected. */
+  validationConflict?: OsmConflationDecisionConflict;
+}
+
+/** Complete review state returned after replacing the choices for one imported feature. */
+export interface OsmConflationSourceDecisionResult {
+  decisions: OsmConflationDecision[];
+  summary: OsmConflationSummary;
 }
 
 /** Routing graph measurements captured before and after fuzzy conflation. */
@@ -171,6 +201,30 @@ function conflationCandidateMatches(
   if (filter.sourceId != null && candidate.sourceId !== filter.sourceId) return false;
   if ("targetId" in filter && candidate.targetId !== filter.targetId) return false;
   return true;
+}
+
+function readConflationConflict(error: unknown): OsmConflationDecisionConflict | null {
+  if (!(error instanceof Error) || !("conflict" in error)) return null;
+  const conflict = error.conflict;
+  if (conflict == null || typeof conflict !== "object") return null;
+  if (
+    !("entityType" in conflict) ||
+    (conflict.entityType !== "node" && conflict.entityType !== "way") ||
+    !("sourceId" in conflict) ||
+    typeof conflict.sourceId !== "number" ||
+    !("candidateIds" in conflict) ||
+    !Array.isArray(conflict.candidateIds) ||
+    !conflict.candidateIds.every((id): id is string => typeof id === "string") ||
+    !("message" in conflict) ||
+    typeof conflict.message !== "string"
+  )
+    return null;
+  return {
+    entityType: conflict.entityType,
+    sourceId: conflict.sourceId,
+    candidateIds: [...conflict.candidateIds],
+    message: conflict.message,
+  };
 }
 
 function routingGraphStats(osm: Osm, filter: HighwayFilter): OsmConflationRoutingGraphStats {
@@ -752,8 +806,13 @@ export class OsmixWorker extends EventTarget {
     this.getConflationSession(baseOsmId).filter = { ...filter };
   }
 
-  /** Retrieve a stable page of candidates together with their current review decisions. */
-  getConflationPage(baseOsmId: string, page: number, pageSize: number): OsmConflationPage {
+  /** Retrieve candidates, optionally paging whole imported features and all their alternatives. */
+  getConflationPage(
+    baseOsmId: string,
+    page: number,
+    pageSize: number,
+    options: OsmConflationPageOptions = {},
+  ): OsmConflationPage {
     if (!Number.isInteger(page) || page < 0) throw Error("page must be a non-negative integer");
     if (!Number.isInteger(pageSize) || pageSize <= 0) {
       throw Error("pageSize must be a positive integer");
@@ -764,16 +823,35 @@ export class OsmixWorker extends EventTarget {
     );
     const start = page * pageSize;
     const decisions = [...session.decisions.values()];
+    let validationConflict: OsmConflationDecisionConflict | undefined;
+    try {
+      validateConflationDecisions(session.discovery.candidates, decisions);
+    } catch (error) {
+      const conflict = readConflationConflict(error);
+      if (!conflict) throw error;
+      validationConflict = conflict;
+    }
     const bulkActions = Object.fromEntries(
       (["transfer-properties", "attach-network", "reject"] as const).map((action) => [
         action,
-        buildConflationBulkDecisionResult(session.discovery.candidates, decisions, {
-          action,
-          filter: session.filter,
-        }).preview,
+        validationConflict
+          ? {
+              action,
+              filteredCandidates: candidates.length,
+              eligibleCandidates: 0,
+              changedCandidates: 0,
+              skippedCandidates: candidates.length,
+              automaticCandidates: 0,
+              reviewCandidates: 0,
+              overriddenDecisions: 0,
+            }
+          : buildConflationBulkDecisionResult(session.discovery.candidates, decisions, {
+              action,
+              filter: session.filter,
+            }).preview,
       ]),
     ) as Record<OsmConflationBulkAction, OsmConflationBulkDecisionPreview>;
-    return {
+    const result: OsmConflationPage = {
       bulkActions,
       candidates: candidates
         .slice(start, start + pageSize)
@@ -784,6 +862,42 @@ export class OsmixWorker extends EventTarget {
       pageSize,
       totalCandidates: candidates.length,
       totalPages: Math.ceil(candidates.length / pageSize),
+      ...(validationConflict ? { validationConflict } : {}),
+    };
+    if (!options.groupBySource) return result;
+
+    const matchingIds = new Set(candidates.map((candidate) => candidate.id));
+    const matchingSources = new Set(
+      candidates.map((candidate) => `${candidate.entityType}:${candidate.sourceId}`),
+    );
+    const groups = new Map<string, OsmConflationSourceGroup>();
+    for (const candidate of session.discovery.candidates) {
+      const sourceKey = `${candidate.entityType}:${candidate.sourceId}`;
+      if (!matchingSources.has(sourceKey)) continue;
+      let group = groups.get(sourceKey);
+      if (!group) {
+        group = {
+          entityType: candidate.entityType,
+          sourceId: candidate.sourceId,
+          candidateIds: [],
+        };
+        groups.set(sourceKey, group);
+      }
+      group.candidateIds.push(candidate.id);
+    }
+    const pageGroups = [...groups.values()].slice(start, start + pageSize);
+    const pageIds = new Set(pageGroups.flatMap((group) => group.candidateIds));
+    return {
+      ...result,
+      candidates: session.discovery.candidates
+        .filter((candidate) => pageIds.has(candidate.id))
+        .map((candidate) => ({
+          ...cloneConflationCandidateView(candidate, session.decisions.get(candidate.id)),
+          matchesFilter: matchingIds.has(candidate.id),
+        })),
+      groups: pageGroups,
+      totalSources: groups.size,
+      totalPages: Math.ceil(groups.size / pageSize),
     };
   }
 
@@ -791,7 +905,13 @@ export class OsmixWorker extends EventTarget {
   setConflationDecision(baseOsmId: string, decision: OsmConflationDecision) {
     const session = this.getConflationSession(baseOsmId);
     // Validate before touching session state so malformed RPC input is atomic.
-    validateConflationDecisions(session.discovery.candidates, [decision]);
+    const next = [
+      ...[...session.decisions.values()].filter(
+        (current) => current.candidateId !== decision?.candidateId,
+      ),
+      decision,
+    ];
+    validateConflationDecisions(session.discovery.candidates, next);
     this.invalidateGeneratedConflationChangeset(baseOsmId);
     session.decisions.set(decision.candidateId, { ...decision });
     session.summary = summarizeConflationCandidates(session.discovery.candidates, [
@@ -816,6 +936,46 @@ export class OsmixWorker extends EventTarget {
         ? session.discovery.summary
         : summarizeConflationCandidates(session.discovery.candidates, [...next.values()]);
     return { ...session.summary };
+  }
+
+  /**
+   * Restore a previously retained review snapshot during worker recovery.
+   * Legacy source conflicts stay visible for correction; this never restores
+   * generated output or permits conflicted decisions to generate/apply changes.
+   */
+  restoreConflationReview(baseOsmId: string, decisions: OsmConflationDecision[]) {
+    const session = this.getConflationSession(baseOsmId);
+    validateRetainedConflationReview(session.discovery.candidates, decisions);
+    const summary = summarizeConflationCandidates(session.discovery.candidates, decisions);
+    const next = new Map(decisions.map((decision) => [decision.candidateId, { ...decision }]));
+    this.invalidateGeneratedConflationChangeset(baseOsmId);
+    session.decisions = next;
+    session.summary = summary;
+    return { ...summary };
+  }
+
+  /** Replace one imported feature's target choices atomically, preserving all unrelated decisions. */
+  setConflationSourceDecision(
+    baseOsmId: string,
+    source: Pick<OsmConflationCandidate, "entityType" | "sourceId">,
+    selected: OsmConflationDecision | null,
+  ): OsmConflationSourceDecisionResult {
+    const session = this.getConflationSession(baseOsmId);
+    const decisions = buildConflationSourceDecision(
+      session.discovery.candidates,
+      [...session.decisions.values()],
+      source,
+      selected,
+    );
+    // The source helper permits an explicit correction even when a different
+    // legacy source still needs repair. Raw full-set updates remain strict.
+    const summary = summarizeConflationCandidates(session.discovery.candidates, decisions);
+    this.invalidateGeneratedConflationChangeset(baseOsmId);
+    session.decisions = new Map(
+      decisions.map((decision) => [decision.candidateId, { ...decision }]),
+    );
+    session.summary = summary;
+    return { decisions: decisions.map((decision) => ({ ...decision })), summary: { ...summary } };
   }
 
   /** Apply one action to every eligible candidate matching the supplied filter. */

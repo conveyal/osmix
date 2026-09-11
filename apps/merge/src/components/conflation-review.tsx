@@ -148,6 +148,9 @@ export interface ConflationReviewProps {
   isFilterPending: boolean;
   onDecision: (decision: OsmConflationDecision) => Promise<void>;
   onResetDecision: (candidateId: string) => Promise<void>;
+  onLeaveUnmatched: (
+    source: Pick<OsmConflationCandidateView, "entityType" | "sourceId">,
+  ) => Promise<void>;
   onBulkDecision: (request: OsmConflationBulkDecisionRequest) => Promise<void>;
   onFilterChange: (filter: OsmConflationCandidateFilter) => Promise<void>;
   onPageChange: (page: number) => Promise<void>;
@@ -476,10 +479,12 @@ export function CandidateActions({
   candidate,
   onDecision,
   onResetDecision,
+  showSkip = true,
 }: {
   candidate: OsmConflationCandidateView;
   onDecision: (decision: OsmConflationDecision) => Promise<void>;
   onResetDecision?: (candidateId: string) => Promise<void>;
+  showSkip?: boolean;
 }) {
   const { isPending, runAction } = useAction();
   const descriptionId = useId();
@@ -535,14 +540,16 @@ export function CandidateActions({
         </p>
       ) : null}
       <div className="flex flex-wrap gap-1">
-        <ActionButton
-          size="sm"
-          variant="ghost"
-          disabled={effectiveStatus(candidate) === "rejected"}
-          onAction={() => onDecision({ candidateId: candidate.id, action: "reject" })}
-        >
-          Skip match
-        </ActionButton>
+        {showSkip ? (
+          <ActionButton
+            size="sm"
+            variant="ghost"
+            disabled={effectiveStatus(candidate) === "rejected"}
+            onAction={() => onDecision({ candidateId: candidate.id, action: "reject" })}
+          >
+            Skip match
+          </ActionButton>
+        ) : null}
         {candidate.decision && onResetDecision ? (
           <ActionButton size="sm" variant="outline" onAction={() => onResetDecision(candidate.id)}>
             Use automatic choices
@@ -574,6 +581,94 @@ export function ConflationResultsHeader({
   );
 }
 
+/** Keep target selection separate from the eligible actions on each alternative. */
+export function CandidateTargetChoices({
+  candidates,
+  onDecision,
+  onLeaveUnmatched,
+}: {
+  candidates: OsmConflationCandidateView[];
+  onDecision: ConflationReviewProps["onDecision"];
+  onLeaveUnmatched: ConflationReviewProps["onLeaveUnmatched"];
+}) {
+  const { isPending, runAction } = useAction();
+  const groupId = useId();
+  const source = candidates[0];
+  if (!source || candidates.length < 2) return null;
+  const selected = candidates.filter((candidate) => {
+    const actions = resolveConflationActions(candidate, candidate.decision);
+    return actions.transferProperties || actions.attachNetwork;
+  });
+  const leftUnmatched = candidates.every((candidate) => effectiveStatus(candidate) === "rejected");
+  return (
+    <fieldset className="flex min-w-0 flex-col gap-2 p-2 border-b" disabled={isPending}>
+      <legend className="px-2 font-bold">Choose one base target</legend>
+      <p>
+        These are alternative matches for the same imported feature. Choosing a target schedules its
+        eligible actions. Adjust Copy tags and Connect network below.
+      </p>
+      {selected.length > 1 ? (
+        <p role="alert">
+          More than one target is selected. Choose one target or leave this feature unmatched.
+        </p>
+      ) : null}
+      {selected.length === 0 && !leftUnmatched ? (
+        <p>No target selected. Choose one or leave this feature unmatched.</p>
+      ) : null}
+      <label className="flex items-center gap-2">
+        <input
+          type="radio"
+          name={groupId}
+          checked={selected.length === 0 && leftUnmatched}
+          onChange={() => runAction(() => onLeaveUnmatched(source))}
+        />
+        Leave unmatched
+      </label>
+      <p className="text-muted-foreground">Leaving unmatched keeps ordinary imported additions.</p>
+      {candidates.map((candidate) => {
+        const actions = resolveConflationActions(candidate, {
+          candidateId: candidate.id,
+          action: "accept",
+        });
+        const eligible = actions.transferProperties || actions.attachNetwork;
+        const reasonId = `${groupId}-${candidate.id}`;
+        return (
+          <div key={candidate.id} className="flex flex-col gap-1">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name={groupId}
+                checked={selected.length === 1 && selected[0]?.id === candidate.id}
+                disabled={!eligible}
+                aria-describedby={!eligible ? reasonId : undefined}
+                onChange={() =>
+                  runAction(() =>
+                    onDecision({
+                      candidateId: candidate.id,
+                      action: "accept",
+                      ...actions,
+                    }),
+                  )
+                }
+              />
+              Base {candidate.entityType} {candidate.targetId ?? "unavailable"}
+              {candidate.matchesFilter === false ? " (outside current filters)" : ""}
+            </label>
+            {!eligible ? (
+              <p id={reasonId} className="text-muted-foreground">
+                Unavailable:{" "}
+                {candidate.reasons.map(conflationReasonLabel).join(", ") ||
+                  "No eligible matching action"}
+                .
+              </p>
+            ) : null}
+          </div>
+        );
+      })}
+    </fieldset>
+  );
+}
+
 export function ConflationReview({
   base,
   patch,
@@ -583,12 +678,19 @@ export function ConflationReview({
   isFilterPending,
   onDecision,
   onResetDecision,
+  onLeaveUnmatched,
   onBulkDecision,
   onFilterChange,
   onPageChange,
 }: ConflationReviewProps) {
   const { isPending, runAction } = useAction();
   const isReviewPending = isFilterPending || isPending;
+  const validationConflict = page.validationConflict;
+  const candidatesBySource = Map.groupBy(
+    page.candidates,
+    (candidate) => `${candidate.entityType}:${candidate.sourceId}`,
+  );
+
   const map = useMap();
   const setComparison = useSetAtom(conflationComparisonAtom);
   const showCandidate = (candidate: OsmConflationCandidateView) => {
@@ -647,6 +749,25 @@ export function ConflationReview({
       <Card>
         <CardHeader>Candidate filters</CardHeader>
         <CardContent className="flex flex-wrap gap-2">
+          {filter.sourceId !== undefined ? (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <span>
+                Showing imported {filter.entityType ?? "feature"} {filter.sourceId}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isReviewPending}
+                onClick={() =>
+                  runAction(() =>
+                    onFilterChange({ ...filter, entityType: undefined, sourceId: undefined }),
+                  )
+                }
+              >
+                Show all imported features
+              </Button>
+            </div>
+          ) : null}
           <label className="flex items-center gap-1" htmlFor="conflation-status-filter">
             Match status
             <select
@@ -720,55 +841,105 @@ export function ConflationReview({
           totalCandidates={page.totalCandidates}
         />
         <CardContent className={cn("p-0", isFilterPending && "opacity-60")} inert={isFilterPending}>
+          {validationConflict ? (
+            <div className="flex flex-col gap-2 p-2 border-b" role="alert">
+              <p>
+                {validationConflict.message} Choose a single target before using bulk actions or
+                generating a preview.
+              </p>
+              <Button
+                variant="outline"
+                disabled={isReviewPending}
+                onClick={() =>
+                  runAction(() =>
+                    onFilterChange({
+                      entityType: validationConflict.entityType,
+                      sourceId: validationConflict.sourceId,
+                    }),
+                  )
+                }
+              >
+                Review imported {validationConflict.entityType} {validationConflict.sourceId}
+              </Button>
+            </div>
+          ) : null}
           <ConflationBulkActions
             bulkActions={page.bulkActions}
             disabled={isReviewPending}
             filter={filter}
             onBulkDecision={onBulkDecision}
           />
+          {page.groups ? (
+            <p className="p-2 border-b text-muted-foreground">
+              {page.totalSources?.toLocaleString()} imported features match these filters. All their
+              alternatives are shown together. Bulk actions affect only matches inside the filters;
+              ambiguous alternatives require an individual target choice.
+            </p>
+          ) : null}
           {page.candidates.length === 0 ? (
             <EmptyState>No candidates match these filters</EmptyState>
           ) : (
             <ItemGroup>
-              {page.candidates.map((candidate) => {
-                const status = effectiveStatus(candidate);
-                return (
-                  <Item key={candidate.id} className="p-0" variant="outline">
-                    <ItemContent className="min-w-0 gap-0">
-                      <div className="flex items-start gap-2 p-2">
-                        <StatusDot className="mt-1" status={STATUS_DOT[status]} />
-                        <div className="min-w-0 flex-1">
-                          <ItemTitle>{conflationCandidateTitle(candidate)}</ItemTitle>
-                          <ItemDescription>
-                            {conflationStatusLabel(status)};{" "}
-                            {candidate.evidence.distanceMeters.toFixed(3)} m
-                            {candidate.reasons.length > 0
-                              ? `; ${candidate.reasons.map(conflationReasonLabel).join(", ")}`
-                              : ""}
-                          </ItemDescription>
-                          <CandidateActionStatuses candidate={candidate} />
-                        </div>
-                        <ItemActions>
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            title="Compare imported entity and base target on map"
-                            onClick={() => showCandidate(candidate)}
-                          >
-                            <LocateFixedIcon />
-                          </Button>
-                        </ItemActions>
-                      </div>
-                      <CandidateEvidence candidate={candidate} />
-                      <CandidateActions
-                        candidate={candidate}
-                        onDecision={onDecision}
-                        onResetDecision={onResetDecision}
-                      />
-                    </ItemContent>
-                  </Item>
-                );
-              })}
+              {[...candidatesBySource.entries()].map(([sourceKey, candidates]) => (
+                <section
+                  key={sourceKey}
+                  aria-label={`Imported ${candidates[0]?.entityType} ${candidates[0]?.sourceId}`}
+                >
+                  <h3 className="p-2 font-bold border-b">
+                    Imported {candidates[0]?.entityType} {candidates[0]?.sourceId}
+                  </h3>
+                  <CandidateTargetChoices
+                    candidates={candidates}
+                    onDecision={onDecision}
+                    onLeaveUnmatched={onLeaveUnmatched}
+                  />
+                  {candidates.map((candidate) => {
+                    const status = effectiveStatus(candidate);
+                    return (
+                      <Item key={candidate.id} className="p-0" variant="outline">
+                        <ItemContent className="min-w-0 gap-0">
+                          <div className="flex items-start gap-2 p-2">
+                            <StatusDot className="mt-1" status={STATUS_DOT[status]} />
+                            <div className="min-w-0 flex-1">
+                              <ItemTitle>{conflationCandidateTitle(candidate)}</ItemTitle>
+                              <ItemDescription>
+                                {conflationStatusLabel(status)};{" "}
+                                {candidate.evidence.distanceMeters.toFixed(3)} m
+                                {candidate.reasons.length > 0
+                                  ? `; ${candidate.reasons.map(conflationReasonLabel).join(", ")}`
+                                  : ""}
+                              </ItemDescription>
+                              {candidate.matchesFilter === false ? (
+                                <p className="text-muted-foreground">
+                                  Outside current filters · shown as an alternative
+                                </p>
+                              ) : null}
+                              <CandidateActionStatuses candidate={candidate} />
+                            </div>
+                            <ItemActions>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                title="Compare imported entity and base target on map"
+                                onClick={() => showCandidate(candidate)}
+                              >
+                                <LocateFixedIcon />
+                              </Button>
+                            </ItemActions>
+                          </div>
+                          <CandidateEvidence candidate={candidate} />
+                          <CandidateActions
+                            candidate={candidate}
+                            onDecision={onDecision}
+                            onResetDecision={onResetDecision}
+                            showSkip={candidates.length === 1}
+                          />
+                        </ItemContent>
+                      </Item>
+                    );
+                  })}
+                </section>
+              ))}
             </ItemGroup>
           )}
         </CardContent>
