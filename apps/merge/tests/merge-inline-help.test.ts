@@ -84,9 +84,9 @@ describe("merge inline guidance", () => {
     expect(html).toContain('aria-label="About automatic matching decisions"');
     expect(html).not.toContain("Distance alone never guarantees acceptance");
     expect(html).not.toContain("routing-affecting tags require review");
-    expect(html).not.toContain("equivalent one-to-one imported");
-    expect(html).not.toContain("tagless nodes");
-    expect(html).not.toContain("referenced by any way or relation");
+    expect(html).not.toContain("Imported geometry stays intact");
+    expect(html).not.toContain("Missing imported values leave base tags unchanged");
+    expect(html).not.toContain("reconciliation apply their own rules separately");
   });
 
   it("humanizes candidate statuses, reasons, evidence, and actions", () => {

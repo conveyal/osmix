@@ -413,7 +413,7 @@ describe("OsmixWorker registries", () => {
     }
   });
 
-  it("isolates the automatic WALK guard from unrelated CAR way property suppression", () => {
+  it("keeps CAR topology unchanged when copying way properties alongside WALK attachment", () => {
     const worker = new TestWorker();
     const base = createMixedParallelNetwork("mixed-base", 1, 10, 0, "Base");
     const patch = createMixedParallelNetwork("mixed-patch", 11, 20, 0.000004, "Imported");
@@ -430,7 +430,7 @@ describe("OsmixWorker registries", () => {
       deduplicateWays: true,
     });
 
-    expect(result.routing.car.delta.edges).toBeLessThan(0);
+    expect(result.routing.car.delta.edges).toBe(0);
     expect(result.routing.walk.delta.components).toBeLessThan(0);
   });
 });

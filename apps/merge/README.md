@@ -86,7 +86,7 @@ in-stream extraction remains available. The app does not build the large index s
    base-only entities remain. In the reviewed workflow this is a preview until the cumulative merge is
    accepted.
 4. **Match imported data (optional)** – Discover nearby cross-dataset candidates. Property transfer copies
-   selected tags onto preserved base entities; network attachment rewrites only accepted references in
+   selected tags onto base entities and keeps imported geometry; network attachment rewrites only accepted references in
    patch-created ways. Ambiguous and routing-affecting candidates remain reviewable.
 5. **Reconcile exact matches** – Combine compatible entities with different IDs only when coordinates or
    ordered geometry agree at OSM precision. Base IDs are preserved and patch references are rewritten.
@@ -118,9 +118,11 @@ paths, school boundaries, and ambiguous intersections must remain separate.
 
 **Match imported data** restores that workflow as an explicit opt-in conflation stage:
 
-- **Property transfer** preserves the base entity ID, coordinates, references, and relation membership while
-  copying only the tag keys entered in the form. Patch values win for those selected keys; missing patch
-  values never delete base values. Structural keys are blocked, and routing-affecting keys require review.
+- **Property transfer** copies only the tag keys entered in the form while preserving both base and imported
+  geometry. Matched imported ways and their connecting nodes remain present, so copying tags does not disconnect
+  imported branches. Patch values win for selected keys; missing patch values never delete base values. Structural
+  keys are blocked, and routing-affecting keys require review. Direct merge and exact reconciliation still apply
+  their own rules independently of tag copying.
 - **Network attachment** preserves the base node and rewrites only accepted references in imported patch
   ways. Automatic matches must be unique and agree on routing family, grade context, and local bearing.
   Restrictions, relation-member rewrites, way collapse, and other integrity hazards remain blocked.

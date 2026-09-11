@@ -3,7 +3,7 @@
 import type { Osm } from "@osmix/core";
 import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { ProgressEvent } from "@osmix/shared/progress";
-import type { LonLat, OsmEntity, OsmNode, OsmRelation, OsmTags, OsmWay } from "@osmix/types";
+import type { LonLat, OsmEntity, OsmNode, OsmTags, OsmWay } from "@osmix/types";
 
 import { applyChangesetToOsm } from "./apply-changeset.ts";
 import { OsmChangeset } from "./changeset.ts";
@@ -1256,39 +1256,6 @@ function currentEntity<T extends "node" | "way">(changeset: OsmChangeset, type: 
   return change?.entity ?? changeset.getEntity(type, id) ?? null;
 }
 
-function currentRelations(changeset: OsmChangeset) {
-  const relations = new Map<number, OsmRelation>();
-  for (const relation of changeset.osm.relations) {
-    const change = changeset.relationChanges[relation.id];
-    if (change?.changeType !== "delete") relations.set(relation.id, change?.entity ?? relation);
-  }
-  for (const change of Object.values(changeset.relationChanges)) {
-    if (change.changeType === "delete") relations.delete(change.entity.id);
-    else relations.set(change.entity.id, change.entity);
-  }
-  return relations.values();
-}
-
-function currentWays(changeset: OsmChangeset) {
-  const ways = new Map<number, OsmWay>();
-  for (const way of changeset.osm.ways) {
-    const change = changeset.wayChanges[way.id];
-    if (change?.changeType !== "delete") ways.set(way.id, change?.entity ?? way);
-  }
-  for (const change of Object.values(changeset.wayChanges)) {
-    if (change.changeType === "delete") ways.delete(change.entity.id);
-    else ways.set(change.entity.id, change.entity);
-  }
-  return ways.values();
-}
-
-function removeCurrentEntity(changeset: OsmChangeset, entity: OsmEntity) {
-  const type = "lon" in entity ? "node" : "refs" in entity ? "way" : "relation";
-  const change = changeset.changes(type)[entity.id];
-  if (change?.changeType === "create") delete changeset.changes(type)[entity.id];
-  else changeset.delete(entity);
-}
-
 function acceptedAction(
   candidate: OsmConflationCandidate,
   action: "propertyTransfer" | "networkAttachment",
@@ -1357,35 +1324,11 @@ function validateAcceptedMappings(
   }
 }
 
-function cleanupUnreferencedPatchNodes(
-  changeset: OsmChangeset,
-  patch: Osm,
-  originalBase: Osm,
-  cleanupCandidateIds: ReadonlySet<number>,
-) {
-  // Cleanup is intentionally limited to nodes from a suppressed matched patch way.
-  // Removing every orphan patch node would violate direct merge preservation.
-  const referenced = new Set<number>();
-  for (const way of currentWays(changeset)) for (const ref of way.refs) referenced.add(ref);
-  for (const relation of currentRelations(changeset)) {
-    for (const member of relation.members) if (member.type === "node") referenced.add(member.ref);
-  }
-  for (const nodeId of cleanupCandidateIds) {
-    const node = patch.nodes.getById(nodeId);
-    if (!node) continue;
-    if (originalBase.nodes.ids.has(node.id) || node.tags != null || referenced.has(node.id))
-      continue;
-    const current = currentEntity(changeset, "node", node.id);
-    if (current) removeCurrentEntity(changeset, current);
-  }
-}
-
 function applyDiscoveredConflation(
   changeset: OsmChangeset,
   patch: Osm,
   discovery: OsmConflationDiscovery,
   decisions: readonly OsmConflationDecision[],
-  originalBase: Osm,
 ) {
   if (patch.id !== discovery.patchOsmId) {
     throw Error(`Conflation discovery patch ${discovery.patchOsmId} does not match ${patch.id}`);
@@ -1395,7 +1338,6 @@ function applyDiscoveredConflation(
 
   const attachments = new Map<number, number>();
   const patchWayIds = new Set<number>();
-  const cleanupCandidateNodeIds = new Set<number>();
   for (const candidate of discovery.candidates) {
     const decision = decisionsById.get(candidate.id);
     if (!acceptedAction(candidate, "networkAttachment", decision) || candidate.targetId == null) {
@@ -1431,22 +1373,7 @@ function applyDiscoveredConflation(
     if (!source)
       throw Error(`Conflation source ${candidate.entityType} ${candidate.sourceId} is missing`);
     transferSelectedProperties(changeset, candidate, source);
-    if (
-      candidate.entityType !== "way" ||
-      candidate.reasons.includes("relation-member") ||
-      candidate.reasons.includes("protected-tag")
-    ) {
-      continue;
-    }
-    const current = currentEntity(changeset, "way", candidate.sourceId);
-    if (current) {
-      // An equivalent one-to-one patch way is suppressed after property transfer.
-      // Its nodes become cleanup candidates, not unconditional deletions.
-      for (const ref of current.refs) cleanupCandidateNodeIds.add(ref);
-      removeCurrentEntity(changeset, current);
-    }
   }
-  cleanupUnreferencedPatchNodes(changeset, patch, originalBase, cleanupCandidateNodeIds);
 }
 
 function generateConflationApplicationArtifacts(
@@ -1467,7 +1394,7 @@ function generateConflationApplicationArtifacts(
     );
   }
   const changeset = new OsmChangeset(baseline);
-  applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions, originalBase);
+  applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions);
   const result = applyChangesetToOsm(changeset);
   assertConflationPreservesBaseTopology(originalBase, baseline, result);
   return { changeset, result };
@@ -1555,7 +1482,7 @@ function generateCumulativeConflationArtifacts(
     ? generateChangeset(base, patch, ordinaryOptions, onProgress)
     : generateChangeset(base, patch, ordinaryOptions);
   const ordinaryBaseline = applyChangesetToOsm(changeset);
-  applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions, base);
+  applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions);
   const result = applyChangesetToOsm(changeset);
   assertConflationPreservesBaseTopology(base, ordinaryBaseline, result);
   return { changeset, ordinaryBaseline, result };

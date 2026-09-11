@@ -629,7 +629,7 @@ describe("safe fuzzy property transfer", () => {
     expect(result.nodes.getById(1)?.tags).toEqual({ highway: "crossing" });
   });
 
-  it("matches reversed one-to-one ways and removes only redundant imported geometry", async () => {
+  it("copies properties from reversed one-to-one ways without removing imported geometry", async () => {
     const base = createOsm(
       "base",
       [
@@ -656,9 +656,9 @@ describe("safe fuzzy property transfer", () => {
     const result = await merge(base, patch, { directMerge: true, conflation: options }, silent);
     expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
     expect(result.ways.getById(10)?.tags?.["name"]).toBe("Imported");
-    expect(result.ways.ids.has(20)).toBe(false);
-    expect(result.nodes.ids.has(101)).toBe(false);
-    expect(result.nodes.ids.has(102)).toBe(false);
+    expect(result.ways.getById(20)).toEqual(patch.ways.getById(20));
+    expect(result.nodes.getById(101)).toEqual(patch.nodes.getById(101));
+    expect(result.nodes.getById(102)).toEqual(patch.nodes.getById(102));
     expect(result.nodes.ids.has(999)).toBe(true);
   });
 
@@ -701,7 +701,8 @@ describe("safe fuzzy property transfer", () => {
     );
     expect(result.nodes.getById(1)?.tags?.["ref"]).toBe("patch");
     expect(result.ways.getById(10)?.tags?.["surface"]).toBe("paved");
-    expect(result.ways.ids.has(20)).toBe(false);
+    expect(result.ways.getById(20)?.refs).toEqual([1, 2]);
+    expect(result.ways.getById(20)?.tags?.["surface"]).toBe("paved");
   });
 
   it("keeps same-ID patch updates authoritative over nearby fuzzy sources", async () => {

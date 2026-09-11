@@ -52,10 +52,9 @@ export function ConflationConfig() {
               </CheckboxLabel>
               <InfoTooltip label="About property transfer" side="right" align="start">
                 Copy only the selected OSM tags from an accepted imported match onto its base
-                entity. This does not move geometry, rewrite the imported network, or delete a base
-                tag when the imported value is absent. After tags transfer, an equivalent one-to-one
-                imported way may be suppressed. Cleanup removes only its newly imported, tagless
-                nodes that are no longer referenced by any way or relation.
+                entity. Imported geometry stays intact, including matched ways and their connecting
+                nodes. Missing imported values leave base tags unchanged. Direct merge and exact
+                reconciliation apply their own rules separately.
               </InfoTooltip>
             </div>
 

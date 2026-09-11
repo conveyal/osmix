@@ -125,7 +125,10 @@ console.log(summary, generated.routing.car, generated.routing.walk);
 await remote.applyChangesAndReplace(base.id);
 ```
 
-Property transfer changes only explicitly selected tags. Network attachment rewrites only patch-created way
+Property transfer changes only explicitly selected tags and retains imported geometry, including matched ways
+and their connecting nodes. Relative to the same direct/exact merge without property transfer, it never adds or
+removes entities or changes coordinates, way references, or relation members. This applies to automatic,
+individual, and filter-wide decisions. Network attachment separately rewrites only patch-created way
 references. The worker preserves discovery settings, filters, decisions, and generated changes across worker
 restarts, and reports CAR/WALK node, edge, and component deltas before the changeset is applied. Automatic
 pedestrian attachments are rejected if they alter routable CAR topology.

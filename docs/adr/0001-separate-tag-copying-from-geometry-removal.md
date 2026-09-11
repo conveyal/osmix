@@ -1,0 +1,3 @@
+# Separate tag copying from geometry removal
+
+Copying attributes from a matched imported way previously removed that way, which could disconnect imported branches even when network attachment was disabled. Tag copying now changes only selected tag values relative to the ordinary direct/exact merge baseline; geometry removal requires a separate explicit action with its own connectivity checks and preview. Retaining overlapping imported geometry is an accepted trade-off because copying accessibility or descriptive attributes must preserve the network the user imported; a separate removal action is deferred until it can preserve connected ways and relations.
