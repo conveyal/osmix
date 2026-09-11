@@ -48,6 +48,11 @@ High-level merges leave the original inputs intact and reconcile only compatible
 base matches. Regenerate PBFs created by older releases from their original inputs if automatic within-file
 deduplication may already have rewritten routing topology.
 
+Intersection creation preserves existing shared junctions, including bridge and tunnel entrances. Endpoint
+reuse updates every incident way and affected restriction via-node together; an unsafe shared-junction
+substitution leaves that crossing unchanged. This does not connect new grade-separated interior crossings.
+The same rules apply through direct merge APIs and worker-backed operations.
+
 ### Profile merge performance
 
 The test-only merge profiler runs the reviewed merge stages in their production order and reports per-stage

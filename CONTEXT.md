@@ -37,6 +37,13 @@ The existing API and interface term for copying tags; it has the same attribute-
 A connectivity change that connects imported ways to preserved base nodes through accepted reference changes.
 _Avoid_: Copy tags, property transfer
 
+**Shared junction**:
+A node referenced by multiple ways that already connects those ways, including a bridge or tunnel entrance where the connected ways can have different grade tags.
+_Avoid_: Nearby endpoints
+
+**Intersection creation**:
+The addition of a shared node at a compatible crossing, with existing junction connections preserved. Crossing geometry alone does not establish a connection between ways at different grades.
+
 **Geometry removal**:
 The removal of imported entities deemed redundant, with consequences for any connected ways or relations; it is distinct from copying their tags.
 

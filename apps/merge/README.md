@@ -90,8 +90,8 @@ in-stream extraction remains available. The app does not build the large index s
    patch-created ways. Ambiguous and routing-affecting candidates remain reviewable.
 5. **Reconcile exact matches** – Combine compatible entities with different IDs only when coordinates or
    ordered geometry agree at OSM precision. Base IDs are preserved and patch references are rewritten.
-6. **Create intersections** – Connect compatible same-grade crossings. Unsafe endpoint reuse, ambiguous
-   crossings, and grade-separated roads remain separate.
+6. **Create intersections** – Connect compatible same-grade crossings while preserving existing junctions,
+   including bridge entrances. Unsafe shared-junction changes and new grade-separated interior crossings are skipped.
 7. **Inspect and download** – Compare the result on the map and download the merged PBF or change summary.
    The result stays in memory until downloaded, and the original input files are never modified.
 
@@ -102,6 +102,12 @@ In verified mode, the direct merge is first shown as a preview. The app then reg
 cumulative direct-merge plus optional reconciliation changeset from the untouched source inputs. Intersection
 changes are generated only after that merged base has been rebuilt and indexed, so newly added patch ways are
 included in the crossing scan.
+
+When intersection creation reuses an endpoint, every way already connected there and every affected turn
+restriction moves to the same surviving node together. A bridge entrance is an existing connection to preserve,
+even when the bridge and surface road have different grade tags. If any participating way would become invalid
+or a restriction or grade connection would be broken, the shared junction stays unchanged. An isolated endpoint
+without an affected restriction may instead use a new exact crossing node when reuse would collapse its way.
 
 The automatic workflow skips diagnostic scans and intermediate checkpoints. Imported-data matching remains
 off unless configured explicitly; when enabled, automatic mode applies only high-confidence automatic
@@ -202,6 +208,9 @@ See [Australia-scale manual verification](./AUSTRALIA-PBF-CHECKLIST.md) for the 
 - **A merge reports new routing-integrity problems** – The result was rejected before replacing the base.
   Inspect the reported entity IDs for missing references, degenerate highways, or detached turn restrictions,
   then correct the source data rather than discarding the affected restriction.
+- **A restriction reports a detached via node** – Inspect the reported restriction, via node, and from/to way
+  IDs. The via node must belong to the participating ways at their shared junction; correct those references in
+  the source data and rerun the merge.
 - **A proximity candidate is blocked** – Review its reason code and map comparison. Grade conflicts,
   restrictions, relation membership, and changes that would collapse a way cannot be overridden. Multiple
   targets and other uncertain candidates require an explicit accepted target or can be left unchanged.

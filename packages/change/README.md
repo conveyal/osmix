@@ -64,6 +64,13 @@ that merge the patch into the base. All options default to `false`, so you can e
 An empty patch is therefore an identity operation; the high-level pipeline does not normalize either input as
 a hidden preliminary step.
 
+Intersection creation distinguishes existing shared junctions from new crossings. Reusing an endpoint updates
+every incident way and affected restriction via-node together, including an already connected bridge or tunnel
+entrance. The proposed junction must preserve valid way geometry, restrictions, and grade context. If any part
+of a shared-junction substitution is unsafe, that crossing is skipped and its original references remain.
+Only an isolated endpoint with no affected restriction can use the dedicated crossing-node fallback when
+replacement would degenerate its way. New grade-separated interior crossings remain disconnected.
+
 ### Match imported data within one meter
 
 Exact reconciliation remains the default. For imported GeoJSON, Shapefile, OSW, or other independently
@@ -170,7 +177,8 @@ Options:
 
 Applies all pending changes in the changeset to produce a **new** `Osm` instance. The original `base` is immutable.
 Application rejects new dangling references, degenerate highways, and detached turn-restriction topology
-before returning the result.
+before returning the result. A detached via-node error identifies the restriction, via node, and participating
+from/to way IDs so the source junction can be inspected and corrected.
 
 ### Augmented Diffs
 

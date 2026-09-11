@@ -349,7 +349,7 @@ describe("routing-safe merge reconciliation", () => {
     );
 
     await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
-      "restriction 100 via node 2 is detached",
+      "restriction 100 via node 2 is detached from its from/to ways (from: [10]; to: [20])",
     );
   });
 

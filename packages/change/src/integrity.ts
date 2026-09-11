@@ -64,24 +64,28 @@ function isAbsoluteIntegrityIssue(issue: IntegrityIssue) {
   );
 }
 
-function restrictionIssues(osm: Osm, relation: OsmRelation): IntegrityIssue[] {
+/** @internal Validate a restriction against current or proposed way references. */
+export function restrictionTopologyIssues(
+  relation: OsmRelation,
+  getWay: (id: number) => OsmWay | null | undefined,
+): IntegrityIssue[] {
   if (relation.tags?.["type"] !== "restriction") return [];
 
   const issues: IntegrityIssue[] = [];
   const fromWays = relation.members
     .filter((member) => member.type === "way" && member.role === "from")
-    .map((member) => osm.ways.getById(member.ref))
+    .map((member) => getWay(member.ref))
     .filter((way): way is OsmWay => way != null);
   const toWays = relation.members
     .filter((member) => member.type === "way" && member.role === "to")
-    .map((member) => osm.ways.getById(member.ref))
+    .map((member) => getWay(member.ref))
     .filter((way): way is OsmWay => way != null);
   const viaNodes = relation.members.filter(
     (member) => member.type === "node" && member.role === "via",
   );
   const viaWays = relation.members
     .filter((member) => member.type === "way" && member.role === "via")
-    .map((member) => osm.ways.getById(member.ref))
+    .map((member) => getWay(member.ref))
     .filter((way): way is OsmWay => way != null);
 
   if (fromWays.length === 0) {
@@ -107,9 +111,11 @@ function restrictionIssues(osm: Osm, relation: OsmRelation): IntegrityIssue[] {
     const belongsToFrom = fromWays.some((way) => way.refs.includes(viaNode.ref));
     const belongsToTo = toWays.some((way) => way.refs.includes(viaNode.ref));
     if (!belongsToFrom || !belongsToTo) {
+      const fromIds = fromWays.map((way) => way.id).join(", ");
+      const toIds = toWays.map((way) => way.id).join(", ");
       issues.push({
         key: `restriction:${relation.id}:detached-via-node:${viaNode.ref}`,
-        description: `restriction ${relation.id} via node ${viaNode.ref} is detached from its from/to ways`,
+        description: `restriction ${relation.id} via node ${viaNode.ref} is detached from its from/to ways (from: [${fromIds}]; to: [${toIds}]); keep the via node referenced by both sides`,
       });
     }
   }
@@ -129,6 +135,34 @@ function restrictionIssues(osm: Osm, relation: OsmRelation): IntegrityIssue[] {
   }
 
   return issues;
+}
+
+function incompatibleGradePairs(ways: readonly IncidentHighway[]): [number, number][] {
+  const pairs: [number, number][] = [];
+  for (let leftIndex = 0; leftIndex < ways.length; leftIndex++) {
+    for (let rightIndex = leftIndex + 1; rightIndex < ways.length; rightIndex++) {
+      const left = ways[leftIndex]!;
+      const right = ways[rightIndex]!;
+      if (left.gradeSignature === right.gradeSignature) continue;
+      if (!left.interior && !right.interior) continue;
+      if (hasSameGradeEndpointContinuation(ways, left, right)) continue;
+      pairs.push([Math.min(left.way.id, right.way.id), Math.max(left.way.id, right.way.id)]);
+    }
+  }
+  return pairs;
+}
+
+/** @internal Check a proposed junction with the same portal rules as final validation. */
+export function junctionHasIncompatibleGrades(nodeId: number, ways: readonly OsmWay[]) {
+  const incident = ways
+    .filter((way) => way.tags?.["highway"] != null && way.refs.includes(nodeId))
+    .map((way) => ({
+      way,
+      gradeSignature: routingGradeSignature(way.tags),
+      interior: way.refs.slice(1, -1).includes(nodeId),
+      endpoint: way.refs[0] === nodeId || way.refs.at(-1) === nodeId,
+    }));
+  return incompatibleGradePairs(incident).length > 0;
 }
 
 function collectRoutingIntegrityIssues(osm: Osm): readonly IntegrityIssue[] {
@@ -171,19 +205,11 @@ function collectRoutingIntegrityIssues(osm: Osm): readonly IntegrityIssue[] {
   }
 
   for (const [nodeId, ways] of highwayWaysByNode) {
-    for (let leftIndex = 0; leftIndex < ways.length; leftIndex++) {
-      for (let rightIndex = leftIndex + 1; rightIndex < ways.length; rightIndex++) {
-        const left = ways[leftIndex]!;
-        const right = ways[rightIndex]!;
-        if (left.gradeSignature === right.gradeSignature) continue;
-        if (!left.interior && !right.interior) continue;
-        if (hasSameGradeEndpointContinuation(ways, left, right)) continue;
-        const [firstWayId, secondWayId] = [left.way.id, right.way.id].toSorted((a, b) => a - b);
-        issues.push({
-          key: `node:${nodeId}:incompatible-grade:${firstWayId}:${secondWayId}`,
-          description: `node ${nodeId} newly connects grade-separated highways ${firstWayId} and ${secondWayId}`,
-        });
-      }
+    for (const [firstWayId, secondWayId] of incompatibleGradePairs(ways)) {
+      issues.push({
+        key: `node:${nodeId}:incompatible-grade:${firstWayId}:${secondWayId}`,
+        description: `node ${nodeId} newly connects grade-separated highways ${firstWayId} and ${secondWayId}`,
+      });
     }
   }
 
@@ -201,7 +227,7 @@ function collectRoutingIntegrityIssues(osm: Osm): readonly IntegrityIssue[] {
         description: `relation ${relation.id} references missing ${member.type} ${member.ref}`,
       });
     }
-    issues.push(...restrictionIssues(osm, relation));
+    issues.push(...restrictionTopologyIssues(relation, (id) => osm.ways.getById(id)));
   }
 
   if (osm.isReady()) routingIntegrityIssuesByOsm.set(osm, issues);
