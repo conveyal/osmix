@@ -370,6 +370,9 @@ need to post Osmix payloads through your own worker setup.
 
 `OsmixRemote` provides off-thread routing via `@osmix/router`. The routing graph
 builds lazily on first use, so there's no upfront cost until you actually route.
+Routing and way matching share [one-way normalization](../router/README.md#way-direction), also exposed as
+`normalizedWayDirection(tags)`. Explicit `no`, `false`, and `0` override implicit roundabout direction.
+Unsupported one-way values block way matching; the router's documented fallback remains an approximation.
 
 ```ts check-docs monaco-pbf
 import { createRemote } from "osmix";

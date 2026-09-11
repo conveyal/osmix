@@ -4,6 +4,7 @@ import type { Osm } from "@osmix/core";
 import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { ProgressEvent } from "@osmix/shared/progress";
 import type { LonLat, OsmEntity, OsmNode, OsmTags, OsmWay } from "@osmix/types";
+import { normalizedWayDirection, type OsmWayDirection } from "@osmix/types/way-direction";
 
 import { applyChangesetToOsm } from "./apply-changeset.ts";
 import { OsmChangeset } from "./changeset.ts";
@@ -279,23 +280,23 @@ function wayGradeAccessCompatible(source: OsmWay, target: OsmWay) {
   );
 }
 
-function normalizedOneway(way: OsmWay) {
-  const value = String(way.tags?.["oneway"] ?? "").toLowerCase();
-  if (["yes", "true", "1"].includes(value)) return "forward";
-  if (["-1", "reverse"].includes(value)) return "reverse";
-  if (String(way.tags?.["junction"] ?? "") === "roundabout" && value !== "no") {
-    return "forward";
-  }
-  return "both";
-}
-
-function reversedOneway(value: ReturnType<typeof normalizedOneway>) {
+function reversedOneway(value: OsmWayDirection) {
   return value === "forward" ? "reverse" : value === "reverse" ? "forward" : value;
 }
 
-function wayRoutingSemanticsCompatible(source: OsmWay, target: OsmWay, targetReversed: boolean) {
-  const targetOneway = normalizedOneway(target);
-  if (normalizedOneway(source) !== (targetReversed ? reversedOneway(targetOneway) : targetOneway)) {
+function wayRoutingSemanticsCompatible(
+  source: OsmWay,
+  target: OsmWay,
+  targetReversed: boolean | null,
+) {
+  const targetOneway = normalizedWayDirection(target.tags);
+  const sourceOneway = normalizedWayDirection(source.tags);
+  if (
+    targetOneway === "unsupported" ||
+    sourceOneway === "unsupported" ||
+    (targetReversed === null && (sourceOneway !== "both" || targetOneway !== "both")) ||
+    sourceOneway !== (targetReversed ? reversedOneway(targetOneway) : targetOneway)
+  ) {
     return false;
   }
   const routingKeys = new Set(
@@ -304,9 +305,9 @@ function wayRoutingSemanticsCompatible(source: OsmWay, target: OsmWay, targetRev
     ),
   );
   if (
-    targetReversed &&
-    // Reversed geometry is safe only when no remaining routing tag has a direction
-    // whose meaning would also need to be inverted or swapped.
+    targetReversed !== false &&
+    // Reversed or unresolved geometry is safe only when no remaining routing tag
+    // has a direction whose meaning would need to be inverted or swapped.
     [...routingKeys].some(
       (key) =>
         key.startsWith("oneway:") ||
@@ -803,7 +804,14 @@ function endpointDistances(source: readonly LonLat[], target: readonly LonLat[])
     haversineDistance(source[0]!, target.at(-1)!),
     haversineDistance(source.at(-1)!, target[0]!),
   ];
-  return Math.max(...forward) <= Math.max(...reverse)
+  const forwardDistance = Math.max(...forward);
+  const reverseDistance = Math.max(...reverse);
+  // Closed ways have identical endpoints in both orientations. A tie must not
+  // certify direction equivalence; their winding requires separate evidence.
+  if (Math.abs(forwardDistance - reverseDistance) < 1e-6) {
+    return { distances: forward, reversed: null };
+  }
+  return forwardDistance < reverseDistance
     ? { distances: forward, reversed: false }
     : { distances: reverse, reversed: true };
 }

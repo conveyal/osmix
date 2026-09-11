@@ -90,6 +90,43 @@ Way directionality is currently graph-wide: custom filters can select pedestrian
 do not disable `oneway` or implicit roundabout direction. Use a policy-aware router such as R5
 when authoritative pedestrian access and direction rules are required.
 
+#### Way direction
+
+Graph construction and exact/fuzzy way matching share `normalizedWayDirection(tags)`, available from
+`osmix` or `@osmix/types/way-direction`. It returns `OsmWayDirection`: `forward`, `reverse`, `both`, or
+`unsupported`. Forward follows the way's ordered node references; reverse travels against that order.
+
+| `oneway` value                              | Normalized direction             |
+| ------------------------------------------- | -------------------------------- |
+| `yes`, `true`, `1`                          | `forward`                        |
+| `reverse`, `-1`                             | `reverse`                        |
+| `no`, `false`, `0`                          | `both`, including on roundabouts |
+| Absent or empty, with `junction=roundabout` | `forward`                        |
+| Absent or empty, on other ways              | `both`                           |
+| Any other nonempty value                    | `unsupported`                    |
+
+One-way aliases are case-insensitive, and numeric values normalize like their string equivalents. Values
+are not trimmed: `" yes "` is unsupported. The roundabout implication requires the literal
+`junction=roundabout` value.
+
+```ts check-docs
+import { normalizedWayDirection } from "osmix";
+
+const direction = normalizedWayDirection({ junction: "roundabout", oneway: "0" });
+console.log(direction); // "both"
+```
+
+Unsupported values such as `reversible` and `alternating` prevent exact or fuzzy way matching from treating
+two ways as direction-equivalent, even when their values are identical. The routing graph retains its existing
+approximation for such values: forward on roundabouts and both directions on other ways. This fallback does
+not model their actual rules. Conditional, time-dependent, lane-specific, and mode-specific one-way rules are
+not evaluated by this normalization.
+
+Fuzzy matching also needs a reliable geometry orientation before comparing one-way travel. It blocks one-way
+candidates whose endpoints fit equally well in either order, including closed one-way loops. This matching
+limit does not change their routing graph: graph edges always follow the stored references and normalized
+tag direction.
+
 #### Serialization (Web Worker support)
 
 `RoutingGraph` can be serialized and transferred between Web Workers:

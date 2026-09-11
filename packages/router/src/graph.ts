@@ -14,6 +14,7 @@
 import { BufferConstructor, type BufferType, type Osm } from "@osmix/core";
 import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { LonLat } from "@osmix/types";
+import { normalizedWayDirection } from "@osmix/types/way-direction";
 
 import type {
   DefaultSpeeds,
@@ -128,17 +129,15 @@ export class RoutingGraph {
       if (refs.length < 2) continue;
 
       // Create directed edges between consecutive nodes (respecting one-way direction).
-      const onewayTag = String(tags?.["oneway"] ?? "").toLowerCase();
-      const explicitlyForward = onewayTag === "yes" || onewayTag === "1" || onewayTag === "true";
-      const explicitlyReverse = onewayTag === "-1" || onewayTag === "reverse";
-      const explicitlyBidirectional =
-        onewayTag === "no" || onewayTag === "0" || onewayTag === "false";
-      // OSM roundabouts are one-way by implication unless explicitly overridden.
-      const direction = explicitlyReverse
-        ? "reverse"
-        : explicitlyForward || (tags?.["junction"] === "roundabout" && !explicitlyBidirectional)
-          ? "forward"
-          : "both";
+      const normalizedDirection = normalizedWayDirection(tags);
+      // Preserve the existing router approximation for unsupported dynamic values.
+      // Matching does not use this fallback to establish direction equivalence.
+      const direction =
+        normalizedDirection === "unsupported"
+          ? tags?.["junction"] === "roundabout"
+            ? "forward"
+            : "both"
+          : normalizedDirection;
       const speedKph = getSpeedLimit(tags, defaultSpeeds);
       const speedMps = (speedKph * 1_000) / 60 / 60;
       const nodes = refs.map((ref) => osm.nodes.ids.getIndexFromId(ref));

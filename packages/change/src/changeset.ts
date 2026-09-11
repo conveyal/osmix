@@ -19,6 +19,7 @@ import type {
   OsmWay,
 } from "@osmix/types";
 import { entityPropertiesEqual, getEntityType } from "@osmix/types/utils";
+import { normalizedWayDirection } from "@osmix/types/way-direction";
 import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 
 import {
@@ -155,8 +156,12 @@ function isDescriptiveWayTag(key: string) {
 }
 
 function routingSemanticTagsEqual(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
+  const direction = normalizedWayDirection(a);
+  if (direction === "unsupported" || direction !== normalizedWayDirection(b)) return false;
   const keys = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
-  return [...keys].every((key) => isDescriptiveWayTag(key) || a?.[key] === b?.[key]);
+  return [...keys].every(
+    (key) => key === "oneway" || isDescriptiveWayTag(key) || a?.[key] === b?.[key],
+  );
 }
 
 function hashText(hash: number, value: string) {
@@ -177,10 +182,11 @@ function exactWayHash(way: OsmWay) {
   let hash = 2_166_136_261;
   hash = hashText(hash, `${way.refs.length}:`);
   for (const ref of way.refs) hash = hashText(hash, `${ref},`);
+  hash = hashText(hash, `direction:${normalizedWayDirection(way.tags)};`);
   for (const [key, value] of Object.entries(way.tags ?? {}).toSorted(([a], [b]) =>
     a < b ? -1 : a > b ? 1 : 0,
   )) {
-    if (isDescriptiveWayTag(key)) continue;
+    if (key === "oneway" || isDescriptiveWayTag(key)) continue;
     hash = hashText(hash, `${key.length}:${key}${String(value).length}:${String(value)}`);
   }
   return hash;
