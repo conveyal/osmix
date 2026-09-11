@@ -157,7 +157,9 @@ Use the merge terms consistently:
   including matched ways and their connecting nodes; **network attachment** rewrites
   only accepted references in patch-created ways.
 - **Intersection creation** connects compatible same-grade crossings while
-  leaving ambiguous and grade-separated crossings disconnected.
+  preserving existing shared junctions, including bridge and tunnel entrances.
+  New grade-separated interior crossings remain disconnected, and unsafe
+  shared-junction substitutions leave the original connections unchanged.
 - **Review each merge stage** exposes previews and checkpoints. **Run automatic
   merge** skips those checkpoints and uses only behavior explicitly configured
   for the automatic path.

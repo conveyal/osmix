@@ -85,20 +85,19 @@ describe("merge osm", () => {
       changeset = new OsmChangeset(baseOsm);
       changeset.createIntersectionsForWays(osm2.ways);
 
-      // Intersections are grouped by their containing segment and inserted in geometric
-      // order. Endpoint reuse that would create duplicate or degenerate refs falls back
-      // to a dedicated exact intersection node.
+      // Endpoint reuse updates whole junctions. Unsafe shared substitutions are
+      // skipped; only isolated endpoints can use a dedicated intersection fallback.
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 9_508,
-        nodeChanges: 5_869,
-        wayChanges: 3_639,
+        totalChanges: 9_525,
+        nodeChanges: 5_858,
+        wayChanges: 3_667,
         relationChanges: 0,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
-        intersectionPointsFound: 3_105,
-        intersectionNodesCreated: 2_609,
+        intersectionPointsFound: 3_091,
+        intersectionNodesCreated: 2_604,
       });
 
       baseOsm = applyChangesetToOsm(changeset);
@@ -113,6 +112,28 @@ describe("merge osm", () => {
         way.refs.filter((ref) => !baseOsm.nodes.ids.has(ref)),
       );
       expect(danglingWayRefs).toEqual([]);
+
+      // Every original imported junction must still connect all its incident
+      // ways, even when its node ID was replaced during intersection creation.
+      const importedJunctions = new Map<number, number[]>();
+      for (const way of osm2.ways) {
+        for (const ref of new Set(way.refs)) {
+          const wayIds = importedJunctions.get(ref) ?? [];
+          wayIds.push(way.id);
+          importedJunctions.set(ref, wayIds);
+        }
+      }
+      for (const [nodeId, wayIds] of importedJunctions) {
+        if (wayIds.length < 2) continue;
+        const incidentWays = wayIds.map((id) => baseOsm.ways.getById(id)!);
+        const sharedRefs = incidentWays[0]!.refs.filter((ref) =>
+          incidentWays.every((way) => way.refs.includes(ref)),
+        );
+        expect(
+          sharedRefs,
+          `Imported junction ${nodeId} joining ways ${wayIds.join(", ")}`,
+        ).not.toHaveLength(0);
+      }
 
       expect(baseOsm.nodes.getById(2135545)).toEqual({
         ...testNode,

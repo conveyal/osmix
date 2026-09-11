@@ -306,7 +306,7 @@ function IntersectionsDiagram() {
     <DiagramFrame
       kind="intersections"
       title="Intersection compatibility"
-      description="Same-grade highway crossings receive a shared node, while crossings separated by bridge, tunnel, layer, level, or covered context remain disconnected."
+      description="Compatible same-grade highway crossings receive a shared node. New interior crossings separated by bridge, tunnel, layer, level, or covered context remain disconnected; existing bridge and tunnel entrances stay connected."
     >
       <text className="fill-foreground font-mono font-semibold" fontSize="12" x="12" y="20">
         Compatible grade
