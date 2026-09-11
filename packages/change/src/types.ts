@@ -3,6 +3,7 @@
  * @module
  */
 
+import type { Osm } from "@osmix/core";
 import type { OsmEntity, OsmEntityType, OsmEntityTypeMap } from "@osmix/types";
 
 /**
@@ -246,4 +247,25 @@ export type OsmChanges = {
   ways: Record<number, OsmChange<OsmEntityTypeMap["way"]>>;
   relations: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>;
   stats: OsmChangesetStats;
+  /** Omitted by legacy changes-only JSON, which can verify only existing base issues. */
+  validationContext?: OsmChangesetValidationContext;
 };
+
+/** Storage identity of an immutable, indexed merge input; not an authenticity signature. */
+export interface OsmChangesetInputIdentity {
+  id: string;
+  contentHash: string;
+  contentHashVersion: number;
+}
+
+/** Input bindings used to recompute integrity policy; never a list of issue exemptions. */
+export interface OsmChangesetValidationContext {
+  version: 1;
+  base: OsmChangesetInputIdentity;
+  patches: OsmChangesetInputIdentity[];
+}
+
+/** Original immutable patch inputs, in the order passed to generateDirectChanges(). */
+export interface OsmChangesetRestoreContext {
+  patches: readonly Osm[];
+}
