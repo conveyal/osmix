@@ -4,21 +4,40 @@ import {
   type OsmConflationCandidateFilter,
   type OsmConflationDecision,
   OsmixWorker,
+  summarizeConflationCandidates,
 } from "osmix";
 import { useEffect, useState } from "react";
 
 import { ConflationReview } from "../src/components/conflation-review";
+import { BackToMatching, MatchingReviewProblem } from "../src/components/matching-review-recovery";
 import { SectionTitle } from "../src/components/section";
 import { Button } from "../src/components/ui/button";
+import {
+  matchingReviewIssue,
+  type MatchingReviewIssue,
+  returnToMatchingReview,
+} from "../src/lib/matching-review";
 
 type HarnessRequest =
-  | { kind: "decision"; decision: OsmConflationDecision }
+  | {
+      kind: "source";
+      source: { entityType: "node" | "way"; sourceId: number };
+      selected: OsmConflationDecision | null;
+    }
   | { kind: "reset"; candidateId: string; decisions: OsmConflationDecision[] }
   | { kind: "bulk"; request: OsmConflationBulkDecisionRequest };
 
 class HarnessWorker extends OsmixWorker {
   add(osm: Osm) {
     this.set(osm.id, osm);
+  }
+
+  seedLegacyDecisions(baseId: string, decisions: OsmConflationDecision[]) {
+    // Exercise correction of decisions retained before boundary validation existed.
+    const session = this["conflations"].get(baseId);
+    if (!session) throw Error("Expected an active matching review");
+    session.decisions = new Map(decisions.map((decision) => [decision.candidateId, decision]));
+    session.summary = summarizeConflationCandidates(session.discovery.candidates, decisions);
   }
 }
 
@@ -42,6 +61,44 @@ function createSession(blocked: boolean) {
   patch.ways.addWay({ id: 20, refs: [101, 102], tags: { highway: "footway" } });
   patch.buildIndexes();
   patch.buildSpatialIndexes();
+  return startSession(base, patch, blocked, false);
+}
+
+function createAlternativeSession(blockedTarget = false) {
+  const base = new Osm({ id: "review-base" });
+  for (const node of [
+    { id: 1, lon: -0.000003, lat: 0, tags: { name: "West entrance" } },
+    {
+      id: 2,
+      lon: 0.000003,
+      lat: 0,
+      tags: {
+        name: blockedTarget ? "Imported entrance" : "East entrance",
+        ...(blockedTarget ? { barrier: "gate" } : {}),
+      },
+    },
+    { id: 3, lon: 0.01, lat: 0, tags: { name: "Other entrance" } },
+    { id: 4, lon: -0.001, lat: 0 },
+    { id: 5, lon: 0.001, lat: 0 },
+  ])
+    base.nodes.addNode(node);
+  base.nodes.buildIndex();
+  base.ways.addWay({ id: 10, refs: [4, 1], tags: { highway: "footway" } });
+  base.ways.addWay({ id: 11, refs: [2, 5], tags: { highway: "footway" } });
+  base.buildIndexes();
+  base.buildSpatialIndexes();
+  const patch = new Osm({ id: "review-patch" });
+  patch.nodes.addNode({ id: 101, lon: 0, lat: 0, tags: { name: "Imported entrance" } });
+  patch.nodes.addNode({ id: 102, lon: 0.010005, lat: 0, tags: { name: "Unrelated import" } });
+  patch.nodes.addNode({ id: 103, lon: 0.005, lat: 0 });
+  patch.nodes.buildIndex();
+  patch.ways.addWay({ id: 20, refs: [101, 103], tags: { highway: "footway" } });
+  patch.buildIndexes();
+  patch.buildSpatialIndexes();
+  return startSession(base, patch, blockedTarget, true);
+}
+
+function startSession(base: Osm, patch: Osm, blocked: boolean, alternatives: boolean) {
   const worker = new HarnessWorker();
   worker.add(base);
   worker.add(patch);
@@ -53,12 +110,15 @@ function createSession(blocked: boolean) {
     patch,
     worker,
     blocked,
+    alternatives,
     filter,
     pageNumber: 0,
     decisions: [] as OsmConflationDecision[],
     requests: [] as HarnessRequest[],
     preview: null as ReturnType<OsmixWorker["getChangesetPage"]> | null,
     generations: 0,
+    generationAttempts: 0,
+    issue: null as MatchingReviewIssue | null,
     showPreview: false,
     delayNavigation: false,
     finishNavigation: null as (() => void) | null,
@@ -72,9 +132,16 @@ function snapshot(session: Session) {
     blocked: session.blocked,
     decisions: session.decisions,
     requests: session.requests,
-    workerPage: session.worker.getConflationPage(session.base.id, session.pageNumber, 1),
+    workerPage: session.worker.getConflationPage(session.base.id, session.pageNumber, 1, {
+      groupBySource: session.alternatives,
+    }),
+    filter: session.filter,
+    inputs: { base: [...session.base.nodes.sorted()], patch: [...session.patch.nodes.sorted()] },
+    options: { propertyKeys: ["name"], attachNetwork: true },
+    issue: session.issue,
     preview: session.preview,
     generations: session.generations,
+    generationAttempts: session.generationAttempts,
   });
 }
 
@@ -88,10 +155,49 @@ export function ConflationReviewHarness() {
   }, [session]);
 
   const generate = () => {
-    session.worker.generateConflationChangeset(session.base.id, { directMerge: true });
-    session.preview = session.worker.getChangesetPage(session.base.id, 0, 100);
-    session.generations++;
+    session.generationAttempts++;
+    try {
+      session.worker.generateConflationChangeset(session.base.id, { directMerge: true });
+      session.preview = session.worker.getChangesetPage(session.base.id, 0, 100);
+      session.generations++;
+      session.issue = null;
+    } catch (error) {
+      session.issue = matchingReviewIssue(error);
+    }
     session.showPreview = true;
+    refresh();
+  };
+  const updateFilter = async (filter: OsmConflationCandidateFilter) => {
+    session.filter = filter;
+    session.worker.setConflationFilter(session.base.id, filter);
+    session.pageNumber = 0;
+    refresh();
+  };
+  const updatePage = async (page: number) => {
+    session.pageNumber = page;
+    refresh();
+  };
+  const returnToMatching = () =>
+    returnToMatchingReview({
+      filter: session.filter,
+      page: session.pageNumber,
+      issue: session.issue,
+      onFilterChange: updateFilter,
+      onPageChange: updatePage,
+      onReturn: () => {
+        session.showPreview = false;
+        refresh();
+      },
+    });
+  const saveSource = async (
+    source: { entityType: "node" | "way"; sourceId: number },
+    selected: OsmConflationDecision | null,
+  ) => {
+    session.requests.push({ kind: "source", source, selected: structuredClone(selected) });
+    const result = session.worker.setConflationSourceDecision(session.base.id, source, selected);
+    session.decisions = result.decisions;
+    session.preview = null;
+    session.issue = null;
     refresh();
   };
   const nodeChange = session.preview?.changes?.find(
@@ -111,6 +217,27 @@ export function ConflationReviewHarness() {
         <Button variant="outline" onClick={() => setSession(createSession(true))}>
           Load blocked connection fixture
         </Button>
+        <Button variant="outline" onClick={() => setSession(createAlternativeSession())}>
+          Load alternative target fixture
+        </Button>
+        <Button variant="outline" onClick={() => setSession(createAlternativeSession(true))}>
+          Load blocked target fixture
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            const next = createAlternativeSession();
+            next.decisions = [
+              { candidateId: "node:101->1", action: "accept" },
+              { candidateId: "node:101->2", action: "accept" },
+              { candidateId: "node:102->3", action: "reject" },
+            ];
+            next.worker.seedLegacyDecisions(next.base.id, next.decisions);
+            setSession(next);
+          }}
+        >
+          Load conflicting saved review
+        </Button>
         <Button
           variant="outline"
           onClick={() => {
@@ -125,47 +252,55 @@ export function ConflationReviewHarness() {
       {session.showPreview ? (
         <div className="flex flex-col gap-2 border p-2" data-testid="matching-preview">
           <SectionTitle>Generated matching preview</SectionTitle>
-          <dl className="grid grid-cols-1 gap-1">
-            <dt>Base entrance name</dt>
-            <dd data-testid="preview-name">
-              {String(nodeChange?.entity.tags?.["name"] ?? "Base entrance")}
-            </dd>
-            <dt>Imported way node references</dt>
-            <dd data-testid="preview-refs">
-              {wayChange && "refs" in wayChange.entity ? wayChange.entity.refs.join(", ") : "None"}
-            </dd>
-          </dl>
+          <MatchingReviewProblem issue={session.issue} />
+          {session.preview ? (
+            <>
+              <dl className="grid grid-cols-1 gap-1">
+                <dt>Base entrance name</dt>
+                <dd data-testid="preview-name">
+                  {String(
+                    nodeChange?.entity.tags?.["name"] ??
+                      session.base.nodes.getById(1)?.tags?.["name"],
+                  )}
+                </dd>
+                <dt>Imported way node references</dt>
+                <dd data-testid="preview-refs">
+                  {wayChange && "refs" in wayChange.entity
+                    ? wayChange.entity.refs.join(", ")
+                    : "None"}
+                </dd>
+              </dl>
+            </>
+          ) : null}
           <Button onClick={generate}>Regenerate current preview</Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              session.showPreview = false;
-              refresh();
-            }}
-          >
-            Back to match review
-          </Button>
+          <BackToMatching onBack={returnToMatching} />
         </div>
       ) : (
         <>
           <div data-testid="conflation-review-panel">
+            <MatchingReviewProblem issue={session.issue} />
             <ConflationReview
               base={session.base}
               patch={session.patch}
               summary={session.worker.getConflationSummary(session.base.id)}
-              page={session.worker.getConflationPage(session.base.id, session.pageNumber, 1)}
+              page={session.worker.getConflationPage(session.base.id, session.pageNumber, 1, {
+                groupBySource: session.alternatives,
+              })}
               filter={session.filter}
               isFilterPending={false}
               onDecision={async (decision) => {
-                session.requests.push({ kind: "decision", decision: structuredClone(decision) });
-                session.worker.setConflationDecision(session.base.id, decision);
-                session.decisions = [
-                  ...session.decisions.filter((row) => row.candidateId !== decision.candidateId),
+                const candidate = session.worker
+                  .getConflationPage(session.base.id, session.pageNumber, 1, {
+                    groupBySource: session.alternatives,
+                  })
+                  .candidates.find((row) => row.id === decision.candidateId);
+                if (!candidate) throw Error("Expected the selected candidate on the current page");
+                await saveSource(
+                  { entityType: candidate.entityType, sourceId: candidate.sourceId },
                   decision,
-                ];
-                session.preview = null;
-                refresh();
+                );
               }}
+              onLeaveUnmatched={(source) => saveSource(source, null)}
               onResetDecision={async (candidateId) => {
                 const decisions = session.decisions.filter(
                   (row) => row.candidateId !== candidateId,
@@ -178,6 +313,7 @@ export function ConflationReviewHarness() {
                 session.worker.setConflationDecisions(session.base.id, decisions);
                 session.decisions = decisions;
                 session.preview = null;
+                session.issue = null;
                 refresh();
               }}
               onBulkDecision={async (request) => {
@@ -187,12 +323,7 @@ export function ConflationReviewHarness() {
                 session.preview = null;
                 refresh();
               }}
-              onFilterChange={async (filter) => {
-                session.filter = filter;
-                session.worker.setConflationFilter(session.base.id, filter);
-                session.pageNumber = 0;
-                refresh();
-              }}
+              onFilterChange={updateFilter}
               onPageChange={async (page) => {
                 if (session.delayNavigation) {
                   session.delayNavigation = false;
@@ -202,8 +333,7 @@ export function ConflationReviewHarness() {
                   });
                   session.finishNavigation = null;
                 }
-                session.pageNumber = page;
-                refresh();
+                await updatePage(page);
               }}
             />
           </div>

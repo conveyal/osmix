@@ -12,4 +12,5 @@ export {
   discoverConflationCandidatesForTrustedMerge,
   generateConflationApplicationArtifactsFromTrustedDiscovery,
   generateConflationArtifactsFromTrustedDiscovery,
+  validateRetainedConflationReview,
 } from "../conflation.ts";

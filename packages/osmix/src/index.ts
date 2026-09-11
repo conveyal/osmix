@@ -25,9 +25,12 @@ export {
   type OsmConflationCandidateView,
   type OsmConflationGenerationResult,
   type OsmConflationPage,
+  type OsmConflationPageOptions,
   type OsmConflationRoutingDelta,
   type OsmConflationRoutingDiagnostics,
   type OsmConflationRoutingGraphStats,
+  type OsmConflationSourceDecisionResult,
+  type OsmConflationSourceGroup,
   type RouteResult,
   type WaySegment,
 } from "./worker.ts";
@@ -73,6 +76,7 @@ export {
 export {
   applyChangesetToOsm,
   buildConflationActionDecision,
+  buildConflationSourceDecision,
   conflationEffectiveStatus,
   discoverConflationCandidates,
   filterConflationCandidates,
@@ -116,6 +120,7 @@ export type {
   OsmConflationCandidate,
   OsmConflationCandidateFilter,
   OsmConflationDecision,
+  OsmConflationDecisionConflict,
   OsmConflationDiscovery,
   OsmConflationEffectiveStatus,
   OsmConflationEntityType,

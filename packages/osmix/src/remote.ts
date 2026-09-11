@@ -11,6 +11,7 @@
 import type {
   OsmChangeTypes,
   OsmConflationBulkDecisionRequest,
+  OsmConflationCandidate,
   OsmConflationCandidateFilter,
   OsmConflationDecision,
   OsmConflationOptions,
@@ -49,7 +50,7 @@ import {
   type OsmixWorkerPool,
   type OsmixWorkerPoolDiagnostics,
 } from "./worker-pool.ts";
-import { OsmixWorker } from "./worker.ts";
+import { type OsmConflationPageOptions, OsmixWorker } from "./worker.ts";
 
 installStructuredComlinkErrorTransferHandler();
 
@@ -115,6 +116,7 @@ type ConflationDatasetProxyMethodName =
   | "getConflationPage"
   | "setConflationDecision"
   | "setConflationDecisions"
+  | "setConflationSourceDecision"
   | "generateConflationChangeset"
   | "clearConflation";
 
@@ -748,9 +750,12 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       for (const state of this.activeConflations.values()) {
         // Recovery reproduces review state by rediscovering from restored untouched
         // inputs, then replaying stable ID-based decisions and filters.
-        await worker.discoverConflation(state.baseOsmId, state.patchOsmId, state.options);
+        await worker.discoverConflation(state.baseOsmId, state.patchOsmId, {
+          ...state.options,
+          decisions: undefined,
+        });
         await worker.setConflationFilter(state.baseOsmId, state.filter);
-        await worker.setConflationDecisions(state.baseOsmId, state.decisions);
+        await worker.restoreConflationReview(state.baseOsmId, state.decisions);
       }
       // Candidate review and generated output have independent lifetimes. Only
       // the latest successful generation for each base may replace its preview.
@@ -1549,10 +1554,16 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     state.filter = storedFilter;
   }
 
-  /** Retrieve one page of filtered candidates and their current decisions. */
-  getConflationPage(baseOsmId: OsmId, page: number, pageSize: number) {
+  /** Retrieve filtered candidates, optionally keeping every alternative for each source together. */
+  getConflationPage(
+    baseOsmId: OsmId,
+    page: number,
+    pageSize: number,
+    options: OsmConflationPageOptions = {},
+  ) {
+    const storedOptions = structuredClone(options);
     return this.runWithWorker(
-      (worker) => worker.getConflationPage(this.getId(baseOsmId), page, pageSize),
+      (worker) => worker.getConflationPage(this.getId(baseOsmId), page, pageSize, storedOptions),
       { lane: "control", retry: "once" },
     );
   }
@@ -1586,6 +1597,28 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     state.decisions = storedDecisions;
     this.invalidateGeneratedConflationChangeset(baseId);
     return result;
+  }
+
+  /** Replace one imported feature's target choices while preserving all unrelated review decisions. */
+  async setConflationSourceDecision(
+    baseOsmId: OsmId,
+    source: Pick<OsmConflationCandidate, "entityType" | "sourceId">,
+    selected: OsmConflationDecision | null,
+  ) {
+    const baseId = this.getId(baseOsmId);
+    const state = this.getActiveConflation(baseId);
+    const storedSource = structuredClone(source);
+    const storedSelected = structuredClone(selected);
+    const result = await this.runWithWorker(
+      (worker) => worker.setConflationSourceDecision(baseId, storedSource, storedSelected),
+      { lane: "control", retry: "never" },
+    );
+    state.decisions = result.decisions.map((decision) => ({ ...decision }));
+    this.invalidateGeneratedConflationChangeset(baseId);
+    return {
+      decisions: result.decisions.map((decision) => ({ ...decision })),
+      summary: { ...result.summary },
+    };
   }
 
   /** Apply one action to all eligible candidates matching a filter across every page. */

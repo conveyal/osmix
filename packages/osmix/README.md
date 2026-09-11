@@ -104,7 +104,7 @@ const summary = await remote.discoverConflation(base.id, patch.id, {
   propertyKeys: ["name", "operator", "surface"],
   attachNetwork: true,
 });
-const page = await remote.getConflationPage(base.id, 0, 100);
+const page = await remote.getConflationPage(base.id, 0, 25, { groupBySource: true });
 
 // Page previews cover every candidate matching the worker's current filter, not
 // just the rows returned on this page.
@@ -179,6 +179,48 @@ Review and acceptance cannot override an action's hard safety block. Ordinary re
 ambiguity adds review context without making an already blocked action eligible. Property transfer and network
 attachment retain separate eligibility, including after worker recovery; an eligible action can proceed while
 the other remains blocked. Filter-wide decisions skip the blocked action and count it as ineligible.
+
+#### Review alternative targets and correct choices
+
+Merge groups possible targets under their imported feature. Only one target can have scheduled matching
+actions, including when Copy tags and Connect network are selected independently. Choosing a target selects
+its eligible configured actions; adjust the two checkboxes afterward if needed. An eligible checkbox on an
+unselected alternative also switches to that target, using the selected action without requiring both.
+Turning both off leaves no selected target. **Leave unmatched** clears every alternative's matching actions while retaining ordinary
+imported additions under the direct/exact merge rules.
+
+Use `setConflationSourceDecision(baseId, source, selected)` for paged review controls. `source` identifies
+one `{ entityType, sourceId }`; `selected` is the chosen candidate decision, or `null` to leave the imported
+feature unmatched. The worker uses its complete discovery to reject sibling targets and preserve decisions
+for other imported features. It returns `{ summary, decisions }`; replace the client decision snapshot with
+the returned complete array so sibling and off-page choices stay synchronized. The standalone
+`buildConflationSourceDecision(candidates, decisions, source, selected)` helper provides the same replacement
+for clients holding the full discovery candidate collection and complete decision snapshot. Do not pass only
+a page of candidates to that helper. Single-decision and batch worker updates reject conflicting effective targets before changing
+saved decisions or invalidating a generated preview. The error identifies the imported feature and candidate
+IDs; its `conflict` object provides `entityType`, `sourceId`, `candidateIds`, and `message` for focusing review
+on that feature. Bulk selection skips ambiguous alternatives; resolve them individually.
+
+Use `getConflationPage(baseId, page, pageSize, { groupBySource: true })` to keep all alternatives together.
+In this mode, `pageSize` and `totalPages` count imported features, `totalSources` reports the number of
+matching source groups, and `groups` lists each group's entity type, source ID, and candidate IDs.
+`candidates` includes every alternative for those paged groups. An alternative outside the current filters
+has `matchesFilter: false`; label it as context. `totalCandidates` still counts only candidates that match
+the filters, and bulk previews and actions remain restricted to those matching candidates. Omitting the
+fourth argument retains ordinary flat candidate paging.
+
+If an older session already contains conflicting choices, its candidates remain readable and the page
+includes `validationConflict` with an affected imported feature and candidate IDs. Explicit source updates
+can correct one feature at a time while preserving other sources' existing conflicts. They cannot introduce
+new conflicts or bypass checks for competing uses of a base target. Bulk previews report no eligible changes,
+and generation remains blocked, until every conflict is corrected through explicit target choices or
+**Leave unmatched**. Raw single-decision and full-set updates remain strict.
+
+Before applying a cumulative matching preview, **Back to matching** returns from reconciliation, the preview,
+or a generation failure with the original loaded inputs, options, and decisions preserved. Correct the
+identified imported feature and regenerate the preview without reloading either file. Retrying an unchanged
+invalid decision set continues to report its conflict. Once the cumulative changes have been applied,
+intersection failures use the intersection retry path; returning to matching is not an undo operation.
 
 #### Which mode am I in?
 
@@ -501,6 +543,8 @@ spec-compliant without staging everything in memory.
   evidence and review state.
 - `remote.setConflationDecision(baseId, decision)` / `remote.setConflationDecisions(...)` - Persist individual
   or batch review decisions.
+- `remote.setConflationSourceDecision(baseId, source, selected)` - Atomically replace one imported feature's
+  selected target, or leave it unmatched with `null`, preserving unrelated decisions.
 - `remote.applyConflationBulkDecision(baseId, request)` - Atomically apply an action to all candidates matching
   the request's filter and return preview counts, the updated summary, and the complete decision snapshot.
 - `remote.generateChangeset(baseId, patchId, options)` - Build an ordinary changeset that replaces the active

@@ -77,6 +77,7 @@ describe("conflation review safety status", () => {
           isFilterPending: false,
           onDecision: async () => {},
           onResetDecision: async () => {},
+          onLeaveUnmatched: async () => {},
           onBulkDecision: async () => {},
           onFilterChange: async () => {},
           onPageChange: async () => {},
