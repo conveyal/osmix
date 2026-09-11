@@ -45,7 +45,6 @@ import type {
 import {
   areWayTagsIntersectionCandidate,
   cleanCoords,
-  entityHasTagValue,
   nearestNodeOnWay,
   removeDuplicateAdjacentRelationMembers,
   removeDuplicateAdjacentWayRefs,
@@ -969,7 +968,9 @@ export class OsmChangeset {
 
   private markNodeAsCrossing(nodeId: number) {
     const node = this.getCurrentNode(nodeId);
-    if (!node || entityHasTagValue(node, "crossing", "yes")) return;
+    // Intersection discovery can supply a missing default, but must not erase
+    // a specific crossing value supplied by the base or an earlier tag copy.
+    if (!node || node.tags?.["crossing"] != null) return;
     this.modify("node", node.id, (node) => ({
       ...node,
       tags: { ...node.tags, crossing: "yes" },

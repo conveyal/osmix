@@ -253,6 +253,8 @@ Options:
   rejected rows.
 - `generateConflationChangeset(base, patch, mergeOptions, decisions?, discovery?)`: Generate one cumulative
   direct, exact, and fuzzy changeset from untouched inputs.
+- `generateConflationArtifacts(base, patch, mergeOptions, decisions?, discovery?)`: Generate the same
+  cumulative changeset plus its `ordinaryBaseline`, materialized `result`, and matching `outcome` report.
 - `generateConflationApplicationChangeset(baseline, patch, discovery, originalBase, decisions?)`: Apply only
   reviewed fuzzy actions to an already materialized ordinary-merge baseline. The immutable original base is
   required so generation can rediscover and validate candidates instead of trusting mutable review records.
@@ -276,6 +278,29 @@ errors identify the imported feature and expose `error.conflict` as an `OsmConfl
 `entityType`, `sourceId`, `candidateIds`, and `message`. Hard blockers still prevent the affected action. Bulk actions conservatively
 skip ambiguous and many-to-one candidates, including an already selected alternative; use individual
 target and action controls to resolve those features.
+
+### Matching outcome reports
+
+`generateConflationArtifacts()` returns an `OsmConflationOutcomeReport` alongside the generated dataset. The report compares the ordinary direct/exact baseline with the generated result, so its action counts describe actual changes rather than candidate eligibility or scheduled choices. Generation alone does not replace a loaded base dataset; a workflow should show these counts as completed work only after successful application and any required intersection stage.
+
+The report's `stage` is `"matching-before-intersections"`. All outcome fields describe the result immediately after matching, before intersection creation. A later intersection stage can add connections or remap a shared junction to another node. Reported targets, connected way IDs, unresolved work, and retention remain evidence of the matching stage; they are not a snapshot of the later dataset's references. Intersection effects must not be credited as matching actions.
+
+A tag-copy action counts one source-target mapping credited with at least one surviving changed tag value in the matching result. A network-connection action counts one matched imported node whose references changed in at least one imported way, rather than counting every affected way. Feature totals count unique imported nodes and ways considered for matching, with alternative targets counted once. They do not count every entity in the import: ordinary same-ID updates and features outside the matching options are excluded.
+
+Unresolved features need attention; intentionally skipped features are counted separately. Applied and unresolved counts can overlap when only part of a feature's requested work succeeded. Selected values already present on a base target are not failed copies. A key also counts as already equal when every alternative target already has that value in the ordinary baseline and matching result; this does not select a target. A value supplied by another surviving copy is satisfied without receiving another action credit. Only values missing from the target after matching because of a competing copy are reported as `superseded`.
+
+The report includes per-feature and per-tag details so clients can identify which selected attributes were not copied to a base target and why:
+
+| Field             | Meaning                                                                                                                                                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `summary`         | Unique considered, applied, unresolved, skipped, and unchanged feature counts; separate tag-copy, copied-value, and network-connection counts. Partial success can contribute to both applied and unresolved totals. |
+| `features`        | One row per considered imported node or way, with original ID, candidate IDs, base target used for comparison when known, copied keys, connected way IDs, and unresolved or skipped status.                          |
+| `tags`            | Per-key `presentFeatures`, `copiedFeatures`, `alreadyEqualFeatures`, and `satisfiedByOtherCopyFeatures`, plus `uncopied` source IDs and reasons. Absent imported values are excluded.                                |
+| `retainedImports` | Node, way, and relation counts for original imported IDs present in the result, plus the subset retained as ordinary additions.                                                                                      |
+
+Uncopied tag reasons distinguish `no-accepted-target`, `blocked`, `not-selected`, `protected-tag`, and `superseded`; discovery reasons provide further context. When copies compete for a target tag, only the surviving write receives credit. These reasons report the existing matching rules; they do not expose a configurable conflict policy.
+
+A skipped or unresolved match does not discard the imported feature; ordinary imported additions, including their original attributes, remain subject to the direct/exact merge rules. Retained-import counts refer to original imported IDs still present after matching. Exact reconciliation can instead represent an imported feature under a base ID, so absence from those counts does not by itself mean the feature was lost. A subsequent intersection can allocate an ID that exact reconciliation removed; that newly created node is not evidence that the original imported feature was retained.
 
 ### `applyChangesetToOsm(changeset: OsmChangeset): Osm`
 

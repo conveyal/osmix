@@ -106,7 +106,8 @@ type DatasetProxyMethodName =
   | "generateChangeset"
   | "applyChangesAndReplace"
   | "setChangesetFilters"
-  | "getChangesetPage";
+  | "getChangesetPage"
+  | "synchronizeDataset";
 
 type ConflationDatasetProxyMethodName =
   | "applyConflationBulkDecision"
@@ -297,6 +298,25 @@ export class OsmixRemoteStateError extends Error {
     super(`The Osmix worker pool is unusable after a partial ${operation}`, { cause });
     this.name = "OsmixRemoteStateError";
     this.operation = operation;
+    this.cause = cause;
+  }
+}
+
+/** A worker mutation succeeded, but subsequent synchronization or result lookup failed. */
+export class OsmixCommittedMutationError extends Error {
+  readonly committed = true;
+  readonly operation: "applyChangesAndReplace" | "merge";
+  readonly osmId: string;
+  override readonly cause: unknown;
+
+  constructor(operation: "applyChangesAndReplace" | "merge", osmId: string, cause: unknown) {
+    super(
+      `The ${operation} operation committed dataset ${osmId}, but synchronizing the result failed. Retry synchronization and refresh; do not apply the merge again.`,
+      { cause },
+    );
+    this.name = "OsmixCommittedMutationError";
+    this.operation = operation;
+    this.osmId = osmId;
     this.cause = cause;
   }
 }
@@ -844,6 +864,15 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       lane: "control",
       retry: "once",
     });
+  }
+
+  /**
+   * Synchronize an already committed control-worker dataset without generating
+   * or applying changes. Await this before refreshing after a committed mutation
+   * error; terminal pool failures still require loading the original inputs again.
+   */
+  async synchronizeDataset(osmId: OsmId): Promise<void> {
+    await this.populateDatasetFromControl(this.getId(osmId));
   }
 
   private wrap(info: OsmInfo): OsmRemoteDataset<T> {
@@ -1659,7 +1688,9 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       patchOsmId: state.patchOsmId,
       options: storedOptions,
     });
-    return result;
+    // In-process workers do not cross a cloning boundary. Keep this run's
+    // completion report independent of later review and generation changes.
+    return structuredClone(result);
   }
 
   /** Cancel a review session and discard only a preview generated from that session. */
@@ -1686,10 +1717,17 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     this.invalidateMergeStateForDataset(baseOsmId);
     this.invalidateMergeStateForDataset(patchOsmId);
     this.markDatasetUnrecoverable(osmId);
-    await this.populateDatasetFromControl(osmId);
-    await this.delete(patchOsmId);
-    const merged = await this.get(osmId);
-    return this.wrap(merged.info());
+    try {
+      // The control worker already removed the patch. Forget its recovery source
+      // and remove replicas before any fallible result synchronization; otherwise
+      // a refresh-only retry could resurrect the deleted input after restart.
+      await this.delete(patchOsmId);
+      await this.populateDatasetFromControl(osmId);
+      const merged = await this.get(osmId);
+      return this.wrap(merged.info());
+    } catch (cause) {
+      throw new OsmixCommittedMutationError("merge", osmId, cause);
+    }
   }
 
   /**
@@ -1722,13 +1760,18 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Synchronizes the updated instance across all workers.
    */
   async applyChangesAndReplace(osmId: OsmId) {
-    await this.runWithWorker((worker) => worker.applyChangesAndReplace(this.getId(osmId)), {
+    const id = this.getId(osmId);
+    await this.runWithWorker((worker) => worker.applyChangesAndReplace(id), {
       lane: "control",
       retry: "never",
     });
-    this.invalidateMergeStateForDataset(osmId);
-    this.markDatasetUnrecoverable(osmId);
-    await this.populateDatasetFromControl(osmId);
+    this.invalidateMergeStateForDataset(id);
+    this.markDatasetUnrecoverable(id);
+    try {
+      await this.populateDatasetFromControl(id);
+    } catch (cause) {
+      throw new OsmixCommittedMutationError("applyChangesAndReplace", id, cause);
+    }
   }
 
   /**

@@ -82,15 +82,26 @@ describe("merge osm", () => {
         relations: baseSizes.relations + patchSizes.relations,
       });
 
+      // Capture the direct-merge baseline so legitimate imported updates have
+      // already been applied before testing intersection tag preservation.
+      const crossingValues = new Map<number, string | number>();
+      for (const node of baseOsm.nodes) {
+        if (node.tags?.["crossing"] != null) {
+          crossingValues.set(node.id, node.tags["crossing"]);
+        }
+      }
+      expect([...crossingValues.values()].some((value) => value !== "yes")).toBe(true);
+
       changeset = new OsmChangeset(baseOsm);
       changeset.createIntersectionsForWays(osm2.ways);
 
       // Endpoint reuse updates whole junctions. Unsafe shared substitutions are
       // skipped; only isolated endpoints can use a dedicated intersection fallback.
+      // Existing crossing values are retained, avoiding 68 crossing-only updates.
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 9_525,
-        nodeChanges: 5_858,
+        totalChanges: 9_457,
+        nodeChanges: 5_790,
         wayChanges: 3_667,
         relationChanges: 0,
         deduplicatedNodes: 0,
@@ -101,6 +112,12 @@ describe("merge osm", () => {
       });
 
       baseOsm = applyChangesetToOsm(changeset);
+      for (const [nodeId, value] of crossingValues) {
+        expect(
+          baseOsm.nodes.getById(nodeId)?.tags?.["crossing"],
+          `Crossing at node ${nodeId}`,
+        ).toBe(value);
+      }
 
       expect(sizes(baseOsm)).toEqual({
         nodes: baseSizes.nodes + patchSizes.nodes + changeset.stats.intersectionNodesCreated,

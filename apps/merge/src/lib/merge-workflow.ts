@@ -84,6 +84,7 @@ interface RunConflationAllStepsOptions {
   conflation: OsmConflationOptions;
   isCancelled: () => boolean;
   onBaseApplied?: () => void;
+  onIntersectionsApplied?: () => void;
   onDiscovered?: (summary: OsmConflationSummary) => void;
   onGenerated?: (result: OsmConflationGenerationResult) => void;
   onStageChange?: (stage: ConflationRunAllStage) => void;
@@ -121,6 +122,7 @@ export async function runConflationAllSteps({
   conflation,
   isCancelled,
   onBaseApplied,
+  onIntersectionsApplied,
   onDiscovered,
   onGenerated,
   onStageChange,
@@ -143,14 +145,47 @@ export async function runConflationAllSteps({
   // This is the first irreversible stage. After it succeeds, finish or explicitly
   // expose the intersection retry state instead of pretending cancellation rolled back.
   onStageChange?.("apply-verified-merge");
-  await worker.applyChangesAndReplace(generation.stats.osmId);
+  try {
+    await worker.applyChangesAndReplace(generation.stats.osmId);
+  } catch (error) {
+    if (committedMutationOsmId(error, "applyChangesAndReplace") === generation.stats.osmId) {
+      onBaseApplied?.();
+    }
+    throw error;
+  }
   onBaseApplied?.();
 
   onStageChange?.("create-intersections");
   const intersections = await worker.generateChangeset(baseOsmId, patchOsmId, INTERSECTION_OPTIONS);
-  await worker.applyChangesAndReplace(intersections.osmId);
+  try {
+    await worker.applyChangesAndReplace(intersections.osmId);
+  } catch (error) {
+    if (committedMutationOsmId(error, "applyChangesAndReplace") === intersections.osmId) {
+      onIntersectionsApplied?.();
+    }
+    throw error;
+  }
+  onIntersectionsApplied?.();
 
   return { generation, intersections, status: "completed", summary };
+}
+
+/** Identify a committed mutation whose replicas still need synchronization before refresh. */
+export function committedMutationOsmId(
+  error: unknown,
+  operation: "applyChangesAndReplace" | "merge",
+): string | null {
+  return error &&
+    typeof error === "object" &&
+    "committed" in error &&
+    error.committed === true &&
+    "operation" in error &&
+    error.operation === operation &&
+    "osmId" in error &&
+    typeof error.osmId === "string" &&
+    error.osmId.length > 0
+    ? error.osmId
+    : null;
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { Osm, OsmInfo } from "osmix";
 import { describe, expect, it, vi } from "vitest";
 
-import { prepareMergedOsmState } from "../src/lib/merged-osm-state";
+import { mergedOsmRefreshRetryId, prepareMergedOsmState } from "../src/lib/merged-osm-state";
 
 const info = (id: string): OsmInfo => ({
   bbox: [7.4, 43.7, 7.5, 43.8],
@@ -23,6 +23,61 @@ const osm = (id: string, contentHash: string, equal = false) =>
   }) as unknown as Osm;
 
 describe("merged OSM state", () => {
+  it("retries the surviving worker ID when refresh fails after a successful rename", async () => {
+    const beforeRename = osm("base", "merged-hash");
+    const afterRename = osm("merged-hash", "merged-hash");
+    const get = vi
+      .fn<(id: string) => Promise<Osm>>()
+      .mockResolvedValueOnce(beforeRename)
+      .mockRejectedValueOnce(Error("Transfer failed"))
+      .mockResolvedValueOnce(afterRename);
+    const rename = vi.fn(async () => {});
+    const options = {
+      currentOsm: null,
+      currentFileInfo: null,
+      mergedFileName: "merged.pbf",
+      newOsmId: "base",
+      worker: { get, rename },
+    };
+    let refreshError: unknown;
+    try {
+      await prepareMergedOsmState(options);
+    } catch (error) {
+      refreshError = error;
+    }
+    expect(refreshError).toMatchObject({
+      message: "Merged dataset refresh failed: Transfer failed",
+      mergedOsmId: "merged-hash",
+    });
+    const result = await prepareMergedOsmState({
+      ...options,
+      newOsmId: mergedOsmRefreshRetryId(refreshError, "base"),
+    });
+    expect(result.osm).toBe(afterRename);
+    expect(get).toHaveBeenNthCalledWith(3, "merged-hash");
+    expect(rename).toHaveBeenCalledExactlyOnceWith("base", "merged-hash");
+  });
+
+  it("keeps the original worker ID when the initial refresh fails", async () => {
+    const rename = vi.fn(async () => {});
+    await expect(
+      prepareMergedOsmState({
+        currentOsm: null,
+        currentFileInfo: null,
+        newOsmId: "base",
+        worker: {
+          get: async () => {
+            throw Error("Disconnected");
+          },
+          rename,
+        },
+      }),
+    ).rejects.toMatchObject({ mergedOsmId: "base" });
+    expect(rename).not.toHaveBeenCalled();
+    expect(mergedOsmRefreshRetryId({ mergedOsmId: 42 }, "base")).toBe("base");
+    expect(mergedOsmRefreshRetryId(null, "base")).toBe("base");
+  });
+
   it("re-fetches a renamed dataset and returns content-addressed metadata", async () => {
     const beforeRename = osm("base", "merged-hash");
     const afterRename = osm("merged-hash", "merged-hash");

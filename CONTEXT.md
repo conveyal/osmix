@@ -71,6 +71,16 @@ An eligible matching action that the current automatic rules or saved choices se
 A matching action scheduled by the configured rules without an individual selection. A saved choice can turn it off, and skipping the match schedules neither action. Automatic does not mean already applied.
 _Avoid_: Applied automatically, completed match
 
+**Applied action**:
+A matching action that changed the result when matching was applied, before intersection creation. Copying one or more tag values counts as one tag-copy action for an imported feature; changing one or more imported way references for a matched node counts as one network-connection action. An eligible, scheduled, or already-satisfied action is not an applied change. Later intersection work can further connect or remap junctions.
+
+**Unresolved imported feature**:
+An imported feature with work still needing attention at the end of matching, such as an ambiguous target, a blocked action, or no available target. Alternative candidates for the same feature count once. A feature can have an applied action and unresolved work; deliberate whole-feature skips are counted separately. A later intersection connection does not retroactively count as a matching action.
+_Avoid_: Failed import
+
+**Retained imported feature**:
+An imported feature that remains after the reported merge stage under the ordinary direct/exact merge rules, whether matching actions were applied, skipped, or unresolved. Retention does not mean that its attributes were copied to a base target or that its network was connected.
+
 **Skip match**:
 A decision to schedule neither Copy tags nor Connect network for a proposed correspondence while retaining the imported feature under the ordinary direct/exact merge rules.
 _Avoid_: Delete imported feature
