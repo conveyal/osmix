@@ -8,10 +8,17 @@ import { normalizedWayDirection, type OsmWayDirection } from "@osmix/types/way-d
 
 import { applyChangesetToOsm } from "./apply-changeset.ts";
 import { OsmChangeset } from "./changeset.ts";
+import {
+  conflationTagSourceKey,
+  conflationTagTargetKey,
+  createConflationOutcomeReport,
+  type ConflationApplicationTrace,
+} from "./conflation-outcome.ts";
 import { generateChangeset } from "./generate-changeset.ts";
 import { assertConflationPreservesBaseTopology } from "./integrity.ts";
 import type {
   OsmConflationActionAssessment,
+  OsmConflationArtifacts,
   OsmConflationBulkDecisionRequest,
   OsmConflationBulkDecisionResult,
   OsmConflationCandidate,
@@ -1378,6 +1385,7 @@ function transferSelectedProperties(
   changeset: OsmChangeset,
   candidate: OsmConflationCandidate,
   source: OsmEntity,
+  trace: ConflationApplicationTrace,
 ) {
   if (candidate.targetId == null) return;
   const type = candidate.entityType;
@@ -1385,7 +1393,13 @@ function transferSelectedProperties(
     const tags = { ...target.tags };
     for (const diff of candidate.evidence.tagDiff) {
       if (diff.protected) continue;
-      tags[diff.key] = source.tags![diff.key]!;
+      const value = source.tags![diff.key]!;
+      if (tags[diff.key] === value) {
+        trace.alreadyEqualTagValues.add(conflationTagSourceKey(candidate, diff.key));
+        continue;
+      }
+      tags[diff.key] = value;
+      trace.tagWriters.set(conflationTagTargetKey(candidate, diff.key), candidate.id);
     }
     return { ...target, tags };
   });
@@ -1495,6 +1509,10 @@ function applyDiscoveredConflation(
   const decisionsById = validatedDecisionMap(discovery.candidates, decisions);
   validateAcceptedMappings(discovery.candidates, decisionsById);
 
+  const trace: ConflationApplicationTrace = {
+    tagWriters: new Map(),
+    alreadyEqualTagValues: new Set(),
+  };
   const attachments = new Map<number, number>();
   const patchWayIds = new Set<number>();
   for (const candidate of discovery.candidates) {
@@ -1537,8 +1555,9 @@ function applyDiscoveredConflation(
         : patch.ways.getById(candidate.sourceId);
     if (!source)
       throw Error(`Conflation source ${candidate.entityType} ${candidate.sourceId} is missing`);
-    transferSelectedProperties(changeset, candidate, source);
+    transferSelectedProperties(changeset, candidate, source, trace);
   }
+  return trace;
 }
 
 function generateConflationApplicationArtifacts(
@@ -1559,10 +1578,20 @@ function generateConflationApplicationArtifacts(
     );
   }
   const changeset = new OsmChangeset(baseline);
-  applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions);
+  const trace = applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions);
   const result = applyChangesetToOsm(changeset);
   assertConflationPreservesBaseTopology(originalBase, baseline, result);
-  return { changeset, result };
+  const outcome = createConflationOutcomeReport(
+    originalBase,
+    patch,
+    baseline,
+    result,
+    canonicalDiscovery,
+    decisions,
+    trace,
+    resolveConflationActions,
+  );
+  return { changeset, ordinaryBaseline: baseline, result, outcome };
 }
 
 /** Generate fuzzy-only changes over an already applied ordinary direct/exact merge baseline. */
@@ -1648,23 +1677,33 @@ function generateCumulativeConflationArtifacts(
     ? generateChangeset(base, patch, ordinaryOptions, onProgress)
     : generateChangeset(base, patch, ordinaryOptions);
   const ordinaryBaseline = applyChangesetToOsm(changeset);
-  applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions);
+  const trace = applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions);
   const result = applyChangesetToOsm(changeset);
   assertConflationPreservesBaseTopology(base, ordinaryBaseline, result);
-  return { changeset, ordinaryBaseline, result };
+  const outcome = createConflationOutcomeReport(
+    base,
+    patch,
+    ordinaryBaseline,
+    result,
+    canonicalDiscovery,
+    decisions,
+    trace,
+    resolveConflationActions,
+  );
+  return { changeset, ordinaryBaseline, result, outcome };
 }
 
 /**
- * Generate a cumulative direct/exact/fuzzy changeset from untouched inputs.
+ * Generate cumulative changes, ordinary/final datasets, and a detached matching outcome report.
  * Intersection creation remains a later stage because newly created ways are not indexed yet.
  */
-export function generateConflationChangeset(
+export function generateConflationArtifacts(
   base: Osm,
   patch: Osm,
   options: Partial<OsmMergeOptions>,
   decisions: readonly OsmConflationDecision[] = options.conflation?.decisions ?? [],
   discovery?: OsmConflationDiscovery,
-) {
+): OsmConflationArtifacts {
   if (!options.conflation) throw Error("generateConflationChangeset requires conflation options");
   if (!options.directMerge)
     throw Error("Fuzzy conflation requires directMerge to preserve unmatched patch entities");
@@ -1680,8 +1719,18 @@ export function generateConflationChangeset(
   // Validate the supplied review snapshot even though the fresh canonical
   // discovery remains the only source of mutation instructions.
   validateCumulativeConflationOptions(base, patch, options, suppliedDiscovery);
-  return generateCumulativeConflationArtifacts(base, patch, options, decisions, canonicalDiscovery)
-    .changeset;
+  return generateCumulativeConflationArtifacts(base, patch, options, decisions, canonicalDiscovery);
+}
+
+/** Generate a cumulative changeset; use generateConflationArtifacts for actual outcome details. */
+export function generateConflationChangeset(
+  base: Osm,
+  patch: Osm,
+  options: Partial<OsmMergeOptions>,
+  decisions: readonly OsmConflationDecision[] = options.conflation?.decisions ?? [],
+  discovery?: OsmConflationDiscovery,
+): OsmChangeset {
+  return generateConflationArtifacts(base, patch, options, decisions, discovery).changeset;
 }
 
 /**

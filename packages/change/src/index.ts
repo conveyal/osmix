@@ -42,6 +42,7 @@ export {
   discoverConflationCandidates,
   filterConflationCandidates,
   generateConflationApplicationChangeset,
+  generateConflationArtifacts,
   generateConflationChangeset,
   resolveConflationActions,
   summarizeConflationCandidates,

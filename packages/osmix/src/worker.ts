@@ -40,6 +40,7 @@ import {
   type OsmConflationDecisionConflict,
   type OsmConflationDiscovery,
   type OsmConflationOptions,
+  type OsmConflationOutcomeReport,
   type OsmConflationSummary,
   type OsmMergeOptions,
   validateConflationDecisions,
@@ -141,6 +142,8 @@ export interface OsmConflationRoutingDiagnostics {
 export interface OsmConflationGenerationResult {
   stats: OsmChangeset["stats"];
   routing: OsmConflationRoutingDiagnostics;
+  /** Actual matching changes and unresolved features in this generated result. */
+  outcome: OsmConflationOutcomeReport;
 }
 
 interface ConflationSession {
@@ -1097,7 +1100,11 @@ export class OsmixWorker extends EventTarget {
     // change list until a caller actually opens a changeset page; automatic runs
     // apply the already validated materialized result without building it.
     this.filteredChanges.delete(baseOsmId);
-    return { stats: artifacts.changeset.stats, routing: diagnostics };
+    return {
+      stats: artifacts.changeset.stats,
+      routing: diagnostics,
+      outcome: structuredClone(artifacts.outcome),
+    };
   }
 
   /** Clear a review session and discard only a preview generated from that session. */

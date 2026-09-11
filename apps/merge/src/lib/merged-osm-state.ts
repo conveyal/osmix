@@ -44,35 +44,58 @@ export async function prepareMergedOsmState({
   now = new Date(),
   worker,
 }: PrepareMergedOsmStateOptions): Promise<PreparedMergedOsmState> {
-  let mergedOsm = await worker.get(newOsmId);
-  const initialInfo = mergedOsm.info();
+  let retryOsmId = newOsmId;
+  try {
+    let mergedOsm = await worker.get(newOsmId);
+    const initialInfo = mergedOsm.info();
 
-  if (mergedOsm.isEqual(currentOsm) && currentFileInfo) {
-    return { kind: "unchanged", osm: mergedOsm, osmInfo: initialInfo };
+    if (mergedOsm.isEqual(currentOsm) && currentFileInfo) {
+      return { kind: "unchanged", osm: mergedOsm, osmInfo: initialInfo };
+    }
+
+    const contentHash = mergedOsm.contentHash();
+    if (newOsmId !== contentHash) {
+      await worker.rename(newOsmId, contentHash);
+      retryOsmId = contentHash;
+      mergedOsm = await worker.get(contentHash);
+    }
+
+    const refreshedInfo = mergedOsm.info();
+    const timestamp = now.toISOString().slice(0, 19).replace(/[:]/g, "-");
+    const fileName = mergedFileName ?? `osmix-merged-${timestamp}.pbf`;
+    const fileInfo: StoredFileInfo = {
+      fileHash: contentHash,
+      fileName,
+      fileSize:
+        refreshedInfo.stats.nodes * 20 +
+        refreshedInfo.stats.ways * 100 +
+        refreshedInfo.stats.relations * 200,
+    };
+
+    return {
+      fileInfo,
+      kind: "changed",
+      osm: mergedOsm,
+      osmInfo: { ...refreshedInfo, id: contentHash },
+    };
+  } catch (error) {
+    throw Object.assign(
+      new Error(
+        `Merged dataset refresh failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        { cause: error },
+      ),
+      { mergedOsmId: retryOsmId },
+    );
   }
+}
 
-  const contentHash = mergedOsm.contentHash();
-  if (newOsmId !== contentHash) {
-    await worker.rename(newOsmId, contentHash);
-    mergedOsm = await worker.get(contentHash);
-  }
-
-  const refreshedInfo = mergedOsm.info();
-  const timestamp = now.toISOString().slice(0, 19).replace(/[:]/g, "-");
-  const fileName = mergedFileName ?? `osmix-merged-${timestamp}.pbf`;
-  const fileInfo: StoredFileInfo = {
-    fileHash: contentHash,
-    fileName,
-    fileSize:
-      refreshedInfo.stats.nodes * 20 +
-      refreshedInfo.stats.ways * 100 +
-      refreshedInfo.stats.relations * 200,
-  };
-
-  return {
-    fileInfo,
-    kind: "changed",
-    osm: mergedOsm,
-    osmInfo: { ...refreshedInfo, id: contentHash },
-  };
+/** A failed post-rename refresh must retry the new worker ID, not the removed input ID. */
+export function mergedOsmRefreshRetryId(error: unknown, fallback: string): string {
+  return error &&
+    typeof error === "object" &&
+    "mergedOsmId" in error &&
+    typeof error.mergedOsmId === "string" &&
+    error.mergedOsmId.length > 0
+    ? error.mergedOsmId
+    : fallback;
 }

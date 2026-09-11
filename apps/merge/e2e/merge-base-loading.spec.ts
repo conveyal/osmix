@@ -1,8 +1,12 @@
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { Osm, toPbfBuffer } from "osmix";
 
-async function loadPbf(card: Locator, page: Page, path: string) {
+type PbfInput = string | { name: string; mimeType: string; buffer: Buffer };
+
+async function loadPbf(card: Locator, page: Page, path: PbfInput) {
   await card.getByRole("button", { name: "Open file" }).click();
   const fileChooserPromise = page.waitForEvent("filechooser");
   await page.getByRole("menuitem", { name: /^OSM PBF/ }).click();
@@ -103,4 +107,146 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   await expect(withoutExact).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(withExact).toBeFocused();
+});
+
+async function tinyInputs() {
+  const base = new Osm({ id: "tiny-base" });
+  base.nodes.addNode({ id: 1, lon: 0, lat: 0, tags: { name: "Old entrance" } });
+  base.nodes.addNode({ id: 2, lon: -0.001, lat: 0.001 });
+  base.nodes.buildIndex();
+  base.ways.addWay({ id: 10, refs: [2, 1], tags: { highway: "footway" } });
+  base.buildIndexes();
+  const patch = new Osm({ id: "tiny-patch" });
+  patch.nodes.addNode({ id: 101, lon: 0.000005, lat: 0, tags: { name: "Imported entrance" } });
+  patch.buildIndexes();
+  return {
+    base: {
+      name: "completion-base.pbf",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from(await toPbfBuffer(base)),
+    },
+    patch: {
+      name: "completion-patch.pbf",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from(await toPbfBuffer(patch)),
+    },
+  };
+}
+
+async function openTinyMerge(page: Page, inputs: Awaited<ReturnType<typeof tinyInputs>>) {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, get: () => 1 });
+  });
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => window.osmWorker?.workerCount ?? 0)).toBe(1);
+  await page.getByRole("tab", { name: "Merge" }).click();
+  const baseCard = page
+    .locator('[data-slot="card"]')
+    .filter({ hasText: "Base OSM — authoritative existing dataset" })
+    .first();
+  const patchCard = page
+    .locator('[data-slot="card"]')
+    .filter({ hasText: "Patch OSM — imported additions and updates" })
+    .first();
+  await loadPbf(baseCard, page, inputs.base);
+  await loadPbf(patchCard, page, inputs.patch);
+  return { baseCard, patchCard };
+}
+
+test("a tiny automatic matching merge retains its report and starts a clean new merge", async ({
+  page,
+}) => {
+  const inputs = await tinyInputs();
+  const { baseCard, patchCard } = await openTinyMerge(page, inputs);
+  await page.getByRole("checkbox", { name: "Enable proximity matching" }).check();
+  await page.getByLabel("OSM tag keys to copy").fill("name");
+  await page.getByRole("button", { name: /Run automatic merge/ }).click();
+  const summary = page.getByLabel("Merge completion summary");
+  await expect(summary).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toBeVisible();
+  await expect(summary.getByLabel("Applied matching actions").locator("dd")).toHaveText([
+    "1",
+    "1",
+    "0",
+    "0",
+  ]);
+  await expect(summary).toContainText("completion-base.pbf + completion-patch.pbf");
+  const downloadPromise = page.waitForEvent("download");
+  await summary.getByRole("button", { name: "Download merge report" }).click();
+  const reportFile = await (await downloadPromise).path();
+  if (!reportFile) throw Error("Missing automatic merge report download");
+  expect(JSON.parse(await readFile(reportFile, "utf8"))).toMatchObject({
+    format: "osmix-merge-outcome",
+    version: 1,
+    outcome: {
+      stage: "matching-before-intersections",
+      summary: { tagCopyActions: 1, unresolvedFeatures: 0 },
+      features: [{ entityType: "node", sourceId: 101, copiedKeys: ["name"] }],
+    },
+  });
+  await page.getByRole("button", { name: "Start a new merge" }).click();
+  await expect(page.getByText("Select merge inputs and options", { exact: false })).toBeVisible();
+  await expect(summary).toHaveCount(0);
+  await expect(baseCard.getByRole("button", { name: "Open file" })).toBeVisible();
+  await expect(patchCard.getByRole("button", { name: "Open file" })).toBeVisible();
+  await expect(baseCard).not.toContainText("completion-base.pbf");
+  await expect(patchCard).not.toContainText("completion-patch.pbf");
+});
+
+test("a late cancellation preserves the committed exact result and a new extracted base clears completion", async ({
+  page,
+}) => {
+  const inputs = await tinyInputs();
+  const { baseCard } = await openTinyMerge(page, inputs);
+  // Hold only the return after the real worker commits, so cancellation exercises
+  // the actual irreversible boundary without racing a tiny fixture's parse time.
+  await page.evaluate(() => {
+    const remote = window.osmWorker;
+    const merge = remote.merge.bind(remote);
+    remote.merge = async (...args) => {
+      const result = await merge(...args);
+      const get = remote.get.bind(remote);
+      let refreshFailures = 2;
+      remote.get = async (osmId) => {
+        if (osmId === result.id && refreshFailures > 0) {
+          refreshFailures--;
+          throw Error("Injected completed-result refresh failure");
+        }
+        return get(osmId);
+      };
+      document.documentElement.setAttribute("data-test-merge-committed", "true");
+      await new Promise<void>((resolve) => {
+        document.addEventListener("test-release-merge", () => resolve(), { once: true });
+      });
+      return result;
+    };
+  });
+  await page.getByRole("button", { name: /Run automatic merge/ }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-test-merge-committed", "true");
+  await page.getByRole("button", { name: "Request cancellation" }).click();
+  await page.evaluate(() => document.dispatchEvent(new Event("test-release-merge")));
+  const summary = page.getByLabel("Merge completion summary");
+  await expect(page.getByRole("alert")).toContainText("Injected completed-result refresh failure");
+  await expect(summary).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Run automatic merge/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Refresh merged dataset" }).click();
+  await expect(summary).toBeVisible();
+  await expect(summary).toContainText("Imported-data matching was not enabled");
+  await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Extract", exact: true }).click();
+  await page.getByLabel("Paste bbox", { exact: false }).fill("-0.002,-0.002,0.002,0.002");
+  await page.getByRole("button", { name: "Parse", exact: true }).click();
+  const chooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Select PBF", exact: true }).click();
+  await (await chooserPromise).setFiles(inputs.base);
+  await page.getByRole("button", { name: "Extract", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Use as base OSM" })).toBeEnabled();
+  await page.getByRole("button", { name: "Use as base OSM" }).click();
+  await page.getByRole("tab", { name: "Merge", exact: true }).click();
+  await expect(page.getByText("Select merge inputs and options", { exact: false })).toBeVisible();
+  await expect(summary).toHaveCount(0);
+  await expect(baseCard.getByRole("button", { name: "File info" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toHaveCount(0);
 });

@@ -197,6 +197,10 @@ loaded original inputs, options, and saved decisions. Show the affected imported
 feature when a decision conflict needs correction. After changes are applied,
 intersection recovery must not imply a return to the original matching state.
 
+After a successful merge, show the matching outcome before download controls. Identify it as evidence from after matching and before intersection creation. Targets, connected ways, outstanding work, and retained IDs describe that stage; later intersections can add connections or remap junctions. Do not present the report as a final-reference snapshot or credit intersection effects as matching. Count actual tag-copy actions and network connections separately from imported features considered for matching. Count each imported feature once regardless of its number of alternative targets. Unresolved features need attention; intentional skips are a separate category. A partially completed feature can contribute both an applied action and unresolved work. Values already present on the base are not failed copies.
+
+Keep the completion summary prominent and concise. Provide paged details for ambiguous, blocked, unmatched, and skipped features, including selected tag values not copied to a base target and available reasons. Explain that ordinary imported additions remain in the output. Keep graph diagnostics secondary; they do not prove route correctness. Show completion only after all required application and intersection stages succeed and the displayed result is refreshed. If refresh fails after application, offer a refresh-only retry and prevent advancement or reapplication until it succeeds. Retain that run's readable report until **Start a new merge** clears both input slots and the selected map state. Instruct users to reload the original base and import files to revise a completed merge; the merged result must not be reused as an implicit retry input.
+
 `Details` is the shared disclosure primitive. Its open-state styles target Base
 UI's `data-panel-open` attribute. Disclosure triggers remain keyboard
 accessible, and decorative chevrons are hidden from assistive technology.

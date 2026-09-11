@@ -16,7 +16,9 @@ import { ensureOsmPbfDownloadName } from "../lib/osm-pbf-download-name";
 import { showSaveFilePickerWithFallback } from "../lib/save-file-picker";
 import { canStoreBytes } from "../lib/storage-utils";
 import { isStreamCloneable } from "../lib/stream-transfer";
+import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import { Log } from "../state/log";
+import { updateMergeOutcomeAtom } from "../state/merge-outcome";
 import {
   osmAtomFamily,
   osmFileAtomFamily,
@@ -102,6 +104,12 @@ export function useOsmFile(osmKey: string) {
     check: Awaited<ReturnType<typeof canStoreBytes>>;
   } | null>(null);
   const setSelectedOsm = useSetAtom(selectedOsmAtom);
+  const updateMergeOutcome = useSetAtom(updateMergeOutcomeAtom);
+  const invalidateMergeInput = () => {
+    if (osmKey === BASE_OSM_KEY || osmKey === PATCH_OSM_KEY) {
+      updateMergeOutcome({ type: "reset" });
+    }
+  };
 
   // Track current load to prevent stale cancellations from clearing newer load state
   const currentLoadIdRef = useRef(0);
@@ -139,6 +147,7 @@ export function useOsmFile(osmKey: string) {
       profileOverride?: OsmLoadProfile,
     ) => {
       const loadId = ++currentLoadIdRef.current;
+      invalidateMergeInput();
       setFile(file);
       sourceUrlRef.current = null;
       setOsm(null);
@@ -264,6 +273,7 @@ export function useOsmFile(osmKey: string) {
       signal?: AbortSignal,
     ) => {
       const loadId = ++currentLoadIdRef.current;
+      invalidateMergeInput();
       setFile(file);
       setOsm(null);
       setFileInfo(null);
@@ -340,6 +350,7 @@ export function useOsmFile(osmKey: string) {
   const loadOsmPbfUrl = useEffectEvent(
     async (url: string, signal?: AbortSignal, profileOverride?: OsmLoadProfile) => {
       const loadId = ++currentLoadIdRef.current;
+      invalidateMergeInput();
       sourceUrlRef.current = url;
       setFile(null);
       setOsm(null);
@@ -415,6 +426,7 @@ export function useOsmFile(osmKey: string) {
 
   const loadFromStorage = useEffectEvent(async (storageId: string, signal?: AbortSignal) => {
     const loadId = ++currentLoadIdRef.current;
+    invalidateMergeInput();
     setLoadFailure(null);
     const taskLog = Log.startTask("Loading osm from storage...");
     try {
@@ -552,6 +564,7 @@ export function useOsmFile(osmKey: string) {
       osmInfo: ReturnType<typeof useOsmFile>["osmInfo"];
       isStored: boolean;
     }) => {
+      invalidateMergeInput();
       setFile(source.file);
       setFileInfo(source.fileInfo);
       setOsm(source.osm);

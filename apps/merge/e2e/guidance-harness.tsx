@@ -13,6 +13,7 @@ import { StepActions } from "../src/components/step-actions";
 import { Button } from "../src/components/ui/button";
 import { Card, CardContent } from "../src/components/ui/card";
 import { ConflationReviewHarness } from "./conflation-review-harness";
+import { MergeOutcomeHarness } from "./merge-outcome-harness";
 
 interface InputHarnessState {
   baseDownloads: number;
@@ -187,6 +188,7 @@ function GuidanceHarness() {
       {new URLSearchParams(window.location.search).has("conflation") ? (
         <ConflationReviewHarness />
       ) : null}
+      {new URLSearchParams(window.location.search).has("outcomes") ? <MergeOutcomeHarness /> : null}
     </main>
   );
 }

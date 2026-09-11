@@ -6,6 +6,8 @@
 import type { Osm } from "@osmix/core";
 import type { OsmEntity, OsmEntityType, OsmEntityTypeMap } from "@osmix/types";
 
+import type { OsmChangeset } from "./changeset.ts";
+
 /**
  * Reference to an OSM entity with its origin dataset.
  * Used to track provenance when merging multiple datasets.
@@ -179,6 +181,100 @@ export interface OsmConflationDecisionConflict {
   sourceId: number;
   candidateIds: string[];
   message: string;
+}
+
+/** Why an imported feature still needs matching review after generation. */
+export type OsmConflationUnresolvedKind = "ambiguous" | "blocked" | "unmatched" | "review";
+
+/** Why a present, configured imported tag did not produce a surviving copy. */
+export type OsmConflationUncopiedTagReason =
+  | "no-accepted-target"
+  | "blocked"
+  | "not-selected"
+  | "protected-tag"
+  | "superseded";
+
+/** One imported feature affected by an uncopied configured tag. */
+export interface OsmConflationUncopiedTagFeature {
+  entityType: OsmConflationEntityType;
+  sourceId: number;
+  reason: OsmConflationUncopiedTagReason;
+  reasons: OsmConflationReasonCode[];
+}
+
+/** Per-key outcomes count imported features; absent imported values are excluded. */
+export interface OsmConflationTagOutcome {
+  key: string;
+  presentFeatures: number;
+  copiedFeatures: number;
+  alreadyEqualFeatures: number;
+  /** Final value is present because a different imported source owns the surviving copy. */
+  satisfiedByOtherCopyFeatures: number;
+  uncopied: OsmConflationUncopiedTagFeature[];
+}
+
+/** Actual matching outcome for one source, regardless of its number of alternative candidates. */
+export interface OsmConflationOutcomeFeature {
+  entityType: OsmConflationEntityType;
+  sourceId: number;
+  candidateIds: string[];
+  /** Selected target or sole comparison target; a non-null ID does not imply an applied action. */
+  targetId: number | null;
+  copiedKeys: string[];
+  connectedWayIds: number[];
+  unresolved: OsmConflationUnresolvedKind | null;
+  skipped: boolean;
+  /** Whether the imported entity's original ID is present; exact reconciliation can replace that ID. */
+  retained: boolean;
+  ordinaryAddition: boolean;
+  reasons: OsmConflationReasonCode[];
+}
+
+/** Actual actions and unique sources. Applied and unresolved counts can overlap for partial success. */
+export interface OsmConflationOutcomeSummary {
+  features: number;
+  appliedFeatures: number;
+  tagCopyActions: number;
+  copiedTagValues: number;
+  networkAttachmentActions: number;
+  unresolvedFeatures: number;
+  ambiguousFeatures: number;
+  blockedFeatures: number;
+  unmatchedFeatures: number;
+  reviewFeatures: number;
+  skippedFeatures: number;
+  unchangedFeatures: number;
+}
+
+/** Literal entity-ID counts, not candidate counts or counts of equivalent geometry. */
+export interface OsmConflationEntityCounts {
+  nodes: number;
+  ways: number;
+  relations: number;
+}
+
+/** Patch IDs still present, including the subset introduced by ordinary merge rules. */
+export interface OsmConflationRetainedImports {
+  originalIds: OsmConflationEntityCounts;
+  ordinaryAdditions: OsmConflationEntityCounts;
+}
+
+/** Detached report comparing the ordinary merge baseline with the generated matching result. */
+export interface OsmConflationOutcomeReport {
+  /** Evidence after matching; subsequent intersection work can further remap junctions. */
+  stage: "matching-before-intersections";
+  summary: OsmConflationOutcomeSummary;
+  features: OsmConflationOutcomeFeature[];
+  tags: OsmConflationTagOutcome[];
+  retainedImports: OsmConflationRetainedImports;
+}
+
+/** Generated matching changes and the actual before/after result used by the outcome report. */
+export interface OsmConflationArtifacts {
+  changeset: OsmChangeset;
+  ordinaryBaseline: Osm;
+  result: Osm;
+  outcome: OsmConflationOutcomeReport;
 }
 
 /** A filter-wide review operation performed atomically in the conflation worker. */

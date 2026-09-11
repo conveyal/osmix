@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { expect, type Page, test } from "@playwright/test";
@@ -719,3 +719,127 @@ test.describe("matching action review", () => {
     expect((await readState(page)).options).toEqual(before.options);
   });
 });
+
+async function generateAndApplyOutcome(page: Page) {
+  const harness = page.getByTestId("merge-outcome-harness");
+  await harness.getByRole("button", { name: "Generate completion preview" }).click();
+  await expect(harness.getByLabel("Merge completion summary")).toHaveCount(0);
+  await harness.getByRole("button", { name: "Apply completion preview" }).click();
+  await expect(harness.getByLabel("Merge completion summary")).toHaveCount(0);
+  return harness;
+}
+
+test("completion explains mixed matching results and downloads the retained report after apply", async ({
+  page,
+}) => {
+  await page.goto("/e2e/guidance-harness.html?outcomes");
+  const harness = await generateAndApplyOutcome(page);
+  const applied = await page.evaluate(() => window.mergeOutcomeHarness.readState());
+  expect(applied.reviewAvailable).toBe(false);
+  expect(applied.baseName).toBe("Imported");
+  await harness.getByRole("button", { name: "Refresh completion result" }).click();
+  await harness.getByRole("button", { name: "Finish completion run" }).click();
+  const summary = harness.getByLabel("Merge completion summary");
+  await expect(summary).toContainText("Merge complete · unresolved matches remain");
+  await expect(summary).toContainText("5 imported features were considered");
+  await expect(summary.getByLabel("Applied matching actions").locator("dd")).toHaveText([
+    "1",
+    "1",
+    "0",
+    "3",
+  ]);
+  await expect(summary).toContainText("1 were intentionally skipped");
+  await summary.getByRole("button", { name: "Imported feature outcomes" }).click();
+  await expect(summary.getByLabel("Imported feature outcome details")).toContainText(
+    "Imported node 201",
+  );
+  await expect(summary.getByLabel("Imported feature outcome details")).toContainText(
+    "Imported node 401",
+  );
+  await expect(summary.getByLabel("Imported feature outcome details")).toContainText(
+    "Imported node 501",
+  );
+  await summary.getByRole("button", { name: "Selected tag outcomes" }).click();
+  await summary.getByRole("combobox", { name: "Selected tag", exact: true }).selectOption("layer");
+  await expect(summary).toContainText("This structural tag is protected");
+
+  const retained = (await page.evaluate(() => window.mergeOutcomeHarness.readState())).completion;
+  const downloadPromise = page.waitForEvent("download");
+  await summary.getByRole("button", { name: "Download merge report" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("osmix-merge-outcome.json");
+  const path = await download.path();
+  if (!path) throw Error("The merge report download was not written");
+  expect(JSON.parse(await readFile(path, "utf8"))).toEqual({
+    format: "osmix-merge-outcome",
+    version: 1,
+    ...retained,
+  });
+  expect((await page.evaluate(() => window.mergeOutcomeHarness.readState())).completion).toEqual(
+    retained,
+  );
+  const artifactDirectory = resolve(
+    import.meta.dirname,
+    "../../../output/playwright/pr-218-ticket09",
+  );
+  await mkdir(artifactDirectory, { recursive: true });
+  for (const width of [320, 512]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect
+      .poll(() => summary.evaluate((element) => element.scrollWidth <= element.clientWidth))
+      .toBe(true);
+    const path = resolve(artifactDirectory, `merge-completion-${width}.png`);
+    await summary.screenshot({ path, animations: "disabled" });
+    await test.info().attach(`Merge completion at ${width}px`, { path, contentType: "image/png" });
+  }
+});
+
+test("completion stays hidden during refresh failure and reports download failure inline", async ({
+  page,
+}) => {
+  await page.goto("/e2e/guidance-harness.html?outcomes");
+  const harness = await generateAndApplyOutcome(page);
+  await harness.getByLabel("Fail next refresh").check();
+  await harness.getByRole("button", { name: "Refresh completion result" }).click();
+  await expect(harness.getByRole("alert")).toContainText("could not be refreshed");
+  await expect(harness.getByRole("button", { name: "Finish completion run" })).toBeDisabled();
+  await expect(harness.getByLabel("Merge completion summary")).toHaveCount(0);
+  await harness.getByRole("button", { name: "Refresh completion result" }).click();
+  await harness.getByRole("button", { name: "Finish completion run" }).click();
+  const summary = harness.getByLabel("Merge completion summary");
+  await expect(summary).toBeVisible();
+  await harness.getByLabel("Fail report download").check();
+  await summary.getByRole("button", { name: "Download merge report" }).click();
+  await expect(summary.getByRole("alert")).toContainText(
+    "The report could not be saved. Disk full",
+  );
+  await expect(summary).toContainText("Merge complete");
+  await harness.getByRole("button", { name: "Reset completion scenario" }).click();
+  await expect(harness.getByLabel("Merge completion summary")).toHaveCount(0);
+});
+
+for (const scenario of ["unresolved", "zero"] as const) {
+  test(`completion handles ${scenario} matching without claiming actions`, async ({ page }) => {
+    await page.goto("/e2e/guidance-harness.html?outcomes");
+    const harness = page.getByTestId("merge-outcome-harness");
+    await harness.getByLabel("Completion scenario").selectOption(scenario);
+    await generateAndApplyOutcome(page);
+    await harness.getByRole("button", { name: "Refresh completion result" }).click();
+    await harness.getByRole("button", { name: "Finish completion run" }).click();
+    const summary = harness.getByLabel("Merge completion summary");
+    await expect(summary.getByLabel("Applied matching actions").locator("dd")).toHaveText([
+      "0",
+      "0",
+      "0",
+      scenario === "unresolved" ? "1" : "0",
+    ]);
+    if (scenario === "zero") {
+      await expect(summary).toContainText("No imported features were considered for matching");
+    } else {
+      await expect(summary).toContainText("Merge complete · unresolved matches remain");
+      await expect(summary.getByLabel("Unresolved imported features")).toContainText(
+        "Choice still needed",
+      );
+    }
+  });
+}

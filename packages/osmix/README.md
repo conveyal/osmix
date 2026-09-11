@@ -119,7 +119,7 @@ const generated = await remote.generateConflationChangeset(base.id, {
   deduplicateNodes: true,
   deduplicateWays: true,
 });
-console.log(summary, generated.routing.car, generated.routing.walk);
+console.log(summary, generated.outcome.summary, generated.routing.car, generated.routing.walk);
 await remote.applyChangesAndReplace(base.id);
 ```
 
@@ -221,6 +221,20 @@ or a generation failure with the original loaded inputs, options, and decisions 
 identified imported feature and regenerate the preview without reloading either file. Retrying an unchanged
 invalid decision set continues to report its conflict. Once the cumulative changes have been applied,
 intersection failures use the intersection retry path; returning to matching is not an undo operation.
+
+#### Understand the completed merge
+
+`generateConflationChangeset()` returns an `outcome` report derived from the actual difference between the ordinary direct/exact baseline and its generated result. Keep this report with that run; it remains readable after applying the result, generating intersections, or changing review state. Regenerating matching recomputes the report from the original inputs and current decisions. A generated report describes a preview until the workflow successfully applies all required changes.
+
+The report's `stage: "matching-before-intersections"` identifies matching before intersection creation. Its target IDs, connected ways, outstanding work, and retained-import counts describe that stage. Later intersections may add connections or remap junctions, so these details are historical matching evidence rather than final-reference assertions.
+
+Merge shows the completed report before download. Tag-copy actions and network connections are separate from the number of imported features considered for matching: a feature can have both actions, and several alternative candidates still count as one feature. Unresolved features need attention; ambiguous, blocked, and unmatched work have distinct reasons, and deliberate skips are counted separately. Partly completed features may contribute an applied action and unresolved work. Already-equal tag values are not failed copies. Values satisfied by another surviving copy are counted separately, without crediting duplicate actions. With no matching candidates, the report does not imply that every imported feature matched.
+
+Paged details identify imported features and selected tags not copied to a base target, with available reasons. The report can also be downloaded as JSON. Values not copied to a base target may still be present on ordinary imported additions. Retained-import counts track original import IDs present after matching; exact reconciliation may represent other features under base IDs instead.
+
+A successful merge can be downloaded with unresolved matching work. Failed generation, an incomplete application/intersection stage, or a failed result refresh does not display a successful completion summary. If changes were applied but refreshing the displayed dataset failed, retrying refresh does not apply them again. **Start a new merge** clears both loaded input slots and the selected map state. Reload the original base and import files to revise a completed merge; the completed result is not reused as an implicit retry input. That explicit action also clears the previous run's report.
+
+If `remote.applyChangesAndReplace()` or `remote.merge()` updates the control worker but then fails to synchronize or retrieve the result, it throws `OsmixCommittedMutationError`. Its enumerable fields include `committed: true`, `operation`, and the surviving result's `osmId`; `cause` retains the underlying error. Do not repeat the mutation. Await `remote.synchronizeDataset(error.osmId)`, then retrieve and refresh that result. Synchronization copies the already committed dataset without generating or applying another changeset. For `merge()`, the consumed patch is removed from recovery state before result synchronization. An error from a rejected worker mutation has no committed marker. Terminal worker-pool failures remain terminal; synchronization cannot repair them, and a new session must load the original inputs again.
 
 #### Which mode am I in?
 
@@ -550,10 +564,12 @@ spec-compliant without staging everything in memory.
 - `remote.generateChangeset(baseId, patchId, options)` - Build an ordinary changeset that replaces the active
   preview for this base while retaining an otherwise valid matching session.
 - `remote.generateConflationChangeset(baseId, mergeOptions)` - Build one cumulative direct, exact, and fuzzy
-  changeset, replace the active preview for this base, and return routing diagnostics.
+  changeset, replace the active preview for this base, and return routing diagnostics and an outcome report.
 - `remote.clearConflation(baseId)` - Discard the active review session and any preview generated from it;
   retain a newer ordinary preview.
 - `remote.applyChangesAndReplace(baseId)` - Apply the latest active preview and replace its base dataset.
+- `remote.synchronizeDataset(osmId)` - Synchronize an already committed result after a reported
+  `OsmixCommittedMutationError`, without generating or applying changes again.
 - `remote.search(osmId, key, val?)` - Search by tag.
 - `remote.toPbf(osmId, stream)` - Export to PBF.
 

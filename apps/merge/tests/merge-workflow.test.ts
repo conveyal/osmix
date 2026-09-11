@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   canApplyChangeset,
+  committedMutationOsmId,
   COMPLETE_MERGE_OPTIONS,
   completeMergeOptions,
   CROSS_DATASET_RECONCILIATION_OPTIONS,
@@ -14,6 +15,7 @@ import {
   verifiedBaseMergeOptions,
   WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
 } from "../src/lib/merge-workflow";
+import { emptyMatchingOutcome } from "./fixtures/merge-outcome";
 
 const changesetStats = (osmId: string, totalChanges: number): OsmChangesetStats => ({
   deduplicatedNodes: 0,
@@ -39,6 +41,7 @@ const summary: OsmConflationSummary = {
 };
 
 const generation: OsmConflationGenerationResult = {
+  outcome: emptyMatchingOutcome(),
   stats: changesetStats("base", 3),
   routing: {
     car: {
@@ -55,6 +58,79 @@ const generation: OsmConflationGenerationResult = {
 };
 
 describe("merge workflow policy", () => {
+  it.each([1, 2])(
+    "records worker commit %i even when synchronization fails afterwards",
+    async (failedApply) => {
+      let applied = 0;
+      const error = Object.assign(Error("Synchronization failed"), {
+        operation: "applyChangesAndReplace",
+        committed: true,
+        osmId: "base",
+      });
+      const onBaseApplied = vi.fn();
+      const onIntersectionsApplied = vi.fn();
+      const generateChangeset = vi.fn(async () => changesetStats("base", 1));
+      const applyChangesAndReplace = vi.fn(async () => {
+        if (++applied === failedApply) throw error;
+      });
+      await expect(
+        runConflationAllSteps({
+          baseOsmId: "base",
+          patchOsmId: "patch",
+          conflation: { propertyKeys: ["name"] },
+          isCancelled: () => false,
+          onBaseApplied,
+          onIntersectionsApplied,
+          worker: {
+            discoverConflation: async () => summary,
+            generateConflationChangeset: async () => generation,
+            generateChangeset,
+            applyChangesAndReplace,
+          },
+        }),
+      ).rejects.toBe(error);
+      expect(onBaseApplied).toHaveBeenCalledOnce();
+      expect(onIntersectionsApplied).toHaveBeenCalledTimes(failedApply === 2 ? 1 : 0);
+      expect(generateChangeset).toHaveBeenCalledTimes(failedApply === 2 ? 1 : 0);
+      expect(applyChangesAndReplace).toHaveBeenCalledTimes(failedApply);
+    },
+  );
+
+  it("does not mark failed worker mutation as applied", async () => {
+    const onBaseApplied = vi.fn();
+    const onIntersectionsApplied = vi.fn();
+    await expect(
+      runConflationAllSteps({
+        baseOsmId: "base",
+        patchOsmId: "patch",
+        conflation: { propertyKeys: ["name"] },
+        isCancelled: () => false,
+        onBaseApplied,
+        onIntersectionsApplied,
+        worker: {
+          discoverConflation: async () => summary,
+          generateConflationChangeset: async () => generation,
+          generateChangeset: async () => changesetStats("base", 0),
+          applyChangesAndReplace: async () => {
+            throw Error("Validation failed");
+          },
+        },
+      }),
+    ).rejects.toThrow("Validation failed");
+    expect(onBaseApplied).not.toHaveBeenCalled();
+    expect(onIntersectionsApplied).not.toHaveBeenCalled();
+    expect(committedMutationOsmId({ osmId: "base", committed: false }, "merge")).toBeNull();
+    expect(
+      committedMutationOsmId({ osmId: "base", committed: true, operation: "merge" }, "merge"),
+    ).toBe("base");
+    expect(
+      committedMutationOsmId(
+        { osmId: "base", committed: true, operation: "merge" },
+        "applyChangesAndReplace",
+      ),
+    ).toBeNull();
+  });
+
   it("keeps within-dataset duplicate scans diagnostic", () => {
     expect(WITHIN_DATASET_DIAGNOSTIC_OPTIONS).toEqual({
       deduplicateNodes: true,
