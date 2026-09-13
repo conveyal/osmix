@@ -59,6 +59,9 @@ export interface OsmMergeOptions {
   conflation?: OsmConflationOptions;
 }
 
+/** Stages supported by ordinary changeset generation; matching uses its own generator. */
+export type OsmChangesetOptions = Omit<OsmMergeOptions, "conflation">;
+
 /** Entity kinds supported by fuzzy conflation. */
 export type OsmConflationEntityType = "node" | "way";
 

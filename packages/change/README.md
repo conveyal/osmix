@@ -44,6 +44,24 @@ ways in one changeset rooted in the original base. Apply that changeset before c
 new patch ways are present in the rebuilt spatial index. For that reason, `generateChangeset()` rejects
 `directMerge: true` combined with `createIntersections: true`; use `merge()` for the staged pipeline.
 
+### Generate an ordinary preview
+
+```ts check-docs change-context
+import { generateChangeset, type OsmChangesetOptions } from "osmix";
+
+const options: Partial<OsmChangesetOptions> = {
+  directMerge: true,
+  deduplicateNodes: true,
+  deduplicateWays: true,
+};
+const preview = generateChangeset(base, patch, options);
+console.log(preview.stats);
+```
+
+`OsmChangesetOptions` supports `directMerge`, `deduplicateNodes`, `deduplicateWays`, and `createIntersections`. Ordinary `generateChangeset()` does not perform proximity matching. A defined `conflation` value is rejected before generation, including when supplied through JavaScript or a structurally wider typed object; `conflation: undefined` is treated as absent. The error directs callers to `generateConflationChangeset()` or `merge()` instead of returning a preview that silently omits requested matching.
+
+Use `generateConflationChangeset(base, patch, { directMerge: true, conflation })` to inspect matching changes before applying them, or `merge(base, patch, { directMerge: true, conflation })` to run the high-level pipeline. These APIs continue to accept `Partial<OsmMergeOptions>`, which includes matching configuration. Cumulative matching previews keep intersection creation as a later stage; the high-level pipeline can run it after matching.
+
 ### Run the bundled merge pipeline
 
 ```ts check-docs change-context

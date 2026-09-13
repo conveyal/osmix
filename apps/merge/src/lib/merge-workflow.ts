@@ -1,4 +1,5 @@
 import type {
+  OsmChangesetOptions,
   OsmChangesetStats,
   OsmConflationGenerationResult,
   OsmConflationOptions,
@@ -15,20 +16,20 @@ export type ChangesetReviewPurpose = "apply" | "diagnostic" | "preview";
 export const WITHIN_DATASET_DIAGNOSTIC_OPTIONS = {
   deduplicateNodes: true,
   deduplicateWays: true,
-} as const satisfies Partial<OsmMergeOptions>;
+} as const satisfies Partial<OsmChangesetOptions>;
 
 /** Reconcile entities from the patch against the base without normalizing either input. */
 export const CROSS_DATASET_RECONCILIATION_OPTIONS = {
   deduplicateNodes: true,
   deduplicateWays: true,
-} as const satisfies Partial<OsmMergeOptions>;
+} as const satisfies Partial<OsmChangesetOptions>;
 
 export const DIRECT_MERGE_OPTIONS = {
   directMerge: true,
-} as const satisfies Partial<OsmMergeOptions>;
+} as const satisfies Partial<OsmChangesetOptions>;
 
 /** Build a verified base merge from the untouched base and patch. */
-export function verifiedBaseMergeOptions(reconcile: boolean): Partial<OsmMergeOptions> {
+export function verifiedBaseMergeOptions(reconcile: boolean): Partial<OsmChangesetOptions> {
   return {
     ...DIRECT_MERGE_OPTIONS,
     ...(reconcile ? CROSS_DATASET_RECONCILIATION_OPTIONS : {}),
@@ -37,7 +38,7 @@ export function verifiedBaseMergeOptions(reconcile: boolean): Partial<OsmMergeOp
 
 export const INTERSECTION_OPTIONS = {
   createIntersections: true,
-} as const satisfies Partial<OsmMergeOptions>;
+} as const satisfies Partial<OsmChangesetOptions>;
 
 /** Options shared by the non-interactive, high-level merge workflow. */
 export const COMPLETE_MERGE_OPTIONS = {
@@ -74,7 +75,7 @@ interface ConflationRunAllWorker {
   generateChangeset(
     baseOsmId: string,
     patchOsmId: string,
-    options: Partial<OsmMergeOptions>,
+    options: Partial<OsmChangesetOptions>,
   ): Promise<OsmChangesetStats>;
   applyChangesAndReplace(osmId: string): Promise<void>;
 }

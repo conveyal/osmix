@@ -109,6 +109,7 @@ export type {
   OsmChange,
   OsmChanges,
   OsmChangesetInputIdentity,
+  OsmChangesetOptions,
   OsmChangesetRestoreContext,
   OsmChangesetStats,
   OsmChangesetValidationContext,

@@ -29,6 +29,7 @@ import {
   summarizeConflationCandidates,
   type OsmChange,
   type OsmChangeset,
+  type OsmChangesetOptions,
   type OsmChangeTypes,
   type OsmConflationBulkAction,
   type OsmConflationBulkDecisionPreview,
@@ -45,6 +46,7 @@ import {
   type OsmMergeOptions,
   validateConflationDecisions,
 } from "@osmix/change";
+import { validateOrdinaryChangesetOptions } from "@osmix/change/internal/changeset-options";
 import {
   discoverConflationCandidatesForTrustedMerge,
   generateConflationApplicationArtifactsFromTrustedDiscovery,
@@ -1137,8 +1139,9 @@ export class OsmixWorker extends EventTarget {
   async generateChangeset(
     baseOsmId: string,
     patchOsmId: string,
-    options: Partial<OsmMergeOptions> = {},
+    options: Partial<OsmChangesetOptions> = {},
   ) {
+    validateOrdinaryChangesetOptions(options);
     const changeset = generateChangeset(
       this.get(baseOsmId),
       this.get(patchOsmId),

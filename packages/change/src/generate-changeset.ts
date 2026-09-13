@@ -12,7 +12,8 @@ import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/pr
 import { throttle } from "@osmix/shared/throttle";
 
 import { OsmChangeset } from "./changeset.ts";
-import type { OsmMergeOptions } from "./types.ts";
+import { validateOrdinaryChangesetOptions } from "./internal/changeset-options.ts";
+import type { OsmChangesetOptions } from "./types.ts";
 
 /**
  * Generate a changeset from a patch dataset with configurable operations.
@@ -25,6 +26,8 @@ import type { OsmMergeOptions } from "./types.ts";
  * @param options - Options controlling which operations to run.
  * @param onProgress - Callback for progress updates (throttled for way operations).
  * @returns The populated OsmChangeset ready for application or inspection.
+ * @throws When a defined conflation configuration is supplied. Use
+ * `generateConflationChangeset()` or `merge()` to perform imported-data matching.
  * @throws When direct merge and intersection creation are requested together. Newly created
  * patch ways are not spatially indexed until the direct changeset is applied; use `merge()` or
  * apply the direct changes before generating an intersection-only changeset.
@@ -42,9 +45,10 @@ import type { OsmMergeOptions } from "./types.ts";
 export function generateChangeset(
   base: Osm,
   patch: Osm,
-  options: Partial<OsmMergeOptions> = {},
+  options: Partial<OsmChangesetOptions> = {},
   onProgress: (progress: ProgressEvent) => void = logProgress,
 ) {
+  validateOrdinaryChangesetOptions(options);
   if (options.directMerge && options.createIntersections) {
     throw Error(
       "generateChangeset cannot combine directMerge with createIntersections because new patch ways are not indexed; use merge() or apply direct changes before generating intersections",

@@ -12,6 +12,7 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./internal/changeset-options": "./src/internal/changeset-options.ts",
     "./internal/conflation": "./src/internal/conflation.ts"
   },
   "scripts": {
