@@ -85,7 +85,7 @@ describe("conflation review safety status", () => {
       ),
     );
 
-    // Accepted remains a valid summary/filter label; inspect the actual candidate row.
+    // Inspect the candidate itself, separately from the summary and status filter.
     const rowDescription = html.match(
       /<p[^>]*data-slot="item-description"[^>]*>([\s\S]*?)<\/p>/,
     )?.[1];
@@ -94,5 +94,16 @@ describe("conflation review safety status", () => {
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Copy tags \(0\)<\/button>/);
     expect(html).not.toMatch(/<button[^>]*>Copy tags<\/button>/);
     expect(html).not.toContain("Transfer + attach");
+    expect(html.match(/<[a-z]+[^>]*role="checkbox"[^>]*>/)?.[0]).toContain('aria-disabled="true"');
+    expect(html).toContain('aria-label="Compare imported way 20 with base way 10"');
+    expect(html).toContain('aria-pressed="false"');
+    expect(html).toContain("Nodes are points; ways are ordered point sequences");
+    expect(html).toMatch(/<div[^>]*role="group"[^>]*aria-label="Imported features"/);
+    const filterDescription = html.match(
+      /<select[^>]*id="conflation-status-filter"[^>]*aria-describedby="([^"]+)"/,
+    )?.[1];
+    expect(filterDescription).toBeTruthy();
+    expect(html).toContain(`id="${filterDescription}"`);
+    expect(html).toContain("bulk choices affect matching rows only");
   });
 });

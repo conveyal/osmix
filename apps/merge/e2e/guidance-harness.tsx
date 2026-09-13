@@ -12,6 +12,7 @@ import { OsmInputCardHeader } from "../src/components/osm-input-card-header";
 import { StepActions } from "../src/components/step-actions";
 import { Button } from "../src/components/ui/button";
 import { Card, CardContent } from "../src/components/ui/card";
+import { ConflationEvidenceHarness } from "./conflation-evidence-harness";
 import { ConflationReviewHarness } from "./conflation-review-harness";
 import { MergeOutcomeHarness } from "./merge-outcome-harness";
 
@@ -197,7 +198,13 @@ window.guidanceHarness = {
   readState: () => ({ ...harnessState, inputs: { ...harnessState.inputs } }),
 };
 
-createRoot(document.getElementById("root")!).render(<GuidanceHarness />);
+createRoot(document.getElementById("root")!).render(
+  new URLSearchParams(window.location.search).has("evidence") ? (
+    <ConflationEvidenceHarness />
+  ) : (
+    <GuidanceHarness />
+  ),
+);
 
 declare global {
   interface Window {

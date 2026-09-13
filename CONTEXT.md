@@ -12,6 +12,12 @@ _Avoid_: Original file, destination file
 The dataset of imported additions and updates to combine with the base.
 _Avoid_: Second file, source file
 
+**OSM node**:
+A point with latitude and longitude that can represent a feature, such as a crossing, or form part of a way's geometry.
+
+**OSM way**:
+An ordered sequence of node references representing a line or an area boundary, such as a sidewalk or building outline.
+
 **Direct merge**:
 The combination of patch-only additions, same-ID patch updates, and unchanged base-only entities.
 
@@ -25,6 +31,12 @@ _Avoid_: Proximity deduplication
 **Candidate**:
 A proposed correspondence between an imported feature and a base feature, with evidence and separate eligibility for copying tags and connecting networks. A candidate does not by itself select either action.
 _Avoid_: Confirmed match
+
+**Match evidence**:
+The locations, measured differences, attributes, and connection context used to assess a proposed correspondence. Proximity is evidence of a possible match, not proof that either matching action is safe.
+
+**Candidate distance**:
+The measured separation between a proposed pair: point-to-point distance for nodes, or the maximum sampled separation between way geometries. An unavailable measurement differs from finding no eligible target in the search area.
 
 **Alternative targets**:
 Possible base counterparts proposed for the same imported feature. They are reviewed together because that feature can have matching actions scheduled for at most one target.
