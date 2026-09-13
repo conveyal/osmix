@@ -9,6 +9,7 @@
  */
 
 import type {
+  OsmChangesetOptions,
   OsmChangeTypes,
   OsmConflationBulkDecisionRequest,
   OsmConflationCandidate,
@@ -17,6 +18,7 @@ import type {
   OsmConflationOptions,
   OsmMergeOptions,
 } from "@osmix/change";
+import { validateOrdinaryChangesetOptions } from "@osmix/change/internal/changeset-options";
 import { Osm, type OsmInfo, type OsmOptions, type OsmTransferables } from "@osmix/core";
 import type { GeoParquetReadOptions } from "@osmix/geoparquet";
 import { type GtfsConversionOptions, isGtfsZip as isGtfsZipBytes } from "@osmix/gtfs";
@@ -1737,8 +1739,11 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   async generateChangeset(
     baseOsmId: OsmId,
     patchOsmId: OsmId,
-    options: Partial<OsmMergeOptions> = {},
+    options: Partial<OsmChangesetOptions> = {},
   ) {
+    // Validate the original object: cloning can discard inherited or hidden
+    // options and turn an unsupported request into an ordinary preview.
+    validateOrdinaryChangesetOptions(options);
     const baseId = this.getId(baseOsmId);
     const patchId = this.getId(patchOsmId);
     const storedOptions = structuredClone(options);

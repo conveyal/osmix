@@ -89,6 +89,12 @@ system. `processPeakRssBytes` is the process-lifetime high-water mark, so later 
 earlier run's peak. CI verifies operation counts and semantic fingerprints, but intentionally has no timing
 threshold or compressed-PBF byte golden.
 
+### Generate changes and review matching
+
+Ordinary `generateChangeset(base, patch, options)`, `OsmixWorker.generateChangeset()`, and `remote.generateChangeset()` accept `Partial<OsmChangesetOptions>`, containing only direct merge, node/way reconciliation, and intersection options. They reject any defined `conflation` value instead of silently omitting matching; `conflation: undefined` remains equivalent to omission. Runtime validation also covers JavaScript and structurally wider typed objects. Rejection preserves the existing active preview, review decisions, and datasets.
+
+For direct API calls, use `generateConflationChangeset(base, patch, { directMerge: true, conflation })` to build a matching preview, or `merge(base, patch, { directMerge: true, conflation })` to run the high-level pipeline. See the [ordinary preview and matching API guidance](../change/README.md#generate-an-ordinary-preview).
+
 Proximity matching for independently created imports is available as a separate opt-in review session. The
 recommended defaults use a 1-meter radius and schedule high-confidence actions automatically. Discovery and
 decision changes do not update the base dataset:
@@ -122,6 +128,8 @@ const generated = await remote.generateConflationChangeset(base.id, {
 console.log(summary, generated.outcome.summary, generated.routing.car, generated.routing.walk);
 await remote.applyChangesAndReplace(base.id);
 ```
+
+Worker and remote `generateConflationChangeset(baseId, mergeOptions)` use the matching configuration and decisions retained by `discoverConflation()` and the review session. Passing `mergeOptions.conflation` does not replace that configuration; start discovery with the intended matching options. Ordinary stage options such as `directMerge` and node/way reconciliation still come from `mergeOptions`. Generate and apply the cumulative matching preview before requesting intersections.
 
 OSM tags are feature attributes, such as `surface=asphalt` or `kerb=lowered`. **Copy tags** (property transfer
 in the API) changes only explicitly selected tags and retains imported geometry, including matched ways
@@ -567,10 +575,10 @@ spec-compliant without staging everything in memory.
   selected target, or leave it unmatched with `null`, preserving unrelated decisions.
 - `remote.applyConflationBulkDecision(baseId, request)` - Atomically apply an action to all candidates matching
   the request's filter and return preview counts, the updated summary, and the complete decision snapshot.
-- `remote.generateChangeset(baseId, patchId, options)` - Build an ordinary changeset that replaces the active
-  preview for this base while retaining an otherwise valid matching session.
+- `remote.generateChangeset(baseId, patchId, options)` - Build an ordinary changeset using `Partial<OsmChangesetOptions>` that replaces the active
+  preview for this base while retaining an otherwise valid matching session. Defined `conflation` options reject before replacing a preview.
 - `remote.generateConflationChangeset(baseId, mergeOptions)` - Build one cumulative direct, exact, and fuzzy
-  changeset, replace the active preview for this base, and return routing diagnostics and an outcome report.
+  changeset using the reviewed session's matching configuration, replace the active preview for this base, and return routing diagnostics and an outcome report.
 - `remote.clearConflation(baseId)` - Discard the active review session and any preview generated from it;
   retain a newer ordinary preview.
 - `remote.applyChangesAndReplace(baseId)` - Apply the latest active preview and replace its base dataset.
