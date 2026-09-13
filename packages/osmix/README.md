@@ -48,6 +48,10 @@ High-level merges leave the original inputs intact and reconcile only compatible
 base matches. Regenerate PBFs created by older releases from their original inputs if automatic within-file
 deduplication may already have rewritten routing topology.
 
+Exact node reconciliation validates every source proposed for a final base survivor as a group before any replacement. Their shared tags and incident-way grade/access context must be mutually compatible. An untagged base node therefore cannot absorb coincident imported cafe and school nodes: both imported features and references to their node IDs remain. Other compatible groups can still reconcile. The same check covers explicit same-dataset diagnostic replacement chains; high-level merges continue to preserve both original inputs and authoritative same-ID updates. Exact-way descriptive reconciliation retains its existing policy.
+
+This fixes a residual pre-existing node-reconciliation defect found during the PR #218 review; the PR did not introduce it. The [change package guidance](../change/README.md#run-the-bundled-merge-pipeline) describes the group-compatibility requirement.
+
 Intersection creation preserves existing shared junctions, including bridge and tunnel entrances. Endpoint
 reuse updates every incident way and affected restriction via-node together; an unsafe shared-junction
 substitution leaves that crossing unchanged. This does not connect new grade-separated interior crossings.

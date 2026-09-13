@@ -200,6 +200,13 @@ function hasConflictingGradeOrAccessTags(a: OsmEntity["tags"], b: OsmEntity["tag
   );
 }
 
+function wayContextsCompatible(a: OsmWay, b: OsmWay) {
+  return (
+    !hasConflictingGradeOrAccessTags(a.tags, b.tags) &&
+    (a.tags?.["highway"] == null) === (b.tags?.["highway"] == null)
+  );
+}
+
 function withNonConflictingTags<T extends OsmEntity>(base: T, patch: T): T {
   if (!patch.tags) return base;
   const tags = { ...base.tags };
@@ -629,11 +636,7 @@ export class OsmChangeset {
     if (patchWays.length === 0 || baseWays.length === 0) return true;
 
     return patchWays.every((patchWay) =>
-      baseWays.every(
-        (baseWay) =>
-          !hasConflictingGradeOrAccessTags(patchWay.tags, baseWay.tags) &&
-          (patchWay.tags?.["highway"] == null) === (baseWay.tags?.["highway"] == null),
-      ),
+      baseWays.every((baseWay) => wayContextsCompatible(patchWay, baseWay)),
     );
   }
 
@@ -675,6 +678,57 @@ export class OsmChangeset {
     }
   }
 
+  /**
+   * A blank target can accept incompatible sources independently. Validate the
+   * complete group against itself before copying tags or rewriting references;
+   * retaining every source in a conflicting group avoids choosing by input order.
+   * The supplied map must point directly to final survivors, including diagnostic
+   * same-dataset replacement chains.
+   */
+  private removeConflictingNodeReplacements(
+    replacementMap: ReplacementMap,
+    waysByNode: WaysByNode,
+  ) {
+    const groups = new Map<number, number[]>();
+    for (const [sourceId, targetId] of replacementMap) {
+      const group = groups.get(targetId) ?? [targetId];
+      group.push(sourceId);
+      groups.set(targetId, group);
+    }
+    for (const group of groups.values()) {
+      if (this.nodeReplacementGroupCompatible(group, waysByNode)) continue;
+      for (const id of group) replacementMap.delete(id);
+    }
+  }
+
+  private nodeReplacementGroupCompatible(group: readonly number[], waysByNode: WaysByNode) {
+    const firstNode = this.getCurrentNode(group[0]!);
+    if (!firstNode) return false;
+    const tagValues = new Map<string, string | number>();
+    const incidentWayGroups: (readonly OsmWay[])[] = [];
+    for (const id of group) {
+      const node = this.getCurrentNode(id);
+      if (!node || hasConflictingGradeOrAccessTags(firstNode.tags, node.tags)) return false;
+      for (const [key, value] of Object.entries(node.tags ?? {})) {
+        const previous = tagValues.get(key);
+        if (previous !== undefined && previous !== value) return false;
+        tagValues.set(key, value);
+      }
+      const ways = waysByNode.get(id);
+      if (ways?.length) incidentWayGroups.push(ways);
+    }
+
+    // One existing junction may already join different grades. Isolated sources
+    // add no way context. With two incident sets, compatibility across every pair
+    // requires all contexts to agree; equality against one representative proves
+    // that in linear time, without repeatedly comparing coincident source nodes.
+    if (incidentWayGroups.length < 2) return true;
+    const firstWay = incidentWayGroups[0]![0]!;
+    return incidentWayGroups.every((ways) =>
+      ways.every((way) => wayContextsCompatible(firstWay, way)),
+    );
+  }
+
   private reconcileNodeTags(patchNode: OsmNode, baseNodeId: number) {
     const baseNode = this.getCurrentNode(baseNodeId);
     if (!baseNode) return;
@@ -701,7 +755,7 @@ export class OsmChangeset {
    */
   deduplicateNodes(nodes: Nodes) {
     const sameDataset = nodes === this.osm.nodes;
-    const replacementMap: ReplacementMap = new Map();
+    let replacementMap: ReplacementMap = new Map();
     const exactCandidates: NodeCandidate[] = [];
     const contextNodeIds = new Set<number>();
 
@@ -749,6 +803,8 @@ export class OsmChangeset {
     }
 
     if (replacementMap.size === 0) return replacementMap;
+    replacementMap = flattenReplacementMap(replacementMap);
+    this.removeConflictingNodeReplacements(replacementMap, waysByNode);
     this.removeUnsafeNodeReplacements(replacementMap);
     if (replacementMap.size === 0) return replacementMap;
     this.applyNodeReplacementsToWays(replacementMap);

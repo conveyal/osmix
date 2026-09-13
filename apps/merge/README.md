@@ -89,7 +89,7 @@ in-stream extraction remains available. The app does not build the large index s
    selected tags onto base entities and keeps imported geometry; network attachment rewrites only accepted references in
    patch-created ways. Ambiguous and routing-affecting candidates remain reviewable.
 5. **Reconcile exact matches** – Combine compatible entities with different IDs only when coordinates or
-   ordered geometry agree at OSM precision. Base IDs are preserved and patch references are rewritten.
+   ordered geometry agree at OSM precision. All nodes proposed for one base survivor must also be compatible with each other. A conflicting group retains its imported nodes, attributes, and references to those nodes; compatible groups preserve the base ID and rewrite accepted patch references.
 6. **Create intersections** – Connect compatible same-grade crossings while preserving existing junctions,
    including bridge entrances. Unsafe shared-junction changes and new grade-separated interior crossings are skipped.
 7. **Inspect and download** – Compare the result on the map and download the merged PBF or change summary.
