@@ -16,6 +16,7 @@ import {
   type RoutingCaseReport,
   RoutingTestHarness,
   stableRoutingReport,
+  verifyRoutingCaseReport,
   writeR5OracleArtifacts,
   writeRoutingDiagnostics,
 } from "./routing-harness.ts";
@@ -54,51 +55,12 @@ function topologyFingerprint(osm: Osm): string {
 }
 
 function expectReportToMatchCase(report: RoutingCaseReport, testCase: RoutingTestCase): void {
-  expect(report.caseId).toBe(testCase.id);
-  expect(report.graphPolicy).toBe(testCase.graphPolicy ?? "osmix-default");
-  expect
-    .soft(
-      report.algorithmAgreement,
-      `${testCase.id}: Dijkstra and A* disagree (${JSON.stringify(report.algorithmCosts)})`,
-    )
-    .toBe(true);
-
-  if (testCase.policyLimitation) {
-    expect(report.from, `${testCase.id}: policy-witness origin did not resolve`).not.toBeNull();
-    expect(report.to, `${testCase.id}: policy-witness destination did not resolve`).not.toBeNull();
-    return;
-  }
-
-  if (testCase.expect.reachable === undefined) {
-    throw new Error(`${testCase.id}: non-policy cases must declare reachability`);
-  }
-  expect(report.reachable).toBe(testCase.expect.reachable);
-
-  if (!testCase.expect.reachable) {
-    expect(report.path).toBeNull();
-    return;
-  }
-
-  expect(report.from, `${testCase.id}: origin did not resolve`).not.toBeNull();
-  expect(report.to, `${testCase.id}: destination did not resolve`).not.toBeNull();
-  expect(report.path, `${testCase.id}: expected a route`).not.toBeNull();
-  if (!report.path) return;
-
-  const { distanceMeters, timeSeconds, wayIds } = report.path;
-  const distance = testCase.expect.distanceMeters;
-  if (distance) {
-    expect(distanceMeters).toBeGreaterThanOrEqual(distance.min);
-    expect(distanceMeters).toBeLessThanOrEqual(distance.max);
-  }
-  const time = testCase.expect.timeSeconds;
-  if (time) {
-    expect(timeSeconds).toBeGreaterThanOrEqual(time.min);
-    expect(timeSeconds).toBeLessThanOrEqual(time.max);
-  }
-  for (const wayId of testCase.expect.requiredWayIds ?? []) expect(wayIds).toContain(wayId);
-  for (const wayId of testCase.expect.forbiddenWayIds ?? []) {
-    expect(wayIds).not.toContain(wayId);
-  }
+  const verification = verifyRoutingCaseReport(report, testCase);
+  expect(report.verification).toEqual(verification);
+  expect(
+    verification.checks.filter((check) => check.outcome === "failed").map((check) => check.name),
+    `${testCase.id}: ${JSON.stringify(stableRoutingReport(report))}`,
+  ).toEqual([]);
 }
 
 function expectReportsToMatchCases(
@@ -128,6 +90,7 @@ function stableReports(
       toNodeId: report.to?.nodeId ?? null,
       algorithmAgreement: report.algorithmAgreement,
       policyLimitation: report.policyLimitation,
+      verification: report.verification,
     };
   });
 }

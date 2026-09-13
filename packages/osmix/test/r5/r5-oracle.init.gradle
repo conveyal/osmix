@@ -17,8 +17,6 @@ gradle.afterProject { project, state ->
     }
 
     def oracleSourceDirectory = requiredProperty('osmixOracleSourceDir')
-    def oracleManifest = requiredProperty('osmixOracleManifest')
-    def oracleOutputDirectory = requiredProperty('osmixOracleOutputDir')
     def defaultOracleDatasets = [
             'monaco-raw',
             'monaco-empty-merge',
@@ -50,9 +48,17 @@ gradle.afterProject { project, state ->
         dependsOn(project.tasks.named(oracleSourceSet.classesTaskName))
         classpath = oracleSourceSet.runtimeClasspath
         mainClass = 'R5RoutingOracle'
+        def oracleManifest = requiredProperty('osmixOracleManifest')
+        def oracleOutputDirectory = requiredProperty('osmixOracleOutputDir')
         args(oracleManifest, oracleOutputDirectory)
         oracleDatasets.each { datasetId ->
             args(datasetId, new File(oracleOutputDirectory, "${datasetId}.osm.pbf").absolutePath)
         }
+    }
+
+    project.tasks.register('testOsmixRoutingOracle', JavaExec) {
+        dependsOn(project.tasks.named(oracleSourceSet.classesTaskName))
+        classpath = oracleSourceSet.runtimeClasspath
+        mainClass = 'R5RoutingOracleTest'
     }
 }
