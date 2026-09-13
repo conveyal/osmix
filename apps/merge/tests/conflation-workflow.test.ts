@@ -8,14 +8,43 @@ import {
 } from "../src/components/conflation-review";
 import {
   conflationBulkActionCopy,
+  conflationFormErrors,
   DEFAULT_CONFLATION_FORM_STATE,
   DEFAULT_CONFLATION_PROPERTY_KEYS,
+  firstInvalidConflationInputId,
   parseConflationPropertyKeys,
   toOsmConflationOptions,
   validateConflationForm,
 } from "../src/lib/conflation-workflow";
 
 describe("conflation workflow configuration", () => {
+  it("links independent setting errors to the first input that needs correction", () => {
+    const invalid = {
+      ...DEFAULT_CONFLATION_FORM_STATE,
+      enabled: true,
+      propertyKeys: " , ",
+      maxDistanceMeters: Number.NaN,
+    };
+    expect(conflationFormErrors(invalid)).toEqual({
+      maxDistanceMeters: "Match distance must be greater than zero.",
+      propertyKeys: "Enter at least one OSM tag key to copy.",
+    });
+    expect(firstInvalidConflationInputId(invalid)).toBe("conflation-property-keys");
+    expect(firstInvalidConflationInputId({ ...invalid, propertyKeys: "name" })).toBe(
+      "conflation-distance",
+    );
+    const correctedRadius = { ...invalid, maxDistanceMeters: 0.001 };
+    expect(firstInvalidConflationInputId(correctedRadius)).toBe("conflation-property-keys");
+    const noActions = { ...correctedRadius, transferProperties: false };
+    expect(conflationFormErrors(noActions)).toEqual({
+      actions: "Select Copy tags, Connect network, or both.",
+    });
+    expect(firstInvalidConflationInputId(noActions)).toBe("conflation-property-transfer");
+    expect(firstInvalidConflationInputId({ ...noActions, attachNetwork: true })).toBeNull();
+    expect(conflationFormErrors({ ...invalid, enabled: false })).toEqual({});
+    expect(firstInvalidConflationInputId({ ...invalid, enabled: false })).toBeNull();
+  });
+
   it("keeps fuzzy matching disabled by default", () => {
     expect(DEFAULT_CONFLATION_FORM_STATE).toEqual({
       enabled: false,

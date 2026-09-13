@@ -191,6 +191,16 @@ Put concise supporting text next to unfamiliar controls and connect it with
 `aria-describedby`. Humanize internal status and reason-code values in visible
 copy, but do not change the stable values used by workers or saved decisions.
 
+### Matching evidence and accessibility
+
+Lead with features, attributes, and connections. Explain an OSM node as a point and an OSM way as an ordered sequence of points; keep their type and ID available for identifying the exact data. A proposed match is evidence to assess, not a completed action.
+
+Show finite distances with meters. Distinguish no eligible target within the search radius, nearby segments that cannot form a supported match, and an unavailable distance for an existing target. Never display `Infinity`, `NaN`, or a fabricated zero as a measurement. A small distance alone does not establish a safe connection.
+
+Compare base and imported geometry using both shape and color: a base circle and solid line, an imported diamond and dashed line. Keep a visible text legend. Co-located points must remain distinguishable at their true coordinates; do not offset a marker to separate them. Coordinate evidence must come from the same highlighted geometry, with explicit Latitude and Longitude labels and selectable values. For a way, identify its start and end instead of implying a single point represents the whole geometry. Changing or clearing the comparison must update map and text together without changing matching decisions.
+
+Associate controls with visible labels and persistent concise help through `aria-describedby`; optional popovers may add detail. Associate field errors with the relevant input and mark it invalid. Expose selection and expanded states, retain visible keyboard focus, and give evidence a named region. During a pending choice, keep eligible radios and checkboxes focusable, expose their temporary disabled state, and block repeated changes in their handlers; permanently ineligible controls remain disabled. Focus indicators must remain visible in forced-colors mode. Explain protected and routing-affecting attributes in text as well as row styling. Keep evidence and long attribute values readable at 320 px and 512 px; use stacked values when a three-column diff would force horizontal scrolling.
+
 Provide **Back to matching** from reconciliation, failed cumulative generation,
 and the cumulative matching preview before application. Returning preserves the
 loaded original inputs, options, and saved decisions. Show the affected imported

@@ -124,19 +124,22 @@ paths, school boundaries, and ambiguous intersections must remain separate.
 
 **Match imported data** restores that workflow as an explicit opt-in conflation stage:
 
-- **Property transfer** copies only the tag keys entered in the form while preserving both base and imported
+- **Copy tags** (property transfer) copies only the tag keys entered in the form while preserving both base and imported
   geometry. Matched imported ways and their connecting nodes remain present, so copying tags does not disconnect
   imported branches. Patch values win for selected keys; missing patch values never delete base values. Structural
   keys are blocked, and routing-affecting keys require review. Direct merge and exact reconciliation still apply
   their own rules independently of tag copying.
-- **Network attachment** preserves the base node and rewrites only accepted references in imported patch
+- **Connect network** (network attachment) preserves the base node and rewrites only accepted references in imported patch
   ways. Automatic matches must be unique and agree on routing family, grade context, and local bearing.
   Restrictions, relation-member rewrites, way collapse, and other integrity hazards remain blocked.
 
-The default radius is one meter. High-confidence matches are automatic; accepted, review, blocked, unmatched,
-and rejected candidates remain visible through paged status, entity, and reason filters. Selecting a candidate
-draws the imported source and proposed base target together on the map and shows its geometry evidence and
-property diff. Review decisions are stable candidate-ID records and are restored with the worker session.
+The default radius is one meter. High-confidence actions are scheduled automatically for the next preview; they change the dataset only when that preview is applied. Paged status, feature-type, and reason filters keep scheduled, review, blocked, unmatched, and skipped choices available. Review decisions are stable candidate-ID records and are restored with the worker session.
+
+**Compare** highlights an imported feature and its proposed base target without changing the scheduled actions. The visible legend identifies the base with a circle and solid line and the import with a diamond and dashed line. Co-located markers stay at their actual coordinates, with both shapes visible. The comparison shows selectable Latitude and Longitude values from the highlighted geometry; ways show their start and end positions. An OSM node is a point, and an OSM way is an ordered sequence of node references forming a line or area boundary.
+
+**Match evidence and attributes** explains the proposed correspondence and shows base and imported attribute values. Finite distances include meters. No eligible target within the search radius, unsupported nearby segments, and an unavailable measurement for an existing target have different explanations. A short distance does not override a blocked action. Protected and routing-affecting attributes are identified in text, so their meaning does not depend on row color.
+
+Matching controls have visible labels and associated help. Keyboard users can change filters, choose a target, toggle either action, compare geometry, and expand evidence; the comparison selection is separate from the target scheduled for matching. Long values wrap in narrow panels.
 
 Check the status of each action: property transfer and network attachment are assessed separately. **Needs
 review** allows a decision about an eligible action; it does not override **Blocked** on the other action.
@@ -144,8 +147,8 @@ An ordinary relation membership or an additional review reason never lifts an ex
 example, a bridge in a walking-route relation remains blocked from transferring tags to a ground-level path
 when their grade contexts conflict.
 
-The **Filtered matches** toolbar applies property transfer, network attachment, or rejection to every candidate
-matching the current filters across all pages. Automatic matches already apply unless rejected. Before changing
+The **Filtered matches** toolbar schedules Copy tags, Connect network, or Skip filtered for eligible candidates
+matching the current filters across all pages. Automatic actions are already scheduled for preview. Before changing
 decisions, the app shows how many automatic and review candidates are eligible, how many blocked or ambiguous
 matches will be skipped, and how many prior decisions will be replaced. Accepted and rejected rows may leave the
 active status filter, so the list returns to its first page after a successful action.

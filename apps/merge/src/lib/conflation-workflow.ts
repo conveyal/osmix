@@ -37,17 +37,41 @@ export function parseConflationPropertyKeys(value: string): string[] {
   ].sort();
 }
 
-/** Return the first configuration problem that must be resolved before discovery. */
-export function validateConflationForm(state: ConflationFormState): string | null {
-  if (!state.enabled) return null;
+export const CONFLATION_ERROR_FIELD_IDS = {
+  actions: "conflation-property-transfer",
+  propertyKeys: "conflation-property-keys",
+  maxDistanceMeters: "conflation-distance",
+} as const;
+
+export type ConflationFormErrors = Partial<Record<keyof typeof CONFLATION_ERROR_FIELD_IDS, string>>;
+
+/** Keep each configuration problem attached to the control that can resolve it. */
+export function conflationFormErrors(state: ConflationFormState): ConflationFormErrors {
+  const errors: ConflationFormErrors = {};
+  if (!state.enabled) return errors;
   if (!Number.isFinite(state.maxDistanceMeters) || state.maxDistanceMeters <= 0) {
-    return "Match distance must be greater than zero.";
+    errors.maxDistanceMeters = "Match distance must be greater than zero.";
   }
   if (!state.transferProperties && !state.attachNetwork) {
-    return "Select Copy tags, Connect network, or both.";
+    errors.actions = "Select Copy tags, Connect network, or both.";
   }
   if (state.transferProperties && parseConflationPropertyKeys(state.propertyKeys).length === 0) {
-    return "Enter at least one OSM tag key to copy.";
+    errors.propertyKeys = "Enter at least one OSM tag key to copy.";
+  }
+  return errors;
+}
+
+/** Return the first configuration problem that must be resolved before discovery. */
+export function validateConflationForm(state: ConflationFormState): string | null {
+  const errors = conflationFormErrors(state);
+  return errors.actions ?? errors.propertyKeys ?? errors.maxDistanceMeters ?? null;
+}
+
+/** Focus the same first problem that blocks discovery when a workflow is started. */
+export function firstInvalidConflationInputId(state: ConflationFormState): string | null {
+  const errors = conflationFormErrors(state);
+  for (const field of ["actions", "propertyKeys", "maxDistanceMeters"] as const) {
+    if (errors[field]) return CONFLATION_ERROR_FIELD_IDS[field];
   }
   return null;
 }

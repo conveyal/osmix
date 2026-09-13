@@ -2,7 +2,12 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: ["guidance.spec.ts", "merge-base-loading.spec.ts", "worker-runtime.spec.ts"],
+  testMatch: [
+    "guidance.spec.ts",
+    "match-evidence.spec.ts",
+    "merge-base-loading.spec.ts",
+    "worker-runtime.spec.ts",
+  ],
   timeout: 120_000,
   use: {
     baseURL: "http://127.0.0.1:4173",
@@ -24,7 +29,7 @@ export default defineConfig({
       // Merge journey is parsing PBFs and rendering MapLibre.
       name: "guidance",
       dependencies: ["merge-integration"],
-      testMatch: ["guidance.spec.ts"],
+      testMatch: ["guidance.spec.ts", "match-evidence.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
     {

@@ -251,7 +251,7 @@ export function MergeCompletionSummary({
   };
 
   return (
-    <Card aria-label="Merge completion summary">
+    <Card role="region" aria-label="Merge completion summary">
       <CardHeader>
         Merge complete
         {summary && summary.unresolvedFeatures > 0 ? " · unresolved matches remain" : ""}
@@ -275,10 +275,9 @@ export function MergeCompletionSummary({
                 <dd className="font-bold">{summary.unresolvedFeatures.toLocaleString()}</dd>
               </dl>
               <p>
-                {summary.features.toLocaleString()} imported features were considered for matching.{" "}
-                {summary.skippedFeatures.toLocaleString()} were intentionally skipped;{" "}
-                {summary.unchangedFeatures.toLocaleString()} were resolved without an additional
-                matching action.
+                Imported features considered for matching: {summary.features.toLocaleString()}.{" "}
+                Intentionally skipped: {summary.skippedFeatures.toLocaleString()}. Resolved without
+                additional matching actions: {summary.unchangedFeatures.toLocaleString()}.
               </p>
               <p>
                 Actions count actual changes from matching, after the ordinary merge. One feature

@@ -1,30 +1,35 @@
 import { useAtom, useSetAtom } from "jotai";
 
-import { validateConflationForm } from "../lib/conflation-workflow";
+import { conflationFormErrors } from "../lib/conflation-workflow";
 import { conflationFormAtom, resetConflationReviewAtom } from "../state/conflation";
 import { InfoTooltip } from "./info-tooltip";
 import { Card, CardContent, CardHeader } from "./ui/card";
 import { Checkbox, CheckboxLabel } from "./ui/checkbox";
 import { Input } from "./ui/input";
 
+const CONTROL_FOCUS =
+  "focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[CanvasText]";
+
 export function ConflationConfig() {
   const [form, setForm] = useAtom(conflationFormAtom);
   const resetReview = useSetAtom(resetConflationReviewAtom);
-  const validationMessage = validateConflationForm(form);
+  const errors = conflationFormErrors(form);
   const updateForm = (update: (current: typeof form) => typeof form) => {
     setForm(update);
     resetReview();
   };
 
   return (
-    <Card>
-      <CardHeader>Match imported data</CardHeader>
+    <Card role="region" aria-labelledby="conflation-settings-title">
+      <CardHeader id="conflation-settings-title">Match imported data</CardHeader>
       <CardContent className="flex flex-col gap-2">
         <div className="flex items-center gap-1">
-          <CheckboxLabel>
+          <CheckboxLabel className="min-h-8">
             <Checkbox
+              className={CONTROL_FOCUS}
               checked={form.enabled}
               id="conflation-enabled"
+              aria-describedby="conflation-enabled-help"
               onCheckedChange={(enabled) => {
                 updateForm((current) => ({ ...current, enabled }));
               }}
@@ -37,6 +42,10 @@ export function ConflationConfig() {
           </InfoTooltip>
         </div>
 
+        <p id="conflation-enabled-help" className="text-muted-foreground">
+          Find possible matches between imported features and the nearby base dataset.
+        </p>
+
         {form.enabled ? (
           <div className="flex flex-col gap-2 border-t pt-2">
             <p>
@@ -44,10 +53,13 @@ export function ConflationConfig() {
               connecting, or both.
             </p>
             <div className="flex items-center gap-1">
-              <CheckboxLabel>
+              <CheckboxLabel className="min-h-8">
                 <Checkbox
+                  className={CONTROL_FOCUS}
                   checked={form.transferProperties}
                   id="conflation-property-transfer"
+                  aria-describedby={`conflation-copy-help${errors.actions ? " conflation-actions-error" : ""}`}
+                  aria-invalid={errors.actions ? true : undefined}
                   onCheckedChange={(transferProperties) => {
                     updateForm((current) => ({ ...current, transferProperties }));
                   }}
@@ -62,6 +74,11 @@ export function ConflationConfig() {
               </InfoTooltip>
             </div>
 
+            <p id="conflation-copy-help" className="text-muted-foreground">
+              Copy selected attributes to base features. Imported geometry stays intact; missing
+              imported values leave base attributes unchanged.
+            </p>
+
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1">
                 <label htmlFor="conflation-property-keys">OSM tag keys to copy</label>
@@ -73,7 +90,12 @@ export function ConflationConfig() {
                 </InfoTooltip>
               </div>
               <Input
+                className={CONTROL_FOCUS}
                 id="conflation-property-keys"
+                name="matching-tag-keys"
+                spellCheck={false}
+                aria-describedby={`conflation-keys-help${errors.propertyKeys ? " conflation-keys-error" : ""}`}
+                aria-invalid={errors.propertyKeys ? true : undefined}
                 disabled={!form.transferProperties}
                 placeholder="name, surface, operator"
                 value={form.propertyKeys}
@@ -84,13 +106,24 @@ export function ConflationConfig() {
                   }));
                 }}
               />
+              <p id="conflation-keys-help" className="text-muted-foreground">
+                Use attribute names, separated by commas or spaces. Only selected keys are copied.
+              </p>
+              {errors.propertyKeys ? (
+                <p id="conflation-keys-error" className="text-destructive">
+                  {errors.propertyKeys}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex items-center gap-1">
-              <CheckboxLabel>
+              <CheckboxLabel className="min-h-8">
                 <Checkbox
+                  className={CONTROL_FOCUS}
                   checked={form.attachNetwork}
                   id="conflation-network-attachment"
+                  aria-describedby={`conflation-network-help${errors.actions ? " conflation-actions-error" : ""}`}
+                  aria-invalid={errors.actions ? true : undefined}
                   onCheckedChange={(attachNetwork) => {
                     updateForm((current) => ({ ...current, attachNetwork }));
                   }}
@@ -104,6 +137,16 @@ export function ConflationConfig() {
               </InfoTooltip>
             </div>
 
+            <p id="conflation-network-help" className="text-muted-foreground">
+              Join eligible imported paths to existing base points. This changes how the paths
+              connect.
+            </p>
+            {errors.actions ? (
+              <p id="conflation-actions-error" className="text-destructive">
+                {errors.actions}
+              </p>
+            ) : null}
+
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1">
                 <label htmlFor="conflation-distance">Candidate search radius (meters)</label>
@@ -114,11 +157,16 @@ export function ConflationConfig() {
                 </InfoTooltip>
               </div>
               <Input
+                className={CONTROL_FOCUS}
                 id="conflation-distance"
-                min="0.01"
-                step="0.1"
+                name="matching-search-radius"
+                aria-describedby={`conflation-distance-help${errors.maxDistanceMeters ? " conflation-distance-error" : ""}`}
+                aria-invalid={errors.maxDistanceMeters ? true : undefined}
+                min="0"
+                step="any"
                 type="number"
-                value={form.maxDistanceMeters}
+                inputMode="decimal"
+                value={Number.isFinite(form.maxDistanceMeters) ? form.maxDistanceMeters : ""}
                 onChange={(event) => {
                   updateForm((current) => ({
                     ...current,
@@ -126,6 +174,15 @@ export function ConflationConfig() {
                   }));
                 }}
               />
+              <p id="conflation-distance-help" className="text-muted-foreground">
+                Search nearby features within this distance in meters. Proximity alone does not
+                establish a match.
+              </p>
+              {errors.maxDistanceMeters ? (
+                <p id="conflation-distance-error" className="text-destructive">
+                  {errors.maxDistanceMeters}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex items-center gap-1 text-muted-foreground">
@@ -136,12 +193,6 @@ export function ConflationConfig() {
                 candidates remain available for review.
               </InfoTooltip>
             </div>
-
-            {validationMessage ? (
-              <p className="text-destructive" role="alert">
-                {validationMessage}
-              </p>
-            ) : null}
           </div>
         ) : null}
       </CardContent>

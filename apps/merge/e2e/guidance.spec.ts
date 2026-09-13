@@ -414,8 +414,15 @@ test.describe("matching action review", () => {
       .click();
     const connect = actions(page).getByRole("checkbox", { name: "Connect network", exact: true });
     await expect(connect).toBeDisabled();
+    await expect(connect).toHaveAttribute("aria-disabled", "true");
+    await expect(
+      actions(page)
+        .locator("label")
+        .filter({ hasText: "Connect network" })
+        .locator('input[type="checkbox"]'),
+    ).toBeDisabled();
     await expect(connect).not.toBeChecked();
-    await expect(connect).toHaveAccessibleDescription(/Blocked: Routing uses are incompatible/);
+    await expect(connect).toHaveAccessibleDescription(/Blocked: Allowed travel is incompatible/);
     await expect(
       actions(page).getByRole("checkbox", { name: "Copy tags", exact: true }),
     ).toBeChecked();
@@ -639,7 +646,7 @@ test.describe("matching action review", () => {
       .click();
     await expect(target(page, 2)).toBeDisabled();
     await expect(target(page, 2)).toHaveAccessibleDescription(
-      /Unavailable: .*Routing uses are incompatible/,
+      /Unavailable: .*Allowed travel is incompatible/,
     );
     await expect(target(page, 1)).toBeEnabled();
     await target(page, 1).click();
@@ -741,14 +748,14 @@ test("completion explains mixed matching results and downloads the retained repo
   await harness.getByRole("button", { name: "Finish completion run" }).click();
   const summary = harness.getByLabel("Merge completion summary");
   await expect(summary).toContainText("Merge complete · unresolved matches remain");
-  await expect(summary).toContainText("5 imported features were considered");
+  await expect(summary).toContainText("Imported features considered for matching: 5");
   await expect(summary.getByLabel("Applied matching actions").locator("dd")).toHaveText([
     "1",
     "1",
     "0",
     "3",
   ]);
-  await expect(summary).toContainText("1 were intentionally skipped");
+  await expect(summary).toContainText("Intentionally skipped: 1");
   await summary.getByRole("button", { name: "Imported feature outcomes" }).click();
   await expect(summary.getByLabel("Imported feature outcome details")).toContainText(
     "Imported node 201",

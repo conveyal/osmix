@@ -60,7 +60,11 @@ import {
 } from "../components/ui/item";
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
-import { toOsmConflationOptions, validateConflationForm } from "../lib/conflation-workflow";
+import {
+  firstInvalidConflationInputId,
+  toOsmConflationOptions,
+  validateConflationForm,
+} from "../lib/conflation-workflow";
 import { writeJsonArray, writeJsonReport } from "../lib/json-download";
 import {
   matchingReviewIssue,
@@ -291,6 +295,12 @@ export default function MergeBlock() {
     }
   };
   const conflationValidationMessage = validateConflationForm(conflationForm);
+  const canStartConfiguredMerge = () => {
+    const invalidInputId = firstInvalidConflationInputId(conflationForm);
+    if (!invalidInputId) return true;
+    document.getElementById(invalidInputId)?.focus();
+    return false;
+  };
   const conflationOptions = conflationValidationMessage
     ? undefined
     : toOsmConflationOptions(conflationForm);
@@ -803,17 +813,16 @@ export default function MergeBlock() {
         <div
           className={cn(
             "flex flex-col gap-4",
-            !base.osm || !patch.osm || conflationValidationMessage
-              ? "opacity-50 pointer-events-none"
-              : "",
+            !base.osm || !patch.osm ? "opacity-50 pointer-events-none" : "",
           )}
         >
           <Item
             render={
               <button
                 type="button"
-                disabled={!base.osm || !patch.osm || Boolean(conflationValidationMessage)}
+                disabled={!base.osm || !patch.osm}
                 onClick={() => {
+                  if (!canStartConfiguredMerge()) return;
                   beginMergeOutcome();
                   setChangesetStats(null);
                   resetConflationReview();
@@ -839,8 +848,9 @@ export default function MergeBlock() {
             render={
               <button
                 type="button"
-                disabled={!base.osm || !patch.osm || Boolean(conflationValidationMessage)}
+                disabled={!base.osm || !patch.osm}
                 onClick={async () => {
+                  if (!canStartConfiguredMerge()) return;
                   beginMergeOutcome();
                   const automaticSteps = conflationOptions
                     ? CONFLATION_AUTOMATIC_MERGE_STEPS

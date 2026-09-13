@@ -63,7 +63,7 @@ function renderWithStore(
 }
 
 describe("merge inline guidance", () => {
-  it("keeps proximity labels visible and moves detailed help into info tooltips", () => {
+  it("keeps labels and essential field descriptions visible with optional detailed help", () => {
     const html = renderWithStore(createElement(ConflationConfig), (store) => {
       store.set(conflationFormAtom, {
         enabled: true,
@@ -84,7 +84,8 @@ describe("merge inline guidance", () => {
     expect(html).toContain('aria-label="About automatic matching decisions"');
     expect(html).not.toContain("Distance alone never guarantees acceptance");
     expect(html).not.toContain("routing-affecting tags require review");
-    expect(html).not.toContain("Imported geometry stays intact");
+    expect(html).toContain("Imported geometry stays intact");
+    expect(html).toContain("values leave base attributes unchanged");
     expect(html).not.toContain("Missing imported values leave base tags unchanged");
     expect(html).not.toContain("reconciliation apply their own rules separately");
   });
@@ -103,13 +104,13 @@ describe("merge inline guidance", () => {
 
     expect(legend).toContain('aria-label="About candidate statuses"');
     expect(legend).not.toContain("at least one action needs a decision");
-    expect(conflationReasonLabel("would-collapse-way")).toBe("Attachment would collapse a way");
+    expect(conflationReasonLabel("would-collapse-way")).toBe("Connection would collapse a path");
     expect(conflationCandidateTitle(CANDIDATE)).toBe("Imported node 11 → Base node 22");
     expect(evidence).toContain('aria-label="About candidate evidence metrics"');
     expect(evidence).not.toContain("Distance finds nearby candidates");
-    expect(evidence).toContain("Imported routing family");
-    expect(evidence).toContain("Base routing family");
-    expect(evidence).toContain("Property");
+    expect(evidence).toContain("Imported network use");
+    expect(evidence).toContain("Base network use");
+    expect(evidence).toContain("Attribute differences");
     expect(evidence).toContain("Base value");
     expect(evidence).toContain("Imported value");
     expect(actions).toContain("Copy tags");

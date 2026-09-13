@@ -1,4 +1,4 @@
-import { useSetAtom } from "jotai";
+import { useAtom } from "jotai";
 import { LocateFixedIcon } from "lucide-react";
 import type {
   Osm,
@@ -16,19 +16,23 @@ import type {
 import {
   buildConflationActionDecision,
   conflationEffectiveStatus,
-  osmEntityToGeoJSONFeature,
   resolveConflationActions,
 } from "osmix";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { useMap } from "../hooks/map";
+import { comparisonBounds, createConflationComparison } from "../lib/conflation-comparison";
 import { conflationBulkActionCopy } from "../lib/conflation-workflow";
 import { cn } from "../lib/utils";
 import { conflationComparisonAtom } from "../state/conflation";
 import ActionButton, { useAction } from "./action-button";
-import { Details, DetailsContent, DetailsSummary } from "./details";
+import { CandidateEvidence, conflationDistanceLabel } from "./conflation-candidate-evidence";
+import {
+  ConflationComparisonEvidence,
+  ConflationComparisonLegend,
+} from "./conflation-comparison-evidence";
 import { InfoTooltip } from "./info-tooltip";
-import { EmptyState } from "./section";
+import { EmptyState, SectionTitle } from "./section";
 import { StatusDot, type StatusDotStatus } from "./status-dot";
 import { Button } from "./ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group";
@@ -44,7 +48,9 @@ import {
 } from "./ui/dialog";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "./ui/item";
 import { Spinner } from "./ui/spinner";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Table, TableBody, TableCell, TableRow } from "./ui/table";
+
+export { CandidateEvidence } from "./conflation-candidate-evidence";
 
 const REASON_CODES = [
   "bearing-mismatch",
@@ -77,7 +83,7 @@ const STATUS_DOT: Record<OsmConflationEffectiveStatus, StatusDotStatus> = {
 };
 
 const STATUS_LABEL: Record<OsmConflationEffectiveStatus, string> = {
-  accepted: "Accepted",
+  accepted: "Scheduled",
   automatic: "Scheduled automatically",
   blocked: "Blocked",
   rejected: "Skipped",
@@ -100,28 +106,21 @@ const REASON_LABEL: Record<OsmConflationReasonCode, string> = {
   "drivable-network": "Drivable network requires review",
   "exact-match": "Handled by exact reconciliation",
   "geometry-mismatch": "Geometry differs",
-  "grade-conflict": "Grade separation conflicts",
+  "grade-conflict": "Features are on incompatible levels",
   "length-mismatch": "Lengths differ",
-  "many-to-one": "Multiple imported entities share one base target",
+  "many-to-one": "Multiple imported features share one base target",
   "multiple-targets": "Multiple possible base targets",
-  "no-transferable-properties": "No selected properties differ",
-  "node-context-conflict": "Connected-way context conflicts",
+  "no-transferable-properties": "No selected attributes differ",
+  "node-context-conflict": "Connected paths have incompatible context",
   "non-routing-target": "Base target is not routable",
-  "protected-tag": "Protected structural property differs",
-  "relation-member": "Entity participates in a relation",
-  "routing-family-conflict": "Routing uses are incompatible",
-  "routing-property": "Routing property requires review",
+  "protected-tag": "Protected structural attribute differs",
+  "relation-member": "Feature belongs to an OSM relation",
+  "routing-family-conflict": "Allowed travel is incompatible",
+  "routing-property": "Attribute affects travel and requires review",
   "same-id": "Handled as a same-ID update",
-  "unsupported-way-chain": "One-to-many way matching is unsupported",
-  "would-collapse-way": "Attachment would collapse a way",
+  "unsupported-way-chain": "Matching one feature to several paths is unsupported",
+  "would-collapse-way": "Connection would collapse a path",
 };
-
-const ROUTING_FAMILY_LABEL = {
-  "bicycle-shared": "Bicycle or shared-use",
-  "motor-road": "Motor road",
-  "non-routable": "Non-routable",
-  pedestrian: "Pedestrian",
-} as const;
 
 export function conflationStatusLabel(status: OsmConflationEffectiveStatus) {
   return STATUS_LABEL[status];
@@ -160,33 +159,6 @@ function effectiveStatus(candidate: OsmConflationCandidateView) {
   return conflationEffectiveStatus(candidate, candidate.decision ? [candidate.decision] : []);
 }
 
-function entityFeature(
-  osm: Osm,
-  candidate: OsmConflationCandidateView,
-  role: "source" | "target",
-): GeoJSON.Feature | null {
-  const id = role === "source" ? candidate.sourceId : candidate.targetId;
-  if (id == null) return null;
-  const entity = candidate.entityType === "node" ? osm.nodes.getById(id) : osm.ways.getById(id);
-  if (!entity) return null;
-  const feature = osmEntityToGeoJSONFeature(osm, entity);
-  if (feature.type !== "Feature") return null;
-  return {
-    ...feature,
-    properties: { ...feature.properties, role },
-  };
-}
-
-function entityBbox(osm: Osm, candidate: OsmConflationCandidateView, role: "source" | "target") {
-  const id = role === "source" ? candidate.sourceId : candidate.targetId;
-  if (id == null) return null;
-  if (candidate.entityType === "node") {
-    const node = osm.nodes.getById(id);
-    return node ? ([node.lon, node.lat, node.lon, node.lat] as const) : null;
-  }
-  return osm.ways.getEntityBbox({ id });
-}
-
 function SummaryTable({ summary }: { summary: OsmConflationSummary }) {
   return (
     <Table>
@@ -209,9 +181,9 @@ export function ConflationStatusLegend() {
     <InfoTooltip label="About candidate statuses" side="bottom" align="end">
       <div className="grid gap-1">
         <p>
-          Overall status summarizes the candidate. Property transfer and network attachment are
-          assessed independently. Review reasons never lift a safety block. An eligible action can
-          still run while the other action remains blocked.
+          Overall status summarizes the proposed match. Copy tags and Connect network are assessed
+          independently. Review reasons never lift a safety block. An eligible action can still run
+          while the other action remains blocked.
         </p>
         {(["automatic", "review", "blocked", "unmatched", "accepted", "rejected"] as const).map(
           (status) => (
@@ -241,6 +213,13 @@ const MATCHING_ACTIONS = [
   },
 ] as const;
 
+const REVIEW_FOCUS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[CanvasText] forced-colors:focus-visible:outline-offset-2";
+
+function featureLabel(entityType: "node" | "way") {
+  return entityType === "node" ? "point" : "line or area";
+}
+
 function actionStatus(
   candidate: OsmConflationCandidateView,
   action: (typeof MATCHING_ACTIONS)[number],
@@ -258,6 +237,7 @@ export function CandidateActionStatuses({ candidate }: { candidate: OsmConflatio
   return (
     <div
       className="flex flex-wrap gap-x-3 text-muted-foreground"
+      role="group"
       aria-label="Scheduled matching actions"
       aria-live="polite"
     >
@@ -288,7 +268,7 @@ function BulkPreviewTable({ preview }: { preview: OsmConflationBulkDecisionPrevi
       <TableBody>
         {rows.map(([label, count]) => (
           <TableRow key={label}>
-            <TableCell>{label}</TableCell>
+            <TableCell className="whitespace-normal break-words">{label}</TableCell>
             <TableCell>{count.toLocaleString()}</TableCell>
           </TableRow>
         ))}
@@ -315,13 +295,13 @@ export function ConflationBulkActions({
   return (
     <>
       <div className="flex flex-col gap-2 border-b bg-muted/50 p-2">
-        <div className="flex items-center gap-1 font-bold uppercase tracking-wide">
+        <SectionTitle>
           Bulk decisions
           <InfoTooltip label="About bulk decisions" side="right" align="start">
             Bulk choices affect every match in the current filters across all pages. Automatic
             actions are already scheduled; preview changes before applying them.
           </InfoTooltip>
-        </div>
+        </SectionTitle>
         <div className="flex flex-wrap gap-1">
           {BULK_ACTIONS.map((action) => {
             const preview = bulkActions[action];
@@ -378,103 +358,6 @@ export function ConflationBulkActions({
   );
 }
 
-export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandidateView }) {
-  const { evidence } = candidate;
-  return (
-    <Details>
-      <DetailsSummary>Evidence and property diff</DetailsSummary>
-      <DetailsContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <span className="flex items-center gap-1">
-                  Evidence
-                  <InfoTooltip label="About candidate evidence metrics" side="right" align="start">
-                    Distance finds nearby candidates. Routing families describe allowed network use;
-                    bearing compares direction, length difference compares total geometry length,
-                    and maximum geometry distance measures the worst sampled separation.
-                  </InfoTooltip>
-                </span>
-              </TableHead>
-              <TableHead>Measured value</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell>Candidate distance</TableCell>
-              <TableCell>{evidence.distanceMeters.toFixed(3)} m</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Imported routing family</TableCell>
-              <TableCell>
-                {evidence.sourceRoutingFamilies
-                  .map((family) => ROUTING_FAMILY_LABEL[family])
-                  .join(", ") || "None"}
-              </TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Base routing family</TableCell>
-              <TableCell>
-                {evidence.targetRoutingFamilies
-                  .map((family) => ROUTING_FAMILY_LABEL[family])
-                  .join(", ") || "None"}
-              </TableCell>
-            </TableRow>
-            {evidence.bearingDifferenceDegrees !== undefined ? (
-              <TableRow>
-                <TableCell>Bearing difference</TableCell>
-                <TableCell>{evidence.bearingDifferenceDegrees.toFixed(1)}°</TableCell>
-              </TableRow>
-            ) : null}
-            {evidence.lengthDifferenceRatio !== undefined ? (
-              <TableRow>
-                <TableCell>Length difference</TableCell>
-                <TableCell>{(evidence.lengthDifferenceRatio * 100).toFixed(1)}%</TableCell>
-              </TableRow>
-            ) : null}
-            {evidence.maxGeometryDistanceMeters !== undefined ? (
-              <TableRow>
-                <TableCell>Maximum geometry distance</TableCell>
-                <TableCell>{evidence.maxGeometryDistanceMeters.toFixed(3)} m</TableCell>
-              </TableRow>
-            ) : null}
-          </TableBody>
-        </Table>
-
-        {evidence.tagDiff.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Property</TableHead>
-                <TableHead>Base value</TableHead>
-                <TableHead>Imported value</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {evidence.tagDiff.map((diff) => (
-                <TableRow
-                  key={diff.key}
-                  className={cn(
-                    diff.protected && "bg-destructive/10",
-                    !diff.protected && diff.routing && "bg-warning/10",
-                  )}
-                >
-                  <TableCell>{diff.key}</TableCell>
-                  <TableCell>{String(diff.baseValue ?? "not set")}</TableCell>
-                  <TableCell>{String(diff.patchValue)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <EmptyState>No selected property differences</EmptyState>
-        )}
-      </DetailsContent>
-    </Details>
-  );
-}
-
 export function CandidateActions({
   candidate,
   onDecision,
@@ -492,9 +375,15 @@ export function CandidateActions({
   return (
     <fieldset
       className="flex min-w-0 flex-col gap-2 border-t p-2"
-      disabled={isPending}
+      aria-busy={isPending}
+      aria-disabled={isPending ? true : undefined}
       aria-label={`Matching actions for imported ${candidate.entityType} ${candidate.sourceId}`}
+      aria-describedby={descriptionId}
     >
+      <p id={descriptionId} className="text-muted-foreground">
+        Choose actions for the next preview. Each choice preserves the other; the dataset changes
+        only when applied.
+      </p>
       {MATCHING_ACTIONS.map((action) => {
         const assessment = candidate[action.assessment];
         if (!assessment) return null;
@@ -506,12 +395,16 @@ export function CandidateActions({
         const helpId = `${descriptionId}-${action.action}`;
         return (
           <div key={action.action} className="flex flex-col gap-1">
-            <CheckboxLabel>
+            <CheckboxLabel className="min-h-8">
               <Checkbox
                 checked={scheduled[action.selected]}
-                disabled={isPending || !eligible}
-                aria-describedby={!eligible ? helpId : undefined}
-                onCheckedChange={(checked) =>
+                disabled={!eligible}
+                {...(eligible && isPending ? { "aria-disabled": true } : {})}
+                className={REVIEW_FOCUS}
+                aria-describedby={`${descriptionId}${!eligible ? ` ${helpId}` : ""}`}
+                onCheckedChange={(checked) => {
+                  // A temporary native disabled state would discard keyboard focus.
+                  if (isPending) return;
                   runAction(() =>
                     onDecision(
                       buildConflationActionDecision(
@@ -521,8 +414,8 @@ export function CandidateActions({
                         checked,
                       ),
                     ),
-                  )
-                }
+                  );
+                }}
               />
               {action.label}
             </CheckboxLabel>
@@ -600,31 +493,45 @@ export function CandidateTargetChoices({
     return actions.transferProperties || actions.attachNetwork;
   });
   const leftUnmatched = candidates.every((candidate) => effectiveStatus(candidate) === "rejected");
+  const choiceDescription = `${groupId}-help${selected.length > 1 ? ` ${groupId}-conflict` : ""}`;
   return (
-    <fieldset className="flex min-w-0 flex-col gap-2 p-2 border-b" disabled={isPending}>
+    <fieldset
+      className="flex min-w-0 flex-col gap-2 p-2 border-b"
+      aria-busy={isPending}
+      aria-disabled={isPending ? true : undefined}
+      aria-describedby={choiceDescription}
+      aria-invalid={selected.length > 1 ? true : undefined}
+    >
       <legend className="px-2 font-bold">Choose one base target</legend>
-      <p>
+      <p id={`${groupId}-help`}>
         These are alternative matches for the same imported feature. Choosing a target schedules its
         eligible actions. Adjust Copy tags and Connect network below.
       </p>
       {selected.length > 1 ? (
-        <p role="alert">
+        <p id={`${groupId}-conflict`} role="alert">
           More than one target is selected. Choose one target or leave this feature unmatched.
         </p>
       ) : null}
       {selected.length === 0 && !leftUnmatched ? (
         <p>No target selected. Choose one or leave this feature unmatched.</p>
       ) : null}
-      <label className="flex items-center gap-2">
+      <label className="flex min-h-8 items-center gap-2">
         <input
           type="radio"
+          className={REVIEW_FOCUS}
           name={groupId}
+          aria-disabled={isPending ? true : undefined}
+          aria-describedby={`${choiceDescription} ${groupId}-unmatched`}
           checked={selected.length === 0 && leftUnmatched}
-          onChange={() => runAction(() => onLeaveUnmatched(source))}
+          onChange={() => {
+            if (!isPending) runAction(() => onLeaveUnmatched(source));
+          }}
         />
         Leave unmatched
       </label>
-      <p className="text-muted-foreground">Leaving unmatched keeps ordinary imported additions.</p>
+      <p id={`${groupId}-unmatched`} className="text-muted-foreground">
+        Leaving unmatched keeps ordinary imported additions.
+      </p>
       {candidates.map((candidate) => {
         const actions = resolveConflationActions(candidate, {
           candidateId: candidate.id,
@@ -634,22 +541,26 @@ export function CandidateTargetChoices({
         const reasonId = `${groupId}-${candidate.id}`;
         return (
           <div key={candidate.id} className="flex flex-col gap-1">
-            <label className="flex items-center gap-2">
+            <label className="flex min-h-8 items-center gap-2">
               <input
                 type="radio"
+                className={REVIEW_FOCUS}
                 name={groupId}
                 checked={selected.length === 1 && selected[0]?.id === candidate.id}
                 disabled={!eligible}
-                aria-describedby={!eligible ? reasonId : undefined}
-                onChange={() =>
+                aria-disabled={eligible && isPending ? true : undefined}
+                aria-describedby={`${choiceDescription}${!eligible ? ` ${reasonId}` : ""}`}
+                onChange={() => {
+                  // Keep native radio focus and arrow navigation through an async commit.
+                  if (isPending) return;
                   runAction(() =>
                     onDecision({
                       candidateId: candidate.id,
                       action: "accept",
                       ...actions,
                     }),
-                  )
-                }
+                  );
+                }}
               />
               Base {candidate.entityType} {candidate.targetId ?? "unavailable"}
               {candidate.matchesFilter === false ? " (outside current filters)" : ""}
@@ -692,38 +603,52 @@ export function ConflationReview({
   );
 
   const map = useMap();
-  const setComparison = useSetAtom(conflationComparisonAtom);
-  const showCandidate = (candidate: OsmConflationCandidateView) => {
-    const sourceFeature = entityFeature(patch, candidate, "source");
-    const targetFeature = entityFeature(base, candidate, "target");
-    const features: GeoJSON.Feature[] = [];
-    if (sourceFeature) features.push(sourceFeature);
-    if (targetFeature) features.push(targetFeature);
-    setComparison({
-      type: "FeatureCollection",
-      features,
-    });
+  const [comparison, setComparison] = useAtom(conflationComparisonAtom);
+  const [selection, setSelection] = useState<{
+    candidateId: string;
+    geometry: GeoJSON.FeatureCollection;
+  } | null>(null);
+  const reviewId = useId();
+  const selectedCandidate =
+    selection?.geometry === comparison
+      ? page.candidates.find((candidate) => candidate.id === selection.candidateId)
+      : undefined;
+  const candidateIds = page.candidates.map((candidate) => candidate.id).join("|");
+  const filterKey = JSON.stringify([
+    filter.entityType,
+    filter.status,
+    filter.reason,
+    filter.sourceId,
+    filter.targetId,
+  ]);
+  useEffect(() => {
+    setSelection(null);
+    setComparison({ type: "FeatureCollection", features: [] });
+  }, [base, patch, page.page, candidateIds, filterKey, isFilterPending, setComparison]);
+  useEffect(
+    () => () => {
+      setComparison({ type: "FeatureCollection", features: [] });
+    },
+    [setComparison],
+  );
 
-    const boxes = [
-      entityBbox(patch, candidate, "source"),
-      entityBbox(base, candidate, "target"),
-    ].filter((bbox): bbox is readonly [number, number, number, number] => bbox !== null);
-    if (!map || boxes.length === 0) return;
-    const bounds = boxes.reduce(
-      (result, bbox) => [
-        Math.min(result[0], bbox[0]),
-        Math.min(result[1], bbox[1]),
-        Math.max(result[2], bbox[2]),
-        Math.max(result[3], bbox[3]),
-      ],
-      [...boxes[0]],
-    );
+  const showCandidate = (candidate: OsmConflationCandidateView) => {
+    if (selectedCandidate?.id === candidate.id) {
+      setSelection(null);
+      setComparison({ type: "FeatureCollection", features: [] });
+      return;
+    }
+    const geometry = createConflationComparison(base, patch, candidate);
+    setComparison(geometry);
+    setSelection({ candidateId: candidate.id, geometry });
+    const bounds = comparisonBounds(geometry);
+    if (!map || !bounds) return;
     map.fitBounds(
       [
         [bounds[0], bounds[1]],
         [bounds[2], bounds[3]],
       ],
-      { padding: 120, maxDuration: 200, maxZoom: 19 },
+      { padding: 80, maxDuration: 200, maxZoom: 19 },
     );
   };
 
@@ -731,15 +656,16 @@ export function ConflationReview({
     <div className="flex flex-col gap-2">
       <Card>
         <CardHeader>
-          Candidate summary
+          Match summary
           <CardAction>
             <ConflationStatusLegend />
           </CardAction>
         </CardHeader>
         <CardContent className="p-0">
           <p className="p-2 border-b">
-            A match proposes how imported data corresponds to a base feature. OSM tags are feature
-            attributes, such as a surface type. Choose actions independently; selections enter the
+            A proposed match compares an imported feature with a base feature. OSM tags are feature
+            attributes, such as a surface type. Nodes are points; ways are ordered point sequences
+            forming lines or area boundaries. Choose actions independently; selections enter the
             next preview and update the dataset only when you apply it.
           </p>
           <SummaryTable summary={summary} />
@@ -747,8 +673,13 @@ export function ConflationReview({
       </Card>
 
       <Card>
-        <CardHeader>Candidate filters</CardHeader>
+        <CardHeader>Match filters</CardHeader>
         <CardContent className="flex flex-wrap gap-2">
+          <p id={`${reviewId}-filters-help`} className="w-full text-muted-foreground">
+            Filter proposed matches by their scheduled or unresolved status, feature type, or
+            explanation. Alternatives outside these filters remain labeled context; bulk choices
+            affect matching rows only.
+          </p>
           {filter.sourceId !== undefined ? (
             <div className="flex w-full flex-wrap items-center gap-2">
               <span>
@@ -768,11 +699,15 @@ export function ConflationReview({
               </Button>
             </div>
           ) : null}
-          <label className="flex items-center gap-1" htmlFor="conflation-status-filter">
+          <label
+            className="flex w-full min-w-0 flex-col items-start gap-1"
+            htmlFor="conflation-status-filter"
+          >
             Match status
             <select
               id="conflation-status-filter"
-              className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              className={cn("h-8 w-full min-w-0 rounded border bg-background px-2", REVIEW_FOCUS)}
+              aria-describedby={`${reviewId}-filters-help`}
               disabled={isReviewPending}
               value={filter.status ?? ""}
               onChange={(event) => {
@@ -791,11 +726,15 @@ export function ConflationReview({
             </select>
           </label>
 
-          <label className="flex items-center gap-1" htmlFor="conflation-entity-filter">
-            Entity type
+          <label
+            className="flex w-full min-w-0 flex-col items-start gap-1"
+            htmlFor="conflation-entity-filter"
+          >
+            Feature type
             <select
               id="conflation-entity-filter"
-              className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              className={cn("h-8 w-full min-w-0 rounded border bg-background px-2", REVIEW_FOCUS)}
+              aria-describedby={`${reviewId}-filters-help`}
               disabled={isReviewPending}
               value={filter.entityType ?? ""}
               onChange={(event) => {
@@ -803,20 +742,21 @@ export function ConflationReview({
                 void onFilterChange({ ...filter, entityType: entityType || undefined });
               }}
             >
-              <option value="">All entity types</option>
-              <option value="node">Node</option>
-              <option value="way">Way</option>
+              <option value="">All feature types</option>
+              <option value="node">Point (OSM node)</option>
+              <option value="way">Line or area (OSM way)</option>
             </select>
           </label>
 
           <label
-            className="flex w-full min-w-0 items-center gap-1"
+            className="flex w-full min-w-0 flex-col items-start gap-1"
             htmlFor="conflation-reason-filter"
           >
             <span className="shrink-0">Match reason</span>
             <select
               id="conflation-reason-filter"
-              className="h-7 min-w-0 max-w-full flex-1 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+              className={cn("h-8 w-full min-w-0 rounded border bg-background px-2", REVIEW_FOCUS)}
+              aria-describedby={`${reviewId}-filters-help`}
               disabled={isReviewPending}
               value={filter.reason ?? ""}
               onChange={(event) => {
@@ -871,15 +811,15 @@ export function ConflationReview({
           />
           {page.groups ? (
             <p className="p-2 border-b text-muted-foreground">
-              {page.totalSources?.toLocaleString()} imported features match these filters. All their
-              alternatives are shown together. Bulk actions affect only matches inside the filters;
-              ambiguous alternatives require an individual target choice.
+              Imported features matching these filters: {page.totalSources?.toLocaleString()}. All
+              their alternatives are shown together. Bulk actions affect only matches inside the
+              filters; ambiguous alternatives require an individual target choice.
             </p>
           ) : null}
           {page.candidates.length === 0 ? (
             <EmptyState>No candidates match these filters</EmptyState>
           ) : (
-            <ItemGroup>
+            <ItemGroup role="group" aria-label="Imported features">
               {[...candidatesBySource.entries()].map(([sourceKey, candidates]) => (
                 <section
                   key={sourceKey}
@@ -898,13 +838,21 @@ export function ConflationReview({
                     return (
                       <Item key={candidate.id} className="p-0" variant="outline">
                         <ItemContent className="min-w-0 gap-0">
-                          <div className="flex items-start gap-2 p-2">
+                          <div className="flex min-w-0 items-start gap-2 p-2">
                             <StatusDot className="mt-1" status={STATUS_DOT[status]} />
                             <div className="min-w-0 flex-1">
-                              <ItemTitle>{conflationCandidateTitle(candidate)}</ItemTitle>
+                              <ItemTitle>
+                                Imported {featureLabel(candidate.entityType)} →{" "}
+                                {candidate.targetId == null
+                                  ? "No eligible base target"
+                                  : `Base ${featureLabel(candidate.entityType)}`}
+                              </ItemTitle>
+                              <p className="select-all break-words text-muted-foreground">
+                                {conflationCandidateTitle(candidate)}
+                              </p>
                               <ItemDescription>
                                 {conflationStatusLabel(status)};{" "}
-                                {candidate.evidence.distanceMeters.toFixed(3)} m
+                                {conflationDistanceLabel(candidate)}
                                 {candidate.reasons.length > 0
                                   ? `; ${candidate.reasons.map(conflationReasonLabel).join(", ")}`
                                   : ""}
@@ -920,13 +868,28 @@ export function ConflationReview({
                               <Button
                                 size="icon-sm"
                                 variant="ghost"
-                                title="Compare imported entity and base target on map"
+                                aria-label={`Compare imported ${candidate.entityType} ${candidate.sourceId} with ${candidate.targetId == null ? "no base target" : `base ${candidate.entityType} ${candidate.targetId}`}`}
+                                aria-pressed={selectedCandidate?.id === candidate.id}
+                                aria-controls={`${reviewId}-comparison`}
+                                className={cn(
+                                  REVIEW_FOCUS,
+                                  selectedCandidate?.id === candidate.id &&
+                                    "bg-info/10 ring-1 ring-info",
+                                )}
                                 onClick={() => showCandidate(candidate)}
                               >
-                                <LocateFixedIcon />
+                                <LocateFixedIcon aria-hidden="true" />
                               </Button>
                             </ItemActions>
                           </div>
+                          {selectedCandidate?.id === candidate.id ? (
+                            <div id={`${reviewId}-comparison`}>
+                              <ConflationComparisonEvidence
+                                candidate={candidate}
+                                comparison={comparison}
+                              />
+                            </div>
+                          ) : null}
                           <CandidateEvidence candidate={candidate} />
                           <CandidateActions
                             candidate={candidate}
@@ -969,22 +932,20 @@ export function ConflationReview({
         </Button>
       </ButtonGroup>
 
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
-        <span className="flex items-center gap-1">
-          Map comparison
-          <InfoTooltip label="About map comparison colors" side="top" align="start">
-            The imported source is shown in destructive red and the proposed base target in
-            informational blue.
-          </InfoTooltip>
-        </span>
-        <span className="flex items-center gap-1">
-          Skipping a match
-          <InfoTooltip label="About skipping a match" side="top" align="start">
-            Skipping schedules neither copying tags nor connecting networks. Ordinary imported
-            additions remain in the merge.
-          </InfoTooltip>
-        </span>
-      </div>
+      <p role="status" aria-live="polite" className="sr-only">
+        {selectedCandidate
+          ? `Comparing ${conflationCandidateTitle(selectedCandidate)}. Coordinate evidence is shown with this match.`
+          : ""}
+      </p>
+      {!selectedCandidate ? (
+        <div id={`${reviewId}-comparison`}>
+          <ConflationComparisonLegend />
+        </div>
+      ) : null}
+      <p className="text-muted-foreground">
+        Compare highlights geometry without scheduling an action. Skipping schedules neither copying
+        nor connecting; ordinary imported additions remain in the merge.
+      </p>
     </div>
   );
 }

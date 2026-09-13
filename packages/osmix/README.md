@@ -157,6 +157,8 @@ Persist the returned decision with `setConflationDecision()`. The `"attach-netwo
 way for Connect network. The helper writes both flags explicitly. For backward compatibility, omitted flags
 on a manually constructed accept decision select every eligible action.
 
+In Merge, comparing a candidate is separate from selecting its matching actions. The map and selectable Latitude/Longitude evidence show the same pair; base circles and solid lines differ from imported diamonds and dashed lines even without color. Finite distances include meters, while unavailable measurements and missing eligible targets have distinct explanations. See the [Merge matching guide](../../apps/merge/README.md#safe-imported-data-matching) for evidence and keyboard controls.
+
 Skipping a match, including turning both choices off, schedules neither action and retains ordinary
 imported additions under the direct/exact merge rules. Removing a saved decision with
 `setConflationDecisions()` restores that candidate's discovery defaults; the Merge app calls this
