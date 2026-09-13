@@ -82,6 +82,12 @@ that merge the patch into the base. All options default to `false`, so you can e
 An empty patch is therefore an identity operation; the high-level pipeline does not normalize either input as
 a hidden preliminary step.
 
+Exact node reconciliation checks every proposed source and its final survivor as one group before changing tags, references, or entity existence. Shared tag values and incident-way grade/access context must be compatible across the whole group. Agreement with an initially untagged base node does not establish agreement among imported sources. A conflicting group keeps every proposed node replacement unapplied; compatible groups elsewhere can still reconcile.
+
+For example, when an untagged base node and imported cafe and school nodes share the same stored coordinate, both imported nodes and their distinct attributes remain. Way and relation references to those nodes are retained. Explicit same-dataset diagnostic scans also check the entire proposed replacement chain, so an untagged intermediate node cannot connect incompatible endpoints of that chain. Valid replacement maps point directly to their final surviving nodes. Same-ID updates remain authoritative, and high-level merges still do not normalize entities within either original input.
+
+This group check applies to exact nodes. Exact ways retain their existing ordered-reference and routing/structural-tag requirements; permitted descriptive differences retain their existing reconciliation policy. The node-group defect was a residual pre-existing issue uncovered during the PR #218 review, not introduced by that PR.
+
 Intersection creation distinguishes existing shared junctions from new crossings. Reusing an endpoint updates
 every incident way and affected restriction via-node together, including an already connected bridge or tunnel
 entrance. The proposed junction must preserve valid way geometry, restrictions, and grade context. If any part
@@ -203,7 +209,7 @@ constructor(base: Osm)
 
 #### Core methods
 
-- `deduplicateNodes(nodes: Nodes)`: Check candidate nodes (normally from a patch) against the base dataset and map safe duplicates to the surviving base node. Proximity alone is not sufficient.
+- `deduplicateNodes(nodes: Nodes)`: Check exact-coordinate candidates (normally from a patch) against the base dataset, validate all sources proposed for each final survivor together, and return safe replacement mappings. A conflicting node group retains all of its proposed sources.
 - `deduplicateWays(ways: Ways)`: Check candidate ways against the base and reconcile only matching geometry with compatible routing and grade-separation tags.
 - `generateDirectChanges(patch: Osm)`: Merge a patch dataset into the changeset. Handles creates and updates.
 - `createIntersectionsForWays(ways: Ways)`: Checks provided ways for intersections with existing ways in the base dataset. Splits ways and inserts nodes where they cross.

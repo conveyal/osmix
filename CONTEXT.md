@@ -22,7 +22,7 @@ An ordered sequence of node references representing a line or an area boundary, 
 The combination of patch-only additions, same-ID patch updates, and unchanged base-only entities.
 
 **Exact reconciliation**:
-The representation of different IDs by one base entity when their coordinates or ordered geometry and routing context agree.
+The representation of different IDs by one base entity when their coordinates or ordered geometry and routing context agree. Nodes proposed for one survivor must be compatible as a group; individual agreement with an untagged survivor does not establish agreement among the sources.
 
 **Imported-data matching**:
 The comparison of nearby patch and base features to propose correspondences despite differences in their coordinates or geometry.
