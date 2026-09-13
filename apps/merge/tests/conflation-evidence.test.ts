@@ -90,4 +90,32 @@ describe("matching evidence for imported features", () => {
       "A long imported description with exact details that must remain readable",
     );
   });
+
+  it("shows conflicting feature classifications independently of selected copy attributes", () => {
+    const value = candidate(0.25);
+    value.evidence.tagDiff = [
+      { key: "name", baseValue: "Cafe", patchValue: "School", protected: false, routing: false },
+    ];
+    value.evidence.featureTypeConflicts = [
+      { key: "amenity", baseValue: "cafe", patchValue: "school" },
+      { key: "building", baseValue: "commercial", patchValue: "school" },
+    ];
+
+    const html = render(value);
+    const conflicts = html.match(
+      /<section[^>]*aria-label="Feature type conflict"[^>]*>([\s\S]*?)<\/section>/,
+    )?.[1];
+    expect(conflicts).toBeDefined();
+    expect(conflicts).toContain("These classifications block Copy tags and Connect network");
+    expect(conflicts).toContain("even when they are not selected for copying");
+    expect(conflicts).toContain("amenity");
+    expect(conflicts).toContain("building");
+    expect(conflicts).toContain("Base classification");
+    expect(conflicts).toContain("Imported classification");
+    expect(conflicts).toContain("cafe");
+    expect(conflicts).toContain("commercial");
+    expect(conflicts).toContain("school");
+    expect(html).toContain('aria-label="Attribute differences"');
+    expect(html).toContain("name");
+  });
 });

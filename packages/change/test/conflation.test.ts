@@ -521,14 +521,19 @@ describe("safe fuzzy conflation discovery", () => {
 describe("safe fuzzy property transfer", () => {
   it("overwrites only selected properties and retains the imported point geometry", async () => {
     const base = createOsm("base", [
-      { id: 1, lon: 0, lat: 0, tags: { amenity: "cafe", name: "Old" } },
+      { id: 1, lon: 0, lat: 0, tags: { amenity: "cafe", name: "Old", operator: "Base operator" } },
     ]);
     const patch = createOsm("patch", [
       {
         id: 101,
         lon: 0.000005,
         lat: 0,
-        tags: { amenity: "school", name: "Imported", source: "survey" },
+        tags: {
+          amenity: "cafe",
+          name: "Imported",
+          operator: "Imported operator",
+          source: "survey",
+        },
       },
     ]);
 
@@ -541,10 +546,15 @@ describe("safe fuzzy property transfer", () => {
       },
       silent,
     );
-    expect(result.nodes.getById(1)?.tags).toEqual({ amenity: "cafe", name: "Imported" });
-    expect(result.nodes.getById(101)?.tags).toEqual({
-      amenity: "school",
+    expect(result.nodes.getById(1)?.tags).toEqual({
+      amenity: "cafe",
       name: "Imported",
+      operator: "Base operator",
+    });
+    expect(result.nodes.getById(101)?.tags).toEqual({
+      amenity: "cafe",
+      name: "Imported",
+      operator: "Imported operator",
       source: "survey",
     });
   });

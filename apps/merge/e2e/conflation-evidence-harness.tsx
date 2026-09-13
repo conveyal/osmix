@@ -22,6 +22,7 @@ type Scenario =
   | "missing"
   | "coincident"
   | "way"
+  | "feature-conflict"
   | "alternatives";
 
 class EvidenceWorker extends OsmixWorker {
@@ -32,14 +33,26 @@ class EvidenceWorker extends OsmixWorker {
 
 function createSession(scenario: Scenario) {
   const base = new Osm({ id: `evidence-base-${scenario}` });
-  base.nodes.addNode({ id: 1, lon: -120.5, lat: 46.6, tags: { name: "Base entrance" } });
+  base.nodes.addNode({
+    id: 1,
+    lon: -120.5,
+    lat: 46.6,
+    tags:
+      scenario === "feature-conflict"
+        ? { name: "Base cafe", amenity: "cafe" }
+        : { name: "Base entrance" },
+  });
   if (scenario === "alternatives") {
     base.nodes.addNode({ id: 2, lon: -120.49999, lat: 46.6, tags: { name: "Other entrance" } });
   }
   base.nodes.addNode({ id: 21, lon: -120.5001, lat: 46.6001 });
   base.nodes.addNode({ id: 22, lon: -120.4999, lat: 46.6001 });
   base.nodes.buildIndex();
-  base.ways.addWay({ id: 10, refs: [21, 22], tags: { highway: "footway", name: "Base path" } });
+  base.ways.addWay({
+    id: 10,
+    refs: scenario === "feature-conflict" ? [1, 21, 22] : [21, 22],
+    tags: { highway: "footway", name: "Base path" },
+  });
   base.buildIndexes();
   base.buildSpatialIndexes();
 
@@ -48,14 +61,17 @@ function createSession(scenario: Scenario) {
     id: 101,
     lon: scenario === "unmatched" ? -120.49 : scenario === "coincident" ? -120.5 : -120.499995,
     lat: 46.6,
-    tags: { name: "Imported entrance" },
+    tags:
+      scenario === "feature-conflict"
+        ? { name: "Imported school", amenity: "school" }
+        : { name: "Imported entrance" },
   });
   patch.nodes.addNode({ id: 102, lon: -120.500095, lat: 46.6001 });
   patch.nodes.addNode({ id: 103, lon: -120.499895, lat: 46.6001 });
   patch.nodes.buildIndex();
   patch.ways.addWay({
     id: 20,
-    refs: [102, 103],
+    refs: scenario === "feature-conflict" ? [101, 102, 103] : [102, 103],
     tags: {
       highway: "footway",
       name: "Imported_accessible_path_with_a_very_long_unbroken_attribute_value_for_narrow_panels",
@@ -69,7 +85,7 @@ function createSession(scenario: Scenario) {
   worker.add(patch);
   worker.discoverConflation(base.id, patch.id, {
     propertyKeys: ["name"],
-    attachNetwork: false,
+    attachNetwork: scenario === "feature-conflict",
     maxDistanceMeters: 2,
   });
   const filter: OsmConflationCandidateFilter = { entityType: scenario === "way" ? "way" : "node" };
@@ -142,6 +158,7 @@ function EvidenceContent() {
             ["missing", "Missing distance"],
             ["coincident", "Coincident point pair"],
             ["way", "Way pair"],
+            ["feature-conflict", "Nearby school and cafe"],
             ["alternatives", "Alternative point targets"],
           ] as const
         ).map(([scenario, label]) => (

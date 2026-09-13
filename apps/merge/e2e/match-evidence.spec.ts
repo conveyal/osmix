@@ -225,6 +225,48 @@ test("finite, unknown, missing, and unmatched distances remain distinct", async 
   expect((await readState(page)).comparison.features).toHaveLength(1);
 });
 
+test("school and cafe classifications block both actions when only name is selected", async ({
+  page,
+}, testInfo) => {
+  await page.getByRole("button", { name: "Nearby school and cafe" }).click();
+  await review(page)
+    .getByRole("combobox", { name: "Match reason" })
+    .selectOption({ label: "Feature classifications conflict" });
+  await expect(review(page)).toContainText("Imported features matching these filters: 1");
+  const conflict = review(page).getByRole("region", { name: "Feature type conflict", exact: true });
+  await expect(conflict).toBeVisible();
+  await expect(conflict).toContainText("amenity");
+  await expect(conflict.locator("dd")).toHaveText(["cafe", "school"]);
+  await expect(conflict).toContainText("even when they are not selected for copying");
+  const attributes = review(page).getByRole("region", { name: "Attribute differences" });
+  await expect(attributes).toContainText("name");
+  await expect(attributes).not.toContainText("amenity");
+  for (const name of ["Copy tags", "Connect network"]) {
+    const action = review(page).getByRole("checkbox", { name, exact: true });
+    await expect(action).toBeDisabled();
+    await expect(action).toHaveAccessibleDescription(/Blocked:.*Feature classifications conflict/);
+    await expect(
+      review(page).getByRole("button", { name: `${name} (0)`, exact: true }),
+    ).toBeDisabled();
+  }
+  expect((await readState(page)).decisions).toEqual([]);
+
+  const directory = resolve(import.meta.dirname, "../../../output/playwright/ticket11");
+  await mkdir(directory, { recursive: true });
+  for (const width of [320, 512]) {
+    await page.setViewportSize({ width, height: 900 });
+    await settleMap(page);
+    await expectContained(review(page));
+    await expectContained(conflict);
+    const path = resolve(directory, `feature-type-conflict-${width}.png`);
+    await review(page).screenshot({ path });
+    await testInfo.attach(`Feature type conflict at ${width}px`, {
+      path,
+      contentType: "image/png",
+    });
+  }
+});
+
 test("keyboard comparison keeps coordinates, markers, and selection consistent without changing actions", async ({
   page,
 }) => {

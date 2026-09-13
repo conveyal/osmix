@@ -3,7 +3,7 @@ import type { OsmConflationCandidateView } from "osmix";
 import { cn } from "../lib/utils";
 import { Details, DetailsContent, DetailsSummary } from "./details";
 import { InfoTooltip } from "./info-tooltip";
-import { EmptyState } from "./section";
+import { EmptyState, SectionTitle } from "./section";
 
 const ROUTING_FAMILY_LABEL = {
   "bicycle-shared": "Bicycle or shared-use",
@@ -68,7 +68,8 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
       <DetailsContent>
         <section aria-label="Match evidence" className="flex min-w-0 flex-col gap-2 p-2">
           <p className="flex items-center gap-1 text-muted-foreground">
-            Distance suggests a possible match; it does not prove a safe connection.
+            Nearby features can represent different things. Distance alone does not prove a match or
+            a safe connection.
             <InfoTooltip label="About candidate evidence metrics" side="right" align="start">
               Point distance compares two locations. Way distance measures the largest sampled
               separation between their geometries. Network use describes allowed travel; direction
@@ -85,6 +86,29 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
             ))}
           </dl>
         </section>
+        {evidence.featureTypeConflicts && evidence.featureTypeConflicts.length > 0 ? (
+          <section
+            aria-label="Feature type conflict"
+            className="flex min-w-0 flex-col gap-2 border-t bg-destructive/10 p-2"
+          >
+            <SectionTitle>Feature type conflict</SectionTitle>
+            <p>
+              These classifications block Copy tags and Connect network, even when they are not
+              selected for copying.
+            </p>
+            {evidence.featureTypeConflicts.map((conflict) => (
+              <div key={conflict.key} className="flex min-w-0 flex-col gap-1">
+                <p className="select-all break-all font-bold">{conflict.key}</p>
+                <dl className="flex min-w-0 flex-col gap-1">
+                  <dt className="text-muted-foreground">Base classification</dt>
+                  <dd className="min-w-0 select-all break-all">{String(conflict.baseValue)}</dd>
+                  <dt className="text-muted-foreground">Imported classification</dt>
+                  <dd className="min-w-0 select-all break-all">{String(conflict.patchValue)}</dd>
+                </dl>
+              </div>
+            ))}
+          </section>
+        ) : null}
         {evidence.tagDiff.length > 0 ? (
           <section aria-label="Attribute differences" className="flex min-w-0 flex-col">
             {evidence.tagDiff.map((diff) => (

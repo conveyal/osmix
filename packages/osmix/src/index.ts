@@ -129,6 +129,7 @@ export type {
   OsmConflationEntityType,
   OsmConflationEntityCounts,
   OsmConflationEvidence,
+  OsmConflationFeatureTypeConflict,
   OsmConflationOptions,
   OsmConflationOutcomeReport,
   OsmConflationOutcomeSummary,
