@@ -26,6 +26,11 @@ export interface RoutingTestExpectation {
   timeSeconds?: { min: number; max: number };
   requiredWayIds?: readonly number[];
   forbiddenWayIds?: readonly number[];
+  forbiddenTransitions?: readonly {
+    fromWayId: number;
+    viaNodeId: number;
+    toWayId: number;
+  }[];
 }
 
 export interface RoutingTestCase {
@@ -39,6 +44,12 @@ export interface RoutingTestCase {
   /** Optional test-only policy refinement; this is not a public Osmix routing profile. */
   graphPolicy?: "access-aware";
   policyLimitation?: RoutingPolicyLimitation;
+  /** Separate R5 coordinate-route checks; Osmix node-route bounds do not transfer automatically. */
+  r5Expect?: {
+    reachable?: boolean;
+    forbiddenWayIds?: readonly number[];
+    forbiddenWayTransitions?: readonly { fromWayId: number; toWayId: number }[];
+  };
 }
 
 /**
@@ -177,6 +188,7 @@ export const MONACO_ROUTING_CASES = [
     from: { nodeId: 254470916 },
     to: { nodeId: 1704462513 },
     expect: {},
+    r5Expect: { forbiddenWayIds: [158215187] },
     policyLimitation: {
       kind: "access",
       reason: "Osmix's default vehicle filter currently checks highway class but not access tags.",
@@ -196,6 +208,9 @@ export const MONACO_ROUTING_CASES = [
     from: { nodeId: 1704462546 },
     to: { nodeId: 1778433989 },
     expect: {},
+    r5Expect: {
+      forbiddenWayTransitions: [{ fromWayId: 176527122, toWayId: 166399477 }],
+    },
     policyLimitation: {
       kind: "turn-restriction",
       reason: "Osmix's routing graph does not currently interpret restriction relations.",
@@ -394,6 +409,7 @@ export const SYNTHETIC_CONFLATION_DISCONNECTED_CASES = [
     from: { nodeId: 801 },
     to: { nodeId: 902 },
     expect: { reachable: false },
+    r5Expect: { reachable: false },
   },
   {
     id: "synthetic-conflation-car",
@@ -420,6 +436,7 @@ export const SYNTHETIC_CONFLATION_ATTACHED_CASES = [
       distanceMeters: { min: 215, max: 230 },
       requiredWayIds: [810, 910],
     },
+    r5Expect: { reachable: true },
   },
   {
     id: "synthetic-conflation-car",

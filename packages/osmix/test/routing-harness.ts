@@ -52,7 +52,7 @@ export const routingTestCarAccessFilter: HighwayFilter = (tags?: OsmTags): boole
   return !NEGATIVE_ACCESS_VALUES.has(String(access));
 };
 
-/** Test-only pedestrian policy. R5 remains the authority for production access semantics. */
+/** Test-only pedestrian policy; this does not establish complete production access semantics. */
 export const routingTestWalkFilter: HighwayFilter = (tags?: OsmTags): boolean => {
   const highway = tags?.["highway"];
   if (!highway || !WALKABLE_HIGHWAYS.has(String(highway))) return false;
@@ -76,6 +76,7 @@ export interface RoutingEndpointReport {
   nodeId: number;
   coordinates: LonLat;
   snapDistanceMeters: number;
+  resolution: "osm-node-id" | "nearest-routable-node";
 }
 
 export interface RoutingPathReport {
@@ -86,9 +87,10 @@ export interface RoutingPathReport {
   distanceMeters: number;
   timeSeconds: number;
   optimizedCost: number;
+  edges: { fromNodeId: number; toNodeId: number; wayId: number }[];
 }
 
-export interface RoutingCaseReport {
+interface RoutingCaseEvidence {
   caseId: string;
   mode: RoutingTestMode;
   graphPolicy: "access-aware" | "osmix-default";
@@ -97,10 +99,156 @@ export interface RoutingCaseReport {
   from: RoutingEndpointReport | null;
   to: RoutingEndpointReport | null;
   reachable: boolean;
-  algorithmAgreement: boolean;
+  /** Null when unresolved endpoints prevented both algorithms from running. */
+  algorithmAgreement: boolean | null;
   algorithmCosts: { astar: number | null; dijkstra: number | null };
   policyLimitation?: RoutingPolicyLimitation;
   path: RoutingPathReport | null;
+}
+
+export interface RoutingVerification {
+  kind: "asserted-route" | "policy-diagnostic";
+  status: "passed" | "failed" | "diagnostic-only" | "not-applicable" | "unavailable";
+  checks: {
+    name: string;
+    outcome: "passed" | "failed" | "not-applicable" | "unavailable";
+    routeAssertion: boolean;
+  }[];
+}
+
+export interface RoutingCaseReport extends RoutingCaseEvidence {
+  verification: RoutingVerification;
+}
+
+/** Evaluate only declared expectations; a policy limitation never suppresses a declared check. */
+export function verifyRoutingCaseReport(
+  report: RoutingCaseEvidence,
+  testCase: RoutingTestCase,
+): RoutingVerification {
+  const checks: RoutingVerification["checks"] = [];
+  const check = (name: string, passed: boolean, routeAssertion = false) => {
+    checks.push({ name, outcome: passed ? "passed" : "failed", routeAssertion });
+  };
+  const endpointsResolved = report.from !== null && report.to !== null;
+  const routeCheck = (name: string, passed: boolean) => {
+    checks.push({
+      name,
+      outcome: !endpointsResolved ? "unavailable" : passed ? "passed" : "failed",
+      routeAssertion: true,
+    });
+  };
+  check("case-id", report.caseId === testCase.id);
+  check("graph-policy", report.graphPolicy === (testCase.graphPolicy ?? "osmix-default"));
+  checks.push({
+    name: "algorithm-agreement",
+    outcome:
+      report.algorithmAgreement === null
+        ? "not-applicable"
+        : report.algorithmAgreement
+          ? "passed"
+          : "failed",
+    routeAssertion: false,
+  });
+  check("route-evidence-consistency", report.reachable === (report.path !== null));
+  for (const side of ["from", "to"] as const) {
+    const endpoint = testCase[side];
+    const resolved = report[side];
+    if (resolved && "nodeId" in endpoint) {
+      check(
+        `${side}-osm-node-identity`,
+        resolved.nodeId === endpoint.nodeId && resolved.resolution === "osm-node-id",
+      );
+    }
+  }
+
+  const expected = testCase.expect;
+  if (expected.reachable !== undefined) {
+    routeCheck("reachability", report.reachable === expected.reachable);
+    if (expected.reachable) check("resolved-endpoints", report.from !== null && report.to !== null);
+  } else if (!testCase.policyLimitation) {
+    check("declared-reachability", false, true);
+  }
+  if (testCase.policyLimitation) {
+    check("diagnostic-endpoints", report.from !== null && report.to !== null);
+  }
+
+  for (const metric of ["distanceMeters", "timeSeconds"] as const) {
+    const bounds = expected[metric];
+    if (!bounds) continue;
+    const value = report.path?.[metric];
+    routeCheck(metric, value !== undefined && value >= bounds.min && value <= bounds.max);
+  }
+  for (const id of expected.requiredWayIds ?? []) {
+    routeCheck(`required-way:${id}`, report.path?.wayIds.includes(id) === true);
+  }
+  const forbidden = (name: string, present: boolean) => {
+    checks.push({
+      name,
+      outcome: !endpointsResolved
+        ? "unavailable"
+        : report.path === null
+          ? "not-applicable"
+          : present
+            ? "failed"
+            : "passed",
+      routeAssertion: true,
+    });
+  };
+  for (const id of expected.forbiddenWayIds ?? []) {
+    forbidden(`forbidden-way:${id}`, report.path?.wayIds.includes(id) === true);
+  }
+  for (const turn of expected.forbiddenTransitions ?? []) {
+    forbidden(
+      `forbidden-transition:${turn.fromWayId}/${turn.viaNodeId}/${turn.toWayId}`,
+      report.path?.edges.some((edge, index, edges) => {
+        const next = edges[index + 1];
+        return (
+          edge.wayId === turn.fromWayId &&
+          edge.toNodeId === turn.viaNodeId &&
+          next?.fromNodeId === turn.viaNodeId &&
+          next.wayId === turn.toWayId
+        );
+      }) === true,
+    );
+  }
+  const asserted = checks.some((item) => item.routeAssertion);
+  const applicable = checks.some(
+    (item) => item.routeAssertion && item.outcome !== "not-applicable",
+  );
+  return {
+    kind: asserted ? "asserted-route" : "policy-diagnostic",
+    status: checks.some((item) => item.outcome === "failed")
+      ? "failed"
+      : checks.some((item) => item.outcome === "unavailable")
+        ? "unavailable"
+        : asserted
+          ? applicable
+            ? "passed"
+            : "not-applicable"
+          : "diagnostic-only",
+    checks,
+  };
+}
+
+export function summarizeRoutingVerification(reports: readonly RoutingCaseReport[]) {
+  return {
+    assertedCases: reports.filter((report) => report.verification.kind === "asserted-route").length,
+    diagnosticCases: reports.filter((report) => report.verification.kind === "policy-diagnostic")
+      .length,
+    failedCases: reports.filter((report) => report.verification.status === "failed").length,
+    unavailableCases: reports.filter((report) => report.verification.status === "unavailable")
+      .length,
+    passedCases: reports.filter((report) => report.verification.status === "passed").length,
+    passedRouteChecks: reports
+      .flatMap((report) => report.verification.checks)
+      .filter((check) => check.routeAssertion && check.outcome === "passed").length,
+    notApplicableRouteChecks: reports
+      .flatMap((report) => report.verification.checks)
+      .filter((check) => check.routeAssertion && check.outcome === "not-applicable").length,
+    unavailableRouteChecks: reports
+      .flatMap((report) => report.verification.checks)
+      .filter((check) => check.routeAssertion && check.outcome === "unavailable").length,
+  };
 }
 
 interface RoutingContext {
@@ -174,6 +322,7 @@ function resolveEndpoint(
       nodeId: endpoint.nodeId,
       coordinates: osm.nodes.getNodeLonLat({ index: nodeIndex }),
       snapDistanceMeters: 0,
+      resolution: "osm-node-id",
     };
   }
 
@@ -187,6 +336,7 @@ function resolveEndpoint(
     nodeId: osm.nodes.ids.at(nearest.nodeIndex),
     coordinates: nearest.coordinates,
     snapDistanceMeters: nearest.distance,
+    resolution: "nearest-routable-node",
   };
 }
 
@@ -198,7 +348,7 @@ function routeCase(
   osm: Osm,
   context: RoutingContext,
   testCase: RoutingTestCase,
-): RoutingCaseReport {
+): RoutingCaseEvidence {
   const from = resolveEndpoint(osm, context.graph, testCase.from);
   const to = resolveEndpoint(osm, context.graph, testCase.to);
   if (!from || !to) {
@@ -211,7 +361,7 @@ function routeCase(
       from,
       to,
       reachable: false,
-      algorithmAgreement: true,
+      algorithmAgreement: null,
       algorithmCosts: { astar: null, dijkstra: null },
       policyLimitation: testCase.policyLimitation,
       path: null,
@@ -283,6 +433,17 @@ function routeCase(
       distanceMeters: stats.distance,
       timeSeconds: stats.time,
       optimizedCost: dijkstra.at(-1)!.cost,
+      edges: dijkstra.flatMap((segment) =>
+        segment.wayIndex === undefined || segment.previousNodeIndex === undefined
+          ? []
+          : [
+              {
+                fromNodeId: osm.nodes.ids.at(segment.previousNodeIndex),
+                toNodeId: osm.nodes.ids.at(segment.nodeIndex),
+                wayId: osm.ways.ids.at(segment.wayIndex),
+              },
+            ],
+      ),
     },
   };
 }
@@ -305,7 +466,8 @@ export class RoutingTestHarness {
       testCase.mode === "car" && testCase.graphPolicy === "access-aware"
         ? "car-access-aware"
         : testCase.mode;
-    return routeCase(this.osm, this.contexts[contextKey], testCase);
+    const report = routeCase(this.osm, this.contexts[contextKey], testCase);
+    return { ...report, verification: verifyRoutingCaseReport(report, testCase) };
   }
 
   runAll(testCases: readonly RoutingTestCase[]): RoutingCaseReport[] {
@@ -322,6 +484,8 @@ export function stableRoutingReport(report: RoutingCaseReport) {
     graph: report.graph,
     fromNodeId: report.from?.nodeId ?? null,
     toNodeId: report.to?.nodeId ?? null,
+    fromResolution: report.from?.resolution ?? "unresolved",
+    toResolution: report.to?.resolution ?? "unresolved",
     reachable: report.reachable,
     algorithmAgreement: report.algorithmAgreement,
     algorithmCosts: {
@@ -335,6 +499,7 @@ export function stableRoutingReport(report: RoutingCaseReport) {
           : Number(report.algorithmCosts.dijkstra.toFixed(3)),
     },
     policyLimitation: report.policyLimitation,
+    verification: report.verification,
     path: report.path
       ? {
           nodeIds: report.path.nodeIds,
@@ -343,6 +508,7 @@ export function stableRoutingReport(report: RoutingCaseReport) {
           distanceMeters: Number(report.path.distanceMeters.toFixed(3)),
           timeSeconds: Number(report.path.timeSeconds.toFixed(3)),
           optimizedCost: Number(report.path.optimizedCost.toFixed(3)),
+          edges: report.path.edges,
         }
       : null,
   };
@@ -364,6 +530,8 @@ export function routingReportsToGeoJson(
                 distanceMeters: report.path.distanceMeters,
                 timeSeconds: report.path.timeSeconds,
                 wayIds: report.path.wayIds.join(","),
+                verificationKind: report.verification.kind,
+                verificationStatus: report.verification.status,
               },
               geometry: {
                 type: "LineString" as const,
@@ -383,6 +551,10 @@ export async function writeRoutingDiagnostics(
 ): Promise<void> {
   await mkdir(directory, { recursive: true });
   await Promise.all([
+    writeFile(
+      join(directory, "routing-verification.json"),
+      `${JSON.stringify(summarizeRoutingVerification(reports), null, 2)}\n`,
+    ),
     writeFile(
       join(directory, "routing-report.json"),
       `${JSON.stringify(reports.map(stableRoutingReport), null, 2)}\n`,
@@ -419,28 +591,43 @@ export async function writeR5OracleArtifacts(
   await mkdir(directory, { recursive: true });
 
   const referenceReports = new Map(datasets[0]?.reports.map((report) => [report.caseId, report]));
-  const routeRows = testCases.flatMap((testCase) => {
+  const endpointCoordinates = (
+    endpoint: RoutingTestEndpoint,
+    resolved: RoutingEndpointReport | null | undefined,
+  ) => {
+    if (resolved) return resolved.coordinates;
+    if ("coordinates" in endpoint) return endpoint.coordinates;
+    const node = datasets[0]?.osm.nodes.getById(endpoint.nodeId);
+    return node ? [node.lon, node.lat] : undefined;
+  };
+  const routeRows = testCases.map((testCase) => {
     const report = referenceReports.get(testCase.id);
-    if (!report?.from || !report.to) return [];
+    const fromCoordinates = endpointCoordinates(testCase.from, report?.from);
+    const toCoordinates = endpointCoordinates(testCase.to, report?.to);
     return [
-      [
-        testCase.id,
-        testCase.mode.toUpperCase(),
-        report.from.coordinates[0],
-        report.from.coordinates[1],
-        report.to.coordinates[0],
-        report.to.coordinates[1],
-        "nodeId" in testCase.from ? "osm-node" : "coordinate",
-        "nodeId" in testCase.from ? testCase.from.nodeId : undefined,
-        "nodeId" in testCase.to ? "osm-node" : "coordinate",
-        "nodeId" in testCase.to ? testCase.to.nodeId : undefined,
-        testCase.policyLimitation?.kind ?? "absolute-golden",
-        testCase.expect.reachable,
-        testCase.expect.distanceMeters?.min,
-        testCase.expect.distanceMeters?.max,
-        testCase.policyLimitation?.r5Expectation ?? "",
-      ].map(tsvCell),
-    ];
+      testCase.id,
+      testCase.mode.toUpperCase(),
+      fromCoordinates?.[0],
+      fromCoordinates?.[1],
+      toCoordinates?.[0],
+      toCoordinates?.[1],
+      "nodeId" in testCase.from ? "osm-node" : "coordinate",
+      "nodeId" in testCase.from ? testCase.from.nodeId : undefined,
+      "nodeId" in testCase.to ? "osm-node" : "coordinate",
+      "nodeId" in testCase.to ? testCase.to.nodeId : undefined,
+      report?.verification.kind ?? "unavailable",
+      testCase.expect.reachable,
+      testCase.expect.distanceMeters?.min,
+      testCase.expect.distanceMeters?.max,
+      testCase.policyLimitation?.r5Expectation ?? "",
+      testCase.r5Expect?.reachable,
+      JSON.stringify(testCase.r5Expect?.forbiddenWayIds ?? []),
+      JSON.stringify(testCase.r5Expect?.forbiddenWayTransitions ?? []),
+      report?.from?.nodeId,
+      report?.to?.nodeId,
+      report?.from?.resolution ?? "unresolved",
+      report?.to?.resolution ?? "unresolved",
+    ].map(tsvCell);
   });
   const manifestRows = [
     [
@@ -459,6 +646,13 @@ export async function writeR5OracleArtifacts(
       "expected_distance_min_m",
       "expected_distance_max_m",
       "r5_expectation",
+      "r5_expected_reachable",
+      "r5_forbidden_way_ids",
+      "r5_forbidden_way_transitions",
+      "from_osmix_resolved_node_id",
+      "to_osmix_resolved_node_id",
+      "from_osmix_resolution",
+      "to_osmix_resolution",
     ],
     ...routeRows,
   ];
@@ -472,12 +666,13 @@ export async function writeR5OracleArtifacts(
       join(directory, "oracle-matrix.json"),
       `${JSON.stringify(
         {
-          schemaVersion: 1,
+          schemaVersion: 2,
           note: "Local diagnostic output; it is not a checked-in golden and is never auto-updated.",
           datasets: datasets.map((dataset) => ({
             id: dataset.id,
             pbf: `${dataset.id}.osm.pbf`,
             osmix: dataset.reports.map(stableRoutingReport),
+            verification: summarizeRoutingVerification(dataset.reports),
           })),
         },
         null,

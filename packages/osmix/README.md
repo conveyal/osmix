@@ -479,6 +479,8 @@ Routing and way matching share [one-way normalization](../router/README.md#way-d
 `normalizedWayDirection(tags)`. Explicit `no`, `false`, and `0` override implicit roundabout direction.
 Unsupported one-way values block way matching; the router's documented fallback remains an approximation.
 
+Routing regression reports distinguish OSM node-ID lookup from coordinate snapping and list the checks actually evaluated: declared reachability, metric bounds, required/forbidden way IDs, and prohibited transitions where specified. Unresolved endpoints make route checks unavailable; they do not prove that a route is unreachable. Policy-limitation witnesses are reported separately and do not count as passed legality checks. Dijkstra/A* agreement and unchanged graph counts do not prove complete access or turn-restriction behavior. The [optional local R5 runner](test/r5/README.md) provides separately scoped comparison evidence; normal package and CI tests require neither R5 nor large local fixtures.
+
 ```ts check-docs monaco-pbf
 import { createRemote } from "osmix";
 

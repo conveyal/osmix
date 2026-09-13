@@ -87,8 +87,7 @@ if (nearest) {
 - `defaultSpeeds` - Optional speed limits (km/h) by highway type.
 
 Way directionality is currently graph-wide: custom filters can select pedestrian ways, but they
-do not disable `oneway` or implicit roundabout direction. Use a policy-aware router such as R5
-when authoritative pedestrian access and direction rules are required.
+do not disable `oneway` or implicit roundabout direction. A custom filter does not supply a complete pedestrian or turn-restriction policy. The [optional local R5 comparison](../osmix/test/r5/README.md) evaluates declared fixture checks against a specific R5 checkout; coordinate linking and diagnostic observations do not establish complete modal legality.
 
 #### Way direction
 

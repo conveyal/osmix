@@ -167,6 +167,8 @@ Set `PORTLESS=0` to bypass the proxy and run the underlying development command 
 
 Complete TypeScript examples are marked `check-docs` and compiled by `check:docs`; partial configuration and application-wiring fragments are labeled `schematic`.
 
+Routing regressions use checked-in Monaco and small generated fixtures. Reports distinguish declared route assertions from policy diagnostics and node-ID lookup from coordinate snapping. The [optional local R5 comparison](packages/osmix/test/r5/README.md) records its own endpoint-resolution and assertion evidence; R5 and large local datasets are not required by the normal test suite or CI.
+
 ## Apps
 
 - **[www](apps/www/)** – Main site with interactive examples and package overview ([osmix.dev](https://osmix.dev))
