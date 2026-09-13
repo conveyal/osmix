@@ -135,11 +135,27 @@ and ordered relation members stay authoritative.
 
 Structural properties cannot transfer. Routing-affecting properties, motor-road attachments, ambiguous
 targets, ordinary relation membership, and uncertain geometry require review when otherwise eligible. Adding
-a review reason never weakens an existing block: hard grade, access, geometry, restriction, or reference
+a review reason never weakens an existing block: hard feature-type, grade, access, geometry, restriction, or reference
 conflicts still prevent the affected action, even when an accept decision is supplied. Property transfer and
 network attachment are assessed independently, so blocking one does not disable an otherwise eligible action.
 Equivalent one-to-one patch ways remain after property transfer, including the nodes that connect them to other imported ways.
 Exact reconciliation remains a separate operation; segmented way chains are reported but unsupported.
+
+### Feature classification policy
+
+Proximity proposes candidates; it does not establish feature identity. Discovery compares explicit classifications independently of the tag keys selected for copying. For example, `amenity=cafe` on the base and `amenity=school` on the import produce `feature-type-conflict` even when only `name` is selected. The conflict hard-blocks both enabled matching actions. Manual acceptance, bulk acceptance, and additional relation-membership review reasons cannot override it.
+
+The supported classification keys are `amenity`, `shop`, `tourism`, `leisure`, `office`, `craft`, `healthcare`, `emergency`, `historic`, `man_made`, `natural`, `landuse`, `building`, `boundary`, `aeroway`, `railway`, `public_transport`, `power`, and `place`. Comparisons use trimmed, case-sensitive text for the same key. Different explicit values conflict, with these boundaries:
+
+- Missing or empty values are unknown and do not establish a conflict.
+- `yes` means an unspecified positive subtype, so it does not conflict with a more specific positive value. Explicit `no` conflicts with any different nonempty value, including `yes`.
+- No cross-key, subtype-hierarchy, or semicolon-list equivalence is inferred. Names and other descriptive differences do not establish a classification conflict.
+
+Candidate evidence includes optional `featureTypeConflicts: Array<{ key: string; baseValue: string | number; patchValue: string | number }>` containing the original typed values, independently of selected-tag `tagDiff` entries. Merge displays these base and imported values under **Feature type conflict**. Equal classifications or the absence of a supported conflict do not prove identity; existing geometry, routing, grade, and integrity checks still apply.
+
+Blocking a matching candidate does not itself discard its imported feature. Ordinary direct/exact merge rules still apply, and same-ID authoritative updates retain their existing behavior. This classification policy applies to imported-data matching; it does not change the separate exact-reconciliation rules.
+
+### Choosing matching actions
 
 The current decision selects Copy tags, Connect network, both, or neither. An action can be eligible without
 being selected. Changing one choice preserves the other on the same target, including a choice that was scheduled automatically.

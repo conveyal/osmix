@@ -139,6 +139,10 @@ The default radius is one meter. High-confidence actions are scheduled automatic
 
 **Match evidence and attributes** explains the proposed correspondence and shows base and imported attribute values. Finite distances include meters. No eligible target within the search radius, unsupported nearby segments, and an unavailable measurement for an existing target have different explanations. A short distance does not override a blocked action. Protected and routing-affecting attributes are identified in text, so their meaning does not depend on row color.
 
+Nearby features can represent different things. A base cafe (`amenity=cafe`) and an imported school (`amenity=school`) remain blocked even when only `name` is selected for copying. **Feature type conflict** shows the actual base and imported classifications separately from selected attribute differences. Both Copy tags and Connect network stay unavailable for that match, including after an earlier acceptance or a relation-membership review reason. Use the **Feature classifications conflict** reason filter to find these candidates.
+
+Classification checks compare supported attributes on both features. Missing information is unknown; equal classifications alone do not confirm identity. See the [supported classification keys and compatibility rules](../../packages/change/README.md#feature-classification-policy). Blocking a match does not discard the import: ordinary direct/exact merge rules still apply, including authoritative same-ID updates.
+
 Matching controls have visible labels and associated help. Keyboard users can change filters, choose a target, toggle either action, compare geometry, and expand evidence; the comparison selection is separate from the target scheduled for matching. Long values wrap in narrow panels.
 
 Check the status of each action: property transfer and network attachment are assessed separately. **Needs

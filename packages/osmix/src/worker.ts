@@ -183,6 +183,9 @@ function cloneConflationCandidateView(
       sourceRoutingFamilies: [...candidate.evidence.sourceRoutingFamilies],
       targetRoutingFamilies: [...candidate.evidence.targetRoutingFamilies],
       tagDiff: candidate.evidence.tagDiff.map((diff) => ({ ...diff })),
+      featureTypeConflicts: candidate.evidence.featureTypeConflicts?.map((conflict) => ({
+        ...conflict,
+      })),
       patchWayIds: candidate.evidence.patchWayIds ? [...candidate.evidence.patchWayIds] : undefined,
       endpointDistancesMeters: candidate.evidence.endpointDistancesMeters
         ? [...candidate.evidence.endpointDistancesMeters]

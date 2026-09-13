@@ -76,6 +76,7 @@ export type OsmConflationReasonCode =
   | "bearing-mismatch"
   | "drivable-network"
   | "exact-match"
+  | "feature-type-conflict"
   | "geometry-mismatch"
   | "grade-conflict"
   | "length-mismatch"
@@ -101,12 +102,20 @@ export interface OsmConflationTagDiff {
   routing: boolean;
 }
 
+/** Explicit same-key classification disagreement, independent of selected copy keys. */
+export interface OsmConflationFeatureTypeConflict {
+  key: string;
+  baseValue: string | number;
+  patchValue: string | number;
+}
+
 /** Serializable matching evidence used by the UI and deterministic tests. */
 export interface OsmConflationEvidence {
   distanceMeters: number;
   sourceRoutingFamilies: OsmConflationRoutingFamily[];
   targetRoutingFamilies: OsmConflationRoutingFamily[];
   tagDiff: OsmConflationTagDiff[];
+  featureTypeConflicts?: OsmConflationFeatureTypeConflict[];
   patchWayIds?: number[];
   bearingDifferenceDegrees?: number;
   endpointDistancesMeters?: [number, number];

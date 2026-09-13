@@ -16,6 +16,7 @@ import {
 } from "./conflation-outcome.ts";
 import { generateChangeset } from "./generate-changeset.ts";
 import { assertConflationPreservesBaseTopology } from "./integrity.ts";
+import { featureTypeConflicts } from "./internal/feature-classification.ts";
 import type {
   OsmConflationActionAssessment,
   OsmConflationArtifacts,
@@ -771,6 +772,13 @@ function discoverNodeCandidates(context: DiscoveryContext) {
       const tagDiff = selectedTagDiff(source, target, context.options.propertyKeys);
       const property = nodePropertyAssessment(context, patchWays, baseWays, tagDiff);
       const attachment = nodeAttachmentAssessment(context, source, target, patchWays, baseWays);
+      const typeConflicts = featureTypeConflicts(source.tags, target.tags);
+      if (typeConflicts.length > 0) {
+        for (const assessment of [property, attachment.assessment]) {
+          assessment.status = "blocked";
+          assessment.reasons = uniqueReasons([...assessment.reasons, "feature-type-conflict"]);
+        }
+      }
       if (targets.length > 1) {
         if (property.status === "automatic") property.status = "review";
         if (attachment.assessment.status === "automatic") attachment.assessment.status = "review";
@@ -796,6 +804,7 @@ function discoverNodeCandidates(context: DiscoveryContext) {
           sourceRoutingFamilies: routingFamilies(patchWays),
           targetRoutingFamilies: routingFamilies(baseWays),
           tagDiff,
+          featureTypeConflicts: typeConflicts.length > 0 ? typeConflicts : undefined,
           ...attachment.evidence,
         },
       });
@@ -845,6 +854,7 @@ function discoverWayCandidates(context: DiscoveryContext) {
         | "endpointDistancesMeters"
         | "lengthDifferenceRatio"
         | "maxGeometryDistanceMeters"
+        | "featureTypeConflicts"
       >;
     }[] = [];
     for (const index of nearbyIndexes) {
@@ -862,6 +872,8 @@ function discoverWayCandidates(context: DiscoveryContext) {
       const maxGeometryDistanceMeters = symmetricLineDistance(sourceCoordinates, targetCoordinates);
       if (maxGeometryDistanceMeters > context.options.maxDistanceMeters) continue;
       const reasons: OsmConflationReasonCode[] = [];
+      const typeConflicts = featureTypeConflicts(source.tags, target.tags);
+      if (typeConflicts.length > 0) reasons.push("feature-type-conflict");
       // Keep geometrically plausible conflicts as blocked candidate rows. Users need
       // to see why a nearby way was rejected instead of seeing it as merely unmatched.
       if (isAreaWay(source) !== isAreaWay(target)) reasons.push("geometry-mismatch");
@@ -884,6 +896,7 @@ function discoverWayCandidates(context: DiscoveryContext) {
           endpointDistancesMeters: endpoints.distances.map(roundEvidence) as [number, number],
           lengthDifferenceRatio: roundEvidence(lengthDifferenceRatio),
           maxGeometryDistanceMeters: roundEvidence(maxGeometryDistanceMeters),
+          featureTypeConflicts: typeConflicts.length > 0 ? typeConflicts : undefined,
         },
       });
     }

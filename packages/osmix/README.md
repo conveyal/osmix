@@ -182,6 +182,10 @@ ambiguity adds review context without making an already blocked action eligible.
 attachment retain separate eligibility, including after worker recovery; an eligible action can proceed while
 the other remains blocked. Filter-wide decisions skip the blocked action and count it as ineligible.
 
+`feature-type-conflict` blocks both enabled matching actions when supported explicit feature classifications disagree, independently of the selected copy keys. A nearby imported school therefore cannot copy its name onto a base cafe merely because only `name` was selected. Optional `evidence.featureTypeConflicts` lists each conflicting key and its original typed `baseValue` and `patchValue`; these values remain available when the classification key is absent from `tagDiff`. Merge shows them under **Feature type conflict** and provides a **Feature classifications conflict** reason filter. Worker review, recovery, and acceptance retain the block.
+
+Missing classifications are unknown, and equal values alone do not prove identity. The [classification policy](../change/README.md#feature-classification-policy) specifies supported keys, same-key comparisons, generic `yes`, explicit `no`, and unsupported equivalence assumptions. Existing routing and grade checks still apply. A blocked matching candidate retains ordinary direct/exact merge behavior; same-ID updates remain authoritative.
+
 #### Review alternative targets and correct choices
 
 Merge groups possible targets under their imported feature. Only one target can have scheduled matching

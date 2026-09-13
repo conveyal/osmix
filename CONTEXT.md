@@ -33,7 +33,13 @@ A proposed correspondence between an imported feature and a base feature, with e
 _Avoid_: Confirmed match
 
 **Match evidence**:
-The locations, measured differences, attributes, and connection context used to assess a proposed correspondence. Proximity is evidence of a possible match, not proof that either matching action is safe.
+The locations, measured differences, attributes, and connection context used to assess a proposed correspondence. Proximity is evidence of a possible match, not proof of feature identity or that either matching action is safe.
+
+**Feature classification**:
+An explicit attribute describing what a feature represents, such as a school or cafe. Missing classification information is unknown; equal classifications alone do not establish that two features are the same.
+
+**Feature type conflict**:
+Contradictory explicit classifications on a proposed pair, such as a base cafe and an imported school. The conflict prevents both copying tags and connecting networks for that match, independently of which attributes were selected for copying.
 
 **Candidate distance**:
 The measured separation between a proposed pair: point-to-point distance for nodes, or the maximum sampled separation between way geometries. An unavailable measurement differs from finding no eligible target in the search area.
