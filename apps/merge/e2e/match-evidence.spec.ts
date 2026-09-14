@@ -93,10 +93,13 @@ test("matching settings expose names, help, keyboard choices, and field-specific
 
   const copy = settings.getByRole("checkbox", { name: "Copy tags", exact: true });
   const connect = settings.getByRole("checkbox", { name: "Connect network", exact: true });
+  const removal = settings.getByRole("checkbox", { name: "Review redundant way removal" });
   const keys = settings.getByRole("textbox", { name: "OSM tag keys to copy" });
   const radius = settings.getByRole("spinbutton", { name: "Candidate search radius (meters)" });
   await expect(copy).toHaveAccessibleDescription(/Imported geometry stays intact/);
   await expect(connect).toHaveAccessibleDescription(/changes how the paths connect/);
+  await expect(removal).not.toBeChecked();
+  await expect(removal).toHaveAccessibleDescription(/Manual review only/);
   await expect(keys).toHaveAccessibleDescription(/separated by commas or spaces/);
   await expect(radius).toHaveAccessibleDescription(/Proximity alone does not establish a match/);
   await keys.fill("");
@@ -108,9 +111,20 @@ test("matching settings expose names, help, keyboard choices, and field-specific
   await copy.focus();
   await copy.press("Space");
   await expect(copy).not.toBeChecked();
-  await expect(copy).toHaveAccessibleDescription(/Select Copy tags, Connect network, or both/);
+  await expect(copy).toHaveAccessibleDescription(
+    /Select Copy tags, Connect network, or Review redundant way removal/,
+  );
   await expect(connect).toHaveAttribute("aria-invalid", "true");
+  await expect(removal).toHaveAttribute("aria-invalid", "true");
   await expect(keys).toBeDisabled();
+  await removal.focus();
+  await removal.press("Space");
+  await expect(removal).toBeChecked();
+  await expect(removal).not.toHaveAttribute("aria-invalid", "true");
+  await expect(copy).not.toBeChecked();
+  await expect(connect).not.toBeChecked();
+  await removal.press("Space");
+  await expect(removal).not.toBeChecked();
   await connect.focus();
   await connect.press("Space");
   await expect(connect).toBeChecked();

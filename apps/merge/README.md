@@ -132,6 +132,23 @@ paths, school boundaries, and ambiguous intersections must remain separate.
 - **Connect network** (network attachment) preserves the base node and rewrites only accepted references in imported patch
   ways. Automatic matches must be unique and agree on routing family, grade context, and local bearing.
   Restrictions, relation-member rewrites, way collapse, and other integrity hazards remain blocked.
+- **Review redundant way removal** enables a third, default-off choice. It requires **Review each merge stage**;
+  automatic merge is unavailable while this option is selected. Each eligible **Remove imported way** checkbox
+  identifies the imported way, retained base counterpart, branch connections, original attributes, and any newly
+  orphaned points to remove. Neither copying tags nor choosing a target selects removal automatically.
+
+Removal supports a unique equivalent open, non-area way with equal vertex counts and compatible routing meaning.
+Differently segmented paths, one-to-many chains, involved relations, grade/access conflicts, and unverified branch
+connections remain blocked. Keep the imported way when these checks cannot pass; changing copied tag keys cannot
+bypass them. Tagged points, referenced points, base entities, and unrelated imports are retained.
+
+For a branch prerequisite, use **Review connection at imported point…**. If the connection is already scheduled
+automatically, **Confirm connection for removal** records the required explicit choice without toggling it off and
+on. Return to the imported way and select removal once eligible. The generated cumulative **Way removal preview**
+shows the complete selected plans before **Apply cumulative merge**. Changing any matching choice clears that
+preview and requires regeneration. Removing a way also removes its remaining attributes, so select **Copy tags**
+separately for values that should remain on the base. If exact reconciliation already handles the same source,
+clear the explicit removal choice and regenerate.
 
 The default radius is one meter. High-confidence actions are scheduled automatically for the next preview; they change the dataset only when that preview is applied. Paged status, feature-type, and reason filters keep scheduled, review, blocked, unmatched, and skipped choices available. Review decisions are stable candidate-ID records and are restored with the worker session.
 
@@ -139,14 +156,14 @@ The default radius is one meter. High-confidence actions are scheduled automatic
 
 **Match evidence and attributes** explains the proposed correspondence and shows base and imported attribute values. Finite distances include meters. No eligible target within the search radius, unsupported nearby segments, and an unavailable measurement for an existing target have different explanations. A short distance does not override a blocked action. Protected and routing-affecting attributes are identified in text, so their meaning does not depend on row color.
 
-Nearby features can represent different things. A base cafe (`amenity=cafe`) and an imported school (`amenity=school`) remain blocked even when only `name` is selected for copying. **Feature type conflict** shows the actual base and imported classifications separately from selected attribute differences. Both Copy tags and Connect network stay unavailable for that match, including after an earlier acceptance or a relation-membership review reason. Use the **Feature classifications conflict** reason filter to find these candidates.
+Nearby features can represent different things. A base cafe (`amenity=cafe`) and an imported school (`amenity=school`) remain blocked even when only `name` is selected for copying. **Feature type conflict** shows the actual base and imported classifications separately from selected attribute differences. Matching actions stay unavailable for that match, including after an earlier acceptance or a relation-membership review reason. Use the **Feature classifications conflict** reason filter to find these candidates.
 
 Classification checks compare supported attributes on both features. Missing information is unknown; equal classifications alone do not confirm identity. See the [supported classification keys and compatibility rules](../../packages/change/README.md#feature-classification-policy). Blocking a match does not discard the import: ordinary direct/exact merge rules still apply, including authoritative same-ID updates.
 
-Matching controls have visible labels and associated help. Keyboard users can change filters, choose a target, toggle either action, compare geometry, and expand evidence; the comparison selection is separate from the target scheduled for matching. Long values wrap in narrow panels.
+Matching controls have visible labels and associated help. Keyboard users can change filters, choose a target, toggle actions independently, compare geometry, and expand evidence; the comparison selection is separate from the target scheduled for matching. Long values wrap in narrow panels.
 
-Check the status of each action: property transfer and network attachment are assessed separately. **Needs
-review** allows a decision about an eligible action; it does not override **Blocked** on the other action.
+Check the status of each action: copying, connection, and removal are assessed separately. **Needs
+review** allows a decision about an eligible action; it does not override **Blocked** on another action.
 An ordinary relation membership or an additional review reason never lifts an existing safety block. For
 example, a bridge in a walking-route relation remains blocked from transferring tags to a ground-level path
 when their grade contexts conflict.
@@ -156,6 +173,8 @@ matching the current filters across all pages. Automatic actions are already sch
 decisions, the app shows how many automatic and review candidates are eligible, how many blocked or ambiguous
 matches will be skipped, and how many prior decisions will be replaced. Accepted and rejected rows may leave the
 active status filter, so the list returns to its first page after a successful action.
+There is no bulk removal action. Completed reports identify explicitly removed ways and cleaned orphan points
+separately from copied attributes, connections, and retained imports.
 
 In verified mode, discovery happens against the untouched base and patch before either dataset is changed.
 The app then generates one cumulative direct, exact-reconciliation, and accepted-conflation changeset,

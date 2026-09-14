@@ -5,6 +5,7 @@ export default defineConfig({
   testMatch: [
     "guidance.spec.ts",
     "match-evidence.spec.ts",
+    "way-removal.spec.ts",
     "merge-base-loading.spec.ts",
     "worker-runtime.spec.ts",
   ],
@@ -29,7 +30,7 @@ export default defineConfig({
       // Merge journey is parsing PBFs and rendering MapLibre.
       name: "guidance",
       dependencies: ["merge-integration"],
-      testMatch: ["guidance.spec.ts", "match-evidence.spec.ts"],
+      testMatch: ["guidance.spec.ts", "match-evidence.spec.ts", "way-removal.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
     {

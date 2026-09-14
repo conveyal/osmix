@@ -167,7 +167,7 @@ Exact reconciliation remains a separate operation; segmented way chains are repo
 
 ### Feature classification policy
 
-Proximity proposes candidates; it does not establish feature identity. Discovery compares explicit classifications independently of the tag keys selected for copying. For example, `amenity=cafe` on the base and `amenity=school` on the import produce `feature-type-conflict` even when only `name` is selected. The conflict hard-blocks both enabled matching actions. Manual acceptance, bulk acceptance, and additional relation-membership review reasons cannot override it.
+Proximity proposes candidates; it does not establish feature identity. Discovery compares explicit classifications independently of the tag keys selected for copying. For example, `amenity=cafe` on the base and `amenity=school` on the import produce `feature-type-conflict` even when only `name` is selected. The conflict hard-blocks enabled matching actions. Manual acceptance, bulk acceptance, and additional relation-membership review reasons cannot override it.
 
 The supported classification keys are `amenity`, `shop`, `tourism`, `leisure`, `office`, `craft`, `healthcare`, `emergency`, `historic`, `man_made`, `natural`, `landuse`, `building`, `boundary`, `aeroway`, `railway`, `public_transport`, `power`, and `place`. Comparisons use trimmed, case-sensitive text for the same key. Different explicit values conflict, with these boundaries:
 
@@ -181,9 +181,9 @@ Blocking a matching candidate does not itself discard its imported feature. Ordi
 
 ### Choosing matching actions
 
-The current decision selects Copy tags, Connect network, both, or neither. An action can be eligible without
-being selected. Changing one choice preserves the other on the same target, including a choice that was scheduled automatically.
-Skipping a match schedules neither action; imported additions still follow the ordinary direct/exact merge
+The current decision independently selects Copy tags, Connect network, and optional explicit way removal. An action can be eligible without
+being selected. Changing one choice preserves the others on the same target, including copying or connection choices that were scheduled automatically.
+Skipping a match schedules no actions; imported additions still follow the ordinary direct/exact merge
 rules. Clearing a saved decision restores discovery defaults, which may schedule high-confidence actions
 again. Automatic describes the current schedule, not a completed change.
 
@@ -192,8 +192,20 @@ scheduled for only one of those targets: copying tags to one target while connec
 conflict. Choosing a replacement must clear the prior target's actions while preserving other imported
 features' decisions. In Merge, selecting an action on another alternative replaces the target using that
 action choice, so a user can switch targets and copy tags without also connecting the network.
-Leaving the feature unmatched schedules neither action for any target and retains
+Leaving the feature unmatched schedules no actions for any target and retains
 ordinary imported additions under the direct/exact merge rules.
+
+### Explicit imported-way removal
+
+Set `allowWayRemoval: true` to enable a separate removal assessment; its default is false. Discovery adds `candidate.wayRemoval` with `status`, `reasons`, and a nullable `preview`. Neither automatic matching, a plain accept decision, nor a bulk copying/connection action selects removal. An eligible removal requires an individual accept decision with `removeWay: true`; use `buildConflationActionDecision(candidate, current, "remove-way", true)` to preserve the other choices. Removal-only matching permits empty `propertyKeys` and `attachNetwork: false`.
+
+Removal supports only a unique equivalent open, non-area imported way and one retained base counterpart. Paired vertices must have equal counts and fit within the search radius, with compatible direction and identical non-descriptive semantics. Reversed matches with direction- or side-dependent keys or values remain blocked, including `sidewalk=left` and point `direction=forward`. Different segmentation, one-to-many chains, relation involvement, conflicting grade/access/feature meaning, and unproven connections block removal. Tag selections cannot bypass these checks. Copying tags remains independent: the removed way's original attributes are shown in the preview, and any values not otherwise retained leave with it.
+
+Every connection from the removed way to a retained branch must already use the required base point or have an explicitly accepted eligible node attachment. An automatically scheduled connection is insufficient. The worker reassesses removal plans after decisions change, including changes on other pages. `preview.connections` identifies each imported/base node pair, retained branch way IDs, attachment candidate ID, and whether the prerequisite is explicitly satisfied. A true `explicitlyAccepted` with no attachment candidate means an existing base connection; false with no candidate means no supported connection is available. Keep the imported way when its required connections cannot be verified.
+
+The preview identifies `sourceWayId`, `retainedWayId`, original `sourceTags`, `orphanNodeIds`, `retainedTaggedNodeIds`, `connections`, `blockedNodeIds`, and `blockingRelationIds`. Blocked node IDs can identify geometry or routing failures as well as missing connections. Cleanup removes only untagged imported nodes newly orphaned by this removal after accepted attachments, with no remaining way or relation references. Tagged nodes, base nodes, unrelated imports, and nodes already orphaned by an earlier attachment remain.
+
+Generation revalidates the plan against the ordinary direct/exact baseline and all selected actions. If exact reconciliation already handled the source, clear its explicit removal choice and regenerate; a stale removal must not claim credit for the separate exact operation. Preview generation does not apply changes. Inspect the generated outcome's per-feature `wayRemoval` details before applying, and regenerate after editing decisions. The generated report adds optional `summary.wayRemovalActions` and `summary.removedOrphanNodes`, counting actual explicit removals and newly cleaned points.
 
 ## API
 
@@ -272,17 +284,16 @@ Options:
 - `createIntersections` (boolean): Split intersecting ways.
 - `conflation` (optional): Explicit imported-data matching configuration. `propertyKeys` and
   `attachNetwork` are required when supplied; `maxDistanceMeters` defaults to `1`, and `automatic` defaults
-  to `"high-confidence"`.
+  to `"high-confidence"`. `allowWayRemoval` defaults to false and enables manual review only.
 
 ### Conflation discovery and generation
 
 - `discoverConflationCandidates(base, patch, options)`: Return deterministic node and one-to-one-way
   candidates with action-specific status, evidence, tag diffs, and reason codes.
 - `resolveConflationActions(candidate, decision?)`: Return the eligible actions currently scheduled as
-  `{ transferProperties, attachNetwork }`. Use this result for selected control states and action labels.
-- `buildConflationActionDecision(candidate, current, action, selected)`: Change `"transfer-properties"` or
-  `"attach-network"` while preserving the other resolved choice. Returns an accept decision with both flags
-  explicit; eligibility checks still govern whether either action can be scheduled.
+  `{ transferProperties, attachNetwork, removeWay? }`. `removeWay` appears only for an eligible explicitly selected removal. Use this result for selected control states and action labels.
+- `buildConflationActionDecision(candidate, current, action, selected)`: Change `"transfer-properties"`,
+  `"attach-network"`, or `"remove-way"` while preserving the other resolved choices. Returns an accept decision that preserves automatic connection scheduling without converting it into explicit connection approval. Removal remains explicit and eligibility still governs each action.
 - `buildConflationSourceDecision(candidates, decisions, source, selected)`: Replace the choices for one
   `{ entityType, sourceId }`. Pass a candidate decision as `selected` to retain its action flags and reject
   every sibling target, or `null` to leave the imported feature unmatched. Returns the complete decision
@@ -299,11 +310,11 @@ Options:
   reviewed fuzzy actions to an already materialized ordinary-merge baseline. The immutable original base is
   required so generation can rediscover and validate candidates instead of trusting mutable review records.
 
-An `OsmConflationDecision` uses `transferProperties` for Copy tags and `attachNetwork` for Connect network.
-With no decision, only actions classified `automatic` are scheduled. An accept decision honors explicit
-flags; omitted flags retain the legacy behavior of selecting every eligible action. New controls should use
-`buildConflationActionDecision()` so changing one choice does not accidentally select the other. Reject
-decisions schedule neither action. An accept decision with both flags `false` also resolves to the effective
+An `OsmConflationDecision` uses `transferProperties` for Copy tags, `attachNetwork` for Connect network, and explicit `removeWay: true` for removal.
+With no decision, only copying/connection actions classified `automatic` are scheduled. An accept decision honors explicit
+flags; omitted copying/connection flags retain their legacy selection behavior, while omitted removal never selects it. New controls should use
+`buildConflationActionDecision()` so changing one choice preserves the others. Reject
+decisions schedule no actions. An accept decision with no selected action also resolves to the effective
 `rejected` status, shown as **Skipped** in Merge. Blocked and unmatched actions remain unscheduled regardless
 of requested flags.
 
@@ -331,16 +342,16 @@ Unresolved features need attention; intentionally skipped features are counted s
 
 The report includes per-feature and per-tag details so clients can identify which selected attributes were not copied to a base target and why:
 
-| Field             | Meaning                                                                                                                                                                                                              |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `summary`         | Unique considered, applied, unresolved, skipped, and unchanged feature counts; separate tag-copy, copied-value, and network-connection counts. Partial success can contribute to both applied and unresolved totals. |
-| `features`        | One row per considered imported node or way, with original ID, candidate IDs, base target used for comparison when known, copied keys, connected way IDs, and unresolved or skipped status.                          |
-| `tags`            | Per-key `presentFeatures`, `copiedFeatures`, `alreadyEqualFeatures`, and `satisfiedByOtherCopyFeatures`, plus `uncopied` source IDs and reasons. Absent imported values are excluded.                                |
-| `retainedImports` | Node, way, and relation counts for original imported IDs present in the result, plus the subset retained as ordinary additions.                                                                                      |
+| Field             | Meaning                                                                                                                                                                                                                                            |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `summary`         | Unique considered, applied, unresolved, skipped, and unchanged feature counts; separate tag-copy, copied-value, network-connection, and optional way-removal/cleanup counts. Partial success can contribute to both applied and unresolved totals. |
+| `features`        | One row per considered imported node or way, with original ID, candidate IDs, base target used for comparison when known, copied keys, connected way IDs, optional removal details, and unresolved or skipped status.                              |
+| `tags`            | Per-key `presentFeatures`, `copiedFeatures`, `alreadyEqualFeatures`, and `satisfiedByOtherCopyFeatures`, plus `uncopied` source IDs and reasons. Absent imported values are excluded.                                                              |
+| `retainedImports` | Node, way, and relation counts for original imported IDs present in the result, plus the subset retained as ordinary additions.                                                                                                                    |
 
 Uncopied tag reasons distinguish `no-accepted-target`, `blocked`, `not-selected`, `protected-tag`, and `superseded`; discovery reasons provide further context. When copies compete for a target tag, only the surviving write receives credit. These reasons report the existing matching rules; they do not expose a configurable conflict policy.
 
-A skipped or unresolved match does not discard the imported feature; ordinary imported additions, including their original attributes, remain subject to the direct/exact merge rules. Retained-import counts refer to original imported IDs still present after matching. Exact reconciliation can instead represent an imported feature under a base ID, so absence from those counts does not by itself mean the feature was lost. A subsequent intersection can allocate an ID that exact reconciliation removed; that newly created node is not evidence that the original imported feature was retained.
+A skipped or unresolved match does not itself discard the imported feature; explicit removals are recorded separately in `features[].wayRemoval`. Other imported additions remain subject to the direct/exact merge rules. Retained-import counts refer to original imported IDs still present after matching. Exact reconciliation can instead represent an imported feature under a base ID, so absence from those counts does not by itself mean the feature was lost. A subsequent intersection can allocate an ID that exact reconciliation removed; that newly created node is not evidence that the original imported feature was retained.
 
 ### `applyChangesetToOsm(changeset: OsmChangeset): Osm`
 

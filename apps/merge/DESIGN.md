@@ -156,8 +156,9 @@ Use the merge terms consistently:
   proposes a correspondence; it does not select every eligible action.
 - **Alternative targets** belong together under their imported feature. Show
   at most one selected target and an explicit **Leave unmatched** choice.
-  Choosing a target selects its eligible configured actions; independent action
-  controls can refine that choice. Keep eligible actions available on unselected
+  Choosing a target selects its eligible configured copying and connection actions;
+  removal requires its own explicit choice. Independent action controls can refine
+  the selection. Keep eligible actions available on unselected
   alternatives: selecting one switches the target using that action choice.
   Replacing a target preserves other imported features' decisions. Use the group's
   **Leave unmatched** control to clear its choice, rather than per-alternative
@@ -169,13 +170,21 @@ Use the merge terms consistently:
   their connecting nodes.
 - **Connect network** is an independent choice that changes connectivity by
   rewriting accepted references in patch-created ways. **Network attachment**
-  is the API term. Changing either action must preserve the other choice on the
+  is the API term. Changing an action must preserve the other choices on the
   same target.
+- **Remove imported way** is a separate, default-off geometry change. It requires
+  an equivalent retained base counterpart and verified retained connections;
+  copying attributes or choosing a target must never schedule it. Show the exact
+  imported/base way IDs, affected branches, accepted connection prerequisites,
+  and orphan-node cleanup before selection and in the generated preview before
+  application. Explain that remaining attributes leave with the removed way and
+  that copying selected attributes is a separate choice. If removal is blocked,
+  explain how to review the required connection or keep the imported geometry.
 - **Scheduled** describes what the current choices include in the next
   matching preview. Applying that preview is a separate step. **Automatic** means scheduled by the matching rules; it
   never means already applied. Keep discovery eligibility distinct from the
   actions currently scheduled, and show blocked actions with their reasons.
-- **Skip match** schedules neither matching action. Imported additions remain
+- **Skip match** schedules no matching actions. Imported additions remain
   subject to the ordinary direct/exact merge rules. Use **Skipped** for the
   user-facing status while retaining `rejected` in saved decisions and APIs.
 - **Intersection creation** connects compatible same-grade crossings while
@@ -207,9 +216,14 @@ loaded original inputs, options, and saved decisions. Show the affected imported
 feature when a decision conflict needs correction. After changes are applied,
 intersection recovery must not imply a return to the original matching state.
 
-After a successful merge, show the matching outcome before download controls. Identify it as evidence from after matching and before intersection creation. Targets, connected ways, outstanding work, and retained IDs describe that stage; later intersections can add connections or remap junctions. Do not present the report as a final-reference snapshot or credit intersection effects as matching. Count actual tag-copy actions and network connections separately from imported features considered for matching. Count each imported feature once regardless of its number of alternative targets. Unresolved features need attention; intentional skips are a separate category. A partially completed feature can contribute both an applied action and unresolved work. Values already present on the base are not failed copies.
+Removal previews belong to the generated changeset and become stale when any
+matching decision changes, including a connection on another page. Clear stale
+preview evidence and require regeneration before application. Never describe a
+scheduled removal as already applied, and never provide automatic or bulk removal.
 
-Keep the completion summary prominent and concise. Provide paged details for ambiguous, blocked, unmatched, and skipped features, including selected tag values not copied to a base target and available reasons. Explain that ordinary imported additions remain in the output. Keep graph diagnostics secondary; they do not prove route correctness. Show completion only after all required application and intersection stages succeed and the displayed result is refreshed. If refresh fails after application, offer a refresh-only retry and prevent advancement or reapplication until it succeeds. Retain that run's readable report until **Start a new merge** clears both input slots and the selected map state. Instruct users to reload the original base and import files to revise a completed merge; the merged result must not be reused as an implicit retry input.
+After a successful merge, show the matching outcome before download controls. Identify it as evidence from after matching and before intersection creation. Targets, connected ways, explicit way removals, outstanding work, and retained IDs describe that stage; later intersections can add connections or remap junctions. Do not present the report as a final-reference snapshot or credit intersection effects as matching. Count actual tag-copy actions, network connections, and explicit removals separately from imported features considered for matching. Count each imported feature once regardless of its number of alternative targets. Unresolved features need attention; intentional skips are a separate category. A partially completed feature can contribute both an applied action and unresolved work. Values already present on the base are not failed copies.
+
+Keep the completion summary prominent and concise. Provide paged details for ambiguous, blocked, unmatched, and skipped features, including selected tag values not copied to a base target and available reasons. Distinguish ordinary retained imports from explicitly removed ways and cleaned orphan points. Keep graph diagnostics secondary; they do not prove route correctness. Show completion only after all required application and intersection stages succeed and the displayed result is refreshed. If refresh fails after application, offer a refresh-only retry and prevent advancement or reapplication until it succeeds. Retain that run's readable report until **Start a new merge** clears both input slots and the selected map state. Instruct users to reload the original base and import files to revise a completed merge; the merged result must not be reused as an implicit retry input.
 
 `Details` is the shared disclosure primitive. Its open-state styles target Base
 UI's `data-panel-open` attribute. Disclosure triggers remain keyboard

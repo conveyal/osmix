@@ -4,7 +4,7 @@
  */
 
 import type { Osm } from "@osmix/core";
-import type { OsmEntity, OsmEntityType, OsmEntityTypeMap } from "@osmix/types";
+import type { OsmEntity, OsmEntityType, OsmEntityTypeMap, OsmTags } from "@osmix/types";
 
 import type { OsmChangeset } from "./changeset.ts";
 
@@ -94,6 +94,11 @@ export type OsmConflationReasonCode =
   | "routing-property"
   | "same-id"
   | "unsupported-way-chain"
+  | "way-removal-connection-required"
+  | "way-removal-topology-conflict"
+  | "way-removal-routing-conflict"
+  | "way-removal-relation-member"
+  | "way-removal-unsupported"
   | "would-collapse-way";
 
 /** A selected patch tag and the value it would replace on the base entity. */
@@ -139,6 +144,33 @@ export interface OsmConflationActionAssessment {
   reasons: OsmConflationReasonCode[];
 }
 
+/** A retained branch and the explicit node connection needed before removing its trunk. */
+export interface OsmConflationWayRemovalConnection {
+  sourceNodeId: number;
+  targetNodeId: number | null;
+  retainedWayIds: number[];
+  attachmentCandidateId: string | null;
+  explicitlyAccepted: boolean;
+}
+
+/** Proposed removal, or actual removal when included in a generated outcome. */
+export interface OsmConflationWayRemovalPreview {
+  sourceWayId: number;
+  retainedWayId: number;
+  orphanNodeIds: number[];
+  retainedTaggedNodeIds: number[];
+  connections: OsmConflationWayRemovalConnection[];
+  blockedNodeIds: number[];
+  blockingRelationIds: number[];
+  /** All original way attributes are discarded unless separately copied. */
+  sourceTags: OsmTags;
+}
+
+/** Removal is always manually reviewed; it is never an automatic action. */
+export interface OsmConflationWayRemovalAssessment extends OsmConflationActionAssessment {
+  preview: OsmConflationWayRemovalPreview | null;
+}
+
 /** One stable source/target candidate. Ambiguous sources have one row per target. */
 export interface OsmConflationCandidate {
   id: string;
@@ -149,6 +181,7 @@ export interface OsmConflationCandidate {
   reasons: OsmConflationReasonCode[];
   propertyTransfer: OsmConflationActionAssessment;
   networkAttachment: OsmConflationActionAssessment | null;
+  wayRemoval?: OsmConflationWayRemovalAssessment;
   evidence: OsmConflationEvidence;
 }
 
@@ -156,6 +189,8 @@ export interface OsmConflationCandidate {
 export interface OsmConflationOptions {
   propertyKeys: string[];
   attachNetwork: boolean;
+  /** Enable manual removal review; never selects a removal by itself. */
+  allowWayRemoval?: boolean;
   maxDistanceMeters?: number;
   automatic?: OsmConflationAutomatic;
   decisions?: OsmConflationDecision[];
@@ -165,26 +200,32 @@ export interface OsmConflationOptions {
 export interface ResolvedOsmConflationOptions {
   propertyKeys: string[];
   attachNetwork: boolean;
+  /** Enable manual removal review; never selects a removal by itself. */
+  allowWayRemoval?: boolean;
   maxDistanceMeters: number;
   automatic: OsmConflationAutomatic;
 }
 
 /**
  * A user's explicit choice for a discovered source/target pair.
- * Accepted decisions select eligible actions when their flags are omitted.
- * Two false flags skip the match; rejection ignores both action flags.
+ * Omitted copy/connect flags select eligible actions. Removal requires explicit true.
+ * Selecting no actions skips the match; rejection ignores all action flags.
  */
 export interface OsmConflationDecision {
   candidateId: string;
   action: "accept" | "reject";
   transferProperties?: boolean;
   attachNetwork?: boolean;
+  /** Explicitly remove the imported way after its topology checks pass. */
+  removeWay?: boolean;
 }
 
 /** Eligible matching actions scheduled by a decision or automatic discovery defaults. */
 export interface OsmConflationResolvedActions {
   transferProperties: boolean;
   attachNetwork: boolean;
+  /** Present only when an eligible removal was explicitly selected. */
+  removeWay?: boolean;
 }
 
 /** A recoverable selection conflict attached to validation errors as `error.conflict`. */
@@ -234,6 +275,7 @@ export interface OsmConflationOutcomeFeature {
   targetId: number | null;
   copiedKeys: string[];
   connectedWayIds: number[];
+  wayRemoval?: OsmConflationWayRemovalPreview;
   unresolved: OsmConflationUnresolvedKind | null;
   skipped: boolean;
   /** Whether the imported entity's original ID is present; exact reconciliation can replace that ID. */
@@ -249,6 +291,8 @@ export interface OsmConflationOutcomeSummary {
   tagCopyActions: number;
   copiedTagValues: number;
   networkAttachmentActions: number;
+  wayRemovalActions?: number;
+  removedOrphanNodes?: number;
   unresolvedFeatures: number;
   ambiguousFeatures: number;
   blockedFeatures: number;

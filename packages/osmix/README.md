@@ -144,10 +144,10 @@ references. The worker preserves discovery settings, filters, decisions, and gen
 restarts, and reports CAR/WALK node, edge, and component deltas before the changeset is applied. Automatic
 pedestrian attachments are rejected if they alter routable CAR topology.
 
-Copy tags and Connect network are independent choices. Review controls show which actions are currently
+Copy tags, Connect network, and optional explicit way removal are independent choices. Review controls show which actions are currently
 scheduled, separately from whether discovery considers each action eligible. Changing one choice preserves
-the other. The shared `resolveConflationActions(candidate, decision?)` helper returns the scheduled
-`transferProperties` and `attachNetwork` flags. Use `buildConflationActionDecision()` to build a row update:
+the others. The shared `resolveConflationActions(candidate, decision?)` helper returns the scheduled
+`transferProperties` and `attachNetwork` flags, plus `removeWay: true` only for an eligible explicitly selected removal. Use `buildConflationActionDecision()` to build a row update:
 
 ```ts check-docs
 import {
@@ -166,12 +166,12 @@ function chooseCopyTags(
 ```
 
 Persist the returned decision with `setConflationDecision()`. The `"attach-network"` action works the same
-way for Connect network. The helper writes both flags explicitly. For backward compatibility, omitted flags
-on a manually constructed accept decision select every eligible action.
+way for Connect network; `"remove-way"` selects removal independently. The helper preserves other choices without converting an automatically scheduled connection into explicit approval for removal. For backward compatibility, omitted copying/connection flags
+on a manually constructed accept decision select those eligible actions. Removal always requires explicit `removeWay: true`.
 
 In Merge, comparing a candidate is separate from selecting its matching actions. The map and selectable Latitude/Longitude evidence show the same pair; base circles and solid lines differ from imported diamonds and dashed lines even without color. Finite distances include meters, while unavailable measurements and missing eligible targets have distinct explanations. See the [Merge matching guide](../../apps/merge/README.md#safe-imported-data-matching) for evidence and keyboard controls.
 
-Skipping a match, including turning both choices off, schedules neither action and retains ordinary
+Skipping a match, including turning every choice off, schedules no actions and retains ordinary
 imported additions under the direct/exact merge rules. Removing a saved decision with
 `setConflationDecisions()` restores that candidate's discovery defaults; the Merge app calls this
 **Use automatic choices**.
@@ -183,8 +183,8 @@ the current choices. Updating or clearing decisions invalidates their dependent 
 
 Filter-wide decisions are computed and committed atomically in the worker. Property and network actions
 accept eligible automatic and review candidates while skipping blocked, unmatched, ambiguous, or structurally
-invalid matches. Each action preserves the other current choice, using the same decision resolution as an
-individual control. Reject schedules neither action for every filtered candidate that is not already rejected;
+invalid matches. Each action preserves the other current choices, using the same decision resolution as an
+individual control. There is no bulk removal action. Reject schedules no actions for every filtered candidate that is not already rejected;
 the Merge app labels this **Skip filtered**. Each result returns the
 complete decision snapshot for restart recovery, and accepted candidates can be queried with
 `{ status: "accepted" }`.
@@ -194,17 +194,47 @@ ambiguity adds review context without making an already blocked action eligible.
 attachment retain separate eligibility, including after worker recovery; an eligible action can proceed while
 the other remains blocked. Filter-wide decisions skip the blocked action and count it as ineligible.
 
-`feature-type-conflict` blocks both enabled matching actions when supported explicit feature classifications disagree, independently of the selected copy keys. A nearby imported school therefore cannot copy its name onto a base cafe merely because only `name` was selected. Optional `evidence.featureTypeConflicts` lists each conflicting key and its original typed `baseValue` and `patchValue`; these values remain available when the classification key is absent from `tagDiff`. Merge shows them under **Feature type conflict** and provides a **Feature classifications conflict** reason filter. Worker review, recovery, and acceptance retain the block.
+`feature-type-conflict` blocks enabled matching actions when supported explicit feature classifications disagree, independently of the selected copy keys. A nearby imported school therefore cannot copy its name onto a base cafe merely because only `name` was selected. Optional `evidence.featureTypeConflicts` lists each conflicting key and its original typed `baseValue` and `patchValue`; these values remain available when the classification key is absent from `tagDiff`. Merge shows them under **Feature type conflict** and provides a **Feature classifications conflict** reason filter. Worker review, recovery, and acceptance retain the block.
 
 Missing classifications are unknown, and equal values alone do not prove identity. The [classification policy](../change/README.md#feature-classification-policy) specifies supported keys, same-key comparisons, generic `yes`, explicit `no`, and unsupported equivalence assumptions. Existing routing and grade checks still apply. A blocked matching candidate retains ordinary direct/exact merge behavior; same-ID updates remain authoritative.
+
+#### Preview explicit imported-way removal
+
+Start `discoverConflation()` with `allowWayRemoval: true` to expose `candidate.wayRemoval`; this capability is off by default and never schedules removal. The optional assessment and `OsmConflationWayRemovalPreview` identify the imported/base way, original attributes, newly orphaned points to clean, tagged points to retain, branch connections, and blocking nodes/relations. Removing an imported way also removes its remaining attributes; copying selected tags stays a separate decision.
+
+The supported case is a unique equivalent open, non-area way with equal vertex counts, paired vertices within the search radius, compatible routing semantics, and verified retained connections. Different segmentation, one-to-many chains, involved relations, or unsafe grade/access context block removal. A retained branch needs an existing base connection or an explicit eligible `attachNetwork: true` decision; automatic scheduling is insufficient. Worker pages reassess these prerequisites after every choice, including changes on other pages. See the [removal policy and cleanup scope](../change/README.md#explicit-imported-way-removal).
+
+After discovery and reviewing the plan, schedule removal through the same atomic source-selection API:
+
+```ts check-docs
+import {
+  buildConflationActionDecision,
+  type OsmConflationCandidate,
+  type OsmConflationDecision,
+  type OsmixRemote,
+} from "osmix";
+
+async function previewReviewedRemoval(
+  remote: OsmixRemote,
+  baseId: string,
+  candidate: OsmConflationCandidate,
+  current: OsmConflationDecision | undefined,
+) {
+  const decision = buildConflationActionDecision(candidate, current, "remove-way", true);
+  await remote.setConflationSourceDecision(baseId, candidate, decision);
+  return remote.generateConflationChangeset(baseId, { directMerge: true });
+}
+```
+
+Inspect `result.outcome.features[].wayRemoval` before calling `applyChangesAndReplace()`. Optional `summary.wayRemovalActions` and `summary.removedOrphanNodes` count actual generated removals, not eligibility. The existing detached outcome carries removal details through application; review choices and the latest generation recover through the existing worker journal. Input replacement invalidates stale choices, and any decision edit invalidates its generated preview. If ordinary exact reconciliation already handled a reviewed source, clear its explicit removal choice and regenerate instead of attributing that separate operation to removal.
 
 #### Review alternative targets and correct choices
 
 Merge groups possible targets under their imported feature. Only one target can have scheduled matching
 actions, including when Copy tags and Connect network are selected independently. Choosing a target selects
-its eligible configured actions; adjust the two checkboxes afterward if needed. An eligible checkbox on an
+its eligible configured copying/connection actions; removal requires its own explicit choice. An eligible checkbox on an
 unselected alternative also switches to that target, using the selected action without requiring both.
-Turning both off leaves no selected target. **Leave unmatched** clears every alternative's matching actions while retaining ordinary
+Turning every action off leaves no selected target. **Leave unmatched** clears every alternative's matching actions while retaining ordinary
 imported additions under the direct/exact merge rules.
 
 Use `setConflationSourceDecision(baseId, source, selected)` for paged review controls. `source` identifies

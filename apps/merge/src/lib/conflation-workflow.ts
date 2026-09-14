@@ -5,6 +5,7 @@ export interface ConflationFormState {
   transferProperties: boolean;
   propertyKeys: string;
   attachNetwork: boolean;
+  allowWayRemoval: boolean;
   maxDistanceMeters: number;
 }
 
@@ -22,6 +23,7 @@ export const DEFAULT_CONFLATION_FORM_STATE: ConflationFormState = {
   transferProperties: true,
   propertyKeys: DEFAULT_CONFLATION_PROPERTY_KEYS.join(", "),
   attachNetwork: false,
+  allowWayRemoval: false,
   maxDistanceMeters: 1,
 };
 
@@ -52,8 +54,8 @@ export function conflationFormErrors(state: ConflationFormState): ConflationForm
   if (!Number.isFinite(state.maxDistanceMeters) || state.maxDistanceMeters <= 0) {
     errors.maxDistanceMeters = "Match distance must be greater than zero.";
   }
-  if (!state.transferProperties && !state.attachNetwork) {
-    errors.actions = "Select Copy tags, Connect network, or both.";
+  if (!state.transferProperties && !state.attachNetwork && !state.allowWayRemoval) {
+    errors.actions = "Select Copy tags, Connect network, or Review redundant way removal.";
   }
   if (state.transferProperties && parseConflationPropertyKeys(state.propertyKeys).length === 0) {
     errors.propertyKeys = "Enter at least one OSM tag key to copy.";
@@ -86,6 +88,7 @@ export function toOsmConflationOptions(
   return {
     propertyKeys: state.transferProperties ? parseConflationPropertyKeys(state.propertyKeys) : [],
     attachNetwork: state.attachNetwork,
+    ...(state.allowWayRemoval ? { allowWayRemoval: true } : {}),
     maxDistanceMeters: state.maxDistanceMeters,
     automatic: "high-confidence",
   };
@@ -107,7 +110,7 @@ export function conflationBulkActionCopy(
       buttonLabel: "Copy tags",
       confirmLabel: "Copy tags",
       description:
-        "Schedule copying selected imported attributes to every eligible base match in the current filters. Keep each network connection choice unchanged.",
+        "Schedule copying selected imported attributes to every eligible base match in the current filters. Keep each network connection and removal choice unchanged.",
       title: "Copy tags for filtered matches?",
     };
   }
@@ -116,7 +119,7 @@ export function conflationBulkActionCopy(
       buttonLabel: "Connect network",
       confirmLabel: "Connect network",
       description:
-        "Schedule connecting imported ways to every eligible base match in the current filters. Keep each tag-copying choice unchanged.",
+        "Schedule connecting imported ways to every eligible base match in the current filters. Keep each tag-copying and removal choice unchanged.",
       title: "Connect the filtered imported network?",
     };
   }

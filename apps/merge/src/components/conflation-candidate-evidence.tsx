@@ -93,8 +93,8 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
           >
             <SectionTitle>Feature type conflict</SectionTitle>
             <p>
-              These classifications block Copy tags and Connect network, even when they are not
-              selected for copying.
+              These classifications block matching actions, even when they are not selected for
+              copying.
             </p>
             {evidence.featureTypeConflicts.map((conflict) => (
               <div key={conflict.key} className="flex min-w-0 flex-col gap-1">

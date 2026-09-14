@@ -223,28 +223,30 @@ export const MERGE_STEP_GUIDES = {
     diagram: "intersections",
   },
   "match-imported": {
-    summary: "Review nearby matches and independently choose Copy tags, Connect network, or both.",
+    summary:
+      "Review nearby matches and independently choose copying, connections, or explicit imported-way removal.",
     inputs: [
       "The untouched patch compared only against the immutable original base.",
-      "Explicit tag keys, network-attachment choice, and candidate search radius.",
+      "Explicit tag keys, network-attachment choice, removal-review choice, and candidate search radius.",
       "Geometry, routing family, bearings, access, grade context, and relation participation used as evidence.",
     ],
     mutations: [
       "Discovery and decisions do not mutate OSM data.",
       "Property transfer can overwrite only selected base tag values; an absent patch value never deletes a base value.",
       "Network attachment can later rewrite only patch-created way references to a preserved base node.",
+      "An explicitly selected imported-way removal can delete an equivalent imported way and eligible orphan points after its connection checks pass. Inspect the generated removal preview before applying.",
     ],
     invariants: [
       "Fuzzy matching preserves original base IDs, coordinates, ordered way references, and relation membership; ordinary same-ID patch updates remain authoritative in the direct-merge baseline.",
       "Property transfer keeps imported geometry, including matched ways and the nodes connecting them to other imported ways. Direct merge and exact reconciliation apply their own rules separately.",
       "Protected structural tags cannot transfer fuzzily, and routing-affecting properties require review.",
-      "Review and acceptance cannot override a blocked action. Relation membership and ambiguity add reasons without lifting existing safety blocks; property transfer and network attachment keep separate eligibility.",
+      "Review and acceptance cannot override a blocked action. Relation membership and ambiguity add reasons without lifting existing safety blocks; matching actions keep separate eligibility.",
       "Ambiguous, many-to-one, grade-conflicting, restricted, or structurally invalid candidates are not accepted automatically.",
+      "Removal is off by default and never automatic. Keep an imported way when its equivalent counterpart or retained connections cannot be established.",
     ],
-    output:
-      "Saved Copy tags and Connect network choices, plus candidate eligibility and evidence for the next preview.",
+    output: "Saved matching choices, plus candidate eligibility and evidence for the next preview.",
     warning:
-      "Skipping a match schedules neither copying tags nor connecting networks. Ordinary imported additions remain in the merge.",
+      "Skipping schedules no matching actions. Removing an imported way also removes its remaining attributes; copy selected tags separately if they should remain on the base.",
     diagram: "fuzzy-conflation",
   },
   reconcile: {

@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Osm, toPbfBuffer } from "osmix";
 
+import { createWayRemovalInputs } from "../tests/fixtures/way-removal";
+
 type PbfInput = string | { name: string; mimeType: string; buffer: Buffer };
 
 async function loadPbf(card: Locator, page: Page, path: PbfInput) {
@@ -75,7 +77,7 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
     "monaco.pbf",
   );
 
-  await page.getByRole("button", { name: /Review each merge stage/ }).click();
+  await page.getByRole("button", { name: /^Review each merge stage/ }).click();
   await expect(page.getByText(/2: Inspect base OSM/i)).toBeVisible();
   await expect(page.getByRole("button", { name: "Skip base diagnostic" })).toBeVisible();
 
@@ -204,6 +206,83 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   await expect(patchCard.getByRole("button", { name: "Open file" })).toBeVisible();
   await expect(baseCard).not.toContainText("completion-base.pbf");
   await expect(patchCard).not.toContainText("completion-patch.pbf");
+});
+
+test("manual removal requires preview and rediscovery clears stale removal evidence before apply", async ({
+  page,
+}) => {
+  const { base, patch } = createWayRemovalInputs();
+  await openTinyMerge(page, {
+    base: {
+      name: "removal-base.pbf",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from(await toPbfBuffer(base)),
+    },
+    patch: {
+      name: "removal-patch.pbf",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from(await toPbfBuffer(patch)),
+    },
+  });
+  await page.getByRole("checkbox", { name: "Enable proximity matching" }).check();
+  await page.getByRole("checkbox", { name: "Copy tags", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "Review redundant way removal" }).check();
+  const automatic = page.getByRole("button", { name: /Run automatic merge/ });
+  await expect(automatic).toBeDisabled();
+  await expect(automatic).toHaveAccessibleDescription(/Review each merge stage/);
+  await page.getByRole("button", { name: /^Review each merge stage/ }).click();
+  await page.getByRole("button", { name: "Skip base diagnostic" }).click();
+  await page.getByRole("button", { name: "Skip patch diagnostic" }).click();
+  await page.getByRole("button", { name: "Preview direct merge" }).click();
+  await page.getByRole("button", { name: "Continue to matching and reconciliation" }).click();
+  await page.getByRole("button", { name: "Discover match candidates" }).click();
+  const feature = page.getByRole("region", { name: "Imported way 20", exact: true });
+  const removal = feature.getByRole("checkbox", { name: "Remove imported way", exact: true });
+  await expect(removal).not.toBeChecked();
+  await removal.click();
+  await expect(removal).toBeChecked();
+  await page.getByRole("button", { name: "Continue with current decisions" }).click();
+  await page.getByRole("button", { name: "Preview without exact reconciliation" }).click();
+  const preview = page.getByRole("region", { name: "Way removal preview", exact: true });
+  await expect(preview).toContainText("Imported ways to remove: 1");
+  await expect(preview).toContainText("Orphan points to remove: 2");
+  await expect(
+    page.getByRole("button", { name: "Apply cumulative merge", exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Back to matching", exact: true }).click();
+  await page.getByRole("button", { name: "Run candidate discovery again" }).click();
+  await expect(removal).not.toBeChecked();
+  await page
+    .getByRole("group", { name: "Imported-data matching actions" })
+    .getByRole("button", { name: "Back", exact: true })
+    .click();
+  await expect(preview).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Apply cumulative merge", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "No changes, go to next step" }).click();
+  await removal.click();
+  await expect(removal).toBeChecked();
+  await page.getByRole("button", { name: "Continue with current decisions" }).click();
+  await page.getByRole("button", { name: "Preview without exact reconciliation" }).click();
+  await expect(preview).toContainText("Imported ways to remove: 1");
+  await page.getByRole("button", { name: "Apply cumulative merge", exact: true }).click();
+  await page.getByRole("button", { name: "Skip intersections and finish" }).click();
+  const completion = page.getByRole("region", { name: "Merge completion summary", exact: true });
+  await expect(
+    completion.getByRole("region", { name: "Applied way removals", exact: true }),
+  ).toContainText("Removed imported ways: 1");
+  const download = page.waitForEvent("download");
+  await completion.getByRole("button", { name: "Download merge report" }).click();
+  const reportPath = await (await download).path();
+  if (!reportPath) throw Error("Missing removal report download");
+  expect(JSON.parse(await readFile(reportPath, "utf8"))).toMatchObject({
+    outcome: {
+      summary: { wayRemovalActions: 1, removedOrphanNodes: 2 },
+      features: [{ wayRemoval: { sourceWayId: 20, retainedWayId: 10, orphanNodeIds: [101, 102] } }],
+    },
+  });
 });
 
 test("a late cancellation preserves the committed exact result and a new extracted base clears completion", async ({

@@ -31,6 +31,7 @@ import {
   ConflationComparisonEvidence,
   ConflationComparisonLegend,
 } from "./conflation-comparison-evidence";
+import { WayRemovalDetails } from "./conflation-way-removal";
 import { InfoTooltip } from "./info-tooltip";
 import { EmptyState, SectionTitle } from "./section";
 import { StatusDot, type StatusDotStatus } from "./status-dot";
@@ -72,6 +73,11 @@ const REASON_CODES = [
   "same-id",
   "unsupported-way-chain",
   "would-collapse-way",
+  "way-removal-connection-required",
+  "way-removal-topology-conflict",
+  "way-removal-routing-conflict",
+  "way-removal-relation-member",
+  "way-removal-unsupported",
 ] as const satisfies readonly OsmConflationReasonCode[];
 
 const STATUS_DOT: Record<OsmConflationEffectiveStatus, StatusDotStatus> = {
@@ -122,6 +128,11 @@ const REASON_LABEL: Record<OsmConflationReasonCode, string> = {
   "same-id": "Handled as a same-ID update",
   "unsupported-way-chain": "Matching one feature to several paths is unsupported",
   "would-collapse-way": "Connection would collapse a path",
+  "way-removal-connection-required": "Select the required branch connections before removal",
+  "way-removal-topology-conflict": "Removal would change required network connections",
+  "way-removal-routing-conflict": "Retained way does not have equivalent travel meaning",
+  "way-removal-relation-member": "Related OSM relations prevent removal",
+  "way-removal-unsupported": "A supported equivalent way is required for removal",
 };
 
 export function conflationStatusLabel(status: OsmConflationEffectiveStatus) {
@@ -147,6 +158,7 @@ export interface ConflationReviewProps {
   page: OsmConflationPage;
   filter: OsmConflationCandidateFilter;
   isFilterPending: boolean;
+  allowWayRemoval?: boolean;
   onDecision: (decision: OsmConflationDecision) => Promise<void>;
   onResetDecision: (candidateId: string) => Promise<void>;
   onLeaveUnmatched: (
@@ -183,9 +195,9 @@ export function ConflationStatusLegend() {
     <InfoTooltip label="About candidate statuses" side="bottom" align="end">
       <div className="grid gap-1">
         <p>
-          Overall status summarizes the proposed match. Copy tags and Connect network are assessed
+          Overall status summarizes the proposed match. Each matching action is assessed
           independently. Review reasons never lift a safety block. An eligible action can still run
-          while the other action remains blocked.
+          while another action remains blocked. Removing an imported way is never automatic.
         </p>
         {(["automatic", "review", "blocked", "unmatched", "accepted", "rejected"] as const).map(
           (status) => (
@@ -212,6 +224,12 @@ const MATCHING_ACTIONS = [
     assessment: "networkAttachment",
     selected: "attachNetwork",
     label: "Connect network",
+  },
+  {
+    action: "remove-way",
+    assessment: "wayRemoval",
+    selected: "removeWay",
+    label: "Remove imported way",
   },
 ] as const;
 
@@ -365,11 +383,15 @@ export function CandidateActions({
   onDecision,
   onResetDecision,
   showSkip = true,
+  onReviewConnection,
+  allowWayRemoval = false,
 }: {
   candidate: OsmConflationCandidateView;
   onDecision: (decision: OsmConflationDecision) => Promise<void>;
   onResetDecision?: (candidateId: string) => Promise<void>;
   showSkip?: boolean;
+  onReviewConnection?: (sourceNodeId: number) => Promise<void>;
+  allowWayRemoval?: boolean;
 }) {
   const { isPending, runAction } = useAction();
   const descriptionId = useId();
@@ -383,7 +405,7 @@ export function CandidateActions({
       aria-describedby={descriptionId}
     >
       <p id={descriptionId} className="text-muted-foreground">
-        Choose actions for the next preview. Each choice preserves the other; the dataset changes
+        Choose actions for the next preview. Each choice preserves the others; the dataset changes
         only when applied.
       </p>
       {MATCHING_ACTIONS.map((action) => {
@@ -399,11 +421,11 @@ export function CandidateActions({
           <div key={action.action} className="flex flex-col gap-1">
             <CheckboxLabel className="min-h-8">
               <Checkbox
-                checked={scheduled[action.selected]}
+                checked={Boolean(scheduled[action.selected])}
                 disabled={!eligible}
                 {...(eligible && isPending ? { "aria-disabled": true } : {})}
                 className={REVIEW_FOCUS}
-                aria-describedby={`${descriptionId}${!eligible ? ` ${helpId}` : ""}`}
+                aria-describedby={`${descriptionId}${!eligible ? ` ${helpId}` : ""}${action.action === "remove-way" ? ` ${helpId}-removal` : ""}`}
                 onCheckedChange={(checked) => {
                   // A temporary native disabled state would discard keyboard focus.
                   if (isPending) return;
@@ -426,10 +448,56 @@ export function CandidateActions({
                 {actionStatus(candidate, action)}: {reasons || "No eligible matching action"}.
               </p>
             ) : null}
+            {allowWayRemoval &&
+            action.action === "attach-network" &&
+            eligible &&
+            scheduled.attachNetwork &&
+            candidate.decision?.attachNetwork !== true ? (
+              <div className="flex flex-col gap-1">
+                <p className="text-muted-foreground">
+                  This connection is scheduled. Confirm it explicitly if an imported-way removal
+                  depends on it.
+                </p>
+                <ActionButton
+                  size="sm"
+                  variant="outline"
+                  className="h-auto min-h-8 max-w-full whitespace-normal"
+                  onAction={() =>
+                    onDecision(
+                      buildConflationActionDecision(
+                        candidate,
+                        candidate.decision,
+                        "attach-network",
+                        true,
+                      ),
+                    )
+                  }
+                >
+                  Confirm connection for removal
+                </ActionButton>
+              </div>
+            ) : null}
+            {action.action === "remove-way" ? (
+              <div className="flex min-w-0 flex-col gap-2 border-l-2 border-destructive/60 pl-2">
+                <p id={`${helpId}-removal`} className="text-muted-foreground">
+                  Separate, explicit choice. Review the retained counterpart, connections, and
+                  orphan-point cleanup below before applying. Removal is never selected
+                  automatically.
+                </p>
+                {candidate.wayRemoval?.preview ? (
+                  <WayRemovalDetails
+                    preview={candidate.wayRemoval.preview}
+                    onReviewConnection={onReviewConnection}
+                  />
+                ) : (
+                  <p>No verified removal plan is available. Keep this imported way.</p>
+                )}
+              </div>
+            ) : null}
           </div>
         );
       })}
-      {!scheduled.transferProperties && !scheduled.attachNetwork ? (
+      {!scheduled.transferProperties && !scheduled.attachNetwork && !scheduled.removeWay ? (
         <p className="text-muted-foreground">
           No matching actions scheduled. Ordinary imported additions are kept.
         </p>
@@ -492,7 +560,7 @@ export function CandidateTargetChoices({
   if (!source || candidates.length < 2) return null;
   const selected = candidates.filter((candidate) => {
     const actions = resolveConflationActions(candidate, candidate.decision);
-    return actions.transferProperties || actions.attachNetwork;
+    return actions.transferProperties || actions.attachNetwork || actions.removeWay;
   });
   const leftUnmatched = candidates.every((candidate) => effectiveStatus(candidate) === "rejected");
   const choiceDescription = `${groupId}-help${selected.length > 1 ? ` ${groupId}-conflict` : ""}`;
@@ -507,7 +575,8 @@ export function CandidateTargetChoices({
       <legend className="px-2 font-bold">Choose one base target</legend>
       <p id={`${groupId}-help`}>
         These are alternative matches for the same imported feature. Choosing a target schedules its
-        eligible actions. Adjust Copy tags and Connect network below.
+        eligible copying and connection actions. Adjust them below; removing a way requires its own
+        explicit choice.
       </p>
       {selected.length > 1 ? (
         <p id={`${groupId}-conflict`} role="alert">
@@ -589,6 +658,7 @@ export function ConflationReview({
   page,
   filter,
   isFilterPending,
+  allowWayRemoval = false,
   onDecision,
   onResetDecision,
   onLeaveUnmatched,
@@ -897,7 +967,11 @@ export function ConflationReview({
                             candidate={candidate}
                             onDecision={onDecision}
                             onResetDecision={onResetDecision}
+                            onReviewConnection={(sourceNodeId) =>
+                              onFilterChange({ entityType: "node", sourceId: sourceNodeId })
+                            }
                             showSkip={candidates.length === 1}
+                            allowWayRemoval={allowWayRemoval}
                           />
                         </ItemContent>
                       </Item>
@@ -945,8 +1019,8 @@ export function ConflationReview({
         </div>
       ) : null}
       <p className="text-muted-foreground">
-        Compare highlights geometry without scheduling an action. Skipping schedules neither copying
-        nor connecting; ordinary imported additions remain in the merge.
+        Compare highlights geometry without scheduling an action. Skipping schedules no matching
+        actions; ordinary imported additions remain in the merge.
       </p>
     </div>
   );

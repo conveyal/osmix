@@ -13,6 +13,7 @@ import { StepActions } from "../src/components/step-actions";
 import { Button } from "../src/components/ui/button";
 import { Card, CardContent } from "../src/components/ui/card";
 import { ConflationEvidenceHarness } from "./conflation-evidence-harness";
+import { ConflationRemovalHarness } from "./conflation-removal-harness";
 import { ConflationReviewHarness } from "./conflation-review-harness";
 import { MergeOutcomeHarness } from "./merge-outcome-harness";
 
@@ -199,7 +200,9 @@ window.guidanceHarness = {
 };
 
 createRoot(document.getElementById("root")!).render(
-  new URLSearchParams(window.location.search).has("evidence") ? (
+  new URLSearchParams(window.location.search).has("removal") ? (
+    <ConflationRemovalHarness />
+  ) : new URLSearchParams(window.location.search).has("evidence") ? (
     <ConflationEvidenceHarness />
   ) : (
     <GuidanceHarness />

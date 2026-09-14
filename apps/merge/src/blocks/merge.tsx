@@ -32,6 +32,7 @@ import {
 import { ConflationConfig } from "../components/conflation-config";
 import { ConflationReview } from "../components/conflation-review";
 import { ConflationRoutingDiagnostics } from "../components/conflation-routing-diagnostics";
+import { ConflationWayRemovalPreview } from "../components/conflation-way-removal";
 import { Details, DetailsContent, DetailsSummary } from "../components/details";
 import EntityDetails from "../components/entity-details";
 import { FullIndexRequired, hasFullNodeIndex } from "../components/full-index-required";
@@ -99,6 +100,7 @@ import {
 } from "../state/conflation";
 import { Log } from "../state/log";
 import {
+  generatedMergeOutcomeAtom,
   mergeCompletionAtom,
   mergeRunInputsAtom,
   mergeStepIndexAtom as stepIndexAtom,
@@ -218,6 +220,7 @@ export default function MergeBlock() {
   const base = useOsmFile(BASE_OSM_KEY);
   const patch = useOsmFile(PATCH_OSM_KEY);
   const completion = useAtomValue(mergeCompletionAtom);
+  const generatedOutcome = useAtomValue(generatedMergeOutcomeAtom);
   const runInputs = useAtomValue(mergeRunInputsAtom);
   const [pendingMergedRefresh, setPendingMergedRefresh] = useAtom(pendingMergedRefreshAtom);
   const updateMergeOutcome = useSetAtom(updateMergeOutcomeAtom);
@@ -304,6 +307,7 @@ export default function MergeBlock() {
   const conflationOptions = conflationValidationMessage
     ? undefined
     : toOsmConflationOptions(conflationForm);
+  const requiresRemovalReview = conflationForm.enabled && conflationForm.allowWayRemoval;
   const baseFileName = base.file?.name ?? base.fileInfo?.fileName;
   const patchFileName = patch.file?.name ?? patch.fileInfo?.fileName;
   const beginMergeOutcome = () =>
@@ -848,8 +852,12 @@ export default function MergeBlock() {
             render={
               <button
                 type="button"
-                disabled={!base.osm || !patch.osm}
+                disabled={!base.osm || !patch.osm || requiresRemovalReview}
+                aria-describedby={
+                  requiresRemovalReview ? "removal-manual-review-required" : undefined
+                }
                 onClick={async () => {
+                  if (requiresRemovalReview) return;
                   if (!canStartConfiguredMerge()) return;
                   beginMergeOutcome();
                   const automaticSteps = conflationOptions
@@ -1066,8 +1074,14 @@ export default function MergeBlock() {
             <ItemContent>
               <ItemTitle>Run automatic merge</ItemTitle>
               <ItemDescription>
-                Skip diagnostics and review screens; apply direct merge, exact reconciliation, safe
-                intersections, and only high-confidence fuzzy matches when enabled.
+                {requiresRemovalReview ? (
+                  <span id="removal-manual-review-required">
+                    Use Review each merge stage to select imported-way removals and inspect their
+                    preview before applying.
+                  </span>
+                ) : (
+                  "Skip diagnostics and review screens; apply direct merge, exact reconciliation, safe intersections, and only high-confidence fuzzy matches when enabled."
+                )}
               </ItemDescription>
             </ItemContent>
             <ItemActions>
@@ -1290,6 +1304,14 @@ export default function MergeBlock() {
           <ConflationRoutingDiagnostics diagnostics={conflationRoutingDiagnostics} />
         ) : null}
 
+        {changesetReviewContext.kind === "cumulative" &&
+        changesetReviewContext.matching &&
+        changesetStats !== null &&
+        generatedOutcome &&
+        requiresRemovalReview ? (
+          <ConflationWayRemovalPreview outcome={generatedOutcome} />
+        ) : null}
+
         {changesetReviewContext.kind === "cumulative" && changesetReviewContext.matching ? (
           <MatchingReviewProblem issue={matchingIssue} />
         ) : null}
@@ -1397,6 +1419,7 @@ export default function MergeBlock() {
                 patch.osm.id,
                 conflationOptions,
               );
+              invalidateMatchingPreview();
               setConflationSummary(summary);
               const page = await osmWorker.getConflationPage(base.osm.id, 0, CONFLATION_PAGE_SIZE, {
                 groupBySource: true,
@@ -1423,6 +1446,7 @@ export default function MergeBlock() {
             page={conflationCandidatePage}
             filter={conflationCandidateFilter}
             isFilterPending={isConflationFilterPending}
+            allowWayRemoval={requiresRemovalReview}
             onDecision={updateConflationDecision}
             onResetDecision={resetConflationDecision}
             onLeaveUnmatched={(source) => saveConflationSourceChoice(source, null)}

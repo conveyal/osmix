@@ -70,6 +70,7 @@ describe("merge inline guidance", () => {
         transferProperties: true,
         propertyKeys: "barrier, crossing, kerb, tactile_paving",
         attachNetwork: true,
+        allowWayRemoval: false,
         maxDistanceMeters: 1,
       });
     });
