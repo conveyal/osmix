@@ -35,3 +35,12 @@ runs:
     - name: Run browser worker tests
       shell: bash
       run: pnpm --filter @osmix/merge test:e2e
+
+    - name: Upload browser failure diagnostics
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: browser-test-results
+        path: apps/merge/test-results/
+        if-no-files-found: ignore
+        retention-days: 7
