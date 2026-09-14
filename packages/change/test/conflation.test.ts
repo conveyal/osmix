@@ -297,7 +297,7 @@ describe("safe fuzzy conflation discovery", () => {
         candidateId: automatic.id,
         action: "accept",
         transferProperties: true,
-        attachNetwork: true,
+        attachNetwork: undefined,
       },
       {
         candidateId: review.id,
@@ -315,9 +315,9 @@ describe("safe fuzzy conflation discovery", () => {
     expect(networkResult.preview).toMatchObject({
       filteredCandidates: 2,
       eligibleCandidates: 2,
-      changedCandidates: 1,
+      changedCandidates: 2,
       skippedCandidates: 0,
-      overriddenDecisions: 1,
+      overriddenDecisions: 2,
     });
     expect(networkResult.decisions.find((decision) => decision.candidateId === review.id)).toEqual({
       candidateId: review.id,

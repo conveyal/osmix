@@ -30,6 +30,7 @@ describe("matching settings accessibility", () => {
       "conflation-copy-help",
       "conflation-keys-help",
       "conflation-network-help",
+      "conflation-removal-help",
       "conflation-distance-help",
     ]) {
       expect(controlWithHelp(html, helpId)).toBeDefined();
@@ -55,18 +56,37 @@ describe("matching settings accessibility", () => {
     expect(html).not.toContain('value="NaN"');
   });
 
-  it("describes the missing-action error on both choices without invalidating disabled keys", () => {
+  it("describes the missing-action error on every choice without invalidating disabled keys", () => {
     const html = renderConfig({
       transferProperties: false,
       attachNetwork: false,
       propertyKeys: "",
     });
-    for (const helpId of ["conflation-copy-help", "conflation-network-help"]) {
+    for (const helpId of [
+      "conflation-copy-help",
+      "conflation-network-help",
+      "conflation-removal-help",
+    ]) {
       expect(controlWithHelp(html, helpId)).toContain("conflation-actions-error");
       expect(controlWithHelp(html, helpId)).toContain('aria-invalid="true"');
     }
     expect(html).toContain('id="conflation-actions-error"');
     expect(html).not.toContain('id="conflation-keys-error"');
     expect(controlWithHelp(html, "conflation-keys-help")).not.toContain('aria-invalid="true"');
+  });
+
+  it("keeps geometry removal off and explains its manual preview requirement", () => {
+    const html = renderConfig();
+    const removal = controlWithHelp(html, "conflation-removal-help");
+    expect(removal).toContain('aria-checked="false"');
+    expect(html).toContain("Review redundant way removal");
+    expect(html).toContain("Manual review only.");
+    expect(html).toContain("No geometry is removed automatically.");
+    const removalOnly = renderConfig({
+      transferProperties: false,
+      allowWayRemoval: true,
+      propertyKeys: "",
+    });
+    expect(removalOnly).not.toContain('aria-invalid="true"');
   });
 });

@@ -49,8 +49,8 @@ export function ConflationConfig() {
         {form.enabled ? (
           <div className="flex flex-col gap-2 border-t pt-2">
             <p>
-              OSM tags are feature attributes, such as surface type or kerb height. Choose copying,
-              connecting, or both.
+              OSM tags are feature attributes, such as surface type or kerb height. Copy tags,
+              connect paths, and review geometry removal independently.
             </p>
             <div className="flex items-center gap-1">
               <CheckboxLabel className="min-h-8">
@@ -141,6 +141,24 @@ export function ConflationConfig() {
               Join eligible imported paths to existing base points. This changes how the paths
               connect.
             </p>
+            <CheckboxLabel className="min-h-8">
+              <Checkbox
+                className={CONTROL_FOCUS}
+                checked={form.allowWayRemoval}
+                id="conflation-way-removal"
+                aria-describedby={`conflation-removal-help${errors.actions ? " conflation-actions-error" : ""}`}
+                aria-invalid={errors.actions ? true : undefined}
+                onCheckedChange={(allowWayRemoval) => {
+                  updateForm((current) => ({ ...current, allowWayRemoval }));
+                }}
+              />
+              Review redundant way removal
+            </CheckboxLabel>
+            <p id="conflation-removal-help" className="text-muted-foreground">
+              Manual review only. Choose each imported way to remove and inspect its retained base
+              counterpart, connections, and orphan-point cleanup before applying. No geometry is
+              removed automatically.
+            </p>
             {errors.actions ? (
               <p id="conflation-actions-error" className="text-destructive">
                 {errors.actions}
@@ -190,7 +208,8 @@ export function ConflationConfig() {
               <InfoTooltip label="About automatic matching decisions" side="right" align="start">
                 High-confidence actions are scheduled for the next preview. The dataset changes when
                 you apply that preview. Ambiguous, routing-affecting, and structurally uncertain
-                candidates remain available for review.
+                candidates remain available for review. Removing an imported way always requires its
+                own explicit choice.
               </InfoTooltip>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { MergeCompletion } from "../state/merge-outcome";
 import ActionButton from "./action-button";
 import { conflationReasonLabel } from "./conflation-review";
+import { ConflationWayRemovalPreview } from "./conflation-way-removal";
 import { Details, DetailsContent, DetailsSummary } from "./details";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader } from "./ui/card";
@@ -124,11 +125,13 @@ function FeatureOutcomes({ outcome }: { outcome: OsmConflationOutcomeReport }) {
                   </p>
                 ) : null}
                 <p className="text-muted-foreground">
-                  {feature.retained
-                    ? feature.ordinaryAddition
-                      ? "Included as an ordinary imported addition."
-                      : "The original imported ID remains after matching."
-                    : "The original imported ID is not present after matching. Exact reconciliation may represent it with a base ID."}
+                  {feature.wayRemoval
+                    ? `Explicitly removed in favor of base way ${feature.wayRemoval.retainedWayId}.`
+                    : feature.retained
+                      ? feature.ordinaryAddition
+                        ? "Included as an ordinary imported addition."
+                        : "The original imported ID remains after matching."
+                      : "The original imported ID is not present after matching. Exact reconciliation may represent it with a base ID."}
                 </p>
               </li>
             ))}
@@ -271,6 +274,14 @@ export function MergeCompletionSummary({
                 <dd>{summary.copiedTagValues.toLocaleString()}</dd>
                 <dt>Network connections</dt>
                 <dd>{summary.networkAttachmentActions.toLocaleString()}</dd>
+                {summary.wayRemovalActions !== undefined ? (
+                  <>
+                    <dt>Imported ways removed</dt>
+                    <dd>{summary.wayRemovalActions.toLocaleString()}</dd>
+                    <dt>Orphan points removed</dt>
+                    <dd>{(summary.removedOrphanNodes ?? 0).toLocaleString()}</dd>
+                  </>
+                ) : null}
                 <dt className="font-bold">Imported features unresolved</dt>
                 <dd className="font-bold">{summary.unresolvedFeatures.toLocaleString()}</dd>
               </dl>
@@ -281,7 +292,7 @@ export function MergeCompletionSummary({
               </p>
               <p>
                 Actions count actual changes from matching, after the ordinary merge. One feature
-                can have both actions, or an applied action and another unresolved action.
+                can have several actions, or an applied action and another unresolved action.
               </p>
               <p>
                 These details record the matching stage. The later intersection step can make more
@@ -314,15 +325,18 @@ export function MergeCompletionSummary({
             <p>Imported-data matching was not enabled. The ordinary merge has completed.</p>
           )}
           <p>
-            Skipping or leaving a match unresolved does not discard the import. Ordinary additions
-            remain under the merge rules; exact reconciliation can represent an imported feature
-            with a base ID.
+            Skipping or leaving a match unresolved does not itself discard the import. Explicit way
+            removals are listed separately. Other additions remain under ordinary merge rules; exact
+            reconciliation can represent an imported feature with a base ID.
           </p>
         </div>
         {outcome ? (
           <>
             <FeatureOutcomes outcome={outcome} />
             <UncopiedTags outcome={outcome} />
+            {outcome.features.some((feature) => feature.wayRemoval) ? (
+              <ConflationWayRemovalPreview outcome={outcome} applied />
+            ) : null}
           </>
         ) : null}
         <div className="flex flex-col gap-2 p-2 border-t">

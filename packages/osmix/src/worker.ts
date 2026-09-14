@@ -51,6 +51,7 @@ import {
   discoverConflationCandidatesForTrustedMerge,
   generateConflationApplicationArtifactsFromTrustedDiscovery,
   generateConflationArtifactsFromTrustedDiscovery,
+  refreshConflationWayRemovalAssessments,
   validateRetainedConflationReview,
 } from "@osmix/change/internal/conflation";
 import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core";
@@ -180,6 +181,7 @@ function cloneConflationCandidateView(
           reasons: [...candidate.networkAttachment.reasons],
         }
       : null,
+    ...(candidate.wayRemoval ? { wayRemoval: structuredClone(candidate.wayRemoval) } : {}),
     evidence: {
       ...candidate.evidence,
       sourceRoutingFamilies: [...candidate.evidence.sourceRoutingFamilies],
@@ -784,16 +786,20 @@ export class OsmixWorker extends EventTarget {
       options,
     );
     const initialDecisions = options.decisions === undefined ? [] : options.decisions;
+    refreshConflationWayRemovalAssessments(
+      this.get(baseOsmId),
+      this.get(patchOsmId),
+      discovery,
+      initialDecisions,
+      true,
+    );
     validateConflationDecisions(discovery.candidates, initialDecisions);
     const decisions = new Map<string, OsmConflationDecision>();
     for (const decision of initialDecisions) {
       decisions.set(decision.candidateId, { ...decision });
     }
     this.invalidateGeneratedConflationChangeset(baseOsmId);
-    const summary =
-      decisions.size === 0
-        ? discovery.summary
-        : summarizeConflationCandidates(discovery.candidates, [...decisions.values()]);
+    const summary = summarizeConflationCandidates(discovery.candidates, [...decisions.values()]);
     this.conflations.set(baseOsmId, {
       decisions,
       discovery,
@@ -919,7 +925,7 @@ export class OsmixWorker extends EventTarget {
       ),
       decision,
     ];
-    validateConflationDecisions(session.discovery.candidates, next);
+    this.prepareConflationDecisions(baseOsmId, session, next);
     this.invalidateGeneratedConflationChangeset(baseOsmId);
     session.decisions.set(decision.candidateId, { ...decision });
     session.summary = summarizeConflationCandidates(session.discovery.candidates, [
@@ -932,17 +938,16 @@ export class OsmixWorker extends EventTarget {
   setConflationDecisions(baseOsmId: string, decisions: OsmConflationDecision[]) {
     const session = this.getConflationSession(baseOsmId);
     // Build and validate the replacement set before discarding reviewed output.
-    validateConflationDecisions(session.discovery.candidates, decisions);
+    this.prepareConflationDecisions(baseOsmId, session, decisions);
     const next = new Map<string, OsmConflationDecision>();
     for (const decision of decisions) {
       next.set(decision.candidateId, { ...decision });
     }
     this.invalidateGeneratedConflationChangeset(baseOsmId);
     session.decisions = next;
-    session.summary =
-      next.size === 0
-        ? session.discovery.summary
-        : summarizeConflationCandidates(session.discovery.candidates, [...next.values()]);
+    session.summary = summarizeConflationCandidates(session.discovery.candidates, [
+      ...next.values(),
+    ]);
     return { ...session.summary };
   }
 
@@ -953,7 +958,7 @@ export class OsmixWorker extends EventTarget {
    */
   restoreConflationReview(baseOsmId: string, decisions: OsmConflationDecision[]) {
     const session = this.getConflationSession(baseOsmId);
-    validateRetainedConflationReview(session.discovery.candidates, decisions);
+    this.prepareConflationDecisions(baseOsmId, session, decisions, true);
     const summary = summarizeConflationCandidates(session.discovery.candidates, decisions);
     const next = new Map(decisions.map((decision) => [decision.candidateId, { ...decision }]));
     this.invalidateGeneratedConflationChangeset(baseOsmId);
@@ -975,6 +980,7 @@ export class OsmixWorker extends EventTarget {
       source,
       selected,
     );
+    this.prepareConflationDecisions(baseOsmId, session, decisions, true, true);
     // The source helper permits an explicit correction even when a different
     // legacy source still needs repair. Raw full-set updates remain strict.
     const summary = summarizeConflationCandidates(session.discovery.candidates, decisions);
@@ -997,17 +1003,18 @@ export class OsmixWorker extends EventTarget {
       [...session.decisions.values()],
       request,
     );
+    this.prepareConflationDecisions(baseOsmId, session, result.decisions);
     if (result.preview.changedCandidates > 0) {
       this.invalidateGeneratedConflationChangeset(baseOsmId);
       session.decisions = new Map(
         result.decisions.map((decision) => [decision.candidateId, { ...decision }]),
       );
     }
-    session.summary = { ...result.summary };
+    session.summary = summarizeConflationCandidates(session.discovery.candidates, result.decisions);
     return {
       decisions: result.decisions.map((decision) => ({ ...decision })),
       preview: { ...result.preview },
-      summary: { ...result.summary },
+      summary: { ...session.summary },
     };
   }
 
@@ -1077,21 +1084,27 @@ export class OsmixWorker extends EventTarget {
       }
     }
     if (hasAutomaticNetworkAttachment) {
-      const automaticAttachment = generateConflationApplicationArtifactsFromTrustedDiscovery(
-        artifacts.ordinaryBaseline,
-        patch,
-        session.discovery,
-        base,
-        automaticAttachmentDecisions,
-      );
-      const automaticCarDelta = routingDelta(
-        diagnostics.car.before,
-        routingGraphStats(automaticAttachment.result, defaultHighwayFilter),
-      );
-      if (carTopologyChanged(automaticCarDelta)) {
-        throw Error(
-          "Automatic walk-only conflation changed the CAR graph; review the candidate instead",
+      try {
+        const automaticAttachment = generateConflationApplicationArtifactsFromTrustedDiscovery(
+          artifacts.ordinaryBaseline,
+          patch,
+          session.discovery,
+          base,
+          automaticAttachmentDecisions,
         );
+        const automaticCarDelta = routingDelta(
+          diagnostics.car.before,
+          routingGraphStats(automaticAttachment.result, defaultHighwayFilter),
+        );
+        if (carTopologyChanged(automaticCarDelta)) {
+          throw Error(
+            "Automatic walk-only conflation changed the CAR graph; review the candidate instead",
+          );
+        }
+      } finally {
+        // The diagnostic projection deliberately omits manual removal choices.
+        // Restore assessments for the review snapshot the user actually selected.
+        refreshConflationWayRemovalAssessments(base, patch, session.discovery, decisions);
       }
     }
 
@@ -1206,6 +1219,36 @@ export class OsmixWorker extends EventTarget {
     const session = this.conflations.get(baseOsmId);
     if (!session) throw Error("No active conflation session");
     return session;
+  }
+
+  /** Assess the complete next snapshot before replacing decisions or their generated preview. */
+  private prepareConflationDecisions(
+    baseOsmId: string,
+    session: ConflationSession,
+    decisions: readonly OsmConflationDecision[],
+    retainedReview = false,
+    requireSelectedEligible = !retainedReview,
+  ) {
+    const base = this.get(baseOsmId);
+    const patch = this.get(session.patchOsmId);
+    try {
+      refreshConflationWayRemovalAssessments(
+        base,
+        patch,
+        session.discovery,
+        decisions,
+        requireSelectedEligible,
+      );
+      if (retainedReview) validateRetainedConflationReview(session.discovery.candidates, decisions);
+      else validateConflationDecisions(session.discovery.candidates, decisions);
+    } catch (error) {
+      // A failed source/shape validation must not leave assessments from a choice
+      // that was never saved. The previous reviewed preview remains applicable.
+      refreshConflationWayRemovalAssessments(base, patch, session.discovery, [
+        ...session.decisions.values(),
+      ]);
+      throw error;
+    }
   }
 
   private invalidateGeneratedConflationChangeset(baseOsmId: string) {

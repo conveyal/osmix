@@ -13,4 +13,5 @@ export {
   generateConflationApplicationArtifactsFromTrustedDiscovery,
   generateConflationArtifactsFromTrustedDiscovery,
   validateRetainedConflationReview,
+  refreshConflationWayRemovalAssessments,
 } from "../conflation.ts";

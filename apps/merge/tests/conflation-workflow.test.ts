@@ -37,7 +37,7 @@ describe("conflation workflow configuration", () => {
     expect(firstInvalidConflationInputId(correctedRadius)).toBe("conflation-property-keys");
     const noActions = { ...correctedRadius, transferProperties: false };
     expect(conflationFormErrors(noActions)).toEqual({
-      actions: "Select Copy tags, Connect network, or both.",
+      actions: "Select Copy tags, Connect network, or Review redundant way removal.",
     });
     expect(firstInvalidConflationInputId(noActions)).toBe("conflation-property-transfer");
     expect(firstInvalidConflationInputId({ ...noActions, attachNetwork: true })).toBeNull();
@@ -51,6 +51,7 @@ describe("conflation workflow configuration", () => {
       transferProperties: true,
       propertyKeys: "barrier, crossing, kerb, tactile_paving",
       attachNetwork: false,
+      allowWayRemoval: false,
       maxDistanceMeters: 1,
     });
     expect(parseConflationPropertyKeys(DEFAULT_CONFLATION_FORM_STATE.propertyKeys)).toEqual([
@@ -74,7 +75,7 @@ describe("conflation workflow configuration", () => {
         enabled: true,
         transferProperties: false,
       }),
-    ).toBe("Select Copy tags, Connect network, or both.");
+    ).toBe("Select Copy tags, Connect network, or Review redundant way removal.");
   });
 
   it("requires explicit property keys when property transfer is enabled", () => {
@@ -98,6 +99,24 @@ describe("conflation workflow configuration", () => {
     expect(toOsmConflationOptions(state)).toEqual({
       propertyKeys: [],
       attachNetwork: true,
+      maxDistanceMeters: 1,
+      automatic: "high-confidence",
+    });
+  });
+
+  it("enables removal review without scheduling copying or connections", () => {
+    const state = {
+      ...DEFAULT_CONFLATION_FORM_STATE,
+      enabled: true,
+      transferProperties: false,
+      propertyKeys: "",
+      allowWayRemoval: true,
+    };
+    expect(validateConflationForm(state)).toBeNull();
+    expect(toOsmConflationOptions(state)).toEqual({
+      propertyKeys: [],
+      attachNetwork: false,
+      allowWayRemoval: true,
       maxDistanceMeters: 1,
       automatic: "high-confidence",
     });

@@ -206,8 +206,18 @@ describe("resolved matching actions", () => {
       candidateId: candidate.id,
       action: "accept",
       transferProperties: false,
+      attachNetwork: undefined,
+    });
+    expect(resolveConflationActions(candidate, connectOnly)).toEqual({
+      transferProperties: false,
       attachNetwork: true,
     });
+    const confirmation = buildConflationBulkDecisionResult([candidate], [connectOnly], {
+      action: "attach-network",
+      filter: {},
+    });
+    expect(confirmation.preview.changedCandidates).toBe(1);
+    expect(confirmation.decisions[0]?.attachNetwork).toBe(true);
     const neither = buildConflationActionDecision(candidate, connectOnly, "attach-network", false);
     expect(resolveConflationActions(candidate, neither)).toEqual({
       transferProperties: false,

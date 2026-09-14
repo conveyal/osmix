@@ -80,6 +80,7 @@ export function reduceMergeOutcome(
 const mergeOutcomeStateAtom = atom<MergeOutcomeState>({ ...EMPTY_OUTCOME });
 export const mergeStepIndexAtom = atom(0);
 export const mergeCompletionAtom = atom((get) => get(mergeOutcomeStateAtom).completion);
+export const generatedMergeOutcomeAtom = atom((get) => get(mergeOutcomeStateAtom).generated);
 export const mergeRunInputsAtom = atom((get) => get(mergeOutcomeStateAtom).inputs);
 export const pendingMergedRefreshAtom = atom<{
   osmId: string;

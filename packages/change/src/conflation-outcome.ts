@@ -13,12 +13,14 @@ import type {
   OsmConflationTagOutcome,
   OsmConflationUncopiedTagReason,
   OsmConflationUnresolvedKind,
+  OsmConflationWayRemovalPreview,
 } from "./types.ts";
 
 /** Actual changing writers, rather than assignments that merely repeat an existing value. */
 export interface ConflationApplicationTrace {
   tagWriters: Map<string, string>;
   alreadyEqualTagValues: Set<string>;
+  wayRemovals?: Map<string, OsmConflationWayRemovalPreview>;
 }
 
 export function conflationTagTargetKey(candidate: OsmConflationCandidate, key: string): string {
@@ -38,8 +40,38 @@ function explicitlySkipped(decision: OsmConflationDecision | undefined): boolean
     decision?.action === "reject" ||
     (decision?.action === "accept" &&
       decision.transferProperties === false &&
-      decision.attachNetwork === false)
+      decision.attachNetwork === false &&
+      decision.removeWay !== true)
   );
+}
+
+function actualWayRemoval(
+  baseline: Osm,
+  result: Osm,
+  preview: OsmConflationWayRemovalPreview | undefined,
+): OsmConflationWayRemovalPreview | undefined {
+  if (!preview || !baseline.ways.ids.has(preview.sourceWayId)) return undefined;
+  if (result.ways.ids.has(preview.sourceWayId)) return undefined;
+  if (!result.ways.ids.has(preview.retainedWayId)) {
+    throw Error(`Removed imported way ${preview.sourceWayId} has no retained counterpart`);
+  }
+  for (const connection of preview.connections) {
+    if (
+      connection.targetNodeId === null ||
+      connection.retainedWayIds.some(
+        (id) => !result.ways.getById(id)?.refs.includes(connection.targetNodeId!),
+      )
+    ) {
+      throw Error(`Removed imported way ${preview.sourceWayId} lost a retained branch connection`);
+    }
+  }
+  return {
+    ...structuredClone(preview),
+    orphanNodeIds: preview.orphanNodeIds.filter(
+      (id) => baseline.nodes.ids.has(id) && !result.nodes.ids.has(id),
+    ),
+    retainedTaggedNodeIds: preview.retainedTaggedNodeIds.filter((id) => result.nodes.ids.has(id)),
+  };
 }
 
 function retainedImports(base: Osm, patch: Osm, baseline: Osm, result: Osm) {
@@ -142,7 +174,7 @@ export function createConflationOutcomeReport(
     const source = entity(patch, entityType, sourceId)!;
     const active = candidates.find((candidate) => {
       const actions = resolveActions(candidate, decisionsById.get(candidate.id));
-      return actions.transferProperties || actions.attachNetwork;
+      return actions.transferProperties || actions.attachNetwork || actions.removeWay === true;
     });
     const explicit = candidates.filter((candidate) => {
       const decision = decisionsById.get(candidate.id);
@@ -260,6 +292,11 @@ export function createConflationOutcomeReport(
       ? null
       : unresolvedKind(candidates, selected, failedTags, networkOutstanding);
     const retained = entity(result, entityType, sourceId) != null;
+    const wayRemoval = actualWayRemoval(
+      ordinaryBaseline,
+      result,
+      targetCandidate ? trace.wayRemovals?.get(targetCandidate.id) : undefined,
+    );
     features.push({
       entityType,
       sourceId,
@@ -275,10 +312,14 @@ export function createConflationOutcomeReport(
         entity(base, entityType, sourceId) == null &&
         entity(ordinaryBaseline, entityType, sourceId) != null,
       reasons: [...reasons],
+      ...(wayRemoval ? { wayRemoval } : {}),
     });
   }
   const applied = (feature: OsmConflationOutcomeFeature) =>
-    feature.copiedKeys.length > 0 || feature.connectedWayIds.length > 0;
+    feature.copiedKeys.length > 0 ||
+    feature.connectedWayIds.length > 0 ||
+    feature.wayRemoval != null;
+  const removals = features.flatMap((feature) => (feature.wayRemoval ? [feature.wayRemoval] : []));
   return {
     summary: {
       features: features.length,
@@ -296,6 +337,12 @@ export function createConflationOutcomeReport(
       unchangedFeatures: features.filter(
         (feature) => !applied(feature) && !feature.unresolved && !feature.skipped,
       ).length,
+      ...(removals.length > 0
+        ? {
+            wayRemovalActions: removals.length,
+            removedOrphanNodes: new Set(removals.flatMap((removal) => removal.orphanNodeIds)).size,
+          }
+        : {}),
     },
     features,
     tags,

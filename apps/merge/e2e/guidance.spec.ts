@@ -389,7 +389,7 @@ test.describe("matching action review", () => {
     await actions(page).getByRole("button", { name: "Skip match", exact: true }).click();
     await harness(page).getByRole("button", { name: "Copy tags (1)", exact: true }).click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog).toContainText("Keep each network connection choice unchanged");
+    await expect(dialog).toContainText("Keep each network connection and removal choice unchanged");
     await dialog.getByRole("button", { name: "Copy tags (1)", exact: true }).click();
     await expectChoices(page, true, false);
     expect((await readState(page)).decisions[0]).toEqual(rowDecision);

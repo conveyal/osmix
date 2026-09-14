@@ -17,6 +17,7 @@ import {
 import { generateChangeset } from "./generate-changeset.ts";
 import { assertConflationPreservesBaseTopology } from "./integrity.ts";
 import { featureTypeConflicts } from "./internal/feature-classification.ts";
+import { assessWayRemovals } from "./internal/way-removal.ts";
 import type {
   OsmConflationActionAssessment,
   OsmConflationArtifacts,
@@ -142,6 +143,9 @@ function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOp
   if (typeof options.attachNetwork !== "boolean") {
     throw Error("Conflation attachNetwork must be a boolean");
   }
+  if (options.allowWayRemoval !== undefined && typeof options.allowWayRemoval !== "boolean") {
+    throw Error("Conflation allowWayRemoval must be a boolean");
+  }
   if (options.automatic != null && !["high-confidence", "none"].includes(options.automatic)) {
     throw Error("Conflation automatic must be high-confidence or none");
   }
@@ -150,12 +154,15 @@ function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOp
     throw Error("Conflation maxDistanceMeters must be a positive finite number");
   }
   const propertyKeys = [...new Set(options.propertyKeys)].toSorted();
-  if (propertyKeys.length === 0 && !options.attachNetwork) {
-    throw Error("Conflation requires at least one property key or network attachment");
+  if (propertyKeys.length === 0 && !options.attachNetwork && !options.allowWayRemoval) {
+    throw Error(
+      "Conflation requires at least one property key, network attachment, or explicit way removal",
+    );
   }
   return {
     propertyKeys,
     attachNetwork: options.attachNetwork,
+    ...(options.allowWayRemoval ? { allowWayRemoval: true } : {}),
     maxDistanceMeters,
     automatic: options.automatic ?? "high-confidence",
   };
@@ -836,10 +843,15 @@ function endpointDistances(source: readonly LonLat[], target: readonly LonLat[])
 
 function discoverWayCandidates(context: DiscoveryContext) {
   const candidates: OsmConflationCandidate[] = [];
-  if (context.options.propertyKeys.length === 0) return candidates;
+  if (context.options.propertyKeys.length === 0 && !context.options.allowWayRemoval)
+    return candidates;
   for (const source of context.patch.ways.sorted()) {
     if (context.base.ways.ids.has(source.id)) continue;
-    if (!context.options.propertyKeys.some((key) => source.tags?.[key] != null)) continue;
+    if (
+      !context.options.allowWayRemoval &&
+      !context.options.propertyKeys.some((key) => source.tags?.[key] != null)
+    )
+      continue;
     const sourceCoordinates = wayCoordinates(context.patch, source);
     if (sourceCoordinates.length < 2) continue;
     const nearbyIndexes = context.base.ways.intersects(
@@ -1011,13 +1023,72 @@ export function discoverConflationCandidates(
       (a.targetId ?? Number.POSITIVE_INFINITY) - (b.targetId ?? Number.POSITIVE_INFINITY),
   );
   applyManyToOneClassification(candidates);
-  return {
+  const discovery = {
     baseOsmId: base.id,
     patchOsmId: patch.id,
     options: resolved,
     candidates,
     summary: summarizeConflationCandidates(candidates),
   };
+  refreshConflationWayRemovalAssessments(base, patch, discovery, options.decisions ?? []);
+  return discovery;
+}
+
+function assertSelectedRemovalEligible(
+  candidate: OsmConflationCandidate,
+  decision: OsmConflationDecision | undefined,
+  assessment = candidate.wayRemoval,
+) {
+  if (decision?.action !== "accept" || decision.removeWay !== true) return;
+  if (assessment?.status !== "review" || !assessment.preview) {
+    throw Error(
+      `Cannot remove imported ${candidate.entityType} ${candidate.sourceId}: ${assessment?.reasons.join(", ") || "explicit way removal is not enabled or supported"}. Keep the imported geometry, or clear its removal choice before changing required connections.`,
+    );
+  }
+}
+
+/** Refresh detached removal plans atomically while preserving trusted candidate identities. @internal */
+export function refreshConflationWayRemovalAssessments(
+  base: Osm,
+  patch: Osm,
+  discovery: OsmConflationDiscovery,
+  decisions: readonly OsmConflationDecision[],
+  requireSelectedEligible = false,
+): void {
+  if (!discovery.options.allowWayRemoval) {
+    if (requireSelectedEligible) {
+      const byId = validatedDecisionMap(discovery.candidates, decisions);
+      for (const candidate of discovery.candidates)
+        assertSelectedRemovalEligible(candidate, byId.get(candidate.id));
+    }
+    return;
+  }
+  const byId = validatedDecisionMap(discovery.candidates, decisions);
+  const assessments = assessWayRemovals(base, patch, discovery, byId, resolveConflationActions);
+  if (requireSelectedEligible)
+    for (const candidate of discovery.candidates)
+      assertSelectedRemovalEligible(
+        candidate,
+        byId.get(candidate.id),
+        assessments.get(candidate.id),
+      );
+  for (const candidate of discovery.candidates) {
+    const assessment = assessments.get(candidate.id);
+    if (!assessment) continue;
+    candidate.wayRemoval = assessment;
+    if (candidate.targetId == null) continue;
+    const actions = [
+      assessment,
+      ...(discovery.options.propertyKeys.length ? [candidate.propertyTransfer] : []),
+    ];
+    candidate.status = actions.some((item) => item.status === "review")
+      ? "review"
+      : actions.some((item) => item.status === "automatic")
+        ? "automatic"
+        : "blocked";
+    candidate.reasons = uniqueReasons(actions.flatMap((item) => item.reasons));
+  }
+  discovery.summary = summarizeConflationCandidates(discovery.candidates);
 }
 
 /**
@@ -1079,6 +1150,9 @@ function validatedDecisionMap(
     }
     if (decision.attachNetwork !== undefined && typeof decision.attachNetwork !== "boolean") {
       throw Error(`Conflation attachNetwork must be a boolean for ${decision.candidateId}`);
+    }
+    if (decision.removeWay !== undefined && typeof decision.removeWay !== "boolean") {
+      throw Error(`Conflation removeWay must be a boolean for ${decision.candidateId}`);
     }
     result.set(decision.candidateId, decision);
   }
@@ -1169,12 +1243,16 @@ function effectiveStatusForDecision(
   if (decision?.action === "reject") return "rejected";
   if (decision?.action === "accept") {
     const actions = resolveConflationActions(candidate, decision);
-    if (actions.transferProperties || actions.attachNetwork) {
+    if (actions.transferProperties || actions.attachNetwork || actions.removeWay) {
       return "accepted";
     }
     // A saved acceptance cannot make a blocked action applicable. Keep its
     // blocked/unmatched status visible in summaries, paging, and restored reviews.
-    if (decision.transferProperties !== false || decision.attachNetwork !== false) {
+    if (
+      decision.transferProperties !== false ||
+      decision.attachNetwork !== false ||
+      decision.removeWay === true
+    ) {
       return candidate.status === "unmatched" ? "unmatched" : "blocked";
     }
     return "rejected";
@@ -1269,7 +1347,7 @@ function bulkActionEligible(
 export function buildConflationActionDecision(
   candidate: OsmConflationCandidate,
   current: OsmConflationDecision | undefined,
-  action: Exclude<OsmConflationBulkDecisionRequest["action"], "reject">,
+  action: Exclude<OsmConflationBulkDecisionRequest["action"], "reject"> | "remove-way",
   selected: boolean,
 ): OsmConflationDecision {
   const actions = resolveConflationActions(candidate, current);
@@ -1277,7 +1355,21 @@ export function buildConflationActionDecision(
     candidateId: candidate.id,
     action: "accept",
     transferProperties: action === "transfer-properties" ? selected : actions.transferProperties,
-    attachNetwork: action === "attach-network" ? selected : actions.attachNetwork,
+    // Preserve an implicit automatic connection without turning a copy/removal
+    // choice into the explicit connection approval required by way removal.
+    attachNetwork:
+      action === "attach-network"
+        ? selected
+        : actions.attachNetwork
+          ? current?.action === "accept" && current.attachNetwork === true
+            ? true
+            : undefined
+          : false,
+    ...(action === "remove-way"
+      ? { removeWay: selected }
+      : current?.action === "accept" && current.removeWay !== undefined
+        ? { removeWay: current.removeWay }
+        : {}),
   };
 }
 
@@ -1292,7 +1384,9 @@ function decisionsHaveSameEffect(
   const nextActions = resolveConflationActions(candidate, next);
   return (
     currentActions.transferProperties === nextActions.transferProperties &&
-    currentActions.attachNetwork === nextActions.attachNetwork
+    currentActions.attachNetwork === nextActions.attachNetwork &&
+    !!currentActions.removeWay === !!nextActions.removeWay &&
+    (current.attachNetwork === true) === (next.attachNetwork === true)
   );
 }
 
@@ -1391,6 +1485,11 @@ export function resolveConflationActions(
   return {
     transferProperties: acceptedAction(candidate, "propertyTransfer", decision),
     attachNetwork: acceptedAction(candidate, "networkAttachment", decision),
+    ...(decision?.action === "accept" &&
+    decision.removeWay === true &&
+    candidate.wayRemoval?.status === "review"
+      ? { removeWay: true }
+      : {}),
   };
 }
 
@@ -1434,7 +1533,7 @@ function findPreservedSourceConflicts(
     )
       continue;
     const actions = resolveConflationActions(candidate, decisions.get(candidate.id));
-    if (!actions.transferProperties && !actions.attachNetwork) continue;
+    if (!actions.transferProperties && !actions.attachNetwork && !actions.removeWay) continue;
     const sourceKey = `${candidate.entityType}:${candidate.sourceId}`;
     if (scheduledSources.has(sourceKey)) preservedConflicts.add(sourceKey);
     scheduledSources.add(sourceKey);
@@ -1450,7 +1549,7 @@ function findDecisionConflict(
   const scheduledSources = new Set<string>();
   for (const candidate of candidates) {
     const actions = resolveConflationActions(candidate, decisions.get(candidate.id));
-    if (!actions.transferProperties && !actions.attachNetwork) continue;
+    if (!actions.transferProperties && !actions.attachNetwork && !actions.removeWay) continue;
     const sourceKey = `${candidate.entityType}:${candidate.sourceId}`;
     if (preservedSourceConflicts?.has(sourceKey)) continue;
     if (!scheduledSources.has(sourceKey)) {
@@ -1463,7 +1562,7 @@ function findDecisionConflict(
         if (alternative.entityType !== entityType || alternative.sourceId !== sourceId)
           return false;
         const selected = resolveConflationActions(alternative, decisions.get(alternative.id));
-        return selected.transferProperties || selected.attachNetwork;
+        return selected.transferProperties || selected.attachNetwork || selected.removeWay;
       })
       .map((alternative) => alternative.id)
       .toSorted();
@@ -1488,11 +1587,12 @@ function validateAcceptedMappings(
   const wayTargets = new Set<number>();
   for (const candidate of candidates) {
     const decision = decisions.get(candidate.id);
-    const { transferProperties: transfer, attachNetwork: attach } = resolveConflationActions(
-      candidate,
-      decision,
-    );
-    if (!transfer && !attach) continue;
+    const {
+      transferProperties: transfer,
+      attachNetwork: attach,
+      removeWay,
+    } = resolveConflationActions(candidate, decision);
+    if (!transfer && !attach && !removeWay) continue;
     if (candidate.targetId == null)
       throw Error(`Conflation accepted unmatched candidate ${candidate.id}`);
     if (attach) {
@@ -1501,7 +1601,7 @@ function validateAcceptedMappings(
       }
       attachmentTargets.add(candidate.targetId);
     }
-    if (candidate.entityType === "way" && transfer) {
+    if (candidate.entityType === "way" && (transfer || removeWay)) {
       if (wayTargets.has(candidate.targetId)) {
         throw Error(`Conflation accepted multiple ways for target ${candidate.targetId}`);
       }
@@ -1510,8 +1610,18 @@ function validateAcceptedMappings(
   }
 }
 
+/** Cancel a pending import or delete an entity already present in the application baseline. */
+function removeImportedEntity(changeset: OsmChangeset, entity: OsmNode | OsmWay) {
+  const type = "refs" in entity ? "way" : "node";
+  const wasCreated = changeset.changes(type)[entity.id]?.changeType === "create";
+  // Use delete to invalidate geometry/incidence caches before cancelling a create.
+  changeset.delete(entity);
+  if (wasCreated) delete changeset.changes(type)[entity.id];
+}
+
 function applyDiscoveredConflation(
   changeset: OsmChangeset,
+  originalBase: Osm,
   patch: Osm,
   discovery: OsmConflationDiscovery,
   decisions: readonly OsmConflationDecision[],
@@ -1519,6 +1629,7 @@ function applyDiscoveredConflation(
   if (patch.id !== discovery.patchOsmId) {
     throw Error(`Conflation discovery patch ${discovery.patchOsmId} does not match ${patch.id}`);
   }
+  refreshConflationWayRemovalAssessments(originalBase, patch, discovery, decisions, true);
   const decisionsById = validatedDecisionMap(discovery.candidates, decisions);
   validateAcceptedMappings(discovery.candidates, decisionsById);
 
@@ -1570,6 +1681,43 @@ function applyDiscoveredConflation(
       throw Error(`Conflation source ${candidate.entityType} ${candidate.sourceId} is missing`);
     transferSelectedProperties(changeset, candidate, source, trace);
   }
+  const selectedRemovals = discovery.candidates.filter(
+    (candidate) =>
+      decisionsById.get(candidate.id)?.action === "accept" &&
+      decisionsById.get(candidate.id)?.removeWay === true,
+  );
+  if (selectedRemovals.length) {
+    // Recheck the actual ordinary merge plus all accepted copy/connection changes.
+    // Validate every plan before deleting anything, so dependent removals cannot bypass checks.
+    const current = applyChangesetToOsm(changeset);
+    const assessments = assessWayRemovals(
+      originalBase,
+      patch,
+      discovery,
+      decisionsById,
+      resolveConflationActions,
+      current,
+    );
+    for (const candidate of selectedRemovals)
+      assertSelectedRemovalEligible(
+        candidate,
+        decisionsById.get(candidate.id),
+        assessments.get(candidate.id),
+      );
+    trace.wayRemovals = new Map();
+    for (const candidate of selectedRemovals) {
+      const preview = assessments.get(candidate.id)?.preview;
+      if (!preview) throw Error(`Missing validated removal preview for ${candidate.id}`);
+      const source = current.ways.getById(preview.sourceWayId);
+      if (!source) throw Error(`Imported way ${preview.sourceWayId} is no longer present`);
+      removeImportedEntity(changeset, source);
+      for (const id of preview.orphanNodeIds) {
+        const node = current.nodes.getById(id);
+        if (node) removeImportedEntity(changeset, node);
+      }
+      trace.wayRemovals.set(candidate.id, preview);
+    }
+  }
   return trace;
 }
 
@@ -1591,7 +1739,13 @@ function generateConflationApplicationArtifacts(
     );
   }
   const changeset = new OsmChangeset(baseline);
-  const trace = applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions);
+  const trace = applyDiscoveredConflation(
+    changeset,
+    originalBase,
+    patch,
+    canonicalDiscovery,
+    decisions,
+  );
   const result = applyChangesetToOsm(changeset);
   assertConflationPreservesBaseTopology(originalBase, baseline, result);
   const outcome = createConflationOutcomeReport(
@@ -1658,6 +1812,7 @@ function validateCumulativeConflationOptions(
   const expectedOptions = resolvedOptions(options.conflation);
   if (
     discovery.options.attachNetwork !== expectedOptions.attachNetwork ||
+    !!discovery.options.allowWayRemoval !== !!expectedOptions.allowWayRemoval ||
     discovery.options.automatic !== expectedOptions.automatic ||
     discovery.options.maxDistanceMeters !== expectedOptions.maxDistanceMeters ||
     discovery.options.propertyKeys.length !== expectedOptions.propertyKeys.length ||
@@ -1676,6 +1831,7 @@ function generateCumulativeConflationArtifacts(
   onProgress?: (progress: ProgressEvent) => void,
 ) {
   validateCumulativeConflationOptions(base, patch, options, canonicalDiscovery);
+  refreshConflationWayRemovalAssessments(base, patch, canonicalDiscovery, decisions, true);
   validateConflationDecisions(canonicalDiscovery.candidates, decisions);
   const ordinaryOptions = {
     directMerge: true,
@@ -1690,7 +1846,7 @@ function generateCumulativeConflationArtifacts(
     ? generateChangeset(base, patch, ordinaryOptions, onProgress)
     : generateChangeset(base, patch, ordinaryOptions);
   const ordinaryBaseline = applyChangesetToOsm(changeset);
-  const trace = applyDiscoveredConflation(changeset, patch, canonicalDiscovery, decisions);
+  const trace = applyDiscoveredConflation(changeset, base, patch, canonicalDiscovery, decisions);
   const result = applyChangesetToOsm(changeset);
   assertConflationPreservesBaseTopology(base, ordinaryBaseline, result);
   const outcome = createConflationOutcomeReport(

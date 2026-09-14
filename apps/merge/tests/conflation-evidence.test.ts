@@ -106,7 +106,7 @@ describe("matching evidence for imported features", () => {
       /<section[^>]*aria-label="Feature type conflict"[^>]*>([\s\S]*?)<\/section>/,
     )?.[1];
     expect(conflicts).toBeDefined();
-    expect(conflicts).toContain("These classifications block Copy tags and Connect network");
+    expect(conflicts).toContain("These classifications block matching actions");
     expect(conflicts).toContain("even when they are not selected for copying");
     expect(conflicts).toContain("amenity");
     expect(conflicts).toContain("building");
