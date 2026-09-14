@@ -4,6 +4,7 @@
 
 - For each changed package/app (and packages/apps that depend on the changed code): `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test` must be green.
 - Add or extend tests and documentation when behavior or public APIs change.
+- Before changing merge rules, matching actions, or merge workflow states, read [docs/merge-process.md](docs/merge-process.md). Update its affected rules/examples and linked regression tests in the same PR.
 - Only run root tests before committing.
 - `pnpm run check:deps` validates workspace import/dependency alignment.
 

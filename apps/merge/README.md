@@ -76,114 +76,14 @@ in-stream extraction remains available. The app does not build the large index s
 
 ### Merge view (default route)
 
-1. **Select merge inputs** – Choose `Base OSM — authoritative existing dataset` and
-   `Patch OSM — imported additions and updates`. Both files stay local. Select **Review each merge stage** for
-   previews and checkpoints or **Run automatic merge** to use the configured automatic path.
-2. **Review diagnostics** – Optional base and patch scans report possible within-file duplicates without
-   mutating either input. Nearby roads can be intentionally separate because of topology, access, or grade
-   separation.
-3. **Preview the direct merge** – Patch-only entities are added, same-ID patch updates take precedence, and
-   base-only entities remain. In the reviewed workflow this is a preview until the cumulative merge is
-   accepted.
-4. **Match imported data (optional)** – Discover nearby cross-dataset candidates. Property transfer copies
-   selected tags onto base entities and keeps imported geometry; network attachment rewrites only accepted references in
-   patch-created ways. Ambiguous and routing-affecting candidates remain reviewable.
-5. **Reconcile exact matches** – Combine compatible entities with different IDs only when coordinates or
-   ordered geometry agree at OSM precision. All nodes proposed for one base survivor must also be compatible with each other. A conflicting group retains its imported nodes, attributes, and references to those nodes; compatible groups preserve the base ID and rewrite accepted patch references.
-6. **Create intersections** – Connect compatible same-grade crossings while preserving existing junctions,
-   including bridge entrances. Unsafe shared-junction changes and new grade-separated interior crossings are skipped.
-7. **Inspect and download** – Compare the result on the map and download the merged PBF or change summary.
-   The result stays in memory until downloaded, and the original input files are never modified.
+The [merge-process guide](../../docs/merge-process.md) owns the merge rules, examples, and known limitations. Read its [input identity requirements](../../docs/merge-process.md#inputs-and-identity) before combining independently prepared imports.
 
-Each numbered stage includes a concise summary and a collapsed **How this step works** explanation of its
-inputs, possible changes, safety guarantees, and output. The stepper resets selection state between actions,
-and you can jump backward or forward if you need to rerun a task.
-In verified mode, the direct merge is first shown as a preview. The app then regenerates and applies one
-cumulative direct-merge plus optional reconciliation changeset from the untouched source inputs. Intersection
-changes are generated only after that merged base has been rebuilt and indexed, so newly added patch ways are
-included in the crossing scan.
+1. Load the base and patch in Full mode.
+2. Choose **Run automatic merge** or **Review each merge stage**, and configure optional imported-data matching.
+3. In the reviewed workflow, inspect previews and choose Copy tags, Connect network, and optional explicit Remove imported way independently.
+4. Complete application and intersection work, read the applied/unresolved summary, and download the result.
 
-When intersection creation reuses an endpoint, every way already connected there and every affected turn
-restriction moves to the same surviving node together. A bridge entrance is an existing connection to preserve,
-even when the bridge and surface road have different grade tags. If any participating way would become invalid
-or a restriction or grade connection would be broken, the shared junction stays unchanged. An isolated endpoint
-without an affected restriction may instead use a new exact crossing node when reuse would collapse its way.
-
-The automatic workflow skips diagnostic scans and intermediate checkpoints. Imported-data matching remains
-off unless configured explicitly; when enabled, automatic mode applies only high-confidence automatic
-candidates and reports unresolved candidates without accepting them. Once the first generated changeset is
-applied, cancellation cannot restore the prior in-memory workflow state, though the source files remain
-untouched and can be loaded again.
-
-### Safe imported-data matching
-
-The original Merge tool used a one-meter proximity search to combine datasets whose independently created
-entities do not have identical OSM coordinates. That remains useful for GeoJSON, Shapefile, and other
-non-OSM sources, but proximity alone is unsafe for road topology: nearby surface and tunnel roads, parallel
-paths, school boundaries, and ambiguous intersections must remain separate.
-
-**Match imported data** restores that workflow as an explicit opt-in conflation stage:
-
-- **Copy tags** (property transfer) copies only the tag keys entered in the form while preserving both base and imported
-  geometry. Matched imported ways and their connecting nodes remain present, so copying tags does not disconnect
-  imported branches. Patch values win for selected keys; missing patch values never delete base values. Structural
-  keys are blocked, and routing-affecting keys require review. Direct merge and exact reconciliation still apply
-  their own rules independently of tag copying.
-- **Connect network** (network attachment) preserves the base node and rewrites only accepted references in imported patch
-  ways. Automatic matches must be unique and agree on routing family, grade context, and local bearing.
-  Restrictions, relation-member rewrites, way collapse, and other integrity hazards remain blocked.
-- **Review redundant way removal** enables a third, default-off choice. It requires **Review each merge stage**;
-  automatic merge is unavailable while this option is selected. Each eligible **Remove imported way** checkbox
-  identifies the imported way, retained base counterpart, branch connections, original attributes, and any newly
-  orphaned points to remove. Neither copying tags nor choosing a target selects removal automatically.
-
-Removal supports a unique equivalent open, non-area way with equal vertex counts and compatible routing meaning.
-Differently segmented paths, one-to-many chains, involved relations, grade/access conflicts, and unverified branch
-connections remain blocked. Keep the imported way when these checks cannot pass; changing copied tag keys cannot
-bypass them. Tagged points, referenced points, base entities, and unrelated imports are retained.
-
-For a branch prerequisite, use **Review connection at imported point…**. If the connection is already scheduled
-automatically, **Confirm connection for removal** records the required explicit choice without toggling it off and
-on. Return to the imported way and select removal once eligible. The generated cumulative **Way removal preview**
-shows the complete selected plans before **Apply cumulative merge**. Changing any matching choice clears that
-preview and requires regeneration. Removing a way also removes its remaining attributes, so select **Copy tags**
-separately for values that should remain on the base. If exact reconciliation already handles the same source,
-clear the explicit removal choice and regenerate.
-
-The default radius is one meter. High-confidence actions are scheduled automatically for the next preview; they change the dataset only when that preview is applied. Paged status, feature-type, and reason filters keep scheduled, review, blocked, unmatched, and skipped choices available. Review decisions are stable candidate-ID records and are restored with the worker session.
-
-**Compare** highlights an imported feature and its proposed base target without changing the scheduled actions. The visible legend identifies the base with a circle and solid line and the import with a diamond and dashed line. Co-located markers stay at their actual coordinates, with both shapes visible. The comparison shows selectable Latitude and Longitude values from the highlighted geometry; ways show their start and end positions. An OSM node is a point, and an OSM way is an ordered sequence of node references forming a line or area boundary.
-
-**Match evidence and attributes** explains the proposed correspondence and shows base and imported attribute values. Finite distances include meters. No eligible target within the search radius, unsupported nearby segments, and an unavailable measurement for an existing target have different explanations. A short distance does not override a blocked action. Protected and routing-affecting attributes are identified in text, so their meaning does not depend on row color.
-
-Nearby features can represent different things. A base cafe (`amenity=cafe`) and an imported school (`amenity=school`) remain blocked even when only `name` is selected for copying. **Feature type conflict** shows the actual base and imported classifications separately from selected attribute differences. Matching actions stay unavailable for that match, including after an earlier acceptance or a relation-membership review reason. Use the **Feature classifications conflict** reason filter to find these candidates.
-
-Classification checks compare supported attributes on both features. Missing information is unknown; equal classifications alone do not confirm identity. See the [supported classification keys and compatibility rules](../../packages/change/README.md#feature-classification-policy). Blocking a match does not discard the import: ordinary direct/exact merge rules still apply, including authoritative same-ID updates.
-
-Matching controls have visible labels and associated help. Keyboard users can change filters, choose a target, toggle actions independently, compare geometry, and expand evidence; the comparison selection is separate from the target scheduled for matching. Long values wrap in narrow panels.
-
-Check the status of each action: copying, connection, and removal are assessed separately. **Needs
-review** allows a decision about an eligible action; it does not override **Blocked** on another action.
-An ordinary relation membership or an additional review reason never lifts an existing safety block. For
-example, a bridge in a walking-route relation remains blocked from transferring tags to a ground-level path
-when their grade contexts conflict.
-
-The **Filtered matches** toolbar schedules Copy tags, Connect network, or Skip filtered for eligible candidates
-matching the current filters across all pages. Automatic actions are already scheduled for preview. Before changing
-decisions, the app shows how many automatic and review candidates are eligible, how many blocked or ambiguous
-matches will be skipped, and how many prior decisions will be replaced. Accepted and rejected rows may leave the
-active status filter, so the list returns to its first page after a successful action.
-There is no bulk removal action. Completed reports identify explicitly removed ways and cleaned orphan points
-separately from copied attributes, connections, and retained imports.
-
-In verified mode, discovery happens against the untouched base and patch before either dataset is changed.
-The app then generates one cumulative direct, exact-reconciliation, and accepted-conflation changeset,
-reports CAR and WALK graph-count/component deltas, and applies it atomically. Intersection creation remains a
-separate final stage. **Run automatic merge** stays exact-only unless matching was explicitly enabled; when enabled,
-it accepts only automatic candidates and reports unresolved counts without silently approving them. The
-enabled fast path uses the same session generation and CAR safety gate, applies the cumulative result, then
-creates intersections against that indexed base. The patch is cleared only after both stages and merged-file
-metadata refresh complete.
+See [automatic and reviewed workflows](../../docs/merge-process.md#application-workflows) for the exact checkpoint order, cancellation boundaries, and recovery actions. Each numbered app stage also has a collapsed **How this step works** explanation. Matching discovery, scheduled actions, previews, and completed application are distinct states.
 
 ### Inspect view (`/inspect`)
 
