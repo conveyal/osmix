@@ -2,6 +2,8 @@
 
 `@osmix/change` is the change-management companion to [`@osmix/core`](../core/README.md). It builds, inspects, and applies OpenStreetMap changesets on top of `Osm` datasets, giving you tools to deduplicate entities, reconcile overlaps, generate stats, and orchestrate merge pipelines.
 
+The [merge-process guide](../../docs/merge-process.md) is the authoritative reference for merge rules, defaults, examples, workflows, and known limitations. This README describes the package API.
+
 ## Highlights
 
 - Construct repeatable `OsmChangeset`s that track creates, modifies, and deletes with origin metadata and per-entity refs.
@@ -76,44 +78,11 @@ const combined = await merge(base, patch, {
 console.log(combined.id);
 ```
 
-`merge` preserves the two source datasets and uses deduplication only to reconcile compatible patch entities
-with the base. It optionally creates intersections and, when `directMerge` is true, generates modifications
-that merge the patch into the base. All options default to `false`, so you can enable only the stages you need.
-An empty patch is therefore an identity operation; the high-level pipeline does not normalize either input as
-a hidden preliminary step.
-
-Exact node reconciliation checks every proposed source and its final survivor as one group before changing tags, references, or entity existence. Shared tag values and incident-way grade/access context must be compatible across the whole group. Agreement with an initially untagged base node does not establish agreement among imported sources. A conflicting group keeps every proposed node replacement unapplied; compatible groups elsewhere can still reconcile.
-
-For example, when an untagged base node and imported cafe and school nodes share the same stored coordinate, both imported nodes and their distinct attributes remain. Way and relation references to those nodes are retained. Explicit same-dataset diagnostic scans also check the entire proposed replacement chain, so an untagged intermediate node cannot connect incompatible endpoints of that chain. Valid replacement maps point directly to their final surviving nodes. Same-ID updates remain authoritative, and high-level merges still do not normalize entities within either original input.
-
-This group check applies to exact nodes. Exact ways retain their existing ordered-reference and routing/structural-tag requirements; permitted descriptive differences retain their existing reconciliation policy. The node-group defect was a residual pre-existing issue uncovered during the PR #218 review, not introduced by that PR.
-
-Intersection creation distinguishes existing shared junctions from new crossings. Reusing an endpoint updates
-every incident way and affected restriction via-node together, including an already connected bridge or tunnel
-entrance. The proposed junction must preserve valid way geometry, restrictions, and grade context. If any part
-of a shared-junction substitution is unsafe, that crossing is skipped and its original references remain.
-Only an isolated endpoint with no affected restriction can use the dedicated crossing-node fallback when
-replacement would degenerate its way. New grade-separated interior crossings remain disconnected.
-
-Exact reconciliation and fuzzy way matching use the same [one-way normalization as routing](../router/README.md#way-direction).
-Supported aliases such as `yes`/`true`/`1` and `no`/`false`/`0` compare by travel direction. An explicit
-`no`, `false`, or `0` overrides a roundabout's implied forward direction. Exact reconciliation still requires
-the same ordered node references and compatible remaining tags; fuzzy matching accounts for reversed
-geometry when comparing direction. Unsupported nonempty values, including `reversible` and `alternating`,
-prevent way matching even when their text is identical. Input tag values are retained rather than rewritten
-to a canonical spelling.
-
-Fuzzy matching cannot establish orientation when the endpoints fit equally well in both orders. It blocks
-such candidates if either way is one-way or has recognized direction-sensitive routing tags, such as
-`maxspeed:forward` or `oneway:bicycle`. This includes closed one-way roundabouts even when their tag values
-and apparent winding agree. Bidirectional ways without those direction-sensitive tags can still match.
-Exact reconciliation continues to compare ordered node references directly.
+See the [worked merge](../../docs/merge-process.md#worked-merge) and [direct/exact rules](../../docs/merge-process.md#direct-and-exact-rules) for the effect of these options. All stages default off in the API.
 
 ### Match imported data within one meter
 
-Exact reconciliation remains the default. For imported GeoJSON, Shapefile, OSW, or other independently
-created data, opt into proximity conflation with explicit property keys and an explicit network-attachment
-choice. The historical radius is one meter unless `maxDistanceMeters` is supplied.
+Configure imported-data matching explicitly. Review the [identity prerequisites](../../docs/merge-process.md#inputs-and-identity) before merging independently converted GIS data.
 
 ```ts check-docs change-context
 import {
@@ -148,64 +117,7 @@ const changeset = generateConflationChangeset(
 const conflated = applyChangesetToOsm(changeset);
 ```
 
-Discovery compares only the untouched patch with the immutable original base. High-confidence actions are
-scheduled by default; set `automatic: "none"` when every action should require a decision. Discovery does not
-apply changes. OSM tags are feature attributes, such as `surface=asphalt` or `kerb=lowered`. **Copy tags**
-(property transfer in the API) copies only selected tag values onto the base entity and retains the imported geometry. Compared with
-the same direct/exact merge without property transfer, it never adds or removes entities or changes coordinates,
-way references, or relation members. Missing patch values leave base tags unchanged. **Connect network**
-(network attachment in the API) is a separate choice that changes only patch-created way references. Base IDs, coordinates, ordered way references,
-and ordered relation members stay authoritative.
-
-Structural properties cannot transfer. Routing-affecting properties, motor-road attachments, ambiguous
-targets, ordinary relation membership, and uncertain geometry require review when otherwise eligible. Adding
-a review reason never weakens an existing block: hard feature-type, grade, access, geometry, restriction, or reference
-conflicts still prevent the affected action, even when an accept decision is supplied. Property transfer and
-network attachment are assessed independently, so blocking one does not disable an otherwise eligible action.
-Equivalent one-to-one patch ways remain after property transfer, including the nodes that connect them to other imported ways.
-Exact reconciliation remains a separate operation; segmented way chains are reported but unsupported.
-
-### Feature classification policy
-
-Proximity proposes candidates; it does not establish feature identity. Discovery compares explicit classifications independently of the tag keys selected for copying. For example, `amenity=cafe` on the base and `amenity=school` on the import produce `feature-type-conflict` even when only `name` is selected. The conflict hard-blocks enabled matching actions. Manual acceptance, bulk acceptance, and additional relation-membership review reasons cannot override it.
-
-The supported classification keys are `amenity`, `shop`, `tourism`, `leisure`, `office`, `craft`, `healthcare`, `emergency`, `historic`, `man_made`, `natural`, `landuse`, `building`, `boundary`, `aeroway`, `railway`, `public_transport`, `power`, and `place`. Comparisons use trimmed, case-sensitive text for the same key. Different explicit values conflict, with these boundaries:
-
-- Missing or empty values are unknown and do not establish a conflict.
-- `yes` means an unspecified positive subtype, so it does not conflict with a more specific positive value. Explicit `no` conflicts with any different nonempty value, including `yes`.
-- No cross-key, subtype-hierarchy, or semicolon-list equivalence is inferred. Names and other descriptive differences do not establish a classification conflict.
-
-Candidate evidence includes optional `featureTypeConflicts: Array<{ key: string; baseValue: string | number; patchValue: string | number }>` containing the original typed values, independently of selected-tag `tagDiff` entries. Merge displays these base and imported values under **Feature type conflict**. Equal classifications or the absence of a supported conflict do not prove identity; existing geometry, routing, grade, and integrity checks still apply.
-
-Blocking a matching candidate does not itself discard its imported feature. Ordinary direct/exact merge rules still apply, and same-ID authoritative updates retain their existing behavior. This classification policy applies to imported-data matching; it does not change the separate exact-reconciliation rules.
-
-### Choosing matching actions
-
-The current decision independently selects Copy tags, Connect network, and optional explicit way removal. An action can be eligible without
-being selected. Changing one choice preserves the others on the same target, including copying or connection choices that were scheduled automatically.
-Skipping a match schedules no actions; imported additions still follow the ordinary direct/exact merge
-rules. Clearing a saved decision restores discovery defaults, which may schedule high-confidence actions
-again. Automatic describes the current schedule, not a completed change.
-
-Several candidates can propose different base targets for one imported feature. Matching actions may be
-scheduled for only one of those targets: copying tags to one target while connecting to another is also a
-conflict. Choosing a replacement must clear the prior target's actions while preserving other imported
-features' decisions. In Merge, selecting an action on another alternative replaces the target using that
-action choice, so a user can switch targets and copy tags without also connecting the network.
-Leaving the feature unmatched schedules no actions for any target and retains
-ordinary imported additions under the direct/exact merge rules.
-
-### Explicit imported-way removal
-
-Set `allowWayRemoval: true` to enable a separate removal assessment; its default is false. Discovery adds `candidate.wayRemoval` with `status`, `reasons`, and a nullable `preview`. Neither automatic matching, a plain accept decision, nor a bulk copying/connection action selects removal. An eligible removal requires an individual accept decision with `removeWay: true`; use `buildConflationActionDecision(candidate, current, "remove-way", true)` to preserve the other choices. Removal-only matching permits empty `propertyKeys` and `attachNetwork: false`.
-
-Removal supports only a unique equivalent open, non-area imported way and one retained base counterpart. Paired vertices must have equal counts and fit within the search radius, with compatible direction and identical non-descriptive semantics. Reversed matches with direction- or side-dependent keys or values remain blocked, including `sidewalk=left` and point `direction=forward`. Different segmentation, one-to-many chains, relation involvement, conflicting grade/access/feature meaning, and unproven connections block removal. Tag selections cannot bypass these checks. Copying tags remains independent: the removed way's original attributes are shown in the preview, and any values not otherwise retained leave with it.
-
-Every connection from the removed way to a retained branch must already use the required base point or have an explicitly accepted eligible node attachment. An automatically scheduled connection is insufficient. The worker reassesses removal plans after decisions change, including changes on other pages. `preview.connections` identifies each imported/base node pair, retained branch way IDs, attachment candidate ID, and whether the prerequisite is explicitly satisfied. A true `explicitlyAccepted` with no attachment candidate means an existing base connection; false with no candidate means no supported connection is available. Keep the imported way when its required connections cannot be verified.
-
-The preview identifies `sourceWayId`, `retainedWayId`, original `sourceTags`, `orphanNodeIds`, `retainedTaggedNodeIds`, `connections`, `blockedNodeIds`, and `blockingRelationIds`. Blocked node IDs can identify geometry or routing failures as well as missing connections. Cleanup removes only untagged imported nodes newly orphaned by this removal after accepted attachments, with no remaining way or relation references. Tagged nodes, base nodes, unrelated imports, and nodes already orphaned by an earlier attachment remain.
-
-Generation revalidates the plan against the ordinary direct/exact baseline and all selected actions. If exact reconciliation already handled the source, clear its explicit removal choice and regenerate; a stale removal must not claim credit for the separate exact operation. Preview generation does not apply changes. Inspect the generated outcome's per-feature `wayRemoval` details before applying, and regenerate after editing decisions. The generated report adds optional `summary.wayRemovalActions` and `summary.removedOrphanNodes`, counting actual explicit removals and newly cleaned points.
+For the behavioral contract, see [matching measurements and policies](../../docs/merge-process.md#matching-rules), [action selection](../../docs/merge-process.md#mp-m5), and [explicit imported-way removal](../../docs/merge-process.md#mp-r1). Copying, connecting, and removal are separate actions. Use `buildConflationActionDecision()` to update one choice while preserving the others.
 
 ## API
 
@@ -224,7 +136,7 @@ constructor(base: Osm)
 - `deduplicateNodes(nodes: Nodes)`: Check exact-coordinate candidates (normally from a patch) against the base dataset, validate all sources proposed for each final survivor together, and return safe replacement mappings. A conflicting node group retains all of its proposed sources.
 - `deduplicateWays(ways: Ways)`: Check candidate ways against the base and reconcile only matching geometry with compatible routing and grade-separation tags.
 - `generateDirectChanges(patch: Osm)`: Merge a patch dataset into the changeset. Handles creates and updates.
-- `createIntersectionsForWays(ways: Ways)`: Checks provided ways for intersections with existing ways in the base dataset. Splits ways and inserts nodes where they cross.
+- `createIntersectionsForWays(ways: Ways)`: Checks provided ways for intersections with existing ways in the base dataset. Inserts shared node references into existing ways.
 - `applyNodeReplacementsToWays(replacementMap)`: Updates way references based on a map of replaced node IDs (generated by `deduplicateNodes`).
 - `applyNodeReplacementsToRelations(replacementMap)`: Updates relation members based on replaced node IDs.
 - `toJSON(): OsmChanges`: Export changes, statistics, and versioned input identities for restoration. `JSON.stringify(changeset)` uses this method automatically.
@@ -274,14 +186,14 @@ The Merge app's **Download JSON changes** action exports a diagnostic array of c
 
 ### `merge(base: Osm, patch: Osm, options)`
 
-High-level pipeline to merge `patch` into `base`. Returns a new `Osm` instance.
+High-level pipeline to merge `patch` into `base`. Returns the resulting `Osm`; with no stages enabled, returns the original base. See the [defaults and stage order](../../docs/merge-process.md#defaults-and-stage-order).
 
 Options:
 
 - `directMerge` (boolean): Apply creates/updates from patch.
 - `deduplicateNodes` (boolean): Reconcile compatible patch nodes with unique base matches.
 - `deduplicateWays` (boolean): Reconcile compatible patch ways with matching base geometry.
-- `createIntersections` (boolean): Split intersecting ways.
+- `createIntersections` (boolean): Insert shared references at eligible crossings.
 - `conflation` (optional): Explicit imported-data matching configuration. `propertyKeys` and
   `attachNetwork` are required when supplied; `maxDistanceMeters` defaults to `1`, and `automatic` defaults
   to `"high-confidence"`. `allowWayRemoval` defaults to false and enables manual review only.
@@ -310,37 +222,11 @@ Options:
   reviewed fuzzy actions to an already materialized ordinary-merge baseline. The immutable original base is
   required so generation can rediscover and validate candidates instead of trusting mutable review records.
 
-An `OsmConflationDecision` uses `transferProperties` for Copy tags, `attachNetwork` for Connect network, and explicit `removeWay: true` for removal.
-With no decision, only copying/connection actions classified `automatic` are scheduled. An accept decision honors explicit
-flags; omitted copying/connection flags retain their legacy selection behavior, while omitted removal never selects it. New controls should use
-`buildConflationActionDecision()` so changing one choice preserves the others. Reject
-decisions schedule no actions. An accept decision with no selected action also resolves to the effective
-`rejected` status, shown as **Skipped** in Merge. Blocked and unmatched actions remain unscheduled regardless
-of requested flags.
-
-Use `buildConflationSourceDecision()` when changing targets. It validates the replacement and explicitly
-rejects sibling targets so automatic defaults cannot select them again. Older reviews can be corrected one
-imported feature at a time: existing conflicts for other sources remain unchanged, but the replacement cannot
-introduce a new source conflict or bypass checks for competing uses of a base target. Generation, raw
-single-decision or full-set updates, and bulk actions still require a fully valid decision set. Supply the
-full discovery candidate collection and complete decision snapshot; a single page cannot validate decisions
-for other sources. Multiple-target validation
-errors identify the imported feature and expose `error.conflict` as an `OsmConflationDecisionConflict` with
-`entityType`, `sourceId`, `candidateIds`, and `message`. Hard blockers still prevent the affected action. Bulk actions conservatively
-skip ambiguous and many-to-one candidates, including an already selected alternative; use individual
-target and action controls to resolve those features.
+Use `buildConflationSourceDecision()` when changing targets. Supply the full discovery and decision snapshot rather than a single visible page. Source-conflict errors expose `error.conflict` as an `OsmConflationDecisionConflict` with `entityType`, `sourceId`, `candidateIds`, and `message`. See [decision rules](../../docs/merge-process.md#mp-m5) for selection, bulk-operation, and conflict behavior.
 
 ### Matching outcome reports
 
-`generateConflationArtifacts()` returns an `OsmConflationOutcomeReport` alongside the generated dataset. The report compares the ordinary direct/exact baseline with the generated result, so its action counts describe actual changes rather than candidate eligibility or scheduled choices. Generation alone does not replace a loaded base dataset; a workflow should show these counts as completed work only after successful application and any required intersection stage.
-
-The report's `stage` is `"matching-before-intersections"`. All outcome fields describe the result immediately after matching, before intersection creation. A later intersection stage can add connections or remap a shared junction to another node. Reported targets, connected way IDs, unresolved work, and retention remain evidence of the matching stage; they are not a snapshot of the later dataset's references. Intersection effects must not be credited as matching actions.
-
-A tag-copy action counts one source-target mapping credited with at least one surviving changed tag value in the matching result. A network-connection action counts one matched imported node whose references changed in at least one imported way, rather than counting every affected way. Feature totals count unique imported nodes and ways considered for matching, with alternative targets counted once. They do not count every entity in the import: ordinary same-ID updates and features outside the matching options are excluded.
-
-Unresolved features need attention; intentionally skipped features are counted separately. Applied and unresolved counts can overlap when only part of a feature's requested work succeeded. Selected values already present on a base target are not failed copies. A key also counts as already equal when every alternative target already has that value in the ordinary baseline and matching result; this does not select a target. A value supplied by another surviving copy is satisfied without receiving another action credit. Only values missing from the target after matching because of a competing copy are reported as `superseded`.
-
-The report includes per-feature and per-tag details so clients can identify which selected attributes were not copied to a base target and why:
+`generateConflationArtifacts()` returns an `OsmConflationOutcomeReport` alongside the generated dataset. Its `stage` is `"matching-before-intersections"`. See [Reading the result](../../docs/merge-process.md#reading-the-result) for counting rules, partial outcomes, and stage boundaries.
 
 | Field             | Meaning                                                                                                                                                                                                                                            |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -410,7 +296,7 @@ Options:
 
 - Requires runtimes compatible with `@osmix/core` (Node 20+, Bun, or modern browsers) since the same typed-array data structures are used.
 - Deduplication helpers assume datasets store dense node blocks and rely on spatial indexes built via `Osm.buildIndexes()`.
-- Intersections are generated only for highway/footway-style features; polygonal ways are ignored.
+- Intersection eligibility and its area-filtering limitation are specified in the [merge-process guide](../../docs/merge-process.md#intersections-and-validation).
 - A scan that compares a dataset with itself is useful for diagnostics, but its proposed proximity matches
   should not be applied automatically. Use the high-level cross-dataset merge for reconciliation.
 - PBFs produced by older Osmix versions may already contain topology changes caused by automatic

@@ -6,6 +6,8 @@ streaming, and worker orchestration utilities on top of the low-level
 request raster/vector tiles with a single import. PBF loading, extraction, and
 export live in [`@osmix/load`](../load/README.md) and are re-exported here.
 
+The [merge-process guide](../../docs/merge-process.md) defines merge behavior and known limitations across the library, workers, and app. This README describes how to call the facade and worker APIs.
+
 ## Installation
 
 ```sh
@@ -39,23 +41,17 @@ import { createRemote } from "osmix";
 using remote = await createRemote();
 const monaco = await remote.fromPbf(monacoPbf);
 const patch = await remote.fromPbf(patchPbf, { id: "patch" });
-const merged = await monaco.merge(patch);
+const merged = await monaco.merge(patch, {
+  directMerge: true,
+  deduplicateNodes: true,
+  deduplicateWays: true,
+  createIntersections: true,
+});
 const rasterTile = await merged.getRasterTile([10561, 22891, 16]);
 console.log(rasterTile.byteLength);
 ```
 
-High-level merges leave the original inputs intact and reconcile only compatible patch entities with unique
-base matches. Regenerate PBFs created by older releases from their original inputs if automatic within-file
-deduplication may already have rewritten routing topology.
-
-Exact node reconciliation validates every source proposed for a final base survivor as a group before any replacement. Their shared tags and incident-way grade/access context must be mutually compatible. An untagged base node therefore cannot absorb coincident imported cafe and school nodes: both imported features and references to their node IDs remain. Other compatible groups can still reconcile. The same check covers explicit same-dataset diagnostic replacement chains; high-level merges continue to preserve both original inputs and authoritative same-ID updates. Exact-way descriptive reconciliation retains its existing policy.
-
-This fixes a residual pre-existing node-reconciliation defect found during the PR #218 review; the PR did not introduce it. The [change package guidance](../change/README.md#run-the-bundled-merge-pipeline) describes the group-compatibility requirement.
-
-Intersection creation preserves existing shared junctions, including bridge and tunnel entrances. Endpoint
-reuse updates every incident way and affected restriction via-node together; an unsafe shared-junction
-substitution leaves that crossing unchanged. This does not connect new grade-separated interior crossings.
-The same rules apply through direct merge APIs and worker-backed operations.
+Worker merge replaces the loaded base and removes the loaded patch; original source files remain unchanged. The [merge-process guide](../../docs/merge-process.md#inputs-and-identity) distinguishes source files, loaded state, and same-ID updates. See its [exact reconciliation](../../docs/merge-process.md#direct-and-exact-rules) and [intersection](../../docs/merge-process.md#intersections-and-validation) rules for geometry changes.
 
 ### Profile merge performance
 
@@ -135,19 +131,7 @@ await remote.applyChangesAndReplace(base.id);
 
 Worker and remote `generateConflationChangeset(baseId, mergeOptions)` use the matching configuration and decisions retained by `discoverConflation()` and the review session. Passing `mergeOptions.conflation` does not replace that configuration; start discovery with the intended matching options. Ordinary stage options such as `directMerge` and node/way reconciliation still come from `mergeOptions`. Generate and apply the cumulative matching preview before requesting intersections.
 
-OSM tags are feature attributes, such as `surface=asphalt` or `kerb=lowered`. **Copy tags** (property transfer
-in the API) changes only explicitly selected tags and retains imported geometry, including matched ways
-and their connecting nodes. Relative to the same direct/exact merge without property transfer, it never adds or
-removes entities or changes coordinates, way references, or relation members. This applies to automatic,
-individual, and filter-wide decisions. **Connect network** (network attachment in the API) separately rewrites only patch-created way
-references. The worker preserves discovery settings, filters, decisions, and generated changes across worker
-restarts, and reports CAR/WALK node, edge, and component deltas before the changeset is applied. Automatic
-pedestrian attachments are rejected if they alter routable CAR topology.
-
-Copy tags, Connect network, and optional explicit way removal are independent choices. Review controls show which actions are currently
-scheduled, separately from whether discovery considers each action eligible. Changing one choice preserves
-the others. The shared `resolveConflationActions(candidate, decision?)` helper returns the scheduled
-`transferProperties` and `attachNetwork` flags, plus `removeWay: true` only for an eligible explicitly selected removal. Use `buildConflationActionDecision()` to build a row update:
+The worker preserves discovery settings, filters, decisions, and generated changes across recoverable worker restarts. The [guide](../../docs/merge-process.md#matching-rules) defines independent action selection and the scope of routing checks. `resolveConflationActions(candidate, decision?)` returns scheduled flags; use `buildConflationActionDecision()` to construct a row update:
 
 ```ts check-docs
 import {
@@ -169,40 +153,15 @@ Persist the returned decision with `setConflationDecision()`. The `"attach-netwo
 way for Connect network; `"remove-way"` selects removal independently. The helper preserves other choices without converting an automatically scheduled connection into explicit approval for removal. For backward compatibility, omitted copying/connection flags
 on a manually constructed accept decision select those eligible actions. Removal always requires explicit `removeWay: true`.
 
-In Merge, comparing a candidate is separate from selecting its matching actions. The map and selectable Latitude/Longitude evidence show the same pair; base circles and solid lines differ from imported diamonds and dashed lines even without color. Finite distances include meters, while unavailable measurements and missing eligible targets have distinct explanations. See the [Merge matching guide](../../apps/merge/README.md#safe-imported-data-matching) for evidence and keyboard controls.
+`generateConflationChangeset()` stages selected actions; `applyChangesAndReplace()` installs the result. See [review controls](../../docs/merge-process.md#review-controls), [scheduling rules](../../docs/merge-process.md#mp-m5), and [result interpretation](../../docs/merge-process.md#reading-the-result).
 
-Skipping a match, including turning every choice off, schedules no actions and retains ordinary
-imported additions under the direct/exact merge rules. Removing a saved decision with
-`setConflationDecisions()` restores that candidate's discovery defaults; the Merge app calls this
-**Use automatic choices**.
-
-`generateConflationChangeset()` stages the selected actions in a preview. **Automatic** means scheduled by
-the matching rules, not already applied. Inspect the preview before calling `applyChangesAndReplace()` to
-update the base dataset. Saved choices survive navigation and worker recovery, and regenerated previews use
-the current choices. Updating or clearing decisions invalidates their dependent matching preview.
-
-Filter-wide decisions are computed and committed atomically in the worker. Property and network actions
-accept eligible automatic and review candidates while skipping blocked, unmatched, ambiguous, or structurally
-invalid matches. Each action preserves the other current choices, using the same decision resolution as an
-individual control. There is no bulk removal action. Reject schedules no actions for every filtered candidate that is not already rejected;
-the Merge app labels this **Skip filtered**. Each result returns the
-complete decision snapshot for restart recovery, and accepted candidates can be queried with
-`{ status: "accepted" }`.
-
-Review and acceptance cannot override an action's hard safety block. Ordinary relation membership or
-ambiguity adds review context without making an already blocked action eligible. Property transfer and network
-attachment retain separate eligibility, including after worker recovery; an eligible action can proceed while
-the other remains blocked. Filter-wide decisions skip the blocked action and count it as ineligible.
-
-`feature-type-conflict` blocks enabled matching actions when supported explicit feature classifications disagree, independently of the selected copy keys. A nearby imported school therefore cannot copy its name onto a base cafe merely because only `name` was selected. Optional `evidence.featureTypeConflicts` lists each conflicting key and its original typed `baseValue` and `patchValue`; these values remain available when the classification key is absent from `tagDiff`. Merge shows them under **Feature type conflict** and provides a **Feature classifications conflict** reason filter. Worker review, recovery, and acceptance retain the block.
-
-Missing classifications are unknown, and equal values alone do not prove identity. The [classification policy](../change/README.md#feature-classification-policy) specifies supported keys, same-key comparisons, generic `yes`, explicit `no`, and unsupported equivalence assumptions. Existing routing and grade checks still apply. A blocked matching candidate retains ordinary direct/exact merge behavior; same-ID updates remain authoritative.
+Optional `evidence.featureTypeConflicts` contains conflicting keys and their original typed `baseValue` and `patchValue`, independently of selected-tag `tagDiff`. The [classification policy](../../docs/merge-process.md#mp-m4) specifies how those conflicts constrain actions.
 
 #### Preview explicit imported-way removal
 
 Start `discoverConflation()` with `allowWayRemoval: true` to expose `candidate.wayRemoval`; this capability is off by default and never schedules removal. The optional assessment and `OsmConflationWayRemovalPreview` identify the imported/base way, original attributes, newly orphaned points to clean, tagged points to retain, branch connections, and blocking nodes/relations. Removing an imported way also removes its remaining attributes; copying selected tags stays a separate decision.
 
-The supported case is a unique equivalent open, non-area way with equal vertex counts, paired vertices within the search radius, compatible routing semantics, and verified retained connections. Different segmentation, one-to-many chains, involved relations, or unsafe grade/access context block removal. A retained branch needs an existing base connection or an explicit eligible `attachNetwork: true` decision; automatic scheduling is insufficient. Worker pages reassess these prerequisites after every choice, including changes on other pages. See the [removal policy and cleanup scope](../change/README.md#explicit-imported-way-removal).
+See the authoritative [removal prerequisites and cleanup scope](../../docs/merge-process.md#mp-r1). Worker pages reassess removal dependencies after decisions change, including on other pages.
 
 After discovery and reviewing the plan, schedule removal through the same atomic source-selection API:
 
@@ -272,15 +231,7 @@ intersection failures use the intersection retry path; returning to matching is 
 
 #### Understand the completed merge
 
-`generateConflationChangeset()` returns an `outcome` report derived from the actual difference between the ordinary direct/exact baseline and its generated result. Keep this report with that run; it remains readable after applying the result, generating intersections, or changing review state. Regenerating matching recomputes the report from the original inputs and current decisions. A generated report describes a preview until the workflow successfully applies all required changes.
-
-The report's `stage: "matching-before-intersections"` identifies matching before intersection creation. Its target IDs, connected ways, outstanding work, and retained-import counts describe that stage. Later intersections may add connections or remap junctions, so these details are historical matching evidence rather than final-reference assertions.
-
-Merge shows the completed report before download. Tag-copy actions and network connections are separate from the number of imported features considered for matching: a feature can have both actions, and several alternative candidates still count as one feature. Unresolved features need attention; ambiguous, blocked, and unmatched work have distinct reasons, and deliberate skips are counted separately. Partly completed features may contribute an applied action and unresolved work. Already-equal tag values are not failed copies. Values satisfied by another surviving copy are counted separately, without crediting duplicate actions. With no matching candidates, the report does not imply that every imported feature matched.
-
-Paged details identify imported features and selected tags not copied to a base target, with available reasons. The report can also be downloaded as JSON. Values not copied to a base target may still be present on ordinary imported additions. Retained-import counts track original import IDs present after matching; exact reconciliation may represent other features under base IDs instead.
-
-A successful merge can be downloaded with unresolved matching work. Failed generation, an incomplete application/intersection stage, or a failed result refresh does not display a successful completion summary. If changes were applied but refreshing the displayed dataset failed, retrying refresh does not apply them again. **Start a new merge** clears both loaded input slots and the selected map state. Reload the original base and import files to revise a completed merge; the completed result is not reused as an implicit retry input. That explicit action also clears the previous run's report.
+Worker/remote `generateConflationChangeset()` returns an `outcome` report with the generated preview. Retain that report with its run. Use the authoritative [result definitions](../../docs/merge-process.md#reading-the-result) and [workflow recovery rules](../../docs/merge-process.md#application-workflows) to distinguish generated work, committed changes, and completed results.
 
 If `remote.applyChangesAndReplace()` or `remote.merge()` updates the control worker but then fails to synchronize or retrieve the result, it throws `OsmixCommittedMutationError`. Its enumerable fields include `committed: true`, `operation`, and the surviving result's `osmId`; `cause` retains the underlying error. Do not repeat the mutation. Await `remote.synchronizeDataset(error.osmId)`, then retrieve and refresh that result. Synchronization copies the already committed dataset without generating or applying another changeset. For `merge()`, the consumed patch is removed from recovery state before result synchronization. An error from a rejected worker mutation has no committed marker. Terminal worker-pool failures remain terminal; synchronization cannot repair them, and a new session must load the original inputs again.
 

@@ -64,19 +64,16 @@ console.log(`Serialized ${pbfBytes.byteLength} bytes`);
 const patchResponse = await fetch("./monaco-patch.pbf");
 const patchPbf = new Uint8Array(await patchResponse.arrayBuffer());
 const patchOsm = await fromPbf(patchPbf);
-const mergedOsm = await merge(osm, patchOsm);
+const mergedOsm = await merge(osm, patchOsm, {
+  directMerge: true,
+  deduplicateNodes: true,
+  deduplicateWays: true,
+  createIntersections: true,
+});
 console.log(mergedOsm.id);
 ```
 
-The high-level merge preserves each source dataset and only reconciles compatible entities across the base
-and patch. If a PBF was produced by an older release that automatically deduplicated within each input,
-regenerate it from the original source files rather than trying to repair rewritten routing topology.
-
-Imported datasets with sub-meter coordinate offsets can opt into safe fuzzy conflation. The explicit
-`conflation` configuration restores the historical 1-meter search while separating selected-property
-transfer from patch-network attachment. High-confidence matches may apply automatically; ambiguous,
-routing-affecting, relation-involved, or structurally uncertain candidates are reviewable or blocked. Exact
-merge behavior and empty-merge identity remain unchanged when conflation is not configured.
+The [merge-process guide](docs/merge-process.md) is the authoritative reference for input identity, stage order, defaults, matching and intersection rules, worked examples, and known limitations. The API enables only the stages requested above; `merge(base, patch)` without options returns the base unchanged.
 
 ### Use in a Web Worker
 

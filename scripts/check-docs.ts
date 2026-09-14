@@ -11,6 +11,7 @@ import {
 
 export const DOCUMENT_PATHS = [
   "README.md",
+  "docs/merge-process.md",
   "packages/change/README.md",
   "packages/vt/README.md",
   "packages/gtfs/README.md",
