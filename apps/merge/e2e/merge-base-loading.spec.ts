@@ -334,8 +334,20 @@ test("a late cancellation preserves the committed exact result and a new extract
   await page.getByRole("button", { name: "Select PBF", exact: true }).click();
   await (await chooserPromise).setFiles(inputs.base);
   await page.getByRole("button", { name: "Extract", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Use as base OSM" })).toBeEnabled();
-  await page.getByRole("button", { name: "Use as base OSM" }).click();
+  const useAsBase = page.getByRole("button", { name: "Use as base OSM" });
+  const extractFailure = page.getByRole("alert");
+  // Extraction crosses the worker boundary, just like loadPbf above. Wait for
+  // its outcome rather than imposing the default five-second UI assertion limit.
+  await expect
+    .poll(async () => (await useAsBase.isEnabled()) || (await extractFailure.isVisible()), {
+      timeout: 120_000,
+    })
+    .toBe(true);
+  if (await extractFailure.isVisible()) {
+    throw new Error(`OSM extraction failed: ${await extractFailure.innerText()}`);
+  }
+  await expect(useAsBase).toBeEnabled();
+  await useAsBase.click();
   await page.getByRole("tab", { name: "Merge", exact: true }).click();
   await expect(page.getByText("Select merge inputs and options", { exact: false })).toBeVisible();
   await expect(summary).toHaveCount(0);

@@ -12,6 +12,8 @@ export default defineConfig({
   timeout: 120_000,
   use: {
     baseURL: "http://127.0.0.1:4173",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
   webServer: {
     command: "pnpm dev:app --host 127.0.0.1 --port 4173",
