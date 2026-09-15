@@ -4,6 +4,9 @@ apps/**/dist/
 *.tsbuildinfo
 *.tgz
 
+# Test outputs
+output/playwright/
+
 # Dependencies
 node_modules/
 .pnpm-store/
