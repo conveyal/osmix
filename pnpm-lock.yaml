@@ -1,3 +1,161 @@
+---
+lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    configDependencies: {}
+    packageManagerDependencies:
+      pnpm:
+        specifier: 12.4.1
+        version: 12.4.1
+
+packages:
+
+  '@pnpm/exe.android-arm64@12.4.1':
+    resolution: {integrity: sha512-/HwsqXMSmlOfgtV9+O0ratzjV6Vd/8n1hh4rGHpCGmDURvt52MwZxdbhyxP4K03ZfvgSDvotFPr8O+RzE5Eu8A==}
+    cpu: [arm64]
+    os: [android]
+
+  '@pnpm/exe.android-x64@12.4.1':
+    resolution: {integrity: sha512-+l74Qb4c2YjOzNKHXJLg+1wr8xHM1ckkUhnU5KRUK9TJqiiczt6yeTZqqzHIlJ8i6pAoj5V0OJevDRwnQKLgrQ==}
+    cpu: [x64]
+    os: [android]
+
+  '@pnpm/exe.darwin-arm64@12.4.1':
+    resolution: {integrity: sha512-6rkZkT3iGfaxknUdGHraqSWFvTa6N0ajAHluv9Ax0GRWs0sIcGNiFhDopv6xSZCsJZmG483aNS/b6UEDy3blfw==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@pnpm/exe.darwin-x64@12.4.1':
+    resolution: {integrity: sha512-Vb1CHlR88HghC1qUxjxjs82zQSXnXacPD+btG2CmG8Q/hBU7Q0/b2YWJKSQqZXicunV5khFtfTlAwJddV9RkYA==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@pnpm/exe.freebsd-x64@12.4.1':
+    resolution: {integrity: sha512-iT3iHz3Nl0Sxxj7UPOtZ/aQ81AFsQhjoeWMAlPkSRO04gsgDGAXv3UYxOFaesMWsfNxaGn0A+CITbuCHFF66FA==}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@pnpm/exe.linux-arm64-musl@12.4.1':
+    resolution: {integrity: sha512-aBooZfNXM5f+OGUgCAMFWpE/kAhsWfvmqIyMtHy6zl3aNxyInWrcY/Saln/UElzo7lZWMC0Yktroxd/2J26lNQ==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@pnpm/exe.linux-arm64@12.4.1':
+    resolution: {integrity: sha512-TlOdacTTP09BgcMvwWBFRsu8VAjfwqwnslBj+XSq1JFM3ck4f3k+1O/747EuctxZxs3/o785b6Q3s7Pd92Ptsg==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@pnpm/exe.linux-ppc64@12.4.1':
+    resolution: {integrity: sha512-r/ab/MlIBo75oizUP5ITiziCCrnXz4SJwfErLQ+603AshB+Yq7xTMCoMtzTSCAMu6aaymIKkAFtZvd2J75Wq0w==}
+    cpu: [ppc64]
+    os: [linux]
+    libc: [glibc]
+
+  '@pnpm/exe.linux-riscv64@12.4.1':
+    resolution: {integrity: sha512-C/D1QWdKMiB8+wv/spl1rGITFUuqC+aI/fb6h8NB5sqxsOaGXeYc/g891oCuzggHn6SODk9p+I09hI76x/cMNw==}
+    cpu: [riscv64]
+    os: [linux]
+    libc: [glibc]
+
+  '@pnpm/exe.linux-s390x@12.4.1':
+    resolution: {integrity: sha512-nxz5zD4yXt94uzbStDk0QTPKW+aE92hH1b5tFXK9ctB1HE9Xcq1vjTiA2LsZMFC6p4gdu5OwQeFqYNAVGa6QlA==}
+    cpu: [s390x]
+    os: [linux]
+    libc: [glibc]
+
+  '@pnpm/exe.linux-x64-musl@12.4.1':
+    resolution: {integrity: sha512-5AwgFdGhVUg2kIweYGfxzSLEHiIG77PQhZAkXC3TwofQHsu1Wr+TrV5/rNX2PopFnHRzuE581zoB8F6Wle32yg==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@pnpm/exe.linux-x64@12.4.1':
+    resolution: {integrity: sha512-FJOZuuuQMhp0oLzBtcKkLXknBI92hfkmSnlKc47vfin4HrmfID5khY2lGekL9tCzk1cpR+HShEw/meFl+nHtzQ==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@pnpm/exe.win32-arm64@12.4.1':
+    resolution: {integrity: sha512-OO7eKBL9S+xk5hRy+JUUZSNJknGuGe3GEUffsrlC2LbqKF02g+VX1anGIzSbJDvkkdnpJhSlxF5AUz2JzJu2Jw==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@pnpm/exe.win32-x64@12.4.1':
+    resolution: {integrity: sha512-x7gJHZgHo6hp354xCYA2NvoFzYJkHwovt2kVsUBK5EmXULLcP51JGMq09CX+5FRFJUZFKoXjLu3mZWmfP7o6PQ==}
+    cpu: [x64]
+    os: [win32]
+
+  pnpm@12.4.1:
+    resolution: {integrity: sha512-LoHjmdc/6DkNqyXgaqeIq3pZCCSNL1o3D4K0gRR6ano2e/gEj5pv22Rg8hpm8FQt7bi5TKLIcjWWdBkgsWVtTA==}
+    engines: {node: '>=18.*'}
+    hasBin: true
+
+snapshots:
+
+  '@pnpm/exe.android-arm64@12.4.1':
+    optional: true
+
+  '@pnpm/exe.android-x64@12.4.1':
+    optional: true
+
+  '@pnpm/exe.darwin-arm64@12.4.1':
+    optional: true
+
+  '@pnpm/exe.darwin-x64@12.4.1':
+    optional: true
+
+  '@pnpm/exe.freebsd-x64@12.4.1':
+    optional: true
+
+  '@pnpm/exe.linux-arm64-musl@12.4.1':
+    optional: true
+
+  '@pnpm/exe.linux-arm64@12.4.1':
+    optional: true
+
+  '@pnpm/exe.linux-ppc64@12.4.1':
+    optional: true
+
+  '@pnpm/exe.linux-riscv64@12.4.1':
+    optional: true
+
+  '@pnpm/exe.linux-s390x@12.4.1':
+    optional: true
+
+  '@pnpm/exe.linux-x64-musl@12.4.1':
+    optional: true
+
+  '@pnpm/exe.linux-x64@12.4.1':
+    optional: true
+
+  '@pnpm/exe.win32-arm64@12.4.1':
+    optional: true
+
+  '@pnpm/exe.win32-x64@12.4.1':
+    optional: true
+
+  pnpm@12.4.1:
+    optionalDependencies:
+      '@pnpm/exe.android-arm64': 12.4.1
+      '@pnpm/exe.android-x64': 12.4.1
+      '@pnpm/exe.darwin-arm64': 12.4.1
+      '@pnpm/exe.darwin-x64': 12.4.1
+      '@pnpm/exe.freebsd-x64': 12.4.1
+      '@pnpm/exe.linux-arm64': 12.4.1
+      '@pnpm/exe.linux-arm64-musl': 12.4.1
+      '@pnpm/exe.linux-ppc64': 12.4.1
+      '@pnpm/exe.linux-riscv64': 12.4.1
+      '@pnpm/exe.linux-s390x': 12.4.1
+      '@pnpm/exe.linux-x64': 12.4.1
+      '@pnpm/exe.linux-x64-musl': 12.4.1
+      '@pnpm/exe.win32-arm64': 12.4.1
+      '@pnpm/exe.win32-x64': 12.4.1
+
+---
 lockfileVersion: '9.0'
 
 settings:
@@ -44,6 +202,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.5
+      node:
+        specifier: runtime:^24.19.0
+        version: runtime:24.21.0
       oxfmt:
         specifier: ^0.68.0
         version: 0.68.0
@@ -400,7 +561,7 @@ importers:
         version: 0.5.11(typescript@7.0.2)(web-tree-sitter@0.25.10)
       '@opentui/three':
         specifier: ^0.5.11
-        version: 0.5.11(stage-js@1.0.2)(typescript@7.0.2)(web-tree-sitter@0.25.10)
+        version: 0.5.11(stage-js@1.0.2)(supports-color@7.2.0)(typescript@7.0.2)(web-tree-sitter@0.25.10)
       '@osmix/geo':
         specifier: workspace:*
         version: link:../geo
@@ -3341,6 +3502,138 @@ packages:
     engines: {node: '>=10.5.0'}
     deprecated: Use your platform's native DOMException instead
 
+  node@runtime:24.21.0:
+    resolution:
+      type: variations
+      variants:
+        - resolution:
+            archive: tarball
+            bin:
+              node: bin/node
+            integrity: sha256-rseyRkr7mfB4wZywbSAdVDvTsxHLoHEoK84bF8l+WLs=
+            type: binary
+            url: https://nodejs.org/download/release/v24.21.0/node-v24.21.0-aix-ppc64.tar.gz
+          targets:
+            - cpu: ppc64
+              os: aix
+        - resolution:
+            archive: tarball
+            bin:
+              node: bin/node
+            integrity: sha256-vtfupTJeEQjzLOUijd1qXw8IpJnuQqp0Qq6lg3AvYFc=
+            type: binary
+            url: https://nodejs.org/download/release/v24.21.0/node-v24.21.0-darwin-arm64.tar.gz
+          targets:
+            - cpu: arm64
+              os: darwin
+        - resolution:
+            archive: tarball
+            bin:
+              node: bin/node
+            integrity: sha256-FGLLOzBGuBXPjqQ209pFDsGp8R2sflpGsK2lMF1+gJc=
+            type: binary
+            url: https://nodejs.org/download/release/v24.21.0/node-v24.21.0-darwin-x64.tar.gz
+          targets:
+            - cpu: x64
+              os: darwin
+        - resolution:
+            archive: tarball
+            bin:
+              node: bin/node
+            integrity: sha256-ckKCw7Q67JmKqVJzgEZbRdIp4CG1gDX19PYwleq/5dU=
+            type: binary
+            url: https://nodejs.org/download/release/v24.21.0/node-v24.21.0-linux-arm64.tar.gz
+          targets:
+            - cpu: arm64
+              os: linux
+        - resolution:
+            archive: tarball
+            bin:
+              node: bin/node
+            integrity: sha256-UcXVMGbukpILYXg7A7Buy5nzZhFg97Fcp36EdBFaZ7w=
+            type: binary
+            url: https://nodejs.org/download/release/v24.21.0/node-v24.21.0-linux-ppc64le.tar.gz
+          targets:
+            - cpu: ppc64le
+              os: linux
+        - resolution:
+            archive: tarball
+            bin:
+              node: bin/node
+            integrity: sha256-Xy+jdCLgx13jXBaG/lHXgyTywqj+LMI5pB2cAAop2Tg=
+            type: binary
+            url: https://nodejs.org/download/release/v24.21.0/node-v24.21.0-linux-s390x.tar.gz
+          targets:
+            - cpu: s390x
+              os: linux
+        - resolution:
+            archive: tarball
+            bin:
+              node: bin/node
+            integrity: sha256-PWNAX8ZaDS0pdsHwvC/Se7C9ByEkaecFqsPwOuWrTJw=
+            type: binary
+            url: https://nodejs.org/download/release/v24.21.0/node-v24.21.0-linux-x64-musl.tar.gz
+          targets:
+            - cpu: x64
+              os: linux
+              libc: musl
+        - resolution:
+            archive: tarball
+            bin:
+              node: bin/node
+            integrity: sha256-bh24fvWLiBnl1UAu/xU2SRsY7djre+5e94l4duiNxf8=
+            type: binary
+            url: https://nodejs.org/download/release/v24.21.0/node-v24.21.0-linux-x64.tar.gz
+          targets:
+            - cpu: x64
+              os: linux
+        - resolution:
+            archive: zip
+            bin:
+              node: node.exe
+            integrity: sha256-h3mxveHTn41CDjtXqmV7OYka9DTT3kSpGQRM7AZ4WSE=
+            prefix: node-v24.21.0-win-arm64
+            type: binary
+            url: https://nodejs.org/download/release/v24.21.0/node-v24.21.0-win-arm64.zip
+          targets:
+            - cpu: arm64
+              os: win32
+        - resolution:
+            archive: zip
+            bin:
+              node: node.exe
+            integrity: sha256-FY92hbRN5R9sDfHRU1JsvNPhvHOajfxgdyHO913p5UE=
+            prefix: node-v24.21.0-win-x64
+            type: binary
+            url: https://nodejs.org/download/release/v24.21.0/node-v24.21.0-win-x64.zip
+          targets:
+            - cpu: x64
+              os: win32
+        - resolution:
+            archive: tarball
+            bin:
+              node: bin/node
+            integrity: sha256-MEiwgR4VjKDYZytZyDmGF2PhREkpgNjSmzad/uRXR+Q=
+            type: binary
+            url: https://unofficial-builds.nodejs.org/download/release/v24.21.0/node-v24.21.0-linux-arm64-musl.tar.gz
+          targets:
+            - cpu: arm64
+              os: linux
+              libc: musl
+        - resolution:
+            archive: tarball
+            bin:
+              node: bin/node
+            integrity: sha256-AacT402pjntNKjGR7nyj+T3QOE0aLvI8N5shYe5uEzo=
+            type: binary
+            url: https://unofficial-builds.nodejs.org/download/release/v24.21.0/node-v24.21.0-linux-x64-musl.tar.gz
+          targets:
+            - cpu: x64
+              os: linux
+              libc: musl
+    version: 24.21.0
+    hasBin: true
+
   obug@2.2.1:
     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
     engines: {node: '>=12.20.0'}
@@ -4611,21 +4904,21 @@ snapshots:
     optionalDependencies:
       '@types/node': 24.13.5
 
-  '@jimp/core@1.6.1':
+  '@jimp/core@1.6.1(supports-color@7.2.0)':
     dependencies:
       '@jimp/file-ops': 1.6.1
       '@jimp/types': 1.6.1
       '@jimp/utils': 1.6.1
       await-to-js: 3.0.0
       exif-parser: 0.1.12
-      file-type: 21.3.4
+      file-type: 21.3.4(supports-color@7.2.0)
       mime: 3.0.0
     transitivePeerDependencies:
       - supports-color
 
-  '@jimp/diff@1.6.1':
+  '@jimp/diff@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/plugin-resize': 1.6.1
+      '@jimp/plugin-resize': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       '@jimp/utils': 1.6.1
       pixelmatch: 5.3.0
@@ -4634,43 +4927,43 @@ snapshots:
 
   '@jimp/file-ops@1.6.1': {}
 
-  '@jimp/js-bmp@1.6.1':
+  '@jimp/js-bmp@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       '@jimp/utils': 1.6.1
       bmp-ts: 1.0.9
     transitivePeerDependencies:
       - supports-color
 
-  '@jimp/js-gif@1.6.1':
+  '@jimp/js-gif@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       gifwrap: 0.10.1
       omggif: 1.0.10
     transitivePeerDependencies:
       - supports-color
 
-  '@jimp/js-jpeg@1.6.1':
+  '@jimp/js-jpeg@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       jpeg-js: 0.4.4
     transitivePeerDependencies:
       - supports-color
 
-  '@jimp/js-png@1.6.1':
+  '@jimp/js-png@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       pngjs: 7.0.0
     transitivePeerDependencies:
       - supports-color
 
-  '@jimp/js-tiff@1.6.1':
+  '@jimp/js-tiff@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       utif2: 4.1.0
     transitivePeerDependencies:
@@ -4682,9 +4975,9 @@ snapshots:
       '@jimp/utils': 1.6.1
       zod: 3.25.76
 
-  '@jimp/plugin-blur@1.6.1':
+  '@jimp/plugin-blur@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
       '@jimp/utils': 1.6.1
     transitivePeerDependencies:
       - supports-color
@@ -4694,9 +4987,9 @@ snapshots:
       '@jimp/types': 1.6.1
       zod: 3.25.76
 
-  '@jimp/plugin-color@1.6.1':
+  '@jimp/plugin-color@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       '@jimp/utils': 1.6.1
       tinycolor2: 1.6.0
@@ -4704,30 +4997,30 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@jimp/plugin-contain@1.6.1':
+  '@jimp/plugin-contain@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
       '@jimp/plugin-blit': 1.6.1
-      '@jimp/plugin-resize': 1.6.1
+      '@jimp/plugin-resize': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       '@jimp/utils': 1.6.1
       zod: 3.25.76
     transitivePeerDependencies:
       - supports-color
 
-  '@jimp/plugin-cover@1.6.1':
+  '@jimp/plugin-cover@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
-      '@jimp/plugin-crop': 1.6.1
-      '@jimp/plugin-resize': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-crop': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-resize': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       zod: 3.25.76
     transitivePeerDependencies:
       - supports-color
 
-  '@jimp/plugin-crop@1.6.1':
+  '@jimp/plugin-crop@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       '@jimp/utils': 1.6.1
       zod: 3.25.76
@@ -4755,15 +5048,15 @@ snapshots:
       '@jimp/types': 1.6.1
       zod: 3.25.76
 
-  '@jimp/plugin-hash@1.6.1':
+  '@jimp/plugin-hash@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
-      '@jimp/js-bmp': 1.6.1
-      '@jimp/js-jpeg': 1.6.1
-      '@jimp/js-png': 1.6.1
-      '@jimp/js-tiff': 1.6.1
-      '@jimp/plugin-color': 1.6.1
-      '@jimp/plugin-resize': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-bmp': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-jpeg': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-png': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-tiff': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-color': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-resize': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       '@jimp/utils': 1.6.1
       any-base: 1.1.0
@@ -4775,11 +5068,11 @@ snapshots:
       '@jimp/types': 1.6.1
       zod: 3.25.76
 
-  '@jimp/plugin-print@1.6.1':
+  '@jimp/plugin-print@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
-      '@jimp/js-jpeg': 1.6.1
-      '@jimp/js-png': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-jpeg': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-png': 1.6.1(supports-color@7.2.0)
       '@jimp/plugin-blit': 1.6.1
       '@jimp/types': 1.6.1
       parse-bmfont-ascii: 1.0.6
@@ -4795,30 +5088,30 @@ snapshots:
       image-q: 4.0.0
       zod: 3.25.76
 
-  '@jimp/plugin-resize@1.6.1':
+  '@jimp/plugin-resize@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       zod: 3.25.76
     transitivePeerDependencies:
       - supports-color
 
-  '@jimp/plugin-rotate@1.6.1':
+  '@jimp/plugin-rotate@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
-      '@jimp/plugin-crop': 1.6.1
-      '@jimp/plugin-resize': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-crop': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-resize': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       '@jimp/utils': 1.6.1
       zod: 3.25.76
     transitivePeerDependencies:
       - supports-color
 
-  '@jimp/plugin-threshold@1.6.1':
+  '@jimp/plugin-threshold@1.6.1(supports-color@7.2.0)':
     dependencies:
-      '@jimp/core': 1.6.1
-      '@jimp/plugin-color': 1.6.1
-      '@jimp/plugin-hash': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-color': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-hash': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       '@jimp/utils': 1.6.1
       zod: 3.25.76
@@ -4990,10 +5283,10 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@opentui/three@0.5.11(stage-js@1.0.2)(typescript@7.0.2)(web-tree-sitter@0.25.10)':
+  '@opentui/three@0.5.11(stage-js@1.0.2)(supports-color@7.2.0)(typescript@7.0.2)(web-tree-sitter@0.25.10)':
     dependencies:
       '@opentui/core': 0.5.11(typescript@7.0.2)(web-tree-sitter@0.25.10)
-      jimp: 1.6.1
+      jimp: 1.6.1(supports-color@7.2.0)
       three: 0.177.0
     optionalDependencies:
       '@dimforge/rapier2d-simd-compat': 0.17.3
@@ -5461,9 +5754,9 @@ snapshots:
     dependencies:
       '@testing-library/dom': 10.4.1
 
-  '@tokenizer/inflate@0.4.1':
+  '@tokenizer/inflate@0.4.1(supports-color@7.2.0)':
     dependencies:
-      debug: 4.4.3
+      debug: 4.4.3(supports-color@7.2.0)
       token-types: 6.1.2
     transitivePeerDependencies:
       - supports-color
@@ -5889,9 +6182,11 @@ snapshots:
       - '@noble/hashes'
     optional: true
 
-  debug@4.4.3:
+  debug@4.4.3(supports-color@7.2.0):
     dependencies:
       ms: 2.1.3
+    optionalDependencies:
+      supports-color: 7.2.0
 
   decimal.js@10.6.0:
     optional: true
@@ -6022,9 +6317,9 @@ snapshots:
 
   fflate@0.8.3: {}
 
-  file-type@21.3.4:
+  file-type@21.3.4(supports-color@7.2.0):
     dependencies:
-      '@tokenizer/inflate': 0.4.1
+      '@tokenizer/inflate': 0.4.1(supports-color@7.2.0)
       strtok3: 10.3.5
       token-types: 6.1.2
       uint8array-extras: 1.5.0
@@ -6199,33 +6494,33 @@ snapshots:
 
   isobject@3.0.1: {}
 
-  jimp@1.6.1:
+  jimp@1.6.1(supports-color@7.2.0):
     dependencies:
-      '@jimp/core': 1.6.1
-      '@jimp/diff': 1.6.1
-      '@jimp/js-bmp': 1.6.1
-      '@jimp/js-gif': 1.6.1
-      '@jimp/js-jpeg': 1.6.1
-      '@jimp/js-png': 1.6.1
-      '@jimp/js-tiff': 1.6.1
+      '@jimp/core': 1.6.1(supports-color@7.2.0)
+      '@jimp/diff': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-bmp': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-gif': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-jpeg': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-png': 1.6.1(supports-color@7.2.0)
+      '@jimp/js-tiff': 1.6.1(supports-color@7.2.0)
       '@jimp/plugin-blit': 1.6.1
-      '@jimp/plugin-blur': 1.6.1
+      '@jimp/plugin-blur': 1.6.1(supports-color@7.2.0)
       '@jimp/plugin-circle': 1.6.1
-      '@jimp/plugin-color': 1.6.1
-      '@jimp/plugin-contain': 1.6.1
-      '@jimp/plugin-cover': 1.6.1
-      '@jimp/plugin-crop': 1.6.1
+      '@jimp/plugin-color': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-contain': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-cover': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-crop': 1.6.1(supports-color@7.2.0)
       '@jimp/plugin-displace': 1.6.1
       '@jimp/plugin-dither': 1.6.1
       '@jimp/plugin-fisheye': 1.6.1
       '@jimp/plugin-flip': 1.6.1
-      '@jimp/plugin-hash': 1.6.1
+      '@jimp/plugin-hash': 1.6.1(supports-color@7.2.0)
       '@jimp/plugin-mask': 1.6.1
-      '@jimp/plugin-print': 1.6.1
+      '@jimp/plugin-print': 1.6.1(supports-color@7.2.0)
       '@jimp/plugin-quantize': 1.6.1
-      '@jimp/plugin-resize': 1.6.1
-      '@jimp/plugin-rotate': 1.6.1
-      '@jimp/plugin-threshold': 1.6.1
+      '@jimp/plugin-resize': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-rotate': 1.6.1(supports-color@7.2.0)
+      '@jimp/plugin-threshold': 1.6.1(supports-color@7.2.0)
       '@jimp/types': 1.6.1
       '@jimp/utils': 1.6.1
     transitivePeerDependencies:
@@ -6514,6 +6809,8 @@ snapshots:
 
   node-domexception@1.0.0:
     optional: true
+
+  node@runtime:24.21.0: {}
 
   obug@2.2.1: {}
 
