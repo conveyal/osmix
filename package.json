@@ -35,7 +35,7 @@
     "oxlint-tsgolint": "^0.24.0",
     "portless": "0.15.4",
     "typescript": "catalog:",
-    "vitest": "^4.1.9"
+    "vitest": "^5.0.1"
   },
   "packageManager": "pnpm@11.10.0"
 }
