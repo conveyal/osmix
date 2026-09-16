@@ -37,12 +37,12 @@
     "typescript": "catalog:",
     "vitest": "^5.0.1"
   },
-  "packageManager": "pnpm@12.4.1",
   "devEngines": {
     "runtime": {
       "name": "node",
       "version": "^24.19.0",
       "onFail": "download"
     }
-  }
+  },
+  "packageManager": "pnpm@12.4.1"
 }
