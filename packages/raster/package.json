@@ -29,5 +29,8 @@
     "@osmix/shared": "workspace:*",
     "@types/geojson": "catalog:",
     "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

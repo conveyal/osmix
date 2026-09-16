@@ -27,5 +27,8 @@
     "@osmix/shared": "workspace:*",
     "@osmix/test-utils": "workspace:*",
     "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

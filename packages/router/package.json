@@ -27,5 +27,8 @@
     "@osmix/test-utils": "workspace:*",
     "mitata": "^1.0.34",
     "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

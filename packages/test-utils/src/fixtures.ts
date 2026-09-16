@@ -1,11 +1,9 @@
 import { createReadStream, createWriteStream } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { Readable, Writable } from "node:stream";
-import { fileURLToPath } from "node:url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT_DIR = resolve(__dirname, "../../../");
+const ROOT_DIR = resolve(import.meta.dirname, "../../../");
 const FIXTURES_DIR = resolve(ROOT_DIR, "fixtures");
 
 export function getFixturePath(url: string) {

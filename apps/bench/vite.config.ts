@@ -10,7 +10,7 @@ export default defineConfig({
   publicDir: process.env.NODE_ENV === "development" ? "../../fixtures" : undefined,
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   server: {

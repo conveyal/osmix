@@ -30,5 +30,8 @@
     "@osmix/test-utils": "workspace:*",
     "pbf": "catalog:",
     "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

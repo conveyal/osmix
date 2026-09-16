@@ -24,5 +24,8 @@
   },
   "devDependencies": {
     "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --experimental-strip-types ../../scripts/portless-dev.ts shortbread.osmix node --import tsx --watch server.ts",
-    "dev:app": "node --import tsx --watch server.ts",
-    "start": "node --import tsx server.ts",
-    "stress:regional": "node --import tsx test/regional-stress.ts",
-    "test": "node --import tsx test/server.test.ts",
+    "dev": "node ../../scripts/portless-dev.ts shortbread.osmix node --watch server.ts",
+    "dev:app": "node --watch server.ts",
+    "start": "node server.ts",
+    "stress:regional": "node test/regional-stress.ts",
+    "test": "node test/server.test.ts",
     "typecheck": "tsc --build --noEmit"
   },
   "dependencies": {
@@ -25,7 +25,6 @@
   },
   "devDependencies": {
     "@osmix/pbf": "workspace:*",
-    "tsx": "^4.23.13",
     "typescript": "catalog:"
   }
 }
