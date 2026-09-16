@@ -20,7 +20,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v7
 
-      - uses: ./.github/actions/setup
+      - uses: pnpm/setup@v2
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
@@ -39,8 +39,6 @@ jobs:
 
       - name: Setup Bun for standalone executables
         uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.14
 
       - name: Check CLI release assets
         id: cli-assets
