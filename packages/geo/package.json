@@ -27,5 +27,8 @@
   "devDependencies": {
     "@osmix/shared": "workspace:*",
     "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

@@ -7,7 +7,7 @@
  */
 
 import { readdir, readFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
@@ -77,20 +77,19 @@ async function findPackageDirs(): Promise<string[]> {
   return dirs;
 }
 
-async function collectSourceFiles(dir: string): Promise<string[]> {
-  const files: string[] = [];
-  await walk(dir, files, new Set(["node_modules", "dist"]));
-  return files;
-}
+const SKIP_DIRS = new Set(["node_modules", "dist"]);
 
-async function walk(dir: string, files: string[], skip: Set<string>): Promise<void> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (skip.has(entry.name)) continue;
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) await walk(path, files, skip);
-    else if (/\.(ts|tsx|mts|js|jsx)$/.test(entry.name)) files.push(path);
-  }
+async function collectSourceFiles(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true, recursive: true });
+  return entries
+    .filter((entry) => entry.isFile() && /\.(ts|tsx|mts|js|jsx)$/.test(entry.name))
+    .filter(
+      (entry) =>
+        !relative(dir, entry.parentPath)
+          .split(sep)
+          .some((part) => SKIP_DIRS.has(part)),
+    )
+    .map((entry) => join(entry.parentPath, entry.name));
 }
 
 function packageNameFromImport(specifier: string): string {

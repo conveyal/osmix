@@ -31,5 +31,8 @@
   "devDependencies": {
     "@osmix/pbf": "workspace:*",
     "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

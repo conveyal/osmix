@@ -17,7 +17,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "profile:merge": "node --expose-gc --experimental-strip-types test/merge-profile-cli.ts",
+    "profile:merge": "node --expose-gc test/merge-profile-cli.ts",
     "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
     "typecheck": "tsc --noEmit"
   },
@@ -46,5 +46,8 @@
     "@types/geojson": "catalog:",
     "typescript": "catalog:",
     "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

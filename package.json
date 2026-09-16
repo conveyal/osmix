@@ -15,13 +15,13 @@
     "test:all": "pnpm run typecheck && pnpm run check && VITEST_INCLUDE_APPS=1 vitest run",
     "test:apps": "VITEST_INCLUDE_APPS=1 vitest run '--project=@osmix/merge' '--project=@osmix/bench*'",
     "test:node-smoke": "node scripts/node-smoke.ts",
-    "test:portless": "node --experimental-strip-types --test scripts/portless-dev.test.ts",
-    "test:check-docs": "node --experimental-strip-types scripts/check-docs.test.ts",
+    "test:portless": "node --test scripts/portless-dev.test.ts",
+    "test:check-docs": "node scripts/check-docs.test.ts",
     "test:packages": "vitest run",
-    "test:verify-workspace": "node --experimental-strip-types scripts/verify-workspace.test.ts",
-    "verify:all": "node --experimental-strip-types scripts/verify-workspace.ts --all",
-    "verify:workspace": "node --experimental-strip-types scripts/verify-workspace.ts",
-    "check:docs": "node --experimental-strip-types scripts/check-docs.ts",
+    "test:verify-workspace": "node scripts/verify-workspace.test.ts",
+    "verify:all": "node scripts/verify-workspace.ts --all",
+    "verify:workspace": "node scripts/verify-workspace.ts",
+    "check:docs": "node scripts/check-docs.ts",
     "check:deps": "node scripts/check-deps.ts",
     "typecheck": "pnpm -r typecheck",
     "version": "changeset version && pnpm install",
@@ -43,6 +43,9 @@
       "version": "^24.19.0",
       "onFail": "download"
     }
+  },
+  "engines": {
+    "node": ">=24"
   },
   "packageManager": "pnpm@12.4.1"
 }

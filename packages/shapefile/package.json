@@ -26,5 +26,8 @@
   "devDependencies": {
     "@types/geojson": "catalog:",
     "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
