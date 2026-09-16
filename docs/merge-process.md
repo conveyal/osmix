@@ -322,7 +322,7 @@ Thus base `amenity=cafe` versus patch `amenity=school` hard-blocks matching acti
 
 ### MP-R1 — Explicit way removal
 
-Enable `allowWayRemoval: true` to assess removal. An individual accepted decision must additionally contain `removeWay: true`. Automatic matching, ordinary acceptance, copying tags, and bulk connection never supply removal consent. 
+Enable `allowWayRemoval: true` to assess removal. An individual accepted decision must additionally contain `removeWay: true`. Automatic matching, ordinary acceptance, copying tags, and bulk connection never supply removal consent.
 
 > **Separate tag copying from geometry removal**
 > Copying attributes from a matched imported way previously removed that way, which could disconnect imported branches even when network attachment was disabled. Tag copying changes only selected tag values relative to the ordinary direct/exact merge baseline; removal is a separate, default-off choice that requires a supported equivalent base counterpart, verified retained connections, and a preview before application. Retaining overlapping imported geometry is the accepted result whenever removal cannot be established safely, so importing accessibility or descriptive attributes cannot silently discard the user's network.
