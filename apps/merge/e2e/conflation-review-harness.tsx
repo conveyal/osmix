@@ -6,7 +6,7 @@ import {
   OsmixWorker,
   summarizeConflationCandidates,
 } from "osmix";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { ConflationReview } from "../src/components/conflation-review";
 import { BackToMatching, MatchingReviewProblem } from "../src/components/matching-review-recovery";
@@ -17,6 +17,7 @@ import {
   type MatchingReviewIssue,
   returnToMatchingReview,
 } from "../src/lib/matching-review";
+import { createHarnessStore, useHarnessSession } from "./harness-store";
 
 type HarnessRequest =
   | {
@@ -145,38 +146,38 @@ function snapshot(session: Session) {
   });
 }
 
+const store = createHarnessStore<Session>(() => createSession(false));
+
 export function ConflationReviewHarness() {
-  const [session, setSession] = useState(() => createSession(false));
-  const [, setRevision] = useState(0);
-  const refresh = () => setRevision((revision) => revision + 1);
+  const session = useHarnessSession(store);
 
   useEffect(() => {
     window.conflationReviewHarness = { readState: () => snapshot(session) };
   }, [session]);
 
-  const generate = () => {
-    session.generationAttempts++;
-    try {
-      session.worker.generateConflationChangeset(session.base.id, { directMerge: true });
-      session.preview = session.worker.getChangesetPage(session.base.id, 0, 100);
-      session.generations++;
-      session.issue = null;
-    } catch (error) {
-      session.issue = matchingReviewIssue(error);
-    }
-    session.showPreview = true;
-    refresh();
-  };
-  const updateFilter = async (filter: OsmConflationCandidateFilter) => {
-    session.filter = filter;
-    session.worker.setConflationFilter(session.base.id, filter);
-    session.pageNumber = 0;
-    refresh();
-  };
-  const updatePage = async (page: number) => {
-    session.pageNumber = page;
-    refresh();
-  };
+  const generate = () =>
+    store.mutate((current) => {
+      current.generationAttempts++;
+      try {
+        current.worker.generateConflationChangeset(current.base.id, { directMerge: true });
+        current.preview = current.worker.getChangesetPage(current.base.id, 0, 100);
+        current.generations++;
+        current.issue = null;
+      } catch (error) {
+        current.issue = matchingReviewIssue(error);
+      }
+      current.showPreview = true;
+    });
+  const updateFilter = async (filter: OsmConflationCandidateFilter) =>
+    store.mutate((current) => {
+      current.filter = filter;
+      current.worker.setConflationFilter(current.base.id, filter);
+      current.pageNumber = 0;
+    });
+  const updatePage = async (page: number) =>
+    store.mutate((current) => {
+      current.pageNumber = page;
+    });
   const returnToMatching = () =>
     returnToMatchingReview({
       filter: session.filter,
@@ -184,21 +185,22 @@ export function ConflationReviewHarness() {
       issue: session.issue,
       onFilterChange: updateFilter,
       onPageChange: updatePage,
-      onReturn: () => {
-        session.showPreview = false;
-        refresh();
-      },
+      onReturn: () =>
+        store.mutate((current) => {
+          current.showPreview = false;
+        }),
     });
   const saveSource = async (
     source: { entityType: "node" | "way"; sourceId: number },
     selected: OsmConflationDecision | null,
   ) => {
-    session.requests.push({ kind: "source", source, selected: structuredClone(selected) });
-    const result = session.worker.setConflationSourceDecision(session.base.id, source, selected);
-    session.decisions = result.decisions;
-    session.preview = null;
-    session.issue = null;
-    refresh();
+    store.mutate((current) => {
+      current.requests.push({ kind: "source", source, selected: structuredClone(selected) });
+      const result = current.worker.setConflationSourceDecision(current.base.id, source, selected);
+      current.decisions = result.decisions;
+      current.preview = null;
+      current.issue = null;
+    });
   };
   const nodeChange = session.preview?.changes?.find(
     (change) => change.entity.id === 1 && "lon" in change.entity,
@@ -211,16 +213,16 @@ export function ConflationReviewHarness() {
     <section className="mt-2 flex min-w-0 flex-col gap-2" data-testid="conflation-review-harness">
       <SectionTitle>Matching interaction fixture</SectionTitle>
       <div className="flex flex-wrap gap-1">
-        <Button variant="outline" onClick={() => setSession(createSession(false))}>
+        <Button variant="outline" onClick={() => store.replace(createSession(false))}>
           Load compatible fixture
         </Button>
-        <Button variant="outline" onClick={() => setSession(createSession(true))}>
+        <Button variant="outline" onClick={() => store.replace(createSession(true))}>
           Load blocked connection fixture
         </Button>
-        <Button variant="outline" onClick={() => setSession(createAlternativeSession())}>
+        <Button variant="outline" onClick={() => store.replace(createAlternativeSession())}>
           Load alternative target fixture
         </Button>
-        <Button variant="outline" onClick={() => setSession(createAlternativeSession(true))}>
+        <Button variant="outline" onClick={() => store.replace(createAlternativeSession(true))}>
           Load blocked target fixture
         </Button>
         <Button
@@ -233,21 +235,24 @@ export function ConflationReviewHarness() {
               { candidateId: "node:102->3", action: "reject" },
             ];
             next.worker.seedLegacyDecisions(next.base.id, next.decisions);
-            setSession(next);
+            store.replace(next);
           }}
         >
           Load conflicting saved review
         </Button>
         <Button
           variant="outline"
-          onClick={() => {
-            session.delayNavigation = true;
-            refresh();
-          }}
+          onClick={() =>
+            store.mutate((current) => {
+              current.delayNavigation = true;
+            })
+          }
         >
           Delay next candidate navigation
         </Button>
-        <Button onClick={() => session.finishNavigation?.()}>Complete delayed page change</Button>
+        <Button onClick={() => store.current.finishNavigation?.()}>
+          Complete delayed page change
+        </Button>
       </div>
       {session.showPreview ? (
         <div className="flex flex-col gap-2 border p-2" data-testid="matching-preview">
@@ -302,36 +307,46 @@ export function ConflationReviewHarness() {
               }}
               onLeaveUnmatched={(source) => saveSource(source, null)}
               onResetDecision={async (candidateId) => {
-                const decisions = session.decisions.filter(
-                  (row) => row.candidateId !== candidateId,
-                );
-                session.requests.push({
-                  kind: "reset",
-                  candidateId,
-                  decisions: structuredClone(decisions),
+                store.mutate((current) => {
+                  const decisions = current.decisions.filter(
+                    (row) => row.candidateId !== candidateId,
+                  );
+                  current.requests.push({
+                    kind: "reset",
+                    candidateId,
+                    decisions: structuredClone(decisions),
+                  });
+                  current.worker.setConflationDecisions(current.base.id, decisions);
+                  current.decisions = decisions;
+                  current.preview = null;
+                  current.issue = null;
                 });
-                session.worker.setConflationDecisions(session.base.id, decisions);
-                session.decisions = decisions;
-                session.preview = null;
-                session.issue = null;
-                refresh();
               }}
               onBulkDecision={async (request) => {
-                session.requests.push({ kind: "bulk", request: structuredClone(request) });
-                const result = session.worker.applyConflationBulkDecision(session.base.id, request);
-                session.decisions = result.decisions;
-                session.preview = null;
-                refresh();
+                store.mutate((current) => {
+                  current.requests.push({ kind: "bulk", request: structuredClone(request) });
+                  const result = current.worker.applyConflationBulkDecision(
+                    current.base.id,
+                    request,
+                  );
+                  current.decisions = result.decisions;
+                  current.preview = null;
+                });
               }}
               onFilterChange={updateFilter}
               onPageChange={async (page) => {
-                if (session.delayNavigation) {
-                  session.delayNavigation = false;
-                  await new Promise<void>((resolve) => {
-                    session.finishNavigation = resolve;
-                    refresh();
+                if (store.current.delayNavigation) {
+                  store.mutate((current) => {
+                    current.delayNavigation = false;
                   });
-                  session.finishNavigation = null;
+                  await new Promise<void>((resolve) => {
+                    store.mutate((current) => {
+                      current.finishNavigation = resolve;
+                    });
+                  });
+                  store.mutate((current) => {
+                    current.finishNavigation = null;
+                  });
                 }
                 await updatePage(page);
               }}

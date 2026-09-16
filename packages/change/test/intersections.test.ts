@@ -297,8 +297,8 @@ describe("intersection geometry integrity", () => {
 
     expect(changeset.stats.intersectionNodesCreated).toBe(1);
     const result = applyChangesetToOsm(changeset);
-    const sharedRefs = [10, 20, 30].map(
-      (wayId) => result.ways.getById(wayId)!.refs.find((ref) => ref > 6)!,
+    const sharedRefs = [10, 20, 30].map((wayId) =>
+      result.ways.getById(wayId)!.refs.find((ref) => ref > 6)!,
     );
     expect(new Set(sharedRefs)).toEqual(new Set([7]));
     for (const wayId of [10, 20, 30]) {

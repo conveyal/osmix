@@ -1,3 +1,4 @@
+import type { LngLatBounds } from "maplibre-gl";
 import type { GeoBbox2D } from "osmix";
 
 /** Initial map viewport around default merge basemap (Yakima area). */
@@ -18,7 +19,7 @@ export function parseBboxString(raw: string): GeoBbox2D | null {
   return isValidBbox(candidate) ? candidate : null;
 }
 
-export function boundsLikeToBbox(bounds: maplibregl.LngLatBounds | null): GeoBbox2D | null {
+export function boundsLikeToBbox(bounds: LngLatBounds | null): GeoBbox2D | null {
   if (!bounds) return null;
   const [sw, ne] = bounds.toArray() as [[number, number], [number, number]];
   const [w, s] = sw;

@@ -1,4 +1,5 @@
 import { MaximizeIcon } from "lucide-react";
+import type { FitBoundsOptions, LngLatBoundsLike } from "maplibre-gl";
 import type { GeoBbox2D } from "osmix";
 
 import { useMap } from "../hooks/map";
@@ -8,8 +9,8 @@ export default function FitBounds({
   bounds,
   options,
 }: {
-  bounds?: maplibregl.LngLatBoundsLike | GeoBbox2D;
-  options?: maplibregl.FitBoundsOptions;
+  bounds?: LngLatBoundsLike | GeoBbox2D;
+  options?: FitBoundsOptions;
 }) {
   const map = useMap();
   return (

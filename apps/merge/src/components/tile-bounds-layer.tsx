@@ -68,7 +68,7 @@ export default function TileBoundsLayer() {
         map.getBounds().toArray().flat() as GeoBbox2D,
         Math.floor(map.getZoom()),
       );
-      source.setData({
+      void source.setData({
         type: "FeatureCollection",
         features: tiles,
       });

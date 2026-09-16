@@ -14,6 +14,7 @@ import { ConflationConfig } from "../src/components/conflation-config";
 import { ConflationReview } from "../src/components/conflation-review";
 import { Button } from "../src/components/ui/button";
 import { conflationComparisonAtom } from "../src/state/conflation";
+import { createHarnessStore, useHarnessSession } from "./harness-store";
 
 type Scenario =
   | "finite"
@@ -110,13 +111,13 @@ const EMPTY_STYLE: StyleSpecification = {
   layers: [{ id: "background", type: "background", paint: { "background-color": "#f5f5f4" } }],
 };
 
+const store = createHarnessStore(() => createSession("finite"));
+
 function EvidenceContent() {
-  const [session, setSession] = useState(() => createSession("finite"));
-  const [, setRevision] = useState(0);
+  const session = useHarnessSession(store);
   const [mapLoaded, setMapLoaded] = useState(false);
   const comparison = useAtomValue(conflationComparisonAtom);
   const mapRef = useRef<MapRef>(null);
-  const refresh = () => setRevision((value) => value + 1);
   const page = session.worker.getConflationPage(session.base.id, session.page, 5, {
     groupBySource: true,
   });
@@ -140,7 +141,7 @@ function EvidenceContent() {
         decisionCalls: session.decisionCalls,
         mapMoving: mapRef.current?.getMap().isMoving() ?? false,
       }),
-      completeChoice: () => session.completeChoice?.(),
+      completeChoice: () => store.current.completeChoice?.(),
     };
   }, [comparison, mapLoaded, session]);
 
@@ -165,7 +166,7 @@ function EvidenceContent() {
           <Button
             key={scenario}
             variant="outline"
-            onClick={() => setSession(createSession(scenario))}
+            onClick={() => store.replace(createSession(scenario))}
           >
             {label}
           </Button>
@@ -173,9 +174,11 @@ function EvidenceContent() {
       </div>
       <Button
         variant="outline"
-        onClick={() => {
-          session.delayNextChoice = true;
-        }}
+        onClick={() =>
+          store.mutate((current) => {
+            current.delayNextChoice = true;
+          })
+        }
       >
         Delay next matching choice
       </Button>
@@ -200,55 +203,68 @@ function EvidenceContent() {
           filter={session.filter}
           isFilterPending={false}
           onDecision={async (decision) => {
-            session.decisionCalls++;
-            if (session.delayNextChoice) {
-              session.delayNextChoice = false;
-              await new Promise<void>((resolve) => {
-                session.completeChoice = resolve;
-                refresh();
+            store.mutate((current) => {
+              current.decisionCalls++;
+            });
+            if (store.current.delayNextChoice) {
+              store.mutate((current) => {
+                current.delayNextChoice = false;
               });
-              session.completeChoice = null;
+              await new Promise<void>((resolve) => {
+                store.mutate((current) => {
+                  current.completeChoice = resolve;
+                });
+              });
+              store.mutate((current) => {
+                current.completeChoice = null;
+              });
             }
             const candidate = page.candidates.find((row) => row.id === decision.candidateId);
             if (!candidate) throw Error("Missing comparison candidate");
-            session.decisions = session.worker.setConflationSourceDecision(
-              session.base.id,
-              candidate,
-              decision,
-            ).decisions;
-            refresh();
+            store.mutate((current) => {
+              current.decisions = current.worker.setConflationSourceDecision(
+                current.base.id,
+                candidate,
+                decision,
+              ).decisions;
+            });
           }}
           onLeaveUnmatched={async (source) => {
-            session.decisions = session.worker.setConflationSourceDecision(
-              session.base.id,
-              source,
-              null,
-            ).decisions;
-            refresh();
+            store.mutate((current) => {
+              current.decisions = current.worker.setConflationSourceDecision(
+                current.base.id,
+                source,
+                null,
+              ).decisions;
+            });
           }}
           onResetDecision={async (candidateId) => {
-            session.decisions = session.decisions.filter(
-              (decision) => decision.candidateId !== candidateId,
-            );
-            session.worker.setConflationDecisions(session.base.id, session.decisions);
-            refresh();
+            store.mutate((current) => {
+              current.decisions = current.decisions.filter(
+                (decision) => decision.candidateId !== candidateId,
+              );
+              current.worker.setConflationDecisions(current.base.id, current.decisions);
+            });
           }}
           onBulkDecision={async (request) => {
-            session.decisions = session.worker.applyConflationBulkDecision(
-              session.base.id,
-              request,
-            ).decisions;
-            refresh();
+            store.mutate((current) => {
+              current.decisions = current.worker.applyConflationBulkDecision(
+                current.base.id,
+                request,
+              ).decisions;
+            });
           }}
           onFilterChange={async (filter) => {
-            session.filter = filter;
-            session.worker.setConflationFilter(session.base.id, filter);
-            session.page = 0;
-            refresh();
+            store.mutate((current) => {
+              current.filter = filter;
+              current.worker.setConflationFilter(current.base.id, filter);
+              current.page = 0;
+            });
           }}
           onPageChange={async (pageNumber) => {
-            session.page = pageNumber;
-            refresh();
+            store.mutate((current) => {
+              current.page = pageNumber;
+            });
           }}
         />
       </div>

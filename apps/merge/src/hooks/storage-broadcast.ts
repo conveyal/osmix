@@ -83,20 +83,21 @@ export function createStorageStore(remote: MergeRemote) {
 /** Global storage store instance - initialized lazily */
 let storageStore: ReturnType<typeof createStorageStore> | null = null;
 
+function getStorageStore(remote: MergeRemote) {
+  storageStore ??= createStorageStore(remote);
+  return storageStore;
+}
+
 /**
  * Hook to access stored Osm entries with automatic updates via BroadcastChannel.
  * Uses useSyncExternalStore for React 18+ concurrent mode compatibility.
  */
 export function useStoredOsm(remote: MergeRemote) {
-  // Initialize store on first use
-  if (!storageStore) {
-    storageStore = createStorageStore(remote);
-  }
-
-  const snapshot = useSyncExternalStore(storageStore.subscribe, storageStore.getSnapshot);
+  const store = getStorageStore(remote);
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
 
   const refresh = useEffectEvent(() => {
-    void storageStore?.refresh();
+    void store.refresh();
   });
 
   return { ...snapshot, refresh };

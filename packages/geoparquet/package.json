@@ -21,7 +21,7 @@
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
     "@placemarkio/geojson-rewind": "catalog:",
-    "hyparquet": "^1.26.2"
+    "hyparquet": "^1.31.0"
   },
   "devDependencies": {
     "@osmix/test-utils": "workspace:*",

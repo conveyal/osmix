@@ -1,4 +1,4 @@
-import { bench, describe } from "vitest";
+import { describe, test } from "vitest";
 
 import { Osm } from "../src/osm";
 
@@ -21,7 +21,9 @@ const osm = createManyMemberRelations();
 osm.relations.getWayMemberIds();
 
 describe("relation way membership cache", () => {
-  bench("1000 repeated cached lookups", () => {
-    for (let i = 0; i < 1000; i++) osm.relations.getWayMemberIds();
+  test("1000 repeated cached lookups", async ({ bench }) => {
+    await bench("1000 repeated cached lookups", () => {
+      for (let i = 0; i < 1000; i++) osm.relations.getWayMemberIds();
+    }).run();
   });
 });

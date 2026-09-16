@@ -146,10 +146,15 @@ export function AutomaticMergeProgress({
 export function LiveAutomaticMergeProgress(props: AutomaticMergeProgressState) {
   const { activeTasks, log, taskStartedAt } = useLog();
   const [now, setNow] = useState(() => Date.now());
+  const [clockStartedAt, setClockStartedAt] = useState(taskStartedAt);
+  if (clockStartedAt !== taskStartedAt) {
+    // Start the clock at zero; the interval below advances it once a second.
+    setClockStartedAt(taskStartedAt);
+    setNow(taskStartedAt ?? now);
+  }
 
   useEffect(() => {
     if (taskStartedAt == null) return;
-    setNow(Date.now());
     const interval = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(interval);
   }, [taskStartedAt]);

@@ -1,4 +1,4 @@
-import maplibre from "maplibre-gl";
+import { addProtocol, type GetResourceResponse, removeProtocol } from "maplibre-gl";
 import type { Tile } from "osmix";
 
 import { RASTER_PROTOCOL_NAME } from "../settings";
@@ -14,9 +14,9 @@ export function osmixIdToTileUrl(osmId: string, tileSize: number) {
  * Creates a MapLibre protocol action that handles requests for raster tiles.
  */
 export function addOsmixRasterProtocol() {
-  maplibre.addProtocol(
+  addProtocol(
     RASTER_PROTOCOL_NAME,
-    async (req, abortController): Promise<maplibregl.GetResourceResponse<ArrayBuffer>> => {
+    async (req, abortController): Promise<GetResourceResponse<ArrayBuffer>> => {
       // @osmix/raster://<osmId>/<tileSize>/<z>/<x>/<y>.png
       const m = /^@osmix\/raster:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\.png$/.exec(req.url);
       if (!m) throw new Error(`Bad ${RASTER_PROTOCOL_NAME} URL: ${req.url}`);
@@ -43,7 +43,7 @@ export function addOsmixRasterProtocol() {
 }
 
 export function removeOsmixRasterProtocol() {
-  maplibre.removeProtocol(RASTER_PROTOCOL_NAME);
+  removeProtocol(RASTER_PROTOCOL_NAME);
 }
 
 /**

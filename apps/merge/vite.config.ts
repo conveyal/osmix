@@ -1,6 +1,6 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   base: "/",
@@ -12,5 +12,12 @@ export default defineConfig({
       "Cross-Origin-Opener-Policy": "same-origin",
       "Cross-Origin-Resource-Policy": "same-origin",
     },
+  },
+  optimizeDeps: {
+    // maplibre-gl 6 loads its worker from a sibling module that the dep optimizer cannot follow.
+    exclude: ["maplibre-gl"],
+  },
+  test: {
+    include: ["tests/**/*.test.ts"],
   },
 });

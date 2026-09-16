@@ -1,4 +1,5 @@
 import { useSetAtom } from "jotai";
+import type { MapStyleDataEvent } from "maplibre-gl";
 import { useEffectEvent, useRef } from "react";
 import {
   Map as MaplibreMap,
@@ -47,7 +48,7 @@ export default function Basemap({
   });
 
   // Hide roads in base map - only run once on initial style load
-  const onStyleData = useEffectEvent((e: maplibregl.MapStyleDataEvent) => {
+  const onStyleData = useEffectEvent((e: MapStyleDataEvent) => {
     if (hasHiddenLayersRef.current) return;
 
     const map = e.target;
