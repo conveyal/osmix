@@ -1,4 +1,4 @@
-import { bench, describe } from "vitest";
+import { describe, test } from "vitest";
 
 import { Ids } from "../src/ids";
 import { Osm } from "../src/osm";
@@ -17,13 +17,17 @@ for (const value of values) osm.nodes.addNode({ id: value, lon: value, lat: valu
 osm.buildIndexes();
 
 describe("sorted ID iteration", () => {
-  bench("build shuffled sorted index", () => {
-    buildIds();
+  test("build shuffled sorted index", async ({ bench }) => {
+    await bench("build shuffled sorted index", () => {
+      buildIds();
+    }).run();
   });
 
-  bench("iterate all sorted entities", () => {
-    let checksum = 0;
-    for (const node of osm.nodes.sorted()) checksum += node.id + node.lon;
-    if (checksum === 0) throw Error("Unexpected empty benchmark");
+  test("iterate all sorted entities", async ({ bench }) => {
+    await bench("iterate all sorted entities", () => {
+      let checksum = 0;
+      for (const node of osm.nodes.sorted()) checksum += node.id + node.lon;
+      if (checksum === 0) throw Error("Unexpected empty benchmark");
+    }).run();
   });
 });

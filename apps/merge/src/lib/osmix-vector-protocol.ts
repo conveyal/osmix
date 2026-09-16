@@ -1,4 +1,4 @@
-import maplibre from "maplibre-gl";
+import { addProtocol, type GetResourceResponse, removeProtocol } from "maplibre-gl";
 import type { Tile } from "osmix";
 
 import { VECTOR_PROTOCOL_NAME } from "../settings";
@@ -14,9 +14,9 @@ export function osmixIdToTileUrl(osmId: string) {
 
 export function addOsmixVectorProtocol() {
   if (registered) return;
-  maplibre.addProtocol(
+  addProtocol(
     VECTOR_PROTOCOL_NAME,
-    async (req, abortController): Promise<maplibregl.GetResourceResponse<ArrayBuffer | null>> => {
+    async (req, abortController): Promise<GetResourceResponse<ArrayBuffer | null>> => {
       const match = VECTOR_URL_PATTERN.exec(req.url);
       if (!match) throw new Error(`Bad @osmix/vector URL: ${req.url}`);
       const [, osmId, zStr, xStr, yStr] = match;
@@ -39,6 +39,6 @@ export function addOsmixVectorProtocol() {
 
 export function removeOsmixVectorProtocol() {
   if (!registered) return;
-  maplibre.removeProtocol(VECTOR_PROTOCOL_NAME);
+  removeProtocol(VECTOR_PROTOCOL_NAME);
   registered = false;
 }

@@ -544,6 +544,26 @@ export function ConflationResultsHeader({
   );
 }
 
+type SelectionContext = {
+  base: Osm;
+  patch: Osm;
+  page: number;
+  candidateIds: string;
+  filterKey: string;
+  isFilterPending: boolean;
+};
+
+function sameSelectionContext(a: SelectionContext, b: SelectionContext) {
+  return (
+    a.base === b.base &&
+    a.patch === b.patch &&
+    a.page === b.page &&
+    a.candidateIds === b.candidateIds &&
+    a.filterKey === b.filterKey &&
+    a.isFilterPending === b.isFilterPending
+  );
+}
+
 /** Keep target selection separate from the eligible actions on each alternative. */
 export function CandidateTargetChoices({
   candidates,
@@ -676,15 +696,6 @@ export function ConflationReview({
 
   const map = useMap();
   const [comparison, setComparison] = useAtom(conflationComparisonAtom);
-  const [selection, setSelection] = useState<{
-    candidateId: string;
-    geometry: GeoJSON.FeatureCollection;
-  } | null>(null);
-  const reviewId = useId();
-  const selectedCandidate =
-    selection?.geometry === comparison
-      ? page.candidates.find((candidate) => candidate.id === selection.candidateId)
-      : undefined;
   const candidateIds = page.candidates.map((candidate) => candidate.id).join("|");
   const filterKey = JSON.stringify([
     filter.entityType,
@@ -693,8 +704,30 @@ export function ConflationReview({
     filter.sourceId,
     filter.targetId,
   ]);
+  // A selection only stays valid for the review page it was made on.
+  const selectionContext: SelectionContext = {
+    base,
+    patch,
+    page: page.page,
+    candidateIds,
+    filterKey,
+    isFilterPending,
+  };
+  const [storedSelection, setSelection] = useState<{
+    context: SelectionContext;
+    candidateId: string;
+    geometry: GeoJSON.FeatureCollection;
+  } | null>(null);
+  const selection =
+    storedSelection && sameSelectionContext(storedSelection.context, selectionContext)
+      ? storedSelection
+      : null;
+  const reviewId = useId();
+  const selectedCandidate =
+    selection?.geometry === comparison
+      ? page.candidates.find((candidate) => candidate.id === selection.candidateId)
+      : undefined;
   useEffect(() => {
-    setSelection(null);
     setComparison({ type: "FeatureCollection", features: [] });
   }, [base, patch, page.page, candidateIds, filterKey, isFilterPending, setComparison]);
   useEffect(
@@ -712,7 +745,7 @@ export function ConflationReview({
     }
     const geometry = createConflationComparison(base, patch, candidate);
     setComparison(geometry);
-    setSelection({ candidateId: candidate.id, geometry });
+    setSelection({ context: selectionContext, candidateId: candidate.id, geometry });
     const bounds = comparisonBounds(geometry);
     if (!map || !bounds) return;
     map.fitBounds(

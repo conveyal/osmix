@@ -1,5 +1,5 @@
 import * as Osmix from "osmix";
-import { beforeAll, bench, describe } from "vitest";
+import { beforeAll, describe, test } from "vitest";
 
 import monacoPbf from "../../../fixtures/monaco.pbf?url";
 import { DuckDBBenchWorker } from "../src/workers/duckdb.worker";
@@ -16,13 +16,14 @@ describe.runIf(import.meta.env.CI !== "true")("Osmix vs DuckDB", async () => {
     pbf = await getPbf();
   });
 
-  describe("load", () => {
-    bench("osmix", async () => {
-      await osmixRemote.fromPbf(pbf.slice());
-    });
-
-    bench("duckdb", async () => {
-      await duckdb.loadFromPbf(pbf.slice(), "monaco.pbf");
-    });
+  test("load", async ({ bench }) => {
+    await bench.compare(
+      bench("osmix", async () => {
+        await osmixRemote.fromPbf(pbf.slice());
+      }),
+      bench("duckdb", async () => {
+        await duckdb.loadFromPbf(pbf.slice(), "monaco.pbf");
+      }),
+    );
   });
 });

@@ -9,6 +9,7 @@ import { ConflationReview } from "../src/components/conflation-review";
 import { ConflationWayRemovalPreview } from "../src/components/conflation-way-removal";
 import { Button } from "../src/components/ui/button";
 import { createWayRemovalSession } from "../tests/fixtures/way-removal";
+import { createHarnessStore, useHarnessSession } from "./harness-store";
 
 type Session = ReturnType<typeof createWayRemovalSession> & {
   decisions: OsmConflationDecision[];
@@ -29,13 +30,13 @@ function startSession(branch = false, taggedNode = false): Session {
   };
 }
 
+const store = createHarnessStore(() => startSession());
+
 export function ConflationRemovalHarness() {
-  const [session, setSession] = useState(startSession);
-  const [, setRevision] = useState(0);
+  const session = useHarnessSession(store);
   const [outcome, setOutcome] = useState<OsmConflationOutcomeReport | null>(null);
   const [applied, setApplied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const refresh = () => setRevision((revision) => revision + 1);
   const page = applied
     ? null
     : session.worker.getConflationPage(session.base.id, 0, 20, { groupBySource: true });
@@ -44,19 +45,29 @@ export function ConflationRemovalHarness() {
     source: { entityType: "node" | "way"; sourceId: number },
     decision: OsmConflationDecision | null,
   ) => {
-    session.decisionCalls++;
-    if (session.delayNextChoice) {
-      session.delayNextChoice = false;
-      await new Promise<void>((resolve) => {
-        session.finishChoice = resolve;
+    store.mutate((current) => {
+      current.decisionCalls++;
+    });
+    if (store.current.delayNextChoice) {
+      store.mutate((current) => {
+        current.delayNextChoice = false;
       });
-      session.finishChoice = null;
+      await new Promise<void>((resolve) => {
+        store.mutate((current) => {
+          current.finishChoice = resolve;
+        });
+      });
+      store.mutate((current) => {
+        current.finishChoice = null;
+      });
     }
-    const result = session.worker.setConflationSourceDecision(session.base.id, source, decision);
-    session.decisions = result.decisions;
+    const current = store.current;
+    const result = current.worker.setConflationSourceDecision(current.base.id, source, decision);
+    store.mutate((current) => {
+      current.decisions = result.decisions;
+    });
     setOutcome(null);
     setError(null);
-    refresh();
   };
 
   useEffect(() => {
@@ -73,7 +84,7 @@ export function ConflationRemovalHarness() {
         applied,
         decisionCalls: session.decisionCalls,
       }),
-      finishChoice: () => session.finishChoice?.(),
+      finishChoice: () => store.current.finishChoice?.(),
     };
   }, [session, outcome, applied]);
 
@@ -100,7 +111,7 @@ export function ConflationRemovalHarness() {
           <Button
             key={scenario.label}
             onClick={() => {
-              setSession(startSession(scenario.branch, scenario.tagged));
+              store.replace(startSession(scenario.branch, scenario.tagged));
               setOutcome(null);
               setApplied(false);
               setError(null);
@@ -114,9 +125,11 @@ export function ConflationRemovalHarness() {
       {page ? (
         <>
           <Button
-            onClick={() => {
-              session.delayNextChoice = true;
-            }}
+            onClick={() =>
+              store.mutate((current) => {
+                current.delayNextChoice = true;
+              })
+            }
           >
             Delay next choice
           </Button>
@@ -137,23 +150,28 @@ export function ConflationRemovalHarness() {
             }}
             onLeaveUnmatched={(source) => choose(source, null)}
             onResetDecision={async (candidateId) => {
-              session.decisions = session.decisions.filter(
-                (decision) => decision.candidateId !== candidateId,
-              );
-              session.worker.setConflationDecisions(session.base.id, session.decisions);
+              store.mutate((current) => {
+                current.decisions = current.decisions.filter(
+                  (decision) => decision.candidateId !== candidateId,
+                );
+                current.worker.setConflationDecisions(current.base.id, current.decisions);
+              });
               setOutcome(null);
-              refresh();
             }}
             onBulkDecision={async (request) => {
-              const result = session.worker.applyConflationBulkDecision(session.base.id, request);
-              session.decisions = result.decisions;
+              store.mutate((current) => {
+                current.decisions = current.worker.applyConflationBulkDecision(
+                  current.base.id,
+                  request,
+                ).decisions;
+              });
               setOutcome(null);
-              refresh();
             }}
             onFilterChange={async (filter) => {
-              session.worker.setConflationFilter(session.base.id, filter);
-              session.filter = filter;
-              refresh();
+              store.mutate((current) => {
+                current.worker.setConflationFilter(current.base.id, filter);
+                current.filter = filter;
+              });
             }}
             onPageChange={async () => {}}
           />

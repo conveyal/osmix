@@ -24,19 +24,12 @@ type SystemIssue = {
 };
 
 function useSystemIssues() {
-  const [secure, setSecure] = useState(false);
-  const [crossOriginIsolated, setCrossOriginIsolated] = useState(false);
-  const [deviceMemory, setDeviceMemory] = useState<number | null>(null);
-
-  useEffect(() => {
-    setSecure(window.isSecureContext);
-    setCrossOriginIsolated(window.crossOriginIsolated);
-    setDeviceMemory(
-      "deviceMemory" in navigator
-        ? Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 0)
-        : null,
-    );
-  }, []);
+  const secure = window.isSecureContext;
+  const crossOriginIsolated = window.crossOriginIsolated;
+  const deviceMemory =
+    "deviceMemory" in navigator
+      ? Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 0)
+      : null;
 
   const issues = useMemo<SystemIssue[]>(() => {
     const next: SystemIssue[] = [];
@@ -125,15 +118,9 @@ export default function BrowserCheck() {
 }
 
 function SecureContext() {
-  const [secure, setSecure] = useState(false);
-  const [crossOriginIsolated, setCrossOriginIsolated] = useState(false);
-  const [hardwareConcurrency, setHardwareConcurrency] = useState(0);
-
-  useEffect(() => {
-    setSecure(window.isSecureContext);
-    setCrossOriginIsolated(window.crossOriginIsolated);
-    setHardwareConcurrency(navigator.hardwareConcurrency);
-  }, []);
+  const secure = window.isSecureContext;
+  const crossOriginIsolated = window.crossOriginIsolated;
+  const hardwareConcurrency = navigator.hardwareConcurrency;
 
   return (
     <div>
@@ -148,11 +135,7 @@ function SecureContext() {
 }
 
 function DeviceMemory() {
-  const [memory, setMemory] = useState("unknown");
-
-  useEffect(() => {
-    setMemory("deviceMemory" in navigator ? `${String(navigator.deviceMemory)}GiB` : "unknown");
-  }, []);
+  const memory = "deviceMemory" in navigator ? `${String(navigator.deviceMemory)}GiB` : "unknown";
 
   return (
     <div>

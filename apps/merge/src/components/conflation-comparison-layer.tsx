@@ -1,6 +1,6 @@
 import { useAtomValue } from "jotai";
 import type { LineLayerSpecification } from "maplibre-gl";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Layer, Marker, Source } from "react-map-gl/maplibre";
 
 import { comparisonCoordinate, comparisonLocations } from "../lib/conflation-comparison";
@@ -34,10 +34,7 @@ function mapComparisonColors() {
 
 export function ConflationComparisonLayer() {
   const comparison = useAtomValue(conflationComparisonAtom);
-  const [colors, setColors] = useState<ReturnType<typeof mapComparisonColors>>(null);
-  useEffect(() => {
-    setColors(mapComparisonColors());
-  }, []);
+  const [colors] = useState(() => mapComparisonColors());
   const locations = comparisonLocations(comparison);
   const basePaint: LineLayerSpecification["paint"] = {
     "line-color": colors?.target,

@@ -86,6 +86,11 @@ export default function ExtractBlock() {
   const [bbox, setBbox] = useAtom(extractBboxAtom);
   const [bboxText, setBboxText] = useState("");
   const [bboxInputs, setBboxInputs] = useState(() => bbox.map((v) => String(v)));
+  const [inputsBbox, setInputsBbox] = useState(bbox);
+  if (inputsBbox !== bbox) {
+    setInputsBbox(bbox);
+    setBboxInputs(bbox.map((v) => String(v)));
+  }
   const [strategy, setStrategy] = useState<ExtractStrategy>("complete_ways");
   const [tagFilterEditor, setTagFilterEditor] = useState<TagFilterEditorState>(
     conveyalTagFilterEditorState,
@@ -93,11 +98,6 @@ export default function ExtractBlock() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const isExtracting = activeTasks > 0;
-
-  useEffect(() => {
-    const [w, s, e, n] = bbox;
-    setBboxInputs([String(w), String(s), String(e), String(n)]);
-  }, [bbox]);
 
   useEffect(() => {
     if (strategy !== "simple" && extract.loadProfile !== "full") {

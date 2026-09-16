@@ -1,7 +1,7 @@
 import { createExtract, fromPbf } from "@osmix/load";
 import { getFixtureFile } from "@osmix/test-utils/fixtures";
 import type { GeoBbox2D } from "@osmix/types";
-import { beforeAll, bench, describe } from "vitest";
+import { beforeAll, describe, test } from "vitest";
 
 const MONACO_BBOX: GeoBbox2D = [7.4053929, 43.7232244, 7.4447259, 43.7543687];
 // const SEATTLE_BBOX: GeoBbox2D = [-122.33, 47.48, -122.29, 47.52]
@@ -16,14 +16,17 @@ beforeAll(async () => {
 });
 
 describe("simple extract benchmark", () => {
-  bench("two-step parse then extract", async () => {
-    const data = buffer.slice(0);
-    const full = await fromPbf(data);
-    createExtract(full, BBOX, "simple");
-  });
-
-  bench("streaming extract during parse", async () => {
-    const data = buffer.slice(0);
-    await fromPbf(data, { extractBbox: BBOX });
+  test("two-step parse then extract vs streaming extract", async ({ bench }) => {
+    await bench.compare(
+      bench("two-step parse then extract", async () => {
+        const data = buffer.slice(0);
+        const full = await fromPbf(data);
+        createExtract(full, BBOX, "simple");
+      }),
+      bench("streaming extract during parse", async () => {
+        const data = buffer.slice(0);
+        await fromPbf(data, { extractBbox: BBOX });
+      }),
+    );
   });
 });

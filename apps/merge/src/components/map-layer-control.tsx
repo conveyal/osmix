@@ -1,6 +1,6 @@
 import { useAtomValue } from "jotai";
 import { ChevronDown, Eye, EyeOff, Folder, FolderOpen, Layers } from "lucide-react";
-import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useCallback, useEffectEvent, useMemo, useState, useSyncExternalStore } from "react";
 
 import { useMap } from "../hooks/map";
 import { cn } from "../lib/utils";
@@ -34,40 +34,50 @@ export default function MapLayerControl() {
   );
 }
 
+type MapHandle = NonNullable<ReturnType<typeof useMap>>;
+
+const NO_LAYERS: LayerInfo[] = [];
+const layerCache = new WeakMap<MapHandle, { key: string; layers: LayerInfo[] }>();
+
+/** Read the style's layers, reusing the previous array while nothing changed. */
+function readMapLayers(map: MapHandle): LayerInfo[] {
+  const layers: LayerInfo[] = (map.getStyle()?.layers ?? []).map((layer) => ({
+    id: layer.id,
+    type: layer.type,
+    visible: map.getLayoutProperty(layer.id, "visibility") !== "none",
+  }));
+  const key = layers
+    .map((layer) => `${layer.id}\u0000${layer.type}\u0000${layer.visible}`)
+    .join("\n");
+  const cached = layerCache.get(map);
+  if (cached?.key === key) return cached.layers;
+  layerCache.set(map, { key, layers });
+  return layers;
+}
+
+/** Subscribe to the map's style so the layer list follows style loads and visibility changes. */
+function useMapLayers(map: MapHandle | null): LayerInfo[] {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (!map) return () => {};
+      map.on("styledata", onChange);
+      map.on("load", onChange);
+      return () => {
+        map.off("styledata", onChange);
+        map.off("load", onChange);
+      };
+    },
+    [map],
+  );
+  const getSnapshot = useCallback(() => (map ? readMapLayers(map) : NO_LAYERS), [map]);
+  return useSyncExternalStore(subscribe, getSnapshot);
+}
+
 export function MapLayers() {
   const map = useMap();
-  const [layers, setLayers] = useState<LayerInfo[]>([]);
+  const layers = useMapLayers(map);
   const [searchQuery, setSearchQuery] = useState("");
   const [isOpen, setIsOpen] = useState(true);
-
-  // Fetch layers from the map
-  const refreshLayers = useEffectEvent(() => {
-    const layerInfos: LayerInfo[] = (map?.getStyle()?.layers ?? []).map((layer) => {
-      const visibility = map?.getLayoutProperty(layer.id, "visibility");
-      return {
-        id: layer.id,
-        type: layer.type,
-        visible: visibility !== "none",
-      };
-    });
-
-    setLayers(layerInfos);
-  });
-
-  // Listen for style changes
-  useEffect(() => {
-    if (!map) return;
-
-    refreshLayers();
-
-    map.on("styledata", refreshLayers);
-    map.on("load", refreshLayers);
-
-    return () => {
-      map.off("styledata", refreshLayers);
-      map.off("load", refreshLayers);
-    };
-  }, [map]);
 
   // Group layers by prefix
   const groups = useMemo((): LayerGroup[] => {
@@ -102,7 +112,6 @@ export function MapLayers() {
   const toggleLayerVisibility = useEffectEvent((layerId: string, currentlyVisible: boolean) => {
     const newVisibility = currentlyVisible ? "none" : "visible";
     map?.getMap().setLayoutProperty(layerId, "visibility", newVisibility);
-    refreshLayers();
   });
 
   // Toggle all layers in a group
@@ -111,7 +120,6 @@ export function MapLayers() {
     for (const layer of group.layers) {
       map?.getMap().setLayoutProperty(layer.id, "visibility", visibility);
     }
-    refreshLayers();
   });
 
   if (!map) return null;

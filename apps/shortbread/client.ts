@@ -6,7 +6,8 @@
  */
 import type { OsmPbfHeaderBlock } from "@osmix/pbf";
 import type { GeoBbox2D, LonLat } from "@osmix/types";
-import maplibregl, { type ControlPosition, type MapGeoJSONFeature } from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
+import { type ControlPosition, type MapGeoJSONFeature } from "maplibre-gl";
 
 let map: maplibregl.Map | null = null;
 
