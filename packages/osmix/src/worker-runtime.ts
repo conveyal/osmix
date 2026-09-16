@@ -185,6 +185,11 @@ async function createWebConnection<T extends object>(
         // A failed endpoint may already have released its proxy.
       } finally {
         endpoint.clear();
+        // Bun can fail to exit when a Worker is terminated inside the same task that
+        // delivered its last message (for example, a dispose() call chained onto the final
+        // response). Yielding a macrotask first lets Bun settle the delivery before teardown.
+        // A microtask yield or awaiting the Comlink release round trip is not enough.
+        if (runtime === "bun") await new Promise<void>((resolve) => setTimeout(resolve, 0));
         worker.terminate();
       }
     },
