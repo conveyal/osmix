@@ -193,7 +193,7 @@ core-storage limit from an optional spatial-index failure.
 
 ## Environment and Limitations
 
-- Requires Web Streams, `TextEncoder`/`TextDecoder`, `CompressionStream`/`DecompressionStream` (Bun, Node 20+, modern browsers).
+- Requires Web Streams, `TextEncoder`/`TextDecoder`, `CompressionStream`/`DecompressionStream` (Bun, Node 24+, modern browsers).
 - Uses ES2024 resizable `ArrayBuffer` and growable `SharedArrayBuffer` when available.
 - Every individual typed-array column must still fit in one fixed buffer when entity indexes are finalized.
 - Coordinates stored as `Int32Array` microdegrees (1e-7 degree precision, ~1cm at equator); converted to degrees at API boundaries.

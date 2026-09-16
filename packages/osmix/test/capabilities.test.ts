@@ -38,7 +38,7 @@ describe("capabilities", () => {
   });
 
   describe("getOsmixCapabilities", () => {
-    it("does not throw without a navigator global (Node 20)", () => {
+    it("does not throw without a navigator global (Node 24)", () => {
       vi.stubGlobal("navigator", undefined);
       const capabilities = getOsmixCapabilities();
       expect(capabilities.hardwareConcurrency).toBe(1);

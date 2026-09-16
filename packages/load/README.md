@@ -224,7 +224,7 @@ for await (const entity of stream) {
 
 ## Environment and Limitations
 
-- Requires Web Streams and `CompressionStream` / `DecompressionStream` (Node 20+, Bun, modern browsers).
+- Requires Web Streams and `CompressionStream` / `DecompressionStream` (Node 24+, Bun, modern browsers).
 - `fromPbf` expects dense-node blocks; sparse node encodings throw.
 - `"simple"` in-stream bbox filtering may leave incomplete way geometry at boundaries; prefer `"complete_ways"` or `"smart"` for topology-safe extracts.
 - Tag filtering on dense nodes may drop refs when nodes precede ways in a block; use post-load `createExtract` when reference completeness matters.

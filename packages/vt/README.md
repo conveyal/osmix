@@ -68,7 +68,7 @@ Lower-level method to encode a specific bounding box with a custom projection fu
 
 ## Environment and limitations
 
-- Designed for modern runtimes (Node 20+, Bun, browser workers). Uses typed arrays throughout.
+- Designed for modern runtimes (Node 24+, Bun, browser workers). Uses typed arrays throughout.
 - Multipolygon relations are supported, but other relation types are skipped.
 - Ways are clipped to tile bounds; nodes outside the tile are omitted.
 - Extent defaults to 4096; set a larger extent if you need higher precision.

@@ -259,7 +259,7 @@ console.log(remote.mode, remote.workerCount); // "single-worker", 1
 | Browser, not isolated (no COOP/COEP headers) | `single-worker` | One worker; data is transferred/copied instead of shared          |
 | Bun                                          | Web Workers     | Runs off-thread; shared buffers enable multi-worker datasets      |
 | Deno                                         | Web Workers     | Runs off-thread; local worker entries require read permission     |
-| Node 20+                                     | worker threads  | Runs off-thread; shared buffers enable multi-worker datasets      |
+| Node 24+                                     | worker threads  | Runs off-thread; shared buffers enable multi-worker datasets      |
 | No worker implementation                     | throws          | Pass `inProcess: true` or use the main-thread API                 |
 | `createRemote({ inProcess: true })`          | `in-process`    | Same API on the calling thread; long operations block that thread |
 
@@ -604,7 +604,7 @@ spec-compliant without staging everything in memory.
 ## Environment and limitations
 
 - Requires runtimes that expose Web Streams plus modern typed array + compression
-  APIs (Node 20+, Bun, current browsers). See
+  APIs (Node 24+, Bun, current browsers). See
   [Environment support](#environment-support) for how `OsmixRemote` behaves
   with and without Web Workers and `SharedArrayBuffer`.
 - `fromPbf` expects dense-node blocks; sparse node encodings are not yet supported.
