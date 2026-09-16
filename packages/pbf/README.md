@@ -112,7 +112,7 @@ const dataBytes = await osmBlockToPbfBlobBytes(primitiveBlock);
 
 ## Environment and Limitations
 
-- Requires runtimes with Web Streams + `CompressionStream` / `DecompressionStream` (modern browsers, Node 20+, Bun).
+- Requires runtimes with Web Streams + `CompressionStream` / `DecompressionStream` (modern browsers, Node 24+, Bun).
 - Only `zlib_data` blobs are supported; files with `raw` or `lzma` payloads will throw.
 - When working with Node `Readable` / `Writable` streams, adapt them to Web Streams (`stream/web`) first.
 

@@ -113,7 +113,7 @@ const pbfStream = entityStream
 
 ## Environment and Limitations
 
-- Requires Web Streams, `TextEncoder`/`TextDecoder` (Bun, Node 20+, modern browsers).
+- Requires Web Streams, `TextEncoder`/`TextDecoder` (Bun, Node 24+, modern browsers).
 - Expects zlib-compressed blobs; other compression formats are not supported.
 - JSON → PBF pipelines assume sorted entities (nodes, then ways, then relations).
 

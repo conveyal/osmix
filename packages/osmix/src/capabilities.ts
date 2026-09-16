@@ -2,7 +2,7 @@
  * Runtime capability detection for Osmix worker orchestration.
  *
  * All checks are evaluated at call time (never at module load) so importing
- * `osmix` is side-effect free and safe in every runtime, including Node 20
+ * `osmix` is side-effect free and safe in every runtime, including Node 24
  * where the `navigator` global does not exist.
  *
  * @module

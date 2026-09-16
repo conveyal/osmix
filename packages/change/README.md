@@ -294,7 +294,7 @@ Options:
 
 ## Environment and limitations
 
-- Requires runtimes compatible with `@osmix/core` (Node 20+, Bun, or modern browsers) since the same typed-array data structures are used.
+- Requires runtimes compatible with `@osmix/core` (Node 24+, Bun, or modern browsers) since the same typed-array data structures are used.
 - Deduplication helpers assume datasets store dense node blocks and rely on spatial indexes built via `Osm.buildIndexes()`.
 - Intersection eligibility and its area-filtering limitation are specified in the [merge-process guide](../../docs/merge-process.md#intersections-and-validation).
 - A scan that compares a dataset with itself is useful for diagnostics, but its proposed proximity matches

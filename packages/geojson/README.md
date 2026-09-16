@@ -113,7 +113,7 @@ console.log(`Imported ${osm.ways.size} ways`);
 
 ## Environment and Limitations
 
-- Requires `Map`/`Set`, typed arrays, and `ReadableStream`/`TextDecoder` (Bun, Node 20+, modern browsers).
+- Requires `Map`/`Set`, typed arrays, and `ReadableStream`/`TextDecoder` (Bun, Node 24+, modern browsers).
 - Import supports Point, LineString, Polygon, MultiPolygon only.
 - Relation export focuses on multipolygon/route relations; other types return GeometryCollection.
 
