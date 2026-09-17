@@ -19,6 +19,16 @@ describe("appOrigin", () => {
     ).toBe("https://my-branch.merge.osmix.localhost");
   });
 
+  it("swaps the real app label when the worktree prefix is itself an app name", () => {
+    expect(
+      appOrigin("inspect", {
+        hostname: "inspect.merge.osmix.localhost",
+        protocol: "https:",
+        port: "",
+      }),
+    ).toBe("https://inspect.inspect.osmix.localhost");
+  });
+
   it("keeps an explicit port", () => {
     expect(
       appOrigin("inspect", { hostname: "merge.osmix.localhost", protocol: "http:", port: "4173" }),

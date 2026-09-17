@@ -11,7 +11,9 @@ const APP_IDS = new Set<string>(OSMIX_APPS.map((app) => app.id));
 /**
  * Origin of a sibling app. Each app is served from `<app>.<domain>` (`merge.osmix.dev`,
  * `merge.osmix.localhost` under Portless, optionally behind a worktree prefix), so the sibling
- * is the same host with the app label swapped. Hosts that carry no app label, such as a bare
+ * is the same host with the app label swapped. The app label is the last one that names an app,
+ * because a worktree prefix may itself be an app name (`inspect.merge.osmix.localhost` is the
+ * Merge app in a worktree called "inspect"). Hosts that carry no app label, such as a bare
  * `localhost:5173`, fall back to the production origin.
  */
 export function appOrigin(
@@ -19,7 +21,7 @@ export function appOrigin(
   location: Pick<Location, "hostname" | "protocol" | "port"> = window.location,
 ): string {
   const labels = location.hostname.split(".");
-  const index = labels.findIndex((label) => APP_IDS.has(label));
+  const index = labels.findLastIndex((label) => APP_IDS.has(label));
   if (index === -1) {
     const target = OSMIX_APPS.find((candidate) => candidate.id === app);
     if (!target) throw new Error(`Unknown Osmix app: ${app}`);
