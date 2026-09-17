@@ -1,5 +1,12 @@
 # @osmix/geo
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [466adc0]
+  - @osmix/types@0.1.1
+
 ## 0.1.0
 
 ### Minor Changes
