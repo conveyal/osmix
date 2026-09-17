@@ -1,16 +1,20 @@
+import {
+  cn,
+  SectionTitle,
+  Button,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  Input,
+} from "@osmix/ui";
 import { useAtomValue } from "jotai";
 import { ChevronDown, Eye, EyeOff, Folder, FolderOpen, Layers } from "lucide-react";
 import { useCallback, useEffectEvent, useMemo, useState, useSyncExternalStore } from "react";
 
 import { useMap } from "../hooks/map";
-import { cn } from "../lib/utils";
 import { APPID } from "../settings";
 import { layerControlIsOpenAtom } from "../state/map";
 import CustomControl from "./custom-control";
-import { SectionTitle } from "./section";
-import { Button } from "./ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { Input } from "./ui/input";
 
 type LayerInfo = {
   id: string;

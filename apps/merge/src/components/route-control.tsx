@@ -1,3 +1,4 @@
+import { SectionTitle, Button } from "@osmix/ui";
 import { useAtom, useAtomValue } from "jotai";
 import { NavigationIcon, XIcon } from "lucide-react";
 import type { Osm } from "osmix";
@@ -15,8 +16,6 @@ import { routingStateAtom, type SnappedNode } from "../state/routing";
 import { osmWorker } from "../state/worker";
 import CustomControl from "./custom-control";
 import { FullIndexRequired } from "./full-index-required";
-import { SectionTitle } from "./section";
-import { Button } from "./ui/button";
 
 /** Maximum distance (m) to snap click point to nearest node. */
 const SNAP_RADIUS_M = 1_000;

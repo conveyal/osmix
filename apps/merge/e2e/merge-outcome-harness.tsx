@@ -1,10 +1,9 @@
+import { ActionButton, Button } from "@osmix/ui";
 import { useAtomValue, useSetAtom } from "jotai";
 import { Osm, OsmixWorker, type OsmConflationOptions, type OsmNode } from "osmix";
 import { useEffect, useState } from "react";
 
-import ActionButton from "../src/components/action-button";
 import { MergeCompletionSummary } from "../src/components/merge-completion-summary";
-import { Button } from "../src/components/ui/button";
 import { writeJsonReport } from "../src/lib/json-download";
 import { mergeCompletionAtom, updateMergeOutcomeAtom } from "../src/state/merge-outcome";
 

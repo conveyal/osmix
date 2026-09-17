@@ -1,3 +1,4 @@
+import { ActionButton, Button } from "@osmix/ui";
 import { useAtomValue } from "jotai";
 import { DownloadIcon, EyeIcon, EyeOffIcon, MaximizeIcon, SaveIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -6,10 +7,8 @@ import { useFlyToOsmBounds, useMap } from "../hooks/map";
 import type { UseOsmFileReturn } from "../hooks/osm";
 import { APPID } from "../settings";
 import { osmFileControlIsOpenAtom } from "../state/map";
-import ActionButton from "./action-button";
 import CustomControl from "./custom-control";
 import OsmInfoTable from "./osm-info-table";
-import { Button } from "./ui/button";
 
 interface OsmFileCardProps {
   osmFile: UseOsmFileReturn;

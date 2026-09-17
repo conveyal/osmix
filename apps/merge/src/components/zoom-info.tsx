@@ -1,9 +1,9 @@
+import { Button } from "@osmix/ui";
 import { useAtomValue } from "jotai";
 import { MinusIcon, PlusIcon } from "lucide-react";
 
 import { useMap } from "../hooks/map";
 import { zoomAtom } from "../state/map";
-import { Button } from "./ui/button";
 
 export default function ZoomInfo() {
   const zoom = useAtomValue(zoomAtom);

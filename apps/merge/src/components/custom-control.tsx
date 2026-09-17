@@ -1,11 +1,10 @@
+import { cn } from "@osmix/ui";
 import type { ClassValue } from "clsx";
 import * as React from "react";
 import { cloneElement, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ControlPosition, IControl, MapInstance } from "react-map-gl/maplibre";
 import { useControl } from "react-map-gl/maplibre";
-
-import { cn } from "../lib/utils";
 
 class OverlayControl implements IControl {
   _map: MapInstance | null = null;

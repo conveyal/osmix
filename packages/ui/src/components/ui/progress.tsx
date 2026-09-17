@@ -1,7 +1,7 @@
 import { Progress as BaseProgress } from "@base-ui/react/progress";
 import type * as React from "react";
 
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/utils.ts";
 
 /**
  * Thin progress bar. Pass `value={null}` for indeterminate (animated sweep).

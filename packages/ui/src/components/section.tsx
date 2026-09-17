@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import { cn } from "../lib/utils";
-import { Spinner } from "./ui/spinner";
+import { cn } from "../lib/utils.ts";
+import { Spinner } from "./ui/spinner.tsx";
 
 /**
  * The single section-title style: bold, uppercase, tracking-wide at the inherited

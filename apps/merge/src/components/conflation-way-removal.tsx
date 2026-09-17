@@ -1,10 +1,15 @@
+import {
+  ActionButton,
+  Details,
+  DetailsContent,
+  DetailsSummary,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+} from "@osmix/ui";
 import type { OsmConflationOutcomeReport, OsmConflationWayRemovalPreview } from "osmix";
 import { useState } from "react";
-
-import ActionButton from "./action-button";
-import { Details, DetailsContent, DetailsSummary } from "./details";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader } from "./ui/card";
 
 function ids(values: number[]) {
   return values.length ? values.join(", ") : "none";

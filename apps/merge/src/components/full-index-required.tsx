@@ -1,8 +1,8 @@
+import { ActionButton } from "@osmix/ui";
 import { RefreshCwIcon } from "lucide-react";
 import type { OsmInfo } from "osmix";
 
 import type { UseOsmFileReturn } from "../hooks/osm";
-import ActionButton from "./action-button";
 
 export function hasFullNodeIndex(info: OsmInfo | null | undefined): boolean {
   return info?.spatialIndexes.nodes.all === true;

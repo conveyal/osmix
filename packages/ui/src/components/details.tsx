@@ -2,9 +2,9 @@ import type { ClassValue } from "clsx";
 import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { cn } from "../lib/utils";
-import { SectionTitle } from "./section";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import { cn } from "../lib/utils.ts";
+import { SectionTitle } from "./section.tsx";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible.tsx";
 
 export function Details({
   className,

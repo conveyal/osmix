@@ -1,8 +1,25 @@
+import {
+  ActionButton,
+  Details,
+  DetailsContent,
+  DetailsSummary,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemGroup,
+  ItemHeader,
+  ItemTitle,
+} from "@osmix/ui";
 /**
  * UI component for managing stored Osm data in IndexedDB.
  * Uses BroadcastChannel to receive updates from the worker.
  */
-
 import { useAtom } from "jotai";
 import {
   CheckIcon,
@@ -23,18 +40,12 @@ import type { OsmLoadFailure } from "../lib/osm-load-failure";
 import { osmLoadProfileAtomFamily } from "../state/osm";
 import { osmLoadingAbortControllerAtom } from "../state/status";
 import { osmWorker } from "../state/worker";
-import ActionButton from "./action-button";
-import { Details, DetailsContent, DetailsSummary } from "./details";
 import { OsmLoadFailurePanel } from "./osm-load-failure";
 import {
   OsmLoadProfileSelector,
   OsmPbfOpenUrlButton,
   OsmPbfSelectFileButton,
 } from "./osm-pbf-file-input";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Input } from "./ui/input";
-import { Item, ItemActions, ItemContent, ItemGroup, ItemHeader, ItemTitle } from "./ui/item";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";

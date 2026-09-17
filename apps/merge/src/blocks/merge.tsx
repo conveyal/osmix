@@ -1,3 +1,23 @@
+import {
+  ActionButton,
+  Details,
+  DetailsContent,
+  DetailsSummary,
+  LoadingState,
+  Button,
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+  cn,
+} from "@osmix/ui";
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   ArrowLeft,
@@ -22,7 +42,6 @@ import {
 } from "osmix";
 import { Suspense, useMemo, useState } from "react";
 
-import ActionButton from "../components/action-button";
 import {
   type AutomaticMergeProgressState,
   CONFLATION_AUTOMATIC_MERGE_STEPS,
@@ -33,7 +52,6 @@ import { ConflationConfig } from "../components/conflation-config";
 import { ConflationReview } from "../components/conflation-review";
 import { ConflationRoutingDiagnostics } from "../components/conflation-routing-diagnostics";
 import { ConflationWayRemovalPreview } from "../components/conflation-way-removal";
-import { Details, DetailsContent, DetailsSummary } from "../components/details";
 import EntityDetails from "../components/entity-details";
 import { FullIndexRequired, hasFullNodeIndex } from "../components/full-index-required";
 import { BackToMatching, MatchingReviewProblem } from "../components/matching-review-recovery";
@@ -46,19 +64,8 @@ import ChangesSummary, {
 } from "../components/osm-changes-summary";
 import OsmInfoTable from "../components/osm-info-table";
 import { OsmInputCardHeader } from "../components/osm-input-card-header";
-import { LoadingState } from "../components/section";
 import { StepActions } from "../components/step-actions";
 import StoredOsmList from "../components/stored-osm-list";
-import { Button } from "../components/ui/button";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle,
-} from "../components/ui/item";
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
 import {
@@ -84,7 +91,6 @@ import {
 } from "../lib/merge-workflow";
 import { mergedOsmRefreshRetryId } from "../lib/merged-osm-state";
 import { showSaveFilePickerWithFallback } from "../lib/save-file-picker";
-import { cn } from "../lib/utils";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import { changesetStatsAtom } from "../state/changes";
 import {

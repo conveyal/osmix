@@ -1,14 +1,20 @@
+import {
+  ActionButton,
+  Details,
+  DetailsContent,
+  DetailsSummary,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+} from "@osmix/ui";
 import { DownloadIcon } from "lucide-react";
 import type { OsmConflationOutcomeReport } from "osmix";
 import { useState } from "react";
 
 import type { MergeCompletion } from "../state/merge-outcome";
-import ActionButton from "./action-button";
 import { conflationReasonLabel } from "./conflation-review";
 import { ConflationWayRemovalPreview } from "./conflation-way-removal";
-import { Details, DetailsContent, DetailsSummary } from "./details";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader } from "./ui/card";
 
 const PAGE_SIZE = 10;
 const UNRESOLVED_LABELS = {

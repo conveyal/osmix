@@ -1,18 +1,20 @@
 import * as React from "react";
 
-import { Log } from "../state/log";
+type ErrorBoundaryProps = {
+  fallback: React.ReactNode;
+  children: React.ReactNode;
+  /** Called with the caught error before it is logged to the console. */
+  onError?: (error: Error, info: React.ErrorInfo) => void;
+};
 
 export class ErrorBoundary extends React.Component<
-  {
-    fallback: React.ReactNode;
-    children: React.ReactNode;
-  },
+  ErrorBoundaryProps,
   {
     error: Error | null;
     info: React.ErrorInfo | null;
   }
 > {
-  constructor(props: { fallback: React.ReactNode; children: React.ReactNode }) {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { error: null, info: null };
   }
@@ -23,7 +25,7 @@ export class ErrorBoundary extends React.Component<
   }
 
   override componentDidCatch(error: Error, info: React.ErrorInfo) {
-    Log.addMessage(error.message, "error");
+    this.props.onError?.(error, info);
     console.error(
       error,
       // Example "componentStack":

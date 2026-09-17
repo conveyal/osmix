@@ -1,3 +1,39 @@
+import {
+  cn,
+  ActionButton,
+  useAction,
+  InfoTooltip,
+  EmptyState,
+  SectionTitle,
+  StatusDot,
+  type StatusDotStatus,
+  Button,
+  ButtonGroup,
+  ButtonGroupSeparator,
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  Checkbox,
+  CheckboxLabel,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+  Spinner,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from "@osmix/ui";
 import { useAtom } from "jotai";
 import { LocateFixedIcon } from "lucide-react";
 import type {
@@ -23,33 +59,13 @@ import { useEffect, useId, useState } from "react";
 import { useMap } from "../hooks/map";
 import { comparisonBounds, createConflationComparison } from "../lib/conflation-comparison";
 import { conflationBulkActionCopy } from "../lib/conflation-workflow";
-import { cn } from "../lib/utils";
 import { conflationComparisonAtom } from "../state/conflation";
-import ActionButton, { useAction } from "./action-button";
 import { CandidateEvidence, conflationDistanceLabel } from "./conflation-candidate-evidence";
 import {
   ConflationComparisonEvidence,
   ConflationComparisonLegend,
 } from "./conflation-comparison-evidence";
 import { WayRemovalDetails } from "./conflation-way-removal";
-import { InfoTooltip } from "./info-tooltip";
-import { EmptyState, SectionTitle } from "./section";
-import { StatusDot, type StatusDotStatus } from "./status-dot";
-import { Button } from "./ui/button";
-import { ButtonGroup, ButtonGroupSeparator } from "./ui/button-group";
-import { Card, CardAction, CardContent, CardHeader } from "./ui/card";
-import { Checkbox, CheckboxLabel } from "./ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "./ui/item";
-import { Spinner } from "./ui/spinner";
-import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 
 export { CandidateEvidence } from "./conflation-candidate-evidence";
 

@@ -1,9 +1,7 @@
+import { Button, Input } from "@osmix/ui";
 import { Plus, Trash2 } from "lucide-react";
 import type { ExtractTagFilterRule, ExtractTagFilterRules } from "osmix";
 import { CONVEYAL_EXTRACT_TAG_FILTERS, normalizeTagFilterRules } from "osmix";
-
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 
 export type TagFilterEditorRow = {
   id: string;

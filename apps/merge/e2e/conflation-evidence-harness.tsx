@@ -1,3 +1,4 @@
+import { Button } from "@osmix/ui";
 import { useAtomValue } from "jotai";
 import type { StyleSpecification } from "maplibre-gl";
 import {
@@ -12,7 +13,6 @@ import { Map, MapProvider, type MapRef } from "react-map-gl/maplibre";
 import { ConflationComparisonLayer } from "../src/components/conflation-comparison-layer";
 import { ConflationConfig } from "../src/components/conflation-config";
 import { ConflationReview } from "../src/components/conflation-review";
-import { Button } from "../src/components/ui/button";
 import { conflationComparisonAtom } from "../src/state/conflation";
 import { createHarnessStore, useHarnessSession } from "./harness-store";
 

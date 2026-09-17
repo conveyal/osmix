@@ -1,3 +1,4 @@
+import { Button } from "@osmix/ui";
 import type {
   OsmConflationCandidateFilter,
   OsmConflationDecision,
@@ -7,7 +8,6 @@ import { useEffect, useState } from "react";
 
 import { ConflationReview } from "../src/components/conflation-review";
 import { ConflationWayRemovalPreview } from "../src/components/conflation-way-removal";
-import { Button } from "../src/components/ui/button";
 import { createWayRemovalSession } from "../tests/fixtures/way-removal";
 import { createHarnessStore, useHarnessSession } from "./harness-store";
 

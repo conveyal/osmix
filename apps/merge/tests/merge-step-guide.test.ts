@@ -1,8 +1,8 @@
+import { Details, DetailsContent, DetailsSummary } from "@osmix/ui";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Details, DetailsContent, DetailsSummary } from "../src/components/details";
 import { MERGE_GUIDE_DIAGRAM_IDS, MergeGuideDiagram } from "../src/components/merge-guide-diagram";
 import {
   MERGE_STEP_GUIDE_IDS,

@@ -1,13 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
-import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
-import type { OsmFileType, OsmLoadProfile } from "osmix";
-import { useId, useState } from "react";
-
-import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file";
-import { Log } from "../state/log";
-import ActionButton from "./action-button";
-import { Button } from "./ui/button";
 import {
+  ActionButton,
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -15,8 +9,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "./ui/dialog";
-import { Input } from "./ui/input";
+  Input,
+} from "@osmix/ui";
+import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
+import type { OsmFileType, OsmLoadProfile } from "osmix";
+import { useId, useState } from "react";
+
+import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file";
+import { Log } from "../state/log";
 
 /** File type options with labels and accepted extensions */
 const FILE_TYPE_OPTIONS: {

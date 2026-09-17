@@ -1,8 +1,7 @@
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@osmix/ui";
 import { SearchIcon } from "lucide-react";
 import type { OsmEntity } from "osmix";
 import { useActionState } from "react";
-
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "./ui/input-group";
 
 export default function EntityLookup({
   setSelectedEntity,

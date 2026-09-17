@@ -1,7 +1,7 @@
 import { Separator as BaseSeparator } from "@base-ui/react/separator";
 import type * as React from "react";
 
-import { cn } from "../../lib/utils";
+import { cn } from "../../lib/utils.ts";
 
 function Separator({
   className,

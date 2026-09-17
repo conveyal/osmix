@@ -1,3 +1,4 @@
+import { SectionTitle, Button } from "@osmix/ui";
 import {
   Osm,
   type OsmConflationBulkDecisionRequest,
@@ -10,8 +11,6 @@ import { useEffect } from "react";
 
 import { ConflationReview } from "../src/components/conflation-review";
 import { BackToMatching, MatchingReviewProblem } from "../src/components/matching-review-recovery";
-import { SectionTitle } from "../src/components/section";
-import { Button } from "../src/components/ui/button";
 import {
   matchingReviewIssue,
   type MatchingReviewIssue,
