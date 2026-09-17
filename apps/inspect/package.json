@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/inspect",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "node ../../scripts/portless-dev.ts inspect.osmix vite",
+    "dev:app": "vite",
+    "test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run tests --project \"$npm_package_name\" --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@base-ui/react": "catalog:",
+    "@osmix/app-components": "workspace:*",
+    "@osmix/app-core": "workspace:*",
+    "@osmix/ui": "workspace:*",
+    "jotai": "catalog:",
+    "jotai-family": "catalog:",
+    "lucide-react": "catalog:",
+    "maplibre-gl": "catalog:",
+    "osmix": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-map-gl": "catalog:"
+  },
+  "devDependencies": {
+    "@osmix/shared": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "^5.0.1"
+  }
+}
