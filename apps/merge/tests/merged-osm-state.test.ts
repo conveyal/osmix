@@ -5,10 +5,11 @@ import { mergedOsmRefreshRetryId, prepareMergedOsmState } from "../src/lib/merge
 
 const info = (id: string): OsmInfo => ({
   bbox: [7.4, 43.7, 7.5, 43.8],
-  header: {},
+  header: { optional_features: [], required_features: [] },
   id,
   spatialIndexes: {
     nodes: { all: true, tagged: true },
+    relations: true,
     ways: true,
   },
   stats: { nodes: 10, relations: 2, ways: 3 },

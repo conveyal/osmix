@@ -12,7 +12,7 @@ export function Details({
   defaultOpen = true,
 }: {
   className?: ClassValue;
-  children: ReactNode;
+  children?: ReactNode;
   defaultOpen?: boolean;
 }) {
   return (
