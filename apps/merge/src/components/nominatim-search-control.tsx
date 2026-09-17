@@ -1,3 +1,4 @@
+import { searchControlIsOpenAtom } from "@osmix/app-core";
 import {
   InputGroup,
   InputGroupAddon,
@@ -11,7 +12,6 @@ import { SearchIcon } from "lucide-react";
 import { useState, useTransition } from "react";
 import type { MapInstance } from "react-map-gl/maplibre";
 
-import { searchControlIsOpenAtom } from "../state/map";
 import CustomControl from "./custom-control";
 
 export type NominatimResult = {

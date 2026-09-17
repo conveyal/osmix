@@ -16,15 +16,6 @@ export const BASE_MAP_STYLES = {
 
 export const DEFAULT_BASE_MAP_STYLE: keyof typeof BASE_MAP_STYLES = "carto-dark";
 
-// IndexedDB database name
-export const DB_NAME = "@osmix/storage";
-// v3 invalidates cached transferables after the spatial-index storage schema changed.
-export const DB_VERSION = 3;
-export const OSM_STORE = "osm";
-
-// BroadcastChannel name for storage notifications
-export const STORAGE_CHANNEL = "@osmix/storage-channel";
-
 export const BASE_OSM_KEY = "main";
 export const PATCH_OSM_KEY = "patch";
 export const EXTRACT_OSM_KEY = "extract";

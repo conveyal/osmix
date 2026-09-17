@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { canStoreBytes } from "../src/lib/storage-utils";
+import { canStoreBytes } from "../src/lib/storage-utils.ts";
 
 describe("canStoreBytes", () => {
   afterEach(() => vi.unstubAllGlobals());

@@ -1,3 +1,4 @@
+import { layerControlIsOpenAtom } from "@osmix/app-core";
 import {
   cn,
   SectionTitle,
@@ -13,7 +14,6 @@ import { useCallback, useEffectEvent, useMemo, useState, useSyncExternalStore } 
 
 import { useMap } from "../hooks/map";
 import { APPID } from "../settings";
-import { layerControlIsOpenAtom } from "../state/map";
 import CustomControl from "./custom-control";
 
 type LayerInfo = {

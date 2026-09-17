@@ -1,7 +1,5 @@
 import { Osm } from "osmix";
-import { describe, expect, it, vi } from "vitest";
-
-vi.mock("../src/state/worker", () => ({ osmWorker: {} }));
+import { describe, expect, it } from "vitest";
 
 import { OsmixMapSources } from "../src/components/osmix-map-sources";
 import OsmixRasterSource from "../src/components/osmix-raster-source";

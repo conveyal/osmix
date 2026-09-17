@@ -1,3 +1,4 @@
+import { mapBoundsAtom, mapCenterAtom, zoomAtom } from "@osmix/app-core";
 import { useSetAtom } from "jotai";
 import type { MapStyleDataEvent } from "maplibre-gl";
 import { useEffectEvent, useRef } from "react";
@@ -9,7 +10,6 @@ import {
 } from "react-map-gl/maplibre";
 
 import { APPID, BASE_MAP_STYLES, DEFAULT_BASE_MAP_STYLE } from "../settings";
-import { mapBoundsAtom, mapCenterAtom, zoomAtom } from "../state/map";
 import MapLayerControl from "./map-layer-control";
 import NominatimSearchControl from "./nominatim-search-control";
 import RouteMapControl from "./route-control";

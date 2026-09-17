@@ -1,7 +1,7 @@
 /**
  * Extended OsmixRemote with IndexedDB storage capabilities.
  *
- * Provides a clean API for storage operations by wrapping the MergeWorker
+ * Provides a clean API for storage operations by wrapping the OsmixAppWorker
  * methods, following the same pattern as the base OsmixRemote class.
  */
 
@@ -17,30 +17,32 @@ import {
 } from "osmix";
 
 import type {
-  MergeWorker,
+  OsmixAppWorker,
   PbfUrlLoadResult,
   StoredFileInfo,
   StoredOsmEntry,
-} from "../workers/osm.worker";
+} from "./workers/osmix-app.worker.ts";
 // oxlint-disable-next-line import/default -- Vite ?worker&url resolves to a string URL
-import OsmWorkerUrl from "../workers/osm.worker.ts?worker&url";
+import OsmWorkerUrl from "./workers/osmix-app.worker.ts?worker&url";
 
-export interface MergeRemoteOptions {
+export interface OsmixAppRemoteOptions {
   workerCount?: number;
   onProgress?: (progress: Progress) => void;
 }
 
 /**
- * Create a new MergeRemote instance with initialized worker pool.
+ * Create a new OsmixAppRemote instance with initialized worker pool.
  *
  * @example
- * const remote = await createMergeRemote({
+ * const remote = await createOsmixAppRemote({
  *   onProgress: (progress) => console.log(progress.msg),
  * })
  * const hash = await remote.hashBuffer(buffer)
  */
-export async function createMergeRemote(options: MergeRemoteOptions = {}): Promise<MergeRemote> {
-  const remote = new MergeRemote();
+export async function createOsmixAppRemote(
+  options: OsmixAppRemoteOptions = {},
+): Promise<OsmixAppRemote> {
+  const remote = new OsmixAppRemote();
   const hardwareConcurrency = typeof navigator === "undefined" ? 1 : navigator.hardwareConcurrency;
   const defaultWorkerCount = getOsmixCapabilities().canShareArrayBuffers
     ? selectWorkerCount({ hardwareConcurrency, reserveCores: 1, maxWorkers: 4 })
@@ -56,11 +58,11 @@ export async function createMergeRemote(options: MergeRemoteOptions = {}): Promi
 /**
  * Extended OsmixRemote with storage capabilities.
  *
- * Wraps MergeWorker storage methods to provide a consistent API
+ * Wraps OsmixAppWorker storage methods to provide a consistent API
  * that follows the OsmixRemote pattern. All storage operations
  * are delegated to workers to keep the main thread responsive.
  */
-export class MergeRemote extends OsmixRemote<MergeWorker> {
+export class OsmixAppRemote extends OsmixRemote<OsmixAppWorker> {
   private readonly storageRecoveryIds = new Map<string, string>();
 
   /**
@@ -197,7 +199,7 @@ export class MergeRemote extends OsmixRemote<MergeWorker> {
   }
 
   protected override async recoverDataset(
-    worker: Remote<MergeWorker>,
+    worker: Remote<OsmixAppWorker>,
     datasetId: string,
   ): Promise<boolean> {
     const storageId = this.storageRecoveryIds.get(datasetId);

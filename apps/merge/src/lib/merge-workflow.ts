@@ -1,3 +1,7 @@
+import { WITHIN_DATASET_DIAGNOSTIC_OPTIONS } from "@osmix/app-core";
+
+export { WITHIN_DATASET_DIAGNOSTIC_OPTIONS };
+
 import type {
   OsmChangesetOptions,
   OsmChangesetStats,
@@ -13,11 +17,6 @@ export type ChangesetReviewPurpose = "apply" | "diagnostic" | "preview";
  * A same-dataset comparison may surface suspicious entities for review, but its
  * proposed edits must never be applied automatically.
  */
-export const WITHIN_DATASET_DIAGNOSTIC_OPTIONS = {
-  deduplicateNodes: true,
-  deduplicateWays: true,
-} as const satisfies Partial<OsmChangesetOptions>;
-
 /** Reconcile entities from the patch against the base without normalizing either input. */
 export const CROSS_DATASET_RECONCILIATION_OPTIONS = {
   deduplicateNodes: true,

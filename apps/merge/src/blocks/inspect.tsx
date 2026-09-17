@@ -1,4 +1,12 @@
 import {
+  useOsmFile,
+  changesetStatsAtom,
+  selectOsmEntityAtom,
+  osmLoadingAbortControllerAtom,
+} from "@osmix/app-core";
+import { useOsmixRemote } from "@osmix/app-core";
+import { WITHIN_DATASET_DIAGNOSTIC_OPTIONS } from "@osmix/app-core";
+import {
   ActionButton,
   Details,
   DetailsContent,
@@ -23,19 +31,14 @@ import ChangesSummary, {
 } from "../components/osm-changes-summary";
 import StoredOsmList from "../components/stored-osm-list";
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
-import { useOsmFile } from "../hooks/osm";
-import { WITHIN_DATASET_DIAGNOSTIC_OPTIONS } from "../lib/merge-workflow";
 import { BASE_OSM_KEY } from "../settings";
-import { changesetStatsAtom } from "../state/changes";
-import { selectOsmEntityAtom } from "../state/osm";
-import { osmLoadingAbortControllerAtom } from "../state/status";
-import { osmWorker } from "../state/worker";
 
 export default function InspectBlock({
   openOsmFile,
 }: {
   openOsmFile: (file: File | string, fileType?: OsmFileType) => Promise<OsmInfo | null>;
 }) {
+  const remote = useOsmixRemote();
   const flyToEntity = useFlyToEntity();
   const flyToOsmBounds = useFlyToOsmBounds();
   const baseOsm = useOsmFile(BASE_OSM_KEY);
@@ -106,7 +109,7 @@ export default function InspectBlock({
         disabled={!hasFullNodeIndex(baseOsm.osmInfo)}
         onAction={async () => {
           if (!baseOsm.osm) throw Error("Osm has not been loaded.");
-          const changes = await osmWorker.generateChangeset(
+          const changes = await remote.generateChangeset(
             baseOsm.osm.id,
             baseOsm.osm.id,
             WITHIN_DATASET_DIAGNOSTIC_OPTIONS,

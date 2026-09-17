@@ -1,4 +1,12 @@
 import {
+  type StoredOsmEntry,
+  useStoredOsm,
+  osmLoadProfileAtomFamily,
+  osmLoadingAbortControllerAtom,
+} from "@osmix/app-core";
+import type { OsmLoadFailure } from "@osmix/app-core";
+import { useOsmixRemote } from "@osmix/app-core";
+import {
   ActionButton,
   Details,
   DetailsContent,
@@ -35,11 +43,6 @@ import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
 import { useEffectEvent, useRef, useState } from "react";
 
-import { type StoredOsmEntry, useStoredOsm } from "../hooks/storage-broadcast";
-import type { OsmLoadFailure } from "../lib/osm-load-failure";
-import { osmLoadProfileAtomFamily } from "../state/osm";
-import { osmLoadingAbortControllerAtom } from "../state/status";
-import { osmWorker } from "../state/worker";
 import { OsmLoadFailurePanel } from "./osm-load-failure";
 import {
   OsmLoadProfileSelector,
@@ -80,6 +83,7 @@ interface StoredOsmItemProps {
 }
 
 function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
+  const remote = useOsmixRemote();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(entry.fileName);
@@ -88,7 +92,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
   const handleDelete = useEffectEvent(async () => {
     setIsDeleting(true);
     try {
-      await osmWorker.deleteStoredOsm(entry.fileHash);
+      await remote.deleteStoredOsm(entry.fileHash);
     } finally {
       setIsDeleting(false);
     }
@@ -104,7 +108,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
   const handleConfirmRename = useEffectEvent(async () => {
     const trimmed = renameValue.trim();
     if (trimmed && trimmed !== entry.fileName) {
-      await osmWorker.renameStoredOsm(entry.fileHash, trimmed);
+      await remote.renameStoredOsm(entry.fileHash, trimmed);
     }
     setIsRenaming(false);
   });
@@ -213,7 +217,8 @@ export function StoredOsmList({
   openOsmFile,
   openOsmPbfUrl,
 }: StoredOsmListProps) {
-  const { entries, estimatedBytes } = useStoredOsm(osmWorker);
+  const remote = useOsmixRemote();
+  const { entries, estimatedBytes } = useStoredOsm(remote);
   const [loadingState, setLoadingState] = useAtom(osmLoadingAbortControllerAtom);
   const [loadProfile, setLoadProfile] = useAtom(osmLoadProfileAtomFamily(osmKey ?? "default"));
   const isLoading = loadingState !== null && (!osmKey || loadingState.osmKey === osmKey);

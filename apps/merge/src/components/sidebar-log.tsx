@@ -1,3 +1,4 @@
+import { useLog } from "@osmix/app-core";
 import {
   cn,
   SectionTitle,
@@ -10,7 +11,6 @@ import {
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { useLog } from "../hooks/log";
 import LogContent from "./log";
 
 export default function SidebarLog() {

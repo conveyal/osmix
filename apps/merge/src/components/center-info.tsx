@@ -1,6 +1,5 @@
+import { mapCenterAtom } from "@osmix/app-core";
 import { useAtomValue } from "jotai";
-
-import { mapCenterAtom } from "../state/map";
 
 export default function CenterInfo() {
   const center = useAtomValue(mapCenterAtom);

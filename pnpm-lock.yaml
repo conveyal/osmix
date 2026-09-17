@@ -332,6 +332,9 @@ importers:
       '@base-ui/react':
         specifier: 'catalog:'
         version: 1.8.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@osmix/app-core':
+        specifier: workspace:*
+        version: link:../../packages/app-core
       '@osmix/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -347,12 +350,6 @@ importers:
       dequal:
         specifier: 'catalog:'
         version: 2.0.3
-      hash-wasm:
-        specifier: ^4.12.0
-        version: 4.12.0
-      idb:
-        specifier: ^8.0.3
-        version: 8.0.3
       jotai:
         specifier: 'catalog:'
         version: 3.0.0(@types/react@19.3.0)(react@19.3.0)
@@ -365,9 +362,6 @@ importers:
       maplibre-gl:
         specifier: 'catalog:'
         version: 6.10.0
-      native-file-system-adapter:
-        specifier: ^3.0.1
-        version: 3.0.1
       osmix:
         specifier: workspace:*
         version: link:../../packages/osmix
@@ -552,6 +546,49 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
+
+  packages/app-core:
+    dependencies:
+      comlink:
+        specifier: 'catalog:'
+        version: 4.4.2
+      hash-wasm:
+        specifier: ^4.12.0
+        version: 4.12.0
+      idb:
+        specifier: ^8.0.3
+        version: 8.0.3
+      jotai:
+        specifier: 'catalog:'
+        version: 3.0.0(@types/react@19.3.0)(react@19.3.0)
+      jotai-family:
+        specifier: 'catalog:'
+        version: 1.1.0(jotai@3.0.0(@types/react@19.3.0)(react@19.3.0))
+      maplibre-gl:
+        specifier: 'catalog:'
+        version: 6.10.0
+      native-file-system-adapter:
+        specifier: ^3.0.1
+        version: 3.0.1
+      osmix:
+        specifier: workspace:*
+        version: link:../osmix
+      react:
+        specifier: 'catalog:'
+        version: 19.3.0
+    devDependencies:
+      '@osmix/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.1)
 
   packages/change:
     dependencies:

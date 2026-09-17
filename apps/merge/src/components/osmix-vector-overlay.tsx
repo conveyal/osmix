@@ -1,3 +1,4 @@
+import { selectOsmEntityAtom } from "@osmix/app-core";
 import { useSetAtom } from "jotai";
 import {
   type ExpressionSpecification,
@@ -17,18 +18,13 @@ import {
 } from "react-map-gl/maplibre";
 
 import { useMap } from "../hooks/map";
-import { addOsmixVectorProtocol, osmixIdToTileUrl } from "../lib/osmix-vector-protocol";
+import { osmixIdToTileUrl } from "../lib/osmix-vector-protocol";
 import { APPID, MIN_PICKABLE_ZOOM } from "../settings";
-import { selectOsmEntityAtom } from "../state/osm";
 
 const DEFAULT_TOOLTIP_CLASS = "osmix-overlay-tooltip";
 
 const tooltipTemplate = ({ id, type }: { id: number; type: string }) =>
   `<div class="${DEFAULT_TOOLTIP_CLASS}">${type}/${id}</div>`;
-
-if (typeof window !== "undefined") {
-  addOsmixVectorProtocol();
-}
 
 const wayBaseColorExpression: ExpressionSpecification = [
   "case",

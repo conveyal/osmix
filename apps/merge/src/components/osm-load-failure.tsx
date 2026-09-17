@@ -1,7 +1,6 @@
+import type { OsmLoadFailure } from "@osmix/app-core";
 import { Button } from "@osmix/ui";
 import { AlertTriangleIcon, RotateCcwIcon, XIcon } from "lucide-react";
-
-import type { OsmLoadFailure } from "../lib/osm-load-failure";
 
 function labelForTechnicalKey(key: string): string {
   return key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (letter) => letter.toUpperCase());

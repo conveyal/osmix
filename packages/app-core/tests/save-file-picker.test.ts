@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { shouldRetrySavePickerWithPolyfill } from "../src/lib/save-file-picker";
+import { shouldRetrySavePickerWithPolyfill } from "../src/lib/save-file-picker.ts";
 
 const originalNavigator = globalThis.navigator;
 

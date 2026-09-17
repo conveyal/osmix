@@ -1,14 +1,14 @@
-import { Nav, ToggleButton, cn } from "@osmix/ui";
-import { ButtonGroupSeparator } from "@osmix/ui";
-import { FilesIcon, Layers, Navigation, SearchIcon } from "lucide-react";
-import { NavLink, type NavLinkRenderProps } from "react-router";
-
 import {
   layerControlIsOpenAtom,
   osmFileControlIsOpenAtom,
   routingControlIsOpenAtom,
   searchControlIsOpenAtom,
-} from "../state/map";
+} from "@osmix/app-core";
+import { Nav, ToggleButton, cn } from "@osmix/ui";
+import { ButtonGroupSeparator } from "@osmix/ui";
+import { FilesIcon, Layers, Navigation, SearchIcon } from "lucide-react";
+import { NavLink, type NavLinkRenderProps } from "react-router";
+
 import BrowserCheck from "./browser-check";
 import CenterInfo from "./center-info";
 import Status from "./status";

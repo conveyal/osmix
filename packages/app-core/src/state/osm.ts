@@ -3,8 +3,8 @@ import { atomFamily } from "jotai-family";
 import type { Osm, OsmInfo, OsmLoadProfile } from "osmix";
 import type { OsmEntity } from "osmix";
 
-import type { OsmLoadFailure } from "../lib/osm-load-failure";
-import type { StoredFileInfo } from "../workers/osm.worker";
+import type { OsmLoadFailure } from "../lib/osm-load-failure.ts";
+import type { StoredFileInfo } from "../workers/osmix-app.worker.ts";
 
 export const osmInfoAtomFamily = atomFamily((_id: string) => atom<OsmInfo | null>(null));
 export const osmAtomFamily = atomFamily((_id: string) => atom<Osm | null>(null));

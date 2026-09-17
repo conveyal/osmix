@@ -1,3 +1,4 @@
+import type { StoredFileInfo } from "@osmix/app-core";
 import {
   bytesSizeToHuman,
   Details,
@@ -11,8 +12,6 @@ import {
   TableRow,
 } from "@osmix/ui";
 import type { Osm } from "osmix";
-
-import type { StoredFileInfo } from "../workers/osm.worker";
 
 export default function OsmInfoTable({
   defaultOpen,

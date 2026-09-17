@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { isStreamCloneable } from "../src/lib/stream-transfer";
+import { isStreamCloneable } from "../src/lib/stream-transfer.ts";
 
 const OriginalMessageChannel = globalThis.MessageChannel;
 
