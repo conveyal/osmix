@@ -1,5 +1,43 @@
 # @osmix/router
 
+## 0.0.15
+
+### Patch Changes
+
+- 466adc0: Share one-way normalization between exact reconciliation, fuzzy way matching, and routing. Respect explicit `no`, `false`, and `0` on roundabouts, recognize equivalent supported aliases, and compare reversed geometry consistently. Prevent unsupported values from being treated as direction-equivalent during matching while retaining the router's documented fallback behavior.
+
+  Block fuzzy matches when endpoint geometry cannot establish the orientation needed to compare one-way travel, including closed one-way roundabouts. Bidirectional ways without recognized direction-sensitive tags remain eligible.
+
+- 8be5c80: Allow Osmix to use its ArrayBuffer fallback when SharedArrayBuffer is unavailable, so browser
+  applications no longer need to install a global SharedArrayBuffer shim.
+- cd987f5: Preserve input topology during merges, conservatively reconcile compatible patch entities with the base,
+  validate routing-sensitive references, and insert multiple intersections in way order. Within-file duplicate
+  scans in the Merge app are now diagnostic only; regenerate older merged PBFs from their source inputs. Correct
+  the router priority queue so shortest-path searches visit lower-cost states first, and honor the one-way
+  direction implied by OSM roundabouts plus reverse one-way (`oneway=-1`) tags.
+
+  Restore the original 1-meter matching behavior as explicit, cross-dataset fuzzy conflation for imported data.
+  Callers select transferable properties independently from patch-network attachment; exact merge behavior
+  remains the default. Unique, high-confidence pedestrian and one-to-one-way matches can apply automatically,
+  while routing properties, motor roads, ambiguity, relation involvement, and uncertain geometry require review.
+  Grade conflicts, restrictions, protected tags, dangling references, way collapse, and base-topology rewrites
+  remain blocked. Add public candidate/evidence/decision APIs, restart-safe worker review sessions, CAR/WALK
+  topology diagnostics, and a dedicated Merge-app review step.
+
+  Add atomic, filter-wide conflation decisions with worker-computed previews. The Merge app can transfer
+  properties, attach networks, or reject every candidate matching the current filters across all pages, while
+  showing skipped ambiguity and overwritten decisions before confirmation. Accepted candidates now have a stable
+  summary and filter status, and complete bulk decision snapshots remain restart-safe.
+
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [e4785fe]
+- Updated dependencies [466adc0]
+- Updated dependencies [8be5c80]
+  - @osmix/core@0.3.0
+  - @osmix/types@0.1.1
+  - @osmix/geo@0.1.1
+
 ## 0.0.14
 
 ### Patch Changes

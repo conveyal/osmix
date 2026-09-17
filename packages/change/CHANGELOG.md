@@ -1,5 +1,68 @@
 # @osmix/change
 
+## 0.1.11
+
+### Patch Changes
+
+- 303ca75: Keep unsafe imported-data matching actions blocked when ordinary relation membership adds a review reason. Hard grade, access, geometry, protected-property, and restriction conflicts remain authoritative during individual and filter-wide acceptance. Preserve separate eligibility for property transfer and network attachment so a safe action can still proceed while another is blocked.
+- e123e58: Block imported-data matching between conflicting explicit feature classifications, such as a school and a cafe, independently of the tag keys selected for copying. Preserve this hard block for both matching actions during manual and bulk acceptance and when relation membership adds review context. Candidate evidence reports the conflicting base and imported values for inspection in Merge.
+
+  Compare supported classifications on the same key, treating missing or empty values as unknown and generic `yes` as an unspecified positive subtype. Explicit `no` still conflicts with different nonempty values. This matching check does not alter ordinary direct/exact merge rules or authoritative same-ID updates.
+
+- 9b63b65: Report matching outcomes from actual generated changes, with separate tag-copy and network-connection actions, unique unresolved imported features, and intentional skips. Include per-feature and selected-tag details, including values already present or superseded by another copy, and explain retained imports. Identify these as matching-stage results before later intersections can further connect or remap junctions. Preserve existing crossing classifications during intersection creation. Show Merge users a completion summary after successful application and final result refresh, with readable details and a downloadable report. Allow download with unresolved matches and require fresh input selection when starting a new merge.
+
+  Distinguish committed worker mutations from later synchronization failures. Retrying synchronization or display refresh does not reapply the merge, and completion waits until the result is ready to inspect and download.
+
+- 61de06c: Add default-off, explicitly reviewed removal of equivalent imported ways, independently of copying tags and connecting the network. Require a supported retained base counterpart, compatible routing meaning, and verified branch connections; automatic connections alone cannot authorize removal. Block unsafe topology, relation involvement, and unsupported segmentation, and clean only untagged imported points newly orphaned by the selected removal.
+
+  Expose decision-dependent removal plans through the matching APIs and worker review, retain them in generated outcome reports and recovery, and show source/base IDs, attributes, branch prerequisites, and cleanup before applying in Merge. Automatic and bulk actions never select removal. Existing tag-copying and connection-only callers retain their imported geometry.
+
+- 06354ea: Resolve scheduled matching actions consistently across row controls, bulk decisions, saved review state, and generation. Let users choose Copy tags and Connect network independently while preserving the other choice. Show the current schedule separately from discovery eligibility, make skipping schedule neither action, and clarify that automatic actions are staged for preview before applying changes.
+- 466adc0: Share one-way normalization between exact reconciliation, fuzzy way matching, and routing. Respect explicit `no`, `false`, and `0` on roundabouts, recognize equivalent supported aliases, and compare reversed geometry consistently. Prevent unsupported values from being treated as direction-equivalent during matching while retaining the router's documented fallback behavior.
+
+  Block fuzzy matches when endpoint geometry cannot establish the orientation needed to compare one-way travel, including closed one-way roundabouts. Bidirectional ways without recognized direction-sensitive tags remain eligible.
+
+- 875c4f9: Add a supported changeset JSON round trip that preserves integrity validation using verified base and patch input context. Recompute inherited issues from matching original input snapshots instead of trusting serialized issue exemptions. Keep safe legacy changes-only snapshots usable, and explain when missing source context requires restoring a newer snapshot or regenerating the changeset.
+- c269e52: Fix a residual pre-existing exact-node reconciliation defect discovered during the PR #218 review, not introduced by that PR. Validate all proposed sources and their final survivor together before changing tags, references, or entity existence. An untagged base node can no longer absorb conflicting coincident imported cafe and school nodes and silently lose one classification.
+
+  Leave every proposed replacement in an incompatible node group unapplied, including conflicts in incident-way grade/access context and transitive same-dataset diagnostic chains. Compatible groups, authoritative same-ID updates, and existing exact-way descriptive reconciliation retain their established behavior. High-level merges still do not normalize either original input.
+
+- 5ea11cf: Preserve shared junctions during intersection creation by updating every incident way and affected restriction via-node together. Existing bridge and tunnel entrances stay connected, while unsafe shared-junction substitutions leave the original references unchanged and new grade-separated interior crossings remain disconnected. Detached restriction errors identify the via node and participating from/to ways to make source-data corrections easier.
+- cd66e74: Keep alternative targets together for each imported feature and enforce one target with scheduled matching actions. Add a source-level decision helper that replaces a target or leaves the feature unmatched while preserving unrelated choices. Allow older conflicting reviews to be corrected one feature at a time; generation stays blocked until all conflicts are resolved. Reject invalid replacements before changing decisions or invalidating previews, and support grouped pagination with all alternatives visible. Let Merge users return from reconciliation, a cumulative preview before application, or generation failure to correct matching choices without reloading their original inputs.
+- 3c51084: Reject defined `conflation` options passed to ordinary `generateChangeset()` instead of returning a preview that silently omits requested matching. Export `OsmChangesetOptions` for the supported ordinary stages and retain runtime validation for JavaScript, worker/remote calls, and structurally wider typed objects. Undefined matching options remain equivalent to omission.
+
+  The rejection preserves existing generated previews and datasets and directs callers to `generateConflationChangeset()` or `merge()`. Supported direct matching APIs and worker/remote generation from reviewed matching sessions retain their existing behavior.
+
+- 6978796: Keep matched imported ways and their connecting nodes when copying selected tags onto base features. Property transfer now changes only tag values relative to the ordinary direct/exact merge, including automatic, individual, and filter-wide decisions. This prevents tag-only merges from disconnecting imported branches when network attachment is disabled. Geometry removal is no longer an implicit side effect of copying tags.
+- cd987f5: Preserve input topology during merges, conservatively reconcile compatible patch entities with the base,
+  validate routing-sensitive references, and insert multiple intersections in way order. Within-file duplicate
+  scans in the Merge app are now diagnostic only; regenerate older merged PBFs from their source inputs. Correct
+  the router priority queue so shortest-path searches visit lower-cost states first, and honor the one-way
+  direction implied by OSM roundabouts plus reverse one-way (`oneway=-1`) tags.
+
+  Restore the original 1-meter matching behavior as explicit, cross-dataset fuzzy conflation for imported data.
+  Callers select transferable properties independently from patch-network attachment; exact merge behavior
+  remains the default. Unique, high-confidence pedestrian and one-to-one-way matches can apply automatically,
+  while routing properties, motor roads, ambiguity, relation involvement, and uncertain geometry require review.
+  Grade conflicts, restrictions, protected tags, dangling references, way collapse, and base-topology rewrites
+  remain blocked. Add public candidate/evidence/decision APIs, restart-safe worker review sessions, CAR/WALK
+  topology diagnostics, and a dedicated Merge-app review step.
+
+  Add atomic, filter-wide conflation decisions with worker-computed previews. The Merge app can transfer
+  properties, attach networks, or reject every candidate matching the current filters across all pages, while
+  showing skipped ambiguity and overwritten decisions before confirmation. Accepted candidates now have a stable
+  summary and filter status, and complete bulk decision snapshots remain restart-safe.
+
+- Updated dependencies [e4785fe]
+- Updated dependencies [df04f92]
+- Updated dependencies [e4785fe]
+- Updated dependencies [466adc0]
+- Updated dependencies [8be5c80]
+  - @osmix/shared@0.2.0
+  - @osmix/core@0.3.0
+  - @osmix/types@0.1.1
+  - @osmix/geo@0.1.1
+
 ## 0.1.10
 
 ### Patch Changes
