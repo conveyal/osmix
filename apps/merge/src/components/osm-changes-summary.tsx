@@ -1,3 +1,17 @@
+import {
+  cn,
+  Details,
+  DetailsContent,
+  DetailsSummary,
+  EmptyState,
+  Button,
+  Checkbox,
+  CheckboxLabel,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { OsmChange } from "osmix";
@@ -5,7 +19,6 @@ import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from "osmix";
 import { getEntityType, isNode, isRelation, isWay } from "osmix";
 import { useId, useTransition } from "react";
 
-import { cn } from "../lib/utils";
 import {
   changesAtom,
   changesetStatsAtom,
@@ -14,12 +27,7 @@ import {
   pageAtom,
   startIndexAtom,
 } from "../state/changes";
-import { Details, DetailsContent, DetailsSummary } from "./details";
 import { EntityContent } from "./entity-details";
-import { EmptyState } from "./section";
-import { Button } from "./ui/button";
-import { Checkbox, CheckboxLabel } from "./ui/checkbox";
-import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 
 export default function ChangesSummary() {
   return (

@@ -1,21 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
-
 import {
-  type BrowserLoadCapabilities,
-  getBrowserLoadCapabilities,
-} from "../lib/browser-capabilities";
-import { bytesSizeToHuman } from "../utils";
-import { StatusDot } from "./status-dot";
-import { Button } from "./ui/button";
-import {
+  bytesSizeToHuman,
+  StatusDot,
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "./ui/dialog";
-import { Spinner } from "./ui/spinner";
+  Spinner,
+} from "@osmix/ui";
+import { useEffect, useMemo, useState } from "react";
+
+import {
+  type BrowserLoadCapabilities,
+  getBrowserLoadCapabilities,
+} from "../lib/browser-capabilities";
 
 type SystemIssue = {
   id: "secure-context" | "cross-origin-isolated" | "device-memory";

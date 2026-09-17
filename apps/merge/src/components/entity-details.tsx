@@ -1,12 +1,18 @@
+import {
+  Details,
+  DetailsContent,
+  DetailsSummary,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from "@osmix/ui";
 import type { Osm } from "osmix";
 import { getRelationKindMetadata } from "osmix";
 import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from "osmix";
 import { isNode, isRelation, isWay } from "osmix";
 import type { ReactNode } from "react";
 import { Fragment } from "react/jsx-runtime";
-
-import { Details, DetailsContent, DetailsSummary } from "./details";
-import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 
 const noop = (_: OsmEntity) => undefined;
 

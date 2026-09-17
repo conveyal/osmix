@@ -1,5 +1,5 @@
-import { flattenValue } from "../utils";
-import { TableCell, TableRow } from "./ui/table";
+import { flattenValue } from "../lib/format.ts";
+import { TableCell, TableRow } from "./ui/table.tsx";
 
 export default function ObjectToTableRows({ object }: { object: null | Record<string, unknown> }) {
   if (!object) return null;

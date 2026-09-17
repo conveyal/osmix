@@ -1,3 +1,4 @@
+import { Button, Card, CardContent, CardHeader, Input, cn } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Info, SaveIcon } from "lucide-react";
 import type { ExtractStrategy } from "osmix";
@@ -11,14 +12,10 @@ import ExtractTagFilterEditor, {
 } from "../components/extract-tag-filter-editor";
 import { OsmLoadFailurePanel } from "../components/osm-load-failure";
 import OsmPbfFileInput from "../components/osm-pbf-file-input";
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardHeader } from "../components/ui/card";
-import { Input } from "../components/ui/input";
 import { useLog } from "../hooks/log";
 import { useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
 import { boundsLikeToBbox, isValidBbox, parseBboxString } from "../lib/extract-bbox";
-import { cn } from "../lib/utils";
 import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import { activeTabAtom, extractBboxAtom } from "../state/extract";
 import { mapBoundsAtom } from "../state/map";

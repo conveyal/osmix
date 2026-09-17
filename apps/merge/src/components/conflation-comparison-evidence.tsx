@@ -1,3 +1,4 @@
+import { SectionTitle } from "@osmix/ui";
 import type { FeatureCollection } from "geojson";
 import type { OsmConflationCandidateView } from "osmix";
 
@@ -7,7 +8,6 @@ import {
   comparisonLocations,
   type ConflationComparisonRole,
 } from "../lib/conflation-comparison";
-import { SectionTitle } from "./section";
 
 /** A smaller diamond fits inside the outlined circle without moving either coordinate. */
 export function ComparisonMarkerSymbol({ role }: { role: ConflationComparisonRole }) {

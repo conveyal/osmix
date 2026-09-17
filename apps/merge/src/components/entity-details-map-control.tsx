@@ -1,3 +1,4 @@
+import { SectionTitle, Button } from "@osmix/ui";
 import { useAtom, useSetAtom } from "jotai";
 import { MaximizeIcon, XIcon } from "lucide-react";
 import type { Osm } from "osmix";
@@ -8,8 +9,6 @@ import { selectedEntityAtom, selectedOsmAtom } from "../state/osm";
 import { getOsmixEntityByStringId } from "../utils";
 import EntityDetails from "./entity-details";
 import EntityLookup from "./entity-lookup";
-import { SectionTitle } from "./section";
-import { Button } from "./ui/button";
 
 export default function EntityMapControl({ osm }: { osm: Osm }) {
   const [selectedEntity, setSelectedEntity] = useAtom(selectedEntityAtom);

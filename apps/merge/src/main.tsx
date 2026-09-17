@@ -1,18 +1,19 @@
+import { ErrorBoundary } from "@osmix/ui";
 import { StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { MapProvider } from "react-map-gl/maplibre";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router";
 
-import { ErrorBoundary } from "./components/error-boundary";
+import MergeNav from "./components/nav";
 import "./lib/maplibre-worker";
-import Nav from "./components/nav";
 import MergePage from "./pages/merge";
+import { Log } from "./state/log";
 
 function RootLayout() {
   return (
     <MapProvider>
       <div className="h-screen w-screen flex flex-col">
-        <Nav />
+        <MergeNav />
         <Suspense fallback={<div>Loading...</div>}>
           <Outlet />
         </Suspense>
@@ -26,7 +27,10 @@ if (!rootEl) throw new Error("Root element not found");
 
 createRoot(rootEl).render(
   <StrictMode>
-    <ErrorBoundary fallback={<div>Error</div>}>
+    <ErrorBoundary
+      fallback={<div>Error</div>}
+      onError={(error) => Log.addMessage(error.message, "error")}
+    >
       <BrowserRouter>
         <Routes>
           <Route path={"/"} element={<RootLayout />}>

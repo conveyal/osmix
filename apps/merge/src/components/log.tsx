@@ -1,6 +1,6 @@
+import { cn, formatTimestampMs } from "@osmix/ui";
+
 import { useLog } from "../hooks/log";
-import { cn } from "../lib/utils";
-import { formatTimestampMs } from "../utils";
 
 export default function LogContent() {
   const { log } = useLog();

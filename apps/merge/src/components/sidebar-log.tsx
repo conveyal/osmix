@@ -1,13 +1,17 @@
+import {
+  cn,
+  SectionTitle,
+  StatusDot,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  Spinner,
+} from "@osmix/ui";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import { useLog } from "../hooks/log";
-import { cn } from "../lib/utils";
 import LogContent from "./log";
-import { SectionTitle } from "./section";
-import { StatusDot } from "./status-dot";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
-import { Spinner } from "./ui/spinner";
 
 export default function SidebarLog() {
   const { activeTasks, log } = useLog();

@@ -1,4 +1,5 @@
 import { Tabs } from "@base-ui/react/tabs";
+import { Main, MapContent, Sidebar, buttonVariants, cn } from "@osmix/ui";
 import { useAtom, useSetAtom } from "jotai";
 import type { OsmFileType } from "osmix";
 import { useEffect, useMemo, useRef } from "react";
@@ -12,17 +13,14 @@ import { ConflationComparisonLayer } from "../components/conflation-comparison-l
 import CustomControl from "../components/custom-control";
 import EntityDetailsMapControl from "../components/entity-details-map-control";
 import ExtractMapLayers from "../components/extract-map-layers";
-import { Main, MapContent, Sidebar } from "../components/layout";
 import OsmFileMapControl from "../components/osm-file-map-control";
 import { OsmixMapSources } from "../components/osmix-map-sources";
 import SelectedEntityLayer from "../components/selected-entity-layer";
 import SidebarLog from "../components/sidebar-log";
-import { buttonVariants } from "../components/ui/button";
 import { useLog } from "../hooks/log";
 import { useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
 import { DEFAULT_EXTRACT_BBOX } from "../lib/extract-bbox";
-import { cn } from "../lib/utils";
 import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import { changesetStatsAtom } from "../state/changes";
 import { activeTabAtom } from "../state/extract";

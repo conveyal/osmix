@@ -164,6 +164,9 @@ settings:
 
 catalogs:
   default:
+    '@base-ui/react':
+      specifier: ^1.8.0
+      version: 1.8.0
     '@placemarkio/geojson-rewind':
       specifier: ^1.0.3
       version: 1.0.3
@@ -173,15 +176,45 @@ catalogs:
     '@types/node':
       specifier: ^24.13.5
       version: 24.13.5
+    '@types/react':
+      specifier: ^19.3.0
+      version: 19.3.0
+    '@types/react-dom':
+      specifier: ^19.3.0
+      version: 19.3.0
+    comlink:
+      specifier: ^4.4.2
+      version: 4.4.2
     dequal:
       specifier: ^2.0.3
       version: 2.0.3
+    jotai:
+      specifier: ^3.0.0
+      version: 3.0.0
+    jotai-family:
+      specifier: ^1.1.0
+      version: 1.1.0
+    lucide-react:
+      specifier: ^1.46.0
+      version: 1.46.0
     maplibre-gl:
       specifier: ^6.10.0
       version: 6.10.0
     pbf:
       specifier: ^5.1.2
       version: 5.1.2
+    react:
+      specifier: ^19.3.0
+      version: 19.3.0
+    react-dom:
+      specifier: ^19.3.0
+      version: 19.3.0
+    react-map-gl:
+      specifier: ^8.1.3
+      version: 8.1.3
+    tailwindcss:
+      specifier: ^4.3.3
+      version: 4.3.3
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
@@ -254,7 +287,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/vt
       comlink:
-        specifier: ^4.4.2
+        specifier: 'catalog:'
         version: 4.4.2
       maplibre-gl:
         specifier: 'catalog:'
@@ -263,20 +296,20 @@ importers:
         specifier: workspace:*
         version: link:../../packages/osmix
       react:
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0
       react-dom:
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0(react@19.3.0)
       react-map-gl:
-        specifier: ^8.1.3
+        specifier: 'catalog:'
         version: 8.1.3(maplibre-gl@6.10.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
       '@types/react':
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0
       '@types/react-dom':
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0(@types/react@19.3.0)
       '@vitejs/plugin-react':
         specifier: ^6.1.1
@@ -297,8 +330,11 @@ importers:
   apps/merge:
     dependencies:
       '@base-ui/react':
-        specifier: ^1.8.0
+        specifier: 'catalog:'
         version: 1.8.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@osmix/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -306,7 +342,7 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       comlink:
-        specifier: ^4.4.2
+        specifier: 'catalog:'
         version: 4.4.2
       dequal:
         specifier: 'catalog:'
@@ -318,13 +354,13 @@ importers:
         specifier: ^8.0.3
         version: 8.0.3
       jotai:
-        specifier: ^3.0.0
+        specifier: 'catalog:'
         version: 3.0.0(@types/react@19.3.0)(react@19.3.0)
       jotai-family:
-        specifier: ^1.1.0
+        specifier: 'catalog:'
         version: 1.1.0(jotai@3.0.0(@types/react@19.3.0)(react@19.3.0))
       lucide-react:
-        specifier: ^1.46.0
+        specifier: 'catalog:'
         version: 1.46.0(react@19.3.0)
       maplibre-gl:
         specifier: 'catalog:'
@@ -336,13 +372,13 @@ importers:
         specifier: workspace:*
         version: link:../../packages/osmix
       react:
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0
       react-dom:
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0(react@19.3.0)
       react-map-gl:
-        specifier: ^8.1.3
+        specifier: 'catalog:'
         version: 8.1.3(maplibre-gl@6.10.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react-router:
         specifier: ^8.4.0
@@ -364,16 +400,16 @@ importers:
         specifier: 'catalog:'
         version: 7946.0.16
       '@types/react':
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0
       '@types/react-dom':
-        specifier: ^19.3.0
+        specifier: 'catalog:'
         version: 19.3.0(@types/react@19.3.0)
       '@vitejs/plugin-react':
         specifier: ^6.1.1
         version: 6.1.1(vite@8.3.0(@types/node@24.13.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.1))
       tailwindcss:
-        specifier: ^4.3.3
+        specifier: 'catalog:'
         version: 4.3.3
       tw-animate-css:
         specifier: ^1.4.0
@@ -973,6 +1009,52 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
+  packages/ui:
+    dependencies:
+      '@base-ui/react':
+        specifier: 'catalog:'
+        version: 1.8.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      jotai:
+        specifier: 'catalog:'
+        version: 3.0.0(@types/react@19.3.0)(react@19.3.0)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.46.0(react@19.3.0)
+      react:
+        specifier: 'catalog:'
+        version: 19.3.0
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.3.0(react@19.3.0)
+      tailwind-merge:
+        specifier: ^3.7.0
+        version: 3.7.0
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.3
+      tw-animate-css:
+        specifier: ^1.4.0
+        version: 1.4.0
+    devDependencies:
+      '@osmix/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.3.0(@types/react@19.3.0)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

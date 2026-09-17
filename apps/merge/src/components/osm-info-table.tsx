@@ -1,11 +1,18 @@
+import {
+  bytesSizeToHuman,
+  Details,
+  DetailsContent,
+  DetailsSummary,
+  ObjectToTableRows,
+  SectionTitle,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from "@osmix/ui";
 import type { Osm } from "osmix";
 
-import { bytesSizeToHuman } from "../utils";
 import type { StoredFileInfo } from "../workers/osm.worker";
-import { Details, DetailsContent, DetailsSummary } from "./details";
-import ObjectToTableRows from "./object-to-table";
-import { SectionTitle } from "./section";
-import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 
 export default function OsmInfoTable({
   defaultOpen,

@@ -1,10 +1,19 @@
+import {
+  ActionButton,
+  Details,
+  DetailsContent,
+  DetailsSummary,
+  EmptyState,
+  LoadingState,
+  Card,
+  CardContent,
+  CardHeader,
+} from "@osmix/ui";
 import { useAtom, useSetAtom } from "jotai";
 import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
 import { Suspense } from "react";
 
-import ActionButton from "../components/action-button";
-import { Details, DetailsContent, DetailsSummary } from "../components/details";
 import ExtractList from "../components/extract-list";
 import { FullIndexRequired, hasFullNodeIndex } from "../components/full-index-required";
 import ChangesSummary, {
@@ -12,9 +21,7 @@ import ChangesSummary, {
   ChangesList,
   ChangesPagination,
 } from "../components/osm-changes-summary";
-import { EmptyState, LoadingState } from "../components/section";
 import StoredOsmList from "../components/stored-osm-list";
-import { Card, CardContent, CardHeader } from "../components/ui/card";
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
 import { useOsmFile } from "../hooks/osm";
 import { WITHIN_DATASET_DIAGNOSTIC_OPTIONS } from "../lib/merge-workflow";

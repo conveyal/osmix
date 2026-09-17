@@ -1,6 +1,5 @@
+import { cn } from "@osmix/ui";
 import type * as React from "react";
-
-import { cn } from "../lib/utils";
 
 /**
  * Full-width workflow actions for the narrow Merge sidebar.

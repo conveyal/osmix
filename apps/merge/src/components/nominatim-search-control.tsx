@@ -1,18 +1,18 @@
-import { useAtomValue } from "jotai";
-import { SearchIcon } from "lucide-react";
-import { useState, useTransition } from "react";
-import type { MapInstance } from "react-map-gl/maplibre";
-
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-} from "../components/ui/input-group";
-import { cn } from "../lib/utils";
+  cn,
+  Spinner,
+} from "@osmix/ui";
+import { useAtomValue } from "jotai";
+import { SearchIcon } from "lucide-react";
+import { useState, useTransition } from "react";
+import type { MapInstance } from "react-map-gl/maplibre";
+
 import { searchControlIsOpenAtom } from "../state/map";
 import CustomControl from "./custom-control";
-import { Spinner } from "./ui/spinner";
 
 export type NominatimResult = {
   addresstype: string;

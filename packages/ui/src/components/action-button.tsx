@@ -1,8 +1,8 @@
 import { atom, useAtom } from "jotai";
 import { useTransition } from "react";
 
-import { Button } from "./ui/button";
-import { Spinner } from "./ui/spinner";
+import { Button } from "./ui/button.tsx";
+import { Spinner } from "./ui/spinner.tsx";
 
 const actionPendingAtom = atom(false);
 

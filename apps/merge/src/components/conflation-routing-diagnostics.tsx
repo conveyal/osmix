@@ -1,8 +1,16 @@
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@osmix/ui";
 import type { OsmConflationRoutingDiagnostics, OsmConflationRoutingGraphStats } from "osmix";
 import { useId } from "react";
-
-import { Card, CardContent, CardHeader } from "./ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 
 const METRICS = [
   "nodes",

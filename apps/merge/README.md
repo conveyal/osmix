@@ -85,7 +85,7 @@ The [merge-process guide](../../docs/merge-process.md) owns the merge rules, exa
 
 See [automatic and reviewed workflows](../../docs/merge-process.md#application-workflows) for the exact checkpoint order, cancellation boundaries, and recovery actions. Each numbered app stage also has a collapsed **How this step works** explanation. Matching discovery, scheduled actions, previews, and completed application are distinct states.
 
-### Inspect view (`/inspect`)
+### Inspect tab
 
 - Load a single PBF, run diagnostic duplicate detection, and page through the resulting candidate list.
 - Fit to the file’s bounding box, search for entities, and drill into their tags and relations.

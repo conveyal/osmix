@@ -2,8 +2,8 @@ import { useAtom } from "jotai";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { cn } from "../lib/utils";
-import { sidebarIsOpenAtom } from "../state/layout";
+import { cn } from "../lib/utils.ts";
+import { sidebarIsOpenAtom } from "../state/layout.ts";
 
 export function Main({ children }: { children: ReactNode }) {
   return <div className="flex flex-row grow h-full overflow-hidden">{children}</div>;

@@ -1,8 +1,12 @@
+import {
+  ActionButton,
+  ButtonGroup,
+  CardAction,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@osmix/ui";
 import { DownloadIcon, XIcon } from "lucide-react";
-
-import ActionButton from "./action-button";
-import { ButtonGroup } from "./ui/button-group";
-import { CardAction, CardDescription, CardHeader, CardTitle } from "./ui/card";
 
 /**
  * Loaded-input chrome shared by the Merge workflow and its lightweight browser

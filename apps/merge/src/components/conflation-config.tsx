@@ -1,11 +1,16 @@
+import {
+  InfoTooltip,
+  Card,
+  CardContent,
+  CardHeader,
+  Checkbox,
+  CheckboxLabel,
+  Input,
+} from "@osmix/ui";
 import { useAtom, useSetAtom } from "jotai";
 
 import { conflationFormErrors } from "../lib/conflation-workflow";
 import { conflationFormAtom, resetConflationReviewAtom } from "../state/conflation";
-import { InfoTooltip } from "./info-tooltip";
-import { Card, CardContent, CardHeader } from "./ui/card";
-import { Checkbox, CheckboxLabel } from "./ui/checkbox";
-import { Input } from "./ui/input";
 
 const CONTROL_FOCUS =
   "focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[CanvasText]";

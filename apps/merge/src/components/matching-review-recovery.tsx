@@ -1,8 +1,7 @@
+import { ActionButton, Card, CardContent, CardHeader } from "@osmix/ui";
 import { ArrowLeft } from "lucide-react";
 
 import type { MatchingReviewIssue } from "../lib/matching-review";
-import ActionButton from "./action-button";
-import { Card, CardContent, CardHeader } from "./ui/card";
 
 export function MatchingReviewProblem({ issue }: { issue: MatchingReviewIssue | null }) {
   if (!issue) return null;

@@ -1,6 +1,6 @@
-import { Details, DetailsContent, DetailsSummary } from "./details";
+import { Details, DetailsContent, DetailsSummary, SectionTitle } from "@osmix/ui";
+
 import { MergeGuideDiagram, type MergeGuideDiagramId } from "./merge-guide-diagram";
-import { SectionTitle } from "./section";
 
 export const MERGE_STEP_GUIDE_IDS = [
   "select",

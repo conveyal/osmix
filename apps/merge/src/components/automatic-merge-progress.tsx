@@ -1,9 +1,8 @@
+import { cn, Spinner } from "@osmix/ui";
 import { CheckIcon, CircleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useLog } from "../hooks/log";
-import { cn } from "../lib/utils";
-import { Spinner } from "./ui/spinner";
 
 export interface AutomaticMergeStep {
   id: AutomaticMergeStepId;

@@ -1,9 +1,13 @@
+import {
+  cn,
+  Details,
+  DetailsContent,
+  DetailsSummary,
+  InfoTooltip,
+  EmptyState,
+  SectionTitle,
+} from "@osmix/ui";
 import type { OsmConflationCandidateView } from "osmix";
-
-import { cn } from "../lib/utils";
-import { Details, DetailsContent, DetailsSummary } from "./details";
-import { InfoTooltip } from "./info-tooltip";
-import { EmptyState, SectionTitle } from "./section";
 
 const ROUTING_FAMILY_LABEL = {
   "bicycle-shared": "Bicycle or shared-use",
