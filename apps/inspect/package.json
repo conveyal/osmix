@@ -8,6 +8,7 @@
     "dev": "node ../../scripts/portless-dev.ts inspect.osmix vite",
     "dev:app": "vite",
     "test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run tests --project \"$npm_package_name\" --passWithNoTests",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@osmix/shared": "workspace:*",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

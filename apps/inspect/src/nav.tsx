@@ -1,4 +1,4 @@
-import { BrowserCheck, MapNavControls, Status } from "@osmix/app-components";
+import { AppLinks, BrowserCheck, MapNavControls, Status } from "@osmix/app-components";
 import { Nav } from "@osmix/ui";
 
 export function InspectNav() {
@@ -6,7 +6,7 @@ export function InspectNav() {
     <Nav
       links={
         <>
-          <span className="font-normal text-info">Inspect</span>
+          <AppLinks current="inspect" />
           <BrowserCheck />
         </>
       }

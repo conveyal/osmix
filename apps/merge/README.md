@@ -1,6 +1,6 @@
 # Osmix Merge
 
-Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PBF datasets. It builds on [`@osmix/core`](../../packages/core/README.md) and [`@osmix/change`](../../packages/change/README.md) in a web worker, renders MapLibre raster and vector overlays, and guides you through a multi-step merge workflow that stays entirely in the browser.
+Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PBF datasets. Its sibling apps, [Inspect](../inspect/README.md) and (soon) Extract, are linked from the nav bar. It builds on [`@osmix/core`](../../packages/core/README.md) and [`@osmix/change`](../../packages/change/README.md) in a web worker, renders MapLibre raster and vector overlays, and guides you through a multi-step merge workflow that stays entirely in the browser.
 
 ## Highlights
 
@@ -8,7 +8,6 @@ Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PB
   merge, exact reconciliation, optional imported-data matching, and intersection creation.
 - Select Auto, Full, or View loading according to the dataset and available browser memory.
 - Visualize both datasets with raster previews produced on the worker thread plus interactive vector overlays for selected entities.
-- Inspect individual OSM files for possible duplicate entities without mutating the source data.
 - Opt in to reviewed, one-meter proximity matching for importing selected properties or attaching compatible imported networks without rewriting base geometry.
 - Built-in Nominatim search, entity lookups, and task logging keep large merges manageable.
 
@@ -84,12 +83,6 @@ The [merge-process guide](../../docs/merge-process.md) owns the merge rules, exa
 4. Complete application and intersection work, read the applied/unresolved summary, and download the result.
 
 See [automatic and reviewed workflows](../../docs/merge-process.md#application-workflows) for the exact checkpoint order, cancellation boundaries, and recovery actions. Each numbered app stage also has a collapsed **How this step works** explanation. Matching discovery, scheduled actions, previews, and completed application are distinct states.
-
-### Inspect tab
-
-- Load a single PBF, run diagnostic duplicate detection, and page through the resulting candidate list.
-- Fit to the file’s bounding box, search for entities, and drill into their tags and relations.
-- Investigate candidates against the source data; the Inspect view does not apply proximity-based changes.
 
 ## Map & rendering stack
 

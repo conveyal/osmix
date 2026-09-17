@@ -9,21 +9,13 @@ import {
   SelectedEntityLayer,
   SidebarLog,
   useFlyToOsmBounds,
-  InspectPanel,
   RouteLayer,
   RouteMapControl,
 } from "@osmix/app-components";
-import {
-  useLog,
-  useOsmFile,
-  changesetStatsAtom,
-  selectOsmEntityAtom,
-  osmLoadingAbortControllerAtom,
-} from "@osmix/app-core";
+import { useLog, useOsmFile, changesetStatsAtom, selectOsmEntityAtom } from "@osmix/app-core";
 import { useLoadFromUrl } from "@osmix/app-core";
 import { Main, MapContent, Sidebar, buttonVariants, cn } from "@osmix/ui";
 import { useAtom, useSetAtom } from "jotai";
-import type { OsmFileType } from "osmix";
 import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -46,8 +38,8 @@ export default function Merge() {
   const navigate = useNavigate();
   const { activeTasks } = useLog();
   const isBusy = activeTasks > 0;
-  const [activeTab, setActiveTab] = useAtom(activeTabAtom);
-  const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
+  const [storedTab, setActiveTab] = useAtom(activeTabAtom);
+  const activeTab = storedTab === "Extract" ? "Extract" : "Merge";
 
   // Open `?load=<hash>` from storage, or fall back to the most recently used dataset.
   useLoadFromUrl({ loadFromStorage: base.loadFromStorage, onLoaded: flyToOsmBounds });
@@ -70,25 +62,6 @@ export default function Merge() {
   useEffect(() => {
     if (extract.osmInfo) flyToOsmBounds(extract.osmInfo);
   }, [extract.osmInfo, flyToOsmBounds]);
-
-  const openOsmFile = async (file: File | string, fileType?: OsmFileType) => {
-    selectEntity(null, null);
-    setChangesetStats(null);
-
-    const abortController = new AbortController();
-    setLoadingState({ controller: abortController, osmKey: BASE_OSM_KEY });
-
-    try {
-      const osmInfo =
-        typeof file === "string"
-          ? await base.loadFromStorage(file, abortController.signal)
-          : await base.loadOsmFile(file, fileType, abortController.signal);
-      if (osmInfo) flyToOsmBounds(osmInfo);
-      return osmInfo;
-    } finally {
-      setLoadingState(null);
-    }
-  };
 
   const initialViewState: MapInitialViewState | undefined = useMemo(() => {
     if (activeTab === "Extract") {
@@ -119,17 +92,6 @@ export default function Merge() {
               <Tabs.Tab
                 className={cn(
                   buttonVariants({ variant: "outline", size: "sm" }),
-                  "data-active:border-accent-foreground",
-                  isBusy && "opacity-50 cursor-not-allowed",
-                )}
-                disabled={isBusy}
-                value="Inspect"
-              >
-                Inspect
-              </Tabs.Tab>
-              <Tabs.Tab
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "sm" }),
                   "data-active:border-primary",
                   isBusy && "opacity-50 cursor-not-allowed",
                 )}
@@ -150,9 +112,6 @@ export default function Merge() {
                 Extract
               </Tabs.Tab>
             </Tabs.List>
-            <Tabs.Panel value="Inspect">
-              <InspectPanel osmKey={BASE_OSM_KEY} openOsmFile={openOsmFile} />
-            </Tabs.Panel>
             <Tabs.Panel value="Merge">
               <MergeBlock />
             </Tabs.Panel>
