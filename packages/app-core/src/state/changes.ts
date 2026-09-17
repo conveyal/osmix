@@ -2,7 +2,7 @@ import { atom } from "jotai";
 import type { OsmChangesetStats, OsmChangeTypes } from "osmix";
 import type { OsmEntityType } from "osmix";
 
-import { osmWorker } from "./worker";
+import { remoteAtom } from "./remote.ts";
 
 export const DEFAULT_PAGE_SIZE = 10;
 
@@ -22,8 +22,9 @@ export const changesAtom = atom(async (get) => {
   const page = get(pageAtom);
   const changeTypeFilter = get(changeTypeFilterAtom);
   const entityTypeFilter = get(entityTypeFilterAtom);
-  osmWorker.setChangesetFilters(changeTypeFilter, entityTypeFilter);
-  return osmWorker.getChangesetPage(changeStats.osmId, page, pageSize);
+  const remote = get(remoteAtom);
+  remote.setChangesetFilters(changeTypeFilter, entityTypeFilter);
+  return remote.getChangesetPage(changeStats.osmId, page, pageSize);
 });
 
 export const startIndexAtom = atom<number>((get) => {

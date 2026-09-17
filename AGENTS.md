@@ -36,8 +36,9 @@ Layering (low → high):
 | `@osmix/router`                                        | Routing graph and pathfinding                                                |
 | `osmix`                                                | Curated facade + worker/Comlink orchestration (`OsmixRemote`, `OsmixWorker`) |
 | `@osmix/ui`                                            | Private: shared React primitives, layout shell, design tokens (`styles.css`) |
+| `@osmix/app-core`                                      | Private: app worker/remote, IndexedDB storage, jotai atoms, `useOsmFile`     |
 
-**App import rule:** apps import `osmix` for runtime APIs and re-exported types, plus the private app-tier packages (`@osmix/ui`). Use other granular `@osmix/*` packages only when a symbol is not exposed by the facade (e.g. benchmarks, servers, or tests).
+**App import rule:** apps import `osmix` for runtime APIs and re-exported types, plus the private app-tier packages (`@osmix/ui`, `@osmix/app-core`). Use other granular `@osmix/*` packages only when a symbol is not exposed by the facade (e.g. benchmarks, servers, or tests).
 
 Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` entry).
 
@@ -49,7 +50,7 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 
 ## Key Paths
 
-- UI: `apps/merge` (React 19 + Vite); worker wrapper at `apps/merge/src/workers/osm.worker.ts`.
+- UI: `apps/merge` (React 19 + Vite); app worker at `packages/app-core/src/workers/osmix-app.worker.ts`, created per app with `createOsmixAppRemote()` and shared through `remoteAtom`.
 - Shared UI conventions: `packages/ui/DESIGN.md` — read before UI changes; merge-specific rules in `apps/merge/DESIGN.md`.
 - Worker API: `packages/osmix/src/worker.ts`, `packages/osmix/src/remote.ts`.
 - Fixtures: `fixtures/` at repo root; loaded via `@osmix/test-utils/fixtures`.

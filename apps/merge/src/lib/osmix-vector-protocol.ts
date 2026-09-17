@@ -1,8 +1,8 @@
+import type { OsmixAppRemote } from "@osmix/app-core";
 import { addProtocol, type GetResourceResponse, removeProtocol } from "maplibre-gl";
 import type { Tile } from "osmix";
 
 import { VECTOR_PROTOCOL_NAME } from "../settings";
-import { osmWorker } from "../state/worker";
 
 const VECTOR_URL_PATTERN = /^@osmix\/vector:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\.mvt$/;
 
@@ -12,7 +12,7 @@ export function osmixIdToTileUrl(osmId: string) {
   return `${VECTOR_PROTOCOL_NAME}://${encodeURIComponent(osmId)}/{z}/{x}/{y}.mvt`;
 }
 
-export function addOsmixVectorProtocol() {
+export function addOsmixVectorProtocol(remote: OsmixAppRemote) {
   if (registered) return;
   addProtocol(
     VECTOR_PROTOCOL_NAME,
@@ -22,7 +22,7 @@ export function addOsmixVectorProtocol() {
       const [, osmId, zStr, xStr, yStr] = match;
       const tileIndex: Tile = [+xStr, +yStr, +zStr];
       const id = decodeURIComponent(osmId);
-      const data = await osmWorker.runWithWorker((worker) => worker.getVectorTile(id, tileIndex), {
+      const data = await remote.runWithWorker((worker) => worker.getVectorTile(id, tileIndex), {
         lane: "compute",
         retry: "once",
         signal: abortController.signal,

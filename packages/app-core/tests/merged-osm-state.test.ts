@@ -1,7 +1,7 @@
 import type { Osm, OsmInfo } from "osmix";
 import { describe, expect, it, vi } from "vitest";
 
-import { mergedOsmRefreshRetryId, prepareMergedOsmState } from "../src/lib/merged-osm-state";
+import { mergedOsmRefreshRetryId, prepareMergedOsmState } from "../src/lib/merged-osm-state.ts";
 
 const info = (id: string): OsmInfo => ({
   bbox: [7.4, 43.7, 7.5, 43.8],

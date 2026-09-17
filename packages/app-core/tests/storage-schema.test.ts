@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { OSM_STORE } from "../src/settings";
-import { type OsmSchemaUpgradeDatabase, upgradeOsmStore } from "../src/workers/storage-schema";
+import { OSM_STORE } from "../src/constants.ts";
+import { type OsmSchemaUpgradeDatabase, upgradeOsmStore } from "../src/workers/storage-schema.ts";
 
 function fakeDatabase() {
   const createIndex = vi.fn();

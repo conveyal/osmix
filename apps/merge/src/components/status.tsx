@@ -1,6 +1,5 @@
+import { useLog } from "@osmix/app-core";
 import { formatTimestampMs, StatusDot, Spinner } from "@osmix/ui";
-
-import { useLog } from "../hooks/log";
 
 export default function Status() {
   const { log, activeTasks } = useLog();

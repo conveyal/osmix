@@ -1,4 +1,4 @@
-import { OSM_STORE } from "../settings";
+import { OSM_STORE } from "../constants.ts";
 
 export interface OsmSchemaUpgradeDatabase {
   createObjectStore(

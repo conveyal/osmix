@@ -1,4 +1,12 @@
 import {
+  changesAtom,
+  changesetStatsAtom,
+  changeTypeFilterAtom,
+  entityTypeFilterAtom,
+  pageAtom,
+  startIndexAtom,
+} from "@osmix/app-core";
+import {
   cn,
   Details,
   DetailsContent,
@@ -19,14 +27,6 @@ import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from "osmix";
 import { getEntityType, isNode, isRelation, isWay } from "osmix";
 import { useId, useTransition } from "react";
 
-import {
-  changesAtom,
-  changesetStatsAtom,
-  changeTypeFilterAtom,
-  entityTypeFilterAtom,
-  pageAtom,
-  startIndexAtom,
-} from "../state/changes";
 import { EntityContent } from "./entity-details";
 
 export default function ChangesSummary() {

@@ -1,9 +1,8 @@
+import { Log } from "@osmix/app-core";
 import { ActionButton, Card, CardContent } from "@osmix/ui";
 import { FilesIcon } from "lucide-react";
 import type { OsmInfo } from "osmix";
 import { useEffectEvent } from "react";
-
-import { Log } from "../state/log";
 
 const EXAMPLE_MONACO_PBF_URL =
   "https://trevorgerhardt.github.io/files/487218b69358-1f24d3e4e476/monaco.pbf";

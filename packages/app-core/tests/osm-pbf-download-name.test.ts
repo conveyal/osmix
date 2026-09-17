@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ensureOsmPbfDownloadName } from "../src/lib/osm-pbf-download-name";
+import { ensureOsmPbfDownloadName } from "../src/lib/osm-pbf-download-name.ts";
 
 describe("ensureOsmPbfDownloadName", () => {
   it("replaces other extensions with .pbf", () => {

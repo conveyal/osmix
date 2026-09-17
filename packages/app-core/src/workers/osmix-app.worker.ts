@@ -25,9 +25,9 @@ import {
 } from "osmix";
 import { OsmixWorker } from "osmix";
 
-import { DB_NAME, DB_VERSION, OSM_STORE, STORAGE_CHANNEL } from "../settings";
-import { hashStreamIncrementally } from "./incremental-hash";
-import { type OsmSchemaUpgradeDatabase, upgradeOsmStore } from "./storage-schema";
+import { DB_NAME, DB_VERSION, OSM_STORE, STORAGE_CHANNEL } from "../constants.ts";
+import { hashStreamIncrementally } from "./incremental-hash.ts";
+import { type OsmSchemaUpgradeDatabase, upgradeOsmStore } from "./storage-schema.ts";
 
 /** File metadata stored alongside Osm data */
 export interface StoredFileInfo {
@@ -90,7 +90,7 @@ function pbfFileName(response: Response, inputUrl: string): string {
  * Extended worker with IndexedDB storage capabilities.
  * All heavy operations (hashing, storage, loading) run off the main thread.
  */
-export class MergeWorker extends OsmixWorker {
+export class OsmixAppWorker extends OsmixWorker {
   private dbPromise: Promise<IDBPDatabase<OsmixDB>> | null = null;
   private broadcastChannel = new BroadcastChannel(STORAGE_CHANNEL);
   private hashControllers = new Map<string, AbortController>();
@@ -568,4 +568,4 @@ function fromStorableTransferables(t: OsmTransferables<ArrayBuffer>): OsmTransfe
   };
 }
 
-expose(new MergeWorker());
+expose(new OsmixAppWorker());

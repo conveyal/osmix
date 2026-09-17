@@ -1,9 +1,17 @@
 import { Tabs } from "@base-ui/react/tabs";
+import {
+  useLog,
+  useOsmFile,
+  changesetStatsAtom,
+  selectOsmEntityAtom,
+  osmLoadingAbortControllerAtom,
+} from "@osmix/app-core";
+import { useLoadFromUrl } from "@osmix/app-core";
 import { Main, MapContent, Sidebar, buttonVariants, cn } from "@osmix/ui";
 import { useAtom, useSetAtom } from "jotai";
 import type { OsmFileType } from "osmix";
-import { useEffect, useMemo, useRef } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router";
 
 import ExtractBlock from "../blocks/extract";
 import InspectBlock from "../blocks/inspect";
@@ -17,16 +25,10 @@ import OsmFileMapControl from "../components/osm-file-map-control";
 import { OsmixMapSources } from "../components/osmix-map-sources";
 import SelectedEntityLayer from "../components/selected-entity-layer";
 import SidebarLog from "../components/sidebar-log";
-import { useLog } from "../hooks/log";
 import { useFlyToOsmBounds } from "../hooks/map";
-import { useOsmFile } from "../hooks/osm";
 import { DEFAULT_EXTRACT_BBOX } from "../lib/extract-bbox";
 import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings";
-import { changesetStatsAtom } from "../state/changes";
 import { activeTabAtom } from "../state/extract";
-import { selectOsmEntityAtom } from "../state/osm";
-import { osmLoadingAbortControllerAtom } from "../state/status";
-import { osmWorker } from "../state/worker";
 
 export default function Merge() {
   const base = useOsmFile(BASE_OSM_KEY);
@@ -35,41 +37,15 @@ export default function Merge() {
   const setChangesetStats = useSetAtom(changesetStatsAtom);
   const flyToOsmBounds = useFlyToOsmBounds();
   const selectEntity = useSetAtom(selectOsmEntityAtom);
-  const autoLoadAttempted = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { activeTasks } = useLog();
   const isBusy = activeTasks > 0;
   const [activeTab, setActiveTab] = useAtom(activeTabAtom);
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
 
-  // Handle auto-loading from URL parameter or most recently used file
-  useEffect(() => {
-    if (autoLoadAttempted.current) return;
-    autoLoadAttempted.current = true;
-
-    const loadId = searchParams.get("load");
-    if (loadId) {
-      // Clear the URL parameter
-      setSearchParams({}, { replace: true });
-      // Load the file from storage
-      void base.loadFromStorage(loadId).then((osmInfo) => {
-        if (osmInfo) {
-          flyToOsmBounds(osmInfo);
-        }
-      });
-    } else {
-      // No URL parameter, try to load the most recently used file
-      void osmWorker.getMostRecentlyUsed().then((mostRecent) => {
-        if (mostRecent) {
-          void base.loadFromStorage(mostRecent.fileHash).then((osmInfo) => {
-            if (osmInfo) flyToOsmBounds(osmInfo);
-          });
-        }
-      });
-    }
-  }, [searchParams, setSearchParams, base.loadFromStorage, flyToOsmBounds, base]);
+  // Open `?load=<hash>` from storage, or fall back to the most recently used dataset.
+  useLoadFromUrl({ loadFromStorage: base.loadFromStorage, onLoaded: flyToOsmBounds });
 
   useEffect(() => {
     if (location.pathname.endsWith("/extract")) {

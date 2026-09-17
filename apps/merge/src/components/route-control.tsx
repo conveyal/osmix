@@ -1,3 +1,5 @@
+import { useOsmFile, routingControlIsOpenAtom, selectedOsmAtom } from "@osmix/app-core";
+import { useOsmixRemote } from "@osmix/app-core";
 import { SectionTitle, Button } from "@osmix/ui";
 import { useAtom, useAtomValue } from "jotai";
 import { NavigationIcon, XIcon } from "lucide-react";
@@ -8,12 +10,8 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre";
 
 import { useMap } from "../hooks/map";
-import { useOsmFile } from "../hooks/osm";
 import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings";
-import { routingControlIsOpenAtom } from "../state/map";
-import { selectedOsmAtom } from "../state/osm";
 import { routingStateAtom, type SnappedNode } from "../state/routing";
-import { osmWorker } from "../state/worker";
 import CustomControl from "./custom-control";
 import { FullIndexRequired } from "./full-index-required";
 
@@ -79,6 +77,7 @@ export default function RouteMapControl() {
 }
 
 export function Routing({ osm }: { osm: Osm }) {
+  const remote = useOsmixRemote();
   const map = useMap();
   const [routingState, setRoutingState] = useAtom(routingStateAtom);
   const clickPhaseRef = useRef<"from" | "to">("from");
@@ -94,7 +93,7 @@ export function Routing({ osm }: { osm: Osm }) {
 
     setIsRouting(true);
     try {
-      const snapped = await osmWorker.findNearestRoutableNode(osm.id, point, SNAP_RADIUS_M);
+      const snapped = await remote.findNearestRoutableNode(osm.id, point, SNAP_RADIUS_M);
 
       if (!snapped) {
         // No routable node nearby - show feedback
@@ -133,7 +132,7 @@ export function Routing({ osm }: { osm: Osm }) {
           return;
         }
 
-        const result = await osmWorker.route(osm.id, fromNode.nodeIndex, snappedNode.nodeIndex, {
+        const result = await remote.route(osm.id, fromNode.nodeIndex, snappedNode.nodeIndex, {
           includeStats: true,
           includePathInfo: true,
         });

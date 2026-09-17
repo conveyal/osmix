@@ -1,8 +1,7 @@
+import { useLog } from "@osmix/app-core";
 import { cn, Spinner } from "@osmix/ui";
 import { CheckIcon, CircleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-
-import { useLog } from "../hooks/log";
 
 export interface AutomaticMergeStep {
   id: AutomaticMergeStepId;

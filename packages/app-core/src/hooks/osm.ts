@@ -9,16 +9,16 @@ import type {
 } from "osmix";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { getBrowserLoadCapabilities } from "../lib/browser-capabilities";
-import { prepareMergedOsmState } from "../lib/merged-osm-state";
-import { describeOsmLoadFailure, type OsmLoadFailureContext } from "../lib/osm-load-failure";
-import { ensureOsmPbfDownloadName } from "../lib/osm-pbf-download-name";
-import { showSaveFilePickerWithFallback } from "../lib/save-file-picker";
-import { canStoreBytes } from "../lib/storage-utils";
-import { isStreamCloneable } from "../lib/stream-transfer";
-import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
-import { Log } from "../state/log";
-import { updateMergeOutcomeAtom } from "../state/merge-outcome";
+import { getBrowserLoadCapabilities } from "../lib/browser-capabilities.ts";
+import { prepareMergedOsmState } from "../lib/merged-osm-state.ts";
+import { describeOsmLoadFailure, type OsmLoadFailureContext } from "../lib/osm-load-failure.ts";
+import { ensureOsmPbfDownloadName } from "../lib/osm-pbf-download-name.ts";
+import { showSaveFilePickerWithFallback } from "../lib/save-file-picker.ts";
+import { canStoreBytes } from "../lib/storage-utils.ts";
+import { isStreamCloneable } from "../lib/stream-transfer.ts";
+import type { OsmixAppRemote } from "../remote.ts";
+import { Log } from "../state/log.ts";
+import { osmDatasetVersionAtomFamily } from "../state/osm-version.ts";
 import {
   osmAtomFamily,
   osmFileAtomFamily,
@@ -28,9 +28,9 @@ import {
   osmLoadProfileAtomFamily,
   osmStoredAtomFamily,
   selectedOsmAtom,
-} from "../state/osm";
-import { osmWorker } from "../state/worker";
-import type { StoredFileInfo } from "../workers/osm.worker";
+} from "../state/osm.ts";
+import type { StoredFileInfo } from "../workers/osmix-app.worker.ts";
+import { useOsmixRemote } from "./remote.ts";
 
 export class LoadCancelledError extends Error {
   constructor() {
@@ -39,15 +39,19 @@ export class LoadCancelledError extends Error {
   }
 }
 
-async function hashFileWithCancellation(file: File, signal?: AbortSignal): Promise<string> {
+async function hashFileWithCancellation(
+  remote: OsmixAppRemote,
+  file: File,
+  signal?: AbortSignal,
+): Promise<string> {
   if (signal?.aborted) throw new LoadCancelledError();
   const taskId = crypto.randomUUID();
   const cancel = () => {
-    osmWorker.cancelHash(taskId);
+    remote.cancelHash(taskId);
   };
   signal?.addEventListener("abort", cancel, { once: true });
   try {
-    return await osmWorker.hashFile(file, taskId, signal);
+    return await remote.hashFile(file, taskId, signal);
   } catch (error) {
     if (signal?.aborted) throw new LoadCancelledError();
     throw error;
@@ -104,12 +108,10 @@ export function useOsmFile(osmKey: string) {
     check: Awaited<ReturnType<typeof canStoreBytes>>;
   } | null>(null);
   const setSelectedOsm = useSetAtom(selectedOsmAtom);
-  const updateMergeOutcome = useSetAtom(updateMergeOutcomeAtom);
-  const invalidateMergeInput = () => {
-    if (osmKey === BASE_OSM_KEY || osmKey === PATCH_OSM_KEY) {
-      updateMergeOutcome({ type: "reset" });
-    }
-  };
+  const remote = useOsmixRemote();
+  const bumpDatasetVersion = useSetAtom(osmDatasetVersionAtomFamily(osmKey));
+  /** Announce that the dataset in this slot is being replaced or cleared. */
+  const invalidateDataset = () => bumpDatasetVersion((version) => version + 1);
 
   // Track current load to prevent stale cancellations from clearing newer load state
   const currentLoadIdRef = useRef(0);
@@ -122,7 +124,7 @@ export function useOsmFile(osmKey: string) {
       try {
         const storableBytes =
           osmInfo.loadDiagnostics?.bytes.storageBytes ??
-          (await osmWorker.getStorableByteLength(osmInfo.id));
+          (await remote.getStorableByteLength(osmInfo.id));
         const check = await canStoreBytes(storableBytes);
         if (!disposed) setStorageCheckResult({ osmId: osmInfo.id, check });
       } catch {
@@ -132,7 +134,7 @@ export function useOsmFile(osmKey: string) {
     return () => {
       disposed = true;
     };
-  }, [isStored, osmInfo]);
+  }, [isStored, osmInfo, remote]);
 
   const storageCheck =
     !isStored && storageCheckResult && storageCheckResult.osmId === osmInfo?.id
@@ -147,7 +149,7 @@ export function useOsmFile(osmKey: string) {
       profileOverride?: OsmLoadProfile,
     ) => {
       const loadId = ++currentLoadIdRef.current;
-      invalidateMergeInput();
+      invalidateDataset();
       setFile(file);
       sourceUrlRef.current = null;
       setOsm(null);
@@ -164,7 +166,7 @@ export function useOsmFile(osmKey: string) {
 
         // Hash the file in the worker to avoid blocking UI
         taskLog.update("Hashing file...");
-        const fileHash = await hashFileWithCancellation(file, signal);
+        const fileHash = await hashFileWithCancellation(remote, file, signal);
 
         // Check after hashing
         if (signal?.aborted) throw new LoadCancelledError();
@@ -177,7 +179,7 @@ export function useOsmFile(osmKey: string) {
         setFileInfo(storedFileInfo);
 
         // Check if we already have this file stored (in worker)
-        const existing = await osmWorker.findByHash(fileHash, signal);
+        const existing = await remote.findByHash(fileHash, signal);
 
         // Check after cache lookup
         if (signal?.aborted) throw new LoadCancelledError();
@@ -185,14 +187,14 @@ export function useOsmFile(osmKey: string) {
         const requestedProfile = profileOverride ?? loadProfile;
         if (existing && cachedProfileIsUsable(requestedProfile, existing.info)) {
           taskLog.update("Found cached version, loading from storage...");
-          const stored = await osmWorker.loadFromStorage(existing.fileHash, signal);
+          const stored = await remote.loadFromStorage(existing.fileHash, signal);
 
           // Check after loading from storage
           if (signal?.aborted) throw new LoadCancelledError();
 
           if (stored) {
             // Get the Osm instance from worker (already has spatial indexes built)
-            const osm = await osmWorker.get(stored.entry.fileHash);
+            const osm = await remote.get(stored.entry.fileHash);
 
             // Final check before setting state
             if (signal?.aborted) throw new LoadCancelledError();
@@ -211,7 +213,7 @@ export function useOsmFile(osmKey: string) {
         taskLog.update("Parsing file...");
         const pbfInput = isPbfFile(file, fileType);
         loadCapabilities = pbfInput ? await getBrowserLoadCapabilities() : undefined;
-        const osmInfo: OsmInfo = await osmWorker.fromFile(
+        const osmInfo: OsmInfo = await remote.fromFile(
           file,
           {
             id: fileHash,
@@ -224,7 +226,7 @@ export function useOsmFile(osmKey: string) {
         if (signal?.aborted) throw new LoadCancelledError();
 
         setOsmInfo(osmInfo);
-        const osm = await osmWorker.get(osmInfo.id);
+        const osm = await remote.get(osmInfo.id);
 
         // Final check before setting state
         if (signal?.aborted) throw new LoadCancelledError();
@@ -273,7 +275,7 @@ export function useOsmFile(osmKey: string) {
       signal?: AbortSignal,
     ) => {
       const loadId = ++currentLoadIdRef.current;
-      invalidateMergeInput();
+      invalidateDataset();
       setFile(file);
       setOsm(null);
       setFileInfo(null);
@@ -285,7 +287,7 @@ export function useOsmFile(osmKey: string) {
         if (signal?.aborted) throw new LoadCancelledError();
 
         taskLog.update("Hashing file…");
-        const fileHash = await hashFileWithCancellation(file, signal);
+        const fileHash = await hashFileWithCancellation(remote, file, signal);
         if (signal?.aborted) throw new LoadCancelledError();
 
         const storedFileInfo: StoredFileInfo = {
@@ -297,7 +299,7 @@ export function useOsmFile(osmKey: string) {
 
         taskLog.update("Reading PBF and applying extract…");
         const loadCapabilities = await getBrowserLoadCapabilities();
-        const osmInfo: OsmInfo = await osmWorker.fromFile(
+        const osmInfo: OsmInfo = await remote.fromFile(
           file,
           {
             id: fileHash,
@@ -313,7 +315,7 @@ export function useOsmFile(osmKey: string) {
         if (signal?.aborted) throw new LoadCancelledError();
 
         setOsmInfo(osmInfo);
-        const osm = await osmWorker.get(osmInfo.id);
+        const osm = await remote.get(osmInfo.id);
 
         if (signal?.aborted) throw new LoadCancelledError();
 
@@ -350,7 +352,7 @@ export function useOsmFile(osmKey: string) {
   const loadOsmPbfUrl = useEffectEvent(
     async (url: string, signal?: AbortSignal, profileOverride?: OsmLoadProfile) => {
       const loadId = ++currentLoadIdRef.current;
-      invalidateMergeInput();
+      invalidateDataset();
       sourceUrlRef.current = url;
       setFile(null);
       setOsm(null);
@@ -362,7 +364,7 @@ export function useOsmFile(osmKey: string) {
         if (signal?.aborted) throw new LoadCancelledError();
         const loadCapabilities = await getBrowserLoadCapabilities();
         const requestedProfile = profileOverride ?? loadProfile;
-        const result = await osmWorker.fromPbfUrl(
+        const result = await remote.fromPbfUrl(
           url,
           {
             loadProfile: requestedProfile,
@@ -371,7 +373,7 @@ export function useOsmFile(osmKey: string) {
           signal,
         );
         if (signal?.aborted) throw new LoadCancelledError();
-        const loadedOsm = await osmWorker.get(result.info.id);
+        const loadedOsm = await remote.get(result.info.id);
         if (signal?.aborted) throw new LoadCancelledError();
         setFileInfo(result.fileInfo);
         setOsmInfo(result.info);
@@ -426,7 +428,7 @@ export function useOsmFile(osmKey: string) {
 
   const loadFromStorage = useEffectEvent(async (storageId: string, signal?: AbortSignal) => {
     const loadId = ++currentLoadIdRef.current;
-    invalidateMergeInput();
+    invalidateDataset();
     setLoadFailure(null);
     const taskLog = Log.startTask("Loading osm from storage...");
     try {
@@ -434,7 +436,7 @@ export function useOsmFile(osmKey: string) {
       if (signal?.aborted) throw new LoadCancelledError();
 
       // Load from IndexedDB in the worker
-      const stored = await osmWorker.loadFromStorage(storageId, signal);
+      const stored = await remote.loadFromStorage(storageId, signal);
 
       // Check after loading from storage
       if (signal?.aborted) throw new LoadCancelledError();
@@ -443,7 +445,7 @@ export function useOsmFile(osmKey: string) {
 
       // Get the Osm instance from worker (already has spatial indexes built)
       // Worker registers under fileHash, so use that as the ID
-      const osm = await osmWorker.get(stored.entry.fileHash);
+      const osm = await remote.get(stored.entry.fileHash);
 
       // Final check before setting state
       if (signal?.aborted) throw new LoadCancelledError();
@@ -512,10 +514,10 @@ export function useOsmFile(osmKey: string) {
     );
     const stream = await fileHandle.createWritable();
     if (isStreamCloneable(stream)) {
-      await osmWorker.toPbf(osmInfo.id, stream);
+      await remote.toPbf(osmInfo.id, stream);
     } else {
       task.update("Stream transfer unsupported in this browser; using buffered download fallback");
-      const data = await osmWorker.toPbfData(osmInfo.id);
+      const data = await remote.toPbfData(osmInfo.id);
       await stream.write(data);
       await stream.close();
     }
@@ -529,7 +531,7 @@ export function useOsmFile(osmKey: string) {
     // Check storage availability
     const storableBytes =
       osmInfo.loadDiagnostics?.bytes.storageBytes ??
-      (await osmWorker.getStorableByteLength(osmInfo.id));
+      (await remote.getStorableByteLength(osmInfo.id));
     const storageCheck = await canStoreBytes(storableBytes);
     if (!storageCheck.canStore) {
       Log.addMessage(
@@ -542,7 +544,7 @@ export function useOsmFile(osmKey: string) {
 
     const task = Log.startTask("Saving to storage...");
     try {
-      await osmWorker.storeCurrentOsm(osmInfo.id, fileInfo);
+      await remote.storeCurrentOsm(osmInfo.id, fileInfo);
       setIsStored(true);
       task.end(`${fileInfo.fileName} saved to storage.`);
     } catch (e) {
@@ -564,7 +566,7 @@ export function useOsmFile(osmKey: string) {
       osmInfo: ReturnType<typeof useOsmFile>["osmInfo"];
       isStored: boolean;
     }) => {
-      invalidateMergeInput();
+      invalidateDataset();
       setFile(source.file);
       setFileInfo(source.fileInfo);
       setOsm(source.osm);
@@ -586,7 +588,7 @@ export function useOsmFile(osmKey: string) {
       currentOsm: osm,
       mergedFileName,
       newOsmId,
-      worker: osmWorker,
+      worker: remote,
     });
 
     // Check if anything actually changed using isEqual

@@ -1,6 +1,6 @@
 import type { Osm, OsmInfo } from "osmix";
 
-import type { StoredFileInfo } from "../workers/osm.worker";
+import type { StoredFileInfo } from "../workers/osmix-app.worker.ts";
 
 interface MergedOsmWorker {
   get(osmId: string): Promise<Osm>;

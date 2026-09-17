@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { MergeWorker } from "../src/workers/osm.worker";
+import { OsmixAppWorker } from "../src/workers/osmix-app.worker.ts";
 
 vi.mock("comlink", async (importOriginal) => ({
   ...(await importOriginal<typeof import("comlink")>()),
@@ -13,7 +13,7 @@ class MockBroadcastChannel {
   close(): void {}
 }
 
-describe("MergeWorker streaming hashing", () => {
+describe("OsmixAppWorker streaming hashing", () => {
   beforeAll(() => {
     vi.stubGlobal("BroadcastChannel", MockBroadcastChannel);
   });
@@ -28,7 +28,7 @@ describe("MergeWorker streaming hashing", () => {
     });
     const stream = vi.fn(() => new Blob([new TextEncoder().encode("abc")]).stream());
     const file = { arrayBuffer, stream } as unknown as File;
-    const worker = new MergeWorker();
+    const worker = new OsmixAppWorker();
 
     const digest = await worker.hashFile(file);
 
@@ -61,7 +61,7 @@ describe("MergeWorker streaming hashing", () => {
       arrayBuffer,
       stream: vi.fn(() => stream),
     } as unknown as File;
-    const worker = new MergeWorker();
+    const worker = new OsmixAppWorker();
     const hashing = worker.hashFile(file, "cancel-me");
     while (chunksProduced < 3) await new Promise((resolve) => setTimeout(resolve, 1));
 

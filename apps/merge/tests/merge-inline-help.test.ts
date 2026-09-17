@@ -1,15 +1,10 @@
+import { type OsmixAppRemote, remoteAtom } from "@osmix/app-core";
+import { changesetStatsAtom } from "@osmix/app-core";
 import { createStore, Provider } from "jotai";
 import type { OsmConflationCandidateView, OsmConflationRoutingDiagnostics } from "osmix";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-
-vi.mock("../src/state/worker", () => ({
-  osmWorker: {
-    getChangesetPage: vi.fn(),
-    setChangesetFilters: vi.fn(),
-  },
-}));
 
 import { ConflationConfig } from "../src/components/conflation-config";
 import {
@@ -22,7 +17,6 @@ import {
 } from "../src/components/conflation-review";
 import { ConflationRoutingDiagnostics } from "../src/components/conflation-routing-diagnostics";
 import ChangesSummary, { ChangesFilters } from "../src/components/osm-changes-summary";
-import { changesetStatsAtom } from "../src/state/changes";
 import { conflationFormAtom } from "../src/state/conflation";
 
 const CANDIDATE: OsmConflationCandidateView = {
@@ -155,6 +149,10 @@ describe("merge inline guidance", () => {
     const html = renderWithStore(
       createElement("div", null, createElement(ChangesSummary), createElement(ChangesFilters)),
       (store) => {
+        store.set(remoteAtom, {
+          getChangesetPage: vi.fn(),
+          setChangesetFilters: vi.fn(),
+        } as unknown as OsmixAppRemote);
         store.set(changesetStatsAtom, {
           osmId: "merged",
           totalChanges: 25,

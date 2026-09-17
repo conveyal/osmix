@@ -1,4 +1,15 @@
 import {
+  useOsmFile,
+  mergedOsmRefreshRetryId,
+  showSaveFilePickerWithFallback,
+  changesetStatsAtom,
+  Log,
+  selectedEntityAtom,
+  selectOsmEntityAtom,
+  osmLoadingAbortControllerAtom,
+} from "@osmix/app-core";
+import { useOsmixRemote } from "@osmix/app-core";
+import {
   ActionButton,
   Details,
   DetailsContent,
@@ -67,7 +78,6 @@ import { OsmInputCardHeader } from "../components/osm-input-card-header";
 import { StepActions } from "../components/step-actions";
 import StoredOsmList from "../components/stored-osm-list";
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
-import { useOsmFile } from "../hooks/osm";
 import {
   firstInvalidConflationInputId,
   toOsmConflationOptions,
@@ -89,10 +99,7 @@ import {
   verifiedBaseMergeOptions,
   WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
 } from "../lib/merge-workflow";
-import { mergedOsmRefreshRetryId } from "../lib/merged-osm-state";
-import { showSaveFilePickerWithFallback } from "../lib/save-file-picker";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
-import { changesetStatsAtom } from "../state/changes";
 import {
   conflationCandidateFilterAtom,
   conflationCandidatePageAtom,
@@ -104,7 +111,6 @@ import {
   conflationSummaryAtom,
   resetConflationReviewAtom,
 } from "../state/conflation";
-import { Log } from "../state/log";
 import {
   generatedMergeOutcomeAtom,
   mergeCompletionAtom,
@@ -113,10 +119,7 @@ import {
   pendingMergedRefreshAtom,
   updateMergeOutcomeAtom,
 } from "../state/merge-outcome";
-import { selectedEntityAtom, selectOsmEntityAtom } from "../state/osm";
-import { mergeAbortControllerAtom, osmLoadingAbortControllerAtom } from "../state/status";
-import { osmWorker } from "../state/worker";
-
+import { mergeAbortControllerAtom } from "../state/status";
 const STEPS = [
   "select-osm-pbf-files",
   "inspect-base-osm",
@@ -223,6 +226,7 @@ function reviewChangesetTitle(context: ChangesetReviewContext): string {
 }
 
 export default function MergeBlock() {
+  const remote = useOsmixRemote();
   const base = useOsmFile(BASE_OSM_KEY);
   const patch = useOsmFile(PATCH_OSM_KEY);
   const completion = useAtomValue(mergeCompletionAtom);
@@ -348,12 +352,12 @@ export default function MergeBlock() {
 
   const loadConflationPage = async (page: number) => {
     if (!base.osm) throw Error("Base OSM is not loaded");
-    let result = await osmWorker.getConflationPage(base.osm.id, page, CONFLATION_PAGE_SIZE, {
+    let result = await remote.getConflationPage(base.osm.id, page, CONFLATION_PAGE_SIZE, {
       groupBySource: true,
     });
     const lastPage = Math.max(0, result.totalPages - 1);
     if (page > lastPage) {
-      result = await osmWorker.getConflationPage(base.osm.id, lastPage, CONFLATION_PAGE_SIZE, {
+      result = await remote.getConflationPage(base.osm.id, lastPage, CONFLATION_PAGE_SIZE, {
         groupBySource: true,
       });
     }
@@ -367,13 +371,13 @@ export default function MergeBlock() {
     setConflationCandidateFilter(filter);
     setIsConflationFilterPending(true);
     try {
-      await osmWorker.setConflationFilter(base.osm.id, filter);
+      await remote.setConflationFilter(base.osm.id, filter);
       await loadConflationPage(0);
     } catch (error) {
       // Keep the visible controls aligned with the still-displayed page when a
       // worker failure prevents the requested filter from being applied.
       try {
-        await osmWorker.setConflationFilter(base.osm.id, previousFilter);
+        await remote.setConflationFilter(base.osm.id, previousFilter);
       } catch {
         // Preserve the original refresh error; a later page request will surface
         // any worker recovery failure through the ordinary error channel.
@@ -407,7 +411,7 @@ export default function MergeBlock() {
   ) =>
     withMatchingReviewError(async () => {
       if (!base.osm) throw Error("Base OSM is not loaded");
-      const result = await osmWorker.setConflationSourceDecision(
+      const result = await remote.setConflationSourceDecision(
         base.osm.id,
         { entityType: source.entityType, sourceId: source.sourceId },
         decision,
@@ -450,7 +454,7 @@ export default function MergeBlock() {
       const decisions = conflationDecisions.filter(
         (decision) => decision.candidateId !== candidateId,
       );
-      const summary = await osmWorker.setConflationDecisions(base.osm.id, decisions);
+      const summary = await remote.setConflationDecisions(base.osm.id, decisions);
       setConflationDecisions(decisions);
       setConflationSummary(summary);
       setMatchingIssue(null);
@@ -461,7 +465,7 @@ export default function MergeBlock() {
   const updateConflationBulkDecision = (request: OsmConflationBulkDecisionRequest) =>
     withMatchingReviewError(async () => {
       if (!base.osm) throw Error("Base OSM is not loaded");
-      const result = await osmWorker.applyConflationBulkDecision(base.osm.id, request);
+      const result = await remote.applyConflationBulkDecision(base.osm.id, request);
       setConflationDecisions(result.decisions);
       setConflationSummary(result.summary);
       if (result.preview.changedCandidates > 0) invalidateMatchingPreview();
@@ -480,7 +484,7 @@ export default function MergeBlock() {
         if (!conflationSummary) {
           throw Error("Discover and review imported-data match candidates first");
         }
-        const result = await osmWorker.generateConflationChangeset(
+        const result = await remote.generateConflationChangeset(
           base.osm.id,
           verifiedBaseMergeOptions(reconcile),
         );
@@ -499,7 +503,7 @@ export default function MergeBlock() {
       }
     }
 
-    const result = await osmWorker.generateChangeset(
+    const result = await remote.generateChangeset(
       base.osm.id,
       patch.osm.id,
       verifiedBaseMergeOptions(reconcile),
@@ -535,7 +539,7 @@ export default function MergeBlock() {
       const task = Log.startTask(`Converting ${changesetStats.totalChanges} changes to JSON`);
       async function* changePages() {
         for (let page = 0; ; page++) {
-          const result = await osmWorker.getChangesetPage(osmId, page, pageSize);
+          const result = await remote.getChangesetPage(osmId, page, pageSize);
           if (!result.changes || result.changes.length === 0) return;
           yield result.changes;
         }
@@ -584,7 +588,7 @@ export default function MergeBlock() {
     let needsSynchronization = synchronize;
     setPendingMergedRefresh(pending);
     try {
-      if (synchronize) await osmWorker.synchronizeDataset(osmId);
+      if (synchronize) await remote.synchronizeDataset(osmId);
       // Once synchronization succeeds, a later rename/refresh retry uses its surviving ID.
       needsSynchronization = false;
       await base.setMergedOsm(osmId, fileName);
@@ -621,7 +625,7 @@ export default function MergeBlock() {
     if (!changesetStats) throw Error("Changeset stats are not loaded");
     let synchronize = false;
     try {
-      await osmWorker.applyChangesAndReplace(changesetStats.osmId);
+      await remote.applyChangesAndReplace(changesetStats.osmId);
     } catch (error) {
       if (committedMutationOsmId(error, "applyChangesAndReplace") !== changesetStats.osmId) {
         throw error;
@@ -930,11 +934,11 @@ export default function MergeBlock() {
                           );
                         },
                         patchOsmId,
-                        worker: osmWorker,
+                        worker: remote,
                       });
 
                       if (result.status === "cancelled") {
-                        await osmWorker.clearConflation(baseOsmId);
+                        await remote.clearConflation(baseOsmId);
                         task.end("Merge cancelled by user");
                         goToStep("select-osm-pbf-files");
                         return;
@@ -955,7 +959,7 @@ export default function MergeBlock() {
                     setAutomaticMergeProgress((current) =>
                       current ? { ...current, currentStepId: "merge-exact" } : current,
                     );
-                    const merged = await osmWorker.merge(
+                    const merged = await remote.merge(
                       baseOsmId,
                       patchOsmId,
                       completeMergeOptions(),
@@ -1044,12 +1048,12 @@ export default function MergeBlock() {
                           restoreReview: conflationDiscoveryCompleted
                             ? async () => {
                                 if (issue.source) {
-                                  await osmWorker.setConflationFilter(baseOsmId, issue.source);
+                                  await remote.setConflationFilter(baseOsmId, issue.source);
                                   setConflationCandidateFilter(issue.source);
                                 }
                                 const [summary, page] = await Promise.all([
-                                  osmWorker.getConflationSummary(baseOsmId),
-                                  osmWorker.getConflationPage(baseOsmId, 0, CONFLATION_PAGE_SIZE, {
+                                  remote.getConflationSummary(baseOsmId),
+                                  remote.getConflationPage(baseOsmId, 0, CONFLATION_PAGE_SIZE, {
                                     groupBySource: true,
                                   }),
                                 ]);
@@ -1145,7 +1149,7 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Inspecting base OSM for duplicate entities", async () => {
                 if (!base.osm) throw Error("Base OSM is not loaded");
-                const changes = await osmWorker.generateChangeset(
+                const changes = await remote.generateChangeset(
                   base.osm.id,
                   base.osm.id,
                   WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
@@ -1191,7 +1195,7 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Inspecting patch OSM for duplicate entities", async () => {
                 if (!patch.osm) throw Error("Patch OSM is not loaded");
-                const patchChanges = await osmWorker.generateChangeset(
+                const patchChanges = await remote.generateChangeset(
                   patch.osm.id,
                   patch.osm.id,
                   WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
@@ -1258,7 +1262,7 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Generating direct-merge preview", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                const results = await osmWorker.generateChangeset(
+                const results = await remote.generateChangeset(
                   base.osm.id,
                   patch.osm.id,
                   verifiedBaseMergeOptions(false),
@@ -1386,7 +1390,7 @@ export default function MergeBlock() {
                       applied.synchronize,
                     );
                   } else if (changesetStats.osmId === patch.osm?.id) {
-                    if (applied.synchronize) await osmWorker.synchronizeDataset(applied.osmId);
+                    if (applied.synchronize) await remote.synchronizeDataset(applied.osmId);
                     await patch.setMergedOsm(applied.osmId);
                   } else {
                     throw Error("Changeset OSM ID does not match base or patch OSM ID");
@@ -1420,14 +1424,14 @@ export default function MergeBlock() {
             try {
               resetConflationReview();
               setMatchingIssue(null);
-              const summary = await osmWorker.discoverConflation(
+              const summary = await remote.discoverConflation(
                 base.osm.id,
                 patch.osm.id,
                 conflationOptions,
               );
               invalidateMatchingPreview();
               setConflationSummary(summary);
-              const page = await osmWorker.getConflationPage(base.osm.id, 0, CONFLATION_PAGE_SIZE, {
+              const page = await remote.getConflationPage(base.osm.id, 0, CONFLATION_PAGE_SIZE, {
                 groupBySource: true,
               });
               setConflationCandidatePage(page);
@@ -1549,7 +1553,7 @@ export default function MergeBlock() {
             onAction={() =>
               startStepTask("Generating intersection preview", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                const results = await osmWorker.generateChangeset(
+                const results = await remote.generateChangeset(
                   base.osm.id,
                   patch.osm.id,
                   INTERSECTION_OPTIONS,

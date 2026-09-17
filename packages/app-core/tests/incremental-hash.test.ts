@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { hashFileIncrementally, hashStreamIncrementally } from "../src/workers/incremental-hash";
+import { hashFileIncrementally, hashStreamIncrementally } from "../src/workers/incremental-hash.ts";
 
 describe("incremental hashing", () => {
   it("hashes File.stream() without invoking File.arrayBuffer()", async () => {

@@ -1,8 +1,8 @@
+import type { OsmixAppRemote } from "@osmix/app-core";
 import { addProtocol, type GetResourceResponse, removeProtocol } from "maplibre-gl";
 import type { Tile } from "osmix";
 
 import { RASTER_PROTOCOL_NAME } from "../settings";
-import { osmWorker } from "../state/worker";
 
 export const RASTER_URL_PATTERN = /^@osmix\/raster:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\.png$/;
 
@@ -13,7 +13,10 @@ export function osmixIdToTileUrl(osmId: string, tileSize: number) {
 /**
  * Creates a MapLibre protocol action that handles requests for raster tiles.
  */
-export function addOsmixRasterProtocol() {
+let registered = false;
+
+export function addOsmixRasterProtocol(remote: OsmixAppRemote) {
+  if (registered) return;
   addProtocol(
     RASTER_PROTOCOL_NAME,
     async (req, abortController): Promise<GetResourceResponse<ArrayBuffer>> => {
@@ -25,7 +28,7 @@ export function addOsmixRasterProtocol() {
       const tileSize = +sizeStr;
       const tileIndex: Tile = [+xStr, +yStr, +zStr];
       const id = decodeURIComponent(osmId);
-      const rasterTile = await osmWorker.runWithWorker(
+      const rasterTile = await remote.runWithWorker(
         (worker) => worker.getRasterTile(id, tileIndex, { tileSize }),
         {
           lane: "compute",
@@ -40,10 +43,13 @@ export function addOsmixRasterProtocol() {
       };
     },
   );
+  registered = true;
 }
 
 export function removeOsmixRasterProtocol() {
+  if (!registered) return;
   removeProtocol(RASTER_PROTOCOL_NAME);
+  registered = false;
 }
 
 /**

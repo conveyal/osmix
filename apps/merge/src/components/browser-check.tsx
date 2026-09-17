@@ -1,3 +1,4 @@
+import { type BrowserLoadCapabilities, getBrowserLoadCapabilities } from "@osmix/app-core";
 import {
   bytesSizeToHuman,
   StatusDot,
@@ -11,11 +12,6 @@ import {
   Spinner,
 } from "@osmix/ui";
 import { useEffect, useMemo, useState } from "react";
-
-import {
-  type BrowserLoadCapabilities,
-  getBrowserLoadCapabilities,
-} from "../lib/browser-capabilities";
 
 type SystemIssue = {
   id: "secure-context" | "cross-origin-isolated" | "device-memory";

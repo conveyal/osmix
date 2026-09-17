@@ -1,18 +1,18 @@
 /**
  * Hook for subscribing to storage changes via BroadcastChannel.
  *
- * The MergeWorker broadcasts storage changes when IndexedDB is modified,
+ * The OsmixAppWorker broadcasts storage changes when IndexedDB is modified,
  * allowing the UI to react without polling.
  */
 
 import { useEffect, useEffectEvent, useSyncExternalStore } from "react";
 
-import type { MergeRemote } from "../lib/merge-remote";
-import { STORAGE_CHANNEL } from "../settings";
-import type { StoredOsmEntry } from "../workers/osm.worker";
+import { STORAGE_CHANNEL } from "../constants.ts";
+import type { OsmixAppRemote } from "../remote.ts";
+import type { StoredOsmEntry } from "../workers/osmix-app.worker.ts";
 
 // Re-export types for convenience
-export type { StoredFileInfo, StoredOsmEntry } from "../workers/osm.worker";
+export type { StoredFileInfo, StoredOsmEntry } from "../workers/osmix-app.worker.ts";
 
 /** Snapshot of storage state for useSyncExternalStore */
 interface StorageSnapshot {
@@ -25,7 +25,7 @@ interface StorageSnapshot {
  * Creates a storage subscription that listens to BroadcastChannel messages
  * and fetches the latest data from the remote.
  */
-export function createStorageStore(remote: MergeRemote) {
+export function createStorageStore(remote: OsmixAppRemote) {
   let snapshot: StorageSnapshot = {
     entries: [],
     estimatedBytes: 0,
@@ -80,19 +80,23 @@ export function createStorageStore(remote: MergeRemote) {
   };
 }
 
-/** Global storage store instance - initialized lazily */
-let storageStore: ReturnType<typeof createStorageStore> | null = null;
+/** One storage store per remote, created lazily. */
+const storageStores = new WeakMap<OsmixAppRemote, ReturnType<typeof createStorageStore>>();
 
-function getStorageStore(remote: MergeRemote) {
-  storageStore ??= createStorageStore(remote);
-  return storageStore;
+function getStorageStore(remote: OsmixAppRemote) {
+  let store = storageStores.get(remote);
+  if (!store) {
+    store = createStorageStore(remote);
+    storageStores.set(remote, store);
+  }
+  return store;
 }
 
 /**
  * Hook to access stored Osm entries with automatic updates via BroadcastChannel.
  * Uses useSyncExternalStore for React 18+ concurrent mode compatibility.
  */
-export function useStoredOsm(remote: MergeRemote) {
+export function useStoredOsm(remote: OsmixAppRemote) {
   const store = getStorageStore(remote);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
 

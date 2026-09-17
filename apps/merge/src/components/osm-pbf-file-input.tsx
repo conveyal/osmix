@@ -1,4 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
+import { fetchOsmFileFromUrl, Log } from "@osmix/app-core";
 import {
   ActionButton,
   Button,
@@ -14,9 +15,6 @@ import {
 import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
 import type { OsmFileType, OsmLoadProfile } from "osmix";
 import { useId, useState } from "react";
-
-import { fetchOsmFileFromUrl } from "../lib/fetch-osm-file";
-import { Log } from "../state/log";
 
 /** File type options with labels and accepted extensions */
 const FILE_TYPE_OPTIONS: {

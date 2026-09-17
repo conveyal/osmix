@@ -1,7 +1,7 @@
 import * as Comlink from "comlink";
 import type { OsmLoadCapabilities } from "osmix";
 
-import type { BrowserCheckWorkerApi, BufferKind } from "../workers/browser-check.worker";
+import type { BrowserCheckWorkerApi, BufferKind } from "../workers/browser-check.worker.ts";
 
 export interface BrowserLoadCapabilities extends OsmLoadCapabilities {
   arrayBufferMaxBytes: number;

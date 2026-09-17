@@ -1,11 +1,7 @@
 import { Layer, Source } from "react-map-gl/maplibre";
 
-import { addOsmixRasterProtocol, osmixIdToTileUrl } from "../lib/osmix-raster-protocol";
+import { osmixIdToTileUrl } from "../lib/osmix-raster-protocol";
 import { APPID, MIN_PICKABLE_ZOOM, RASTER_TILE_SIZE } from "../settings";
-
-if (typeof window !== "undefined") {
-  addOsmixRasterProtocol();
-}
 
 export default function OsmixRasterSource({
   osmId,
