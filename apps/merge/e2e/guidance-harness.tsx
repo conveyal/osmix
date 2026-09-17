@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import "../src/main.css";
+import "../src/lib/maplibre-worker";
 import {
   AutomaticMergeProgress,
   CONFLATION_AUTOMATIC_MERGE_STEPS,
