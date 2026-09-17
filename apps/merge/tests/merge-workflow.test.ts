@@ -77,7 +77,7 @@ describe("merge workflow policy", () => {
         runConflationAllSteps({
           baseOsmId: "base",
           patchOsmId: "patch",
-          conflation: { propertyKeys: ["name"] },
+          conflation: { attachNetwork: false, propertyKeys: ["name"] },
           isCancelled: () => false,
           onBaseApplied,
           onIntersectionsApplied,
@@ -103,7 +103,7 @@ describe("merge workflow policy", () => {
       runConflationAllSteps({
         baseOsmId: "base",
         patchOsmId: "patch",
-        conflation: { propertyKeys: ["name"] },
+        conflation: { attachNetwork: false, propertyKeys: ["name"] },
         isCancelled: () => false,
         onBaseApplied,
         onIntersectionsApplied,
