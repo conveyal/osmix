@@ -1,3 +1,5 @@
+export { AppLinks } from "./components/app-links.tsx";
+export { OsmixAppShell } from "./components/app-shell.tsx";
 export { default as Basemap, type MapInitialViewState } from "./components/basemap.tsx";
 export { default as BrowserCheck } from "./components/browser-check.tsx";
 export { default as CenterInfo } from "./components/center-info.tsx";
@@ -57,6 +59,7 @@ export { default as SidebarLog } from "./components/sidebar-log.tsx";
 export { default as Status } from "./components/status.tsx";
 export { StoredOsmList } from "./components/stored-osm-list.tsx";
 export { default as ZoomInfo, ZoomInButton, ZoomOutButton } from "./components/zoom-info.tsx";
+export { createOsmixAppRuntime, type OsmixAppRuntime, type OsmixAppStore } from "./bootstrap.ts";
 export {
   APPID,
   BASE_MAP_STYLES,
@@ -67,6 +70,7 @@ export {
   VECTOR_PROTOCOL_NAME,
 } from "./constants.ts";
 export { useFlyToEntity, useFlyToOsmBounds, useMap } from "./hooks/map.ts";
+export { appOrigin, OSMIX_APPS, type OsmixAppId } from "./lib/app-origin.ts";
 export { getOsmixEntityByStringId } from "./lib/entity-id.ts";
 export { installMaplibreWorker } from "./lib/maplibre-worker.ts";
 export { registerOsmixProtocols } from "./lib/osmix-protocols.ts";

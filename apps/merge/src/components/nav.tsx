@@ -1,21 +1,12 @@
-import { BrowserCheck, MapNavControls, Status } from "@osmix/app-components";
-import { cn, Nav } from "@osmix/ui";
-import { NavLink, type NavLinkRenderProps } from "react-router";
+import { AppLinks, BrowserCheck, MapNavControls, Status } from "@osmix/app-components";
+import { Nav } from "@osmix/ui";
 
 export default function MergeNav() {
   return (
     <Nav
       links={
         <>
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }: NavLinkRenderProps) =>
-              cn("font-normal hover:underline", isActive ? "text-info" : "text-muted-foreground")
-            }
-          >
-            Merge
-          </NavLink>
+          <AppLinks current="merge" />
           <BrowserCheck />
         </>
       }

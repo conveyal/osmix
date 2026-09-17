@@ -16,6 +16,6 @@ The app itself is a few files: `src/main.tsx` creates the worker remote and jota
 pnpm --filter @osmix/inspect dev
 ```
 
-Dev runs on `inspect.osmix` through Portless. `?load=<fileHash>` opens a dataset already saved in this browser's storage; otherwise the most recently used dataset loads.
+Production: [inspect.osmix.dev](https://inspect.osmix.dev). Dev runs on `inspect.osmix.localhost` through Portless. `?load=<fileHash>` opens a dataset already saved in this browser's storage; otherwise the most recently used dataset loads.
 
 Like the merge app it needs COOP/COEP headers (set in `vite.config.ts` and `vercel.json`) so workers can share memory. Design conventions live in [`packages/ui/DESIGN.md`](../../packages/ui/DESIGN.md).
