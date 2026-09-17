@@ -122,6 +122,7 @@ not found by automatic source detection. Each package stylesheet declares
 
 ```css
 @import "@osmix/ui/styles.css";
+@import "@osmix/app-components/styles.css";
 @source "./";
 ```
 
@@ -144,7 +145,7 @@ duplicates the preflight and utilities.
   nav buttons via jotai atoms. Panel headers use `SectionTitle` with a border-b
   row and a ghost close/action button.
 - CSS that targets MapLibre-generated DOM (`.maplibregl-ctrl`,
-  `.osmix-overlay-popup`, `.osmix-overlay-tooltip`) must stay in a plain stylesheet (the app `main.css` today) —
+  `.osmix-overlay-popup`, `.osmix-overlay-tooltip`) must stay in a plain stylesheet (`packages/app-components/src/styles.css`) —
   those elements are not rendered by React. Popup backgrounds use
   `var(--background)`.
 

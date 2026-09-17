@@ -1,3 +1,4 @@
+import { ChangesSummary, ChangesFilters } from "@osmix/app-components";
 import { type OsmixAppRemote, remoteAtom } from "@osmix/app-core";
 import { changesetStatsAtom } from "@osmix/app-core";
 import { createStore, Provider } from "jotai";
@@ -16,7 +17,6 @@ import {
   ConflationStatusLegend,
 } from "../src/components/conflation-review";
 import { ConflationRoutingDiagnostics } from "../src/components/conflation-routing-diagnostics";
-import ChangesSummary, { ChangesFilters } from "../src/components/osm-changes-summary";
 import { conflationFormAtom } from "../src/state/conflation";
 
 const CANDIDATE: OsmConflationCandidateView = {

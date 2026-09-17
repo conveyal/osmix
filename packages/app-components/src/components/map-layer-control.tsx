@@ -12,9 +12,9 @@ import { useAtomValue } from "jotai";
 import { ChevronDown, Eye, EyeOff, Folder, FolderOpen, Layers } from "lucide-react";
 import { useCallback, useEffectEvent, useMemo, useState, useSyncExternalStore } from "react";
 
-import { useMap } from "../hooks/map";
-import { APPID } from "../settings";
-import CustomControl from "./custom-control";
+import { APPID } from "../constants.ts";
+import { useMap } from "../hooks/map.ts";
+import CustomControl from "./custom-control.tsx";
 
 type LayerInfo = {
   id: string;

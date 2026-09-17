@@ -1,4 +1,17 @@
 import {
+  EntityDetails,
+  FullIndexRequired,
+  hasFullNodeIndex,
+  ChangesSummary,
+  ChangesExpandableList,
+  ChangesFilters,
+  ChangesPagination,
+  OsmInfoTable,
+  StoredOsmList,
+  useFlyToEntity,
+  useFlyToOsmBounds,
+} from "@osmix/app-components";
+import {
   useOsmFile,
   mergedOsmRefreshRetryId,
   showSaveFilePickerWithFallback,
@@ -63,21 +76,11 @@ import { ConflationConfig } from "../components/conflation-config";
 import { ConflationReview } from "../components/conflation-review";
 import { ConflationRoutingDiagnostics } from "../components/conflation-routing-diagnostics";
 import { ConflationWayRemovalPreview } from "../components/conflation-way-removal";
-import EntityDetails from "../components/entity-details";
-import { FullIndexRequired, hasFullNodeIndex } from "../components/full-index-required";
 import { BackToMatching, MatchingReviewProblem } from "../components/matching-review-recovery";
 import { MergeCompletionSummary } from "../components/merge-completion-summary";
 import { MergeStepGuide, type MergeStepGuideId } from "../components/merge-step-guide";
-import ChangesSummary, {
-  ChangesExpandableList,
-  ChangesFilters,
-  ChangesPagination,
-} from "../components/osm-changes-summary";
-import OsmInfoTable from "../components/osm-info-table";
 import { OsmInputCardHeader } from "../components/osm-input-card-header";
 import { StepActions } from "../components/step-actions";
-import StoredOsmList from "../components/stored-osm-list";
-import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
 import {
   firstInvalidConflationInputId,
   toOsmConflationOptions,

@@ -9,10 +9,9 @@ import {
   type ViewStateChangeEvent,
 } from "react-map-gl/maplibre";
 
-import { APPID, BASE_MAP_STYLES, DEFAULT_BASE_MAP_STYLE } from "../settings";
-import MapLayerControl from "./map-layer-control";
-import NominatimSearchControl from "./nominatim-search-control";
-import RouteMapControl from "./route-control";
+import { APPID, BASE_MAP_STYLES, DEFAULT_BASE_MAP_STYLE } from "../constants.ts";
+import MapLayerControl from "./map-layer-control.tsx";
+import NominatimSearchControl from "./nominatim-search-control.tsx";
 
 const MAP_CENTER = [-120.5, 46.6] as const; // Yakima, WA
 const MAP_ZOOM = 10;
@@ -77,7 +76,6 @@ export default function Basemap({
       <ScaleControl style={controlStyle} position="bottom-left" unit="imperial" />
 
       <MapLayerControl />
-      <RouteMapControl />
       <NominatimSearchControl />
 
       {children}

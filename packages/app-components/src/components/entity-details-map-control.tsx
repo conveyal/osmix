@@ -4,11 +4,11 @@ import { useAtom, useSetAtom } from "jotai";
 import { MaximizeIcon, XIcon } from "lucide-react";
 import type { Osm } from "osmix";
 
-import { useFlyToEntity } from "../hooks/map";
-import { MIN_PICKABLE_ZOOM } from "../settings";
-import { getOsmixEntityByStringId } from "../utils";
-import EntityDetails from "./entity-details";
-import EntityLookup from "./entity-lookup";
+import { MIN_PICKABLE_ZOOM } from "../constants.ts";
+import { useFlyToEntity } from "../hooks/map.ts";
+import { getOsmixEntityByStringId } from "../lib/entity-id.ts";
+import EntityDetails from "./entity-details.tsx";
+import EntityLookup from "./entity-lookup.tsx";
 
 export default function EntityMapControl({ osm }: { osm: Osm }) {
   const [selectedEntity, setSelectedEntity] = useAtom(selectedEntityAtom);

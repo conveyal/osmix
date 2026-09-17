@@ -1,20 +1,5 @@
-export const APPID = "osmix";
-export const MIN_PICKABLE_ZOOM = 11;
 export const DEFAULT_BASE_PBF_URL = "./yakima-full.osm.pbf";
 export const DEFAULT_PATCH_PBF_URL = "./yakima-osw.osm.pbf";
-
-export const RASTER_PROTOCOL_NAME = "@osmix/raster";
-export const RASTER_TILE_SIZE = 256;
-
-export const VECTOR_PROTOCOL_NAME = "@osmix/vector";
-
-export const BASE_MAP_STYLES = {
-  "carto-positron": "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-  "carto-dark": "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-  "carto-voyager": "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
-} as const;
-
-export const DEFAULT_BASE_MAP_STYLE: keyof typeof BASE_MAP_STYLES = "carto-dark";
 
 export const BASE_OSM_KEY = "main";
 export const PATCH_OSM_KEY = "patch";

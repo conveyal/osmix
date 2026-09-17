@@ -11,7 +11,7 @@ import {
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import LogContent from "./log";
+import LogContent from "./log.tsx";
 
 export default function SidebarLog() {
   const { activeTasks, log } = useLog();

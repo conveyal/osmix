@@ -43,12 +43,12 @@ import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
 import { useEffectEvent, useRef, useState } from "react";
 
-import { OsmLoadFailurePanel } from "./osm-load-failure";
+import { OsmLoadFailurePanel } from "./osm-load-failure.tsx";
 import {
   OsmLoadProfileSelector,
   OsmPbfOpenUrlButton,
   OsmPbfSelectFileButton,
-} from "./osm-pbf-file-input";
+} from "./osm-pbf-file-input.tsx";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";

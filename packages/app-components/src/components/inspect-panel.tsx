@@ -22,26 +22,32 @@ import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
 import { Suspense } from "react";
 
-import ExtractList from "../components/extract-list";
-import { FullIndexRequired, hasFullNodeIndex } from "../components/full-index-required";
+import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map.ts";
+import { FullIndexRequired, hasFullNodeIndex } from "./full-index-required.tsx";
 import ChangesSummary, {
   ChangesFilters,
   ChangesList,
   ChangesPagination,
-} from "../components/osm-changes-summary";
-import StoredOsmList from "../components/stored-osm-list";
-import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map";
-import { BASE_OSM_KEY } from "../settings";
+} from "./osm-changes-summary.tsx";
+import { OsmSourceLinks } from "./osm-source-links.tsx";
+import StoredOsmList from "./stored-osm-list.tsx";
 
-export default function InspectBlock({
+/**
+ * Sidebar panel for inspecting one loaded dataset: source links and stored files while the
+ * slot is empty, then within-dataset duplicate diagnostics once a dataset is loaded.
+ */
+export function InspectPanel({
+  osmKey,
   openOsmFile,
 }: {
+  /** The osm slot this panel inspects. */
+  osmKey: string;
   openOsmFile: (file: File | string, fileType?: OsmFileType) => Promise<OsmInfo | null>;
 }) {
   const remote = useOsmixRemote();
   const flyToEntity = useFlyToEntity();
   const flyToOsmBounds = useFlyToOsmBounds();
-  const baseOsm = useOsmFile(BASE_OSM_KEY);
+  const baseOsm = useOsmFile(osmKey);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
   const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom);
@@ -52,7 +58,7 @@ export default function InspectBlock({
         <EmptyState className="p-0">
           Select an OSM file to inspect, or extract a region on the Extract tab.
         </EmptyState>
-        <ExtractList
+        <OsmSourceLinks
           openOsmPbfUrl={async (url) => {
             const osmInfo = await baseOsm.loadOsmPbfUrl(url);
             if (osmInfo) flyToOsmBounds(osmInfo);
@@ -60,13 +66,13 @@ export default function InspectBlock({
           }}
         />
         <StoredOsmList
-          osmKey={BASE_OSM_KEY}
+          osmKey={osmKey}
           loadFailure={baseOsm.loadFailure}
           onDismissLoadFailure={baseOsm.clearLoadFailure}
           onReloadView={baseOsm.reloadWithViewProfile}
           openOsmPbfUrl={async (url) => {
             const abortController = new AbortController();
-            setLoadingState({ controller: abortController, osmKey: BASE_OSM_KEY });
+            setLoadingState({ controller: abortController, osmKey: osmKey });
             try {
               const osmInfo = await baseOsm.loadOsmPbfUrl(url, abortController.signal);
               if (osmInfo) flyToOsmBounds(osmInfo);
@@ -79,7 +85,7 @@ export default function InspectBlock({
             const abortController = new AbortController();
             setLoadingState({
               controller: abortController,
-              osmKey: BASE_OSM_KEY,
+              osmKey: osmKey,
             });
             try {
               const osmInfo =

@@ -17,9 +17,9 @@ import {
   Source,
 } from "react-map-gl/maplibre";
 
-import { useMap } from "../hooks/map";
-import { osmixIdToTileUrl } from "../lib/osmix-vector-protocol";
-import { APPID, MIN_PICKABLE_ZOOM } from "../settings";
+import { APPID, MIN_PICKABLE_ZOOM } from "../constants.ts";
+import { useMap } from "../hooks/map.ts";
+import { osmixIdToTileUrl } from "../lib/osmix-vector-protocol.ts";
 
 const DEFAULT_TOOLTIP_CLASS = "osmix-overlay-tooltip";
 

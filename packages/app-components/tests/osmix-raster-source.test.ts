@@ -1,8 +1,8 @@
 import { Osm } from "osmix";
 import { describe, expect, it } from "vitest";
 
-import { OsmixMapSources } from "../src/components/osmix-map-sources";
-import OsmixRasterSource from "../src/components/osmix-raster-source";
+import { OsmixMapSources } from "../src/components/osmix-map-sources.tsx";
+import OsmixRasterSource from "../src/components/osmix-raster-source.tsx";
 
 function childKeys(element: ReturnType<typeof OsmixMapSources>) {
   return (element.props.children as React.ReactElement[]).filter(Boolean).map((child) => child.key);

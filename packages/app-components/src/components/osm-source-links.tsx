@@ -7,7 +7,8 @@ import { useEffectEvent } from "react";
 const EXAMPLE_MONACO_PBF_URL =
   "https://trevorgerhardt.github.io/files/487218b69358-1f24d3e4e476/monaco.pbf";
 
-export default function ExtractList({
+/** Where to get OSM PBF data, plus a one-click Monaco example. */
+export function OsmSourceLinks({
   openOsmPbfUrl,
 }: {
   openOsmPbfUrl: (url: string) => Promise<OsmInfo | null>;

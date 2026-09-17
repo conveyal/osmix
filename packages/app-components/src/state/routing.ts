@@ -1,3 +1,4 @@
+import type { Feature, FeatureCollection } from "geojson";
 import { atom } from "jotai";
 import type { RouteResult, WaySegment } from "osmix";
 import type { LonLat } from "osmix";
@@ -39,9 +40,9 @@ const initialState: RoutingState = {
 export const routingStateAtom = atom<RoutingState>(initialState);
 
 /** Derived atom that builds GeoJSON from routing state. */
-export const routingGeoJsonAtom = atom<GeoJSON.FeatureCollection>((get) => {
+export const routingGeoJsonAtom = atom<FeatureCollection>((get) => {
   const routingState = get(routingStateAtom);
-  const features: GeoJSON.Feature[] = [];
+  const features: Feature[] = [];
 
   // Route line
   if (routingState.result && routingState.result.coordinates.length > 1) {

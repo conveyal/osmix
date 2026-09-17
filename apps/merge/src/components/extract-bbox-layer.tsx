@@ -1,9 +1,8 @@
+import { APPID } from "@osmix/app-components";
 import type { FeatureCollection } from "geojson";
 import type { FillLayerSpecification, LineLayerSpecification } from "maplibre-gl";
 import type { GeoBbox2D } from "osmix";
 import { Layer, Source } from "react-map-gl/maplibre";
-
-import { APPID } from "../settings";
 
 const SOURCE_ID = `${APPID}:extract-bbox`;
 const FILL_LAYER_ID = `${APPID}:extract-bbox-fill`;
