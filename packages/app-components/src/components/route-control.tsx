@@ -1,4 +1,4 @@
-import { useOsmFile, routingControlIsOpenAtom, selectedOsmAtom } from "@osmix/app-core";
+import { routingControlIsOpenAtom, selectedOsmAtom, type UseOsmFileReturn } from "@osmix/app-core";
 import { useOsmixRemote } from "@osmix/app-core";
 import { SectionTitle, Button } from "@osmix/ui";
 import { useAtom, useAtomValue } from "jotai";
@@ -9,11 +9,10 @@ import { bboxFromLonLats } from "osmix";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre";
 
-import { useMap } from "../hooks/map";
-import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings";
-import { routingStateAtom, type SnappedNode } from "../state/routing";
-import CustomControl from "./custom-control";
-import { FullIndexRequired } from "./full-index-required";
+import { useMap } from "../hooks/map.ts";
+import { routingStateAtom, type SnappedNode } from "../state/routing.ts";
+import CustomControl from "./custom-control.tsx";
+import { FullIndexRequired } from "./full-index-required.tsx";
 
 /** Maximum distance (m) to snap click point to nearest node. */
 const SNAP_RADIUS_M = 1_000;
@@ -40,17 +39,16 @@ function formatTime(seconds: number): string {
   return `${hours} hr ${remainMins} min`;
 }
 
-export default function RouteMapControl() {
+/**
+ * Floating routing panel. `osmFiles` are the app's loaded slots, used to offer a Full reload
+ * when the selected dataset lacks the all-node index routing needs.
+ */
+export default function RouteMapControl({ osmFiles }: { osmFiles: readonly UseOsmFileReturn[] }) {
   const isOpen = useAtomValue(routingControlIsOpenAtom);
   const osm = useAtomValue(selectedOsmAtom);
-  const baseOsm = useOsmFile(BASE_OSM_KEY);
-  const patchOsm = useOsmFile(PATCH_OSM_KEY);
-  const extractOsm = useOsmFile(EXTRACT_OSM_KEY);
   if (!isOpen || !osm) return null;
   if (!osm.info().spatialIndexes.nodes.all) {
-    const selectedOsmFile = [baseOsm, patchOsm, extractOsm].find(
-      (osmFile) => osmFile.osmInfo?.id === osm.id,
-    );
+    const selectedOsmFile = osmFiles.find((osmFile) => osmFile.osmInfo?.id === osm.id);
     return (
       <CustomControl position="bottom-left">
         {selectedOsmFile ? (

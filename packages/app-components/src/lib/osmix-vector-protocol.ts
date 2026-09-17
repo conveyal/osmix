@@ -2,7 +2,7 @@ import type { OsmixAppRemote } from "@osmix/app-core";
 import { addProtocol, type GetResourceResponse, removeProtocol } from "maplibre-gl";
 import type { Tile } from "osmix";
 
-import { VECTOR_PROTOCOL_NAME } from "../settings";
+import { VECTOR_PROTOCOL_NAME } from "../constants.ts";
 
 const VECTOR_URL_PATTERN = /^@osmix\/vector:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\.mvt$/;
 

@@ -1,3 +1,4 @@
+import { OsmLoadFailurePanel, OsmPbfFileInput, useFlyToOsmBounds } from "@osmix/app-components";
 import {
   useLog,
   useOsmFile,
@@ -17,9 +18,6 @@ import ExtractTagFilterEditor, {
   rulesFromEditorState,
   type TagFilterEditorState,
 } from "../components/extract-tag-filter-editor";
-import { OsmLoadFailurePanel } from "../components/osm-load-failure";
-import OsmPbfFileInput from "../components/osm-pbf-file-input";
-import { useFlyToOsmBounds } from "../hooks/map";
 import { boundsLikeToBbox, isValidBbox, parseBboxString } from "../lib/extract-bbox";
 import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import { activeTabAtom, extractBboxAtom } from "../state/extract";

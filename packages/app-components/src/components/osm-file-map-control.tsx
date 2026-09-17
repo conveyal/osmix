@@ -5,10 +5,10 @@ import { useAtomValue } from "jotai";
 import { DownloadIcon, EyeIcon, EyeOffIcon, MaximizeIcon, SaveIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { useFlyToOsmBounds, useMap } from "../hooks/map";
-import { APPID } from "../settings";
-import CustomControl from "./custom-control";
-import OsmInfoTable from "./osm-info-table";
+import { APPID } from "../constants.ts";
+import { useFlyToOsmBounds, useMap } from "../hooks/map.ts";
+import CustomControl from "./custom-control.tsx";
+import OsmInfoTable from "./osm-info-table.tsx";
 
 interface OsmFileCardProps {
   osmFile: UseOsmFileReturn;

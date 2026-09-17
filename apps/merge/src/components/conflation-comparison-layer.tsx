@@ -1,10 +1,10 @@
+import { APPID } from "@osmix/app-components";
 import { useAtomValue } from "jotai";
 import type { LineLayerSpecification } from "maplibre-gl";
 import { useState } from "react";
 import { Layer, Marker, Source } from "react-map-gl/maplibre";
 
 import { comparisonCoordinate, comparisonLocations } from "../lib/conflation-comparison";
-import { APPID } from "../settings";
 import { conflationComparisonAtom } from "../state/conflation";
 import { ComparisonMarkerSymbol } from "./conflation-comparison-evidence";
 

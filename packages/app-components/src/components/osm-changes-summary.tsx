@@ -27,7 +27,7 @@ import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from "osmix";
 import { getEntityType, isNode, isRelation, isWay } from "osmix";
 import { useId, useTransition } from "react";
 
-import { EntityContent } from "./entity-details";
+import { EntityContent } from "./entity-details.tsx";
 
 export default function ChangesSummary() {
   return (

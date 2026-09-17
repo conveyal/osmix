@@ -1,9 +1,9 @@
+import { installMaplibreWorker } from "@osmix/app-components";
 import { InfoTooltip, Button, Card, CardContent } from "@osmix/ui";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import "../src/main.css";
-import "../src/lib/maplibre-worker";
 import {
   AutomaticMergeProgress,
   CONFLATION_AUTOMATIC_MERGE_STEPS,
@@ -198,6 +198,7 @@ window.guidanceHarness = {
   readState: () => ({ ...harnessState, inputs: { ...harnessState.inputs } }),
 };
 
+installMaplibreWorker();
 createRoot(document.getElementById("root")!).render(
   new URLSearchParams(window.location.search).has("removal") ? (
     <ConflationRemovalHarness />

@@ -1,7 +1,7 @@
 import type { Osm } from "osmix";
 
-import OsmixRasterSource from "./osmix-raster-source";
-import OsmixVectorOverlay from "./osmix-vector-overlay";
+import OsmixRasterSource from "./osmix-raster-source.tsx";
+import OsmixVectorOverlay from "./osmix-vector-overlay.tsx";
 
 export function OsmixMapSources({
   activeTab,

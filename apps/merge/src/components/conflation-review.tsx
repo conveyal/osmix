@@ -1,3 +1,4 @@
+import { useMap } from "@osmix/app-components";
 import {
   cn,
   ActionButton,
@@ -56,7 +57,6 @@ import {
 } from "osmix";
 import { useEffect, useId, useState } from "react";
 
-import { useMap } from "../hooks/map";
 import { comparisonBounds, createConflationComparison } from "../lib/conflation-comparison";
 import { conflationBulkActionCopy } from "../lib/conflation-workflow";
 import { conflationComparisonAtom } from "../state/conflation";

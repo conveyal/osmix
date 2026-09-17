@@ -12,7 +12,7 @@ import { SearchIcon } from "lucide-react";
 import { useState, useTransition } from "react";
 import type { MapInstance } from "react-map-gl/maplibre";
 
-import CustomControl from "./custom-control";
+import CustomControl from "./custom-control.tsx";
 
 export type NominatimResult = {
   addresstype: string;

@@ -1,5 +1,19 @@
 import { Tabs } from "@base-ui/react/tabs";
 import {
+  Basemap,
+  type MapInitialViewState,
+  CustomControl,
+  EntityDetailsMapControl,
+  OsmFileMapControl,
+  OsmixMapSources,
+  SelectedEntityLayer,
+  SidebarLog,
+  useFlyToOsmBounds,
+  InspectPanel,
+  RouteLayer,
+  RouteMapControl,
+} from "@osmix/app-components";
+import {
   useLog,
   useOsmFile,
   changesetStatsAtom,
@@ -14,18 +28,9 @@ import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import ExtractBlock from "../blocks/extract";
-import InspectBlock from "../blocks/inspect";
 import MergeBlock from "../blocks/merge";
-import Basemap, { type MapInitialViewState } from "../components/basemap";
 import { ConflationComparisonLayer } from "../components/conflation-comparison-layer";
-import CustomControl from "../components/custom-control";
-import EntityDetailsMapControl from "../components/entity-details-map-control";
 import ExtractMapLayers from "../components/extract-map-layers";
-import OsmFileMapControl from "../components/osm-file-map-control";
-import { OsmixMapSources } from "../components/osmix-map-sources";
-import SelectedEntityLayer from "../components/selected-entity-layer";
-import SidebarLog from "../components/sidebar-log";
-import { useFlyToOsmBounds } from "../hooks/map";
 import { DEFAULT_EXTRACT_BBOX } from "../lib/extract-bbox";
 import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import { activeTabAtom } from "../state/extract";
@@ -146,7 +151,7 @@ export default function Merge() {
               </Tabs.Tab>
             </Tabs.List>
             <Tabs.Panel value="Inspect">
-              <InspectBlock openOsmFile={openOsmFile} />
+              <InspectPanel osmKey={BASE_OSM_KEY} openOsmFile={openOsmFile} />
             </Tabs.Panel>
             <Tabs.Panel value="Merge">
               <MergeBlock />
@@ -171,6 +176,8 @@ export default function Merge() {
 
           {activeTab === "Merge" ? <ConflationComparisonLayer /> : null}
           <SelectedEntityLayer />
+          <RouteMapControl osmFiles={[base, patch, extract]} />
+          <RouteLayer />
 
           <OsmFileMapControl
             files={[

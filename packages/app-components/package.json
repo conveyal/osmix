@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@osmix/app-components",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MapLibre integration and OSM domain components shared by the Osmix browser apps",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css",
+    "./components/*": "./src/components/*.tsx",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "pnpm -w exec vitest run --project \"$npm_package_name\" --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@osmix/app-core": "workspace:*",
+    "@osmix/ui": "workspace:*",
+    "clsx": "^2.1.1",
+    "osmix": "workspace:*"
+  },
+  "devDependencies": {
+    "@osmix/shared": "workspace:*",
+    "@types/geojson": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "peerDependencies": {
+    "@base-ui/react": "catalog:",
+    "jotai": "catalog:",
+    "lucide-react": "catalog:",
+    "maplibre-gl": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-map-gl": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

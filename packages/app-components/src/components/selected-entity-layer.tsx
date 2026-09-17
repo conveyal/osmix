@@ -11,8 +11,8 @@ import {
   Source,
 } from "react-map-gl/maplibre";
 
-import { useMap } from "../hooks/map";
-import { APPID } from "../settings";
+import { APPID } from "../constants.ts";
+import { useMap } from "../hooks/map.ts";
 
 const SOURCE_ID = `${APPID}:selected-entity`;
 const LINE_ID = `${APPID}:selected-line`;

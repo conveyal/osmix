@@ -3,7 +3,7 @@ import { Button } from "@osmix/ui";
 import { useAtomValue } from "jotai";
 import { MinusIcon, PlusIcon } from "lucide-react";
 
-import { useMap } from "../hooks/map";
+import { useMap } from "../hooks/map.ts";
 
 export default function ZoomInfo() {
   const zoom = useAtomValue(zoomAtom);

@@ -7,9 +7,9 @@ import {
   Source,
 } from "react-map-gl/maplibre";
 
-import { useMap } from "../hooks/map";
-import { APPID } from "../settings";
-import { routingGeoJsonAtom } from "../state/routing";
+import { APPID } from "../constants.ts";
+import { useMap } from "../hooks/map.ts";
+import { routingGeoJsonAtom } from "../state/routing.ts";
 
 const SOURCE_ID = `${APPID}:route`;
 const LINE_ID = `${SOURCE_ID}:route-line`;

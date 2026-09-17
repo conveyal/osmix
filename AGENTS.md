@@ -38,7 +38,7 @@ Layering (low → high):
 | `@osmix/ui`                                            | Private: shared React primitives, layout shell, design tokens (`styles.css`) |
 | `@osmix/app-core`                                      | Private: app worker/remote, IndexedDB storage, jotai atoms, `useOsmFile`     |
 
-**App import rule:** apps import `osmix` for runtime APIs and re-exported types, plus the private app-tier packages (`@osmix/ui`, `@osmix/app-core`). Use other granular `@osmix/*` packages only when a symbol is not exposed by the facade (e.g. benchmarks, servers, or tests).
+**App import rule:** apps import `osmix` for runtime APIs and re-exported types, plus the private app-tier packages (`@osmix/ui`, `@osmix/app-core`, `@osmix/app-components`). Use other granular `@osmix/*` packages only when a symbol is not exposed by the facade (e.g. benchmarks, servers, or tests).
 
 Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` entry).
 
@@ -46,7 +46,7 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 
 - In-browser merge: Comlink workers host `osmix` (`OsmixWorker`) to keep the React UI responsive.
 - `@osmix/pbf` + `@osmix/json` stream PBF blocks to entities; `@osmix/load` builds `Osm` indexes from PBF; `@osmix/core` indexes and ships transferables to dodge clone costs.
-- MapLibre uses a custom raster protocol and renders vector overlays for node/way previews.
+- MapLibre uses custom raster and vector tile protocols (`registerOsmixProtocols(remote)` in `@osmix/app-components`) and renders vector overlays for node/way previews. Call `installMaplibreWorker()` before the first map mounts.
 
 ## Key Paths
 

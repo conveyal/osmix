@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
+    "@osmix/app-components": "workspace:*",
     "@osmix/app-core": "workspace:*",
     "@osmix/ui": "workspace:*",
     "class-variance-authority": "^0.7.1",

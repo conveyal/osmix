@@ -1,3 +1,4 @@
+import { installMaplibreWorker, registerOsmixProtocols } from "@osmix/app-components";
 import {
   createOsmixAppRemote,
   createThrottledProgressLogger,
@@ -13,9 +14,7 @@ import { createRoot } from "react-dom/client";
 import { MapProvider } from "react-map-gl/maplibre";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router";
 
-import "./lib/maplibre-worker";
 import MergeNav from "./components/nav";
-import { registerOsmixProtocols } from "./lib/osmix-protocols";
 import MergePage from "./pages/merge";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "./settings";
 import { updateMergeOutcomeAtom } from "./state/merge-outcome";
@@ -50,6 +49,7 @@ async function bootstrap() {
   store.set(remoteAtom, remote);
   window.osmWorker = remote;
   registerOsmixProtocols(remote);
+  installMaplibreWorker();
 
   // Replacing or clearing either merge input invalidates the merge outcome.
   for (const osmKey of [BASE_OSM_KEY, PATCH_OSM_KEY]) {

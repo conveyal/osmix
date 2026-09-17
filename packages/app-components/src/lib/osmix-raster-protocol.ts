@@ -2,7 +2,7 @@ import type { OsmixAppRemote } from "@osmix/app-core";
 import { addProtocol, type GetResourceResponse, removeProtocol } from "maplibre-gl";
 import type { Tile } from "osmix";
 
-import { RASTER_PROTOCOL_NAME } from "../settings";
+import { RASTER_PROTOCOL_NAME } from "../constants.ts";
 
 export const RASTER_URL_PATTERN = /^@osmix\/raster:\/\/([^/]+)\/(\d+)\/(\d+)\/(\d+)\/(\d+)\.png$/;
 
