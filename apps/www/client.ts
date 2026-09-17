@@ -5,6 +5,7 @@ import * as maplibregl from "maplibre-gl";
 import { createRemote, type OsmRemoteDataset } from "osmix";
 
 import { codeToHtml } from "./shiki.bundle";
+import "./maplibre-worker";
 // oxlint-disable-next-line import/default -- Vite ?worker&url resolves to a string URL
 import MergeWorkerUrl from "./worker.ts?worker&url";
 

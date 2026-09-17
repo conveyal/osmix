@@ -4,6 +4,7 @@ import { MapProvider } from "react-map-gl/maplibre";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router";
 
 import { ErrorBoundary } from "./components/error-boundary";
+import "./lib/maplibre-worker";
 import Nav from "./components/nav";
 import MergePage from "./pages/merge";
 

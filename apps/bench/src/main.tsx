@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { Layer, Map as MaplibreMap, type MapRef, Source } from "react-map-gl/maplibre";
 
 import { runDuckDBBenchmarks } from "./benchmarks/duckdb-bench";
+import "./maplibre-worker";
 import { runOsmixBenchmarks } from "./benchmarks/osmix-bench";
 import { runAllBenchmarks } from "./benchmarks/runner";
 import type { BenchmarkMetricType, BenchmarkResults } from "./benchmarks/types";

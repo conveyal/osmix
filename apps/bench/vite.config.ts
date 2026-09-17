@@ -21,7 +21,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ["@duckdb/duckdb-wasm", "maplibre-gl"],
+    exclude: ["@duckdb/duckdb-wasm"],
     rolldownOptions: {
       target: "esnext",
     },

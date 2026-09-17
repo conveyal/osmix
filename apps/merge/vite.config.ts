@@ -13,10 +13,6 @@ export default defineConfig({
       "Cross-Origin-Resource-Policy": "same-origin",
     },
   },
-  optimizeDeps: {
-    // maplibre-gl 6 loads its worker from a sibling module that the dep optimizer cannot follow.
-    exclude: ["maplibre-gl"],
-  },
   test: {
     include: ["tests/**/*.test.ts"],
   },
