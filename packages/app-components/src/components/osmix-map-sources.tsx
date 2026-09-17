@@ -3,16 +3,13 @@ import type { Osm } from "osmix";
 import OsmixRasterSource from "./osmix-raster-source.tsx";
 import OsmixVectorOverlay from "./osmix-vector-overlay.tsx";
 
+/** Raster preview plus interactive overlay for a base dataset and an optional patch. */
 export function OsmixMapSources({
-  activeTab,
   baseOsm,
-  extractOsm,
-  patchOsm,
+  patchOsm = null,
 }: {
-  activeTab: string;
   baseOsm: Osm | null;
-  extractOsm: Osm | null;
-  patchOsm: Osm | null;
+  patchOsm?: Osm | null;
 }) {
   return (
     <>
@@ -22,12 +19,6 @@ export function OsmixMapSources({
       {patchOsm && <OsmixRasterSource key={`patch:raster:${patchOsm.id}`} osmId={patchOsm.id} />}
       {baseOsm && <OsmixVectorOverlay key={`base:overlay:${baseOsm.id}`} osm={baseOsm} />}
       {patchOsm && <OsmixVectorOverlay key={`patch:overlay:${patchOsm.id}`} osm={patchOsm} />}
-      {activeTab === "Extract" && extractOsm ? (
-        <>
-          <OsmixRasterSource key={`extract:raster:${extractOsm.id}`} osmId={extractOsm.id} />
-          <OsmixVectorOverlay key={`extract:overlay:${extractOsm.id}`} osm={extractOsm} />
-        </>
-      ) : null}
     </>
   );
 }

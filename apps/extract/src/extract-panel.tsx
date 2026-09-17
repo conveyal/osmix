@@ -1,4 +1,4 @@
-import { OsmLoadFailurePanel, OsmPbfFileInput, useFlyToOsmBounds } from "@osmix/app-components";
+import { appOrigin, OsmLoadFailurePanel, OsmPbfFileInput } from "@osmix/app-components";
 import {
   useLog,
   useOsmFile,
@@ -11,16 +11,15 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Info, SaveIcon } from "lucide-react";
 import type { ExtractStrategy } from "osmix";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
 
 import ExtractTagFilterEditor, {
   conveyalTagFilterEditorState,
   rulesFromEditorState,
   type TagFilterEditorState,
-} from "../components/extract-tag-filter-editor";
-import { boundsLikeToBbox, isValidBbox, parseBboxString } from "../lib/extract-bbox";
-import { BASE_OSM_KEY, EXTRACT_OSM_KEY, PATCH_OSM_KEY } from "../settings";
-import { activeTabAtom, extractBboxAtom } from "../state/extract";
+} from "./components/extract-tag-filter-editor";
+import { boundsLikeToBbox, isValidBbox, parseBboxString } from "./lib/extract-bbox";
+import { OSM_KEY } from "./settings";
+import { extractBboxAtom } from "./state/extract";
 
 const STRATEGY_OPTIONS: {
   value: ExtractStrategy;
@@ -68,17 +67,12 @@ function StrategyInfoTooltip({ label, description }: { label: string; descriptio
   );
 }
 
-export default function ExtractBlock() {
-  const extract = useOsmFile(EXTRACT_OSM_KEY);
-  const base = useOsmFile(BASE_OSM_KEY);
-  const patch = useOsmFile(PATCH_OSM_KEY);
-  const flyToOsmBounds = useFlyToOsmBounds();
+export function ExtractPanel() {
+  const extract = useOsmFile(OSM_KEY);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
   const mapBounds = useAtomValue(mapBoundsAtom);
   const { activeTasks } = useLog();
-  const navigate = useNavigate();
-  const setActiveTab = useSetAtom(activeTabAtom);
 
   const [bbox, setBbox] = useAtom(extractBboxAtom);
   const [bboxText, setBboxText] = useState("");
@@ -119,7 +113,7 @@ export default function ExtractBlock() {
     if (!pendingFile || !canExtract) return;
     selectEntity(null, null);
     const abortController = new AbortController();
-    setLoadingState({ controller: abortController, osmKey: EXTRACT_OSM_KEY });
+    setLoadingState({ controller: abortController, osmKey: OSM_KEY });
     try {
       await extract.loadExtractFromPbf(
         pendingFile,
@@ -133,34 +127,6 @@ export default function ExtractBlock() {
     } finally {
       setLoadingState(null);
     }
-  };
-
-  const useAsBase = () => {
-    if (!hasExtractResult) return;
-    base.copyStateFrom({
-      file: extract.file,
-      fileInfo: extract.fileInfo,
-      osm: extract.osm,
-      osmInfo: extract.osmInfo,
-      isStored: extract.isStored,
-    });
-    setActiveTab("Inspect");
-    void navigate("/", { replace: true });
-    if (extract.osmInfo) flyToOsmBounds(extract.osmInfo);
-  };
-
-  const useAsPatch = () => {
-    if (!hasExtractResult) return;
-    patch.copyStateFrom({
-      file: extract.file,
-      fileInfo: extract.fileInfo,
-      osm: extract.osm,
-      osmInfo: extract.osmInfo,
-      isStored: extract.isStored,
-    });
-    setActiveTab("Merge");
-    void navigate("/", { replace: true });
-    if (extract.osmInfo) flyToOsmBounds(extract.osmInfo);
   };
 
   return (
@@ -382,24 +348,13 @@ export default function ExtractBlock() {
               Save to storage
             </Button>
           ) : null}
-          <Button
-            type="button"
-            disabled={isExtracting || !hasExtractResult}
-            variant="outline"
-            className="w-full"
-            onClick={useAsBase}
-          >
-            Use as base OSM
-          </Button>
-          <Button
-            type="button"
-            disabled={isExtracting || !hasExtractResult}
-            variant="outline"
-            className="w-full"
-            onClick={useAsPatch}
-          >
-            Use as patch OSM
-          </Button>
+          <p className="text-muted-foreground">
+            Each app keeps its own storage. To merge this extract, download it and open it in{" "}
+            <a href={appOrigin("merge")} className="text-info">
+              Merge
+            </a>
+            .
+          </p>
         </CardContent>
       </Card>
     </div>

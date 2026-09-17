@@ -1,6 +1,6 @@
 # Osmix Merge
 
-Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PBF datasets. Its sibling apps, [Inspect](../inspect/README.md) and (soon) Extract, are linked from the nav bar. It builds on [`@osmix/core`](../../packages/core/README.md) and [`@osmix/change`](../../packages/change/README.md) in a web worker, renders MapLibre raster and vector overlays, and guides you through a multi-step merge workflow that stays entirely in the browser.
+Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PBF datasets. Its sibling apps, [Inspect](../inspect/README.md) and [Extract](../extract/README.md), are linked from the nav bar; each runs on its own origin with its own browser storage. It builds on [`@osmix/core`](../../packages/core/README.md) and [`@osmix/change`](../../packages/change/README.md) in a web worker, renders MapLibre raster and vector overlays, and guides you through a multi-step merge workflow that stays entirely in the browser.
 
 ## Highlights
 
@@ -73,7 +73,7 @@ When View omits the all-node index, merge, exact node/way reconciliation, comple
 other all-node-dependent controls are disabled with an explanation and a **Reload using Full** action. Simple
 in-stream extraction remains available. The app does not build the large index synchronously on first use.
 
-### Merge view (default route)
+### Merge workflow
 
 The [merge-process guide](../../docs/merge-process.md) owns the merge rules, examples, and known limitations. Read its [input identity requirements](../../docs/merge-process.md#inputs-and-identity) before combining independently prepared imports.
 

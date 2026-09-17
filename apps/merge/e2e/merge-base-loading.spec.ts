@@ -40,7 +40,6 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   });
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.osmWorker?.workerCount ?? 0)).toBe(1);
-  await page.getByRole("tab", { name: "Merge" }).click();
 
   const baseCard = page
     .locator('[data-slot="card"]')
@@ -141,7 +140,6 @@ async function openTinyMerge(page: Page, inputs: Awaited<ReturnType<typeof tinyI
   });
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.osmWorker?.workerCount ?? 0)).toBe(1);
-  await page.getByRole("tab", { name: "Merge" }).click();
   const baseCard = page
     .locator('[data-slot="card"]')
     .filter({ hasText: "Base OSM — authoritative existing dataset" })
@@ -285,7 +283,7 @@ test("manual removal requires preview and rediscovery clears stale removal evide
   });
 });
 
-test("a late cancellation preserves the committed exact result and a new extracted base clears completion", async ({
+test("a late cancellation preserves the committed exact result and replacing the base clears completion", async ({
   page,
 }) => {
   const inputs = await tinyInputs();
@@ -327,28 +325,11 @@ test("a late cancellation preserves the committed exact result and a new extract
   await expect(summary).toContainText("Imported-data matching was not enabled");
   await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toBeVisible();
 
-  await page.getByRole("tab", { name: "Extract", exact: true }).click();
-  await page.getByLabel("Paste bbox", { exact: false }).fill("-0.002,-0.002,0.002,0.002");
-  await page.getByRole("button", { name: "Parse", exact: true }).click();
-  const chooserPromise = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Select PBF", exact: true }).click();
-  await (await chooserPromise).setFiles(inputs.base);
-  await page.getByRole("button", { name: "Extract", exact: true }).click();
-  const useAsBase = page.getByRole("button", { name: "Use as base OSM" });
-  const extractFailure = page.getByRole("alert");
-  // Extraction crosses the worker boundary, just like loadPbf above. Wait for
-  // its outcome rather than imposing the default five-second UI assertion limit.
-  await expect
-    .poll(async () => (await useAsBase.isEnabled()) || (await extractFailure.isVisible()), {
-      timeout: 120_000,
-    })
-    .toBe(true);
-  if (await extractFailure.isVisible()) {
-    throw new Error(`OSM extraction failed: ${await extractFailure.innerText()}`);
-  }
-  await expect(useAsBase).toBeEnabled();
-  await useAsBase.click();
-  await page.getByRole("tab", { name: "Merge", exact: true }).click();
+  // Clearing the base from the map's file panel promotes the patch into the base slot,
+  // which replaces the base dataset and must invalidate the completed merge.
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByTitle("Clear file").first().click();
+  await loadPbf(baseCard, page, inputs.base);
   await expect(page.getByText("Select merge inputs and options", { exact: false })).toBeVisible();
   await expect(summary).toHaveCount(0);
   await expect(baseCard.getByRole("button", { name: "File info" })).toBeVisible();

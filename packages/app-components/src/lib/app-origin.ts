@@ -2,6 +2,7 @@
 export const OSMIX_APPS = [
   { id: "merge", label: "Merge", productionOrigin: "https://merge.osmix.dev" },
   { id: "inspect", label: "Inspect", productionOrigin: "https://inspect.osmix.dev" },
+  { id: "extract", label: "Extract", productionOrigin: "https://extract.osmix.dev" },
 ] as const;
 
 export type OsmixAppId = (typeof OSMIX_APPS)[number]["id"];

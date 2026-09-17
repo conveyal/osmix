@@ -76,12 +76,7 @@ export function InspectApp() {
       </Sidebar>
       <MapContent>
         <Basemap initialViewState={initialViewState}>
-          <OsmixMapSources
-            activeTab="Inspect"
-            baseOsm={osmFile.osm}
-            extractOsm={null}
-            patchOsm={null}
-          />
+          <OsmixMapSources baseOsm={osmFile.osm} />
           <SelectedEntityLayer />
           <RouteMapControl osmFiles={[osmFile]} />
           <RouteLayer />

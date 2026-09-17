@@ -2,6 +2,7 @@
   "turbo": false,
   "apps": {
     "apps/bench": { "name": "bench.osmix", "script": "dev:app" },
+    "apps/extract": { "name": "extract.osmix", "script": "dev:app" },
     "apps/inspect": { "name": "inspect.osmix", "script": "dev:app" },
     "apps/merge": { "name": "merge.osmix", "script": "dev:app" },
     "apps/shortbread": { "name": "shortbread.osmix", "script": "dev:app" },
