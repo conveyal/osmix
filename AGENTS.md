@@ -50,7 +50,7 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 
 ## Key Paths
 
-- UI: `apps/merge` (React 19 + Vite) and `apps/inspect` (single-dataset viewer); app worker at `packages/app-core/src/workers/osmix-app.worker.ts`, created per app with `createOsmixAppRemote()` and shared through `remoteAtom`.
+- UI: `apps/merge` (React 19 + Vite), `apps/inspect` (single-dataset viewer) and `apps/extract` (bbox extracts), each on its own origin and linked via `AppLinks`; app worker at `packages/app-core/src/workers/osmix-app.worker.ts`, created per app with `createOsmixAppRemote()` and shared through `remoteAtom`.
 - Shared UI conventions: `packages/ui/DESIGN.md` — read before UI changes; merge-specific rules in `apps/merge/DESIGN.md`.
 - Worker API: `packages/osmix/src/worker.ts`, `packages/osmix/src/remote.ts`.
 - Fixtures: `fixtures/` at repo root; loaded via `@osmix/test-utils/fixtures`.

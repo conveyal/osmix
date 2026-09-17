@@ -1,6 +1,11 @@
 import { defineConfig } from "vitest/config";
 
-const appProjects = ["apps/merge", "apps/inspect", "apps/bench/vite.config.ts"] as const;
+const appProjects = [
+  "apps/merge",
+  "apps/inspect",
+  "apps/extract",
+  "apps/bench/vite.config.ts",
+] as const;
 
 export default defineConfig({
   test: {

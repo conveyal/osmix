@@ -156,7 +156,7 @@ pnpm run verify:all
 
 **Workspace commands** support filtering: `pnpm --filter @osmix/merge dev`
 
-Development servers use [Portless](https://github.com/vercel-labs/portless) and stable HTTPS URLs: `merge.osmix.localhost`, `inspect.osmix.localhost`, `bench.osmix.localhost`, `www.osmix.localhost`, `vt.osmix.localhost`, and `shortbread.osmix.localhost`. The first run creates and trusts a local certificate authority; run `pnpm exec portless trust` if trust setup was skipped. Branch-backed worktrees add the sanitized branch name as a prefix, while detached worktrees add their Git worktree ID, so concurrent checkouts do not compete for routes. Filtered commands retain the same naming convention.
+Development servers use [Portless](https://github.com/vercel-labs/portless) and stable HTTPS URLs: `merge.osmix.localhost`, `inspect.osmix.localhost`, `extract.osmix.localhost`, `bench.osmix.localhost`, `www.osmix.localhost`, `vt.osmix.localhost`, and `shortbread.osmix.localhost`. The first run creates and trusts a local certificate authority; run `pnpm exec portless trust` if trust setup was skipped. Branch-backed worktrees add the sanitized branch name as a prefix, while detached worktrees add their Git worktree ID, so concurrent checkouts do not compete for routes. Filtered commands retain the same naming convention.
 
 Set `PORTLESS=0` to bypass the proxy and run the underlying development command directly, for example `PORTLESS=0 pnpm --filter @osmix/merge dev`. Portless proxy and certificate state are user-level state and are not stored in this repository.
 
@@ -171,6 +171,7 @@ Routing regressions use checked-in Monaco and small generated fixtures. Reports 
 - **[www](apps/www/)** – Main site with interactive examples and package overview ([osmix.dev](https://osmix.dev))
 - **[merge](apps/merge/README.md)** – Interactive merge tool for OSM extracts with MapLibre visualization ([merge.osmix.dev](https://merge.osmix.dev))
 - **[inspect](apps/inspect/README.md)** – Single-dataset viewer: load, search, diagnose duplicates, route ([inspect.osmix.dev](https://inspect.osmix.dev))
+- **[extract](apps/extract/README.md)** – Bounding-box extracts with strategy and tag filters ([extract.osmix.dev](https://extract.osmix.dev))
 - **[bench](apps/bench/README.md)** – Performance benchmarks comparing Osmix with DuckDB-wasm
 - **[vt-server](apps/vt-server/README.md)** – Example vector tile server implementation
 - **[shortbread](apps/shortbread/)** – Shortbread schema vector tile server demo

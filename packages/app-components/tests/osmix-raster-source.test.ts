@@ -20,15 +20,11 @@ describe("Osmix map sources", () => {
 
   it("replaces base and patch source wrappers after a merge", () => {
     const beforeMerge = OsmixMapSources({
-      activeTab: "Merge",
       baseOsm: new Osm({ id: "yakima-base" }),
-      extractOsm: null,
       patchOsm: new Osm({ id: "yakima-osw" }),
     });
     const afterMerge = OsmixMapSources({
-      activeTab: "Merge",
       baseOsm: new Osm({ id: "yakima-merged" }),
-      extractOsm: null,
       patchOsm: null,
     });
 

@@ -40,6 +40,10 @@ runs:
       shell: bash
       run: pnpm --filter @osmix/inspect test:e2e
 
+    - name: Run extract app browser tests
+      shell: bash
+      run: pnpm --filter @osmix/extract test:e2e
+
     - name: Upload browser failure diagnostics
       if: failure()
       uses: actions/upload-artifact@v4
@@ -48,5 +52,6 @@ runs:
         path: |
           apps/merge/test-results/
           apps/inspect/test-results/
+          apps/extract/test-results/
         if-no-files-found: ignore
         retention-days: 7

@@ -1,7 +1,6 @@
 import { createOsmixAppRuntime, OsmixAppShell } from "@osmix/app-components";
 import { type OsmixAppRemote, osmDatasetVersionAtomFamily } from "@osmix/app-core";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes } from "react-router";
 
 import MergeNav from "./components/nav";
 import MergePage from "./pages/merge";
@@ -30,12 +29,7 @@ async function bootstrap() {
 
   createRoot(rootEl).render(
     <OsmixAppShell store={store} nav={<MergeNav />}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<MergePage />} />
-          <Route path="/extract" element={<MergePage />} />
-        </Routes>
-      </BrowserRouter>
+      <MergePage />
     </OsmixAppShell>,
   );
 }

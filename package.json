@@ -13,7 +13,7 @@
     "lint:check": "oxlint --type-aware",
     "test": "pnpm run test:portless && vitest run",
     "test:all": "pnpm run typecheck && pnpm run check && VITEST_INCLUDE_APPS=1 vitest run",
-    "test:apps": "VITEST_INCLUDE_APPS=1 vitest run '--project=@osmix/merge' '--project=@osmix/inspect' '--project=@osmix/bench*'",
+    "test:apps": "VITEST_INCLUDE_APPS=1 vitest run '--project=@osmix/merge' '--project=@osmix/inspect' '--project=@osmix/extract' '--project=@osmix/bench*'",
     "test:node-smoke": "node scripts/node-smoke.ts",
     "test:portless": "node --test scripts/portless-dev.test.ts",
     "test:check-docs": "node scripts/check-docs.test.ts",
