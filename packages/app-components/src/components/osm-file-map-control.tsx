@@ -145,15 +145,26 @@ export interface OsmFileMapControlProps {
   }>;
 }
 
+type PanelFile = {
+  osmFile: Pick<UseOsmFileReturn, "osmKey" | "osm" | "osmInfo" | "fileInfo">;
+};
+
+/**
+ * The loaded files that get a panel, keyed by role (`osmKey`). Not by file hash: Merge can
+ * load the same file as both base and patch, and each role still needs its own panel.
+ */
+export function loadedOsmFilePanels<T extends PanelFile>(files: T[]) {
+  return files
+    .filter((file) => file.osmFile.osm && file.osmFile.osmInfo && file.osmFile.fileInfo)
+    .map((file) => ({ key: file.osmFile.osmKey, file }));
+}
+
 export default function OsmFileMapControl({ files }: OsmFileMapControlProps) {
   const isOpen = useAtomValue(osmFileControlIsOpenAtom);
   if (!isOpen) return null;
 
-  // Filter to only show files that are loaded
-  const loadedFiles = files.filter((f) => f.osmFile.osm && f.osmFile.osmInfo && f.osmFile.fileInfo);
-
-  return loadedFiles.map((file) => (
-    <CustomControl key={file.osmFile.fileInfo?.fileHash} position="top-left">
+  return loadedOsmFilePanels(files).map(({ key, file }) => (
+    <CustomControl key={key} position="top-left">
       <OsmFileCard osmFile={file.osmFile} onClear={file.onClear} />
     </CustomControl>
   ));

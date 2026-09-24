@@ -617,6 +617,8 @@ export function useOsmFile(osmKey: string) {
   const clearLoadFailure = useEffectEvent(() => setLoadFailure(null));
 
   return {
+    /** The role this file fills (e.g. "base", "patch"). Unique per app; use it as a React key. */
+    osmKey,
     copyStateFrom,
     canStore: storageCheck?.canStore === true,
     downloadOsm,
