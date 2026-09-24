@@ -2,12 +2,41 @@ packages:
   - apps/*
   - packages/*
 
-overrides:
-  apache-arrow: ^18.1.0
-
 autoInstallPeers: true
 enableGlobalVirtualStore: true
 minimumReleaseAge: 0
+
+tasks:
+  build:
+    dependsOn: ["^build"]
+    outputs: ["dist/**"]
+    inputs: ["src/**", "tsconfig*.json", "package.json"]
+  typecheck:
+    dependsOn: ["^typecheck"]
+    outputs: []
+    inputs: ["src/**", "test/**", "tsconfig*.json"]
+  test:
+    dependsOn: ["^test"]
+    outputs: []
+    inputs: ["src/**", "test/**", "tsconfig*.json", "vitest.config.ts"]
+    env: ["VITEST_INCLUDE_APPS"]
+  "lint:check":
+    outputs: []
+    inputs: ["+**/*.ts", "+**/*.tsx", ".oxlintrc.json"]
+  "check:deps":
+    outputs: []
+    inputs: ["+**/package.json", "pnpm-workspace.yaml"]
+
+pipelines:
+  build: [build]
+  typecheck: [typecheck]
+  test: [test]
+  lint: ["lint:check"]
+  deps: ["check:deps"]
+  verify: [build, typecheck, test]
+
+overrides:
+  apache-arrow: ^18.1.0
 
 allowBuilds:
   "@tailwindcss/oxide": true

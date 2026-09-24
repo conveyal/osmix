@@ -22,6 +22,14 @@ jobs:
       - uses: pnpm/setup@v2
       - uses: oven-sh/setup-bun@v2
 
+      - name: Cache pnpm pipeline results
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pnpm/pipeline
+          key: pnpm-pipeline-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            pnpm-pipeline-${{ runner.os }}-
+
       - uses: ./.github/actions/checks
 
   cli-executable:

@@ -61,12 +61,18 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 - `pnpm run check` runs `oxfmt` then type-aware `oxlint` in one pass.
 - `pnpm run format:check` and `pnpm run lint:check` run non-mutating formatting and lint checks.
 - `pnpm run check:deps` flags undeclared or unused workspace dependencies.
-- `pnpm run test:verify-workspace` tests the workspace selector and required-script checks.
-- `pnpm run verify:workspace -- @osmix/core` verifies a workspace and its runtime/development dependents in dependency order.
-- `pnpm run verify:workspace -- apps/vt-server` accepts an app path selector and verifies that app's runtime graph.
-- `pnpm run verify:all` verifies every non-benchmark workspace, then runs dependency and Node smoke checks.
+- `pnpm run verify` runs `build`, `typecheck`, and `test` for every workspace via `pnpm pipeline`
+  (`pipelines`/`tasks` in `pnpm-workspace.yaml`). Each task's result is cached by its declared
+  `inputs`, so a repeat run only redoes work for packages whose source (or a dependency's source, via
+  the task's `dependsOn`) actually changed.
+- `pnpm run verify:all` runs `verify` plus lint, format, dependency, docs, and Node smoke checks.
 
-`verify:workspace` is check-only by default. Pass `--write` when an explicit formatting write is intended. The benchmark app is excluded from the all-workspace contract because its browser benchmark is not a package test; select it explicitly when working on that app.
+`pnpm pipeline`'s `--filter`/`-F` does not scope which projects run (confirmed non-functional as of
+pnpm 12.6.0), so `verify`/`verify:all` always run the full graph — caching, not filtering, is what
+keeps repeat runs fast. `lint:check` and `check:deps` are root-only scripts with no per-package
+equivalent, so their pipelines (`pnpm pipeline lint`/`pnpm pipeline deps`) require
+`--include-workspace-root`; don't add that flag to `build`/`typecheck`/`test`/`verify`, since those
+scripts are also defined at the root as `pnpm -r` aggregators and including the root would recurse.
 
 ## Gotchas
 

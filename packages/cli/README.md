@@ -96,7 +96,7 @@ pnpm --filter @osmix/cli run start -- fixtures/monaco.pbf
 pnpm --filter @osmix/cli run build:executable
 pnpm --filter @osmix/cli run run:executable -- fixtures/monaco.pbf
 pnpm --filter @osmix/cli run test:executable
-pnpm run verify:workspace -- @osmix/cli
+pnpm run verify
 ```
 
 The executable smoke test compiles both the CLI and its worker into one host binary, checks help and

@@ -147,10 +147,10 @@ pnpm run check
 pnpm run format:check
 pnpm run lint:check
 
-# Verify one workspace and its runtime dependents
-pnpm run verify:workspace -- @osmix/core
+# Build, typecheck, and test every workspace (cached; unaffected packages restore instantly)
+pnpm run verify
 
-# Verify all non-benchmark workspaces plus dependency and Node smoke checks
+# verify, plus lint, format, dependency, docs, and Node smoke checks
 pnpm run verify:all
 ```
 
@@ -160,7 +160,7 @@ Development servers use [Portless](https://github.com/vercel-labs/portless) and 
 
 Set `PORTLESS=0` to bypass the proxy and run the underlying development command directly, for example `PORTLESS=0 pnpm --filter @osmix/merge dev`. Portless proxy and certificate state are user-level state and are not stored in this repository.
 
-`verify:workspace` accepts a package name or path such as `apps/vt-server`, follows runtime and development workspace dependencies to include dependents, and runs formatting, typechecking, and tests in dependency order. It is check-only by default; pass `--write` only when formatting changes are intentional. `verify:all` excludes the browser benchmark app, whose benchmark script is not a package test.
+`verify` runs `build`, `typecheck`, and `test` across every workspace via [pnpm's task orchestration](https://pnpm.io/workspace-task-orchestration): each task's result is cached by its declared inputs, so a repeat run only redoes work for packages whose source (or a dependency's source) actually changed. `verify:all` adds lint, format, dependency, docs, and Node smoke checks on top.
 
 Complete TypeScript examples are marked `check-docs` and compiled by `check:docs`; partial configuration and application-wiring fragments are labeled `schematic`.
 
