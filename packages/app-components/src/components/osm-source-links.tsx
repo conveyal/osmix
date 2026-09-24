@@ -30,7 +30,7 @@ export function OsmSourceLinks({
     <Card>
       <CardContent className="flex flex-col gap-2">
         <p>Looking for OpenStreetMap PBF data? We recommend the following services:</p>
-        <ul className="flex list-inside list-disc flex-col gap-1">
+        <ul className="flex list-disc flex-col gap-1 pl-4">
           <li>
             <a
               href="https://slice.openstreetmap.us/#0/0/0"

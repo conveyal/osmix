@@ -4,7 +4,7 @@ export { default as Basemap, type MapInitialViewState } from "./components/basem
 export { default as BrowserCheck } from "./components/browser-check.tsx";
 export { default as CenterInfo } from "./components/center-info.tsx";
 export { default as CustomControl } from "./components/custom-control.tsx";
-export { MapPanelHeader } from "./components/map-panel-header.tsx";
+export { MapPanelBody, MapPanelHeader } from "./components/map-panel-header.tsx";
 export {
   default as EntityDetails,
   EntityContent,

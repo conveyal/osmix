@@ -68,7 +68,7 @@ export function ConflationComparisonEvidence({
 }) {
   const locations = comparisonLocations(comparisonForCandidate(comparison, candidate.id));
   return (
-    <section className="flex flex-col gap-2 border-t p-2" aria-label="Selected map comparison">
+    <section className="flex flex-col gap-2 border-t p-inset" aria-label="Selected map comparison">
       <SectionTitle>Map comparison</SectionTitle>
       <ConflationComparisonLegend />
       <p className="text-muted-foreground">

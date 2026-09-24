@@ -14,7 +14,7 @@ export default function EntityLookup({
     return setSelectedEntity(typeof fde === "string" ? fde : fde.name);
   }, null);
   return (
-    <form action={formAction} className="p-2">
+    <form action={formAction} className="px-inset py-2">
       <InputGroup>
         <InputGroupInput
           type="text"
@@ -23,13 +23,7 @@ export default function EntityLookup({
           placeholder="Find by ID: node/…, way/…, or relation/…"
         />
         <InputGroupAddon align="inline-end">
-          <InputGroupButton
-            type="submit"
-            size="icon-sm"
-            variant="ghost"
-            title="Find entity"
-            aria-label="Find entity"
-          >
+          <InputGroupButton type="submit" size="icon-xs" variant="ghost" aria-label="Find entity">
             <SearchIcon aria-hidden="true" />
           </InputGroupButton>
         </InputGroupAddon>

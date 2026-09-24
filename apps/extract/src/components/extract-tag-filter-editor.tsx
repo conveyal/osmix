@@ -1,4 +1,4 @@
-import { Button, EmptyState, Input, SectionTitle } from "@osmix/ui";
+import { Button, EmptyState, IconButton, Input, SectionTitle } from "@osmix/ui";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import type { ExtractTagFilterRule, ExtractTagFilterRules } from "osmix";
 import { CONVEYAL_EXTRACT_TAG_FILTERS, normalizeTagFilterRules } from "osmix";
@@ -100,15 +100,13 @@ function TagFilterSection({
               className="min-w-0 flex-1"
               aria-label={`${title} tag value`}
             />
-            <Button
+            <IconButton
               type="button"
-              variant="ghost"
-              size="icon-sm"
+              size="icon"
+              label={`Remove ${title} rule`}
+              icon={<Trash2Icon aria-hidden="true" />}
               onClick={() => removeRow(row.id)}
-              aria-label={`Remove ${title} rule`}
-            >
-              <Trash2Icon aria-hidden="true" />
-            </Button>
+            />
           </li>
         ))}
       </ul>

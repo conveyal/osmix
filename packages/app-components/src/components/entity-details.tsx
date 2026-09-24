@@ -2,6 +2,7 @@ import {
   Details,
   DetailsContent,
   DetailsSummary,
+  ScrollArea,
   Table,
   TableBody,
   TableCell,
@@ -202,8 +203,10 @@ export function NodeListDetails({
   return (
     <Details defaultOpen>
       <DetailsSummary>Nodes ({nodes.length})</DetailsSummary>
-      <DetailsContent className="max-h-48 overflow-y-scroll">
-        <NodeListTable nodes={nodes} onSelect={onSelect} />
+      <DetailsContent>
+        <ScrollArea className="max-h-48">
+          <NodeListTable nodes={nodes} onSelect={onSelect} />
+        </ScrollArea>
       </DetailsContent>
     </Details>
   );

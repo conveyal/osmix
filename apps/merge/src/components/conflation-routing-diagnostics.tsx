@@ -41,7 +41,7 @@ export function ConflationRoutingDiagnostics({
     <Card>
       <CardHeader>Routing topology impact</CardHeader>
       <CardContent className="p-0">
-        <div className="grid gap-1 p-2 text-muted-foreground" id={descriptionId}>
+        <div className="grid gap-1 p-inset text-muted-foreground" id={descriptionId}>
           <p>
             <span className="font-semibold">Before</span> is the ordinary direct merge, including
             exact reconciliation when selected. <span className="font-semibold">After</span> adds
@@ -82,7 +82,7 @@ export function ConflationRoutingDiagnostics({
             )}
           </TableBody>
         </Table>
-        <p className="border-t p-2 text-muted-foreground">
+        <p className="border-t p-inset text-muted-foreground">
           A walk-only attachment should not change CAR topology. Fewer WALK components can indicate
           the intended new connection, but topology counts alone do not prove that routing is
           correct.

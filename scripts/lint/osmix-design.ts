@@ -95,6 +95,38 @@ const noNativeRadio: Rule = {
   },
 };
 
+/** Icon-only buttons are `IconButton`s, which require a label and show it as a tooltip. */
+const noIconSizeButton: Rule = {
+  meta: {
+    type: "problem",
+    docs: { description: "Disallow icon-sized Button at call sites." },
+    messages: {
+      iconButton: "Use IconButton from @osmix/ui, which requires a label and shows a tooltip.",
+    },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        const name = node["name"] as Node;
+        if (name.type !== "JSXIdentifier" || name["name"] !== "Button") return;
+        for (const attribute of node["attributes"] as Node[]) {
+          if (attribute.type !== "JSXAttribute") continue;
+          if ((attribute["name"] as Node)["name"] !== "size") continue;
+          let value = attribute["value"] as Node | null;
+          if (value?.type === "JSXExpressionContainer") value = value["expression"] as Node;
+          if (
+            value?.type === "Literal" &&
+            typeof value["value"] === "string" &&
+            value["value"].startsWith("icon")
+          ) {
+            context.report({ node, messageId: "iconButton" });
+          }
+        }
+      },
+    };
+  },
+};
+
 const ASCII_ELLIPSIS = /\.\.\.(?!\w)/;
 
 /** UI copy uses the "…" character (U+2026), never three periods. */
@@ -128,6 +160,7 @@ const noAsciiEllipsis: Rule = {
 
 export const rules = {
   "no-ascii-ellipsis": noAsciiEllipsis,
+  "no-icon-size-button": noIconSizeButton,
   "no-native-radio": noNativeRadio,
   "no-raw-color": noRawColor,
 };

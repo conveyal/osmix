@@ -42,7 +42,7 @@ export default function OsmInfoTable({
   return (
     <Details defaultOpen={defaultOpen}>
       <DetailsSummary>File info</DetailsSummary>
-      <DetailsContent className="overflow-auto">
+      <DetailsContent>
         <Table>
           <TableBody>
             {fileName ? (

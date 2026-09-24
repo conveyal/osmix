@@ -1,5 +1,5 @@
 import { useLog } from "@osmix/app-core";
-import { Details, DetailsContent, DetailsSummary, Spinner, StatusDot } from "@osmix/ui";
+import { Details, DetailsContent, DetailsSummary, ScrollArea, Spinner, StatusDot } from "@osmix/ui";
 
 import LogContent from "./log.tsx";
 
@@ -17,8 +17,12 @@ export default function SidebarLog() {
           <StatusDot status={status?.type === "error" ? "error" : "ok"} />
         )}
       </DetailsSummary>
-      <DetailsContent className="flex h-36 flex-col gap-1 overflow-auto bg-muted/50 p-2">
-        <LogContent />
+      <DetailsContent className="bg-muted/50">
+        <ScrollArea className="h-36" orientation="both">
+          <div className="flex flex-col gap-1 px-inset py-2">
+            <LogContent />
+          </div>
+        </ScrollArea>
       </DetailsContent>
     </Details>
   );

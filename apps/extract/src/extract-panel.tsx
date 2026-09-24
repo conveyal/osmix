@@ -202,13 +202,7 @@ export function ExtractPanel() {
               </Button>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={useMapViewAsBbox}
-          >
+          <Button type="button" variant="outline" className="w-full" onClick={useMapViewAsBbox}>
             Use current map view as bbox
           </Button>
           {!isValidBbox(bbox) ? (

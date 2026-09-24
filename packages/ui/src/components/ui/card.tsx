@@ -17,7 +17,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "flex min-h-8 items-center justify-between gap-2 border-b px-2 py-1.5 font-mono font-bold tracking-wider uppercase",
+        "flex min-h-8 items-center justify-between gap-2 border-b px-inset py-1.5 font-mono font-bold tracking-wider uppercase",
         className,
       )}
       {...props}
@@ -56,7 +56,7 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="card-content" className={cn("w-full p-2", className)} {...props} />;
+  return <div data-slot="card-content" className={cn("w-full p-inset", className)} {...props} />;
 }
 
 export { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle };

@@ -7,6 +7,7 @@ import {
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
+  ScrollArea,
   Spinner,
 } from "@osmix/ui";
 import { useAtomValue, useSetAtom } from "jotai";
@@ -149,9 +150,9 @@ export function NominatimSearch({
   };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-0 flex-col">
       <form
-        className="p-2"
+        className="shrink-0 px-inset py-2"
         onSubmit={(e) => {
           e.preventDefault();
           search(query);
@@ -171,8 +172,7 @@ export function NominatimSearch({
           <InputGroupAddon align="inline-end">
             <InputGroupButton
               type="submit"
-              size="icon-sm"
-              title="Search"
+              size="icon-xs"
               aria-label="Search"
               variant="ghost"
               disabled={isTransitioning}
@@ -184,11 +184,11 @@ export function NominatimSearch({
       </form>
 
       {error ? (
-        <Alert variant="destructive" className="mx-2 mb-2">
+        <Alert variant="destructive" className="mx-inset mb-2">
           {error}
         </Alert>
       ) : isTransitioning ? (
-        <div className="flex items-center gap-2 px-2 pb-2 text-muted-foreground">
+        <div className="flex items-center gap-2 px-inset pb-2 text-muted-foreground">
           <Spinner />
           Searching…
         </div>
@@ -197,20 +197,21 @@ export function NominatimSearch({
       ) : null}
 
       {results.length > 0 && (
-        <ul className="flex max-h-60 flex-col overflow-y-auto border-t p-1">
-          {results.map((result) => (
-            <li key={result.place_id}>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto w-full justify-start py-1.5 text-left whitespace-normal"
-                onClick={() => handleSelect(result)}
-              >
-                {result.display_name}
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <ScrollArea className="max-h-60 border-t">
+          <ul className="flex flex-col p-1">
+            {results.map((result) => (
+              <li key={result.place_id}>
+                <Button
+                  variant="ghost"
+                  className="h-auto w-full justify-start px-2 py-1.5 text-left whitespace-normal"
+                  onClick={() => handleSelect(result)}
+                >
+                  {result.display_name}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </ScrollArea>
       )}
     </div>
   );

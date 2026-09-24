@@ -40,6 +40,7 @@ import {
   ItemDescription,
   ItemMedia,
   ItemTitle,
+  IconButton,
   Step as StepCard,
 } from "@osmix/ui";
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
@@ -683,7 +684,7 @@ export default function MergeBlock() {
         <Card>
           <CardHeader>Merge pipeline</CardHeader>
           <CardContent className="flex flex-col gap-2">
-            <ol className="list-inside list-decimal">
+            <ol className="list-decimal pl-4">
               <li>Optionally inspect each input for possible internal duplicates</li>
               <li>Add patch entities and apply same-ID patch updates</li>
               <li>Optionally match nearby imported entities</li>
@@ -1212,7 +1213,12 @@ export default function MergeBlock() {
             Base OSM PBF
             {base.osm && (
               <CardAction>
-                <ActionButton icon={<DownloadIcon />} onAction={base.downloadOsm} variant="ghost" />
+                <ActionButton
+                  icon={<DownloadIcon />}
+                  label="Download base OSM"
+                  onAction={base.downloadOsm}
+                  variant="ghost"
+                />
               </CardAction>
             )}
           </CardHeader>
@@ -1232,6 +1238,7 @@ export default function MergeBlock() {
               <CardAction>
                 <ActionButton
                   icon={<DownloadIcon />}
+                  label="Download patch OSM"
                   onAction={patch.downloadOsm}
                   variant="ghost"
                 />
@@ -1491,7 +1498,12 @@ export default function MergeBlock() {
             Current OSM PBF
             {base.osm && (
               <CardAction>
-                <ActionButton icon={<DownloadIcon />} onAction={base.downloadOsm} variant="ghost" />
+                <ActionButton
+                  icon={<DownloadIcon />}
+                  label="Download current OSM"
+                  onAction={base.downloadOsm}
+                  variant="ghost"
+                />
               </CardAction>
             )}
           </CardHeader>
@@ -1599,17 +1611,14 @@ export default function MergeBlock() {
                 <CardHeader>
                   Selected entity
                   <CardAction>
-                    <Button
+                    <IconButton
+                      label="Fit bounds to entity"
+                      icon={<MaximizeIcon />}
                       onClick={() => {
                         if (!base.osm || !selectedEntity) return;
                         flyToEntity(base.osm, selectedEntity);
                       }}
-                      variant="ghost"
-                      size="icon-sm"
-                      title="Fit bounds to entity"
-                    >
-                      <MaximizeIcon />
-                    </Button>
+                    />
                   </CardAction>
                 </CardHeader>
                 <CardContent className="p-0">

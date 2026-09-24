@@ -1,5 +1,5 @@
 import type { OsmLoadFailure } from "@osmix/app-core";
-import { Alert, Button, Details, DetailsContent, DetailsSummary } from "@osmix/ui";
+import { Alert, Button, Details, DetailsContent, DetailsSummary, ScrollArea } from "@osmix/ui";
 import { RotateCcwIcon, XIcon } from "lucide-react";
 
 function labelForTechnicalKey(key: string): string {
@@ -7,16 +7,19 @@ function labelForTechnicalKey(key: string): string {
 }
 
 export function OsmLoadFailurePanel({
+  className,
   failure,
   onDismiss,
   onReloadView,
 }: {
+  /** Layout only: margins that place the alert inside flush content. */
+  className?: string;
   failure: OsmLoadFailure;
   onDismiss: () => void;
   onReloadView?: () => unknown;
 }) {
   return (
-    <Alert variant="destructive" aria-live="assertive" title={failure.title} className="m-2">
+    <Alert variant="destructive" aria-live="assertive" title={failure.title} className={className}>
       <p>{failure.summary}</p>
       <p className="text-muted-foreground">{failure.suggestion}</p>
       <div className="flex flex-wrap gap-2">
@@ -33,7 +36,7 @@ export function OsmLoadFailurePanel({
       </div>
       <Details defaultOpen={false}>
         <DetailsSummary>Technical details</DetailsSummary>
-        <DetailsContent className="flex flex-col gap-2 p-2">
+        <DetailsContent className="flex flex-col gap-2 px-inset py-2">
           <OsmLoadFailureTechnicalDetails technical={failure.technical} />
         </DetailsContent>
       </Details>
@@ -60,9 +63,9 @@ export function OsmLoadFailureTechnicalDetails({
         ))}
       </dl>
       {stack ? (
-        <pre className="max-h-40 overflow-auto border-t pt-2 font-mono whitespace-pre-wrap text-muted-foreground">
-          {stack}
-        </pre>
+        <ScrollArea className="max-h-40 border-t" orientation="both">
+          <pre className="pt-2 font-mono whitespace-pre text-muted-foreground">{stack}</pre>
+        </ScrollArea>
       ) : null}
     </>
   );

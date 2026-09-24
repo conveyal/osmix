@@ -1,16 +1,17 @@
 import type * as React from "react";
 
 import { cn } from "../../lib/utils.ts";
+import { ScrollArea } from "./scroll-area.tsx";
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
+    <ScrollArea data-slot="table-container" orientation="horizontal" className="w-full">
       <table
         data-slot="table"
         className={cn("w-full caption-bottom border-collapse", className)}
         {...props}
       />
-    </div>
+    </ScrollArea>
   );
 }
 
@@ -47,7 +48,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "px-2 py-1 text-left align-top font-mono font-bold tracking-wider text-muted-foreground uppercase",
+        "px-2 py-1 text-left align-top font-mono font-bold tracking-wider text-muted-foreground uppercase first:pl-inset last:pr-inset",
         className,
       )}
       {...props}
@@ -63,7 +64,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "overflow-hidden px-2 py-1 align-top font-mono text-ellipsis whitespace-nowrap select-all",
+        "overflow-hidden px-2 py-1 align-top font-mono text-ellipsis whitespace-nowrap select-all first:pl-inset last:pr-inset",
         className,
       )}
       {...props}

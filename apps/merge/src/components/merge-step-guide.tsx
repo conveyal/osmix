@@ -345,13 +345,16 @@ export function MergeStepGuide({
       data-guide-id={guideId}
       data-slot="merge-step-guide"
     >
-      <p className="px-2 pt-2 text-muted-foreground" data-slot="merge-step-guide-summary">
+      <p className="px-inset pt-inset text-muted-foreground" data-slot="merge-step-guide-summary">
         {guide.summary}
       </p>
       <Details defaultOpen={defaultOpen}>
         <DetailsSummary>How this step works</DetailsSummary>
         <DetailsContent>
-          <div className="flex flex-col gap-2 bg-muted/50 p-2" data-slot="merge-step-guide-details">
+          <div
+            className="flex flex-col gap-2 bg-muted/50 p-inset"
+            data-slot="merge-step-guide-details"
+          >
             {"diagram" in guide ? (
               <div className="mx-auto w-full max-w-64 overflow-hidden border p-2">
                 <MergeGuideDiagram diagram={guide.diagram} />

@@ -65,7 +65,6 @@ export function WayRemovalDetails({
               </p>
               {!applied && onReviewConnection && connection.attachmentCandidateId ? (
                 <ActionButton
-                  size="sm"
                   variant="outline"
                   className="h-auto min-h-8 max-w-full text-left whitespace-normal"
                   onAction={() => onReviewConnection(connection.sourceNodeId)}
@@ -97,7 +96,7 @@ export function WayRemovalDetails({
       </p>
       <Details>
         <DetailsSummary>Original attributes on the imported way</DetailsSummary>
-        <DetailsContent className="flex flex-col gap-2 p-2">
+        <DetailsContent className="flex flex-col gap-2 p-inset">
           {Object.entries(preview.sourceTags).map(([key, value]) => (
             <div key={key} className="min-w-0 wrap-break-word">
               <span className="font-mono font-semibold">{key}</span>:{" "}

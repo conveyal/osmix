@@ -16,6 +16,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  IconButton,
   Input,
   Item,
   ItemActions,
@@ -153,47 +154,36 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
         <ItemActions>
           {isRenaming ? (
             <>
-              <Button
+              <IconButton
                 variant="outline"
-                size="icon-sm"
-                title="Confirm rename"
-                aria-label="Confirm rename"
+                label="Confirm rename"
+                icon={<CheckIcon aria-hidden="true" />}
                 onClick={handleConfirmRename}
-              >
-                <CheckIcon aria-hidden="true" />
-              </Button>
-              <Button
+              />
+              <IconButton
                 variant="outline"
-                size="icon-sm"
-                title="Cancel rename"
-                aria-label="Cancel rename"
+                label="Cancel rename"
+                icon={<XIcon aria-hidden="true" />}
                 onClick={handleCancelRename}
-              >
-                <XIcon aria-hidden="true" />
-              </Button>
+              />
             </>
           ) : (
             <>
-              <Button
+              <IconButton
                 variant="outline"
-                size="icon-sm"
-                title="Rename file"
-                aria-label="Rename file"
+                label="Rename file"
+                icon={<PencilIcon aria-hidden="true" />}
                 onClick={handleStartRename}
-              >
-                <PencilIcon aria-hidden="true" />
-              </Button>
+              />
               <ActionButton
                 variant="outline"
-                title="Restore from storage"
-                aria-label="Restore from storage"
+                label="Restore from storage"
                 icon={<RotateCcwIcon aria-hidden="true" />}
                 onAction={() => onLoad(entry.fileHash)}
               />
               <ActionButton
                 variant="outline"
-                title="Delete from storage"
-                aria-label="Delete from storage"
+                label="Delete from storage"
                 icon={<Trash2Icon aria-hidden="true" />}
                 disabled={isDeleting}
                 onAction={handleDelete}
@@ -243,7 +233,7 @@ export function StoredOsmList({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="flex flex-col items-stretch gap-2 p-2 lg:flex-row">
+        <div className="flex flex-col items-stretch gap-2 p-inset lg:flex-row">
           {isLoading ? (
             <Button
               variant="destructive"
@@ -275,12 +265,13 @@ export function StoredOsmList({
           )}
         </div>
         {!isLoading ? (
-          <div className="px-2 pb-2">
+          <div className="px-inset pb-inset">
             <OsmLoadProfileSelector value={loadProfile} onChange={setLoadProfile} />
           </div>
         ) : null}
         {loadFailure && onDismissLoadFailure ? (
           <OsmLoadFailurePanel
+            className="mx-inset mb-inset"
             failure={loadFailure}
             onDismiss={onDismissLoadFailure}
             onReloadView={onReloadView}
@@ -296,7 +287,7 @@ export function StoredOsmList({
               </span>
             </DetailsSummary>
             <DetailsContent>
-              <ItemGroup className="gap-2 p-2">
+              <ItemGroup className="gap-2 p-inset">
                 {entries.map((entry) => (
                   <StoredOsmItem
                     key={entry.fileHash}

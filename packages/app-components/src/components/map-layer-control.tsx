@@ -1,10 +1,12 @@
 import { layerControlIsOpenAtom } from "@osmix/app-core";
 import {
   Button,
+  cn,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
   EmptyState,
+  IconButton,
   Input,
 } from "@osmix/ui";
 import { useAtomValue } from "jotai";
@@ -21,7 +23,7 @@ import { useCallback, useEffectEvent, useMemo, useState, useSyncExternalStore } 
 import { APPID } from "../constants.ts";
 import { useMap } from "../hooks/map.ts";
 import CustomControl from "./custom-control.tsx";
-import { MapPanelHeader } from "./map-panel-header.tsx";
+import { MapPanelBody, MapPanelHeader } from "./map-panel-header.tsx";
 
 type LayerInfo = {
   id: string;
@@ -88,6 +90,7 @@ export function MapLayers() {
   const map = useMap();
   const layers = useMapLayers(map);
   const [searchQuery, setSearchQuery] = useState("");
+  const [open, setOpen] = useState(true);
 
   // Group layers by prefix
   const groups = useMemo((): LayerGroup[] => {
@@ -137,33 +140,28 @@ export function MapLayers() {
   const matchCount = filteredGroups.reduce((count, group) => count + group.layers.length, 0);
 
   return (
-    <Collapsible defaultOpen>
+    <Collapsible open={open} onOpenChange={setOpen} className="flex min-h-0 flex-col">
       <MapPanelHeader
         icon={<LayersIcon aria-hidden="true" />}
         title="Layers"
         detail={layers.length.toLocaleString()}
         actions={
-          <CollapsibleTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="group"
-                title="Toggle layer list"
-                aria-label="Toggle layer list"
+          <IconButton
+            label="Toggle layer list"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            icon={
+              <ChevronDownIcon
+                aria-hidden="true"
+                className={cn("transition-transform", open && "rotate-180")}
               />
             }
-          >
-            <ChevronDownIcon
-              aria-hidden="true"
-              className="transition-transform group-data-panel-open:rotate-180"
-            />
-          </CollapsibleTrigger>
+          />
         }
       />
 
-      <CollapsibleContent>
-        <div className="border-b p-2">
+      <CollapsibleContent className="flex min-h-0 flex-col">
+        <div className="shrink-0 border-b px-inset py-2">
           <Input
             type="search"
             placeholder="Search layers…"
@@ -173,18 +171,20 @@ export function MapLayers() {
           />
         </div>
 
-        {matchCount === 0 ? (
-          <EmptyState>No layers match the search</EmptyState>
-        ) : (
-          filteredGroups.map((group) => (
-            <LayerGroupComponent
-              key={group.id}
-              group={group}
-              onToggleLayer={toggleLayerVisibility}
-              onToggleGroup={toggleGroupVisibility}
-            />
-          ))
-        )}
+        <MapPanelBody>
+          {matchCount === 0 ? (
+            <EmptyState>No layers match the search</EmptyState>
+          ) : (
+            filteredGroups.map((group) => (
+              <LayerGroupComponent
+                key={group.id}
+                group={group}
+                onToggleLayer={toggleLayerVisibility}
+                onToggleGroup={toggleGroupVisibility}
+              />
+            ))
+          )}
+        </MapPanelBody>
       </CollapsibleContent>
     </Collapsible>
   );
@@ -222,23 +222,19 @@ function LayerGroupComponent({
             {visibleCount}/{group.layers.length}
           </span>
         </CollapsibleTrigger>
-        <Button
+        <IconButton
           onClick={() => onToggleGroup(group, noneVisible || !allVisible)}
-          variant="ghost"
-          size="icon-sm"
-          title={allVisible ? `Hide all ${group.name} layers` : `Show all ${group.name} layers`}
-          aria-label={
-            allVisible ? `Hide all ${group.name} layers` : `Show all ${group.name} layers`
+          label={allVisible ? `Hide all ${group.name} layers` : `Show all ${group.name} layers`}
+          icon={
+            allVisible ? (
+              <EyeIcon aria-hidden="true" />
+            ) : noneVisible ? (
+              <EyeOffIcon aria-hidden="true" className="text-muted-foreground" />
+            ) : (
+              <EyeIcon aria-hidden="true" className="text-muted-foreground" />
+            )
           }
-        >
-          {allVisible ? (
-            <EyeIcon aria-hidden="true" />
-          ) : noneVisible ? (
-            <EyeOffIcon aria-hidden="true" className="text-muted-foreground" />
-          ) : (
-            <EyeIcon aria-hidden="true" className="text-muted-foreground" />
-          )}
-        </Button>
+        />
       </div>
       <CollapsibleContent className="flex flex-col border-t bg-muted/50">
         {group.layers.map((layer) => (

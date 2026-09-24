@@ -99,7 +99,7 @@ export function AutomaticMergeProgress({
             <li
               aria-current={status === "running" ? "step" : undefined}
               className={cn(
-                "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-2 py-2",
+                "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-inset py-2",
                 status === "remaining" && "text-muted-foreground",
               )}
               data-status={status}

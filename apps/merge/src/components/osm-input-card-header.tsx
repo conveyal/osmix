@@ -32,13 +32,13 @@ export function OsmInputCardHeader({
             <ButtonGroup aria-label={`${kindLabel} OSM file actions`}>
               <ActionButton
                 icon={<DownloadIcon />}
-                title={`Download ${kind} OSM`}
+                label={`Download ${kind} OSM`}
                 onAction={onDownload}
                 variant="ghost"
               />
               <ActionButton
                 icon={<XIcon />}
-                title={`Clear ${kind} OSM file`}
+                label={`Clear ${kind} OSM file`}
                 onAction={onClear}
                 variant="ghost"
               />
@@ -47,7 +47,7 @@ export function OsmInputCardHeader({
         ) : null}
       </CardHeader>
       {fileName ? (
-        <CardDescription className="truncate border-b px-2 py-1 font-mono" title={fileName}>
+        <CardDescription className="truncate border-b px-inset py-1 font-mono" title={fileName}>
           {fileName}
         </CardDescription>
       ) : null}

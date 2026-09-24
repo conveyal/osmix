@@ -74,7 +74,7 @@ export default function BrowserCheck() {
 
   return (
     <Dialog>
-      <DialogTrigger render={<Button size="sm" variant="link" />}>
+      <DialogTrigger render={<Button size="sm" variant="ghost" />}>
         Check system
         {issues.length > 0 ? <StatusDot status="error" title={hoverText} /> : null}
       </DialogTrigger>

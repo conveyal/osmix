@@ -32,7 +32,7 @@ export function DetailsSummary({
   return (
     <CollapsibleTrigger
       className={cn(
-        "group flex h-8 w-full cursor-pointer items-center justify-between border-t p-2 focus-ring transition-colors hover:bg-accent data-panel-open:border-b",
+        "group flex h-8 w-full cursor-pointer items-center justify-between border-t px-inset py-2 focus-ring transition-colors hover:bg-accent data-panel-open:border-b",
         className,
       )}
     >

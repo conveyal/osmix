@@ -25,7 +25,10 @@ export function Step({
       data-slot="step"
       className={cn("flex flex-col rounded-md border bg-card text-card-foreground", className)}
     >
-      <div data-slot="step-header" className="flex min-h-9 items-center gap-2 border-b px-2 py-1.5">
+      <div
+        data-slot="step-header"
+        className="flex min-h-9 items-center gap-2 border-b px-inset py-1.5"
+      >
         <h2 className="flex min-w-0 flex-1 items-baseline gap-2 text-sm font-semibold">
           {number !== undefined ? (
             <span data-slot="step-number" className="font-mono font-bold text-brand">

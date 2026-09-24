@@ -9,12 +9,6 @@ const comparison = (page: Page) =>
   review(page).getByRole("region", { name: "Selected map comparison" });
 const ARTIFACT_DIRECTORY = resolve(import.meta.dirname, "../../../output/playwright/ticket10");
 
-/** Base UI `Select` renders its options in a portal; open the combobox, then pick by label. */
-async function chooseOption(page: Page, combobox: Locator, option: string) {
-  await combobox.click();
-  await page.getByRole("option", { name: option, exact: true }).click();
-}
-
 async function compareFirst(page: Page) {
   const button = review(page)
     .getByRole("button", { name: /Compare imported/ })
@@ -249,11 +243,9 @@ test("school and cafe classifications block both actions when only name is selec
   page,
 }, testInfo) => {
   await page.getByRole("button", { name: "Nearby school and cafe" }).click();
-  await chooseOption(
-    page,
-    review(page).getByRole("combobox", { name: "Match reason" }),
-    "Feature classifications conflict",
-  );
+  await review(page)
+    .getByRole("combobox", { name: "Match reason" })
+    .selectOption({ label: "Feature classifications conflict" });
   await expect(review(page)).toContainText("Imported features matching these filters: 1");
   const conflict = review(page).getByRole("region", { name: "Feature type conflict", exact: true });
   await expect(conflict).toBeVisible();
@@ -324,7 +316,9 @@ test("keyboard comparison keeps coordinates, markers, and selection consistent w
   const targetMarker = page.getByTestId("evidence-map").getByRole("img", { name: /Base/ });
   await expect(targetMarker).toHaveAccessibleName(/-120\.4999900/);
 
-  await chooseOption(page, review(page).getByRole("combobox", { name: "Match status" }), "Blocked");
+  await review(page)
+    .getByRole("combobox", { name: "Match status" })
+    .selectOption({ label: "Blocked" });
   await expect(comparison(page)).toHaveCount(0);
   await expect.poll(async () => (await readState(page)).comparison.features).toEqual([]);
   await expect(

@@ -328,7 +328,7 @@ test("a late cancellation preserves the committed exact result and replacing the
   // Clearing the base from the map's file panel promotes the patch into the base slot,
   // which replaces the base dataset and must invalidate the completed merge.
   page.once("dialog", (dialog) => void dialog.accept());
-  await page.getByTitle("Clear file").first().click();
+  await page.getByRole("button", { name: "Clear file", exact: true }).first().click();
   await loadPbf(baseCard, page, inputs.base);
   await expect(page.getByText("Select merge inputs and options", { exact: false })).toBeVisible();
   await expect(summary).toHaveCount(0);

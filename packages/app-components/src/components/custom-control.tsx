@@ -44,8 +44,8 @@ const PANEL_WIDTHS = { narrow: "w-72", default: "w-sm" } as const;
 
 /**
  * A floating map panel (raised card) that rerenders arbitrary React content whenever the
- * camera changes. Start the content with `MapPanelHeader`. `width` picks one of two steps;
- * `className` is for layout only.
+ * camera changes. Start the content with `MapPanelHeader` and put the rest in `MapPanelBody`,
+ * the panel's only scroller. `width` picks one of two steps; `className` is for layout only.
  */
 function CustomControl(props: {
   className?: ClassValue;
@@ -72,7 +72,7 @@ function CustomControl(props: {
     <div
       data-slot="map-panel"
       className={cn(
-        "osmix-map-panel flex flex-col overflow-auto rounded-md border bg-card shadow-raised",
+        "osmix-map-panel flex flex-col overflow-hidden rounded-md border bg-card shadow-raised",
         PANEL_WIDTHS[props.width ?? "default"],
         props.className,
       )}

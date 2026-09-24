@@ -1,5 +1,5 @@
 import { zoomAtom } from "@osmix/app-core";
-import { Button } from "@osmix/ui";
+import { IconButton } from "@osmix/ui";
 import { useAtomValue } from "jotai";
 import { MinusIcon, PlusIcon } from "lucide-react";
 
@@ -12,30 +12,10 @@ export default function ZoomInfo() {
 
 export function ZoomInButton() {
   const map = useMap();
-  return (
-    <Button
-      onClick={() => map?.zoomIn()}
-      size="icon-sm"
-      variant="ghost"
-      title="Zoom in"
-      aria-label="Zoom in"
-    >
-      <PlusIcon aria-hidden="true" />
-    </Button>
-  );
+  return <IconButton label="Zoom in" icon={<PlusIcon />} onClick={() => map?.zoomIn()} />;
 }
 
 export function ZoomOutButton() {
   const map = useMap();
-  return (
-    <Button
-      onClick={() => map?.zoomOut()}
-      size="icon-sm"
-      variant="ghost"
-      title="Zoom out"
-      aria-label="Zoom out"
-    >
-      <MinusIcon aria-hidden="true" />
-    </Button>
-  );
+  return <IconButton label="Zoom out" icon={<MinusIcon />} onClick={() => map?.zoomOut()} />;
 }

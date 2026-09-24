@@ -70,7 +70,7 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
         Match evidence and attributes
       </DetailsSummary>
       <DetailsContent>
-        <section aria-label="Match evidence" className="flex min-w-0 flex-col gap-2 p-2">
+        <section aria-label="Match evidence" className="flex min-w-0 flex-col gap-2 p-inset">
           <p className="flex items-center gap-1 text-muted-foreground">
             Nearby features can represent different things. Distance alone does not prove a match or
             a safe connection.
@@ -93,7 +93,7 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
         {evidence.featureTypeConflicts && evidence.featureTypeConflicts.length > 0 ? (
           <Alert
             aria-label="Feature type conflict"
-            className="m-2 min-w-0"
+            className="m-inset min-w-0"
             role="region"
             title="Feature type conflict"
             variant="destructive"
@@ -121,7 +121,7 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
               <div
                 key={diff.key}
                 className={cn(
-                  "flex min-w-0 flex-col gap-1 border-t p-2",
+                  "flex min-w-0 flex-col gap-1 border-t p-inset",
                   diff.protected && "bg-destructive/10",
                   !diff.protected && diff.routing && "bg-warning/10",
                 )}

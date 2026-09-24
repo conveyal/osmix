@@ -1,6 +1,14 @@
 import { Log } from "@osmix/app-core";
-import { ErrorBoundary, LoadingState, Nav } from "@osmix/ui";
-import { Provider } from "jotai";
+import {
+  ErrorBoundary,
+  LoadingState,
+  Nav,
+  SidebarProvider,
+  SidebarTrigger,
+  sidebarIsOpenAtom,
+  TooltipProvider,
+} from "@osmix/ui";
+import { Provider, useAtom } from "jotai";
 import { type ReactNode, StrictMode, Suspense, useLayoutEffect } from "react";
 import { MapProvider } from "react-map-gl/maplibre";
 
@@ -15,14 +23,11 @@ import Status from "./status.tsx";
 export function OsmixNav({ current }: { current: OsmixAppId }) {
   return (
     <Nav
-      links={
-        <>
-          <AppLinks current={current} />
-          <BrowserCheck />
-        </>
-      }
+      start={<SidebarTrigger />}
+      links={<AppLinks current={current} />}
       status={<Status />}
       controls={<MapNavControls />}
+      end={<BrowserCheck />}
     />
   );
 }
@@ -50,13 +55,25 @@ export function OsmixAppShell({
       <Provider store={store}>
         <ErrorBoundary onError={(error) => Log.addMessage(error.message, "error")}>
           <MapProvider>
-            <div className="flex h-screen w-screen flex-col">
-              <OsmixNav current={app} />
-              <Suspense fallback={<LoadingState />}>{children}</Suspense>
-            </div>
+            <TooltipProvider>
+              <OsmixSidebarProvider>
+                <OsmixNav current={app} />
+                <Suspense fallback={<LoadingState />}>{children}</Suspense>
+              </OsmixSidebarProvider>
+            </TooltipProvider>
           </MapProvider>
         </ErrorBoundary>
       </Provider>
     </StrictMode>
+  );
+}
+
+/** The page frame: the nav above a sidebar/map row. The sidebar's open state persists. */
+function OsmixSidebarProvider({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useAtom(sidebarIsOpenAtom);
+  return (
+    <SidebarProvider open={open} onOpenChange={setOpen} className="h-svh min-h-0 flex-col">
+      {children}
+    </SidebarProvider>
   );
 }

@@ -1,7 +1,7 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 interface HarnessState {
   decision: string;
@@ -14,12 +14,6 @@ interface HarnessState {
   propertyKeys: string;
   workerCalls: number;
   workflowStep: string;
-}
-
-/** Base UI `Select` renders its options in a portal; open the combobox, then pick by label. */
-async function chooseOption(page: Page, combobox: Locator, option: string) {
-  await combobox.click();
-  await page.getByRole("option", { name: option, exact: true }).click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -583,11 +577,9 @@ test.describe("matching action review", () => {
     expect(unrelatedChoice).toEqual({ candidateId: "node:102->3", action: "reject" });
     await expectAlternativePreview(page, 1);
 
-    await chooseOption(
-      page,
-      harness(page).getByRole("combobox", { name: "Match status", exact: true }),
-      "Scheduled",
-    );
+    await harness(page)
+      .getByRole("combobox", { name: "Match status", exact: true })
+      .selectOption({ label: "Scheduled" });
     await expect(target(page, 2)).toHaveAccessibleName("Base node 2 (outside current filters)");
     const filtered = (await readState(page)).workerPage;
     expect(filtered).toMatchObject({ totalCandidates: 1, totalSources: 1, totalPages: 1 });
@@ -628,11 +620,9 @@ test.describe("matching action review", () => {
     await expectAlternativePreview(page, 2);
     await sourceGroup(page).getByRole("radio", { name: "Leave unmatched", exact: true }).click();
     await expect(harness(page)).toContainText("No candidates match these filters");
-    await chooseOption(
-      page,
-      harness(page).getByRole("combobox", { name: "Match status", exact: true }),
-      "All statuses",
-    );
+    await harness(page)
+      .getByRole("combobox", { name: "Match status", exact: true })
+      .selectOption({ label: "All statuses" });
     await expect(
       sourceGroup(page).getByRole("radio", { name: "Leave unmatched", exact: true }),
     ).toBeChecked();
@@ -676,11 +666,9 @@ test.describe("matching action review", () => {
     await expect(sourceGroup(page).getByRole("alert")).toContainText(
       "More than one target is selected",
     );
-    await chooseOption(
-      page,
-      harness(page).getByRole("combobox", { name: "Match status", exact: true }),
-      "Skipped",
-    );
+    await harness(page)
+      .getByRole("combobox", { name: "Match status", exact: true })
+      .selectOption({ label: "Skipped" });
     await expect(sourceGroup(page, 102)).toBeVisible();
     const before = await readState(page);
     await harness(page)
@@ -777,11 +765,9 @@ test("completion explains mixed matching results and downloads the retained repo
     "Imported node 501",
   );
   await summary.getByRole("button", { name: "Selected tag outcomes" }).click();
-  await chooseOption(
-    page,
-    summary.getByRole("combobox", { name: "Selected tag", exact: true }),
-    "layer",
-  );
+  await summary
+    .getByRole("combobox", { name: "Selected tag", exact: true })
+    .selectOption({ label: "layer" });
   await expect(summary).toContainText("This structural tag is protected");
 
   const retained = (await page.evaluate(() => window.mergeOutcomeHarness.readState())).completion;

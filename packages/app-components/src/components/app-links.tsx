@@ -6,12 +6,12 @@ import { appOrigin, OSMIX_APPS, type OsmixAppId } from "../lib/app-origin.ts";
  */
 export function AppLinks({ current }: { current: OsmixAppId }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex h-full items-stretch gap-4">
       {OSMIX_APPS.map((app) =>
         app.id === current ? (
           <span
             key={app.id}
-            className="border-b-2 border-app py-0.5 font-semibold text-foreground"
+            className="flex items-center border-y-2 border-t-transparent border-b-app font-semibold text-foreground"
             aria-current="page"
           >
             {app.label}
@@ -21,7 +21,7 @@ export function AppLinks({ current }: { current: OsmixAppId }) {
             key={app.id}
             href={appOrigin(app.id)}
             data-slot="app-link"
-            className="border-b-2 border-transparent py-0.5 text-muted-foreground focus-ring hover:text-foreground"
+            className="flex items-center border-y-2 border-transparent text-muted-foreground focus-ring hover:text-foreground"
           >
             {app.label}
           </a>

@@ -15,7 +15,8 @@ import {
   DialogTrigger,
   Input,
   Item,
-  Select,
+  NativeSelect,
+  NativeSelectOption,
 } from "@osmix/ui";
 import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
 import type { OsmFileType, OsmLoadProfile } from "osmix";
@@ -117,6 +118,20 @@ const LOAD_PROFILE_OPTIONS: Array<{
   },
 ];
 
+/** Narrow a `<select>` value to a known load profile; the options are the only source. */
+function parseLoadProfile(value: string): OsmLoadProfile {
+  const option = LOAD_PROFILE_OPTIONS.find((o) => o.value === value);
+  if (!option) throw Error(`Unknown load profile: ${value}`);
+  return option.value;
+}
+
+/** Narrow a `<select>` value to a known file type; the options are the only source. */
+function parseFileType(value: string): OsmFileType {
+  const option = FILE_TYPE_OPTIONS.find((o) => o.type === value);
+  if (!option) throw Error(`Unknown file type: ${value}`);
+  return option.type;
+}
+
 export function OsmLoadProfileSelector({
   disabled,
   onChange,
@@ -135,15 +150,19 @@ export function OsmLoadProfileSelector({
         <label htmlFor={id} className="font-medium">
           Advanced load profile
         </label>
-        <Select
+        <NativeSelect
           id={id}
-          className="w-auto"
           aria-describedby={descriptionId}
           disabled={disabled}
-          items={LOAD_PROFILE_OPTIONS}
           value={value}
-          onValueChange={onChange}
-        />
+          onChange={(e) => onChange(parseLoadProfile(e.target.value))}
+        >
+          {LOAD_PROFILE_OPTIONS.map((option) => (
+            <NativeSelectOption key={option.value} value={option.value}>
+              {option.label}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
       </div>
       <div id={descriptionId} className="text-muted-foreground">
         {selected.description}
@@ -183,6 +202,7 @@ export function OsmPbfSelectFileButton({
     return (
       <Button
         type="button"
+        variant="outline"
         disabled={disabled || isLoading}
         className="w-full flex-1"
         onClick={async () => {
@@ -203,7 +223,7 @@ export function OsmPbfSelectFileButton({
 
   return (
     <Menu>
-      <MenuTrigger disabled={disabled || isLoading} className="flex-1">
+      <MenuTrigger variant="outline" disabled={disabled || isLoading} className="flex-1">
         <FilesIcon aria-hidden="true" />
         Open file
         <ChevronDownIcon aria-hidden="true" className="ml-auto" />
@@ -256,15 +276,18 @@ export function OsmPbfOpenUrlButton({
             <label htmlFor={fileTypeId} className="font-medium">
               File type
             </label>
-            <Select
+            <NativeSelect
               id={fileTypeId}
-              items={FILE_TYPE_OPTIONS.map((option) => ({
-                value: option.type,
-                label: option.label,
-              }))}
+              className="w-full"
               value={selectedFileType}
-              onValueChange={setSelectedFileType}
-            />
+              onChange={(e) => setSelectedFileType(parseFileType(e.target.value))}
+            >
+              {FILE_TYPE_OPTIONS.map((option) => (
+                <NativeSelectOption key={option.type} value={option.type}>
+                  {option.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
             <div className="text-muted-foreground">
               {FILE_TYPE_OPTIONS.find((option) => option.type === selectedFileType)?.description}
             </div>
@@ -329,11 +352,8 @@ export function OsmPbfClearFileButton({
     <ActionButton
       disabled={disabled}
       onAction={clearFile}
-      title="Clear file"
+      label="Clear file"
       icon={<XIcon aria-hidden="true" />}
-      aria-label="Clear file"
-      size="icon-sm"
-      variant="ghost"
     />
   );
 }

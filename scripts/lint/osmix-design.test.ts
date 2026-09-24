@@ -45,3 +45,18 @@ tester.run("no-ascii-ellipsis", rules["no-ascii-ellipsis"], {
     { code: '<p>{"Searching..."}</p>', errors: [{ messageId: "ellipsis" }] },
   ],
 });
+
+tester.run("no-icon-size-button", rules["no-icon-size-button"], {
+  valid: [
+    '<Button size="sm">Save</Button>',
+    '<IconButton label="Zoom in" icon={<PlusIcon />} />',
+    "<Button>Open</Button>",
+  ],
+  invalid: [
+    {
+      code: '<Button size="icon-sm" aria-label="Close"><XIcon /></Button>',
+      errors: [{ messageId: "iconButton" }],
+    },
+    { code: '<Button size={"icon"}><XIcon /></Button>', errors: [{ messageId: "iconButton" }] },
+  ],
+});

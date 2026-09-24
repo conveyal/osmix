@@ -32,7 +32,7 @@ export function LoadingState({
   return (
     <div
       data-slot="loading-state"
-      className={cn("flex items-center gap-2 p-2 text-muted-foreground", className)}
+      className={cn("flex items-center gap-2 p-inset text-muted-foreground", className)}
     >
       <Spinner />
       {children}
@@ -42,7 +42,7 @@ export function LoadingState({
 
 export function EmptyState({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div data-slot="empty-state" className={cn("p-2 text-muted-foreground", className)}>
+    <div data-slot="empty-state" className={cn("p-inset text-muted-foreground", className)}>
       {children}
     </div>
   );

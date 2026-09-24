@@ -11,7 +11,6 @@ import {
   Details,
   DetailsContent,
   DetailsSummary,
-  EmptyState,
   LoadingState,
   Card,
   CardContent,
@@ -56,12 +55,12 @@ export function InspectPanel({
   if (!baseOsm.osm || !baseOsm.osmInfo || !baseOsm.fileInfo) {
     return (
       <div className="flex flex-col gap-4">
-        <EmptyState>
+        <p className="text-muted-foreground">
           Open an OSM file to inspect, or extract a region with the{" "}
           <a href={appOrigin("extract")} className="text-info underline">
             Extract app
           </a>
-        </EmptyState>
+        </p>
         <OsmSourceLinks
           openOsmPbfUrl={async (url) => {
             const osmInfo = await baseOsm.loadOsmPbfUrl(url);

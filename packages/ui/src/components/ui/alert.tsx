@@ -4,7 +4,7 @@ import type * as React from "react";
 
 import { cn } from "../../lib/utils.ts";
 
-const alertVariants = cva("flex gap-2 rounded-md border p-2", {
+const alertVariants = cva("flex gap-2 rounded-md border p-inset", {
   variants: {
     variant: {
       info: "border-info/40 bg-info/5 [&>svg]:text-info",

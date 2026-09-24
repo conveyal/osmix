@@ -169,6 +169,10 @@
               {
                 "pattern": "^(?:[^:]*:)*border-(?!(?:[trblxyse](?:-\\d+)?|\\d+|solid|dashed|dotted|double|none|hidden|collapse|separate|transparent|border|input|white|app|(?:info|destructive|warning|success|brand)(?:/\\d+)?)$)",
                 "message": "Border colors at call sites are limited to the status colors; primitives own the rest."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*overflow-(?:[xy]-)?(?:auto|scroll)$",
+                "message": "Use ScrollArea from @osmix/ui for scrollable content."
               }
             ]
           }
@@ -186,7 +190,7 @@
             "forbid": [
               {
                 "element": "select",
-                "message": "Use Select from @osmix/ui."
+                "message": "Use NativeSelect from @osmix/ui."
               },
               {
                 "element": "textarea",
@@ -213,7 +217,8 @@
               }
             ]
           }
-        ]
+        ],
+        "osmix/no-icon-size-button": "error"
       }
     },
     {

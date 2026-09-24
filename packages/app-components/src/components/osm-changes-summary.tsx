@@ -88,7 +88,7 @@ function ChangesSummaryTable() {
           </TableRow>
         </TableBody>
       </Table>
-      <p className="border-t p-2 text-muted-foreground" id={reconciliationHelpId}>
+      <p className="border-t px-inset py-2 text-muted-foreground" id={reconciliationHelpId}>
         Reconciliation resolves equivalent entities to one surviving entity instead of retaining
         both. Node references rewritten counts way node references and relation node members changed
         from a reconciled node ID to its surviving node ID.
@@ -134,7 +134,7 @@ export function ChangesFilters() {
   const [entityTypeFilter, setEntityTypeFilter] = useAtom(entityTypeFilterAtom);
 
   return (
-    <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 p-2">
+    <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 px-inset py-2">
       <fieldset className="flex flex-wrap items-center gap-2">
         <legend>
           <SectionTitle>Change type</SectionTitle>
@@ -188,9 +188,8 @@ export function ChangesList({
           <Button
             key={`${entityType}-${entity.id}`}
             variant="ghost"
-            size="sm"
             className={cn(
-              "h-auto w-full justify-start py-1 text-left font-mono font-semibold whitespace-normal select-text",
+              "h-auto w-full justify-start px-inset py-1 text-left font-mono font-semibold whitespace-normal select-text",
               changeTypeColor,
             )}
             onClick={() => setSelectedEntity(entity)}
@@ -780,7 +779,7 @@ function AugmentedDiffContent({ change }: { change: OsmChange }) {
   return (
     <>
       {refs && (
-        <div className="border-b p-2">
+        <div className="border-b px-inset py-2">
           Related: {refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")}
         </div>
       )}
@@ -812,7 +811,7 @@ export function ChangesExpandableList() {
           <Details key={`${entityType}-${entity.id}`} defaultOpen={false}>
             <DetailsSummary className={cn(changeTypeColor)}>{summaryLabel}</DetailsSummary>
 
-            <DetailsContent className="w-full overflow-x-auto">
+            <DetailsContent>
               <AugmentedDiffContent change={change} />
             </DetailsContent>
           </Details>
@@ -828,7 +827,7 @@ export function ChangesPagination() {
   const [isPending, startTransition] = useTransition();
   return (
     <Pager
-      className="p-2"
+      className="px-inset py-2"
       label="Changes pages"
       page={currentPage}
       pageCount={totalPages}
