@@ -122,7 +122,7 @@ const pbfStream = entityStream
 ```sh
 pnpm run test packages/json
 pnpm run lint packages/json
-pnpm run typecheck packages/json
+pnpm --filter ./packages/json run typecheck
 ```
 
 Run `pnpm run check` at the repo root before publishing.

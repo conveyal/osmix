@@ -62,7 +62,7 @@ All modules are tree-shakeable; only import what you need.
 
 - `pnpm run test packages/shared`
 - `pnpm run lint packages/shared`
-- `pnpm run typecheck packages/shared`
+- `pnpm --filter ./packages/shared run typecheck`
 
 Run `pnpm run check` at the repo root before publishing to ensure formatting,
 lint, and type coverage.

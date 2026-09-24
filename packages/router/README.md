@@ -191,6 +191,6 @@ const router = new Router(osm, graph, { algorithm: "astar", metric: "time" });
 
 - `pnpm run test packages/router`
 - `pnpm run lint packages/router`
-- `pnpm run typecheck packages/router`
+- `pnpm --filter ./packages/router run typecheck`
 
 Run `pnpm run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

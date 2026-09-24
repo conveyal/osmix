@@ -89,6 +89,6 @@ Lower-level method to encode a specific bounding box with a custom projection fu
 
 - `pnpm run test packages/vt`
 - `pnpm run lint packages/vt`
-- `pnpm run typecheck packages/vt`
+- `pnpm --filter ./packages/vt run typecheck`
 
 Run `pnpm run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

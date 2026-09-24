@@ -213,7 +213,7 @@ core-storage limit from an optional spatial-index failure.
 
 ```sh
 pnpm run test packages/core
-pnpm run typecheck packages/core
+pnpm --filter ./packages/core run typecheck
 pnpm run lint packages/core
 ```
 

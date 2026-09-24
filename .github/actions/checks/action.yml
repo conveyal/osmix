@@ -22,7 +22,7 @@ runs:
 
     - name: Format check (oxfmt)
       shell: bash
-      run: pnpm exec oxfmt . --check
+      run: pnpm pipeline format --include-workspace-root
 
     - name: Run package tests
       shell: bash

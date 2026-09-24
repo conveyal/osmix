@@ -614,7 +614,7 @@ spec-compliant without staging everything in memory.
 
 - `pnpm run test packages/osmix`
 - `pnpm run lint packages/osmix`
-- `pnpm run typecheck packages/osmix`
+- `pnpm --filter ./packages/osmix run typecheck`
 
 Run `pnpm run check` from the repo root before publishing to keep formatting,
 lint, and types consistent.

@@ -307,6 +307,6 @@ Options:
 
 - `pnpm run test packages/change`
 - `pnpm run lint packages/change`
-- `pnpm run typecheck packages/change`
+- `pnpm --filter ./packages/change run typecheck`
 
 Run `pnpm run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

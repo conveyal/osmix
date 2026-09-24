@@ -11,28 +11,60 @@ tasks:
     dependsOn: ["^build"]
     outputs: ["dist/**"]
     inputs: ["src/**", "tsconfig*.json", "package.json"]
-  typecheck:
-    dependsOn: ["^typecheck"]
+  "check:deps":
     outputs: []
-    inputs: ["src/**", "test/**", "tsconfig*.json"]
+    inputs: ["+**/package.json", "pnpm-workspace.yaml"]
+  "check:docs":
+    outputs: []
+    inputs:
+      [
+        "README.md",
+        "docs/merge-process.md",
+        "packages/change/README.md",
+        "packages/vt/README.md",
+        "packages/gtfs/README.md",
+        "packages/router/README.md",
+        "packages/load/README.md",
+        "packages/core/README.md",
+        "packages/osmix/README.md",
+        "scripts/check-docs.ts",
+        "scripts/tsconfig.docs.json",
+        "packages/osmix/src/**",
+        "packages/change/src/**",
+        "packages/core/src/**",
+        "packages/gtfs/src/**",
+        "packages/load/src/**",
+        "packages/router/src/**",
+        "packages/vt/src/**",
+      ]
+  "format:check":
+    outputs: []
+    inputs: ["+**/*.ts", "+**/*.tsx", "+**/package.json", ".oxfmtrc.json"]
+  "lint:check":
+    outputs: []
+    inputs: ["+**/*.ts", "+**/*.tsx", ".oxlintrc.json"]
   test:
     dependsOn: ["^test"]
     outputs: []
     inputs: ["src/**", "test/**", "tsconfig*.json", "vitest.config.ts"]
     env: ["VITEST_INCLUDE_APPS"]
-  "lint:check":
+  "test:check-docs":
     outputs: []
-    inputs: ["+**/*.ts", "+**/*.tsx", ".oxlintrc.json"]
-  "check:deps":
+    inputs: ["scripts/check-docs.ts", "scripts/check-docs.test.ts"]
+  typecheck:
+    dependsOn: ["^typecheck"]
     outputs: []
-    inputs: ["+**/package.json", "pnpm-workspace.yaml"]
+    inputs: ["src/**", "test/**", "tsconfig*.json"]
 
 pipelines:
+  all-root: ["lint:check", "check:deps", "format:check", "check:docs", "test:check-docs"]
   build: [build]
+  deps: ["check:deps"]
+  docs: ["check:docs", "test:check-docs"]
+  format: ["format:check"]
   typecheck: [typecheck]
   test: [test]
   lint: ["lint:check"]
-  deps: ["check:deps"]
   verify: [build, typecheck, test]
 
 overrides:

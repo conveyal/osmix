@@ -127,7 +127,7 @@ const dataBytes = await osmBlockToPbfBlobBytes(primitiveBlock);
 ```sh
 pnpm run test packages/pbf
 pnpm run lint packages/pbf
-pnpm run typecheck packages/pbf
+pnpm --filter ./packages/pbf run typecheck
 ```
 
 Run `pnpm run check` at the repo root before publishing to ensure formatting, lint, and type coverage.

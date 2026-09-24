@@ -2,7 +2,7 @@
 
 ## Run These Every Change
 
-- For each changed package/app (and packages/apps that depend on the changed code): `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test` must be green.
+- For each changed package/app (and packages/apps that depend on the changed code): `pnpm run format`, `pnpm run lint`, and `pnpm --filter <pkg> run typecheck` must be green. `pnpm run verify` runs `build`+`typecheck`+`test` across the whole repo via `pnpm pipeline` (cached — see "Commands" below); `pnpm run test` runs the whole suite directly.
 - Add or extend tests and documentation when behavior or public APIs change.
 - Before changing merge rules, matching actions, or merge workflow states, read [docs/merge-process.md](docs/merge-process.md). Update its affected rules/examples and linked regression tests in the same PR.
 - Only run root tests before committing.
@@ -57,22 +57,27 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 
 ## Commands
 
-- `pnpm install` to bootstrap; `pnpm run dev` (filterable) for local dev; `pnpm run build` for production bundles.
-- `pnpm run check` runs `oxfmt` then type-aware `oxlint` in one pass.
-- `pnpm run format:check` and `pnpm run lint:check` run non-mutating formatting and lint checks.
-- `pnpm run check:deps` flags undeclared or unused workspace dependencies.
+- `pnpm install` to bootstrap; `pnpm run dev` (filterable) for local dev.
+- `pnpm run check` runs `oxfmt` then type-aware `oxlint` in one pass (mutating).
 - `pnpm run verify` runs `build`, `typecheck`, and `test` for every workspace via `pnpm pipeline`
   (`pipelines`/`tasks` in `pnpm-workspace.yaml`). Each task's result is cached by its declared
   `inputs`, so a repeat run only redoes work for packages whose source (or a dependency's source, via
-  the task's `dependsOn`) actually changed.
-- `pnpm run verify:all` runs `verify` plus lint, format, dependency, docs, and Node smoke checks.
+  the task's `dependsOn`) actually changed. There is no root `build`/`typecheck` script anymore — use
+  `pnpm pipeline build` / `pnpm pipeline typecheck` (or `pnpm run verify` for all three) instead.
+- `pnpm run verify:all` runs `verify` plus lint, format, dependency, and docs checks (`all-root`
+  pipeline), plus the Node smoke test.
+- Each check has its own pipeline for running just that one, still cached, across the whole repo:
+  `pnpm pipeline build`, `pnpm pipeline typecheck`, `pnpm pipeline test`. `lint:check`, `check:deps`,
+  `format:check`, and `check:docs`/`test:check-docs` are root-only scripts with no per-package
+  equivalent, so their pipelines need `--include-workspace-root` (e.g.
+  `pnpm pipeline lint --include-workspace-root`).
 
 `pnpm pipeline`'s `--filter`/`-F` does not scope which projects run (confirmed non-functional as of
-pnpm 12.6.0), so `verify`/`verify:all` always run the full graph — caching, not filtering, is what
-keeps repeat runs fast. `lint:check` and `check:deps` are root-only scripts with no per-package
-equivalent, so their pipelines (`pnpm pipeline lint`/`pnpm pipeline deps`) require
-`--include-workspace-root`; don't add that flag to `build`/`typecheck`/`test`/`verify`, since those
-scripts are also defined at the root as `pnpm -r` aggregators and including the root would recurse.
+pnpm 12.6.0), so every pipeline always runs the full graph — caching, not filtering, is what keeps
+repeat runs fast. To check a single package directly (bypassing the pipeline, e.g. for a quick
+iteration loop), use `pnpm --filter <pkg> run typecheck`/`test`/`build`. Don't add
+`--include-workspace-root` to `build`/`typecheck`/`verify`, since including the root would also run
+its own `dev`/`test` scripts as part of the same pipeline.
 
 ## Gotchas
 

@@ -128,24 +128,11 @@ pnpm install
 # Run all apps through Portless
 pnpm run dev
 
-# Build all packages
-pnpm run build
-
 # Run tests
 pnpm run test
 
-# Type check
-pnpm run typecheck
-
-# Type check complete public documentation examples
-pnpm run check:docs
-
-# Format and lint
+# Format and lint (mutating)
 pnpm run check
-
-# Non-mutating format and lint checks
-pnpm run format:check
-pnpm run lint:check
 
 # Build, typecheck, and test every workspace (cached; unaffected packages restore instantly)
 pnpm run verify
@@ -160,7 +147,9 @@ Development servers use [Portless](https://github.com/vercel-labs/portless) and 
 
 Set `PORTLESS=0` to bypass the proxy and run the underlying development command directly, for example `PORTLESS=0 pnpm --filter @osmix/merge dev`. Portless proxy and certificate state are user-level state and are not stored in this repository.
 
-`verify` runs `build`, `typecheck`, and `test` across every workspace via [pnpm's task orchestration](https://pnpm.io/workspace-task-orchestration): each task's result is cached by its declared inputs, so a repeat run only redoes work for packages whose source (or a dependency's source) actually changed. `verify:all` adds lint, format, dependency, docs, and Node smoke checks on top.
+`verify` runs `build`, `typecheck`, and `test` across every workspace via [pnpm's task orchestration](https://pnpm.io/workspace-task-orchestration): each task's result is cached by its declared inputs, so a repeat run only redoes work for packages whose source (or a dependency's source) actually changed. `verify:all` adds lint, format, dependency, and docs checks, plus the Node smoke test, on top.
+
+Each of `verify`/`verify:all`'s checks is also its own pipeline, so it can be run alone (still cached): `pnpm pipeline build`, `pnpm pipeline typecheck`, `pnpm pipeline test`. `lint:check`, `check:deps`, `format:check`, and `check:docs`/`test:check-docs` are root-only scripts, so their pipelines need `--include-workspace-root`: `pnpm pipeline lint --include-workspace-root`, `pnpm pipeline deps --include-workspace-root`, `pnpm pipeline format --include-workspace-root`, `pnpm pipeline docs --include-workspace-root`.
 
 Complete TypeScript examples are marked `check-docs` and compiled by `check:docs`; partial configuration and application-wiring fragments are labeled `schematic`.
 
