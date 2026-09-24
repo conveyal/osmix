@@ -13,8 +13,14 @@ export default function ZoomInfo() {
 export function ZoomInButton() {
   const map = useMap();
   return (
-    <Button onClick={() => map?.zoomIn()} size="icon-sm" variant="ghost">
-      <PlusIcon />
+    <Button
+      onClick={() => map?.zoomIn()}
+      size="icon-sm"
+      variant="ghost"
+      title="Zoom in"
+      aria-label="Zoom in"
+    >
+      <PlusIcon aria-hidden="true" />
     </Button>
   );
 }
@@ -22,8 +28,14 @@ export function ZoomInButton() {
 export function ZoomOutButton() {
   const map = useMap();
   return (
-    <Button onClick={() => map?.zoomOut()} size="icon-sm" variant="ghost">
-      <MinusIcon />
+    <Button
+      onClick={() => map?.zoomOut()}
+      size="icon-sm"
+      variant="ghost"
+      title="Zoom out"
+      aria-label="Zoom out"
+    >
+      <MinusIcon aria-hidden="true" />
     </Button>
   );
 }

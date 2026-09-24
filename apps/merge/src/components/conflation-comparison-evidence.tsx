@@ -23,24 +23,15 @@ export function ComparisonMarkerSymbol({ role }: { role: ConflationComparisonRol
     >
       {role === "target" ? (
         <>
-          <circle cx="14" cy="14" r="10" fill="none" stroke="white" strokeWidth="7" />
-          <circle
-            cx="14"
-            cy="14"
-            r="10"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3"
-            className="text-info"
-          />
+          <circle cx="14" cy="14" r="10" fill="none" stroke="var(--map-casing)" strokeWidth="7" />
+          <circle cx="14" cy="14" r="10" fill="none" stroke="var(--map-base)" strokeWidth="3" />
         </>
       ) : (
         <path
           d="M14 7 21 14 14 21 7 14Z"
-          fill="currentColor"
-          stroke="white"
+          fill="var(--map-patch)"
+          stroke="var(--map-casing)"
           strokeWidth="2"
-          className="text-destructive"
         />
       )}
     </svg>
@@ -77,7 +68,7 @@ export function ConflationComparisonEvidence({
 }) {
   const locations = comparisonLocations(comparisonForCandidate(comparison, candidate.id));
   return (
-    <section className="flex flex-col gap-2 p-2 border-t" aria-label="Selected map comparison">
+    <section className="flex flex-col gap-2 border-t p-2" aria-label="Selected map comparison">
       <SectionTitle>Map comparison</SectionTitle>
       <ConflationComparisonLegend />
       <p className="text-muted-foreground">
@@ -94,7 +85,7 @@ export function ConflationComparisonEvidence({
             role="group"
             aria-label={`${label} coordinates`}
           >
-            <p className="font-bold">
+            <p className="font-semibold">
               {label}
               {id == null ? "" : ` (${candidate.entityType} ${id})`}
             </p>
@@ -110,9 +101,11 @@ export function ConflationComparisonEvidence({
                   {candidate.entityType === "way" ? <p>{point.location}</p> : null}
                   <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
                     <dt>Latitude</dt>
-                    <dd className="select-all break-all">{comparisonCoordinate(point.latitude)}</dd>
+                    <dd className="font-mono break-all select-all">
+                      {comparisonCoordinate(point.latitude)}
+                    </dd>
                     <dt>Longitude</dt>
-                    <dd className="select-all break-all">
+                    <dd className="font-mono break-all select-all">
                       {comparisonCoordinate(point.longitude)}
                     </dd>
                   </dl>

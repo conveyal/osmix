@@ -121,16 +121,16 @@ describe("conflation review safety status", () => {
       expect(html).toContain("Nodes are points; ways are ordered point sequences");
       expect(html).toMatch(/<div[^>]*role="group"[^>]*aria-label="Imported features"/);
       const filterDescription = html.match(
-        /<select[^>]*id="conflation-status-filter"[^>]*aria-describedby="([^"]+)"/,
+        /<button[^>]*id="conflation-status-filter"[^>]*aria-describedby="([^"]+)"/,
       )?.[1];
       expect(filterDescription).toBeTruthy();
       expect(html).toContain(`id="${filterDescription}"`);
       expect(html).toContain("bulk choices affect matching rows only");
       if (reason === "feature-type-conflict") {
         expect(rowDescription).toContain("Feature classifications conflict");
-        expect(html).toContain(
-          '<option value="feature-type-conflict">Feature classifications conflict</option>',
-        );
+        // The reason options live in the Select popup, which renders only when opened; the
+        // browser suite selects this reason by its label.
+        expect(html).toMatch(/<button[^>]*id="conflation-reason-filter"[^>]*role="combobox"/);
         const actionControls = html.match(/<[a-z]+[^>]*role="checkbox"[^>]*>/g) ?? [];
         expect(actionControls).toHaveLength(2);
         for (const control of actionControls) expect(control).toContain('aria-disabled="true"');

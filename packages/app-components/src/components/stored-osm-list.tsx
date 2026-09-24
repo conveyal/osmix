@@ -31,11 +31,11 @@ import {
 import { useAtom } from "jotai";
 import {
   CheckIcon,
+  CircleStopIcon,
   DatabaseIcon,
   FilesIcon,
   PencilIcon,
   RotateCcwIcon,
-  StopCircleIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
@@ -129,7 +129,12 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
   });
 
   return (
-    <Item className={isActive ? "bg-info/5 border-info/30" : ""}>
+    <Item
+      role="listitem"
+      variant="outline"
+      className={isActive ? "border-info/60 bg-info/5" : undefined}
+      aria-current={isActive ? "true" : undefined}
+    >
       <ItemHeader>
         {isRenaming ? (
           <Input
@@ -138,10 +143,11 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
             onChange={(e) => setRenameValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleConfirmRename}
-            className="h-7 font-bold"
+            aria-label="File name"
+            className="h-7"
           />
         ) : (
-          <ItemTitle className="truncate">{entry.fileName}</ItemTitle>
+          <ItemTitle className="min-w-0 truncate font-mono">{entry.fileName}</ItemTitle>
         )}
 
         <ItemActions>
@@ -151,17 +157,19 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
                 variant="outline"
                 size="icon-sm"
                 title="Confirm rename"
+                aria-label="Confirm rename"
                 onClick={handleConfirmRename}
               >
-                <CheckIcon />
+                <CheckIcon aria-hidden="true" />
               </Button>
               <Button
                 variant="outline"
                 size="icon-sm"
                 title="Cancel rename"
+                aria-label="Cancel rename"
                 onClick={handleCancelRename}
               >
-                <XIcon />
+                <XIcon aria-hidden="true" />
               </Button>
             </>
           ) : (
@@ -170,20 +178,23 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
                 variant="outline"
                 size="icon-sm"
                 title="Rename file"
+                aria-label="Rename file"
                 onClick={handleStartRename}
               >
-                <PencilIcon />
+                <PencilIcon aria-hidden="true" />
               </Button>
               <ActionButton
                 variant="outline"
                 title="Restore from storage"
-                icon={<RotateCcwIcon />}
+                aria-label="Restore from storage"
+                icon={<RotateCcwIcon aria-hidden="true" />}
                 onAction={() => onLoad(entry.fileHash)}
               />
               <ActionButton
                 variant="outline"
                 title="Delete from storage"
-                icon={<Trash2Icon />}
+                aria-label="Delete from storage"
+                icon={<Trash2Icon aria-hidden="true" />}
                 disabled={isDeleting}
                 onAction={handleDelete}
               />
@@ -191,7 +202,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
           )}
         </ItemActions>
       </ItemHeader>
-      <ItemContent className="text-muted-foreground">
+      <ItemContent className="font-mono text-muted-foreground">
         {formatStats(entry.info)} &middot; {formatDate(entry.lastAccessedAt)}
       </ItemContent>
     </Item>
@@ -227,12 +238,12 @@ export function StoredOsmList({
     <Card>
       <CardHeader>
         <CardTitle>
-          <FilesIcon className="size-3" />
+          <FilesIcon aria-hidden="true" className="size-3.5" />
           Files
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="flex flex-col lg:flex-row gap-2 p-2 items-stretch">
+        <div className="flex flex-col items-stretch gap-2 p-2 lg:flex-row">
           {isLoading ? (
             <Button
               variant="destructive"
@@ -242,8 +253,8 @@ export function StoredOsmList({
                 setLoadingState(null);
               }}
             >
-              <StopCircleIcon className="mr-2 h-4 w-4" />
-              Cancel Loading
+              <CircleStopIcon aria-hidden="true" />
+              Cancel loading
             </Button>
           ) : (
             <>
@@ -278,15 +289,14 @@ export function StoredOsmList({
         {entries.length > 0 && (
           <Details>
             <DetailsSummary>
-              <div className="flex items-center gap-2">
-                <DatabaseIcon className="size-3" /> <div>Stored</div>
-                <span className="text-muted-foreground">
-                  &middot; {entries.length} &middot; {formatBytes(estimatedBytes)}
-                </span>
-              </div>
+              <DatabaseIcon aria-hidden="true" className="size-3.5" />
+              Stored
+              <span className="text-muted-foreground">
+                &middot; {entries.length} &middot; {formatBytes(estimatedBytes)}
+              </span>
             </DetailsSummary>
             <DetailsContent>
-              <ItemGroup>
+              <ItemGroup className="gap-2 p-2">
                 {entries.map((entry) => (
                   <StoredOsmItem
                     key={entry.fileHash}

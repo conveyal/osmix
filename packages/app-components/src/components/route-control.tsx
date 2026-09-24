@@ -1,6 +1,6 @@
 import { routingControlIsOpenAtom, selectedOsmAtom, type UseOsmFileReturn } from "@osmix/app-core";
 import { useOsmixRemote } from "@osmix/app-core";
-import { SectionTitle, Button } from "@osmix/ui";
+import { Alert, Button, SectionTitle, Spinner } from "@osmix/ui";
 import { useAtom, useAtomValue } from "jotai";
 import { NavigationIcon, XIcon } from "lucide-react";
 import type { Osm } from "osmix";
@@ -13,6 +13,7 @@ import { useMap } from "../hooks/map.ts";
 import { routingStateAtom, type SnappedNode } from "../state/routing.ts";
 import CustomControl from "./custom-control.tsx";
 import { FullIndexRequired } from "./full-index-required.tsx";
+import { MapPanelHeader } from "./map-panel-header.tsx";
 
 /** Maximum distance (m) to snap click point to nearest node. */
 const SNAP_RADIUS_M = 1_000;
@@ -50,27 +51,33 @@ export default function RouteMapControl({ osmFiles }: { osmFiles: readonly UseOs
   if (!osm.info().spatialIndexes.nodes.all) {
     const selectedOsmFile = osmFiles.find((osmFile) => osmFile.osmInfo?.id === osm.id);
     return (
-      <CustomControl position="bottom-left">
-        {selectedOsmFile ? (
-          <div className="max-w-72 p-2">
-            <FullIndexRequired operation="Routing" osmFile={selectedOsmFile} />
-          </div>
-        ) : (
-          <div className="flex max-w-64 flex-col gap-2 p-2">
-            <SectionTitle>Routing unavailable</SectionTitle>
-            <p>
-              Routing requires the all-node spatial index. Reload this PBF using Full under Advanced
-              load profile.
-            </p>
-          </div>
-        )}
+      <CustomControl position="bottom-left" width="narrow">
+        <RoutingUnavailable osmFile={selectedOsmFile} />
       </CustomControl>
     );
   }
   return (
-    <CustomControl position="bottom-left">
+    <CustomControl position="bottom-left" width="narrow">
       <Routing osm={osm} />
     </CustomControl>
+  );
+}
+
+function RoutingUnavailable({ osmFile }: { osmFile?: UseOsmFileReturn }) {
+  return (
+    <>
+      <MapPanelHeader icon={<NavigationIcon aria-hidden="true" />} title="Routing" />
+      <div className="p-2">
+        {osmFile ? (
+          <FullIndexRequired operation="Routing" osmFile={osmFile} />
+        ) : (
+          <Alert variant="warning" title="Routing unavailable">
+            Routing requires the all-node spatial index. Reload this PBF using Full under Advanced
+            load profile.
+          </Alert>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -165,117 +172,112 @@ export function Routing({ osm }: { osm: Osm }) {
   const hasTo = routingState.toPoint !== null;
   const hasRoute = routingState.result !== null;
 
+  const clearRoute = () => {
+    // Reset click phase when routing is cleared
+    clickPhaseRef.current = "from";
+    setRoutingState({
+      fromNode: null,
+      fromPoint: null,
+      toNode: null,
+      toPoint: null,
+      result: null,
+    });
+  };
+
   return (
     <>
-      <div className="flex items-center justify-between pl-2 border-b">
-        <div className="flex items-center gap-2">
-          <NavigationIcon className="size-4" />
-          <SectionTitle>Routing</SectionTitle>
-        </div>
+      <MapPanelHeader
+        icon={<NavigationIcon aria-hidden="true" />}
+        title="Routing"
+        actions={
+          <Button
+            onClick={clearRoute}
+            variant="ghost"
+            title="Clear route"
+            aria-label="Clear route"
+            size="icon-sm"
+            disabled={!hasFrom || isRouting}
+          >
+            <XIcon aria-hidden="true" />
+          </Button>
+        }
+      />
 
-        <Button
-          onClick={() => {
-            // Reset click phase when routing is cleared
-            clickPhaseRef.current = "from";
-            setRoutingState({
-              fromNode: null,
-              fromPoint: null,
-              toNode: null,
-              toPoint: null,
-              result: null,
-            });
-          }}
-          variant="ghost"
-          title="Clear route"
-          size="icon-sm"
-          disabled={!hasFrom || isRouting}
-        >
-          <XIcon />
-        </Button>
-      </div>
-
-      <div className="p-2 space-y-2">
-        {/* No node nearby feedback */}
+      <div className="flex flex-col gap-2 p-2">
         {noNodeNearby && (
-          <div className="text-warning font-medium text-center">
-            No road found nearby. Click closer to a road.
-          </div>
+          <Alert variant="warning">No road found nearby. Click closer to a road.</Alert>
         )}
 
-        {/* Instructions */}
         {!hasFrom && !noNodeNearby && !isRouting && (
-          <div className="text-muted-foreground text-center">
-            Click on the map to set a starting point
-            <div>(routing graph builds on first search)</div>
-          </div>
+          <p className="text-muted-foreground">
+            Click the map to set a starting point. The routing graph builds on the first search.
+          </p>
         )}
         {hasFrom && !hasTo && !noNodeNearby && !isRouting && (
-          <div className="text-muted-foreground text-center">
-            Click on the map to set a destination
+          <p className="text-muted-foreground">Click the map to set a destination.</p>
+        )}
+
+        {isRouting && (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Spinner />
+            Calculating route…
           </div>
         )}
 
-        {/* Routing in progress */}
-        {isRouting && <div className="text-muted-foreground">Calculating route...</div>}
-
-        {/* From point info */}
         {hasFrom && routingState.fromPoint && routingState.fromNode && (
-          <div className="space-y-1">
-            <SectionTitle className="text-destructive">From</SectionTitle>
+          <div className="flex flex-col gap-1">
+            <SectionTitle>From</SectionTitle>
             <SnappedNodeInfo point={routingState.fromPoint} node={routingState.fromNode} />
           </div>
         )}
 
-        {/* To point info */}
         {hasTo && routingState.toPoint && routingState.toNode && (
-          <div className="space-y-1">
-            <SectionTitle className="text-destructive">To</SectionTitle>
+          <div className="flex flex-col gap-1">
+            <SectionTitle>To</SectionTitle>
             <SnappedNodeInfo point={routingState.toPoint} node={routingState.toNode} />
           </div>
         )}
 
-        {/* Route result */}
         {hasTo && !hasRoute && !isRouting && (
-          <div className="text-destructive text-center font-bold">
-            No route found between these points
-          </div>
+          <Alert variant="destructive" title="No route found">
+            These points are not connected by routable ways. Choose points on connected roads.
+          </Alert>
         )}
 
         {hasRoute && routingState.result && (
-          <div className="space-y-2">
-            <SectionTitle className="text-info">Route</SectionTitle>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-2">
+            <SectionTitle>Route</SectionTitle>
+            <dl className="grid grid-cols-2 gap-2">
               <div>
-                <div className="text-muted-foreground uppercase">Distance</div>
-                <div>{formatDistance(routingState.result.distance ?? 0)}</div>
+                <dt className="text-muted-foreground">Distance</dt>
+                <dd className="font-mono">{formatDistance(routingState.result.distance ?? 0)}</dd>
               </div>
               <div>
-                <div className="text-muted-foreground uppercase">Est. Time</div>
-                <div>{formatTime(routingState.result.time ?? 0)}</div>
+                <dt className="text-muted-foreground">Estimated time</dt>
+                <dd className="font-mono">{formatTime(routingState.result.time ?? 0)}</dd>
               </div>
-            </div>
+            </dl>
 
-            {/* Per-way breakdown */}
             {routingState.result.segments && routingState.result.segments.length > 0 && (
               <>
-                <div className="text-muted-foreground uppercase">
+                <div className="text-muted-foreground">
                   Directions ({routingState.result.segments.length} segments)
                 </div>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {routingState.result.segments.map((seg, _i) => (
-                    <div
+                <ol className="flex max-h-48 flex-col gap-2 overflow-y-auto">
+                  {routingState.result.segments.map((seg) => (
+                    <li
                       key={`${seg.wayIds.join("-")}-${seg.distance}-${seg.time}`}
                       className="border-l-2 border-info/60 pl-2"
                     >
                       <div className="font-medium" title={`Way IDs: ${seg.wayIds.join(", ")}`}>
                         {seg.name || `(${seg.highway})`}
                       </div>
-                      <div className="text-muted-foreground">
+                      <div className="font-mono text-muted-foreground">
                         {formatDistance(seg.distance)} · {formatTime(seg.time)}
                       </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ol>
               </>
             )}
           </div>
@@ -287,17 +289,17 @@ export function Routing({ osm }: { osm: Osm }) {
 
 function SnappedNodeInfo({ point, node }: { point: LonLat; node: SnappedNode }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <dl className="grid grid-cols-2 gap-2">
       <div>
-        <div className="text-muted-foreground uppercase">Click</div>
-        <div>{formatCoord(point)}</div>
+        <dt className="text-muted-foreground">Click</dt>
+        <dd className="font-mono">{formatCoord(point)}</dd>
       </div>
       <div>
-        <div className="text-muted-foreground uppercase">Node</div>
-        <div>
+        <dt className="text-muted-foreground">Node</dt>
+        <dd className="font-mono">
           {node.nodeId} ({formatDistance(node.distance)} away)
-        </div>
+        </dd>
       </div>
-    </div>
+    </dl>
   );
 }

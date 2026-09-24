@@ -1,5 +1,5 @@
 import { useLog } from "@osmix/app-core";
-import { cn, Spinner } from "@osmix/ui";
+import { Card, CardAction, CardHeader, cn, Spinner } from "@osmix/ui";
 import { CheckIcon, CircleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -80,13 +80,13 @@ export function AutomaticMergeProgress({
   const currentStep = steps[currentIndex];
 
   return (
-    <div className="rounded-md border bg-card">
-      <div className="flex items-center justify-between gap-2 border-b px-2 py-1.5 font-bold uppercase tracking-wide">
-        <span>Merge progress</span>
-        <span className="shrink-0 tabular-nums" data-slot="automatic-merge-elapsed">
+    <Card>
+      <CardHeader>
+        Merge progress
+        <CardAction className="tabular-nums" data-slot="automatic-merge-elapsed">
           {formatElapsed(Math.max(0, elapsedMs))}
-        </span>
-      </div>
+        </CardAction>
+      </CardHeader>
       <p className="sr-only" role="status" aria-live="polite">
         {currentStep.label} is running. {completedCount} of {steps.length} steps completed.
       </p>
@@ -105,19 +105,19 @@ export function AutomaticMergeProgress({
               data-status={status}
               key={step.id}
             >
-              <span className="flex size-4 items-center justify-center self-start">
+              <span className="flex size-3.5 items-center justify-center self-start">
                 {status === "completed" ? (
-                  <CheckIcon aria-hidden="true" className="size-4 text-success" />
+                  <CheckIcon aria-hidden="true" className="size-3.5 text-success" />
                 ) : status === "running" ? (
-                  <Spinner aria-hidden="true" className="size-4 text-primary" role="presentation" />
+                  <Spinner aria-hidden="true" className="size-3.5" role="presentation" />
                 ) : (
-                  <CircleIcon aria-hidden="true" className="size-3" />
+                  <CircleIcon aria-hidden="true" className="size-3.5" />
                 )}
               </span>
-              <span className={cn("min-w-0 leading-4", status === "running" && "font-bold")}>
+              <span className={cn("min-w-0", status === "running" && "font-semibold")}>
                 {step.label}
               </span>
-              <span className="text-[0.65rem] uppercase tracking-wide">
+              <span className="text-muted-foreground">
                 {status === "completed"
                   ? "Completed"
                   : status === "running"
@@ -126,7 +126,7 @@ export function AutomaticMergeProgress({
               </span>
               {status === "running" && latestMessage ? (
                 <p
-                  className="col-span-2 col-start-2 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground"
+                  className="col-span-2 col-start-2 truncate text-muted-foreground"
                   data-slot="automatic-merge-latest-message"
                   title={latestMessage}
                 >
@@ -137,7 +137,7 @@ export function AutomaticMergeProgress({
           );
         })}
       </ol>
-    </div>
+    </Card>
   );
 }
 

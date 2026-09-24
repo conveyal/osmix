@@ -2,6 +2,7 @@ import { useMap } from "@osmix/app-components";
 import {
   cn,
   ActionButton,
+  Alert,
   useAction,
   InfoTooltip,
   EmptyState,
@@ -9,8 +10,6 @@ import {
   StatusDot,
   type StatusDotStatus,
   Button,
-  ButtonGroup,
-  ButtonGroupSeparator,
   Card,
   CardAction,
   CardContent,
@@ -29,6 +28,11 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
+  Pager,
+  Radio,
+  RadioLabel,
+  Select,
+  type SelectOption,
   Spinner,
   Table,
   TableBody,
@@ -151,6 +155,24 @@ const REASON_LABEL: Record<OsmConflationReasonCode, string> = {
   "way-removal-unsupported": "A supported equivalent way is required for removal",
 };
 
+const STATUS_FILTER_ITEMS: readonly SelectOption<OsmConflationEffectiveStatus | "">[] = [
+  { value: "", label: "All statuses" },
+  ...(["accepted", "automatic", "review", "blocked", "unmatched", "rejected"] as const).map(
+    (status) => ({ value: status, label: STATUS_LABEL[status] }),
+  ),
+];
+
+const ENTITY_FILTER_ITEMS: readonly SelectOption<"node" | "way" | "">[] = [
+  { value: "", label: "All feature types" },
+  { value: "node", label: "Point (OSM node)" },
+  { value: "way", label: "Line or area (OSM way)" },
+];
+
+const REASON_FILTER_ITEMS: readonly SelectOption<OsmConflationReasonCode | "">[] = [
+  { value: "", label: "All reasons" },
+  ...REASON_CODES.map((reason) => ({ value: reason, label: REASON_LABEL[reason] })),
+];
+
 export function conflationStatusLabel(status: OsmConflationEffectiveStatus) {
   return STATUS_LABEL[status];
 }
@@ -218,7 +240,7 @@ export function ConflationStatusLegend() {
         {(["automatic", "review", "blocked", "unmatched", "accepted", "rejected"] as const).map(
           (status) => (
             <p key={status}>
-              <span className="font-bold">{conflationStatusLabel(status)}:</span>{" "}
+              <span className="font-semibold">{conflationStatusLabel(status)}:</span>{" "}
               {STATUS_HELP[status]}.
             </p>
           ),
@@ -249,9 +271,6 @@ const MATCHING_ACTIONS = [
   },
 ] as const;
 
-const REVIEW_FOCUS =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[CanvasText] forced-colors:focus-visible:outline-offset-2";
-
 function featureLabel(entityType: "node" | "way") {
   return entityType === "node" ? "point" : "line or area";
 }
@@ -279,8 +298,7 @@ export function CandidateActionStatuses({ candidate }: { candidate: OsmConflatio
     >
       {MATCHING_ACTIONS.filter((action) => candidate[action.assessment]).map((action) => (
         <span key={action.action}>
-          {action.label}:{" "}
-          <span className="font-bold text-foreground">{actionStatus(candidate, action)}</span>
+          {action.label}: <span className="font-semibold">{actionStatus(candidate, action)}</span>
         </span>
       ))}
     </div>
@@ -304,7 +322,7 @@ function BulkPreviewTable({ preview }: { preview: OsmConflationBulkDecisionPrevi
       <TableBody>
         {rows.map(([label, count]) => (
           <TableRow key={label}>
-            <TableCell className="whitespace-normal break-words">{label}</TableCell>
+            <TableCell className="wrap-break-word whitespace-normal">{label}</TableCell>
             <TableCell>{count.toLocaleString()}</TableCell>
           </TableRow>
         ))}
@@ -440,7 +458,6 @@ export function CandidateActions({
                 checked={Boolean(scheduled[action.selected])}
                 disabled={!eligible}
                 {...(eligible && isPending ? { "aria-disabled": true } : {})}
-                className={REVIEW_FOCUS}
                 aria-describedby={`${descriptionId}${!eligible ? ` ${helpId}` : ""}${action.action === "remove-way" ? ` ${helpId}-removal` : ""}`}
                 onCheckedChange={(checked) => {
                   // A temporary native disabled state would discard keyboard focus.
@@ -494,7 +511,7 @@ export function CandidateActions({
               </div>
             ) : null}
             {action.action === "remove-way" ? (
-              <div className="flex min-w-0 flex-col gap-2 border-l-2 border-destructive/60 pl-2">
+              <Alert variant="warning" className="min-w-0">
                 <p id={`${helpId}-removal`} className="text-muted-foreground">
                   Separate, explicit choice. Review the retained counterpart, connections, and
                   orphan-point cleanup below before applying. Removal is never selected
@@ -508,7 +525,7 @@ export function CandidateActions({
                 ) : (
                   <p>No verified removal plan is available. Keep this imported way.</p>
                 )}
-              </div>
+              </Alert>
             ) : null}
           </div>
         );
@@ -547,11 +564,11 @@ export function ConflationResultsHeader({
   totalCandidates: number;
 }) {
   return (
-    <CardHeader className={cn(isFilterPending && "bg-warning/10")}>
+    <CardHeader>
       Filtered matches ({totalCandidates.toLocaleString()}
       {isFilterPending ? ", stale" : ""})
       {isFilterPending ? (
-        <CardAction className="text-warning" aria-live="polite">
+        <CardAction aria-live="polite">
           <Spinner />
           Updating filters…
         </CardAction>
@@ -602,30 +619,30 @@ export function CandidateTargetChoices({
   const choiceDescription = `${groupId}-help${selected.length > 1 ? ` ${groupId}-conflict` : ""}`;
   return (
     <fieldset
-      className="flex min-w-0 flex-col gap-2 p-2 border-b"
+      className="flex min-w-0 flex-col gap-2 border-b p-2"
       aria-busy={isPending}
       aria-disabled={isPending ? true : undefined}
       aria-describedby={choiceDescription}
       aria-invalid={selected.length > 1 ? true : undefined}
     >
-      <legend className="px-2 font-bold">Choose one base target</legend>
+      <legend className="px-2">
+        <SectionTitle>Choose one base target</SectionTitle>
+      </legend>
       <p id={`${groupId}-help`}>
         These are alternative matches for the same imported feature. Choosing a target schedules its
         eligible copying and connection actions. Adjust them below; removing a way requires its own
         explicit choice.
       </p>
       {selected.length > 1 ? (
-        <p id={`${groupId}-conflict`} role="alert">
+        <Alert id={`${groupId}-conflict`} variant="destructive">
           More than one target is selected. Choose one target or leave this feature unmatched.
-        </p>
+        </Alert>
       ) : null}
       {selected.length === 0 && !leftUnmatched ? (
         <p>No target selected. Choose one or leave this feature unmatched.</p>
       ) : null}
-      <label className="flex min-h-8 items-center gap-2">
-        <input
-          type="radio"
-          className={REVIEW_FOCUS}
+      <RadioLabel>
+        <Radio
           name={groupId}
           aria-disabled={isPending ? true : undefined}
           aria-describedby={`${choiceDescription} ${groupId}-unmatched`}
@@ -635,7 +652,7 @@ export function CandidateTargetChoices({
           }}
         />
         Leave unmatched
-      </label>
+      </RadioLabel>
       <p id={`${groupId}-unmatched`} className="text-muted-foreground">
         Leaving unmatched keeps ordinary imported additions.
       </p>
@@ -648,10 +665,8 @@ export function CandidateTargetChoices({
         const reasonId = `${groupId}-${candidate.id}`;
         return (
           <div key={candidate.id} className="flex flex-col gap-1">
-            <label className="flex min-h-8 items-center gap-2">
-              <input
-                type="radio"
-                className={REVIEW_FOCUS}
+            <RadioLabel>
+              <Radio
                 name={groupId}
                 checked={selected.length === 1 && selected[0]?.id === candidate.id}
                 disabled={!eligible}
@@ -671,7 +686,7 @@ export function CandidateTargetChoices({
               />
               Base {candidate.entityType} {candidate.targetId ?? "unavailable"}
               {candidate.matchesFilter === false ? " (outside current filters)" : ""}
-            </label>
+            </RadioLabel>
             {!eligible ? (
               <p id={reasonId} className="text-muted-foreground">
                 Unavailable:{" "}
@@ -783,7 +798,7 @@ export function ConflationReview({
           </CardAction>
         </CardHeader>
         <CardContent className="p-0">
-          <p className="p-2 border-b">
+          <p className="border-b p-2">
             A proposed match compares an imported feature with a base feature. OSM tags are feature
             attributes, such as a surface type. Nodes are points; ways are ordered point sequences
             forming lines or area boundaries. Choose actions independently; selections enter the
@@ -820,79 +835,47 @@ export function ConflationReview({
               </Button>
             </div>
           ) : null}
-          <label
-            className="flex w-full min-w-0 flex-col items-start gap-1"
-            htmlFor="conflation-status-filter"
-          >
-            Match status
-            <select
+          <div className="flex w-full min-w-0 flex-col gap-1">
+            <label htmlFor="conflation-status-filter">Match status</label>
+            <Select
               id="conflation-status-filter"
-              className={cn("h-8 w-full min-w-0 rounded border bg-background px-2", REVIEW_FOCUS)}
               aria-describedby={`${reviewId}-filters-help`}
               disabled={isReviewPending}
+              items={STATUS_FILTER_ITEMS}
               value={filter.status ?? ""}
-              onChange={(event) => {
-                const status = event.target.value as OsmConflationEffectiveStatus | "";
+              onValueChange={(status) => {
                 void onFilterChange({ ...filter, status: status || undefined });
               }}
-            >
-              <option value="">All statuses</option>
-              {(
-                ["accepted", "automatic", "review", "blocked", "unmatched", "rejected"] as const
-              ).map((status) => (
-                <option key={status} value={status}>
-                  {conflationStatusLabel(status)}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
 
-          <label
-            className="flex w-full min-w-0 flex-col items-start gap-1"
-            htmlFor="conflation-entity-filter"
-          >
-            Feature type
-            <select
+          <div className="flex w-full min-w-0 flex-col gap-1">
+            <label htmlFor="conflation-entity-filter">Feature type</label>
+            <Select
               id="conflation-entity-filter"
-              className={cn("h-8 w-full min-w-0 rounded border bg-background px-2", REVIEW_FOCUS)}
               aria-describedby={`${reviewId}-filters-help`}
               disabled={isReviewPending}
+              items={ENTITY_FILTER_ITEMS}
               value={filter.entityType ?? ""}
-              onChange={(event) => {
-                const entityType = event.target.value as "node" | "way" | "";
+              onValueChange={(entityType) => {
                 void onFilterChange({ ...filter, entityType: entityType || undefined });
               }}
-            >
-              <option value="">All feature types</option>
-              <option value="node">Point (OSM node)</option>
-              <option value="way">Line or area (OSM way)</option>
-            </select>
-          </label>
+            />
+          </div>
 
-          <label
-            className="flex w-full min-w-0 flex-col items-start gap-1"
-            htmlFor="conflation-reason-filter"
-          >
-            <span className="shrink-0">Match reason</span>
-            <select
+          <div className="flex w-full min-w-0 flex-col gap-1">
+            <label htmlFor="conflation-reason-filter">Match reason</label>
+            <Select
               id="conflation-reason-filter"
-              className={cn("h-8 w-full min-w-0 rounded border bg-background px-2", REVIEW_FOCUS)}
               aria-describedby={`${reviewId}-filters-help`}
               disabled={isReviewPending}
+              items={REASON_FILTER_ITEMS}
               value={filter.reason ?? ""}
-              onChange={(event) => {
-                const reason = event.target.value as OsmConflationReasonCode | "";
+              onValueChange={(reason) => {
                 void onFilterChange({ ...filter, reason: reason || undefined });
               }}
-            >
-              <option value="">All reasons</option>
-              {REASON_CODES.map((reason) => (
-                <option key={reason} value={reason}>
-                  {conflationReasonLabel(reason)}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -901,9 +884,9 @@ export function ConflationReview({
           isFilterPending={isFilterPending}
           totalCandidates={page.totalCandidates}
         />
-        <CardContent className={cn("p-0", isFilterPending && "opacity-60")} inert={isFilterPending}>
+        <CardContent className="p-0" inert={isFilterPending}>
           {validationConflict ? (
-            <div className="flex flex-col gap-2 p-2 border-b" role="alert">
+            <Alert className="m-2" variant="destructive">
               <p>
                 {validationConflict.message} Choose a single target before using bulk actions or
                 generating a preview.
@@ -922,7 +905,7 @@ export function ConflationReview({
               >
                 Review imported {validationConflict.entityType} {validationConflict.sourceId}
               </Button>
-            </div>
+            </Alert>
           ) : null}
           <ConflationBulkActions
             bulkActions={page.bulkActions}
@@ -931,7 +914,7 @@ export function ConflationReview({
             onBulkDecision={onBulkDecision}
           />
           {page.groups ? (
-            <p className="p-2 border-b text-muted-foreground">
+            <p className="border-b p-2 text-muted-foreground">
               Imported features matching these filters: {page.totalSources?.toLocaleString()}. All
               their alternatives are shown together. Bulk actions affect only matches inside the
               filters; ambiguous alternatives require an individual target choice.
@@ -946,8 +929,10 @@ export function ConflationReview({
                   key={sourceKey}
                   aria-label={`Imported ${candidates[0]?.entityType} ${candidates[0]?.sourceId}`}
                 >
-                  <h3 className="p-2 font-bold border-b">
-                    Imported {candidates[0]?.entityType} {candidates[0]?.sourceId}
+                  <h3 className="border-b p-2">
+                    <SectionTitle>
+                      Imported {candidates[0]?.entityType} {candidates[0]?.sourceId}
+                    </SectionTitle>
                   </h3>
                   <CandidateTargetChoices
                     candidates={candidates}
@@ -957,7 +942,7 @@ export function ConflationReview({
                   {candidates.map((candidate) => {
                     const status = effectiveStatus(candidate);
                     return (
-                      <Item key={candidate.id} className="p-0" variant="outline">
+                      <Item key={candidate.id} className="m-2 p-0" variant="outline">
                         <ItemContent className="min-w-0 gap-0">
                           <div className="flex min-w-0 items-start gap-2 p-2">
                             <StatusDot className="mt-1" status={STATUS_DOT[status]} />
@@ -968,7 +953,7 @@ export function ConflationReview({
                                   ? "No eligible base target"
                                   : `Base ${featureLabel(candidate.entityType)}`}
                               </ItemTitle>
-                              <p className="select-all break-words text-muted-foreground">
+                              <p className="wrap-break-word text-muted-foreground select-all">
                                 {conflationCandidateTitle(candidate)}
                               </p>
                               <ItemDescription>
@@ -993,9 +978,8 @@ export function ConflationReview({
                                 aria-pressed={selectedCandidate?.id === candidate.id}
                                 aria-controls={`${reviewId}-comparison`}
                                 className={cn(
-                                  REVIEW_FOCUS,
                                   selectedCandidate?.id === candidate.id &&
-                                    "bg-info/10 ring-1 ring-info",
+                                    "border border-info bg-info/5",
                                 )}
                                 onClick={() => showCandidate(candidate)}
                               >
@@ -1033,29 +1017,13 @@ export function ConflationReview({
         </CardContent>
       </Card>
 
-      <ButtonGroup className="w-full">
-        <Button
-          className="flex-1"
-          disabled={isReviewPending || page.page <= 0}
-          variant="outline"
-          onClick={() => runAction(() => onPageChange(page.page - 1))}
-        >
-          Previous
-        </Button>
-        <ButtonGroupSeparator />
-        <Button className="flex-1" disabled variant="outline">
-          Page {page.totalPages === 0 ? 0 : page.page + 1} of {page.totalPages}
-        </Button>
-        <ButtonGroupSeparator />
-        <Button
-          className="flex-1"
-          disabled={isReviewPending || page.page + 1 >= page.totalPages}
-          variant="outline"
-          onClick={() => runAction(() => onPageChange(page.page + 1))}
-        >
-          Next
-        </Button>
-      </ButtonGroup>
+      <Pager
+        label="Match pages"
+        page={page.page}
+        pageCount={page.totalPages}
+        disabled={isReviewPending}
+        onPageChange={(next) => runAction(() => onPageChange(next))}
+      />
 
       <p role="status" aria-live="polite" className="sr-only">
         {selectedCandidate

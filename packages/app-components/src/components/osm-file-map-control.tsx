@@ -2,12 +2,21 @@ import { osmFileControlIsOpenAtom } from "@osmix/app-core";
 import type { UseOsmFileReturn } from "@osmix/app-core";
 import { ActionButton, Button } from "@osmix/ui";
 import { useAtomValue } from "jotai";
-import { DownloadIcon, EyeIcon, EyeOffIcon, MaximizeIcon, SaveIcon, XIcon } from "lucide-react";
+import {
+  DownloadIcon,
+  EyeIcon,
+  EyeOffIcon,
+  FileIcon,
+  MaximizeIcon,
+  SaveIcon,
+  XIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { APPID } from "../constants.ts";
 import { useFlyToOsmBounds, useMap } from "../hooks/map.ts";
 import CustomControl from "./custom-control.tsx";
+import { MapPanelHeader } from "./map-panel-header.tsx";
 import OsmInfoTable from "./osm-info-table.tsx";
 
 interface OsmFileCardProps {
@@ -70,59 +79,66 @@ function OsmFileCard({ osmFile, onClear }: OsmFileCardProps) {
   const fileName = osmFile.fileInfo.fileName;
 
   return (
-    <div className="border-b last:border-b-0">
-      <div className="flex items-center justify-between gap-2 border-b">
-        <div className="grow font-bold pl-2 overflow-hidden whitespace-nowrap text-ellipsis">
-          {fileName}
-        </div>
-        <div className="flex items-center">
-          <Button
-            onClick={toggleLayersVisibility}
-            variant="ghost"
-            size="icon-sm"
-            title={layersVisible ? "Hide map layers" : "Show map layers"}
-          >
-            {layersVisible ? <EyeIcon /> : <EyeOffIcon />}
-          </Button>
-          {!osmFile.isStored && osmFile.canStore && (
-            <ActionButton
-              onAction={osmFile.saveToStorage}
+    <>
+      <MapPanelHeader
+        icon={<FileIcon aria-hidden="true" />}
+        title="File"
+        detail={fileName}
+        actions={
+          <>
+            <Button
+              onClick={toggleLayersVisibility}
               variant="ghost"
-              icon={<SaveIcon />}
-              title="Save to storage"
-            />
-          )}
-          <ActionButton
-            onAction={osmFile.downloadOsm}
-            variant="ghost"
-            icon={<DownloadIcon />}
-            title="Download OSM PBF"
-          />
-          <ActionButton
-            onAction={async () => flyToOsmBounds(osmFile.osmInfo)}
-            variant="ghost"
-            icon={<MaximizeIcon />}
-            title="Fit bounds to file bbox"
-          />
-          {onClear && (
+              size="icon-sm"
+              title={layersVisible ? "Hide map layers" : "Show map layers"}
+              aria-label={layersVisible ? "Hide map layers" : "Show map layers"}
+            >
+              {layersVisible ? <EyeIcon aria-hidden="true" /> : <EyeOffIcon aria-hidden="true" />}
+            </Button>
+            {!osmFile.isStored && osmFile.canStore && (
+              <ActionButton
+                onAction={osmFile.saveToStorage}
+                variant="ghost"
+                icon={<SaveIcon aria-hidden="true" />}
+                title="Save to storage"
+                aria-label="Save to storage"
+              />
+            )}
             <ActionButton
-              onAction={async () => {
-                void (window.confirm("Are you sure you want to clear the file?") && onClear());
-              }}
-              icon={<XIcon />}
-              title="Clear file"
+              onAction={osmFile.downloadOsm}
               variant="ghost"
+              icon={<DownloadIcon aria-hidden="true" />}
+              title="Download OSM PBF"
+              aria-label="Download OSM PBF"
             />
-          )}
-        </div>
-      </div>
+            <ActionButton
+              onAction={async () => flyToOsmBounds(osmFile.osmInfo)}
+              variant="ghost"
+              icon={<MaximizeIcon aria-hidden="true" />}
+              title="Fit bounds to file bbox"
+              aria-label="Fit bounds to file bbox"
+            />
+            {onClear && (
+              <ActionButton
+                onAction={async () => {
+                  void (window.confirm("Clear this file from the map?") && onClear());
+                }}
+                icon={<XIcon aria-hidden="true" />}
+                title="Clear file"
+                aria-label="Clear file"
+                variant="ghost"
+              />
+            )}
+          </>
+        }
+      />
       <OsmInfoTable
         defaultOpen={false}
         osm={osmFile.osm}
         file={osmFile.file}
         fileInfo={osmFile.fileInfo}
       />
-    </div>
+    </>
   );
 }
 
@@ -142,9 +158,7 @@ export default function OsmFileMapControl({ files }: OsmFileMapControlProps) {
 
   return loadedFiles.map((file) => (
     <CustomControl key={file.osmFile.fileInfo?.fileHash} position="top-left">
-      <div className="flex flex-col">
-        <OsmFileCard osmFile={file.osmFile} onClear={file.onClear} />
-      </div>
+      <OsmFileCard osmFile={file.osmFile} onClear={file.onClear} />
     </CustomControl>
   ));
 }

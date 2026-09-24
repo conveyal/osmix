@@ -9,9 +9,8 @@ export default function LogContent() {
         <div
           key={`${message.timestamp}-${message.message}`}
           className={cn(
-            "whitespace-nowrap",
-            "text-muted-foreground",
-            index === 0 && "text-foreground font-medium",
+            "font-mono whitespace-nowrap",
+            index === 0 ? "font-medium" : "text-muted-foreground",
           )}
           title={formatTimestampMs(message.timestamp)}
         >

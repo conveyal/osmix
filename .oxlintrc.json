@@ -32,13 +32,33 @@
     "typescript/prefer-as-const": "error",
     "typescript/prefer-enum-initializers": "error",
     "typescript/no-unnecessary-template-expression": "error",
-    "typescript/ban-ts-comment": "off"
+    "typescript/ban-ts-comment": "off",
+    "tailwindcss/no-unknown-classes": [
+      "error",
+      {
+        "ignorePrefixes": ["osmix-", "maplibregl-"]
+      }
+    ],
+    "tailwindcss/no-duplicate-classes": "error",
+    "tailwindcss/no-conflicting-classes": "error",
+    "tailwindcss/no-deprecated-classes": "error",
+    "tailwindcss/no-unnecessary-whitespace": "error",
+    "tailwindcss/no-hardcoded-colors": "error",
+    "tailwindcss/no-unnecessary-arbitrary-value": "error",
+    "tailwindcss/prefer-theme-tokens": "error",
+    "tailwindcss/enforce-canonical": "error"
   },
   "overrides": [
     {
       "files": ["packages/*/src/**/*.ts", "packages/*/src/**/*.tsx"],
       "rules": {
-        "import/extensions": ["error", "always", { "ignorePackages": true }]
+        "import/extensions": [
+          "error",
+          "always",
+          {
+            "ignorePackages": true
+          }
+        ]
       }
     },
     {
@@ -46,6 +66,177 @@
       "env": {
         "vitest": true
       }
+    },
+    {
+      "files": [
+        "apps/merge/src/**/*.ts",
+        "apps/inspect/src/**/*.ts",
+        "apps/extract/src/**/*.ts",
+        "apps/merge/src/**/*.tsx",
+        "apps/inspect/src/**/*.tsx",
+        "apps/extract/src/**/*.tsx",
+        "packages/app-components/src/**/*.ts",
+        "packages/app-components/src/**/*.tsx",
+        "packages/ui/src/**/*.ts",
+        "packages/ui/src/**/*.tsx"
+      ],
+      "rules": {
+        "osmix/no-raw-color": "error",
+        "osmix/no-ascii-ellipsis": "error",
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["lucide-react"],
+                "allowImportNamePattern": "Icon$",
+                "allowTypeImports": true,
+                "message": "Import lucide icons by their *Icon name (ChevronDownIcon, not ChevronDown)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "apps/merge/src/**/*.ts",
+        "apps/inspect/src/**/*.ts",
+        "apps/extract/src/**/*.ts",
+        "apps/merge/src/**/*.tsx",
+        "apps/inspect/src/**/*.tsx",
+        "apps/extract/src/**/*.tsx",
+        "packages/app-components/src/**/*.ts",
+        "packages/app-components/src/**/*.tsx"
+      ],
+      "rules": {
+        "tailwindcss/no-restricted-classes": [
+          "error",
+          {
+            "patterns": [
+              {
+                "pattern": "^(?:[^:]*:)*text-(?:xs|sm|base|lg|xl|\\dxl)$",
+                "message": "Font size belongs to primitives: the body is text-xs; Step and DialogTitle use text-sm."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*(?:uppercase|lowercase|capitalize|normal-case)$",
+                "message": "Letter case comes from SectionTitle, CardHeader or DetailsSummary; write copy in sentence case."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*tracking-",
+                "message": "Letter spacing belongs to SectionTitle, CardHeader and DetailsSummary."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*font-(?:thin|extralight|light|bold|extrabold|black)$",
+                "message": "Use font-semibold or font-medium for emphasis; titles use SectionTitle."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*shadow-(?!none$)",
+                "message": "Elevation belongs to primitives: CustomControl and Nav are raised, dialogs and popovers are modal, cards are flat."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*shadow$",
+                "message": "Elevation belongs to primitives: CustomControl and Nav are raised, dialogs and popovers are modal, cards are flat."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*rounded(?:-|$)",
+                "message": "Corner radius belongs to primitives."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*space-[xy]-",
+                "message": "Use flex or grid with gap-* instead of space-*."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*(?:ring|ring-offset)(?:-|$)",
+                "message": "Focus styling comes from the focus-ring utility, which primitives already apply."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*outline-(?!none$)",
+                "message": "Focus styling comes from the focus-ring utility, which primitives already apply."
+              },
+              {
+                "pattern": "^dark:",
+                "message": "The theme is light only; a dark theme will redefine tokens, not add dark: classes."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*bg-(?!(?:muted/50|info/5|info/10|success/10|warning/10|destructive/10|brand|transparent|none)$)",
+                "message": "Backgrounds belong to primitives. Call sites may use bg-muted/50 (inset panel), bg-info/5 or /10 (active selection), bg-success|warning|destructive/10 (diff rows), bg-brand (map marks)."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*text-(?!(?:muted-foreground|foreground|destructive|success|warning|info|brand|left|center|right|start|end|justify|ellipsis|clip|wrap|nowrap|balance|pretty|xs|sm|base|lg|xl|\\dxl)$)",
+                "message": "Text color at call sites is limited to text-foreground, text-muted-foreground and the status colors (destructive, success, warning, info)."
+              },
+              {
+                "pattern": "^(?:[^:]*:)*border-(?!(?:[trblxyse](?:-\\d+)?|\\d+|solid|dashed|dotted|double|none|hidden|collapse|separate|transparent|border|input|white|app|(?:info|destructive|warning|success|brand)(?:/\\d+)?)$)",
+                "message": "Border colors at call sites are limited to the status colors; primitives own the rest."
+              }
+            ]
+          }
+        ],
+        "tailwindcss/no-arbitrary-value": [
+          "error",
+          {
+            "allow": ["grid-cols-"]
+          }
+        ],
+        "osmix/no-native-radio": "error",
+        "react/forbid-elements": [
+          "error",
+          {
+            "forbid": [
+              {
+                "element": "select",
+                "message": "Use Select from @osmix/ui."
+              },
+              {
+                "element": "textarea",
+                "message": "Add a themed primitive to @osmix/ui before using a textarea."
+              },
+              {
+                "element": "details",
+                "message": "Use Details, DetailsSummary and DetailsContent from @osmix/ui."
+              },
+              {
+                "element": "summary",
+                "message": "Use Details, DetailsSummary and DetailsContent from @osmix/ui."
+              }
+            ]
+          }
+        ],
+        "react/forbid-dom-props": [
+          "error",
+          {
+            "forbid": [
+              {
+                "propName": "style",
+                "message": "Style with tokens and layout classes; MapLibre paint objects are not DOM style."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "packages/app-components/src/components/custom-control.tsx",
+        "packages/app-components/src/components/map-panel-header.tsx",
+        "packages/app-components/src/components/app-links.tsx"
+      ],
+      "rules": {
+        "tailwindcss/no-restricted-classes": "off"
+      }
+    },
+    {
+      "files": ["apps/bench/**"],
+      "rules": {
+        "tailwindcss/no-unknown-classes": "off"
+      }
     }
-  ]
+  ],
+  "jsPlugins": ["oxlint-tailwindcss", "./scripts/lint/osmix-design.ts"],
+  "settings": {
+    "tailwindcss": {
+      "entryPoint": "packages/ui/src/styles.css"
+    }
+  }
 }

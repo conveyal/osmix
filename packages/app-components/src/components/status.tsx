@@ -15,9 +15,7 @@ export default function Status() {
       ) : (
         <StatusDot status={status.type === "error" ? "error" : "ok"} />
       )}
-      <div className="shrink overflow-hidden text-ellipsis whitespace-nowrap text-foreground">
-        {status.message}
-      </div>
+      <div className="shrink truncate">{status.message}</div>
     </div>
   );
 }

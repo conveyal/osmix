@@ -24,6 +24,7 @@ import {
 import { useOsmixRemote } from "@osmix/app-core";
 import {
   ActionButton,
+  Alert,
   Details,
   DetailsContent,
   DetailsSummary,
@@ -33,24 +34,23 @@ import {
   CardAction,
   CardContent,
   CardHeader,
-  CardTitle,
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemMedia,
   ItemTitle,
-  cn,
+  Step as StepCard,
 } from "@osmix/ui";
 import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
-  ArrowLeft,
+  ArrowLeftIcon,
   ArrowRightIcon,
-  CheckCircle,
+  CheckCircleIcon,
   ChevronRightIcon,
   DownloadIcon,
   FastForwardIcon,
-  FileDiff,
+  FileDiffIcon,
   MaximizeIcon,
   MergeIcon,
   SaveIcon,
@@ -666,27 +666,24 @@ export default function MergeBlock() {
   return (
     <div className="flex flex-col gap-4">
       {pendingMergedRefresh?.error ? (
-        <Card role="alert">
-          <CardHeader>The merged dataset needs to be refreshed</CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            <p>{pendingMergedRefresh.error}</p>
-            <p>
-              The worker already applied the changes. Refresh the displayed result before continuing
-              or downloading.
-            </p>
-            <ActionButton onAction={retryMergedRefresh}>Refresh merged dataset</ActionButton>
-            <p>
-              If refreshing cannot recover the dataset, reload this page and load both original
-              input files to start again.
-            </p>
-          </CardContent>
-        </Card>
+        <Alert variant="destructive" title="The merged dataset needs to be refreshed">
+          <p>{pendingMergedRefresh.error}</p>
+          <p>
+            The worker already applied the changes. Refresh the displayed result before continuing
+            or downloading.
+          </p>
+          <ActionButton onAction={retryMergedRefresh}>Refresh merged dataset</ActionButton>
+          <p>
+            If refreshing cannot recover the dataset, reload this page and load both original input
+            files to start again.
+          </p>
+        </Alert>
       ) : null}
       <Step step="select-osm-pbf-files" title="Select merge inputs and options" guideId="select">
         <Card>
           <CardHeader>Merge pipeline</CardHeader>
           <CardContent className="flex flex-col gap-2">
-            <ol className="list-decimal list-inside">
+            <ol className="list-inside list-decimal">
               <li>Optionally inspect each input for possible internal duplicates</li>
               <li>Add patch entities and apply same-ID patch updates</li>
               <li>Optionally match nearby imported entities</li>
@@ -827,12 +824,7 @@ export default function MergeBlock() {
 
         <ConflationConfig />
 
-        <div
-          className={cn(
-            "flex flex-col gap-4",
-            !base.osm || !patch.osm ? "opacity-50 pointer-events-none" : "",
-          )}
-        >
+        <div className="flex flex-col gap-4">
           <Item
             render={
               <button
@@ -849,7 +841,7 @@ export default function MergeBlock() {
             }
           >
             <ItemMedia>
-              <CheckCircle />
+              <CheckCircleIcon />
             </ItemMedia>
             <ItemContent>
               <ItemTitle>Review each merge stage</ItemTitle>
@@ -885,7 +877,7 @@ export default function MergeBlock() {
                   const abortController = new AbortController();
                   setMergeAbortController(abortController);
 
-                  const task = Log.startTask("Running automatic merge, please wait...");
+                  const task = Log.startTask("Running automatic merge, please wait…");
                   if (!base.osm) throw Error("Base OSM is not loaded");
                   if (!patch.osm) throw Error("Patch OSM is not loaded");
                   const baseOsmId = base.osm.id;
@@ -1116,7 +1108,7 @@ export default function MergeBlock() {
               setMergeAbortController(null);
             }}
           >
-            <StopCircleIcon className="mr-2 h-4 w-4" />
+            <StopCircleIcon aria-hidden="true" />
             Request cancellation
           </Button>
         )}
@@ -1217,7 +1209,7 @@ export default function MergeBlock() {
       <Step step="direct-merge" title="Direct merge" guideId="direct">
         <Card>
           <CardHeader>
-            <CardTitle>Base OSM PBF</CardTitle>
+            Base OSM PBF
             {base.osm && (
               <CardAction>
                 <ActionButton icon={<DownloadIcon />} onAction={base.downloadOsm} variant="ghost" />
@@ -1235,7 +1227,7 @@ export default function MergeBlock() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Patch OSM PBF</CardTitle>
+            Patch OSM PBF
             {patch.osm && (
               <CardAction>
                 <ActionButton
@@ -1257,11 +1249,15 @@ export default function MergeBlock() {
         </Card>
 
         <StepActions aria-label="Direct merge actions">
-          <ActionButton icon={<ArrowLeft />} onAction={async () => prevStep()} variant="outline">
+          <ActionButton
+            icon={<ArrowLeftIcon />}
+            onAction={async () => prevStep()}
+            variant="outline"
+          >
             Back
           </ActionButton>
           <ActionButton
-            icon={<FileDiff />}
+            icon={<FileDiffIcon />}
             onAction={() =>
               startStepTask("Generating direct-merge preview", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
@@ -1294,7 +1290,7 @@ export default function MergeBlock() {
         >
           Download JSON changes
         </ActionButton>
-        {changesDownloadError ? <p role="alert">{changesDownloadError}</p> : null}
+        {changesDownloadError ? <Alert variant="destructive">{changesDownloadError}</Alert> : null}
         {changesetStats && base.osm && (
           <Card>
             <CardHeader>{reviewChangesetTitle(changesetReviewContext)}</CardHeader>
@@ -1472,7 +1468,7 @@ export default function MergeBlock() {
         <StepActions aria-label="Imported-data matching actions">
           <ActionButton
             disabled={isConflationFilterPending}
-            icon={<ArrowLeft />}
+            icon={<ArrowLeftIcon />}
             onAction={async () => prevStep()}
             variant="outline"
           >
@@ -1492,7 +1488,7 @@ export default function MergeBlock() {
         <MatchingReviewProblem issue={matchingIssue} />
         <Card>
           <CardHeader>
-            <CardTitle>Current OSM PBF</CardTitle>
+            Current OSM PBF
             {base.osm && (
               <CardAction>
                 <ActionButton icon={<DownloadIcon />} onAction={base.downloadOsm} variant="ghost" />
@@ -1528,7 +1524,7 @@ export default function MergeBlock() {
             Preview without exact reconciliation
           </ActionButton>
           <ActionButton
-            icon={<FileDiff />}
+            icon={<FileDiffIcon />}
             onAction={() =>
               startStepTask("Generating cumulative preview with exact reconciliation", async () => {
                 return generateVerifiedChangeset(true);
@@ -1552,7 +1548,7 @@ export default function MergeBlock() {
           </ActionButton>
           <ActionButton
             disabled={pendingMergedRefresh !== null}
-            icon={<FileDiff />}
+            icon={<FileDiffIcon />}
             onAction={() =>
               startStepTask("Generating intersection preview", async () => {
                 if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
@@ -1601,7 +1597,7 @@ export default function MergeBlock() {
             {selectedEntity && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Selected entity</CardTitle>
+                  Selected entity
                   <CardAction>
                     <Button
                       onClick={() => {
@@ -1631,7 +1627,7 @@ export default function MergeBlock() {
               <ActionButton icon={<DownloadIcon />} onAction={() => base.downloadOsm()}>
                 Download merged OSM PBF
               </ActionButton>
-              <ActionButton icon={<ArrowLeft />} variant="outline" onAction={startNewMerge}>
+              <ActionButton icon={<ArrowLeftIcon />} variant="outline" onAction={startNewMerge}>
                 Start a new merge
               </ActionButton>
             </StepActions>
@@ -1661,19 +1657,18 @@ function Step({
   const hiddenConflationStepBeforeCurrent =
     !conflationEnabled && STEPS.slice(0, stepIndex + 1).includes("match-imported-data") ? 1 : 0;
   if (step !== currentStep) return null;
-  if (isTransitioning === true) return <LoadingState>Please wait...</LoadingState>;
+  if (isTransitioning === true) return <LoadingState>Please wait…</LoadingState>;
+  const isAutomatic = step === "run-all-steps";
   return (
     <>
-      <Card>
-        <CardHeader>
-          {step === "run-all-steps"
-            ? `Automatic workflow: ${title}`
-            : `${stepIndex + 1 - hiddenConflationStepBeforeCurrent}: ${title}`}
-        </CardHeader>
+      <StepCard
+        number={isAutomatic ? undefined : stepIndex + 1 - hiddenConflationStepBeforeCurrent}
+        title={isAutomatic ? `Automatic workflow: ${title}` : title}
+      >
         <CardContent className="p-0">
           <MergeStepGuide guideId={guideId} />
         </CardContent>
-      </Card>
+      </StepCard>
       {children}
     </>
   );

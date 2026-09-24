@@ -1,124 +1,158 @@
 # Osmix UI Design System
 
-Conventions for the shared UI in `@osmix/ui` and every app built on it (`apps/merge`,
-`apps/inspect`, and future apps). Read this before making UI changes. The component
-primitives in `packages/ui/src/components/ui/` and the app-level helpers in
-`packages/ui/src/components/` encode these rules — prefer using them over hand-writing
-utility classes. App-specific rules live next to each app (see `apps/merge/DESIGN.md`).
+These are the conventions for `@osmix/ui`, `@osmix/app-components`, and every app built on them (`apps/merge`, `apps/inspect`, `apps/extract`). Read this before you make UI changes. Merge-specific rules are in `apps/merge/DESIGN.md`.
 
-## Principles
+The design rules are kept in three places, in this order of strength:
 
-- **Dense, mono, data-first.** This is a technical GIS tool. The entire app
-  renders in a monospace stack at `text-xs` with `tabular-nums` (set globally
-  on `body` in `packages/ui/src/styles.css`). Information density is a feature.
-- **Light theme only.** There is no dark mode. Do not add `dark:` utilities;
-  they are dead code without a `.dark` token block. Dark mode is documented
-  future work.
-- **Tight radius.** `--radius: 0.125rem` (2px) is intentional and matches the
-  utilitarian aesthetic. Do not soften per-component.
-- **Semantic tokens only.** Never use raw palette utilities (`slate-*`,
-  `blue-*`, `green-*`, `red-*`, …). Use the tokens below.
+1. **The theme is closed.** `packages/ui/src/styles.css` resets Tailwind's default palette, shadows, font sizes and font families. Only the tokens below produce CSS.
+2. **Primitives own styling.** Colour, type, radius, elevation and focus are set inside the components in `packages/ui` (and the map components in `packages/app-components`). Call sites compose them and add layout.
+3. **Lint enforces the rest.** `pnpm run lint:check` runs the rules in the [enforcement map](#enforcement-map). A rule marked "advisory" depends on review.
 
-## Typography
+## Theme: cartographic instrument
 
-The body is `text-xs` mono; hierarchy comes from weight and case, not size.
+Osmix is a dense, technical GIS tool. The theme looks like a survey instrument on paper:
 
-| Role                      | Style                                              | Where it lives                                 |
-| ------------------------- | -------------------------------------------------- | ---------------------------------------------- |
-| Body / data / table cells | inherited `text-xs`, `font-normal`                 | global `body` style                            |
-| Section title             | `font-bold uppercase tracking-wide` (inherited xs) | `SectionTitle`, `CardHeader`, `DetailsSummary` |
-| Dialog title              | `text-sm font-bold uppercase tracking-wide`        | `DialogTitle`                                  |
-| Muted / meta              | `text-muted-foreground` (no size change)           | anywhere                                       |
+- warm paper neutrals and warm-ink text
+- one signature accent, survey orange (`--brand`)
+- the map is the main subject
 
-Rules:
+The design choices:
 
-- Never hand-set a text-size class for body text. `text-sm` appears exactly
-  once in the app (DialogTitle).
-- Never hand-write `font-bold uppercase` — render titles through
-  `SectionTitle`, `CardHeader`, or `DetailsSummary`.
-- Write title strings in normal sentence case ("Merge steps", not
-  "MERGE STEPS"); the CSS `uppercase` transform handles display. This keeps
-  screen readers from spelling out letters.
+- **Light only.** Tokens are the only colour source, so a future dark theme only redefines them (in a `.dark` block). Do not use `dark:` utilities.
+- **Square corners.** `--radius` is `0.125rem` (2px). Do not soften corners per component.
+- **Dense.** The body is `text-xs` with `tabular-nums`. Hierarchy comes from weight, case and the typeface, not from size.
 
-## Color
+## Tokens
 
-Tokens are defined in `packages/ui/src/styles.css` (`:root` + `@theme`). The standard shadcn
-set (`background`, `foreground`, `card`, `muted`, `accent`, `primary`,
-`destructive`, `border`, …) plus three app additions:
+### Color
 
-| Token                      | Meaning                               | Examples                                                                           |
-| -------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------- |
-| `--success` (≈ green-500)  | Positive status, created/added things | `StatusDot status="ok"`, `text-success` diff additions, `bg-success/10` added rows |
-| `--warning` (≈ amber-500)  | Caution, modified things              | `text-warning`, `bg-warning/10` modified rows                                      |
-| `--info` (≈ blue-500)      | Active/selected state, links, routes  | `text-info` nav active + links, `bg-info/5 border-info/30` active item             |
-| `--destructive` (existing) | Errors, deleted things                | `StatusDot status="error"`, `text-destructive`, `bg-destructive/10` removed rows   |
+| Token                           | Use                                                                                                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `background`                    | The page (paper)                                                                                                                                        |
+| `card`, `popover`               | Surfaces on the paper: cards, panels, menus                                                                                                             |
+| `foreground`                    | Ink                                                                                                                                                     |
+| `muted`, `muted-foreground`     | Sidebar background, secondary text                                                                                                                      |
+| `accent`                        | Hover backgrounds                                                                                                                                       |
+| `primary`, `primary-foreground` | Primary buttons (ink)                                                                                                                                   |
+| `secondary`                     | Secondary buttons                                                                                                                                       |
+| `border`, `input`               | Rules and field borders                                                                                                                                 |
+| `brand` (survey orange)         | The brand mark, the focus ring, progress bars, step numbers and bbox marks. It is **never** a status colour                                             |
+| `app` (`--app-hue`)             | The per-app hue: Merge violet, Inspect teal, Extract magenta. Used only for the nav brand mark and the active app link. `OsmixAppShell` sets `data-app` |
+| `success`                       | Added, OK                                                                                                                                               |
+| `warning`                       | Modified                                                                                                                                                |
+| `info`                          | Selected, active, links                                                                                                                                 |
+| `destructive`                   | Deleted, errors                                                                                                                                         |
+| `overlay`                       | Dialog backdrop                                                                                                                                         |
+| `white`, `black`                | Only for marks drawn on top of map imagery                                                                                                              |
 
-Conventions:
+Opacity steps:
 
-- Opacity variants express surfaces: `/10` for diff-row backgrounds, `/5` for
-  active-selection backgrounds, `/20`–`/60` for tinted borders.
-- Grays come from tokens: `bg-muted` (sidebar chrome), `bg-muted/50` (inset
-  panels like the activity log), `text-muted-foreground` (secondary text),
-  `hover:bg-accent` (hover states).
-- Allowed exception: elements drawn on top of map imagery (e.g. the extract
-  bbox corner markers use `border-white`) may use literal white for contrast
-  against tiles.
+| Step  | Use                                                    |
+| ----- | ------------------------------------------------------ |
+| `/5`  | Active selection (`bg-info/5`) and `Alert` backgrounds |
+| `/10` | Diff-row backgrounds (`bg-success/10`)                 |
+| `/40` | Tinted borders                                         |
 
-## Spacing & layout
+### Map colors
 
-- The base spacing unit inside cards and panels is `p-2` / `gap-2`. Sidebar
-  and nav step up responsively (`p-2 lg:p-4`).
-- **Card owns its padding.** `CardHeader` is `px-2 py-1.5 min-h-8 border-b`;
-  `CardContent` defaults to `p-2`. Pass `className="p-0"` to `CardContent` for
-  flush content (tables, `Details` sections, item lists). Never add padding
-  wrappers inside a header.
-- Collapsible triggers (`DetailsSummary`, the activity-log trigger) are
-  `p-2 h-8`.
-- Prefer flex + `gap-*` over margins and over `space-y-*`.
+MapLibre can't read CSS variables or `oklch()`. So layer paint gets its colours from `useMapColors()` in `@osmix/app-components`. That hook resolves the `--map-*` tokens to `rgb()` strings. Never write a colour literal in paint.
+
+| Role                   | Token                               | Look                                                |
+| ---------------------- | ----------------------------------- | --------------------------------------------------- |
+| `base`                 | `--map-base` (ink)                  | The base or only dataset. Solid lines, circle nodes |
+| `patch`                | `--map-patch` (brand)               | Imported / patch data. Dashed lines, diamond nodes  |
+| `hover`                | `--map-hover`                       | The hovered feature                                 |
+| `selected`             | `--map-selected` (info)             | The selected feature, drawn over a `casing`         |
+| `casing`               | `--map-casing` (white)              | The outline under highlighted lines                 |
+| `route` / `routeError` | `--map-route` / `--map-route-error` | Routes, and unreachable legs                        |
+| `bbox`                 | `--map-bbox` (brand)                | The extract bounding box                            |
+
+The default basemap is `carto-positron`. It's quiet, so data and status colours stand out.
+
+### Type
+
+| Role                                                          | Style                                        | Where it lives                                                           |
+| ------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------ |
+| Body, UI copy                                                 | IBM Plex Sans, `text-xs`                     | `body`                                                                   |
+| Data: IDs, tags, coordinates, file names, table cells, inputs | IBM Plex Mono                                | `TableCell`, `Input`, `MapPanelHeader` detail; `font-mono` at call sites |
+| Section title                                                 | Plex Mono, bold, uppercase, `tracking-wider` | `SectionTitle`, `CardHeader`, `DetailsSummary`, `TableHead`              |
+| Step and dialog title                                         | `text-sm font-semibold`, sentence case       | `Step`, `DialogTitle`                                                    |
+| Emphasis                                                      | `font-semibold` or `font-medium`             | call sites                                                               |
+
+Only two sizes exist: `text-xs` (the body default) and `text-sm` (set inside primitives). Write every string in sentence case. CSS uppercases section titles, and screen readers then read words instead of spelling out letters.
+
+### Elevation, radius and focus
+
+- **Flat:** a border and no shadow. Use it for cards, steps and items in the sidebar.
+- **Raised (`shadow-raised`):** the nav and floating map panels (`CustomControl`).
+- **Modal (`shadow-modal`):** dialogs, popovers, menus and select popups.
+- **Radius:** `rounded-sm` to `rounded-xl` scale from `--radius`. Primitives choose it.
+- **Focus:** the `focus-ring` utility (a 2px brand outline, and `CanvasText` in forced-colors mode). Every interactive primitive applies it. Never hand-write `ring-*` focus styles.
 
 ## Components
 
-UI primitives (`packages/ui/src/components/ui/`): `button` (cva variants + sizes),
-`button-group`, `card`, `checkbox` (+ `CheckboxLabel`), `collapsible`, `dialog`,
-`input`, `input-group`, `item`, `progress`, `separator`, `spinner`, `table`,
-`textarea`. Built on `@base-ui/react`, styled with `cn()`/cva. All are re-exported
-from the `@osmix/ui` barrel.
+Primitives come from `@osmix/ui`. Map components come from `@osmix/app-components`.
 
-Shared helpers (`packages/ui/src/components/`):
+| Need                                             | Use                                                                                                                               | Notes                                                                  |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Page layout                                      | `Main`, `AppSidebar` (`footer={<SidebarLog />}`), `MapContent`                                                                    | `AppSidebar` owns the `p-2 lg:p-4` gutter and the `gap-2` rhythm       |
+| App root and nav                                 | `OsmixAppShell app="…"`                                                                                                           | Renders the standard nav (`OsmixNav`) and sets the app hue             |
+| Workflow step                                    | `Step` (`number`, `title`, `action`)                                                                                              | Renders "1." in brand mono. Omit `number` for unnumbered steps         |
+| Sidebar section                                  | `Card` + `CardHeader` + `CardContent`                                                                                             | `CardContent` is `p-2`; use `p-0` for flush tables and lists           |
+| Collapsible section                              | `Details`, `DetailsSummary`, `DetailsContent`                                                                                     | The chevron rotates on `data-panel-open`                               |
+| Heading inside a panel                           | `SectionTitle`                                                                                                                    | Never hand-write `font-bold uppercase`                                 |
+| Callout (notice, warning, failure, confirmation) | `Alert` (`variant`, `title`, `action`)                                                                                            | `destructive` has `role="alert"`                                       |
+| Key/value data, diffs                            | `Table`                                                                                                                           | `TableCell` is mono and `select-all` on purpose                        |
+| Selectable rows                                  | `Item`, `ItemGroup`                                                                                                               | The `outline` variant has a real border                                |
+| Buttons                                          | `Button` (`default` = ink primary, `outline`, `secondary`, `ghost`, `destructive`, `link`)                                        | `buttonVariants()` styles a non-button trigger                         |
+| Async buttons                                    | `ActionButton`                                                                                                                    | Shows a spinner and a pending state                                    |
+| Text field                                       | `Input`, `InputGroup`                                                                                                             |                                                                        |
+| Action menu                                      | `Menu`, `MenuTrigger`, `MenuContent`, `MenuItem`                                                                                  | The trigger takes `Button` variants                                    |
+| Dropdown                                         | `Select` (`items`, `value`, `onValueChange`)                                                                                      | A Base UI popup, so the theme applies; the trigger has role `combobox` |
+| Mutually exclusive options                       | `Radio` + `RadioLabel` or `RadioCard`, in a `<fieldset>`                                                                          | A themed native radio: arrow keys and focus stay native                |
+| Checkbox                                         | `Checkbox` + `CheckboxLabel`                                                                                                      |                                                                        |
+| Pagination                                       | `Pager` (`page` is zero-based)                                                                                                    | Renders nothing for a single page                                      |
+| Optional explanation                             | `InfoTooltip`                                                                                                                     | Keep essential labels visible                                          |
+| Nothing to show                                  | `EmptyState`                                                                                                                      | One sentence, no trailing period                                       |
+| Waiting                                          | `Spinner` (inline), `LoadingState` (a section or Suspense), `Progress` (long worker tasks, with `value={null}` for indeterminate) | Never text alone                                                       |
+| Status                                           | `StatusDot` (`ok`, `warn`, `error`)                                                                                               |                                                                        |
+| Dialog                                           | `Dialog`, `DialogContent`, `DialogTitle`, …                                                                                       |                                                                        |
+| Floating map panel                               | `CustomControl` (`width="narrow"` or `"default"`) + `MapPanelHeader` (`icon`, `title`, `detail`, `actions`)                       |                                                                        |
+| Map paint colours                                | `useMapColors()`                                                                                                                  | See [Map colors](#map-colors)                                          |
 
-- `SectionTitle` — the one uppercase-bold title style.
-- `LoadingState` / `EmptyState` — the standard Suspense-fallback and
-  nothing-to-show blocks. Do not hand-roll `<div className="p-2">Loading…`.
-- `StatusDot` — `ok | error | warn` dot using the status tokens.
-- `Details`/`DetailsSummary`/`DetailsContent` — collapsible section; the
-  standard way to make a titled, togglable region. Its open-state styles target
-  Base UI's `data-panel-open` attribute. Disclosure triggers remain keyboard
-  accessible, and decorative chevrons are hidden from assistive technology.
-- `InfoTooltip` — moves optional explanatory prose behind a compact,
-  keyboard-accessible information trigger. Keep essential labels and current
-  values visible.
-- `ActionButton` — async button with spinner/transition handling.
-- `Nav` — the top bar shell. Apps fill its `links`, `status` and `controls` slots;
-  `ToggleButton` binds an icon button to a boolean atom for panel toggles.
-- `Main` / `Sidebar` / `MapContent` — the page layout. `Sidebar` owns the persisted
-  open state (`sidebarIsOpenAtom`) and the resize toggle.
-- `ErrorBoundary` — top-level fallback; pass `onError` to route errors to a log.
+Styling at call sites: outside `packages/ui`, `className` carries **layout** only. That covers:
 
-When to use what:
+- flex, grid, gap
+- size, margin, padding
+- position, overflow, alignment
+- truncation, cursor
 
-- **Table** (`ui/table`) for key/value data and diffs. `TableCell` keeps
-  `select-all` on purpose — clicking a cell selects the whole value for
-  copying. Diff rows tint via `className="bg-success/10"` etc. at the call
-  site.
-- **Item/ItemGroup** for selectable list rows with actions (stored files,
-  wizard options).
-- **Card** for titled sections in the sidebar blocks.
+A few role classes are also allowed:
+
+- `text-muted-foreground`, `text-foreground` and the status text colours
+- `font-mono`, `font-semibold`, `font-medium`
+- plain `border-*` sides
+- the documented background opacities
+
+If you need anything else, add a variant to the primitive.
+
+## Copy
+
+- Use sentence case everywhere: buttons, labels and titles.
+- Use "…" (U+2026), never "...".
+- Empty states are one sentence with no trailing period.
+- Errors say what failed and what to do next.
+- Use one name per concept (for example "Open file"; see `apps/merge/DESIGN.md` for the merge terms).
+
+## Icons
+
+- Use lucide only, imported by the `*Icon` name (`ChevronDownIcon`).
+- `Button` sizes its icons, so don't add `size-*` inside a button. Standalone inline icons are `size-3.5`.
+- Decorative icons get `aria-hidden="true"`.
 
 ## Tailwind sources
 
-Tailwind v4 skips `node_modules`, so classes used inside a workspace package are
-not found by automatic source detection. Each package stylesheet declares
-`@source "./"` (relative to that file) and apps import the package stylesheets:
+Tailwind v4 skips `node_modules`, so each package stylesheet declares `@source "./"`. Apps import the package stylesheets:
 
 ```css
 @import "@osmix/ui/styles.css";
@@ -126,32 +160,36 @@ not found by automatic source detection. Each package stylesheet declares
 @source "./";
 ```
 
-Only `@osmix/ui/styles.css` may `@import "tailwindcss"`; importing it twice
-duplicates the preflight and utilities.
+- Only `@osmix/ui/styles.css` may `@import "tailwindcss"`.
+- CSS for DOM that MapLibre creates (`.maplibregl-ctrl`, `.osmix-overlay-popup`, `.osmix-map-panel`) goes in `packages/app-components/src/styles.css`.
+- oxfmt sorts class lists (`sortTailwindcss` in `.oxfmtrc.json`).
 
-## Loading, progress & status
+## Enforcement map
 
-- Quick/inline waits: `Spinner`.
-- Suspense fallbacks: `LoadingState`.
-- Long worker tasks (merges, extracts): an indeterminate `Progress` bar plus the
-  latest log message (see `AutomaticMergeProgress` in `apps/merge`). Worker progress
-  (`@osmix/shared` `Progress`) is `{ msg, timestamp, level }` — there is no
-  numeric percentage yet. If `Progress` gains a `percent` field, pass a real `value`.
-- Status indication: `StatusDot`, never raw `bg-green-500`/`bg-red-500`.
+The lint rules are set in `.oxlintrc.json`. `oxlint-tailwindcss` loads the design system from `packages/ui/src/styles.css`. The local rules live in `scripts/lint/osmix-design.ts`, with tests in `scripts/lint/osmix-design.test.ts` (`pnpm run test:design-lint`). Scope names the files each rule applies to: "all UI" is `apps/{merge,inspect,extract}/src`, `packages/app-components/src` and `packages/ui/src`; "apps" is `apps/{merge,inspect,extract}/src` and `packages/app-components/src`. The benchmark harness (`apps/bench`) is not a product UI and is out of scope.
 
-## Map controls
+| Rule                                                                                                                                                               | Enforced by                                                                        | Scope           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | --------------- |
+| Only theme tokens exist (no palette colours, stock shadows or font sizes)                                                                                          | Closed `@theme` + `tailwindcss/no-unknown-classes`                                 | all             |
+| No colour literals (hex, `rgb()`, `oklch()`, named colours, MapLibre `["rgba", …]`)                                                                                | `osmix/no-raw-color`, `tailwindcss/no-hardcoded-colors`                            | all UI          |
+| Layout-only call sites: no call-site size, case, tracking, bold, shadow, radius, `space-*`, ring/outline, `dark:`, or off-list background, text and border colours | `tailwindcss/no-restricted-classes`                                                | apps            |
+| No arbitrary values (except `grid-cols-[…]`)                                                                                                                       | `tailwindcss/no-arbitrary-value`                                                   | apps            |
+| No inline `style`                                                                                                                                                  | `react/forbid-dom-props`                                                           | apps            |
+| `Select`, `Details` instead of native `<select>`, `<details>`, `<summary>`, `<textarea>`                                                                           | `react/forbid-elements`                                                            | apps            |
+| `Radio` instead of `<input type="radio">`                                                                                                                          | `osmix/no-native-radio`                                                            | apps            |
+| Lucide `*Icon` names                                                                                                                                               | `no-restricted-imports`                                                            | all UI          |
+| "…" not "..." in UI copy                                                                                                                                           | `osmix/no-ascii-ellipsis`                                                          | all UI          |
+| Canonical, non-conflicting, sorted classes                                                                                                                         | `tailwindcss/enforce-canonical`, `no-conflicting-classes`, oxfmt `sortTailwindcss` | all             |
+| Which component to use (the table above)                                                                                                                           | Primitives + the rules above                                                       | partly advisory |
+| Sentence case, empty-state and error copy                                                                                                                          | —                                                                                  | advisory        |
+| Map roles match the legend (base = circle and solid, patch = diamond and dashed)                                                                                   | —                                                                                  | advisory        |
 
-- Floating panels are MapLibre custom controls (`CustomControl`) toggled by
-  nav buttons via jotai atoms. Panel headers use `SectionTitle` with a border-b
-  row and a ghost close/action button.
-- CSS that targets MapLibre-generated DOM (`.maplibregl-ctrl`,
-  `.osmix-overlay-popup`, `.osmix-overlay-tooltip`) must stay in a plain stylesheet (`packages/app-components/src/styles.css`) —
-  those elements are not rendered by React. Popup backgrounds use
-  `var(--background)`.
+The map primitives in `packages/app-components` (`custom-control.tsx`, `map-panel-header.tsx` and `app-links.tsx`) own their styling, so they are exempt from `no-restricted-classes`, like `packages/ui`.
+
+When a rule has a real exception, disable it on that line and give the reason: `// oxlint-disable-next-line <rule> -- <why>`.
 
 ## Future work
 
-- **Dark mode**: add a `.dark` token block and a toggle; audit the map-marker
-  white exceptions.
-- **Determinate progress**: extend `@osmix/shared` `Progress` with a
-  `percent?` field and surface it in the progress components.
+- **Dark mode:** add a `.dark` token block and a toggle, and review the white map-mark exceptions.
+- **Determinate progress:** extend `@osmix/shared` `Progress` with `percent?` and pass a real `value` to `Progress`.
+- **Screenshot baselines:** add Playwright visual baselines for each app's main states once the theme has settled.

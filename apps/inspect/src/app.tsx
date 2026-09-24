@@ -19,7 +19,7 @@ import {
   useLoadFromUrl,
   useOsmFile,
 } from "@osmix/app-core";
-import { Main, MapContent, Sidebar } from "@osmix/ui";
+import { AppSidebar, Main, MapContent } from "@osmix/ui";
 import { useSetAtom } from "jotai";
 import type { OsmFileType } from "osmix";
 import { useMemo } from "react";
@@ -68,12 +68,9 @@ export function InspectApp() {
 
   return (
     <Main>
-      <Sidebar>
-        <div className="flex-1 p-2 lg:p-4 overflow-y-auto">
-          <InspectPanel osmKey={OSM_KEY} openOsmFile={openOsmFile} />
-        </div>
-        <SidebarLog />
-      </Sidebar>
+      <AppSidebar footer={<SidebarLog />}>
+        <InspectPanel osmKey={OSM_KEY} openOsmFile={openOsmFile} />
+      </AppSidebar>
       <MapContent>
         <Basemap initialViewState={initialViewState}>
           <OsmixMapSources baseOsm={osmFile.osm} />

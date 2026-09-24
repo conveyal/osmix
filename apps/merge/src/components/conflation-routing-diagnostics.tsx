@@ -43,10 +43,9 @@ export function ConflationRoutingDiagnostics({
       <CardContent className="p-0">
         <div className="grid gap-1 p-2 text-muted-foreground" id={descriptionId}>
           <p>
-            <span className="font-bold text-foreground">Before</span> is the ordinary direct merge,
-            including exact reconciliation when selected.{" "}
-            <span className="font-bold text-foreground">After</span> adds accepted fuzzy property
-            transfers and network attachments.
+            <span className="font-semibold">Before</span> is the ordinary direct merge, including
+            exact reconciliation when selected. <span className="font-semibold">After</span> adds
+            accepted fuzzy property transfers and network attachments.
           </p>
           <p>
             All graph nodes include every node loaded into the mode-specific graph. Routable nodes

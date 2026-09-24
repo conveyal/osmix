@@ -1,20 +1,27 @@
 import { layerControlIsOpenAtom } from "@osmix/app-core";
 import {
-  cn,
-  SectionTitle,
   Button,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
+  EmptyState,
   Input,
 } from "@osmix/ui";
 import { useAtomValue } from "jotai";
-import { ChevronDown, Eye, EyeOff, Folder, FolderOpen, Layers } from "lucide-react";
+import {
+  ChevronDownIcon,
+  EyeIcon,
+  EyeOffIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  LayersIcon,
+} from "lucide-react";
 import { useCallback, useEffectEvent, useMemo, useState, useSyncExternalStore } from "react";
 
 import { APPID } from "../constants.ts";
 import { useMap } from "../hooks/map.ts";
 import CustomControl from "./custom-control.tsx";
+import { MapPanelHeader } from "./map-panel-header.tsx";
 
 type LayerInfo = {
   id: string;
@@ -32,7 +39,7 @@ export default function MapLayerControl() {
   const isOpen = useAtomValue(layerControlIsOpenAtom);
   if (!isOpen) return null;
   return (
-    <CustomControl position="bottom-right" className="w-72">
+    <CustomControl position="bottom-right" width="narrow">
       <MapLayers />
     </CustomControl>
   );
@@ -81,7 +88,6 @@ export function MapLayers() {
   const map = useMap();
   const layers = useMapLayers(map);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isOpen, setIsOpen] = useState(true);
 
   // Group layers by prefix
   const groups = useMemo((): LayerGroup[] => {
@@ -128,43 +134,57 @@ export function MapLayers() {
 
   if (!map) return null;
 
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="flex h-8 cursor-pointer w-full items-center justify-between p-2">
-        <div className="flex items-center gap-2">
-          <Layers className="size-4" />
-          <SectionTitle>Layers</SectionTitle>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">{layers.length}</span>
+  const matchCount = filteredGroups.reduce((count, group) => count + group.layers.length, 0);
 
-          <ChevronDown className={cn("size-4 transition-transform", isOpen && "rotate-180")} />
-        </div>
-      </CollapsibleTrigger>
+  return (
+    <Collapsible defaultOpen>
+      <MapPanelHeader
+        icon={<LayersIcon aria-hidden="true" />}
+        title="Layers"
+        detail={layers.length.toLocaleString()}
+        actions={
+          <CollapsibleTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="group"
+                title="Toggle layer list"
+                aria-label="Toggle layer list"
+              />
+            }
+          >
+            <ChevronDownIcon
+              aria-hidden="true"
+              className="transition-transform group-data-panel-open:rotate-180"
+            />
+          </CollapsibleTrigger>
+        }
+      />
 
       <CollapsibleContent>
-        <Input
-          type="text"
-          placeholder="Search layers..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="h-8 bg-muted/50 rounded-none shadow-inner"
-        />
-
-        <div>
-          {filteredGroups.length === 0 ? (
-            <div className="text-muted-foreground text-center py-2">No layers found</div>
-          ) : (
-            filteredGroups.map((group) => (
-              <LayerGroupComponent
-                key={group.id}
-                group={group}
-                onToggleLayer={toggleLayerVisibility}
-                onToggleGroup={toggleGroupVisibility}
-              />
-            ))
-          )}
+        <div className="border-b p-2">
+          <Input
+            type="search"
+            placeholder="Search layers…"
+            aria-label="Search layers"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
+
+        {matchCount === 0 ? (
+          <EmptyState>No layers match the search</EmptyState>
+        ) : (
+          filteredGroups.map((group) => (
+            <LayerGroupComponent
+              key={group.id}
+              group={group}
+              onToggleLayer={toggleLayerVisibility}
+              onToggleGroup={toggleGroupVisibility}
+            />
+          ))
+        )}
       </CollapsibleContent>
     </Collapsible>
   );
@@ -185,60 +205,61 @@ function LayerGroupComponent({
 
   return (
     <Collapsible>
-      <div className="group cursor-pointer flex h-8 pl-2 py-2 justify-between items-center w-full">
-        <div className="uppercase flex gap-2 items-center">
-          <FolderOpen className="size-4 hidden group-data-[state=open]:block" />
-          <Folder className="size-4 block group-data-[state=open]:hidden" /> {group.name}
-        </div>
-        <div className="flex gap-0 items-center">
-          <span className="text-muted-foreground pr-1">
+      <div className="flex items-center gap-1 pr-1">
+        <CollapsibleTrigger
+          render={
+            <Button variant="ghost" size="sm" className="group min-w-0 flex-1 justify-start" />
+          }
+        >
+          <ChevronDownIcon
+            aria-hidden="true"
+            className="transition-transform group-data-panel-open:rotate-180"
+          />
+          <FolderIcon aria-hidden="true" className="group-data-panel-open:hidden" />
+          <FolderOpenIcon aria-hidden="true" className="hidden group-data-panel-open:block" />
+          <span className="truncate">{group.name}</span>
+          <span className="ml-auto font-mono text-muted-foreground tabular-nums">
             {visibleCount}/{group.layers.length}
           </span>
-          <Button
-            onClick={(e) => {
-              e.preventDefault();
-              onToggleGroup(group, noneVisible || !allVisible);
-            }}
-            variant="ghost"
-            size="icon-sm"
-            title={allVisible ? "Hide all layers" : "Show all layers"}
-          >
-            {allVisible ? (
-              <Eye />
-            ) : noneVisible ? (
-              <EyeOff className="text-muted-foreground" />
-            ) : (
-              <Eye className="text-muted-foreground" />
-            )}
-          </Button>
-
-          <CollapsibleTrigger render={<Button variant="ghost" size="icon-sm" />}>
-            <ChevronDown className={"size-4 transition-transform group-data-open:rotate-180"} />
-          </CollapsibleTrigger>
-        </div>
+        </CollapsibleTrigger>
+        <Button
+          onClick={() => onToggleGroup(group, noneVisible || !allVisible)}
+          variant="ghost"
+          size="icon-sm"
+          title={allVisible ? `Hide all ${group.name} layers` : `Show all ${group.name} layers`}
+          aria-label={
+            allVisible ? `Hide all ${group.name} layers` : `Show all ${group.name} layers`
+          }
+        >
+          {allVisible ? (
+            <EyeIcon aria-hidden="true" />
+          ) : noneVisible ? (
+            <EyeOffIcon aria-hidden="true" className="text-muted-foreground" />
+          ) : (
+            <EyeIcon aria-hidden="true" className="text-muted-foreground" />
+          )}
+        </Button>
       </div>
-      <CollapsibleContent className="border-t shadow-inner">
-        <div className="flex flex-col gap-y-0">
-          {group.layers.map((layer) => (
-            <Button
-              className="flex gap-2 w-full items-center"
-              key={layer.id}
-              onClick={() => onToggleLayer(layer.id, layer.visible)}
-              title={layer.visible ? "Hide layer" : "Show layer"}
-              variant="ghost"
-              size="xs"
-            >
-              {layer.visible ? (
-                <Eye className="size-3.5" />
-              ) : (
-                <EyeOff className="size-3.5 text-muted-foreground" />
-              )}
-
-              <div className="truncate text-left flex-1">{layer.id}</div>
-              <div className="text-muted-foreground shrink-0">{layer.type}</div>
-            </Button>
-          ))}
-        </div>
+      <CollapsibleContent className="flex flex-col border-t bg-muted/50">
+        {group.layers.map((layer) => (
+          <Button
+            key={layer.id}
+            className="w-full justify-start"
+            onClick={() => onToggleLayer(layer.id, layer.visible)}
+            title={layer.visible ? "Hide layer" : "Show layer"}
+            aria-pressed={layer.visible}
+            variant="ghost"
+            size="xs"
+          >
+            {layer.visible ? (
+              <EyeIcon aria-hidden="true" />
+            ) : (
+              <EyeOffIcon aria-hidden="true" className="text-muted-foreground" />
+            )}
+            <span className="flex-1 truncate text-left font-mono">{layer.id}</span>
+            <span className="shrink-0 text-muted-foreground">{layer.type}</span>
+          </Button>
+        ))}
       </CollapsibleContent>
     </Collapsible>
   );

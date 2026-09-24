@@ -1,11 +1,11 @@
 import {
+  Alert,
   cn,
   Details,
   DetailsContent,
   DetailsSummary,
   InfoTooltip,
   EmptyState,
-  SectionTitle,
 } from "@osmix/ui";
 import type { OsmConflationCandidateView } from "osmix";
 
@@ -66,7 +66,7 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
 
   return (
     <Details>
-      <DetailsSummary className="h-auto min-h-8 gap-2 text-left [&_[data-slot=section-title]]:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[CanvasText] forced-colors:focus-visible:outline-offset-2">
+      <DetailsSummary className="h-auto min-h-8 gap-2 text-left">
         Match evidence and attributes
       </DetailsSummary>
       <DetailsContent>
@@ -81,37 +81,39 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
               OSM relation groups features, such as a route or turn restriction.
             </InfoTooltip>
           </p>
-          <dl className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-2 gap-y-1">
+          <dl className="grid min-w-0 grid-cols-2 gap-x-2 gap-y-1">
             {measurements.map(([label, value]) => (
               <div key={label} className="contents">
-                <dt className="min-w-0 break-words text-muted-foreground">{label}</dt>
-                <dd className="min-w-0 select-all break-words">{value}</dd>
+                <dt className="min-w-0 wrap-break-word text-muted-foreground">{label}</dt>
+                <dd className="min-w-0 wrap-break-word select-all">{value}</dd>
               </div>
             ))}
           </dl>
         </section>
         {evidence.featureTypeConflicts && evidence.featureTypeConflicts.length > 0 ? (
-          <section
+          <Alert
             aria-label="Feature type conflict"
-            className="flex min-w-0 flex-col gap-2 border-t bg-destructive/10 p-2"
+            className="m-2 min-w-0"
+            role="region"
+            title="Feature type conflict"
+            variant="destructive"
           >
-            <SectionTitle>Feature type conflict</SectionTitle>
             <p>
               These classifications block matching actions, even when they are not selected for
               copying.
             </p>
             {evidence.featureTypeConflicts.map((conflict) => (
               <div key={conflict.key} className="flex min-w-0 flex-col gap-1">
-                <p className="select-all break-all font-bold">{conflict.key}</p>
+                <p className="font-mono font-semibold break-all select-all">{conflict.key}</p>
                 <dl className="flex min-w-0 flex-col gap-1">
                   <dt className="text-muted-foreground">Base classification</dt>
-                  <dd className="min-w-0 select-all break-all">{String(conflict.baseValue)}</dd>
+                  <dd className="min-w-0 break-all select-all">{String(conflict.baseValue)}</dd>
                   <dt className="text-muted-foreground">Imported classification</dt>
-                  <dd className="min-w-0 select-all break-all">{String(conflict.patchValue)}</dd>
+                  <dd className="min-w-0 break-all select-all">{String(conflict.patchValue)}</dd>
                 </dl>
               </div>
             ))}
-          </section>
+          </Alert>
         ) : null}
         {evidence.tagDiff.length > 0 ? (
           <section aria-label="Attribute differences" className="flex min-w-0 flex-col">
@@ -124,7 +126,7 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
                   !diff.protected && diff.routing && "bg-warning/10",
                 )}
               >
-                <p className="select-all break-all font-bold">{diff.key}</p>
+                <p className="font-mono font-semibold break-all select-all">{diff.key}</p>
                 {diff.protected ? (
                   <p>Protected attribute: this value cannot be copied.</p>
                 ) : diff.routing ? (
@@ -132,11 +134,11 @@ export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandi
                 ) : null}
                 <dl className="flex min-w-0 flex-col gap-1">
                   <dt className="text-muted-foreground">Base value</dt>
-                  <dd className="min-w-0 select-all break-all">
+                  <dd className="min-w-0 break-all select-all">
                     {String(diff.baseValue ?? "not set")}
                   </dd>
                   <dt className="text-muted-foreground">Imported value</dt>
-                  <dd className="min-w-0 select-all break-all">{String(diff.patchValue)}</dd>
+                  <dd className="min-w-0 break-all select-all">{String(diff.patchValue)}</dd>
                 </dl>
               </div>
             ))}

@@ -1,11 +1,4 @@
-import {
-  ActionButton,
-  ButtonGroup,
-  CardAction,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@osmix/ui";
+import { ActionButton, ButtonGroup, CardAction, CardDescription, CardHeader } from "@osmix/ui";
 import { DownloadIcon, XIcon } from "lucide-react";
 
 /**
@@ -31,36 +24,33 @@ export function OsmInputCardHeader({
   const kindLabel = kind === "base" ? "Base" : "Patch";
 
   return (
-    <CardHeader className="items-start">
-      <div className="min-w-0 flex-1">
-        <CardTitle className="leading-tight">{title}</CardTitle>
-        {fileName ? (
-          <CardDescription
-            className="mt-1 truncate font-normal normal-case tracking-normal"
-            title={fileName}
-          >
-            {fileName}
-          </CardDescription>
+    <>
+      <CardHeader>
+        <span className="min-w-0 flex-1">{title}</span>
+        {loaded ? (
+          <CardAction>
+            <ButtonGroup aria-label={`${kindLabel} OSM file actions`}>
+              <ActionButton
+                icon={<DownloadIcon />}
+                title={`Download ${kind} OSM`}
+                onAction={onDownload}
+                variant="ghost"
+              />
+              <ActionButton
+                icon={<XIcon />}
+                title={`Clear ${kind} OSM file`}
+                onAction={onClear}
+                variant="ghost"
+              />
+            </ButtonGroup>
+          </CardAction>
         ) : null}
-      </div>
-      {loaded ? (
-        <CardAction>
-          <ButtonGroup aria-label={`${kindLabel} OSM file actions`}>
-            <ActionButton
-              icon={<DownloadIcon />}
-              title={`Download ${kind} OSM`}
-              onAction={onDownload}
-              variant="ghost"
-            />
-            <ActionButton
-              icon={<XIcon />}
-              title={`Clear ${kind} OSM file`}
-              onAction={onClear}
-              variant="ghost"
-            />
-          </ButtonGroup>
-        </CardAction>
+      </CardHeader>
+      {fileName ? (
+        <CardDescription className="truncate border-b px-2 py-1 font-mono" title={fileName}>
+          {fileName}
+        </CardDescription>
       ) : null}
-    </CardHeader>
+    </>
   );
 }

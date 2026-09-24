@@ -11,13 +11,16 @@ test("extracts a bounding box from a PBF and offers the result for download", as
   await expect(page.getByRole("link", { name: "Merge" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Inspect" })).toBeVisible();
 
+  // The shared place search is open by default, and Extract adds no second search box.
+  await expect(page.getByRole("button", { name: "Search", exact: true })).toHaveCount(1);
+
   // A small box in the middle of Monaco.
   await page.getByLabel("Paste bbox", { exact: false }).fill("7.415,43.73,7.425,43.74");
   await page.getByRole("button", { name: "Parse", exact: true }).click();
   await page.getByRole("radio", { name: "Simple" }).check();
 
   const chooserPromise = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Select PBF", exact: true }).click();
+  await page.getByRole("button", { name: "Open file", exact: true }).click();
   await (await chooserPromise).setFiles(MONACO_PBF);
 
   const extractButton = page.getByRole("button", { name: "Extract", exact: true });

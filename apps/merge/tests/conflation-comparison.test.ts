@@ -102,7 +102,7 @@ describe("matching map and coordinate evidence", () => {
     expect(html).toContain('aria-label="Imported feature coordinates"');
     expect(html.match(/<dt>Latitude<\/dt>/g)).toHaveLength(2);
     expect(html.match(/<dt>Longitude<\/dt>/g)).toHaveLength(2);
-    expect(html.match(/class="select-all break-all"/g)).toHaveLength(4);
+    expect(html.match(/class="font-mono break-all select-all"/g)).toHaveLength(4);
     expect(html).toContain("46.5000000°");
     expect(html).toContain("-120.5000000°");
   });

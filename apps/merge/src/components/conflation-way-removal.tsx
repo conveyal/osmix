@@ -3,10 +3,11 @@ import {
   Details,
   DetailsContent,
   DetailsSummary,
-  Button,
   Card,
   CardContent,
   CardHeader,
+  EmptyState,
+  Pager,
 } from "@osmix/ui";
 import type { OsmConflationOutcomeReport, OsmConflationWayRemovalPreview } from "osmix";
 import { useState } from "react";
@@ -27,10 +28,10 @@ export function WayRemovalDetails({
 }) {
   return (
     <section
-      className="flex min-w-0 flex-col gap-2 break-words"
+      className="flex min-w-0 flex-col gap-2 wrap-break-word"
       aria-label={`Removal details for imported way ${preview.sourceWayId}`}
     >
-      <p className="font-bold">
+      <p className="font-semibold">
         {applied ? "Removed" : "Remove"} imported way {preview.sourceWayId};{" "}
         {applied ? "retained" : "retain"} base way {preview.retainedWayId}.
       </p>
@@ -66,7 +67,7 @@ export function WayRemovalDetails({
                 <ActionButton
                   size="sm"
                   variant="outline"
-                  className="h-auto min-h-8 max-w-full whitespace-normal text-left"
+                  className="h-auto min-h-8 max-w-full text-left whitespace-normal"
                   onAction={() => onReviewConnection(connection.sourceNodeId)}
                 >
                   Review connection at imported point {connection.sourceNodeId}
@@ -76,7 +77,7 @@ export function WayRemovalDetails({
           ))}
         </ul>
       ) : (
-        <p>No retained imported branches depend on this way.</p>
+        <EmptyState className="p-0">No retained imported branches depend on this way</EmptyState>
       )}
       {preview.blockedNodeIds.length ? (
         <p className="text-destructive">
@@ -98,11 +99,14 @@ export function WayRemovalDetails({
         <DetailsSummary>Original attributes on the imported way</DetailsSummary>
         <DetailsContent className="flex flex-col gap-2 p-2">
           {Object.entries(preview.sourceTags).map(([key, value]) => (
-            <div key={key} className="min-w-0 break-words">
-              <span className="font-bold">{key}</span>: <span className="select-all">{value}</span>
+            <div key={key} className="min-w-0 wrap-break-word">
+              <span className="font-mono font-semibold">{key}</span>:{" "}
+              <span className="select-all">{value}</span>
             </div>
           ))}
-          {Object.keys(preview.sourceTags).length === 0 ? <p>No imported way attributes.</p> : null}
+          {Object.keys(preview.sourceTags).length === 0 ? (
+            <EmptyState className="p-0">No imported way attributes</EmptyState>
+          ) : null}
         </DetailsContent>
       </Details>
     </section>
@@ -147,31 +151,11 @@ export function ConflationWayRemovalPreview({
             ))}
           </ul>
         ) : (
-          <p>No imported way was selected for this removal action.</p>
+          <EmptyState className="p-0">
+            No imported way was selected for this removal action
+          </EmptyState>
         )}
-        {pages > 1 ? (
-          <nav className="flex items-center justify-between gap-2" aria-label="Way removal pages">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={page === 0}
-              onClick={() => setPage(page - 1)}
-            >
-              Previous
-            </Button>
-            <span>
-              Page {page + 1} of {pages}
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={page + 1 >= pages}
-              onClick={() => setPage(page + 1)}
-            >
-              Next
-            </Button>
-          </nav>
-        ) : null}
+        <Pager label="Way removal pages" page={page} pageCount={pages} onPageChange={setPage} />
       </CardContent>
     </Card>
   );

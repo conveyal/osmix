@@ -1,5 +1,5 @@
-import { Button, Input } from "@osmix/ui";
-import { Plus, Trash2 } from "lucide-react";
+import { Button, EmptyState, Input, SectionTitle } from "@osmix/ui";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import type { ExtractTagFilterRule, ExtractTagFilterRules } from "osmix";
 import { CONVEYAL_EXTRACT_TAG_FILTERS, normalizeTagFilterRules } from "osmix";
 
@@ -77,12 +77,12 @@ function TagFilterSection({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-semibold">{title}</h3>
-        <span className="text-muted-foreground text-right">
+        <SectionTitle>{title}</SectionTitle>
+        <span className="text-right text-muted-foreground">
           One rule: required. Multiple: match any.
         </span>
       </div>
-      {rows.length === 0 ? <p className="text-center">No rules (no tag filter).</p> : null}
+      {rows.length === 0 ? <EmptyState>No rules, so no tag filter</EmptyState> : null}
       <ul className="flex flex-col gap-1">
         {rows.map((row) => (
           <li key={row.id} className="flex items-center gap-1">
@@ -90,14 +90,14 @@ function TagFilterSection({
               value={row.key}
               onChange={(e) => updateRow(row.id, { key: e.target.value })}
               placeholder="key"
-              className="h-8 text-xs font-mono flex-1 min-w-0"
+              className="min-w-0 flex-1"
               aria-label={`${title} tag key`}
             />
             <Input
               value={row.value}
               onChange={(e) => updateRow(row.id, { value: e.target.value })}
               placeholder="any value"
-              className="h-8 text-xs font-mono flex-1 min-w-0"
+              className="min-w-0 flex-1"
               aria-label={`${title} tag value`}
             />
             <Button
@@ -107,7 +107,7 @@ function TagFilterSection({
               onClick={() => removeRow(row.id)}
               aria-label={`Remove ${title} rule`}
             >
-              <Trash2 className="size-3.5" />
+              <Trash2Icon aria-hidden="true" />
             </Button>
           </li>
         ))}
@@ -116,10 +116,10 @@ function TagFilterSection({
         type="button"
         variant="outline"
         size="sm"
-        className="w-full text-xs"
+        className="w-full"
         onClick={() => onChange([...rows, newRow()])}
       >
-        <Plus className="size-3.5" />
+        <PlusIcon aria-hidden="true" />
         Add rule
       </Button>
     </div>

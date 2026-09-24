@@ -1,4 +1,4 @@
-import { APPID } from "@osmix/app-components";
+import { APPID, useMapColors } from "@osmix/app-components";
 import type { FeatureCollection } from "geojson";
 import type { FillLayerSpecification, LineLayerSpecification } from "maplibre-gl";
 import type { GeoBbox2D } from "osmix";
@@ -33,18 +33,17 @@ function bboxToFeatureCollection(bbox: GeoBbox2D): FeatureCollection {
   };
 }
 
-const fillPaint: FillLayerSpecification["paint"] = {
-  "fill-color": "#3b82f6",
-  "fill-opacity": 0.12,
-};
-
-const linePaint: LineLayerSpecification["paint"] = {
-  "line-color": "#2563eb",
-  "line-width": 2,
-};
-
 export default function ExtractBboxLayer({ bbox }: { bbox: GeoBbox2D }) {
+  const colors = useMapColors();
   const data = bboxToFeatureCollection(bbox);
+  const fillPaint: FillLayerSpecification["paint"] = {
+    "fill-color": colors.bbox,
+    "fill-opacity": 0.12,
+  };
+  const linePaint: LineLayerSpecification["paint"] = {
+    "line-color": colors.bbox,
+    "line-width": 2,
+  };
   return (
     <Source id={SOURCE_ID} type="geojson" data={data}>
       <Layer id={FILL_LAYER_ID} type="fill" paint={fillPaint} />

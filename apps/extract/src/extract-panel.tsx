@@ -6,9 +6,20 @@ import {
   selectOsmEntityAtom,
   osmLoadingAbortControllerAtom,
 } from "@osmix/app-core";
-import { Button, Card, CardContent, CardHeader, Input, cn } from "@osmix/ui";
+import {
+  ActionButton,
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  InfoTooltip,
+  Input,
+  Radio,
+  RadioCard,
+  Step,
+} from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { Info, SaveIcon } from "lucide-react";
+import { DownloadIcon, SaveIcon } from "lucide-react";
 import type { ExtractStrategy } from "osmix";
 import { useEffect, useState } from "react";
 
@@ -42,30 +53,6 @@ const STRATEGY_OPTIONS: {
     hint: "Like complete ways, and resolves multipolygon relations completely.",
   },
 ];
-
-function StrategyInfoTooltip({ label, description }: { label: string; description: string }) {
-  return (
-    <span className="relative inline-flex shrink-0 group">
-      <button
-        type="button"
-        className="text-muted-foreground hover:text-foreground rounded-full p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label={`About ${label} extract strategy`}
-      >
-        <Info className="size-3.5" aria-hidden />
-      </button>
-      <span
-        role="tooltip"
-        className={cn(
-          "pointer-events-none absolute right-full top-1/2 z-100 mr-1.5 w-56 -translate-y-1/2 rounded-md border bg-popover px-2.5 py-1.5  font-normal text-popover-foreground shadow-md",
-          "opacity-0 invisible transition-opacity",
-          "group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible",
-        )}
-      >
-        {description}
-      </span>
-    </span>
-  );
-}
 
 export function ExtractPanel() {
   const extract = useOsmFile(OSM_KEY);
@@ -131,15 +118,14 @@ export function ExtractPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>1. Select bounding box</CardHeader>
+      <Step number={1} title="Select bounding box">
         <CardContent className="flex flex-col gap-2">
           <p className="text-muted-foreground">
             Search on the map (top right), or edit coordinates below. The rectangle updates on the
             map.
           </p>
           <div className="grid grid-cols-2 gap-2">
-            <label className=" flex flex-col gap-1" htmlFor="extract-bbox-min-lon">
+            <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lon">
               Min longitude
               <Input
                 id="extract-bbox-min-lon"
@@ -154,7 +140,7 @@ export function ExtractPanel() {
                 }}
               />
             </label>
-            <label className=" flex flex-col gap-1" htmlFor="extract-bbox-min-lat">
+            <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lat">
               Min latitude
               <Input
                 id="extract-bbox-min-lat"
@@ -169,7 +155,7 @@ export function ExtractPanel() {
                 }}
               />
             </label>
-            <label className=" flex flex-col gap-1" htmlFor="extract-bbox-max-lon">
+            <label className="flex flex-col gap-1" htmlFor="extract-bbox-max-lon">
               Max longitude
               <Input
                 id="extract-bbox-max-lon"
@@ -184,7 +170,7 @@ export function ExtractPanel() {
                 }}
               />
             </label>
-            <label className=" flex flex-col gap-1" htmlFor="extract-bbox-max-lat">
+            <label className="flex flex-col gap-1" htmlFor="extract-bbox-max-lat">
               Max latitude
               <Input
                 id="extract-bbox-max-lat"
@@ -201,9 +187,8 @@ export function ExtractPanel() {
             </label>
           </div>
           <div className="flex flex-col gap-2">
-            <label className=" text-muted-foreground" htmlFor="extract-bbox-paste">
-              Paste bbox{" "}
-              <code className="bg-muted px-1 rounded">min_lon,min_lat,max_lon,max_lat</code>
+            <label className="text-muted-foreground" htmlFor="extract-bbox-paste">
+              Paste bbox <code className="font-mono">min_lon,min_lat,max_lon,max_lat</code>
             </label>
             <div className="flex gap-2">
               <Input
@@ -211,7 +196,6 @@ export function ExtractPanel() {
                 value={bboxText}
                 onChange={(e) => setBboxText(e.target.value)}
                 placeholder="-122.5,47.2,-122.3,47.5"
-                className="font-mono"
               />
               <Button type="button" variant="outline" onClick={applyParsedBboxString}>
                 Parse
@@ -228,15 +212,15 @@ export function ExtractPanel() {
             Use current map view as bbox
           </Button>
           {!isValidBbox(bbox) ? (
-            <p className=" text-destructive mt-1">
-              Bbox must have min &lt; max for both lon and lat.
-            </p>
+            <Alert variant="destructive">
+              Invalid bbox: the minimum must be less than the maximum for both longitude and
+              latitude.
+            </Alert>
           ) : null}
         </CardContent>
-      </Card>
+      </Step>
 
-      <Card>
-        <CardHeader>2. Extract strategy</CardHeader>
+      <Step number={2} title="Extract strategy">
         <CardContent className="flex flex-col gap-2">
           <p className="text-muted-foreground">
             See the{" "}
@@ -244,36 +228,34 @@ export function ExtractPanel() {
               href="https://osmcode.org/osmium-tool/manual.html#creating-geographic-extracts"
               target="_blank"
               rel="noreferrer"
-              className="text-info"
             >
-              Osmium Tool Manual
+              Osmium Tool manual
             </a>{" "}
             for more information about each strategy. For usage with Conveyal, use "Complete ways".
           </p>
-          {STRATEGY_OPTIONS.map((opt) => {
-            const inputId = `extract-strategy-${opt.value}`;
-            return (
-              <div
-                key={opt.value}
-                className={cn(
-                  "flex items-center gap-2 rounded border p-2 ",
-                  strategy === opt.value && "border-primary",
-                )}
-              >
-                <input
-                  id={inputId}
-                  type="radio"
-                  name="extract-strategy"
-                  checked={strategy === opt.value}
-                  onChange={() => setStrategy(opt.value)}
-                />
-                <label htmlFor={inputId} className="font-medium flex-1 cursor-pointer">
-                  {opt.label}
-                </label>
-                <StrategyInfoTooltip label={opt.label} description={opt.hint} />
-              </div>
-            );
-          })}
+          <fieldset className="flex flex-col gap-2">
+            <legend className="sr-only">Extract strategy</legend>
+            {STRATEGY_OPTIONS.map((opt) => {
+              const labelId = `extract-strategy-${opt.value}-label`;
+              return (
+                <RadioCard key={opt.value}>
+                  {/* Name the radio by its label only, not the tooltip trigger's label. */}
+                  <Radio
+                    name="extract-strategy"
+                    aria-labelledby={labelId}
+                    checked={strategy === opt.value}
+                    onChange={() => setStrategy(opt.value)}
+                  />
+                  <span id={labelId} className="flex-1 font-medium">
+                    {opt.label}
+                  </span>
+                  <InfoTooltip label={`About the ${opt.label} extract strategy`} side="left">
+                    {opt.hint}
+                  </InfoTooltip>
+                </RadioCard>
+              );
+            })}
+          </fieldset>
           {strategy !== "simple" ? (
             <p className="text-muted-foreground">
               Complete ways and Smart require the Full node index, so this extract will load in Full
@@ -281,17 +263,15 @@ export function ExtractPanel() {
             </p>
           ) : null}
         </CardContent>
-      </Card>
+      </Step>
 
-      <Card>
-        <CardHeader>3. Tag filters</CardHeader>
+      <Step number={3} title="Tag filters">
         <CardContent>
           <ExtractTagFilterEditor state={tagFilterEditor} onChange={setTagFilterEditor} />
         </CardContent>
-      </Card>
+      </Step>
 
-      <Card>
-        <CardHeader>4. OSM PBF file</CardHeader>
+      <Step number={4} title="OSM PBF file">
         <CardContent className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <OsmPbfFileInput
@@ -305,7 +285,7 @@ export function ExtractPanel() {
               pbfOnly
               disabled={isExtracting}
             />
-            {pendingFile?.name}
+            {pendingFile ? <span className="truncate font-mono">{pendingFile.name}</span> : null}
           </div>
           {extract.loadFailure ? (
             <OsmLoadFailurePanel
@@ -314,46 +294,44 @@ export function ExtractPanel() {
             />
           ) : null}
         </CardContent>
-      </Card>
+      </Step>
 
       <Card>
         <CardContent className="flex flex-col gap-2">
-          <Button
+          <ActionButton
             type="button"
             size="lg"
             className="w-full"
             disabled={!canExtract}
-            onClick={() => void runExtract()}
+            onAction={runExtract}
           >
             Extract
-          </Button>
-          <Button
+          </ActionButton>
+          <ActionButton
             type="button"
             disabled={!extract.osm || isExtracting || !hasExtractResult}
             variant="outline"
             className="w-full"
-            onClick={() => void extract.downloadOsm()}
+            icon={<DownloadIcon aria-hidden="true" />}
+            onAction={() => extract.downloadOsm()}
           >
             Download extracted PBF
-          </Button>
+          </ActionButton>
           {hasExtractResult && !extract.isStored && extract.canStore ? (
-            <Button
+            <ActionButton
               type="button"
               disabled={isExtracting}
               variant="outline"
               className="w-full"
-              onClick={() => void extract.saveToStorage()}
+              icon={<SaveIcon aria-hidden="true" />}
+              onAction={() => extract.saveToStorage()}
             >
-              <SaveIcon className="size-4" aria-hidden />
               Save to storage
-            </Button>
+            </ActionButton>
           ) : null}
           <p className="text-muted-foreground">
             Each app keeps its own storage. To merge this extract, download it and open it in{" "}
-            <a href={appOrigin("merge")} className="text-info">
-              Merge
-            </a>
-            .
+            <a href={appOrigin("merge")}>Merge</a>.
           </p>
         </CardContent>
       </Card>

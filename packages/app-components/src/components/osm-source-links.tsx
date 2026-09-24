@@ -14,7 +14,7 @@ export function OsmSourceLinks({
   openOsmPbfUrl: (url: string) => Promise<OsmInfo | null>;
 }) {
   const useExample = useEffectEvent(async (): Promise<OsmInfo | null> => {
-    const task = Log.startTask("Opening Monaco.pbf example...");
+    const task = Log.startTask("Opening Monaco.pbf example…");
     try {
       const osmInfo = await openOsmPbfUrl(EXAMPLE_MONACO_PBF_URL);
       task.end("Example loaded");
@@ -28,9 +28,9 @@ export function OsmSourceLinks({
 
   return (
     <Card>
-      <CardContent className="flex flex-col gap-2 leading-relaxed p-4">
+      <CardContent className="flex flex-col gap-2">
         <p>Looking for OpenStreetMap PBF data? We recommend the following services:</p>
-        <ul className="list-disc list-inside space-y-1">
+        <ul className="flex list-inside list-disc flex-col gap-1">
           <li>
             <a
               href="https://slice.openstreetmap.us/#0/0/0"
@@ -51,10 +51,14 @@ export function OsmSourceLinks({
             >
               Geofabrik Extracts
             </a>
-            : Extracts for the world, continents, countries, regions--updated daily.
+            : Extracts for the world, continents, countries, regions, updated daily.
           </li>
         </ul>
-        <ActionButton className="w-full" icon={<FilesIcon />} onAction={useExample}>
+        <ActionButton
+          className="w-full"
+          icon={<FilesIcon aria-hidden="true" />}
+          onAction={useExample}
+        >
           Use example Monaco.pbf file
         </ActionButton>
       </CardContent>

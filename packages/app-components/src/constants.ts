@@ -14,4 +14,4 @@ export const BASE_MAP_STYLES = {
   "carto-voyager": "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
 } as const;
 
-export const DEFAULT_BASE_MAP_STYLE: keyof typeof BASE_MAP_STYLES = "carto-dark";
+export const DEFAULT_BASE_MAP_STYLE: keyof typeof BASE_MAP_STYLES = "carto-positron";

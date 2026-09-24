@@ -1,16 +1,19 @@
 import {
   ActionButton,
+  Alert,
   Details,
   DetailsContent,
   DetailsSummary,
-  Button,
   Card,
   CardContent,
   CardHeader,
+  EmptyState,
+  Pager,
+  Select,
 } from "@osmix/ui";
 import { DownloadIcon } from "lucide-react";
 import type { OsmConflationOutcomeReport } from "osmix";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import type { MergeCompletion } from "../state/merge-outcome";
 import { conflationReasonLabel } from "./conflation-review";
@@ -31,39 +34,11 @@ const TAG_REASON_LABELS = {
   superseded: "A later copy replaced this value",
 } as const;
 
-function OutcomePagination({
-  page,
-  pages,
-  onPage,
-  label,
-}: {
-  page: number;
-  pages: number;
-  onPage: (page: number) => void;
-  label: string;
-}) {
-  return (
-    <nav aria-label={label} className="flex items-center justify-between gap-2 p-2 border-t">
-      <Button size="sm" variant="outline" disabled={page <= 0} onClick={() => onPage(page - 1)}>
-        Previous
-      </Button>
-      <span>
-        Page {pages === 0 ? 0 : page + 1} of {pages}
-      </span>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={page + 1 >= pages}
-        onClick={() => onPage(page + 1)}
-      >
-        Next
-      </Button>
-    </nav>
-  );
-}
+type FeatureFilter = "unresolved" | "skipped" | "all";
 
 function FeatureOutcomes({ outcome }: { outcome: OsmConflationOutcomeReport }) {
-  const [filter, setFilter] = useState(
+  const filterId = useId();
+  const [filter, setFilter] = useState<FeatureFilter>(
     outcome.summary.unresolvedFeatures > 0 ? "unresolved" : "all",
   );
   const [requestedPage, setPage] = useState(0);
@@ -77,37 +52,41 @@ function FeatureOutcomes({ outcome }: { outcome: OsmConflationOutcomeReport }) {
     <Details defaultOpen={false}>
       <DetailsSummary>Imported feature outcomes</DetailsSummary>
       <DetailsContent>
-        <label className="flex flex-wrap items-center gap-2 p-2 border-t">
-          Show features
-          <select
-            className="min-w-0 border bg-background px-2 h-8"
+        <div className="flex flex-col gap-1 border-t p-2">
+          <label htmlFor={filterId}>Show features</label>
+          <Select
+            id={filterId}
+            items={[
+              {
+                value: "unresolved",
+                label: `Unresolved (${outcome.summary.unresolvedFeatures.toLocaleString()})`,
+              },
+              {
+                value: "skipped",
+                label: `Intentionally skipped (${outcome.summary.skippedFeatures.toLocaleString()})`,
+              },
+              {
+                value: "all",
+                label: `All considered (${outcome.summary.features.toLocaleString()})`,
+              },
+            ]}
             value={filter}
-            onChange={(event) => {
-              setFilter(event.target.value);
+            onValueChange={(next) => {
+              setFilter(next);
               setPage(0);
             }}
-          >
-            <option value="unresolved">
-              Unresolved ({outcome.summary.unresolvedFeatures.toLocaleString()})
-            </option>
-            <option value="skipped">
-              Intentionally skipped ({outcome.summary.skippedFeatures.toLocaleString()})
-            </option>
-            <option value="all">
-              All considered ({outcome.summary.features.toLocaleString()})
-            </option>
-          </select>
-        </label>
+          />
+        </div>
         {features.length === 0 ? (
-          <p className="p-2">No imported features in this category.</p>
+          <EmptyState>No imported features in this category</EmptyState>
         ) : (
           <ul className="divide-y border-t" aria-label="Imported feature outcome details">
             {features.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((feature) => (
               <li
                 key={`${feature.entityType}:${feature.sourceId}`}
-                className="flex flex-col gap-1 p-2 break-words"
+                className="flex flex-col gap-1 p-2 wrap-break-word"
               >
-                <p className="font-bold">
+                <p className="font-semibold">
                   Imported {feature.entityType} {feature.sourceId}
                   {feature.targetId === null
                     ? " · no single base target"
@@ -143,11 +122,12 @@ function FeatureOutcomes({ outcome }: { outcome: OsmConflationOutcomeReport }) {
             ))}
           </ul>
         )}
-        <OutcomePagination
-          page={page}
-          pages={pages}
-          onPage={setPage}
+        <Pager
+          className="border-t p-2"
           label="Imported feature outcome pages"
+          page={page}
+          pageCount={pages}
+          onPageChange={setPage}
         />
       </DetailsContent>
     </Details>
@@ -155,6 +135,7 @@ function FeatureOutcomes({ outcome }: { outcome: OsmConflationOutcomeReport }) {
 }
 
 function UncopiedTags({ outcome }: { outcome: OsmConflationOutcomeReport }) {
+  const tagSelectId = useId();
   const [key, setKey] = useState(
     outcome.tags.find((tag) => tag.uncopied.length > 0)?.key ?? outcome.tags[0]?.key ?? "",
   );
@@ -171,26 +152,22 @@ function UncopiedTags({ outcome }: { outcome: OsmConflationOutcomeReport }) {
           Counts include imported features with a value for the selected tag. Values not copied to a
           base target can still be present on ordinary imported additions.
         </p>
-        <label className="flex flex-wrap items-center gap-2 p-2 border-t">
-          Selected tag
-          <select
-            className="min-w-0 max-w-full border bg-background px-2 h-8"
+        <div className="flex flex-col gap-1 border-t p-2">
+          <label htmlFor={tagSelectId}>Selected tag</label>
+          <Select
+            id={tagSelectId}
+            className="font-mono"
+            items={outcome.tags.map((tag) => ({ value: tag.key, label: tag.key }))}
             value={key}
-            onChange={(event) => {
-              setKey(event.target.value);
+            onValueChange={(next) => {
+              setKey(next);
               setPage(0);
             }}
-          >
-            {outcome.tags.map((tag) => (
-              <option key={tag.key} value={tag.key}>
-                {tag.key}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+        </div>
         {tag ? (
           <>
-            <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 p-2 border-t">
+            <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 border-t p-2">
               <dt>Imported features with this tag</dt>
               <dd>{tag.presentFeatures.toLocaleString()}</dd>
               <dt>Copied to a base target</dt>
@@ -206,9 +183,9 @@ function UncopiedTags({ outcome }: { outcome: OsmConflationOutcomeReport }) {
               {tag.uncopied.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((feature) => (
                 <li
                   key={`${feature.entityType}:${feature.sourceId}`}
-                  className="flex flex-col gap-1 p-2 break-words"
+                  className="flex flex-col gap-1 p-2 wrap-break-word"
                 >
-                  <p className="font-bold">
+                  <p className="font-semibold">
                     Imported {feature.entityType} {feature.sourceId}
                   </p>
                   <p>{TAG_REASON_LABELS[feature.reason]}</p>
@@ -221,13 +198,14 @@ function UncopiedTags({ outcome }: { outcome: OsmConflationOutcomeReport }) {
               ))}
             </ul>
             {tag.uncopied.length === 0 ? (
-              <p className="p-2">Every present value is satisfied in the result.</p>
+              <EmptyState>Every present value is satisfied in the result</EmptyState>
             ) : null}
-            <OutcomePagination
-              page={page}
-              pages={pages}
-              onPage={setPage}
+            <Pager
+              className="border-t p-2"
               label="Selected tag detail pages"
+              page={page}
+              pageCount={pages}
+              onPageChange={setPage}
             />
           </>
         ) : null}
@@ -288,8 +266,8 @@ export function MergeCompletionSummary({
                     <dd>{(summary.removedOrphanNodes ?? 0).toLocaleString()}</dd>
                   </>
                 ) : null}
-                <dt className="font-bold">Imported features unresolved</dt>
-                <dd className="font-bold">{summary.unresolvedFeatures.toLocaleString()}</dd>
+                <dt className="font-semibold">Imported features unresolved</dt>
+                <dd className="font-semibold">{summary.unresolvedFeatures.toLocaleString()}</dd>
               </dl>
               <p>
                 Imported features considered for matching: {summary.features.toLocaleString()}.{" "}
@@ -345,12 +323,12 @@ export function MergeCompletionSummary({
             ) : null}
           </>
         ) : null}
-        <div className="flex flex-col gap-2 p-2 border-t">
+        <div className="flex flex-col gap-2 border-t p-2">
           <ActionButton icon={<DownloadIcon />} variant="outline" onAction={downloadReport}>
             Download merge report
           </ActionButton>
-          {downloadError ? <p role="alert">{downloadError}</p> : null}
-          <p className="text-muted-foreground break-words">
+          {downloadError ? <Alert variant="destructive">{downloadError}</Alert> : null}
+          <p className="wrap-break-word text-muted-foreground">
             Inputs: {completion.inputs.baseName} + {completion.inputs.patchName}.
           </p>
           <p>

@@ -1,18 +1,22 @@
 import { searchControlIsOpenAtom } from "@osmix/app-core";
 import {
+  Alert,
+  Button,
+  EmptyState,
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-  cn,
   Spinner,
 } from "@osmix/ui";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { SearchIcon } from "lucide-react";
 import { useState, useTransition } from "react";
 import type { MapInstance } from "react-map-gl/maplibre";
 
+import { nominatimPlaceAtom } from "../state/nominatim.ts";
 import CustomControl from "./custom-control.tsx";
+import { MapPanelHeader } from "./map-panel-header.tsx";
 
 export type NominatimResult = {
   addresstype: string;
@@ -29,11 +33,21 @@ const NOMINATIM_ENDPOINT = "https://nominatim.openstreetmap.org/search";
 
 export default function NominatimSearchControl() {
   const isOpen = useAtomValue(searchControlIsOpenAtom);
-  if (!isOpen) return false;
+  if (!isOpen) return null;
   return (
     <CustomControl position="top-right">
-      <NominatimSearch />
+      <NominatimSearchPanel />
     </CustomControl>
+  );
+}
+
+/** `CustomControl` passes `map` to its child element. */
+function NominatimSearchPanel({ map }: { map?: MapInstance }) {
+  return (
+    <>
+      <MapPanelHeader icon={<SearchIcon aria-hidden="true" />} title="Search places" />
+      <NominatimSearch map={map} />
+    </>
   );
 }
 
@@ -42,17 +56,23 @@ export function NominatimSearch({
   onPlaceResolved,
 }: {
   map?: MapInstance;
-  /** Called after the map is focused on the chosen result (bbox or center). */
+  /**
+   * Called after the map is focused on the chosen result (bbox or center). The result is also
+   * published to `nominatimPlaceAtom`.
+   */
   onPlaceResolved?: (result: NominatimResult) => void;
 }) {
+  const setPlace = useSetAtom(nominatimPlaceAtom);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [searched, setSearched] = useState(false);
   const [isTransitioning, startTransition] = useTransition();
 
   const search = (value: string) => {
     setError(null);
     setResults([]);
+    setSearched(false);
     const trimmed = value.trim();
     if (!trimmed) return;
     startTransition(async () => {
@@ -75,19 +95,29 @@ export function NominatimSearch({
 
         const data = (await response.json()) as NominatimResult[];
         setResults(Array.isArray(data) ? data : []);
+        setSearched(true);
       } catch (err) {
         console.error(err);
-        setError("Unable to load results");
+        setError("Place search failed. Check your connection and try again.");
         setResults([]);
       }
     });
   };
 
+  const resolvePlace = (result: NominatimResult) => {
+    setPlace(result);
+    onPlaceResolved?.(result);
+  };
+
   const handleSelect = (result: NominatimResult) => {
     setQuery(result.display_name);
     setResults([]);
+    setSearched(false);
 
-    if (!map) return;
+    if (!map) {
+      resolvePlace(result);
+      return;
+    }
 
     const bbox = result.boundingbox?.map(Number);
     if (bbox && bbox.length === 4 && bbox.every(Number.isFinite)) {
@@ -100,7 +130,7 @@ export function NominatimSearch({
         ],
         { padding: 100, maxDuration: 100 },
       );
-      onPlaceResolved?.(result);
+      resolvePlace(result);
       return;
     }
 
@@ -115,12 +145,13 @@ export function NominatimSearch({
         maxDuration: 100,
       });
     }
-    onPlaceResolved?.(result);
+    resolvePlace(result);
   };
 
   return (
-    <>
+    <div className="flex flex-col">
       <form
+        className="p-2"
         onSubmit={(e) => {
           e.preventDefault();
           search(query);
@@ -142,41 +173,45 @@ export function NominatimSearch({
               type="submit"
               size="icon-sm"
               title="Search"
+              aria-label="Search"
               variant="ghost"
               disabled={isTransitioning}
             >
-              {isTransitioning ? <Spinner /> : <SearchIcon className="size-4" />}
+              {isTransitioning ? <Spinner /> : <SearchIcon aria-hidden="true" />}
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
       </form>
 
       {error ? (
-        <div className="px-3 py-2 text-destructive">{error}</div>
+        <Alert variant="destructive" className="mx-2 mb-2">
+          {error}
+        </Alert>
       ) : isTransitioning ? (
-        <div className="px-3 py-2 text-muted-foreground">Searching...</div>
+        <div className="flex items-center gap-2 px-2 pb-2 text-muted-foreground">
+          <Spinner />
+          Searching…
+        </div>
+      ) : searched && results.length === 0 ? (
+        <EmptyState className="pt-0">No places found</EmptyState>
       ) : null}
 
       {results.length > 0 && (
-        <div className="max-h-60 overflow-y-auto rounded">
-          <ul className="divide-y">
-            {results.map((result) => (
-              <li key={result.place_id}>
-                <button
-                  type="button"
-                  className={cn(
-                    "w-full px-3 py-2 text-left cursor-pointer",
-                    "hover:bg-accent hover:text-accent-foreground",
-                  )}
-                  onClick={() => handleSelect(result)}
-                >
-                  <div className="font-bold leading-4">{result.display_name}</div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ul className="flex max-h-60 flex-col overflow-y-auto border-t p-1">
+          {results.map((result) => (
+            <li key={result.place_id}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-auto w-full justify-start py-1.5 text-left whitespace-normal"
+                onClick={() => handleSelect(result)}
+              >
+                {result.display_name}
+              </Button>
+            </li>
+          ))}
+        </ul>
       )}
-    </>
+    </div>
   );
 }

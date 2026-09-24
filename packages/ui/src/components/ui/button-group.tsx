@@ -1,11 +1,10 @@
-import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "../../lib/utils.ts";
 import { Separator } from "./separator.tsx";
 
 const buttonGroupVariants = cva(
-  "flex w-fit items-stretch [&>*]:focus-visible:z-10 [&>*]:focus-visible:relative [&>[data-slot=select-trigger]:not([class*='w-'])]:w-fit [&>input]:flex-1 has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-r-md has-[>[data-slot=button-group]]:gap-2",
+  "flex w-fit items-stretch has-[>[data-slot=button-group]]:gap-2 [&>*]:focus-visible:relative [&>*]:focus-visible:z-10 has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-r-md [&>[data-slot=select-trigger]:not([class*='w-'])]:w-fit [&>input]:flex-1",
   {
     variants: {
       orientation: {
@@ -36,25 +35,6 @@ function ButtonGroup({
   );
 }
 
-function ButtonGroupText({
-  className,
-  render,
-  ...props
-}: React.ComponentProps<"div"> & {
-  render?: React.ReactElement;
-}) {
-  return useRender({
-    render: render ?? <div />,
-    props: {
-      className: cn(
-        "bg-muted flex items-center gap-2 rounded-md border px-4 font-medium shadow-xs [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
-        className,
-      ),
-      ...props,
-    },
-  });
-}
-
 function ButtonGroupSeparator({
   className,
   orientation = "vertical",
@@ -65,7 +45,7 @@ function ButtonGroupSeparator({
       data-slot="button-group-separator"
       orientation={orientation}
       className={cn(
-        "bg-input relative !m-0 self-stretch data-[orientation=vertical]:h-auto",
+        "relative !m-0 self-stretch bg-input data-[orientation=vertical]:h-auto",
         className,
       )}
       {...props}
@@ -73,4 +53,4 @@ function ButtonGroupSeparator({
   );
 }
 
-export { ButtonGroup, ButtonGroupSeparator, ButtonGroupText, buttonGroupVariants };
+export { ButtonGroup, ButtonGroupSeparator, buttonGroupVariants };

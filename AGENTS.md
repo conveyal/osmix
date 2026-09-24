@@ -51,7 +51,7 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 ## Key Paths
 
 - UI: `apps/merge` (React 19 + Vite), `apps/inspect` (single-dataset viewer) and `apps/extract` (bbox extracts), each on its own origin and linked via `AppLinks`; app worker at `packages/app-core/src/workers/osmix-app.worker.ts`, created per app with `createOsmixAppRemote()` and shared through `remoteAtom`.
-- Shared UI conventions: `packages/ui/DESIGN.md` — read before UI changes; merge-specific rules in `apps/merge/DESIGN.md`.
+- Shared UI conventions: `packages/ui/DESIGN.md` — read before UI changes; merge-specific rules in `apps/merge/DESIGN.md`. The theme is closed (only tokens produce CSS) and lint enforces call-site styling: use the primitives it lists (`Step`, `Alert`, `Select`, `Radio`, `Pager`, `AppSidebar`, `MapPanelHeader`, `useMapColors`) instead of styling at call sites.
 - Worker API: `packages/osmix/src/worker.ts`, `packages/osmix/src/remote.ts`.
 - Fixtures: `fixtures/` at repo root; loaded via `@osmix/test-utils/fixtures`.
 
@@ -72,7 +72,7 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 
 - `Nodes.addDenseNodes` only accepts dense encodings; malformed blocks fail fast.
 - Call `buildIndexes()` after changes before spatial queries.
-- MapLibre raster URLs: `<osmId>/<tileSize>/<z>/<x>/<y>.png`.
+- MapLibre raster URLs: `<osmId>/<tileSize>/<z>/<x>/<y>.png`, with an optional `?role=base|patch` that picks the dataset's `--map-*` color.
 - Use throttled logging when streaming worker progress.
 - `@osmix/pbf` must stay dependency-free at runtime (helpers inlined; test helpers in `test/helpers`).
 

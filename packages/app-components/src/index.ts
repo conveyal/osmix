@@ -1,9 +1,10 @@
 export { AppLinks } from "./components/app-links.tsx";
-export { OsmixAppShell } from "./components/app-shell.tsx";
+export { OsmixAppShell, OsmixNav } from "./components/app-shell.tsx";
 export { default as Basemap, type MapInitialViewState } from "./components/basemap.tsx";
 export { default as BrowserCheck } from "./components/browser-check.tsx";
 export { default as CenterInfo } from "./components/center-info.tsx";
 export { default as CustomControl } from "./components/custom-control.tsx";
+export { MapPanelHeader } from "./components/map-panel-header.tsx";
 export {
   default as EntityDetails,
   EntityContent,
@@ -51,7 +52,10 @@ export {
 export { OsmSourceLinks } from "./components/osm-source-links.tsx";
 export { OsmixMapSources } from "./components/osmix-map-sources.tsx";
 export { default as OsmixRasterSource } from "./components/osmix-raster-source.tsx";
-export { default as OsmixVectorOverlay } from "./components/osmix-vector-overlay.tsx";
+export {
+  default as OsmixVectorOverlay,
+  type OsmixOverlayRole,
+} from "./components/osmix-vector-overlay.tsx";
 export { default as RouteMapControl, Routing } from "./components/route-control.tsx";
 export { default as RouteLayer } from "./components/route-layer.tsx";
 export { default as SelectedEntityLayer } from "./components/selected-entity-layer.tsx";
@@ -70,6 +74,12 @@ export {
   VECTOR_PROTOCOL_NAME,
 } from "./constants.ts";
 export { useFlyToEntity, useFlyToOsmBounds, useMap } from "./hooks/map.ts";
+export {
+  type MapColorRole,
+  type MapColors,
+  readMapColors,
+  useMapColors,
+} from "./hooks/map-colors.ts";
 export { appOrigin, OSMIX_APPS, type OsmixAppId } from "./lib/app-origin.ts";
 export { getOsmixEntityByStringId } from "./lib/entity-id.ts";
 export { installMaplibreWorker } from "./lib/maplibre-worker.ts";
@@ -78,6 +88,7 @@ export {
   addOsmixRasterProtocol,
   osmixIdToTileUrl as osmixIdToRasterTileUrl,
   RASTER_URL_PATTERN,
+  type RasterColorRole,
   rasterTileToImageBuffer,
   removeOsmixRasterProtocol,
 } from "./lib/osmix-raster-protocol.ts";
@@ -86,6 +97,7 @@ export {
   osmixIdToTileUrl as osmixIdToVectorTileUrl,
   removeOsmixVectorProtocol,
 } from "./lib/osmix-vector-protocol.ts";
+export { nominatimPlaceAtom } from "./state/nominatim.ts";
 export {
   type RoutingState,
   routingGeoJsonAtom,

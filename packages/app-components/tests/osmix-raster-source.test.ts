@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { OsmixMapSources } from "../src/components/osmix-map-sources.tsx";
 import OsmixRasterSource from "../src/components/osmix-raster-source.tsx";
+import { osmixIdToTileUrl, RASTER_URL_PATTERN } from "../src/lib/osmix-raster-protocol.ts";
 
 function childKeys(element: ReturnType<typeof OsmixMapSources>) {
   return (element.props.children as React.ReactElement[]).filter(Boolean).map((child) => child.key);
@@ -38,5 +39,33 @@ describe("Osmix map sources", () => {
       "base:raster:yakima-merged",
       "base:overlay:yakima-merged",
     ]);
+  });
+
+  it("draws the patch dataset in the patch color", () => {
+    const sources = OsmixMapSources({
+      baseOsm: new Osm({ id: "yakima-base" }),
+      patchOsm: new Osm({ id: "yakima-osw" }),
+    });
+    const roles = (sources.props.children as React.ReactElement<{ role?: string }>[])
+      .filter(Boolean)
+      .map((child) => child.props.role ?? "base");
+    expect(roles).toEqual(["base", "patch", "base", "patch"]);
+  });
+
+  it("encodes the color role in raster tile URLs", () => {
+    const url = osmixIdToTileUrl("a/b", 512, "patch")
+      .replace("{z}", "3")
+      .replace("{x}", "4")
+      .replace("{y}", "5");
+    expect(RASTER_URL_PATTERN.exec(url)?.slice(1)).toEqual([
+      "a%2Fb",
+      "512",
+      "3",
+      "4",
+      "5",
+      "patch",
+    ]);
+    const legacy = "@osmix/raster://base/256/1/2/3.png";
+    expect(RASTER_URL_PATTERN.exec(legacy)?.[6]).toBeUndefined();
   });
 });

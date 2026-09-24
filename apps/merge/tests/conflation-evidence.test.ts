@@ -102,9 +102,9 @@ describe("matching evidence for imported features", () => {
     ];
 
     const html = render(value);
-    const conflicts = html.match(
-      /<section[^>]*aria-label="Feature type conflict"[^>]*>([\s\S]*?)<\/section>/,
-    )?.[1];
+    const conflicts = html
+      .split('aria-label="Feature type conflict"')[1]
+      ?.split('aria-label="Attribute differences"')[0];
     expect(conflicts).toBeDefined();
     expect(conflicts).toContain("These classifications block matching actions");
     expect(conflicts).toContain("even when they are not selected for copying");

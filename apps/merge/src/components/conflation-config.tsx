@@ -12,9 +12,6 @@ import { useAtom, useSetAtom } from "jotai";
 import { conflationFormErrors } from "../lib/conflation-workflow";
 import { conflationFormAtom, resetConflationReviewAtom } from "../state/conflation";
 
-const CONTROL_FOCUS =
-  "focus-visible:ring-2 focus-visible:ring-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-background forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[CanvasText]";
-
 export function ConflationConfig() {
   const [form, setForm] = useAtom(conflationFormAtom);
   const resetReview = useSetAtom(resetConflationReviewAtom);
@@ -31,7 +28,6 @@ export function ConflationConfig() {
         <div className="flex items-center gap-1">
           <CheckboxLabel className="min-h-8">
             <Checkbox
-              className={CONTROL_FOCUS}
               checked={form.enabled}
               id="conflation-enabled"
               aria-describedby="conflation-enabled-help"
@@ -60,7 +56,6 @@ export function ConflationConfig() {
             <div className="flex items-center gap-1">
               <CheckboxLabel className="min-h-8">
                 <Checkbox
-                  className={CONTROL_FOCUS}
                   checked={form.transferProperties}
                   id="conflation-property-transfer"
                   aria-describedby={`conflation-copy-help${errors.actions ? " conflation-actions-error" : ""}`}
@@ -95,7 +90,6 @@ export function ConflationConfig() {
                 </InfoTooltip>
               </div>
               <Input
-                className={CONTROL_FOCUS}
                 id="conflation-property-keys"
                 name="matching-tag-keys"
                 spellCheck={false}
@@ -124,7 +118,6 @@ export function ConflationConfig() {
             <div className="flex items-center gap-1">
               <CheckboxLabel className="min-h-8">
                 <Checkbox
-                  className={CONTROL_FOCUS}
                   checked={form.attachNetwork}
                   id="conflation-network-attachment"
                   aria-describedby={`conflation-network-help${errors.actions ? " conflation-actions-error" : ""}`}
@@ -148,7 +141,6 @@ export function ConflationConfig() {
             </p>
             <CheckboxLabel className="min-h-8">
               <Checkbox
-                className={CONTROL_FOCUS}
                 checked={form.allowWayRemoval}
                 id="conflation-way-removal"
                 aria-describedby={`conflation-removal-help${errors.actions ? " conflation-actions-error" : ""}`}
@@ -180,7 +172,6 @@ export function ConflationConfig() {
                 </InfoTooltip>
               </div>
               <Input
-                className={CONTROL_FOCUS}
                 id="conflation-distance"
                 name="matching-search-radius"
                 aria-describedby={`conflation-distance-help${errors.maxDistanceMeters ? " conflation-distance-error" : ""}`}

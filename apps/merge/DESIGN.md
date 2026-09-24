@@ -10,8 +10,10 @@ tokens, spacing, primitives, map-control CSS) lives in
   numbered merge stage.
 - `StepActions` — the full-width vertical action footer for Merge workflow
   stages. It keeps long decision labels contained in the narrow sidebar.
-- `AutomaticMergeProgress` — indeterminate bar + latest log message + elapsed
-  timer for long worker tasks.
+- `AutomaticMergeProgress` — a `Card` listing the automatic workflow's stages
+  (completed, running, remaining) with the latest log message and an elapsed
+  timer. The stage list is the progress indicator; it deliberately renders no
+  `progressbar`, because worker progress has no numeric percentage.
 
 ### Merge step actions
 
@@ -33,8 +35,11 @@ Every merge stage must explain itself where the user makes the decision. Keep
 the explanation layered so that experienced users can scan the workflow while
 new users can inspect the consequences before applying anything:
 
-1. Show one plain-language summary at the top of the numbered step card, before
-   controls or results.
+1. Open each stage with the shared `Step` card from `@osmix/ui`. Pass the
+   computed stage number as `number` (it renders "1." in brand mono before the
+   title); omit it for the automatic workflow, whose title stays "Automatic
+   workflow: …". Show one plain-language summary at the top of the step card,
+   before controls or results.
 2. Follow it with a collapsed **How this step works** disclosure using
    `MergeStepGuide`. Do not duplicate these disclosures at individual call
    sites; add or revise the app-private guide registry instead.
@@ -167,9 +172,12 @@ replication, recovery, and disposal coverage.
 ## Loading, progress & status
 
 - Quick/inline waits: `Spinner`.
-- Suspense fallbacks: `LoadingState`.
-- Long worker tasks (merges, extracts): `TaskProgress`. Worker progress
-  (`@osmix/shared` `Progress`) is `{ msg, timestamp, level }` — there is no
-  numeric percentage yet, so the bar is indeterminate. If `Progress` gains a
-  `percent` field, thread it into `TaskProgress` and pass a real `value`.
-- Status indication: `StatusDot`, never raw `bg-green-500`/`bg-red-500`.
+- Suspense fallbacks and transitions: `LoadingState` ("Please wait…").
+- The automatic workflow: `AutomaticMergeProgress`. Worker progress
+  (`@osmix/shared` `Progress`) is `{ msg, timestamp, level }` with no numeric
+  percentage, so the stage list carries progress. If `Progress` gains a
+  `percent` field, add a determinate `Progress` bar with a real `value`.
+- Status indication: `StatusDot`, never raw palette colors.
+- Merge notices, recovery prompts and failures use `Alert` (`destructive` for
+  failures that need action; `warning` for irreversible choices such as way
+  removal).

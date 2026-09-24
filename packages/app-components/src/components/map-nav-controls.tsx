@@ -5,7 +5,7 @@ import {
   searchControlIsOpenAtom,
 } from "@osmix/app-core";
 import { ButtonGroupSeparator, ToggleButton } from "@osmix/ui";
-import { FilesIcon, Layers, Navigation, SearchIcon } from "lucide-react";
+import { FilesIcon, LayersIcon, NavigationIcon, SearchIcon } from "lucide-react";
 
 import CenterInfo from "./center-info.tsx";
 import ZoomInfo, { ZoomInButton, ZoomOutButton } from "./zoom-info.tsx";
@@ -18,25 +18,29 @@ export function MapNavControls() {
   return (
     <>
       <ToggleButton atom={routingControlIsOpenAtom}>
-        <Navigation />
+        <NavigationIcon aria-hidden="true" />
+        <span className="sr-only">Routing panel</span>
       </ToggleButton>
       <ToggleButton atom={layerControlIsOpenAtom}>
-        <Layers />
+        <LayersIcon aria-hidden="true" />
+        <span className="sr-only">Layers panel</span>
       </ToggleButton>
       <ToggleButton atom={searchControlIsOpenAtom}>
-        <SearchIcon />
+        <SearchIcon aria-hidden="true" />
+        <span className="sr-only">Place search panel</span>
       </ToggleButton>
       <ToggleButton atom={osmFileControlIsOpenAtom}>
-        <FilesIcon />
+        <FilesIcon aria-hidden="true" />
+        <span className="sr-only">Files panel</span>
       </ToggleButton>
       <ButtonGroupSeparator />
-      <div className="whitespace-nowrap px-2">
+      <div className="px-2 font-mono whitespace-nowrap tabular-nums">
         <CenterInfo />
       </div>
       <ButtonGroupSeparator />
       <div className="flex items-center gap-1">
         <ZoomOutButton />
-        <div>
+        <div className="font-mono tabular-nums">
           z<ZoomInfo />
         </div>
         <ZoomInButton />

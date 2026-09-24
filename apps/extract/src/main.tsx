@@ -3,7 +3,6 @@ import type { OsmixAppRemote } from "@osmix/app-core";
 import { createRoot } from "react-dom/client";
 
 import { ExtractApp } from "./app";
-import { ExtractNav } from "./nav";
 
 declare global {
   interface Window {
@@ -19,7 +18,7 @@ async function bootstrap() {
   window.osmWorker = remote;
 
   createRoot(rootEl).render(
-    <OsmixAppShell store={store} nav={<ExtractNav />}>
+    <OsmixAppShell app="extract" store={store}>
       <ExtractApp />
     </OsmixAppShell>,
   );

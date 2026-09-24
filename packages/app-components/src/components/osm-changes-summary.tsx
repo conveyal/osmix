@@ -15,13 +15,14 @@ import {
   Button,
   Checkbox,
   CheckboxLabel,
+  Pager,
+  SectionTitle,
   Table,
   TableBody,
   TableCell,
   TableRow,
 } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { OsmChange } from "osmix";
 import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from "osmix";
 import { getEntityType, isNode, isRelation, isWay } from "osmix";
@@ -133,9 +134,11 @@ export function ChangesFilters() {
   const [entityTypeFilter, setEntityTypeFilter] = useAtom(entityTypeFilterAtom);
 
   return (
-    <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 px-2 py-2">
+    <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 p-2">
       <fieldset className="flex flex-wrap items-center gap-2">
-        <legend className="font-bold">Change type</legend>
+        <legend>
+          <SectionTitle>Change type</SectionTitle>
+        </legend>
         {(["create", "modify", "delete"] as const).map((value) => (
           <FilterCheckbox
             key={value}
@@ -146,7 +149,9 @@ export function ChangesFilters() {
         ))}
       </fieldset>
       <fieldset className="flex flex-wrap items-center gap-2">
-        <legend className="font-bold">Entity type</legend>
+        <legend>
+          <SectionTitle>Entity type</SectionTitle>
+        </legend>
         {(["node", "way", "relation"] as const).map((value) => (
           <FilterCheckbox
             key={value}
@@ -180,19 +185,19 @@ export function ChangesList({
         const changeTypeColor = CHANGE_TYPE_COLOR[changeType];
         const entityType = getEntityType(entity);
         return (
-          <button
+          <Button
             key={`${entityType}-${entity.id}`}
+            variant="ghost"
+            size="sm"
             className={cn(
-              "pl-2 py-1 font-bold cursor-pointer w-full text-left select-text hover:bg-accent",
+              "h-auto w-full justify-start py-1 text-left font-mono font-semibold whitespace-normal select-text",
               changeTypeColor,
             )}
             onClick={() => setSelectedEntity(entity)}
-            type="button"
-            tabIndex={0}
           >
-            {startIndex + i + 1}. {changeType.toUpperCase()} {entityType.toUpperCase()} {entity.id}{" "}
-            {refs && `(${refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")})`}
-          </button>
+            {startIndex + i + 1}. {changeType} {entityType} {entity.id}
+            {refs && ` (${refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")})`}
+          </Button>
         );
       })}
     </div>
@@ -775,7 +780,7 @@ function AugmentedDiffContent({ change }: { change: OsmChange }) {
   return (
     <>
       {refs && (
-        <div className="p-2 border-b">
+        <div className="border-b p-2">
           Related: {refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")}
         </div>
       )}
@@ -802,12 +807,12 @@ export function ChangesExpandableList() {
         const { changeType, entity } = change;
         const changeTypeColor = CHANGE_TYPE_COLOR[changeType];
         const entityType = getEntityType(entity);
-        const summaryLabel = `${startIndex + i + 1}. ${changeType.toUpperCase()} ${entityType.toUpperCase()} ${entity.id}`;
+        const summaryLabel = `${startIndex + i + 1}. ${changeType} ${entityType} ${entity.id}`;
         return (
           <Details key={`${entityType}-${entity.id}`} defaultOpen={false}>
             <DetailsSummary className={cn(changeTypeColor)}>{summaryLabel}</DetailsSummary>
 
-            <DetailsContent className="w-full overflow-scroll inset-shadow">
+            <DetailsContent className="w-full overflow-x-auto">
               <AugmentedDiffContent change={change} />
             </DetailsContent>
           </Details>
@@ -820,37 +825,15 @@ export function ChangesExpandableList() {
 export function ChangesPagination() {
   const [currentPage, setCurrentPage] = useAtom(pageAtom);
   const totalPages = useAtomValue(changesAtom)?.totalPages ?? 0;
-  const [, startTransition] = useTransition();
-  const goToNextPage = () => {
-    startTransition(() => {
-      if (currentPage < totalPages - 1) {
-        setCurrentPage(currentPage + 1);
-      }
-    });
-  };
-  const goToPrevPage = () => {
-    startTransition(() => {
-      if (currentPage > 0) {
-        setCurrentPage(currentPage - 1);
-      }
-    });
-  };
+  const [isPending, startTransition] = useTransition();
   return (
-    <div className="flex items-center justify-between">
-      <Button variant="ghost" size="icon-sm" onClick={goToPrevPage} disabled={currentPage <= 0}>
-        <ArrowLeft />
-      </Button>
-      <span className="text-muted-foreground">
-        {(totalPages === 0 ? 0 : currentPage + 1).toLocaleString()} of {totalPages.toLocaleString()}
-      </span>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={goToNextPage}
-        disabled={currentPage >= totalPages - 1}
-      >
-        <ArrowRight />
-      </Button>
-    </div>
+    <Pager
+      className="p-2"
+      label="Changes pages"
+      page={currentPage}
+      pageCount={totalPages}
+      disabled={isPending}
+      onPageChange={(page) => startTransition(() => setCurrentPage(page))}
+    />
   );
 }

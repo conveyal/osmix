@@ -4,16 +4,15 @@ import {
   EntityDetailsMapControl,
   type MapInitialViewState,
   OsmFileMapControl,
-  OsmixRasterSource,
-  OsmixVectorOverlay,
+  OsmixMapSources,
   RouteLayer,
   RouteMapControl,
   SelectedEntityLayer,
   SidebarLog,
   useFlyToOsmBounds,
 } from "@osmix/app-components";
-import { selectOsmEntityAtom, useOsmFile } from "@osmix/app-core";
-import { Main, MapContent, Sidebar } from "@osmix/ui";
+import { searchControlIsOpenAtom, selectOsmEntityAtom, useOsmFile } from "@osmix/app-core";
+import { AppSidebar, Main, MapContent } from "@osmix/ui";
 import { useSetAtom } from "jotai";
 import { useEffect, useMemo } from "react";
 
@@ -27,6 +26,12 @@ export function ExtractApp() {
   const extract = useOsmFile(OSM_KEY);
   const flyToOsmBounds = useFlyToOsmBounds();
   const selectEntity = useSetAtom(selectOsmEntityAtom);
+  const setSearchControlIsOpen = useSetAtom(searchControlIsOpenAtom);
+
+  // Place search is how most extracts start, so show the shared map search by default.
+  useEffect(() => {
+    setSearchControlIsOpen(true);
+  }, [setSearchControlIsOpen]);
 
   useEffect(() => {
     if (extract.osmInfo) flyToOsmBounds(extract.osmInfo);
@@ -46,21 +51,12 @@ export function ExtractApp() {
 
   return (
     <Main>
-      <Sidebar>
-        <div className="flex-1 p-2 lg:p-4 overflow-y-auto">
-          <ExtractPanel />
-        </div>
-        <SidebarLog />
-      </Sidebar>
+      <AppSidebar footer={<SidebarLog />}>
+        <ExtractPanel />
+      </AppSidebar>
       <MapContent>
         <Basemap initialViewState={initialViewState}>
-          {/* Content-hash IDs change per extract; keys remount the immutable react-map-gl sources. */}
-          {extract.osm && (
-            <OsmixRasterSource key={`extract:raster:${extract.osm.id}`} osmId={extract.osm.id} />
-          )}
-          {extract.osm && (
-            <OsmixVectorOverlay key={`extract:overlay:${extract.osm.id}`} osm={extract.osm} />
-          )}
+          <OsmixMapSources baseOsm={extract.osm} />
           <ExtractMapLayers />
           <SelectedEntityLayer />
           <RouteMapControl osmFiles={[extract]} />

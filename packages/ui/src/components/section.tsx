@@ -12,7 +12,10 @@ export function SectionTitle({ className, children }: { className?: string; chil
   return (
     <div
       data-slot="section-title"
-      className={cn("flex items-center gap-1 font-bold uppercase tracking-wide", className)}
+      className={cn(
+        "flex items-center gap-1 font-mono font-bold tracking-wider uppercase",
+        className,
+      )}
     >
       {children}
     </div>
@@ -21,7 +24,7 @@ export function SectionTitle({ className, children }: { className?: string; chil
 
 export function LoadingState({
   className,
-  children = "Loading...",
+  children = "Loading…",
 }: {
   className?: string;
   children?: ReactNode;

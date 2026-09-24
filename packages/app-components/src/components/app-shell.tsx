@@ -1,36 +1,58 @@
 import { Log } from "@osmix/app-core";
-import { ErrorBoundary } from "@osmix/ui";
+import { ErrorBoundary, LoadingState, Nav } from "@osmix/ui";
 import { Provider } from "jotai";
-import { type ReactNode, StrictMode, Suspense } from "react";
+import { type ReactNode, StrictMode, Suspense, useLayoutEffect } from "react";
 import { MapProvider } from "react-map-gl/maplibre";
 
 import type { OsmixAppStore } from "../bootstrap.ts";
+import type { OsmixAppId } from "../lib/app-origin.ts";
+import { AppLinks } from "./app-links.tsx";
+import BrowserCheck from "./browser-check.tsx";
+import { MapNavControls } from "./map-nav-controls.tsx";
+import Status from "./status.tsx";
+
+/** The standard top bar: brand, links to the sibling apps, status, and map controls. */
+export function OsmixNav({ current }: { current: OsmixAppId }) {
+  return (
+    <Nav
+      links={
+        <>
+          <AppLinks current={current} />
+          <BrowserCheck />
+        </>
+      }
+      status={<Status />}
+      controls={<MapNavControls />}
+    />
+  );
+}
 
 /**
- * The React wrapper every Osmix app renders inside: strict mode, the app's jotai store, an
- * error boundary that logs, the react-map-gl provider, and the full-height column with the
- * nav on top. Apps that need more providers wrap `children` themselves.
+ * Root of every Osmix app: StrictMode, the jotai store, an error boundary, the map provider,
+ * and the standard nav above the app content. `app` selects the nav's per-app hue
+ * (`--app-hue`, via `data-app` on the document element) and highlights the current app link.
  */
 export function OsmixAppShell({
+  app,
   store,
-  nav,
   children,
 }: {
+  app: OsmixAppId;
   store: OsmixAppStore;
-  nav: ReactNode;
   children: ReactNode;
 }) {
+  useLayoutEffect(() => {
+    document.documentElement.dataset.app = app;
+  }, [app]);
+
   return (
     <StrictMode>
       <Provider store={store}>
-        <ErrorBoundary
-          fallback={<div>Error</div>}
-          onError={(error) => Log.addMessage(error.message, "error")}
-        >
+        <ErrorBoundary onError={(error) => Log.addMessage(error.message, "error")}>
           <MapProvider>
-            <div className="h-screen w-screen flex flex-col">
-              {nav}
-              <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
+            <div className="flex h-screen w-screen flex-col">
+              <OsmixNav current={app} />
+              <Suspense fallback={<LoadingState />}>{children}</Suspense>
             </div>
           </MapProvider>
         </ErrorBoundary>

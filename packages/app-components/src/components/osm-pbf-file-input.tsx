@@ -1,8 +1,11 @@
-import { Menu } from "@base-ui/react/menu";
 import { fetchOsmFileFromUrl, Log } from "@osmix/app-core";
 import {
   ActionButton,
   Button,
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuTrigger,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -11,6 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
   Input,
+  Item,
+  Select,
 } from "@osmix/ui";
 import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
 import type { OsmFileType, OsmLoadProfile } from "osmix";
@@ -122,30 +127,28 @@ export function OsmLoadProfileSelector({
   value: OsmLoadProfile;
 }) {
   const id = useId();
+  const descriptionId = useId();
   const selected = LOAD_PROFILE_OPTIONS.find((option) => option.value === value)!;
   return (
-    <div className="flex flex-col gap-1 rounded border bg-muted/50 p-2">
+    <Item variant="outline" className="flex-col items-stretch gap-1 bg-muted/50">
       <div className="flex items-center justify-between gap-2">
         <label htmlFor={id} className="font-medium">
           Advanced load profile
         </label>
-        <select
+        <Select
           id={id}
-          aria-label="PBF load profile"
-          className="h-7 rounded border bg-background px-2 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+          className="w-auto"
+          aria-describedby={descriptionId}
           disabled={disabled}
+          items={LOAD_PROFILE_OPTIONS}
           value={value}
-          onChange={(event) => onChange(event.target.value as OsmLoadProfile)}
-        >
-          {LOAD_PROFILE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          onValueChange={onChange}
+        />
       </div>
-      <div className="text-muted-foreground">{selected.description}</div>
-    </div>
+      <div id={descriptionId} className="text-muted-foreground">
+        {selected.description}
+      </div>
+    </Item>
   );
 }
 
@@ -181,7 +184,7 @@ export function OsmPbfSelectFileButton({
       <Button
         type="button"
         disabled={disabled || isLoading}
-        className="flex-1 w-full"
+        className="w-full flex-1"
         onClick={async () => {
           setIsLoading(true);
           try {
@@ -192,41 +195,28 @@ export function OsmPbfSelectFileButton({
           }
         }}
       >
-        <FilesIcon />
-        Select PBF
+        <FilesIcon aria-hidden="true" />
+        Open file
       </Button>
     );
   }
 
   return (
-    <Menu.Root>
-      <Menu.Trigger
-        disabled={disabled || isLoading}
-        className="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 has-[>svg]:px-3 flex-1"
-      >
-        <FilesIcon />
+    <Menu>
+      <MenuTrigger disabled={disabled || isLoading} className="flex-1">
+        <FilesIcon aria-hidden="true" />
         Open file
-        <ChevronDownIcon className="ml-auto" />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <Menu.Positioner className="z-50" sideOffset={4}>
-          <Menu.Popup className="min-w-[200px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
-            {FILE_TYPE_OPTIONS.map((option) => (
-              <Menu.Item
-                key={option.type}
-                className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                onClick={() => handleSelectFileType(option.type)}
-              >
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-medium">{option.label}</span>
-                  <span className="text-muted-foreground">{option.description}</span>
-                </div>
-              </Menu.Item>
-            ))}
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
+        <ChevronDownIcon aria-hidden="true" className="ml-auto" />
+      </MenuTrigger>
+      <MenuContent>
+        {FILE_TYPE_OPTIONS.map((option) => (
+          <MenuItem key={option.type} onClick={() => void handleSelectFileType(option.type)}>
+            <span className="font-medium">{option.label}</span>
+            <span className="text-muted-foreground">{option.description}</span>
+          </MenuItem>
+        ))}
+      </MenuContent>
+    </Menu>
   );
 }
 
@@ -242,11 +232,13 @@ export function OsmPbfOpenUrlButton({
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [selectedFileType, setSelectedFileType] = useState<OsmFileType>("pbf");
+  const fileTypeId = useId();
+  const urlId = useId();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button className="flex-1" variant="outline" disabled={disabled} />}>
-        <LinkIcon />
+        <LinkIcon aria-hidden="true" />
         Open from URL
       </DialogTrigger>
       <DialogContent>
@@ -261,40 +253,29 @@ export function OsmPbfOpenUrlButton({
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <div className="font-medium">File Type</div>
-            <Menu.Root>
-              <Menu.Trigger className="cursor-pointer inline-flex items-center justify-between gap-2 whitespace-nowrap rounded-md font-medium border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2 w-full">
-                {FILE_TYPE_OPTIONS.find((o) => o.type === selectedFileType)?.label ??
-                  "Select file type"}
-                <ChevronDownIcon />
-              </Menu.Trigger>
-              <Menu.Portal>
-                <Menu.Positioner className="z-50" sideOffset={4}>
-                  <Menu.Popup className="min-w-[200px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
-                    {FILE_TYPE_OPTIONS.map((option) => (
-                      <Menu.Item
-                        key={option.type}
-                        className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                        onClick={() => setSelectedFileType(option.type)}
-                      >
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-medium">{option.label}</span>
-                          <span className="text-muted-foreground">{option.description}</span>
-                        </div>
-                      </Menu.Item>
-                    ))}
-                  </Menu.Popup>
-                </Menu.Positioner>
-              </Menu.Portal>
-            </Menu.Root>
+            <label htmlFor={fileTypeId} className="font-medium">
+              File type
+            </label>
+            <Select
+              id={fileTypeId}
+              items={FILE_TYPE_OPTIONS.map((option) => ({
+                value: option.type,
+                label: option.label,
+              }))}
+              value={selectedFileType}
+              onValueChange={setSelectedFileType}
+            />
+            <div className="text-muted-foreground">
+              {FILE_TYPE_OPTIONS.find((option) => option.type === selectedFileType)?.description}
+            </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="url-input" className="font-medium">
+            <label htmlFor={urlId} className="font-medium">
               URL
             </label>
             <Input
-              id="url-input"
+              id={urlId}
               placeholder="https://example.com/data.osm.pbf"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
@@ -309,14 +290,14 @@ export function OsmPbfOpenUrlButton({
           </Button>
           <ActionButton
             disabled={disabled || url.trim().length === 0}
-            icon={<LinkIcon />}
+            icon={<LinkIcon aria-hidden="true" />}
             onAction={async () => {
               if (selectedFileType === "pbf" && openPbfUrl) {
                 await openPbfUrl(url);
                 setOpen(false);
                 return;
               }
-              const task = Log.startTask("Downloading file from URL...");
+              const task = Log.startTask("Downloading file from URL…");
               try {
                 const file = await fetchOsmFileFromUrl(url);
                 task.end(`Downloaded ${file.name}`);
@@ -349,7 +330,8 @@ export function OsmPbfClearFileButton({
       disabled={disabled}
       onAction={clearFile}
       title="Clear file"
-      icon={<XIcon />}
+      icon={<XIcon aria-hidden="true" />}
+      aria-label="Clear file"
       size="icon-sm"
       variant="ghost"
     />

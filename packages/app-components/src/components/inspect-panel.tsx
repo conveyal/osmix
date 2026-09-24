@@ -23,6 +23,7 @@ import type { OsmFileType } from "osmix";
 import { Suspense } from "react";
 
 import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map.ts";
+import { appOrigin } from "../lib/app-origin.ts";
 import { FullIndexRequired, hasFullNodeIndex } from "./full-index-required.tsx";
 import ChangesSummary, {
   ChangesFilters,
@@ -55,8 +56,11 @@ export function InspectPanel({
   if (!baseOsm.osm || !baseOsm.osmInfo || !baseOsm.fileInfo) {
     return (
       <div className="flex flex-col gap-4">
-        <EmptyState className="p-0">
-          Select an OSM file to inspect, or extract a region on the Extract tab.
+        <EmptyState>
+          Open an OSM file to inspect, or extract a region with the{" "}
+          <a href={appOrigin("extract")} className="text-info underline">
+            Extract app
+          </a>
         </EmptyState>
         <OsmSourceLinks
           openOsmPbfUrl={async (url) => {
@@ -127,30 +131,28 @@ export function InspectPanel({
       </ActionButton>
 
       {changesetStats != null && (
-        <>
-          <Card>
-            <CardHeader>Diagnostic candidates</CardHeader>
-            <CardContent className="p-0">
-              <ChangesSummary />
-              <Suspense fallback={<LoadingState />}>
-                <Details>
-                  <DetailsSummary>Changes</DetailsSummary>
-                  <DetailsContent>
-                    <ChangesFilters />
-                    <ChangesList
-                      setSelectedEntity={(entity) => {
-                        if (!baseOsm.osm) throw Error("Osm has not been loaded.");
-                        selectEntity(baseOsm.osm, entity);
-                        flyToEntity(baseOsm.osm, entity);
-                      }}
-                    />
-                    <ChangesPagination />
-                  </DetailsContent>
-                </Details>
-              </Suspense>
-            </CardContent>
-          </Card>
-        </>
+        <Card>
+          <CardHeader>Diagnostic candidates</CardHeader>
+          <CardContent className="p-0">
+            <ChangesSummary />
+            <Suspense fallback={<LoadingState />}>
+              <Details>
+                <DetailsSummary>Changes</DetailsSummary>
+                <DetailsContent>
+                  <ChangesFilters />
+                  <ChangesList
+                    setSelectedEntity={(entity) => {
+                      if (!baseOsm.osm) throw Error("Osm has not been loaded.");
+                      selectEntity(baseOsm.osm, entity);
+                      flyToEntity(baseOsm.osm, entity);
+                    }}
+                  />
+                  <ChangesPagination />
+                </DetailsContent>
+              </Details>
+            </Suspense>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

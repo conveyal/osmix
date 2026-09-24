@@ -40,13 +40,18 @@ class OverlayControl implements IControl {
   }
 }
 
+const PANEL_WIDTHS = { narrow: "w-72", default: "w-sm" } as const;
+
 /**
- * A custom control that rerenders arbitrary React content whenever the camera changes
+ * A floating map panel (raised card) that rerenders arbitrary React content whenever the
+ * camera changes. Start the content with `MapPanelHeader`. `width` picks one of two steps;
+ * `className` is for layout only.
  */
 function CustomControl(props: {
   className?: ClassValue;
   children: React.ReactElement<{ map: MapInstance }>;
   position?: ControlPosition;
+  width?: keyof typeof PANEL_WIDTHS;
 }) {
   const [, setVersion] = useState(0);
 
@@ -65,8 +70,10 @@ function CustomControl(props: {
 
   return createPortal(
     <div
+      data-slot="map-panel"
       className={cn(
-        "bg-white rounded-md shadow-lg w-sm max-h-[50lvh] overflow-scroll flex flex-col",
+        "osmix-map-panel flex flex-col overflow-auto rounded-md border bg-card shadow-raised",
+        PANEL_WIDTHS[props.width ?? "default"],
         props.className,
       )}
     >

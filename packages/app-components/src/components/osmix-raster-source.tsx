@@ -1,13 +1,16 @@
 import { Layer, Source } from "react-map-gl/maplibre";
 
 import { APPID, MIN_PICKABLE_ZOOM, RASTER_TILE_SIZE } from "../constants.ts";
-import { osmixIdToTileUrl } from "../lib/osmix-raster-protocol.ts";
+import { osmixIdToTileUrl, type RasterColorRole } from "../lib/osmix-raster-protocol.ts";
 
+/** Raster preview of a dataset below `MIN_PICKABLE_ZOOM`, drawn in the `role` map color. */
 export default function OsmixRasterSource({
   osmId,
+  role = "base",
   tileSize = RASTER_TILE_SIZE,
 }: {
   osmId: string;
+  role?: RasterColorRole;
   tileSize?: number;
 }) {
   const id = `${APPID}:${osmId}:${tileSize}:raster`;
@@ -19,7 +22,7 @@ export default function OsmixRasterSource({
       key={id}
       id={id}
       type="raster"
-      tiles={[osmixIdToTileUrl(osmId, tileSize)]}
+      tiles={[osmixIdToTileUrl(osmId, tileSize, role)]}
       tileSize={tileSize / 2}
     >
       <Layer id={id} type="raster" source={id} maxzoom={MIN_PICKABLE_ZOOM} />

@@ -2,7 +2,6 @@ import { createOsmixAppRuntime, OsmixAppShell } from "@osmix/app-components";
 import { type OsmixAppRemote, osmDatasetVersionAtomFamily } from "@osmix/app-core";
 import { createRoot } from "react-dom/client";
 
-import MergeNav from "./components/nav";
 import MergePage from "./pages/merge";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "./settings";
 import { updateMergeOutcomeAtom } from "./state/merge-outcome";
@@ -28,7 +27,7 @@ async function bootstrap() {
   }
 
   createRoot(rootEl).render(
-    <OsmixAppShell store={store} nav={<MergeNav />}>
+    <OsmixAppShell app="merge" store={store}>
       <MergePage />
     </OsmixAppShell>,
   );

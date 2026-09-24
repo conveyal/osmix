@@ -129,12 +129,16 @@ export default function ExtractBboxCornerMarkers({
             }}
             anchor="center"
           >
-            <div
-              className="size-4 rounded-full border-2 border-white bg-info shadow-md cursor-grab active:cursor-grabbing ring-2 ring-info/40 touch-none"
+            {/* A drawn circle, not a rounded box: the white stroke keeps it visible on imagery. */}
+            <svg
+              className="size-4 cursor-grab touch-none active:cursor-grabbing"
+              viewBox="0 0 16 16"
               aria-label={label}
               role="button"
               tabIndex={0}
-            />
+            >
+              <circle cx="8" cy="8" r="7" strokeWidth="2" className="fill-brand stroke-white" />
+            </svg>
           </Marker>
         );
       })}

@@ -126,7 +126,7 @@ describe("merge step guidance", () => {
       ),
     );
 
-    expect(html).toContain("data-panel-open:shadow-sm");
+    expect(html).toContain("data-panel-open:border-b");
     expect(html).toContain("group-data-panel-open:rotate-180");
     expect(html).toMatch(/<svg[^>]*aria-hidden="true"/);
     expect(html).toContain('aria-expanded="true"');

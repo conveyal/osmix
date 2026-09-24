@@ -22,10 +22,6 @@ const DEFAULT_INITIAL_VIEW_STATE = {
   zoom: MAP_ZOOM,
 };
 
-const controlStyle: React.CSSProperties = {
-  borderRadius: "var(--radius)",
-};
-
 export type MapInitialViewState = MapProps["initialViewState"];
 
 export default function Basemap({
@@ -73,7 +69,7 @@ export default function Basemap({
       onZoom={onViewStateChange}
       onStyleData={onStyleData}
     >
-      <ScaleControl style={controlStyle} position="bottom-left" unit="imperial" />
+      <ScaleControl position="bottom-left" unit="imperial" />
 
       <MapLayerControl />
       <NominatimSearchControl />

@@ -1,40 +1,33 @@
-import { useMap, CustomControl, NominatimSearch } from "@osmix/app-components";
+import { nominatimPlaceAtom, type NominatimResult } from "@osmix/app-components";
 import { useAtom, useAtomValue } from "jotai";
 import type { GeoBbox2D } from "osmix";
-import type { MapInstance } from "react-map-gl/maplibre";
+import { useEffect } from "react";
 
 import { extractBboxAtom } from "../state/extract";
 import ExtractBboxCornerMarkers, { bboxAfterCornerDrag } from "./extract-bbox-corner-markers";
 import ExtractBboxLayer from "./extract-bbox-layer";
 
-function ExtractMapSearch() {
-  const map = useMap();
-  const [, setBbox] = useAtom(extractBboxAtom);
-
-  return (
-    <CustomControl position="top-right">
-      <NominatimSearch
-        map={(map ?? undefined) as MapInstance | undefined}
-        onPlaceResolved={(result) => {
-          const bbox = result.boundingbox?.map(Number);
-          if (bbox && bbox.length === 4 && bbox.every(Number.isFinite)) {
-            const [latSouth, latNorth, lonWest, lonEast] = bbox as [number, number, number, number];
-            const next: GeoBbox2D = [lonWest, latSouth, lonEast, latNorth];
-            setBbox(next);
-          }
-        }}
-      />
-    </CustomControl>
-  );
+/** Nominatim returns `[latSouth, latNorth, lonWest, lonEast]` as strings. */
+function nominatimResultToBbox(result: NominatimResult): GeoBbox2D | null {
+  const bbox = result.boundingbox?.map(Number);
+  if (!bbox || bbox.length !== 4 || !bbox.every(Number.isFinite)) return null;
+  const [latSouth, latNorth, lonWest, lonEast] = bbox as [number, number, number, number];
+  return [lonWest, latSouth, lonEast, latNorth];
 }
 
 export default function ExtractMapLayers() {
-  const bbox = useAtomValue(extractBboxAtom);
-  const [, setBbox] = useAtom(extractBboxAtom);
+  const [bbox, setBbox] = useAtom(extractBboxAtom);
+  const place = useAtomValue(nominatimPlaceAtom);
+
+  // The shared map search resolves a place; use its bounding box as the extract bbox.
+  useEffect(() => {
+    if (!place) return;
+    const next = nominatimResultToBbox(place);
+    if (next) setBbox(next);
+  }, [place, setBbox]);
 
   return (
     <>
-      <ExtractMapSearch />
       <ExtractBboxLayer bbox={bbox} />
       <ExtractBboxCornerMarkers
         bbox={bbox}

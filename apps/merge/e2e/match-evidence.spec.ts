@@ -9,6 +9,12 @@ const comparison = (page: Page) =>
   review(page).getByRole("region", { name: "Selected map comparison" });
 const ARTIFACT_DIRECTORY = resolve(import.meta.dirname, "../../../output/playwright/ticket10");
 
+/** Base UI `Select` renders its options in a portal; open the combobox, then pick by label. */
+async function chooseOption(page: Page, combobox: Locator, option: string) {
+  await combobox.click();
+  await page.getByRole("option", { name: option, exact: true }).click();
+}
+
 async function compareFirst(page: Page) {
   const button = review(page)
     .getByRole("button", { name: /Compare imported/ })
@@ -61,16 +67,19 @@ async function focusContrast(control: Locator) {
       });
       return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
     };
-    const ring = luminance(style.getPropertyValue("--tw-ring-color"));
+    // The shared `focus-ring` utility draws a solid, offset outline in the `--ring` color.
+    // Read the token rather than `outlineColor`, which may still be mid-transition.
+    const ring = luminance(style.getPropertyValue("--ring"));
     const contrast = (token: string) => {
       const surface = luminance(style.getPropertyValue(token));
       return (Math.max(ring, surface) + 0.05) / (Math.min(ring, surface) + 0.05);
     };
     return {
-      boxShadow: style.boxShadow,
-      offset: style.getPropertyValue("--tw-ring-offset-width"),
+      outline: `${style.outlineStyle} ${style.outlineWidth}`,
+      offset: style.outlineOffset,
+      // The 1px offset places the outline on the surrounding surface, not the input border.
       background: contrast("--background"),
-      border: contrast("--border"),
+      card: contrast("--card"),
     };
   });
 }
@@ -153,14 +162,11 @@ test("keyboard focus is visible against the form and survives forced colors", as
   await radius.focus();
   await expect(radius).toBeFocused();
   expect(await radius.evaluate((element) => element.matches(":focus-visible"))).toBe(true);
-  await expect
-    .poll(async () => (await focusContrast(radius)).boxShadow)
-    .toContain("0px 0px 0px 4px");
+  await expect.poll(async () => (await focusContrast(radius)).outline).toBe("solid 2px");
   const measured = await focusContrast(radius);
-  expect(measured.boxShadow).not.toBe("none");
-  expect(measured.offset.trim()).toBe("2px");
+  expect(measured.offset).toBe("1px");
   expect(measured.background).toBeGreaterThanOrEqual(3);
-  expect(measured.border).toBeGreaterThanOrEqual(3);
+  expect(measured.card).toBeGreaterThanOrEqual(3);
   await testInfo.attach("Focus contrast", {
     body: JSON.stringify(measured, null, 2),
     contentType: "application/json",
@@ -243,9 +249,11 @@ test("school and cafe classifications block both actions when only name is selec
   page,
 }, testInfo) => {
   await page.getByRole("button", { name: "Nearby school and cafe" }).click();
-  await review(page)
-    .getByRole("combobox", { name: "Match reason" })
-    .selectOption({ label: "Feature classifications conflict" });
+  await chooseOption(
+    page,
+    review(page).getByRole("combobox", { name: "Match reason" }),
+    "Feature classifications conflict",
+  );
   await expect(review(page)).toContainText("Imported features matching these filters: 1");
   const conflict = review(page).getByRole("region", { name: "Feature type conflict", exact: true });
   await expect(conflict).toBeVisible();
@@ -316,7 +324,7 @@ test("keyboard comparison keeps coordinates, markers, and selection consistent w
   const targetMarker = page.getByTestId("evidence-map").getByRole("img", { name: /Base/ });
   await expect(targetMarker).toHaveAccessibleName(/-120\.4999900/);
 
-  await review(page).getByRole("combobox", { name: "Match status" }).selectOption("blocked");
+  await chooseOption(page, review(page).getByRole("combobox", { name: "Match status" }), "Blocked");
   await expect(comparison(page)).toHaveCount(0);
   await expect.poll(async () => (await readState(page)).comparison.features).toEqual([]);
   await expect(

@@ -17,7 +17,7 @@ import {
   useLoadFromUrl,
   useOsmFile,
 } from "@osmix/app-core";
-import { Main, MapContent, Sidebar } from "@osmix/ui";
+import { AppSidebar, Main, MapContent } from "@osmix/ui";
 import { useSetAtom } from "jotai";
 import { useMemo } from "react";
 
@@ -42,12 +42,9 @@ export default function Merge() {
 
   return (
     <Main>
-      <Sidebar>
-        <div className="flex-1 p-2 lg:p-4 overflow-y-auto">
-          <MergeBlock />
-        </div>
-        <SidebarLog />
-      </Sidebar>
+      <AppSidebar footer={<SidebarLog />}>
+        <MergeBlock />
+      </AppSidebar>
       <MapContent>
         <Basemap initialViewState={initialViewState}>
           <OsmixMapSources baseOsm={base.osm} patchOsm={patch.osm} />

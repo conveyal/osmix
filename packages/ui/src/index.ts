@@ -2,16 +2,18 @@ export { default as ActionButton, useAction } from "./components/action-button.t
 export { Details, DetailsContent, DetailsSummary } from "./components/details.tsx";
 export { ErrorBoundary } from "./components/error-boundary.tsx";
 export { InfoTooltip } from "./components/info-tooltip.tsx";
-export { Main, MapContent, Sidebar } from "./components/layout.tsx";
+export { AppSidebar, Main, MapContent, Sidebar } from "./components/layout.tsx";
 export { GithubLogo, Nav, ToggleButton } from "./components/nav.tsx";
 export { default as ObjectToTableRows } from "./components/object-to-table.tsx";
+export { Pager } from "./components/pager.tsx";
 export { EmptyState, LoadingState, SectionTitle } from "./components/section.tsx";
 export { StatusDot, type StatusDotStatus } from "./components/status-dot.tsx";
+export { Step } from "./components/step.tsx";
+export { Alert, alertVariants } from "./components/ui/alert.tsx";
 export { Button, buttonVariants } from "./components/ui/button.tsx";
 export {
   ButtonGroup,
   ButtonGroupSeparator,
-  ButtonGroupText,
   buttonGroupVariants,
 } from "./components/ui/button-group.tsx";
 export {
@@ -19,7 +21,6 @@ export {
   CardAction,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "./components/ui/card.tsx";
@@ -48,7 +49,6 @@ export {
   InputGroupButton,
   InputGroupInput,
   InputGroupText,
-  InputGroupTextarea,
 } from "./components/ui/input-group.tsx";
 export {
   Item,
@@ -62,8 +62,10 @@ export {
   ItemSeparator,
   ItemTitle,
 } from "./components/ui/item.tsx";
+export { Menu, MenuContent, MenuItem, MenuTrigger } from "./components/ui/menu.tsx";
 export { Progress } from "./components/ui/progress.tsx";
-export { Separator } from "./components/ui/separator.tsx";
+export { Radio, RadioCard, RadioLabel } from "./components/ui/radio.tsx";
+export { Select, type SelectOption } from "./components/ui/select.tsx";
 export { Spinner } from "./components/ui/spinner.tsx";
 export {
   Table,
@@ -75,7 +77,6 @@ export {
   TableHeader,
   TableRow,
 } from "./components/ui/table.tsx";
-export { Textarea } from "./components/ui/textarea.tsx";
 export { bytesSizeToHuman, flattenValue, formatTimestampMs } from "./lib/format.ts";
 export { cn } from "./lib/utils.ts";
 export { sidebarIsOpenAtom } from "./state/layout.ts";

@@ -1,4 +1,4 @@
-import { Details, DetailsContent, DetailsSummary, SectionTitle } from "@osmix/ui";
+import { Alert, Details, DetailsContent, DetailsSummary, SectionTitle } from "@osmix/ui";
 
 import { MergeGuideDiagram, type MergeGuideDiagramId } from "./merge-guide-diagram";
 
@@ -341,19 +341,19 @@ export function MergeStepGuide({
 
   return (
     <div
-      className="flex w-full flex-col gap-2 font-normal normal-case tracking-normal"
+      className="flex w-full flex-col gap-2"
       data-guide-id={guideId}
       data-slot="merge-step-guide"
     >
       <p className="px-2 pt-2 text-muted-foreground" data-slot="merge-step-guide-summary">
         {guide.summary}
       </p>
-      <Details className="border-b" defaultOpen={defaultOpen}>
+      <Details defaultOpen={defaultOpen}>
         <DetailsSummary>How this step works</DetailsSummary>
         <DetailsContent>
           <div className="flex flex-col gap-2 bg-muted/50 p-2" data-slot="merge-step-guide-details">
             {"diagram" in guide ? (
-              <div className="mx-auto w-full max-w-64 overflow-hidden border bg-card p-2">
+              <div className="mx-auto w-full max-w-64 overflow-hidden border p-2">
                 <MergeGuideDiagram diagram={guide.diagram} />
               </div>
             ) : null}
@@ -379,10 +379,10 @@ export function MergeStepGuide({
             </div>
 
             {"warning" in guide ? (
-              <div className="border border-warning/40 bg-warning/10 p-2" role="note">
+              <Alert variant="warning" role="note">
                 <GuideHeading>Caution</GuideHeading>
                 <p>{guide.warning}</p>
-              </div>
+              </Alert>
             ) : null}
           </div>
         </DetailsContent>
