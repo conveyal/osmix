@@ -1,10 +1,11 @@
-import { appOrigin, OsmLoadFailurePanel, OsmPbfFileInput } from "@osmix/app-components";
+import { appOrigin, OsmLoadFailurePanel, OsmPbfFileInput, useMap } from "@osmix/app-components";
 import {
   useLog,
   useOsmFile,
   mapBoundsAtom,
   selectOsmEntityAtom,
   osmLoadingAbortControllerAtom,
+  useOsmixRemote,
 } from "@osmix/app-core";
 import {
   ActionButton,
@@ -12,25 +13,35 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
+  CheckboxLabel,
+  Field,
+  FieldDescription,
   InfoTooltip,
   Input,
   Radio,
   RadioCard,
+  Spinner,
   Step,
 } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { DownloadIcon, SaveIcon } from "lucide-react";
-import type { ExtractStrategy } from "osmix";
-import { useEffect, useState } from "react";
+import type { ExtractStrategy, GeoBbox2D } from "osmix";
+import { useEffect, useRef, useState } from "react";
 
 import ExtractTagFilterEditor, {
   conveyalTagFilterEditorState,
   rulesFromEditorState,
   type TagFilterEditorState,
 } from "./components/extract-tag-filter-editor";
-import { boundsLikeToBbox, isValidBbox, parseBboxString } from "./lib/extract-bbox";
+import {
+  boundsLikeToBbox,
+  headerBboxToGeoBbox,
+  isValidBbox,
+  parseBboxString,
+} from "./lib/extract-bbox";
 import { OSM_KEY } from "./settings";
-import { extractBboxAtom } from "./state/extract";
+import { extractBboxAtom, useFileBoundsAtom } from "./state/extract";
 
 const STRATEGY_OPTIONS: {
   value: ExtractStrategy;
@@ -54,6 +65,37 @@ const STRATEGY_OPTIONS: {
   },
 ];
 
+/** What the selected file's PBF header says about its bounds. */
+type FileBounds =
+  | { status: "none" }
+  | { status: "reading" }
+  | { status: "ok"; bbox: GeoBbox2D }
+  | { status: "missing" }
+  | { status: "error"; message: string };
+
+function FileBoundsDescription({ fileBounds }: { fileBounds: FileBounds }) {
+  switch (fileBounds.status) {
+    case "none":
+      return <>Select a PBF file in step 1 first</>;
+    case "reading":
+      return (
+        <span className="flex items-center gap-2">
+          <Spinner /> Reading the file header…
+        </span>
+      );
+    case "missing":
+      return <>This file's header doesn't record its bounds; draw a bounding box instead</>;
+    case "error":
+      return <>Couldn't read this file's header: {fileBounds.message}</>;
+    case "ok":
+      return (
+        <>
+          From the file header: <span className="font-mono">{fileBounds.bbox.join(", ")}</span>
+        </>
+      );
+  }
+}
+
 export function ExtractPanel() {
   const extract = useOsmFile(OSM_KEY);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
@@ -74,6 +116,12 @@ export function ExtractPanel() {
     conveyalTagFilterEditorState,
   );
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const remote = useOsmixRemote();
+  const map = useMap();
+  const [fileBounds, setFileBounds] = useState<FileBounds>({ status: "none" });
+  const [useFileBounds, setUseFileBounds] = useAtom(useFileBoundsAtom);
+  const [bboxBeforeFileBounds, setBboxBeforeFileBounds] = useState<GeoBbox2D | null>(null);
+  const headerRequest = useRef(0);
 
   const isExtracting = activeTasks > 0;
 
@@ -85,6 +133,47 @@ export function ExtractPanel() {
 
   const canExtract = !!pendingFile && isValidBbox(bbox) && !isExtracting;
   const hasExtractResult = !!extract.osm && !!extract.osmInfo;
+
+  /** Turn off "use the file's bounds" and give back the bbox the user had before. */
+  const stopUsingFileBounds = () => {
+    if (!useFileBounds) return;
+    if (bboxBeforeFileBounds) setBbox(bboxBeforeFileBounds);
+    setBboxBeforeFileBounds(null);
+    setUseFileBounds(false);
+  };
+
+  const selectFile = async (file: File | null) => {
+    stopUsingFileBounds();
+    setPendingFile(file);
+    const request = ++headerRequest.current;
+    if (!file) {
+      setFileBounds({ status: "none" });
+      return;
+    }
+    setFileBounds({ status: "reading" });
+    try {
+      const header = await remote.readHeader(file);
+      if (request !== headerRequest.current) return;
+      const headerBbox = headerBboxToGeoBbox(header.bbox);
+      setFileBounds(headerBbox ? { status: "ok", bbox: headerBbox } : { status: "missing" });
+    } catch (error) {
+      if (request !== headerRequest.current) return;
+      const message = error instanceof Error ? error.message : String(error);
+      setFileBounds({ status: "error", message });
+    }
+  };
+
+  const changeUseFileBounds = (enabled: boolean) => {
+    if (!enabled) {
+      stopUsingFileBounds();
+      return;
+    }
+    if (fileBounds.status !== "ok") return;
+    setBboxBeforeFileBounds(bbox);
+    setBbox(fileBounds.bbox);
+    setUseFileBounds(true);
+    map?.fitBounds(fileBounds.bbox, { padding: 40, maxDuration: 500 });
+  };
 
   const applyParsedBboxString = () => {
     const parsed = parseBboxString(bboxText);
@@ -118,15 +207,13 @@ export function ExtractPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Step number={1} title="OSM PBF file">
+      <Step number={1} title="Select OSM PBF file">
         <CardContent className="flex flex-col gap-2">
           <OsmPbfFileInput
             file={pendingFile}
             loadProfile={extract.loadProfile}
             onLoadProfileChange={extract.setLoadProfile}
-            setFile={async (f) => {
-              setPendingFile(f);
-            }}
+            setFile={selectFile}
             pbfOnly
             disabled={isExtracting}
           />
@@ -141,15 +228,32 @@ export function ExtractPanel() {
 
       <Step number={2} title="Select bounding box">
         <CardContent className="flex flex-col gap-2">
-          <p className="text-muted-foreground">
-            Search on the map (top right), or edit coordinates below. The rectangle updates on the
-            map.
-          </p>
+          <Field>
+            <CheckboxLabel className="min-h-8">
+              <Checkbox
+                checked={useFileBounds}
+                disabled={fileBounds.status !== "ok" || isExtracting}
+                aria-describedby="extract-file-bounds-help"
+                onCheckedChange={changeUseFileBounds}
+              />
+              Use the selected file's bounds
+            </CheckboxLabel>
+            <FieldDescription id="extract-file-bounds-help">
+              <FileBoundsDescription fileBounds={fileBounds} />
+            </FieldDescription>
+          </Field>
+          {!useFileBounds ? (
+            <p className="text-muted-foreground">
+              Search on the map (top right), or edit coordinates below. The rectangle updates on the
+              map.
+            </p>
+          ) : null}
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lon">
               Min longitude
               <Input
                 id="extract-bbox-min-lon"
+                disabled={useFileBounds}
                 type="number"
                 step="any"
                 value={bboxInputs[0]}
@@ -165,6 +269,7 @@ export function ExtractPanel() {
               Min latitude
               <Input
                 id="extract-bbox-min-lat"
+                disabled={useFileBounds}
                 type="number"
                 step="any"
                 value={bboxInputs[1]}
@@ -180,6 +285,7 @@ export function ExtractPanel() {
               Max longitude
               <Input
                 id="extract-bbox-max-lon"
+                disabled={useFileBounds}
                 type="number"
                 step="any"
                 value={bboxInputs[2]}
@@ -195,6 +301,7 @@ export function ExtractPanel() {
               Max latitude
               <Input
                 id="extract-bbox-max-lat"
+                disabled={useFileBounds}
                 type="number"
                 step="any"
                 value={bboxInputs[3]}
@@ -214,16 +321,28 @@ export function ExtractPanel() {
             <div className="flex gap-2">
               <Input
                 id="extract-bbox-paste"
+                disabled={useFileBounds}
                 value={bboxText}
                 onChange={(e) => setBboxText(e.target.value)}
                 placeholder="-122.5,47.2,-122.3,47.5"
               />
-              <Button type="button" variant="outline" onClick={applyParsedBboxString}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={useFileBounds}
+                onClick={applyParsedBboxString}
+              >
                 Parse
               </Button>
             </div>
           </div>
-          <Button type="button" variant="outline" className="w-full" onClick={useMapViewAsBbox}>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={useFileBounds}
+            onClick={useMapViewAsBbox}
+          >
             Use current map view as bbox
           </Button>
           {!isValidBbox(bbox) ? (

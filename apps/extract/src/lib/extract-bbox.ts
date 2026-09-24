@@ -1,5 +1,5 @@
 import type { LngLatBounds } from "maplibre-gl";
-import type { GeoBbox2D } from "osmix";
+import type { GeoBbox2D, OsmPbfHeaderBlock } from "osmix";
 
 /** Initial map viewport around default merge basemap (Yakima area). */
 export const DEFAULT_EXTRACT_BBOX: GeoBbox2D = [-121.65, 46.45, -120.35, 47.25];
@@ -26,4 +26,14 @@ export function boundsLikeToBbox(bounds: LngLatBounds | null): GeoBbox2D | null 
   const [e, n] = ne;
   const bbox: GeoBbox2D = [w, s, e, n];
   return isValidBbox(bbox) ? bbox : null;
+}
+
+/**
+ * A PBF header's optional bbox as `[west, south, east, north]`, or null when the header doesn't
+ * record one or records an invalid one.
+ */
+export function headerBboxToGeoBbox(bbox: OsmPbfHeaderBlock["bbox"]): GeoBbox2D | null {
+  if (!bbox) return null;
+  const candidate: GeoBbox2D = [bbox.left, bbox.bottom, bbox.right, bbox.top];
+  return isValidBbox(candidate) ? candidate : null;
 }

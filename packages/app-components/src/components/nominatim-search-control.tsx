@@ -160,9 +160,9 @@ export function NominatimSearch({
       >
         <InputGroup>
           <InputGroupInput
-            ref={(ref) => {
-              ref?.focus();
-            }}
+            // Focus once when the panel opens. (An inline ref callback re-ran on every render,
+            // and map panels re-render on every camera move, so it stole focus.)
+            autoFocus
             onFocus={(e) => e.target.select()}
             value={query}
             onChange={(event) => setQuery(event.target.value)}

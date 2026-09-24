@@ -1072,6 +1072,23 @@ describe("OsmixRemote", () => {
     );
 
     it(
+      "reads a PBF header from a File through a real worker",
+      async () => {
+        const bytes = await getFixtureFile(monacoPbf.url);
+        using remote = await createRemote({ workerCount: 1 });
+        // A File is sent as its stream, which must be transferred, not cloned.
+        const header = await remote.readHeader(new File([new Uint8Array(bytes)], "monaco.pbf"));
+        expect(header.bbox).toEqual({
+          left: 7.4053929,
+          right: 7.4447259,
+          top: 43.7543687,
+          bottom: 43.7232244,
+        });
+      },
+      workerTestTimeout,
+    );
+
+    it(
       "uses Node worker threads when Web Workers are unavailable",
       async () => {
         using remote = await createRemote({ workerCount: 1 });

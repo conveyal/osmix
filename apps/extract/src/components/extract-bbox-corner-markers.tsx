@@ -87,9 +87,12 @@ function lngLatForCorner(id: BboxCornerId, bbox: GeoBbox2D): [number, number] {
  */
 export default function ExtractBboxCornerMarkers({
   bbox,
+  locked = false,
   onCornerDrag,
 }: {
   bbox: GeoBbox2D;
+  /** The bbox is fixed (the file's bounds): markers are shown but can't be dragged or focused. */
+  locked?: boolean;
   onCornerDrag: (corner: BboxCornerId, lng: number, lat: number) => void;
 }) {
   const [dragOverride, setDragOverride] = useState<{
@@ -111,7 +114,7 @@ export default function ExtractBboxCornerMarkers({
             key={id}
             longitude={longitude}
             latitude={latitude}
-            draggable
+            draggable={!locked}
             onDragStart={(ev: MarkerDragEvent) => {
               const { lng, lat } = ev.lngLat;
               setDragOverride({ corner: id, lng, lat });
@@ -131,11 +134,11 @@ export default function ExtractBboxCornerMarkers({
           >
             {/* A drawn circle, not a rounded box: the white stroke keeps it visible on imagery. */}
             <svg
-              className="size-4 cursor-grab touch-none active:cursor-grabbing"
+              className={locked ? "size-4" : "size-4 cursor-grab touch-none active:cursor-grabbing"}
               viewBox="0 0 16 16"
-              aria-label={label}
-              role="button"
-              tabIndex={0}
+              {...(locked
+                ? { "aria-hidden": true }
+                : { "aria-label": label, role: "button", tabIndex: 0 })}
             >
               <circle cx="8" cy="8" r="7" strokeWidth="2" className="fill-brand stroke-white" />
             </svg>

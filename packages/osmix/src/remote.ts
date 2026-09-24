@@ -1218,7 +1218,8 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    */
   async readHeader(data: ArrayBuffer | ReadableStream | Uint8Array | File) {
     const transferableData = await this.getTransferableData(data);
-    return this.runWithWorker((worker) => worker.readHeader(transferableData), {
+    // Streams (a File is sent as its stream) can only cross to the worker when transferred.
+    return this.runWithWorker((worker) => worker.readHeader(transfer(transferableData)), {
       retry: "never",
     });
   }
