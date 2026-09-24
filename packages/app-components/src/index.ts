@@ -46,6 +46,7 @@ export {
   default as OsmPbfFileInput,
   OsmLoadProfileSelector,
   OsmPbfClearFileButton,
+  OsmPbfSelectedFile,
   OsmPbfOpenUrlButton,
   OsmPbfSelectFileButton,
 } from "./components/osm-pbf-file-input.tsx";

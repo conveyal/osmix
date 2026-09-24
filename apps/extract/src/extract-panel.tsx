@@ -118,7 +118,28 @@ export function ExtractPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Step number={1} title="Select bounding box">
+      <Step number={1} title="OSM PBF file">
+        <CardContent className="flex flex-col gap-2">
+          <OsmPbfFileInput
+            file={pendingFile}
+            loadProfile={extract.loadProfile}
+            onLoadProfileChange={extract.setLoadProfile}
+            setFile={async (f) => {
+              setPendingFile(f);
+            }}
+            pbfOnly
+            disabled={isExtracting}
+          />
+          {extract.loadFailure ? (
+            <OsmLoadFailurePanel
+              failure={extract.loadFailure}
+              onDismiss={extract.clearLoadFailure}
+            />
+          ) : null}
+        </CardContent>
+      </Step>
+
+      <Step number={2} title="Select bounding box">
         <CardContent className="flex flex-col gap-2">
           <p className="text-muted-foreground">
             Search on the map (top right), or edit coordinates below. The rectangle updates on the
@@ -214,7 +235,7 @@ export function ExtractPanel() {
         </CardContent>
       </Step>
 
-      <Step number={2} title="Extract strategy">
+      <Step number={3} title="Extract strategy">
         <CardContent className="flex flex-col gap-2">
           <p className="text-muted-foreground">
             See the{" "}
@@ -259,34 +280,9 @@ export function ExtractPanel() {
         </CardContent>
       </Step>
 
-      <Step number={3} title="Tag filters">
+      <Step number={4} title="Tag filters">
         <CardContent>
           <ExtractTagFilterEditor state={tagFilterEditor} onChange={setTagFilterEditor} />
-        </CardContent>
-      </Step>
-
-      <Step number={4} title="OSM PBF file">
-        <CardContent className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <OsmPbfFileInput
-              file={pendingFile}
-              loadProfile={extract.loadProfile}
-              onLoadProfileChange={extract.setLoadProfile}
-              setFile={async (f) => {
-                setPendingFile(f);
-                return;
-              }}
-              pbfOnly
-              disabled={isExtracting}
-            />
-            {pendingFile ? <span className="truncate font-mono">{pendingFile.name}</span> : null}
-          </div>
-          {extract.loadFailure ? (
-            <OsmLoadFailurePanel
-              failure={extract.loadFailure}
-              onDismiss={extract.clearLoadFailure}
-            />
-          ) : null}
         </CardContent>
       </Step>
 
@@ -324,8 +320,8 @@ export function ExtractPanel() {
             </ActionButton>
           ) : null}
           <p className="text-muted-foreground">
-            Each app keeps its own storage. To merge this extract, download it and open it in{" "}
-            <a href={appOrigin("merge")}>Merge</a>.
+            To merge this extract, download it and open it in <a href={appOrigin("merge")}>Merge</a>
+            .
           </p>
         </CardContent>
       </Card>

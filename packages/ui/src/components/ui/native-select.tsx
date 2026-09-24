@@ -16,7 +16,7 @@ function NativeSelect({ className, size = "default", ...props }: NativeSelectPro
   return (
     <div
       className={cn(
-        "group/native-select relative w-fit has-[select:disabled]:opacity-50",
+        "group/native-select relative w-fit shrink-0 has-[select:disabled]:opacity-50",
         className,
       )}
       data-slot="native-select-wrapper"
@@ -26,7 +26,7 @@ function NativeSelect({ className, size = "default", ...props }: NativeSelectPro
         data-slot="native-select"
         data-size={size}
         className={cn(
-          "h-8 w-full min-w-0 cursor-pointer appearance-none truncate rounded-md border border-input bg-card py-1 pr-7 pl-2 focus-ring transition-colors select-none hover:bg-accent",
+          "h-8 w-full cursor-pointer appearance-none truncate rounded-md border border-input bg-card py-1 pr-7 pl-2 focus-ring transition-colors select-none hover:bg-accent",
           "disabled:pointer-events-none disabled:cursor-not-allowed aria-invalid:border-destructive",
           "data-[size=sm]:h-7 data-[size=sm]:py-0.5",
         )}

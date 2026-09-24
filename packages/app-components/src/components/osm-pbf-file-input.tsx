@@ -2,6 +2,7 @@ import { fetchOsmFileFromUrl, Log } from "@osmix/app-core";
 import {
   ActionButton,
   Button,
+  bytesSizeToHuman,
   Menu,
   MenuContent,
   MenuItem,
@@ -13,12 +14,21 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
   Input,
   Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
   NativeSelect,
   NativeSelectOption,
 } from "@osmix/ui";
-import { ChevronDownIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, FileIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
 import type { OsmFileType, OsmLoadProfile } from "osmix";
 import { useId, useState } from "react";
 
@@ -77,14 +87,12 @@ export default function OsmPbfFileInput({
   setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>;
 }) {
   return (
-    <div className="flex flex-1 flex-col gap-2">
-      <div className="flex items-center gap-2">
-        {!file ? (
-          <OsmPbfSelectFileButton disabled={disabled} pbfOnly={pbfOnly} setFile={setFile} />
-        ) : (
-          <OsmPbfClearFileButton disabled={disabled} clearFile={() => setFile(null)} />
-        )}
-      </div>
+    <div className="flex min-w-0 flex-1 flex-col gap-3">
+      {!file ? (
+        <OsmPbfSelectFileButton disabled={disabled} pbfOnly={pbfOnly} setFile={setFile} />
+      ) : (
+        <OsmPbfSelectedFile file={file} disabled={disabled} clearFile={() => setFile(null)} />
+      )}
       {loadProfile && onLoadProfileChange ? (
         <OsmLoadProfileSelector
           disabled={disabled}
@@ -145,29 +153,25 @@ export function OsmLoadProfileSelector({
   const descriptionId = useId();
   const selected = LOAD_PROFILE_OPTIONS.find((option) => option.value === value)!;
   return (
-    <Item variant="outline" className="flex-col items-stretch gap-1 bg-muted/50">
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor={id} className="font-medium">
-          Advanced load profile
-        </label>
-        <NativeSelect
-          id={id}
-          aria-describedby={descriptionId}
-          disabled={disabled}
-          value={value}
-          onChange={(e) => onChange(parseLoadProfile(e.target.value))}
-        >
-          {LOAD_PROFILE_OPTIONS.map((option) => (
-            <NativeSelectOption key={option.value} value={option.value}>
-              {option.label}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </div>
-      <div id={descriptionId} className="text-muted-foreground">
-        {selected.description}
-      </div>
-    </Item>
+    <Field orientation="horizontal">
+      <FieldContent>
+        <FieldLabel htmlFor={id}>Load profile</FieldLabel>
+        <FieldDescription id={descriptionId}>{selected.description}</FieldDescription>
+      </FieldContent>
+      <NativeSelect
+        id={id}
+        aria-describedby={descriptionId}
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(parseLoadProfile(e.target.value))}
+      >
+        {LOAD_PROFILE_OPTIONS.map((option) => (
+          <NativeSelectOption key={option.value} value={option.value}>
+            {option.label}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+    </Field>
   );
 }
 
@@ -204,7 +208,7 @@ export function OsmPbfSelectFileButton({
         type="button"
         variant="outline"
         disabled={disabled || isLoading}
-        className="w-full flex-1"
+        className="w-full"
         onClick={async () => {
           setIsLoading(true);
           try {
@@ -338,6 +342,36 @@ export function OsmPbfOpenUrlButton({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The chosen file, before it is loaded: name, size, and a clear action. */
+export function OsmPbfSelectedFile({
+  file,
+  disabled,
+  clearFile,
+}: {
+  file: File;
+  disabled?: boolean;
+  clearFile: () => Promise<void>;
+}) {
+  return (
+    <Item variant="outline" size="sm" className="flex-nowrap">
+      <ItemMedia variant="icon">
+        <FileIcon aria-hidden="true" />
+      </ItemMedia>
+      <ItemContent className="min-w-0 gap-0">
+        <ItemTitle className="w-full min-w-0">
+          <span className="truncate font-mono" title={file.name}>
+            {file.name}
+          </span>
+        </ItemTitle>
+        <ItemDescription>{bytesSizeToHuman(file.size)}</ItemDescription>
+      </ItemContent>
+      <ItemActions>
+        <OsmPbfClearFileButton disabled={disabled} clearFile={clearFile} />
+      </ItemActions>
+    </Item>
   );
 }
 

@@ -204,7 +204,9 @@
 @utility focus-ring {
   outline-style: none;
 
-  &:focus-visible {
+  /* Not while a native picker is open: macOS draws its menu translucent and the ring shows
+     through it. The :is() keeps the selector valid in browsers without :open. */
+  &:focus-visible:not(:is(:open)) {
     outline: 2px solid var(--ring);
     outline-offset: 1px;
   }
@@ -232,7 +234,7 @@
     overscroll-behavior: none;
   }
 
-  :focus-visible {
+  :focus-visible:not(:is(:open)) {
     outline: 2px solid var(--ring);
     outline-offset: 1px;
   }

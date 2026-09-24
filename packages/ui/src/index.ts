@@ -43,6 +43,7 @@ export {
   DialogTitle,
   DialogTrigger,
 } from "./components/ui/dialog.tsx";
+export { Field, FieldContent, FieldDescription, FieldLabel } from "./components/ui/field.tsx";
 export { Input } from "./components/ui/input.tsx";
 export {
   InputGroup,
