@@ -11,7 +11,11 @@ import type StringTable from "./stringtable.ts";
 import { Tags } from "./tags.ts";
 import { BufferConstructor, type BufferType, ResizeableTypedArray as RTA } from "./typed-arrays.ts";
 
-const MISSING_NODE_INDEX = 0xffffffff;
+/**
+ * Node-index sentinel stored for way refs whose node is not present in the dataset.
+ * Returned by {@link Ways.getRefIndexes} in place of a node index.
+ */
+export const MISSING_NODE_INDEX = 0xffffffff;
 const HASH_REF_CHUNK_SIZE = 8192;
 
 export interface WaysTransferables<
@@ -283,6 +287,18 @@ export class Ways extends Entities<OsmWay> {
     const refs = Array.from<number>({ length: count });
     for (let i = 0; i < count; i++) refs[i] = this.getRefId(start + i);
     return refs;
+  }
+
+  /**
+   * Get the node indexes referenced by a way without allocating.
+   *
+   * Returns a view into internal storage; do not mutate it or hold it across writes. Refs to
+   * nodes absent from the dataset are {@link MISSING_NODE_INDEX}. Requires `buildEntityIndex()`.
+   */
+  getRefIndexes(index: number): Uint32Array {
+    if (this.pendingRefIds !== null) throw Error("Way index is not built.");
+    const start = this.refStart.at(index);
+    return this.refs.array.subarray(start, start + this.refCount.at(index));
   }
 
   /**

@@ -227,6 +227,7 @@ for await (const entity of stream) {
 - Requires Web Streams and `CompressionStream` / `DecompressionStream` (Node 24+, Bun, modern browsers).
 - `fromPbf` expects dense-node blocks; sparse node encodings throw.
 - `"simple"` in-stream bbox filtering may leave incomplete way geometry at boundaries; prefer `"complete_ways"` or `"smart"` for topology-safe extracts.
+- `createExtract` selects ways only by their nodes inside the bbox and adds entities in ascending ID order. Membership is tracked as bitsets over source entity indexes, so memory scales with the source dataset (about 1 bit per entity per tracking set) rather than hitting JS `Set` limits.
 - Tag filtering on dense nodes may drop refs when nodes precede ways in a block; use post-load `createExtract` when reference completeness matters.
 - View supports simple in-stream extraction. Complete/smart extraction, deduplication, routing, and other
   arbitrary-node spatial operations require Full; callers must reload or explicitly build the all-node

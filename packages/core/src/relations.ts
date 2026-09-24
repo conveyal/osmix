@@ -1,6 +1,7 @@
 import { buildRelationRings } from "@osmix/geo/relation-multipolygon";
 import type { OsmPbfRelation } from "@osmix/pbf";
 import { assertValue } from "@osmix/shared/assert";
+import { BitSet } from "@osmix/shared/bit-set";
 import type { ContentHasher } from "@osmix/shared/content-hasher";
 import type {
   GeoBbox2D,
@@ -74,8 +75,9 @@ export class Relations extends Entities<OsmRelation> {
   private nodes: Nodes;
   private ways: Ways;
 
-  // Lazily computed relation way membership. Invalidated whenever relations change.
-  private wayMemberIdsCache: ReadonlySet<number> | null = null;
+  // Lazily computed relation way membership keyed by way index. Invalidated whenever relations
+  // change, and rebuilt if the way count no longer matches.
+  private wayMemberCache: BitSet | null = null;
 
   /**
    * Create a new Relations index.
@@ -118,7 +120,7 @@ export class Relations extends Entities<OsmRelation> {
    * Add a single relation to the index.
    */
   addRelation(relation: OsmRelation) {
-    this.wayMemberIdsCache = null;
+    this.wayMemberCache = null;
     const relationIndex = this.addEntity(relation.id, relation.tags ?? {});
     this.memberStart.push(this.memberRefs.length);
     this.memberCount.push(relation.members.length);
@@ -138,7 +140,7 @@ export class Relations extends Entities<OsmRelation> {
     blockStringIndexMap: Uint32Array,
     filter?: (relation: OsmRelation) => OsmRelation | null,
   ): number {
-    this.wayMemberIdsCache = null;
+    this.wayMemberCache = null;
     const blockToStringTable = (k: number) => {
       const index = blockStringIndexMap[k];
       if (index === undefined) throw Error("Tag key not found");
@@ -377,30 +379,35 @@ export class Relations extends Entities<OsmRelation> {
   }
 
   /**
-   * Get all way IDs that are members of relations, including nested relations.
+   * Check whether a way is a member of any relation, including through nested relations.
    * Used to exclude these ways from individual rendering.
+   *
+   * Membership is computed once and cached as one bit per way index. Requires the way ID index.
    */
-  getWayMemberIds(): ReadonlySet<number> {
-    if (this.wayMemberIdsCache !== null) return this.wayMemberIdsCache;
+  isWayMember(wayIndex: number): boolean {
+    return this.getWayMembers().has(wayIndex);
+  }
 
-    const wayIds = new Set<number>();
+  private getWayMembers(): BitSet {
+    if (this.wayMemberCache !== null && this.wayMemberCache.size === this.ways.size) {
+      return this.wayMemberCache;
+    }
+
+    const members = new BitSet(this.ways.size);
+    const getRelation = (relId: number) => {
+      const relIndex = this.ids.getIndexFromId(relId);
+      if (relIndex === -1) return null;
+      return this.getByIndex(relIndex);
+    };
     for (let i = 0; i < this.size; i++) {
-      const relation = this.getByIndex(i);
-      const resolved = resolveRelationMembers(
-        relation,
-        (relId) => {
-          const relIndex = this.ids.getIndexFromId(relId);
-          if (relIndex === -1) return null;
-          return this.getByIndex(relIndex);
-        },
-        10, // max depth
-      );
+      const resolved = resolveRelationMembers(this.getByIndex(i), getRelation, 10);
       for (const wayId of resolved.ways) {
-        wayIds.add(wayId);
+        const wayIndex = this.ways.ids.getIndexFromId(wayId);
+        if (wayIndex !== -1) members.add(wayIndex);
       }
     }
-    this.wayMemberIdsCache = wayIds;
-    return this.wayMemberIdsCache;
+    this.wayMemberCache = members;
+    return members;
   }
 
   /**
