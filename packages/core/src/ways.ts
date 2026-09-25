@@ -200,9 +200,11 @@ export class Ways extends Entities<OsmWay> {
   /**
    * Build the spatial index for ways.
    * If bbox data already exists (e.g., loaded from storage), reuses it.
+   * Returns the existing index when it is already built.
    */
   buildSpatialIndex() {
     if (!this.nodes.isReady()) throw Error("Node index is not ready.");
+    if (this.spatialIndexBuilt) return this.spatialIndex;
     if (this.size === 0) {
       this.spatialIndex = new Flatbush(1, 128, Float64Array, BufferConstructor);
       this.spatialIndexBuilt = true;

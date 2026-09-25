@@ -223,10 +223,12 @@ export class Relations extends Entities<OsmRelation> {
    * Build the spatial index for relations.
    * Handles nested relations by resolving all descendant nodes and ways.
    * If bbox data already exists (e.g., loaded from storage), reuses it.
+   * Returns the existing index when it is already built.
    */
   buildSpatialIndex() {
     if (!this.nodes.isReady()) throw Error("Node index is not ready.");
     if (!this.ways.isReady()) throw Error("Way index is not ready.");
+    if (this.spatialIndexBuilt) return this.spatialIndex;
     if (this.size === 0) {
       this.spatialIndex = new Flatbush(1, 128, Float64Array, BufferConstructor);
       this.spatialIndexBuilt = true;
