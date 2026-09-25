@@ -156,7 +156,7 @@ pnpm run verify:all
 
 **Workspace commands** support filtering: `pnpm --filter @osmix/merge dev`
 
-Development servers use [Portless](https://github.com/vercel-labs/portless) and stable HTTPS URLs: `merge.osmix.localhost`, `inspect.osmix.localhost`, `extract.osmix.localhost`, `bench.osmix.localhost`, `www.osmix.localhost`, `vt.osmix.localhost`, and `shortbread.osmix.localhost`. The first run creates and trusts a local certificate authority; run `pnpm exec portless trust` if trust setup was skipped. Branch-backed worktrees add the sanitized branch name as a prefix, while detached worktrees add their Git worktree ID, so concurrent checkouts do not compete for routes. Filtered commands retain the same naming convention.
+Development servers use [Portless](https://github.com/vercel-labs/portless) and stable HTTPS URLs: `merge.osmix.localhost`, `inspect.osmix.localhost`, `extract.osmix.localhost`, `bench.osmix.localhost`, `www.osmix.localhost`, `vt.osmix.localhost`, and `shortbread.osmix.localhost`. The first run creates and trusts a local certificate authority; run `pnpm exec portless trust` if trust setup was skipped. Each app sets its route name in the `"portless"` key of its `package.json`. Linked worktrees on a branch other than `main` add the sanitized branch name as a prefix, so concurrent checkouts do not compete for routes. Detached-HEAD worktrees get no prefix; create a branch or run `PORTLESS=0 pnpm run dev:app` instead.
 
 Set `PORTLESS=0` to bypass the proxy and run the underlying development command directly, for example `PORTLESS=0 pnpm --filter @osmix/merge dev`. Portless proxy and certificate state are user-level state and are not stored in this repository.
 
