@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "portless",
-    "dev:app": "node --watch server.ts",
+    "dev": "node --watch server.ts",
     "start": "node server.ts",
     "test": "node test/server.test.ts",
     "typecheck": "tsc --build --noEmit"
@@ -25,9 +24,5 @@
     "@osmix/pbf": "workspace:*",
     "@osmix/shared": "workspace:*",
     "typescript": "catalog:"
-  },
-  "portless": {
-    "name": "vt.osmix",
-    "script": "dev:app"
   }
 }

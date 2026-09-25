@@ -6,8 +6,7 @@
   "scripts": {
     "bench": "vitest bench",
     "build": "vite build",
-    "dev": "portless",
-    "dev:app": "vite",
+    "dev": "vite",
     "test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run --project '@osmix/bench*'",
     "typecheck": "tsc --build --noEmit"
   },
@@ -36,9 +35,5 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "^5.0.1"
-  },
-  "portless": {
-    "name": "bench.osmix",
-    "script": "dev:app"
   }
 }

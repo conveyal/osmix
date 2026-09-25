@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm -r --parallel --if-present dev",
     "build": "pnpm -r build",
     "check": "oxfmt . && oxlint --type-aware --fix --fix-dangerously",
     "clean": "rm -rf packages/*/dist apps/*/dist node_modules packages/*/node_modules apps/*/node_modules packages/*/*.tgz",
+    "dev": "portless",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint --type-aware --fix --fix-dangerously",

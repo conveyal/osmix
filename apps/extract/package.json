@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "portless",
-    "dev:app": "vite",
+    "dev": "vite",
     "test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run tests --project \"$npm_package_name\" --passWithNoTests",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
@@ -37,9 +36,5 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "^5.0.1"
-  },
-  "portless": {
-    "name": "extract.osmix",
-    "script": "dev:app"
   }
 }

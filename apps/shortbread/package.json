@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "portless",
-    "dev:app": "node --watch server.ts",
+    "dev": "node --watch server.ts",
     "start": "node server.ts",
     "stress:regional": "node test/regional-stress.ts",
     "test": "node test/server.test.ts",
@@ -26,9 +25,5 @@
   "devDependencies": {
     "@osmix/pbf": "workspace:*",
     "typescript": "catalog:"
-  },
-  "portless": {
-    "name": "shortbread.osmix",
-    "script": "dev:app"
   }
 }

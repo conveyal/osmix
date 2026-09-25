@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "portless",
-    "dev:app": "vite dev",
+    "dev": "vite dev",
     "start": "vite",
     "test": "vite build",
     "typecheck": "tsc --build --noEmit"
@@ -28,9 +27,5 @@
   "devDependencies": {
     "@osmix/shared": "workspace:*",
     "typescript": "catalog:"
-  },
-  "portless": {
-    "name": "www.osmix",
-    "script": "dev:app"
   }
 }
