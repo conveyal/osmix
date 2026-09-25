@@ -40,6 +40,17 @@ const STATUS_LABELS: Record<ActivityStatus, string> = {
 };
 
 /**
+ * Tree geometry, in one place so rows line up across levels. A row is a 12px chevron column, a
+ * 14px icon column, the title and `meta`, with 4px gaps, so the title starts at 34px. Children
+ * start 18px in, under the parent's icon, with the guide line dropping from the parent's chevron;
+ * a child's own title then starts under the parent's title.
+ */
+const ITEM_GRID = "grid w-full grid-cols-[0.75rem_0.875rem_minmax(0,1fr)_auto] gap-x-1";
+const CHILDREN = "ml-1.5 flex flex-col border-l pl-[11px]";
+/** Offset of message text and error blocks from a row's start: one chevron column plus a gap. */
+const TEXT_INSET = "ml-4";
+
+/**
  * A task or step in the activity tree: a status icon, title and right-aligned `meta` (a timer or
  * duration). With `children` it collapses, and nested rows hang off a guide line.
  */
@@ -80,7 +91,7 @@ export function ActivityItem({
       ) : null}
     </>
   );
-  const grid = "grid w-full grid-cols-[1rem_auto_minmax(0,1fr)_auto] items-center gap-x-1.5 py-1";
+  const grid = cn(ITEM_GRID, "items-center py-1");
   if (!children) {
     return (
       <div data-slot="activity-item" data-status={status} className={grid} title={titleAttribute}>
@@ -97,18 +108,21 @@ export function ActivityItem({
       >
         <ChevronRightIcon
           aria-hidden="true"
-          className="size-3.5 text-muted-foreground transition-transform group-data-panel-open:rotate-90"
+          className="size-3 text-muted-foreground transition-transform group-data-panel-open:rotate-90"
         />
         {header}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="ml-1.5 flex flex-col border-l pl-2.5">{children}</div>
+        <div className={CHILDREN}>{children}</div>
       </CollapsibleContent>
     </Collapsible>
   );
 }
 
-/** A plain message under a task: its level icon, text, and `meta` (e.g. "+2.31s"). */
+/**
+ * A plain message under a task: its level icon in the chevron column (under the parent's status
+ * icon), text aligned with the parent's title, and `meta` (e.g. "+2.31s").
+ */
 export function ActivityMessage({
   level,
   message,
@@ -126,14 +140,13 @@ export function ActivityMessage({
       data-level={level}
       title={titleAttribute}
       className={cn(
-        "grid grid-cols-[1rem_auto_minmax(0,1fr)_auto] items-start gap-x-1.5 py-0.5",
+        "grid grid-cols-[0.75rem_minmax(0,1fr)_auto] items-start gap-x-1 py-0.5",
         level === "info" && "text-muted-foreground",
         level === "warn" && "text-warning",
         level === "error" && "text-destructive",
       )}
     >
-      <span />
-      <span className="flex size-3.5 items-center justify-center">
+      <span className="flex h-lh items-center justify-center">
         {level === "warn" ? (
           <TriangleAlertIcon aria-hidden="true" className="size-3" />
         ) : level === "error" ? (
@@ -155,7 +168,10 @@ export function ActivityError({ message, stack }: { message: string; stack?: str
   return (
     <div
       data-slot="activity-error"
-      className="my-1 flex gap-1 rounded-sm border border-destructive/40 bg-destructive/5 p-2"
+      className={cn(
+        TEXT_INSET,
+        "my-1 flex gap-1 rounded-sm border border-destructive/40 bg-destructive/5 p-2",
+      )}
     >
       <pre className="min-w-0 flex-1 overflow-x-auto font-mono wrap-break-word whitespace-pre-wrap text-destructive">
         {text}
