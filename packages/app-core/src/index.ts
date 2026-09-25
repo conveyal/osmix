@@ -29,11 +29,13 @@ export {
 export { ensureOsmPbfDownloadName } from "./lib/osm-pbf-download-name.ts";
 export { createThrottledProgressLogger } from "./lib/progress-log.ts";
 export {
+  getSaveFileSupport,
+  hasNativeSaveFilePicker,
+  type SaveFileSupport,
   shouldRetrySavePickerWithPolyfill,
   showSaveFilePickerWithFallback,
 } from "./lib/save-file-picker.ts";
 export { canStoreBytes, type StorageCheck } from "./lib/storage-utils.ts";
-export { isStreamCloneable } from "./lib/stream-transfer.ts";
 export { createOsmixAppRemote, OsmixAppRemote, type OsmixAppRemoteOptions } from "./remote.ts";
 export {
   changesAtom,

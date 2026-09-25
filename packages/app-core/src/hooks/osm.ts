@@ -13,9 +13,8 @@ import { getBrowserLoadCapabilities } from "../lib/browser-capabilities.ts";
 import { prepareMergedOsmState } from "../lib/merged-osm-state.ts";
 import { describeOsmLoadFailure, type OsmLoadFailureContext } from "../lib/osm-load-failure.ts";
 import { ensureOsmPbfDownloadName } from "../lib/osm-pbf-download-name.ts";
-import { showSaveFilePickerWithFallback } from "../lib/save-file-picker.ts";
+import { chooseSaveTarget, downloadBlob } from "../lib/save-file-picker.ts";
 import { canStoreBytes } from "../lib/storage-utils.ts";
-import { isStreamCloneable } from "../lib/stream-transfer.ts";
 import type { OsmixAppRemote } from "../remote.ts";
 import { Log } from "../state/log.ts";
 import { osmDatasetVersionAtomFamily } from "../state/osm-version.ts";
@@ -498,8 +497,9 @@ export function useOsmFile(osmKey: string) {
     const withPrefix = sourceName.startsWith("osmix-") ? sourceName : `osmix-${sourceName}`;
     const rawSuggestedName = name ?? withPrefix;
     const suggestedName = ensureOsmPbfDownloadName(rawSuggestedName);
-    const fileHandle = await showSaveFilePickerWithFallback(
-      {
+    // Errors are logged, not rethrown: a rejected action reaches the app-wide error boundary.
+    try {
+      const target = await chooseSaveTarget({
         suggestedName,
         types: [
           {
@@ -507,22 +507,28 @@ export function useOsmFile(osmKey: string) {
             accept: { "application/x-protobuf": [".pbf"] },
           },
         ],
-      },
-      () => {
+      });
+      let fileName: string;
+      if (target.kind === "file") {
+        // The worker writes straight to the picked file.
+        await remote.toPbfFile(osmInfo.id, target.handle);
+        fileName = target.handle.name;
+      } else {
         task.update("Native save picker unavailable, falling back to browser download");
-      },
-    );
-    const stream = await fileHandle.createWritable();
-    if (isStreamCloneable(stream)) {
-      await remote.toPbf(osmInfo.id, stream);
-    } else {
-      task.update("Stream transfer unsupported in this browser; using buffered download fallback");
-      const data = await remote.toPbfData(osmInfo.id);
-      await stream.write(data);
-      await stream.close();
+        downloadBlob(await remote.toPbfBlob(osmInfo.id), target.name);
+        fileName = target.name;
+      }
+      task.end(`Created ${fileName} PBF for download`);
+      Log.addMessage(`Download complete: ${fileName}`);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        task.end("Download cancelled.");
+        return;
+      }
+      console.error(error);
+      const message = error instanceof Error ? error.message : String(error);
+      task.end(`Download failed: ${message}`, "error");
     }
-    task.end(`Created ${fileHandle.name} PBF for download`);
-    Log.addMessage(`Download complete: ${fileHandle.name}`);
   });
 
   const saveToStorage = useEffectEvent(async () => {

@@ -1,4 +1,10 @@
-import { appOrigin, OsmLoadFailurePanel, OsmPbfFileInput, useMap } from "@osmix/app-components";
+import {
+  appOrigin,
+  OsmLoadFailurePanel,
+  OsmPbfFileInput,
+  SaveToDiskNotice,
+  useMap,
+} from "@osmix/app-components";
 import {
   useLog,
   useOsmFile,
@@ -413,6 +419,7 @@ export function ExtractPanel() {
           >
             Download extracted PBF
           </ActionButton>
+          <SaveToDiskNotice />
           <p className="text-muted-foreground">
             To merge this extract, download it and open it in <a href={appOrigin("merge")}>Merge</a>
             .

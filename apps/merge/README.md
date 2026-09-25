@@ -121,6 +121,7 @@ See [Australia-scale manual verification](./AUSTRALIA-PBF-CHECKLIST.md) for the 
 
 - **Secure context warnings** – If the system check reports a missing secure context, make sure you’re on `https://` (or `localhost`) and disable extensions that inject insecure content.
 - **File picker errors** – Exports try native `showSaveFilePicker` first, then automatically fall back to browser download when picker APIs are unavailable/restricted.
+- **Downloads built in memory** – Browsers without `showSaveFilePicker` (Firefox, Safari, and Brave by default) hold the whole PBF in memory before the download starts, and the app shows a note next to the download button. In Brave, enable `brave://flags/#file-system-access-api` and relaunch to save straight to disk.
 - **Raster tiles missing** – Cross-origin isolation is required for OffscreenCanvas. Confirm the dev server sent the COOP/COEP headers listed in `vite.config.ts`.
 - **A control requires Full** – The dataset was loaded without an all-node index. Use the offered reload action
   and select Full; the app does not construct that index lazily.

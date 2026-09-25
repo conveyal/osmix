@@ -319,6 +319,11 @@ function carTopologyChanged(delta: OsmConflationRoutingDelta) {
   return delta.delta.routableNodes !== 0 || delta.delta.edges !== 0 || delta.delta.components !== 0;
 }
 
+/** `Blob` parts cannot be views of a `SharedArrayBuffer`. */
+function isArrayBufferBacked(chunk: Uint8Array): chunk is Uint8Array<ArrayBuffer> {
+  return chunk.buffer instanceof ArrayBuffer;
+}
+
 import {
   fromPbf,
   getOsmLoadDecision as getStoredOsmLoadDecision,
@@ -419,6 +424,32 @@ export class OsmixWorker extends EventTarget {
   async toPbf(osmId: string) {
     const data = await toPbfBuffer(this.get(osmId));
     return Comlink.transfer(data, [data.buffer]);
+  }
+
+  /**
+   * Serialize an Osm instance to PBF and write it through a file handle.
+   * The handle is structured-cloneable, so the worker writes to disk without a main-thread hop.
+   */
+  async toPbfFile({ osmId, fileHandle }: { osmId: string; fileHandle: FileSystemFileHandle }) {
+    const osm = this.get(osmId);
+    await toPbfStream(osm).pipeTo(await fileHandle.createWritable());
+  }
+
+  /**
+   * Serialize an Osm instance to a PBF `Blob`.
+   * Chunks are not concatenated, and posting a `Blob` shares it instead of copying its bytes.
+   */
+  async toPbfBlob(osmId: string): Promise<Blob> {
+    const chunks: Uint8Array<ArrayBuffer>[] = [];
+    await toPbfStream(this.get(osmId)).pipeTo(
+      new WritableStream({
+        write(chunk) {
+          if (!isArrayBufferBacked(chunk)) throw Error("PBF writer emitted a shared-memory chunk.");
+          chunks.push(chunk);
+        },
+      }),
+    );
+    return new Blob(chunks, { type: "application/x-protobuf" });
   }
 
   /**

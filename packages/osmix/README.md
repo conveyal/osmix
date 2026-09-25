@@ -445,7 +445,8 @@ example that adds IndexedDB storage.
 - Loading and merging synchronize datasets across the pool in multi-worker
   mode; in single-worker and in-process modes there is nothing to synchronize.
 - Streams are transferred to workers when the browser supports transferable
-  streams and buffered otherwise (`supportsReadableStreamTransfer()`).
+  streams (`supportsReadableStreamTransfer()`). Otherwise `remote.toPbf` pipes a
+  worker-built `Blob`, so serialization stays off the main thread.
 
 `OsmixRemote` exposes the same helpers as the main import: `fromPbf`,
 `fromGeoJSON`, `getVectorTile`, `getRasterTile`, `search`, `merge`,
@@ -573,6 +574,8 @@ spec-compliant without staging everything in memory.
   `OsmixCommittedMutationError`, without generating or applying changes again.
 - `remote.search(osmId, key, val?)` - Search by tag.
 - `remote.toPbf(osmId, stream)` - Export to PBF.
+- `remote.toPbfFile(osmId, fileHandle)` - Write PBF through a `FileSystemFileHandle` (for example from `showSaveFilePicker()`). The worker writes to the file directly, so transferable streams are not required.
+- `remote.toPbfBlob(osmId)` - Serialize to a PBF `Blob` in a worker, for a browser download.
 
 #### Routing
 

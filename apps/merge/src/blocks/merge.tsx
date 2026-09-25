@@ -7,6 +7,7 @@ import {
   ChangesFilters,
   ChangesPagination,
   OsmInfoTable,
+  SaveToDiskNotice,
   StoredOsmList,
   useFlyToEntity,
   useFlyToOsmBounds,
@@ -1627,6 +1628,7 @@ export default function MergeBlock() {
               </Card>
             )}
 
+            <SaveToDiskNotice />
             <StepActions aria-label="Final merged OSM actions">
               {!base.isStored && base.canStore && (
                 <ActionButton icon={<SaveIcon />} onAction={base.saveToStorage} variant="outline">

@@ -20,6 +20,7 @@ export {
 export { default as EntityDetailsMapControl } from "./components/entity-details-map-control.tsx";
 export { default as EntityLookup } from "./components/entity-lookup.tsx";
 export { FullIndexRequired, hasFullNodeIndex } from "./components/full-index-required.tsx";
+export { SaveToDiskNotice } from "./components/save-to-disk-notice.tsx";
 export { InspectPanel } from "./components/inspect-panel.tsx";
 export { default as LogContent } from "./components/log.tsx";
 export { default as MapLayerControl, MapLayers } from "./components/map-layer-control.tsx";

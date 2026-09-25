@@ -3,7 +3,7 @@ import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/test-util
 import type { FeatureCollection, LineString, Point } from "geojson";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { merge } from "../src/index";
+import { fromPbf, merge } from "../src/index";
 import { createRemote, OsmixDatasetLossError, OsmixRemote } from "../src/remote";
 import { createBlockedBridgeFixture, entitySnapshot } from "./conflation-blocked-fixture";
 
@@ -850,6 +850,82 @@ describe("OsmixRemote", () => {
         expect(retrieved.id).toBe("manual-set-remote");
         expect(retrieved.nodes.size).toBe(monacoPbf.nodes);
         expect(await remote.has("original-remote")).toBe(false);
+      },
+      workerTestTimeout,
+    );
+  });
+
+  describe("PBF export", () => {
+    beforeAll(() => getFixtureFile(monacoPbf.url));
+
+    async function loadMonaco(remote: OsmixRemote, id: string) {
+      const pbfData = await getFixtureFile(monacoPbf.url);
+      return remote.fromPbf(pbfData.buffer, { id });
+    }
+
+    async function expectMonacoPbf(bytes: ArrayBuffer, id: string) {
+      const reparsed = await fromPbf(new Uint8Array(bytes), { id });
+      expect(reparsed.nodes.size).toBe(monacoPbf.nodes);
+      expect(reparsed.ways.size).toBe(monacoPbf.ways);
+      expect(reparsed.relations.size).toBe(monacoPbf.relations);
+    }
+
+    it(
+      "builds a PBF Blob in the worker",
+      async () => {
+        using remote = await createRemote({ inProcess: true });
+        const dataset = await loadMonaco(remote, "export-blob");
+        const blob = await dataset.toPbfBlob();
+        expect(blob.type).toBe("application/x-protobuf");
+        await expectMonacoPbf(await blob.arrayBuffer(), "export-blob-reparsed");
+      },
+      workerTestTimeout,
+    );
+
+    it(
+      "writes a PBF through a file handle's writable",
+      async () => {
+        using remote = await createRemote({ inProcess: true });
+        const dataset = await loadMonaco(remote, "export-file");
+        const chunks: Uint8Array<ArrayBuffer>[] = [];
+        let closed = false;
+        const fileHandle = {
+          createWritable: async () =>
+            new WritableStream<Uint8Array<ArrayBuffer>>({
+              write(chunk) {
+                chunks.push(chunk);
+              },
+              close() {
+                closed = true;
+              },
+            }),
+        } as unknown as FileSystemFileHandle;
+
+        await dataset.toPbfFile(fileHandle);
+
+        expect(closed).toBe(true);
+        await expectMonacoPbf(await new Blob(chunks).arrayBuffer(), "export-file-reparsed");
+      },
+      workerTestTimeout,
+    );
+
+    it(
+      "serializes in the worker when streams cannot be transferred",
+      async () => {
+        using remote = await createRemote({ inProcess: true });
+        const dataset = await loadMonaco(remote, "export-stream-fallback");
+        const get = vi.spyOn(remote, "get");
+        const toPbfBlob = vi.spyOn(remote, "toPbfBlob");
+        // `supportsReadableStreamTransfer()` needs a MessageChannel.
+        vi.stubGlobal("MessageChannel", undefined);
+        const output = new TransformStream<Uint8Array, Uint8Array>();
+        const bytes = new Response(output.readable).arrayBuffer();
+
+        await dataset.toPbf(output.writable);
+
+        expect(toPbfBlob).toHaveBeenCalledOnce();
+        expect(get).not.toHaveBeenCalled();
+        await expectMonacoPbf(await bytes, "export-stream-fallback-reparsed");
       },
       workerTestTimeout,
     );

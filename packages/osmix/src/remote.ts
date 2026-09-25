@@ -22,7 +22,7 @@ import { validateOrdinaryChangesetOptions } from "@osmix/change/internal/changes
 import { Osm, type OsmInfo, type OsmOptions, type OsmTransferables } from "@osmix/core";
 import type { GeoParquetReadOptions } from "@osmix/geoparquet";
 import { type GtfsConversionOptions, isGtfsZip as isGtfsZipBytes } from "@osmix/gtfs";
-import { type OsmFromPbfOptions, type OsmLoadDecision, toPbfStream } from "@osmix/load";
+import type { OsmFromPbfOptions, OsmLoadDecision } from "@osmix/load";
 import type {
   DefaultSpeeds,
   HighwayFilter,
@@ -98,6 +98,8 @@ type DatasetProxyMethodName =
   | "getVectorTile"
   | "getRasterTile"
   | "toPbfData"
+  | "toPbfBlob"
+  | "toPbfFile"
   | "toPbf"
   | "transferOut"
   | "delete"
@@ -938,13 +940,35 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   }
 
   /**
+   * Serialize an `Osm` instance to PBF and write it through a `FileSystemFileHandle`, such as one
+   * from `showSaveFilePicker()`. The handle is cloned to a worker, which writes to disk directly,
+   * so this does not need transferable streams.
+   */
+  toPbfFile(osmId: OsmId, fileHandle: FileSystemFileHandle) {
+    return this.runWithWorker(
+      (worker) => worker.toPbfFile({ osmId: this.getId(osmId), fileHandle }),
+      { lane: "any", retry: "never" },
+    );
+  }
+
+  /**
+   * Serialize an `Osm` instance to a PBF `Blob` in a worker.
+   * Avoids the contiguous copy that `toPbfData` makes; browsers can page large blobs to disk.
+   */
+  toPbfBlob(osmId: OsmId) {
+    return this.runWithWorker((worker) => worker.toPbfBlob(this.getId(osmId)), {
+      retry: "once",
+    });
+  }
+
+  /**
    * Serialize an `Osm` instance to PBF and write to the provided stream.
-   * Automatically selects worker-based streaming or fallback based on browser support.
+   * Transfers the stream to a worker when supported; otherwise pipes a worker-built `Blob`.
    */
   async toPbf(osmId: OsmId, stream: WritableStream<Uint8Array>) {
     if (supportsReadableStreamTransfer()) return this.toPbfStream(osmId, stream);
-    const osm = await this.get(osmId);
-    return toPbfStream(osm).pipeTo(stream);
+    const blob = await this.toPbfBlob(osmId);
+    return blob.stream().pipeTo(stream);
   }
 
   /**

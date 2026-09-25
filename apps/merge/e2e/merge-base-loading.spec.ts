@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { Osm, toPbfBuffer } from "osmix";
+import { fromPbf, Osm, toPbfBuffer } from "osmix";
 
 import { createWayRemovalInputs } from "../tests/fixtures/way-removal";
 
@@ -197,6 +197,16 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
       features: [{ entityType: "node", sourceId: 101, copiedKeys: ["name"] }],
     },
   });
+  // Automated Chromium cannot use the native save picker, so this covers the Blob download path.
+  const pbfDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download merged OSM PBF" }).click();
+  const mergedPbf = await pbfDownload;
+  expect(mergedPbf.suggestedFilename()).toMatch(/\.pbf$/);
+  const mergedPbfPath = await mergedPbf.path();
+  if (!mergedPbfPath) throw Error("Missing merged PBF download");
+  const merged = await fromPbf(await readFile(mergedPbfPath), { id: "downloaded-merge" });
+  expect(merged.ways.getById(10)?.refs).toEqual([2, 1]);
+  expect(merged.nodes.getById(1)?.tags?.["name"]).toBe("Imported entrance");
   await page.getByRole("button", { name: "Start a new merge" }).click();
   await expect(page.getByText("Select merge inputs and options", { exact: false })).toBeVisible();
   await expect(summary).toHaveCount(0);
