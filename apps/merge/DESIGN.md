@@ -8,6 +8,10 @@ tokens, spacing, primitives, map-control CSS) lives in
 
 - `MergeStepGuide` — the standard layered explanation at the top of each
   numbered merge stage.
+- `MergeStart` — the input step's "Workflow" card: the "Run every stage
+  automatically, without review" checkbox (its `InfoTooltip` lists what runs
+  without stopping) and the one regular "Start merge" `Button`. The only
+  visible help is the reason the checkbox is disabled during removal review.
 - `StepActions` — the full-width vertical action footer for Merge workflow
   stages. It keeps long decision labels contained in the narrow sidebar.
 - `AutomaticMergeProgress` — a `Card` listing the automatic workflow's stages
@@ -100,9 +104,10 @@ Use the merge terms consistently:
   preserving existing shared junctions, including bridge and tunnel entrances.
   New grade-separated interior crossings remain disconnected, and unsafe
   shared-junction substitutions leave the original connections unchanged.
-- **Review each merge stage** exposes previews and checkpoints. **Run automatic
-  merge** skips those checkpoints and uses only behavior explicitly configured
-  for the automatic path.
+- **Start merge** with **Run every stage automatically** off exposes previews
+  and checkpoints for each stage. With it on, the merge skips those checkpoints
+  and uses only behavior explicitly configured for the automatic path. Removal
+  review requires the reviewed workflow, so it disables that checkbox.
 
 Labels must state what a control changes instead of relying on a placeholder.
 Put concise supporting text next to unfamiliar controls and connect it with

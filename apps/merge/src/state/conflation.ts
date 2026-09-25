@@ -37,3 +37,6 @@ export const resetConflationReviewAtom = atom(null, (_get, set) => {
   set(conflationRoutingDiagnosticsAtom, null);
   set(conflationComparisonAtom, { type: "FeatureCollection", features: [] });
 });
+
+/** Whether "Start merge" runs every stage without review. Off by default; kept for the session. */
+export const automaticMergeAtom = atom(false);

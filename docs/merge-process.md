@@ -409,7 +409,7 @@ Matching additionally verifies preservation of the ordinary-result base topology
 
 1. Load both inputs in Full mode and inspect their roles and identity assumptions.
 2. Configure optional matching. Removal remains an individual review action; use the reviewed workflow to select it.
-3. Run automatic merge. Diagnostics and intermediate user checkpoints are skipped.
+3. Check "Run every stage automatically, without review" and start the merge. Diagnostics and intermediate user checkpoints are skipped.
 4. Generate and apply the direct/exact result, with selected automatic matching when enabled.
 5. Run and apply intersections.
 6. Refresh the completed dataset and read the prominent applied/unresolved summary before downloading.
@@ -432,7 +432,7 @@ Automatic mode completes with unresolved work reported; it does not silently acc
 
 ### Review each merge stage
 
-1. Select inputs and optionally run within-file duplicate diagnostics. Diagnostics change neither input.
+1. Select inputs, leave "Run every stage automatically" unchecked, and start the merge. Optionally run within-file duplicate diagnostics. Diagnostics change neither input.
 2. Generate and inspect the direct preview. This has not committed the cumulative merge.
 3. If matching is enabled, discover candidates from the original inputs, inspect evidence, and select actions. Review all alternatives for a source together.
 4. Choose exact reconciliation and generate the cumulative direct/exact/matching preview. Recheck removal dependencies and actual outcomes. Editing choices requires a new preview.

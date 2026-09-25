@@ -28,7 +28,8 @@ test("extracts a bounding box from a PBF and offers the result for download", as
   await extractButton.click();
 
   const download = page.getByRole("button", { name: "Download extracted PBF" });
-  const failure = page.getByRole("alert");
+  // The in-page Alert, not the error toast that also announces as \`alert\`.
+  const failure = page.locator('[data-slot="alert"][role="alert"]');
   // Extraction crosses the worker boundary; wait for its outcome rather than the default limit.
   await expect
     .poll(async () => (await download.isEnabled()) || (await failure.isVisible()), {

@@ -76,7 +76,8 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
     "monaco.pbf",
   );
 
-  await page.getByRole("button", { name: /^Review each merge stage/ }).click();
+  // Automatic mode is off by default, so Start merge enters the reviewed workflow.
+  await page.getByRole("button", { name: "Start merge" }).click();
   await expect(page.getByRole("heading", { name: /^2\.\s*Inspect base OSM$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Skip base diagnostic" })).toBeVisible();
 
@@ -162,7 +163,10 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   await page.getByLabel("OSM tag keys to copy").fill("name");
   const radius = page.getByRole("spinbutton", { name: "Candidate search radius (meters)" });
   await radius.fill("0");
-  const start = page.getByRole("button", { name: /Run automatic merge/ });
+  await page
+    .getByRole("checkbox", { name: "Run every stage automatically, without review" })
+    .check();
+  const start = page.getByRole("button", { name: "Start merge" });
   await expect(start).toBeEnabled();
   await start.click();
   await expect(radius).toBeFocused();
@@ -173,7 +177,7 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   await expect(patchCard).toContainText(inputs.patch.name);
   await radius.fill("1");
   await expect(radius).not.toHaveAttribute("aria-invalid", "true");
-  await page.getByRole("button", { name: /Run automatic merge/ }).click();
+  await start.click();
   const summary = page.getByLabel("Merge completion summary");
   await expect(summary).toBeVisible();
   await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toBeVisible();
@@ -235,10 +239,13 @@ test("manual removal requires preview and rediscovery clears stale removal evide
   await page.getByRole("checkbox", { name: "Enable proximity matching" }).check();
   await page.getByRole("checkbox", { name: "Copy tags", exact: true }).uncheck();
   await page.getByRole("checkbox", { name: "Review redundant way removal" }).check();
-  const automatic = page.getByRole("button", { name: /Run automatic merge/ });
+  const automatic = page.getByRole("checkbox", {
+    name: "Run every stage automatically, without review",
+  });
   await expect(automatic).toBeDisabled();
-  await expect(automatic).toHaveAccessibleDescription(/Review each merge stage/);
-  await page.getByRole("button", { name: /^Review each merge stage/ }).click();
+  await expect(automatic).not.toBeChecked();
+  await expect(automatic).toHaveAccessibleDescription(/reviewed workflow/);
+  await page.getByRole("button", { name: "Start merge" }).click();
   await page.getByRole("button", { name: "Skip base diagnostic" }).click();
   await page.getByRole("button", { name: "Skip patch diagnostic" }).click();
   await page.getByRole("button", { name: "Preview direct merge" }).click();
@@ -321,14 +328,20 @@ test("a late cancellation preserves the committed exact result and replacing the
       return result;
     };
   });
-  await page.getByRole("button", { name: /Run automatic merge/ }).click();
+  await page
+    .getByRole("checkbox", { name: "Run every stage automatically, without review" })
+    .check();
+  await page.getByRole("button", { name: "Start merge" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-test-merge-committed", "true");
   await page.getByRole("button", { name: "Request cancellation" }).click();
   await page.evaluate(() => document.dispatchEvent(new Event("test-release-merge")));
   const summary = page.getByLabel("Merge completion summary");
-  await expect(page.getByRole("alert")).toContainText("Injected completed-result refresh failure");
+  // Scope to the in-page Alert: the task's error toast is also a live `alert` region.
+  await expect(page.locator('[data-slot="alert"][role="alert"]')).toContainText(
+    "Injected completed-result refresh failure",
+  );
   await expect(summary).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Run automatic merge/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Start merge" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toHaveCount(0);
   await page.getByRole("button", { name: "Refresh merged dataset" }).click();
   await expect(summary).toBeVisible();

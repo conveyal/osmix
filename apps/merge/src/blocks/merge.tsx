@@ -37,12 +37,6 @@ import {
   CardAction,
   CardContent,
   CardHeader,
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle,
   IconButton,
   Step as StepCard,
   useTaskLock,
@@ -51,10 +45,7 @@ import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
-  CheckCircleIcon,
-  ChevronRightIcon,
   DownloadIcon,
-  FastForwardIcon,
   FileDiffIcon,
   MaximizeIcon,
   MergeIcon,
@@ -85,6 +76,7 @@ import { ConflationRoutingDiagnostics } from "../components/conflation-routing-d
 import { ConflationWayRemovalPreview } from "../components/conflation-way-removal";
 import { BackToMatching, MatchingReviewProblem } from "../components/matching-review-recovery";
 import { MergeCompletionSummary } from "../components/merge-completion-summary";
+import { MergeStart } from "../components/merge-start";
 import { MergeStepGuide, type MergeStepGuideId } from "../components/merge-step-guide";
 import { OsmInputCardHeader } from "../components/osm-input-card-header";
 import { StepActions } from "../components/step-actions";
@@ -645,6 +637,207 @@ export default function MergeBlock() {
     return { osmId: changesetStats.osmId, synchronize };
   };
 
+  /** Enter the reviewed workflow: every stage pauses for inspection and approval. */
+  const startReviewedMerge = () => {
+    if (!canStartConfiguredMerge()) return;
+    beginMergeOutcome();
+    setChangesetStats(null);
+    resetConflationReview();
+    nextStep();
+  };
+
+  /** Run every stage without checkpoints, as one task whose steps are the stages. */
+  const runAutomaticMerge = async () => {
+    // Removal review needs the reviewed workflow; `MergeStart` never offers automatic then.
+    if (requiresRemovalReview) throw Error("Automatic merge is unavailable with removal review");
+    if (!canStartConfiguredMerge()) return;
+    // Check inputs before the task starts so a failed check never leaves it open.
+    if (!base.osm) throw Error("Base OSM is not loaded");
+    if (!patch.osm) throw Error("Patch OSM is not loaded");
+    beginMergeOutcome();
+    const automaticSteps: readonly AutomaticMergeStep[] = conflationOptions
+      ? CONFLATION_AUTOMATIC_MERGE_STEPS
+      : EXACT_AUTOMATIC_MERGE_STEPS;
+    const abortController = new AbortController();
+    const task = Tasks.start("Run automatic merge", { controller: abortController });
+    setAutomaticMergeProgress({ taskId: task.id, steps: automaticSteps });
+    goToStep("run-all-steps");
+    setMergeAbortController(abortController);
+    // Each automatic stage is a step of the task; entering one ends the previous.
+    let stage: TaskHandle | null = null;
+    const enterStage = (id: AutomaticMergeStepId) => {
+      const step = automaticSteps.find((candidate) => candidate.id === id);
+      if (!step) throw Error(`Unknown automatic merge stage: ${id}`);
+      stage?.end();
+      stage = task.step(step.label);
+    };
+
+    const baseOsmId = base.osm.id;
+    const patchOsmId = patch.osm.id;
+    const mergedName = makeMergedDownloadName(base.fileInfo?.fileName, patch.fileInfo?.fileName);
+    // Track transaction boundaries separately: each failure state has a different
+    // safe recovery path and we cannot roll back an applied worker changeset.
+    let conflationDiscoveryCompleted = false;
+    let conflationBaseApplied = false;
+    let mergePipelineCompleted = false;
+    let completedOsmId = baseOsmId;
+
+    try {
+      setChangesetStats(null);
+      resetConflationReview();
+      if (conflationOptions) {
+        const result = await runConflationAllSteps({
+          baseOsmId,
+          conflation: conflationOptions,
+          isCancelled: () => abortController.signal.aborted,
+          onBaseApplied: () => {
+            updateMergeOutcome({ type: "applied" });
+            conflationBaseApplied = true;
+          },
+          onIntersectionsApplied: () => {
+            mergePipelineCompleted = true;
+          },
+          onDiscovered: (summary) => {
+            conflationDiscoveryCompleted = true;
+            setConflationSummary(summary);
+            const unresolved = summary.review + summary.blocked + summary.unmatched;
+            Tasks.message(
+              `Imported-data matching found ${summary.automatic.toLocaleString()} automatic and ${unresolved.toLocaleString()} unresolved candidates`,
+            );
+          },
+          onGenerated: (generation) => {
+            updateMergeOutcome({ type: "generated", outcome: generation.outcome });
+            setConflationRoutingDiagnostics(generation.routing);
+            Tasks.message(
+              `Verified imported-data changes: ${changeStatsSummary(generation.stats)}`,
+            );
+          },
+          onStageChange: enterStage,
+          patchOsmId,
+          worker: remote,
+        });
+
+        if (result.status === "cancelled") {
+          await remote.clearConflation(baseOsmId);
+          task.cancelled("Merge cancelled");
+          goToStep("select-osm-pbf-files");
+          return;
+        }
+
+        mergePipelineCompleted = true;
+        enterStage("refresh-result");
+        await refreshMergedResult(result.generation.stats.osmId, mergedName, true);
+        setChangesetStats(null);
+        task.end(
+          `Automatic merge completed; intersections: ${changeStatsSummary(result.intersections)}`,
+        );
+        showVerifiedMergeResult();
+        return;
+      }
+      enterStage("merge-exact");
+      const merged = await remote.merge(baseOsmId, patchOsmId, completeMergeOptions());
+
+      mergePipelineCompleted = true;
+      completedOsmId = merged.id;
+      // The atomic worker stage already committed. Finish refreshing its result even
+      // when cancellation arrived too late; the original inputs are no longer live.
+      if (abortController.signal.aborted) {
+        task.message(
+          "Cancellation arrived after the merge was applied. Refreshing the completed result; start a new merge to use the original inputs again.",
+          "warn",
+        );
+      }
+
+      // Use setMergedOsm to properly update file info for the new merged result
+      enterStage("refresh-result");
+      updateMergeOutcome({ type: "applied" });
+      await refreshMergedResult(merged.id, mergedName, true);
+      task.end("Automatic merge completed");
+      showVerifiedMergeResult();
+    } catch (error) {
+      const committedMergeId = committedMutationOsmId(error, "merge");
+      const committedApplyId = committedMutationOsmId(error, "applyChangesAndReplace");
+      if (mergePipelineCompleted || committedMergeId) {
+        if (committedMergeId) updateMergeOutcome({ type: "applied" });
+        // The worker finished every mutation; only refreshing React state failed.
+        try {
+          await refreshMergedResult(
+            mergedOsmRefreshRetryId(error, committedMergeId ?? committedApplyId ?? completedOsmId),
+            mergedName,
+            true,
+            Boolean(committedMergeId || committedApplyId),
+          );
+          setChangesetStats(null);
+          task.end("Automatic merge completed after refreshing the merged dataset");
+          showVerifiedMergeResult();
+        } catch (refreshError) {
+          task.fail(
+            refreshError,
+            `All merge stages completed, but the merged dataset could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`,
+          );
+        }
+      } else if (conflationBaseApplied) {
+        // Preserve both datasets so the user can retry intersection creation without
+        // rediscovering or reapplying imported-data matches.
+        try {
+          await refreshMergedResult(baseOsmId, mergedName, false, Boolean(committedApplyId));
+        } catch (refreshError) {
+          Tasks.message(
+            `Could not refresh the partially merged base: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`,
+            "warn",
+          );
+        }
+        task.fail(
+          error,
+          `Imported-data changes were applied, but the remaining stages could not finish: ${error instanceof Error ? error.message : "Unknown error"}. The patch remains loaded; refresh the dataset if needed, then continue with intersections.`,
+        );
+        goToStep("create-intersections");
+      } else if (abortController.signal.aborted) {
+        task.cancelled("Merge cancelled");
+        goToStep("select-osm-pbf-files");
+      } else {
+        task.fail(
+          error,
+          `Merge failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+        if (conflationOptions) {
+          const issue = matchingReviewIssue(error);
+          setMatchingIssue(issue);
+          // Discovery is read-only, so returning to candidate review is safe even when
+          // generation failed partway through validation.
+          const restoreFailure = await recoverConflationRunAllFailure({
+            restoreReview: conflationDiscoveryCompleted
+              ? async () => {
+                  if (issue.source) {
+                    await remote.setConflationFilter(baseOsmId, issue.source);
+                    setConflationCandidateFilter(issue.source);
+                  }
+                  const [summary, page] = await Promise.all([
+                    remote.getConflationSummary(baseOsmId),
+                    remote.getConflationPage(baseOsmId, 0, CONFLATION_PAGE_SIZE, {
+                      groupBySource: true,
+                    }),
+                  ]);
+                  setConflationSummary(summary);
+                  setConflationCandidatePageIndex(0);
+                  setConflationCandidatePage(page);
+                }
+              : undefined,
+            showReview: () => goToStep("match-imported-data"),
+          });
+          if (restoreFailure) {
+            Tasks.message(
+              `Could not restore candidate details after the failed merge: ${restoreFailure.error instanceof Error ? restoreFailure.error.message : "Unknown error"}`,
+              "warn",
+            );
+          }
+        }
+      }
+    } finally {
+      setMergeAbortController(null);
+    }
+  };
+
   const hasZeroChanges = useMemo(() => {
     if (!changesetStats) return true;
     return changesetStats.totalChanges === 0;
@@ -826,274 +1019,12 @@ export default function MergeBlock() {
 
         <ConflationConfig />
 
-        <div className="flex flex-col gap-4">
-          <Item
-            render={
-              <button
-                type="button"
-                disabled={!base.osm || !patch.osm || taskLocked}
-                onClick={() => {
-                  if (!canStartConfiguredMerge()) return;
-                  beginMergeOutcome();
-                  setChangesetStats(null);
-                  resetConflationReview();
-                  nextStep();
-                }}
-              />
-            }
-          >
-            <ItemMedia>
-              <CheckCircleIcon />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>Review each merge stage</ItemTitle>
-              <ItemDescription>
-                Inspect diagnostics and approve each changeset before the in-memory base changes.
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <ChevronRightIcon />
-            </ItemActions>
-          </Item>
-          <Item
-            render={
-              <button
-                type="button"
-                disabled={!base.osm || !patch.osm || requiresRemovalReview || taskLocked}
-                aria-describedby={
-                  requiresRemovalReview ? "removal-manual-review-required" : undefined
-                }
-                onClick={async () => {
-                  if (requiresRemovalReview) return;
-                  if (!canStartConfiguredMerge()) return;
-                  // Check inputs before the task starts so a failed check never leaves it open.
-                  if (!base.osm) throw Error("Base OSM is not loaded");
-                  if (!patch.osm) throw Error("Patch OSM is not loaded");
-                  beginMergeOutcome();
-                  const automaticSteps: readonly AutomaticMergeStep[] = conflationOptions
-                    ? CONFLATION_AUTOMATIC_MERGE_STEPS
-                    : EXACT_AUTOMATIC_MERGE_STEPS;
-                  const abortController = new AbortController();
-                  const task = Tasks.start("Run automatic merge", { controller: abortController });
-                  setAutomaticMergeProgress({ taskId: task.id, steps: automaticSteps });
-                  goToStep("run-all-steps");
-                  setMergeAbortController(abortController);
-                  // Each automatic stage is a step of the task; entering one ends the previous.
-                  let stage: TaskHandle | null = null;
-                  const enterStage = (id: AutomaticMergeStepId) => {
-                    const step = automaticSteps.find((candidate) => candidate.id === id);
-                    if (!step) throw Error(`Unknown automatic merge stage: ${id}`);
-                    stage?.end();
-                    stage = task.step(step.label);
-                  };
-
-                  const baseOsmId = base.osm.id;
-                  const patchOsmId = patch.osm.id;
-                  const mergedName = makeMergedDownloadName(
-                    base.fileInfo?.fileName,
-                    patch.fileInfo?.fileName,
-                  );
-                  // Track transaction boundaries separately: each failure state has a different
-                  // safe recovery path and we cannot roll back an applied worker changeset.
-                  let conflationDiscoveryCompleted = false;
-                  let conflationBaseApplied = false;
-                  let mergePipelineCompleted = false;
-                  let completedOsmId = baseOsmId;
-
-                  try {
-                    setChangesetStats(null);
-                    resetConflationReview();
-                    if (conflationOptions) {
-                      const result = await runConflationAllSteps({
-                        baseOsmId,
-                        conflation: conflationOptions,
-                        isCancelled: () => abortController.signal.aborted,
-                        onBaseApplied: () => {
-                          updateMergeOutcome({ type: "applied" });
-                          conflationBaseApplied = true;
-                        },
-                        onIntersectionsApplied: () => {
-                          mergePipelineCompleted = true;
-                        },
-                        onDiscovered: (summary) => {
-                          conflationDiscoveryCompleted = true;
-                          setConflationSummary(summary);
-                          const unresolved = summary.review + summary.blocked + summary.unmatched;
-                          Tasks.message(
-                            `Imported-data matching found ${summary.automatic.toLocaleString()} automatic and ${unresolved.toLocaleString()} unresolved candidates`,
-                          );
-                        },
-                        onGenerated: (generation) => {
-                          updateMergeOutcome({ type: "generated", outcome: generation.outcome });
-                          setConflationRoutingDiagnostics(generation.routing);
-                          Tasks.message(
-                            `Verified imported-data changes: ${changeStatsSummary(generation.stats)}`,
-                          );
-                        },
-                        onStageChange: enterStage,
-                        patchOsmId,
-                        worker: remote,
-                      });
-
-                      if (result.status === "cancelled") {
-                        await remote.clearConflation(baseOsmId);
-                        task.cancelled("Merge cancelled");
-                        goToStep("select-osm-pbf-files");
-                        return;
-                      }
-
-                      mergePipelineCompleted = true;
-                      enterStage("refresh-result");
-                      await refreshMergedResult(result.generation.stats.osmId, mergedName, true);
-                      setChangesetStats(null);
-                      task.end(
-                        `Automatic merge completed; intersections: ${changeStatsSummary(result.intersections)}`,
-                      );
-                      showVerifiedMergeResult();
-                      return;
-                    }
-                    enterStage("merge-exact");
-                    const merged = await remote.merge(
-                      baseOsmId,
-                      patchOsmId,
-                      completeMergeOptions(),
-                    );
-
-                    mergePipelineCompleted = true;
-                    completedOsmId = merged.id;
-                    // The atomic worker stage already committed. Finish refreshing its result even
-                    // when cancellation arrived too late; the original inputs are no longer live.
-                    if (abortController.signal.aborted) {
-                      task.message(
-                        "Cancellation arrived after the merge was applied. Refreshing the completed result; start a new merge to use the original inputs again.",
-                        "warn",
-                      );
-                    }
-
-                    // Use setMergedOsm to properly update file info for the new merged result
-                    enterStage("refresh-result");
-                    updateMergeOutcome({ type: "applied" });
-                    await refreshMergedResult(merged.id, mergedName, true);
-                    task.end("Automatic merge completed");
-                    showVerifiedMergeResult();
-                  } catch (error) {
-                    const committedMergeId = committedMutationOsmId(error, "merge");
-                    const committedApplyId = committedMutationOsmId(
-                      error,
-                      "applyChangesAndReplace",
-                    );
-                    if (mergePipelineCompleted || committedMergeId) {
-                      if (committedMergeId) updateMergeOutcome({ type: "applied" });
-                      // The worker finished every mutation; only refreshing React state failed.
-                      try {
-                        await refreshMergedResult(
-                          mergedOsmRefreshRetryId(
-                            error,
-                            committedMergeId ?? committedApplyId ?? completedOsmId,
-                          ),
-                          mergedName,
-                          true,
-                          Boolean(committedMergeId || committedApplyId),
-                        );
-                        setChangesetStats(null);
-                        task.end("Automatic merge completed after refreshing the merged dataset");
-                        showVerifiedMergeResult();
-                      } catch (refreshError) {
-                        task.fail(
-                          refreshError,
-                          `All merge stages completed, but the merged dataset could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`,
-                        );
-                      }
-                    } else if (conflationBaseApplied) {
-                      // Preserve both datasets so the user can retry intersection creation without
-                      // rediscovering or reapplying imported-data matches.
-                      try {
-                        await refreshMergedResult(
-                          baseOsmId,
-                          mergedName,
-                          false,
-                          Boolean(committedApplyId),
-                        );
-                      } catch (refreshError) {
-                        Tasks.message(
-                          `Could not refresh the partially merged base: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`,
-                          "warn",
-                        );
-                      }
-                      task.fail(
-                        error,
-                        `Imported-data changes were applied, but the remaining stages could not finish: ${error instanceof Error ? error.message : "Unknown error"}. The patch remains loaded; refresh the dataset if needed, then continue with intersections.`,
-                      );
-                      goToStep("create-intersections");
-                    } else if (abortController.signal.aborted) {
-                      task.cancelled("Merge cancelled");
-                      goToStep("select-osm-pbf-files");
-                    } else {
-                      task.fail(
-                        error,
-                        `Merge failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-                      );
-                      if (conflationOptions) {
-                        const issue = matchingReviewIssue(error);
-                        setMatchingIssue(issue);
-                        // Discovery is read-only, so returning to candidate review is safe even when
-                        // generation failed partway through validation.
-                        const restoreFailure = await recoverConflationRunAllFailure({
-                          restoreReview: conflationDiscoveryCompleted
-                            ? async () => {
-                                if (issue.source) {
-                                  await remote.setConflationFilter(baseOsmId, issue.source);
-                                  setConflationCandidateFilter(issue.source);
-                                }
-                                const [summary, page] = await Promise.all([
-                                  remote.getConflationSummary(baseOsmId),
-                                  remote.getConflationPage(baseOsmId, 0, CONFLATION_PAGE_SIZE, {
-                                    groupBySource: true,
-                                  }),
-                                ]);
-                                setConflationSummary(summary);
-                                setConflationCandidatePageIndex(0);
-                                setConflationCandidatePage(page);
-                              }
-                            : undefined,
-                          showReview: () => goToStep("match-imported-data"),
-                        });
-                        if (restoreFailure) {
-                          Tasks.message(
-                            `Could not restore candidate details after the failed merge: ${restoreFailure.error instanceof Error ? restoreFailure.error.message : "Unknown error"}`,
-                            "warn",
-                          );
-                        }
-                      }
-                    }
-                  } finally {
-                    setMergeAbortController(null);
-                  }
-                }}
-              />
-            }
-          >
-            <ItemMedia>
-              <FastForwardIcon />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>Run automatic merge</ItemTitle>
-              <ItemDescription>
-                {requiresRemovalReview ? (
-                  <span id="removal-manual-review-required">
-                    Use Review each merge stage to select imported-way removals and inspect their
-                    preview before applying.
-                  </span>
-                ) : (
-                  "Skip diagnostics and review screens; apply direct merge, exact reconciliation, safe intersections, and only high-confidence fuzzy matches when enabled."
-                )}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <ChevronRightIcon />
-            </ItemActions>
-          </Item>
-        </div>
+        <MergeStart
+          disabled={!base.osm || !patch.osm || taskLocked}
+          matchingEnabled={conflationForm.enabled}
+          requiresRemovalReview={requiresRemovalReview}
+          onStart={(automatic) => (automatic ? runAutomaticMerge() : startReviewedMerge())}
+        />
       </Step>
 
       <Step step="run-all-steps" title="Merge in progress" guideId="run-all">

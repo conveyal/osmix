@@ -42,7 +42,7 @@ export interface MergeStepGuideDefinition {
 export const MERGE_STEP_GUIDES = {
   select: {
     summary:
-      "Choose the authoritative base dataset and the imported patch, then choose a reviewed or automatic workflow.",
+      "Choose the authoritative base dataset and the imported patch, then choose whether to run every stage automatically or review each one.",
     inputs: [
       "Base OSM: the existing dataset whose IDs and topology are authoritative except where a same-ID patch entity supplies an update.",
       "Patch OSM: imported additions and updates that will be merged into the base.",
@@ -53,10 +53,10 @@ export const MERGE_STEP_GUIDES = {
     ],
     invariants: [
       "The source files on disk are never overwritten.",
-      "Selecting the automatic workflow does not enable fuzzy matching unless it was explicitly configured.",
+      "Running every stage automatically does not enable fuzzy matching unless it was explicitly configured.",
     ],
     output:
-      "Two indexed inputs and a workflow choice that determine which review checkpoints are shown.",
+      "Two indexed inputs and the automatic-or-reviewed choice, which determines which review checkpoints are shown.",
     diagram: "pipeline",
   },
   "run-all": {

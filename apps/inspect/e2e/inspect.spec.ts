@@ -19,7 +19,8 @@ test("loads a PBF, renders the map, and runs duplicate diagnostics", async ({ pa
   await fileChooser.setFiles(MONACO_PBF);
 
   const fileInfo = page.getByRole("button", { name: "File info" });
-  const loadFailure = page.getByRole("alert");
+  // The in-page Alert, not the error toast that also announces as \`alert\`.
+  const loadFailure = page.locator('[data-slot="alert"][role="alert"]');
   await expect(fileInfo.or(loadFailure)).toBeVisible({ timeout: 120_000 });
   if (await loadFailure.isVisible()) {
     throw new Error(`OSM load failed: ${await loadFailure.innerText()}`);
