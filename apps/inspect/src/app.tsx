@@ -9,7 +9,6 @@ import {
   RouteLayer,
   RouteMapControl,
   SelectedEntityLayer,
-  SidebarLog,
   useFlyToOsmBounds,
 } from "@osmix/app-components";
 import {
@@ -46,8 +45,8 @@ export function InspectApp() {
     try {
       const osmInfo =
         typeof file === "string"
-          ? await osmFile.loadFromStorage(file, abortController.signal)
-          : await osmFile.loadOsmFile(file, fileType, abortController.signal);
+          ? await osmFile.loadFromStorage(file, abortController)
+          : await osmFile.loadOsmFile(file, fileType, abortController);
       if (osmInfo) flyToOsmBounds(osmInfo);
       return osmInfo;
     } finally {
@@ -68,7 +67,7 @@ export function InspectApp() {
 
   return (
     <Main>
-      <AppSidebar footer={<SidebarLog />}>
+      <AppSidebar>
         <InspectPanel osmKey={OSM_KEY} openOsmFile={openOsmFile} />
       </AppSidebar>
       <MapContent>

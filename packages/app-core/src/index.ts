@@ -1,8 +1,8 @@
 export { DB_NAME, DB_VERSION, OSM_STORE, STORAGE_CHANNEL } from "./constants.ts";
 export { LOAD_FROM_URL_PARAM, useLoadFromUrl } from "./hooks/load-from-url.ts";
-export { useLog } from "./hooks/log.ts";
 export { LoadCancelledError, type UseOsmFileReturn, useOsmFile } from "./hooks/osm.ts";
 export { useOsmixRemote } from "./hooks/remote.ts";
+export { useTasks } from "./hooks/tasks.ts";
 export {
   createStorageStore,
   useStorageBroadcast,
@@ -48,7 +48,6 @@ export {
   pageSizeAtom,
   startIndexAtom,
 } from "./state/changes.ts";
-export { Log, type Status, type StatusType } from "./state/log.ts";
 export {
   layerControlIsOpenAtom,
   mapBoundsAtom,
@@ -72,11 +71,28 @@ export {
 } from "./state/osm.ts";
 export { osmDatasetVersionAtomFamily } from "./state/osm-version.ts";
 export { remoteAtom } from "./state/remote.ts";
+export { osmLoadingAbortControllerAtom } from "./state/status.ts";
 export {
-  actionPendingAtom,
-  activeTasksAtom,
-  osmLoadingAbortControllerAtom,
-} from "./state/status.ts";
+  type ActivityEntry,
+  createTaskStore,
+  innermostOpenNode,
+  isCancellationError,
+  isTaskNode,
+  isTaskOpen,
+  openNodePath,
+  TASK_HISTORY_LIMIT,
+  TaskAlreadyRunningError,
+  type TaskError,
+  type TaskHandle,
+  type TaskLevel,
+  type TaskMessage,
+  type TaskNode,
+  Tasks,
+  type TasksSnapshot,
+  type TaskStartOptions,
+  type TaskStatus,
+  type TaskStore,
+} from "./state/tasks.ts";
 export type {
   OsmixAppWorker,
   OsmixDB,

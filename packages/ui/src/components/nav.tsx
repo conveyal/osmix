@@ -8,7 +8,7 @@ import { Separator } from "./ui/separator.tsx";
 /**
  * The top bar shared by the Osmix apps, one `--header-height` tall with a single `gap-3`
  * rhythm. Left: `start` (the sidebar trigger), the brand, a rule, and `links`. Centre:
- * `status`. Right: `controls`, a rule, `end`, and the GitHub link.
+ * `status` (which must provide its own compact form below `md`). Right: `controls`, a rule, `end`, and the GitHub link.
  */
 export function Nav({
   brand = "OSMIX",
@@ -47,7 +47,7 @@ export function Nav({
         ) : null}
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-center">
-        <div className="hidden min-w-0 md:flex">{status}</div>
+        <div className="flex min-w-0 overflow-hidden">{status}</div>
       </div>
       <div className="flex h-full shrink-0 items-center gap-1">
         {controls}

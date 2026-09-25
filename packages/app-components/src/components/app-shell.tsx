@@ -1,4 +1,4 @@
-import { Log } from "@osmix/app-core";
+import { Tasks, useTasks } from "@osmix/app-core";
 import {
   ErrorBoundary,
   LoadingState,
@@ -6,6 +6,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
   sidebarIsOpenAtom,
+  TaskLockProvider,
+  Toaster,
   TooltipProvider,
 } from "@osmix/ui";
 import { Provider, useAtom } from "jotai";
@@ -14,18 +16,20 @@ import { MapProvider } from "react-map-gl/maplibre";
 
 import type { OsmixAppStore } from "../bootstrap.ts";
 import type { OsmixAppId } from "../lib/app-origin.ts";
+import { ActivitySheet } from "./activity-sheet.tsx";
 import { AppLinks } from "./app-links.tsx";
 import BrowserCheck from "./browser-check.tsx";
 import { MapNavControls } from "./map-nav-controls.tsx";
-import Status from "./status.tsx";
+import { TaskIndicator } from "./task-indicator.tsx";
+import { TaskToasts } from "./task-toasts.tsx";
 
-/** The standard top bar: brand, links to the sibling apps, status, and map controls. */
+/** The standard top bar: brand, links to the sibling apps, the task indicator, map controls. */
 export function OsmixNav({ current }: { current: OsmixAppId }) {
   return (
     <Nav
       start={<SidebarTrigger />}
       links={<AppLinks current={current} />}
-      status={<Status />}
+      status={<TaskIndicator />}
       controls={<MapNavControls />}
       end={<BrowserCheck />}
     />
@@ -34,7 +38,7 @@ export function OsmixNav({ current }: { current: OsmixAppId }) {
 
 /**
  * Root of every Osmix app: StrictMode, the jotai store, an error boundary, the map provider,
- * and the standard nav above the app content. `app` selects the nav's per-app hue
+ * the task lock, toasts and the Activity sheet, and the standard nav above the app content. `app` selects the nav's per-app hue
  * (`--app-hue`, via `data-app` on the document element) and highlights the current app link.
  */
 export function OsmixAppShell({
@@ -53,19 +57,30 @@ export function OsmixAppShell({
   return (
     <StrictMode>
       <Provider store={store}>
-        <ErrorBoundary onError={(error) => Log.addMessage(error.message, "error")}>
+        <ErrorBoundary onError={(error) => Tasks.message(error.message, "error")}>
           <MapProvider>
             <TooltipProvider>
-              <OsmixSidebarProvider>
-                <OsmixNav current={app} />
-                <Suspense fallback={<LoadingState />}>{children}</Suspense>
-              </OsmixSidebarProvider>
+              <TaskLock>
+                <OsmixSidebarProvider>
+                  <OsmixNav current={app} />
+                  <Suspense fallback={<LoadingState />}>{children}</Suspense>
+                </OsmixSidebarProvider>
+                <ActivitySheet />
+              </TaskLock>
+              <TaskToasts />
+              <Toaster />
             </TooltipProvider>
           </MapProvider>
         </ErrorBoundary>
       </Provider>
     </StrictMode>
   );
+}
+
+/** Disable task-starting controls while a task runs: only one runs at a time. */
+function TaskLock({ children }: { children: ReactNode }) {
+  const { current } = useTasks();
+  return <TaskLockProvider locked={current !== null}>{children}</TaskLockProvider>;
 }
 
 /** The page frame: the nav above a sidebar/map row. The sidebar's open state persists. */

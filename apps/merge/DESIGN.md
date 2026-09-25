@@ -11,9 +11,12 @@ tokens, spacing, primitives, map-control CSS) lives in
 - `StepActions` — the full-width vertical action footer for Merge workflow
   stages. It keeps long decision labels contained in the narrow sidebar.
 - `AutomaticMergeProgress` — a `Card` listing the automatic workflow's stages
-  (completed, running, remaining) with the latest log message and an elapsed
-  timer. The stage list is the progress indicator; it deliberately renders no
-  `progressbar`, because worker progress has no numeric percentage.
+  (completed, running, remaining) with the latest worker line, an elapsed
+  timer, and each stage's own duration. `LiveAutomaticMergeProgress` reads all
+  of it from the "Run automatic merge" task: each stage is a step of that task
+  titled with the stage label. The stage list is the progress indicator; it
+  deliberately renders no `progressbar`, because worker progress has no
+  numeric percentage.
 
 ### Merge step actions
 
@@ -173,6 +176,11 @@ replication, recovery, and disposal coverage.
 
 - Quick/inline waits: `Spinner`.
 - Suspense fallbacks and transitions: `LoadingState` ("Please wait…").
+- Every merge operation (a review stage, candidate discovery, the automatic
+  run, JSON export) is a top-level task (`Tasks.run` / `Tasks.start` from
+  `@osmix/app-core`), so it shows in the nav indicator and Activity and gets a
+  toast when it finishes. Only one runs at a time: the stage buttons read
+  `useTaskLock()`. Sub-work is a step (`task.step` / `task.runStep`).
 - The automatic workflow: `AutomaticMergeProgress`. Worker progress
   (`@osmix/shared` `Progress`) is `{ msg, timestamp, level }` with no numeric
   percentage, so the stage list carries progress. If `Progress` gains a

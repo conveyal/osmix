@@ -8,7 +8,6 @@ import {
   RouteLayer,
   RouteMapControl,
   SelectedEntityLayer,
-  SidebarLog,
   useFlyToOsmBounds,
 } from "@osmix/app-components";
 import {
@@ -42,7 +41,7 @@ export default function Merge() {
 
   return (
     <Main>
-      <AppSidebar footer={<SidebarLog />}>
+      <AppSidebar>
         <MergeBlock />
       </AppSidebar>
       <MapContent>

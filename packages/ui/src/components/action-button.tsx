@@ -2,17 +2,22 @@ import { atom, useAtom } from "jotai";
 import { useTransition } from "react";
 
 import { IconButton } from "./icon-button.tsx";
+import { useTaskLock } from "./task-lock.tsx";
 import { Button } from "./ui/button.tsx";
 import { Spinner } from "./ui/spinner.tsx";
 
 const actionPendingAtom = atom(false);
 
-/** Share the pending state across async buttons and other review controls. */
+/**
+ * Share the pending state across async buttons and other review controls. `isPending` is also
+ * set while any task runs (see `TaskLockProvider`), since only one task runs at a time.
+ */
 export function useAction() {
   const [isPending, setIsPending] = useAtom(actionPendingAtom);
   const [isTransitioning, startTransition] = useTransition();
+  const taskLocked = useTaskLock();
   return {
-    isPending: isPending || isTransitioning,
+    isPending: isPending || isTransitioning || taskLocked,
     isTransitioning,
     runAction: (action: () => Promise<unknown>) => {
       setIsPending(true);
@@ -37,7 +42,7 @@ type ActionButtonProps = Omit<React.ComponentProps<typeof Button>, "children"> &
 
 /**
  * A button that runs an async action, showing a spinner and disabling every action button
- * while it runs. With `children` it is a text button; without, it is an `IconButton` and
+ * while it runs, or while any task runs. With `children` it is a text button; without, it is an `IconButton` and
  * needs a `label`.
  */
 export default function ActionButton({

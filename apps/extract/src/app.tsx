@@ -8,7 +8,6 @@ import {
   RouteLayer,
   RouteMapControl,
   SelectedEntityLayer,
-  SidebarLog,
   useFlyToOsmBounds,
 } from "@osmix/app-components";
 import { searchControlIsOpenAtom, selectOsmEntityAtom, useOsmFile } from "@osmix/app-core";
@@ -51,7 +50,7 @@ export function ExtractApp() {
 
   return (
     <Main>
-      <AppSidebar footer={<SidebarLog />}>
+      <AppSidebar>
         <ExtractPanel />
       </AppSidebar>
       <MapContent>

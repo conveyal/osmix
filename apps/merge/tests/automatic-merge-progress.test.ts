@@ -44,4 +44,20 @@ describe("automatic merge progress", () => {
     expect(html).toContain("Applying verified imported-data changes");
     expect(html).not.toContain('role="progressbar"');
   });
+
+  it("shows each finished stage's own duration", () => {
+    const html = renderToStaticMarkup(
+      createElement(AutomaticMergeProgress, {
+        currentStepId: "refresh-result",
+        stepTimings: {
+          "merge-exact": { startedAt: 10_000, endedAt: 12_310 },
+          "refresh-result": { startedAt: 12_310 },
+        },
+        steps: EXACT_AUTOMATIC_MERGE_STEPS,
+      }),
+    );
+
+    expect(html).toContain("2.31s");
+    expect(html).not.toContain(">Completed<");
+  });
 });

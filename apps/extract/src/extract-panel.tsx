@@ -6,7 +6,7 @@ import {
   useMap,
 } from "@osmix/app-components";
 import {
-  useLog,
+  useTasks,
   useOsmFile,
   mapBoundsAtom,
   selectOsmEntityAtom,
@@ -114,7 +114,7 @@ export function ExtractPanel() {
   const selectEntity = useSetAtom(selectOsmEntityAtom);
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
   const mapBounds = useAtomValue(mapBoundsAtom);
-  const { activeTasks } = useLog();
+  const { current } = useTasks();
 
   const [bbox, setBbox] = useAtom(extractBboxAtom);
   const [bboxText, setBboxText] = useState("");
@@ -136,7 +136,8 @@ export function ExtractPanel() {
   const [bboxBeforeFileBounds, setBboxBeforeFileBounds] = useState<GeoBbox2D | null>(null);
   const headerRequest = useRef(0);
 
-  const isExtracting = activeTasks > 0;
+  // Only one task runs at a time, so any running task locks the extract controls.
+  const isExtracting = current !== null;
 
   const bboxMissesFile =
     fileBounds.status === "ok" && isValidBbox(bbox) && !bboxesOverlap(bbox, fileBounds.bbox);
@@ -207,7 +208,7 @@ export function ExtractPanel() {
           extractStrategy: strategy,
           extractTagFilter: rulesFromEditorState(tagFilterEditor),
         },
-        abortController.signal,
+        abortController,
       );
     } finally {
       setLoadingState(null);

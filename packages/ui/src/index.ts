@@ -1,5 +1,14 @@
 export { default as ActionButton, useAction } from "./components/action-button.tsx";
+export {
+  ActivityError,
+  ActivityItem,
+  type ActivityLevel,
+  ActivityMessage,
+  type ActivityStatus,
+  ActivityStatusIcon,
+} from "./components/activity.tsx";
 export { Details, DetailsContent, DetailsSummary } from "./components/details.tsx";
+export { ElapsedTimer } from "./components/elapsed-timer.tsx";
 export { ErrorBoundary } from "./components/error-boundary.tsx";
 export { InfoTooltip } from "./components/info-tooltip.tsx";
 export { AppSidebar, Main, MapContent } from "./components/layout.tsx";
@@ -10,6 +19,7 @@ export { Pager } from "./components/pager.tsx";
 export { EmptyState, LoadingState, SectionTitle } from "./components/section.tsx";
 export { StatusDot, type StatusDotStatus } from "./components/status-dot.tsx";
 export { Step } from "./components/step.tsx";
+export { TaskLockProvider, useTaskLock } from "./components/task-lock.tsx";
 export { Alert, alertVariants } from "./components/ui/alert.tsx";
 export { Button, buttonVariants } from "./components/ui/button.tsx";
 export {
@@ -117,6 +127,7 @@ export {
   TooltipTrigger,
 } from "./components/ui/tooltip.tsx";
 export { Spinner } from "./components/ui/spinner.tsx";
+export { showToast, Toaster, toastManager, type ToastVariant } from "./components/ui/toast.tsx";
 export {
   Table,
   TableBody,
@@ -127,7 +138,13 @@ export {
   TableHeader,
   TableRow,
 } from "./components/ui/table.tsx";
-export { bytesSizeToHuman, flattenValue, formatTimestampMs } from "./lib/format.ts";
+export {
+  bytesSizeToHuman,
+  flattenValue,
+  formatDuration,
+  formatElapsedClock,
+  formatTimestampMs,
+} from "./lib/format.ts";
 export { useIsMobile } from "./hooks/use-mobile.ts";
 export { cn } from "./lib/utils.ts";
 export { sidebarIsOpenAtom } from "./state/layout.ts";

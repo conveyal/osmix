@@ -1,4 +1,3 @@
-import { Log } from "@osmix/app-core";
 import { ActionButton, Card, CardContent } from "@osmix/ui";
 import { FilesIcon } from "lucide-react";
 import type { OsmInfo } from "osmix";
@@ -13,18 +12,10 @@ export function OsmSourceLinks({
 }: {
   openOsmPbfUrl: (url: string) => Promise<OsmInfo | null>;
 }) {
-  const useExample = useEffectEvent(async (): Promise<OsmInfo | null> => {
-    const task = Log.startTask("Opening Monaco.pbf example…");
-    try {
-      const osmInfo = await openOsmPbfUrl(EXAMPLE_MONACO_PBF_URL);
-      task.end("Example loaded");
-      return osmInfo;
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Unknown error";
-      task.end(`Failed to load example: ${message}`, "error");
-      throw e;
-    }
-  });
+  // The URL load records its own task, so the example needs no wrapper task.
+  const useExample = useEffectEvent((): Promise<OsmInfo | null> =>
+    openOsmPbfUrl(EXAMPLE_MONACO_PBF_URL),
+  );
 
   return (
     <Card>

@@ -21,7 +21,7 @@ export function Main({ children }: { children: ReactNode }) {
 /**
  * The app sidebar: shadcn's `Sidebar`, below the nav, collapsing offcanvas (nav trigger, the
  * edge rail, or Cmd/Ctrl+B; a sheet on mobile). Children scroll in one `ScrollArea` with the
- * inset gutter and `gap-2` rhythm; `footer` (the activity log) stays pinned.
+ * inset gutter and `gap-2` rhythm; `footer` stays pinned below the scroll.
  */
 export function AppSidebar({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   return (

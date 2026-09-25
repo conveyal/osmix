@@ -1,4 +1,4 @@
-import { fetchOsmFileFromUrl, Log } from "@osmix/app-core";
+import { fetchOsmFileFromUrl, Tasks } from "@osmix/app-core";
 import {
   ActionButton,
   Button,
@@ -27,6 +27,7 @@ import {
   ItemTitle,
   NativeSelect,
   NativeSelectOption,
+  useTaskLock,
 } from "@osmix/ui";
 import { ChevronDownIcon, FileIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
 import type { OsmFileType, OsmLoadProfile } from "osmix";
@@ -186,6 +187,7 @@ export function OsmPbfSelectFileButton({
   setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>;
 }) {
   const [isLoading, setIsLoading] = useState(false);
+  const locked = useTaskLock();
 
   const handleSelectFileType = async (fileType: OsmFileType) => {
     const option = FILE_TYPE_OPTIONS.find((opt) => opt.type === fileType);
@@ -207,7 +209,7 @@ export function OsmPbfSelectFileButton({
       <Button
         type="button"
         variant="outline"
-        disabled={disabled || isLoading}
+        disabled={disabled || isLoading || locked}
         className="w-full"
         onClick={async () => {
           setIsLoading(true);
@@ -227,7 +229,7 @@ export function OsmPbfSelectFileButton({
 
   return (
     <Menu>
-      <MenuTrigger variant="outline" disabled={disabled || isLoading} className="flex-1">
+      <MenuTrigger variant="outline" disabled={disabled || isLoading || locked} className="flex-1">
         <FilesIcon aria-hidden="true" />
         Open file
         <ChevronDownIcon aria-hidden="true" className="ml-auto" />
@@ -254,6 +256,7 @@ export function OsmPbfOpenUrlButton({
   setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const locked = useTaskLock();
   const [url, setUrl] = useState("");
   const [selectedFileType, setSelectedFileType] = useState<OsmFileType>("pbf");
   const fileTypeId = useId();
@@ -261,7 +264,9 @@ export function OsmPbfOpenUrlButton({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button className="flex-1" variant="outline" disabled={disabled} />}>
+      <DialogTrigger
+        render={<Button className="flex-1" variant="outline" disabled={disabled || locked} />}
+      >
         <LinkIcon aria-hidden="true" />
         Open from URL
       </DialogTrigger>
@@ -324,17 +329,12 @@ export function OsmPbfOpenUrlButton({
                 setOpen(false);
                 return;
               }
-              const task = Log.startTask("Downloading file from URL…");
-              try {
-                const file = await fetchOsmFileFromUrl(url);
-                task.end(`Downloaded ${file.name}`);
-                await setFile(file, selectedFileType);
-                setOpen(false);
-              } catch (e) {
-                const message = e instanceof Error ? e.message : "Unknown error";
-                task.end(`Download failed: ${message}`, "error");
-                throw e;
-              }
+              // The download is its own task; opening the file then starts the load task.
+              const file = await Tasks.run(`Download ${url}`, () => fetchOsmFileFromUrl(url), {
+                summary: (downloaded) => `Downloaded ${downloaded.name}`,
+              });
+              await setFile(file, selectedFileType);
+              setOpen(false);
             }}
           >
             Download and open

@@ -3,6 +3,7 @@ import {
   changesetStatsAtom,
   selectOsmEntityAtom,
   osmLoadingAbortControllerAtom,
+  Tasks,
 } from "@osmix/app-core";
 import { useOsmixRemote } from "@osmix/app-core";
 import { WITHIN_DATASET_DIAGNOSTIC_OPTIONS } from "@osmix/app-core";
@@ -63,9 +64,15 @@ export function InspectPanel({
         </p>
         <OsmSourceLinks
           openOsmPbfUrl={async (url) => {
-            const osmInfo = await baseOsm.loadOsmPbfUrl(url);
-            if (osmInfo) flyToOsmBounds(osmInfo);
-            return osmInfo;
+            const abortController = new AbortController();
+            setLoadingState({ controller: abortController, osmKey: osmKey });
+            try {
+              const osmInfo = await baseOsm.loadOsmPbfUrl(url, abortController);
+              if (osmInfo) flyToOsmBounds(osmInfo);
+              return osmInfo;
+            } finally {
+              setLoadingState(null);
+            }
           }}
         />
         <StoredOsmList
@@ -77,7 +84,7 @@ export function InspectPanel({
             const abortController = new AbortController();
             setLoadingState({ controller: abortController, osmKey: osmKey });
             try {
-              const osmInfo = await baseOsm.loadOsmPbfUrl(url, abortController.signal);
+              const osmInfo = await baseOsm.loadOsmPbfUrl(url, abortController);
               if (osmInfo) flyToOsmBounds(osmInfo);
               return osmInfo;
             } finally {
@@ -93,8 +100,8 @@ export function InspectPanel({
             try {
               const osmInfo =
                 typeof file === "string"
-                  ? await baseOsm.loadFromStorage(file, abortController.signal)
-                  : await baseOsm.loadOsmFile(file, undefined, abortController.signal);
+                  ? await baseOsm.loadFromStorage(file, abortController)
+                  : await baseOsm.loadOsmFile(file, undefined, abortController);
               if (osmInfo) flyToOsmBounds(osmInfo);
               return osmInfo;
             } finally {
@@ -117,13 +124,24 @@ export function InspectPanel({
       <ActionButton
         disabled={!hasFullNodeIndex(baseOsm.osmInfo)}
         onAction={async () => {
-          if (!baseOsm.osm) throw Error("Osm has not been loaded.");
-          const changes = await remote.generateChangeset(
-            baseOsm.osm.id,
-            baseOsm.osm.id,
-            WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
+          const osm = baseOsm.osm;
+          if (!osm) throw Error("Osm has not been loaded.");
+          await Tasks.run(
+            "Find duplicate nodes and ways",
+            async () => {
+              const changes = await remote.generateChangeset(
+                osm.id,
+                osm.id,
+                WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
+              );
+              setChangesetStats(changes);
+              return changes;
+            },
+            {
+              summary: (changes) =>
+                `Found ${changes.totalChanges.toLocaleString()} duplicate candidates`,
+            },
           );
-          setChangesetStats(changes);
         }}
       >
         Find duplicate nodes and ways

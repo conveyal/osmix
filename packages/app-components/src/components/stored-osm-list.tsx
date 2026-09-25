@@ -3,6 +3,7 @@ import {
   useStoredOsm,
   osmLoadProfileAtomFamily,
   osmLoadingAbortControllerAtom,
+  useTasks,
 } from "@osmix/app-core";
 import type { OsmLoadFailure } from "@osmix/app-core";
 import { useOsmixRemote } from "@osmix/app-core";
@@ -29,7 +30,7 @@ import {
  * UI component for managing stored Osm data in IndexedDB.
  * Uses BroadcastChannel to receive updates from the worker.
  */
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import {
   CheckIcon,
   CircleStopIcon,
@@ -220,7 +221,8 @@ export function StoredOsmList({
 }: StoredOsmListProps) {
   const remote = useOsmixRemote();
   const { entries, estimatedBytes } = useStoredOsm(remote);
-  const [loadingState, setLoadingState] = useAtom(osmLoadingAbortControllerAtom);
+  const loadingState = useAtomValue(osmLoadingAbortControllerAtom);
+  const { current } = useTasks();
   const [loadProfile, setLoadProfile] = useAtom(osmLoadProfileAtomFamily(osmKey ?? "default"));
   const isLoading = loadingState !== null && (!osmKey || loadingState.osmKey === osmKey);
 
@@ -238,13 +240,12 @@ export function StoredOsmList({
             <Button
               variant="destructive"
               className="flex-1"
-              onClick={() => {
-                loadingState.controller.abort();
-                setLoadingState(null);
-              }}
+              // The load holds the task lock until it actually stops, then clears this state.
+              disabled={current?.status === "cancelling"}
+              onClick={() => loadingState.controller.abort()}
             >
               <CircleStopIcon aria-hidden="true" />
-              Cancel loading
+              {current?.status === "cancelling" ? "Cancelling…" : "Cancel loading"}
             </Button>
           ) : (
             <>

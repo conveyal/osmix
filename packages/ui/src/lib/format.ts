@@ -47,3 +47,21 @@ export function bytesSizeToHuman(size?: number) {
   if (size < GB) return `${(size / MB).toFixed(2)}MB`;
   return `${(size / GB).toFixed(2)}GB`;
 }
+
+/** Format elapsed milliseconds as a clock: "0:07", "12:34", "1:02:03". */
+export function formatElapsedClock(ms: number) {
+  const totalSeconds = Math.floor(Math.max(0, ms) / 1_000);
+  const hours = Math.floor(totalSeconds / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`;
+  return `${minutes}:${seconds}`;
+}
+
+/** Format a finished duration: "812ms", "2.31s", then clock form from one minute. */
+export function formatDuration(ms: number) {
+  const clamped = Math.max(0, Math.round(ms));
+  if (clamped < 1_000) return `${clamped}ms`;
+  if (clamped < 60_000) return `${(clamped / 1_000).toFixed(2)}s`;
+  return formatElapsedClock(clamped);
+}

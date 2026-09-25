@@ -1,3 +1,4 @@
+export { ActivitySheet } from "./components/activity-sheet.tsx";
 export { AppLinks } from "./components/app-links.tsx";
 export { OsmixAppShell, OsmixNav } from "./components/app-shell.tsx";
 export { default as Basemap, type MapInitialViewState } from "./components/basemap.tsx";
@@ -22,7 +23,6 @@ export { default as EntityLookup } from "./components/entity-lookup.tsx";
 export { FullIndexRequired, hasFullNodeIndex } from "./components/full-index-required.tsx";
 export { SaveToDiskNotice } from "./components/save-to-disk-notice.tsx";
 export { InspectPanel } from "./components/inspect-panel.tsx";
-export { default as LogContent } from "./components/log.tsx";
 export { default as MapLayerControl, MapLayers } from "./components/map-layer-control.tsx";
 export { MapNavControls } from "./components/map-nav-controls.tsx";
 export {
@@ -61,9 +61,9 @@ export {
 export { default as RouteMapControl, Routing } from "./components/route-control.tsx";
 export { default as RouteLayer } from "./components/route-layer.tsx";
 export { default as SelectedEntityLayer } from "./components/selected-entity-layer.tsx";
-export { default as SidebarLog } from "./components/sidebar-log.tsx";
-export { default as Status } from "./components/status.tsx";
 export { StoredOsmList } from "./components/stored-osm-list.tsx";
+export { TaskIndicator } from "./components/task-indicator.tsx";
+export { QUIET_TASK_MS, TaskToasts, taskToasts } from "./components/task-toasts.tsx";
 export { default as ZoomInfo, ZoomInButton, ZoomOutButton } from "./components/zoom-info.tsx";
 export { createOsmixAppRuntime, type OsmixAppRuntime, type OsmixAppStore } from "./bootstrap.ts";
 export {
@@ -99,6 +99,7 @@ export {
   osmixIdToTileUrl as osmixIdToVectorTileUrl,
   removeOsmixVectorProtocol,
 } from "./lib/osmix-vector-protocol.ts";
+export { activitySheetOpenAtom } from "./state/activity.ts";
 export { nominatimPlaceAtom } from "./state/nominatim.ts";
 export {
   type RoutingState,
