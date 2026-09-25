@@ -25,9 +25,9 @@ import {
   Step,
 } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { DownloadIcon, SaveIcon } from "lucide-react";
+import { DownloadIcon } from "lucide-react";
 import type { ExtractStrategy, GeoBbox2D } from "osmix";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import ExtractTagFilterEditor, {
   conveyalTagFilterEditorState,
@@ -52,17 +52,23 @@ const STRATEGY_OPTIONS: {
   {
     value: "simple",
     label: "Simple",
-    hint: "Strict bbox cut; geometries may be incomplete at the boundary.",
+    hint:
+      "Strict bbox cut; geometries may be incomplete at the boundary. Loads with the Auto " +
+      "profile: the full node index when it fits in memory, otherwise a lighter view index.",
   },
   {
     value: "complete_ways",
     label: "Complete ways",
-    hint: "Keep full way geometry; includes nodes outside the bbox when needed.",
+    hint:
+      "Keep full way geometry; includes nodes outside the bbox when needed. Requires the " +
+      "full node index, so the file loads in Full mode.",
   },
   {
     value: "smart",
     label: "Smart",
-    hint: "Like complete ways, and resolves multipolygon relations completely.",
+    hint:
+      "Like complete ways, and resolves multipolygon relations completely. Requires the " +
+      "full node index, so the file loads in Full mode.",
   },
 ];
 
@@ -125,12 +131,6 @@ export function ExtractPanel() {
   const headerRequest = useRef(0);
 
   const isExtracting = activeTasks > 0;
-
-  useEffect(() => {
-    if (strategy !== "simple" && extract.loadProfile !== "full") {
-      extract.setLoadProfile("full");
-    }
-  }, [extract.loadProfile, extract.setLoadProfile, strategy, extract]);
 
   const bboxMissesFile =
     fileBounds.status === "ok" && isValidBbox(bbox) && !bboxesOverlap(bbox, fileBounds.bbox);
@@ -214,8 +214,6 @@ export function ExtractPanel() {
         <CardContent className="flex flex-col gap-2">
           <OsmPbfFileInput
             file={pendingFile}
-            loadProfile={extract.loadProfile}
-            onLoadProfileChange={extract.setLoadProfile}
             setFile={selectFile}
             pbfOnly
             disabled={isExtracting}
@@ -232,7 +230,7 @@ export function ExtractPanel() {
       <Step number={2} title="Select bounding box">
         <CardContent className="flex flex-col gap-2">
           <Field>
-            <CheckboxLabel className="min-h-8">
+            <CheckboxLabel>
               <Checkbox
                 checked={useFileBounds}
                 disabled={fileBounds.status !== "ok" || isExtracting}
@@ -246,108 +244,94 @@ export function ExtractPanel() {
             </FieldDescription>
           </Field>
           {!useFileBounds ? (
-            <p className="text-muted-foreground">
-              Search on the map (top right), or edit coordinates below. The rectangle updates on the
-              map.
-            </p>
-          ) : null}
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lon">
-              Min longitude
-              <Input
-                id="extract-bbox-min-lon"
-                disabled={useFileBounds}
-                type="number"
-                step="any"
-                value={bboxInputs[0]}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setBboxInputs((prev) => [v, prev[1], prev[2], prev[3]]);
-                  const n = Number.parseFloat(v);
-                  if (Number.isFinite(n)) setBbox((b) => [n, b[1], b[2], b[3]]);
-                }}
-              />
-            </label>
-            <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lat">
-              Min latitude
-              <Input
-                id="extract-bbox-min-lat"
-                disabled={useFileBounds}
-                type="number"
-                step="any"
-                value={bboxInputs[1]}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setBboxInputs((prev) => [prev[0], v, prev[2], prev[3]]);
-                  const n = Number.parseFloat(v);
-                  if (Number.isFinite(n)) setBbox((b) => [b[0], n, b[2], b[3]]);
-                }}
-              />
-            </label>
-            <label className="flex flex-col gap-1" htmlFor="extract-bbox-max-lon">
-              Max longitude
-              <Input
-                id="extract-bbox-max-lon"
-                disabled={useFileBounds}
-                type="number"
-                step="any"
-                value={bboxInputs[2]}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setBboxInputs((prev) => [prev[0], prev[1], v, prev[3]]);
-                  const n = Number.parseFloat(v);
-                  if (Number.isFinite(n)) setBbox((b) => [b[0], b[1], n, b[3]]);
-                }}
-              />
-            </label>
-            <label className="flex flex-col gap-1" htmlFor="extract-bbox-max-lat">
-              Max latitude
-              <Input
-                id="extract-bbox-max-lat"
-                disabled={useFileBounds}
-                type="number"
-                step="any"
-                value={bboxInputs[3]}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setBboxInputs((prev) => [prev[0], prev[1], prev[2], v]);
-                  const n = Number.parseFloat(v);
-                  if (Number.isFinite(n)) setBbox((b) => [b[0], b[1], b[2], n]);
-                }}
-              />
-            </label>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-muted-foreground" htmlFor="extract-bbox-paste">
-              Paste bbox <code className="font-mono">min_lon,min_lat,max_lon,max_lat</code>
-            </label>
-            <div className="flex gap-2">
-              <Input
-                id="extract-bbox-paste"
-                disabled={useFileBounds}
-                value={bboxText}
-                onChange={(e) => setBboxText(e.target.value)}
-                placeholder="-122.5,47.2,-122.3,47.5"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                disabled={useFileBounds}
-                onClick={applyParsedBboxString}
-              >
-                Parse
+            <>
+              <p className="text-muted-foreground">
+                Search on the map (top right), or edit coordinates below. The rectangle updates on
+                the map.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lon">
+                  Min longitude
+                  <Input
+                    id="extract-bbox-min-lon"
+                    type="number"
+                    step="any"
+                    value={bboxInputs[0]}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setBboxInputs((prev) => [v, prev[1], prev[2], prev[3]]);
+                      const n = Number.parseFloat(v);
+                      if (Number.isFinite(n)) setBbox((b) => [n, b[1], b[2], b[3]]);
+                    }}
+                  />
+                </label>
+                <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lat">
+                  Min latitude
+                  <Input
+                    id="extract-bbox-min-lat"
+                    type="number"
+                    step="any"
+                    value={bboxInputs[1]}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setBboxInputs((prev) => [prev[0], v, prev[2], prev[3]]);
+                      const n = Number.parseFloat(v);
+                      if (Number.isFinite(n)) setBbox((b) => [b[0], n, b[2], b[3]]);
+                    }}
+                  />
+                </label>
+                <label className="flex flex-col gap-1" htmlFor="extract-bbox-max-lon">
+                  Max longitude
+                  <Input
+                    id="extract-bbox-max-lon"
+                    type="number"
+                    step="any"
+                    value={bboxInputs[2]}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setBboxInputs((prev) => [prev[0], prev[1], v, prev[3]]);
+                      const n = Number.parseFloat(v);
+                      if (Number.isFinite(n)) setBbox((b) => [b[0], b[1], n, b[3]]);
+                    }}
+                  />
+                </label>
+                <label className="flex flex-col gap-1" htmlFor="extract-bbox-max-lat">
+                  Max latitude
+                  <Input
+                    id="extract-bbox-max-lat"
+                    type="number"
+                    step="any"
+                    value={bboxInputs[3]}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setBboxInputs((prev) => [prev[0], prev[1], prev[2], v]);
+                      const n = Number.parseFloat(v);
+                      if (Number.isFinite(n)) setBbox((b) => [b[0], b[1], b[2], n]);
+                    }}
+                  />
+                </label>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-muted-foreground" htmlFor="extract-bbox-paste">
+                  Paste bbox <code className="font-mono">min_lon,min_lat,max_lon,max_lat</code>
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    id="extract-bbox-paste"
+                    value={bboxText}
+                    onChange={(e) => setBboxText(e.target.value)}
+                    placeholder="-122.5,47.2,-122.3,47.5"
+                  />
+                  <Button type="button" variant="outline" onClick={applyParsedBboxString}>
+                    Parse
+                  </Button>
+                </div>
+              </div>
+              <Button type="button" variant="outline" className="w-full" onClick={useMapViewAsBbox}>
+                Use current map view as bbox
               </Button>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            disabled={useFileBounds}
-            onClick={useMapViewAsBbox}
-          >
-            Use current map view as bbox
-          </Button>
+            </>
+          ) : null}
           {!isValidBbox(bbox) ? (
             <Alert variant="destructive">
               Invalid bbox: the minimum must be less than the maximum for both longitude and
@@ -399,12 +383,6 @@ export function ExtractPanel() {
               );
             })}
           </fieldset>
-          {strategy !== "simple" ? (
-            <p className="text-muted-foreground">
-              Complete ways and Smart require the Full node index, so this extract will load in Full
-              mode.
-            </p>
-          ) : null}
         </CardContent>
       </Step>
 
@@ -435,18 +413,6 @@ export function ExtractPanel() {
           >
             Download extracted PBF
           </ActionButton>
-          {hasExtractResult && !extract.isStored && extract.canStore ? (
-            <ActionButton
-              type="button"
-              disabled={isExtracting}
-              variant="outline"
-              className="w-full"
-              icon={<SaveIcon aria-hidden="true" />}
-              onAction={() => extract.saveToStorage()}
-            >
-              Save to storage
-            </ActionButton>
-          ) : null}
           <p className="text-muted-foreground">
             To merge this extract, download it and open it in <a href={appOrigin("merge")}>Merge</a>
             .
