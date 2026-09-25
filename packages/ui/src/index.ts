@@ -13,7 +13,7 @@ export { ErrorBoundary } from "./components/error-boundary.tsx";
 export { InfoTooltip } from "./components/info-tooltip.tsx";
 export { AppSidebar, Main, MapContent } from "./components/layout.tsx";
 export { IconButton } from "./components/icon-button.tsx";
-export { GithubLogo, Nav, NavSeparator, ToggleButton } from "./components/nav.tsx";
+export { GithubLogo, Nav, NavSeparator } from "./components/nav.tsx";
 export { default as ObjectToTableRows } from "./components/object-to-table.tsx";
 export { Pager } from "./components/pager.tsx";
 export { EmptyState, LoadingState, SectionTitle } from "./components/section.tsx";
@@ -74,7 +74,19 @@ export {
   ItemSeparator,
   ItemTitle,
 } from "./components/ui/item.tsx";
-export { Menu, MenuContent, MenuItem, MenuTrigger } from "./components/ui/menu.tsx";
+export {
+  Menu,
+  MenuCheckboxItem,
+  MenuContent,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuIconTrigger,
+  MenuItem,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+  MenuTrigger,
+} from "./components/ui/menu.tsx";
 export { Progress } from "./components/ui/progress.tsx";
 export { Radio, RadioCard, RadioLabel } from "./components/ui/radio.tsx";
 export {

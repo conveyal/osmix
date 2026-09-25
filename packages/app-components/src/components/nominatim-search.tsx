@@ -1,4 +1,3 @@
-import { searchControlIsOpenAtom } from "@osmix/app-core";
 import {
   Alert,
   Button,
@@ -10,14 +9,14 @@ import {
   ScrollArea,
   Spinner,
 } from "@osmix/ui";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useSetAtom } from "jotai";
 import { SearchIcon } from "lucide-react";
+import type { LngLatBounds } from "maplibre-gl";
 import { useState, useTransition } from "react";
-import type { MapInstance } from "react-map-gl/maplibre";
+import type { MapRef } from "react-map-gl/maplibre";
 
+import { useMap } from "../hooks/map.ts";
 import { nominatimPlaceAtom } from "../state/nominatim.ts";
-import CustomControl from "./custom-control.tsx";
-import { MapPanelHeader } from "./map-panel-header.tsx";
 
 export type NominatimResult = {
   addresstype: string;
@@ -32,37 +31,72 @@ export type NominatimResult = {
 
 const NOMINATIM_ENDPOINT = "https://nominatim.openstreetmap.org/search";
 
-export default function NominatimSearchControl() {
-  const isOpen = useAtomValue(searchControlIsOpenAtom);
-  if (!isOpen) return null;
-  return (
-    <CustomControl position="top-right">
-      <NominatimSearchPanel />
-    </CustomControl>
-  );
+/** Query Nominatim for places matching `query`, preferring results inside `bounds`. */
+export async function searchNominatim(
+  query: string,
+  bounds?: LngLatBounds | null,
+): Promise<NominatimResult[]> {
+  const url = new URL(NOMINATIM_ENDPOINT);
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("limit", "10");
+  url.searchParams.set("q", query);
+  if (bounds) url.searchParams.set("viewbox", bounds.toArray().flat().join(","));
+
+  const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!response.ok) throw Error(`Nominatim request failed (${response.status})`);
+
+  const data = (await response.json()) as NominatimResult[];
+  return Array.isArray(data) ? data : [];
 }
 
-/** `CustomControl` passes `map` to its child element. */
-function NominatimSearchPanel({ map }: { map?: MapInstance }) {
-  return (
-    <>
-      <MapPanelHeader icon={<SearchIcon aria-hidden="true" />} title="Search places" />
-      <NominatimSearch map={map} />
-    </>
-  );
+/** Move the map to a result: fit its bounding box, or fly to its point at street zoom. */
+export function focusNominatimResult(map: MapRef, result: NominatimResult): void {
+  const bbox = result.boundingbox?.map(Number);
+  if (bbox && bbox.length === 4 && bbox.every(Number.isFinite)) {
+    const [latSouth, latNorth, lonWest, lonEast] = bbox as [number, number, number, number];
+    map.fitBounds(
+      [
+        [lonWest, latSouth],
+        [lonEast, latNorth],
+      ],
+      { padding: 100, maxDuration: 100 },
+    );
+    return;
+  }
+
+  const lat = Number(result.lat);
+  const lon = Number(result.lon);
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    const targetZoom = Math.max(map.getZoom(), 14);
+    map.flyTo({ center: [lon, lat], zoom: targetZoom, maxDuration: 100 });
+  }
 }
 
+/**
+ * A place search box backed by Nominatim: a query field, a result list, and the map moves to
+ * the chosen place. The result is published to `nominatimPlaceAtom`. Used by the map search and
+ * embedded in sidebars (Extract's step 2). The field's accessible name is `label`; pass
+ * `inputId` to point a visible `FieldLabel` at it.
+ */
 export function NominatimSearch({
-  map,
   onPlaceResolved,
+  autoFocus = false,
+  inputId,
+  label = "Search for a place",
 }: {
-  map?: MapInstance;
   /**
    * Called after the map is focused on the chosen result (bbox or center). The result is also
    * published to `nominatimPlaceAtom`.
    */
   onPlaceResolved?: (result: NominatimResult) => void;
+  /** Focus the query field on mount. Off by default so a remount does not steal focus. */
+  autoFocus?: boolean;
+  /** The query field's DOM id, for a visible label's `htmlFor`. */
+  inputId?: string;
+  /** The query field's accessible name and placeholder. */
+  label?: string;
 }) {
+  const map = useMap();
   const setPlace = useSetAtom(nominatimPlaceAtom);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NominatimResult[]>([]);
@@ -78,24 +112,7 @@ export function NominatimSearch({
     if (!trimmed) return;
     startTransition(async () => {
       try {
-        const url = new URL(NOMINATIM_ENDPOINT);
-        url.searchParams.set("format", "jsonv2");
-        url.searchParams.set("limit", "10");
-        url.searchParams.set("q", trimmed);
-        const bounds = map?.getBounds();
-        if (bounds) url.searchParams.set("viewbox", bounds.toArray().flat().join(","));
-
-        const response = await fetch(url.toString(), {
-          headers: {
-            Accept: "application/json",
-          },
-        });
-        if (!response.ok) {
-          throw Error(`Nominatim request failed (${response.status})`);
-        }
-
-        const data = (await response.json()) as NominatimResult[];
-        setResults(Array.isArray(data) ? data : []);
+        setResults(await searchNominatim(trimmed, map?.getBounds()));
         setSearched(true);
       } catch (err) {
         console.error(err);
@@ -105,48 +122,13 @@ export function NominatimSearch({
     });
   };
 
-  const resolvePlace = (result: NominatimResult) => {
-    setPlace(result);
-    onPlaceResolved?.(result);
-  };
-
   const handleSelect = (result: NominatimResult) => {
     setQuery(result.display_name);
     setResults([]);
     setSearched(false);
-
-    if (!map) {
-      resolvePlace(result);
-      return;
-    }
-
-    const bbox = result.boundingbox?.map(Number);
-    if (bbox && bbox.length === 4 && bbox.every(Number.isFinite)) {
-      const [latSouth, latNorth, lonWest, lonEast] = bbox as [number, number, number, number];
-      // Clamp to a sensible padding so we don't zoom too far out
-      map.fitBounds(
-        [
-          [lonWest, latSouth],
-          [lonEast, latNorth],
-        ],
-        { padding: 100, maxDuration: 100 },
-      );
-      resolvePlace(result);
-      return;
-    }
-
-    const lat = Number(result.lat);
-    const lon = Number(result.lon);
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      const currentZoom = map.getZoom?.() ?? 12;
-      const targetZoom = Math.max(currentZoom, 14);
-      map.flyTo({
-        center: [lon, lat],
-        zoom: targetZoom,
-        maxDuration: 100,
-      });
-    }
-    resolvePlace(result);
+    if (map) focusNominatimResult(map, result);
+    setPlace(result);
+    onPlaceResolved?.(result);
   };
 
   return (
@@ -160,14 +142,13 @@ export function NominatimSearch({
       >
         <InputGroup>
           <InputGroupInput
-            // Focus once when the panel opens. (An inline ref callback re-ran on every render,
-            // and map panels re-render on every camera move, so it stole focus.)
-            autoFocus
+            id={inputId}
+            autoFocus={autoFocus}
             onFocus={(e) => e.target.select()}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search for a place"
-            aria-label="Search for a place"
+            placeholder={label}
+            aria-label={label}
           />
           <InputGroupAddon align="inline-end">
             <InputGroupButton

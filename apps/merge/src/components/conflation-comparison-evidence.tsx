@@ -1,3 +1,4 @@
+import { MapRoleSymbol } from "@osmix/app-components";
 import { SectionTitle } from "@osmix/ui";
 import type { FeatureCollection } from "geojson";
 import type { OsmConflationCandidateView } from "osmix";
@@ -9,32 +10,20 @@ import {
   type ConflationComparisonRole,
 } from "../lib/conflation-comparison";
 
-/** A smaller diamond fits inside the outlined circle without moving either coordinate. */
+/**
+ * The map marker for a comparison role: the base (`target`) is the map's base point symbol (a
+ * ring), the imported feature (`source`) its patch point symbol (a diamond that fits inside the
+ * ring), so markers, legend and map agree and a co-located pair stays visible.
+ */
 export function ComparisonMarkerSymbol({ role }: { role: ConflationComparisonRole }) {
   return (
-    <svg
-      aria-hidden="true"
+    <MapRoleSymbol
+      role={role === "target" ? "base" : "patch"}
+      variant="point"
+      size={28}
       data-slot="comparison-marker-symbol"
       data-role={role}
-      width="28"
-      height="28"
-      viewBox="0 0 28 28"
-      className="shrink-0"
-    >
-      {role === "target" ? (
-        <>
-          <circle cx="14" cy="14" r="10" fill="none" stroke="var(--map-casing)" strokeWidth="7" />
-          <circle cx="14" cy="14" r="10" fill="none" stroke="var(--map-base)" strokeWidth="3" />
-        </>
-      ) : (
-        <path
-          d="M14 7 21 14 14 21 7 14Z"
-          fill="var(--map-patch)"
-          stroke="var(--map-casing)"
-          strokeWidth="2"
-        />
-      )}
-    </svg>
+    />
   );
 }
 

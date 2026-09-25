@@ -1,7 +1,7 @@
 # Merge App Design Notes
 
 Rules specific to `apps/merge`. The shared design system (typography, color
-tokens, spacing, primitives, map-control CSS) lives in
+tokens, spacing, primitives, map overlay primitives) lives in
 [`packages/ui/DESIGN.md`](../../packages/ui/DESIGN.md); read that first.
 
 ## Merge-only components

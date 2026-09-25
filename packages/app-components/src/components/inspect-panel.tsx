@@ -30,12 +30,14 @@ import ChangesSummary, {
   ChangesList,
   ChangesPagination,
 } from "./osm-changes-summary.tsx";
+import { OsmDatasetCard } from "./osm-dataset-card.tsx";
 import { OsmSourceLinks } from "./osm-source-links.tsx";
 import StoredOsmList from "./stored-osm-list.tsx";
 
 /**
  * Sidebar panel for inspecting one loaded dataset: source links and stored files while the
- * slot is empty, then within-dataset duplicate diagnostics once a dataset is loaded.
+ * slot is empty, then the dataset card (file info, save, download, clear), the within-dataset
+ * duplicate diagnostics and their results once a dataset is loaded.
  */
 export function InspectPanel({
   osmKey,
@@ -113,39 +115,52 @@ export function InspectPanel({
     );
   }
 
+  const clearDataset = async () => {
+    selectEntity(null, null);
+    setChangesetStats(null);
+    await baseOsm.loadOsmFile(null);
+  };
+
   return (
     <div className="flex flex-1 flex-col gap-4">
-      <FullIndexRequired operation="Duplicate detection" osmFile={baseOsm} />
-      <p>
-        Scan for possible duplicates without changing the dataset. Nearby OSM entities may belong to
-        different roads, layers, or restrictions, so candidates must be investigated against the
-        source data instead of applied automatically.
-      </p>
-      <ActionButton
-        disabled={!hasFullNodeIndex(baseOsm.osmInfo)}
-        onAction={async () => {
-          const osm = baseOsm.osm;
-          if (!osm) throw Error("Osm has not been loaded.");
-          await Tasks.run(
-            "Find duplicate nodes and ways",
-            async () => {
-              const changes = await remote.generateChangeset(
-                osm.id,
-                osm.id,
-                WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
+      <OsmDatasetCard title="Dataset" name="dataset" osmFile={baseOsm} onClear={clearDataset} />
+
+      <Card>
+        <CardHeader>Diagnostics</CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <FullIndexRequired operation="Duplicate detection" osmFile={baseOsm} />
+          <p>
+            Scan for possible duplicates without changing the dataset. Nearby OSM entities may
+            belong to different roads, layers, or restrictions, so candidates must be investigated
+            against the source data instead of applied automatically.
+          </p>
+          <ActionButton
+            disabled={!hasFullNodeIndex(baseOsm.osmInfo)}
+            onAction={async () => {
+              const osm = baseOsm.osm;
+              if (!osm) throw Error("Osm has not been loaded.");
+              await Tasks.run(
+                "Find duplicate nodes and ways",
+                async () => {
+                  const changes = await remote.generateChangeset(
+                    osm.id,
+                    osm.id,
+                    WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
+                  );
+                  setChangesetStats(changes);
+                  return changes;
+                },
+                {
+                  summary: (changes) =>
+                    `Found ${changes.totalChanges.toLocaleString()} duplicate candidates`,
+                },
               );
-              setChangesetStats(changes);
-              return changes;
-            },
-            {
-              summary: (changes) =>
-                `Found ${changes.totalChanges.toLocaleString()} duplicate candidates`,
-            },
-          );
-        }}
-      >
-        Find duplicate nodes and ways
-      </ActionButton>
+            }}
+          >
+            Find duplicate nodes and ways
+          </ActionButton>
+        </CardContent>
+      </Card>
 
       {changesetStats != null && (
         <Card>

@@ -1,5 +1,5 @@
-import { selectOsmEntityAtom } from "@osmix/app-core";
-import { useSetAtom } from "jotai";
+import { mapModeAtom, selectOsmEntityAtom } from "@osmix/app-core";
+import { useAtomValue, useSetAtom } from "jotai";
 import {
   type ExpressionSpecification,
   type FillLayerSpecification,
@@ -39,13 +39,20 @@ function featureColor(fallback: string): ExpressionSpecification {
 
 const outlineWidth: ExpressionSpecification = ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 1];
 
-/** Layer paint for an overlay, colored by dataset role (see `useMapColors`). */
+/**
+ * Layer paint for an overlay, colored by dataset role (see `useMapColors`). Patch lines are
+ * dashed, matching the legend; nodes stay circles for both roles because a MapLibre `circle`
+ * layer cannot draw diamonds.
+ */
 function overlayPaints(colors: MapColors, role: OsmixOverlayRole) {
   const color = colors[role];
+  const dashes: Pick<LineLayerSpecification["paint"] & object, "line-dasharray"> =
+    role === "patch" ? { "line-dasharray": [2, 2] } : {};
   const ways: LineLayerSpecification["paint"] = {
     "line-color": ["case", isHovered, colors.hover, featureColor(color)],
     "line-opacity": 1,
     "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 2, 18, 10],
+    ...dashes,
   };
   const wayPolygons: FillLayerSpecification["paint"] = {
     "fill-color": ["case", isHovered, colors.hover, featureColor(color)],
@@ -55,6 +62,7 @@ function overlayPaints(colors: MapColors, role: OsmixOverlayRole) {
     "line-color": featureColor(color),
     "line-opacity": 0.5,
     "line-width": outlineWidth,
+    ...dashes,
   };
   const relationPolygons: FillLayerSpecification["paint"] = {
     "fill-color": ["case", isHovered, colors.hover, color],
@@ -64,6 +72,7 @@ function overlayPaints(colors: MapColors, role: OsmixOverlayRole) {
     "line-color": color,
     "line-opacity": 0.5,
     "line-width": outlineWidth,
+    ...dashes,
   };
   const nodes: CircleLayerSpecification["paint"] = {
     "circle-color": ["case", isHovered, colors.hover, color],
@@ -82,10 +91,6 @@ function overlayPaints(colors: MapColors, role: OsmixOverlayRole) {
   };
 }
 
-const waysLayout: LineLayerSpecification["layout"] = {
-  "line-join": "round",
-};
-
 const nodeFilter: FilterSpecification = ["==", ["get", "type"], "node"];
 const wayLinesFilter: FilterSpecification = ["==", ["geometry-type"], "LineString"];
 const wayPolygonsFilter: FilterSpecification = ["==", ["geometry-type"], "Polygon"];
@@ -94,22 +99,29 @@ const relationFilter: FilterSpecification = ["==", ["get", "type"], "relation"];
 
 /**
  * Interactive vector overlay for one dataset: hover tooltips and click-to-select. `role` picks
- * the dataset color; a feature's own `color` property wins.
+ * the dataset color and prefixes the source and layer ids, so one file loaded in both Merge
+ * slots never shares layers; a feature's own `color` property wins. `visible={false}` keeps the
+ * layers mounted but hidden. In route mode clicks are left to the routing tool and the cursor
+ * is not touched; hover tooltips stay.
  */
 export default function OsmixVectorOverlay({
   osm,
   role = "base",
+  visible = true,
 }: {
   osm: Osm;
   role?: OsmixOverlayRole;
+  visible?: boolean;
 }) {
   const map = useMap();
   const colors = useMapColors();
   const paints = useMemo(() => overlayPaints(colors, role), [colors, role]);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
+  const mode = useAtomValue(mapModeAtom);
   const popupRef = useRef<Popup | null>(null);
+  const visibility = visible ? "visible" : "none";
 
-  const overlayId = `${APPID}:${osm?.id}:overlay`;
+  const overlayId = `${APPID}:${role}:${osm.id}:overlay`;
   const sourceId = `${overlayId}:source`;
   const waysLayerId = `${overlayId}:ways`;
   const wayPolygonsLayerId = `${waysLayerId}:polygons`;
@@ -120,7 +132,7 @@ export default function OsmixVectorOverlay({
 
   const clearHover = useEffectEvent(() => {
     if (map) {
-      map.getCanvas().style.setProperty("cursor", "");
+      if (mode !== "route") map.getCanvas().style.setProperty("cursor", "");
       const source = map.getSource(sourceId);
       if (sourceId && source) {
         map.removeFeatureState({
@@ -142,6 +154,7 @@ export default function OsmixVectorOverlay({
   });
 
   const handleClick = useEffectEvent(async (event: MapLayerMouseEvent) => {
+    if (mode === "route") return;
     const feature = event.features?.[0];
     if (!osm || !feature || typeof feature.id !== "number") {
       selectEntity(null, null);
@@ -167,7 +180,7 @@ export default function OsmixVectorOverlay({
       clearHover();
       return;
     }
-    map.getCanvas().style.setProperty("cursor", "pointer");
+    if (mode !== "route") map.getCanvas().style.setProperty("cursor", "pointer");
     if (!popupRef.current) {
       popupRef.current = new Popup({
         closeButton: false,
@@ -257,6 +270,7 @@ export default function OsmixVectorOverlay({
         filter={relationFilter}
         type="fill"
         {...{ "source-layer": `${sourceLayerPrefix}:relations` }}
+        layout={{ visibility }}
         paint={paints.relationPolygons}
       />
       <Layer
@@ -264,6 +278,7 @@ export default function OsmixVectorOverlay({
         filter={relationFilter}
         type="line"
         {...{ "source-layer": `${sourceLayerPrefix}:relations` }}
+        layout={{ visibility }}
         paint={paints.relationPolygonsOutline}
       />
       <Layer
@@ -271,6 +286,7 @@ export default function OsmixVectorOverlay({
         filter={wayPolygonsFilter}
         type="fill"
         {...{ "source-layer": `${sourceLayerPrefix}:ways` }}
+        layout={{ visibility }}
         paint={paints.wayPolygons}
       />
       <Layer
@@ -278,6 +294,7 @@ export default function OsmixVectorOverlay({
         filter={wayPolygonsFilter}
         type="line"
         {...{ "source-layer": `${sourceLayerPrefix}:ways` }}
+        layout={{ visibility }}
         paint={paints.wayPolygonsOutline}
       />
       {/* Way lines - rendered on top of polygon fills */}
@@ -286,7 +303,7 @@ export default function OsmixVectorOverlay({
         filter={wayLinesFilter}
         type="line"
         {...{ "source-layer": `${sourceLayerPrefix}:ways` }}
-        layout={waysLayout}
+        layout={{ "line-join": "round", visibility }}
         paint={paints.ways}
       />
       {/* Nodes - rendered on top of lines */}
@@ -295,6 +312,7 @@ export default function OsmixVectorOverlay({
         filter={nodeFilter}
         type="circle"
         {...{ "source-layer": `${sourceLayerPrefix}:nodes` }}
+        layout={{ visibility }}
         paint={paints.nodes}
       />
     </Source>

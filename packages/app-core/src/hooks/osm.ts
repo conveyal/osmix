@@ -25,7 +25,6 @@ import {
   osmLoadFailureAtomFamily,
   osmLoadProfileAtomFamily,
   osmStoredAtomFamily,
-  selectedOsmAtom,
 } from "../state/osm.ts";
 import { Tasks } from "../state/tasks.ts";
 import type { StoredFileInfo } from "../workers/osmix-app.worker.ts";
@@ -106,7 +105,6 @@ export function useOsmFile(osmKey: string) {
     osmId: string;
     check: Awaited<ReturnType<typeof canStoreBytes>>;
   } | null>(null);
-  const setSelectedOsm = useSetAtom(selectedOsmAtom);
   const remote = useOsmixRemote();
   const bumpDatasetVersion = useSetAtom(osmDatasetVersionAtomFamily(osmKey));
   /** Announce that the dataset in this slot is being replaced or cleared. */
@@ -202,7 +200,6 @@ export function useOsmFile(osmKey: string) {
 
             setOsmInfo(stored.stored.info);
             setOsm(stored.osm);
-            setSelectedOsm(stored.osm);
             setIsStored(true);
 
             task.end(`${file.name} loaded from cache`);
@@ -234,7 +231,6 @@ export function useOsmFile(osmKey: string) {
         if (signal?.aborted) throw new LoadCancelledError();
 
         setOsm(osm);
-        setSelectedOsm(osm);
 
         task.end(`${file.name} loaded`);
         return osmInfo;
@@ -325,7 +321,6 @@ export function useOsmFile(osmKey: string) {
         if (signal?.aborted) throw new LoadCancelledError();
 
         setOsm(osm);
-        setSelectedOsm(osm);
 
         task.end(`${file.name} extracted`);
         return osmInfo;
@@ -386,7 +381,6 @@ export function useOsmFile(osmKey: string) {
         setFileInfo(result.fileInfo);
         setOsmInfo(result.info);
         setOsm(loadedOsm);
-        setSelectedOsm(loadedOsm);
         setIsStored(
           result.existing !== null && cachedProfileIsUsable(requestedProfile, result.existing.info),
         );
@@ -470,7 +464,6 @@ export function useOsmFile(osmKey: string) {
         const osmInfo: OsmInfo = { ...stored.info, id: stored.entry.fileHash };
         setOsmInfo(osmInfo);
         setOsm(osm);
-        setSelectedOsm(osm);
         setIsStored(true);
 
         // Restore file info from storage (clear actual file since we loaded from storage)
@@ -601,7 +594,6 @@ export function useOsmFile(osmKey: string) {
       setOsm(source.osm);
       setOsmInfo(source.osmInfo);
       setIsStored(source.isStored);
-      setSelectedOsm(source.osm);
       setLoadFailure(null);
     },
   );
@@ -625,7 +617,6 @@ export function useOsmFile(osmKey: string) {
       // No changes - keep the original file info and stored state
       setOsm(prepared.osm);
       setOsmInfo(prepared.osmInfo);
-      setSelectedOsm(prepared.osm);
       setLoadFailure(null);
       return prepared.osm;
     }
@@ -637,7 +628,6 @@ export function useOsmFile(osmKey: string) {
     setOsm(prepared.osm);
     setOsmInfo(prepared.osmInfo);
     setIsStored(false); // New file, not stored yet
-    setSelectedOsm(prepared.osm);
     setLoadFailure(null);
 
     return prepared.osm;

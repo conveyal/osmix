@@ -19,18 +19,16 @@ import type { OsmixAppId } from "../lib/app-origin.ts";
 import { ActivitySheet } from "./activity-sheet.tsx";
 import { AppLinks } from "./app-links.tsx";
 import BrowserCheck from "./browser-check.tsx";
-import { MapNavControls } from "./map-nav-controls.tsx";
 import { TaskIndicator } from "./task-indicator.tsx";
 import { TaskToasts } from "./task-toasts.tsx";
 
-/** The standard top bar: brand, links to the sibling apps, the task indicator, map controls. */
+/** The standard top bar: brand, links to the sibling apps, the task indicator, the system check. */
 export function OsmixNav({ current }: { current: OsmixAppId }) {
   return (
     <Nav
       start={<SidebarTrigger />}
       links={<AppLinks current={current} />}
       status={<TaskIndicator />}
-      controls={<MapNavControls />}
       end={<BrowserCheck />}
     />
   );

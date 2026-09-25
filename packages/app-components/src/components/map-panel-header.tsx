@@ -2,9 +2,9 @@ import { ScrollArea, SectionTitle } from "@osmix/ui";
 import type { ReactNode } from "react";
 
 /**
- * The header row of every floating map panel (`CustomControl`): an optional icon, the
- * section title, an optional muted detail (a file name, a count), and trailing `IconButton`
- * actions. Follow it with `MapPanelBody`.
+ * The header row of a `MapPanel`: an optional icon, the section title, an optional muted
+ * detail (a file name, a dataset label), and trailing `IconButton` actions flush with the
+ * panel's edge. Follow it with `MapPanelBody`.
  */
 export function MapPanelHeader({
   icon,
@@ -33,9 +33,10 @@ export function MapPanelHeader({
 }
 
 /**
- * The scrolling body of a floating map panel, below `MapPanelHeader`: it fills the rest of the
- * panel (capped at half the viewport) so the header stays in view while the content scrolls.
+ * The scrolling body of a `MapPanel`, below `MapPanelHeader`. It takes the rest of the panel,
+ * whose height the overlay region bounds, so the header stays in view while the content
+ * scrolls.
  */
 export function MapPanelBody({ children }: { children: ReactNode }) {
-  return <ScrollArea className="flex-1">{children}</ScrollArea>;
+  return <ScrollArea className="min-h-0 flex-1">{children}</ScrollArea>;
 }

@@ -1,18 +1,6 @@
-import {
-  Basemap,
-  CustomControl,
-  EntityDetailsMapControl,
-  type MapInitialViewState,
-  OsmFileMapControl,
-  OsmixMapSources,
-  RouteLayer,
-  RouteMapControl,
-  SelectedEntityLayer,
-  useFlyToOsmBounds,
-} from "@osmix/app-components";
-import { searchControlIsOpenAtom, selectOsmEntityAtom, useOsmFile } from "@osmix/app-core";
+import { type MapInitialViewState, OsmixMap, useFlyToOsmBounds } from "@osmix/app-components";
+import { useOsmFile } from "@osmix/app-core";
 import { AppSidebar, Main, MapContent } from "@osmix/ui";
-import { useSetAtom } from "jotai";
 import { useEffect, useMemo } from "react";
 
 import ExtractMapLayers from "./components/extract-map-layers";
@@ -24,14 +12,8 @@ import { OSM_KEY } from "./settings";
 export function ExtractApp() {
   const extract = useOsmFile(OSM_KEY);
   const flyToOsmBounds = useFlyToOsmBounds();
-  const selectEntity = useSetAtom(selectOsmEntityAtom);
-  const setSearchControlIsOpen = useSetAtom(searchControlIsOpenAtom);
 
-  // Place search is how most extracts start, so show the shared map search by default.
-  useEffect(() => {
-    setSearchControlIsOpen(true);
-  }, [setSearchControlIsOpen]);
-
+  // OsmixMap seeds the camera at mount only; fit it to each new extract result.
   useEffect(() => {
     if (extract.osmInfo) flyToOsmBounds(extract.osmInfo);
   }, [extract.osmInfo, flyToOsmBounds]);
@@ -43,30 +25,20 @@ export function ExtractApp() {
     return { bounds: DEFAULT_EXTRACT_BBOX, fitBoundsOptions: { padding: 80 } };
   }, [extract.osmInfo]);
 
-  const clearExtract = async () => {
-    selectEntity(null, null);
-    await extract.loadOsmFile(null);
-  };
-
   return (
     <Main>
       <AppSidebar>
         <ExtractPanel />
       </AppSidebar>
       <MapContent>
-        <Basemap initialViewState={initialViewState}>
-          <OsmixMapSources baseOsm={extract.osm} />
+        <OsmixMap
+          datasets={
+            extract.osm ? [{ osmFile: extract, role: "base", label: "Extract result" }] : []
+          }
+          initialViewState={initialViewState}
+        >
           <ExtractMapLayers />
-          <SelectedEntityLayer />
-          <RouteMapControl osmFiles={[extract]} />
-          <RouteLayer />
-          <OsmFileMapControl files={[{ osmFile: extract, onClear: clearExtract }]} />
-          {extract.osm && (
-            <CustomControl position="top-left">
-              <EntityDetailsMapControl osm={extract.osm} />
-            </CustomControl>
-          )}
-        </Basemap>
+        </OsmixMap>
       </MapContent>
     </Main>
   );

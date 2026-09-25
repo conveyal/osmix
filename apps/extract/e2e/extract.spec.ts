@@ -11,7 +11,9 @@ test("extracts a bounding box from a PBF and offers the result for download", as
   await expect(page.getByRole("link", { name: "Merge" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Inspect" })).toBeVisible();
 
-  // The shared place search is open by default, and Extract adds no second search box.
+  // Exactly one button is named "Search": the submit of the place search embedded in step 2.
+  // The map's own search is closed by default (its toggle is "Open map search" and its submit
+  // is "Run search"), so it adds no second one.
   await expect(page.getByRole("button", { name: "Search", exact: true })).toHaveCount(1);
 
   // A small box in the middle of Monaco.
@@ -31,11 +33,9 @@ test("extracts a bounding box from a PBF and offers the result for download", as
   // The in-page Alert, not the error toast that also announces as \`alert\`.
   const failure = page.locator('[data-slot="alert"][role="alert"]');
   // Extraction crosses the worker boundary; wait for its outcome rather than the default limit.
-  await expect
-    .poll(async () => (await download.isEnabled()) || (await failure.isVisible()), {
-      timeout: 120_000,
-    })
-    .toBe(true);
+  // The download button is only mounted after a successful extract, so wait for either it or
+  // the failure alert to appear.
+  await expect(download.or(failure)).toBeVisible({ timeout: 120_000 });
   if (await failure.isVisible()) {
     throw new Error(`OSM extraction failed: ${await failure.innerText()}`);
   }
@@ -66,8 +66,8 @@ test("extracts using the bounds recorded in the selected file's header", async (
     "From the file header: 7.4053929, 43.7232244, 7.4447259, 43.7543687",
   );
   await expect(minLon).toHaveCount(0);
-  // Fitting the map to the file's bounds moves the camera; map panels re-render on camera
-  // moves and must not pull focus away (the place search used to refocus on every render).
+  // Fitting the map to the file's bounds moves the camera; nothing on the map may pull focus
+  // away while it does.
   await page.waitForTimeout(700);
   await expect(useFileBounds).toBeFocused();
   // The manual bbox controls are hidden with the inputs.
@@ -81,8 +81,10 @@ test("extracts using the bounds recorded in the selected file's header", async (
   const download = page.getByRole("button", { name: "Download extracted PBF" });
   await expect(download).toBeEnabled({ timeout: 120_000 });
 
-  // Unchecking gives back the bbox from before, and the controls unlock.
+  // Unchecking gives back the bbox from before, and the controls unlock. The embedded place
+  // search remounts with them and must not steal focus.
   await useFileBounds.uncheck();
+  await expect(useFileBounds).toBeFocused();
   await expect(minLon).toHaveValue(previousMinLon);
   await expect(minLon).toBeEnabled();
 });

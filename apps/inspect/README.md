@@ -6,7 +6,7 @@ It is the first consumer of the shared app packages besides the merge app:
 
 - [`@osmix/ui`](../../packages/ui) — primitives, layout shell, design tokens
 - [`@osmix/app-core`](../../packages/app-core) — worker remote, IndexedDB storage, jotai state, `useOsmFile`
-- [`@osmix/app-components`](../../packages/app-components) — MapLibre basemap and protocols, `InspectPanel`, map controls
+- [`@osmix/app-components`](../../packages/app-components) — MapLibre basemap and protocols, `InspectPanel`, `OsmixMap` (toolbar, inspector, legend, routing tool)
 
 The app itself is a few files: `src/main.tsx` creates the worker remote and jotai store, `src/app.tsx` composes the panel and map, and `src/settings.ts` names the one dataset slot.
 

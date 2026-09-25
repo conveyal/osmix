@@ -41,6 +41,45 @@ describe("Osmix map sources", () => {
     ]);
   });
 
+  it("prefixes raster ids with the role, so one file in both slots gets two sources", () => {
+    const base = OsmixRasterSource({ osmId: "abc123" });
+    const patch = OsmixRasterSource({ osmId: "abc123", role: "patch" });
+
+    expect(base.props.id).toBe("osmix:base:abc123:256:raster");
+    expect(patch.props.id).toBe("osmix:patch:abc123:256:raster");
+    expect(base.key).not.toBe(patch.key);
+  });
+
+  it("hides a raster layer with visible={false} instead of unmounting it", () => {
+    const shown = OsmixRasterSource({ osmId: "yakima-base" });
+    const hidden = OsmixRasterSource({ osmId: "yakima-base", visible: false });
+    const layerLayout = (source: ReturnType<typeof OsmixRasterSource>) =>
+      (source.props.children as React.ReactElement<{ layout: { visibility: string } }>).props
+        .layout;
+
+    expect(layerLayout(shown)).toEqual({ visibility: "visible" });
+    expect(layerLayout(hidden)).toEqual({ visibility: "none" });
+    expect(hidden.key).toBe(shown.key);
+  });
+
+  it("passes visible={false} through to the raster source and the vector overlay", () => {
+    const sources = OsmixMapSources({
+      baseOsm: new Osm({ id: "yakima-base" }),
+      patchOsm: new Osm({ id: "yakima-osw" }),
+      patchVisible: false,
+    });
+    const visibility = (sources.props.children as React.ReactElement<{ visible?: boolean }>[])
+      .filter(Boolean)
+      .map((child) => child.props.visible);
+    expect(visibility).toEqual([true, false, true, false]);
+    expect(childKeys(sources)).toEqual([
+      "base:raster:yakima-base",
+      "patch:raster:yakima-osw",
+      "base:overlay:yakima-base",
+      "patch:overlay:yakima-osw",
+    ]);
+  });
+
   it("draws the patch dataset in the patch color", () => {
     const sources = OsmixMapSources({
       baseOsm: new Osm({ id: "yakima-base" }),

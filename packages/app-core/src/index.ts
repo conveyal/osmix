@@ -49,12 +49,14 @@ export {
   startIndexAtom,
 } from "./state/changes.ts";
 export {
-  layerControlIsOpenAtom,
+  type BasemapPreset,
+  type BasemapStyleId,
+  basemapPresetAtom,
+  datasetVisibleAtomFamily,
+  DEFAULT_BASEMAP_PRESET,
   mapBoundsAtom,
   mapCenterAtom,
-  osmFileControlIsOpenAtom,
-  routingControlIsOpenAtom,
-  searchControlIsOpenAtom,
+  mapModeAtom,
   zoomAtom,
 } from "./state/map.ts";
 export {

@@ -1,5 +1,7 @@
 import {
   appOrigin,
+  NominatimSearch,
+  OsmDatasetCard,
   OsmLoadFailurePanel,
   OsmPbfFileInput,
   SaveToDiskNotice,
@@ -23,6 +25,7 @@ import {
   CheckboxLabel,
   Field,
   FieldDescription,
+  FieldLabel,
   InfoTooltip,
   Input,
   Radio,
@@ -30,10 +33,10 @@ import {
   Spinner,
   Step,
 } from "@osmix/ui";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
 import { DownloadIcon } from "lucide-react";
 import type { ExtractStrategy, GeoBbox2D } from "osmix";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import ExtractTagFilterEditor, {
   conveyalTagFilterEditorState,
@@ -48,7 +51,12 @@ import {
   parseBboxString,
 } from "./lib/extract-bbox";
 import { OSM_KEY } from "./settings";
-import { extractBboxAtom, useFileBoundsAtom } from "./state/extract";
+import {
+  extractBboxAtom,
+  type FileBounds,
+  fileBoundsAtom,
+  useFileBoundsAtom,
+} from "./state/extract";
 
 const STRATEGY_OPTIONS: {
   value: ExtractStrategy;
@@ -77,14 +85,6 @@ const STRATEGY_OPTIONS: {
       "full node index, so the file loads in Full mode.",
   },
 ];
-
-/** What the selected file's PBF header says about its bounds. */
-type FileBounds =
-  | { status: "none" }
-  | { status: "reading" }
-  | { status: "ok"; bbox: GeoBbox2D }
-  | { status: "missing" }
-  | { status: "error"; message: string };
 
 function FileBoundsDescription({ fileBounds }: { fileBounds: FileBounds }) {
   switch (fileBounds.status) {
@@ -131,10 +131,12 @@ export function ExtractPanel() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const remote = useOsmixRemote();
   const map = useMap();
-  const [fileBounds, setFileBounds] = useState<FileBounds>({ status: "none" });
+  const store = useStore();
+  const [fileBounds, setFileBounds] = useAtom(fileBoundsAtom);
   const [useFileBounds, setUseFileBounds] = useAtom(useFileBoundsAtom);
   const [bboxBeforeFileBounds, setBboxBeforeFileBounds] = useState<GeoBbox2D | null>(null);
   const headerRequest = useRef(0);
+  const findPlaceId = useId();
 
   // Only one task runs at a time, so any running task locks the extract controls.
   const isExtracting = current !== null;
@@ -166,6 +168,12 @@ export function ExtractPanel() {
       if (request !== headerRequest.current) return;
       const headerBbox = headerBboxToGeoBbox(header.bbox);
       setFileBounds(headerBbox ? { status: "ok", bbox: headerBbox } : { status: "missing" });
+      // When the bbox misses the file, show the file's outline and the warning together. Read
+      // the bbox from the store: the closure's value predates `stopUsingFileBounds` above.
+      const currentBbox = store.get(extractBboxAtom);
+      if (headerBbox && isValidBbox(currentBbox) && !bboxesOverlap(currentBbox, headerBbox)) {
+        map?.fitBounds(headerBbox, { padding: 40, maxDuration: 500 });
+      }
     } catch (error) {
       if (request !== headerRequest.current) return;
       const message = error instanceof Error ? error.message : String(error);
@@ -215,6 +223,11 @@ export function ExtractPanel() {
     }
   };
 
+  const clearExtract = async () => {
+    selectEntity(null, null);
+    await extract.loadOsmFile(null);
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <Step number={1} title="Select OSM PBF file">
@@ -253,9 +266,16 @@ export function ExtractPanel() {
           {!useFileBounds ? (
             <>
               <p className="text-muted-foreground">
-                Search on the map (top right), or edit coordinates below. The rectangle updates on
-                the map.
+                Find a place, drag the corners on the map, or edit the coordinates below. The
+                rectangle updates on the map.
               </p>
+              <Field>
+                <FieldLabel htmlFor={findPlaceId}>Find a place</FieldLabel>
+                {/* The search box carries the inset itself; pull it flush with the card. */}
+                <div className="-mx-inset -mt-2">
+                  <NominatimSearch inputId={findPlaceId} label="Find a place" />
+                </div>
+              </Field>
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lon">
                   Min longitude
@@ -400,7 +420,7 @@ export function ExtractPanel() {
       </Step>
 
       <Card>
-        <CardContent className="flex flex-col gap-2">
+        <CardContent>
           <ActionButton
             type="button"
             size="lg"
@@ -410,23 +430,37 @@ export function ExtractPanel() {
           >
             Extract
           </ActionButton>
-          <ActionButton
-            type="button"
-            disabled={!extract.osm || isExtracting || !hasExtractResult}
-            variant="outline"
-            className="w-full"
-            icon={<DownloadIcon aria-hidden="true" />}
-            onAction={() => extract.downloadOsm()}
-          >
-            Download extracted PBF
-          </ActionButton>
-          <SaveToDiskNotice />
-          <p className="text-muted-foreground">
-            To merge this extract, download it and open it in <a href={appOrigin("merge")}>Merge</a>
-            .
-          </p>
         </CardContent>
       </Card>
+
+      {hasExtractResult ? (
+        <OsmDatasetCard
+          title="Extract result"
+          name="extract result"
+          osmFile={extract}
+          actions={{ download: false }}
+          onClear={clearExtract}
+          primaryAction={
+            <ActionButton
+              type="button"
+              disabled={isExtracting}
+              className="w-full"
+              icon={<DownloadIcon aria-hidden="true" />}
+              onAction={() => extract.downloadOsm()}
+            >
+              Download extracted PBF
+            </ActionButton>
+          }
+        >
+          <div className="flex flex-col gap-2 p-inset">
+            <SaveToDiskNotice />
+            <p className="text-muted-foreground">
+              To merge this extract, download it and open it in{" "}
+              <a href={appOrigin("merge")}>Merge</a>.
+            </p>
+          </div>
+        </OsmDatasetCard>
+      ) : null}
     </div>
   );
 }

@@ -238,8 +238,12 @@ describe("matching map and coordinate evidence", () => {
     const base = renderToStaticMarkup(createElement(ComparisonMarkerSymbol, { role: "target" }));
     const source = renderToStaticMarkup(createElement(ComparisonMarkerSymbol, { role: "source" }));
     expect(base).toContain("<circle");
+    // The base marker is a hollow ring, so a co-located diamond shows through it.
+    expect(base).toContain('fill="none"');
+    expect(base).not.toContain("<line");
     expect(source).toContain("<path");
     expect(source).not.toContain("<circle");
+    expect(source).not.toContain("<line");
     const legend = renderToStaticMarkup(createElement(ConflationComparisonLegend));
     expect(legend).toContain('role="group" aria-label="Map comparison legend"');
     expect(legend).toContain("Base OSM: circle, solid line");

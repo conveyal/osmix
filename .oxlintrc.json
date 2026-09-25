@@ -132,11 +132,11 @@
               },
               {
                 "pattern": "^(?:[^:]*:)*shadow-(?!none$)",
-                "message": "Elevation belongs to primitives: CustomControl and Nav are raised, dialogs and popovers are modal, cards are flat."
+                "message": "Elevation belongs to primitives: MapPanel and Nav are raised, dialogs and popovers are modal, cards are flat."
               },
               {
                 "pattern": "^(?:[^:]*:)*shadow$",
-                "message": "Elevation belongs to primitives: CustomControl and Nav are raised, dialogs and popovers are modal, cards are flat."
+                "message": "Elevation belongs to primitives: MapPanel and Nav are raised, dialogs and popovers are modal, cards are flat."
               },
               {
                 "pattern": "^(?:[^:]*:)*rounded(?:-|$)",
@@ -223,7 +223,7 @@
     },
     {
       "files": [
-        "packages/app-components/src/components/custom-control.tsx",
+        "packages/app-components/src/components/map-overlay.tsx",
         "packages/app-components/src/components/map-panel-header.tsx",
         "packages/app-components/src/components/app-links.tsx"
       ],

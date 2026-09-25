@@ -1,15 +1,14 @@
 import {
-  EntityDetails,
   FullIndexRequired,
   hasFullNodeIndex,
   ChangesSummary,
   ChangesExpandableList,
   ChangesFilters,
   ChangesPagination,
+  OsmDatasetCard,
   OsmInfoTable,
   SaveToDiskNotice,
   StoredOsmList,
-  useFlyToEntity,
   useFlyToOsmBounds,
 } from "@osmix/app-components";
 import {
@@ -20,7 +19,6 @@ import {
   type TaskHandle,
   TaskAlreadyRunningError,
   Tasks,
-  selectedEntityAtom,
   selectOsmEntityAtom,
   osmLoadingAbortControllerAtom,
 } from "@osmix/app-core";
@@ -37,7 +35,6 @@ import {
   CardAction,
   CardContent,
   CardHeader,
-  IconButton,
   Step as StepCard,
   useTaskLock,
 } from "@osmix/ui";
@@ -47,7 +44,6 @@ import {
   ArrowRightIcon,
   DownloadIcon,
   FileDiffIcon,
-  MaximizeIcon,
   MergeIcon,
   SaveIcon,
   SearchCodeIcon,
@@ -261,9 +257,7 @@ export default function MergeBlock() {
   );
   const resetConflationReview = useSetAtom(resetConflationReviewAtom);
   const setConflationComparison = useSetAtom(conflationComparisonAtom);
-  const flyToEntity = useFlyToEntity();
   const flyToOsmBounds = useFlyToOsmBounds();
-  const selectedEntity = useAtomValue(selectedEntityAtom);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
   const [stepIndex, setStepIndex] = useAtom(stepIndexAtom);
   const [mergeAbortController, setMergeAbortController] = useAtom(mergeAbortControllerAtom);
@@ -343,9 +337,25 @@ export default function MergeBlock() {
     selectEntity(null, null);
   };
 
+  /**
+   * Clear the base slot. While a patch is loaded it is promoted into the base slot so the
+   * next merge can start from it; otherwise the slot is simply emptied.
+   */
   const clearBaseOsm = async () => {
     resetMergeDerivedState();
-    await base.loadOsmFile(null);
+    if (patch.osm) {
+      const patchState = {
+        file: patch.file,
+        fileInfo: patch.fileInfo,
+        osm: patch.osm,
+        osmInfo: patch.osmInfo,
+        isStored: patch.isStored,
+      };
+      await patch.loadOsmFile(null);
+      base.copyStateFrom(patchState);
+    } else {
+      await base.loadOsmFile(null);
+    }
   };
 
   const clearPatchOsm = async () => {
@@ -850,8 +860,16 @@ export default function MergeBlock() {
   const baseNeedsFull = base.osmInfo !== null && !hasFullNodeIndex(base.osmInfo);
   const patchNeedsFull = patch.osmInfo !== null && !hasFullNodeIndex(patch.osmInfo);
   if (baseNeedsFull || patchNeedsFull) {
+    // The cards keep a stored dataset without a reload path clearable.
     return (
       <div className="flex flex-col gap-4">
+        <OsmDatasetCard title="Base OSM" name="base OSM" osmFile={base} onClear={clearBaseOsm} />
+        <OsmDatasetCard
+          title="Patch OSM"
+          name="patch OSM"
+          osmFile={patch}
+          onClear={clearPatchOsm}
+        />
         <FullIndexRequired operation="Merge and duplicate detection" osmFile={base} />
         <FullIndexRequired operation="Merge and duplicate detection" osmFile={patch} />
       </div>
@@ -1522,42 +1540,18 @@ export default function MergeBlock() {
         ) : null}
         {base.osm && (
           <>
-            <Card>
-              <CardHeader>Merged OSM — in-memory result</CardHeader>
-              <CardContent className="p-0">
-                <OsmInfoTable
-                  defaultOpen={false}
-                  osm={base.osm}
-                  file={base.file}
-                  fileInfo={base.fileInfo}
-                />
-              </CardContent>
-            </Card>
+            {/* The step actions below keep "Save to storage" and the download. */}
+            <OsmDatasetCard
+              title="Merged OSM"
+              name="merged OSM"
+              osmFile={base}
+              onClear={clearBaseOsm}
+              actions={{ download: false, save: false }}
+            />
 
             {conflationRoutingDiagnostics ? (
               <ConflationRoutingDiagnostics diagnostics={conflationRoutingDiagnostics} />
             ) : null}
-
-            {selectedEntity && (
-              <Card>
-                <CardHeader>
-                  Selected entity
-                  <CardAction>
-                    <IconButton
-                      label="Fit bounds to entity"
-                      icon={<MaximizeIcon />}
-                      onClick={() => {
-                        if (!base.osm || !selectedEntity) return;
-                        flyToEntity(base.osm, selectedEntity);
-                      }}
-                    />
-                  </CardAction>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <EntityDetails entity={selectedEntity} defaultOpen={true} osm={base.osm} />
-                </CardContent>
-              </Card>
-            )}
 
             <SaveToDiskNotice />
             <StepActions aria-label="Final merged OSM actions">

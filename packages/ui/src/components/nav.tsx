@@ -1,14 +1,14 @@
-import { type PrimitiveAtom, useAtom } from "jotai";
 import type { ReactNode } from "react";
 
-import { cn } from "../lib/utils.ts";
 import { IconButton } from "./icon-button.tsx";
 import { Separator } from "./ui/separator.tsx";
 
 /**
  * The top bar shared by the Osmix apps, one `--header-height` tall with a single `gap-3`
  * rhythm. Left: `start` (the sidebar trigger), the brand, a rule, and `links`. Centre:
- * `status` (which must provide its own compact form below `md`). Right: `controls`, a rule, `end`, and the GitHub link.
+ * `status` (which must provide its own compact form below `md`). Right: `controls`, a rule,
+ * `end`, and the GitHub link. `controls` is for app-specific controls and is empty by default;
+ * the map's own tools live on the map.
  */
 export function Nav({
   brand = "OSMIX",
@@ -77,28 +77,6 @@ export function NavSeparator() {
     <Separator
       orientation="vertical"
       className="mx-1 self-center data-[orientation=vertical]:h-4"
-    />
-  );
-}
-
-/** Icon button bound to a boolean atom, used for the nav's panel toggles. On = info. */
-export function ToggleButton({
-  atom,
-  label,
-  icon,
-}: {
-  atom: PrimitiveAtom<boolean>;
-  label: string;
-  icon: ReactNode;
-}) {
-  const [isOpen, setIsOpen] = useAtom(atom);
-  return (
-    <IconButton
-      label={label}
-      icon={icon}
-      className={cn(isOpen ? "text-info" : "text-muted-foreground")}
-      aria-pressed={isOpen}
-      onClick={() => setIsOpen((o) => !o)}
     />
   );
 }

@@ -17,53 +17,89 @@ import { Fragment } from "react/jsx-runtime";
 
 const noop = (_: OsmEntity) => undefined;
 
+/**
+ * Value cells wrap instead of widening the table: a way's refs list or a long tag value would
+ * otherwise scroll the panel sideways. `wrap-anywhere` lets an unbroken value break too.
+ */
+const VALUE_CELL = "whitespace-normal wrap-anywhere";
+
+/**
+ * The details of one entity: its coordinates or refs, its tags and, with `osm`, a disclosure
+ * listing a way's nodes or a relation's members that `onSelect` follows. With `summary` (the
+ * default) everything sits under a `Details` titled "{Type} {id}"; `summary={false}` renders the
+ * content directly, for a panel whose header already names the entity.
+ */
 export default function EntityDetails({
   defaultOpen,
   entity,
   onSelect = noop,
   osm,
+  summary = true,
 }: {
   defaultOpen?: boolean;
   entity: OsmEntity;
   onSelect?: (entity: OsmEntity) => void;
   osm?: Osm;
+  summary?: boolean;
 }) {
-  if (isNode(entity)) return <NodeDetails node={entity} defaultOpen={defaultOpen} />;
-  if (isWay(entity))
+  if (isNode(entity)) {
+    if (!summary) return <NodeContent node={entity} />;
+    return <NodeDetails node={entity} defaultOpen={defaultOpen} />;
+  }
+  if (isWay(entity)) {
+    const wayNodes = osm && (
+      <Details defaultOpen={false}>
+        <DetailsSummary>Way nodes ({entity.refs.length})</DetailsSummary>
+        <DetailsContent>
+          <NodeListTable
+            nodes={entity.refs.map((ref) => osm.nodes.getById(ref)).filter((n) => n != null)}
+            onSelect={onSelect}
+          />
+        </DetailsContent>
+      </Details>
+    );
+    if (!summary)
+      return (
+        <>
+          <WayContent way={entity} />
+          {wayNodes}
+        </>
+      );
     return (
       <WayDetails way={entity} defaultOpen={defaultOpen}>
-        {osm && (
-          <Details defaultOpen={false}>
-            <DetailsSummary>Way nodes ({entity.refs.length})</DetailsSummary>
-            <DetailsContent>
-              <NodeListTable
-                nodes={entity.refs.map((ref) => osm.nodes.getById(ref)).filter((n) => n != null)}
-                onSelect={onSelect}
-              />
-            </DetailsContent>
-          </Details>
-        )}
+        {wayNodes}
       </WayDetails>
     );
-  if (isRelation(entity))
+  }
+  if (isRelation(entity)) {
+    const members = osm && (
+      <Details defaultOpen={false}>
+        <DetailsSummary>Relation members ({entity.members.length})</DetailsSummary>
+        <DetailsContent>
+          <RelationMemberListTable members={entity.members} osm={osm} onSelect={onSelect} />
+        </DetailsContent>
+      </Details>
+    );
+    if (!summary)
+      return (
+        <>
+          <RelationContent relation={entity} />
+          {members}
+        </>
+      );
     return (
       <RelationDetails relation={entity} defaultOpen={defaultOpen}>
-        {osm && (
-          <Details defaultOpen={false}>
-            <DetailsSummary>Relation members ({entity.members.length})</DetailsSummary>
-            <DetailsContent>
-              <RelationMemberListTable members={entity.members} osm={osm} onSelect={onSelect} />
-            </DetailsContent>
-          </Details>
-        )}
+        {members}
       </RelationDetails>
     );
+  }
 }
 
+/** The content table for any entity, without a `Details` wrapper. */
 export function EntityContent({ entity }: { entity: OsmEntity }) {
   if (isNode(entity)) return <NodeContent node={entity} />;
   if (isWay(entity)) return <WayContent way={entity} />;
-  if (isRelation(entity)) return <RelationDetails relation={entity} />;
+  if (isRelation(entity)) return <RelationContent relation={entity} />;
 }
 
 export function NodeDetails({ node, defaultOpen }: { node: OsmNode; defaultOpen?: boolean }) {
@@ -83,11 +119,11 @@ export function NodeContent({ node }: { node: OsmNode }) {
       <TableBody>
         <TableRow>
           <TableCell>lon</TableCell>
-          <TableCell>{node.lon}</TableCell>
+          <TableCell className={VALUE_CELL}>{node.lon}</TableCell>
         </TableRow>
         <TableRow>
           <TableCell>lat</TableCell>
-          <TableCell>{node.lat}</TableCell>
+          <TableCell className={VALUE_CELL}>{node.lat}</TableCell>
         </TableRow>
         <TagList tags={node.tags} />
       </TableBody>
@@ -101,7 +137,7 @@ export function WayContent({ way }: { way: OsmWay }) {
       <TableBody>
         <TableRow>
           <TableCell>refs</TableCell>
-          <TableCell>{way.refs.join(",")}</TableCell>
+          <TableCell className={VALUE_CELL}>{way.refs.join(", ")}</TableCell>
         </TableRow>
         <TagList tags={way.tags} />
       </TableBody>
@@ -138,18 +174,18 @@ export function RelationContent({ relation }: { relation: OsmRelation }) {
       <TableBody>
         <TableRow>
           <TableCell>kind</TableCell>
-          <TableCell>{kindMetadata.kind}</TableCell>
+          <TableCell className={VALUE_CELL}>{kindMetadata.kind}</TableCell>
         </TableRow>
         {kindMetadata.description && (
           <TableRow>
             <TableCell>description</TableCell>
-            <TableCell>{kindMetadata.description}</TableCell>
+            <TableCell className={VALUE_CELL}>{kindMetadata.description}</TableCell>
           </TableRow>
         )}
         {relationMemberCount > 0 && (
           <TableRow>
             <TableCell>nested relations</TableCell>
-            <TableCell>{relationMemberCount}</TableCell>
+            <TableCell className={VALUE_CELL}>{relationMemberCount}</TableCell>
           </TableRow>
         )}
         <TagList tags={relation.tags} />
@@ -186,7 +222,7 @@ export function TagList({ tags }: { tags?: Record<string, unknown> }) {
       {entries.map(([k, v]) => (
         <TableRow key={k}>
           <TableCell>{k}</TableCell>
-          <TableCell>{String(v)}</TableCell>
+          <TableCell className={VALUE_CELL}>{String(v)}</TableCell>
         </TableRow>
       ))}
     </>

@@ -1,14 +1,7 @@
 import {
-  Basemap,
-  CustomControl,
-  EntityDetailsMapControl,
   InspectPanel,
   type MapInitialViewState,
-  OsmFileMapControl,
-  OsmixMapSources,
-  RouteLayer,
-  RouteMapControl,
-  SelectedEntityLayer,
+  OsmixMap,
   useFlyToOsmBounds,
 } from "@osmix/app-components";
 import {
@@ -54,12 +47,6 @@ export function InspectApp() {
     }
   };
 
-  const clearOsmFile = async () => {
-    selectEntity(null, null);
-    setChangesetStats(null);
-    await osmFile.loadOsmFile(null);
-  };
-
   const initialViewState: MapInitialViewState | undefined = useMemo(() => {
     if (!osmFile.osmInfo?.bbox) return undefined;
     return { bounds: osmFile.osmInfo.bbox, fitBoundsOptions: { padding: 100 } };
@@ -71,18 +58,11 @@ export function InspectApp() {
         <InspectPanel osmKey={OSM_KEY} openOsmFile={openOsmFile} />
       </AppSidebar>
       <MapContent>
-        <Basemap initialViewState={initialViewState}>
-          <OsmixMapSources baseOsm={osmFile.osm} />
-          <SelectedEntityLayer />
-          <RouteMapControl osmFiles={[osmFile]} />
-          <RouteLayer />
-          <OsmFileMapControl files={[{ osmFile, onClear: clearOsmFile }]} />
-          {osmFile.osm && (
-            <CustomControl position="top-left">
-              <EntityDetailsMapControl osm={osmFile.osm} />
-            </CustomControl>
-          )}
-        </Basemap>
+        <OsmixMap
+          datasets={[{ osmFile, role: "base" }]}
+          initialViewState={initialViewState}
+          tools={{ routing: true }}
+        />
       </MapContent>
     </Main>
   );
