@@ -10,7 +10,7 @@
 import { MISSING_NODE_INDEX, Osm } from "@osmix/core";
 import { BitSet } from "@osmix/shared/bit-set";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
-import type { GeoBbox2D, OsmRelation } from "@osmix/types";
+import type { GeoBbox2D, OsmRelation, OsmRelationMember } from "@osmix/types";
 import { resolveRelationMembers } from "@osmix/types/relation-kind";
 import { isMultipolygonRelation } from "@osmix/types/utils";
 
@@ -39,7 +39,7 @@ export type ExtractStrategy = "simple" | "complete_ways" | "smart";
  *
  * Strategy "smart":
  * 1 & 2. Same as "complete_ways".
- * 3. Selects relations with at least one member inside the bbox, adding missing relation members from outside the bbox. Relations are reference complete.
+ * 3. Selects relations with at least one member inside the bbox, adding missing relation members from outside the bbox. Relations are reference complete. Members that the source itself lacks (e.g. boundaries cut by a regional file) are dropped and reported through `onProgress`.
  *
  * The "complete_ways" strategy preserves way geometry integrity but includes entities outside the bbox.
  * The "simple" strategy creates a strict spatial cut but may result in incomplete geometries.
@@ -124,26 +124,32 @@ export function createExtract(
   const intersectingRelations = new BitSet(osm.relations.size);
   const selectedRelations = new BitSet(osm.relations.size);
   const completeRelations = new BitSet(osm.relations.size);
+  /** Source index of a relation member, or -1 when the source file doesn't contain it. */
+  const memberIndex = (member: OsmRelationMember): number => {
+    if (member.type === "node") return osm.nodes.ids.getIndexFromId(member.ref);
+    if (member.type === "way") return osm.ways.ids.getIndexFromId(member.ref);
+    return osm.relations.ids.getIndexFromId(member.ref);
+  };
+  // Regional files cut large relations (country and maritime boundaries) at the region edge, so
+  // members missing from the source are skipped rather than treated as errors.
+  let skippedMembers = 0;
   /** Mark a relation reference complete, recursively adding its members to the emit sets. */
   const addCompleteRelation = (relationIndex: number, relation: OsmRelation): void => {
     if (completeRelations.has(relationIndex)) return;
     completeRelations.add(relationIndex);
     selectedRelations.add(relationIndex);
     for (const member of relation.members) {
-      if (member.type === "node") {
-        const nodeIndex = osm.nodes.ids.getIndexFromId(member.ref);
-        if (nodeIndex === -1) throw Error(`Node ${member.ref} not found`);
-        emitNodes.add(nodeIndex);
+      const index = memberIndex(member);
+      if (index === -1) {
+        skippedMembers++;
+      } else if (member.type === "node") {
+        emitNodes.add(index);
       } else if (member.type === "way") {
-        const wayIndex = osm.ways.ids.getIndexFromId(member.ref);
-        if (wayIndex === -1) throw Error(`Way ${member.ref} not found`);
-        if (emitWays.has(wayIndex)) continue;
-        emitWays.add(wayIndex);
-        addWayNodes(wayIndex, emitNodes);
-      } else if (member.type === "relation") {
-        const nestedIndex = osm.relations.ids.getIndexFromId(member.ref);
-        if (nestedIndex === -1) continue;
-        addCompleteRelation(nestedIndex, osm.relations.getByIndex(nestedIndex));
+        if (emitWays.has(index)) continue;
+        emitWays.add(index);
+        addWayNodes(index, emitNodes);
+      } else {
+        addCompleteRelation(index, osm.relations.getByIndex(index));
       }
     }
   };
@@ -159,6 +165,11 @@ export function createExtract(
       // Add relation and recursively add direct members even if they're outside the bbox
       addCompleteRelation(relationIndex, relation);
     }
+  }
+  if (skippedMembers > 0) {
+    onProgress(
+      progressEvent(`Skipped ${skippedMembers} relation members missing from the source file.`),
+    );
   }
 
   onProgress(progressEvent("Writing extract..."));
@@ -185,7 +196,11 @@ export function createExtract(
   for (const relationIndex of sortedIndexes(selectedRelations, osm.relations.ids)) {
     const relation = osm.relations.getByIndex(relationIndex);
     if (completeRelations.has(relationIndex)) {
-      extracted.relations.addRelation(relation);
+      // Every member present in the source was added to the output.
+      extracted.relations.addRelation({
+        ...relation,
+        members: relation.members.filter((m) => memberIndex(m) !== -1),
+      });
       continue;
     }
     // Filter out members that are outside the selection

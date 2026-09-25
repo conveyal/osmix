@@ -248,7 +248,7 @@ export default function OsmixVectorOverlay({
       id={sourceId}
       type="vector"
       tiles={[osmixIdToTileUrl(osm.id)]}
-      bounds={osm.bbox()}
+      bounds={osm.bbox() ?? undefined}
       minzoom={MIN_PICKABLE_ZOOM}
     >
       {/* Polygon fills - rendered first (behind everything) */}

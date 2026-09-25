@@ -528,6 +528,33 @@ describe("extract", () => {
     expect(smart.nodes.ids.has(3)).toBe(true);
   });
 
+  test("smart strategy skips multipolygon members missing from the source", () => {
+    const osm = new Osm({ id: "regional" });
+    osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }); // inside
+    osm.nodes.addNode({ id: 2, lat: 0, lon: 2 }); // outside
+    osm.ways.addWay({ id: 10, refs: [1, 2] });
+    // A boundary cut by a regional file: way 99 and node 98 are not in the source.
+    osm.relations.addRelation({
+      id: 20,
+      members: [
+        { type: "way", ref: 10, role: "outer" },
+        { type: "way", ref: 99, role: "outer" },
+        { type: "node", ref: 98, role: "label" },
+      ],
+      tags: { type: "multipolygon" },
+    });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+
+    const messages: string[] = [];
+    const smart = createExtract(osm, TEST_BBOX, "smart", (event) =>
+      messages.push(event.detail.msg),
+    );
+
+    expect(smart.relations.getById(20)?.members).toEqual([{ type: "way", ref: 10, role: "outer" }]);
+    expect(messages).toContain("Skipped 2 relation members missing from the source file.");
+  });
+
   test.skip("extract from a large PBF", async () => {
     const seattle = await fromPbf(getFixtureFileReadStream("usa.pbf"), {
       extractBbox: SEATTLE_BBOX,

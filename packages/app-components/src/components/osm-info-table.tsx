@@ -71,7 +71,7 @@ export default function OsmInfoTable({
             </TableRow>
             <TableRow>
               <TableCell>bbox</TableCell>
-              <TableCell>{osm.bbox()?.join(",")}</TableCell>
+              <TableCell>{osm.bbox()?.join(",") ?? "empty"}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell>load profile</TableCell>

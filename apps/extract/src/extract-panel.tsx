@@ -35,6 +35,7 @@ import ExtractTagFilterEditor, {
   type TagFilterEditorState,
 } from "./components/extract-tag-filter-editor";
 import {
+  bboxesOverlap,
   boundsLikeToBbox,
   headerBboxToGeoBbox,
   isValidBbox,
@@ -131,7 +132,9 @@ export function ExtractPanel() {
     }
   }, [extract.loadProfile, extract.setLoadProfile, strategy, extract]);
 
-  const canExtract = !!pendingFile && isValidBbox(bbox) && !isExtracting;
+  const bboxMissesFile =
+    fileBounds.status === "ok" && isValidBbox(bbox) && !bboxesOverlap(bbox, fileBounds.bbox);
+  const canExtract = !!pendingFile && isValidBbox(bbox) && !bboxMissesFile && !isExtracting;
   const hasExtractResult = !!extract.osm && !!extract.osmInfo;
 
   /** Turn off "use the file's bounds" and give back the bbox the user had before. */
@@ -349,6 +352,12 @@ export function ExtractPanel() {
             <Alert variant="destructive">
               Invalid bbox: the minimum must be less than the maximum for both longitude and
               latitude.
+            </Alert>
+          ) : null}
+          {bboxMissesFile ? (
+            <Alert variant="warning" title="The bounding box is outside this file">
+              It doesn't overlap the file's bounds, so the extract would be empty. Move the box over
+              the file's area or use the file's bounds.
             </Alert>
           ) : null}
         </CardContent>

@@ -88,12 +88,12 @@ export class OsmixVtEncoder {
 
   /**
    * Get a vector tile PBF for a specific tile coordinate.
-   * Returns an empty buffer if the tile does not intersect with the OSM dataset.
+   * Returns an empty buffer if the dataset is empty or the tile does not intersect it.
    */
   getTile(tile: Tile): ArrayBuffer {
     const bbox = tileToBbox(tile);
     const osmBbox = this.osm.bbox();
-    if (!bboxContainsOrIntersects(bbox, osmBbox)) {
+    if (osmBbox === null || !bboxContainsOrIntersects(bbox, osmBbox)) {
       return new ArrayBuffer(0);
     }
     return this.getTileForBbox(bbox, (ll) => llToTilePx(ll, tile, this.extent));

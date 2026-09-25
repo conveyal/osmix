@@ -42,6 +42,7 @@ export function useFlyToOsmBounds() {
   const map = useMap();
 
   return useEffectEvent((osmInfo?: OsmInfo | null) => {
+    // An empty dataset has no bbox; leave the camera where it is.
     const bbox = osmInfo?.bbox;
     if (!map || !bbox) return;
     map.fitBounds(bbox, {

@@ -152,7 +152,7 @@ export class OsmixBenchWorker {
     nodes: number;
     ways: number;
     relations: number;
-    bbox: [number, number, number, number];
+    bbox: [number, number, number, number] | null;
   } | null {
     if (!this.osm) return null;
     return {

@@ -37,3 +37,11 @@ export function headerBboxToGeoBbox(bbox: OsmPbfHeaderBlock["bbox"]): GeoBbox2D 
   const candidate: GeoBbox2D = [bbox.left, bbox.bottom, bbox.right, bbox.top];
   return isValidBbox(candidate) ? candidate : null;
 }
+
+/**
+ * Whether two valid bboxes share any area or edge. An extract whose bbox misses the file's bounds
+ * can only come back empty.
+ */
+export function bboxesOverlap(a: GeoBbox2D, b: GeoBbox2D): boolean {
+  return a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
+}

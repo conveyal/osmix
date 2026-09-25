@@ -265,9 +265,11 @@ export class Nodes extends Entities<OsmNode> {
   }
 
   /**
-   * Get the bounding box of all nodes.
+   * Get the bounding box of all nodes, or `null` when there are no nodes.
    */
-  getBbox(): GeoBbox2D {
+  getBbox(): GeoBbox2D | null {
+    // The bbox starts inverted and only becomes valid once a node extends it.
+    if (this.bbox[0] > this.bbox[2] || this.bbox[1] > this.bbox[3]) return null;
     return this.bbox;
   }
 
