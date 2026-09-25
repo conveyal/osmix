@@ -61,19 +61,18 @@ test("extracts using the bounds recorded in the selected file's header", async (
   // monaco.pbf records its bounds in the PBF header.
   await expect(useFileBounds).toBeEnabled();
   await useFileBounds.check();
-  await expect(minLon).toHaveValue("7.4053929");
+  // The file's bbox replaces the coordinate inputs, which are hidden while it is in use.
+  await expect(page.locator("#extract-file-bounds-help")).toHaveText(
+    "From the file header: 7.4053929, 43.7232244, 7.4447259, 43.7543687",
+  );
+  await expect(minLon).toHaveCount(0);
   // Fitting the map to the file's bounds moves the camera; map panels re-render on camera
   // moves and must not pull focus away (the place search used to refocus on every render).
   await page.waitForTimeout(700);
   await expect(useFileBounds).toBeFocused();
-  await expect(page.locator("#extract-bbox-min-lat")).toHaveValue("43.7232244");
-  await expect(page.locator("#extract-bbox-max-lon")).toHaveValue("7.4447259");
-  await expect(page.locator("#extract-bbox-max-lat")).toHaveValue("43.7543687");
-  for (const id of ["min-lon", "min-lat", "max-lon", "max-lat"]) {
-    await expect(page.locator(`#extract-bbox-${id}`)).toBeDisabled();
-  }
-  await expect(page.getByRole("button", { name: "Parse", exact: true })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Use current map view as bbox" })).toBeDisabled();
+  // The manual bbox controls are hidden with the inputs.
+  await expect(page.getByRole("button", { name: "Parse", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Use current map view as bbox" })).toHaveCount(0);
 
   await page.getByRole("radio", { name: "Simple" }).check();
   const extractButton = page.getByRole("button", { name: "Extract", exact: true });
