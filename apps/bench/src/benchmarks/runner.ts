@@ -18,7 +18,7 @@ export async function runAllBenchmarks(options: BenchmarkOptions): Promise<Bench
   // Read file as ArrayBuffer
   const fileData = await file.arrayBuffer();
   const osmixRemote = await Osmix.createRemote({ workerCount: 1 });
-  const header = await osmixRemote.readHeader(fileData);
+  const header = await osmixRemote.readHeader(fileData.slice(0));
   if (!header.bbox) throw new Error("Header bbox not found");
 
   const bbox: GeoBbox2D = [

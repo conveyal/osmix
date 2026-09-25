@@ -4,6 +4,7 @@ import type { GeoBbox2D, LonLat } from "@osmix/types";
 import * as maplibregl from "maplibre-gl";
 import { type ControlPosition } from "maplibre-gl";
 
+import "./maplibre-worker.ts";
 import { nodesPaint, waysOutlinePaint, waysPaint } from "./map-style";
 
 const map = new maplibregl.Map({

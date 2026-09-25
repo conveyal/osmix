@@ -23,6 +23,7 @@
     "@osmix/json": "workspace:*",
     "@osmix/pbf": "workspace:*",
     "@osmix/shared": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite": "catalog:"
   }
 }
