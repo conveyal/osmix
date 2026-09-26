@@ -57,8 +57,9 @@ export default function ExtractBboxLayer({ bbox }: { bbox: GeoBbox2D }) {
 }
 
 /**
- * The selected file's header bounds: a dashed outline with no fill, so the user can see where
- * the file is when the extract bbox misses it.
+ * The selected file's header bounds: a long-dashed outline with no fill, so the user can see
+ * where the file is when the extract bbox misses it. The dash is longer than the patch
+ * overlay's `[2, 2]` so the outline never reads as patch data.
  */
 export function ExtractFileBoundsLayer({ bbox }: { bbox: GeoBbox2D }) {
   const colors = useMapColors();
@@ -66,7 +67,7 @@ export function ExtractFileBoundsLayer({ bbox }: { bbox: GeoBbox2D }) {
   const linePaint: LineLayerSpecification["paint"] = {
     "line-color": colors.bbox,
     "line-width": 2,
-    "line-dasharray": [2, 2],
+    "line-dasharray": [6, 3],
   };
   return (
     <Source id={FILE_BOUNDS_SOURCE_ID} type="geojson" data={data}>

@@ -337,25 +337,29 @@ export default function MergeBlock() {
     selectEntity(null, null);
   };
 
-  /**
-   * Clear the base slot. While a patch is loaded it is promoted into the base slot so the
-   * next merge can start from it; otherwise the slot is simply emptied.
-   */
+  /** Clear the base slot. The patch, if loaded, stays where it is. */
   const clearBaseOsm = async () => {
     resetMergeDerivedState();
-    if (patch.osm) {
-      const patchState = {
-        file: patch.file,
-        fileInfo: patch.fileInfo,
-        osm: patch.osm,
-        osmInfo: patch.osmInfo,
-        isStored: patch.isStored,
-      };
-      await patch.loadOsmFile(null);
-      base.copyStateFrom(patchState);
-    } else {
-      await base.loadOsmFile(null);
-    }
+    await base.loadOsmFile(null);
+  };
+
+  /**
+   * Move the loaded patch into the empty base slot (the patch card's "Use as base"), so the
+   * next merge starts from it. A no-op while the base slot is occupied.
+   */
+  const usePatchAsBase = async () => {
+    if (!patch.osm || base.osm) return;
+    resetMergeDerivedState();
+    const patchState = {
+      file: patch.file,
+      fileInfo: patch.fileInfo,
+      osm: patch.osm,
+      osmInfo: patch.osmInfo,
+      isStored: patch.isStored,
+      loadProfile: patch.loadProfile,
+    };
+    await patch.loadOsmFile(null);
+    base.copyStateFrom(patchState);
   };
 
   const clearPatchOsm = async () => {
@@ -983,6 +987,8 @@ export default function MergeBlock() {
             loaded={Boolean(patch.osm)}
             onClear={clearPatchOsm}
             onDownload={patch.downloadOsm}
+            onUseAsBase={usePatchAsBase}
+            canUseAsBase={!base.osm}
             title="Patch OSM — imported additions and updates"
           />
           <CardContent className="p-0">

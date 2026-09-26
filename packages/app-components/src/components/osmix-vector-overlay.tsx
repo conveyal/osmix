@@ -1,4 +1,4 @@
-import { mapModeAtom, selectOsmEntityAtom } from "@osmix/app-core";
+import { mapModeAtom, type SelectionOrigin, selectOsmEntityAtom } from "@osmix/app-core";
 import { useAtomValue, useSetAtom } from "jotai";
 import {
   type ExpressionSpecification,
@@ -162,12 +162,14 @@ export default function OsmixVectorOverlay({
     }
     // Decode zigzag-encoded ID if it was originally negative
     const decodedId = decodeZigzag(feature.id);
+    // The clicked point lets the inspector nudge the map when its panel would cover it.
+    const origin: SelectionOrigin = { source: "map", point: [event.point.x, event.point.y] };
     if (feature.properties?.type === "node") {
-      selectEntity(osm, osm.nodes.getById(decodedId));
+      selectEntity(osm, osm.nodes.getById(decodedId), origin);
     } else if (feature.properties?.type === "way") {
-      selectEntity(osm, osm.ways.getById(decodedId));
+      selectEntity(osm, osm.ways.getById(decodedId), origin);
     } else if (feature.properties?.type === "relation") {
-      selectEntity(osm, osm.relations.getById(decodedId));
+      selectEntity(osm, osm.relations.getById(decodedId), origin);
     } else {
       selectEntity(osm, null);
     }

@@ -93,7 +93,16 @@ export {
   RASTER_TILE_SIZE,
   VECTOR_PROTOCOL_NAME,
 } from "./constants.ts";
-export { useFlyToEntity, useFlyToOsmBounds, useMap } from "./hooks/map.ts";
+export {
+  type MapPadding,
+  paddingOffset,
+  useFlyToEntity,
+  useFlyToOsmBounds,
+  useMap,
+  useMapPadding,
+  useSelectAndFlyToEntity,
+  withMapInset,
+} from "./hooks/map.ts";
 export {
   type MapColorRole,
   type MapColors,

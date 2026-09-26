@@ -22,7 +22,7 @@ import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
 import { Suspense } from "react";
 
-import { useFlyToEntity, useFlyToOsmBounds } from "../hooks/map.ts";
+import { useFlyToOsmBounds, useSelectAndFlyToEntity } from "../hooks/map.ts";
 import { appOrigin } from "../lib/app-origin.ts";
 import { FullIndexRequired, hasFullNodeIndex } from "./full-index-required.tsx";
 import ChangesSummary, {
@@ -48,7 +48,7 @@ export function InspectPanel({
   openOsmFile: (file: File | string, fileType?: OsmFileType) => Promise<OsmInfo | null>;
 }) {
   const remote = useOsmixRemote();
-  const flyToEntity = useFlyToEntity();
+  const selectAndFlyToEntity = useSelectAndFlyToEntity();
   const flyToOsmBounds = useFlyToOsmBounds();
   const baseOsm = useOsmFile(osmKey);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
@@ -175,8 +175,7 @@ export function InspectPanel({
                   <ChangesList
                     setSelectedEntity={(entity) => {
                       if (!baseOsm.osm) throw Error("Osm has not been loaded.");
-                      selectEntity(baseOsm.osm, entity);
-                      flyToEntity(baseOsm.osm, entity);
+                      selectAndFlyToEntity(baseOsm.osm, entity);
                     }}
                   />
                   <ChangesPagination />

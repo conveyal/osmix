@@ -22,7 +22,7 @@ import type { GeoBbox2D } from "osmix";
 import { useMemo } from "react";
 
 import { BASE_MAP_STYLES } from "../constants.ts";
-import { useMap } from "../hooks/map.ts";
+import { useMap, useMapPadding } from "../hooks/map.ts";
 import { enterRoutingModeAtom, exitRoutingModeAtom } from "../state/routing.ts";
 import { useMapDatasets } from "./map-datasets.tsx";
 import { MapPanel, useMapOverlayAction } from "./map-overlay.tsx";
@@ -78,6 +78,7 @@ export function MapToolbar({
   searchPanelId: string;
 }) {
   const map = useMap();
+  const mapPadding = useMapPadding();
   const datasets = useMapDatasets();
   const [preset, setPreset] = useAtom(basemapPresetAtom);
   const mode = useAtomValue(mapModeAtom);
@@ -123,7 +124,7 @@ export function MapToolbar({
           icon={<MaximizeIcon aria-hidden="true" />}
           disabled={!dataBbox}
           onClick={() => {
-            if (dataBbox) map?.fitBounds(dataBbox, { padding: 100, maxDuration: 200 });
+            if (dataBbox) map?.fitBounds(dataBbox, { padding: mapPadding(100), maxDuration: 200 });
           }}
         />
       </div>

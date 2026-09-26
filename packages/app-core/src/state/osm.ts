@@ -19,10 +19,27 @@ export const osmLoadFailureAtomFamily = atomFamily((_id: string) =>
 export const selectedEntityAtom = atom<OsmEntity | null>(null);
 export const selectedOsmAtom = atom<Osm | null>(null);
 
+/**
+ * Where the current selection came from: a map click, with the clicked point in CSS pixels
+ * from the map's top-left corner, or anything else (search, a list, a clear). The inspector
+ * reads a map origin once, to nudge the map when the panel it opens covers the clicked point,
+ * then sets it back to `other`.
+ */
+export type SelectionOrigin = { source: "map"; point: [number, number] } | { source: "other" };
+
+export const selectionOriginAtom = atom<SelectionOrigin>({ source: "other" });
+
 export const selectOsmEntityAtom = atom(
   null,
-  (_get, set, osm: Osm | null, entity: OsmEntity | null) => {
+  (
+    _get,
+    set,
+    osm: Osm | null,
+    entity: OsmEntity | null,
+    origin: SelectionOrigin = { source: "other" },
+  ) => {
     set(selectedOsmAtom, osm);
     set(selectedEntityAtom, entity);
+    set(selectionOriginAtom, origin);
   },
 );

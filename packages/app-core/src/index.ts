@@ -56,6 +56,8 @@ export {
   DEFAULT_BASEMAP_PRESET,
   mapBoundsAtom,
   mapCenterAtom,
+  type MapInset,
+  mapInsetAtom,
   mapModeAtom,
   zoomAtom,
 } from "./state/map.ts";
@@ -69,6 +71,8 @@ export {
   osmStoredAtomFamily,
   selectedEntityAtom,
   selectedOsmAtom,
+  type SelectionOrigin,
+  selectionOriginAtom,
   selectOsmEntityAtom,
 } from "./state/osm.ts";
 export { osmDatasetVersionAtomFamily } from "./state/osm-version.ts";

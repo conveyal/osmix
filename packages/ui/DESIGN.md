@@ -57,17 +57,19 @@ Opacity steps:
 
 MapLibre can't read CSS variables or `oklch()`. So layer paint gets its colours from `useMapColors()` in `@osmix/app-components`. That hook resolves the `--map-*` tokens to `rgb()` strings. Never write a colour literal in paint.
 
-| Role                   | Token                               | Look                                                |
-| ---------------------- | ----------------------------------- | --------------------------------------------------- |
-| `base`                 | `--map-base` (ink)                  | The base or only dataset. Solid lines, circle nodes |
-| `patch`                | `--map-patch` (brand)               | Imported / patch data. Dashed lines, diamond nodes  |
-| `hover`                | `--map-hover`                       | The hovered feature                                 |
-| `selected`             | `--map-selected` (info)             | The selected feature, drawn over a `casing`         |
-| `casing`               | `--map-casing` (white)              | The outline under highlighted lines                 |
-| `route` / `routeError` | `--map-route` / `--map-route-error` | Routes, and unreachable legs                        |
-| `bbox`                 | `--map-bbox` (brand)                | The extract bounding box                            |
+| Role                   | Token                               | Look                                                                                                  |
+| ---------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `base`                 | `--map-base` (ink)                  | The base or only dataset. Solid lines, circle nodes                                                   |
+| `patch`                | `--map-patch` (brand)               | Imported / patch data. Dashed lines, diamond nodes                                                    |
+| `hover`                | `--map-hover`                       | The hovered feature                                                                                   |
+| `selected`             | `--map-selected` (info)             | The selected feature, drawn over a `casing`                                                           |
+| `casing`               | `--map-casing` (white)              | The outline under highlighted lines                                                                   |
+| `route` / `routeError` | `--map-route` / `--map-route-error` | Routes, and unreachable legs                                                                          |
+| `bbox`                 | `--map-bbox` (brand)                | The extract bounding box, and the long-dashed outline of the selected file's header bounds in Extract |
 
-The overlay draws patch ways and outlines with `line-dasharray: [2, 2]` so the map matches the legend. Diamond nodes appear in the comparison markers and the legend (`MapRoleSymbol`); overlay nodes are circles for both roles, because a MapLibre `circle` layer cannot draw diamonds.
+The overlay draws patch ways and outlines with `line-dasharray: [2, 2]` so the map matches the legend. Diamond nodes appear in the comparison markers and the legend (`MapRoleSymbol`); overlay nodes are circles for both roles, because a MapLibre `circle` layer cannot draw diamonds. Extract's file-bounds outline uses a longer dash (`[6, 3]`) so it never reads as patch data.
+
+Below `MIN_PICKABLE_ZOOM` the raster preview draws both roles with solid lines; dashes exist only in the vector layers.
 
 The default basemap is Positron (`carto-positron`) with labels on and roads off. It's quiet, so data and status colours stand out. The style, labels and roads switch from the map's Basemap menu, and the choice persists as `basemapPresetAtom` (`@osmix/app-core`); nothing else about the map overlay persists.
 
@@ -143,7 +145,7 @@ The nav is `--header-height` (2.5rem) tall with a `gap-3` rhythm. Left: the side
 The sidebar is the workflow; the map is the canvas. `OsmixMap` anchors three things to the map through `MapOverlay`, each with one slot and one show rule:
 
 - **Toolbar** (top right): zoom in, zoom out, "Fit map to all data", "Open map search", the Basemap menu, and "Route between two points" only where the app passes `tools={{ routing: true }}` (Inspect). Always shown. The search opens as a panel beside it.
-- **Inspector**: shown only while an entity is selected or the routing tool is active. When the map is at least 768px wide (`DOCKED_MIN_WIDTH`) it docks to the right edge under the toolbar and pads the map (`setPadding({ right: 400 })`) so fits do not centre under it; otherwise it docks to the bottom edge.
+- **Inspector**: shown only while an entity is selected or the routing tool is active. When the map is at least 768px wide (`DOCKED_MIN_WIDTH`) it docks to the right edge under the toolbar; otherwise it docks to the bottom edge. Padding is data, not map state: while docked and open it sets `mapInsetAtom` (`{ right: 400 }`), and every fit and flight goes through `useMapPadding()`, which adds the inset to `fitBounds` padding (or, for `flyTo`, an equivalent `offset`) and clamps it to the map's width. The map's own transform padding is never set, so opening the panel moves nothing; the one exception is a map click that the opening panel would cover, which the inspector nudges left by just enough (`coveredClickNudge`) to clear it.
 - **Legend** (bottom left): one row per loaded dataset (`MapRoleSymbol`, label, show/hide, "Fit map to {label}"). Shown only while a dataset is loaded, and hidden while the bottom-docked inspector is open.
 
 Esc closes the topmost open layer in this order: search, then inspector (clearing the selection, or exiting routing in the route view), then route mode. Text fields and open menus, sheets and dialogs handle Esc themselves. Selections and routing phases are read to a polite live region (`useMapAnnounce`). Only the basemap preset persists (`basemapPresetAtom`); selection, visibility, search and route state reset with the page. File info, download, save to storage and clear live in sidebar cards (`OsmDatasetCard`), not on the map.

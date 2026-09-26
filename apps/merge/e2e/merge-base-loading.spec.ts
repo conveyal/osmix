@@ -348,9 +348,10 @@ test("a late cancellation preserves the committed exact result and replacing the
   await expect(summary).toContainText("Imported-data matching was not enabled");
   await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toBeVisible();
 
-  // At completion the patch slot's `osm` is already null, so clearing the base from the
-  // "Merged OSM" card empties the slot (promotion applies only while a patch is loaded).
-  // Either way the base dataset changes, which must invalidate the completed merge.
+  // Clearing the base from the "Merged OSM" card only empties the slot; nothing is promoted
+  // into it. "Use as base" on the patch card is the explicit move, and it is disabled while a
+  // base is loaded. Either way the base dataset changes, which must invalidate the completed
+  // merge.
   await page.getByRole("button", { name: "Clear merged OSM" }).click();
   await loadPbf(baseCard, page, inputs.base);
   await expect(page.getByText("Select merge inputs and options", { exact: false })).toBeVisible();

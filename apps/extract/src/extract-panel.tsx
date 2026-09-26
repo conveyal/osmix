@@ -6,6 +6,7 @@ import {
   OsmPbfFileInput,
   SaveToDiskNotice,
   useMap,
+  useMapPadding,
 } from "@osmix/app-components";
 import {
   useTasks,
@@ -131,6 +132,7 @@ export function ExtractPanel() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const remote = useOsmixRemote();
   const map = useMap();
+  const mapPadding = useMapPadding();
   const store = useStore();
   const [fileBounds, setFileBounds] = useAtom(fileBoundsAtom);
   const [useFileBounds, setUseFileBounds] = useAtom(useFileBoundsAtom);
@@ -172,7 +174,7 @@ export function ExtractPanel() {
       // the bbox from the store: the closure's value predates `stopUsingFileBounds` above.
       const currentBbox = store.get(extractBboxAtom);
       if (headerBbox && isValidBbox(currentBbox) && !bboxesOverlap(currentBbox, headerBbox)) {
-        map?.fitBounds(headerBbox, { padding: 40, maxDuration: 500 });
+        map?.fitBounds(headerBbox, { padding: mapPadding(40), maxDuration: 500 });
       }
     } catch (error) {
       if (request !== headerRequest.current) return;
@@ -190,7 +192,7 @@ export function ExtractPanel() {
     setBboxBeforeFileBounds(bbox);
     setBbox(fileBounds.bbox);
     setUseFileBounds(true);
-    map?.fitBounds(fileBounds.bbox, { padding: 40, maxDuration: 500 });
+    map?.fitBounds(fileBounds.bbox, { padding: mapPadding(40), maxDuration: 500 });
   };
 
   const applyParsedBboxString = () => {
@@ -271,10 +273,7 @@ export function ExtractPanel() {
               </p>
               <Field>
                 <FieldLabel htmlFor={findPlaceId}>Find a place</FieldLabel>
-                {/* The search box carries the inset itself; pull it flush with the card. */}
-                <div className="-mx-inset -mt-2">
-                  <NominatimSearch inputId={findPlaceId} label="Find a place" />
-                </div>
+                <NominatimSearch inputId={findPlaceId} label="Find a place" />
               </Field>
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lon">

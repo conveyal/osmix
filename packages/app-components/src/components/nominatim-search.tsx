@@ -15,7 +15,7 @@ import type { LngLatBounds } from "maplibre-gl";
 import { useState, useTransition } from "react";
 import type { MapRef } from "react-map-gl/maplibre";
 
-import { useMap } from "../hooks/map.ts";
+import { type MapPadding, paddingOffset, useMap, useMapPadding } from "../hooks/map.ts";
 import { nominatimPlaceAtom } from "../state/nominatim.ts";
 
 export type NominatimResult = {
@@ -49,8 +49,15 @@ export async function searchNominatim(
   return Array.isArray(data) ? data : [];
 }
 
-/** Move the map to a result: fit its bounding box, or fly to its point at street zoom. */
-export function focusNominatimResult(map: MapRef, result: NominatimResult): void {
+/**
+ * Move the map to a result: fit its bounding box with `padding`, or fly to its point at street
+ * zoom, offset so it centres in the padded area (`useMapPadding()` supplies both).
+ */
+export function focusNominatimResult(
+  map: MapRef,
+  result: NominatimResult,
+  padding: MapPadding,
+): void {
   const bbox = result.boundingbox?.map(Number);
   if (bbox && bbox.length === 4 && bbox.every(Number.isFinite)) {
     const [latSouth, latNorth, lonWest, lonEast] = bbox as [number, number, number, number];
@@ -59,7 +66,7 @@ export function focusNominatimResult(map: MapRef, result: NominatimResult): void
         [lonWest, latSouth],
         [lonEast, latNorth],
       ],
-      { padding: 100, maxDuration: 100 },
+      { padding, maxDuration: 100 },
     );
     return;
   }
@@ -68,15 +75,22 @@ export function focusNominatimResult(map: MapRef, result: NominatimResult): void
   const lon = Number(result.lon);
   if (Number.isFinite(lat) && Number.isFinite(lon)) {
     const targetZoom = Math.max(map.getZoom(), 14);
-    map.flyTo({ center: [lon, lat], zoom: targetZoom, maxDuration: 100 });
+    map.flyTo({
+      center: [lon, lat],
+      zoom: targetZoom,
+      offset: paddingOffset(padding),
+      maxDuration: 100,
+    });
   }
 }
 
 /**
- * A place search box backed by Nominatim: a query field, a result list, and the map moves to
- * the chosen place. The result is published to `nominatimPlaceAtom`. Used by the map search and
- * embedded in sidebars (Extract's step 2). The field's accessible name is `label`; pass
- * `inputId` to point a visible `FieldLabel` at it.
+ * A place search control backed by Nominatim: a query field with a bordered result list under
+ * it, and the map moves to the chosen place. It carries no edge padding of its own, so it sits
+ * in a form like any other field (Extract's step 2). The result is published to
+ * `nominatimPlaceAtom`. The map search has its own panel and shares only `searchNominatim` and
+ * `focusNominatimResult`. The field's accessible name is `label`; pass `inputId` to point a
+ * visible `FieldLabel` at it.
  */
 export function NominatimSearch({
   onPlaceResolved,
@@ -97,6 +111,7 @@ export function NominatimSearch({
   label?: string;
 }) {
   const map = useMap();
+  const mapPadding = useMapPadding();
   const setPlace = useSetAtom(nominatimPlaceAtom);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NominatimResult[]>([]);
@@ -126,15 +141,15 @@ export function NominatimSearch({
     setQuery(result.display_name);
     setResults([]);
     setSearched(false);
-    if (map) focusNominatimResult(map, result);
+    if (map) focusNominatimResult(map, result, mapPadding(100));
     setPlace(result);
     onPlaceResolved?.(result);
   };
 
   return (
-    <div className="flex min-h-0 flex-col">
+    <div className="flex min-h-0 flex-col gap-2">
       <form
-        className="shrink-0 px-inset py-2"
+        className="shrink-0"
         onSubmit={(e) => {
           e.preventDefault();
           search(query);
@@ -165,20 +180,18 @@ export function NominatimSearch({
       </form>
 
       {error ? (
-        <Alert variant="destructive" className="mx-inset mb-2">
-          {error}
-        </Alert>
+        <Alert variant="destructive">{error}</Alert>
       ) : isTransitioning ? (
-        <div className="flex items-center gap-2 px-inset pb-2 text-muted-foreground">
+        <div className="flex items-center gap-2 text-muted-foreground">
           <Spinner />
           Searching…
         </div>
       ) : searched && results.length === 0 ? (
-        <EmptyState className="pt-0">No places found</EmptyState>
+        <EmptyState className="p-0">No places found</EmptyState>
       ) : null}
 
       {results.length > 0 && (
-        <ScrollArea className="max-h-60 border-t">
+        <ScrollArea className="max-h-60 border">
           <ul className="flex flex-col p-1">
             {results.map((result) => (
               <li key={result.place_id}>

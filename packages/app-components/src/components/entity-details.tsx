@@ -1,4 +1,5 @@
 import {
+  Button,
   Details,
   DetailsContent,
   DetailsSummary,
@@ -10,12 +11,10 @@ import {
 } from "@osmix/ui";
 import type { Osm } from "osmix";
 import { getRelationKindMetadata } from "osmix";
-import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from "osmix";
+import type { OsmEntity, OsmEntityType, OsmNode, OsmRelation, OsmWay } from "osmix";
 import { isNode, isRelation, isWay } from "osmix";
 import type { ReactNode } from "react";
 import { Fragment } from "react/jsx-runtime";
-
-const noop = (_: OsmEntity) => undefined;
 
 /**
  * Value cells wrap instead of widening the table: a way's refs list or a long tag value would
@@ -25,14 +24,15 @@ const VALUE_CELL = "whitespace-normal wrap-anywhere";
 
 /**
  * The details of one entity: its coordinates or refs, its tags and, with `osm`, a disclosure
- * listing a way's nodes or a relation's members that `onSelect` follows. With `summary` (the
- * default) everything sits under a `Details` titled "{Type} {id}"; `summary={false}` renders the
- * content directly, for a panel whose header already names the entity.
+ * listing a way's nodes or a relation's members. With `onSelect`, each listed entity gets a
+ * "Select {type} {id}" button that calls it. With `summary` (the default) everything sits
+ * under a `Details` titled "{Type} {id}"; `summary={false}` renders the content directly, for
+ * a panel whose header already names the entity.
  */
 export default function EntityDetails({
   defaultOpen,
   entity,
-  onSelect = noop,
+  onSelect,
   osm,
   summary = true,
 }: {
@@ -229,12 +229,39 @@ export function TagList({ tags }: { tags?: Record<string, unknown> }) {
   );
 }
 
+/**
+ * The id of a listed way node or relation member as a link button that selects it. An explicit
+ * control, so the row stays a plain row: its cells keep `select-all` for copying, and the
+ * keyboard reaches the selection like any other button.
+ */
+function SelectEntityButton({
+  type,
+  id,
+  onSelect,
+}: {
+  type: OsmEntityType;
+  id: number;
+  onSelect: () => void;
+}) {
+  return (
+    <Button
+      variant="link"
+      size="xs"
+      className="h-auto p-0"
+      aria-label={`Select ${type} ${id}`}
+      onClick={onSelect}
+    >
+      {id}
+    </Button>
+  );
+}
+
 export function NodeListDetails({
   nodes,
   onSelect,
 }: {
   nodes: OsmNode[];
-  onSelect: (node: OsmNode) => void;
+  onSelect?: (node: OsmNode) => void;
 }) {
   return (
     <Details defaultOpen>
@@ -248,25 +275,28 @@ export function NodeListDetails({
   );
 }
 
-function NodeListTable({
+/** A way's nodes in order, with tags under each; `onSelect` adds a select button per row. */
+export function NodeListTable({
   nodes,
   onSelect,
 }: {
   nodes: OsmNode[];
-  onSelect: (node: OsmNode) => void;
+  onSelect?: (node: OsmNode) => void;
 }) {
   return (
     <Table className="table-auto">
       <TableBody>
         {nodes.map((node, i) => (
           <Fragment key={String(node.id)}>
-            <TableRow
-              onClick={() => onSelect(node)}
-              onKeyDown={() => onSelect(node)}
-              className="cursor-pointer"
-            >
+            <TableRow>
               <TableCell>{i + 1}</TableCell>
-              <TableCell>{node.id}</TableCell>
+              <TableCell>
+                {onSelect ? (
+                  <SelectEntityButton type="node" id={node.id} onSelect={() => onSelect(node)} />
+                ) : (
+                  node.id
+                )}
+              </TableCell>
               <TableCell>
                 {node.lon}, {node.lat}
               </TableCell>
@@ -286,38 +316,47 @@ function NodeListTable({
   );
 }
 
-function RelationMemberListTable({
+function resolveMember(osm: Osm, member: OsmRelation["members"][number]): OsmEntity | null {
+  if (member.type === "node") return osm.nodes.getById(member.ref);
+  if (member.type === "way") return osm.ways.getById(member.ref);
+  if (member.type === "relation") return osm.relations.getById(member.ref);
+  return null;
+}
+
+/**
+ * A relation's members in order, resolved against `osm`, with tags under each; `onSelect` adds
+ * a select button to every member that resolves. A member missing from `osm` keeps a plain id.
+ */
+export function RelationMemberListTable({
   members,
   osm,
   onSelect,
 }: {
   members: OsmRelation["members"];
   osm: Osm;
-  onSelect: (entity: OsmEntity) => void;
+  onSelect?: (entity: OsmEntity) => void;
 }) {
   return (
     <Table className="table-auto">
       <TableBody>
         {members.map((member, i) => {
-          let entity: OsmEntity | null = null;
-          if (member.type === "node") {
-            entity = osm.nodes.getById(member.ref);
-          } else if (member.type === "way") {
-            entity = osm.ways.getById(member.ref);
-          } else if (member.type === "relation") {
-            entity = osm.relations.getById(member.ref);
-          }
-
+          const entity = resolveMember(osm, member);
           return (
             <Fragment key={`${member.type}-${member.ref}-${member.role ?? ""}`}>
-              <TableRow
-                onClick={() => entity && onSelect(entity)}
-                onKeyDown={() => entity && onSelect(entity)}
-                className={entity ? "cursor-pointer" : ""}
-              >
+              <TableRow>
                 <TableCell>{i + 1}</TableCell>
                 <TableCell>{member.type}</TableCell>
-                <TableCell>{member.ref}</TableCell>
+                <TableCell>
+                  {entity && onSelect ? (
+                    <SelectEntityButton
+                      type={member.type}
+                      id={member.ref}
+                      onSelect={() => onSelect(entity)}
+                    />
+                  ) : (
+                    member.ref
+                  )}
+                </TableCell>
                 <TableCell>{member.role || ""}</TableCell>
                 {member.type === "node" && entity && (
                   <TableCell>

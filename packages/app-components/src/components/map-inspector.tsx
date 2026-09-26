@@ -1,11 +1,13 @@
 import {
+  mapInsetAtom,
   mapModeAtom,
   selectedEntityAtom,
   selectedOsmAtom,
+  selectionOriginAtom,
   selectOsmEntityAtom,
 } from "@osmix/app-core";
 import { IconButton } from "@osmix/ui";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom, useStore } from "jotai";
 import { CircleDotIcon, MaximizeIcon, ShapesIcon, SplineIcon, XIcon } from "lucide-react";
 import type { Osm, OsmEntity, OsmEntityType } from "osmix";
 import { getEntityType } from "osmix";
@@ -18,7 +20,7 @@ import {
   useRef,
 } from "react";
 
-import { useFlyToEntity, useMap } from "../hooks/map.ts";
+import { useFlyToEntity, useMap, useSelectAndFlyToEntity } from "../hooks/map.ts";
 import { exitRoutingModeAtom } from "../state/routing.ts";
 import EntityDetails from "./entity-details.tsx";
 import { type LoadedMapDataset, useMapDatasets } from "./map-datasets.tsx";
@@ -49,8 +51,17 @@ export function inspectorView(
   return null;
 }
 
-/** The map padding that keeps fits clear of the docked inspector (its width plus gutters). */
-const DOCKED_INSPECTOR_PADDING_PX = 400;
+/** How much of the map's right edge the docked inspector covers (its width plus gutters). */
+const DOCKED_INSPECTOR_INSET_PX = 400;
+
+/**
+ * How far to pan the map left so a click at `x` (CSS px from the map's left edge) is not under
+ * a panel that covers the rightmost `inset` px of a map `mapWidth` px wide: zero when the point
+ * is already clear of it.
+ */
+export function coveredClickNudge(x: number, mapWidth: number, inset: number): number {
+  return Math.max(0, Math.ceil(x - (mapWidth - inset)));
+}
 
 const ENTITY_ICONS: Record<OsmEntityType, typeof CircleDotIcon> = {
   node: CircleDotIcon,
@@ -73,21 +84,29 @@ function focusMapCanvas(): void {
  * The panel anchored to the map that shows the selected entity or, in route mode, the routing
  * tool (on the first visible dataset). Docked (the map is at least 768px wide) it sits under
  * the toolbar and is content-sized up to the column; otherwise it takes a strip along the
- * bottom edge, at most three fifths of the map's height. While docked and open it
- * pads the map on the right so fits keep clear of it. Esc closes it through the overlay's stack
- * (after the search); closing clears the selection or exits routing, then returns focus to
- * whatever opened it (the search or route button) when that is still in the DOM, else to the
- * map canvas. Selections are announced here, once, through the overlay's live region.
+ * bottom edge, at most three fifths of the map's height. While docked and open it publishes
+ * its width as `mapInsetAtom`, which every fit and flight adds to its padding; the map itself
+ * is not moved when the panel opens, except to nudge a map-clicked point out from under it.
+ * Esc closes it through the overlay's stack (after the search); closing clears the selection
+ * or exits routing, then returns focus to whatever opened it (the search or route button) when
+ * that is still in the DOM, else to the map canvas. Selections are announced here, once,
+ * through the overlay's live region. "Select node …" in a way's node list (or a relation's
+ * member list) selects that entity and flies to it; the panel stays open, and since the list
+ * that held the button is gone with the old entity, the new title takes focus so the keyboard
+ * does not fall back to the top of the page. Esc still returns to the original opener.
  */
 export function MapInspector() {
   const mode = useAtomValue(mapModeAtom);
   const selectedEntity = useAtomValue(selectedEntityAtom);
   const selectedOsm = useAtomValue(selectedOsmAtom);
   const selectOsmEntity = useSetAtom(selectOsmEntityAtom);
+  const setMapInset = useSetAtom(mapInsetAtom);
   const exitRouting = useSetAtom(exitRoutingModeAtom);
   const datasets = useMapDatasets();
   const { docked } = useMapOverlayLayout();
   const map = useMap();
+  const store = useStore();
+  const selectAndFlyToEntity = useSelectAndFlyToEntity();
   const announce = useMapAnnounce();
 
   const view = inspectorView(mode, selectedEntity);
@@ -124,12 +143,25 @@ export function MapInspector() {
   useMapOverlayAction("inspector", open, close);
 
   useEffect(() => {
-    if (!map || !docked || !open) return;
-    map.setPadding({ right: DOCKED_INSPECTOR_PADDING_PX });
+    if (!docked || !open) return;
+    setMapInset({ right: DOCKED_INSPECTOR_INSET_PX });
     return () => {
-      map.setPadding({ right: 0 });
+      setMapInset({ right: 0 });
     };
-  }, [map, docked, open]);
+  }, [docked, open, setMapInset]);
+
+  // A map click under where the panel opens would select something the panel then covers.
+  // The origin is consumed either way, so a resize to docked cannot replay a stale point.
+  useEffect(() => {
+    if (view !== "entity") return;
+    const origin = store.get(selectionOriginAtom);
+    if (origin.source !== "map") return;
+    store.set(selectionOriginAtom, { source: "other" });
+    if (!map || !docked) return;
+    const mapWidth = map.getContainer().clientWidth;
+    const dx = coveredClickNudge(origin.point[0], mapWidth, DOCKED_INSPECTOR_INSET_PX);
+    if (dx > 0) map.panBy([dx, 0], { duration: 200 });
+  }, [docked, map, selectedEntity, store, view]);
 
   const dataset =
     selectedOsm === null ? undefined : datasets.find((entry) => entry.osm === selectedOsm);
@@ -171,7 +203,19 @@ export function MapInspector() {
             osm={selectedOsm}
             dataset={dataset}
             showRole={datasets.length > 1}
-            onSelect={(entity) => selectOsmEntity(selectedOsm, entity)}
+            onSelect={(entity) => {
+              // The lists only render with a dataset, so `selectedOsm` is set here.
+              if (!selectedOsm) return;
+              selectAndFlyToEntity(selectedOsm, entity);
+              // The button that was activated unmounts with the old entity's list, which drops
+              // focus on the body; the new title takes it once the new view has rendered. The
+              // opener recorded when the panel opened is kept, so Esc still returns there.
+              requestAnimationFrame(() => {
+                panelRef.current
+                  ?.querySelector<HTMLElement>(`[data-slot="${MAP_INSPECTOR_TITLE_SLOT}"]`)
+                  ?.focus();
+              });
+            }}
             onClose={close}
           />
         ) : null}

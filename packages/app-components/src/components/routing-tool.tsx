@@ -7,7 +7,7 @@ import { bboxFromLonLats } from "osmix";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre";
 
-import { useMap } from "../hooks/map.ts";
+import { useMap, useMapPadding } from "../hooks/map.ts";
 import {
   exitRoutingModeAtom,
   initialRoutingState,
@@ -114,6 +114,7 @@ function RoutingBody({ dataset }: { dataset: LoadedMapDataset }) {
   const { osm } = dataset;
   const remote = useOsmixRemote();
   const map = useMap();
+  const mapPadding = useMapPadding();
   const store = useStore();
   const announce = useMapAnnounce();
   const [routingState, setRoutingState] = useAtom(routingStateAtom);
@@ -185,7 +186,7 @@ function RoutingBody({ dataset }: { dataset: LoadedMapDataset }) {
       }
       setRoutingState((prev) => ({ ...prev, toPoint: point, toNode: snappedNode, result }));
       if (result?.coordinates) {
-        map?.fitBounds(bboxFromLonLats(result.coordinates), { padding: 50 });
+        map?.fitBounds(bboxFromLonLats(result.coordinates), { padding: mapPadding(50) });
       }
     } finally {
       setIsRouting(false);

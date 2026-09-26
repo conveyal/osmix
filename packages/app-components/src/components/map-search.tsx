@@ -1,4 +1,3 @@
-import { selectOsmEntityAtom } from "@osmix/app-core";
 import {
   Alert,
   Button,
@@ -14,7 +13,7 @@ import { useSetAtom } from "jotai";
 import { SearchIcon } from "lucide-react";
 import { useState, useTransition } from "react";
 
-import { useFlyToEntity, useMap } from "../hooks/map.ts";
+import { useMap, useMapPadding, useSelectAndFlyToEntity } from "../hooks/map.ts";
 import { type EntityQuery, getOsmixEntityByStringId, parseEntityQuery } from "../lib/entity-id.ts";
 import { nominatimPlaceAtom } from "../state/nominatim.ts";
 import { exitRoutingModeAtom } from "../state/routing.ts";
@@ -98,11 +97,11 @@ function MapSearchPanel({
   onEntitySelected: () => void;
 }) {
   const map = useMap();
+  const mapPadding = useMapPadding();
   const datasets = useMapDatasets();
-  const selectOsmEntity = useSetAtom(selectOsmEntityAtom);
+  const selectAndFlyToEntity = useSelectAndFlyToEntity();
   const exitRouting = useSetAtom(exitRoutingModeAtom);
   const setPlace = useSetAtom(nominatimPlaceAtom);
-  const flyToEntity = useFlyToEntity();
   const announce = useMapAnnounce();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NominatimResult[]>([]);
@@ -121,8 +120,7 @@ function MapSearchPanel({
       // Focus the toolbar button before selecting: the inspector records what had focus when
       // it opened, so closing it later returns focus to the search button, not the map.
       focusById(mapSearchToggleId(id));
-      selectOsmEntity(dataset.osm, entity);
-      flyToEntity(dataset.osm, entity);
+      selectAndFlyToEntity(dataset.osm, entity);
       // The inspector announces the selection; announcing here too would read it twice.
       onEntitySelected();
       focusMapInspectorTitle(mapSearchToggleId(id));
@@ -161,7 +159,7 @@ function MapSearchPanel({
   };
 
   const selectPlace = (result: NominatimResult) => {
-    if (map) focusNominatimResult(map, result);
+    if (map) focusNominatimResult(map, result, mapPadding(100));
     setPlace(result);
     onClose();
   };

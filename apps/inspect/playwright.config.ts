@@ -9,7 +9,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "pnpm dev:app --host 127.0.0.1 --port 4174",
+    command: "vite --host 127.0.0.1 --port 4174",
     url: "http://127.0.0.1:4174/",
     reuseExistingServer: false,
     timeout: 120_000,

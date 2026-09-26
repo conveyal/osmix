@@ -577,8 +577,9 @@ export function useOsmFile(osmKey: string) {
   });
 
   /**
-   * Copy all state from another useOsmFile instance.
-   * Used to transfer patch to base when base is cleared.
+   * Take over a snapshot of another `useOsmFile` slot's loaded state, load profile included, so
+   * a dataset moves between slots without reloading. Merge's "Use as base" moves the patch into
+   * an empty base slot this way. The caller clears the source slot itself.
    */
   const copyStateFrom = useEffectEvent(
     (source: {
@@ -587,6 +588,7 @@ export function useOsmFile(osmKey: string) {
       osm: ReturnType<typeof useOsmFile>["osm"];
       osmInfo: ReturnType<typeof useOsmFile>["osmInfo"];
       isStored: boolean;
+      loadProfile: OsmLoadProfile;
     }) => {
       invalidateDataset();
       setFile(source.file);
@@ -594,6 +596,7 @@ export function useOsmFile(osmKey: string) {
       setOsm(source.osm);
       setOsmInfo(source.osmInfo);
       setIsStored(source.isStored);
+      setLoadProfile(source.loadProfile);
       setLoadFailure(null);
     },
   );

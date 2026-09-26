@@ -1,4 +1,4 @@
-import { useMap } from "@osmix/app-components";
+import { useMap, useMapPadding } from "@osmix/app-components";
 import {
   cn,
   ActionButton,
@@ -736,6 +736,7 @@ export function ConflationReview({
   );
 
   const map = useMap();
+  const mapPadding = useMapPadding();
   const [comparison, setComparison] = useAtom(conflationComparisonAtom);
   const candidateIds = page.candidates.map((candidate) => candidate.id).join("|");
   const filterKey = JSON.stringify([
@@ -794,7 +795,7 @@ export function ConflationReview({
         [bounds[0], bounds[1]],
         [bounds[2], bounds[3]],
       ],
-      { padding: 80, maxDuration: 200, maxZoom: 19 },
+      { padding: mapPadding(80), maxDuration: 200, maxZoom: 19 },
     );
   };
 
