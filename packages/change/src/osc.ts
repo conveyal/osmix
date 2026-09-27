@@ -12,7 +12,7 @@
 
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/types";
 
-import type { OsmChangeset } from "./changeset.ts";
+import type { OsmChangeRecords } from "./types.ts";
 import { escapeXmlAttribute, osmTagsToOscTags } from "./utils.ts";
 
 /**
@@ -74,7 +74,7 @@ const DEFAULT_OSC_OPTIONS: OscOptions = {
  * Set `augmented: true` to include both old and new versions of elements wrapped
  * in `<old>` and `<new>` elements, following the Overpass API Augmented Diffs format.
  *
- * @param changeset - The changeset to serialize.
+ * @param changeset - The changes to serialize: an `OsmChangeset` or any change records.
  * @param options - Options for OSC generation.
  * @returns XML string in OSC format.
  *
@@ -89,7 +89,7 @@ const DEFAULT_OSC_OPTIONS: OscOptions = {
  * await Bun.write('changes.osc', osc)
  * ```
  */
-export function generateOscChanges(changeset: OsmChangeset, options: Partial<OscOptions> = {}) {
+export function generateOscChanges(changeset: OsmChangeRecords, options: Partial<OscOptions> = {}) {
   const { augmented } = { ...DEFAULT_OSC_OPTIONS, ...options };
 
   let create = "";

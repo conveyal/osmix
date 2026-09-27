@@ -45,6 +45,13 @@ export type OsmChange<T extends OsmEntity = OsmEntity> = {
   refs?: OsmEntityRef[];
 };
 
+/** Pending changes by entity type, keyed by entity ID. An `OsmChangeset` is one. */
+export interface OsmChangeRecords {
+  nodeChanges: Record<number, OsmChange<OsmEntityTypeMap["node"]>>;
+  wayChanges: Record<number, OsmChange<OsmEntityTypeMap["way"]>>;
+  relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>;
+}
+
 /**
  * Options for the high-level `merge()` function.
  * All options default to `false` - enable only the stages you need.
