@@ -58,6 +58,16 @@ describe("plan versus staged merge", () => {
   it.each(cases)("direct changes match on %s", async (_name, inputs) => {
     const { base, patch } = inputs();
     const expected = await outcome(() => merge(base, patch, { directMerge: true }, quiet));
+    const actual = await outcome(
+      () => applyPlan(planMerge(base, patch, { mergeIdenticalPoints: false }, quiet)).osm,
+    );
+    expect(actual).toEqual(expected);
+  });
+
+  it.each(cases)("identical points and ways match on %s", async (_name, inputs) => {
+    const { base, patch } = inputs();
+    const exact = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
+    const expected = await outcome(() => merge(base, patch, exact, quiet));
     const actual = await outcome(() => applyPlan(planMerge(base, patch, {}, quiet)).osm);
     expect(actual).toEqual(expected);
   });

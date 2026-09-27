@@ -617,6 +617,16 @@ export class OsmChangeset {
    * uses the highest compatible ID as a deterministic survivor.
    */
   deduplicateNodes(nodes: Nodes) {
+    const replacementMap = this.planNodeReplacements(nodes);
+    this.applyNodeReplacements(replacementMap);
+    return replacementMap;
+  }
+
+  /**
+   * @internal The safe exact node replacements for `nodes` (source ID to survivor ID), without
+   * recording them. Any subset of the result is also safe to apply.
+   */
+  planNodeReplacements(nodes: Nodes): ReplacementMap {
     const sameDataset = nodes === this.osm.nodes;
     let replacementMap: ReplacementMap = new Map();
     const exactCandidates: NodeCandidate[] = [];
@@ -671,7 +681,12 @@ export class OsmChangeset {
     this.removeConflictingNodeReplacements(replacementMap, waysByNode);
     this.removeUnsafeNodeReplacements(replacementMap);
     this.removeRestrictionBreakingNodeReplacements(replacementMap);
-    if (replacementMap.size === 0) return replacementMap;
+    return replacementMap;
+  }
+
+  /** @internal Record exact node replacements from `planNodeReplacements`. */
+  applyNodeReplacements(replacementMap: ReplacementMap) {
+    if (replacementMap.size === 0) return;
     this.applyNodeReplacementsToWays(replacementMap);
     this.applyNodeReplacementsToRelations(replacementMap);
 
@@ -681,7 +696,6 @@ export class OsmChangeset {
       this.reconcileNodeTags(patchNode, baseNodeId);
       this.deleteReconciledNode(patchNode, baseNodeId);
     }
-    return replacementMap;
   }
 
   /**
@@ -932,7 +946,15 @@ export class OsmChangeset {
   /**
    * De-duplicate the ways within this OSM changeset.
    */
-  *deduplicateWaysGenerator(ways: Ways, replacementMap: ReplacementMap = new Map()) {
+  /**
+   * @param accept - Called with each exact way match; returning false leaves the pair
+   * separate. Every match is accepted without it.
+   */
+  *deduplicateWaysGenerator(
+    ways: Ways,
+    replacementMap: ReplacementMap = new Map(),
+    accept?: (patchWayId: number, baseWayId: number) => boolean,
+  ) {
     const dedupedIdPairs = new IdPairs();
     const sameDataset = ways === this.osm.ways;
     const exactWayIndex = sameDataset ? undefined : this.buildCrossDatasetExactWayIndex();
@@ -944,6 +966,7 @@ export class OsmChangeset {
         dedupedIdPairs,
         replacementMap,
         exactWayIndex,
+        accept,
       );
     }
   }
@@ -1024,6 +1047,7 @@ export class OsmChangeset {
     dedupedIdPairs: IdPairs,
     replacementMap: ReplacementMap,
     exactWayIndex?: ExactWayIndex,
+    accept?: (patchWayId: number, baseWayId: number) => boolean,
   ) {
     if (!this.osm.ways.ids.has(patchWay.id) && this.wayChanges[patchWay.id] == null) return 0;
     if (!sameDataset && this.wayChanges[patchWay.id]?.changeType !== "create") return 0;
@@ -1062,6 +1086,7 @@ export class OsmChangeset {
     const baseWay = sameDataset ? candidates.toSorted((a, b) => b.id - a.id)[0] : candidates[0];
     const currentBaseWay = this.getCurrentWay(baseWay!);
     if (!currentBaseWay) return 0;
+    if (accept && !accept(patchWay.id, currentBaseWay.id)) return 0;
 
     const mergedWay = withNonConflictingDescriptiveTags(currentBaseWay, currentPatchWay);
     if (mergedWay !== currentBaseWay) this.modify("way", currentBaseWay.id, () => mergedWay);

@@ -61,6 +61,20 @@ export function remapId(remap: PatchIdRemap, type: OsmEntityType, id: number) {
   return remap[type].get(id) ?? id;
 }
 
+const inverses = new WeakMap<Map<number, number>, Map<number, number>>();
+
+/** The patch ID a planned ID came from. */
+export function originalId(remap: PatchIdRemap, type: OsmEntityType, plannedId: number) {
+  const forward = remap[type];
+  if (forward.size === 0) return plannedId;
+  let inverse = inverses.get(forward);
+  if (!inverse) {
+    inverse = new Map([...forward].map(([original, planned]) => [planned, original]));
+    inverses.set(forward, inverse);
+  }
+  return inverse.get(plannedId) ?? plannedId;
+}
+
 /** The patch with planned IDs, refs and members; the patch itself when nothing changes. */
 export function remapPatch(patch: Osm, remap: PatchIdRemap): Osm {
   if (remappedCount(remap) === 0) return patch;

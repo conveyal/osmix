@@ -14,6 +14,18 @@ export type PatchIdMode = "osm" | "new";
 export interface MergePlanOptions {
   /** How patch IDs are read. Defaults to `osm`. */
   patchIds?: PatchIdMode;
+  /**
+   * Merge imported points at identical coordinates (and ways that become identical) into the
+   * base automatically. When false, those merges wait for a decision. Defaults to true.
+   */
+  mergeIdenticalPoints?: boolean;
+  /** Decisions on proposals, by proposal ID. The plan is rebuilt with them applied. */
+  decisions?: readonly PlanDecision[];
+}
+
+export interface PlanDecision {
+  proposalId: string;
+  action: "accept" | "reject";
 }
 
 /** Which dataset a plan was made from, so a stale plan is never applied to other data. */
@@ -54,21 +66,44 @@ interface PlanProposalBase {
   feature: string;
   status: PlanProposalStatus;
   reasons: string[];
+  decision?: PlanDecision["action"];
   effect: PlanProposalEffect;
 }
 
-/** A new patch entity is created. */
+type EntityKey = { type: OsmEntityType; id: number };
+
+/** A new patch entity is created. Skipped when a merge consumed it instead. */
 export interface AddProposal extends PlanProposalBase {
   kind: "add";
+  entity: EntityKey;
 }
 
 /** A patch entity with a positive ID replaces the base entity with that ID. */
 export interface SameIdReplaceProposal extends PlanProposalBase {
   kind: "same-id-replace";
-  entity: { type: OsmEntityType; id: number };
+  entity: EntityKey;
 }
 
-export type PlanProposal = AddProposal | SameIdReplaceProposal;
+/** An imported point at a base point's exact coordinate becomes that base point. */
+export interface ExactMergeProposal extends PlanProposalBase {
+  kind: "exact-merge";
+  /** Planned IDs. */
+  source: EntityKey;
+  target: EntityKey;
+}
+
+/** An imported way identical to a base way (after point merges) becomes that base way. */
+export interface WayReconcileProposal extends PlanProposalBase {
+  kind: "way-reconcile";
+  source: EntityKey;
+  target: EntityKey;
+}
+
+export type PlanProposal =
+  | AddProposal
+  | SameIdReplaceProposal
+  | ExactMergeProposal
+  | WayReconcileProposal;
 
 /** One imported feature: a way with its vertices, a standalone node, or a relation. */
 export interface PlanFeature {
@@ -101,4 +136,6 @@ export interface MergePlan {
   features: PlanFeature[];
   proposals: Map<string, PlanProposal>;
   summary: MergePlanSummary;
+  /** Decisions naming proposals this plan does not have, for example after another decision. */
+  staleDecisions: string[];
 }
