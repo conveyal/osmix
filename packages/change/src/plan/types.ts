@@ -26,6 +26,11 @@ export interface MergePlanOptions {
    */
   mergeIdenticalPoints?: boolean;
   /**
+   * Connect imported paths and roads to the ways they cross at the same grade: at an existing
+   * vertex within 1 m, or at a new crossing node. Defaults to true.
+   */
+  createIntersections?: boolean;
+  /**
    * Match imported features to nearby base features (copy tags, connect, remove duplicates).
    * Off unless configured. Decide its proposals with `decisions`, not `matching.decisions`.
    */
@@ -134,7 +139,17 @@ export interface RemoveWayProposal extends MatchingProposalBase {
   kind: "remove-way";
 }
 
+/** An imported way and a way it crosses share a node at the crossing (MP-J1). */
+export interface CrossingProposal extends PlanProposalBase {
+  /** `crossing-snap` reuses an existing vertex; `crossing-node` adds a new node. */
+  kind: "crossing-snap" | "crossing-node";
+  /** The imported way, then the way it crosses. Planned IDs. */
+  ways: [EntityKey, EntityKey];
+  point: [number, number];
+}
+
 export type PlanProposal =
+  | CrossingProposal
   | AddProposal
   | SameIdReplaceProposal
   | ExactMergeProposal

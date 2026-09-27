@@ -34,6 +34,8 @@ const PROPOSAL_OUTCOME: Record<PlanProposal["kind"], PlanOutcome> = {
   connect: "connected",
   "copy-tags": "merged",
   "remove-way": "removed",
+  "crossing-snap": "connected",
+  "crossing-node": "connected",
 };
 
 function proposalEffect(

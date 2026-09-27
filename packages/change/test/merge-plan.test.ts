@@ -223,3 +223,50 @@ describe("identity proposals", () => {
     expect(applyPlan(plan).osm.nodes.getById(-1)).toMatchObject({ lon: 0, lat: 0 });
   });
 });
+
+describe("crossing proposals", () => {
+  function crossingInputs() {
+    const base = dataset(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 0.002, lat: 0 },
+      ],
+      [{ id: 10, refs: [1, 2], tags: { highway: "residential" } }],
+    );
+    const patch = dataset(
+      "patch",
+      [
+        { id: -1, lon: 0.001, lat: -0.001 },
+        { id: -2, lon: 0.001, lat: 0.001 },
+      ],
+      [{ id: -1, refs: [-1, -2], tags: { highway: "footway" } }],
+    );
+    return { base, patch };
+  }
+
+  it("connects an imported path to the road it crosses with a new node", () => {
+    const { base, patch } = crossingInputs();
+    const plan = planMerge(base, patch, {}, quiet);
+    const id = "xnode:w-1|w10@0.0010000,0.0000000";
+    expect(plan.proposals.get(id)).toMatchObject({ kind: "crossing-node", effect: "applied" });
+    expect(plan.features[0]).toMatchObject({ key: "way:-1", outcome: "connected" });
+    const { osm } = applyPlan(plan);
+    const [, crossing] = osm.ways.getById(10)!.refs;
+    expect(osm.ways.getById(-1)?.refs).toEqual([-1, crossing, -2]);
+    expect(osm.nodes.getById(crossing!)).toMatchObject({ lon: 0.001, lat: 0 });
+  });
+
+  it("leaves a rejected crossing unconnected", () => {
+    const { base, patch } = crossingInputs();
+    const plan = planMerge(
+      base,
+      patch,
+      { decisions: [{ proposalId: "xnode:w-1|w10@0.0010000,0.0000000", action: "reject" }] },
+      quiet,
+    );
+    const { osm } = applyPlan(plan);
+    expect(osm.ways.getById(10)?.refs).toEqual([1, 2]);
+    expect(osm.ways.getById(-1)?.refs).toEqual([-1, -2]);
+  });
+});

@@ -69,7 +69,15 @@ describe("plan versus staged merge", () => {
     const { base, patch } = inputs();
     const expected = await outcome(() => merge(base, patch, { directMerge: true }, quiet));
     const actual = await outcome(
-      () => applyPlan(planMerge(base, patch, { mergeIdenticalPoints: false }, quiet)).osm,
+      () =>
+        applyPlan(
+          planMerge(
+            base,
+            patch,
+            { mergeIdenticalPoints: false, createIntersections: false },
+            quiet,
+          ),
+        ).osm,
     );
     expect(actual).toEqual(expected);
   });
@@ -78,7 +86,9 @@ describe("plan versus staged merge", () => {
     const { base, patch } = inputs();
     const exact = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
     const expected = await outcome(() => merge(base, patch, exact, quiet));
-    const actual = await outcome(() => applyPlan(planMerge(base, patch, {}, quiet)).osm);
+    const actual = await outcome(
+      () => applyPlan(planMerge(base, patch, { createIntersections: false }, quiet)).osm,
+    );
     expect(actual).toEqual(expected);
   });
 
@@ -93,6 +103,35 @@ describe("plan versus staged merge", () => {
     const expected = await outcome(() =>
       merge(base, patch, { ...staged, conflation: matching }, quiet),
     );
+    const actual = await outcome(
+      () => applyPlan(planMerge(base, patch, { matching, createIntersections: false }, quiet)).osm,
+    );
+    expect(actual).toEqual(expected);
+  });
+
+  it.each(cases)("the whole pipeline matches on %s", async (_name, inputs) => {
+    const { base, patch } = inputs();
+    const all = {
+      directMerge: true,
+      deduplicateNodes: true,
+      deduplicateWays: true,
+      createIntersections: true,
+    };
+    const expected = await outcome(() => merge(base, patch, all, quiet));
+    const actual = await outcome(() => applyPlan(planMerge(base, patch, {}, quiet)).osm);
+    expect(actual).toEqual(expected);
+  });
+
+  it.each(cases)("the whole pipeline with matching matches on %s", async (_name, inputs) => {
+    const { base, patch } = inputs();
+    const all = {
+      directMerge: true,
+      deduplicateNodes: true,
+      deduplicateWays: true,
+      createIntersections: true,
+      conflation: matching,
+    };
+    const expected = await outcome(() => merge(base, patch, all, quiet));
     const actual = await outcome(() => applyPlan(planMerge(base, patch, { matching }, quiet)).osm);
     expect(actual).toEqual(expected);
   });
@@ -112,11 +151,12 @@ describe("plan versus staged merge", () => {
       merge(base, patch, { ...staged, conflation: { ...matching, decisions } }, quiet),
     );
     const actual = await outcome(() => {
-      const undecided = planMerge(base, patch, { matching }, quiet);
+      const options = { matching, createIntersections: false };
+      const undecided = planMerge(base, patch, options, quiet);
       const plan = planMerge(
         base,
         patch,
-        { matching, decisions: planDecisions(undecided, decisions) },
+        { ...options, decisions: planDecisions(undecided, decisions) },
         quiet,
       );
       return applyPlan(plan).osm;
@@ -131,7 +171,7 @@ describe("plan matching candidates", () => {
       ...MONACO_MERGE_CONFLATION,
       propertyKeys: [...MONACO_MERGE_CONFLATION.propertyKeys],
     };
-    const plan = planMerge(monaco, monacoPatch, { matching }, quiet);
+    const plan = planMerge(monaco, monacoPatch, { matching, createIntersections: false }, quiet);
     const merged = new Set<string>();
     for (const proposal of plan.proposals.values()) {
       if (proposal.effect !== "applied") continue;

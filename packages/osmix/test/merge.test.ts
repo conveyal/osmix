@@ -99,18 +99,20 @@ describe("merge osm", () => {
       // Endpoint reuse updates whole junctions. Unsafe shared substitutions are
       // skipped; only isolated endpoints can use a dedicated intersection fallback.
       // Existing crossing values are retained, avoiding 68 crossing-only updates.
+      // Candidate ways are visited in ID order, so these counts do not depend on the
+      // spatial index's layout.
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 9_530,
-        nodeChanges: 5_866,
-        wayChanges: 3_664,
+        totalChanges: 9_522,
+        nodeChanges: 5_863,
+        wayChanges: 3_659,
         relationChanges: 0,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
-        intersectionPointsFound: 3_085,
-        intersectionNodesCreated: 2_606,
-        intersectionNodesRemoved: 138,
+        intersectionPointsFound: 3_082,
+        intersectionNodesCreated: 2_602,
+        intersectionNodesRemoved: 140,
       });
 
       baseOsm = applyChangesetToOsm(changeset);

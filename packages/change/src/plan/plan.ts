@@ -6,13 +6,13 @@
  * `applyPlan`, which materializes the records in a single pass and validates the result.
  *
  * Phases, in order: direct and same-ID changes; identity (imported points at identical
- * coordinates, then ways that became identical); matching, when configured.
+ * coordinates, then ways that became identical); matching, when configured; crossings.
  */
 import type { Osm } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
 
 import { applyChangesetToOsm } from "../apply-changeset.ts";
-import { OsmChangeset } from "../changeset.ts";
+import { type CrossingInsertion, OsmChangeset } from "../changeset.ts";
 import { generateOscChanges, type OscOptions } from "../osc.ts";
 import type { OsmChangesetStats } from "../types.ts";
 import type { OsmConflationDiscovery } from "../types.ts";
@@ -70,6 +70,7 @@ export function planMerge(
     ...options,
     patchIds: options.patchIds ?? "osm",
     mergeIdenticalPoints: options.mergeIdenticalPoints ?? true,
+    createIntersections: options.createIntersections ?? true,
   };
   const remap = planPatchIdRemap(base, patch, resolved.patchIds!);
   const planned = remapPatch(patch, remap);
@@ -88,6 +89,11 @@ export function planMerge(
   if (options.matching) {
     log(`Planning matches from ${patch.id} to ${base.id}...`);
     matched = planMatching(builder, changeset, base, planned, options.matching);
+  }
+
+  if (resolved.createIntersections) {
+    log(`Planning crossings for ${patch.id}...`);
+    planCrossings(builder, changeset, planned);
   }
 
   const { summary, staleDecisions } = builder.finish(base, planned, changeset, resolved);
@@ -155,6 +161,54 @@ function planIdentity(
     return proposal.effect === "applied";
   };
   for (const _ of changeset.deduplicateWaysGenerator(planned.ways, new Map(), accept));
+}
+
+/**
+ * Crossings between surviving imported ways and the ways they cross, found on the planned
+ * state. Every crossing is an automatic proposal; rejecting one leaves that pair unconnected.
+ */
+function planCrossings(builder: PlanBuilder, changeset: OsmChangeset, planned: Osm) {
+  const wayToken = (id: number) =>
+    planned.ways.ids.has(id) ? builder.originalToken("way", id) : entityToken("way", id);
+  const accept = (crossing: CrossingInsertion) => {
+    // Two points at the same spot are the identity phase's decision: a crossing never merges
+    // a pair whose exact merge was rejected or is still waiting.
+    if (crossing.merges && exactMergeProposed(builder, planned, crossing.merges)) return false;
+    const feature = builder.featureOfWay(crossing.wayId);
+    if (!feature) throw Error(`Crossing way ${crossing.wayId} is not an imported way`);
+    const point = crossing.point.map((value) => value.toFixed(7)).join(",");
+    const kind = crossing.kind === "snap" ? "crossing-snap" : "crossing-node";
+    const proposal = builder.propose({
+      id: `${crossing.kind === "snap" ? "xsnap" : "xnode"}:${wayToken(crossing.wayId)}|${wayToken(crossing.otherWayId)}@${point}`,
+      kind,
+      feature: feature.key,
+      ways: [
+        { type: "way", id: crossing.wayId },
+        { type: "way", id: crossing.otherWayId },
+      ],
+      point: crossing.point,
+      status: "automatic",
+      reasons: [],
+    });
+    return proposal.effect === "applied";
+  };
+  for (const _ of changeset.createPlannedIntersections(planned.ways, planned.nodes.ids, accept));
+}
+
+function exactMergeProposed(
+  builder: PlanBuilder,
+  planned: Osm,
+  { replaced, survivor }: { replaced: number; survivor: number },
+) {
+  for (const [source, target] of [
+    [replaced, survivor],
+    [survivor, replaced],
+  ] as const) {
+    if (!planned.nodes.ids.has(source)) continue;
+    const id = `exact:${builder.originalToken("node", source)}>${entityToken("node", target)}`;
+    if (builder.proposals.has(id)) return true;
+  }
+  return false;
 }
 
 export interface MergePlanResult {
