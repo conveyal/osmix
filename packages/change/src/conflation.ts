@@ -60,6 +60,7 @@ import type {
   OsmMergeOptions,
   ResolvedOsmConflationOptions,
 } from "./types.ts";
+import { type DatasetView, type EntityRelationContext, osmDatasetView } from "./views.ts";
 
 // Preserve the historical one-meter matching radius, but only inside this explicit,
 // cross-dataset workflow. Proximity alone never authorizes a topology change.
@@ -68,20 +69,14 @@ const MAX_BEARING_DIFFERENCE_DEGREES = 30;
 const MAX_LENGTH_DIFFERENCE_RATIO = 0.05;
 const SAMPLE_INTERVAL_METERS = 5;
 
-type EntityRelationContext = {
-  nodes: Set<number>;
-  ways: Set<number>;
-  restrictionNodes: Set<number>;
-  restrictionWays: Set<number>;
-};
-
 type DiscoveryContext = {
   base: Osm;
   patch: Osm;
   provenance: MergeProvenance;
   options: ResolvedOsmConflationOptions;
-  baseWaysByNode: Map<number, OsmWay[]>;
-  patchWaysByNode: Map<number, OsmWay[]>;
+  /** Targets come from the base side, sources from the imported side. */
+  baseView: DatasetView;
+  patchView: DatasetView;
   baseRelations: EntityRelationContext;
   patchRelations: EntityRelationContext;
 };
@@ -139,40 +134,6 @@ function uniqueReasons(reasons: readonly OsmConflationReasonCode[]) {
 
 function roundEvidence(value: number) {
   return Number(value.toFixed(6));
-}
-
-function waysByNode(osm: Osm) {
-  const result = new Map<number, OsmWay[]>();
-  for (const way of osm.ways) {
-    for (const ref of new Set(way.refs)) {
-      const ways = result.get(ref) ?? [];
-      ways.push(way);
-      result.set(ref, ways);
-    }
-  }
-  return result;
-}
-
-function relationContext(osm: Osm): EntityRelationContext {
-  const context: EntityRelationContext = {
-    nodes: new Set(),
-    ways: new Set(),
-    restrictionNodes: new Set(),
-    restrictionWays: new Set(),
-  };
-  for (const relation of osm.relations) {
-    const restriction = relation.tags?.["type"] === "restriction";
-    for (const member of relation.members) {
-      if (member.type === "node") {
-        context.nodes.add(member.ref);
-        if (restriction) context.restrictionNodes.add(member.ref);
-      } else if (member.type === "way") {
-        context.ways.add(member.ref);
-        if (restriction) context.restrictionWays.add(member.ref);
-      }
-    }
-  }
-  return context;
 }
 
 function wayContextsCompatible(source: OsmWay, target: OsmWay) {
@@ -381,11 +342,6 @@ function symmetricLineDistance(a: readonly LonLat[], b: readonly LonLat[]) {
   return maximum;
 }
 
-function wayCoordinates(osm: Osm, way: OsmWay) {
-  const index = osm.ways.ids.getIndexFromId(way.id);
-  return index < 0 ? [] : osm.ways.getResolvedCoordinates(index);
-}
-
 function lineBbox(
   coordinates: readonly LonLat[],
   paddingMeters: number,
@@ -423,8 +379,8 @@ function undirectedBearingDifference(a: number, b: number) {
   return Math.min(directed, 360 - directed, Math.abs(180 - directed));
 }
 
-function nodeSegments(osm: Osm, nodeId: number, ways: readonly OsmWay[]) {
-  const node = osm.nodes.getById(nodeId);
+function nodeSegments(view: DatasetView, nodeId: number, ways: readonly OsmWay[]) {
+  const node = view.getNode(nodeId);
   if (!node) return [];
   const segments: { bearing: number; way: OsmWay }[] = [];
   for (const way of ways) {
@@ -433,7 +389,7 @@ function nodeSegments(osm: Osm, nodeId: number, ways: readonly OsmWay[]) {
       for (const neighborIndex of [index - 1, index + 1]) {
         const neighborId = way.refs[neighborIndex];
         if (neighborId == null || neighborId === nodeId) continue;
-        const neighbor = osm.nodes.getById(neighborId);
+        const neighbor = view.getNode(neighborId);
         if (!neighbor) continue;
         segments.push({
           bearing: bearing([node.lon, node.lat], [neighbor.lon, neighbor.lat]),
@@ -543,8 +499,8 @@ function nodeAttachmentAssessment(
     hardReasons.push("grade-conflict");
   }
 
-  const sourceSegments = nodeSegments(context.patch, source.id, sourceWays);
-  const targetSegments = nodeSegments(context.base, target.id, targetWays);
+  const sourceSegments = nodeSegments(context.patchView, source.id, sourceWays);
+  const targetSegments = nodeSegments(context.baseView, target.id, targetWays);
   let maximumMinimumBearingDifference = 0;
   // Every imported incident segment needs at least one compatible base segment.
   // Taking the worst best-match prevents one aligned arm from hiding another.
@@ -621,20 +577,22 @@ function addReviewReason(candidate: OsmConflationCandidate, reason: OsmConflatio
 
 function discoverNodeCandidates(context: DiscoveryContext) {
   const candidates: OsmConflationCandidate[] = [];
-  for (const source of context.patch.nodes.sorted()) {
+  for (const source of context.patchView.nodes()) {
     // Same-ID entities belong to ordinary merge semantics; fuzzy matching must not
     // reinterpret an authoritative patch update.
     if (context.provenance.isBase("node", source.id)) continue;
-    const patchWays = context.patchWaysByNode.get(source.id) ?? [];
+    const patchWays = context.patchView.waysAtNode(source.id);
     const eligible =
       context.options.propertyKeys.some((key) => source.tags?.[key] != null) ||
       (context.options.attachNetwork &&
         patchWays.some((way) => context.provenance.isImported("way", way.id)));
     if (!eligible) continue;
 
-    const nearby = context.base.nodes
-      .findIndexesWithinRadius(source.lon, source.lat, context.options.maxDistanceMeters / 1_000)
-      .map((index) => context.base.nodes.getByIndex(index));
+    const nearby = context.baseView.nodesWithinRadius(
+      source.lon,
+      source.lat,
+      context.options.maxDistanceMeters,
+    );
     // A base ID also present in the patch is mutable under direct merge, so it is
     // not an immutable target for a different imported entity.
     const targets = nearby.filter((target) => !context.provenance.isPatch("node", target.id));
@@ -661,7 +619,7 @@ function discoverNodeCandidates(context: DiscoveryContext) {
     }
 
     for (const target of targets.toSorted((a, b) => a.id - b.id)) {
-      const baseWays = context.baseWaysByNode.get(target.id) ?? [];
+      const baseWays = context.baseView.waysAtNode(target.id);
       const tagDiff = selectedTagDiff(source, target, context.options.propertyKeys);
       const property = nodePropertyAssessment(context, patchWays, baseWays, tagDiff);
       const attachment = nodeAttachmentAssessment(context, source, target, patchWays, baseWays);
@@ -731,16 +689,16 @@ function discoverWayCandidates(context: DiscoveryContext) {
   const candidates: OsmConflationCandidate[] = [];
   if (context.options.propertyKeys.length === 0 && !context.options.allowWayRemoval)
     return candidates;
-  for (const source of context.patch.ways.sorted()) {
+  for (const source of context.patchView.ways()) {
     if (context.provenance.isBase("way", source.id)) continue;
     if (
       !context.options.allowWayRemoval &&
       !context.options.propertyKeys.some((key) => source.tags?.[key] != null)
     )
       continue;
-    const sourceCoordinates = wayCoordinates(context.patch, source);
+    const sourceCoordinates = context.patchView.wayCoordinates(source);
     if (sourceCoordinates.length < 2) continue;
-    const nearbyIndexes = context.base.ways.intersects(
+    const nearbyWays = context.baseView.waysIntersecting(
       lineBbox(sourceCoordinates, context.options.maxDistanceMeters),
     );
     const matches: {
@@ -755,10 +713,9 @@ function discoverWayCandidates(context: DiscoveryContext) {
         | "featureTypeConflicts"
       >;
     }[] = [];
-    for (const index of nearbyIndexes) {
-      const target = context.base.ways.getByIndex(index);
+    for (const target of nearbyWays) {
       if (context.provenance.isPatch("way", target.id)) continue;
-      const targetCoordinates = wayCoordinates(context.base, target);
+      const targetCoordinates = context.baseView.wayCoordinates(target);
       if (targetCoordinates.length < 2) continue;
       const endpoints = endpointDistances(sourceCoordinates, targetCoordinates);
       if (Math.max(...endpoints.distances) > context.options.maxDistanceMeters) continue;
@@ -803,7 +760,7 @@ function discoverWayCandidates(context: DiscoveryContext) {
       // Multiple nearby base ways may represent a segmented equivalent. This version
       // deliberately reports that case instead of guessing a one-to-many mapping.
       const reasons: OsmConflationReasonCode[] =
-        nearbyIndexes.length > 1 ? ["unsupported-way-chain"] : [];
+        nearbyWays.length > 1 ? ["unsupported-way-chain"] : [];
       candidates.push({
         id: candidateId("way", source.id, null),
         entityType: "way",
@@ -890,15 +847,17 @@ export function discoverConflationCandidates(
   options: OsmConflationOptions,
 ): OsmConflationDiscovery {
   const resolved = resolvedOptions(options);
+  const baseView = osmDatasetView(base);
+  const patchView = osmDatasetView(patch);
   const context: DiscoveryContext = {
     base,
     patch,
     provenance: inputProvenance(base, patch),
     options: resolved,
-    baseWaysByNode: waysByNode(base),
-    patchWaysByNode: waysByNode(patch),
-    baseRelations: relationContext(base),
-    patchRelations: relationContext(patch),
+    baseView,
+    patchView,
+    baseRelations: baseView.relationMembership(),
+    patchRelations: patchView.relationMembership(),
   };
   const candidates = [
     ...discoverNodeCandidates(context),
