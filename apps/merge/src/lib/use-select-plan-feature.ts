@@ -1,8 +1,7 @@
-import { useMapPadding } from "@osmix/app-components";
+import { useMap, useMapPadding } from "@osmix/app-components";
 import { useOsmFile, useOsmixRemote } from "@osmix/app-core";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback } from "react";
-import { useMap } from "react-map-gl/maplibre";
 
 import { BASE_OSM_KEY } from "../settings";
 import { selectedPlanFeatureAtom } from "../state/merge-plan";
@@ -16,7 +15,7 @@ export function useSelectPlanFeature() {
   const base = useOsmFile(BASE_OSM_KEY);
   const setSelected = useSetAtom(selectedPlanFeatureAtom);
   const selected = useAtomValue(selectedPlanFeatureAtom);
-  const map = useMap().current;
+  const map = useMap();
   const mapPadding = useMapPadding();
   const baseOsmId = base.osm?.id;
   return useCallback(

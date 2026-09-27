@@ -138,8 +138,8 @@ export function ConflationWayRemovalPreview({
         </p>
         <p>
           {applied
-            ? "These explicit removals were applied during matching, before later intersection work."
-            : "This is the generated plan. The dataset changes only when you apply the cumulative merge. Changing a matching choice requires a new preview."}
+            ? "These removals were accepted in the plan and applied with it."
+            : "These removals are planned. The dataset changes only when you apply the plan."}
         </p>
         {removals.length ? (
           <ul className="flex min-w-0 flex-col divide-y" aria-label="Imported way removal plans">
