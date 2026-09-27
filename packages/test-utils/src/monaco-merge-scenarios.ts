@@ -91,8 +91,8 @@ export interface FeatureSpec {
 export type MergeRun = "automatic" | "reviewed";
 
 /**
- * What the merged result should hold for a feature. Ordinary stages (direct, exact,
- * intersections) behave the same in both runs; matching outcomes can name the `runs` they apply
+ * What the merged result should hold for a feature. Direct, identity and crossing
+ * outcomes are the same in both runs; matching outcomes can name the `runs` they apply
  * to (default: both).
  */
 export type StageExpectation = { runs?: MergeRun[] } & (
@@ -150,6 +150,7 @@ export interface CandidateExpectation {
 /** One scenario: a few features in their own part of Monaco, and what should happen. */
 export interface MergeScenario {
   id: string;
+  /** The plan phase the scenario exercises (`exact` is the identity phase). */
   stage: "direct" | "exact" | "matching" | "removal" | "intersection";
   description: string;
   features: FeatureSpec[];

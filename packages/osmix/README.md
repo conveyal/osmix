@@ -340,7 +340,7 @@ example that adds IndexedDB storage.
 
 `OsmixRemote` exposes the same helpers as the main import: `fromPbf`,
 `fromGeoJSON`, `getVectorTile`, `getRasterTile`, `search`, `merge`,
-`generateChangeset`, etc. Use `collectTransferables` + `transfer` when you
+`planMerge`, `getMergePlanPage`, `applyMergePlan`, etc. Use `collectTransferables` + `transfer` when you
 need to post Osmix payloads through your own worker setup.
 
 ### Routing with workers

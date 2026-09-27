@@ -46,10 +46,8 @@ function isEmpty(changes: OsmChangeRecords) {
  *
  * @example
  * ```ts
- * const changeset = new OsmChangeset(baseOsm)
- * changeset.generateDirectChanges(patchOsm)
- * changeset.deduplicateNodes(patchOsm.nodes)
- * const newOsm = applyChangesetToOsm(changeset)
+ * const changeset = planWithinDatasetDeduplication(osm)
+ * const cleaned = applyChangesetToOsm(changeset)
  * ```
  */
 export function applyChangesetToOsm(changeset: OsmChangeset, newOsmId?: string) {

@@ -18,7 +18,7 @@
 
 Layering (low → high):
 
-`@osmix/types` + `@osmix/geo` + `@osmix/shared` → `@osmix/pbf` + `@osmix/json` → `@osmix/load` → `@osmix/core` → converters (`geojson`, `geoparquet`, `gtfs`, `shapefile`, `change`, `router`, `vt`, `shortbread`, `raster`) → `osmix` facade → apps.
+`@osmix/types` + `@osmix/geo` + `@osmix/shared` → `@osmix/pbf` + `@osmix/json` → `@osmix/load` → `@osmix/core` → converters (`geojson`, `geoparquet`, `gtfs`, `shapefile`, `change`, `router`, `vt`, `shortbread`, `raster`; `change` uses `router` for routing topology) → `osmix` facade → apps.
 
 | Package                                                | Role                                                                         |
 | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
@@ -30,7 +30,7 @@ Layering (low → high):
 | `@osmix/json`                                          | PBF blocks ↔ JSON entities                                                   |
 | `@osmix/load`                                          | PBF streams → `Osm` indexes; extract and export                              |
 | `@osmix/core`                                          | In-memory `Osm` with spatial indexes; `OsmReader`/`OsmWriter` contracts      |
-| `@osmix/change`                                        | Changesets, dedup, merge                                                     |
+| `@osmix/change`                                        | Merge plans (planner, overlay, rulebook), within-dataset dedup, `merge()`    |
 | `@osmix/geojson` / `geoparquet` / `gtfs` / `shapefile` | Alternate import/export formats                                              |
 | `@osmix/raster` / `@osmix/vt` / `@osmix/shortbread`    | Tile encoders                                                                |
 | `@osmix/router`                                        | Routing graph and pathfinding                                                |

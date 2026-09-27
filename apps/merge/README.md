@@ -78,11 +78,11 @@ in-stream extraction remains available. The app does not build the large index s
 The [merge-process guide](../../docs/merge-process.md) owns the merge rules, examples, and known limitations. Read its [input identity requirements](../../docs/merge-process.md#inputs-and-identity) before combining independently prepared imports.
 
 1. Remove duplicates inside each input in [Inspect](../inspect/README.md), then load the base and patch in Full mode.
-2. Configure optional imported-data matching, check **Run every stage automatically, without review** or leave it off to review each stage, then choose **Start merge**.
-3. In the reviewed workflow, inspect previews and choose Copy tags, Connect network, and optional explicit Remove imported way independently.
-4. Complete application and intersection work, read the applied/unresolved summary, and download the result.
+2. Configure optional imported-data matching and how identical points and patch IDs are handled, then choose **Review plan** or **Apply automatically**.
+3. In the review, each imported feature shows its outcome and proposals. Include or leave out the proposals that need you (Copy tags, Connect network, Remove imported way, identical-point merges, crossings), download the plan as osmChange, and **Apply plan**.
+4. Read the completion summary and download the result.
 
-See [automatic and reviewed workflows](../../docs/merge-process.md#application-workflows) for the exact checkpoint order, cancellation boundaries, and recovery actions. Each numbered app stage also has a collapsed **How this step works** explanation. Matching discovery, scheduled actions, previews, and completed application are distinct states.
+See [Review plan and Apply automatically](../../docs/merge-process.md#application-workflows) for cancellation boundaries and recovery. Nothing changes until the plan is applied.
 
 ## Map & rendering stack
 

@@ -21,11 +21,28 @@ An ordered sequence of node references representing a line or an area boundary, 
 **OSM relation**:
 An ordered collection of typed entity references and roles representing a relationship such as a route, boundary, or turn restriction.
 
+**Merge plan**:
+Every change a merge would make, grouped by imported feature and decided before anything is applied. A plan is applied once, in one build.
+_Avoid_: Changeset, preview
+
+**Proposal**:
+One change in a plan, such as adding a feature, merging an identical point, connecting to the network, copying tags, removing a way, or connecting a crossing. It has a status (automatic, review, blocked) and an effect (applied, skipped, blocked, needs decision).
+_Avoid_: Candidate (a candidate is matching evidence; its actions become proposals)
+
+**Imported feature**:
+A patch way with its vertices, a patch node no patch way uses, or a patch relation: one row of the plan review.
+
+**Outcome**:
+The headline of an imported feature in a plan: needs decision, removed, merged, connected, replaced, added, or unchanged.
+
+**Decision**:
+An explicit include (accept) or leave out (reject) for a proposal. Clearing it restores the rule.
+
 **Direct merge**:
 The combination of patch-only additions, same-ID patch updates, and unchanged base-only entities.
 
 **Exact reconciliation**:
-The representation of different entity IDs by one base entity when their coordinates or ordered geometry and context agree.
+The representation of different entity IDs by one base entity when their coordinates or ordered geometry and context agree. In a plan these are identical-point merges.
 
 **Imported-data matching**:
 The comparison of nearby patch and base features to propose correspondences despite differences in their coordinates or geometry.
@@ -92,21 +109,21 @@ The user-facing choice to schedule geometry removal for one reviewed imported wa
 The removal of untagged imported points left without references by an explicitly removed way, by a network connection that replaced them, or by an intersection that reused a close vertex in their place.
 
 **Scheduled action**:
-An eligible matching action selected by the current automatic rules or saved choices for the next preview.
+A proposal the plan currently includes, by its automatic rule or a decision.
 
 **Automatic action**:
 A copying or connection action scheduled by configured rules without an individual selection.
 _Avoid_: Applied automatically, completed match
 
 **Applied action**:
-A matching action that changed the result when matching was applied, before intersection creation.
+A matching action that changed the result, as the matching outcome reports it before crossings.
 
 **Unresolved imported feature**:
 An imported feature with work still needing attention at the end of matching, such as an ambiguous target, a blocked action, or no available target.
 _Avoid_: Failed import
 
 **Retained imported feature**:
-An imported feature that remains after the reported merge stage.
+An imported feature that remains in the result.
 
 **Skip match**:
 A decision to schedule no matching action for a proposed correspondence while retaining the imported feature under the ordinary direct/exact merge rules.

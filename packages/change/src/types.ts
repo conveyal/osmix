@@ -223,7 +223,7 @@ export interface OsmConflationDecisionConflict {
   message: string;
 }
 
-/** Why an imported feature still needs matching review after generation. */
+/** Why an imported feature still still needs a matching decision after planning. */
 export type OsmConflationUnresolvedKind = "ambiguous" | "blocked" | "unmatched" | "review";
 
 /** Why a present, configured imported tag did not produce a surviving copy. */
