@@ -52,9 +52,11 @@ const TEXT_INSET = "ml-4";
 
 /**
  * A task or step in the activity tree: a status icon, title and right-aligned `meta` (a timer or
- * duration). With `children` it collapses, and nested rows hang off a guide line.
+ * duration), then `actions` (such as Cancel) outside the row's toggle. With `children` it
+ * collapses, and nested rows hang off a guide line.
  */
 export function ActivityItem({
+  actions,
   children,
   defaultOpen = false,
   detail,
@@ -64,6 +66,8 @@ export function ActivityItem({
   titleAttribute,
   topLevel = false,
 }: {
+  /** Controls after the row, outside its collapse toggle. */
+  actions?: ReactNode;
   children?: ReactNode;
   defaultOpen?: boolean;
   /** A live progress line shown under the title while running. */
@@ -93,25 +97,44 @@ export function ActivityItem({
   );
   const grid = cn(ITEM_GRID, "items-center py-1");
   if (!children) {
-    return (
-      <div data-slot="activity-item" data-status={status} className={grid} title={titleAttribute}>
+    const row = (
+      <div
+        data-slot="activity-item"
+        data-status={status}
+        className={cn(grid, actions && "min-w-0 flex-1")}
+        title={titleAttribute}
+      >
         <span />
         {header}
       </div>
     );
+    return actions ? (
+      <div className="flex items-center gap-1">
+        {row}
+        {actions}
+      </div>
+    ) : (
+      row
+    );
   }
   return (
     <Collapsible data-slot="activity-item" data-status={status} defaultOpen={defaultOpen}>
-      <CollapsibleTrigger
-        className={cn(grid, "group cursor-pointer rounded-sm focus-ring hover:bg-accent")}
-        title={titleAttribute}
-      >
-        <ChevronRightIcon
-          aria-hidden="true"
-          className="size-3 text-muted-foreground transition-transform group-data-panel-open:rotate-90"
-        />
-        {header}
-      </CollapsibleTrigger>
+      <div className="flex items-center gap-1">
+        <CollapsibleTrigger
+          className={cn(
+            grid,
+            "group min-w-0 flex-1 cursor-pointer rounded-sm focus-ring hover:bg-accent",
+          )}
+          title={titleAttribute}
+        >
+          <ChevronRightIcon
+            aria-hidden="true"
+            className="size-3 text-muted-foreground transition-transform group-data-panel-open:rotate-90"
+          />
+          {header}
+        </CollapsibleTrigger>
+        {actions}
+      </div>
       <CollapsibleContent>
         <div className={CHILDREN}>{children}</div>
       </CollapsibleContent>

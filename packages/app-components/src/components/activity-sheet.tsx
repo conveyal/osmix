@@ -1,4 +1,4 @@
-import { type ActivityEntry, type TaskNode, useTasks } from "@osmix/app-core";
+import { type ActivityEntry, type TaskNode, Tasks, useTasks } from "@osmix/app-core";
 import {
   ActivityError,
   ActivityItem,
@@ -7,6 +7,7 @@ import {
   EmptyState,
   formatDuration,
   formatTimestampMs,
+  IconButton,
   ScrollArea,
   Sheet,
   SheetContent,
@@ -14,17 +15,30 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@osmix/ui";
-import { useAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
+import { XIcon } from "lucide-react";
+import { useEffect } from "react";
 
-import { activitySheetOpenAtom } from "../state/activity.ts";
+import {
+  acknowledgedErrorIdAtom,
+  activitySheetOpenAtom,
+  latestErrorId,
+} from "../state/activity.ts";
 
-/** The session's activity history: tasks and their steps as a collapsible tree, newest first. */
+/**
+ * The session's activity history: tasks and their steps as a collapsible tree, newest first. A
+ * running task that allows it has Cancel. While open, every failure in it counts as seen.
+ */
 export function ActivitySheet() {
   const [open, setOpen] = useAtom(activitySheetOpenAtom);
+  const setAcknowledged = useSetAtom(acknowledgedErrorIdAtom);
   const { entries } = useTasks();
+  useEffect(() => {
+    if (open) setAcknowledged(latestErrorId(entries));
+  }, [open, entries, setAcknowledged]);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent side="right" className="w-full gap-0 sm:max-w-md">
+      <SheetContent side="right" className="gap-0 data-[side=right]:w-md">
         <SheetHeader className="border-b">
           <SheetTitle>Activity</SheetTitle>
           <SheetDescription>Tasks from this session, newest first</SheetDescription>
@@ -74,6 +88,7 @@ function ActivityEntryView({
 
 function TaskNodeView({ node, rootStartedAt }: { node: TaskNode; rootStartedAt: number }) {
   const open = node.status === "running" || node.status === "cancelling";
+  const cancelling = node.status === "cancelling";
   const showSummary = node.summary !== undefined && node.summary !== node.title;
   const hasBody = node.children.length > 0 || showSummary || node.error !== undefined;
   const finishedAt = node.endedAt ? ` · finished ${formatTimestampMs(node.endedAt)}` : "";
@@ -86,6 +101,17 @@ function TaskNodeView({ node, rootStartedAt }: { node: TaskNode; rootStartedAt: 
       defaultOpen={open || node.status === "error"}
       titleAttribute={`Started ${formatTimestampMs(node.startedAt)}${finishedAt}`}
       meta={<ElapsedTimer startedAt={node.startedAt} endedAt={node.endedAt} />}
+      actions={
+        node.kind === "task" && open && node.cancellable ? (
+          <IconButton
+            size="icon-xs"
+            label={cancelling ? "Cancelling…" : `Cancel ${node.title}`}
+            icon={<XIcon aria-hidden="true" />}
+            disabled={cancelling}
+            onClick={() => Tasks.cancel(node.id)}
+          />
+        ) : undefined
+      }
     >
       {hasBody ? (
         <>

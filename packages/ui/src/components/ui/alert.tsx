@@ -4,8 +4,12 @@ import type * as React from "react";
 
 import { cn } from "../../lib/utils.ts";
 
-const alertVariants = cva("flex gap-2 rounded-md border p-inset", {
+const alertVariants = cva("flex gap-2 p-inset", {
   variants: {
+    shape: {
+      box: "rounded-md border",
+      banner: "border-b",
+    },
     variant: {
       info: "border-info/40 bg-info/5 [&>svg]:text-info",
       success: "border-success/40 bg-success/5 [&>svg]:text-success",
@@ -13,7 +17,7 @@ const alertVariants = cva("flex gap-2 rounded-md border p-inset", {
       destructive: "border-destructive/40 bg-destructive/5 [&>svg]:text-destructive",
     },
   },
-  defaultVariants: { variant: "info" },
+  defaultVariants: { shape: "box", variant: "info" },
 });
 
 const ICONS = {
@@ -26,10 +30,12 @@ const ICONS = {
 /**
  * The only callout box: notices, warnings, failures and confirmations inside the sidebar or a
  * panel. `destructive` defaults to `role="alert"`; the other variants are passive notes. Pass
- * `title` for a bold first line and `action` for a trailing button.
+ * `title` for a bold first line and `action` for a trailing button. `shape="banner"` drops the
+ * box for a full-width strip with a bottom rule, for app-level notices under the nav.
  */
 function Alert({
   className,
+  shape,
   variant = "info",
   title,
   action,
@@ -44,7 +50,7 @@ function Alert({
       data-slot="alert"
       data-variant={variant}
       role={role ?? (variant === "destructive" ? "alert" : undefined)}
-      className={cn(alertVariants({ variant }), className)}
+      className={cn(alertVariants({ shape, variant }), className)}
       {...props}
     >
       <Icon aria-hidden="true" className="mt-px size-3.5 shrink-0" />

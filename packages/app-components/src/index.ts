@@ -1,3 +1,4 @@
+export { ActivityButton } from "./components/activity-button.tsx";
 export { ActivitySheet } from "./components/activity-sheet.tsx";
 export { AppLinks } from "./components/app-links.tsx";
 export { OsmixAppShell, OsmixNav } from "./components/app-shell.tsx";
@@ -24,7 +25,6 @@ export {
   type MapOverlayActions,
   type MapOverlayLayer,
   type MapOverlayLayout,
-  MapOverlaySlot,
   MapPanel,
   useMapAnnounce,
   useMapOverlayAction,
@@ -82,8 +82,16 @@ export { default as RouteLayer } from "./components/route-layer.tsx";
 export { RoutingInspector } from "./components/routing-tool.tsx";
 export { default as SelectedEntityLayer } from "./components/selected-entity-layer.tsx";
 export { StoredOsmList } from "./components/stored-osm-list.tsx";
-export { TaskIndicator } from "./components/task-indicator.tsx";
-export { QUIET_TASK_MS, TaskToasts, taskToasts } from "./components/task-toasts.tsx";
+export {
+  PROGRESS_TOAST_DELAY_MS,
+  QUIET_TASK_MS,
+  type TaskToastEvent,
+  type TaskToastRequest,
+  TaskToasts,
+  taskOutcomeToast,
+  taskToastEvents,
+  taskToastId,
+} from "./components/task-toasts.tsx";
 export { createOsmixAppRuntime, type OsmixAppRuntime, type OsmixAppStore } from "./bootstrap.ts";
 export {
   APPID,
@@ -132,7 +140,7 @@ export {
   osmixIdToTileUrl as osmixIdToVectorTileUrl,
   removeOsmixVectorProtocol,
 } from "./lib/osmix-vector-protocol.ts";
-export { activitySheetOpenAtom } from "./state/activity.ts";
+export { acknowledgedErrorIdAtom, activitySheetOpenAtom, latestErrorId } from "./state/activity.ts";
 export { nominatimPlaceAtom } from "./state/nominatim.ts";
 export {
   enterRoutingModeAtom,

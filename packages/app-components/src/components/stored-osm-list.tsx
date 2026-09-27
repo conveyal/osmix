@@ -235,7 +235,7 @@ export function StoredOsmList({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="flex flex-col items-stretch gap-2 p-inset lg:flex-row">
+        <div className="flex gap-2 p-inset">
           {isLoading ? (
             <Button
               variant="destructive"

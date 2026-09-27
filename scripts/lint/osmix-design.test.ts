@@ -60,3 +60,25 @@ tester.run("no-icon-size-button", rules["no-icon-size-button"], {
     { code: '<Button size={"icon"}><XIcon /></Button>', errors: [{ messageId: "iconButton" }] },
   ],
 });
+
+tester.run("no-breakpoint-variant", rules["no-breakpoint-variant"], {
+  valid: [
+    '<div className="flex gap-2 xl:gap-4" />',
+    '<div className="max-w-sm w-md max-h-3/5" />',
+    '<div className="small-window-only data-[side=right]:w-md" />',
+    'const size = { sm: "h-7", lg: "h-12" };',
+    'const url = "https://example.com";',
+  ],
+  invalid: [
+    { code: '<div className="hidden sm:flex" />', errors: [{ messageId: "breakpoint" }] },
+    { code: '<span className="hidden md:inline" />', errors: [{ messageId: "breakpoint" }] },
+    { code: 'cn("flex-col", "lg:flex-row")', errors: [{ messageId: "breakpoint" }] },
+    { code: '<div className="max-md:hidden" />', errors: [{ messageId: "breakpoint" }] },
+    {
+      code: '<div className="data-[side=left]:sm:max-w-sm" />',
+      errors: [{ messageId: "breakpoint" }],
+    },
+    { code: '<div className="min-[900px]:flex" />', errors: [{ messageId: "breakpoint" }] },
+    { code: "const c = `gap-2 md:gap-4`;", errors: [{ messageId: "breakpoint" }] },
+  ],
+});

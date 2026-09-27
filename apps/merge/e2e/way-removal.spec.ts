@@ -5,7 +5,7 @@ async function state(page: Page) {
 }
 
 async function capture(page: Page, testInfo: TestInfo, name: string) {
-  for (const width of [320, 512]) {
+  for (const width of [448, 512]) {
     await page.setViewportSize({ width, height: 1200 });
     const panel = page.getByTestId("removal-harness");
     await expect

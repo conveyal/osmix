@@ -110,7 +110,7 @@ test("automatic merge progress advances completed, running, and remaining steps"
 });
 
 test("loaded input cards remain usable and contained without loading a PBF", async ({ page }) => {
-  await page.setViewportSize({ width: 320, height: 900 });
+  await page.setViewportSize({ width: 448, height: 900 });
   const harness = page.getByTestId("input-card-harness");
   const baseCard = harness
     .locator('[data-slot="card"]')
@@ -152,7 +152,7 @@ test("loaded input cards remain usable and contained without loading a PBF", asy
 });
 
 test("workflow step actions remain contained at supported sidebar widths", async ({ page }) => {
-  for (const width of [320, 512]) {
+  for (const width of [448, 512]) {
     await page.setViewportSize({ width, height: 900 });
     const actionGroups = page.getByRole("group", { name: /step actions$/i });
     await expect(actionGroups).toHaveCount(3);
@@ -204,7 +204,7 @@ test("workflow step actions remain contained at supported sidebar widths", async
 });
 
 test("guidance and diagrams remain contained at supported sidebar widths", async ({ page }) => {
-  for (const width of [320, 512]) {
+  for (const width of [448, 512]) {
     await page.setViewportSize({ width, height: 800 });
     const trigger = page.getByRole("button", { name: "How this step works" });
     if ((await trigger.getAttribute("aria-expanded")) === "false") await trigger.click();
@@ -469,14 +469,14 @@ test.describe("matching action review", () => {
     await expectChoices(page, true, true);
   });
 
-  test("selected actions remain contained at 320 and 512 pixels", async ({ page }) => {
+  test("selected actions remain contained at 448 and 512 pixels", async ({ page }) => {
     const artifactDirectory = resolve(
       import.meta.dirname,
       "../../../output/playwright/pr-218-ticket07",
     );
     await mkdir(artifactDirectory, { recursive: true });
     await choose(page, "Connect network", false);
-    for (const width of [320, 512]) {
+    for (const width of [448, 512]) {
       await page.setViewportSize({ width, height: 1000 });
       const panel = harness(page).getByTestId("conflation-review-panel");
       await expectChoices(page, true, false);
@@ -700,7 +700,7 @@ test.describe("matching action review", () => {
       "../../../output/playwright/pr-218-ticket08",
     );
     await mkdir(artifactDirectory, { recursive: true });
-    for (const width of [320, 512]) {
+    for (const width of [448, 512]) {
       await page.setViewportSize({ width, height: 1000 });
       const panel = harness(page).getByTestId("conflation-review-panel");
       await expect
@@ -790,7 +790,7 @@ test("completion explains mixed matching results and downloads the retained repo
     "../../../output/playwright/pr-218-ticket09",
   );
   await mkdir(artifactDirectory, { recursive: true });
-  for (const width of [320, 512]) {
+  for (const width of [448, 512]) {
     await page.setViewportSize({ width, height: 1000 });
     await expect
       .poll(() => summary.evaluate((element) => element.scrollWidth <= element.clientWidth))

@@ -158,8 +158,48 @@ const noAsciiEllipsis: Rule = {
   },
 };
 
+/**
+ * A class token with a viewport breakpoint variant: `sm:`, `md:`, `lg:`, any `max-*:`, or an
+ * arbitrary `min-[…]:`. `xl:` and `2xl:` stay allowed.
+ */
+const BREAKPOINT_VARIANT = /(?:^|:)(?:sm|md|lg|max-[\w-]+|max-\[[^\]]*\]|min-\[[^\]]*\]):/;
+
+function hasBreakpointVariant(text: string): boolean {
+  return text.split(/\s+/).some((token) => BREAKPOINT_VARIANT.test(token));
+}
+
+/**
+ * The apps are desktop-only (1024px and wider), so layouts never switch on narrower breakpoints.
+ * Narrow windows get `SmallWindowAlert` instead.
+ */
+const noBreakpointVariant: Rule = {
+  meta: {
+    type: "problem",
+    docs: { description: "Disallow sm:, md:, lg: and max-* breakpoint variants." },
+    messages: {
+      breakpoint:
+        "The apps are desktop-only (1024px+): drop the sm:/md:/lg:/max-* variant and style for " +
+        "the desktop. See Supported viewports in packages/ui/DESIGN.md.",
+    },
+  },
+  create(context) {
+    return {
+      Literal(node) {
+        if (typeof node["value"] === "string" && hasBreakpointVariant(node["value"])) {
+          context.report({ node, messageId: "breakpoint" });
+        }
+      },
+      TemplateElement(node) {
+        const value = node["value"] as { raw: string };
+        if (hasBreakpointVariant(value.raw)) context.report({ node, messageId: "breakpoint" });
+      },
+    };
+  },
+};
+
 export const rules = {
   "no-ascii-ellipsis": noAsciiEllipsis,
+  "no-breakpoint-variant": noBreakpointVariant,
   "no-icon-size-button": noIconSizeButton,
   "no-native-radio": noNativeRadio,
   "no-raw-color": noRawColor,

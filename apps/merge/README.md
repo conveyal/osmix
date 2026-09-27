@@ -49,7 +49,7 @@ pnpm run --filter @osmix/merge test:e2e
 ```
 
 The worker harness loads `fixtures/monaco.pbf`; the guidance harness renders the real merge-step disclosure
-components and checks keyboard interaction, state isolation, and narrow-sidebar layout.
+components and checks keyboard interaction, state isolation, and layout at both sidebar widths (448px and 512px).
 
 ## Core workflow
 
@@ -99,7 +99,7 @@ See [automatic and reviewed workflows](../../docs/merge-process.md#application-w
 - Local PBF files are hashed incrementally from `File.stream()` in a worker, avoiding a second whole-file
   input buffer. PBF URLs are hashed while the parser consumes a single response, then re-keyed to the final
   lowercase SHA-256 without copying the dataset buffers.
-- Worker progress is proxied back to the shared `Tasks` store: it attaches to the running task and shows in the nav indicator and the Activity sheet.
+- Worker progress is proxied back to the shared `Tasks` store: it attaches to the running task and shows in the task toast and the Activity sheet.
 - Failed dataset loads remain visible beside their source controls and in Activity. The inline panel explains
   the failing phase, required and tested buffer sizes when available, an actionable next step, and expandable
   technical details; handled load failures do not leave an unhandled UI rejection.

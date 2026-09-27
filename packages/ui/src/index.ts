@@ -139,7 +139,13 @@ export {
   TooltipTrigger,
 } from "./components/ui/tooltip.tsx";
 export { Spinner } from "./components/ui/spinner.tsx";
-export { showToast, Toaster, toastManager, type ToastVariant } from "./components/ui/toast.tsx";
+export {
+  closeToast,
+  showToast,
+  Toaster,
+  toastManager,
+  type ToastVariant,
+} from "./components/ui/toast.tsx";
 export {
   Table,
   TableBody,
@@ -157,6 +163,5 @@ export {
   formatElapsedClock,
   formatTimestampMs,
 } from "./lib/format.ts";
-export { useIsMobile } from "./hooks/use-mobile.ts";
 export { cn } from "./lib/utils.ts";
 export { sidebarIsOpenAtom } from "./state/layout.ts";

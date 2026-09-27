@@ -58,7 +58,7 @@ export function unionBboxes(bboxes: Iterable<GeoBbox2D | null | undefined>): Geo
 }
 
 /**
- * The top-right column of map tools: zoom, fit to all loaded data, the search toggle, the
+ * The top-left column of map tools: zoom, fit to all loaded data, the search toggle, the
  * basemap menu and, with `routing`, the routing tool. The search panel's open state belongs to
  * the parent (`OsmixMap`), which renders `MapSearch` beside this toolbar: `searchOpen` and
  * `searchPanelId` name it in `aria-expanded`/`aria-controls`, and `onToggleSearch` flips it.
@@ -105,21 +105,21 @@ export function MapToolbar({
       <div className="flex flex-col">
         <IconButton
           size="icon"
-          tooltipSide="left"
+          tooltipSide="right"
           label="Zoom in"
           icon={<PlusIcon aria-hidden="true" />}
           onClick={() => map?.zoomIn()}
         />
         <IconButton
           size="icon"
-          tooltipSide="left"
+          tooltipSide="right"
           label="Zoom out"
           icon={<MinusIcon aria-hidden="true" />}
           onClick={() => map?.zoomOut()}
         />
         <IconButton
           size="icon"
-          tooltipSide="left"
+          tooltipSide="right"
           label="Fit map to all data"
           icon={<MaximizeIcon aria-hidden="true" />}
           disabled={!dataBbox}
@@ -131,7 +131,7 @@ export function MapToolbar({
       <div className="flex flex-col border-t">
         <IconButton
           size="icon"
-          tooltipSide="left"
+          tooltipSide="right"
           id={mapSearchToggleId(searchPanelId)}
           label="Open map search"
           aria-expanded={searchOpen}
@@ -141,7 +141,7 @@ export function MapToolbar({
         />
         <Menu>
           <MenuIconTrigger
-            tooltipSide="left"
+            tooltipSide="right"
             label="Basemap"
             icon={<MapIcon aria-hidden="true" />}
           />
@@ -176,7 +176,7 @@ export function MapToolbar({
         {routing ? (
           <IconButton
             size="icon"
-            tooltipSide="left"
+            tooltipSide="right"
             label="Route between two points"
             aria-pressed={routingActive}
             disabled={!canRoute}

@@ -174,20 +174,22 @@
   --app-hue: oklch(0.55 0.21 350);
 }
 
-/* Sidebar width steps with the viewport (the sheet on mobile sets its own). */
+/* Sidebar width: 28rem, 32rem on wide windows. The apps are desktop-only (1024px+). */
 [data-slot="sidebar-wrapper"] {
-  --sidebar-width: 20rem;
-
-  @media (width >= 48rem) {
-    --sidebar-width: 24rem;
-  }
-
-  @media (width >= 64rem) {
-    --sidebar-width: 28rem;
-  }
+  --sidebar-width: 28rem;
 
   @media (width >= 80rem) {
     --sidebar-width: 32rem;
+  }
+}
+
+/*
+ * Shown only in windows narrower than the apps' supported minimum (1024px, 64rem). The one
+ * viewport switch the apps allow; see "Supported viewports" in DESIGN.md.
+ */
+@utility small-window-only {
+  @media (width >= 64rem) {
+    display: none;
   }
 }
 

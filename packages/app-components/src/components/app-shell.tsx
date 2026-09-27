@@ -16,20 +16,21 @@ import { MapProvider } from "react-map-gl/maplibre";
 
 import type { OsmixAppStore } from "../bootstrap.ts";
 import type { OsmixAppId } from "../lib/app-origin.ts";
+import { ActivityButton } from "./activity-button.tsx";
 import { ActivitySheet } from "./activity-sheet.tsx";
 import { AppLinks } from "./app-links.tsx";
 import BrowserCheck from "./browser-check.tsx";
-import { TaskIndicator } from "./task-indicator.tsx";
+import { SmallWindowAlert } from "./small-window-alert.tsx";
 import { TaskToasts } from "./task-toasts.tsx";
 
-/** The standard top bar: brand, links to the sibling apps, the task indicator, the system check. */
+/** The standard top bar: brand, links to the sibling apps, the system check, then Activity. */
 export function OsmixNav({ current }: { current: OsmixAppId }) {
   return (
     <Nav
       start={<SidebarTrigger />}
       links={<AppLinks current={current} />}
-      status={<TaskIndicator />}
       end={<BrowserCheck />}
+      trailing={<ActivityButton />}
     />
   );
 }
@@ -61,6 +62,7 @@ export function OsmixAppShell({
               <TaskLock>
                 <OsmixSidebarProvider>
                   <OsmixNav current={app} />
+                  <SmallWindowAlert />
                   <Suspense fallback={<LoadingState />}>{children}</Suspense>
                 </OsmixSidebarProvider>
                 <ActivitySheet />

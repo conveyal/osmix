@@ -116,10 +116,10 @@ function isInsidePopup(target: EventTarget | null): boolean {
  * panels inside it (`MapPanel`) are clickable and MapLibre's own bottom-right controls stay
  * reachable. Regions:
  *
- * - `toolbar`: the top-right row (the search panel, when open, then the toolbar).
- * - `inspector`: under the toolbar row when `docked`, else a strip along the bottom edge.
+ * - `toolbar`: the top-left row (the toolbar, then the search panel when open).
+ * - `inspector`: the top-right corner when `docked`, else a strip along the bottom edge.
  * - `legend`: the bottom-left corner.
- * - `children`: extras, positioned with `MapOverlaySlot`.
+ * - `children`: extras, positioned by the caller.
  *
  * It measures its own width to decide `docked` (`useMapOverlayLayout`), owns the single Esc
  * dispatcher (`useMapOverlayActions`) and a polite live region (`useMapAnnounce`).
@@ -214,16 +214,19 @@ export function MapOverlay({
               <span key={announcement.nonce}>{announcement.text}</span>
             </div>
             <div
-              data-slot="map-overlay-top-right"
-              className={cn(
-                "absolute inset-x-2 top-2 flex flex-col items-end gap-2",
-                layout.docked && "bottom-16",
-              )}
+              data-slot="map-overlay-top-left"
+              className="absolute top-2 right-2 left-2 flex items-start gap-2"
             >
-              <div className="flex max-w-full items-start justify-end gap-2">{toolbar}</div>
-              {layout.docked ? inspector : null}
+              {toolbar}
             </div>
-            {layout.docked ? null : (
+            {layout.docked ? (
+              <div
+                data-slot="map-overlay-top-right"
+                className="absolute top-2 right-2 bottom-16 flex w-full max-w-sm flex-col items-end"
+              >
+                {inspector}
+              </div>
+            ) : (
               // Spans the map's height so the inspector's max-height has something to resolve
               // against; the panel sits at the bottom of the strip.
               <div
@@ -241,31 +244,6 @@ export function MapOverlay({
         </AnnounceContext>
       </ActionsContext>
     </LayoutContext>
-  );
-}
-
-const SLOT_POSITIONS = {
-  "top-left": "absolute top-2 left-2",
-} as const;
-
-/** An extra overlay region for app-specific panels; unused by the shared map today. */
-export function MapOverlaySlot({
-  position,
-  className,
-  children,
-}: {
-  position: keyof typeof SLOT_POSITIONS;
-  className?: string;
-  children?: ReactNode;
-}) {
-  return (
-    <div
-      data-slot="map-overlay-slot"
-      data-position={position}
-      className={cn(SLOT_POSITIONS[position], className)}
-    >
-      {children}
-    </div>
   );
 }
 

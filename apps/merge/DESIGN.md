@@ -13,7 +13,7 @@ tokens, spacing, primitives, map overlay primitives) lives in
   without stopping) and the one regular "Start merge" `Button`. The only
   visible help is the reason the checkbox is disabled during removal review.
 - `StepActions` — the full-width vertical action footer for Merge workflow
-  stages. It keeps long decision labels contained in the narrow sidebar.
+  stages. It keeps long decision labels contained in the sidebar.
 - `AutomaticMergeProgress` — a `Card` listing the automatic workflow's stages
   (completed, running, remaining) with the latest worker line, an elapsed
   timer, and each stage's own duration. `LiveAutomaticMergeProgress` reads all
@@ -122,7 +122,7 @@ Show finite distances with meters. Distinguish no eligible target within the sea
 
 Compare base and imported geometry using both shape and color: a base circle and solid line, an imported diamond and dashed line. Keep a visible text legend. Co-located points must remain distinguishable at their true coordinates; do not offset a marker to separate them. Coordinate evidence must come from the same highlighted geometry, with explicit Latitude and Longitude labels and selectable values. For a way, identify its start and end instead of implying a single point represents the whole geometry. Changing or clearing the comparison must update map and text together without changing matching decisions.
 
-Associate controls with visible labels and persistent concise help through `aria-describedby`; optional popovers may add detail. Match filters and the completion summary's pickers use `NativeSelect` with a `<label htmlFor>`; a filter's "All …" option has the empty value and clears that filter. Associate field errors with the relevant input and mark it invalid. Expose selection and expanded states, retain visible keyboard focus, and give evidence a named region. During a pending choice, keep eligible radios and checkboxes focusable, expose their temporary disabled state, and block repeated changes in their handlers; permanently ineligible controls remain disabled. Focus indicators must remain visible in forced-colors mode. Explain protected and routing-affecting attributes in text as well as row styling. Keep evidence and long attribute values readable at 320 px and 512 px; use stacked values when a three-column diff would force horizontal scrolling.
+Associate controls with visible labels and persistent concise help through `aria-describedby`; optional popovers may add detail. Match filters and the completion summary's pickers use `NativeSelect` with a `<label htmlFor>`; a filter's "All …" option has the empty value and clears that filter. Associate field errors with the relevant input and mark it invalid. Expose selection and expanded states, retain visible keyboard focus, and give evidence a named region. During a pending choice, keep eligible radios and checkboxes focusable, expose their temporary disabled state, and block repeated changes in their handlers; permanently ineligible controls remain disabled. Focus indicators must remain visible in forced-colors mode. Explain protected and routing-affecting attributes in text as well as row styling. Keep evidence and long attribute values readable at 448 px and 512 px (the sidebar widths at 1024px and 1280px windows); use stacked values when a three-column diff would force horizontal scrolling.
 
 Provide **Back to matching** from reconciliation, failed cumulative generation,
 and the cumulative matching preview before application. Returning preserves the
@@ -158,7 +158,7 @@ picture. Merge diagrams follow these constraints:
 - Set connector strokes to `vector-effect="non-scaling-stroke"` so they remain
   legible at narrow widths.
 - Avoid animation and `<foreignObject>`. SVG text must remain understandable at
-  both 320 px and 512 px sidebar widths.
+  both 448 px and 512 px sidebar widths.
 
 ### Browser test boundaries
 
@@ -183,8 +183,8 @@ replication, recovery, and disposal coverage.
 - Suspense fallbacks and transitions: `LoadingState` ("Please wait…").
 - Every merge operation (a review stage, candidate discovery, the automatic
   run, JSON export) is a top-level task (`Tasks.run` / `Tasks.start` from
-  `@osmix/app-core`), so it shows in the nav indicator and Activity and gets a
-  toast when it finishes. Only one runs at a time: the stage buttons read
+  `@osmix/app-core`), so it gets a task toast (progress, then its outcome) and
+  shows in Activity. Only one runs at a time: the stage buttons read
   `useTaskLock()`. Sub-work is a step (`task.step` / `task.runStep`).
 - The automatic workflow: `AutomaticMergeProgress`. Worker progress
   (`@osmix/shared` `Progress`) is `{ msg, timestamp, level }` with no numeric

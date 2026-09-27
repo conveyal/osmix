@@ -267,7 +267,7 @@ test("school and cafe classifications block both actions when only name is selec
 
   const directory = resolve(import.meta.dirname, "../../../output/playwright/ticket11");
   await mkdir(directory, { recursive: true });
-  for (const width of [320, 512]) {
+  for (const width of [448, 512]) {
     await page.setViewportSize({ width, height: 900 });
     await settleMap(page);
     await expectContained(review(page));
@@ -426,7 +426,7 @@ test("coincident point shapes remain distinct and way evidence wraps at narrow w
   await expect(
     map.locator('[data-slot="comparison-marker-symbol"][data-role="source"] path'),
   ).toHaveCount(1);
-  for (const width of [320, 512]) {
+  for (const width of [448, 512]) {
     await page.setViewportSize({ width, height: 1000 });
     await settleMap(page);
     await expectContained(comparison(page));
@@ -470,7 +470,7 @@ test("coincident point shapes remain distinct and way evidence wraps at narrow w
   expect(importedLine?.type === "line" ? importedLine.paint?.["line-dasharray"] : null).toEqual([
     2, 2,
   ]);
-  for (const width of [320, 512]) {
+  for (const width of [448, 512]) {
     await page.setViewportSize({ width, height: 1000 });
     await settleMap(page);
     await expectContained(review(page));

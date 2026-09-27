@@ -95,7 +95,8 @@
               }
             ]
           }
-        ]
+        ],
+        "osmix/no-breakpoint-variant": "error"
       }
     },
     {

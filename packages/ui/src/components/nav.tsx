@@ -5,25 +5,24 @@ import { Separator } from "./ui/separator.tsx";
 
 /**
  * The top bar shared by the Osmix apps, one `--header-height` tall with a single `gap-3`
- * rhythm. Left: `start` (the sidebar trigger), the brand, a rule, and `links`. Centre:
- * `status` (which must provide its own compact form below `md`). Right: `controls`, a rule,
- * `end`, and the GitHub link. `controls` is for app-specific controls and is empty by default;
- * the map's own tools live on the map.
+ * rhythm. Left: `start` (the sidebar trigger), the brand, a rule, and `links`. Right: `controls`,
+ * a rule, `end` and the GitHub link, then `trailing`. `controls` is for app-specific controls and is empty by default; the map's own
+ * tools live on the map.
  */
 export function Nav({
   brand = "OSMIX",
   start,
   links,
-  status,
   controls,
   end,
+  trailing,
 }: {
   brand?: ReactNode;
   start?: ReactNode;
   links?: ReactNode;
-  status?: ReactNode;
   controls?: ReactNode;
   end?: ReactNode;
+  trailing?: ReactNode;
 }) {
   return (
     <nav
@@ -37,7 +36,7 @@ export function Nav({
           className="flex items-center gap-2 font-mono font-bold tracking-widest"
         >
           <span aria-hidden="true" className="brand-mark" />
-          <span className="hidden sm:inline">{brand}</span>
+          <span>{brand}</span>
         </span>
         {links ? (
           <>
@@ -46,12 +45,9 @@ export function Nav({
           </>
         ) : null}
       </div>
-      <div className="flex min-w-0 flex-1 items-center justify-center">
-        <div className="flex min-w-0 overflow-hidden">{status}</div>
-      </div>
-      <div className="flex h-full shrink-0 items-center gap-1">
+      <div className="ml-auto flex h-full shrink-0 items-center gap-1">
         {controls}
-        <div className="hidden h-full items-center gap-1 sm:flex">
+        <div className="flex h-full items-center gap-1">
           <NavSeparator />
           {end}
           <IconButton
@@ -66,6 +62,12 @@ export function Nav({
             }
           />
         </div>
+        {trailing ? (
+          <>
+            <NavSeparator />
+            {trailing}
+          </>
+        ) : null}
       </div>
     </nav>
   );

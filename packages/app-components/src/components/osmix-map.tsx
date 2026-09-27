@@ -107,16 +107,16 @@ export function OsmixMap({
         <MapOverlay
           toolbar={
             <>
-              <MapSearch
-                id={searchPanelId}
-                open={searchOpen}
-                onClose={() => setSearchOpen(false)}
-              />
               <MapToolbar
                 routing={routing}
                 searchOpen={searchOpen}
                 onToggleSearch={() => setSearchOpen((open) => !open)}
                 searchPanelId={searchPanelId}
+              />
+              <MapSearch
+                id={searchPanelId}
+                open={searchOpen}
+                onClose={() => setSearchOpen(false)}
               />
             </>
           }
