@@ -9,7 +9,6 @@ import {
   Tasks,
   useOsmixRemote,
   type UseOsmFileReturn,
-  WITHIN_DATASET_DEDUPLICATION_OPTIONS,
 } from "@osmix/app-core";
 import {
   ActionButton,
@@ -113,11 +112,7 @@ export function DuplicateFixes({ osmFile }: { osmFile: UseOsmFileReturn }) {
     await Tasks.run(
       "Find duplicate nodes and ways",
       async () => {
-        const stats = await remote.generateChangeset(
-          osm.id,
-          osm.id,
-          WITHIN_DATASET_DEDUPLICATION_OPTIONS,
-        );
+        const stats = await remote.planDeduplication(osm.id);
         setChangesetStats(stats);
         return stats;
       },

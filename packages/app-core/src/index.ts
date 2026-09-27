@@ -12,7 +12,6 @@ export {
   type BrowserLoadCapabilities,
   getBrowserLoadCapabilities,
 } from "./lib/browser-capabilities.ts";
-export { WITHIN_DATASET_DEDUPLICATION_OPTIONS } from "./lib/changeset-options.ts";
 export { committedMutationOsmId } from "./lib/committed-mutation.ts";
 export { fetchOsmFileFromUrl } from "./lib/fetch-osm-file.ts";
 export {
