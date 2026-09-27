@@ -115,9 +115,20 @@ describe("merge-process guide", () => {
       { id: 10, refs: [1, 303, 2], tags: { highway: "footway", name: "Base sidewalk" } },
       { id: 30, refs: [301, 303, 302], tags: { highway: "footway", name: "New link" } },
     ]);
-    expect(entities(await merge(base, patch, { matching: conflation }, () => {}))).toEqual(
-      entities(final),
-    );
+    // merge() plans the same result in one pass; its new crossing node is a new entity, so it
+    // gets a negative ID where the staged changeset allocated 303.
+    const merged = await merge(base, patch, { matching: conflation }, () => {});
+    expect(merged.nodes.getById(-1)).toEqual({ ...final.nodes.getById(303), id: -1 });
+    const renumber = (ref: number) => (ref === 303 ? -1 : ref);
+    const expected = entities(final);
+    expect(entities(merged)).toEqual({
+      nodes: [
+        { ...final.nodes.getById(303)!, id: -1 },
+        ...expected.nodes.filter((node) => node.id !== 303),
+      ],
+      ways: expected.ways.map((way) => ({ ...way, refs: way.refs.map(renumber) })),
+      relations: expected.relations,
+    });
     expect(entities(base)).toEqual(originalBase);
     expect(entities(patch)).toEqual(originalPatch);
     await expectEntityRoundTrip(final);

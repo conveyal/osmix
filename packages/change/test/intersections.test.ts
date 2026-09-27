@@ -289,7 +289,8 @@ describe("intersection geometry integrity", () => {
 
     const baseWay = result.ways.getById(10)!;
     const patchWay = result.ways.getById(20)!;
-    const generatedRefs = patchWay.refs.filter((ref) => ref > 102);
+    // New crossing nodes get negative IDs.
+    const generatedRefs = patchWay.refs.filter((ref) => ref < 0);
 
     expect(patchWay.refs).toContain(2);
     expect(generatedRefs).toHaveLength(1);

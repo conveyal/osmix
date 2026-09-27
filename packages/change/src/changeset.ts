@@ -451,11 +451,14 @@ export class OsmChangeset {
     return this.overlay.changes(type);
   }
 
+  /** 1 allocates above every node (staged changesets); -1 allocates below (plans). */
+  private nodeIdStep: 1 | -1 = 1;
+
   nextNodeId() {
     if (!Number.isSafeInteger(this.currentNodeId)) {
       throw Error("Cannot allocate node ID outside the safe integer range");
     }
-    const nextId = this.currentNodeId + 1;
+    const nextId = this.currentNodeId + this.nodeIdStep;
     if (!Number.isSafeInteger(nextId)) {
       throw Error("Cannot allocate node ID outside the safe integer range");
     }
@@ -1208,10 +1211,12 @@ export class OsmChangeset {
     patchNodeIds: { has(id: number): boolean },
     accept?: (crossing: CrossingInsertion) => boolean,
   ) {
-    // Allocate after every node the planned state holds, as a build of it would.
-    let maximum: number | null = null;
-    for (const node of this.overlay.nodes()) maximum = Math.max(maximum ?? node.id, node.id);
-    this.currentNodeId = maximum ?? EMPTY_ID;
+    // New crossing nodes are new entities, so they get negative IDs, below every node the
+    // planned state holds.
+    let minimum = 0;
+    for (const node of this.overlay.nodes()) minimum = Math.min(minimum, node.id);
+    this.currentNodeId = minimum;
+    this.nodeIdStep = -1;
     yield* this.createIntersections(ways, this.overlayCrossingSearch(), patchNodeIds, accept);
   }
 

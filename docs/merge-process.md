@@ -141,20 +141,20 @@ flowchart TD
 | Exact nodes                  | `1, 2, 201, 301, 302`           | `20` becomes `[1,2]`; other ways unchanged           | None                                                                                   |
 | Exact ways / ordinary result | Same as above                   | `10:[1,2]`, `30:[301,302]`; `20` represented by `10` | Base name wins; `Survey sidewalk` does not replace `Base sidewalk`                     |
 | Imported-data matching       | Same as above                   | Unchanged                                            | Node `1` gains `tactile_paving=yes`; `201` remains with its original position and tags |
-| Intersections / final result | `1, 2, 201, 301, 302, 303`      | `10:[1,303,2]`, `30:[301,303,302]`                   | New node `303` at `(0.00075,0)` has `crossing=yes`                                     |
+| Intersections / final result | `-1, 1, 2, 201, 301, 302`       | `10:[1,-1,2]`, `30:[301,-1,302]`                     | New node `-1` at `(0.00075,0)` has `crossing=yes`                                      |
 
 Exact reconciliation uses coordinates and ordered references, so it can represent `101`, `102`, and `20` by base entities without proximity matching. Matching finds `201 → 1` from the original inputs. Copying its tag does not remove `201`. Intersection creation then adds a shared point; it retains both way IDs.
 
 ```mermaid
 flowchart LR
-  N1["1: tactile_paving=yes"] ---|"way 10"| N303["303: crossing=yes"]
-  N303 ---|"way 10"| N2["2"]
-  N301["301"] ---|"way 30"| N303
-  N303 ---|"way 30"| N302["302"]
+  N1["1: tactile_paving=yes"] ---|"way 10"| NX["-1: crossing=yes"]
+  NX ---|"way 10"| N2["2"]
+  N301["301"] ---|"way 30"| NX
+  NX ---|"way 30"| N302["302"]
   N201["201 remains: tactile_paving=yes"]
 ```
 
-The six final nodes and two ways, their tags, and their references are asserted in [MP-E1](../packages/osmix/test/merge-process.test.ts), including PBF export and reload. `303` is the allocated ID for this fixture, not a universal crossing ID. Source datasets are also checked unchanged. This test verifies entity preservation through export, not replication-header correctness; see [G4](#gap-g4).
+The six final nodes and two ways, their tags, and their references are asserted in [MP-E1](../packages/osmix/test/merge-process.test.ts), including PBF export and reload. A new crossing node is a new entity, so it gets the next negative ID below every node in the planned result (`-1` here). Source datasets are also checked unchanged. This test verifies entity preservation through export, not replication-header correctness; see [G4](#gap-g4).
 
 <a id="defaults-and-stage-order"></a>
 

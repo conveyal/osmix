@@ -56,19 +56,46 @@ const cases: [string, () => { base: Osm; patch: Osm }][] = [
   ["the synthetic conflation network", () => createSyntheticConflationRoutingInputs()],
 ];
 
-/** The merged content hash, or the error that rejected the merge: both must match. */
-async function outcome(run: () => Osm | Promise<Osm>) {
+/**
+ * The merged content, or the error that rejected the merge: both must match. Nodes neither
+ * input has are crossing nodes; the staged pipeline numbers them above every node and a plan
+ * below, so they are compared by position instead of ID.
+ */
+async function outcome(run: () => Osm | Promise<Osm>, inputs: { base: Osm; patch: Osm }) {
   try {
-    return { contentHash: (await run()).contentHash() };
+    return { content: canonical(await run(), inputs) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
 }
 
+function canonical(osm: Osm, { base, patch }: { base: Osm; patch: Osm }) {
+  const created = [...osm.nodes]
+    .filter((node) => !base.nodes.ids.has(node.id) && !patch.nodes.ids.has(node.id))
+    .toSorted((a, b) => a.lon - b.lon || a.lat - b.lat);
+  const token = new Map(created.map((node, index) => [node.id, `new-${index}`]));
+  const ref = (id: number) => token.get(id) ?? id;
+  return {
+    nodes: [...osm.nodes.sorted()]
+      .map((node) => ({ ...node, id: ref(node.id) }))
+      .toSorted((a, b) => String(a.id).localeCompare(String(b.id))),
+    ways: [...osm.ways.sorted()].map((way) => ({ ...way, refs: way.refs.map(ref) })),
+    relations: [...osm.relations.sorted()].map((relation) => ({
+      ...relation,
+      members: relation.members.map((member) =>
+        member.type === "node" ? { ...member, ref: ref(member.ref) } : member,
+      ),
+    })),
+  };
+}
+
 describe("plan versus staged merge", () => {
   it.each(cases)("direct changes match on %s", async (_name, inputs) => {
     const { base, patch } = inputs();
-    const expected = await outcome(() => stagedMerge(base, patch, { directMerge: true }, quiet));
+    const expected = await outcome(() => stagedMerge(base, patch, { directMerge: true }, quiet), {
+      base,
+      patch,
+    });
     const actual = await outcome(
       () =>
         applyPlan(
@@ -79,6 +106,7 @@ describe("plan versus staged merge", () => {
             quiet,
           ),
         ).osm,
+      { base, patch },
     );
     expect(actual).toEqual(expected);
   });
@@ -86,9 +114,10 @@ describe("plan versus staged merge", () => {
   it.each(cases)("identical points and ways match on %s", async (_name, inputs) => {
     const { base, patch } = inputs();
     const exact = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
-    const expected = await outcome(() => stagedMerge(base, patch, exact, quiet));
+    const expected = await outcome(() => stagedMerge(base, patch, exact, quiet), { base, patch });
     const actual = await outcome(
       () => applyPlan(planMerge(base, patch, { createIntersections: false }, quiet)).osm,
+      { base, patch },
     );
     expect(actual).toEqual(expected);
   });
@@ -101,11 +130,13 @@ describe("plan versus staged merge", () => {
   it.each(cases)("automatic matching matches on %s", async (_name, inputs) => {
     const { base, patch } = inputs();
     const staged = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
-    const expected = await outcome(() =>
-      stagedMerge(base, patch, { ...staged, conflation: matching }, quiet),
+    const expected = await outcome(
+      () => stagedMerge(base, patch, { ...staged, conflation: matching }, quiet),
+      { base, patch },
     );
     const actual = await outcome(
       () => applyPlan(planMerge(base, patch, { matching, createIntersections: false }, quiet)).osm,
+      { base, patch },
     );
     expect(actual).toEqual(expected);
   });
@@ -118,8 +149,11 @@ describe("plan versus staged merge", () => {
       deduplicateWays: true,
       createIntersections: true,
     };
-    const expected = await outcome(() => stagedMerge(base, patch, all, quiet));
-    const actual = await outcome(() => applyPlan(planMerge(base, patch, {}, quiet)).osm);
+    const expected = await outcome(() => stagedMerge(base, patch, all, quiet), { base, patch });
+    const actual = await outcome(() => applyPlan(planMerge(base, patch, {}, quiet)).osm, {
+      base,
+      patch,
+    });
     expect(actual).toEqual(expected);
   });
 
@@ -132,8 +166,11 @@ describe("plan versus staged merge", () => {
       createIntersections: true,
       conflation: matching,
     };
-    const expected = await outcome(() => stagedMerge(base, patch, all, quiet));
-    const actual = await outcome(() => applyPlan(planMerge(base, patch, { matching }, quiet)).osm);
+    const expected = await outcome(() => stagedMerge(base, patch, all, quiet), { base, patch });
+    const actual = await outcome(() => applyPlan(planMerge(base, patch, { matching }, quiet)).osm, {
+      base,
+      patch,
+    });
     expect(actual).toEqual(expected);
   });
 
@@ -148,20 +185,24 @@ describe("plan versus staged merge", () => {
         ...(candidate.wayRemoval?.status === "review" ? { removeWay: true } : {}),
       }));
     const staged = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
-    const expected = await outcome(() =>
-      stagedMerge(base, patch, { ...staged, conflation: { ...matching, decisions } }, quiet),
+    const expected = await outcome(
+      () => stagedMerge(base, patch, { ...staged, conflation: { ...matching, decisions } }, quiet),
+      { base, patch },
     );
-    const actual = await outcome(() => {
-      const options = { matching, createIntersections: false };
-      const undecided = planMerge(base, patch, options, quiet);
-      const plan = planMerge(
-        base,
-        patch,
-        { ...options, decisions: planDecisions(undecided, decisions) },
-        quiet,
-      );
-      return applyPlan(plan).osm;
-    });
+    const actual = await outcome(
+      () => {
+        const options = { matching, createIntersections: false };
+        const undecided = planMerge(base, patch, options, quiet);
+        const plan = planMerge(
+          base,
+          patch,
+          { ...options, decisions: planDecisions(undecided, decisions) },
+          quiet,
+        );
+        return applyPlan(plan).osm;
+      },
+      { base, patch },
+    );
     expect(actual).toEqual(expected);
   });
 });
