@@ -100,6 +100,7 @@ export {
   nearestNodeOnWay,
   osmTagsToOscTags,
   planMerge,
+  planWithinDatasetDeduplication,
   removeDuplicateAdjacentRelationMembers,
   removeDuplicateAdjacentWayRefs,
   resolveConflationActions,

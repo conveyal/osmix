@@ -60,6 +60,7 @@ export {
   planMerge,
   setMergePlanDecisions,
 } from "./plan/plan.ts";
+export { planWithinDatasetDeduplication } from "./plan/deduplication.ts";
 export * from "./plan/types.ts";
 export * from "./types.ts";
 export * from "./utils.ts";
