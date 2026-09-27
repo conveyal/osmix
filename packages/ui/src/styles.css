@@ -160,6 +160,14 @@
   --map-route: var(--info);
   --map-route-error: var(--destructive);
   --map-bbox: var(--brand);
+  /* Merge plan outcomes. Each pairs with a label in the plan legend. */
+  --map-outcome-added: var(--success);
+  --map-outcome-replaced: var(--warning);
+  --map-outcome-merged: oklch(0.3 0.02 60);
+  --map-outcome-connected: var(--info);
+  --map-outcome-removed: var(--destructive);
+  --map-outcome-decision: oklch(0.52 0.19 295);
+  --map-outcome-unchanged: var(--muted-foreground);
 }
 
 :root[data-app="merge"] {

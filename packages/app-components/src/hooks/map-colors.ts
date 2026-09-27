@@ -10,6 +10,13 @@ const MAP_COLOR_TOKENS = {
   route: "--map-route",
   routeError: "--map-route-error",
   bbox: "--map-bbox",
+  outcomeAdded: "--map-outcome-added",
+  outcomeReplaced: "--map-outcome-replaced",
+  outcomeMerged: "--map-outcome-merged",
+  outcomeConnected: "--map-outcome-connected",
+  outcomeRemoved: "--map-outcome-removed",
+  outcomeDecision: "--map-outcome-decision",
+  outcomeUnchanged: "--map-outcome-unchanged",
 } as const;
 
 export type MapColorRole = keyof typeof MAP_COLOR_TOKENS;
