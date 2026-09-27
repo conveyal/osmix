@@ -18,6 +18,7 @@ import type {
   OsmConflationOptions,
   MergePlanOptions,
   OsmMergeOptions,
+  PlanDecision,
 } from "@osmix/change";
 import { validateOrdinaryChangesetOptions } from "@osmix/change/internal/changeset-options";
 import { Osm, type OsmInfo, type OsmOptions, type OsmTransferables } from "@osmix/core";
@@ -44,6 +45,7 @@ import {
   type WorkerRuntime,
 } from "./capabilities.ts";
 import { installStructuredComlinkErrorTransferHandler } from "./comlink-errors.ts";
+import type { MergePlanBulkRequest, MergePlanFilter } from "./plan-session.ts";
 import type { DrawToRasterTileOptions } from "./raster.ts";
 import { supportsReadableStreamTransfer, transfer } from "./utils.ts";
 import {
@@ -308,14 +310,17 @@ export class OsmixRemoteStateError extends Error {
   }
 }
 
+/** The mutations that can commit before their result reaches every worker. */
+export type OsmixCommittedMutation = "applyChangesAndReplace" | "applyMergePlan" | "merge";
+
 /** A worker mutation succeeded, but subsequent synchronization or result lookup failed. */
 export class OsmixCommittedMutationError extends Error {
   readonly committed = true;
-  readonly operation: "applyChangesAndReplace" | "merge";
+  readonly operation: OsmixCommittedMutation;
   readonly osmId: string;
   override readonly cause: unknown;
 
-  constructor(operation: "applyChangesAndReplace" | "merge", osmId: string, cause: unknown) {
+  constructor(operation: OsmixCommittedMutation, osmId: string, cause: unknown) {
     super(
       `The ${operation} operation committed dataset ${osmId}, but synchronizing the result failed. Retry synchronization and refresh; do not apply the merge again.`,
       { cause },
@@ -392,6 +397,22 @@ function hasOnlySharedBackingBuffers(value: unknown): boolean {
 }
 
 /**
+ * A merge plan could not be rebuilt after a worker restart because a restored input is not the
+ * data the plan was made from. The plan and its decisions are gone; plan again.
+ */
+export class OsmixPlanRecoveryError extends Error {
+  readonly baseOsmId: string;
+  readonly patchOsmId: string;
+
+  constructor(baseOsmId: string, patchOsmId: string, detail: string) {
+    super(`The merge plan for ${baseOsmId} cannot be restored: ${detail}. Plan the merge again.`);
+    this.name = "OsmixPlanRecoveryError";
+    this.baseOsmId = baseOsmId;
+    this.patchOsmId = patchOsmId;
+  }
+}
+
+/**
  * Create a single `OsmixWorker` instance wrapped with Comlink.
  * Spawns a browser, Bun, or Deno Worker or a Node worker thread and returns a proxy.
  *
@@ -434,9 +455,21 @@ export async function createOsmixWorker<T extends OsmixWorker = OsmixWorker>(
  */
 interface ActiveChangesetState {
   baseOsmId: string;
-  kind: "ordinary" | "conflation";
+  kind: "ordinary" | "conflation" | "deduplication";
   options: Partial<OsmMergeOptions>;
   patchOsmId: string;
+}
+
+/** What rebuilds a merge plan after a worker restart. */
+interface ActivePlanState {
+  baseOsmId: string;
+  patchOsmId: string;
+  /** Plan options without decisions. */
+  options: MergePlanOptions;
+  decisions: PlanDecision[];
+  filter: MergePlanFilter;
+  /** The inputs' content hashes when planned; a restored input must match. */
+  inputs: { base: string; patch: string };
 }
 
 interface ActiveConflationState {
@@ -457,6 +490,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   private changesetChangeTypes: OsmChangeTypes[] = ["create", "modify", "delete"];
   private changesetEntityTypes: OsmEntityType[] = ["node", "way", "relation"];
   private readonly activeConflations = new Map<string, ActiveConflationState>();
+  private readonly activePlans = new Map<string, ActivePlanState>();
   private readonly datasetRestorers = new Map<string, DatasetRestorer<T> | null>();
   private readonly retainedDatasets = new Map<string, OsmTransferables>();
   private readonly retainedLoadDecisions = new Map<string, OsmLoadDecision | null>();
@@ -694,6 +728,9 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     for (const [baseOsmId, state] of this.activeChangesets) {
       if (baseOsmId === id || state.patchOsmId === id) this.activeChangesets.delete(baseOsmId);
     }
+    for (const [baseOsmId, state] of this.activePlans) {
+      if (baseOsmId === id || state.patchOsmId === id) this.activePlans.delete(baseOsmId);
+    }
   }
 
   private invalidateGeneratedConflationChangeset(baseOsmId: string) {
@@ -788,10 +825,37 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
       for (const state of this.activeChangesets.values()) {
         if (state.kind === "conflation") {
           await worker.generateConflationChangeset(state.baseOsmId, state.options);
+        } else if (state.kind === "deduplication") {
+          await worker.planDeduplication(state.baseOsmId);
         } else {
           await worker.generateChangeset(state.baseOsmId, state.patchOsmId, state.options);
         }
       }
+      // A plan is rebuilt from its inputs, options and decisions, never deserialized, and
+      // only when the restored inputs are the data it was made from.
+      let planFailure: OsmixPlanRecoveryError | undefined;
+      for (const [baseOsmId, state] of this.activePlans) {
+        const [base, patch] = await Promise.all([
+          worker.contentHash(state.baseOsmId),
+          worker.contentHash(state.patchOsmId),
+        ]);
+        if (base !== state.inputs.base || patch !== state.inputs.patch) {
+          this.activePlans.delete(baseOsmId);
+          planFailure ??= new OsmixPlanRecoveryError(
+            state.baseOsmId,
+            state.patchOsmId,
+            `restored ${base !== state.inputs.base ? "base" : "patch"} content differs`,
+          );
+          continue;
+        }
+        await worker.planMerge(state.baseOsmId, state.patchOsmId, {
+          ...state.options,
+          decisions: state.decisions,
+        });
+        await worker.setMergePlanFilter(state.baseOsmId, state.filter);
+      }
+      // Other state is restored first, so only the stale plan is lost.
+      if (planFailure) throw planFailure;
       await worker.setChangesetFilters(this.changesetChangeTypes, this.changesetEntityTypes);
     }
   }
@@ -1771,6 +1835,160 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   }
 
   /**
+   * Plan merging `patch` into `base` for review. Neither dataset changes until
+   * {@link applyMergePlan}. After a worker restart the plan is rebuilt from the same inputs,
+   * options and decisions.
+   */
+  async planMerge(baseOsmId: OsmId, patchOsmId: OsmId, options: MergePlanOptions = {}) {
+    const baseId = this.getId(baseOsmId);
+    const patchId = this.getId(patchOsmId);
+    const stored = structuredClone(options);
+    const overview = await this.runWithWorker(
+      (worker) => worker.planMerge(baseId, patchId, stored),
+      { lane: "control", retry: "never" },
+    );
+    const { decisions: _decisions, ...withoutDecisions } = stored;
+    this.activePlans.set(baseId, {
+      baseOsmId: baseId,
+      patchOsmId: patchId,
+      options: withoutDecisions,
+      decisions: overview.decisions,
+      filter: {},
+      inputs: { base: overview.inputs.base.contentHash, patch: overview.inputs.patch.contentHash },
+    });
+    return structuredClone(overview);
+  }
+
+  getMergePlanOverview(baseOsmId: OsmId) {
+    return this.runWithWorker((worker) => worker.getMergePlanOverview(this.getId(baseOsmId)), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
+  /** Set the filter used by subsequent feature page requests. */
+  async setMergePlanFilter(baseOsmId: OsmId, filter: MergePlanFilter = {}) {
+    const baseId = this.getId(baseOsmId);
+    const state = this.getActivePlan(baseId);
+    const stored = structuredClone(filter);
+    await this.runWithWorker((worker) => worker.setMergePlanFilter(baseId, stored), {
+      lane: "control",
+      retry: "never",
+    });
+    state.filter = stored;
+  }
+
+  getMergePlanPage(baseOsmId: OsmId, page: number, pageSize: number) {
+    return this.runWithWorker(
+      (worker) => worker.getMergePlanPage(this.getId(baseOsmId), page, pageSize),
+      { lane: "control", retry: "once" },
+    );
+  }
+
+  getMergePlanFeature(baseOsmId: OsmId, featureKey: string) {
+    return this.runWithWorker(
+      (worker) => worker.getMergePlanFeature(this.getId(baseOsmId), featureKey),
+      { lane: "control", retry: "once" },
+    );
+  }
+
+  getMergePlanLayer(baseOsmId: OsmId) {
+    return this.runWithWorker((worker) => worker.getMergePlanLayer(this.getId(baseOsmId)), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
+  getMergePlanOsc(baseOsmId: OsmId) {
+    return this.runWithWorker((worker) => worker.getMergePlanOsc(this.getId(baseOsmId)), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
+  /** Replace every decision and replan the phases they affect. */
+  async setMergePlanDecisions(baseOsmId: OsmId, decisions: PlanDecision[]) {
+    const baseId = this.getId(baseOsmId);
+    const state = this.getActivePlan(baseId);
+    const stored = structuredClone(decisions);
+    const overview = await this.runWithWorker(
+      (worker) => worker.setMergePlanDecisions(baseId, stored),
+      { lane: "control", retry: "never" },
+    );
+    state.decisions = overview.decisions;
+    return structuredClone(overview);
+  }
+
+  /** Accept, reject, or clear decisions for every proposal a filter matches. */
+  async applyMergePlanBulk(baseOsmId: OsmId, request: MergePlanBulkRequest) {
+    const baseId = this.getId(baseOsmId);
+    const state = this.getActivePlan(baseId);
+    const stored = structuredClone(request);
+    const result = await this.runWithWorker((worker) => worker.applyMergePlanBulk(baseId, stored), {
+      lane: "control",
+      retry: "never",
+    });
+    state.decisions = result.overview.decisions;
+    return structuredClone(result);
+  }
+
+  /**
+   * Apply the plan: replace the base with the merged result, delete the patch, and
+   * synchronize every worker. A failure after the worker applied throws
+   * {@link OsmixCommittedMutationError}; do not apply again.
+   */
+  async applyMergePlan(baseOsmId: OsmId) {
+    const baseId = this.getId(baseOsmId);
+    const state = this.getActivePlan(baseId);
+    const result = await this.runWithWorker((worker) => worker.applyMergePlan(baseId), {
+      lane: "control",
+      retry: "never",
+    });
+    this.invalidateMergeStateForDataset(baseId);
+    this.invalidateMergeStateForDataset(state.patchOsmId);
+    this.markDatasetUnrecoverable(baseId);
+    try {
+      await this.delete(state.patchOsmId);
+      await this.populateDatasetFromControl(baseId);
+      const merged = await this.get(baseId);
+      return { dataset: this.wrap(merged.info()), summary: result.summary, stats: result.stats };
+    } catch (cause) {
+      throw new OsmixCommittedMutationError("applyMergePlan", baseId, cause);
+    }
+  }
+
+  async clearMergePlan(baseOsmId: OsmId) {
+    const baseId = this.getId(baseOsmId);
+    await this.runWithWorker((worker) => worker.clearMergePlan(baseId), {
+      lane: "control",
+      retry: "never",
+    });
+    this.activePlans.delete(baseId);
+  }
+
+  /** Find duplicates inside one dataset; review them with the changeset page API. */
+  async planDeduplication(osmId: OsmId) {
+    const id = this.getId(osmId);
+    const stats = await this.runWithWorker((worker) => worker.planDeduplication(id), {
+      lane: "control",
+      retry: "never",
+    });
+    this.activeChangesets.set(id, {
+      baseOsmId: id,
+      kind: "deduplication",
+      options: {},
+      patchOsmId: id,
+    });
+    return stats;
+  }
+
+  private getActivePlan(baseOsmId: string): ActivePlanState {
+    const state = this.activePlans.get(baseOsmId);
+    if (!state) throw Error("No active merge plan");
+    return state;
+  }
+
+  /**
    * Generate a changeset comparing base and patch `Osm` instances in the changeset worker.
    * Returns statistics about the changeset (create/modify/delete counts).
    */
@@ -1851,6 +2069,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     this.workerPool = null;
     this.activeChangesets.clear();
     this.activeConflations.clear();
+    this.activePlans.clear();
     this.datasetRestorers.clear();
     this.retainedDatasets.clear();
     this.retainedLoadDecisions.clear();

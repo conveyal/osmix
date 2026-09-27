@@ -426,6 +426,68 @@ describe("OsmixRemote", () => {
       expect((await remote.getChangesetPage(base.id, 0, 100)).changes?.length).toBeGreaterThan(0);
     });
 
+    it("rebuilds a merge plan with its decisions and filter after a restart", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const base = createParallelFootway("plan-recovery-base", 1, 10, 0, "Base path");
+      const patch = createParallelFootway("plan-recovery-patch", 11, 20, 0.000004, "Imported");
+      await remote.transferIn(base);
+      await remote.transferIn(patch);
+      const planned = await remote.planMerge(base.id, patch.id, {
+        matching: { propertyKeys: ["name"], attachNetwork: false, automatic: "none" },
+      });
+      expect(planned.summary.features["needs-decision"]).toBe(1);
+      const decided = await remote.setMergePlanDecisions(base.id, [
+        { proposalId: "copy:w20>w10", action: "accept" },
+      ]);
+      await remote.setMergePlanFilter(base.id, { kind: "copy-tags" });
+
+      await remote.getWorker().clearMergePlan(base.id);
+      await remote.restoreForTest();
+
+      expect(await remote.getMergePlanOverview(base.id)).toEqual(decided);
+      const page = await remote.getMergePlanPage(base.id, 0, 10);
+      expect(page.features.map(({ key, outcome }) => [key, outcome])).toEqual([
+        ["way:20", "merged"],
+      ]);
+    });
+
+    it("refuses to rebuild a plan when a restored input is different data", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const base = createParallelFootway("plan-drift-base", 1, 10, 0, "Base path");
+      await remote.transferIn(base);
+      const source = (name: string) =>
+        new TextEncoder().encode(
+          JSON.stringify({
+            type: "FeatureCollection",
+            features: [
+              {
+                type: "Feature",
+                geometry: { type: "Point", coordinates: [1, 1] },
+                properties: { name },
+              },
+            ],
+          }),
+        );
+      remote.registerCustomGeoJson("plan-drift-patch", source("First"));
+      await remote.getWorker().fromGeoJSON({
+        data: source("First").buffer,
+        options: { id: "plan-drift-patch" },
+      });
+      await remote.planMerge(base.id, "plan-drift-patch");
+
+      // The recovery source now yields different data under the same dataset ID.
+      remote.registerCustomGeoJson("plan-drift-patch", source("Second"));
+      await remote.deleteFromWorkerForTest(0, "plan-drift-patch");
+      await expect(remote.restoreForTest()).rejects.toMatchObject({
+        name: "OsmixPlanRecoveryError",
+        baseOsmId: base.id,
+        patchOsmId: "plan-drift-patch",
+      });
+      await expect(remote.getMergePlanOverview(base.id)).rejects.toThrow("No active merge plan");
+    });
+
     it("restores hard blockers without turning an ignored acceptance into a tag transfer", async () => {
       using remote = new RecoveryTestRemote();
       await remote.initializeWorkerPool(1, undefined, undefined, true);

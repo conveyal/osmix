@@ -11,7 +11,9 @@ export {
   detectFileType,
   OSM_FILE_TYPES,
   OsmixCommittedMutationError,
+  type OsmixCommittedMutation,
   OsmixDatasetLossError,
+  OsmixPlanRecoveryError,
   OsmixRemote,
   OsmixRemoteStateError,
   type OsmFileType,
@@ -35,6 +37,16 @@ export {
   type RouteResult,
   type WaySegment,
 } from "./worker.ts";
+export type {
+  MergePlanBulkRequest,
+  MergePlanBulkResult,
+  MergePlanFeatureDetail,
+  MergePlanFeatureView,
+  MergePlanFilter,
+  MergePlanLayer,
+  MergePlanOverview,
+  MergePlanPage,
+} from "./plan-session.ts";
 export { drawToRasterTile, type DrawToRasterTileOptions } from "./raster.ts";
 export {
   canShareArrayBuffers,

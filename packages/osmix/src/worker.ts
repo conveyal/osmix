@@ -20,12 +20,19 @@
 
 import {
   applyChangesetToOsm,
+  applyPlan,
   buildConflationBulkDecisionResult,
   buildConflationSourceDecision,
   conflationEffectiveStatus,
   generateChangeset,
+  generateMergePlanOsc,
   merge,
+  type MergePlan,
+  type PlanDecision,
+  planMerge,
+  planWithinDatasetDeduplication,
   resolveConflationActions,
+  setMergePlanDecisions,
   summarizeConflationCandidates,
   type OsmChange,
   type OsmChangeset,
@@ -166,6 +173,12 @@ interface ConflationSession {
   summary: OsmConflationSummary;
 }
 
+interface PlanSession {
+  patchOsmId: string;
+  plan: MergePlan;
+  filter: MergePlanFilter;
+}
+
 type GeneratedChangeset = {
   changeset: OsmChangeset;
   patchOsmId: string;
@@ -304,6 +317,16 @@ import * as Comlink from "comlink";
 import { dequal } from "dequal/lite";
 
 import { installStructuredComlinkErrorTransferHandler } from "./comlink-errors.ts";
+import {
+  bulkDecisions,
+  type MergePlanBulkRequest,
+  type MergePlanBulkResult,
+  type MergePlanFilter,
+  planFeatureDetail,
+  planLayer,
+  planOverview,
+  planPage,
+} from "./plan-session.ts";
 import { type DrawToRasterTileOptions, drawToRasterTile } from "./raster.ts";
 import { transfer } from "./utils.ts";
 
@@ -320,6 +343,7 @@ export class OsmixWorker extends EventTarget {
   private graphs = new Map<string, RoutingGraph>();
   private changesets = new Map<string, GeneratedChangeset>();
   private conflations = new Map<string, ConflationSession>();
+  private plans = new Map<string, PlanSession>();
   private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"];
   private entityTypes: OsmEntityType[] = ["node", "way", "relation"];
   private filteredChanges = new Map<string, OsmChange[]>();
@@ -543,6 +567,11 @@ export class OsmixWorker extends EventTarget {
   }
 
   /** Return the profile decision recorded while loading a PBF dataset. */
+  /** The dataset's content hash, to check that restored data is what a session was made from. */
+  contentHash(id: string): string {
+    return this.get(id).contentHash();
+  }
+
   getLoadDecision(id: string): OsmLoadDecision | null {
     return this.loadDecisions.get(id) ?? null;
   }
@@ -607,6 +636,9 @@ export class OsmixWorker extends EventTarget {
   }
 
   private invalidateMergeStateForDataset(osmId: string) {
+    for (const [baseOsmId, session] of this.plans) {
+      if (baseOsmId === osmId || session.patchOsmId === osmId) this.plans.delete(baseOsmId);
+    }
     for (const [baseOsmId, session] of this.conflations) {
       if (baseOsmId !== osmId && session.patchOsmId !== osmId) continue;
       this.conflations.delete(baseOsmId);
@@ -1161,6 +1193,102 @@ export class OsmixWorker extends EventTarget {
     this.set(baseOsmId, new Osm(mergedOsm.transferables()));
     this.delete(patchOsmId);
     return mergedOsm.id;
+  }
+
+  /**
+   * Plan merging a loaded patch into a loaded base, for review. Replaces any plan for this
+   * base. Neither dataset changes until {@link applyMergePlan}.
+   */
+  planMerge(baseOsmId: string, patchOsmId: string, options: MergePlanOptions = {}) {
+    const plan = planMerge(this.get(baseOsmId), this.get(patchOsmId), options, this.onProgress);
+    this.plans.set(baseOsmId, { patchOsmId, plan, filter: {} });
+    return planOverview(plan);
+  }
+
+  getMergePlanOverview(baseOsmId: string) {
+    return planOverview(this.getPlanSession(baseOsmId).plan);
+  }
+
+  /** Set the filter used by subsequent feature page requests. */
+  setMergePlanFilter(baseOsmId: string, filter: MergePlanFilter = {}) {
+    this.getPlanSession(baseOsmId).filter = { ...filter };
+  }
+
+  /** One page of imported features that match the filter, decisions first. */
+  getMergePlanPage(baseOsmId: string, page: number, pageSize: number) {
+    const session = this.getPlanSession(baseOsmId);
+    return planPage(session.plan, this.get(session.patchOsmId), session.filter, page, pageSize);
+  }
+
+  /** One feature with the evidence and geometry behind its proposals. */
+  getMergePlanFeature(baseOsmId: string, featureKey: string) {
+    const session = this.getPlanSession(baseOsmId);
+    return planFeatureDetail(
+      session.plan,
+      this.get(baseOsmId),
+      this.get(session.patchOsmId),
+      featureKey,
+    );
+  }
+
+  /** The imported features as GeoJSON, each with its feature key and outcome. */
+  getMergePlanLayer(baseOsmId: string) {
+    const session = this.getPlanSession(baseOsmId);
+    return planLayer(session.plan, this.get(session.patchOsmId));
+  }
+
+  /** Replace every decision and replan the phases they affect. */
+  setMergePlanDecisions(baseOsmId: string, decisions: PlanDecision[]) {
+    const { plan } = this.getPlanSession(baseOsmId);
+    setMergePlanDecisions(plan, decisions);
+    return planOverview(plan);
+  }
+
+  /** Accept, reject, or clear decisions for every proposal the filter matches. */
+  applyMergePlanBulk(baseOsmId: string, request: MergePlanBulkRequest): MergePlanBulkResult {
+    const { plan } = this.getPlanSession(baseOsmId);
+    const { decisions, changed, skipped } = bulkDecisions(plan, request);
+    if (changed > 0) setMergePlanDecisions(plan, decisions);
+    return { overview: planOverview(plan), changed, skipped };
+  }
+
+  /** The plan as an osmChange document. */
+  getMergePlanOsc(baseOsmId: string) {
+    return generateMergePlanOsc(this.getPlanSession(baseOsmId).plan);
+  }
+
+  /**
+   * Apply the plan: build the merged dataset once, replace the base with it, and delete the
+   * patch. Proposals still waiting for a decision are left out.
+   */
+  applyMergePlan(baseOsmId: string) {
+    const session = this.getPlanSession(baseOsmId);
+    const { osm, summary, stats } = applyPlan(session.plan);
+    this.plans.delete(baseOsmId);
+    this.set(baseOsmId, new Osm(osm.transferables()));
+    this.delete(session.patchOsmId);
+    return { osmId: baseOsmId, summary, stats };
+  }
+
+  clearMergePlan(baseOsmId: string) {
+    this.plans.delete(baseOsmId);
+  }
+
+  /**
+   * Find duplicates inside one dataset (MP-I5). The changes open in the changeset page API and
+   * apply with {@link applyChangesAndReplace}.
+   */
+  planDeduplication(osmId: string) {
+    const changeset = planWithinDatasetDeduplication(this.get(osmId), this.onProgress);
+    this.changesets.set(osmId, { kind: "ordinary", patchOsmId: osmId, changeset });
+    this.filteredChanges.delete(osmId);
+    return changeset.stats;
+  }
+
+  private getPlanSession(baseOsmId: string) {
+    const session = this.plans.get(baseOsmId);
+    if (!session) throw Error("No active merge plan");
+    return session;
   }
 
   /**

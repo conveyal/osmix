@@ -80,6 +80,36 @@ describe("committed remote mutations", () => {
     expect(generation.outcome).toEqual(outcome);
   });
 
+  it("identifies a committed plan application and restores the result without the plan", async () => {
+    const { base, patch } = inputs();
+    using remote = new SyncFailureRemote();
+    await remote.initializeWorkerPool(1, undefined, undefined, true);
+    await remote.transferIn(base);
+    await remote.transferIn(patch);
+    await remote.planMerge(base.id, patch.id, {
+      matching: { propertyKeys: ["tactile_paving"], attachNetwork: false },
+    });
+    const apply = vi.spyOn(remote.getWorker(), "applyMergePlan");
+    remote.failNextSynchronization = true;
+    await expect(remote.applyMergePlan(base.id)).rejects.toMatchObject({
+      name: "OsmixCommittedMutationError",
+      committed: true,
+      operation: "applyMergePlan",
+      osmId: base.id,
+      cause: { message: "Simulated result synchronization failure" },
+    });
+    expect(apply).toHaveBeenCalledTimes(1);
+    await expect(remote.getMergePlanOverview(base.id)).rejects.toThrow("No active merge plan");
+
+    await remote.synchronizeDataset(base.id);
+    const actual = await remote.get(base.id);
+    expect(actual.nodes.getById(1)?.tags?.["tactile_paving"]).toBe("yes");
+    await remote.restartForTest();
+    expect(await remote.has(patch.id)).toBe(false);
+    expect([...(await remote.get(base.id)).nodes.sorted()]).toEqual([...actual.nodes.sorted()]);
+    expect(apply).toHaveBeenCalledTimes(1);
+  });
+
   it("identifies a committed direct merge with the returned output ID", async () => {
     const { base, patch } = inputs();
     using remote = new SyncFailureRemote();

@@ -14,6 +14,12 @@ describe("committedMutationOsmId", () => {
         "applyChangesAndReplace",
       ),
     ).toBeNull();
+    expect(
+      committedMutationOsmId(
+        { osmId: "base", committed: true, operation: "applyMergePlan" },
+        "applyMergePlan",
+      ),
+    ).toBe("base");
     expect(committedMutationOsmId(new Error("failed"), "merge")).toBeNull();
   });
 });

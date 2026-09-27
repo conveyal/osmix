@@ -4,7 +4,7 @@
  */
 export function committedMutationOsmId(
   error: unknown,
-  operation: "applyChangesAndReplace" | "merge",
+  operation: "applyChangesAndReplace" | "applyMergePlan" | "merge",
 ): string | null {
   return error &&
     typeof error === "object" &&
