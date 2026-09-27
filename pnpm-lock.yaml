@@ -799,6 +799,9 @@ importers:
       '@osmix/geo':
         specifier: workspace:*
         version: link:../geo
+      '@osmix/router':
+        specifier: workspace:*
+        version: link:../router
       '@osmix/shared':
         specifier: workspace:*
         version: link:../shared

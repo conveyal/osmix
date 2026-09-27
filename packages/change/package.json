@@ -24,6 +24,7 @@
   "dependencies": {
     "@osmix/core": "workspace:*",
     "@osmix/geo": "workspace:*",
+    "@osmix/router": "workspace:*",
     "@osmix/shared": "workspace:*",
     "@osmix/types": "workspace:*",
     "dequal": "catalog:"

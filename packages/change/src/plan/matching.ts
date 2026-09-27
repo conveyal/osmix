@@ -19,6 +19,7 @@ import type {
 } from "../types.ts";
 import { entityToken, type PlanBuilder } from "./builder.ts";
 import type { MergePlan, MergePlanOptions, PlanProposal } from "./types.ts";
+import { demoteDrivableConnections } from "./validate.ts";
 
 type MatchingKind = "connect" | "copy-tags" | "remove-way";
 
@@ -43,11 +44,18 @@ export function planMatching(
   base: Osm,
   planned: Osm,
   options: NonNullable<MergePlanOptions["matching"]>,
-): { discovery: OsmConflationDiscovery; matching: NonNullable<MergePlan["matching"]> } {
+): {
+  discovery: OsmConflationDiscovery;
+  matching: NonNullable<MergePlan["matching"]>;
+  demoted: string[];
+} {
   if ("decisions" in options) {
     throw Error("Decide matching proposals with plan decisions, not matching.decisions");
   }
   const discovery = discoverPlannedConflationCandidates(base, planned, changeset.overlay, options);
+  const demoted = new Set(
+    demoteDrivableConnections(discovery, changeset.overlay).map(({ id }) => id),
+  );
   const byCandidate: CandidateProposals[] = [];
   const propose = (
     candidate: OsmConflationCandidate,
@@ -99,7 +107,14 @@ export function planMatching(
 
   const decisions = matchingDecisions(byCandidate);
   const outcome = applyPlannedConflation(changeset, base, planned, discovery, decisions);
-  return { discovery, matching: { candidates: discovery.summary, outcome } };
+  const demotedProposals = byCandidate.flatMap(({ candidate, connect }) =>
+    connect && demoted.has(candidate.id) ? [connect.id] : [],
+  );
+  return {
+    discovery,
+    matching: { candidates: discovery.summary, outcome },
+    demoted: demotedProposals,
+  };
 }
 
 /**

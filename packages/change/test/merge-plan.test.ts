@@ -3,7 +3,10 @@ import type { OsmNode, OsmRelation, OsmWay } from "@osmix/types";
 import { describe, expect, it } from "vitest";
 
 import { merge } from "../src/merge.ts";
+import { PlanOverlay } from "../src/plan/overlay.ts";
 import { applyPlan, generateMergePlanOsc, planMerge } from "../src/plan/plan.ts";
+import { demoteDrivableConnections } from "../src/plan/validate.ts";
+import type { OsmConflationCandidate, OsmConflationDiscovery } from "../src/types.ts";
 
 const quiet = () => {};
 
@@ -268,5 +271,75 @@ describe("crossing proposals", () => {
     const { osm } = applyPlan(plan);
     expect(osm.ways.getById(10)?.refs).toEqual([1, 2]);
     expect(osm.ways.getById(-1)?.refs).toEqual([-1, -2]);
+  });
+});
+
+describe("plan diagnostics", () => {
+  it("measures routing topology before and after without building", () => {
+    const base = dataset(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 0.002, lat: 0 },
+      ],
+      [{ id: 10, refs: [1, 2], tags: { highway: "residential" } }],
+    );
+    const patch = dataset(
+      "patch",
+      [
+        { id: -1, lon: 0.001, lat: -0.001 },
+        { id: -2, lon: 0.001, lat: 0.001 },
+      ],
+      [{ id: -1, refs: [-1, -2], tags: { highway: "footway" } }],
+    );
+    const { car, walk } = planMerge(base, patch, {}, quiet).diagnostics.routing;
+    // The crossing splits the road; the footway joins the walk network only.
+    expect(car.delta).toEqual({ nodes: 3, routableNodes: 1, edges: 2, components: 0 });
+    expect(walk.delta).toEqual({ nodes: 3, routableNodes: 3, edges: 6, components: 0 });
+  });
+
+  it("reports new routing-integrity problems and refuses to apply them", () => {
+    const base = baseRoad();
+    const patch = new Osm({ id: "patch" });
+    patch.nodes.addNode({ id: -1, lon: 0, lat: 0.001 });
+    patch.ways.addWay({ id: -1, refs: [-1, -99], tags: { highway: "footway" } });
+    patch.buildIndexes();
+    patch.buildSpatialIndexes();
+    const plan = planMerge(base, patch, {}, quiet);
+    expect(plan.diagnostics.integrity).toEqual(["way -1 references missing node -99"]);
+    expect(() => applyPlan(plan)).toThrow(
+      "Merge introduced routing-integrity problems: way -1 references missing node -99",
+    );
+  });
+
+  it("moves an automatic connection that rewrites a drivable imported way to review", () => {
+    const base = baseRoad();
+    const overlay = new PlanOverlay(base);
+    overlay.create({ id: -1, lon: 0, lat: 0.000004 }, "patch");
+    overlay.create({ id: -2, lon: 0, lat: 0.001 }, "patch");
+    overlay.create({ id: -5, refs: [-1, -2], tags: { highway: "service" } }, "patch");
+    const candidate: OsmConflationCandidate = {
+      id: "node:-1->1",
+      entityType: "node",
+      sourceId: -1,
+      targetId: 1,
+      status: "automatic",
+      reasons: [],
+      propertyTransfer: { status: "blocked", reasons: ["no-transferable-properties"] },
+      networkAttachment: { status: "automatic", reasons: [] },
+      evidence: {
+        distanceMeters: 0.45,
+        sourceRoutingFamilies: [],
+        targetRoutingFamilies: [],
+        tagDiff: [],
+        patchWayIds: [-5],
+      },
+    };
+    const discovery = { candidates: [candidate] } as unknown as OsmConflationDiscovery;
+    expect(demoteDrivableConnections(discovery, overlay)).toEqual([candidate]);
+    expect(candidate).toMatchObject({
+      status: "review",
+      networkAttachment: { status: "review", reasons: ["drivable-network"] },
+    });
   });
 });

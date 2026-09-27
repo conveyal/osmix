@@ -26,6 +26,7 @@ import type {
   PlanInputIdentity,
   PlanProposalStatus,
 } from "./types.ts";
+import { planRoutingDiagnostics } from "./validate.ts";
 
 /** The live state behind a plan. Plans are rebuilt from their inputs, never deserialized. */
 interface PlanState {
@@ -96,6 +97,12 @@ export function planMerge(
     planCrossings(builder, changeset, planned);
   }
 
+  log("Checking the plan...");
+  const diagnostics = {
+    routing: planRoutingDiagnostics(base, changeset.overlay),
+    integrity: changeset.pendingIntegrityIssues(),
+    demoted: matched?.demoted ?? [],
+  };
   const { summary, staleDecisions } = builder.finish(base, planned, changeset, resolved);
   const plan: MergePlan = {
     version: 1,
@@ -107,6 +114,7 @@ export function planMerge(
     summary,
     staleDecisions,
     ...(matched ? { matching: matched.matching } : {}),
+    diagnostics,
   };
   planStates.set(plan, {
     base,
@@ -221,9 +229,18 @@ export interface MergePlanResult {
  * Build the merged dataset the plan describes: one full build, then the routing-integrity
  * check. Proposals still waiting for a decision are left out. The plan and its inputs are
  * unchanged, so applying twice gives the same result.
+ *
+ * @throws When the plan's diagnostics list routing-integrity problems; nothing is built.
  */
 export function applyPlan(plan: MergePlan, newOsmId?: string): MergePlanResult {
   const { changeset } = planState(plan);
+  if (plan.diagnostics.integrity.length > 0) {
+    const shown = plan.diagnostics.integrity.slice(0, 10);
+    const omitted = plan.diagnostics.integrity.length - shown.length;
+    throw Error(
+      `Merge introduced routing-integrity problems: ${shown.join("; ")}${omitted > 0 ? `; and ${omitted} more` : ""}`,
+    );
+  }
   const osm = applyChangesetToOsm(changeset, newOsmId);
   return { osm, summary: plan.summary, stats: changeset.stats };
 }

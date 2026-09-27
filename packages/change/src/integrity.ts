@@ -167,8 +167,9 @@ export function junctionHasIncompatibleGrades(nodeId: number, ways: readonly Osm
   return incompatibleGradePairs(incident).length > 0;
 }
 
-function collectRoutingIntegrityIssues(osm: Osm): readonly IntegrityIssue[] {
-  const cachedIssues = routingIntegrityIssuesByOsm.get(osm);
+function collectRoutingIntegrityIssues(osm: Osm | DatasetReader): readonly IntegrityIssue[] {
+  const finalized = "isReady" in osm && osm.isReady() ? osm : undefined;
+  const cachedIssues = finalized && routingIntegrityIssuesByOsm.get(finalized);
   if (cachedIssues) return cachedIssues;
 
   const issues: IntegrityIssue[] = [];
@@ -232,7 +233,7 @@ function collectRoutingIntegrityIssues(osm: Osm): readonly IntegrityIssue[] {
     issues.push(...restrictionTopologyIssues(relation, (id) => osm.ways.getById(id)));
   }
 
-  if (osm.isReady()) routingIntegrityIssuesByOsm.set(osm, issues);
+  if (finalized) routingIntegrityIssuesByOsm.set(finalized, issues);
   return issues;
 }
 
@@ -274,6 +275,16 @@ export function inheritedRoutingIntegrityIssueKeys(
     if (!collidesWithBase) keys.add(issue.key);
   }
   return keys;
+}
+
+/** Routing-integrity problems in `merged` that are not in `baselineKeys`, described. */
+export function newRoutingIntegrityIssues(
+  baselineKeys: ReadonlySet<string>,
+  merged: Osm | DatasetReader,
+): string[] {
+  return collectRoutingIntegrityIssues(merged)
+    .filter((issue) => !baselineKeys.has(issue.key))
+    .map((issue) => issue.description);
 }
 
 /** Throw when a merge introduces routing-integrity issues not present in the base dataset. */

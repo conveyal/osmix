@@ -193,4 +193,25 @@ export interface MergePlan {
   staleDecisions: string[];
   /** Present when matching is configured. */
   matching?: { candidates: OsmConflationSummary; outcome: OsmConflationOutcomeReport };
+  diagnostics: {
+    /** CAR and WALK routing topology of the base and of the planned result. */
+    routing: { car: PlanRoutingDelta; walk: PlanRoutingDelta };
+    /** New routing-integrity problems; applying the plan fails while any remain. */
+    integrity: string[];
+    /** Automatic connections moved to review because they would change the drivable network. */
+    demoted: string[];
+  };
+}
+
+export interface PlanRoutingStats {
+  nodes: number;
+  routableNodes: number;
+  edges: number;
+  components: number;
+}
+
+export interface PlanRoutingDelta {
+  before: PlanRoutingStats;
+  after: PlanRoutingStats;
+  delta: PlanRoutingStats;
 }
