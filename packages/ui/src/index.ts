@@ -139,6 +139,7 @@ export {
   TooltipTrigger,
 } from "./components/ui/tooltip.tsx";
 export { Spinner } from "./components/ui/spinner.tsx";
+export { Popover, PopoverContent, PopoverIconTrigger } from "./components/ui/popover.tsx";
 export {
   closeToast,
   showToast,
@@ -164,4 +165,4 @@ export {
   formatTimestampMs,
 } from "./lib/format.ts";
 export { cn } from "./lib/utils.ts";
-export { sidebarIsOpenAtom } from "./state/layout.ts";
+export { sidebarIsOpenAtom, useNavToolsAnchor } from "./state/layout.ts";

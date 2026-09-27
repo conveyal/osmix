@@ -51,16 +51,16 @@ export function inspectorView(
   return null;
 }
 
-/** How much of the map's right edge the docked inspector covers (its width plus gutters). */
+/** How much of the map's left edge the docked inspector covers (its width plus gutters). */
 const DOCKED_INSPECTOR_INSET_PX = 400;
 
 /**
- * How far to pan the map left so a click at `x` (CSS px from the map's left edge) is not under
- * a panel that covers the rightmost `inset` px of a map `mapWidth` px wide: zero when the point
- * is already clear of it.
+ * How far to move the map's content right so a click at `x` (CSS px from the map's left edge)
+ * is not under a panel that covers the leftmost `inset` px: zero when the point is already clear
+ * of it.
  */
-export function coveredClickNudge(x: number, mapWidth: number, inset: number): number {
-  return Math.max(0, Math.ceil(x - (mapWidth - inset)));
+export function coveredClickNudge(x: number, inset: number): number {
+  return Math.max(0, Math.ceil(inset - x));
 }
 
 const ENTITY_ICONS: Record<OsmEntityType, typeof CircleDotIcon> = {
@@ -82,8 +82,8 @@ function focusMapCanvas(): void {
 
 /**
  * The panel anchored to the map that shows the selected entity or, in route mode, the routing
- * tool (on the first visible dataset). Docked (the map is at least 768px wide) it sits under
- * the toolbar and is content-sized up to the column; otherwise it takes a strip along the
+ * tool (on the first visible dataset). Docked (the map is at least 768px wide) it sits in the
+ * top-left corner beside the sidebar, above the legend, and is content-sized up to the column; otherwise it takes a strip along the
  * bottom edge, at most three fifths of the map's height. While docked and open it publishes
  * its width as `mapInsetAtom`, which every fit and flight adds to its padding; the map itself
  * is not moved when the panel opens, except to nudge a map-clicked point out from under it.
@@ -144,9 +144,9 @@ export function MapInspector() {
 
   useEffect(() => {
     if (!docked || !open) return;
-    setMapInset({ right: DOCKED_INSPECTOR_INSET_PX });
+    setMapInset({ left: DOCKED_INSPECTOR_INSET_PX });
     return () => {
-      setMapInset({ right: 0 });
+      setMapInset({ left: 0 });
     };
   }, [docked, open, setMapInset]);
 
@@ -158,9 +158,9 @@ export function MapInspector() {
     if (origin.source !== "map") return;
     store.set(selectionOriginAtom, { source: "other" });
     if (!map || !docked) return;
-    const mapWidth = map.getContainer().clientWidth;
-    const dx = coveredClickNudge(origin.point[0], mapWidth, DOCKED_INSPECTOR_INSET_PX);
-    if (dx > 0) map.panBy([dx, 0], { duration: 200 });
+    const dx = coveredClickNudge(origin.point[0], DOCKED_INSPECTOR_INSET_PX);
+    // Panning the camera left moves the content, and the clicked point, right.
+    if (dx > 0) map.panBy([-dx, 0], { duration: 200 });
   }, [docked, map, selectedEntity, store, view]);
 
   const dataset =

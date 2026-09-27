@@ -22,16 +22,16 @@ describe("inspectorView", () => {
 
 describe("coveredClickNudge", () => {
   it("is zero for a click clear of the panel", () => {
-    expect(coveredClickNudge(100, 1440, 400)).toBe(0);
-    expect(coveredClickNudge(1040, 1440, 400)).toBe(0);
+    expect(coveredClickNudge(1300, 400)).toBe(0);
+    expect(coveredClickNudge(400, 400)).toBe(0);
   });
 
   it("moves a covered click to the panel's edge", () => {
-    expect(coveredClickNudge(1300, 1440, 400)).toBe(260);
-    expect(coveredClickNudge(1440, 1440, 400)).toBe(400);
+    expect(coveredClickNudge(140, 400)).toBe(260);
+    expect(coveredClickNudge(0, 400)).toBe(400);
   });
 
   it("rounds a fractional click up so it clears the edge", () => {
-    expect(coveredClickNudge(1040.25, 1440, 400)).toBe(1);
+    expect(coveredClickNudge(399.75, 400)).toBe(1);
   });
 });

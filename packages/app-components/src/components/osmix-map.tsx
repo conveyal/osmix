@@ -7,7 +7,7 @@ import {
   type UseOsmFileReturn,
 } from "@osmix/app-core";
 import { atom, useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
-import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 
 import { exitRoutingModeAtom, initialRoutingState, routingStateAtom } from "../state/routing.ts";
 import Basemap, { type MapInitialViewState } from "./basemap.tsx";
@@ -15,7 +15,6 @@ import { type LoadedMapDataset, MapDatasetsContext } from "./map-datasets.tsx";
 import { MapInspector } from "./map-inspector.tsx";
 import { MapLegend } from "./map-legend.tsx";
 import { MapOverlay } from "./map-overlay.tsx";
-import { MapSearch } from "./map-search.tsx";
 import { MapToolbar } from "./map-toolbar.tsx";
 import OsmixRasterSource from "./osmix-raster-source.tsx";
 import OsmixVectorOverlay from "./osmix-vector-overlay.tsx";
@@ -87,9 +86,6 @@ export function OsmixMap({
     });
   });
 
-  const searchPanelId = useId();
-  const [searchOpen, setSearchOpen] = useState(false);
-
   return (
     <MapDatasetsContext value={loaded}>
       {datasets.map((dataset) => (
@@ -105,21 +101,7 @@ export function OsmixMap({
         {routing ? <RouteLayer /> : null}
         {children}
         <MapOverlay
-          toolbar={
-            <>
-              <MapToolbar
-                routing={routing}
-                searchOpen={searchOpen}
-                onToggleSearch={() => setSearchOpen((open) => !open)}
-                searchPanelId={searchPanelId}
-              />
-              <MapSearch
-                id={searchPanelId}
-                open={searchOpen}
-                onClose={() => setSearchOpen(false)}
-              />
-            </>
-          }
+          toolbar={<MapToolbar routing={routing} />}
           inspector={<MapInspector />}
           legend={<MapLegend />}
         />

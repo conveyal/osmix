@@ -13,11 +13,7 @@ export { type InspectorView, inspectorView, MapInspector } from "./components/ma
 export { MapLegend } from "./components/map-legend.tsx";
 export { MapPanelBody, MapPanelHeader } from "./components/map-panel-header.tsx";
 export { MapRoleSymbol } from "./components/map-role-symbol.tsx";
-export {
-  MAP_INSPECTOR_TITLE_SLOT,
-  MapSearch,
-  mapSearchToggleId,
-} from "./components/map-search.tsx";
+export { MAP_INSPECTOR_TITLE_SLOT, MapSearch } from "./components/map-search.tsx";
 export { MapToolbar, unionBboxes } from "./components/map-toolbar.tsx";
 export {
   DOCKED_MIN_WIDTH,

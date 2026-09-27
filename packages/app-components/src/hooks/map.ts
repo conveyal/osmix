@@ -21,14 +21,14 @@ export interface MapPadding {
 }
 
 /**
- * `base` padding on every edge plus the docked panel's inset on the right. With `mapWidth`
- * (the map container's CSS width) the right padding is clamped so `left + right < mapWidth`:
+ * `base` padding on every edge plus the docked panel's inset on the left. With `mapWidth`
+ * (the map container's CSS width) the left padding is clamped so `left + right < mapWidth`:
  * MapLibre refuses a fit whose horizontal padding meets or exceeds the canvas.
  */
 export function withMapInset(base: number, inset: MapInset, mapWidth: number | null): MapPadding {
-  let right = base + inset.right;
-  if (mapWidth !== null) right = Math.min(right, Math.max(0, mapWidth - base - 1));
-  return { top: base, right, bottom: base, left: base };
+  let left = base + inset.left;
+  if (mapWidth !== null) left = Math.min(left, Math.max(0, mapWidth - base - 1));
+  return { top: base, right: base, bottom: base, left };
 }
 
 /**
@@ -41,7 +41,7 @@ export function paddingOffset(padding: MapPadding): [number, number] {
 
 /**
  * `(base) => MapPadding` for a fit or flight: `base` on every edge plus the current
- * `mapInsetAtom` on the right, clamped to the map's width. The inset is read from the store
+ * `mapInsetAtom` on the left, clamped to the map's width. The inset is read from the store
  * when called, so a flight scheduled for after the inspector opens sees its inset. Pass it to
  * `fitBounds` as `padding` (consumed once) and to `flyTo` as `offset: paddingOffset(...)`.
  */

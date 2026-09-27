@@ -1,4 +1,4 @@
-import { cn } from "@osmix/ui";
+import { cn, useNavToolsAnchor } from "@osmix/ui";
 import {
   type ComponentProps,
   createContext,
@@ -12,8 +12,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 
-/** The map must be at least this wide for the inspector to dock to the right edge. */
+/** The map must be at least this wide for the inspector to dock to the top-left corner. */
 export const DOCKED_MIN_WIDTH = 768;
 
 /** Whether the inspector docks to the right edge at `width`; unmeasured (`null`) docks. */
@@ -29,10 +30,10 @@ export function observedBorderBoxWidth(entry: ResizeObserverEntry): number {
   return entry.borderBoxSize?.[0]?.inlineSize ?? entry.target.getBoundingClientRect().width;
 }
 
-/** Which panels Esc closes, in order: the search first, then the inspector, then routing. */
-export type MapOverlayLayer = "search" | "inspector" | "route";
+/** Which panels Esc closes, in order: the inspector, then routing. The search popover closes itself. */
+export type MapOverlayLayer = "inspector" | "route";
 
-const ESCAPE_ORDER: readonly MapOverlayLayer[] = ["search", "inspector", "route"];
+const ESCAPE_ORDER: readonly MapOverlayLayer[] = ["inspector", "route"];
 
 /** Where the overlay's panels go. `docked` is true when the map is at least 768px wide. */
 export interface MapOverlayLayout {
@@ -47,7 +48,7 @@ export interface MapOverlayActions {
    * Registering a layer again replaces its handler.
    */
   register: (layer: MapOverlayLayer, close: () => void) => () => void;
-  /** Close the topmost open layer (search, then inspector, then route). True when one closed. */
+  /** Close the topmost open layer (inspector, then route). True when one closed. */
   closeTop: () => boolean;
 }
 
@@ -105,7 +106,7 @@ function isInsidePopup(target: EventTarget | null): boolean {
   return (
     target instanceof Element &&
     target.closest(
-      '[data-slot="menu-content"], [data-slot="sheet-content"], [role="dialog"], [role="menu"]',
+      '[data-slot="menu-content"], [data-slot="popover-content"], [data-slot="sheet-content"], [role="dialog"], [role="menu"]',
     ) !== null
   );
 }
@@ -114,11 +115,14 @@ function isInsidePopup(target: EventTarget | null): boolean {
  * The layout owner for everything anchored to the map. Render it as a child of react-map-gl's
  * `Map`: it fills the map (`absolute inset-0`) without catching pointer events, so only the
  * panels inside it (`MapPanel`) are clickable and MapLibre's own bottom-right controls stay
- * reachable. Regions:
+ * reachable. Each map corner has one job (toasts take the top-right, from `MapContent`):
  *
- * - `toolbar`: the top-left row (the toolbar, then the search panel when open).
- * - `inspector`: the top-right corner when `docked`, else a strip along the bottom edge.
- * - `legend`: the bottom-left corner.
+ * - `toolbar`: not on the map. It is portalled into the nav's map-tools slot
+ *   (`useNavToolsAnchor`), staying in this tree so it keeps the map and overlay contexts.
+ * - `inspector` and `legend`, when `docked`: one left column, the inspector at the top taking the
+ *   remaining height and the legend at the bottom, so they never overlap.
+ * - Not `docked`: the inspector takes a strip along the bottom edge and the legend sits
+ *   bottom-left (the legend hides itself while that strip is open).
  * - `children`: extras, positioned by the caller.
  *
  * It measures its own width to decide `docked` (`useMapOverlayLayout`), owns the single Esc
@@ -138,6 +142,7 @@ export function MapOverlay({
   const rootRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState<number | null>(null);
   const layout = useMemo<MapOverlayLayout>(() => ({ docked: isDockedWidth(width) }), [width]);
+  const toolbarAnchor = useNavToolsAnchor();
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -213,18 +218,14 @@ export function MapOverlay({
             <div role="status" aria-live="polite" className="sr-only">
               <span key={announcement.nonce}>{announcement.text}</span>
             </div>
-            <div
-              data-slot="map-overlay-top-left"
-              className="absolute top-2 right-2 left-2 flex items-start gap-2"
-            >
-              {toolbar}
-            </div>
+            {toolbarAnchor ? createPortal(toolbar, toolbarAnchor) : null}
             {layout.docked ? (
               <div
-                data-slot="map-overlay-top-right"
-                className="absolute top-2 right-2 bottom-16 flex w-full max-w-sm flex-col items-end"
+                data-slot="map-overlay-left"
+                className="absolute top-2 bottom-2 left-2 flex w-full max-w-sm flex-col items-start gap-2"
               >
                 {inspector}
+                <div className="mt-auto">{legend}</div>
               </div>
             ) : (
               // Spans the map's height so the inspector's max-height has something to resolve
@@ -236,9 +237,11 @@ export function MapOverlay({
                 {inspector}
               </div>
             )}
-            <div data-slot="map-overlay-bottom-left" className="absolute bottom-2 left-2">
-              {legend}
-            </div>
+            {layout.docked ? null : (
+              <div data-slot="map-overlay-bottom-left" className="absolute bottom-2 left-2">
+                {legend}
+              </div>
+            )}
             {children}
           </div>
         </AnnounceContext>

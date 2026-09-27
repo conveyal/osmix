@@ -16,9 +16,10 @@ import { MapPanel, useMapOverlayActions, useMapOverlayLayout } from "./map-overl
 import { MapRoleSymbol } from "./map-role-symbol.tsx";
 
 /**
- * The bottom-left key to the loaded datasets: one row per dataset with its role symbol, its
- * label, a show/hide toggle and a fit action. Rendered only while a dataset is loaded, and not
- * while the inspector is docked to the bottom edge (they would share the strip). Below the rows
+ * The key to the loaded datasets, at the bottom of the map's left column (under the docked
+ * inspector): one row per dataset with its role symbol, its label, a show/hide toggle and a fit
+ * action. Rendered only while a dataset is loaded, and not while the inspector is docked to the
+ * bottom edge (they would share the strip). Below the rows
  * it says when the map is zoomed out too far to select features.
  */
 export function MapLegend() {

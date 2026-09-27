@@ -39,15 +39,15 @@ export const basemapPresetAtom = atomWithStorage<BasemapPreset>(
 export const mapModeAtom = atom<"select" | "route">("select");
 
 /**
- * How much of the map's right edge a docked panel covers, in CSS pixels. Fits and flights add
+ * How much of the map's left edge a docked panel covers, in CSS pixels. Fits and flights add
  * it to their padding (`useMapPadding()` in `@osmix/app-components`) so they land clear of the
  * panel; the map's own transform padding is never set, so opening the panel moves nothing.
  */
 export interface MapInset {
-  right: number;
+  left: number;
 }
 
-export const mapInsetAtom = atom<MapInset>({ right: 0 });
+export const mapInsetAtom = atom<MapInset>({ left: 0 });
 
 /**
  * Whether a loaded dataset is drawn on the map. Keyed by the slot's `osmKey`, not `osm.id`:

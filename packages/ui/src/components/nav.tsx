@@ -1,13 +1,15 @@
 import type { ReactNode } from "react";
 
+import { setNavToolsAnchor } from "../state/layout.ts";
 import { IconButton } from "./icon-button.tsx";
 import { Separator } from "./ui/separator.tsx";
 
 /**
  * The top bar shared by the Osmix apps, one `--header-height` tall with a single `gap-3`
- * rhythm. Left: `start` (the sidebar trigger), the brand, a rule, and `links`. Right: `controls`,
- * a rule, `end` and the GitHub link, then `trailing`. `controls` is for app-specific controls and is empty by default; the map's own
- * tools live on the map.
+ * rhythm. Left: `start` (the sidebar trigger), the brand, a rule, and `links`. Right: the map
+ * tools slot (`OsmixMap` portals its toolbar there; hidden while empty), `controls`, a rule,
+ * `end` and the GitHub link, then a rule and `trailing`. `controls` is for app-specific
+ * controls and is empty by default.
  */
 export function Nav({
   brand = "OSMIX",
@@ -46,6 +48,11 @@ export function Nav({
         ) : null}
       </div>
       <div className="ml-auto flex h-full shrink-0 items-center gap-1">
+        <div
+          ref={setNavToolsAnchor}
+          data-slot="nav-map-tools"
+          className="flex h-full items-center gap-1 empty:hidden"
+        />
         {controls}
         <div className="flex h-full items-center gap-1">
           <NavSeparator />

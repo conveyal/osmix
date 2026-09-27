@@ -37,12 +37,14 @@ function MenuIconTrigger({
   label,
   icon,
   className,
+  size = "icon",
   tooltipSide = "bottom",
   ...props
 }: Omit<React.ComponentProps<typeof BaseMenu.Trigger>, "children"> & {
   /** Accessible name and tooltip text. Required: an icon alone has no name. */
   label: string;
   icon: React.ReactNode;
+  size?: "icon" | "icon-sm" | "icon-xs" | "icon-lg";
   tooltipSide?: "top" | "bottom" | "left" | "right";
 }) {
   return (
@@ -51,7 +53,7 @@ function MenuIconTrigger({
         render={
           <BaseMenu.Trigger
             data-slot="menu-trigger"
-            className={cn(buttonVariants({ variant: "ghost", size: "icon" }), className)}
+            className={cn(buttonVariants({ variant: "ghost", size }), className)}
             aria-label={label}
             {...props}
           />

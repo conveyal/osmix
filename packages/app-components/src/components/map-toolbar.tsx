@@ -8,16 +8,10 @@ import {
   MenuRadioGroup,
   MenuRadioItem,
   MenuSeparator,
+  NavSeparator,
 } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import {
-  MapIcon,
-  MaximizeIcon,
-  MinusIcon,
-  NavigationIcon,
-  PlusIcon,
-  SearchIcon,
-} from "lucide-react";
+import { MapIcon, MaximizeIcon, MinusIcon, NavigationIcon, PlusIcon } from "lucide-react";
 import type { GeoBbox2D } from "osmix";
 import { useMemo } from "react";
 
@@ -25,8 +19,8 @@ import { BASE_MAP_STYLES } from "../constants.ts";
 import { useMap, useMapPadding } from "../hooks/map.ts";
 import { enterRoutingModeAtom, exitRoutingModeAtom } from "../state/routing.ts";
 import { useMapDatasets } from "./map-datasets.tsx";
-import { MapPanel, useMapOverlayAction } from "./map-overlay.tsx";
-import { mapSearchToggleId } from "./map-search.tsx";
+import { useMapOverlayAction } from "./map-overlay.tsx";
+import { MapSearch } from "./map-search.tsx";
 
 const BASEMAP_STYLE_LABELS: Record<BasemapStyleId, string> = {
   "carto-positron": "Positron",
@@ -58,24 +52,15 @@ export function unionBboxes(bboxes: Iterable<GeoBbox2D | null | undefined>): Geo
 }
 
 /**
- * The top-left column of map tools: zoom, fit to all loaded data, the search toggle, the
- * basemap menu and, with `routing`, the routing tool. The search panel's open state belongs to
- * the parent (`OsmixMap`), which renders `MapSearch` beside this toolbar: `searchOpen` and
- * `searchPanelId` name it in `aria-expanded`/`aria-controls`, and `onToggleSearch` flips it.
+ * The map tools, in the nav (`OsmixMap` portals them into its map-tools slot): zoom, fit to all
+ * loaded data, then the search popover, the basemap menu and, with `routing`, the routing tool.
  * The toolbar registers the routing tool with the overlay's Esc stack while it is active.
  */
 export function MapToolbar({
   routing = false,
-  searchOpen,
-  onToggleSearch,
-  searchPanelId,
 }: {
   /** Show the "Route between two points" tool (Inspect only). */
   routing?: boolean;
-  searchOpen: boolean;
-  onToggleSearch: () => void;
-  /** The `MapSearch` panel's DOM id. */
-  searchPanelId: string;
 }) {
   const map = useMap();
   const mapPadding = useMapPadding();
@@ -95,96 +80,71 @@ export function MapToolbar({
   const canRoute = datasets.some((dataset) => dataset.visible);
 
   return (
-    <MapPanel
-      width="auto"
+    <div
       data-slot="map-toolbar"
       role="group"
       aria-label="Map tools"
-      className="shrink-0"
+      className="flex h-full items-center gap-1"
     >
-      <div className="flex flex-col">
+      <IconButton
+        label="Zoom in"
+        icon={<PlusIcon aria-hidden="true" />}
+        onClick={() => map?.zoomIn()}
+      />
+      <IconButton
+        label="Zoom out"
+        icon={<MinusIcon aria-hidden="true" />}
+        onClick={() => map?.zoomOut()}
+      />
+      <IconButton
+        label="Fit map to all data"
+        icon={<MaximizeIcon aria-hidden="true" />}
+        disabled={!dataBbox}
+        onClick={() => {
+          if (dataBbox) map?.fitBounds(dataBbox, { padding: mapPadding(100), maxDuration: 200 });
+        }}
+      />
+      <NavSeparator />
+      <MapSearch />
+      <Menu>
+        <MenuIconTrigger size="icon-sm" label="Basemap" icon={<MapIcon aria-hidden="true" />} />
+        <MenuContent>
+          <MenuRadioGroup
+            value={preset.style}
+            onValueChange={(value) => {
+              if (isBasemapStyleId(value)) setPreset((prev) => ({ ...prev, style: value }));
+            }}
+          >
+            {BASEMAP_STYLE_IDS.map((style) => (
+              <MenuRadioItem key={style} value={style}>
+                {BASEMAP_STYLE_LABELS[style]}
+              </MenuRadioItem>
+            ))}
+          </MenuRadioGroup>
+          <MenuSeparator />
+          <MenuCheckboxItem
+            checked={preset.labels}
+            onCheckedChange={(labels) => setPreset((prev) => ({ ...prev, labels }))}
+          >
+            Labels
+          </MenuCheckboxItem>
+          <MenuCheckboxItem
+            checked={preset.roads}
+            onCheckedChange={(roads) => setPreset((prev) => ({ ...prev, roads }))}
+          >
+            Roads
+          </MenuCheckboxItem>
+        </MenuContent>
+      </Menu>
+      {routing ? (
         <IconButton
-          size="icon"
-          tooltipSide="right"
-          label="Zoom in"
-          icon={<PlusIcon aria-hidden="true" />}
-          onClick={() => map?.zoomIn()}
+          label="Route between two points"
+          aria-pressed={routingActive}
+          disabled={!canRoute}
+          icon={<NavigationIcon aria-hidden="true" />}
+          onClick={() => (routingActive ? exitRouting() : enterRouting())}
         />
-        <IconButton
-          size="icon"
-          tooltipSide="right"
-          label="Zoom out"
-          icon={<MinusIcon aria-hidden="true" />}
-          onClick={() => map?.zoomOut()}
-        />
-        <IconButton
-          size="icon"
-          tooltipSide="right"
-          label="Fit map to all data"
-          icon={<MaximizeIcon aria-hidden="true" />}
-          disabled={!dataBbox}
-          onClick={() => {
-            if (dataBbox) map?.fitBounds(dataBbox, { padding: mapPadding(100), maxDuration: 200 });
-          }}
-        />
-      </div>
-      <div className="flex flex-col border-t">
-        <IconButton
-          size="icon"
-          tooltipSide="right"
-          id={mapSearchToggleId(searchPanelId)}
-          label="Open map search"
-          aria-expanded={searchOpen}
-          aria-controls={searchPanelId}
-          icon={<SearchIcon aria-hidden="true" />}
-          onClick={onToggleSearch}
-        />
-        <Menu>
-          <MenuIconTrigger
-            tooltipSide="right"
-            label="Basemap"
-            icon={<MapIcon aria-hidden="true" />}
-          />
-          <MenuContent>
-            <MenuRadioGroup
-              value={preset.style}
-              onValueChange={(value) => {
-                if (isBasemapStyleId(value)) setPreset((prev) => ({ ...prev, style: value }));
-              }}
-            >
-              {BASEMAP_STYLE_IDS.map((style) => (
-                <MenuRadioItem key={style} value={style}>
-                  {BASEMAP_STYLE_LABELS[style]}
-                </MenuRadioItem>
-              ))}
-            </MenuRadioGroup>
-            <MenuSeparator />
-            <MenuCheckboxItem
-              checked={preset.labels}
-              onCheckedChange={(labels) => setPreset((prev) => ({ ...prev, labels }))}
-            >
-              Labels
-            </MenuCheckboxItem>
-            <MenuCheckboxItem
-              checked={preset.roads}
-              onCheckedChange={(roads) => setPreset((prev) => ({ ...prev, roads }))}
-            >
-              Roads
-            </MenuCheckboxItem>
-          </MenuContent>
-        </Menu>
-        {routing ? (
-          <IconButton
-            size="icon"
-            tooltipSide="right"
-            label="Route between two points"
-            aria-pressed={routingActive}
-            disabled={!canRoute}
-            icon={<NavigationIcon aria-hidden="true" />}
-            onClick={() => (routingActive ? exitRouting() : enterRouting())}
-          />
-        ) : null}
-      </div>
-    </MapPanel>
+      ) : null}
+    </div>
   );
 }

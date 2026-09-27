@@ -6,19 +6,22 @@ import {
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
+  Popover,
+  PopoverContent,
+  PopoverIconTrigger,
   ScrollArea,
   Spinner,
 } from "@osmix/ui";
 import { useSetAtom } from "jotai";
 import { SearchIcon } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 
 import { useMap, useMapPadding, useSelectAndFlyToEntity } from "../hooks/map.ts";
 import { type EntityQuery, getOsmixEntityByStringId, parseEntityQuery } from "../lib/entity-id.ts";
 import { nominatimPlaceAtom } from "../state/nominatim.ts";
 import { exitRoutingModeAtom } from "../state/routing.ts";
 import { useMapDatasets } from "./map-datasets.tsx";
-import { MapPanel, useMapAnnounce, useMapOverlayAction } from "./map-overlay.tsx";
+import { useMapAnnounce } from "./map-overlay.tsx";
 import {
   focusNominatimResult,
   type NominatimResult,
@@ -30,11 +33,6 @@ import {
  * selects an entity, so the inspector must give its title this slot and `tabIndex={-1}`.
  */
 export const MAP_INSPECTOR_TITLE_SLOT = "map-inspector-title";
-
-/** The DOM id of the toolbar button that opens the search panel with `panelId`. */
-export function mapSearchToggleId(panelId: string): string {
-  return `${panelId}-toggle`;
-}
 
 function focusById(id: string): boolean {
   const element = document.getElementById(id);
@@ -59,41 +57,60 @@ function focusMapInspectorTitle(fallbackId: string): void {
 }
 
 /**
- * The map search panel, next to the toolbar while `open`. One field takes either a place name
- * (looked up on Nominatim, biased to the current view) or an entity reference (`node/123`,
- * `way 123`, `r-5`); an entity is looked up in each loaded dataset in order, selected and flown
- * to. `id` is the panel's DOM id, which the toolbar's "Open map search" button names in
- * `aria-controls`; closing returns focus to that button (`mapSearchToggleId(id)`). Esc closes
- * it, from the field or through the overlay's Esc stack.
+ * The map search: a nav button that opens a popover under it. One field takes either a place
+ * name (looked up on Nominatim, biased to the current view) or an entity reference
+ * (`node/123`, `way 123`, `r-5`); an entity is looked up in each loaded dataset in order,
+ * selected and flown to, and focus moves to the inspector's title. The popover owns Esc,
+ * outside clicks and returning focus to the button.
  */
-export function MapSearch({
-  id,
-  open,
-  onClose,
-}: {
-  id: string;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const close = () => {
-    onClose();
-    focusById(mapSearchToggleId(id));
-  };
-  useMapOverlayAction("search", open, close);
-  if (!open) return null;
-  return <MapSearchPanel id={id} onClose={close} onEntitySelected={onClose} />;
+export function MapSearch() {
+  const toggleId = useId();
+  const [open, setOpen] = useState(false);
+  // An entity selection sends focus to the inspector, so closing must not pull it back.
+  const keepFocus = useRef(false);
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (next) keepFocus.current = false;
+        setOpen(next);
+      }}
+    >
+      <PopoverIconTrigger
+        id={toggleId}
+        label="Open map search"
+        icon={<SearchIcon aria-hidden="true" />}
+      />
+      <PopoverContent
+        align="end"
+        className="w-96"
+        finalFocus={() => !keepFocus.current}
+        aria-label="Map search"
+      >
+        <MapSearchPanel
+          toggleId={toggleId}
+          onClose={() => setOpen(false)}
+          onEntitySelected={() => {
+            keepFocus.current = true;
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 /** Mounted only while the search is open, so its query and results reset on close. */
 function MapSearchPanel({
-  id,
+  toggleId,
   onClose,
   onEntitySelected,
 }: {
-  id: string;
-  /** Close and return focus to the toolbar button. */
+  /** The search button's DOM id. */
+  toggleId: string;
+  /** Close and return focus to the search button. */
   onClose: () => void;
-  /** Close without moving focus; the caller sends it to the inspector. */
+  /** Close without moving focus; this panel sends it to the inspector. */
   onEntitySelected: () => void;
 }) {
   const map = useMap();
@@ -117,13 +134,13 @@ function MapSearchPanel({
       if (!entity) continue;
       // Leave the routing tool so the entity view opens (route mode would keep it hidden).
       exitRouting();
-      // Focus the toolbar button before selecting: the inspector records what had focus when
+      // Focus the search button before selecting: the inspector records what had focus when
       // it opened, so closing it later returns focus to the search button, not the map.
-      focusById(mapSearchToggleId(id));
+      focusById(toggleId);
       selectAndFlyToEntity(dataset.osm, entity);
       // The inspector announces the selection; announcing here too would read it twice.
       onEntitySelected();
-      focusMapInspectorTitle(mapSearchToggleId(id));
+      focusMapInspectorTitle(toggleId);
       return;
     }
     setMiss(entityQuery);
@@ -165,13 +182,7 @@ function MapSearchPanel({
   };
 
   return (
-    <MapPanel
-      id={id}
-      data-slot="map-search"
-      role="search"
-      aria-label="Map search"
-      className="min-w-0 flex-1"
-    >
+    <div data-slot="map-search" role="search" aria-label="Map search" className="flex flex-col">
       <form
         className="shrink-0 p-1"
         onSubmit={(e) => {
@@ -185,11 +196,6 @@ function MapSearchPanel({
             onFocus={(e) => e.target.select()}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Escape") return;
-              e.preventDefault();
-              onClose();
-            }}
             placeholder="Place, or node/…, way/…, relation/…"
             aria-label="Place or entity ID"
           />
@@ -244,6 +250,6 @@ function MapSearchPanel({
           </ul>
         </ScrollArea>
       )}
-    </MapPanel>
+    </div>
   );
 }

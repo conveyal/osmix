@@ -144,9 +144,9 @@ function ToastIcon({ variant }: { variant: Exclude<ToastVariant, "progress"> }) 
 }
 
 /**
- * Mount once near the app root: renders queued toasts, newest first, centred along the top of
- * `MapContent` (`useToastAnchor`), or under the nav when no `MapContent` is mounted. At the
- * supported minimum (a 576px map) the centred 384px column clears the top-left map toolbar.
+ * Mount once near the app root: renders queued toasts, newest first, in the top-right corner of
+ * `MapContent` (`useToastAnchor`), or under the nav when no `MapContent` is mounted. The corner
+ * is the toasts' alone: the inspector and legend share the left column.
  */
 export function Toaster() {
   const anchor = useToastAnchor();
@@ -157,7 +157,7 @@ export function Toaster() {
         <ToastPrimitive.Viewport
           data-slot="toast-viewport"
           className={cn(
-            "pointer-events-none left-1/2 z-50 flex w-96 -translate-x-1/2 flex-col gap-2",
+            "pointer-events-none right-2 z-50 flex w-96 flex-col gap-2",
             anchor ? "absolute top-2" : "fixed top-[calc(var(--header-height)+0.5rem)]",
           )}
         >
