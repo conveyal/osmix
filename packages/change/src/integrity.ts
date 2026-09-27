@@ -1,6 +1,7 @@
 import type { Osm } from "@osmix/core";
 import type { OsmRelation, OsmWay } from "@osmix/types";
 
+import { inputProvenance } from "./provenance.ts";
 import { routingGradeSignature } from "./utils.ts";
 
 type IntegrityIssue = {
@@ -254,6 +255,7 @@ export function inheritedRoutingIntegrityIssueKeys(
   baseKeys: ReadonlySet<string> = routingIntegrityIssueKeys(base),
 ) {
   const keys = new Set(baseKeys);
+  const provenance = inputProvenance(base, patch);
   for (const issue of collectRoutingIntegrityIssues(patch)) {
     // Missing references and degenerate highways in a patch are never inherited:
     // accepting them would allow malformed input to pass through unchanged.
@@ -265,13 +267,9 @@ export function inheritedRoutingIntegrityIssueKeys(
     if (kind === "restriction") continue;
     const id = Number(idText);
     const collidesWithBase =
-      kind === "node"
-        ? base.nodes.ids.has(id)
-        : kind === "way"
-          ? base.ways.ids.has(id)
-          : kind === "relation" || kind === "restriction"
-            ? base.relations.ids.has(id)
-            : false;
+      kind === "node" || kind === "way" || kind === "relation"
+        ? provenance.isBase(kind, id)
+        : false;
     if (!collidesWithBase) keys.add(issue.key);
   }
   return keys;

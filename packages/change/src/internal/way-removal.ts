@@ -4,6 +4,7 @@ import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { OsmNode, OsmTags, OsmWay } from "@osmix/types";
 import { normalizedWayDirection } from "@osmix/types/way-direction";
 
+import { inputProvenance } from "../provenance.ts";
 import { isDescriptiveWayTag } from "../rules/tags.ts";
 import type {
   OsmConflationCandidate,
@@ -83,6 +84,7 @@ export function assessWayRemovals(
   ) => OsmConflationResolvedActions,
   current?: Osm,
 ) {
+  const provenance = inputProvenance(base, patch);
   const results = new Map<string, OsmConflationWayRemovalAssessment>();
   if (
     !discovery.options.allowWayRemoval ||
@@ -123,7 +125,7 @@ export function assessWayRemovals(
     for (const way of current.ways) ways.set(way.id, way);
   } else {
     for (const [id, way] of ways) {
-      if (base.ways.ids.has(id)) continue;
+      if (provenance.isBase("way", id)) continue;
       ways.set(id, {
         ...way,
         refs: way.refs.map((ref) => {
@@ -185,7 +187,13 @@ export function assessWayRemovals(
       blockingRelationIds: [],
       sourceTags: { ...source?.tags },
     };
-    if (!source || !target || !currentSource || !currentTarget || base.ways.ids.has(source.id)) {
+    if (
+      !source ||
+      !target ||
+      !currentSource ||
+      !currentTarget ||
+      provenance.isBase("way", source.id)
+    ) {
       reasons.add("way-removal-topology-conflict");
       results.set(candidate.id, { status: "blocked", reasons: [...reasons].toSorted(), preview });
       continue;
@@ -283,7 +291,7 @@ export function assessWayRemovals(
         preview.blockedNodeIds.push(ref);
       }
       if (
-        (base.nodes.ids.has(ref) && paired !== ref) ||
+        (provenance.isBase("node", ref) && paired !== ref) ||
         (attachments.has(ref) && attachments.get(ref)?.target !== paired)
       ) {
         reasons.add("way-removal-topology-conflict");
@@ -297,7 +305,7 @@ export function assessWayRemovals(
       if (!branches.length) continue;
       const attachment = paired === undefined ? undefined : nodeCandidates.get(`${ref}:${paired}`);
       const decision = attachment ? decisions.get(attachment.id) : undefined;
-      const existing = ref === paired && base.nodes.ids.has(ref);
+      const existing = ref === paired && provenance.isBase("node", ref);
       const explicit =
         existing ||
         (decision?.action === "accept" &&
@@ -329,11 +337,11 @@ export function assessWayRemovals(
       }
     }
     for (const ref of new Set([...source.refs, ...currentSource.refs])) {
-      if (base.nodes.ids.has(ref) || !patch.nodes.ids.has(ref)) continue;
+      if (!provenance.isImported("node", ref)) continue;
       if (Object.keys(nodeAt(ref)?.tags ?? {}).length) preview.retainedTaggedNodeIds.push(ref);
     }
     for (const ref of new Set(currentSource.refs)) {
-      const unused = isUnusedImportedNode(base, patch, nodeAt(ref), {
+      const unused = isUnusedImportedNode(provenance, nodeAt(ref), {
         byWay: [...(currentIncidence.get(ref) ?? [])].some((id) => id !== source.id),
         byRelation: relationsByMember.has(`node:${ref}`),
       });

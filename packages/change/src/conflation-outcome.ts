@@ -1,5 +1,6 @@
 import type { Osm } from "@osmix/core";
 
+import { inputProvenance } from "./provenance.ts";
 import type {
   OsmConflationCandidate,
   OsmConflationDecision,
@@ -77,6 +78,7 @@ function actualWayRemoval(
 }
 
 function retainedImports(base: Osm, patch: Osm, baseline: Osm, result: Osm) {
+  const provenance = inputProvenance(base, patch);
   const counts: OsmConflationRetainedImports = {
     originalIds: { nodes: 0, ways: 0, relations: 0 },
     ordinaryAdditions: { nodes: 0, ways: 0, relations: 0 },
@@ -85,7 +87,8 @@ function retainedImports(base: Osm, patch: Osm, baseline: Osm, result: Osm) {
     for (const source of patch[type]) {
       if (!result[type].ids.has(source.id)) continue;
       counts.originalIds[type]++;
-      if (!base[type].ids.has(source.id) && baseline[type].ids.has(source.id))
+      const kind = type === "nodes" ? "node" : type === "ways" ? "way" : "relation";
+      if (provenance.isImported(kind, source.id) && baseline[type].ids.has(source.id))
         counts.ordinaryAdditions[type]++;
     }
   }
@@ -148,9 +151,10 @@ export function createConflationOutcomeReport(
   // Unmatched candidates have no attachment evidence. Inspect actual ordinary
   // imports too, so an unattached endpoint is still reported as unresolved.
   const sourceWays = new Map<number, number[]>();
+  const provenance = inputProvenance(base, patch);
   if (discovery.options.attachNetwork) {
     for (const importedWay of patch.ways) {
-      if (base.ways.ids.has(importedWay.id)) continue;
+      if (!provenance.isImported("way", importedWay.id)) continue;
       const way = ordinaryBaseline.ways.getById(importedWay.id);
       if (!way) continue;
       for (const sourceId of new Set(way.refs)) {

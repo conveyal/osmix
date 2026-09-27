@@ -22,6 +22,7 @@ import {
 import { featureTypeConflicts } from "./internal/feature-classification.ts";
 import { isUnusedImportedNode } from "./internal/imported-nodes.ts";
 import { assessWayRemovals } from "./internal/way-removal.ts";
+import { inputProvenance, type MergeProvenance } from "./provenance.ts";
 import { accessSignature, barrierSignature } from "./rules/access.ts";
 import { isAreaWay } from "./rules/area.ts";
 import {
@@ -77,6 +78,7 @@ type EntityRelationContext = {
 type DiscoveryContext = {
   base: Osm;
   patch: Osm;
+  provenance: MergeProvenance;
   options: ResolvedOsmConflationOptions;
   baseWaysByNode: Map<number, OsmWay[]>;
   patchWaysByNode: Map<number, OsmWay[]>;
@@ -453,7 +455,8 @@ function nodeAttachmentAssessment(
   if (!context.options.attachNetwork)
     return { assessment: { status: "blocked", reasons: [] }, evidence: {} };
   const sourceWays = patchWays.filter(
-    (way) => !context.base.ways.ids.has(way.id) && wayRoutingFamily(way) !== "non-routable",
+    (way) =>
+      context.provenance.isImported("way", way.id) && wayRoutingFamily(way) !== "non-routable",
   );
   const targetWays = baseWays.filter((way) => wayRoutingFamily(way) !== "non-routable");
   if (sourceWays.length === 0 || targetWays.length === 0) {
@@ -621,12 +624,12 @@ function discoverNodeCandidates(context: DiscoveryContext) {
   for (const source of context.patch.nodes.sorted()) {
     // Same-ID entities belong to ordinary merge semantics; fuzzy matching must not
     // reinterpret an authoritative patch update.
-    if (context.base.nodes.ids.has(source.id)) continue;
+    if (context.provenance.isBase("node", source.id)) continue;
     const patchWays = context.patchWaysByNode.get(source.id) ?? [];
     const eligible =
       context.options.propertyKeys.some((key) => source.tags?.[key] != null) ||
       (context.options.attachNetwork &&
-        patchWays.some((way) => !context.base.ways.ids.has(way.id)));
+        patchWays.some((way) => context.provenance.isImported("way", way.id)));
     if (!eligible) continue;
 
     const nearby = context.base.nodes
@@ -634,7 +637,7 @@ function discoverNodeCandidates(context: DiscoveryContext) {
       .map((index) => context.base.nodes.getByIndex(index));
     // A base ID also present in the patch is mutable under direct merge, so it is
     // not an immutable target for a different imported entity.
-    const targets = nearby.filter((target) => !context.patch.nodes.ids.has(target.id));
+    const targets = nearby.filter((target) => !context.provenance.isPatch("node", target.id));
     if (targets.length === 0) {
       candidates.push({
         id: candidateId("node", source.id, null),
@@ -729,7 +732,7 @@ function discoverWayCandidates(context: DiscoveryContext) {
   if (context.options.propertyKeys.length === 0 && !context.options.allowWayRemoval)
     return candidates;
   for (const source of context.patch.ways.sorted()) {
-    if (context.base.ways.ids.has(source.id)) continue;
+    if (context.provenance.isBase("way", source.id)) continue;
     if (
       !context.options.allowWayRemoval &&
       !context.options.propertyKeys.some((key) => source.tags?.[key] != null)
@@ -754,7 +757,7 @@ function discoverWayCandidates(context: DiscoveryContext) {
     }[] = [];
     for (const index of nearbyIndexes) {
       const target = context.base.ways.getByIndex(index);
-      if (context.patch.ways.ids.has(target.id)) continue;
+      if (context.provenance.isPatch("way", target.id)) continue;
       const targetCoordinates = wayCoordinates(context.base, target);
       if (targetCoordinates.length < 2) continue;
       const endpoints = endpointDistances(sourceCoordinates, targetCoordinates);
@@ -890,6 +893,7 @@ export function discoverConflationCandidates(
   const context: DiscoveryContext = {
     base,
     patch,
+    provenance: inputProvenance(base, patch),
     options: resolved,
     baseWaysByNode: waysByNode(base),
     patchWaysByNode: waysByNode(patch),
@@ -1535,7 +1539,7 @@ function removeConnectionOrphans(
     const byWay = (patchWaysByNode.get(sourceId) ?? []).some((wayId) =>
       currentEntity(changeset, "way", wayId)?.refs.includes(sourceId),
     );
-    const unused = isUnusedImportedNode(base, patch, node, {
+    const unused = isUnusedImportedNode(inputProvenance(base, patch), node, {
       byWay,
       byRelation: relationNodeMembers.has(sourceId),
     });
