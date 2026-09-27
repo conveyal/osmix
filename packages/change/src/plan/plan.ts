@@ -5,8 +5,8 @@
  * records in one overlay, grouped into features and proposals. Nothing is built until
  * `applyPlan`, which materializes the records in a single pass and validates the result.
  *
- * Phases, in order: direct and same-ID changes, then identity (imported points at identical
- * coordinates, then ways that became identical).
+ * Phases, in order: direct and same-ID changes; identity (imported points at identical
+ * coordinates, then ways that became identical); matching, when configured.
  */
 import type { Osm } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
@@ -15,7 +15,9 @@ import { applyChangesetToOsm } from "../apply-changeset.ts";
 import { OsmChangeset } from "../changeset.ts";
 import { generateOscChanges, type OscOptions } from "../osc.ts";
 import type { OsmChangesetStats } from "../types.ts";
+import type { OsmConflationDiscovery } from "../types.ts";
 import { entityToken, PlanBuilder } from "./builder.ts";
+import { planMatching } from "./matching.ts";
 import { type PatchIdRemap, planPatchIdRemap, remappedCount, remapPatch } from "./remap.ts";
 import type {
   MergePlan,
@@ -32,6 +34,7 @@ interface PlanState {
   patch: Osm;
   remap: PatchIdRemap;
   changeset: OsmChangeset;
+  discovery?: OsmConflationDiscovery;
 }
 
 const planStates = new WeakMap<MergePlan, PlanState>();
@@ -81,6 +84,12 @@ export function planMerge(
   log(`Planning identical points and ways from ${patch.id}...`);
   planIdentity(builder, changeset, planned, resolved.mergeIdenticalPoints ? "automatic" : "review");
 
+  let matched: ReturnType<typeof planMatching> | undefined;
+  if (options.matching) {
+    log(`Planning matches from ${patch.id} to ${base.id}...`);
+    matched = planMatching(builder, changeset, base, planned, options.matching);
+  }
+
   const { summary, staleDecisions } = builder.finish(base, planned, changeset, resolved);
   const plan: MergePlan = {
     version: 1,
@@ -91,8 +100,15 @@ export function planMerge(
     proposals: builder.proposals,
     summary,
     staleDecisions,
+    ...(matched ? { matching: matched.matching } : {}),
   };
-  planStates.set(plan, { base, patch: planned, remap, changeset });
+  planStates.set(plan, {
+    base,
+    patch: planned,
+    remap,
+    changeset,
+    ...(matched ? { discovery: matched.discovery } : {}),
+  });
   return plan;
 }
 
@@ -156,6 +172,13 @@ export function applyPlan(plan: MergePlan, newOsmId?: string): MergePlanResult {
   const { changeset } = planState(plan);
   const osm = applyChangesetToOsm(changeset, newOsmId);
   return { osm, summary: plan.summary, stats: changeset.stats };
+}
+
+/** The matching candidate behind a matching proposal: its evidence and every assessment. */
+export function getMergePlanCandidate(plan: MergePlan, proposalId: string) {
+  const proposal = plan.proposals.get(proposalId);
+  if (!proposal || !("candidateId" in proposal)) return undefined;
+  return planState(plan).discovery?.candidates.find(({ id }) => id === proposal.candidateId);
 }
 
 /** The plan's changes as an osmChange document. */

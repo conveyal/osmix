@@ -4,6 +4,12 @@
  */
 import type { GeoBbox2D, OsmEntityType } from "@osmix/types";
 
+import type {
+  OsmConflationOptions,
+  OsmConflationOutcomeReport,
+  OsmConflationSummary,
+} from "../types.ts";
+
 /**
  * How patch IDs are read (the OSM convention by default):
  * - `osm`: negative IDs are new features; positive IDs edit the base entity with that ID.
@@ -19,6 +25,11 @@ export interface MergePlanOptions {
    * base automatically. When false, those merges wait for a decision. Defaults to true.
    */
   mergeIdenticalPoints?: boolean;
+  /**
+   * Match imported features to nearby base features (copy tags, connect, remove duplicates).
+   * Off unless configured. Decide its proposals with `decisions`, not `matching.decisions`.
+   */
+  matching?: Omit<OsmConflationOptions, "decisions">;
   /** Decisions on proposals, by proposal ID. The plan is rebuilt with them applied. */
   decisions?: readonly PlanDecision[];
 }
@@ -99,11 +110,38 @@ export interface WayReconcileProposal extends PlanProposalBase {
   target: EntityKey;
 }
 
+interface MatchingProposalBase extends PlanProposalBase {
+  source: EntityKey;
+  target: EntityKey;
+  /** The matching candidate this action belongs to, for its evidence. */
+  candidateId: string;
+  /** Proposals of the same kind for the same source: accept at most one. */
+  alternatives: string[];
+}
+
+/** A nearby imported point becomes a base point in the network (MP-M3). */
+export interface ConnectProposal extends MatchingProposalBase {
+  kind: "connect";
+}
+
+/** Selected tags of an imported feature are copied onto its base match (MP-M2). */
+export interface CopyTagsProposal extends MatchingProposalBase {
+  kind: "copy-tags";
+}
+
+/** An imported way duplicating a base way is removed after its checks pass (MP-R1). */
+export interface RemoveWayProposal extends MatchingProposalBase {
+  kind: "remove-way";
+}
+
 export type PlanProposal =
   | AddProposal
   | SameIdReplaceProposal
   | ExactMergeProposal
-  | WayReconcileProposal;
+  | WayReconcileProposal
+  | ConnectProposal
+  | CopyTagsProposal
+  | RemoveWayProposal;
 
 /** One imported feature: a way with its vertices, a standalone node, or a relation. */
 export interface PlanFeature {
@@ -138,4 +176,6 @@ export interface MergePlan {
   summary: MergePlanSummary;
   /** Decisions naming proposals this plan does not have, for example after another decision. */
   staleDecisions: string[];
+  /** Present when matching is configured. */
+  matching?: { candidates: OsmConflationSummary; outcome: OsmConflationOutcomeReport };
 }

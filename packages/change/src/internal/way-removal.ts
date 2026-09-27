@@ -16,6 +16,7 @@ import type {
   OsmConflationWayRemovalAssessment,
   OsmConflationWayRemovalPreview,
 } from "../types.ts";
+import type { DatasetReader } from "../views.ts";
 
 const MATCH_BLOCKERS = new Set<OsmConflationReasonCode>([
   "feature-type-conflict",
@@ -82,7 +83,7 @@ export function assessWayRemovals(
     candidate: OsmConflationCandidate,
     decision?: OsmConflationDecision,
   ) => OsmConflationResolvedActions,
-  current?: Osm,
+  current?: DatasetReader,
 ) {
   const provenance = inputProvenance(base, patch);
   const results = new Map<string, OsmConflationWayRemovalAssessment>();

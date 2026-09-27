@@ -16,6 +16,7 @@ import type {
   OsmConflationUnresolvedKind,
   OsmConflationWayRemovalPreview,
 } from "./types.ts";
+import type { DatasetReader } from "./views.ts";
 
 /** Actual changing writers, rather than assignments that merely repeat an existing value. */
 export interface ConflationApplicationTrace {
@@ -34,7 +35,7 @@ export function conflationTagSourceKey(candidate: OsmConflationCandidate, key: s
   return `${candidate.id}:${key}`;
 }
 
-function entity(osm: Osm, entityType: OsmConflationEntityType, id: number) {
+function entity(osm: DatasetReader, entityType: OsmConflationEntityType, id: number) {
   return entityType === "node" ? osm.nodes.getById(id) : osm.ways.getById(id);
 }
 
@@ -49,8 +50,8 @@ function explicitlySkipped(decision: OsmConflationDecision | undefined): boolean
 }
 
 function actualWayRemoval(
-  baseline: Osm,
-  result: Osm,
+  baseline: DatasetReader,
+  result: DatasetReader,
   preview: OsmConflationWayRemovalPreview | undefined,
 ): OsmConflationWayRemovalPreview | undefined {
   if (!preview || !baseline.ways.ids.has(preview.sourceWayId)) return undefined;
@@ -77,7 +78,7 @@ function actualWayRemoval(
   };
 }
 
-function retainedImports(base: Osm, patch: Osm, baseline: Osm, result: Osm) {
+function retainedImports(base: Osm, patch: Osm, baseline: DatasetReader, result: DatasetReader) {
   const provenance = inputProvenance(base, patch);
   const counts: OsmConflationRetainedImports = {
     originalIds: { nodes: 0, ways: 0, relations: 0 },
@@ -130,8 +131,8 @@ function unresolvedKind(
 export function createConflationOutcomeReport(
   base: Osm,
   patch: Osm,
-  ordinaryBaseline: Osm,
-  result: Osm,
+  ordinaryBaseline: DatasetReader,
+  result: DatasetReader,
   discovery: OsmConflationDiscovery,
   decisions: readonly OsmConflationDecision[],
   trace: ConflationApplicationTrace,

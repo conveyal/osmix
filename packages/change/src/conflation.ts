@@ -18,6 +18,8 @@ import { generateChangeset } from "./generate-changeset.ts";
 import { assertConflationPreservesBaseTopology, restrictionTopologyIssues } from "./integrity.ts";
 import { featureTypeConflicts } from "./internal/feature-classification.ts";
 import { assessWayRemovals } from "./internal/way-removal.ts";
+import type { PlanOverlay } from "./plan/overlay.ts";
+import { plannedMatchingViews } from "./plan/views.ts";
 import { inputProvenance, type MergeProvenance } from "./provenance.ts";
 import { accessSignature } from "./rules/access.ts";
 import { isAreaWay } from "./rules/area.ts";
@@ -862,9 +864,36 @@ export function discoverConflationCandidates(
   patch: Osm,
   options: OsmConflationOptions,
 ): OsmConflationDiscovery {
+  return discoverOnViews(base, patch, osmDatasetView(base), osmDatasetView(patch), options);
+}
+
+/**
+ * @internal Discover candidates on a merge plan's state after its direct and identity phases.
+ * Imported entities those phases consumed are not sources; targets stay base entities.
+ */
+export function discoverPlannedConflationCandidates(
+  base: Osm,
+  planned: Osm,
+  overlay: PlanOverlay,
+  options: OsmConflationOptions,
+): OsmConflationDiscovery {
+  const { baseView, patchView } = plannedMatchingViews(
+    overlay,
+    base,
+    planned,
+    inputProvenance(base, planned),
+  );
+  return discoverOnViews(base, planned, baseView, patchView, options);
+}
+
+function discoverOnViews(
+  base: Osm,
+  patch: Osm,
+  baseView: DatasetView,
+  patchView: DatasetView,
+  options: OsmConflationOptions,
+): OsmConflationDiscovery {
   const resolved = resolvedOptions(options);
-  const baseView = osmDatasetView(base);
-  const patchView = osmDatasetView(patch);
   const context: DiscoveryContext = {
     base,
     patch,
@@ -1612,9 +1641,10 @@ function applyDiscoveredConflation(
       decisionsById.get(candidate.id)?.removeWay === true,
   );
   if (selectedRemovals.length) {
-    // Recheck the actual ordinary merge plus all accepted copy/connection changes.
-    // Validate every plan before deleting anything, so dependent removals cannot bypass checks.
-    const current = applyChangesetToOsm(changeset);
+    // Recheck the current state: the ordinary merge plus all accepted copy/connection
+    // changes. Validate every removal before deleting anything, so dependent removals cannot
+    // bypass checks.
+    const current = changeset.overlay.reader();
     const assessments = assessWayRemovals(
       originalBase,
       patch,
@@ -1646,6 +1676,33 @@ function applyDiscoveredConflation(
   // Last, so removal checks see the imported geometry they were reviewed against.
   removeConnectionOrphans(changeset, originalBase, patch, attachments, trace);
   return trace;
+}
+
+/**
+ * @internal Apply matching decisions to a merge plan's changes, in place, and report what
+ * they did against the plan's state before matching.
+ */
+export function applyPlannedConflation(
+  changeset: OsmChangeset,
+  base: Osm,
+  planned: Osm,
+  discovery: OsmConflationDiscovery,
+  decisions: readonly OsmConflationDecision[],
+) {
+  const before = changeset.overlay.snapshot().reader();
+  const trace = applyDiscoveredConflation(changeset, base, planned, discovery, decisions);
+  const after = changeset.overlay.reader();
+  assertConflationPreservesBaseTopology(base, before, after);
+  return createConflationOutcomeReport(
+    base,
+    planned,
+    before,
+    after,
+    discovery,
+    decisions,
+    trace,
+    resolveConflationActions,
+  );
 }
 
 function generateConflationApplicationArtifacts(

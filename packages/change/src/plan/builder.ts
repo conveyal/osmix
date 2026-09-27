@@ -31,6 +31,9 @@ const PROPOSAL_OUTCOME: Record<PlanProposal["kind"], PlanOutcome> = {
   "same-id-replace": "replaced",
   "exact-merge": "merged",
   "way-reconcile": "merged",
+  connect: "connected",
+  "copy-tags": "merged",
+  "remove-way": "removed",
 };
 
 function proposalEffect(
@@ -69,6 +72,11 @@ export class PlanBuilder {
   /** The patch's ID for a planned ID, for proposal IDs that survive a remap. */
   originalToken(type: OsmEntityType, plannedId: number) {
     return entityToken(type, originalId(this.remap, type, plannedId));
+  }
+
+  /** A decision on a proposal the plan has not made yet. */
+  decisionFor(proposalId: string) {
+    return this.decisions.get(proposalId);
   }
 
   featureOfNode(plannedId: number) {

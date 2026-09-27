@@ -3,6 +3,7 @@ import type { OsmRelation, OsmWay } from "@osmix/types";
 
 import { inputProvenance } from "./provenance.ts";
 import { routingGradeSignature } from "./utils.ts";
+import type { DatasetReader } from "./views.ts";
 
 type IntegrityIssue = {
   key: string;
@@ -294,8 +295,8 @@ export function assertNoNewRoutingIntegrityIssues(baselineKeys: ReadonlySet<stri
  */
 export function assertConflationPreservesBaseTopology(
   originalBase: Osm,
-  ordinaryBaseline: Osm,
-  conflated: Osm,
+  ordinaryBaseline: DatasetReader,
+  conflated: DatasetReader,
 ) {
   const violations: string[] = [];
   for (const original of originalBase.nodes) {

@@ -14,6 +14,20 @@ export type EntityRelationContext = {
   restrictionWays: Set<number>;
 };
 
+/** Entity lookups and iteration: what an `Osm` table offers, readable from a plan too. */
+export interface EntityReader<T> extends Iterable<T> {
+  getById(id: number): T | null | undefined;
+  ids: { has(id: number): boolean };
+}
+
+/** A dataset read by ID, without spatial indexes. An `Osm` is one; so is a plan's state. */
+export interface DatasetReader {
+  readonly id: string;
+  readonly nodes: EntityReader<OsmNode>;
+  readonly ways: EntityReader<OsmWay>;
+  readonly relations: EntityReader<OsmRelation>;
+}
+
 export interface DatasetView {
   readonly id: string;
   /** Nodes in ascending ID order. */

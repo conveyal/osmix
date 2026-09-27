@@ -24,6 +24,7 @@ import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 
 import type { OsmChange, OsmEntityRef } from "../types.ts";
 import { cleanCoords } from "../utils.ts";
+import type { DatasetReader, EntityReader } from "../views.ts";
 import { GridIndex } from "./grid-index.ts";
 
 type ChangeRecords<T extends OsmEntityType> = Record<number, OsmChange<OsmEntityTypeMap[T]>>;
@@ -209,6 +210,19 @@ export class PlanOverlay {
     if (type === "way") this.invalidateWayGeometry(id);
   }
 
+  /** Current nodes: base order first, then created nodes in record order. */
+  *nodes(): Generator<OsmNode> {
+    for (const node of this.base.nodes) {
+      const change = this.nodeChanges[node.id];
+      if (change?.changeType === "delete") continue;
+      yield change?.entity ?? node;
+    }
+    for (const change of Object.values(this.nodeChanges)) {
+      if (this.base.nodes.ids.has(change.entity.id) || change.changeType === "delete") continue;
+      yield change.entity;
+    }
+  }
+
   /** Current ways: base order first, then created ways in record order. */
   *ways(): Generator<OsmWay> {
     for (const way of this.base.ways) {
@@ -232,6 +246,43 @@ export class PlanOverlay {
       if (this.base.relations.ids.has(change.entity.id) || change.changeType === "delete") continue;
       yield change.entity;
     }
+  }
+
+  /** A copy of the current records over the same base, unaffected by later changes. */
+  snapshot(): PlanOverlay {
+    const copy = new PlanOverlay(this.base);
+    copy.nodeChanges = { ...this.nodeChanges };
+    copy.wayChanges = { ...this.wayChanges };
+    copy.relationChanges = { ...this.relationChanges };
+    if (Object.keys(copy.nodeChanges).length > 0) copy.nodeCoordinateRevision++;
+    return copy;
+  }
+
+  /** The planned state read by ID, as the materialized dataset would read. */
+  reader(): DatasetReader {
+    const table = <T>(
+      getById: (id: number) => T | null,
+      iterate: () => Iterator<T>,
+    ): EntityReader<T> => ({
+      getById,
+      ids: { has: (id) => getById(id) != null },
+      [Symbol.iterator]: iterate,
+    });
+    return {
+      id: this.base.id,
+      nodes: table(
+        (id) => this.getNode(id),
+        () => this.nodes(),
+      ),
+      ways: table(
+        (id) => this.getWay(id),
+        () => this.ways(),
+      ),
+      relations: table(
+        (id) => this.getRelation(id),
+        () => this.relations(),
+      ),
+    };
   }
 
   /** How many nodes the planned dataset has. */
