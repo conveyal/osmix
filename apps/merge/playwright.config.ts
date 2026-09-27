@@ -3,9 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   testMatch: [
-    "guidance.spec.ts",
-    "match-evidence.spec.ts",
-    "way-removal.spec.ts",
+    "plan-review.spec.ts",
     "merge-base-loading.spec.ts",
     "monaco-merge-patch.spec.ts",
     "worker-runtime.spec.ts",
@@ -31,16 +29,16 @@ export default defineConfig({
     {
       // Keep even the lightweight browser harness off the runner while the real
       // Merge journey is parsing PBFs and rendering MapLibre.
-      name: "guidance",
+      name: "plan-review",
       dependencies: ["merge-integration"],
-      testMatch: ["guidance.spec.ts", "match-evidence.spec.ts", "way-removal.spec.ts"],
+      testMatch: ["plan-review.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
     {
       // Worker restart and multi-worker tests run last so their nested workers
       // cannot starve either UI project on small CI runners.
       name: "worker-runtime",
-      dependencies: ["guidance"],
+      dependencies: ["plan-review"],
       testMatch: ["worker-runtime.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },

@@ -6,21 +6,33 @@ tokens, spacing, primitives, map overlay primitives) lives in
 
 ## Merge-only components
 
-- `MergeStepGuide` — the standard layered explanation at the top of each
-  numbered merge stage.
-- `MergeStart` — the input step's "Workflow" card: the "Run every stage
-  automatically, without review" checkbox (its `InfoTooltip` lists what runs
-  without stopping) and the one regular "Start merge" `Button`. The only
-  visible help is the reason the checkbox is disabled during removal review.
+- `PlanInputs` — the input step's **Plan** card: "Merge points at identical
+  coordinates automatically" (on by default), "Treat every patch feature as
+  new", and the two entry points in `StepActions`: **Apply automatically**
+  (outline) then **Review plan** (default).
+- `PatchIdNotice` — a warning `Alert` in the review when positive patch IDs
+  replace base entities, with the count and **Treat all as new**, which
+  replans.
+- `PlanSummary` — features by outcome, a destructive `Alert` when the plan
+  would break routing (Apply is disabled), stale decisions, demoted
+  connections, and routing topology in a `Details`.
+- `PlanReview`, `PlanFeatureRow`, `PlanProposalActions` — one row per imported
+  feature (a way with its vertices, a point, or a relation) named
+  "Imported <type> <patch ID>", with its outcome, each proposal's status,
+  effect and reasons, and a radio group per decidable proposal: **Include
+  (automatic)** / **Leave out** for automatic proposals, **Decide later** /
+  **Include** / **Leave out** for proposals that need review. Blocked
+  proposals show reasons and no choice. Filters (outcome, proposal kind) and
+  bulk choices apply to the features shown; bulk Include skips proposals with
+  alternatives.
+- `PlanMapLayer`, `PlanLegend` — imported features coloured by outcome
+  (`--map-outcome-*`), with features that need a decision drawn wider and
+  dashed so colour is never the only cue; clicking a feature opens its row.
+  The legend pairs each colour with its outcome name and count.
+- `MergeResult` — the result step: the completion summary, the merged dataset
+  card, routing topology, positive IDs, and downloads.
 - `StepActions` — the full-width vertical action footer for Merge workflow
   stages. It keeps long decision labels contained in the sidebar.
-- `AutomaticMergeProgress` — a `Card` listing the automatic workflow's stages
-  (completed, running, remaining) with the latest worker line, an elapsed
-  timer, and each stage's own duration. `LiveAutomaticMergeProgress` reads all
-  of it from the "Run automatic merge" task: each stage is a step of that task
-  titled with the stage label. The stage list is the progress indicator; it
-  deliberately renders no `progressbar`, because worker progress has no
-  numeric percentage.
 
 ### Merge step actions
 
@@ -29,32 +41,17 @@ Merge workflow stage. Step footers remain vertical at every sidebar width:
 buttons fill the available width, labels may wrap, and long OSM terminology
 must not force horizontal scrolling.
 
-Place secondary actions first and the primary forward action last. Back, skip,
-and "without" alternatives use the outline variant; preview, continue, apply,
-and download actions use the default variant. Keep compact header actions,
-candidate toolbars, and other non-footer controls in their existing horizontal
-groups. Do not relax the global button primitive's single-line behavior to fix
-a workflow-footer layout.
+Place secondary actions first and the primary forward action last. Back and
+download actions use the outline variant; apply and review use the default
+variant.
 
 ## Merge workflow guidance
 
-Every merge stage must explain itself where the user makes the decision. Keep
-the explanation layered so that experienced users can scan the workflow while
-new users can inspect the consequences before applying anything:
-
-1. Open each stage with the shared `Step` card from `@osmix/ui`. Pass the
-   computed stage number as `number` (it renders "1." in brand mono before the
-   title); omit it for the automatic workflow, whose title stays "Automatic
-   workflow: …". Show one plain-language summary at the top of the step card,
-   before controls or results.
-2. Follow it with a collapsed **How this step works** disclosure using
-   `MergeStepGuide`. Do not duplicate these disclosures at individual call
-   sites; add or revise the app-private guide registry instead.
-3. In the expanded content, identify the inputs being read, changes that may
-   occur, invariants the step preserves, and its output. Include a warning only
-   when the user can make an irreversible or topology-affecting choice.
-4. Reset the disclosure when moving between steps. Opening help must never
-   change a form value, review decision, workflow state, or worker operation.
+The workflow has three steps: **Choose the inputs**, **Review the plan**, and
+**Merged result**; **Apply automatically** replaces the review with one task
+whose steps are Plan merge, Apply plan and Refresh result. Each step opens with
+the shared `Step` card and one plain-language sentence. Nothing changes until
+the plan is applied; say so in the review.
 
 Use the merge terms consistently:
 
@@ -105,10 +102,14 @@ Use the merge terms consistently:
   preserving existing shared junctions, including bridge and tunnel entrances.
   New grade-separated interior crossings remain disconnected, and unsafe
   shared-junction substitutions leave the original connections unchanged.
-- **Start merge** with **Run every stage automatically** off exposes previews
-  and checkpoints for each stage. With it on, the merge skips those checkpoints
-  and uses only behavior explicitly configured for the automatic path. Removal
-  review requires the reviewed workflow, so it disables that checkbox.
+- **Review plan** plans the merge and stops for decisions; **Apply
+  automatically** plans and applies in one run, leaving out proposals that need
+  a decision. Both use the same plan and validation.
+- **Plan**, **proposal**, **outcome**: a plan lists every change a merge would
+  make, as proposals grouped by imported feature; a feature's outcome is its
+  headline (Needs decision, Removed, Merged, Connected, Replaced, Added,
+  Unchanged). **Include** and **Leave out** decide a proposal; **Decide later**
+  leaves it waiting.
 
 Labels must state what a control changes instead of relying on a placeholder.
 Put concise supporting text next to unfamiliar controls and connect it with
@@ -182,15 +183,14 @@ replication, recovery, and disposal coverage.
 
 - Quick/inline waits: `Spinner`.
 - Suspense fallbacks and transitions: `LoadingState` ("Please wait…").
-- Every merge operation (a review stage, candidate discovery, the automatic
-  run, JSON export) is a top-level task (`Tasks.run` / `Tasks.start` from
+- Every merge operation (planning, a decision, applying, the automatic run) is
+  a top-level task (`Tasks.run` / `Tasks.start` from
   `@osmix/app-core`), so it gets a task toast (progress, then its outcome) and
   shows in Activity. Only one runs at a time: the stage buttons read
   `useTaskLock()`. Sub-work is a step (`task.step` / `task.runStep`).
-- The automatic workflow: `AutomaticMergeProgress`. Worker progress
-  (`@osmix/shared` `Progress`) is `{ msg, timestamp, level }` with no numeric
-  percentage, so the stage list carries progress. If `Progress` gains a
-  `percent` field, add a determinate `Progress` bar with a real `value`.
+- The automatic workflow is one task with the steps Plan merge, Apply plan and
+  Refresh result; its toast and Activity carry progress. Cancel stops it only
+  before the plan is applied.
 - Status indication: `StatusDot`, never raw palette colors.
 - Merge notices, recovery prompts and failures use `Alert` (`destructive` for
   failures that need action; `warning` for irreversible choices such as way

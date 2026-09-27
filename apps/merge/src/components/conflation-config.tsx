@@ -10,11 +10,11 @@ import {
 import { useAtom, useSetAtom } from "jotai";
 
 import { conflationFormErrors } from "../lib/conflation-workflow";
-import { conflationFormAtom, resetConflationReviewAtom } from "../state/conflation";
+import { conflationFormAtom, resetMergePlanAtom } from "../state/merge-plan";
 
 export function ConflationConfig() {
   const [form, setForm] = useAtom(conflationFormAtom);
-  const resetReview = useSetAtom(resetConflationReviewAtom);
+  const resetReview = useSetAtom(resetMergePlanAtom);
   const errors = conflationFormErrors(form);
   const updateForm = (update: (current: typeof form) => typeof form) => {
     setForm(update);

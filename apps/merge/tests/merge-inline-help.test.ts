@@ -2,50 +2,14 @@ import { ChangesSummary, ChangesFilters } from "@osmix/app-components";
 import { type OsmixAppRemote, remoteAtom } from "@osmix/app-core";
 import { changesetStatsAtom } from "@osmix/app-core";
 import { createStore, Provider } from "jotai";
-import type { OsmConflationCandidateView, OsmConflationRoutingDiagnostics } from "osmix";
+import type { OsmConflationRoutingDiagnostics } from "osmix";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ConflationConfig } from "../src/components/conflation-config";
-import {
-  CandidateActionStatuses,
-  CandidateActions,
-  CandidateEvidence,
-  conflationCandidateTitle,
-  conflationReasonLabel,
-  ConflationStatusLegend,
-} from "../src/components/conflation-review";
 import { ConflationRoutingDiagnostics } from "../src/components/conflation-routing-diagnostics";
-import { conflationFormAtom } from "../src/state/conflation";
-
-const CANDIDATE: OsmConflationCandidateView = {
-  id: "node:11:22",
-  entityType: "node",
-  sourceId: 11,
-  targetId: 22,
-  status: "review",
-  reasons: ["routing-property"],
-  propertyTransfer: { status: "review", reasons: ["routing-property"] },
-  networkAttachment: { status: "automatic", reasons: [] },
-  evidence: {
-    distanceMeters: 0.25,
-    sourceRoutingFamilies: ["pedestrian"],
-    targetRoutingFamilies: ["bicycle-shared"],
-    tagDiff: [
-      {
-        key: "crossing",
-        baseValue: "unmarked",
-        patchValue: "marked",
-        protected: false,
-        routing: false,
-      },
-    ],
-    bearingDifferenceDegrees: 4,
-    lengthDifferenceRatio: 0.02,
-    maxGeometryDistanceMeters: 0.4,
-  },
-};
+import { conflationFormAtom } from "../src/state/merge-plan";
 
 function renderWithStore(
   element: React.ReactNode,
@@ -85,45 +49,6 @@ describe("merge inline guidance", () => {
     expect(html).not.toContain("reconciliation apply their own rules separately");
   });
 
-  it("humanizes candidate statuses, reasons, evidence, and actions", () => {
-    const legend = renderToStaticMarkup(createElement(ConflationStatusLegend));
-    const evidence = renderToStaticMarkup(
-      createElement(CandidateEvidence, { candidate: CANDIDATE }),
-    );
-    const actions = renderToStaticMarkup(
-      createElement(CandidateActions, { candidate: CANDIDATE, onDecision: async () => {} }),
-    );
-    const actionStatuses = renderToStaticMarkup(
-      createElement(CandidateActionStatuses, { candidate: CANDIDATE }),
-    );
-
-    expect(legend).toContain('aria-label="About candidate statuses"');
-    expect(legend).not.toContain("at least one action needs a decision");
-    expect(conflationReasonLabel("would-collapse-way")).toBe("Connection would collapse a path");
-    expect(conflationCandidateTitle(CANDIDATE)).toBe("Imported node 11 → Base node 22");
-    expect(evidence).toContain('aria-label="About candidate evidence metrics"');
-    expect(evidence).not.toContain("Distance finds nearby candidates");
-    expect(evidence).toContain("Imported network use");
-    expect(evidence).toContain("Base network use");
-    expect(evidence).toContain("Attribute differences");
-    expect(evidence).toContain("Base value");
-    expect(evidence).toContain("Imported value");
-    expect(actions).toContain("Copy tags");
-    expect(actions).toContain("Connect network");
-    expect(actions.match(/role="checkbox"/g)).toHaveLength(2);
-    expect(actionStatuses).toContain("Copy tags");
-    expect(actionStatuses).toContain("Not selected");
-    expect(actionStatuses).toContain("Connect network");
-    expect(actionStatuses).toContain("Scheduled automatically");
-
-    const wayStatuses = renderToStaticMarkup(
-      createElement(CandidateActionStatuses, {
-        candidate: { ...CANDIDATE, entityType: "way", networkAttachment: null },
-      }),
-    );
-    expect(wayStatuses).not.toContain("Connect network");
-  });
-
   it("defines the routing baseline, metrics, signed deltas, and mode invariants", () => {
     const mode = {
       before: { components: 2, edges: 2, nodes: 3, routableNodes: 3 },
@@ -133,7 +58,7 @@ describe("merge inline guidance", () => {
     const diagnostics: OsmConflationRoutingDiagnostics = { car: mode, walk: mode };
     const html = renderToStaticMarkup(createElement(ConflationRoutingDiagnostics, { diagnostics }));
 
-    expect(html).toContain("including exact reconciliation when selected");
+    expect(html).toContain("is the base dataset");
     expect(html).toContain("Routable nodes");
     expect(html).toContain("Directed edges");
     expect(html).toContain("Connected components");
@@ -141,7 +66,7 @@ describe("merge inline guidance", () => {
     expect(html).toContain("does not guarantee travel in both directions");
     expect(html).toContain("Signed delta");
     expect(html).toContain(">+2<");
-    expect(html).toContain("walk-only attachment should not change CAR topology");
+    expect(html).toContain("Automatic matching never changes CAR topology");
     expect(html).toContain("do not prove that routing is correct");
   });
 

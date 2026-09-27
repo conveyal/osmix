@@ -4,10 +4,12 @@ import { AppSidebar, Main, MapContent } from "@osmix/ui";
 import { useMemo } from "react";
 
 import MergeBlock from "../blocks/merge";
-import { ConflationComparisonLayer } from "../components/conflation-comparison-layer";
+import { PlanMapLayer } from "../components/plan-map-layer";
+import { useSelectPlanFeature } from "../lib/use-select-plan-feature";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 
 export default function Merge() {
+  const selectPlanFeature = useSelectPlanFeature();
   const base = useOsmFile(BASE_OSM_KEY);
   const patch = useOsmFile(PATCH_OSM_KEY);
   const flyToOsmBounds = useFlyToOsmBounds();
@@ -33,7 +35,7 @@ export default function Merge() {
           ]}
           initialViewState={initialViewState}
         >
-          <ConflationComparisonLayer />
+          <PlanMapLayer onSelect={selectPlanFeature} />
         </OsmixMap>
       </MapContent>
     </Main>

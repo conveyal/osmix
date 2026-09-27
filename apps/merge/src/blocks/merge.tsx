@@ -1,342 +1,419 @@
 import {
+  appOrigin,
   FullIndexRequired,
   hasFullNodeIndex,
-  ChangesSummary,
-  ChangesExpandableList,
-  ChangesFilters,
-  ChangesPagination,
   OsmDatasetCard,
   OsmInfoTable,
-  SaveToDiskNotice,
   StoredOsmList,
-  appOrigin,
   useFlyToOsmBounds,
 } from "@osmix/app-components";
 import {
-  useOsmFile,
+  committedMutationOsmId,
   mergedOsmRefreshRetryId,
+  osmLoadingAbortControllerAtom,
+  selectOsmEntityAtom,
   showSaveFilePickerWithFallback,
-  changesetStatsAtom,
   type TaskHandle,
   TaskAlreadyRunningError,
   Tasks,
-  selectOsmEntityAtom,
-  osmLoadingAbortControllerAtom,
-  committedMutationOsmId,
-  saveChangesetJson,
+  type UseOsmFileReturn,
+  useOsmFile,
+  useOsmixRemote,
   writeJsonReport,
 } from "@osmix/app-core";
-import { useOsmixRemote } from "@osmix/app-core";
-import {
-  ActionButton,
-  Alert,
-  Details,
-  DetailsContent,
-  DetailsSummary,
-  LoadingState,
-  Button,
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  Checkbox,
-  CheckboxLabel,
-  Step as StepCard,
-  useTaskLock,
-} from "@osmix/ui";
-import { atom, useAtom, useAtomValue, useSetAtom } from "jotai";
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  DownloadIcon,
-  FileDiffIcon,
-  MergeIcon,
-  SaveIcon,
-  SearchCodeIcon,
-  SkipForwardIcon,
-  StopCircleIcon,
-} from "lucide-react";
-import {
-  changeStatsSummary,
-  type OsmConflationBulkDecisionRequest,
-  type OsmConflationDecision,
-  type OsmConflationCandidateView,
+import { ActionButton, Alert, Card, CardContent, Step, useTaskLock } from "@osmix/ui";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { ArrowLeftIcon, DownloadIcon, MergeIcon } from "lucide-react";
+import type {
+  MergePlanBulkRequest,
+  MergePlanFilter,
+  MergePlanOverview,
+  PatchIdMode,
+  PlanDecision,
 } from "osmix";
-import { Suspense, useMemo, useState } from "react";
+import { useState } from "react";
 
-import {
-  type AutomaticMergeStep,
-  type AutomaticMergeStepId,
-  CONFLATION_AUTOMATIC_MERGE_STEPS,
-  EXACT_AUTOMATIC_MERGE_STEPS,
-  LiveAutomaticMergeProgress,
-  type LiveAutomaticMergeProgressProps,
-} from "../components/automatic-merge-progress";
 import { ConflationConfig } from "../components/conflation-config";
-import { ConflationReview } from "../components/conflation-review";
-import { ConflationRoutingDiagnostics } from "../components/conflation-routing-diagnostics";
-import { ConflationWayRemovalPreview } from "../components/conflation-way-removal";
-import { BackToMatching, MatchingReviewProblem } from "../components/matching-review-recovery";
 import { MergeCompletionSummary } from "../components/merge-completion-summary";
-import { MergeStart } from "../components/merge-start";
-import { MergeStepGuide, type MergeStepGuideId } from "../components/merge-step-guide";
+import { MergeResult } from "../components/merge-result";
 import { OsmInputCardHeader } from "../components/osm-input-card-header";
+import { PatchIdNotice } from "../components/patch-id-notice";
+import { PlanInputs } from "../components/plan-inputs";
+import { PlanLegend } from "../components/plan-map-layer";
+import { PLAN_PAGE_SIZE, PlanReview } from "../components/plan-review";
+import { PlanSummary } from "../components/plan-summary";
 import { StepActions } from "../components/step-actions";
+import { firstInvalidConflationInputId, toOsmConflationOptions } from "../lib/conflation-workflow";
 import {
-  firstInvalidConflationInputId,
-  toOsmConflationOptions,
-  validateConflationForm,
-} from "../lib/conflation-workflow";
-import {
-  matchingReviewIssue,
-  returnToMatchingReview,
-  type MatchingReviewIssue,
-} from "../lib/matching-review";
-import {
-  completeMergeOptions,
-  finalizeVerifiedMerge,
-  INTERSECTION_OPTIONS,
-  recoverConflationRunAllFailure,
-  runConflationAllSteps,
-  verifiedBaseMergeOptions,
-} from "../lib/merge-workflow";
+  buildMergePlanOptions,
+  makeMergedDownloadName,
+  makePlanOscName,
+  withDecision,
+} from "../lib/merge-plan-workflow";
+import { useSelectPlanFeature } from "../lib/use-select-plan-feature";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import {
-  conflationCandidateFilterAtom,
-  conflationCandidatePageAtom,
-  conflationCandidatePageIndexAtom,
-  conflationComparisonAtom,
-  conflationDecisionsAtom,
-  conflationFormAtom,
-  conflationRoutingDiagnosticsAtom,
-  conflationSummaryAtom,
-  resetConflationReviewAtom,
-} from "../state/conflation";
-import {
-  generatedMergeOutcomeAtom,
   mergeCompletionAtom,
   mergeRunInputsAtom,
-  mergeStepIndexAtom as stepIndexAtom,
+  mergeStepAtom,
   pendingMergedRefreshAtom,
   updateMergeOutcomeAtom,
 } from "../state/merge-outcome";
-import { mergeAbortControllerAtom } from "../state/status";
-const STEPS = [
-  "select-osm-pbf-files",
-  "direct-merge",
-  "review-changeset",
-  "match-imported-data",
-  "deduplicate-nodes",
-  "review-changeset",
-  "create-intersections",
-  "review-changeset",
-  "inspect-final-osm",
-  "run-all-steps",
-] as const;
+import {
+  conflationFormAtom,
+  mergeIdenticalPointsAtom,
+  patchIdModeAtom,
+  planFilterAtom,
+  planLayerAtom,
+  planOverviewAtom,
+  planPageAtom,
+  planPageIndexAtom,
+  resetMergePlanAtom,
+  selectedPlanFeatureAtom,
+} from "../state/merge-plan";
 
-type ChangesetReviewContext =
-  | { kind: "direct-preview" }
-  | { kind: "cumulative"; exactReconciliation: boolean; matching: boolean }
-  | { kind: "intersections" };
+const STEP_NUMBER = { inputs: 1, review: 2, automatic: undefined, result: 3 } as const;
 
-const changesetReviewContextAtom = atom<ChangesetReviewContext>({
-  kind: "cumulative",
-  exactReconciliation: true,
-  matching: false,
-});
-const CONFLATION_PAGE_SIZE = 10;
-const stepAtom = atom<(typeof STEPS)[number] | null>((get) => {
-  const stepIndex = get(stepIndexAtom);
-  return STEPS[stepIndex];
-});
-
-const toStem = (name: string | null | undefined) => {
-  if (!name) return "dataset";
-  return (
-    name
-      .replace(/\.[^.]+$/, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 40) || "dataset"
-  );
-};
-
-const makeMergedDownloadName = (baseName?: string | null, patchName?: string | null) => {
-  const baseStem = toStem(baseName);
-  const patchStem = toStem(patchName);
-  const combined = `osmix-merged-${baseStem}-with-${patchStem}`;
-  return `${combined.slice(0, 120)}.pbf`;
-};
-
-function reviewGuideId(context: ChangesetReviewContext): MergeStepGuideId {
-  switch (context.kind) {
-    case "direct-preview":
-      return "review-direct";
-    case "cumulative":
-      return context.exactReconciliation
-        ? "review-cumulative-exact"
-        : "review-cumulative-without-exact";
-    case "intersections":
-      return "review-intersections";
-  }
-}
-
-function reviewStepTitle(context: ChangesetReviewContext): string {
-  switch (context.kind) {
-    case "direct-preview":
-      return "Review direct merge";
-    case "cumulative":
-      return context.exactReconciliation
-        ? "Review cumulative merge"
-        : "Review merge without exact reconciliation";
-    case "intersections":
-      return "Review intersections";
-  }
-}
-
-function reviewChangesetTitle(context: ChangesetReviewContext): string {
-  switch (context.kind) {
-    case "direct-preview":
-      return "Direct-merge preview";
-    case "cumulative":
-      return context.exactReconciliation
-        ? "Cumulative merge changeset"
-        : "Merge changeset without exact reconciliation";
-    case "intersections":
-      return "Intersection changeset";
-  }
-}
-
+/**
+ * The Merge workflow: load the inputs and choose how to read them, review the plan feature by
+ * feature (or apply it automatically), then inspect and download the result.
+ */
 export default function MergeBlock() {
   const remote = useOsmixRemote();
   const base = useOsmFile(BASE_OSM_KEY);
   const patch = useOsmFile(PATCH_OSM_KEY);
+  const [step, setStep] = useAtom(mergeStepAtom);
   const completion = useAtomValue(mergeCompletionAtom);
-  const generatedOutcome = useAtomValue(generatedMergeOutcomeAtom);
   const runInputs = useAtomValue(mergeRunInputsAtom);
-  const [pendingMergedRefresh, setPendingMergedRefresh] = useAtom(pendingMergedRefreshAtom);
-  const updateMergeOutcome = useSetAtom(updateMergeOutcomeAtom);
-  const [changesetStats, setChangesetStats] = useAtom(changesetStatsAtom);
-  const [changesetReviewContext, setChangesetReviewContext] = useAtom(changesetReviewContextAtom);
-  const [conflationForm] = useAtom(conflationFormAtom);
-  const [conflationSummary, setConflationSummary] = useAtom(conflationSummaryAtom);
-  const [conflationCandidatePage, setConflationCandidatePage] = useAtom(
-    conflationCandidatePageAtom,
-  );
-  const [conflationCandidatePageIndex, setConflationCandidatePageIndex] = useAtom(
-    conflationCandidatePageIndexAtom,
-  );
-  const [conflationCandidateFilter, setConflationCandidateFilter] = useAtom(
-    conflationCandidateFilterAtom,
-  );
-  const [isConflationFilterPending, setIsConflationFilterPending] = useState(false);
-  const taskLocked = useTaskLock();
-  const [matchingIssue, setMatchingIssue] = useState<MatchingReviewIssue | null>(null);
-  const [changesDownloadError, setChangesDownloadError] = useState<string | null>(null);
-  // Export new (negative-ID) features with positive IDs, for tools that reject negative IDs.
-  const [positiveIds, setPositiveIds] = useState(false);
-  const [automaticMergeProgress, setAutomaticMergeProgress] =
-    useState<LiveAutomaticMergeProgressProps | null>(null);
-  const [conflationDecisions, setConflationDecisions] = useAtom(conflationDecisionsAtom);
-  const [conflationRoutingDiagnostics, setConflationRoutingDiagnostics] = useAtom(
-    conflationRoutingDiagnosticsAtom,
-  );
-  const resetConflationReview = useSetAtom(resetConflationReviewAtom);
-  const setConflationComparison = useSetAtom(conflationComparisonAtom);
-  const flyToOsmBounds = useFlyToOsmBounds();
+  const [pendingRefresh, setPendingRefresh] = useAtom(pendingMergedRefreshAtom);
+  const updateOutcome = useSetAtom(updateMergeOutcomeAtom);
+  const conflationForm = useAtomValue(conflationFormAtom);
+  const mergeIdenticalPoints = useAtomValue(mergeIdenticalPointsAtom);
+  const [patchIds, setPatchIds] = useAtom(patchIdModeAtom);
+  const [overview, setOverview] = useAtom(planOverviewAtom);
+  const [filter, setFilter] = useAtom(planFilterAtom);
+  const [page, setPage] = useAtom(planPageAtom);
+  const [pageIndex, setPageIndex] = useAtom(planPageIndexAtom);
+  const setLayer = useSetAtom(planLayerAtom);
+  const [selected, setSelected] = useAtom(selectedPlanFeatureAtom);
+  const resetPlan = useSetAtom(resetMergePlanAtom);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
-  const [stepIndex, setStepIndex] = useAtom(stepIndexAtom);
-  const [mergeAbortController, setMergeAbortController] = useAtom(mergeAbortControllerAtom);
+  const selectFeature = useSelectPlanFeature();
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
+  const flyToOsmBounds = useFlyToOsmBounds();
+  const taskLocked = useTaskLock();
+  const [positiveIds, setPositiveIds] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const moveStep = (direction: -1 | 1) => {
-    selectEntity(null, null);
-    setConflationComparison({ type: "FeatureCollection", features: [] });
-    setStepIndex((current) => {
-      let next = current + direction;
-      if (STEPS[next] === "match-imported-data" && !conflationForm.enabled) {
-        next += direction;
-      }
-      return next;
-    });
-  };
-  const prevStep = () => {
-    moveStep(-1);
-  };
-  const nextStep = () => {
-    moveStep(1);
-  };
-  const goToStep = (step: number | (typeof STEPS)[number]) => {
-    const stepIndex = typeof step === "number" ? step : STEPS.indexOf(step);
-    selectEntity(null, null);
-    setConflationComparison({ type: "FeatureCollection", features: [] });
-    setStepIndex(stepIndex);
-  };
-  const showVerifiedMergeResult = () => {
-    updateMergeOutcome({ type: "complete" });
-    finalizeVerifiedMerge(
-      () => patch.setOsm(null),
-      () => goToStep("inspect-final-osm"),
-    );
-  };
-  const completesVerifiedMerge = STEPS[stepIndex - 1] === "create-intersections";
-  /** Run one review stage as a task, then advance. A failure stays on this step to retry. */
-  const startStepTask = async (title: string, fn: () => Promise<string>) => {
-    try {
-      await Tasks.run(title, fn, { summary: (summary) => summary });
-      nextStep();
-    } catch (error) {
-      // The task records the failure; only a lock violation is a programming error.
-      if (error instanceof TaskAlreadyRunningError) throw error;
-    }
-  };
-  const conflationValidationMessage = validateConflationForm(conflationForm);
-  const canStartConfiguredMerge = () => {
-    const invalidInputId = firstInvalidConflationInputId(conflationForm);
-    if (!invalidInputId) return true;
-    document.getElementById(invalidInputId)?.focus();
-    return false;
-  };
-  const conflationOptions = conflationValidationMessage
-    ? undefined
-    : toOsmConflationOptions(conflationForm);
-  const requiresRemovalReview = conflationForm.enabled && conflationForm.allowWayRemoval;
   const baseFileName = base.file?.name ?? base.fileInfo?.fileName;
   const patchFileName = patch.file?.name ?? patch.fileInfo?.fileName;
-  const beginMergeOutcome = () =>
-    updateMergeOutcome({
+  const mergedName = makeMergedDownloadName(
+    runInputs?.baseName ?? baseFileName,
+    runInputs?.patchName ?? patchFileName,
+  );
+
+  const goTo = (next: typeof step) => {
+    selectEntity(null, null);
+    setSelected(null);
+    setStep(next);
+  };
+
+  const resetDerivedState = () => {
+    setDownloadError(null);
+    setPendingRefresh(null);
+    updateOutcome({ type: "reset" });
+    resetPlan();
+    selectEntity(null, null);
+  };
+
+  /** Plan options from the settings, or null after focusing the first invalid field. */
+  const planOptions = (mode: PatchIdMode = patchIds, decisions?: PlanDecision[]) => {
+    const invalid = firstInvalidConflationInputId(conflationForm);
+    if (invalid) {
+      document.getElementById(invalid)?.focus();
+      return null;
+    }
+    return {
+      ...buildMergePlanOptions({
+        matching: toOsmConflationOptions(conflationForm),
+        mergeIdenticalPoints,
+        patchIds: mode,
+      }),
+      ...(decisions ? { decisions } : {}),
+    };
+  };
+
+  const loadPage = async (baseOsmId: string, requested: number) => {
+    let result = await remote.getMergePlanPage(baseOsmId, requested, PLAN_PAGE_SIZE);
+    const last = Math.max(0, result.totalPages - 1);
+    if (requested > last) result = await remote.getMergePlanPage(baseOsmId, last, PLAN_PAGE_SIZE);
+    setPage(result);
+    setPageIndex(Math.min(requested, last));
+  };
+
+  /** Show a new or replanned plan: its overview, the current page, the map layer, the open row. */
+  const showPlan = async (baseOsmId: string, next: MergePlanOverview, pageNumber: number) => {
+    setOverview(next);
+    updateOutcome({ type: "planned", plan: next });
+    const [layer, detail] = await Promise.all([
+      remote.getMergePlanLayer(baseOsmId),
+      selected ? remote.getMergePlanFeature(baseOsmId, selected.key) : null,
+      loadPage(baseOsmId, pageNumber),
+    ]);
+    setLayer(layer);
+    setSelected(detail);
+  };
+
+  const beginRun = () =>
+    updateOutcome({
       type: "begin",
       inputs: {
         baseName: baseFileName ?? "Base dataset",
         patchName: patchFileName ?? "Imported dataset",
-        matchingEnabled: Boolean(conflationOptions),
+        matchingEnabled: conflationForm.enabled,
       },
     });
 
-  const resetMergeDerivedState = () => {
-    setChangesDownloadError(null);
-    setPendingMergedRefresh(null);
-    updateMergeOutcome({ type: "reset" });
-    setMatchingIssue(null);
-    setChangesetStats(null);
-    resetConflationReview();
-    selectEntity(null, null);
+  const reviewPlan = async () => {
+    const options = planOptions();
+    if (!options || !base.osm || !patch.osm) return;
+    const baseOsmId = base.osm.id;
+    const patchOsmId = patch.osm.id;
+    beginRun();
+    resetPlan();
+    await runTask("Plan merge", async () => {
+      const planned = await remote.planMerge(baseOsmId, patchOsmId, options);
+      await showPlan(baseOsmId, planned, 0);
+      goTo("review");
+      return `Planned ${planned.featureCount.toLocaleString()} imported features`;
+    });
   };
 
-  /** Clear the base slot. The patch, if loaded, stays where it is. */
-  const clearBaseOsm = async () => {
-    resetMergeDerivedState();
-    await base.loadOsmFile(null);
+  const replanWithPatchIds = async (mode: PatchIdMode) => {
+    if (!base.osm || !patch.osm) return;
+    const options = planOptions(mode, overview?.decisions);
+    if (!options) return;
+    const baseOsmId = base.osm.id;
+    const patchOsmId = patch.osm.id;
+    setPatchIds(mode);
+    await runTask("Plan merge", async () => {
+      const planned = await remote.planMerge(baseOsmId, patchOsmId, options);
+      await remote.setMergePlanFilter(baseOsmId, filter);
+      await showPlan(baseOsmId, planned, 0);
+      return mode === "new" ? "Replanned with every patch feature new" : "Replanned";
+    });
+  };
+
+  const decide = async (proposalId: string, action: PlanDecision["action"] | null) => {
+    if (!base.osm || !overview) return;
+    const baseOsmId = base.osm.id;
+    const decisions = withDecision(overview.decisions, proposalId, action);
+    await runTask("Update plan", async () => {
+      const next = await remote.setMergePlanDecisions(baseOsmId, decisions);
+      await showPlan(baseOsmId, next, pageIndex);
+      return "Plan updated";
+    });
+  };
+
+  const applyBulk = async (request: MergePlanBulkRequest) => {
+    if (!base.osm) return;
+    const baseOsmId = base.osm.id;
+    await runTask("Choose for shown features", async () => {
+      const result = await remote.applyMergePlanBulk(baseOsmId, request);
+      await showPlan(baseOsmId, result.overview, pageIndex);
+      const skipped =
+        result.skipped > 0
+          ? `; ${result.skipped.toLocaleString()} with alternatives need their own choice`
+          : "";
+      return `Updated ${result.changed.toLocaleString()} choices${skipped}`;
+    });
+  };
+
+  const changeFilter = async (next: MergePlanFilter) => {
+    if (!base.osm) return;
+    const baseOsmId = base.osm.id;
+    await remote.setMergePlanFilter(baseOsmId, next);
+    setFilter(next);
+    await loadPage(baseOsmId, 0);
+  };
+
+  const downloadOsc = async () => {
+    if (!base.osm) return;
+    setDownloadError(null);
+    try {
+      const fileHandle = await showSaveFilePickerWithFallback({
+        suggestedName: makePlanOscName(baseFileName, patchFileName),
+      });
+      if (!fileHandle) return;
+      const osc = await remote.getMergePlanOsc(base.osm.id);
+      const stream = await fileHandle.createWritable();
+      await stream.write(osc);
+      await stream.close();
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+      setDownloadError(
+        `The osmChange file could not be saved. ${error instanceof Error ? error.message : "Try again."}`,
+      );
+    }
+  };
+
+  /** Show the applied result. A failure keeps a refresh-only retry; nothing is applied again. */
+  const refreshResult = async (osmId: string, synchronize: boolean) => {
+    const pending = { osmId, fileName: mergedName, synchronize };
+    setPendingRefresh(pending);
+    let needsSynchronization = synchronize;
+    try {
+      if (synchronize) await remote.synchronizeDataset(osmId);
+      needsSynchronization = false;
+      await base.setMergedOsm(osmId, mergedName);
+      updateOutcome({ type: "refreshed" });
+      setPendingRefresh(null);
+    } catch (error) {
+      setPendingRefresh({
+        ...pending,
+        synchronize: needsSynchronization,
+        osmId: mergedOsmRefreshRetryId(error, osmId),
+        error:
+          error instanceof Error ? error.message : "The merged dataset could not be refreshed.",
+      });
+      throw error;
+    }
+  };
+
+  const finish = () => {
+    updateOutcome({ type: "complete" });
+    patch.setOsm(null);
+    goTo("result");
   };
 
   /**
-   * Move the loaded patch into the empty base slot (the patch card's "Use as base"), so the
-   * next merge starts from it. A no-op while the base slot is occupied.
+   * Apply the current plan, then refresh. A committed apply is never retried; `onApplied` marks
+   * the point after which the original inputs are gone.
    */
+  const applyAndRefresh = async (task: TaskHandle, baseOsmId: string, onApplied = () => {}) => {
+    let synchronize = false;
+    await task.runStep("Apply plan", async () => {
+      try {
+        await remote.applyMergePlan(baseOsmId);
+      } catch (error) {
+        if (committedMutationOsmId(error, "applyMergePlan") !== baseOsmId) throw error;
+        synchronize = true;
+        task.message("The plan was applied; refreshing worker copies before continuing.");
+      }
+      updateOutcome({ type: "applied" });
+      onApplied();
+    });
+    await task.runStep("Refresh result", () => refreshResult(baseOsmId, synchronize));
+  };
+
+  const applyReviewedPlan = async () => {
+    if (!base.osm) return;
+    const baseOsmId = base.osm.id;
+    await runTask("Apply merge plan", async (task) => {
+      await applyAndRefresh(task, baseOsmId);
+      finish();
+      return "Merge applied";
+    });
+  };
+
+  const applyAutomatically = async () => {
+    const options = planOptions();
+    if (!options || !base.osm || !patch.osm) return;
+    const baseOsmId = base.osm.id;
+    const patchOsmId = patch.osm.id;
+    beginRun();
+    resetPlan();
+    const controller = new AbortController();
+    const task = Tasks.start("Apply merge automatically", { controller });
+    goTo("automatic");
+    let applied = false;
+    try {
+      const planned = await task.runStep("Plan merge", () =>
+        remote.planMerge(baseOsmId, patchOsmId, options),
+      );
+      setOverview(planned);
+      updateOutcome({ type: "planned", plan: planned });
+      if (controller.signal.aborted) {
+        await remote.clearMergePlan(baseOsmId);
+        task.cancelled("Merge cancelled");
+        goTo("inputs");
+        return;
+      }
+      await applyAndRefresh(task, baseOsmId, () => {
+        applied = true;
+      });
+      if (controller.signal.aborted) {
+        task.message(
+          "Cancellation arrived after the plan was applied, so the merge was completed.",
+          "warn",
+        );
+      }
+      task.end("Merge applied");
+      finish();
+    } catch (error) {
+      if (applied) {
+        // The worker applied the plan; only showing it failed. The refresh alert retries that.
+        task.fail(
+          error,
+          `The merge was applied, but the merged dataset could not be refreshed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+        return;
+      }
+      if (controller.signal.aborted) {
+        task.cancelled("Merge cancelled");
+      } else {
+        task.fail(
+          error,
+          `Merge failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+      }
+      goTo("inputs");
+    }
+  };
+
+  const retryRefresh = async () => {
+    if (!pendingRefresh) return;
+    await runTask("Refresh merged dataset", async () => {
+      await refreshResult(pendingRefresh.osmId, pendingRefresh.synchronize ?? false);
+      finish();
+      return "Merged dataset refreshed";
+    });
+  };
+
+  const downloadReport = async () => {
+    if (!completion) return;
+    const fileHandle = await showSaveFilePickerWithFallback({
+      suggestedName: "osmix-merge-outcome.json",
+    });
+    if (!fileHandle) return;
+    const stream = await fileHandle.createWritable();
+    // With positive IDs, the report maps each new feature's patch ID to its exported ID.
+    const idMap =
+      positiveIds && base.osmInfo ? { idMap: await remote.negativeIdMap(base.osmInfo.id) } : {};
+    await writeJsonReport(stream, {
+      format: "osmix-merge-outcome",
+      version: 2,
+      ...completion,
+      ...idMap,
+    });
+  };
+
+  const startNewMerge = async () => {
+    await Promise.all([base.loadOsmFile(null), patch.loadOsmFile(null)]);
+    resetDerivedState();
+    goTo("inputs");
+  };
+
+  const clearInput = async (file: UseOsmFileReturn) => {
+    if (overview && base.osm) await remote.clearMergePlan(base.osm.id);
+    resetDerivedState();
+    await file.loadOsmFile(null);
+  };
+
+  /** Move the loaded patch into the empty base slot, so the next merge starts from it. */
   const usePatchAsBase = async () => {
     if (!patch.osm || base.osm) return;
-    resetMergeDerivedState();
+    resetDerivedState();
     const patchState = {
       file: patch.file,
       fileInfo: patch.fileInfo,
@@ -349,498 +426,22 @@ export default function MergeBlock() {
     base.copyStateFrom(patchState);
   };
 
-  const clearPatchOsm = async () => {
-    resetMergeDerivedState();
-    await patch.loadOsmFile(null);
-  };
-
-  const loadConflationPage = async (page: number) => {
-    if (!base.osm) throw Error("Base OSM is not loaded");
-    let result = await remote.getConflationPage(base.osm.id, page, CONFLATION_PAGE_SIZE, {
-      groupBySource: true,
-    });
-    const lastPage = Math.max(0, result.totalPages - 1);
-    if (page > lastPage) {
-      result = await remote.getConflationPage(base.osm.id, lastPage, CONFLATION_PAGE_SIZE, {
-        groupBySource: true,
-      });
-    }
-    setConflationCandidatePageIndex(result.page);
-    setConflationCandidatePage(result);
-  };
-
-  const updateConflationFilter = async (filter: typeof conflationCandidateFilter) => {
-    if (!base.osm) throw Error("Base OSM is not loaded");
-    const previousFilter = conflationCandidateFilter;
-    setConflationCandidateFilter(filter);
-    setIsConflationFilterPending(true);
-    try {
-      await remote.setConflationFilter(base.osm.id, filter);
-      await loadConflationPage(0);
-    } catch (error) {
-      // Keep the visible controls aligned with the still-displayed page when a
-      // worker failure prevents the requested filter from being applied.
-      try {
-        await remote.setConflationFilter(base.osm.id, previousFilter);
-      } catch {
-        // Preserve the original refresh error; a later page request will surface
-        // any worker recovery failure through the ordinary error channel.
-      }
-      setConflationCandidateFilter(previousFilter);
-      throw error;
-    } finally {
-      setIsConflationFilterPending(false);
-    }
-  };
-
-  const invalidateMatchingPreview = () => {
-    updateMergeOutcome({ type: "invalidate-preview" });
-    if (changesetReviewContext.kind === "cumulative" && changesetReviewContext.matching) {
-      setChangesetStats(null);
-    }
-    setConflationRoutingDiagnostics(null);
-  };
-
-  const withMatchingReviewError = async (action: () => Promise<void>) => {
-    try {
-      await action();
-    } catch (error) {
-      setMatchingIssue(matchingReviewIssue(error));
-    }
-  };
-
-  const saveConflationSourceChoice = (
-    source: Pick<OsmConflationCandidateView, "entityType" | "sourceId">,
-    decision: OsmConflationDecision | null,
-  ) =>
-    withMatchingReviewError(async () => {
-      if (!base.osm) throw Error("Base OSM is not loaded");
-      const result = await remote.setConflationSourceDecision(
-        base.osm.id,
-        { entityType: source.entityType, sourceId: source.sourceId },
-        decision,
-      );
-      setConflationDecisions(result.decisions);
-      setConflationSummary(result.summary);
-      setMatchingIssue(null);
-      invalidateMatchingPreview();
-      await loadConflationPage(conflationCandidatePageIndex);
-    });
-
-  const updateConflationDecision = async (decision: OsmConflationDecision) => {
-    const candidate = conflationCandidatePage?.candidates.find(
-      (candidate) => candidate.id === decision.candidateId,
-    );
-    if (!candidate) {
-      setMatchingIssue({
-        message: "This match is no longer on the current page. Refresh the candidates.",
-      });
-      return;
-    }
-    await saveConflationSourceChoice(candidate, decision);
-  };
-
-  const returnToMatching = () =>
-    withMatchingReviewError(() =>
-      returnToMatchingReview({
-        filter: conflationCandidateFilter,
-        page: conflationCandidatePageIndex,
-        issue: matchingIssue,
-        onFilterChange: updateConflationFilter,
-        onPageChange: loadConflationPage,
-        onReturn: () => goToStep("match-imported-data"),
-      }),
-    );
-
-  const resetConflationDecision = (candidateId: string) =>
-    withMatchingReviewError(async () => {
-      if (!base.osm) throw Error("Base OSM is not loaded");
-      const decisions = conflationDecisions.filter(
-        (decision) => decision.candidateId !== candidateId,
-      );
-      const summary = await remote.setConflationDecisions(base.osm.id, decisions);
-      setConflationDecisions(decisions);
-      setConflationSummary(summary);
-      setMatchingIssue(null);
-      invalidateMatchingPreview();
-      await loadConflationPage(conflationCandidatePageIndex);
-    });
-
-  const updateConflationBulkDecision = (request: OsmConflationBulkDecisionRequest) =>
-    withMatchingReviewError(async () => {
-      if (!base.osm) throw Error("Base OSM is not loaded");
-      const result = await remote.applyConflationBulkDecision(base.osm.id, request);
-      setConflationDecisions(result.decisions);
-      setConflationSummary(result.summary);
-      if (result.preview.changedCandidates > 0) invalidateMatchingPreview();
-      await loadConflationPage(0);
-      Tasks.message(
-        `Updated ${result.preview.changedCandidates.toLocaleString()} filtered conflation decisions`,
-      );
-      setMatchingIssue(null);
-    });
-
-  const generateVerifiedChangeset = async (reconcile: boolean) => {
-    if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-    if (conflationOptions) {
-      setMatchingIssue(null);
-      try {
-        if (!conflationSummary) {
-          throw Error("Discover and review imported-data match candidates first");
-        }
-        const result = await remote.generateConflationChangeset(
-          base.osm.id,
-          verifiedBaseMergeOptions(reconcile),
-        );
-        setChangesetReviewContext({
-          kind: "cumulative",
-          exactReconciliation: reconcile,
-          matching: true,
-        });
-        setChangesetStats(result.stats);
-        updateMergeOutcome({ type: "generated", outcome: result.outcome });
-        setConflationRoutingDiagnostics(result.routing);
-        return changeStatsSummary(result.stats);
-      } catch (error) {
-        setMatchingIssue(matchingReviewIssue(error));
-        throw error;
-      }
-    }
-
-    const result = await remote.generateChangeset(
-      base.osm.id,
-      patch.osm.id,
-      verifiedBaseMergeOptions(reconcile),
-    );
-    setChangesetReviewContext({
-      kind: "cumulative",
-      exactReconciliation: reconcile,
-      matching: false,
-    });
-    setConflationRoutingDiagnostics(null);
-    setChangesetStats(result);
-    updateMergeOutcome({ type: "generated", outcome: null });
-    return changeStatsSummary(result);
-  };
-
-  const downloadJsonChanges = async () => {
-    setChangesDownloadError(null);
-    if (!changesetStats) return;
-    try {
-      await saveChangesetJson(remote, changesetStats);
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
-      setChangesDownloadError(
-        `Changes could not be saved. ${error instanceof Error ? error.message : "Try downloading again."}`,
-      );
-    }
-  };
-
-  const downloadOutcomeReport = async () => {
-    if (!completion) return;
-    const fileHandle = await showSaveFilePickerWithFallback({
-      suggestedName: "osmix-merge-outcome.json",
-    });
-    if (!fileHandle) return;
-    const stream = await fileHandle.createWritable();
-    // With positive IDs, the report maps each new feature's patch ID to its exported ID.
-    const idMap =
-      positiveIds && base.osmInfo ? { idMap: await remote.negativeIdMap(base.osmInfo.id) } : {};
-    await writeJsonReport(stream, {
-      format: "osmix-merge-outcome",
-      version: 1,
-      ...completion,
-      ...idMap,
-    });
-  };
-
-  const startNewMerge = async () => {
-    await Promise.all([base.loadOsmFile(null), patch.loadOsmFile(null)]);
-    resetMergeDerivedState();
-    goToStep("select-osm-pbf-files");
-  };
-
-  const refreshMergedResult = async (
-    osmId: string,
-    fileName: string | undefined,
-    finishOnRetry: boolean,
-    synchronize = false,
-  ) => {
-    const pending = { osmId, fileName, finishOnRetry, synchronize };
-    let needsSynchronization = synchronize;
-    setPendingMergedRefresh(pending);
-    try {
-      if (synchronize) await remote.synchronizeDataset(osmId);
-      // Once synchronization succeeds, a later rename/refresh retry uses its surviving ID.
-      needsSynchronization = false;
-      await base.setMergedOsm(osmId, fileName);
-      updateMergeOutcome({ type: "refreshed" });
-      setPendingMergedRefresh(null);
-    } catch (error) {
-      setPendingMergedRefresh({
-        ...pending,
-        synchronize: needsSynchronization,
-        osmId: mergedOsmRefreshRetryId(error, osmId),
-        error:
-          error instanceof Error ? error.message : "The merged dataset could not be refreshed.",
-      });
-      throw error;
-    }
-  };
-
-  const retryMergedRefresh = async () => {
-    if (!pendingMergedRefresh) return;
-    try {
-      await refreshMergedResult(
-        pendingMergedRefresh.osmId,
-        pendingMergedRefresh.fileName,
-        pendingMergedRefresh.finishOnRetry,
-        pendingMergedRefresh.synchronize,
-      );
-      if (pendingMergedRefresh.finishOnRetry) showVerifiedMergeResult();
-    } catch {
-      // The retained refresh state exposes a retry without reapplying a changeset.
-    }
-  };
-
-  const applyChanges = async () => {
-    if (!changesetStats) throw Error("Changeset stats are not loaded");
-    let synchronize = false;
-    try {
-      await remote.applyChangesAndReplace(changesetStats.osmId);
-    } catch (error) {
-      if (committedMutationOsmId(error, "applyChangesAndReplace") !== changesetStats.osmId) {
-        throw error;
-      }
-      synchronize = true;
-      Tasks.message("Changes were applied; refreshing worker copies before continuing.");
-    }
-    updateMergeOutcome({
-      type: changesetReviewContext.kind === "cumulative" ? "applied" : "result-mutated",
-    });
-    setChangesetStats(null);
-    return { osmId: changesetStats.osmId, synchronize };
-  };
-
-  /** Enter the reviewed workflow: every stage pauses for inspection and approval. */
-  const startReviewedMerge = () => {
-    if (!canStartConfiguredMerge()) return;
-    beginMergeOutcome();
-    setChangesetStats(null);
-    resetConflationReview();
-    nextStep();
-  };
-
-  /** Run every stage without checkpoints, as one task whose steps are the stages. */
-  const runAutomaticMerge = async () => {
-    // Removal review needs the reviewed workflow; `MergeStart` never offers automatic then.
-    if (requiresRemovalReview) throw Error("Automatic merge is unavailable with removal review");
-    if (!canStartConfiguredMerge()) return;
-    // Check inputs before the task starts so a failed check never leaves it open.
-    if (!base.osm) throw Error("Base OSM is not loaded");
-    if (!patch.osm) throw Error("Patch OSM is not loaded");
-    beginMergeOutcome();
-    const automaticSteps: readonly AutomaticMergeStep[] = conflationOptions
-      ? CONFLATION_AUTOMATIC_MERGE_STEPS
-      : EXACT_AUTOMATIC_MERGE_STEPS;
-    const abortController = new AbortController();
-    const task = Tasks.start("Run automatic merge", { controller: abortController });
-    setAutomaticMergeProgress({ taskId: task.id, steps: automaticSteps });
-    goToStep("run-all-steps");
-    setMergeAbortController(abortController);
-    // Each automatic stage is a step of the task; entering one ends the previous.
-    let stage: TaskHandle | null = null;
-    const enterStage = (id: AutomaticMergeStepId) => {
-      const step = automaticSteps.find((candidate) => candidate.id === id);
-      if (!step) throw Error(`Unknown automatic merge stage: ${id}`);
-      stage?.end();
-      stage = task.step(step.label);
-    };
-
-    const baseOsmId = base.osm.id;
-    const patchOsmId = patch.osm.id;
-    const mergedName = makeMergedDownloadName(base.fileInfo?.fileName, patch.fileInfo?.fileName);
-    // Track transaction boundaries separately: each failure state has a different
-    // safe recovery path and we cannot roll back an applied worker changeset.
-    let conflationDiscoveryCompleted = false;
-    let conflationBaseApplied = false;
-    let mergePipelineCompleted = false;
-    let completedOsmId = baseOsmId;
-
-    try {
-      setChangesetStats(null);
-      resetConflationReview();
-      if (conflationOptions) {
-        const result = await runConflationAllSteps({
-          baseOsmId,
-          conflation: conflationOptions,
-          isCancelled: () => abortController.signal.aborted,
-          onBaseApplied: () => {
-            updateMergeOutcome({ type: "applied" });
-            conflationBaseApplied = true;
-          },
-          onIntersectionsApplied: () => {
-            mergePipelineCompleted = true;
-          },
-          onDiscovered: (summary) => {
-            conflationDiscoveryCompleted = true;
-            setConflationSummary(summary);
-            const unresolved = summary.review + summary.blocked + summary.unmatched;
-            Tasks.message(
-              `Imported-data matching found ${summary.automatic.toLocaleString()} automatic and ${unresolved.toLocaleString()} unresolved candidates`,
-            );
-          },
-          onGenerated: (generation) => {
-            updateMergeOutcome({ type: "generated", outcome: generation.outcome });
-            setConflationRoutingDiagnostics(generation.routing);
-            Tasks.message(
-              `Verified imported-data changes: ${changeStatsSummary(generation.stats)}`,
-            );
-          },
-          onStageChange: enterStage,
-          patchOsmId,
-          worker: remote,
-        });
-
-        if (result.status === "cancelled") {
-          await remote.clearConflation(baseOsmId);
-          task.cancelled("Merge cancelled");
-          goToStep("select-osm-pbf-files");
-          return;
-        }
-
-        mergePipelineCompleted = true;
-        enterStage("refresh-result");
-        await refreshMergedResult(result.generation.stats.osmId, mergedName, true);
-        setChangesetStats(null);
-        task.end(
-          `Automatic merge completed; intersections: ${changeStatsSummary(result.intersections)}`,
-        );
-        showVerifiedMergeResult();
-        return;
-      }
-      enterStage("merge-exact");
-      const merged = await remote.merge(baseOsmId, patchOsmId, completeMergeOptions());
-
-      mergePipelineCompleted = true;
-      completedOsmId = merged.id;
-      // The atomic worker stage already committed. Finish refreshing its result even
-      // when cancellation arrived too late; the original inputs are no longer live.
-      if (abortController.signal.aborted) {
-        task.message(
-          "Cancellation arrived after the merge was applied. Refreshing the completed result; start a new merge to use the original inputs again.",
-          "warn",
-        );
-      }
-
-      // Use setMergedOsm to properly update file info for the new merged result
-      enterStage("refresh-result");
-      updateMergeOutcome({ type: "applied" });
-      await refreshMergedResult(merged.id, mergedName, true);
-      task.end("Automatic merge completed");
-      showVerifiedMergeResult();
-    } catch (error) {
-      const committedMergeId = committedMutationOsmId(error, "merge");
-      const committedApplyId = committedMutationOsmId(error, "applyChangesAndReplace");
-      if (mergePipelineCompleted || committedMergeId) {
-        if (committedMergeId) updateMergeOutcome({ type: "applied" });
-        // The worker finished every mutation; only refreshing React state failed.
-        try {
-          await refreshMergedResult(
-            mergedOsmRefreshRetryId(error, committedMergeId ?? committedApplyId ?? completedOsmId),
-            mergedName,
-            true,
-            Boolean(committedMergeId || committedApplyId),
-          );
-          setChangesetStats(null);
-          task.end("Automatic merge completed after refreshing the merged dataset");
-          showVerifiedMergeResult();
-        } catch (refreshError) {
-          task.fail(
-            refreshError,
-            `All merge stages completed, but the merged dataset could not be refreshed: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`,
-          );
-        }
-      } else if (conflationBaseApplied) {
-        // Preserve both datasets so the user can retry intersection creation without
-        // rediscovering or reapplying imported-data matches.
-        try {
-          await refreshMergedResult(baseOsmId, mergedName, false, Boolean(committedApplyId));
-        } catch (refreshError) {
-          Tasks.message(
-            `Could not refresh the partially merged base: ${refreshError instanceof Error ? refreshError.message : "Unknown error"}`,
-            "warn",
-          );
-        }
-        task.fail(
-          error,
-          `Imported-data changes were applied, but the remaining stages could not finish: ${error instanceof Error ? error.message : "Unknown error"}. The patch remains loaded; refresh the dataset if needed, then continue with intersections.`,
-        );
-        goToStep("create-intersections");
-      } else if (abortController.signal.aborted) {
-        task.cancelled("Merge cancelled");
-        goToStep("select-osm-pbf-files");
-      } else {
-        task.fail(
-          error,
-          `Merge failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-        );
-        if (conflationOptions) {
-          const issue = matchingReviewIssue(error);
-          setMatchingIssue(issue);
-          // Discovery is read-only, so returning to candidate review is safe even when
-          // generation failed partway through validation.
-          const restoreFailure = await recoverConflationRunAllFailure({
-            restoreReview: conflationDiscoveryCompleted
-              ? async () => {
-                  if (issue.source) {
-                    await remote.setConflationFilter(baseOsmId, issue.source);
-                    setConflationCandidateFilter(issue.source);
-                  }
-                  const [summary, page] = await Promise.all([
-                    remote.getConflationSummary(baseOsmId),
-                    remote.getConflationPage(baseOsmId, 0, CONFLATION_PAGE_SIZE, {
-                      groupBySource: true,
-                    }),
-                  ]);
-                  setConflationSummary(summary);
-                  setConflationCandidatePageIndex(0);
-                  setConflationCandidatePage(page);
-                }
-              : undefined,
-            showReview: () => goToStep("match-imported-data"),
-          });
-          if (restoreFailure) {
-            Tasks.message(
-              `Could not restore candidate details after the failed merge: ${restoreFailure.error instanceof Error ? restoreFailure.error.message : "Unknown error"}`,
-              "warn",
-            );
-          }
-        }
-      }
-    } finally {
-      setMergeAbortController(null);
-    }
-  };
-
-  const hasZeroChanges = useMemo(() => {
-    if (!changesetStats) return true;
-    return changesetStats.totalChanges === 0;
-  }, [changesetStats]);
-  const isDirectPreviewReview = changesetReviewContext.kind === "direct-preview";
-
   const baseNeedsFull = base.osmInfo !== null && !hasFullNodeIndex(base.osmInfo);
   const patchNeedsFull = patch.osmInfo !== null && !hasFullNodeIndex(patch.osmInfo);
   if (baseNeedsFull || patchNeedsFull) {
-    // The cards keep a stored dataset without a reload path clearable.
     return (
       <div className="flex flex-col gap-4">
-        <OsmDatasetCard title="Base OSM" name="base OSM" osmFile={base} onClear={clearBaseOsm} />
+        <OsmDatasetCard
+          title="Base OSM"
+          name="base OSM"
+          osmFile={base}
+          onClear={() => void clearInput(base)}
+        />
         <OsmDatasetCard
           title="Patch OSM"
           name="patch OSM"
           osmFile={patch}
-          onClear={clearPatchOsm}
+          onClear={() => void clearInput(patch)}
         />
         <FullIndexRequired operation="Merge" osmFile={base} />
         <FullIndexRequired operation="Merge" osmFile={patch} />
@@ -848,659 +449,200 @@ export default function MergeBlock() {
     );
   }
 
+  const inputCard = (file: UseOsmFileReturn, osmKey: string, kind: "base" | "patch") => (
+    <Card>
+      <OsmInputCardHeader
+        fileName={kind === "base" ? baseFileName : patchFileName}
+        kind={kind}
+        loaded={Boolean(file.osm)}
+        onClear={() => clearInput(file)}
+        onDownload={file.downloadOsm}
+        {...(kind === "patch" ? { onUseAsBase: usePatchAsBase, canUseAsBase: !base.osm } : {})}
+        title={
+          kind === "base"
+            ? "Base OSM — authoritative existing dataset"
+            : "Patch OSM — imported additions and updates"
+        }
+      />
+      <CardContent className="p-0">
+        {file.osm ? (
+          <OsmInfoTable
+            defaultOpen={false}
+            osm={file.osm}
+            file={file.file}
+            fileInfo={file.fileInfo}
+          />
+        ) : (
+          <StoredOsmList
+            osmKey={osmKey}
+            loadFailure={file.loadFailure}
+            onDismissLoadFailure={file.clearLoadFailure}
+            onReloadView={file.reloadWithViewProfile}
+            openOsmPbfUrl={async (url) => {
+              const controller = new AbortController();
+              setLoadingState({ controller, osmKey });
+              resetDerivedState();
+              try {
+                const osmInfo = await file.loadOsmPbfUrl(url, controller);
+                if (osmInfo) flyToOsmBounds(osmInfo);
+                return osmInfo;
+              } finally {
+                setLoadingState(null);
+              }
+            }}
+            openOsmFile={async (source, fileType) => {
+              const controller = new AbortController();
+              setLoadingState({ controller, osmKey });
+              resetDerivedState();
+              try {
+                const osmInfo =
+                  typeof source === "string"
+                    ? await file.loadFromStorage(source, controller)
+                    : await file.loadOsmFile(source, fileType, controller);
+                if (osmInfo) flyToOsmBounds(osmInfo);
+                return osmInfo;
+              } finally {
+                setLoadingState(null);
+              }
+            }}
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const title = {
+    inputs: "Choose the inputs",
+    review: "Review the plan",
+    automatic: "Applying the merge",
+    result: "Merged result",
+  }[step];
+  const intro = {
+    inputs:
+      "Load the base and the import, then review the plan before anything changes, or apply it automatically.",
+    review:
+      "Nothing has changed yet. Each imported feature shows what the plan does with it; choose where a proposal needs you, then apply.",
+    automatic: "Planning and applying in one run. Progress and details are in Activity.",
+    result: "The merge is applied. Download the result, or start a new merge.",
+  }[step];
+
   return (
     <div className="flex flex-col gap-4">
-      {pendingMergedRefresh?.error ? (
+      {pendingRefresh?.error ? (
         <Alert variant="destructive" title="The merged dataset needs to be refreshed">
-          <p>{pendingMergedRefresh.error}</p>
+          <p>{pendingRefresh.error}</p>
           <p>
-            The worker already applied the changes. Refresh the displayed result before continuing
-            or downloading.
+            The worker already applied the plan. Refresh the displayed result before continuing or
+            downloading.
           </p>
-          <ActionButton onAction={retryMergedRefresh}>Refresh merged dataset</ActionButton>
+          <ActionButton onAction={retryRefresh}>Refresh merged dataset</ActionButton>
           <p>
             If refreshing cannot recover the dataset, reload this page and load both original input
             files to start again.
           </p>
         </Alert>
       ) : null}
-      <Step step="select-osm-pbf-files" title="Select merge inputs and options" guideId="select">
-        <Card>
-          <CardHeader>Merge pipeline</CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            <ol className="list-decimal pl-4">
-              <li>Add patch entities and apply same-ID patch updates</li>
-              <li>Optionally match nearby imported entities</li>
-              <li>Optionally reconcile exact, compatible entities across the inputs</li>
-              <li>Create safe intersections where eligible ways cross</li>
-              <li>Validate topology before exposing the merged result</li>
-            </ol>
+      <Step number={STEP_NUMBER[step]} title={title}>
+        <CardContent>
+          <p>{intro}</p>
+        </CardContent>
+      </Step>
+
+      {step === "inputs" ? (
+        <>
+          <Alert title="Check each input in Inspect first">
             <p>
-              The reviewed workflow pauses at changeset checkpoints. The automatic workflow skips
-              those checkpoints but uses the same safety validation.
+              Merge does not scan inputs for duplicates inside one file. Open each file in the{" "}
+              <a href={appOrigin("inspect")} className="text-info underline">
+                Inspect app
+              </a>{" "}
+              to find and fix duplicate nodes and ways, then open the cleaned PBF here.
             </p>
-          </CardContent>
-        </Card>
-
-        <Alert title="Check each input in Inspect first">
-          <p>
-            Merge does not scan inputs for duplicates inside one file. Open each file in the{" "}
-            <a href={appOrigin("inspect")} className="text-info underline">
-              Inspect app
-            </a>{" "}
-            to find and fix duplicate nodes and ways, then open the cleaned PBF here.
-          </p>
-        </Alert>
-
-        <Card>
-          <OsmInputCardHeader
-            fileName={baseFileName}
-            kind="base"
-            loaded={Boolean(base.osm)}
-            onClear={clearBaseOsm}
-            onDownload={base.downloadOsm}
-            title="Base OSM — authoritative existing dataset"
+          </Alert>
+          {inputCard(base, BASE_OSM_KEY, "base")}
+          {inputCard(patch, PATCH_OSM_KEY, "patch")}
+          <ConflationConfig />
+          <PlanInputs
+            disabled={!base.osm || !patch.osm || taskLocked}
+            onApplyAutomatically={applyAutomatically}
+            onReviewPlan={reviewPlan}
           />
-          <CardContent className="p-0">
-            {!base.osm ? (
-              <StoredOsmList
-                osmKey={BASE_OSM_KEY}
-                loadFailure={base.loadFailure}
-                onDismissLoadFailure={base.clearLoadFailure}
-                onReloadView={base.reloadWithViewProfile}
-                openOsmPbfUrl={async (url) => {
-                  const abortController = new AbortController();
-                  setLoadingState({
-                    controller: abortController,
-                    osmKey: BASE_OSM_KEY,
-                  });
-                  setChangesetStats(null);
-                  resetConflationReview();
-                  selectEntity(null, null);
-                  try {
-                    const osmInfo = await base.loadOsmPbfUrl(url, abortController);
-                    if (osmInfo) flyToOsmBounds(osmInfo);
-                    return osmInfo;
-                  } finally {
-                    setLoadingState(null);
-                  }
-                }}
-                openOsmFile={async (file, fileType) => {
-                  const abortController = new AbortController();
-                  setLoadingState({
-                    controller: abortController,
-                    osmKey: BASE_OSM_KEY,
-                  });
-                  setChangesetStats(null);
-                  resetConflationReview();
-                  selectEntity(null, null);
-                  try {
-                    const osmInfo =
-                      typeof file === "string"
-                        ? await base.loadFromStorage(file, abortController)
-                        : await base.loadOsmFile(file, fileType, abortController);
-                    if (osmInfo) flyToOsmBounds(osmInfo);
-                    return osmInfo;
-                  } finally {
-                    setLoadingState(null);
-                  }
-                }}
-              />
-            ) : (
-              <OsmInfoTable
-                defaultOpen={false}
-                osm={base.osm}
-                file={base.file}
-                fileInfo={base.fileInfo}
-              />
-            )}
-          </CardContent>
-        </Card>
+        </>
+      ) : null}
 
-        <Card>
-          <OsmInputCardHeader
-            fileName={patchFileName}
-            kind="patch"
-            loaded={Boolean(patch.osm)}
-            onClear={clearPatchOsm}
-            onDownload={patch.downloadOsm}
-            onUseAsBase={usePatchAsBase}
-            canUseAsBase={!base.osm}
-            title="Patch OSM — imported additions and updates"
+      {step === "review" && overview && page ? (
+        <>
+          <PatchIdNotice
+            mode={patchIds}
+            replacesBase={overview.summary.replacesBase}
+            onChange={replanWithPatchIds}
           />
-          <CardContent className="p-0">
-            {!patch.osm ? (
-              <StoredOsmList
-                osmKey={PATCH_OSM_KEY}
-                loadFailure={patch.loadFailure}
-                onDismissLoadFailure={patch.clearLoadFailure}
-                onReloadView={patch.reloadWithViewProfile}
-                openOsmPbfUrl={async (url) => {
-                  const abortController = new AbortController();
-                  setLoadingState({
-                    controller: abortController,
-                    osmKey: PATCH_OSM_KEY,
-                  });
-                  try {
-                    const osmInfo = await patch.loadOsmPbfUrl(url, abortController);
-                    if (osmInfo) flyToOsmBounds(osmInfo);
-                    return osmInfo;
-                  } finally {
-                    setLoadingState(null);
-                  }
-                }}
-                openOsmFile={async (file) => {
-                  const abortController = new AbortController();
-                  setLoadingState({
-                    controller: abortController,
-                    osmKey: PATCH_OSM_KEY,
-                  });
-                  try {
-                    const osmInfo =
-                      typeof file === "string"
-                        ? await patch.loadFromStorage(file, abortController)
-                        : await patch.loadOsmFile(file, undefined, abortController);
-                    if (osmInfo) flyToOsmBounds(osmInfo);
-                    return osmInfo;
-                  } finally {
-                    setLoadingState(null);
-                  }
-                }}
-              />
-            ) : (
-              <OsmInfoTable
-                defaultOpen={false}
-                osm={patch.osm}
-                file={patch.file}
-                fileInfo={patch.fileInfo}
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        <ConflationConfig />
-
-        <MergeStart
-          disabled={!base.osm || !patch.osm || taskLocked}
-          matchingEnabled={conflationForm.enabled}
-          requiresRemovalReview={requiresRemovalReview}
-          onStart={(automatic) => (automatic ? runAutomaticMerge() : startReviewedMerge())}
-        />
-      </Step>
-
-      <Step step="run-all-steps" title="Merge in progress" guideId="run-all">
-        <p>The active step may take a few minutes. Detailed worker messages are in Activity.</p>
-        {automaticMergeProgress ? <LiveAutomaticMergeProgress {...automaticMergeProgress} /> : null}
-        {mergeAbortController && (
-          <Button
-            variant="destructive"
-            className="w-full"
-            onClick={() => {
-              mergeAbortController.abort();
-              setMergeAbortController(null);
+          <PlanSummary overview={overview} />
+          <PlanLegend counts={overview.summary.features} />
+          <PlanReview
+            detail={selected}
+            filter={filter}
+            page={page}
+            pageIndex={pageIndex}
+            onBulk={applyBulk}
+            onDecide={decide}
+            onFilterChange={changeFilter}
+            onPageChange={async (next) => {
+              if (base.osm) await loadPage(base.osm.id, next);
             }}
-          >
-            <StopCircleIcon aria-hidden="true" />
-            Request cancellation
-          </Button>
-        )}
-      </Step>
-
-      <Step step="direct-merge" title="Direct merge" guideId="direct">
-        <Card>
-          <CardHeader>
-            Base OSM PBF
-            {base.osm && (
-              <CardAction>
-                <ActionButton
-                  icon={<DownloadIcon />}
-                  label="Download base OSM"
-                  onAction={base.downloadOsm}
-                  variant="ghost"
-                />
-              </CardAction>
-            )}
-          </CardHeader>
-          <CardContent className="p-0">
-            <OsmInfoTable
-              defaultOpen={false}
-              osm={base.osm}
-              file={base.file}
-              fileInfo={base.fileInfo}
-            />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            Patch OSM PBF
-            {patch.osm && (
-              <CardAction>
-                <ActionButton
-                  icon={<DownloadIcon />}
-                  label="Download patch OSM"
-                  onAction={patch.downloadOsm}
-                  variant="ghost"
-                />
-              </CardAction>
-            )}
-          </CardHeader>
-          <CardContent className="p-0">
-            <OsmInfoTable
-              defaultOpen={false}
-              osm={patch.osm}
-              file={patch.file}
-              fileInfo={patch.fileInfo}
-            />
-          </CardContent>
-        </Card>
-
-        <StepActions aria-label="Direct merge actions">
-          <ActionButton
-            icon={<ArrowLeftIcon />}
-            onAction={async () => prevStep()}
-            variant="outline"
-          >
-            Back
-          </ActionButton>
-          <ActionButton
-            icon={<FileDiffIcon />}
-            onAction={() =>
-              startStepTask("Generate direct-merge preview", async () => {
-                if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                const results = await remote.generateChangeset(
-                  base.osm.id,
-                  patch.osm.id,
-                  verifiedBaseMergeOptions(false),
-                );
-                setChangesetReviewContext({ kind: "direct-preview" });
-                setConflationRoutingDiagnostics(null);
-                setChangesetStats(results);
-                return changeStatsSummary(results);
-              })
-            }
-          >
-            Preview direct merge
-          </ActionButton>
-        </StepActions>
-      </Step>
-
-      <Step
-        step="review-changeset"
-        title={reviewStepTitle(changesetReviewContext)}
-        guideId={reviewGuideId(changesetReviewContext)}
-      >
-        <ActionButton
-          icon={<DownloadIcon />}
-          disabled={changesetStats === null || pendingMergedRefresh !== null}
-          onAction={downloadJsonChanges}
-        >
-          Download JSON changes
-        </ActionButton>
-        {changesDownloadError ? <Alert variant="destructive">{changesDownloadError}</Alert> : null}
-        {changesetStats && base.osm && (
-          <Card>
-            <CardHeader>{reviewChangesetTitle(changesetReviewContext)}</CardHeader>
-            <CardContent className="p-0">
-              <ChangesSummary />
-              <Suspense fallback={<LoadingState />}>
-                <Details>
-                  <DetailsSummary>All changes</DetailsSummary>
-                  <DetailsContent>
-                    <ChangesFilters />
-                    <ChangesExpandableList />
-                    <ChangesPagination />
-                  </DetailsContent>
-                </Details>
-              </Suspense>
-            </CardContent>
-          </Card>
-        )}
-        {conflationRoutingDiagnostics ? (
-          <ConflationRoutingDiagnostics diagnostics={conflationRoutingDiagnostics} />
-        ) : null}
-
-        {changesetReviewContext.kind === "cumulative" &&
-        changesetReviewContext.matching &&
-        changesetStats !== null &&
-        generatedOutcome &&
-        requiresRemovalReview ? (
-          <ConflationWayRemovalPreview outcome={generatedOutcome} />
-        ) : null}
-
-        {changesetReviewContext.kind === "cumulative" && changesetReviewContext.matching ? (
-          <MatchingReviewProblem issue={matchingIssue} />
-        ) : null}
-
-        <StepActions aria-label="Changeset review actions">
-          {changesetReviewContext.kind === "cumulative" &&
-          changesetReviewContext.matching &&
-          changesetStats !== null &&
-          base.osm &&
-          patch.osm ? (
-            <BackToMatching onBack={returnToMatching} />
-          ) : null}
-          {isDirectPreviewReview ? (
+            onSelect={selectFeature}
+          />
+          {downloadError ? <Alert variant="destructive">{downloadError}</Alert> : null}
+          <StepActions aria-label="Plan review actions">
             <ActionButton
+              icon={<ArrowLeftIcon />}
+              variant="outline"
               onAction={async () => {
-                setChangesetStats(null);
-                nextStep();
+                if (base.osm) await remote.clearMergePlan(base.osm.id);
+                resetPlan();
+                goTo("inputs");
               }}
-              icon={<ArrowRightIcon />}
             >
-              Continue to matching and reconciliation
+              Back to inputs
             </ActionButton>
-          ) : changesetStats == null || hasZeroChanges ? (
-            <ActionButton
-              disabled={pendingMergedRefresh !== null}
-              onAction={async () => {
-                if (changesetReviewContext.kind === "cumulative" && changesetStats !== null) {
-                  updateMergeOutcome({ type: "applied" });
-                  updateMergeOutcome({ type: "refreshed" });
-                }
-                if (completesVerifiedMerge) showVerifiedMergeResult();
-                else nextStep();
-              }}
-              icon={<ArrowRightIcon />}
-            >
-              {changesetReviewContext.kind === "intersections"
-                ? "No intersections, finish merge"
-                : "No changes, go to next step"}
+            <ActionButton icon={<DownloadIcon />} variant="outline" onAction={downloadOsc}>
+              Download osmChange (.osc)
             </ActionButton>
-          ) : (
             <ActionButton
               icon={<MergeIcon />}
-              onAction={() =>
-                startStepTask("Apply changes", async () => {
-                  if (!changesetStats) throw Error("Changes are not loaded");
-                  const applied = await applyChanges();
-                  if (changesetStats.osmId === base.osm?.id) {
-                    const mergedName = makeMergedDownloadName(
-                      runInputs?.baseName ?? base.fileInfo?.fileName,
-                      runInputs?.patchName ?? patch.fileInfo?.fileName,
-                    );
-                    await refreshMergedResult(
-                      applied.osmId,
-                      mergedName,
-                      completesVerifiedMerge,
-                      applied.synchronize,
-                    );
-                  } else {
-                    throw Error("Changeset OSM ID does not match the base OSM ID");
-                  }
-                  if (completesVerifiedMerge) {
-                    updateMergeOutcome({ type: "complete" });
-                    patch.setOsm(null);
-                  }
-                  return "Changes applied";
-                })
-              }
+              disabled={overview.diagnostics.integrity.length > 0 || pendingRefresh !== null}
+              onAction={applyReviewedPlan}
             >
-              {changesetReviewContext.kind === "intersections"
-                ? "Apply intersections and finish"
-                : "Apply cumulative merge"}
+              Apply plan
             </ActionButton>
-          )}
-        </StepActions>
-      </Step>
+          </StepActions>
+        </>
+      ) : null}
 
-      <Step step="match-imported-data" title="Match imported data" guideId="match-imported">
-        <MatchingReviewProblem issue={matchingIssue} />
-        <ActionButton
-          disabled={!base.osm || !patch.osm || !conflationOptions || isConflationFilterPending}
-          icon={<SearchCodeIcon />}
-          onAction={async () => {
-            if (!base.osm || !patch.osm || !conflationOptions) {
-              throw Error("Valid proximity-matching options and both inputs are required");
-            }
-            const baseOsmId = base.osm.id;
-            const patchOsmId = patch.osm.id;
-            await Tasks.run(
-              "Discover imported-data match candidates",
-              async () => {
-                resetConflationReview();
-                setMatchingIssue(null);
-                const summary = await remote.discoverConflation(
-                  baseOsmId,
-                  patchOsmId,
-                  conflationOptions,
-                );
-                invalidateMatchingPreview();
-                setConflationSummary(summary);
-                const page = await remote.getConflationPage(baseOsmId, 0, CONFLATION_PAGE_SIZE, {
-                  groupBySource: true,
-                });
-                setConflationCandidatePage(page);
-                return summary;
-              },
-              {
-                summary: (summary) =>
-                  `Found ${summary.total.toLocaleString()} imported-data match candidates`,
-              },
-            );
-          }}
-        >
-          {conflationSummary ? "Run candidate discovery again" : "Discover match candidates"}
-        </ActionButton>
-
-        {conflationSummary && conflationCandidatePage && base.osm && patch.osm ? (
-          <ConflationReview
-            base={base.osm}
-            patch={patch.osm}
-            summary={conflationSummary}
-            page={conflationCandidatePage}
-            filter={conflationCandidateFilter}
-            isFilterPending={isConflationFilterPending}
-            allowWayRemoval={requiresRemovalReview}
-            onDecision={updateConflationDecision}
-            onResetDecision={resetConflationDecision}
-            onLeaveUnmatched={(source) => saveConflationSourceChoice(source, null)}
-            onBulkDecision={updateConflationBulkDecision}
-            onFilterChange={updateConflationFilter}
-            onPageChange={loadConflationPage}
-          />
-        ) : null}
-
-        <StepActions aria-label="Imported-data matching actions">
-          <ActionButton
-            disabled={isConflationFilterPending}
-            icon={<ArrowLeftIcon />}
-            onAction={async () => prevStep()}
-            variant="outline"
-          >
-            Back
-          </ActionButton>
-          <ActionButton
-            disabled={!conflationSummary || isConflationFilterPending}
-            icon={<ArrowRightIcon />}
-            onAction={async () => nextStep()}
-          >
-            Continue with current decisions
-          </ActionButton>
-        </StepActions>
-      </Step>
-
-      <Step step="deduplicate-nodes" title="Reconcile matching entities" guideId="reconcile">
-        <MatchingReviewProblem issue={matchingIssue} />
-        <Card>
-          <CardHeader>
-            Current OSM PBF
-            {base.osm && (
-              <CardAction>
-                <ActionButton
-                  icon={<DownloadIcon />}
-                  label="Download current OSM"
-                  onAction={base.downloadOsm}
-                  variant="ghost"
-                />
-              </CardAction>
-            )}
-          </CardHeader>
-          <CardContent className="p-0">
-            <OsmInfoTable
-              defaultOpen={false}
-              osm={base.osm}
-              file={base.file}
-              fileInfo={base.fileInfo}
-            />
-          </CardContent>
-        </Card>
-
-        <StepActions aria-label="Exact reconciliation actions">
-          {conflationOptions && conflationSummary ? (
-            <BackToMatching onBack={returnToMatching} />
-          ) : null}
-          <ActionButton
-            icon={<SkipForwardIcon />}
-            onAction={() =>
-              startStepTask(
-                "Generate cumulative preview without exact reconciliation",
-                async () => {
-                  return generateVerifiedChangeset(false);
-                },
-              )
-            }
-            variant="outline"
-          >
-            Preview without exact reconciliation
-          </ActionButton>
-          <ActionButton
-            icon={<FileDiffIcon />}
-            onAction={() =>
-              startStepTask("Generate cumulative preview with exact reconciliation", async () => {
-                return generateVerifiedChangeset(true);
-              })
-            }
-          >
-            Preview with exact reconciliation
-          </ActionButton>
-        </StepActions>
-      </Step>
-
-      <Step step="create-intersections" title="Create intersections" guideId="intersections">
-        <StepActions aria-label="Intersection actions">
-          <ActionButton
-            disabled={pendingMergedRefresh !== null}
-            icon={<SkipForwardIcon />}
-            onAction={async () => showVerifiedMergeResult()}
-            variant="outline"
-          >
-            Skip intersections and finish
-          </ActionButton>
-          <ActionButton
-            disabled={pendingMergedRefresh !== null}
-            icon={<FileDiffIcon />}
-            onAction={() =>
-              startStepTask("Generate intersection preview", async () => {
-                if (!base.osm || !patch.osm) throw Error("Missing data to generate changes");
-                const results = await remote.generateChangeset(
-                  base.osm.id,
-                  patch.osm.id,
-                  INTERSECTION_OPTIONS,
-                );
-                setChangesetReviewContext({ kind: "intersections" });
-                setConflationRoutingDiagnostics(null);
-                setChangesetStats(results);
-                return changeStatsSummary(results);
-              })
-            }
-          >
-            Preview intersection changes
-          </ActionButton>
-        </StepActions>
-      </Step>
-
-      <Step step="inspect-final-osm" title="Inspect final merged OSM" guideId="final">
-        {completion ? (
-          <MergeCompletionSummary
-            completion={completion}
-            onDownloadReport={downloadOutcomeReport}
-          />
-        ) : null}
-        {base.osm && (
-          <>
-            {/* The step actions below keep "Save to storage" and the download. */}
-            <OsmDatasetCard
-              title="Merged OSM"
-              name="merged OSM"
-              osmFile={base}
-              onClear={clearBaseOsm}
-              actions={{ download: false, save: false }}
-            />
-
-            {conflationRoutingDiagnostics ? (
-              <ConflationRoutingDiagnostics diagnostics={conflationRoutingDiagnostics} />
-            ) : null}
-
-            <SaveToDiskNotice />
-            <div className="flex flex-col gap-1">
-              <CheckboxLabel className="min-h-8">
-                <Checkbox
-                  checked={positiveIds}
-                  aria-describedby="positive-ids-help"
-                  onCheckedChange={setPositiveIds}
-                />
-                Give new features positive IDs
-              </CheckboxLabel>
-              <p id="positive-ids-help" className="text-muted-foreground">
-                New features have negative IDs, the OSM convention for data not yet uploaded. Some
-                tools only accept positive IDs; the merge report then lists each change.
-              </p>
-            </div>
-            <StepActions aria-label="Final merged OSM actions">
-              {!base.isStored && base.canStore && (
-                <ActionButton icon={<SaveIcon />} onAction={base.saveToStorage} variant="outline">
-                  Save to storage
-                </ActionButton>
-              )}
-              <ActionButton
-                icon={<DownloadIcon />}
-                onAction={() => base.downloadOsm(undefined, { renumberNegativeIds: positiveIds })}
-              >
-                Download merged OSM PBF
-              </ActionButton>
-              <ActionButton icon={<ArrowLeftIcon />} variant="outline" onAction={startNewMerge}>
-                Start a new merge
-              </ActionButton>
-            </StepActions>
-          </>
-        )}
-      </Step>
+      {step === "result" ? (
+        <MergeResult
+          base={base}
+          plan={completion?.plan ?? null}
+          positiveIds={positiveIds}
+          onPositiveIdsChange={setPositiveIds}
+          onClear={() => clearInput(base)}
+          onStartNew={startNewMerge}
+          summary={
+            completion ? (
+              <MergeCompletionSummary completion={completion} onDownloadReport={downloadReport} />
+            ) : null
+          }
+        />
+      ) : null}
     </div>
   );
 }
 
-function Step({
-  step,
-  title,
-  guideId,
-  isTransitioning,
-  children,
-}: {
-  step: (typeof STEPS)[number];
-  title: string;
-  guideId: MergeStepGuideId;
-  isTransitioning?: boolean;
-  children: React.ReactNode;
-}) {
-  const currentStep = useAtomValue(stepAtom);
-  const stepIndex = useAtomValue(stepIndexAtom);
-  const conflationEnabled = useAtomValue(conflationFormAtom).enabled;
-  const hiddenConflationStepBeforeCurrent =
-    !conflationEnabled && STEPS.slice(0, stepIndex + 1).includes("match-imported-data") ? 1 : 0;
-  if (step !== currentStep) return null;
-  if (isTransitioning === true) return <LoadingState>Please wait…</LoadingState>;
-  const isAutomatic = step === "run-all-steps";
-  return (
-    <>
-      <StepCard
-        number={isAutomatic ? undefined : stepIndex + 1 - hiddenConflationStepBeforeCurrent}
-        title={isAutomatic ? `Automatic workflow: ${title}` : title}
-      >
-        <CardContent className="p-0">
-          <MergeStepGuide guideId={guideId} />
-        </CardContent>
-      </StepCard>
-      {children}
-    </>
-  );
+/** Run one step of the workflow as a task. A failure is recorded by the task and stays here. */
+async function runTask(title: string, fn: (task: TaskHandle) => Promise<string>) {
+  try {
+    await Tasks.run(title, fn, { summary: (summary) => summary });
+  } catch (error) {
+    if (error instanceof TaskAlreadyRunningError) throw error;
+  }
 }

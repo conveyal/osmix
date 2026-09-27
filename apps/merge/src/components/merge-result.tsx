@@ -41,9 +41,7 @@ export function MergeResult({
             onClear={() => void onClear()}
             actions={{ download: false, save: false }}
           />
-          {plan ? (
-            <ConflationRoutingDiagnostics diagnostics={plan.diagnostics.routing} scope="plan" />
-          ) : null}
+          {plan ? <ConflationRoutingDiagnostics diagnostics={plan.diagnostics.routing} /> : null}
           <SaveToDiskNotice />
           <div className="flex flex-col gap-1">
             <CheckboxLabel className="min-h-8">

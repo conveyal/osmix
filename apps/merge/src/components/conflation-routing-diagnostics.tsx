@@ -31,41 +31,22 @@ function formatDelta(value: number) {
   return value.toLocaleString();
 }
 
-const SCOPE_COPY = {
-  matching: {
-    before: "Before ordinary merge",
-    after: "After fuzzy matching",
-    description:
-      "is the ordinary direct merge, including exact reconciliation when selected. After adds accepted fuzzy property transfers and network attachments.",
-  },
-  plan: {
-    before: "Base",
-    after: "Planned result",
-    description:
-      "is the base dataset. After is the result the plan would apply, with every proposal it currently includes.",
-  },
-} as const;
-
-/**
- * CAR and WALK graph counts before and after. `scope` says what before and after are: the
- * matching stage of the staged workflow, or a whole merge plan.
- */
+/** CAR and WALK graph counts of the base and of the result a merge plan would apply. */
 export function ConflationRoutingDiagnostics({
   diagnostics,
-  scope = "matching",
 }: {
   diagnostics: Pick<OsmConflationRoutingDiagnostics, "car" | "walk">;
-  scope?: keyof typeof SCOPE_COPY;
 }) {
   const descriptionId = useId();
-  const copy = SCOPE_COPY[scope];
   return (
     <Card>
       <CardHeader>Routing topology impact</CardHeader>
       <CardContent className="p-0">
         <div className="grid gap-1 p-inset text-muted-foreground" id={descriptionId}>
           <p>
-            <span className="font-semibold">Before</span> {copy.description}
+            <span className="font-semibold">Before</span> is the base dataset.{" "}
+            <span className="font-semibold">After</span> is the result the plan would apply, with
+            every proposal it currently includes.
           </p>
           <p>
             All graph nodes include every node loaded into the mode-specific graph. Routable nodes
@@ -79,8 +60,8 @@ export function ConflationRoutingDiagnostics({
           <TableHeader>
             <TableRow>
               <TableHead>Mode / metric</TableHead>
-              <TableHead>{copy.before}</TableHead>
-              <TableHead>{copy.after}</TableHead>
+              <TableHead>Base</TableHead>
+              <TableHead>Planned result</TableHead>
               <TableHead>Signed delta</TableHead>
             </TableRow>
           </TableHeader>
@@ -103,9 +84,8 @@ export function ConflationRoutingDiagnostics({
           </TableBody>
         </Table>
         <p className="border-t p-inset text-muted-foreground">
-          A walk-only attachment should not change CAR topology. Fewer WALK components can indicate
-          the intended new connection, but topology counts alone do not prove that routing is
-          correct.
+          Automatic matching never changes CAR topology. Fewer WALK components can indicate the
+          intended new connections, but topology counts alone do not prove that routing is correct.
         </p>
       </CardContent>
     </Card>

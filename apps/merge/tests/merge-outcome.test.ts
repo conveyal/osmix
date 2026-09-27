@@ -1,103 +1,54 @@
 import { createStore } from "jotai";
+import type { MergePlanOverview } from "osmix";
 import { describe, expect, it } from "vitest";
 
 import {
   mergeCompletionAtom,
-  mergeRunInputsAtom,
-  mergeStepIndexAtom,
+  mergeStepAtom,
   pendingMergedRefreshAtom,
   updateMergeOutcomeAtom,
 } from "../src/state/merge-outcome";
-import { emptyMatchingOutcome } from "./fixtures/merge-outcome";
 
-const inputs = { baseName: "base.pbf", patchName: "import.pbf", matchingEnabled: true };
+const inputs = { baseName: "base.pbf", patchName: "import.pbf", matchingEnabled: false };
+const plan = { featureCount: 3 } as MergePlanOverview;
 
-describe("merge completion evidence", () => {
-  it("does not describe missing matching evidence as an exact-only success", () => {
+describe("merge outcome", () => {
+  it("completes only after the plan is applied and the result refreshed", () => {
     const store = createStore();
     store.set(updateMergeOutcomeAtom, { type: "begin", inputs });
-    store.set(updateMergeOutcomeAtom, { type: "applied" });
-    store.set(updateMergeOutcomeAtom, { type: "refreshed" });
-    expect(() => store.set(updateMergeOutcomeAtom, { type: "complete" })).toThrow(
-      "applied outcome report",
+    expect(() => store.set(updateMergeOutcomeAtom, { type: "applied" })).toThrow(
+      "before it is planned",
     );
-    expect(store.get(mergeCompletionAtom)).toBeNull();
-  });
-
-  it("requires successful application and refresh, even when generation succeeded", () => {
-    const store = createStore();
-    store.set(updateMergeOutcomeAtom, { type: "begin", inputs });
-    store.set(updateMergeOutcomeAtom, { type: "generated", outcome: emptyMatchingOutcome() });
+    store.set(updateMergeOutcomeAtom, { type: "planned", plan });
     expect(() => store.set(updateMergeOutcomeAtom, { type: "complete" })).toThrow(
       "applied and refreshed",
     );
-    expect(store.get(mergeCompletionAtom)).toBeNull();
     store.set(updateMergeOutcomeAtom, { type: "applied" });
-    expect(() => store.set(updateMergeOutcomeAtom, { type: "complete" })).toThrow(
-      "applied and refreshed",
-    );
-    expect(store.get(mergeCompletionAtom)).toBeNull();
-    store.set(updateMergeOutcomeAtom, { type: "refreshed" });
-    store.set(updateMergeOutcomeAtom, { type: "complete" });
-    expect(store.get(mergeCompletionAtom)).toEqual({ inputs, outcome: emptyMatchingOutcome() });
-  });
-
-  it("retains the applied report after live preview invalidation and later intersections", () => {
-    const store = createStore();
-    const outcome = emptyMatchingOutcome();
-    outcome.summary.unmatchedFeatures =
-      outcome.summary.unresolvedFeatures =
-      outcome.summary.features =
-        1;
-    store.set(updateMergeOutcomeAtom, { type: "begin", inputs });
-    store.set(updateMergeOutcomeAtom, { type: "generated", outcome });
-    store.set(updateMergeOutcomeAtom, { type: "applied" });
-    store.set(updateMergeOutcomeAtom, { type: "refreshed" });
-    store.set(updateMergeOutcomeAtom, { type: "invalidate-preview" });
-    store.set(updateMergeOutcomeAtom, { type: "result-mutated" });
     expect(() => store.set(updateMergeOutcomeAtom, { type: "complete" })).toThrow(
       "applied and refreshed",
     );
     store.set(updateMergeOutcomeAtom, { type: "refreshed" });
     store.set(updateMergeOutcomeAtom, { type: "complete" });
-    expect(store.get(mergeCompletionAtom)).toEqual({ inputs, outcome });
+    expect(store.get(mergeCompletionAtom)).toEqual({ inputs, plan });
   });
 
-  it("keeps a successful no-op report and replaces it when decisions are regenerated", () => {
+  it("refuses to replan an applied merge", () => {
     const store = createStore();
     store.set(updateMergeOutcomeAtom, { type: "begin", inputs });
-    const previous = emptyMatchingOutcome();
-    previous.summary.unresolvedFeatures = previous.summary.features = 1;
-    store.set(updateMergeOutcomeAtom, { type: "generated", outcome: previous });
-    store.set(updateMergeOutcomeAtom, { type: "invalidate-preview" });
-    const regenerated = emptyMatchingOutcome();
-    store.set(updateMergeOutcomeAtom, { type: "generated", outcome: regenerated });
+    store.set(updateMergeOutcomeAtom, { type: "planned", plan });
     store.set(updateMergeOutcomeAtom, { type: "applied" });
-    store.set(updateMergeOutcomeAtom, { type: "refreshed" });
-    store.set(updateMergeOutcomeAtom, { type: "complete" });
-    expect(store.get(mergeCompletionAtom)?.outcome).toEqual(regenerated);
+    expect(() => store.set(updateMergeOutcomeAtom, { type: "planned", plan })).toThrow(
+      "cannot be planned again",
+    );
   });
 
-  it("clears prior completion on replacement and supports an exact-only run", () => {
+  it("returns to the inputs and forgets a pending refresh on reset", () => {
     const store = createStore();
-    store.set(updateMergeOutcomeAtom, { type: "begin", inputs });
-    store.set(updateMergeOutcomeAtom, { type: "generated", outcome: emptyMatchingOutcome() });
-    store.set(updateMergeOutcomeAtom, { type: "applied" });
-    store.set(updateMergeOutcomeAtom, { type: "refreshed" });
-    store.set(updateMergeOutcomeAtom, { type: "complete" });
-    store.set(mergeStepIndexAtom, 12);
-    store.set(pendingMergedRefreshAtom, { osmId: "old-result", finishOnRetry: true });
+    store.set(mergeStepAtom, "result");
+    store.set(pendingMergedRefreshAtom, { osmId: "base" });
     store.set(updateMergeOutcomeAtom, { type: "reset" });
-    expect(store.get(mergeCompletionAtom)).toBeNull();
-    expect(store.get(mergeRunInputsAtom)).toBeNull();
-    expect(store.get(mergeStepIndexAtom)).toBe(0);
+    expect(store.get(mergeStepAtom)).toBe("inputs");
     expect(store.get(pendingMergedRefreshAtom)).toBeNull();
-    const nextInputs = { ...inputs, baseName: "original.pbf", matchingEnabled: false };
-    store.set(updateMergeOutcomeAtom, { type: "begin", inputs: nextInputs });
-    expect(() => store.set(updateMergeOutcomeAtom, { type: "complete" })).toThrow();
-    store.set(updateMergeOutcomeAtom, { type: "applied" });
-    store.set(updateMergeOutcomeAtom, { type: "refreshed" });
-    store.set(updateMergeOutcomeAtom, { type: "complete" });
-    expect(store.get(mergeCompletionAtom)).toEqual({ inputs: nextInputs, outcome: null });
+    expect(store.get(mergeCompletionAtom)).toBeNull();
   });
 });

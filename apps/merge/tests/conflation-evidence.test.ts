@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { CandidateEvidence } from "../src/components/conflation-review";
+import { CandidateEvidence } from "../src/components/conflation-candidate-evidence";
 
 function candidate(
   distanceMeters: number,

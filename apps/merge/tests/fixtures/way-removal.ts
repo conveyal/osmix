@@ -37,17 +37,30 @@ export class WayRemovalReviewWorker extends OsmixWorker {
   }
 }
 
-export function createWayRemovalSession({ branch = false, taggedNode = false } = {}) {
+/** A worker holding both inputs and a plan with removal review on. */
+export function createWayRemovalSession({
+  branch = false,
+  taggedNode = false,
+  decisions = [],
+}: {
+  branch?: boolean;
+  taggedNode?: boolean;
+  decisions?: { proposalId: string; action: "accept" | "reject" }[];
+} = {}) {
   const { base, patch } = createWayRemovalInputs({ branch, taggedNode });
   const worker = new WayRemovalReviewWorker();
   worker.add(base);
   worker.add(patch);
-  worker.discoverConflation(base.id, patch.id, {
-    propertyKeys: ["name"],
-    attachNetwork: branch,
-    allowWayRemoval: true,
-    maxDistanceMeters: 1,
+  const overview = worker.planMerge(base.id, patch.id, {
+    createIntersections: false,
+    matching: {
+      propertyKeys: ["name"],
+      attachNetwork: branch,
+      allowWayRemoval: true,
+      maxDistanceMeters: 1,
+      automatic: "none",
+    },
+    decisions,
   });
-  worker.setConflationFilter(base.id, { entityType: "way", sourceId: 20 });
-  return { base, patch, worker };
+  return { base, patch, worker, overview };
 }

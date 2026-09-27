@@ -81,31 +81,17 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   await expect(inspectLink).toBeVisible();
   await expect(inspectLink).toHaveAttribute("href", /inspect/);
 
-  // Automatic mode is off by default, so Start merge enters the reviewed workflow.
-  await page.getByRole("button", { name: "Start merge" }).click();
-  await expect(page.getByRole("heading", { name: /^2\.\s*Direct merge$/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Download JSON changes" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Preview direct merge" })).toBeVisible();
-
-  await page.getByRole("button", { name: "Preview direct merge" }).click();
-  await expect(page.getByText(/Review direct merge/i)).toBeVisible();
-  await page.getByRole("button", { name: "Continue to matching and reconciliation" }).click();
-  await expect(page.getByText(/Reconcile matching entities/i)).toBeVisible();
-
-  const reconciliationActions = page.getByRole("group", {
-    name: "Exact reconciliation actions",
-  });
-  const withoutExact = reconciliationActions.getByRole("button", {
-    name: "Preview without exact reconciliation",
-  });
-  const withExact = reconciliationActions.getByRole("button", {
-    name: "Preview with exact reconciliation",
-  });
-
-  await withoutExact.focus();
-  await expect(withoutExact).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(withExact).toBeFocused();
+  // Review plan is the default entry point: nothing changes until the plan is applied.
+  await page.getByRole("button", { name: "Review plan" }).click();
+  await expect(page.getByRole("heading", { name: /^2\.\s*Review the plan$/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Plan summary" })).toBeVisible();
+  // The same file as base and patch: every positive ID names a base entity.
+  await expect(page.getByText(/patch entities replace base entities/)).toBeVisible();
+  const actions = page.getByRole("group", { name: "Plan review actions" });
+  await expect(actions.getByRole("button", { name: "Download osmChange (.osc)" })).toBeVisible();
+  await expect(actions.getByRole("button", { name: "Apply plan" })).toBeEnabled();
+  await actions.getByRole("button", { name: "Back to inputs" }).click();
+  await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeVisible();
 });
 
 async function tinyInputs() {
@@ -160,10 +146,7 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   await page.getByLabel("OSM tag keys to copy").fill("name");
   const radius = page.getByRole("spinbutton", { name: "Candidate search radius (meters)" });
   await radius.fill("0");
-  await page
-    .getByRole("checkbox", { name: "Run every stage automatically, without review" })
-    .check();
-  const start = page.getByRole("button", { name: "Start merge" });
+  const start = page.getByRole("button", { name: "Apply automatically" });
   await expect(start).toBeEnabled();
   await start.click();
   await expect(radius).toBeFocused();
@@ -185,6 +168,7 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
     "0",
     "0",
   ]);
+  await expect(summary.getByLabel("Imported features by outcome")).toContainText("Merged");
   await expect(summary).toContainText("completion-base.pbf + completion-patch.pbf");
   const downloadPromise = page.waitForEvent("download");
   await summary.getByRole("button", { name: "Download merge report" }).click();
@@ -192,11 +176,15 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   if (!reportFile) throw Error("Missing automatic merge report download");
   expect(JSON.parse(await readFile(reportFile, "utf8"))).toMatchObject({
     format: "osmix-merge-outcome",
-    version: 1,
-    outcome: {
-      stage: "matching-before-intersections",
-      summary: { tagCopyActions: 1, unresolvedFeatures: 0 },
-      features: [{ entityType: "node", sourceId: 101, copiedKeys: ["name"] }],
+    version: 2,
+    plan: {
+      summary: { features: { merged: 1 } },
+      matching: {
+        outcome: {
+          summary: { tagCopyActions: 1, unresolvedFeatures: 0 },
+          features: [{ entityType: "node", sourceId: 101, copiedKeys: ["name"] }],
+        },
+      },
     },
   });
   // Automated Chromium cannot use the native save picker, so this covers the Blob download path.
@@ -210,7 +198,7 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   expect(merged.ways.getById(10)?.refs).toEqual([2, 1]);
   expect(merged.nodes.getById(1)?.tags?.["name"]).toBe("Imported entrance");
   await page.getByRole("button", { name: "Start a new merge" }).click();
-  await expect(page.getByText("Select merge inputs and options", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeVisible();
   await expect(summary).toHaveCount(0);
   await expect(baseCard.getByRole("button", { name: "Open file" })).toBeVisible();
   await expect(patchCard.getByRole("button", { name: "Open file" })).toBeVisible();
@@ -218,9 +206,7 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   await expect(patchCard).not.toContainText("completion-patch.pbf");
 });
 
-test("manual removal requires preview and rediscovery clears stale removal evidence before apply", async ({
-  page,
-}) => {
+test("a removal chosen in the review is applied and reported", async ({ page }) => {
   const { base, patch } = createWayRemovalInputs();
   await openTinyMerge(page, {
     base: {
@@ -237,49 +223,16 @@ test("manual removal requires preview and rediscovery clears stale removal evide
   await page.getByRole("checkbox", { name: "Enable proximity matching" }).check();
   await page.getByRole("checkbox", { name: "Copy tags", exact: true }).uncheck();
   await page.getByRole("checkbox", { name: "Review redundant way removal" }).check();
-  const automatic = page.getByRole("checkbox", {
-    name: "Run every stage automatically, without review",
-  });
-  await expect(automatic).toBeDisabled();
-  await expect(automatic).not.toBeChecked();
-  await expect(automatic).toHaveAccessibleDescription(/reviewed workflow/);
-  await page.getByRole("button", { name: "Start merge" }).click();
-  await page.getByRole("button", { name: "Preview direct merge" }).click();
-  await page.getByRole("button", { name: "Continue to matching and reconciliation" }).click();
-  await page.getByRole("button", { name: "Discover match candidates" }).click();
+  await page.getByRole("button", { name: "Review plan" }).click();
   const feature = page.getByRole("region", { name: "Imported way 20", exact: true });
-  const removal = feature.getByRole("checkbox", { name: "Remove imported way", exact: true });
-  await expect(removal).not.toBeChecked();
-  await removal.click();
-  await expect(removal).toBeChecked();
-  await page.getByRole("button", { name: "Continue with current decisions" }).click();
-  await page.getByRole("button", { name: "Preview without exact reconciliation" }).click();
-  const preview = page.getByRole("region", { name: "Way removal preview", exact: true });
-  await expect(preview).toContainText("Imported ways to remove: 1");
-  await expect(preview).toContainText("Orphan points to remove: 2");
-  await expect(
-    page.getByRole("button", { name: "Apply cumulative merge", exact: true }),
-  ).toBeVisible();
-
-  await page.getByRole("button", { name: "Back to matching", exact: true }).click();
-  await page.getByRole("button", { name: "Run candidate discovery again" }).click();
-  await expect(removal).not.toBeChecked();
-  await page
-    .getByRole("group", { name: "Imported-data matching actions" })
-    .getByRole("button", { name: "Back", exact: true })
-    .click();
-  await expect(preview).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Apply cumulative merge", exact: true }),
-  ).toHaveCount(0);
-  await page.getByRole("button", { name: "No changes, go to next step" }).click();
-  await removal.click();
-  await expect(removal).toBeChecked();
-  await page.getByRole("button", { name: "Continue with current decisions" }).click();
-  await page.getByRole("button", { name: "Preview without exact reconciliation" }).click();
-  await expect(preview).toContainText("Imported ways to remove: 1");
-  await page.getByRole("button", { name: "Apply cumulative merge", exact: true }).click();
-  await page.getByRole("button", { name: "Skip intersections and finish" }).click();
+  await expect(feature).toContainText("Needs decision");
+  const removal = feature.locator('[data-proposal-id="remove:w20>w10"]');
+  // The choice replans in the worker; the radio follows the plan once it returns.
+  const include = removal.getByRole("radio", { name: "Include", exact: true });
+  await include.click();
+  await expect(include).toBeChecked();
+  await expect(feature).toContainText("Removed");
+  await page.getByRole("button", { name: "Apply plan", exact: true }).click();
   const completion = page.getByRole("region", { name: "Merge completion summary", exact: true });
   await expect(
     completion.getByRole("region", { name: "Applied way removals", exact: true }),
@@ -289,9 +242,15 @@ test("manual removal requires preview and rediscovery clears stale removal evide
   const reportPath = await (await download).path();
   if (!reportPath) throw Error("Missing removal report download");
   expect(JSON.parse(await readFile(reportPath, "utf8"))).toMatchObject({
-    outcome: {
-      summary: { wayRemovalActions: 1, removedOrphanNodes: 2 },
-      features: [{ wayRemoval: { sourceWayId: 20, retainedWayId: 10, orphanNodeIds: [101, 102] } }],
+    plan: {
+      matching: {
+        outcome: {
+          summary: { wayRemovalActions: 1, removedOrphanNodes: 2 },
+          features: [
+            { wayRemoval: { sourceWayId: 20, retainedWayId: 10, orphanNodeIds: [101, 102] } },
+          ],
+        },
+      },
     },
   });
 });
@@ -305,13 +264,13 @@ test("a late cancellation preserves the committed exact result and replacing the
   // the actual irreversible boundary without racing a tiny fixture's parse time.
   await page.evaluate(() => {
     const remote = window.osmWorker;
-    const merge = remote.merge.bind(remote);
-    remote.merge = async (...args) => {
-      const result = await merge(...args);
+    const apply = remote.applyMergePlan.bind(remote);
+    remote.applyMergePlan = async (...args) => {
+      const result = await apply(...args);
       const get = remote.get.bind(remote);
-      let refreshFailures = 2;
+      let refreshFailures = 1;
       remote.get = async (osmId) => {
-        if (osmId === result.id && refreshFailures > 0) {
+        if (osmId === result.dataset.id && refreshFailures > 0) {
           refreshFailures--;
           throw Error("Injected completed-result refresh failure");
         }
@@ -324,12 +283,9 @@ test("a late cancellation preserves the committed exact result and replacing the
       return result;
     };
   });
-  await page
-    .getByRole("checkbox", { name: "Run every stage automatically, without review" })
-    .check();
-  await page.getByRole("button", { name: "Start merge" }).click();
+  await page.getByRole("button", { name: "Apply automatically" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-test-merge-committed", "true");
-  await page.getByRole("button", { name: "Request cancellation" }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.evaluate(() => document.dispatchEvent(new Event("test-release-merge")));
   const summary = page.getByLabel("Merge completion summary");
   // Scope to the in-page Alert: the task's error toast is also a live `alert` region.
@@ -337,7 +293,7 @@ test("a late cancellation preserves the committed exact result and replacing the
     "Injected completed-result refresh failure",
   );
   await expect(summary).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Start merge" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Apply automatically" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toHaveCount(0);
   await page.getByRole("button", { name: "Refresh merged dataset" }).click();
   await expect(summary).toBeVisible();
@@ -350,7 +306,7 @@ test("a late cancellation preserves the committed exact result and replacing the
   // merge.
   await page.getByRole("button", { name: "Clear merged OSM" }).click();
   await loadPbf(baseCard, page, inputs.base);
-  await expect(page.getByText("Select merge inputs and options", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeVisible();
   await expect(summary).toHaveCount(0);
   await expect(baseCard.getByRole("button", { name: "File info" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toHaveCount(0);

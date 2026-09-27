@@ -59,10 +59,7 @@ async function openMonacoMerge(page: Page, { removal }: { removal: boolean }) {
 
 test("the automatic workflow merges the Monaco scenario patch", async ({ page }) => {
   await openMonacoMerge(page, { removal: false });
-  await page
-    .getByRole("checkbox", { name: "Run every stage automatically, without review" })
-    .check();
-  await page.getByRole("button", { name: "Start merge" }).click();
+  await page.getByRole("button", { name: "Apply automatically" }).click();
   const summary = page.getByLabel("Merge completion summary");
   await expect(summary).toBeVisible({ timeout: 120_000 });
 
@@ -109,39 +106,41 @@ test("the automatic workflow merges the Monaco scenario patch", async ({ page })
 
 test("the reviewed workflow removes the accepted duplicate footway", async ({ page }) => {
   await openMonacoMerge(page, { removal: true });
-  await page.getByRole("button", { name: "Start merge" }).click();
-  await page.getByRole("button", { name: "Preview direct merge" }).click();
-  await page.getByRole("button", { name: "Continue to matching and reconciliation" }).click();
-  await page.getByRole("button", { name: "Discover match candidates" }).click();
+  await page.getByRole("button", { name: "Review plan" }).click();
+  await expect(page.getByRole("region", { name: "Plan summary" })).toBeVisible();
 
-  // The review lists about 110 imported features across pages; filter to the ways.
-  const removal = (feature: number) =>
+  // Filter the imported features to those with a removal proposal.
+  await page.getByLabel("Proposal", { exact: true }).selectOption({ label: "Remove imported way" });
+  const removal = (id: number) =>
     page
-      .getByRole("region", { name: `Imported way ${feature}`, exact: true })
-      .getByRole("checkbox", { name: "Remove imported way", exact: true });
-  await page
-    .getByRole("combobox", { name: "Feature type", exact: true })
-    .selectOption({ label: "Line or area (OSM way)" });
-  const status = page.getByRole("combobox", { name: "Match status", exact: true });
+      .getByRole("region", { name: `Imported way ${id}`, exact: true })
+      .locator(`[data-proposal-id^="remove:w${id}>"]`);
 
-  // R2 keeps an unconnected branch, so its removal is blocked.
-  await status.selectOption({ label: "Blocked" });
-  await expect(removal(scenario("R2").features[0]!.id)).toBeDisabled();
+  // R2 keeps an unconnected branch, so its removal is blocked and takes no choice.
+  const r2 = removal(scenario("R2").features[0]!.id);
+  await expect(r2).toContainText("Blocked");
+  await expect(r2.getByRole("radio")).toHaveCount(0);
 
-  await status.selectOption({ label: "Needs review" });
-  const removeR1 = removal(scenario("R1").features[0]!.id);
-  await expect(removeR1).not.toBeChecked();
-  await removeR1.click();
-  // Choosing removal schedules R1, so it moves out of "Needs review".
-  await status.selectOption({ label: "Scheduled" });
-  await expect(removeR1).toBeChecked();
+  const r1Id = scenario("R1").features[0]!.id;
+  const r1 = page.getByRole("region", { name: `Imported way ${r1Id}`, exact: true });
+  // The choice replans in the worker; the radio follows the plan once it returns.
+  const include = removal(r1Id).getByRole("radio", { name: "Include", exact: true });
+  await include.click();
+  await expect(include).toBeChecked();
+  await expect(r1).toContainText("Removed");
+  await r1.getByRole("button", { name: "Show on map and evidence" }).click();
+  await expect(r1.getByRole("button", { name: "Showing on map" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Continue with current decisions" }).click();
-  await page.getByRole("button", { name: "Preview with exact reconciliation" }).click();
-  const preview = page.getByRole("region", { name: "Way removal preview", exact: true });
-  await expect(preview).toContainText("Imported ways to remove: 1");
-  await page.getByRole("button", { name: "Apply cumulative merge", exact: true }).click();
-  await page.getByRole("button", { name: "Skip intersections and finish" }).click();
+  // The plan downloads as osmChange without applying anything.
+  const oscDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download osmChange (.osc)" }).click();
+  const oscPath = await (await oscDownload).path();
+  if (!oscPath) throw Error("Missing osmChange download");
+  const osc = await readFile(oscPath, "utf8");
+  expect(osc).toContain("<osmChange");
+  expect(osc).not.toContain(`<way id="${r1Id}"`);
+
+  await page.getByRole("button", { name: "Apply plan", exact: true }).click();
   const completion = page.getByRole("region", { name: "Merge completion summary", exact: true });
   await expect(
     completion.getByRole("region", { name: "Applied way removals", exact: true }),

@@ -1,4 +1,4 @@
-import type { OsmConflationBulkAction, OsmConflationOptions } from "osmix";
+import type { OsmConflationOptions } from "osmix";
 
 export interface ConflationFormState {
   enabled: boolean;
@@ -91,43 +91,5 @@ export function toOsmConflationOptions(
     ...(state.allowWayRemoval ? { allowWayRemoval: true } : {}),
     maxDistanceMeters: state.maxDistanceMeters,
     automatic: "high-confidence",
-  };
-}
-
-export interface ConflationBulkActionCopy {
-  buttonLabel: string;
-  confirmLabel: string;
-  description: string;
-  title: string;
-}
-
-/** Keep filter-wide action wording consistent between the toolbar and confirmation dialog. */
-export function conflationBulkActionCopy(
-  action: OsmConflationBulkAction,
-): ConflationBulkActionCopy {
-  if (action === "transfer-properties") {
-    return {
-      buttonLabel: "Copy tags",
-      confirmLabel: "Copy tags",
-      description:
-        "Schedule copying selected imported attributes to every eligible base match in the current filters. Keep each network connection and removal choice unchanged.",
-      title: "Copy tags for filtered matches?",
-    };
-  }
-  if (action === "attach-network") {
-    return {
-      buttonLabel: "Connect network",
-      confirmLabel: "Connect network",
-      description:
-        "Schedule connecting imported ways to every eligible base match in the current filters. Keep each tag-copying and removal choice unchanged.",
-      title: "Connect the filtered imported network?",
-    };
-  }
-  return {
-    buttonLabel: "Skip filtered",
-    confirmLabel: "Skip filtered matches",
-    description:
-      "Schedule no matching actions for the filtered matches. Keep ordinary imported additions, including blocked and unmatched features.",
-    title: "Skip all filtered matches?",
   };
 }

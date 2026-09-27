@@ -77,7 +77,7 @@ export function PlanSummary({ overview }: { overview: MergePlanOverview }) {
       <Details defaultOpen={false}>
         <DetailsSummary>Routing topology</DetailsSummary>
         <DetailsContent>
-          <ConflationRoutingDiagnostics diagnostics={diagnostics.routing} scope="plan" />
+          <ConflationRoutingDiagnostics diagnostics={diagnostics.routing} />
         </DetailsContent>
       </Details>
     </>

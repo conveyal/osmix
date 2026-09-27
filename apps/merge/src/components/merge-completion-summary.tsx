@@ -16,8 +16,8 @@ import { DownloadIcon } from "lucide-react";
 import type { OsmConflationOutcomeReport } from "osmix";
 import { useId, useState } from "react";
 
+import { OUTCOME_LABEL, OUTCOMES, planReasonLabel } from "../lib/merge-plan-workflow";
 import type { MergeCompletion } from "../state/merge-outcome";
-import { conflationReasonLabel } from "./conflation-review";
 import { ConflationWayRemovalPreview } from "./conflation-way-removal";
 
 const PAGE_SIZE = 10;
@@ -113,7 +113,7 @@ function FeatureOutcomes({ outcome }: { outcome: OsmConflationOutcomeReport }) {
                 </p>
                 {feature.reasons.length > 0 ? (
                   <p className="text-muted-foreground">
-                    {feature.reasons.map(conflationReasonLabel).join("; ")}
+                    {feature.reasons.map(planReasonLabel).join("; ")}
                   </p>
                 ) : null}
                 <p className="text-muted-foreground">
@@ -203,7 +203,7 @@ function UncopiedTags({ outcome }: { outcome: OsmConflationOutcomeReport }) {
                   <p>{TAG_REASON_LABELS[feature.reason]}</p>
                   {feature.reasons.length ? (
                     <p className="text-muted-foreground">
-                      {feature.reasons.map(conflationReasonLabel).join("; ")}
+                      {feature.reasons.map(planReasonLabel).join("; ")}
                     </p>
                   ) : null}
                 </li>
@@ -234,8 +234,10 @@ export function MergeCompletionSummary({
   completion: MergeCompletion;
   onDownloadReport: () => Promise<unknown>;
 }) {
-  const { outcome } = completion;
+  const outcome = completion.plan.matching?.outcome ?? null;
   const summary = outcome?.summary;
+  const features = completion.plan.summary.features;
+  const undecided = features["needs-decision"];
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const downloadReport = async () => {
     setDownloadError(null);
@@ -253,11 +255,29 @@ export function MergeCompletionSummary({
     <Card role="region" aria-label="Merge completion summary">
       <CardHeader>
         Merge complete
-        {summary && summary.unresolvedFeatures > 0 ? " · unresolved matches remain" : ""}
+        {undecided > 0 ? " · undecided proposals were left out" : ""}
       </CardHeader>
       <CardContent className="p-0">
         <div className="flex flex-col gap-2 p-inset">
           <p>You can download the merged dataset. This report describes the completed run.</p>
+          <dl
+            className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1"
+            aria-label="Imported features by outcome"
+          >
+            {OUTCOMES.filter((key) => features[key] > 0).map((key) => (
+              <div key={key} className="contents">
+                <dt>{OUTCOME_LABEL[key]}</dt>
+                <dd>{features[key].toLocaleString()}</dd>
+              </div>
+            ))}
+          </dl>
+          {undecided > 0 ? (
+            <p>
+              Proposals for {undecided.toLocaleString()} imported{" "}
+              {undecided === 1 ? "feature were" : "features were"} waiting for a decision and were
+              left out; the features themselves were still added.
+            </p>
+          ) : null}
           {summary ? (
             <>
               <dl
@@ -293,9 +313,8 @@ export function MergeCompletionSummary({
                 can have several actions, or an applied action and another unresolved action.
               </p>
               <p>
-                These details record the matching stage. The later intersection step can make more
-                connections or change the junction IDs used by a way. Unresolved matching work
-                remains listed here so you can review the original choices.
+                These details record matching. Crossings planned after it can make more connections
+                or change the junction IDs used by a way.
               </p>
               {summary.features === 0 ? (
                 <p>

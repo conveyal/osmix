@@ -8,6 +8,16 @@ import type {
   PatchIdMode,
 } from "osmix";
 
+import {
+  type ConflationFormState,
+  DEFAULT_CONFLATION_FORM_STATE,
+} from "../lib/conflation-workflow";
+
+/** The matching settings form; matching is off until enabled. */
+export const conflationFormAtom = atom<ConflationFormState>({
+  ...DEFAULT_CONFLATION_FORM_STATE,
+});
+
 /** "Merge points at identical coordinates automatically". On by default; kept for the session. */
 export const mergeIdenticalPointsAtom = atom(true);
 

@@ -8,7 +8,7 @@ import {
   DEFAULT_CONFLATION_FORM_STATE,
   type ConflationFormState,
 } from "../src/lib/conflation-workflow";
-import { conflationFormAtom } from "../src/state/conflation";
+import { conflationFormAtom } from "../src/state/merge-plan";
 
 function renderConfig(overrides: Partial<ConflationFormState> = {}) {
   const store = createStore();
