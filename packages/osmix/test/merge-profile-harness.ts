@@ -393,7 +393,10 @@ export async function profileMerge(
     }));
     await recorder.measure("create-safe-intersections", () => {
       let waysChecked = 0;
-      for (const _result of changeset.createIntersectionsForWaysGenerator(patch.ways)) {
+      for (const _result of changeset.createIntersectionsForWaysGenerator(
+        patch.ways,
+        patch.nodes.ids,
+      )) {
         waysChecked++;
       }
       return {

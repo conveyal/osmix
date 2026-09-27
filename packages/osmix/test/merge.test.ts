@@ -94,23 +94,23 @@ describe("merge osm", () => {
       expect([...crossingValues.values()].some((value) => value !== "yes")).toBe(true);
 
       changeset = new OsmChangeset(baseOsm);
-      changeset.createIntersectionsForWays(osm2.ways);
+      changeset.createIntersectionsForWays(osm2.ways, osm2.nodes.ids);
 
       // Endpoint reuse updates whole junctions. Unsafe shared substitutions are
       // skipped; only isolated endpoints can use a dedicated intersection fallback.
       // Existing crossing values are retained, avoiding 68 crossing-only updates.
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 9_457,
-        nodeChanges: 5_790,
-        wayChanges: 3_667,
+        totalChanges: 9_530,
+        nodeChanges: 5_866,
+        wayChanges: 3_664,
         relationChanges: 0,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
-        intersectionPointsFound: 3_091,
-        intersectionNodesCreated: 2_604,
-        intersectionNodesRemoved: 0,
+        intersectionPointsFound: 3_085,
+        intersectionNodesCreated: 2_606,
+        intersectionNodesRemoved: 138,
       });
 
       baseOsm = applyChangesetToOsm(changeset);
@@ -122,7 +122,11 @@ describe("merge osm", () => {
       }
 
       expect(sizes(baseOsm)).toEqual({
-        nodes: baseSizes.nodes + patchSizes.nodes + changeset.stats.intersectionNodesCreated,
+        nodes:
+          baseSizes.nodes +
+          patchSizes.nodes +
+          changeset.stats.intersectionNodesCreated -
+          changeset.stats.intersectionNodesRemoved,
         ways: baseSizes.ways + patchSizes.ways,
         relations: baseSizes.relations + patchSizes.relations,
       });

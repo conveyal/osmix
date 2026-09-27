@@ -140,7 +140,7 @@ describe("intersection geometry integrity", () => {
     patch.buildIndexes();
     const changeset = new OsmChangeset(osm);
 
-    changeset.createIntersectionsForWays(patch.ways);
+    changeset.createIntersectionsForWays(patch.ways, patch.nodes.ids);
 
     const result = applyChangesetToOsm(changeset);
     expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
@@ -196,7 +196,9 @@ describe("intersection geometry integrity", () => {
     expect(referenced.changeset.stats.intersectionNodesRemoved).toBe(0);
   });
 
-  it("preserves a shared base node ID when the patch endpoint adds routing tags", () => {
+  // A crossing snap must not change routing on existing ways: an imported gate endpoint does not
+  // merge into an ungated base junction (the same rule keeps exact scenario X5 separate).
+  it("keeps an imported gate endpoint off an ungated base junction", () => {
     const osm = new Osm({ id: "shared-base-endpoint" });
     for (const node of [
       { id: 1, lon: -1, lat: 0 },
@@ -220,13 +222,45 @@ describe("intersection geometry integrity", () => {
     patch.buildIndexes();
     const changeset = new OsmChangeset(osm);
 
-    changeset.createIntersectionsForWays(patch.ways);
+    changeset.createIntersectionsForWays(patch.ways, patch.nodes.ids);
 
     const result = applyChangesetToOsm(changeset);
     expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
     expect(result.ways.getById(11)?.refs).toEqual([2, 3]);
-    expect(result.ways.getById(20)?.refs).toEqual([2, 6]);
-    expect(result.nodes.getById(2)?.tags).toEqual({ barrier: "gate", crossing: "yes" });
+    expect(result.ways.getById(20)?.refs).toEqual([5, 6]);
+    expect(result.nodes.getById(2)?.tags).toBeUndefined();
+  });
+
+  it("never merges two base nodes at a crossing", () => {
+    // An imported way already ends at base node 7, which sits on top of base node 2. Snapping the
+    // crossing would remove one base node from base ways, so the crossing is skipped.
+    const osm = new Osm({ id: "merged" });
+    for (const node of [
+      { id: 1, lon: -1, lat: 0 },
+      { id: 2, lon: 0, lat: 0 },
+      { id: 7, lon: 0, lat: 0 },
+      { id: 8, lon: 0, lat: -1 },
+      { id: 6, lon: 0, lat: 1 },
+    ]) {
+      osm.nodes.addNode(node);
+    }
+    osm.ways.addWay({ id: 10, refs: [1, 2], tags: { highway: "service" } });
+    osm.ways.addWay({ id: 12, refs: [8, 7], tags: { highway: "service" } });
+    osm.ways.addWay({ id: 20, refs: [7, 6], tags: { highway: "service" } });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+    const patch = new Osm({ id: "patch" });
+    patch.nodes.addNode({ id: 6, lon: 0, lat: 1 });
+    patch.ways.addWay({ id: 20, refs: [7, 6], tags: { highway: "service" } });
+    patch.buildIndexes();
+    const changeset = new OsmChangeset(osm);
+
+    changeset.createIntersectionsForWays(patch.ways, patch.nodes.ids);
+
+    const result = applyChangesetToOsm(changeset);
+    expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
+    expect(result.ways.getById(12)?.refs).toEqual([8, 7]);
+    expect(result.nodes.ids.has(2) && result.nodes.ids.has(7)).toBe(true);
   });
 
   it("creates a dedicated node when endpoint reuse would collapse a short patch way", async () => {

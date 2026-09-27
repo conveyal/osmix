@@ -36,9 +36,14 @@ import {
 } from "./integrity.ts";
 import { accessSignature, barrierSignature, NODE_ROUTING_CRITICAL_TAGS } from "./rules/access.ts";
 import { refsWouldCollapse } from "./rules/collapse.ts";
-import { assessNodeIdentity, assessNodeTags, wayPairJoinable } from "./rules/node-identity.ts";
 import {
-  hasAnyTagConflict,
+  assessNodeIdentity,
+  assessNodeTags,
+  canDropReplacedNode,
+  mergesTags,
+  wayPairJoinable,
+} from "./rules/node-identity.ts";
+import {
   isDescriptiveWayTag,
   routingSemanticTagsEqual,
   withNonConflictingDescriptiveTags,
@@ -535,13 +540,19 @@ export class OsmChangeset {
     }
   }
 
-  private nodeContextsCompatible(patchNode: OsmNode, baseNode: OsmNode, waysByNode: WaysByNode) {
+  private nodeContextsCompatible(
+    patchNode: OsmNode,
+    baseNode: OsmNode,
+    waysByNode: WaysByNode,
+    sameDataset: boolean,
+  ) {
     const assessment = assessNodeIdentity(
       "exact",
       patchNode,
       baseNode,
       waysByNode.get(patchNode.id) ?? [],
       waysByNode.get(baseNode.id) ?? [],
+      { sourceIsImported: !sameDataset },
     );
     return assessment.hardReasons.length === 0;
   }
@@ -727,7 +738,9 @@ export class OsmChangeset {
             (!sameDataset || baseNode.id > patchNode.id) &&
             this.nodeChanges[baseNode.id]?.changeType !== "delete" &&
             sameOsmCoordinate(currentPatchNode, baseNode) &&
-            assessNodeTags("exact", currentPatchNode.tags, baseNode.tags).hardReasons.length === 0,
+            assessNodeTags("exact", currentPatchNode.tags, baseNode.tags, {
+              sourceIsImported: !sameDataset,
+            }).hardReasons.length === 0,
         );
 
       if (candidateNodes.length === 0) continue;
@@ -741,7 +754,7 @@ export class OsmChangeset {
     const waysByNode = this.currentWaysByNode(contextNodeIds);
     for (const { baseNodes, patchNode } of exactCandidates) {
       const compatibleNodes = baseNodes.filter((baseNode) =>
-        this.nodeContextsCompatible(patchNode, baseNode, waysByNode),
+        this.nodeContextsCompatible(patchNode, baseNode, waysByNode, sameDataset),
       );
       if (compatibleNodes.length === 0 || (!sameDataset && compatibleNodes.length !== 1)) continue;
       const baseNode = sameDataset
@@ -930,8 +943,37 @@ export class OsmChangeset {
     intersectingWayNode: OsmNode,
     wayIsPatch: boolean,
     intersectingWayIsPatch: boolean,
+    patchNodeIds: { has(id: number): boolean } | undefined,
   ) {
-    if (hasAnyTagConflict(wayNode.tags, intersectingWayNode.tags)) return null;
+    const imported = (id: number) => patchNodeIds?.has(id) ?? false;
+    // A survivor-to-be that is imported cannot be told apart from base here without patch IDs;
+    // check whichever direction adds tags to existing data.
+    const [importedNode, existingNode] = imported(wayNode.id)
+      ? [wayNode, intersectingWayNode]
+      : [intersectingWayNode, wayNode];
+    const oneImported = imported(wayNode.id) !== imported(intersectingWayNode.id);
+    if (
+      assessNodeTags("crossing", importedNode.tags, existingNode.tags, {
+        sourceIsImported: oneImported,
+      }).hardReasons.length
+    ) {
+      return null;
+    }
+    // Never merge two base nodes: that would remove a base node from base ways.
+    if (
+      patchNodeIds &&
+      !patchNodeIds.has(wayNode.id) &&
+      !patchNodeIds.has(intersectingWayNode.id)
+    ) {
+      return null;
+    }
+    // A base node always survives a crossing snap.
+    if (patchNodeIds && patchNodeIds.has(wayNode.id) !== patchNodeIds.has(intersectingWayNode.id)) {
+      const keepWayNode = !patchNodeIds.has(wayNode.id);
+      return keepWayNode
+        ? { keepWayNode, replaced: intersectingWayNode, survivor: wayNode }
+        : { keepWayNode, replaced: wayNode, survivor: intersectingWayNode };
+    }
 
     const wayRoutingTags = nodeRoutingTagCount(wayNode);
     const intersectingRoutingTags = nodeRoutingTagCount(intersectingWayNode);
@@ -972,15 +1014,20 @@ export class OsmChangeset {
   private dropReplacedIntersectionNode(
     replaced: OsmNode,
     survivorId: number,
-    replacement: IntersectionJunctionReplacement,
-    patchWayIds: ReadonlySet<number> | null,
     patchNodeIds: { has(id: number): boolean } | undefined,
   ) {
-    if (!patchNodeIds?.has(replaced.id) || !patchWayIds) return;
-    if (!replacement.ways.every((way) => patchWayIds.has(way.id))) return;
-    for (const relation of this.currentRelations())
-      if (relation.members.some((member) => member.type === "node" && member.ref === replaced.id))
-        return;
+    const referencedByRelation = [...this.currentRelations()].some((relation) =>
+      relation.members.some((member) => member.type === "node" && member.ref === replaced.id),
+    );
+    const droppable = canDropReplacedNode({
+      imported: patchNodeIds?.has(replaced.id) ?? false,
+      tagged: Object.keys(replaced.tags ?? {}).length > 0,
+      tagsMerged: mergesTags("crossing"),
+      // The replacement rewrote every incident way, so no way still uses the replaced node.
+      referencedByWay: false,
+      referencedByRelation,
+    });
+    if (!droppable) return;
     const storedNode = this.osm.nodes.getById(replaced.id);
     if (!storedNode) return;
     this.delete(storedNode, [{ type: "node", id: survivorId, osmId: this.osm.id }]);
@@ -1421,6 +1468,7 @@ export class OsmChangeset {
             intersectingWayNode,
             patchWayIds?.has(currentWay.id) ?? false,
             patchWayIds?.has(currentIntersectingWay.id) ?? false,
+            patchNodeIds,
           );
           if (!endpointResolution) continue;
           const plan = this.planIntersectionNodeReplacement(
@@ -1452,13 +1500,7 @@ export class OsmChangeset {
             this.modify("relation", relation.id, () => relation);
           }
           this.markNodeAsCrossing(survivor.id);
-          this.dropReplacedIntersectionNode(
-            endpointResolution.replaced,
-            survivor.id,
-            junctionReplacement,
-            patchWayIds,
-            patchNodeIds,
-          );
+          this.dropReplacedIntersectionNode(endpointResolution.replaced, survivor.id, patchNodeIds);
         } else if (createDedicatedIntersection) {
           intersectionsCreated++;
           const newIntersectionNode = this.createIntersectionNode(

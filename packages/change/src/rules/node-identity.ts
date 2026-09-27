@@ -56,14 +56,37 @@ export function wayPairJoinable(a: OsmWay, b: OsmWay) {
   );
 }
 
-/** Node-level checks: the survivor must not gain or lose a routing control or vertical context. */
+/**
+ * Node-level checks. Kinds that merge tags must not change routing on the survivor's existing
+ * ways: with `sourceIsImported`, the survivor's grade, access and barrier signatures must be the
+ * same after the merge (the imported point may not add a gate, but may join at one); within one
+ * dataset both sides are existing data, so the signatures must be equal. A connection keeps the
+ * source's tags behind, so its node routing controls must match exactly.
+ */
 export function assessNodeTags(
   kind: NodeIdentityKind,
   source: OsmTags | undefined,
   target: OsmTags | undefined,
+  options: { sourceIsImported?: boolean } = {},
 ): Pick<NodeIdentityAssessment, "hardReasons" | "reviewReasons"> {
   const hardReasons: NodeIdentityReason[] = [];
   const reviewReasons: NodeIdentityReason[] = [];
+  if (mergesTags(kind)) {
+    // Merging tags must not silently pick one of two values.
+    if (hasAnyTagConflict(source, target)) hardReasons.push("tag-conflict");
+    const merged = { ...source, ...target };
+    const after = options.sourceIsImported ? merged : source;
+    if (routingGradeSignature(after) !== routingGradeSignature(target)) {
+      hardReasons.push("grade-conflict");
+    }
+    if (
+      accessSignature(after) !== accessSignature(target) ||
+      barrierSignature(after) !== barrierSignature(target)
+    ) {
+      hardReasons.push("routing-family-conflict");
+    }
+    return { hardReasons, reviewReasons };
+  }
   if (routingGradeSignature(source) !== routingGradeSignature(target)) {
     hardReasons.push("grade-conflict");
   }
@@ -72,18 +95,12 @@ export function assessNodeTags(
   }
   const sourceBarrier = barrierSignature(source);
   if (sourceBarrier !== barrierSignature(target)) hardReasons.push("routing-family-conflict");
-  if (mergesTags(kind)) {
-    // Merging tags must not silently pick one of two values.
-    if (hasAnyTagConflict(source, target)) hardReasons.push("tag-conflict");
-  } else {
-    // A connection leaves the source's tags behind, so every node routing control must agree.
-    if (nodeRoutingSignature(source) !== nodeRoutingSignature(target)) {
-      hardReasons.push("routing-family-conflict");
-    }
-    if (sourceBarrier !== "") reviewReasons.push("node-context-conflict");
-    if (GRADE_KEYS.some((key) => source?.[key] != null || target?.[key] != null)) {
-      reviewReasons.push("node-context-conflict");
-    }
+  if (nodeRoutingSignature(source) !== nodeRoutingSignature(target)) {
+    hardReasons.push("routing-family-conflict");
+  }
+  if (sourceBarrier !== "") reviewReasons.push("node-context-conflict");
+  if (GRADE_KEYS.some((key) => source?.[key] != null || target?.[key] != null)) {
+    reviewReasons.push("node-context-conflict");
   }
   return { hardReasons, reviewReasons };
 }
@@ -137,8 +154,9 @@ export function assessNodeIdentity(
   target: OsmNode,
   sourceWays: readonly OsmWay[],
   targetWays: readonly OsmWay[],
+  options: { sourceIsImported?: boolean } = {},
 ): NodeIdentityAssessment {
-  const { hardReasons, reviewReasons } = assessNodeTags(kind, source.tags, target.tags);
+  const { hardReasons, reviewReasons } = assessNodeTags(kind, source.tags, target.tags, options);
   hardReasons.push(
     ...assessJunction(target.id, source.id, sourceWays, targetWays, {
       // Identical coordinates are the same point: a zero-length segment between two merged
@@ -151,4 +169,24 @@ export function assessNodeIdentity(
     reviewReasons: [...new Set(reviewReasons)],
     mergeTags: mergesTags(kind),
   };
+}
+
+/**
+ * The one cleanup rule: after a merge or connection rewrites every reference to `source`, the
+ * source goes if it was imported and nothing still uses it. A tagged source goes only when its
+ * tags were merged into the survivor, so no value is lost.
+ */
+export function canDropReplacedNode(input: {
+  imported: boolean;
+  tagged: boolean;
+  tagsMerged: boolean;
+  referencedByWay: boolean;
+  referencedByRelation: boolean;
+}) {
+  return (
+    input.imported &&
+    !input.referencedByWay &&
+    !input.referencedByRelation &&
+    (input.tagsMerged || !input.tagged)
+  );
 }
