@@ -34,9 +34,9 @@ import {
   restrictionTopologyIssues,
   routingIntegrityIssueKeys,
 } from "./integrity.ts";
-import { NODE_ROUTING_CRITICAL_TAGS } from "./rules/access.ts";
+import { accessSignature, barrierSignature, NODE_ROUTING_CRITICAL_TAGS } from "./rules/access.ts";
 import { refsWouldCollapse } from "./rules/collapse.ts";
-import { hasConflictingGradeOrAccessTags } from "./rules/grade.ts";
+import { assessNodeIdentity, assessNodeTags, wayPairJoinable } from "./rules/node-identity.ts";
 import {
   hasAnyTagConflict,
   isDescriptiveWayTag,
@@ -91,6 +91,15 @@ interface IntersectionJunctionReplacement {
 }
 
 const EMPTY_ID = -1;
+/** Whether two nodes differ in vertical context, access or barriers (group consistency). */
+function nodeSignaturesDiffer(a: OsmNode["tags"], b: OsmNode["tags"]) {
+  return (
+    routingGradeSignature(a) !== routingGradeSignature(b) ||
+    accessSignature(a) !== accessSignature(b) ||
+    barrierSignature(a) !== barrierSignature(b)
+  );
+}
+
 function sameOsmCoordinate(a: OsmNode, b: OsmNode) {
   return (
     toMicroDegrees(a.lon) === toMicroDegrees(b.lon) &&
@@ -124,13 +133,6 @@ function exactWayHash(way: OsmWay) {
     hash = hashText(hash, `${key.length}:${key}${String(value).length}:${String(value)}`);
   }
   return hash;
-}
-
-function wayContextsCompatible(a: OsmWay, b: OsmWay) {
-  return (
-    !hasConflictingGradeOrAccessTags(a.tags, b.tags) &&
-    (a.tags?.["highway"] == null) === (b.tags?.["highway"] == null)
-  );
 }
 
 function nodeRoutingTagCount(node: OsmNode) {
@@ -534,16 +536,14 @@ export class OsmChangeset {
   }
 
   private nodeContextsCompatible(patchNode: OsmNode, baseNode: OsmNode, waysByNode: WaysByNode) {
-    if (hasAnyTagConflict(patchNode.tags, baseNode.tags)) return false;
-    if (hasConflictingGradeOrAccessTags(patchNode.tags, baseNode.tags)) return false;
-
-    const patchWays = waysByNode.get(patchNode.id) ?? [];
-    const baseWays = waysByNode.get(baseNode.id) ?? [];
-    if (patchWays.length === 0 || baseWays.length === 0) return true;
-
-    return patchWays.every((patchWay) =>
-      baseWays.every((baseWay) => wayContextsCompatible(patchWay, baseWay)),
+    const assessment = assessNodeIdentity(
+      "exact",
+      patchNode,
+      baseNode,
+      waysByNode.get(patchNode.id) ?? [],
+      waysByNode.get(baseNode.id) ?? [],
     );
+    return assessment.hardReasons.length === 0;
   }
 
   /**
@@ -608,31 +608,74 @@ export class OsmChangeset {
   }
 
   private nodeReplacementGroupCompatible(group: readonly number[], waysByNode: WaysByNode) {
-    const firstNode = this.getCurrentNode(group[0]!);
+    const survivorId = group[0]!;
+    const firstNode = this.getCurrentNode(survivorId);
     if (!firstNode) return false;
     const tagValues = new Map<string, string | number>();
-    const incidentWayGroups: (readonly OsmWay[])[] = [];
     for (const id of group) {
       const node = this.getCurrentNode(id);
-      if (!node || hasConflictingGradeOrAccessTags(firstNode.tags, node.tags)) return false;
+      if (!node || nodeSignaturesDiffer(firstNode.tags, node.tags)) return false;
       for (const [key, value] of Object.entries(node.tags ?? {})) {
         const previous = tagValues.get(key);
         if (previous !== undefined && previous !== value) return false;
         tagValues.set(key, value);
       }
-      const ways = waysByNode.get(id);
-      if (ways?.length) incidentWayGroups.push(ways);
     }
 
-    // One existing junction may already join different grades. Isolated sources
-    // add no way context. With two incident sets, compatibility across every pair
-    // requires all contexts to agree; equality against one representative proves
-    // that in linear time, without repeatedly comparing coincident source nodes.
-    if (incidentWayGroups.length < 2) return true;
-    const firstWay = incidentWayGroups[0]![0]!;
-    return incidentWayGroups.every((ways) =>
-      ways.every((way) => wayContextsCompatible(firstWay, way)),
-    );
+    // The survivor's own junction may already mix contexts (a footway and a private road);
+    // each source's ways only need one way there they can join. A blank survivor has no ways,
+    // so the sources' ways must agree with each other instead.
+    const survivorWays = waysByNode.get(survivorId) ?? [];
+    const sourceWays = group.slice(1).flatMap((id) => waysByNode.get(id) ?? []);
+    if (sourceWays.length === 0) return true;
+    const reference = survivorWays.length > 0 ? survivorWays : [sourceWays[0]!];
+    if (!sourceWays.every((way) => reference.some((other) => wayPairJoinable(way, other)))) {
+      return false;
+    }
+    // Every source joins one survivor: the whole resulting junction must pass final validation.
+    const rewritten = [...survivorWays, ...sourceWays].map((way) => ({
+      ...way,
+      refs: way.refs.map((ref) => (group.includes(ref) ? survivorId : ref)),
+    }));
+    return !junctionHasIncompatibleGrades(survivorId, [
+      ...new Map(rewritten.map((way) => [way.id, way])).values(),
+    ]);
+  }
+
+  /**
+   * Relation node members follow a merged node. A turn restriction must stay valid after that:
+   * drop any replacement that would break one (MP-X1), before anything is rewritten.
+   */
+  private removeRestrictionBreakingNodeReplacements(replacementMap: ReplacementMap) {
+    if (replacementMap.size === 0) return;
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const relation of this.currentRelations()) {
+        if (relation.tags?.["type"] !== "restriction") continue;
+        const replaced = relation.members.filter(
+          (member) => member.type === "node" && replacementMap.has(member.ref),
+        );
+        if (replaced.length === 0) continue;
+        const proposed = {
+          ...relation,
+          members: relation.members.map((member) =>
+            member.type === "node" && replacementMap.has(member.ref)
+              ? { ...member, ref: replacementMap.get(member.ref)! }
+              : member,
+          ),
+        };
+        const issues = restrictionTopologyIssues(proposed, (id) => {
+          const stored = this.wayChanges[id]?.entity ?? this.osm.ways.getById(id);
+          const way = stored ? this.getCurrentWay(stored) : null;
+          if (!way) return null;
+          return { ...way, refs: way.refs.map((ref) => replacementMap.get(ref) ?? ref) };
+        });
+        if (issues.length === 0) continue;
+        for (const member of replaced) replacementMap.delete(member.ref);
+        changed = true;
+      }
+    }
   }
 
   private reconcileNodeTags(patchNode: OsmNode, baseNodeId: number) {
@@ -684,8 +727,7 @@ export class OsmChangeset {
             (!sameDataset || baseNode.id > patchNode.id) &&
             this.nodeChanges[baseNode.id]?.changeType !== "delete" &&
             sameOsmCoordinate(currentPatchNode, baseNode) &&
-            !hasAnyTagConflict(currentPatchNode.tags, baseNode.tags) &&
-            !hasConflictingGradeOrAccessTags(currentPatchNode.tags, baseNode.tags),
+            assessNodeTags("exact", currentPatchNode.tags, baseNode.tags).hardReasons.length === 0,
         );
 
       if (candidateNodes.length === 0) continue;
@@ -712,6 +754,7 @@ export class OsmChangeset {
     replacementMap = flattenReplacementMap(replacementMap);
     this.removeConflictingNodeReplacements(replacementMap, waysByNode);
     this.removeUnsafeNodeReplacements(replacementMap);
+    this.removeRestrictionBreakingNodeReplacements(replacementMap);
     if (replacementMap.size === 0) return replacementMap;
     this.applyNodeReplacementsToWays(replacementMap);
     this.applyNodeReplacementsToRelations(replacementMap);

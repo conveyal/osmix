@@ -114,7 +114,9 @@ describe("routing-safe merge reconciliation", () => {
     expect(result.ways.getById(21)?.refs).toEqual([3, 103]);
   });
 
-  it("rejects a candidate when any incident way has incompatible context", async () => {
+  // The rulebook checks the whole resulting junction with final validation's grade rule, not
+  // every way pair: joining where a surface road meets a tunnel portal is a valid junction.
+  it("joins a surface road at a tunnel portal where a surface road also ends", async () => {
     const base = createOsm(
       "base",
       [
@@ -127,6 +129,39 @@ describe("routing-safe merge reconciliation", () => {
         {
           id: 11,
           refs: [1, 3],
+          tags: { highway: "primary", layer: "-1", tunnel: "yes" },
+        },
+      ],
+    );
+    const patch = createOsm(
+      "patch",
+      [
+        { id: 101, lon: 0, lat: 0 },
+        { id: 102, lon: 0, lat: 1 },
+      ],
+      [{ id: 20, refs: [101, 102], tags: { highway: "secondary" } }],
+    );
+
+    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+
+    expect(result.nodes.ids.has(101)).toBe(false);
+    expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
+  });
+
+  it("rejects a candidate inside a tunnel, which final validation would reject", async () => {
+    const base = createOsm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: -1, lat: 0 },
+        { id: 3, lon: 1, lat: 0 },
+        { id: 4, lon: 0, lat: -1 },
+      ],
+      [
+        { id: 10, refs: [4, 1], tags: { highway: "primary" } },
+        {
+          id: 11,
+          refs: [2, 1, 3],
           tags: { highway: "primary", layer: "-1", tunnel: "yes" },
         },
       ],
