@@ -1279,6 +1279,94 @@ describe("safe fuzzy topology gates", () => {
     expect(restriction?.reasons).toContain("relation-member");
   });
 
+  it("reviews a connection that keeps a patch restriction intact and moves its via node", async () => {
+    const base = createOsm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: -0.001, lat: 0 },
+      ],
+      [{ id: 10, refs: [2, 1], tags: { highway: "footway" } }],
+    );
+    const patch = createOsm(
+      "patch",
+      [
+        { id: 101, lon: 0.000005, lat: 0 },
+        { id: 102, lon: 0.001, lat: 0 },
+        { id: 103, lon: 0.000005, lat: 0.001 },
+      ],
+      [
+        { id: 20, refs: [101, 102], tags: { highway: "footway" } },
+        { id: 21, refs: [101, 103], tags: { highway: "footway" } },
+      ],
+      [
+        {
+          id: 31,
+          members: [
+            { type: "way", ref: 20, role: "from" },
+            { type: "node", ref: 101, role: "via" },
+            { type: "way", ref: 21, role: "to" },
+          ],
+          tags: { type: "restriction", restriction: "no_left_turn" },
+        },
+      ],
+    );
+    const candidate = discoverConflationCandidates(base, patch, attachmentOptions).candidates.find(
+      (item) => item.sourceId === 101,
+    );
+    // Previously any restriction membership blocked the connection outright.
+    expect(candidate?.networkAttachment?.status).toBe("review");
+    expect(candidate?.networkAttachment?.reasons).toContain("relation-member");
+
+    const result = await merge(
+      base,
+      patch,
+      {
+        directMerge: true,
+        conflation: {
+          ...attachmentOptions,
+          decisions: [{ candidateId: candidate!.id, action: "accept", attachNetwork: true }],
+        },
+      },
+      silent,
+    );
+    expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
+    expect(result.relations.getById(31)?.members[1]).toEqual({ type: "node", ref: 1, role: "via" });
+    // The via member moved, so nothing uses the imported point any more.
+    expect(result.nodes.ids.has(101)).toBe(false);
+  });
+
+  it("blocks copying tags onto a node in a junction with grade-separated ways (G5)", () => {
+    const base = createOsm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 0.001, lat: 0 },
+        { id: 3, lon: 0, lat: -0.001 },
+        { id: 4, lon: 0, lat: 0.001 },
+      ],
+      [
+        { id: 10, refs: [1, 2], tags: { highway: "footway" } },
+        { id: 11, refs: [3, 1, 4], tags: { highway: "footway", level: "1" } },
+      ],
+    );
+    const patch = createOsm(
+      "patch",
+      [
+        { id: 101, lon: -0.000005, lat: 0, tags: { tactile_paving: "yes" } },
+        { id: 102, lon: -0.001, lat: 0 },
+      ],
+      [{ id: 20, refs: [101, 102], tags: { highway: "footway" } }],
+    );
+    const candidate = discoverConflationCandidates(base, patch, {
+      propertyKeys: ["tactile_paving"],
+      attachNetwork: false,
+    }).candidates.find((item) => item.sourceId === 101);
+    // Previously one compatible base way was enough, so the copy was automatic.
+    expect(candidate?.propertyTransfer.status).toBe("blocked");
+    expect(candidate?.propertyTransfer.reasons).toContain("grade-conflict");
+  });
+
   it("reports one-to-many way chains as unsupported and leaves them in the direct merge", async () => {
     const base = createOsm(
       "base",

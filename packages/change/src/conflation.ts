@@ -15,27 +15,24 @@ import {
   type ConflationApplicationTrace,
 } from "./conflation-outcome.ts";
 import { generateChangeset } from "./generate-changeset.ts";
-import {
-  assertConflationPreservesBaseTopology,
-  junctionHasIncompatibleGrades,
-} from "./integrity.ts";
+import { assertConflationPreservesBaseTopology, restrictionTopologyIssues } from "./integrity.ts";
 import { featureTypeConflicts } from "./internal/feature-classification.ts";
-import { isUnusedImportedNode } from "./internal/imported-nodes.ts";
 import { assessWayRemovals } from "./internal/way-removal.ts";
 import { inputProvenance, type MergeProvenance } from "./provenance.ts";
-import { accessSignature, barrierSignature } from "./rules/access.ts";
+import { accessSignature } from "./rules/access.ts";
 import { isAreaWay } from "./rules/area.ts";
-import {
-  hasAdjacentDuplicateRefs,
-  hasTooFewDistinctRefs,
-  refsWouldCollapse,
-} from "./rules/collapse.ts";
+import { hasAdjacentDuplicateRefs, hasTooFewDistinctRefs } from "./rules/collapse.ts";
 import { routingGradeSignature } from "./rules/grade.ts";
+import {
+  assessJunction,
+  assessNodeTags,
+  canDropReplacedNode,
+  type NodeIdentityReason,
+} from "./rules/node-identity.ts";
 import {
   familyCompatible,
   isProtectedProperty,
   isRoutingProperty,
-  nodeRoutingSignature,
   routingFamilies,
   wayGradeAccessCompatible,
   wayRoutingFamily,
@@ -225,6 +222,8 @@ function propertyAssessment(
 
 function nodePropertyAssessment(
   context: DiscoveryContext,
+  source: OsmNode,
+  target: OsmNode,
   patchWays: readonly OsmWay[],
   baseWays: readonly OsmWay[],
   tagDiff: readonly OsmConflationTagDiff[],
@@ -258,11 +257,12 @@ function nodePropertyAssessment(
     ) {
       reasons.push("routing-family-conflict");
     }
-    if (
-      !patchRoutable.every((source) =>
-        baseRoutable.some((target) => wayGradeAccessCompatible(source, target)),
-      )
-    ) {
+    // The same junction rule as a connection (G5): the target must be a point the imported
+    // ways could join, not one where some base way is grade-separated from them.
+    const junction = assessJunction(target.id, source.id, patchRoutable, baseRoutable, {
+      junctionWays: baseWays.filter((way) => way.tags?.["highway"] != null),
+    });
+    if (junction.includes("grade-conflict")) {
       reasons.push("grade-conflict");
       hardConflict = true;
     }
@@ -401,6 +401,50 @@ function nodeSegments(view: DatasetView, nodeId: number, ways: readonly OsmWay[]
   return segments;
 }
 
+/** Rulebook reasons map onto the public reason codes; a tag conflict never applies to connect. */
+function toReasonCode(reason: NodeIdentityReason): OsmConflationReasonCode {
+  return reason === "tag-conflict" ? "node-context-conflict" : reason;
+}
+
+/**
+ * Whether connecting `source` to `target` would break a patch turn restriction: the restriction's
+ * node members follow the source, and its ways follow the rewritten source ways.
+ */
+function connectionBreaksRestriction(
+  context: DiscoveryContext,
+  source: OsmNode,
+  target: OsmNode,
+  sourceWays: readonly OsmWay[],
+) {
+  const rewritten = new Map(
+    sourceWays.map((way) => [
+      way.id,
+      { ...way, refs: way.refs.map((ref) => (ref === source.id ? target.id : ref)) },
+    ]),
+  );
+  for (const relation of context.patchView.relations()) {
+    if (relation.tags?.["type"] !== "restriction") continue;
+    const involved = relation.members.some(
+      (member) =>
+        (member.type === "node" && member.ref === source.id) ||
+        (member.type === "way" && rewritten.has(member.ref)),
+    );
+    if (!involved) continue;
+    const proposed = {
+      ...relation,
+      members: relation.members.map((member) =>
+        member.type === "node" && member.ref === source.id ? { ...member, ref: target.id } : member,
+      ),
+    };
+    const issues = restrictionTopologyIssues(
+      proposed,
+      (id) => rewritten.get(id) ?? context.patchView.getWay(id) ?? context.baseView.getWay(id),
+    );
+    if (issues.length > 0) return true;
+  }
+  return false;
+}
+
 function nodeAttachmentAssessment(
   context: DiscoveryContext,
   source: OsmNode,
@@ -424,28 +468,9 @@ function nodeAttachmentAssessment(
 
   // Hard reasons describe invariants a manual decision cannot override. Review
   // reasons are plausible matches whose routing intent still needs a person.
-  const hardReasons: OsmConflationReasonCode[] = [];
-  const reviewReasons: OsmConflationReasonCode[] = [];
-  if (routingGradeSignature(source.tags) !== routingGradeSignature(target.tags)) {
-    hardReasons.push("grade-conflict");
-  }
-  if (accessSignature(source.tags) !== accessSignature(target.tags)) {
-    hardReasons.push("routing-family-conflict");
-  }
-  const sourceBarrier = barrierSignature(source.tags);
-  const targetBarrier = barrierSignature(target.tags);
-  if (sourceBarrier !== targetBarrier) hardReasons.push("routing-family-conflict");
-  else if (sourceBarrier !== "") reviewReasons.push("node-context-conflict");
-  if (nodeRoutingSignature(source.tags) !== nodeRoutingSignature(target.tags)) {
-    hardReasons.push("routing-family-conflict");
-  }
-  if (
-    ["layer", "level", "bridge", "tunnel", "covered"].some(
-      (key) => source.tags?.[key] != null || target.tags?.[key] != null,
-    )
-  ) {
-    reviewReasons.push("node-context-conflict");
-  }
+  const nodeTags = assessNodeTags("connect", source.tags, target.tags);
+  const hardReasons: OsmConflationReasonCode[] = [...nodeTags.hardReasons].map(toReasonCode);
+  const reviewReasons: OsmConflationReasonCode[] = [...nodeTags.reviewReasons].map(toReasonCode);
   const restrictionMember =
     context.patchRelations.restrictionNodes.has(source.id) ||
     context.baseRelations.restrictionNodes.has(target.id) ||
@@ -456,8 +481,13 @@ function nodeAttachmentAssessment(
     context.baseRelations.nodes.has(target.id) ||
     sourceWays.some((way) => context.patchRelations.ways.has(way.id)) ||
     targetWays.some((way) => context.baseRelations.ways.has(way.id));
-  if (restrictionMember) hardReasons.push("relation-member");
-  else if (relationMember) reviewReasons.push("relation-member");
+  // Relation node members follow the connection. A restriction the rewrite would break blocks
+  // it; any other relation involvement, including an intact restriction, needs review.
+  if (restrictionMember && connectionBreaksRestriction(context, source, target, sourceWays)) {
+    hardReasons.push("relation-member");
+  } else if (restrictionMember || relationMember) {
+    reviewReasons.push("relation-member");
+  }
 
   const sourceFamilies = routingFamilies(sourceWays);
   const targetFamilies = routingFamilies(targetWays);
@@ -477,27 +507,11 @@ function nodeAttachmentAssessment(
     reviewReasons.push("routing-family-conflict");
   }
 
-  const gradeCompatible = sourceWays.every((sourceWay) =>
-    targetWays.some(
-      (targetWay) =>
-        routingGradeSignature(sourceWay.tags) === routingGradeSignature(targetWay.tags) &&
-        accessSignature(sourceWay.tags) === accessSignature(targetWay.tags),
-    ),
+  hardReasons.push(
+    ...assessJunction(target.id, source.id, sourceWays, targetWays, {
+      junctionWays: baseWays.filter((way) => way.tags?.["highway"] != null),
+    }).map(toReasonCode),
   );
-  if (!gradeCompatible) hardReasons.push("grade-conflict");
-  // The pairwise check above needs only one compatible base way. Apply-time validation checks
-  // the whole resulting junction, so do the same here: every highway already at the target plus
-  // each imported way rewritten onto it, with the same portal exception.
-  const junctionWays = [
-    ...baseWays.filter((way) => way.tags?.["highway"] != null),
-    ...sourceWays.map((way) => ({
-      ...way,
-      refs: way.refs.map((ref) => (ref === source.id ? target.id : ref)),
-    })),
-  ];
-  if (junctionHasIncompatibleGrades(target.id, junctionWays)) {
-    hardReasons.push("grade-conflict");
-  }
 
   const sourceSegments = nodeSegments(context.patchView, source.id, sourceWays);
   const targetSegments = nodeSegments(context.baseView, target.id, targetWays);
@@ -521,11 +535,6 @@ function nodeAttachmentAssessment(
     maximumMinimumBearingDifference > MAX_BEARING_DIFFERENCE_DEGREES
   ) {
     reviewReasons.push("bearing-mismatch");
-  }
-
-  for (const way of sourceWays) {
-    const replacedRefs = way.refs.map((ref) => (ref === source.id ? target.id : ref));
-    if (refsWouldCollapse(replacedRefs)) hardReasons.push("would-collapse-way");
   }
 
   const reasons = uniqueReasons([...hardReasons, ...reviewReasons]);
@@ -621,7 +630,14 @@ function discoverNodeCandidates(context: DiscoveryContext) {
     for (const target of targets.toSorted((a, b) => a.id - b.id)) {
       const baseWays = context.baseView.waysAtNode(target.id);
       const tagDiff = selectedTagDiff(source, target, context.options.propertyKeys);
-      const property = nodePropertyAssessment(context, patchWays, baseWays, tagDiff);
+      const property = nodePropertyAssessment(
+        context,
+        source,
+        target,
+        patchWays,
+        baseWays,
+        tagDiff,
+      );
       const attachment = nodeAttachmentAssessment(context, source, target, patchWays, baseWays);
       const typeConflicts = featureTypeConflicts(source.tags, target.tags);
       if (typeConflicts.length > 0) {
@@ -1300,7 +1316,11 @@ export function buildConflationBulkDecisionResult(
   };
 }
 
-function currentEntity<T extends "node" | "way">(changeset: OsmChangeset, type: T, id: number) {
+function currentEntity<T extends "node" | "way" | "relation">(
+  changeset: OsmChangeset,
+  type: T,
+  id: number,
+) {
   const change = changeset.changes(type)[id];
   if (change?.changeType === "delete") return null;
   return change?.entity ?? changeset.getEntity(type, id) ?? null;
@@ -1477,16 +1497,13 @@ function removeConnectionOrphans(
   trace: ConflationApplicationTrace,
 ) {
   if (attachments.size === 0) return;
+  const provenance = inputProvenance(base, patch);
   const relationNodeMembers = new Set<number>();
-  const relations = [
-    ...patch.relations,
-    ...Object.values(changeset.changes("relation")).flatMap((change) =>
-      change?.changeType === "delete" || !change?.entity ? [] : [change.entity],
-    ),
-  ];
-  for (const relation of relations)
-    for (const member of relation.members)
+  for (const patchRelation of patch.relations) {
+    const relation = currentEntity(changeset, "relation", patchRelation.id);
+    for (const member of relation?.members ?? [])
       if (member.type === "node") relationNodeMembers.add(member.ref);
+  }
   const patchWaysByNode = new Map<number, number[]>();
   for (const way of patch.ways)
     for (const ref of new Set(way.refs))
@@ -1498,11 +1515,15 @@ function removeConnectionOrphans(
     const byWay = (patchWaysByNode.get(sourceId) ?? []).some((wayId) =>
       currentEntity(changeset, "way", wayId)?.refs.includes(sourceId),
     );
-    const unused = isUnusedImportedNode(inputProvenance(base, patch), node, {
-      byWay,
-      byRelation: relationNodeMembers.has(sourceId),
+    if (!node) continue;
+    const droppable = canDropReplacedNode({
+      imported: provenance.isImported("node", sourceId),
+      tagged: Object.keys(node.tags ?? {}).length > 0,
+      tagsMerged: false,
+      referencedByWay: byWay,
+      referencedByRelation: relationNodeMembers.has(sourceId),
     });
-    if (!unused) continue;
+    if (!droppable) continue;
     removeImportedEntity(changeset, node);
     trace.connectionOrphanNodeIds.add(sourceId);
   }
@@ -1553,6 +1574,20 @@ function applyDiscoveredConflation(
       throw Error(`Conflation attachment would collapse highway way ${wayId}`);
     }
     changeset.modify("way", wayId, (current) => ({ ...current, refs }));
+  }
+  // Relation node members follow the connection (restrictions were checked in discovery).
+  for (const patchRelation of patch.relations) {
+    const relation = currentEntity(changeset, "relation", patchRelation.id);
+    if (!relation?.members.some((member) => member.type === "node" && attachments.has(member.ref)))
+      continue;
+    changeset.modify("relation", relation.id, (current) => ({
+      ...current,
+      members: current.members.map((member) =>
+        member.type === "node" && attachments.has(member.ref)
+          ? { ...member, ref: attachments.get(member.ref)! }
+          : member,
+      ),
+    }));
   }
 
   for (const candidate of discovery.candidates) {

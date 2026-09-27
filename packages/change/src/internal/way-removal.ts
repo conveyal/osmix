@@ -5,6 +5,7 @@ import type { OsmNode, OsmTags, OsmWay } from "@osmix/types";
 import { normalizedWayDirection } from "@osmix/types/way-direction";
 
 import { inputProvenance } from "../provenance.ts";
+import { canDropReplacedNode } from "../rules/node-identity.ts";
 import { isDescriptiveWayTag } from "../rules/tags.ts";
 import type {
   OsmConflationCandidate,
@@ -15,7 +16,6 @@ import type {
   OsmConflationWayRemovalAssessment,
   OsmConflationWayRemovalPreview,
 } from "../types.ts";
-import { isUnusedImportedNode } from "./imported-nodes.ts";
 
 const MATCH_BLOCKERS = new Set<OsmConflationReasonCode>([
   "feature-type-conflict",
@@ -341,11 +341,17 @@ export function assessWayRemovals(
       if (Object.keys(nodeAt(ref)?.tags ?? {}).length) preview.retainedTaggedNodeIds.push(ref);
     }
     for (const ref of new Set(currentSource.refs)) {
-      const unused = isUnusedImportedNode(provenance, nodeAt(ref), {
-        byWay: [...(currentIncidence.get(ref) ?? [])].some((id) => id !== source.id),
-        byRelation: relationsByMember.has(`node:${ref}`),
-      });
-      if (unused) preview.orphanNodeIds.push(ref);
+      const node = nodeAt(ref);
+      const droppable =
+        node != null &&
+        canDropReplacedNode({
+          imported: provenance.isImported("node", ref),
+          tagged: Object.keys(node.tags ?? {}).length > 0,
+          tagsMerged: false,
+          referencedByWay: [...(currentIncidence.get(ref) ?? [])].some((id) => id !== source.id),
+          referencedByRelation: relationsByMember.has(`node:${ref}`),
+        });
+      if (droppable) preview.orphanNodeIds.push(ref);
     }
     preview.blockedNodeIds = [...new Set(preview.blockedNodeIds)].toSorted((a, b) => a - b);
     preview.blockingRelationIds.sort((a, b) => a - b);

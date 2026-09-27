@@ -4,7 +4,7 @@
  * state filtered by provenance instead of the untouched inputs.
  */
 import type { Osm } from "@osmix/core";
-import type { LonLat, OsmNode, OsmWay } from "@osmix/types";
+import type { LonLat, OsmNode, OsmRelation, OsmWay } from "@osmix/types";
 
 /** Which nodes and ways relations name, and which of those are turn restrictions. */
 export type EntityRelationContext = {
@@ -31,6 +31,8 @@ export interface DatasetView {
   /** Ways that reference a node. */
   waysAtNode(nodeId: number): readonly OsmWay[];
   relationMembership(): EntityRelationContext;
+  /** Relations in ascending ID order. */
+  relations(): Iterable<OsmRelation>;
 }
 
 /** A view of one complete, indexed `Osm`. Incidence and membership are built on first use. */
@@ -41,6 +43,7 @@ export function osmDatasetView(osm: Osm): DatasetView {
     id: osm.id,
     nodes: () => osm.nodes.sorted(),
     ways: () => osm.ways.sorted(),
+    relations: () => osm.relations.sorted(),
     getNode: (id) => osm.nodes.getById(id),
     getWay: (id) => osm.ways.getById(id),
     wayCoordinates(way) {

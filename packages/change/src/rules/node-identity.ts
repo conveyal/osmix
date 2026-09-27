@@ -118,7 +118,11 @@ export function assessJunction(
   sourceId: number,
   sourceWays: readonly OsmWay[],
   targetWays: readonly OsmWay[],
-  options: { allowAdjacentDuplicates?: boolean } = {},
+  options: {
+    allowAdjacentDuplicates?: boolean;
+    /** Every way already at the target, when it differs from the joinable `targetWays`. */
+    junctionWays?: readonly OsmWay[];
+  } = {},
 ): NodeIdentityReason[] {
   if (sourceWays.length === 0 || targetWays.length === 0) return [];
   const reasons: NodeIdentityReason[] = [];
@@ -133,7 +137,9 @@ export function assessJunction(
     ...way,
     refs: way.refs.map((ref) => (ref === sourceId ? targetId : ref)),
   }));
-  if (junctionHasIncompatibleGrades(targetId, [...targetWays, ...rewritten])) {
+  if (
+    junctionHasIncompatibleGrades(targetId, [...(options.junctionWays ?? targetWays), ...rewritten])
+  ) {
     reasons.push("grade-conflict");
   }
   for (const way of rewritten) {
