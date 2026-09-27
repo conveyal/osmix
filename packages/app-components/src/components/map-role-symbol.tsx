@@ -61,7 +61,7 @@ export function MapRoleSymbol({
             y2="14"
             stroke="var(--map-patch)"
             strokeWidth="3"
-            strokeDasharray="4 3"
+            strokeDasharray="3.6 2.4"
           />
           <path
             d="M14 6 22 14 14 22 6 14Z"

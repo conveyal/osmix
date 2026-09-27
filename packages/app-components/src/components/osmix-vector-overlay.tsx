@@ -47,7 +47,7 @@ const outlineWidth: ExpressionSpecification = ["interpolate", ["linear"], ["zoom
 function overlayPaints(colors: MapColors, role: OsmixOverlayRole) {
   const color = colors[role];
   const dashes: Pick<LineLayerSpecification["paint"] & object, "line-dasharray"> =
-    role === "patch" ? { "line-dasharray": [2, 2] } : {};
+    role === "patch" ? { "line-dasharray": [1.2, 0.8] } : {};
   const ways: LineLayerSpecification["paint"] = {
     "line-color": ["case", isHovered, colors.hover, featureColor(color)],
     "line-opacity": 1,

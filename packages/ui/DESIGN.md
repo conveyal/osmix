@@ -67,7 +67,7 @@ MapLibre can't read CSS variables or `oklch()`. So layer paint gets its colours 
 | `route` / `routeError` | `--map-route` / `--map-route-error` | Routes, and unreachable legs                                                                          |
 | `bbox`                 | `--map-bbox` (brand)                | The extract bounding box, and the long-dashed outline of the selected file's header bounds in Extract |
 
-The overlay draws patch ways and outlines with `line-dasharray: [2, 2]` so the map matches the legend. Diamond nodes appear in the comparison markers and the legend (`MapRoleSymbol`); overlay nodes are circles for both roles, because a MapLibre `circle` layer cannot draw diamonds. Extract's file-bounds outline uses a longer dash (`[6, 3]`) so it never reads as patch data.
+The overlay draws patch ways and outlines with `line-dasharray: [1.2, 0.8]` (in line widths: short dashes, tight gaps, so even a short imported way reads as dashed) and the legend symbol uses the same ratio. Diamond nodes appear in the comparison markers and the legend (`MapRoleSymbol`); overlay nodes are circles for both roles, because a MapLibre `circle` layer cannot draw diamonds. Extract's file-bounds outline uses a longer dash (`[6, 3]`) so it never reads as patch data.
 
 Below `MIN_PICKABLE_ZOOM` the raster preview draws both roles with solid lines; dashes exist only in the vector layers.
 
