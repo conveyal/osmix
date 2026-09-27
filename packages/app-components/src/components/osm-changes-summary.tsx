@@ -102,6 +102,10 @@ function ChangesSummaryTable({ variant }: { variant: ChangesSummaryVariant }) {
                 <TableCell>Intersection nodes created</TableCell>
                 <TableCell>{summary.intersectionNodesCreated.toLocaleString()}</TableCell>
               </TableRow>
+              <TableRow>
+                <TableCell>Replaced imported points removed</TableCell>
+                <TableCell>{summary.intersectionNodesRemoved.toLocaleString()}</TableCell>
+              </TableRow>
             </>
           ) : null}
         </TableBody>

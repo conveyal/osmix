@@ -164,6 +164,7 @@ describe("merge inline guidance", () => {
           deduplicatedWays: 2,
           intersectionPointsFound: 5,
           intersectionNodesCreated: 4,
+          intersectionNodesRemoved: 0,
         });
       },
     );

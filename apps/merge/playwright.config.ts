@@ -7,6 +7,7 @@ export default defineConfig({
     "match-evidence.spec.ts",
     "way-removal.spec.ts",
     "merge-base-loading.spec.ts",
+    "monaco-merge-patch.spec.ts",
     "worker-runtime.spec.ts",
   ],
   timeout: 120_000,
@@ -24,7 +25,7 @@ export default defineConfig({
   projects: [
     {
       name: "merge-integration",
-      testMatch: ["merge-base-loading.spec.ts"],
+      testMatch: ["merge-base-loading.spec.ts", "monaco-merge-patch.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
     {

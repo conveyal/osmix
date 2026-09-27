@@ -96,7 +96,10 @@ export function generateChangeset(
       `Intersection creation progress: ${checkedWays.toLocaleString()} of ${patch.ways.size.toLocaleString()} ways checked`;
 
     // This will check if the osm dataset has the way before trying to create intersections for it.
-    for (const _wayStats of changeset.createIntersectionsForWaysGenerator(patch.ways)) {
+    for (const _wayStats of changeset.createIntersectionsForWaysGenerator(
+      patch.ways,
+      patch.nodes.ids,
+    )) {
       checkedWays++;
       logEverySecond(progressMessage());
     }

@@ -54,7 +54,14 @@ import {
   refreshConflationWayRemovalAssessments,
   validateRetainedConflationReview,
 } from "@osmix/change/internal/conflation";
-import { Osm, type OsmOptions, type OsmTransferables } from "@osmix/core";
+import {
+  negativeIdMap,
+  Osm,
+  type OsmIdMap,
+  type OsmOptions,
+  type OsmTransferables,
+  renumberNegativeIds,
+} from "@osmix/core";
 import { fromGeoJSON } from "@osmix/geojson";
 import { fromGeoParquet, type GeoParquetReadOptions } from "@osmix/geoparquet";
 import { fromGtfs, type GtfsConversionOptions } from "@osmix/gtfs";
@@ -430,18 +437,40 @@ export class OsmixWorker extends EventTarget {
    * Serialize an Osm instance to PBF and write it through a file handle.
    * The handle is structured-cloneable, so the worker writes to disk without a main-thread hop.
    */
-  async toPbfFile({ osmId, fileHandle }: { osmId: string; fileHandle: FileSystemFileHandle }) {
+  async toPbfFile({
+    osmId,
+    fileHandle,
+    renumberNegativeIds: renumber = false,
+  }: {
+    osmId: string;
+    fileHandle: FileSystemFileHandle;
+    /** Export new (negative-ID) entities with positive IDs; see `renumberNegativeIds`. */
+    renumberNegativeIds?: boolean;
+  }) {
+    await toPbfStream(this.exportOsm(osmId, renumber)).pipeTo(await fileHandle.createWritable());
+  }
+
+  /** The dataset to export: as loaded, or with negative IDs renumbered to positive ones. */
+  private exportOsm(osmId: string, renumber: boolean): Osm {
     const osm = this.get(osmId);
-    await toPbfStream(osm).pipeTo(await fileHandle.createWritable());
+    return renumber ? renumberNegativeIds(osm).osm : osm;
+  }
+
+  /** The old → new IDs a positive-ID export of this dataset uses. */
+  negativeIdMap(osmId: string): OsmIdMap {
+    return negativeIdMap(this.get(osmId));
   }
 
   /**
    * Serialize an Osm instance to a PBF `Blob`.
    * Chunks are not concatenated, and posting a `Blob` shares it instead of copying its bytes.
    */
-  async toPbfBlob(osmId: string): Promise<Blob> {
+  async toPbfBlob(
+    osmId: string,
+    { renumberNegativeIds: renumber = false }: { renumberNegativeIds?: boolean } = {},
+  ): Promise<Blob> {
     const chunks: Uint8Array<ArrayBuffer>[] = [];
-    await toPbfStream(this.get(osmId)).pipeTo(
+    await toPbfStream(this.exportOsm(osmId, renumber)).pipeTo(
       new WritableStream({
         write(chunk) {
           if (!isArrayBufferBacked(chunk)) throw Error("PBF writer emitted a shared-memory chunk.");

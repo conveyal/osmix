@@ -521,6 +521,9 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@osmix/test-utils':
+        specifier: workspace:*
+        version: link:../../packages/test-utils
       '@playwright/test':
         specifier: ^1.63.0
         version: 1.63.0

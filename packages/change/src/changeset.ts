@@ -330,6 +330,8 @@ export class OsmChangeset {
   deduplicatedWays = 0;
   intersectionPointsFound = 0;
   intersectionNodesCreated = 0;
+  /** Imported points an intersection replaced and left unused, so they were dropped. */
+  intersectionNodesRemoved = 0;
 
   /** Revisions keep geometry caches correct while intersections rewrite ways in place. */
   private nodeCoordinateRevision = 0;
@@ -381,6 +383,7 @@ export class OsmChangeset {
     changeset.deduplicatedWays = snapshot.stats.deduplicatedWays;
     changeset.intersectionPointsFound = snapshot.stats.intersectionPointsFound;
     changeset.intersectionNodesCreated = snapshot.stats.intersectionNodesCreated;
+    changeset.intersectionNodesRemoved = snapshot.stats.intersectionNodesRemoved ?? 0;
     // Serialized node changes may move, delete, or supply a previously missing
     // ref. Conservatively disable packed base-coordinate reuse for this instance.
     if (Object.keys(json.nodes).length > 0) changeset.nodeCoordinateRevision++;
@@ -459,6 +462,7 @@ export class OsmChangeset {
       deduplicatedWays: this.deduplicatedWays,
       intersectionPointsFound: this.intersectionPointsFound,
       intersectionNodesCreated: this.intersectionNodesCreated,
+      intersectionNodesRemoved: this.intersectionNodesRemoved,
     };
   }
 
@@ -1016,6 +1020,29 @@ export class OsmChangeset {
     return new Set(refs).size < 2;
   }
 
+  /**
+   * Drop an imported point a junction replacement left unused (MP-J1). Its tags were merged into
+   * the survivor and every way was rewritten, so only an imported point used by patch ways alone,
+   * and by no relation, goes; base points and still-referenced ones stay.
+   */
+  private dropReplacedIntersectionNode(
+    replaced: OsmNode,
+    survivorId: number,
+    replacement: IntersectionJunctionReplacement,
+    patchWayIds: ReadonlySet<number> | null,
+    patchNodeIds: { has(id: number): boolean } | undefined,
+  ) {
+    if (!patchNodeIds?.has(replaced.id) || !patchWayIds) return;
+    if (!replacement.ways.every((way) => patchWayIds.has(way.id))) return;
+    for (const relation of this.currentRelations())
+      if (relation.members.some((member) => member.type === "node" && member.ref === replaced.id))
+        return;
+    const storedNode = this.osm.nodes.getById(replaced.id);
+    if (!storedNode) return;
+    this.delete(storedNode, [{ type: "node", id: survivorId, osmId: this.osm.id }]);
+    this.intersectionNodesRemoved++;
+  }
+
   private mergeNodeTags(survivor: OsmNode, replaced: OsmNode) {
     const merged = withNonConflictingTags(survivor, replaced);
     if (merged !== survivor) this.modify("node", survivor.id, () => merged);
@@ -1197,7 +1224,7 @@ export class OsmChangeset {
    * @param ways - The ways to process for intersections
    * @yields Statistics object with `intersectionsFound` and `intersectionsCreated` counts
    */
-  *createIntersectionsForWaysGenerator(ways: Ways) {
+  *createIntersectionsForWaysGenerator(ways: Ways, patchNodeIds?: { has(id: number): boolean }) {
     const wayIdPairs = new IdPairs();
     const patchWayIds = new Set<number>();
     for (const way of ways) patchWayIds.add(way.id);
@@ -1214,12 +1241,13 @@ export class OsmChangeset {
         wayIdPairs,
         patchWayIds,
         metadata,
+        patchNodeIds,
       );
     }
   }
 
-  createIntersectionsForWays(ways: Ways) {
-    for (const _ of this.createIntersectionsForWaysGenerator(ways));
+  createIntersectionsForWays(ways: Ways, patchNodeIds?: { has(id: number): boolean }) {
+    for (const _ of this.createIntersectionsForWaysGenerator(ways, patchNodeIds));
   }
 
   private getCurrentWay(way: OsmWay): OsmWay | null {
@@ -1340,6 +1368,7 @@ export class OsmChangeset {
     wayIdPairs: IdPairs,
     patchWayIds: ReadonlySet<number> | null,
     metadata: IntersectionMetadata,
+    patchNodeIds?: { has(id: number): boolean },
   ) {
     let intersectionsFound = 0;
     let intersectionsCreated = 0;
@@ -1479,6 +1508,13 @@ export class OsmChangeset {
             this.modify("relation", relation.id, () => relation);
           }
           this.markNodeAsCrossing(survivor.id);
+          this.dropReplacedIntersectionNode(
+            endpointResolution.replaced,
+            survivor.id,
+            junctionReplacement,
+            patchWayIds,
+            patchNodeIds,
+          );
         } else if (createDedicatedIntersection) {
           intersectionsCreated++;
           const newIntersectionNode = this.createIntersectionNode(

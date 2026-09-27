@@ -313,7 +313,8 @@ describe("explicit way removal through the facade and worker", () => {
     expect(result.ways.getById(10)).toEqual(base.ways.getById(10));
     expect(result.ways.getById(30)?.refs).toEqual([2, 103]);
     expect(result.nodes.ids.has(101)).toBe(false);
-    expect(result.nodes.ids.has(102)).toBe(true);
+    // The explicit connection left untagged 102 unused, so it is dropped too.
+    expect(result.nodes.ids.has(102)).toBe(false);
     const reloaded = await fromPbf(await toPbfBuffer(result), { id: "branch-reloaded" });
     expect(entities(reloaded)).toEqual(entities(result));
   });

@@ -13,6 +13,7 @@ import type {
   OsmConflationWayRemovalAssessment,
   OsmConflationWayRemovalPreview,
 } from "../types.ts";
+import { isUnusedImportedNode } from "./imported-nodes.ts";
 
 const DESCRIPTIVE_KEYS = new Set([
   "alt_name",
@@ -361,16 +362,11 @@ export function assessWayRemovals(
       if (Object.keys(nodeAt(ref)?.tags ?? {}).length) preview.retainedTaggedNodeIds.push(ref);
     }
     for (const ref of new Set(currentSource.refs)) {
-      if (
-        base.nodes.ids.has(ref) ||
-        !patch.nodes.ids.has(ref) ||
-        !nodeAt(ref) ||
-        Object.keys(nodeAt(ref)?.tags ?? {}).length
-      )
-        continue;
-      if ([...(currentIncidence.get(ref) ?? [])].some((id) => id !== source.id)) continue;
-      if (relationsByMember.has(`node:${ref}`)) continue;
-      preview.orphanNodeIds.push(ref);
+      const unused = isUnusedImportedNode(base, patch, nodeAt(ref), {
+        byWay: [...(currentIncidence.get(ref) ?? [])].some((id) => id !== source.id),
+        byRelation: relationsByMember.has(`node:${ref}`),
+      });
+      if (unused) preview.orphanNodeIds.push(ref);
     }
     preview.blockedNodeIds = [...new Set(preview.blockedNodeIds)].toSorted((a, b) => a - b);
     preview.blockingRelationIds.sort((a, b) => a - b);

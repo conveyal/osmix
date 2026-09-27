@@ -83,6 +83,7 @@ describe("merge performance harness", () => {
       waysChecked: 7,
       intersectionPointsFound: 3,
       intersectionNodesCreated: 3,
+      intersectionNodesRemoved: 0,
     });
   });
 

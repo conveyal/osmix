@@ -89,7 +89,7 @@ The explicit removal of a redundant imported way with an equivalent retained bas
 The user-facing choice to schedule geometry removal for one reviewed imported way.
 
 **Orphan-node cleanup**:
-The removal of untagged imported points left without references by an explicitly removed way.
+The removal of untagged imported points left without references by an explicitly removed way, by a network connection that replaced them, or by an intersection that reused a close vertex in their place.
 
 **Scheduled action**:
 An eligible matching action selected by the current automatic rules or saved choices for the next preview.

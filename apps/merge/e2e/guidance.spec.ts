@@ -751,6 +751,7 @@ test("completion explains mixed matching results and downloads the retained repo
     "1",
     "1",
     "0",
+    "0",
     "3",
   ]);
   await expect(summary).toContainText("Intentionally skipped: 1");
@@ -835,6 +836,7 @@ for (const scenario of ["unresolved", "zero"] as const) {
     await harness.getByRole("button", { name: "Finish completion run" }).click();
     const summary = harness.getByLabel("Merge completion summary");
     await expect(summary.getByLabel("Applied matching actions").locator("dd")).toHaveText([
+      "0",
       "0",
       "0",
       "0",

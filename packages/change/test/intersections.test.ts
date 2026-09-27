@@ -57,6 +57,7 @@ describe("intersection geometry integrity", () => {
     expect(changeset.stats).toMatchObject({
       intersectionPointsFound: 2,
       intersectionNodesCreated: 2,
+      intersectionNodesRemoved: 0,
       nodeChanges: 2,
       wayChanges: 3,
     });
@@ -149,6 +150,50 @@ describe("intersection geometry integrity", () => {
       barrier: "gate",
       crossing: "yes",
     });
+  });
+
+  it("drops an imported endpoint that a junction replacement leaves unused", () => {
+    const build = (withRelation: boolean) => {
+      const osm = new Osm({ id: "merged" });
+      for (const node of [
+        { id: 1, lon: -1, lat: 0 },
+        { id: 2, lon: 0, lat: 0 },
+        { id: 5, lon: 0, lat: 0 },
+        { id: 6, lon: 0, lat: 1 },
+      ]) {
+        osm.nodes.addNode(node);
+      }
+      osm.ways.addWay({ id: 10, refs: [1, 2], tags: { highway: "service" } });
+      osm.ways.addWay({ id: 20, refs: [5, 6], tags: { highway: "service" } });
+      if (withRelation) {
+        osm.relations.addRelation({
+          id: 30,
+          members: [{ type: "node", ref: 5, role: "stop" }],
+          tags: { type: "route" },
+        });
+      }
+      osm.buildIndexes();
+      osm.buildSpatialIndexes();
+      const patch = new Osm({ id: "patch" });
+      patch.nodes.addNode({ id: 5, lon: 0, lat: 0 });
+      patch.nodes.addNode({ id: 6, lon: 0, lat: 1 });
+      patch.ways.addWay({ id: 20, refs: [5, 6], tags: { highway: "service" } });
+      patch.buildIndexes();
+      const changeset = new OsmChangeset(osm);
+      changeset.createIntersectionsForWays(patch.ways, patch.nodes.ids);
+      return { changeset, result: applyChangesetToOsm(changeset) };
+    };
+
+    const unused = build(false);
+    expect(unused.result.ways.getById(20)?.refs).toEqual([2, 6]);
+    expect(unused.result.nodes.ids.has(5)).toBe(false);
+    expect(unused.changeset.stats.intersectionNodesRemoved).toBe(1);
+
+    // A relation still names the imported point, so it stays.
+    const referenced = build(true);
+    expect(referenced.result.ways.getById(20)?.refs).toEqual([2, 6]);
+    expect(referenced.result.nodes.ids.has(5)).toBe(true);
+    expect(referenced.changeset.stats.intersectionNodesRemoved).toBe(0);
   });
 
   it("preserves a shared base node ID when the patch endpoint adds routing tags", () => {
@@ -328,6 +373,7 @@ describe("intersection geometry integrity", () => {
     expect(changeset.stats).toMatchObject({
       intersectionPointsFound: 0,
       intersectionNodesCreated: 0,
+      intersectionNodesRemoved: 0,
       nodeChanges: 0,
       wayChanges: 1,
     });

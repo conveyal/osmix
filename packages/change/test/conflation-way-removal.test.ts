@@ -193,9 +193,14 @@ describe("explicit way removal topology contract", () => {
     expect(output.result.ways.ids.has(20)).toBe(false);
     expect(output.result.ways.getById(30)?.refs).toEqual([2, 103]);
     expect(output.result.nodes.ids.has(101)).toBe(false);
-    // 102 was orphaned by the separately selected attachment, not by removing way20.
-    expect(output.result.nodes.ids.has(102)).toBe(true);
-    expect(output.outcome.summary).toMatchObject({ wayRemovalActions: 1, removedOrphanNodes: 1 });
+    // 102 was left unused by the separately selected attachment, which drops it; removing way20
+    // only accounts for 101.
+    expect(output.result.nodes.ids.has(102)).toBe(false);
+    expect(output.outcome.summary).toMatchObject({
+      wayRemovalActions: 1,
+      removedOrphanNodes: 1,
+      removedConnectionOrphanNodes: 1,
+    });
   });
   it("does not let automatic connections or tag selections authorize branch-dependent removal", () => {
     const input = fixture({ branch: true });

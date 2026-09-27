@@ -21,6 +21,8 @@ export interface ConflationApplicationTrace {
   tagWriters: Map<string, string>;
   alreadyEqualTagValues: Set<string>;
   wayRemovals?: Map<string, OsmConflationWayRemovalPreview>;
+  /** Imported nodes a connection left unused (untagged, unreferenced), so they were dropped. */
+  connectionOrphanNodeIds: Set<number>;
 }
 
 export function conflationTagTargetKey(candidate: OsmConflationCandidate, key: string): string {
@@ -328,6 +330,9 @@ export function createConflationOutcomeReport(
       copiedTagValues: features.reduce((count, feature) => count + feature.copiedKeys.length, 0),
       networkAttachmentActions: features.filter((feature) => feature.connectedWayIds.length > 0)
         .length,
+      removedConnectionOrphanNodes: [...trace.connectionOrphanNodeIds].filter(
+        (id) => ordinaryBaseline.nodes.ids.has(id) && !result.nodes.ids.has(id),
+      ).length,
       unresolvedFeatures: features.filter((feature) => feature.unresolved != null).length,
       ambiguousFeatures: features.filter((feature) => feature.unresolved === "ambiguous").length,
       blockedFeatures: features.filter((feature) => feature.unresolved === "blocked").length,

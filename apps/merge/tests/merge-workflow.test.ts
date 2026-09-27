@@ -19,6 +19,7 @@ const changesetStats = (osmId: string, totalChanges: number): OsmChangesetStats 
   deduplicatedNodesReplaced: 0,
   deduplicatedWays: 0,
   intersectionNodesCreated: 0,
+  intersectionNodesRemoved: 0,
   intersectionPointsFound: 0,
   nodeChanges: totalChanges,
   osmId,

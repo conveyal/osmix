@@ -166,6 +166,7 @@ function changesetCounts(stats: OsmChangesetStats): MergeProfileOperationCounts 
     deduplicatedWays: stats.deduplicatedWays,
     intersectionPointsFound: stats.intersectionPointsFound,
     intersectionNodesCreated: stats.intersectionNodesCreated,
+    intersectionNodesRemoved: stats.intersectionNodesRemoved,
   };
 }
 

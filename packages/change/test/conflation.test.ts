@@ -52,6 +52,46 @@ describe("safe fuzzy conflation discovery", () => {
     );
   });
 
+  it("drops a connected imported node only when it is untagged and nothing else uses it", async () => {
+    const base = createOsm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: -0.001, lat: 0 },
+      ],
+      [{ id: 10, refs: [2, 1], tags: { highway: "footway" } }],
+    );
+    const importWith = (source: Partial<OsmNode>, extraWays: OsmWay[] = []) =>
+      createOsm(
+        "patch",
+        [
+          { id: 101, lon: 0.000005, lat: 0, ...source },
+          { id: 102, lon: 0.001, lat: 0 },
+          { id: 103, lon: 0.000005, lat: 0.001 },
+        ],
+        [{ id: 20, refs: [101, 102], tags: { highway: "footway" } }, ...extraWays],
+      );
+    const mergeWith = (patch: Osm) =>
+      merge(base, patch, { directMerge: true, conflation: attachmentOptions }, silent);
+
+    const untagged = await mergeWith(importWith({}));
+    expect(untagged.ways.getById(20)?.refs).toEqual([1, 102]);
+    expect(untagged.nodes.ids.has(101)).toBe(false);
+
+    // A tagged point keeps values that were not copied.
+    const tagged = await mergeWith(importWith({ tags: { note: "surveyed" } }));
+    expect(tagged.ways.getById(20)?.refs).toEqual([1, 102]);
+    expect(tagged.nodes.getById(101)?.tags).toEqual({ note: "surveyed" });
+
+    // A wall is not a routing way, so the connection does not rewrite it and 101 stays in use.
+    const shared = await mergeWith(
+      importWith({}, [{ id: 21, refs: [101, 103], tags: { barrier: "wall" } }]),
+    );
+    expect(shared.ways.getById(20)?.refs).toEqual([1, 102]);
+    expect(shared.ways.getById(21)?.refs).toEqual([101, 103]);
+    expect(shared.nodes.ids.has(101)).toBe(true);
+  });
+
   it("automatically attaches a unique aligned imported sidewalk without moving the base", async () => {
     const base = createOsm(
       "base",
@@ -94,7 +134,8 @@ describe("safe fuzzy conflation discovery", () => {
       buildIndexes.mockRestore();
     }
     expect(result.nodes.getById(1)).toMatchObject({ lon: 0, lat: 0 });
-    expect(result.nodes.ids.has(101)).toBe(true);
+    // The connection left untagged 101 unused, so it is dropped.
+    expect(result.nodes.ids.has(101)).toBe(false);
     expect(result.ways.getById(10)?.refs).toEqual([2, 1]);
     expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
     const cumulative = applyChangesetToOsm(
@@ -1114,6 +1155,59 @@ describe("safe fuzzy topology gates", () => {
     ).candidates.find((candidate) => candidate.sourceId === 101);
     expect(perpendicular?.status).toBe("review");
     expect(perpendicular?.reasons).toContain("bearing-mismatch");
+  });
+
+  it("blocks attaching into a junction that final validation rejects for mixed grades", () => {
+    // Node 1 ends a surface footway and sits inside a level=1 footway: a surface way satisfies the
+    // pairwise check, but the whole junction is one final validation rejects (issue K1).
+    const patch = createOsm(
+      "patch",
+      [
+        { id: 101, lon: -0.000005, lat: 0 },
+        { id: 102, lon: -0.001, lat: 0 },
+      ],
+      [{ id: 20, refs: [101, 102], tags: { highway: "footway" } }],
+    );
+    const mixed = createOsm(
+      "mixed",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 0.001, lat: 0 },
+        { id: 3, lon: 0, lat: -0.001 },
+        { id: 4, lon: 0, lat: 0.001 },
+      ],
+      [
+        { id: 10, refs: [1, 2], tags: { highway: "footway" } },
+        { id: 11, refs: [3, 1, 4], tags: { highway: "footway", level: "1" } },
+      ],
+    );
+    const blocked = discoverConflationCandidates(mixed, patch, attachmentOptions).candidates.find(
+      (candidate) => candidate.sourceId === 101,
+    );
+    expect(blocked?.networkAttachment?.status).toBe("blocked");
+    expect(blocked?.networkAttachment?.reasons).toContain("grade-conflict");
+
+    // A portal is fine: the surface way passes through, the level=1 way ends there, and another
+    // surface way continues from it, so the junction passes final validation.
+    const portal = createOsm(
+      "portal",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 0.001, lat: 0 },
+        { id: 3, lon: 0, lat: -0.001 },
+        { id: 4, lon: 0, lat: 0.001 },
+        { id: 5, lon: 0.001, lat: 0.001 },
+      ],
+      [
+        { id: 10, refs: [3, 1, 4], tags: { highway: "footway" } },
+        { id: 11, refs: [1, 2], tags: { highway: "footway", level: "1" } },
+        { id: 12, refs: [1, 5], tags: { highway: "footway" } },
+      ],
+    );
+    const allowed = discoverConflationCandidates(portal, patch, attachmentOptions).candidates.find(
+      (candidate) => candidate.sourceId === 101,
+    );
+    expect(allowed?.networkAttachment?.reasons).not.toContain("grade-conflict");
   });
 
   it("blocks patch-way collapse and relation-member attachment", () => {

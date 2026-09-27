@@ -17,6 +17,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "fixtures:generate:merge-patch": "node scripts/generate-monaco-merge-patch.ts",
     "profile:merge": "node --expose-gc test/merge-profile-cli.ts",
     "test": "pnpm -w exec vitest run --project \"$npm_package_name\"",
     "typecheck": "tsc --noEmit"

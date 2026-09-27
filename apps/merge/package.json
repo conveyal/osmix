@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@osmix/shared": "workspace:*",
+    "@osmix/test-utils": "workspace:*",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/geojson": "catalog:",

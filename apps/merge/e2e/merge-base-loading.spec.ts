@@ -183,6 +183,7 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
     "1",
     "0",
     "0",
+    "0",
   ]);
   await expect(summary).toContainText("completion-base.pbf + completion-patch.pbf");
   const downloadPromise = page.waitForEvent("download");

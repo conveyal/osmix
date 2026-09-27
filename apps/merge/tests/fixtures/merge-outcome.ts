@@ -9,6 +9,7 @@ export function emptyMatchingOutcome(): OsmConflationOutcomeReport {
       tagCopyActions: 0,
       copiedTagValues: 0,
       networkAttachmentActions: 0,
+      removedConnectionOrphanNodes: 0,
       unresolvedFeatures: 0,
       ambiguousFeatures: 0,
       blockedFeatures: 0,

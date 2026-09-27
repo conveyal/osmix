@@ -185,7 +185,7 @@ async function previewReviewedRemoval(
 }
 ```
 
-Inspect `result.outcome.features[].wayRemoval` before calling `applyChangesAndReplace()`. Optional `summary.wayRemovalActions` and `summary.removedOrphanNodes` count actual generated removals, not eligibility. The existing detached outcome carries removal details through application; review choices and the latest generation recover through the existing worker journal. Input replacement invalidates stale choices, and any decision edit invalidates its generated preview. If ordinary exact reconciliation already handled a reviewed source, clear its explicit removal choice and regenerate instead of attributing that separate operation to removal.
+Inspect `result.outcome.features[].wayRemoval` before calling `applyChangesAndReplace()`. Optional `summary.wayRemovalActions` and `summary.removedOrphanNodes` count actual generated removals, not eligibility. `summary.removedConnectionOrphanNodes` counts untagged imported points dropped because a connection left them unused. The existing detached outcome carries removal details through application; review choices and the latest generation recover through the existing worker journal. Input replacement invalidates stale choices, and any decision edit invalidates its generated preview. If ordinary exact reconciliation already handled a reviewed source, clear its explicit removal choice and regenerate instead of attributing that separate operation to removal.
 
 #### Review alternative targets and correct choices
 

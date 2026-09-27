@@ -101,6 +101,7 @@ type DatasetProxyMethodName =
   | "toPbfBlob"
   | "toPbfFile"
   | "toPbf"
+  | "negativeIdMap"
   | "transferOut"
   | "delete"
   | "buildRoutingGraph"
@@ -944,19 +945,30 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * from `showSaveFilePicker()`. The handle is cloned to a worker, which writes to disk directly,
    * so this does not need transferable streams.
    */
-  toPbfFile(osmId: OsmId, fileHandle: FileSystemFileHandle) {
+  toPbfFile(
+    osmId: OsmId,
+    fileHandle: FileSystemFileHandle,
+    options: { renumberNegativeIds?: boolean } = {},
+  ) {
     return this.runWithWorker(
-      (worker) => worker.toPbfFile({ osmId: this.getId(osmId), fileHandle }),
+      (worker) => worker.toPbfFile({ osmId: this.getId(osmId), fileHandle, ...options }),
       { lane: "any", retry: "never" },
     );
+  }
+
+  /** The old → new IDs a `renumberNegativeIds` export of this dataset uses. */
+  negativeIdMap(osmId: OsmId) {
+    return this.runWithWorker((worker) => worker.negativeIdMap(this.getId(osmId)), {
+      retry: "once",
+    });
   }
 
   /**
    * Serialize an `Osm` instance to a PBF `Blob` in a worker.
    * Avoids the contiguous copy that `toPbfData` makes; browsers can page large blobs to disk.
    */
-  toPbfBlob(osmId: OsmId) {
-    return this.runWithWorker((worker) => worker.toPbfBlob(this.getId(osmId)), {
+  toPbfBlob(osmId: OsmId, options: { renumberNegativeIds?: boolean } = {}) {
+    return this.runWithWorker((worker) => worker.toPbfBlob(this.getId(osmId), options), {
       retry: "once",
     });
   }

@@ -31,6 +31,7 @@ export { OsmEntityIndexBuildError, type OsmEntityIndexComponent } from "./entiti
 export * from "./nodes.ts";
 export * from "./osm.ts";
 export * from "./relations.ts";
+export { negativeIdMap, renumberNegativeIds, type OsmIdMap } from "./renumber.ts";
 export * from "./stringtable.ts";
 export * from "./tags.ts";
 export {

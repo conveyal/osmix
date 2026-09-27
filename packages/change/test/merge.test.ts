@@ -42,6 +42,7 @@ describe("merge osm", () => {
       deduplicatedWays: 0,
       intersectionPointsFound: 0,
       intersectionNodesCreated: 0,
+      intersectionNodesRemoved: 0,
     });
 
     const directResult = applyChangesetToOsm(changeset);
@@ -104,6 +105,7 @@ describe("merge osm", () => {
       deduplicatedWays: 0,
       intersectionPointsFound: 1,
       intersectionNodesCreated: 1,
+      intersectionNodesRemoved: 0,
     });
 
     const intersectionResult = applyChangesetToOsm(changeset);

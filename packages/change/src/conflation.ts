@@ -15,8 +15,12 @@ import {
   type ConflationApplicationTrace,
 } from "./conflation-outcome.ts";
 import { generateChangeset } from "./generate-changeset.ts";
-import { assertConflationPreservesBaseTopology } from "./integrity.ts";
+import {
+  assertConflationPreservesBaseTopology,
+  junctionHasIncompatibleGrades,
+} from "./integrity.ts";
 import { featureTypeConflicts } from "./internal/feature-classification.ts";
+import { isUnusedImportedNode } from "./internal/imported-nodes.ts";
 import { assessWayRemovals } from "./internal/way-removal.ts";
 import type {
   OsmConflationActionAssessment,
@@ -653,6 +657,19 @@ function nodeAttachmentAssessment(
     ),
   );
   if (!gradeCompatible) hardReasons.push("grade-conflict");
+  // The pairwise check above needs only one compatible base way. Apply-time validation checks
+  // the whole resulting junction, so do the same here: every highway already at the target plus
+  // each imported way rewritten onto it, with the same portal exception.
+  const junctionWays = [
+    ...baseWays.filter((way) => way.tags?.["highway"] != null),
+    ...sourceWays.map((way) => ({
+      ...way,
+      refs: way.refs.map((ref) => (ref === source.id ? target.id : ref)),
+    })),
+  ];
+  if (junctionHasIncompatibleGrades(target.id, junctionWays)) {
+    hardReasons.push("grade-conflict");
+  }
 
   const sourceSegments = nodeSegments(context.patch, source.id, sourceWays);
   const targetSegments = nodeSegments(context.base, target.id, targetWays);
@@ -1619,6 +1636,49 @@ function removeImportedEntity(changeset: OsmChangeset, entity: OsmNode | OsmWay)
   if (wasCreated) delete changeset.changes(type)[entity.id];
 }
 
+/**
+ * Drop each connected imported node the rewrite left unused (MP-M2): untagged and referenced by
+ * no remaining way or relation. Tagged points stay, so uncopied values are never lost.
+ */
+function removeConnectionOrphans(
+  changeset: OsmChangeset,
+  base: Osm,
+  patch: Osm,
+  attachments: ReadonlyMap<number, number>,
+  trace: ConflationApplicationTrace,
+) {
+  if (attachments.size === 0) return;
+  const relationNodeMembers = new Set<number>();
+  const relations = [
+    ...patch.relations,
+    ...Object.values(changeset.changes("relation")).flatMap((change) =>
+      change?.changeType === "delete" || !change?.entity ? [] : [change.entity],
+    ),
+  ];
+  for (const relation of relations)
+    for (const member of relation.members)
+      if (member.type === "node") relationNodeMembers.add(member.ref);
+  const patchWaysByNode = new Map<number, number[]>();
+  for (const way of patch.ways)
+    for (const ref of new Set(way.refs))
+      if (attachments.has(ref))
+        patchWaysByNode.set(ref, [...(patchWaysByNode.get(ref) ?? []), way.id]);
+  for (const sourceId of attachments.keys()) {
+    const node = currentEntity(changeset, "node", sourceId);
+    // Only patch ways can reference an imported node; check their current refs.
+    const byWay = (patchWaysByNode.get(sourceId) ?? []).some((wayId) =>
+      currentEntity(changeset, "way", wayId)?.refs.includes(sourceId),
+    );
+    const unused = isUnusedImportedNode(base, patch, node, {
+      byWay,
+      byRelation: relationNodeMembers.has(sourceId),
+    });
+    if (!unused) continue;
+    removeImportedEntity(changeset, node);
+    trace.connectionOrphanNodeIds.add(sourceId);
+  }
+}
+
 function applyDiscoveredConflation(
   changeset: OsmChangeset,
   originalBase: Osm,
@@ -1636,6 +1696,7 @@ function applyDiscoveredConflation(
   const trace: ConflationApplicationTrace = {
     tagWriters: new Map(),
     alreadyEqualTagValues: new Set(),
+    connectionOrphanNodeIds: new Set(),
   };
   const attachments = new Map<number, number>();
   const patchWayIds = new Set<number>();
@@ -1718,6 +1779,8 @@ function applyDiscoveredConflation(
       trace.wayRemovals.set(candidate.id, preview);
     }
   }
+  // Last, so removal checks see the imported geometry they were reviewed against.
+  removeConnectionOrphans(changeset, originalBase, patch, attachments, trace);
   return trace;
 }
 

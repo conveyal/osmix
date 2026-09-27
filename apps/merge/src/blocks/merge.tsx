@@ -39,6 +39,8 @@ import {
   CardAction,
   CardContent,
   CardHeader,
+  Checkbox,
+  CheckboxLabel,
   Step as StepCard,
   useTaskLock,
 } from "@osmix/ui";
@@ -232,6 +234,8 @@ export default function MergeBlock() {
   const taskLocked = useTaskLock();
   const [matchingIssue, setMatchingIssue] = useState<MatchingReviewIssue | null>(null);
   const [changesDownloadError, setChangesDownloadError] = useState<string | null>(null);
+  // Export new (negative-ID) features with positive IDs, for tools that reject negative IDs.
+  const [positiveIds, setPositiveIds] = useState(false);
   const [automaticMergeProgress, setAutomaticMergeProgress] =
     useState<LiveAutomaticMergeProgressProps | null>(null);
   const [conflationDecisions, setConflationDecisions] = useAtom(conflationDecisionsAtom);
@@ -539,7 +543,15 @@ export default function MergeBlock() {
     });
     if (!fileHandle) return;
     const stream = await fileHandle.createWritable();
-    await writeJsonReport(stream, { format: "osmix-merge-outcome", version: 1, ...completion });
+    // With positive IDs, the report maps each new feature's patch ID to its exported ID.
+    const idMap =
+      positiveIds && base.osmInfo ? { idMap: await remote.negativeIdMap(base.osmInfo.id) } : {};
+    await writeJsonReport(stream, {
+      format: "osmix-merge-outcome",
+      version: 1,
+      ...completion,
+      ...idMap,
+    });
   };
 
   const startNewMerge = async () => {
@@ -1420,13 +1432,30 @@ export default function MergeBlock() {
             ) : null}
 
             <SaveToDiskNotice />
+            <div className="flex flex-col gap-1">
+              <CheckboxLabel className="min-h-8">
+                <Checkbox
+                  checked={positiveIds}
+                  aria-describedby="positive-ids-help"
+                  onCheckedChange={setPositiveIds}
+                />
+                Give new features positive IDs
+              </CheckboxLabel>
+              <p id="positive-ids-help" className="text-muted-foreground">
+                New features have negative IDs, the OSM convention for data not yet uploaded. Some
+                tools only accept positive IDs; the merge report then lists each change.
+              </p>
+            </div>
             <StepActions aria-label="Final merged OSM actions">
               {!base.isStored && base.canStore && (
                 <ActionButton icon={<SaveIcon />} onAction={base.saveToStorage} variant="outline">
                   Save to storage
                 </ActionButton>
               )}
-              <ActionButton icon={<DownloadIcon />} onAction={() => base.downloadOsm()}>
+              <ActionButton
+                icon={<DownloadIcon />}
+                onAction={() => base.downloadOsm(undefined, { renumberNegativeIds: positiveIds })}
+              >
                 Download merged OSM PBF
               </ActionButton>
               <ActionButton icon={<ArrowLeftIcon />} variant="outline" onAction={startNewMerge}>

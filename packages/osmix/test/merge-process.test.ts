@@ -138,6 +138,8 @@ describe("merge-process guide", () => {
     expect([...result.nodes.sorted()]).toEqual([base.nodes.getById(-2), patch.nodes.getById(-1)]);
     expect(result.nodes.getById(-1)?.tags).not.toHaveProperty("wheelchair");
     expect(base.nodes.getById(-1)?.tags).toHaveProperty("wheelchair", "yes");
+    // Negative IDs survive export unchanged.
+    await expectEntityRoundTrip(result);
   });
 
   it.each(["copy", "connect", "copy-connect-remove"] as const)(
@@ -206,8 +208,11 @@ describe("merge-process guide", () => {
             ]),
         { id: 30, refs: connect ? [2, 103] : [102, 103], tags: { highway: "footway" } },
       ]);
-      // 101 is tagged; 102 was already orphaned by attachment before removal.
-      expect([...result.nodes.sorted()]).toEqual([...base.nodes.sorted(), ...patch.nodes.sorted()]);
+      // 101 is tagged, so it stays; the connection drops untagged 102, which it left unused.
+      expect([...result.nodes.sorted()]).toEqual([
+        ...base.nodes.sorted(),
+        ...patch.nodes.sorted().filter((node) => !connect || node.id !== 102),
+      ]);
       if (remove) {
         expect(
           generated.outcome.features.find((feature) => feature.sourceId === 20)?.wayRemoval,

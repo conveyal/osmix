@@ -270,6 +270,8 @@ export function MergeCompletionSummary({
                 <dd>{summary.copiedTagValues.toLocaleString()}</dd>
                 <dt>Network connections</dt>
                 <dd>{summary.networkAttachmentActions.toLocaleString()}</dd>
+                <dt>Replaced points removed</dt>
+                <dd>{summary.removedConnectionOrphanNodes.toLocaleString()}</dd>
                 {summary.wayRemovalActions !== undefined ? (
                   <>
                     <dt>Imported ways removed</dt>

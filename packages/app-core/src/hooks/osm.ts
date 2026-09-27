@@ -498,56 +498,58 @@ export function useOsmFile(osmKey: string) {
     },
   );
 
-  const downloadOsm = useEffectEvent(async (name?: string) => {
-    if (!osmInfo) return;
-    const fallbackName = osmInfo.id.endsWith(".pbf") ? osmInfo.id : `${osmInfo.id}.pbf`;
-    const sourceName = fileInfo?.fileName ?? fallbackName;
-    const withPrefix = sourceName.startsWith("osmix-") ? sourceName : `osmix-${sourceName}`;
-    const rawSuggestedName = name ?? withPrefix;
-    const suggestedName = ensureOsmPbfDownloadName(rawSuggestedName);
-    // Errors are recorded, not rethrown: a rejected action reaches the app-wide error boundary.
-    let target: Awaited<ReturnType<typeof chooseSaveTarget>>;
-    try {
-      // Choose the destination before the task starts, so the timer measures only the export.
-      target = await chooseSaveTarget({
-        suggestedName,
-        types: [
-          {
-            description: "OSM PBF",
-            accept: { "application/x-protobuf": [".pbf"] },
-          },
-        ],
-      });
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
-      console.error(error);
-      const message = error instanceof Error ? error.message : String(error);
-      Tasks.message(`Download failed: ${message}`, "error");
-      return;
-    }
-    const task = Tasks.start(
-      `Download ${target.kind === "file" ? target.handle.name : target.name}`,
-    );
-    try {
-      let fileName: string;
-      if (target.kind === "file") {
-        // The worker writes straight to the picked file.
-        const handle = target.handle;
-        await task.runStep("Write PBF", () => remote.toPbfFile(osmInfo.id, handle));
-        fileName = handle.name;
-      } else {
-        task.message("Native save picker unavailable, falling back to browser download", "warn");
-        const blob = await task.runStep("Write PBF", () => remote.toPbfBlob(osmInfo.id));
-        downloadBlob(blob, target.name);
-        fileName = target.name;
+  const downloadOsm = useEffectEvent(
+    async (name?: string, options: { renumberNegativeIds?: boolean } = {}) => {
+      if (!osmInfo) return;
+      const fallbackName = osmInfo.id.endsWith(".pbf") ? osmInfo.id : `${osmInfo.id}.pbf`;
+      const sourceName = fileInfo?.fileName ?? fallbackName;
+      const withPrefix = sourceName.startsWith("osmix-") ? sourceName : `osmix-${sourceName}`;
+      const rawSuggestedName = name ?? withPrefix;
+      const suggestedName = ensureOsmPbfDownloadName(rawSuggestedName);
+      // Errors are recorded, not rethrown: a rejected action reaches the app-wide error boundary.
+      let target: Awaited<ReturnType<typeof chooseSaveTarget>>;
+      try {
+        // Choose the destination before the task starts, so the timer measures only the export.
+        target = await chooseSaveTarget({
+          suggestedName,
+          types: [
+            {
+              description: "OSM PBF",
+              accept: { "application/x-protobuf": [".pbf"] },
+            },
+          ],
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        console.error(error);
+        const message = error instanceof Error ? error.message : String(error);
+        Tasks.message(`Download failed: ${message}`, "error");
+        return;
       }
-      task.end(`Downloaded ${fileName}`);
-    } catch (error) {
-      console.error(error);
-      const message = error instanceof Error ? error.message : String(error);
-      task.fail(error, `Download failed: ${message}`);
-    }
-  });
+      const task = Tasks.start(
+        `Download ${target.kind === "file" ? target.handle.name : target.name}`,
+      );
+      try {
+        let fileName: string;
+        if (target.kind === "file") {
+          // The worker writes straight to the picked file.
+          const handle = target.handle;
+          await task.runStep("Write PBF", () => remote.toPbfFile(osmInfo.id, handle, options));
+          fileName = handle.name;
+        } else {
+          task.message("Native save picker unavailable, falling back to browser download", "warn");
+          const blob = await task.runStep("Write PBF", () => remote.toPbfBlob(osmInfo.id, options));
+          downloadBlob(blob, target.name);
+          fileName = target.name;
+        }
+        task.end(`Downloaded ${fileName}`);
+      } catch (error) {
+        console.error(error);
+        const message = error instanceof Error ? error.message : String(error);
+        task.fail(error, `Download failed: ${message}`);
+      }
+    },
+  );
 
   const saveToStorage = useEffectEvent(async () => {
     if (!osmInfo || !fileInfo || isStored) return;

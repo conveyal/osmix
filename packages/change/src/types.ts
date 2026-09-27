@@ -291,6 +291,8 @@ export interface OsmConflationOutcomeSummary {
   tagCopyActions: number;
   copiedTagValues: number;
   networkAttachmentActions: number;
+  /** Untagged imported points dropped because a connection left them unused. */
+  removedConnectionOrphanNodes: number;
   wayRemovalActions?: number;
   removedOrphanNodes?: number;
   unresolvedFeatures: number;
@@ -405,6 +407,8 @@ export type OsmChangesetStats = {
   deduplicatedWays: number;
   intersectionPointsFound: number;
   intersectionNodesCreated: number;
+  /** Imported points an intersection replaced and left unused, so they were dropped. */
+  intersectionNodesRemoved: number;
 };
 
 /**

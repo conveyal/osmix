@@ -70,6 +70,7 @@ describe("merge osm", () => {
         deduplicatedWays: 0,
         intersectionPointsFound: 0,
         intersectionNodesCreated: 0,
+        intersectionNodesRemoved: 0,
       });
       // These expected values are based on the yakima fixture files. If they change,
       // it may indicate a change in entity comparison logic (which uses dequal for
@@ -109,6 +110,7 @@ describe("merge osm", () => {
         deduplicatedWays: 0,
         intersectionPointsFound: 3_091,
         intersectionNodesCreated: 2_604,
+        intersectionNodesRemoved: 0,
       });
 
       baseOsm = applyChangesetToOsm(changeset);
@@ -207,6 +209,7 @@ describe("merge osm", () => {
       deduplicatedWays: 1_282,
       intersectionPointsFound: 0,
       intersectionNodesCreated: 0,
+      intersectionNodesRemoved: 0,
     });
 
     baseOsm = applyChangesetToOsm(changeset);
@@ -234,6 +237,7 @@ describe("merge osm", () => {
       deduplicatedWays: 0,
       intersectionPointsFound: 1_014_446,
       intersectionNodesCreated: 243_795,
+      intersectionNodesRemoved: 0,
     });
 
     baseOsm = applyChangesetToOsm(changeset);
