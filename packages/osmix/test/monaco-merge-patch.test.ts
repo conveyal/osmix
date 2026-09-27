@@ -9,7 +9,6 @@ import {
   MONACO_MERGE_KNOWN_ISSUES,
   MONACO_MERGE_PATCH,
   MONACO_MERGE_SCENARIOS,
-  MONACO_MERGE_STAGES,
   type MergeRun,
   type MergeScenario,
   type StageExpectation,
@@ -25,6 +24,7 @@ import {
   type OsmConflationOptions,
 } from "../src/index.ts";
 import { buildMonacoMergePatch } from "./fixtures/monaco-merge-patch.ts";
+import { withMatchingDecisions } from "./plan-decisions.ts";
 
 const conflation = (overrides: Partial<OsmConflationOptions> = {}): OsmConflationOptions => ({
   ...MONACO_MERGE_CONFLATION,
@@ -242,7 +242,7 @@ describe("Monaco merge-scenario fixture", () => {
   describe("automatic merge", () => {
     let merged: Osm;
     beforeAll(async () => {
-      merged = await merge(base, patch, { ...MONACO_MERGE_STAGES, conflation: conflation() });
+      merged = await merge(base, patch, { matching: conflation() });
     });
 
     it.each(stageCases("automatic").map((c) => ({ ...c, name: label(c) })))("$name", (c) => {
@@ -271,10 +271,11 @@ describe("Monaco merge-scenario fixture", () => {
         if (!candidate) throw Error(`No candidate for ${JSON.stringify(expected.source)}`);
         return [{ candidateId: candidate.id, ...expected.decision }];
       });
-      merged = await merge(base, patch, {
-        ...MONACO_MERGE_STAGES,
-        conflation: conflation({ decisions }),
-      });
+      merged = await merge(
+        base,
+        patch,
+        withMatchingDecisions(base, patch, { matching: conflation() }, decisions),
+      );
     });
 
     it.each(stageCases("reviewed").map((c) => ({ ...c, name: label(c) })))("$name", (c) => {
@@ -289,10 +290,7 @@ describe("Monaco merge-scenario fixture", () => {
         JSON.stringify(buildMonacoMergePatch(base, [scenario])),
         { id: `monaco-merge-${scenario.id}` },
       );
-      const merged = await merge(base, issuePatch, {
-        ...MONACO_MERGE_STAGES,
-        conflation: conflation(),
-      });
+      const merged = await merge(base, issuePatch, { matching: conflation() });
       for (const expected of scenario.stages) expectStage(merged, expected);
     });
   });

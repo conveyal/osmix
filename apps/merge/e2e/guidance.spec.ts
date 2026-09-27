@@ -422,7 +422,8 @@ test.describe("matching action review", () => {
         .locator('input[type="checkbox"]'),
     ).toBeDisabled();
     await expect(connect).not.toBeChecked();
-    await expect(connect).toHaveAccessibleDescription(/Blocked: Allowed travel is incompatible/);
+    // A gate also needs review, so its review reason is listed with the blocking one.
+    await expect(connect).toHaveAccessibleDescription(/Blocked: .*Allowed travel is incompatible/);
     await expect(
       actions(page).getByRole("checkbox", { name: "Copy tags", exact: true }),
     ).toBeChecked();

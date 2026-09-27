@@ -71,6 +71,23 @@ export type ProposalDraft = PlanProposal extends infer P
     : never
   : never;
 
+/** The bounding box of the refs a dataset can resolve; no spatial index needed. */
+function refsBbox(osm: Osm, refs: readonly number[]): GeoBbox2D | null {
+  let bbox: GeoBbox2D | null = null;
+  for (const ref of refs) {
+    const node = osm.nodes.getById(ref);
+    if (!node) continue;
+    if (!bbox) bbox = [node.lon, node.lat, node.lon, node.lat];
+    else {
+      bbox[0] = Math.min(bbox[0], node.lon);
+      bbox[1] = Math.min(bbox[1], node.lat);
+      bbox[2] = Math.max(bbox[2], node.lon);
+      bbox[3] = Math.max(bbox[3], node.lat);
+    }
+  }
+  return bbox;
+}
+
 export class PlanBuilder {
   readonly features: PlanFeature[] = [];
   readonly proposals = new Map<string, PlanProposal>();
@@ -139,7 +156,7 @@ export class PlanBuilder {
         originalId: way.id,
         id,
         vertexIds: way.refs.map((ref) => remapId(this.remap, "node", ref)),
-        bbox: patch.ways.getEntityBbox({ id: way.id }),
+        bbox: refsBbox(patch, way.refs),
       });
       this.wayFeatures.set(id, feature);
       for (const ref of way.refs) {

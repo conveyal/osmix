@@ -283,11 +283,8 @@ describe("intersection geometry integrity", () => {
     patch.buildIndexes();
 
     const progress: string[] = [];
-    const result = await merge(
-      base,
-      patch,
-      { createIntersections: true, directMerge: true },
-      (event) => progress.push(event.detail.msg),
+    const result = await merge(base, patch, { mergeIdenticalPoints: false }, (event) =>
+      progress.push(event.detail.msg),
     );
 
     const baseWay = result.ways.getById(10)!;
@@ -314,16 +311,7 @@ describe("intersection geometry integrity", () => {
     patch.buildIndexes();
 
     const progress: string[] = [];
-    const result = await merge(
-      base,
-      patch,
-      {
-        createIntersections: true,
-        deduplicateWays: true,
-        directMerge: true,
-      },
-      (event) => progress.push(event.detail.msg),
-    );
+    const result = await merge(base, patch, {}, (event) => progress.push(event.detail.msg));
 
     expect(result.ways.ids.has(20)).toBe(false);
     expect(progress).toContain("Intersection creation progress: 1 of 1 ways checked");

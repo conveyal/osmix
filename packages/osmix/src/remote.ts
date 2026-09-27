@@ -16,6 +16,7 @@ import type {
   OsmConflationCandidateFilter,
   OsmConflationDecision,
   OsmConflationOptions,
+  MergePlanOptions,
   OsmMergeOptions,
 } from "@osmix/change";
 import { validateOrdinaryChangesetOptions } from "@osmix/change/internal/changeset-options";
@@ -197,7 +198,7 @@ class OsmRemoteDatasetBase<T extends OsmixWorker = OsmixWorker> implements OsmIn
     this.id = toId;
   }
 
-  merge(patch: OsmId, options: Partial<OsmMergeOptions> = {}) {
+  merge(patch: OsmId, options: MergePlanOptions = {}) {
     return this.remote.merge(this, patch, options);
   }
 }
@@ -1748,7 +1749,7 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
    * Replaces the base instance with the merge result and deletes the patch instance.
    * Synchronizes the merged result across all workers.
    */
-  async merge(baseOsmId: OsmId, patchOsmId: OsmId, options: Partial<OsmMergeOptions> = {}) {
+  async merge(baseOsmId: OsmId, patchOsmId: OsmId, options: MergePlanOptions = {}) {
     const osmId = await this.runWithWorker(
       (worker) => worker.merge(this.getId(baseOsmId), this.getId(patchOsmId), options),
       { lane: "control", retry: "never" },

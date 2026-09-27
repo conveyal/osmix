@@ -5,6 +5,7 @@ import type {
   OsmConflationGenerationResult,
   OsmConflationOptions,
   OsmConflationSummary,
+  MergePlanOptions,
   OsmMergeOptions,
 } from "osmix";
 
@@ -30,15 +31,12 @@ export const INTERSECTION_OPTIONS = {
   createIntersections: true,
 } as const satisfies Partial<OsmChangesetOptions>;
 
-/** Options shared by the non-interactive, high-level merge workflow. */
-export const COMPLETE_MERGE_OPTIONS = {
-  ...verifiedBaseMergeOptions(true),
-  ...INTERSECTION_OPTIONS,
-} as const satisfies Partial<OsmMergeOptions>;
-
-/** Add explicit fuzzy conflation without changing the exact-only default object. */
-export function completeMergeOptions(conflation?: OsmConflationOptions): Partial<OsmMergeOptions> {
-  return conflation ? { ...COMPLETE_MERGE_OPTIONS, conflation } : COMPLETE_MERGE_OPTIONS;
+/**
+ * Options for the non-interactive merge: the plan's defaults (identical points merged,
+ * crossings connected), plus matching when it is configured.
+ */
+export function completeMergeOptions(matching?: OsmConflationOptions): MergePlanOptions {
+  return matching ? { matching } : {};
 }
 
 /** Build the cumulative direct, exact, and reviewed-fuzzy verified merge options. */

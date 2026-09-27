@@ -156,12 +156,7 @@ describe("intersection creation preserves imported junctions", () => {
     async (variant) => {
       const { base, patch } = createPortalFixture(variant);
       expectPortalConnected(patch, patch);
-      const result = await merge(
-        base,
-        patch,
-        { directMerge: true, createIntersections: true },
-        () => {},
-      );
+      const result = await merge(base, patch, { mergeIdenticalPoints: false }, () => {});
       await expectPortalAfterReload(result, patch);
     },
   );
@@ -183,24 +178,19 @@ describe("intersection creation preserves imported junctions", () => {
   it("preserves the original junction when substituting an endpoint would collapse an incident way", async () => {
     const { base, patch } = createPortalFixture("unsafe");
     expectPortalConnected(patch, patch);
-    const result = await merge(
-      base,
-      patch,
-      { directMerge: true, createIntersections: true },
-      () => {},
-    );
+    const result = await merge(base, patch, { mergeIdenticalPoints: false }, () => {});
     await expectPortalAfterReload(result, patch, 5);
   });
 
   it("keeps valid junctions separate when combining them would connect a surface way to a bridge interior", async () => {
     const { base, patch } = createPortalFixture("grade-conflict");
-    const baseline = await merge(base, patch, { directMerge: true }, () => {});
-    const result = await merge(
+    const baseline = await merge(
       base,
       patch,
-      { directMerge: true, createIntersections: true },
+      { mergeIdenticalPoints: false, createIntersections: false },
       () => {},
     );
+    const result = await merge(base, patch, { mergeIdenticalPoints: false }, () => {});
     const reloaded = await fromPbf(await toPbfBuffer(result), {
       id: "separate-junctions-reloaded",
     });

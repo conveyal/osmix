@@ -15,6 +15,7 @@ import { generateChangeset } from "../src/generate-changeset.ts";
 import { refreshConflationWayRemovalAssessments } from "../src/internal/conflation.ts";
 import { merge } from "../src/merge.ts";
 import type { OsmConflationDecision, OsmConflationOptions } from "../src/types.ts";
+import { withMatchingDecisions } from "./helpers/plan.ts";
 
 function osm(id: string, nodes: OsmNode[], ways: OsmWay[], relations: OsmRelation[] = []) {
   const result = new Osm({ id });
@@ -164,7 +165,12 @@ describe("explicit way removal topology contract", () => {
     const result = await merge(
       input.base,
       input.patch,
-      { directMerge: true, conflation: { ...options, decisions: [remove] } },
+      withMatchingDecisions(
+        input.base,
+        input.patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [remove],
+      ),
       () => {},
     );
     expect([...result.nodes.sorted()]).toEqual([...cumulative.result.nodes.sorted()]);

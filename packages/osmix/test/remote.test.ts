@@ -3,9 +3,10 @@ import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/test-util
 import type { FeatureCollection, LineString, Point } from "geojson";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { fromPbf, merge } from "../src/index";
+import { fromPbf } from "../src/index";
 import { createRemote, OsmixDatasetLossError, OsmixRemote } from "../src/remote";
 import { createBlockedBridgeFixture, entitySnapshot } from "./conflation-blocked-fixture";
+import { stagedMerge } from "./staged-merge.ts";
 
 const monacoPbf = PBFs["monaco"]!;
 const occupiedMonacoTile: [number, number, number] = [17059, 11948, 15];
@@ -287,9 +288,11 @@ describe("OsmixRemote", () => {
         transferProperties: true,
         attachNetwork: false,
       };
-      const ordinaryResult = entitySnapshot(await merge(base, patch, ordinaryOptions, () => {}));
+      const ordinaryResult = entitySnapshot(
+        await stagedMerge(base, patch, ordinaryOptions, () => {}),
+      );
       const conflationResult = entitySnapshot(
-        await merge(
+        await stagedMerge(
           base,
           patch,
           { ...ordinaryOptions, conflation: { ...propertyOptions, decisions: [decision] } },
@@ -428,7 +431,7 @@ describe("OsmixRemote", () => {
       await remote.initializeWorkerPool(1, undefined, undefined, true);
       const { base, patch } = createBlockedBridgeFixture();
       const options = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
-      const baseline = entitySnapshot(await merge(base, patch, options, () => {}));
+      const baseline = entitySnapshot(await stagedMerge(base, patch, options, () => {}));
       await remote.transferIn(base);
       await remote.transferIn(patch);
       await remote.discoverConflation(base.id, patch.id, {

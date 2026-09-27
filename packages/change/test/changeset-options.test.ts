@@ -65,7 +65,11 @@ describe("ordinary changeset option boundary", () => {
     const { base, patch } = inputs();
     const options = { directMerge: true, conflation };
     const generated = applyChangesetToOsm(generateConflationChangeset(base, patch, options));
-    const merged = await merge(base, patch, options);
+    const merged = await merge(base, patch, {
+      mergeIdenticalPoints: false,
+      createIntersections: false,
+      matching: conflation,
+    });
     for (const result of [generated, merged]) {
       expect(result.nodes.getById(1)?.tags?.["name"]).toBe("Imported");
       expect(result.nodes.getById(101)).toEqual(patch.nodes.getById(101));

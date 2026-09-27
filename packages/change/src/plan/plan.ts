@@ -10,6 +10,7 @@
  */
 import type { Osm } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
+import { throttle } from "@osmix/shared/throttle";
 
 import { applyChangesetToOsm } from "../apply-changeset.ts";
 import { type CrossingInsertion, OsmChangeset, type OsmChangesetCheckpoint } from "../changeset.ts";
@@ -47,6 +48,16 @@ interface PlanState {
   checkpoints: Map<PlanPhase, OsmChangesetCheckpoint>;
   matched?: ReturnType<typeof planMatching>;
   log: (message: string) => void;
+  hooks: MergePlanHooks;
+}
+
+/** Observe the planner, for profiling. */
+export interface MergePlanHooks {
+  /**
+   * Wraps each phase, and the final checks as `check`, each time it runs. Call `run` exactly
+   * once and return its result; `stats` reads the plan's change counts so far.
+   */
+  phase?: <T>(name: PlanPhase | "check", run: () => T, stats: () => OsmChangesetStats) => T;
 }
 
 const planStates = new WeakMap<MergePlan, PlanState>();
@@ -75,6 +86,7 @@ export function planMerge(
   patch: Osm,
   options: MergePlanOptions = {},
   onProgress: (progress: ProgressEvent) => void = logProgress,
+  hooks: MergePlanHooks = {},
 ): MergePlan {
   const inputs = { base: inputIdentity(base), patch: inputIdentity(patch) };
   const resolved: MergePlanOptions = {
@@ -97,6 +109,7 @@ export function planMerge(
     builder,
     checkpoints: new Map(),
     log: (message) => onProgress(progressEvent(message)),
+    hooks,
   };
   const plan = {
     version: 1,
@@ -146,23 +159,25 @@ export function setMergePlanDecisions(plan: MergePlan, decisions: readonly PlanD
 
 /** Run the planner's phases from `from` to the end, then check and summarize the plan. */
 function runPhases(plan: MergePlan, state: PlanState, from: PlanPhase) {
-  const { base, patch, changeset, builder, options, log } = state;
+  const { base, patch, changeset, builder, options, log, hooks } = state;
   const runs = (phase: PlanPhase) => PLAN_PHASES.indexOf(phase) >= PLAN_PHASES.indexOf(from);
-  const checkpoint = (phase: PlanPhase) => state.checkpoints.set(phase, changeset.checkpoint());
+  const phase = (name: PlanPhase, run: () => void) => {
+    if (!runs(name)) return;
+    state.checkpoints.set(name, changeset.checkpoint());
+    if (hooks.phase) hooks.phase(name, run, () => changeset.stats);
+    else run();
+  };
 
-  if (runs("direct")) {
-    checkpoint("direct");
+  phase("direct", () => {
     log(`Planning direct changes from ${patch.id} to ${base.id}...`);
     changeset.generateDirectChanges(patch);
     builder.proposeDirectChanges(base, changeset);
-  }
-  if (runs("identity")) {
-    checkpoint("identity");
+  });
+  phase("identity", () => {
     log(`Planning identical points and ways from ${patch.id}...`);
     planIdentity(builder, changeset, patch, options.mergeIdenticalPoints ? "automatic" : "review");
-  }
-  if (runs("matching")) {
-    checkpoint("matching");
+  });
+  phase("matching", () => {
     if (options.matching) {
       log(`Planning matches from ${patch.id} to ${base.id}...`);
       // Discovery reads the state after identity, which a matching decision does not change.
@@ -172,18 +187,28 @@ function runPhases(plan: MergePlan, state: PlanState, from: PlanPhase) {
           : undefined;
       state.matched = planMatching(builder, changeset, base, patch, options.matching, cached);
     }
-  }
-  if (runs("crossings")) {
-    checkpoint("crossings");
+  });
+  phase("crossings", () => {
     if (options.createIntersections) {
-      log(`Planning crossings for ${patch.id}...`);
-      planCrossings(builder, changeset, patch);
+      log(`Creating intersections from ${patch.id}...`);
+      planCrossings(builder, changeset, patch, log);
     }
-  }
+  });
   finishPlan(plan, state);
 }
 
 function finishPlan(plan: MergePlan, state: PlanState) {
+  const { hooks, changeset } = state;
+  if (hooks.phase)
+    hooks.phase(
+      "check",
+      () => checkPlan(plan, state),
+      () => changeset.stats,
+    );
+  else checkPlan(plan, state);
+}
+
+function checkPlan(plan: MergePlan, state: PlanState) {
   const { base, patch, changeset, builder, options, matched } = state;
   state.log("Checking the plan...");
   plan.diagnostics = {
@@ -246,7 +271,12 @@ function planIdentity(
  * Crossings between surviving imported ways and the ways they cross, found on the planned
  * state. Every crossing is an automatic proposal; rejecting one leaves that pair unconnected.
  */
-function planCrossings(builder: PlanBuilder, changeset: OsmChangeset, planned: Osm) {
+function planCrossings(
+  builder: PlanBuilder,
+  changeset: OsmChangeset,
+  planned: Osm,
+  log: (message: string) => void,
+) {
   const wayToken = (id: number) =>
     planned.ways.ids.has(id) ? builder.originalToken("way", id) : entityToken("way", id);
   const accept = (crossing: CrossingInsertion) => {
@@ -271,7 +301,15 @@ function planCrossings(builder: PlanBuilder, changeset: OsmChangeset, planned: O
     });
     return proposal.effect === "applied";
   };
-  for (const _ of changeset.createPlannedIntersections(planned.ways, planned.nodes.ids, accept));
+  let checked = 0;
+  const progress = () =>
+    `Intersection creation progress: ${checked.toLocaleString()} of ${planned.ways.size.toLocaleString()} ways checked`;
+  const logEverySecond = throttle(() => log(progress()), 1_000);
+  for (const _ of changeset.createPlannedIntersections(planned.ways, planned.nodes.ids, accept)) {
+    checked++;
+    logEverySecond();
+  }
+  if (checked > 0) log(progress());
 }
 
 function exactMergeProposed(

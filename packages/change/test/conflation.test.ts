@@ -15,11 +15,13 @@ import {
 import { generateChangeset } from "../src/generate-changeset.ts";
 import * as publicChangeApi from "../src/index.ts";
 import { merge } from "../src/merge.ts";
+import { applyPlan, planMerge } from "../src/plan/plan.ts";
 import type {
   OsmConflationCandidate,
   OsmConflationDecision,
   OsmConflationOptions,
 } from "../src/types.ts";
+import { withMatchingDecisions } from "./helpers/plan.ts";
 
 function createOsm(
   id: string,
@@ -72,7 +74,12 @@ describe("safe fuzzy conflation discovery", () => {
         [{ id: 20, refs: [101, 102], tags: { highway: "footway" } }, ...extraWays],
       );
     const mergeWith = (patch: Osm) =>
-      merge(base, patch, { directMerge: true, conflation: attachmentOptions }, silent);
+      merge(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: attachmentOptions },
+        silent,
+      );
 
     const untagged = await mergeWith(importWith({}));
     expect(untagged.ways.getById(20)?.refs).toEqual([1, 102]);
@@ -126,10 +133,11 @@ describe("safe fuzzy conflation discovery", () => {
       result = await merge(
         base,
         patch,
-        { directMerge: true, conflation: attachmentOptions },
+        { mergeIdenticalPoints: false, createIntersections: false, matching: attachmentOptions },
         silent,
       );
-      expect(buildIndexes).toHaveBeenCalledTimes(2);
+      // Plan once, build once: the planned state is never materialized in between.
+      expect(buildIndexes).toHaveBeenCalledTimes(1);
     } finally {
       buildIndexes.mockRestore();
     }
@@ -480,24 +488,32 @@ describe("safe fuzzy conflation discovery", () => {
     );
   });
 
-  it("rejects unknown decisions through the high-level merge API", async () => {
+  it("reports decisions naming no proposal instead of applying them", async () => {
     const base = createOsm("base", [{ id: 1, lon: 0, lat: 0, tags: { name: "Base" } }]);
     const patch = createOsm("patch", [{ id: 101, lon: 0.000005, lat: 0, tags: { name: "Patch" } }]);
-    await expect(
-      merge(
-        base,
-        patch,
-        {
-          directMerge: true,
-          conflation: {
-            propertyKeys: ["name"],
-            attachNetwork: false,
-            decisions: [{ candidateId: "node:stale->1", action: "reject" }],
-          },
-        },
-        silent,
-      ),
-    ).rejects.toThrow("Unknown conflation candidate: node:stale->1");
+    const plan = planMerge(
+      base,
+      patch,
+      {
+        mergeIdenticalPoints: false,
+        createIntersections: false,
+        matching: { propertyKeys: ["name"], attachNetwork: false },
+        decisions: [{ proposalId: "copy:nstale>n1", action: "accept" }],
+      },
+      silent,
+    );
+    expect(plan.staleDecisions).toEqual(["copy:nstale>n1"]);
+    const undecided = planMerge(
+      base,
+      patch,
+      {
+        mergeIdenticalPoints: false,
+        createIntersections: false,
+        matching: { propertyKeys: ["name"], attachNetwork: false },
+      },
+      silent,
+    );
+    expect(applyPlan(plan).osm.contentHash()).toBe(applyPlan(undecided).osm.contentHash());
   });
 
   it("recomputes canonical candidates instead of trusting caller-mutated discovery data", () => {
@@ -582,8 +598,9 @@ describe("safe fuzzy property transfer", () => {
       base,
       patch,
       {
-        directMerge: true,
-        conflation: { propertyKeys: ["name", "missing"], attachNetwork: false },
+        mergeIdenticalPoints: false,
+        createIntersections: false,
+        matching: { propertyKeys: ["name", "missing"], attachNetwork: false },
       },
       silent,
     );
@@ -674,9 +691,18 @@ describe("safe fuzzy property transfer", () => {
     const conflation: OsmConflationOptions = {
       propertyKeys: ["highway", "layer"],
       attachNetwork: false,
-      decisions: [{ candidateId: "node:101->1", action: "accept" }],
     };
-    const result = await merge(base, patch, { directMerge: true, conflation }, silent);
+    const result = await merge(
+      base,
+      patch,
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+        [{ candidateId: "node:101->1", action: "accept" }],
+      ),
+      silent,
+    );
     expect(result.nodes.getById(1)?.tags).toEqual({ highway: "crossing" });
   });
 
@@ -704,7 +730,12 @@ describe("safe fuzzy property transfer", () => {
     );
     expect(candidate).toMatchObject({ sourceId: 20, targetId: 10, status: "automatic" });
 
-    const result = await merge(base, patch, { directMerge: true, conflation: options }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+      silent,
+    );
     expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
     expect(result.ways.getById(10)?.tags?.["name"]).toBe("Imported");
     expect(result.ways.getById(20)).toEqual(patch.ways.getById(20));
@@ -742,12 +773,7 @@ describe("safe fuzzy property transfer", () => {
     const result = await merge(
       base,
       patch,
-      {
-        directMerge: true,
-        deduplicateNodes: true,
-        deduplicateWays: true,
-        conflation,
-      },
+      { createIntersections: false, matching: conflation },
       silent,
     );
     expect(result.nodes.getById(1)?.tags?.["ref"]).toBe("patch");
@@ -768,7 +794,12 @@ describe("safe fuzzy property transfer", () => {
       status: "unmatched",
       targetId: null,
     });
-    const result = await merge(base, patch, { directMerge: true, conflation }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+      silent,
+    );
     expect(result.nodes.getById(1)?.tags?.["name"]).toBe("Same-ID authoritative");
   });
 
@@ -802,7 +833,12 @@ describe("safe fuzzy property transfer", () => {
       ],
     );
     const conflation = { propertyKeys: ["name"], attachNetwork: false };
-    const result = await merge(base, patch, { directMerge: true, conflation }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+      silent,
+    );
     expect(result.ways.getById(10)?.tags?.["name"]).toBe("Base");
     expect(result.ways.ids.has(20)).toBe(true);
   });
@@ -846,7 +882,12 @@ describe("safe fuzzy property transfer", () => {
       status: "blocked",
       reasons: ["routing-family-conflict"],
     });
-    const result = await merge(base, patch, { directMerge: true, conflation }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+      silent,
+    );
     expect(result.ways.getById(10)?.tags?.["name"]).toBe("Base");
     expect(result.ways.ids.has(20)).toBe(true);
   });
@@ -890,7 +931,12 @@ describe("safe fuzzy property transfer", () => {
       status: "blocked",
       reasons: ["routing-family-conflict"],
     });
-    const result = await merge(base, patch, { directMerge: true, conflation }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+      silent,
+    );
     expect(result.ways.getById(10)?.tags?.["name"]).toBe("Base");
     expect(result.ways.ids.has(20)).toBe(true);
   });
@@ -920,7 +966,12 @@ describe("safe fuzzy property transfer", () => {
     expect(candidate).toMatchObject({ targetId: 10, status: "blocked" });
     expect(candidate?.reasons).toContain("length-mismatch");
     expect(candidate?.evidence.lengthDifferenceRatio).toBeGreaterThan(0.25);
-    const result = await merge(base, patch, { directMerge: true, conflation }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+      silent,
+    );
     expect(result.ways.getById(10)?.tags?.["name"]).toBe("Base");
     expect(result.ways.ids.has(20)).toBe(true);
   });
@@ -955,7 +1006,12 @@ describe("safe fuzzy property transfer", () => {
 
     expect(candidate).toMatchObject({ targetId: 10, status: "blocked" });
     expect(candidate?.reasons).toContain("grade-conflict");
-    const result = await merge(base, patch, { directMerge: true, conflation }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: conflation },
+      silent,
+    );
     expect(result.ways.ids.has(20)).toBe(true);
   });
 });
@@ -996,7 +1052,7 @@ describe("safe fuzzy topology gates", () => {
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: attachmentOptions },
+      { mergeIdenticalPoints: false, createIntersections: false, matching: attachmentOptions },
       silent,
     );
     expect(result.ways.getById(20)?.refs).toEqual([101, 102]);
@@ -1321,13 +1377,12 @@ describe("safe fuzzy topology gates", () => {
     const result = await merge(
       base,
       patch,
-      {
-        directMerge: true,
-        conflation: {
-          ...attachmentOptions,
-          decisions: [{ candidateId: candidate!.id, action: "accept", attachNetwork: true }],
-        },
-      },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: attachmentOptions },
+        [{ candidateId: candidate!.id, action: "accept", attachNetwork: true }],
+      ),
       silent,
     );
     expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
@@ -1402,7 +1457,12 @@ describe("safe fuzzy topology gates", () => {
     expect(unsupported).toMatchObject({ status: "unmatched", targetId: null });
     expect(unsupported?.reasons).toContain("unsupported-way-chain");
 
-    const result = await merge(base, patch, { directMerge: true, conflation: options }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+      silent,
+    );
     expect(result.ways.getById(20)?.refs).toEqual([101, 102, 103]);
   });
 

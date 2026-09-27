@@ -16,6 +16,7 @@ import type {
   OsmConflationDecision,
   OsmConflationEffectiveStatus,
 } from "../src/types.ts";
+import { withMatchingDecisions } from "./helpers/plan.ts";
 
 interface DecisionScenario {
   name: string;
@@ -157,7 +158,12 @@ describe("resolved matching actions", () => {
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        decisions,
+      ),
       () => {},
     );
     expect(result.nodes.getById(1)?.tags?.["name"]).toBe(
@@ -179,7 +185,12 @@ describe("resolved matching actions", () => {
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: [decision] } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [decision],
+      ),
       () => {},
     );
     expect(result.nodes.getById(1)?.tags).toEqual({ name: "Base" });
@@ -290,7 +301,12 @@ describe("resolved matching actions", () => {
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: [row] } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [row],
+      ),
       () => {},
     );
     expect(result.nodes.getById(1)?.tags).toEqual({ name: "Imported" });

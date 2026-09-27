@@ -2,9 +2,7 @@ import type { OsmChangesetStats, OsmConflationGenerationResult, OsmConflationSum
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  COMPLETE_MERGE_OPTIONS,
   completeMergeOptions,
-  CROSS_DATASET_RECONCILIATION_OPTIONS,
   finalizeVerifiedMerge,
   INTERSECTION_OPTIONS,
   recoverConflationRunAllFailure,
@@ -119,17 +117,7 @@ describe("merge workflow policy", () => {
     expect(onIntersectionsApplied).not.toHaveBeenCalled();
   });
 
-  it("uses the same cross-dataset reconciliation options in a complete merge", () => {
-    expect(COMPLETE_MERGE_OPTIONS).toMatchObject(CROSS_DATASET_RECONCILIATION_OPTIONS);
-    expect(COMPLETE_MERGE_OPTIONS).toEqual({
-      deduplicateNodes: true,
-      deduplicateWays: true,
-      directMerge: true,
-      createIntersections: true,
-    });
-  });
-
-  it("keeps exact-only defaults while adding explicitly configured conflation", () => {
+  it("adds configured matching to the plan defaults", () => {
     const conflation = {
       propertyKeys: ["name"],
       attachNetwork: false,
@@ -137,11 +125,9 @@ describe("merge workflow policy", () => {
       automatic: "high-confidence" as const,
     };
 
-    expect(completeMergeOptions()).toBe(COMPLETE_MERGE_OPTIONS);
-    expect(completeMergeOptions(conflation)).toEqual({
-      ...COMPLETE_MERGE_OPTIONS,
-      conflation,
-    });
+    // The plan's defaults already merge identical points and connect crossings.
+    expect(completeMergeOptions()).toEqual({});
+    expect(completeMergeOptions(conflation)).toEqual({ matching: conflation });
     expect(verifiedConflationMergeOptions(true, conflation)).toEqual({
       directMerge: true,
       deduplicateNodes: true,

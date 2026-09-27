@@ -86,7 +86,12 @@ describe("worker changeset lifecycle", () => {
       worker.setChangesetFilters(["create", "modify", "delete"], ["node", "way", "relation"]);
       expect(preview(worker, base.id)).toEqual(ordinaryPreview);
       worker.applyChangesAndReplace(base.id);
-      const expected = await merge(base, patch, { directMerge: true }, () => {});
+      const expected = await merge(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false },
+        () => {},
+      );
       expect(entities(new Osm(worker.getOsmBuffers(base.id)))).toEqual(entities(expected));
     },
   );
@@ -110,7 +115,12 @@ describe("worker changeset lifecycle", () => {
     expect(() => preview(worker, base.id)).toThrow("No active changeset");
     worker.generateConflationChangeset(base.id, { directMerge: true });
     worker.applyChangesAndReplace(base.id);
-    const expected = await merge(base, patch, { directMerge: true }, () => {});
+    const expected = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      () => {},
+    );
     expect(entities(new Osm(worker.getOsmBuffers(base.id)))).toEqual(entities(expected));
   });
 
@@ -160,7 +170,12 @@ describe("worker changeset lifecycle", () => {
     expect(() => worker.getConflationSummary(base.id)).toThrow("No active conflation session");
     expect(preview(worker, base.id)).toEqual(latestPreview);
     worker.applyChangesAndReplace(base.id);
-    const expected = await merge(base, latestPatch, { directMerge: true }, () => {});
+    const expected = await merge(
+      base,
+      latestPatch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      () => {},
+    );
     expect(entities(new Osm(worker.getOsmBuffers(base.id)))).toEqual(entities(expected));
   });
 
@@ -179,7 +194,12 @@ describe("worker changeset lifecycle", () => {
     expect(() => preview(worker, base.id)).toThrow("No active changeset");
     expect(preview(worker, otherBase.id)).toEqual(otherPreview);
     worker.applyChangesAndReplace(otherBase.id);
-    const expected = await merge(otherBase, otherPatch, { directMerge: true }, () => {});
+    const expected = await merge(
+      otherBase,
+      otherPatch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      () => {},
+    );
     expect(entities(new Osm(worker.getOsmBuffers(otherBase.id)))).toEqual(entities(expected));
   });
 });

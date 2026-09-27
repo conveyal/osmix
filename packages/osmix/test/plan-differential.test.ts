@@ -1,6 +1,6 @@
 /**
  * The planner must produce what the staged merge pipeline produces. Until the pipeline is
- * retired, each planner phase is compared with `merge()` by content hash on the Monaco fixture
+ * retired, each planner phase is compared with `stagedMerge()` by content hash on the Monaco fixture
  * patch and the synthetic routing fixtures.
  */
 import { readFileSync } from "node:fs";
@@ -22,7 +22,8 @@ import {
 } from "@osmix/test-utils/monaco-merge-scenarios";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { fromGeoJSON, merge } from "../src/index.ts";
+import { fromGeoJSON } from "../src/index.ts";
+import { stagedMerge } from "./staged-merge.ts";
 import {
   createMonacoRoutingPatch,
   createSyntheticConflationRoutingInputs,
@@ -67,7 +68,7 @@ async function outcome(run: () => Osm | Promise<Osm>) {
 describe("plan versus staged merge", () => {
   it.each(cases)("direct changes match on %s", async (_name, inputs) => {
     const { base, patch } = inputs();
-    const expected = await outcome(() => merge(base, patch, { directMerge: true }, quiet));
+    const expected = await outcome(() => stagedMerge(base, patch, { directMerge: true }, quiet));
     const actual = await outcome(
       () =>
         applyPlan(
@@ -85,7 +86,7 @@ describe("plan versus staged merge", () => {
   it.each(cases)("identical points and ways match on %s", async (_name, inputs) => {
     const { base, patch } = inputs();
     const exact = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
-    const expected = await outcome(() => merge(base, patch, exact, quiet));
+    const expected = await outcome(() => stagedMerge(base, patch, exact, quiet));
     const actual = await outcome(
       () => applyPlan(planMerge(base, patch, { createIntersections: false }, quiet)).osm,
     );
@@ -101,7 +102,7 @@ describe("plan versus staged merge", () => {
     const { base, patch } = inputs();
     const staged = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
     const expected = await outcome(() =>
-      merge(base, patch, { ...staged, conflation: matching }, quiet),
+      stagedMerge(base, patch, { ...staged, conflation: matching }, quiet),
     );
     const actual = await outcome(
       () => applyPlan(planMerge(base, patch, { matching, createIntersections: false }, quiet)).osm,
@@ -117,7 +118,7 @@ describe("plan versus staged merge", () => {
       deduplicateWays: true,
       createIntersections: true,
     };
-    const expected = await outcome(() => merge(base, patch, all, quiet));
+    const expected = await outcome(() => stagedMerge(base, patch, all, quiet));
     const actual = await outcome(() => applyPlan(planMerge(base, patch, {}, quiet)).osm);
     expect(actual).toEqual(expected);
   });
@@ -131,7 +132,7 @@ describe("plan versus staged merge", () => {
       createIntersections: true,
       conflation: matching,
     };
-    const expected = await outcome(() => merge(base, patch, all, quiet));
+    const expected = await outcome(() => stagedMerge(base, patch, all, quiet));
     const actual = await outcome(() => applyPlan(planMerge(base, patch, { matching }, quiet)).osm);
     expect(actual).toEqual(expected);
   });
@@ -148,7 +149,7 @@ describe("plan versus staged merge", () => {
       }));
     const staged = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
     const expected = await outcome(() =>
-      merge(base, patch, { ...staged, conflation: { ...matching, decisions } }, quiet),
+      stagedMerge(base, patch, { ...staged, conflation: { ...matching, decisions } }, quiet),
     );
     const actual = await outcome(() => {
       const options = { matching, createIntersections: false };

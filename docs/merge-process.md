@@ -35,9 +35,7 @@ A **base** is the existing dataset. A **patch** contains additions and updates. 
 | Entity ID   | A numeric identifier within an entity type.                                                          | Node `10` and way `10` are different entities.                     |
 
 <a id="mp-i1"></a>
-**MP-I1 — Identity comes before geometry.** Base node `10` and patch node `10` are treated as the same entity even if their coordinates or tags differ. File names, dataset IDs, and file hashes do not namespace entity IDs. Matching does not arbitrate these updates by version or timestamp.
-
-For independently prepared GIS imports, verify that shared IDs actually refer to the same features and that new features have non-colliding IDs. Independently converted files can reuse generated negative IDs. The current workflow has no general cross-file ID remapping step; [G1](#gap-g1) explains the consequence. Moving points farther apart does not prevent an ID collision.
+**MP-I1 — Patch IDs follow the OSM convention.** A positive patch ID names an existing entity: base node `10` and patch node `10` are the same entity even if their coordinates or tags differ, and the patch version replaces it. Matching does not arbitrate these edits by version or timestamp. A negative patch ID is a new feature. Before planning, negative patch IDs move below the base's lowest ID (with references and members), so independent imports that both number new features from `-1` never collide. When a patch's positive IDs are not meant as edits, read every patch ID as new (`patchIds: "new"`, **Treat all as new** in the app); the plan counts the patch entities that would replace base entities so this is visible before applying.
 
 <a id="mp-i2"></a>
 **MP-I2 — “Authoritative base” has stage-specific boundaries.** Same-ID direct updates can replace base coordinates, tags, references, and relation members. Exact reconciliation chooses base IDs as survivors. Imported-data matching preserves the geometry of the ordinary direct/exact result. Later intersection creation can insert references into base ways or remap a shared junction.
@@ -51,16 +49,17 @@ For independently prepared GIS imports, verify that shared IDs actually refer to
 <a id="mp-i5"></a>
 **MP-I5 — Remove duplicates inside each input before merging.** Merge does not scan or fix duplicates inside one file. Open each input in the Inspect app first. Its scan finds nodes at the same seven-decimal coordinate and ways with identical ordered references, using the same compatibility checks as exact reconciliation. Applying the scan deletes each duplicate in favor of the compatible entity with the highest ID and rewrites way references and relation members to that survivor. Download the cleaned PBF and load it in Merge. Duplicates left inside the patch are passed to direct merge unchanged.
 
-### Example MP-E2: a same-ID update is not a tag union
+### Example MP-E2: new IDs never collide; positive IDs edit whole entities
 
-These files have different dataset IDs but both contain node `-1`. Coordinates are `(longitude, latitude)`.
+The base came from an earlier import numbered from `-1`; the patch is a new import that also starts at `-1`, plus an edit of base node `7`. Coordinates are `(longitude, latitude)`.
 
-| Entity    | Base                                            | Patch                                   | Result with direct merge enabled                   |
-| --------- | ----------------------------------------------- | --------------------------------------- | -------------------------------------------------- |
-| Node `-1` | `(0, 0)`; `name=Old entrance`, `wheelchair=yes` | `(0.002, 0)`; `name=Different entrance` | Patch coordinates and tags; `wheelchair` is absent |
-| Node `-2` | `(0.001, 0)`; `name=Keep me`                    | Absent                                  | Unchanged                                          |
+| Entity    | Base                                            | Patch                                   | Result                                            |
+| --------- | ----------------------------------------------- | --------------------------------------- | ------------------------------------------------- |
+| Node `-1` | `(0, 0)`; `name=Old entrance`, `wheelchair=yes` | `(0.002, 0)`; `name=Different entrance` | Base node unchanged; the patch point is node `-3` |
+| Node `-2` | `(0.001, 0)`; `name=Keep me`                    | Absent                                  | Unchanged                                         |
+| Node `7`  | `name=Main`, `wheelchair=yes`                   | Same point; `name=Main entrance`        | Patch tags; `wheelchair` is absent                |
 
-If these were independently generated IDs for different entrances, the result would be an unintended update. With no stage options, `merge(base, patch)` instead returns the base unchanged. [Executable example MP-E2](../packages/osmix/test/merge-process.test.ts).
+[Executable example MP-E2](../packages/osmix/test/merge-process.test.ts).
 
 <a id="worked-merge"></a>
 
@@ -162,14 +161,14 @@ The six final nodes and two ways, their tags, and their references are asserted 
 ## Defaults and stage order
 
 <a id="mp-o1"></a>
-**MP-O1 — Choose stages explicitly at the API.** The facade re-exports the library merge behavior. It does not add app defaults.
+**MP-O1 — `merge()` uses the app's defaults.** `merge()` plans and applies in one call (`applyPlan(planMerge(...))`). Options change the defaults: `mergeIdenticalPoints`, `createIntersections`, `matching`, `patchIds`, and `decisions`.
 
 | Setting                     | `merge()` in change/facade; worker/remote `merge()` | Merge app automatic path | App reviewed path                         |
 | --------------------------- | --------------------------------------------------- | ------------------------ | ----------------------------------------- |
-| Direct merge                | Off                                                 | On                       | Included in cumulative generation         |
-| Exact nodes and ways        | Off                                                 | On                       | Controlled by exact reconciliation choice |
-| Imported-data matching      | Absent/off                                          | Off until configured     | Optional discovery and decisions          |
-| Intersections               | Off                                                 | On                       | Separate later stage                      |
+| Direct merge                | Always                                              | On                       | Included in cumulative generation         |
+| Exact nodes and ways        | On (`mergeIdenticalPoints`)                         | On                       | Controlled by exact reconciliation choice |
+| Imported-data matching      | Off until `matching` is configured                  | Off until configured     | Optional discovery and decisions          |
+| Intersections               | On (`createIntersections`)                          | On                       | Separate later stage                      |
 | Within-file duplicate fixes | Not part of merge                                   | Not run; use Inspect     | Not run; use Inspect ([MP-I5](#mp-i5))    |
 | Applying generated previews | Caller responsibility for generator APIs            | Performed by workflow    | Requires the workflow's apply action      |
 
@@ -178,13 +177,13 @@ Matching configuration requires `propertyKeys` and `attachNetwork`. An empty key
 The app's initial opt-in form selects Copy tags with `barrier,crossing,kerb,tactile_paving`, a 1 m radius, and Connect network and removal off. Routing-affecting keys still require review; selecting a key is not approval of every candidate.
 
 <a id="mp-o2"></a>
-**MP-O2 — Discovery and application use different baselines.** Discovery compares untouched patch entities only with the original base. Imported features never become new discovery targets through transitive matching. The ordinary result is direct merge plus the enabled exact stages. Matching changes are applied against that result; intersections come afterward.
+**MP-O2 — Discovery and application use different baselines.** In a plan (`merge()`, `planMerge`), matching discovers candidates on the plan's state after the direct and identity phases: targets are base entities, and imported entities identity already merged are not sources. The staged worker path below compares untouched patch entities only with the original base. Imported features never become new discovery targets through transitive matching. The ordinary result is direct merge plus the enabled exact stages. Matching changes are applied against that result; intersections come afterward.
 
 The reviewed UI may show discovery before the exact reconciliation choice. It later regenerates the cumulative result from untouched inputs. A direct preview is not an already committed result that subsequent generation blindly edits.
 
 | API composition                                                         | Supported behavior                                                                                                                      |
 | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `merge(base, patch, options)`                                           | Runs the selected stages in order, returns the final dataset                                                                            |
+| `merge(base, patch, options)`                                           | Plans with the app's defaults, applies once, returns the final dataset                                                                  |
 | `generateChangeset(...)`                                                | Returns an ordinary preview; rejects a defined `conflation` option                                                                      |
 | Direct merge plus intersections in one ordinary generation              | Rejected: new ways must first be applied and indexed                                                                                    |
 | `generateConflationArtifacts(...)` / `generateConflationChangeset(...)` | Requires direct merge and matching configuration; may include exact stages; rejects intersection creation in that cumulative generation |
@@ -519,16 +518,6 @@ Negative IDs, the OSM convention for new entities, are exported unchanged. For t
 
 These entries are follow-up references for unresolved limitations. Their IDs are stable. No runtime fix is included in establishing this guide. Where the desired replacement policy is not yet agreed, that fact is explicit rather than inventing a future rule.
 
-<a id="gap-g1"></a>
-
-### G1 — Independent imports can collide on entity IDs
-
-**Observed:** The [GeoJSON converter](../packages/geojson/src) generates negative IDs starting at `-1` per entity type for independent imports and can use numeric/parseable feature IDs. Dataset IDs do not prevent collisions during direct merge. MP-E2 demonstrates the resulting whole-entity replacement.
-
-**User impact:** Two unrelated imported entrances or sidewalks can be interpreted as updates. This is a supported identity rule combined with an import limitation, not proof that arbitrary converted GIS files can safely combine.
-
-**Required now:** Shared IDs must mean shared identity; callers must allocate non-colliding IDs for additions. **Follow-up:** Define import namespacing/remapping and preserve all references before changing this policy. A specific automated allocation policy has not been agreed.
-
 <a id="gap-g2"></a>
 
 ### G2 — Intersection filtering does not exclude every area representation
@@ -561,7 +550,7 @@ Rules above are the specification. Tests provide evidence for particular scenari
 
 | Rules / scenario                                                               | Regression evidence                                                                                                                                                                                                                                  |
 | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MP-I1, MP-D1, MP-O1: ID collision, whole replacement, omission, no-op defaults | [Guide tests](../packages/osmix/test/merge-process.test.ts), `MP-E2 distinguishes no-op defaults, whole-entity updates, and absent entities`                                                                                                         |
+| MP-I1, MP-D1: new-ID remap, whole replacement, omission                        | [Guide tests](../packages/osmix/test/merge-process.test.ts), `MP-E2 keeps new patch IDs clear of the base and applies positive IDs as whole edits`; [plan tests](../packages/change/test/merge-plan.test.ts)                                         |
 | MP-X1/X2, MP-M2, MP-J1: complete walkthrough and exported entities             | [Guide tests](../packages/osmix/test/merge-process.test.ts), `MP-E1 traces direct, exact, matching, and intersections through PBF reload`                                                                                                            |
 | MP-M2, MP-R1: action comparison on identical inputs                            | [Guide tests](../packages/osmix/test/merge-process.test.ts), `MP-E3 compares … on the same imported sidewalk and branch` (copy, connect, copy-connect-remove)                                                                                        |
 | MP-X1: conflicting sources sharing one survivor                                | [Exact node groups](../packages/change/test/exact-node-groups.test.ts)                                                                                                                                                                               |

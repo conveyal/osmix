@@ -35,12 +35,7 @@ describe("routing-safe merge reconciliation", () => {
     );
     const patch = createOsm("empty", []);
 
-    const result = await merge(
-      base,
-      patch,
-      { directMerge: true, deduplicateNodes: true, deduplicateWays: true },
-      silent,
-    );
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect([...result.nodes].map((node) => node.id)).toEqual([1, 2]);
     expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
@@ -74,7 +69,7 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.nodes.ids.has(101)).toBe(true);
     expect(result.nodes.ids.has(102)).toBe(true);
@@ -105,7 +100,7 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.nodes.ids.has(101)).toBe(true);
     expect(result.ways.getById(20)?.refs).toEqual([101, 103]);
@@ -142,7 +137,7 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [101, 102], tags: { highway: "secondary" } }],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.nodes.ids.has(101)).toBe(false);
     expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
@@ -175,7 +170,7 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [101, 102], tags: { highway: "secondary" } }],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.nodes.ids.has(101)).toBe(true);
     expect(result.ways.getById(20)?.refs).toEqual([101, 102]);
@@ -193,7 +188,7 @@ describe("routing-safe merge reconciliation", () => {
     );
     const patch = createOsm("patch", [{ id: 1, lon: 1, lat: 0 }]);
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.nodes.ids.has(1)).toBe(true);
     expect(result.nodes.ids.has(2)).toBe(true);
@@ -212,7 +207,7 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [101, 102], tags: { highway: "service" } }],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.nodes.ids.has(101)).toBe(true);
     expect(result.nodes.ids.has(102)).toBe(true);
@@ -234,7 +229,7 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [1, 2], tags: { highway: "residential", oneway: "yes" } }],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.ways.ids.has(10)).toBe(true);
     expect(result.ways.ids.has(20)).toBe(true);
@@ -265,7 +260,7 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.ways.ids.has(10)).toBe(true);
     expect(result.ways.ids.has(20)).toBe(true);
@@ -287,7 +282,7 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [1, 2], tags: { highway: "residential", name: "Connector" } }],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.ways.ids.has(20)).toBe(false);
     expect(result.ways.getById(10)?.tags).toEqual({
@@ -332,7 +327,7 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateWays: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.ways.ids.has(20)).toBe(false);
     expect(result.ways.getById(10)?.tags?.["name"]).toBeUndefined();
@@ -347,9 +342,9 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [101, 999], tags: { highway: "service" } }],
     );
 
-    await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
-      "way 20 references missing node 999",
-    );
+    await expect(
+      merge(base, patch, { mergeIdenticalPoints: false, createIntersections: false }, silent),
+    ).rejects.toThrow("way 20 references missing node 999");
   });
 
   it("rejects a new patch restriction that is detached in the merged network", async () => {
@@ -383,7 +378,9 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
+    await expect(
+      merge(base, patch, { mergeIdenticalPoints: false, createIntersections: false }, silent),
+    ).rejects.toThrow(
       "restriction 100 via node 2 is detached from its from/to ways (from: [10]; to: [20])",
     );
   });
@@ -418,7 +415,7 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true, deduplicateNodes: true }, silent);
+    const result = await merge(base, patch, { createIntersections: false }, silent);
 
     expect(result.ways.getById(30)?.refs).toEqual([2, 1]);
     expect(result.relations.getById(100)?.members[1]).toEqual({
@@ -462,9 +459,9 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [4, 3], tags: { highway: "primary" } }],
     );
 
-    await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
-      "restriction 100 via node 2 is detached",
-    );
+    await expect(
+      merge(base, patch, { mergeIdenticalPoints: false, createIntersections: false }, silent),
+    ).rejects.toThrow("restriction 100 via node 2 is detached");
   });
 
   it("rejects newly connected highways with incompatible grade signatures", async () => {
@@ -493,9 +490,9 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
-      "node 1 newly connects grade-separated highways 10 and 20",
-    );
+    await expect(
+      merge(base, patch, { mergeIdenticalPoints: false, createIntersections: false }, silent),
+    ).rejects.toThrow("node 1 newly connects grade-separated highways 10 and 20");
   });
 
   it("allows a surface road endpoint to transition into a bridge endpoint", async () => {
@@ -522,7 +519,12 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      silent,
+    );
 
     expect(result.ways.getById(20)?.refs).toEqual([2, 3]);
   });
@@ -556,7 +558,12 @@ describe("routing-safe merge reconciliation", () => {
       ],
     );
 
-    const result = await merge(base, patch, { directMerge: true }, silent);
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      silent,
+    );
 
     expect(result.ways.getById(10)?.refs).toEqual([1, 2, 3]);
     expect(result.ways.getById(20)?.refs).toEqual([2, 5]);
@@ -594,9 +601,9 @@ describe("routing-safe merge reconciliation", () => {
       [{ id: 20, refs: [2, 5], tags: { highway: "primary" } }],
     );
 
-    await expect(merge(base, patch, { directMerge: true }, silent)).rejects.toThrow(
-      "node 2 newly connects grade-separated highways 10 and 20",
-    );
+    await expect(
+      merge(base, patch, { mergeIdenticalPoints: false, createIntersections: false }, silent),
+    ).rejects.toThrow("node 2 newly connects grade-separated highways 10 and 20");
   });
 
   it("tolerates an inherited interior grade issue during an unrelated change", () => {
@@ -655,7 +662,7 @@ describe("routing-safe merge reconciliation", () => {
     );
     const options = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
 
-    const highLevel = await merge(base, patch, options, silent);
+    const highLevel = await merge(base, patch, { createIntersections: false }, silent);
     const generated = applyChangesetToOsm(generateChangeset(base, patch, options, silent));
 
     expect([...highLevel.nodes].map((node) => node.id)).toEqual(

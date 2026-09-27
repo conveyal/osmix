@@ -43,6 +43,7 @@ import {
   type OsmConflationOptions,
   type OsmConflationOutcomeReport,
   type OsmConflationSummary,
+  type MergePlanOptions,
   type OsmMergeOptions,
   validateConflationDecisions,
 } from "@osmix/change";
@@ -1150,10 +1151,10 @@ export class OsmixWorker extends EventTarget {
   }
 
   /**
-   * Perform a full merge of two Osm indexes inside of a worker. Both Osm indexes must be loaded already.
-   * Replaces the base Osm and deletes the patch Osm.
+   * Plan and apply a merge of two loaded Osm indexes in one call, without review. Replaces the
+   * base Osm and deletes the patch Osm.
    */
-  async merge(baseOsmId: string, patchOsmId: string, options: Partial<OsmMergeOptions> = {}) {
+  async merge(baseOsmId: string, patchOsmId: string, options: MergePlanOptions = {}) {
     const baseOsm = this.get(baseOsmId);
     const patchOsm = this.get(patchOsmId);
     const mergedOsm = await merge(baseOsm, patchOsm, options, this.onProgress);

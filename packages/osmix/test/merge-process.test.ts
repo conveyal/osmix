@@ -115,29 +115,34 @@ describe("merge-process guide", () => {
       { id: 10, refs: [1, 303, 2], tags: { highway: "footway", name: "Base sidewalk" } },
       { id: 30, refs: [301, 303, 302], tags: { highway: "footway", name: "New link" } },
     ]);
-    expect(
-      entities(
-        await merge(base, patch, { ...options, conflation, createIntersections: true }, () => {}),
-      ),
-    ).toEqual(entities(final));
+    expect(entities(await merge(base, patch, { matching: conflation }, () => {}))).toEqual(
+      entities(final),
+    );
     expect(entities(base)).toEqual(originalBase);
     expect(entities(patch)).toEqual(originalPatch);
     await expectEntityRoundTrip(final);
   });
 
-  it("MP-E2 distinguishes no-op defaults, whole-entity updates, and absent entities", async () => {
+  it("MP-E2 keeps new patch IDs clear of the base and applies positive IDs as whole edits", async () => {
     const base = dataset("first-file", [
       { id: -1, lon: 0, lat: 0, tags: { name: "Old entrance", wheelchair: "yes" } },
       { id: -2, lon: 0.001, lat: 0, tags: { name: "Keep me" } },
+      { id: 7, lon: 0.001, lat: 0.001, tags: { name: "Main", wheelchair: "yes" } },
     ]);
     const patch = dataset("independent-file", [
       { id: -1, lon: 0.002, lat: 0, tags: { name: "Different entrance" } },
+      { id: 7, lon: 0.001, lat: 0.001, tags: { name: "Main entrance" } },
     ]);
-    expect(await merge(base, patch)).toBe(base);
-    const result = await merge(base, patch, { directMerge: true }, () => {});
-    expect([...result.nodes.sorted()]).toEqual([base.nodes.getById(-2), patch.nodes.getById(-1)]);
-    expect(result.nodes.getById(-1)?.tags).not.toHaveProperty("wheelchair");
-    expect(base.nodes.getById(-1)?.tags).toHaveProperty("wheelchair", "yes");
+    const result = await merge(base, patch, {}, () => {});
+    expect([...result.nodes.sorted()]).toEqual([
+      // Patch node -1 is new: it moves below the base's lowest ID instead of replacing -1.
+      { ...patch.nodes.getById(-1), id: -3 },
+      base.nodes.getById(-2),
+      base.nodes.getById(-1),
+      // Patch node 7 edits base node 7: the whole entity, not a union of tags.
+      patch.nodes.getById(7),
+    ]);
+    expect(base.nodes.getById(7)?.tags).toHaveProperty("wheelchair", "yes");
     // Negative IDs survive export unchanged.
     await expectEntityRoundTrip(result);
   });

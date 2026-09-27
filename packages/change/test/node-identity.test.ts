@@ -15,7 +15,7 @@ function dataset(id: string, nodes: OsmNode[], ways: OsmWay[] = []) {
 }
 
 const exactMerge = (base: Osm, patch: Osm) =>
-  merge(base, patch, { directMerge: true, deduplicateNodes: true }, () => {});
+  merge(base, patch, { createIntersections: false }, () => {});
 
 describe("node-identity rulebook", () => {
   it("compares node grade normalized, so equivalent spellings match", () => {

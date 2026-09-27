@@ -9,14 +9,6 @@
 /** The fixture file name, for `getFixturePath`. */
 export const MONACO_MERGE_PATCH = "monaco-merge-patch.geojson";
 
-/** Merge options the fixture is written for: every stage, as the Merge app runs them. */
-export const MONACO_MERGE_STAGES = {
-  directMerge: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-  createIntersections: true,
-} as const;
-
 /**
  * Matching options the fixture is written for: the Merge app's default copy keys, plus a
  * non-routing key (`opening_hours`, `surface`) so automatic copies are reachable, and a

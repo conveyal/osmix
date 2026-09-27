@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { merge, Osm } from "../src/index";
+import { Osm } from "../src/index";
 import { OsmixWorker } from "../src/worker";
 import { createBlockedBridgeFixture, entitySnapshot } from "./conflation-blocked-fixture";
+import { stagedMerge } from "./staged-merge.ts";
 
 class TestWorker extends OsmixWorker {
   setOsm(osm: Osm) {
@@ -67,7 +68,7 @@ describe("worker hard match blockers", () => {
   it("does not apply a blocked transfer or report it as accepted after an explicit decision", async () => {
     const worker = new TestWorker();
     const { base, patch } = createBlockedBridgeFixture();
-    const baseline = await merge(base, patch, mergeOptions, () => {});
+    const baseline = await stagedMerge(base, patch, mergeOptions, () => {});
     worker.setOsm(base);
     worker.setOsm(patch);
     worker.discoverConflation(base.id, patch.id, {

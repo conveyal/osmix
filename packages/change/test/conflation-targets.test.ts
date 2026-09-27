@@ -14,6 +14,7 @@ import * as publicChangeApi from "../src/index.ts";
 import { validateRetainedConflationReview } from "../src/internal/conflation.ts";
 import { merge } from "../src/merge.ts";
 import type { OsmConflationCandidate, OsmConflationDecision } from "../src/types.ts";
+import { withMatchingDecisions } from "./helpers/plan.ts";
 
 function createFixture(blockSecondTarget = false) {
   const base = new Osm({ id: "base" });
@@ -189,7 +190,12 @@ describe("one selected target per imported feature", () => {
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        decisions,
+      ),
       () => {},
     );
     expect(result.nodes.getById(1)?.tags?.["name"]).toBe("A");
@@ -273,7 +279,12 @@ describe("one selected target per imported feature", () => {
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: blockedSelection } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        blockedSelection,
+      ),
       () => {},
     );
     expect(result.nodes.getById(1)?.tags?.["name"]).toBe("A");

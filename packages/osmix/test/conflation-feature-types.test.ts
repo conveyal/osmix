@@ -13,6 +13,7 @@ import {
   OsmixWorker,
   resolveConflationActions,
 } from "../src/index";
+import { withMatchingDecisions } from "./plan-decisions.ts";
 
 const candidateId = "node:101->1";
 const featureTypeConflict: OsmConflationFeatureTypeConflict = {
@@ -144,10 +145,16 @@ describe("feature classification conflicts through the public facade and worker"
 
   it("keeps the school as an ordinary import in the public merge despite explicit acceptance", async () => {
     const { base, patch } = inputs();
-    const result = await merge(base, patch, {
-      directMerge: true,
-      conflation: { ...options, decisions: [accept] },
-    });
+    const result = await merge(
+      base,
+      patch,
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [accept],
+      ),
+    );
     expectOrdinaryAddition(result, base, patch);
   });
 
@@ -264,7 +271,11 @@ describe("feature classification conflicts through the public facade and worker"
 
   it("preserves authoritative same-ID updates even when feature classification changes", async () => {
     const { base, patch } = inputs({ sameId: true });
-    const result = await merge(base, patch, { directMerge: true, conflation: options });
+    const result = await merge(base, patch, {
+      mergeIdenticalPoints: false,
+      createIntersections: false,
+      matching: options,
+    });
     expect(result.nodes.getById(1)).toEqual(patch.nodes.getById(1));
     expect(result.nodes.getById(1)?.tags?.["amenity"]).toBe("school");
     expect(result.ways.getById(10)).toEqual(base.ways.getById(10));

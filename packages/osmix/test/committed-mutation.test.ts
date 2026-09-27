@@ -90,7 +90,10 @@ describe("committed remote mutations", () => {
     remote.failNextSynchronization = true;
     let caught: unknown;
     try {
-      await remote.merge(base.id, patch.id, { directMerge: true });
+      await remote.merge(base.id, patch.id, {
+        mergeIdenticalPoints: false,
+        createIntersections: false,
+      });
     } catch (error) {
       caught = error;
     }
@@ -127,7 +130,9 @@ describe("committed remote mutations", () => {
       return outputId;
     });
     remote.failNextSynchronization = true;
-    await expect(remote.merge(base.id, patch.id, { directMerge: true })).rejects.toMatchObject({
+    await expect(
+      remote.merge(base.id, patch.id, { mergeIdenticalPoints: false, createIntersections: false }),
+    ).rejects.toMatchObject({
       committed: true,
       operation: "merge",
       osmId: outputId,

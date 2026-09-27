@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { fromPbf, merge, Osm, type OsmConflationDecision, toPbfBuffer } from "../src/index.ts";
+import { fromPbf, Osm, type OsmConflationDecision, toPbfBuffer } from "../src/index.ts";
 import { OsmixWorker } from "../src/worker.ts";
 import { RoutingTestHarness } from "./routing-harness.ts";
+import { stagedMerge } from "./staged-merge.ts";
 
 const ordinaryOptions = {
   directMerge: true,
@@ -128,8 +129,8 @@ async function expectPreservedResult(baseline: Osm, result: Osm) {
 describe("property copying preserves imported branch routes", () => {
   it("retains a selected base value when the imported way does not have that tag", async () => {
     const { base, patch } = createBranchFixture();
-    const baseline = await merge(base, patch, ordinaryOptions, () => {});
-    const result = await merge(
+    const baseline = await stagedMerge(base, patch, ordinaryOptions, () => {});
+    const result = await stagedMerge(
       base,
       patch,
       {
@@ -146,9 +147,9 @@ describe("property copying preserves imported branch routes", () => {
     async (mode) => {
       const { base, patch } = createBranchFixture();
       expectBranchRoute(patch);
-      const baseline = await merge(base, patch, ordinaryOptions, () => {});
+      const baseline = await stagedMerge(base, patch, ordinaryOptions, () => {});
       expectBranchRoute(baseline);
-      const result = await merge(
+      const result = await stagedMerge(
         base,
         patch,
         {
@@ -170,7 +171,7 @@ describe("property copying preserves imported branch routes", () => {
     async (mode) => {
       const { base, patch } = createBranchFixture();
       expectBranchRoute(patch);
-      const baseline = await merge(base, patch, ordinaryOptions, () => {});
+      const baseline = await stagedMerge(base, patch, ordinaryOptions, () => {});
       expectBranchRoute(baseline);
       const worker = new TestWorker();
       worker.setOsm(base);

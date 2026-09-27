@@ -50,12 +50,7 @@ describe("planMerge", () => {
   it("applies to the same dataset as a direct merge with exact reconciliation", async () => {
     const base = baseRoad();
     const patch = importedPath();
-    const expected = await merge(
-      base,
-      patch,
-      { directMerge: true, deduplicateNodes: true, deduplicateWays: true },
-      quiet,
-    );
+    const expected = await merge(base, patch, { createIntersections: false }, quiet);
     const { osm } = applyPlan(planMerge(base, patch, {}, quiet));
     expect(osm.contentHash()).toBe(expected.contentHash());
   });

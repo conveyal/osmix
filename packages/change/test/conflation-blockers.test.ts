@@ -14,6 +14,7 @@ import {
   type OsmConflationOptions,
   summarizeConflationCandidates,
 } from "../src/index.ts";
+import { withMatchingDecisions } from "./helpers/plan.ts";
 
 type RelationKind = "none" | "route" | "restriction";
 type ConflictKind = "grade" | "access" | "protected" | "geometry" | "none";
@@ -158,11 +159,21 @@ describe("hard conflation blockers survive combined review reasons", () => {
       skippedCandidates: 1,
       changedCandidates: 0,
     });
-    const baseline = await merge(base, patch, { directMerge: true }, () => {});
+    const baseline = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      () => {},
+    );
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: bulk.decisions } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        bulk.decisions,
+      ),
       () => {},
     );
     expect(entities(result)).toEqual(entities(baseline));
@@ -170,11 +181,26 @@ describe("hard conflation blockers survive combined review reasons", () => {
 
   it("makes explicit acceptance ineffective in generation and the public merge pipeline", async () => {
     const { base, patch, options } = createWayFixture("grade", "source");
-    const baseline = await merge(base, patch, { directMerge: true }, () => {});
+    const baseline = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      () => {},
+    );
     const conflation = { ...options, decisions: [acceptWay] };
     const changeset = generateConflationChangeset(base, patch, { directMerge: true, conflation });
     expect(entities(applyChangesetToOsm(changeset))).toEqual(entities(baseline));
-    const result = await merge(base, patch, { directMerge: true, conflation }, () => {});
+    const result = await merge(
+      base,
+      patch,
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [acceptWay],
+      ),
+      () => {},
+    );
     expect(entities(result)).toEqual(entities(baseline));
   });
 
@@ -231,7 +257,12 @@ describe("hard conflation blockers survive combined review reasons", () => {
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: [acceptWay] } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [acceptWay],
+      ),
       () => {},
     );
     expect(result.ways.getById(10)?.tags?.["name"]).toBe("Imported");
@@ -284,11 +315,21 @@ describe("hard conflation blockers survive combined review reasons", () => {
       accepted: 0,
       blocked: 1,
     });
-    const baseline = await merge(base, patch, { directMerge: true }, () => {});
+    const baseline = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false },
+      () => {},
+    );
     const blockedResult = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: [blockedAttachment] } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [blockedAttachment],
+      ),
       () => {},
     );
     expect(entities(blockedResult)).toEqual(entities(baseline));
@@ -305,7 +346,12 @@ describe("hard conflation blockers survive combined review reasons", () => {
     const result = await merge(
       base,
       patch,
-      { directMerge: true, conflation: { ...options, decisions: bulk.decisions } },
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        bulk.decisions,
+      ),
       () => {},
     );
     expect(result.nodes.getById(1)?.tags).toEqual({ name: "Imported" });

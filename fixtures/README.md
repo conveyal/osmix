@@ -24,7 +24,7 @@ About 30 small scenarios, each in its own part of Monaco, covering direct merge,
 
   `packages/osmix/test/monaco-merge-patch.test.ts` fails if the committed file drifts from what the scenarios produce.
 
-- **Settings:** the tests merge with every stage on and matching enabled (`MONACO_MERGE_STAGES`, `MONACO_MERGE_CONFLATION`): the Merge app's default copy keys plus `opening_hours`, `surface` and `level`, connect network on, and removal review on.
+- **Settings:** the tests merge with the default plan (identical points merged, crossings connected) and matching enabled (`MONACO_MERGE_CONFLATION`): the Merge app's default copy keys plus `opening_hours`, `surface` and `level`, connect network on, and removal review on.
 - **IDs:** each feature has an explicit ID of −(1,000,000 + scenario number × 100 + k), clear of the importer's automatic vertex IDs (−1, −2, …). Only the replacement scenarios (D2, D3) reuse Monaco IDs.
 - **Used by:** the package integration test above (every scenario, in discovery, an automatic merge and a reviewed merge) and the Merge e2e spec [`apps/merge/e2e/monaco-merge-patch.spec.ts`](../apps/merge/e2e/monaco-merge-patch.spec.ts) (upload through the UI, representative outcomes).
 

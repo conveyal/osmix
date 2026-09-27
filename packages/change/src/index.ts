@@ -55,6 +55,7 @@ export {
   applyPlan,
   generateMergePlanOsc,
   getMergePlanCandidate,
+  type MergePlanHooks,
   type MergePlanResult,
   planMerge,
   setMergePlanDecisions,
