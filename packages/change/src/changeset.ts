@@ -34,6 +34,16 @@ import {
   restrictionTopologyIssues,
   routingIntegrityIssueKeys,
 } from "./integrity.ts";
+import { NODE_ROUTING_CRITICAL_TAGS } from "./rules/access.ts";
+import { refsWouldCollapse } from "./rules/collapse.ts";
+import { hasConflictingGradeOrAccessTags } from "./rules/grade.ts";
+import {
+  hasAnyTagConflict,
+  isDescriptiveWayTag,
+  routingSemanticTagsEqual,
+  withNonConflictingDescriptiveTags,
+  withNonConflictingTags,
+} from "./rules/tags.ts";
 import type {
   OsmChange,
   OsmChanges,
@@ -81,85 +91,10 @@ interface IntersectionJunctionReplacement {
 }
 
 const EMPTY_ID = -1;
-const DESCRIPTIVE_WAY_TAGS = new Set([
-  "alt_name",
-  "int_name",
-  "loc_name",
-  "name",
-  "note",
-  "official_name",
-  "old_name",
-  "operator",
-  "ref",
-  "short_name",
-  "source",
-  "wikidata",
-  "wikipedia",
-]);
-const DESCRIPTIVE_WAY_TAG_PREFIXES = [
-  "alt_name:",
-  "name:",
-  "note:",
-  "official_name:",
-  "old_name:",
-  "operator:",
-  "source:",
-] as const;
-const GRADE_AND_ACCESS_TAGS = [
-  "access",
-  "barrier",
-  "bicycle",
-  "foot",
-  "horse",
-  "motor_vehicle",
-  "motorcar",
-  "vehicle",
-] as const;
-const GRADE_TAG_DEFAULTS = {
-  bridge: "no",
-  covered: "no",
-  layer: "0",
-  level: "",
-  tunnel: "no",
-} as const;
-const NODE_ROUTING_CRITICAL_TAGS = [
-  "access",
-  "barrier",
-  "bicycle",
-  "foot",
-  "ford",
-  "highway",
-  "horse",
-  "motor_vehicle",
-  "motorcar",
-  "vehicle",
-] as const;
-
 function sameOsmCoordinate(a: OsmNode, b: OsmNode) {
   return (
     toMicroDegrees(a.lon) === toMicroDegrees(b.lon) &&
     toMicroDegrees(a.lat) === toMicroDegrees(b.lat)
-  );
-}
-
-function hasAnyTagConflict(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
-  if (!a || !b) return false;
-  return Object.entries(a).some(([key, value]) => b[key] != null && b[key] !== value);
-}
-
-function isDescriptiveWayTag(key: string) {
-  return (
-    DESCRIPTIVE_WAY_TAGS.has(key) ||
-    DESCRIPTIVE_WAY_TAG_PREFIXES.some((prefix) => key.startsWith(prefix))
-  );
-}
-
-function routingSemanticTagsEqual(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
-  const direction = normalizedWayDirection(a);
-  if (direction === "unsupported" || direction !== normalizedWayDirection(b)) return false;
-  const keys = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
-  return [...keys].every(
-    (key) => key === "oneway" || isDescriptiveWayTag(key) || a?.[key] === b?.[key],
   );
 }
 
@@ -191,44 +126,11 @@ function exactWayHash(way: OsmWay) {
   return hash;
 }
 
-function hasConflictingGradeOrAccessTags(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
-  if (GRADE_AND_ACCESS_TAGS.some((key) => String(a?.[key] ?? "") !== String(b?.[key] ?? ""))) {
-    return true;
-  }
-  return Object.entries(GRADE_TAG_DEFAULTS).some(
-    ([key, defaultValue]) => String(a?.[key] ?? defaultValue) !== String(b?.[key] ?? defaultValue),
-  );
-}
-
 function wayContextsCompatible(a: OsmWay, b: OsmWay) {
   return (
     !hasConflictingGradeOrAccessTags(a.tags, b.tags) &&
     (a.tags?.["highway"] == null) === (b.tags?.["highway"] == null)
   );
-}
-
-function withNonConflictingTags<T extends OsmEntity>(base: T, patch: T): T {
-  if (!patch.tags) return base;
-  const tags = { ...base.tags };
-  let changed = false;
-  for (const [key, value] of Object.entries(patch.tags)) {
-    if (tags[key] != null) continue;
-    tags[key] = value;
-    changed = true;
-  }
-  return changed ? { ...base, tags } : base;
-}
-
-function withNonConflictingDescriptiveTags<T extends OsmEntity>(base: T, patch: T): T {
-  if (!patch.tags) return base;
-  const tags = { ...base.tags };
-  let changed = false;
-  for (const [key, value] of Object.entries(patch.tags)) {
-    if (!isDescriptiveWayTag(key) || tags[key] != null) continue;
-    tags[key] = value;
-    changed = true;
-  }
-  return changed ? { ...base, tags } : base;
 }
 
 function nodeRoutingTagCount(node: OsmNode) {
@@ -1016,8 +918,7 @@ export class OsmChangeset {
     survivorNodeId: number,
   ) {
     const refs = way.refs.map((ref) => (ref === replacedNodeId ? survivorNodeId : ref));
-    if (refs.some((ref, index) => index > 0 && ref === refs[index - 1])) return true;
-    return new Set(refs).size < 2;
+    return refsWouldCollapse(refs);
   }
 
   /**

@@ -4,6 +4,7 @@ import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { OsmNode, OsmTags, OsmWay } from "@osmix/types";
 import { normalizedWayDirection } from "@osmix/types/way-direction";
 
+import { isDescriptiveWayTag } from "../rules/tags.ts";
 import type {
   OsmConflationCandidate,
   OsmConflationDecision,
@@ -15,30 +16,6 @@ import type {
 } from "../types.ts";
 import { isUnusedImportedNode } from "./imported-nodes.ts";
 
-const DESCRIPTIVE_KEYS = new Set([
-  "alt_name",
-  "int_name",
-  "loc_name",
-  "name",
-  "note",
-  "official_name",
-  "old_name",
-  "operator",
-  "ref",
-  "short_name",
-  "source",
-  "wikidata",
-  "wikipedia",
-]);
-const DESCRIPTIVE_PREFIXES = [
-  "alt_name:",
-  "name:",
-  "note:",
-  "official_name:",
-  "old_name:",
-  "operator:",
-  "source:",
-];
 const MATCH_BLOCKERS = new Set<OsmConflationReasonCode>([
   "feature-type-conflict",
   "geometry-mismatch",
@@ -53,12 +30,7 @@ const MATCH_BLOCKERS = new Set<OsmConflationReasonCode>([
 function semanticTagsEqual(left: OsmTags | undefined, right: OsmTags | undefined, way: boolean) {
   const keys = new Set([...Object.keys(left ?? {}), ...Object.keys(right ?? {})]);
   return [...keys].every((key) => {
-    if (
-      (way && key === "oneway") ||
-      DESCRIPTIVE_KEYS.has(key) ||
-      DESCRIPTIVE_PREFIXES.some((prefix) => key.startsWith(prefix))
-    )
-      return true;
+    if ((way && key === "oneway") || isDescriptiveWayTag(key)) return true;
     return String(left?.[key] ?? "") === String(right?.[key] ?? "");
   });
 }
@@ -74,8 +46,7 @@ function hasRelativeDirection(tags: OsmTags | undefined) {
       key.split(":").some((part) => relative.has(part) || part === "direction")
     )
       return true;
-    if (DESCRIPTIVE_KEYS.has(key) || DESCRIPTIVE_PREFIXES.some((prefix) => key.startsWith(prefix)))
-      return false;
+    if (isDescriptiveWayTag(key)) return false;
     return String(value)
       .toLowerCase()
       .split(/[^a-z]+/)

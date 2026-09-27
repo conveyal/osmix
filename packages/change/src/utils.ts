@@ -13,8 +13,12 @@
 import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from "@osmix/types";
 
+import { isPolygonish } from "./rules/area.ts";
+import { routingGradeSignature } from "./rules/grade.ts";
 import { sweeplineLineIntersections } from "./sweepline-intersections.ts";
 import type { OsmChangesetStats } from "./types.ts";
+
+export { routingGradeSignature };
 
 const XML_ATTRIBUTE_ESCAPES: Record<string, string> = {
   "&": "&amp;",
@@ -104,27 +108,6 @@ export function entityHasTagValue(entity: OsmEntity, tag: string, value: string)
 const isHighway = (t: OsmTags) => t["highway"] != null;
 const isFootish = (t: OsmTags) =>
   ["footway", "path", "cycleway", "bridleway", "steps"].includes(String(t["highway"]));
-const isPolygonish = (t: OsmTags) => !!(t["building"] || t["landuse"] || t["natural"]);
-
-function normalizedGradeValue(value: number | string | undefined, defaultValue: string) {
-  const normalized = String(value ?? "");
-  if (normalized === "" || normalized === "0" || normalized === "false" || normalized === "no") {
-    return defaultValue;
-  }
-  return normalized;
-}
-
-/** Normalize the routing-relevant vertical context of a way for safe comparisons. */
-export function routingGradeSignature(tags?: OsmTags) {
-  return [
-    `layer=${String(tags?.["layer"] ?? "0")}`,
-    `level=${String(tags?.["level"] ?? "")}`,
-    `bridge=${normalizedGradeValue(tags?.["bridge"], "no")}`,
-    `tunnel=${normalizedGradeValue(tags?.["tunnel"], "no")}`,
-    `covered=${normalizedGradeValue(tags?.["covered"], "no")}`,
-  ].join("|");
-}
-
 /**
  * Determine if two ways should be connected based on their tags.
  * Connection logic:

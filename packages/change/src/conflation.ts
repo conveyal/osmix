@@ -3,7 +3,7 @@
 import type { Osm } from "@osmix/core";
 import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { ProgressEvent } from "@osmix/shared/progress";
-import type { LonLat, OsmEntity, OsmNode, OsmTags, OsmWay } from "@osmix/types";
+import type { LonLat, OsmEntity, OsmNode, OsmWay } from "@osmix/types";
 import { normalizedWayDirection, type OsmWayDirection } from "@osmix/types/way-direction";
 
 import { applyChangesetToOsm } from "./apply-changeset.ts";
@@ -22,6 +22,23 @@ import {
 import { featureTypeConflicts } from "./internal/feature-classification.ts";
 import { isUnusedImportedNode } from "./internal/imported-nodes.ts";
 import { assessWayRemovals } from "./internal/way-removal.ts";
+import { accessSignature, barrierSignature } from "./rules/access.ts";
+import { isAreaWay } from "./rules/area.ts";
+import {
+  hasAdjacentDuplicateRefs,
+  hasTooFewDistinctRefs,
+  refsWouldCollapse,
+} from "./rules/collapse.ts";
+import { routingGradeSignature } from "./rules/grade.ts";
+import {
+  familyCompatible,
+  isProtectedProperty,
+  isRoutingProperty,
+  nodeRoutingSignature,
+  routingFamilies,
+  wayGradeAccessCompatible,
+  wayRoutingFamily,
+} from "./rules/routing.ts";
 import type {
   OsmConflationActionAssessment,
   OsmConflationArtifacts,
@@ -37,13 +54,11 @@ import type {
   OsmConflationOptions,
   OsmConflationReasonCode,
   OsmConflationResolvedActions,
-  OsmConflationRoutingFamily,
   OsmConflationSummary,
   OsmConflationTagDiff,
   OsmMergeOptions,
   ResolvedOsmConflationOptions,
 } from "./types.ts";
-import { routingGradeSignature } from "./utils.ts";
 
 // Preserve the historical one-meter matching radius, but only inside this explicit,
 // cross-dataset workflow. Proximity alone never authorizes a topology change.
@@ -51,66 +66,6 @@ const DEFAULT_MAX_DISTANCE_METERS = 1;
 const MAX_BEARING_DIFFERENCE_DEGREES = 30;
 const MAX_LENGTH_DIFFERENCE_RATIO = 0.05;
 const SAMPLE_INTERVAL_METERS = 5;
-
-const PEDESTRIAN_HIGHWAYS = new Set(["corridor", "footway", "path", "pedestrian", "steps"]);
-const BICYCLE_HIGHWAYS = new Set(["cycleway"]);
-const NON_MOTOR_HIGHWAYS = new Set([...PEDESTRIAN_HIGHWAYS, ...BICYCLE_HIGHWAYS, "bridleway"]);
-// Access and routing checks also recognize namespaced variants (for example
-// `access:conditional` and `maxspeed:forward`) so they cannot bypass review.
-const ACCESS_KEYS = [
-  "access",
-  "agricultural",
-  "atv",
-  "bicycle",
-  "bus",
-  "caravan",
-  "carriage",
-  "coach",
-  "emergency",
-  "foot",
-  "forestry",
-  "golf_cart",
-  "goods",
-  "horse",
-  "hgv",
-  "hgv_articulated",
-  "hov",
-  "inline_skates",
-  "mofa",
-  "moped",
-  "motorcycle",
-  "motor_vehicle",
-  "motorcar",
-  "motorhome",
-  "psv",
-  "ski",
-  "snowmobile",
-  "taxi",
-  "tourist_bus",
-  "trailer",
-  "vehicle",
-  "wheelchair",
-] as const;
-const PROTECTED_KEYS = new Set([
-  "area",
-  "bridge",
-  "covered",
-  "layer",
-  "level",
-  "restriction",
-  "tunnel",
-  "type",
-]);
-const ROUTING_KEYS = new Set([
-  ...ACCESS_KEYS,
-  "barrier",
-  "crossing",
-  "highway",
-  "junction",
-  "kerb",
-  "maxspeed",
-  "oneway",
-]);
 
 type EntityRelationContext = {
   nodes: Set<number>;
@@ -218,86 +173,10 @@ function relationContext(osm: Osm): EntityRelationContext {
   return context;
 }
 
-function isAreaWay(way: OsmWay) {
-  if (String(way.tags?.["area"] ?? "") === "yes") return true;
-  if (way.refs.length < 4 || way.refs[0] !== way.refs.at(-1)) return false;
-  return ["building", "landuse", "natural", "boundary"].some((key) => way.tags?.[key] != null);
-}
-
-function wayRoutingFamily(way: OsmWay): OsmConflationRoutingFamily {
-  const highway = String(way.tags?.["highway"] ?? "");
-  if (!highway || isAreaWay(way)) return "non-routable";
-  if (
-    BICYCLE_HIGHWAYS.has(highway) ||
-    (highway === "path" && !["no", "private"].includes(String(way.tags?.["bicycle"] ?? "")))
-  ) {
-    return "bicycle-shared";
-  }
-  if (PEDESTRIAN_HIGHWAYS.has(highway)) return "pedestrian";
-  // Unknown highway values stay in the motor family. Treating a potentially
-  // drivable way as non-routable would make an unsafe attachment look harmless.
-  if (!NON_MOTOR_HIGHWAYS.has(highway)) return "motor-road";
-  return "non-routable";
-}
-
-function routingFamilies(ways: readonly OsmWay[]) {
-  const families = new Set(ways.map(wayRoutingFamily));
-  if (families.size > 1) families.delete("non-routable");
-  return [...families].toSorted() as OsmConflationRoutingFamily[];
-}
-
-function familyCompatible(a: OsmConflationRoutingFamily, b: OsmConflationRoutingFamily) {
-  if (a === b) return true;
-  return (
-    (a === "pedestrian" && b === "bicycle-shared") || (a === "bicycle-shared" && b === "pedestrian")
-  );
-}
-
-function accessSignature(tags: OsmTags | undefined) {
-  return Object.keys(tags ?? {})
-    .filter((key) =>
-      ACCESS_KEYS.some((accessKey) => key === accessKey || key.startsWith(`${accessKey}:`)),
-    )
-    .toSorted()
-    .map((key) => `${key}=${String(tags?.[key] ?? "")}`)
-    .join("|");
-}
-
-// These signatures intentionally compare both presence and value. Rewriting a
-// patch reference must not strand node-level routing semantics on the discarded node.
-function barrierSignature(tags: OsmTags | undefined) {
-  return Object.keys(tags ?? {})
-    .filter((key) => key === "barrier" || key.startsWith("barrier:"))
-    .toSorted()
-    .map((key) => `${key}=${String(tags?.[key] ?? "")}`)
-    .join("|");
-}
-
-function nodeRoutingSignature(tags: OsmTags | undefined) {
-  return Object.keys(tags ?? {})
-    .filter(
-      (key) =>
-        isRoutingProperty(key) &&
-        !ACCESS_KEYS.some((accessKey) => key === accessKey || key.startsWith(`${accessKey}:`)) &&
-        key !== "barrier" &&
-        !key.startsWith("barrier:"),
-    )
-    .toSorted()
-    .map((key) => `${key}=${String(tags?.[key] ?? "")}`)
-    .join("|");
-}
-
 function wayContextsCompatible(source: OsmWay, target: OsmWay) {
   return (
     familyCompatible(wayRoutingFamily(source), wayRoutingFamily(target)) &&
     wayGradeAccessCompatible(source, target)
-  );
-}
-
-function wayGradeAccessCompatible(source: OsmWay, target: OsmWay) {
-  return (
-    routingGradeSignature(source.tags) === routingGradeSignature(target.tags) &&
-    accessSignature(source.tags) === accessSignature(target.tags)
   );
 }
 
@@ -339,16 +218,6 @@ function wayRoutingSemanticsCompatible(
   }
   return [...routingKeys].every(
     (key) => String(source.tags?.[key] ?? "") === String(target.tags?.[key] ?? ""),
-  );
-}
-
-function isProtectedProperty(key: string) {
-  return PROTECTED_KEYS.has(key) || key.startsWith("restriction:");
-}
-
-function isRoutingProperty(key: string) {
-  return [...ROUTING_KEYS].some(
-    (routingKey) => key === routingKey || key.startsWith(`${routingKey}:`),
   );
 }
 
@@ -697,10 +566,7 @@ function nodeAttachmentAssessment(
 
   for (const way of sourceWays) {
     const replacedRefs = way.refs.map((ref) => (ref === source.id ? target.id : ref));
-    const adjacentDuplicate = replacedRefs.some(
-      (ref, index) => index > 0 && ref === replacedRefs[index - 1],
-    );
-    if (adjacentDuplicate || new Set(replacedRefs).size < 2) hardReasons.push("would-collapse-way");
+    if (refsWouldCollapse(replacedRefs)) hardReasons.push("would-collapse-way");
   }
 
   const reasons = uniqueReasons([...hardReasons, ...reviewReasons]);
@@ -1717,10 +1583,10 @@ function applyDiscoveredConflation(
     const way = currentEntity(changeset, "way", wayId);
     if (!way) continue;
     const refs = way.refs.map((ref) => attachments.get(ref) ?? ref);
-    if (refs.some((ref, index) => index > 0 && ref === refs[index - 1])) {
+    if (hasAdjacentDuplicateRefs(refs)) {
       throw Error(`Conflation attachment would create duplicate adjacent refs in way ${wayId}`);
     }
-    if (way.tags?.["highway"] != null && new Set(refs).size < 2) {
+    if (way.tags?.["highway"] != null && hasTooFewDistinctRefs(refs)) {
       throw Error(`Conflation attachment would collapse highway way ${wayId}`);
     }
     changeset.modify("way", wayId, (current) => ({ ...current, refs }));
