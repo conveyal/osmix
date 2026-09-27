@@ -21,47 +21,18 @@
 import {
   applyChangesetToOsm,
   applyPlan,
-  buildConflationBulkDecisionResult,
-  buildConflationSourceDecision,
-  conflationEffectiveStatus,
-  generateChangeset,
   generateMergePlanOsc,
   merge,
   type MergePlan,
   type PlanDecision,
   planMerge,
   planWithinDatasetDeduplication,
-  resolveConflationActions,
   setMergePlanDecisions,
-  summarizeConflationCandidates,
   type OsmChange,
   type OsmChangeset,
-  type OsmChangesetOptions,
   type OsmChangeTypes,
-  type OsmConflationBulkAction,
-  type OsmConflationBulkDecisionPreview,
-  type OsmConflationBulkDecisionRequest,
-  type OsmConflationBulkDecisionResult,
-  type OsmConflationCandidate,
-  type OsmConflationCandidateFilter,
-  type OsmConflationDecision,
-  type OsmConflationDecisionConflict,
-  type OsmConflationDiscovery,
-  type OsmConflationOptions,
-  type OsmConflationOutcomeReport,
-  type OsmConflationSummary,
   type MergePlanOptions,
-  type OsmMergeOptions,
-  validateConflationDecisions,
 } from "@osmix/change";
-import { validateOrdinaryChangesetOptions } from "@osmix/change/internal/changeset-options";
-import {
-  discoverConflationCandidatesForTrustedMerge,
-  generateConflationApplicationArtifactsFromTrustedDiscovery,
-  generateConflationArtifactsFromTrustedDiscovery,
-  refreshConflationWayRemovalAssessments,
-  validateRetainedConflationReview,
-} from "@osmix/change/internal/conflation";
 import {
   negativeIdMap,
   Osm,
@@ -81,10 +52,7 @@ import {
   Router,
   RoutingGraph,
   type RoutingGraphTransferables,
-  routingTopologyStats,
   type WaySegment,
-  defaultHighwayFilter,
-  defaultPedestrianFilter,
 } from "@osmix/router";
 import { fromShapefile } from "@osmix/shapefile";
 import type { Progress, ProgressEvent } from "@osmix/shared/progress";
@@ -94,209 +62,17 @@ import type { LonLat, OsmEntityType, Tile } from "@osmix/types";
 // Re-export types from router for backwards compatibility
 export type { RouteResult, WaySegment };
 
-/** A conflation candidate together with the user's current review decision, if any. */
-export interface OsmConflationCandidateView extends OsmConflationCandidate {
-  decision?: OsmConflationDecision;
-  /** Whether this alternative matches the active filter; present only in source-grouped pages. */
-  matchesFilter?: boolean;
-}
-
-/** Optional paging behavior; flat candidate pagination remains the default. */
-export interface OsmConflationPageOptions {
-  /** Count pages and pageSize in imported features, retaining every alternative for each feature. */
-  groupBySource?: boolean;
-}
-
-/** All candidate alternatives for one imported feature included in a grouped page. */
-export interface OsmConflationSourceGroup {
-  entityType: OsmConflationCandidate["entityType"];
-  sourceId: number;
-  candidateIds: string[];
-}
-
-/** A stable, paginated view of the active conflation candidates. */
-export interface OsmConflationPage {
-  bulkActions: Record<OsmConflationBulkAction, OsmConflationBulkDecisionPreview>;
-  candidates: OsmConflationCandidateView[];
-  page: number;
-  pageSize: number;
-  totalCandidates: number;
-  totalPages: number;
-  /** Present in grouped mode; totalCandidates still counts only candidates matching the filter. */
-  groups?: OsmConflationSourceGroup[];
-  /** Number of imported features with at least one alternative matching the filter. */
-  totalSources?: number;
-  /** A legacy conflicting decision set remains reviewable; bulk actions are disabled until corrected. */
-  validationConflict?: OsmConflationDecisionConflict;
-}
-
-/** Complete review state returned after replacing the choices for one imported feature. */
-export interface OsmConflationSourceDecisionResult {
-  decisions: OsmConflationDecision[];
-  summary: OsmConflationSummary;
-}
-
-/** Routing graph measurements captured before and after fuzzy conflation. */
-export interface OsmConflationRoutingGraphStats {
-  nodes: number;
-  routableNodes: number;
-  edges: number;
-  components: number;
-}
-
-/** Per-mode routing impact of accepted fuzzy conflation candidates. */
-export interface OsmConflationRoutingDelta {
-  before: OsmConflationRoutingGraphStats;
-  after: OsmConflationRoutingGraphStats;
-  delta: OsmConflationRoutingGraphStats;
-}
-
-/** CAR and WALK topology diagnostics for a generated conflation changeset. */
-export interface OsmConflationRoutingDiagnostics {
-  car: OsmConflationRoutingDelta;
-  walk: OsmConflationRoutingDelta;
-}
-
-/** Result of generating the cumulative direct, exact, and fuzzy changeset. */
-export interface OsmConflationGenerationResult {
-  stats: OsmChangeset["stats"];
-  routing: OsmConflationRoutingDiagnostics;
-  /** Actual matching changes and unresolved features in this generated result. */
-  outcome: OsmConflationOutcomeReport;
-}
-
-interface ConflationSession {
-  decisions: Map<string, OsmConflationDecision>;
-  discovery: OsmConflationDiscovery;
-  filter: OsmConflationCandidateFilter;
-  patchOsmId: string;
-  summary: OsmConflationSummary;
-}
-
 interface PlanSession {
   patchOsmId: string;
   plan: MergePlan;
   filter: MergePlanFilter;
 }
 
+/** Changes waiting to be reviewed page by page and applied: Inspect's duplicate fixes. */
 type GeneratedChangeset = {
   changeset: OsmChangeset;
   patchOsmId: string;
-} & ({ kind: "ordinary" } | { kind: "conflation"; result: Osm });
-
-// Comlink normally clones return values, but tests and in-process remotes can expose
-// direct references. Clone every nested collection so UI code cannot mutate discovery.
-function cloneConflationCandidateView(
-  candidate: OsmConflationCandidate,
-  decision: OsmConflationDecision | undefined,
-): OsmConflationCandidateView {
-  return {
-    ...candidate,
-    reasons: [...candidate.reasons],
-    propertyTransfer: {
-      ...candidate.propertyTransfer,
-      reasons: [...candidate.propertyTransfer.reasons],
-    },
-    networkAttachment: candidate.networkAttachment
-      ? {
-          ...candidate.networkAttachment,
-          reasons: [...candidate.networkAttachment.reasons],
-        }
-      : null,
-    ...(candidate.wayRemoval ? { wayRemoval: structuredClone(candidate.wayRemoval) } : {}),
-    evidence: {
-      ...candidate.evidence,
-      sourceRoutingFamilies: [...candidate.evidence.sourceRoutingFamilies],
-      targetRoutingFamilies: [...candidate.evidence.targetRoutingFamilies],
-      tagDiff: candidate.evidence.tagDiff.map((diff) => ({ ...diff })),
-      featureTypeConflicts: candidate.evidence.featureTypeConflicts?.map((conflict) => ({
-        ...conflict,
-      })),
-      patchWayIds: candidate.evidence.patchWayIds ? [...candidate.evidence.patchWayIds] : undefined,
-      endpointDistancesMeters: candidate.evidence.endpointDistancesMeters
-        ? [...candidate.evidence.endpointDistancesMeters]
-        : undefined,
-    },
-    decision: decision ? { ...decision } : undefined,
-  };
-}
-
-function conflationCandidateMatches(
-  candidate: OsmConflationCandidate,
-  decision: OsmConflationDecision | undefined,
-  filter: OsmConflationCandidateFilter,
-) {
-  const status = conflationEffectiveStatus(candidate, decision ? [decision] : []);
-  if (filter.entityType != null && candidate.entityType !== filter.entityType) return false;
-  if (filter.status != null && status !== filter.status) return false;
-  if (filter.reason != null && !candidate.reasons.includes(filter.reason)) return false;
-  if (filter.sourceId != null && candidate.sourceId !== filter.sourceId) return false;
-  if ("targetId" in filter && candidate.targetId !== filter.targetId) return false;
-  return true;
-}
-
-function readConflationConflict(error: unknown): OsmConflationDecisionConflict | null {
-  if (!(error instanceof Error) || !("conflict" in error)) return null;
-  const conflict = error.conflict;
-  if (conflict == null || typeof conflict !== "object") return null;
-  if (
-    !("entityType" in conflict) ||
-    (conflict.entityType !== "node" && conflict.entityType !== "way") ||
-    !("sourceId" in conflict) ||
-    typeof conflict.sourceId !== "number" ||
-    !("candidateIds" in conflict) ||
-    !Array.isArray(conflict.candidateIds) ||
-    !conflict.candidateIds.every((id): id is string => typeof id === "string") ||
-    !("message" in conflict) ||
-    typeof conflict.message !== "string"
-  )
-    return null;
-  return {
-    entityType: conflict.entityType,
-    sourceId: conflict.sourceId,
-    candidateIds: [...conflict.candidateIds],
-    message: conflict.message,
-  };
-}
-
-function routingGraphStats(osm: Osm, filter: HighwayFilter): OsmConflationRoutingGraphStats {
-  return routingTopologyStats({ nodeCount: osm.nodes.size, ways: () => osm.ways }, filter);
-}
-
-function routingDelta(
-  before: OsmConflationRoutingGraphStats,
-  after: OsmConflationRoutingGraphStats,
-): OsmConflationRoutingDelta {
-  return {
-    before,
-    after,
-    delta: {
-      nodes: after.nodes - before.nodes,
-      routableNodes: after.routableNodes - before.routableNodes,
-      edges: after.edges - before.edges,
-      components: after.components - before.components,
-    },
-  };
-}
-
-function routingDiagnostics(baseline: Osm, conflated: Osm): OsmConflationRoutingDiagnostics {
-  const walkFilter: HighwayFilter = (tags) =>
-    defaultHighwayFilter(tags) || defaultPedestrianFilter(tags);
-  return {
-    car: routingDelta(
-      routingGraphStats(baseline, defaultHighwayFilter),
-      routingGraphStats(conflated, defaultHighwayFilter),
-    ),
-    walk: routingDelta(
-      routingGraphStats(baseline, walkFilter),
-      routingGraphStats(conflated, walkFilter),
-    ),
-  };
-}
-
-function carTopologyChanged(delta: OsmConflationRoutingDelta) {
-  return delta.delta.routableNodes !== 0 || delta.delta.edges !== 0 || delta.delta.components !== 0;
-}
+};
 
 /** `Blob` parts cannot be views of a `SharedArrayBuffer`. */
 function isArrayBufferBacked(chunk: Uint8Array): chunk is Uint8Array<ArrayBuffer> {
@@ -342,7 +118,6 @@ export class OsmixWorker extends EventTarget {
   private vtEncoders = new Map<string, OsmixVtEncoder>();
   private graphs = new Map<string, RoutingGraph>();
   private changesets = new Map<string, GeneratedChangeset>();
-  private conflations = new Map<string, ConflationSession>();
   private plans = new Map<string, PlanSession>();
   private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"];
   private entityTypes: OsmEntityType[] = ["node", "way", "relation"];
@@ -639,10 +414,6 @@ export class OsmixWorker extends EventTarget {
     for (const [baseOsmId, session] of this.plans) {
       if (baseOsmId === osmId || session.patchOsmId === osmId) this.plans.delete(baseOsmId);
     }
-    for (const [baseOsmId, session] of this.conflations) {
-      if (baseOsmId !== osmId && session.patchOsmId !== osmId) continue;
-      this.conflations.delete(baseOsmId);
-    }
     for (const [baseOsmId, generated] of this.changesets) {
       if (baseOsmId === osmId || generated.patchOsmId === osmId) {
         this.changesets.delete(baseOsmId);
@@ -825,363 +596,6 @@ export class OsmixWorker extends EventTarget {
     return this.get(osmId).relations.search(key, val);
   }
 
-  /** Discover non-exact, cross-dataset conflation candidates without mutating either input. */
-  discoverConflation(
-    baseOsmId: string,
-    patchOsmId: string,
-    options: OsmConflationOptions,
-  ): OsmConflationSummary {
-    const discovery = discoverConflationCandidatesForTrustedMerge(
-      this.get(baseOsmId),
-      this.get(patchOsmId),
-      options,
-    );
-    const initialDecisions = options.decisions === undefined ? [] : options.decisions;
-    refreshConflationWayRemovalAssessments(
-      this.get(baseOsmId),
-      this.get(patchOsmId),
-      discovery,
-      initialDecisions,
-      true,
-    );
-    validateConflationDecisions(discovery.candidates, initialDecisions);
-    const decisions = new Map<string, OsmConflationDecision>();
-    for (const decision of initialDecisions) {
-      decisions.set(decision.candidateId, { ...decision });
-    }
-    this.invalidateGeneratedConflationChangeset(baseOsmId);
-    const summary = summarizeConflationCandidates(discovery.candidates, [...decisions.values()]);
-    this.conflations.set(baseOsmId, {
-      decisions,
-      discovery,
-      filter: {},
-      patchOsmId,
-      summary,
-    });
-    return { ...summary };
-  }
-
-  /** Return the decision-aware summary for an active conflation session. */
-  getConflationSummary(baseOsmId: string): OsmConflationSummary {
-    return { ...this.getConflationSession(baseOsmId).summary };
-  }
-
-  /** Replace the active candidate filter used by {@link getConflationPage}. */
-  setConflationFilter(baseOsmId: string, filter: OsmConflationCandidateFilter = {}) {
-    this.getConflationSession(baseOsmId).filter = { ...filter };
-  }
-
-  /** Retrieve candidates, optionally paging whole imported features and all their alternatives. */
-  getConflationPage(
-    baseOsmId: string,
-    page: number,
-    pageSize: number,
-    options: OsmConflationPageOptions = {},
-  ): OsmConflationPage {
-    if (!Number.isInteger(page) || page < 0) throw Error("page must be a non-negative integer");
-    if (!Number.isInteger(pageSize) || pageSize <= 0) {
-      throw Error("pageSize must be a positive integer");
-    }
-    const session = this.getConflationSession(baseOsmId);
-    const candidates = session.discovery.candidates.filter((candidate) =>
-      conflationCandidateMatches(candidate, session.decisions.get(candidate.id), session.filter),
-    );
-    const start = page * pageSize;
-    const decisions = [...session.decisions.values()];
-    let validationConflict: OsmConflationDecisionConflict | undefined;
-    try {
-      validateConflationDecisions(session.discovery.candidates, decisions);
-    } catch (error) {
-      const conflict = readConflationConflict(error);
-      if (!conflict) throw error;
-      validationConflict = conflict;
-    }
-    const bulkActions = Object.fromEntries(
-      (["transfer-properties", "attach-network", "reject"] as const).map((action) => [
-        action,
-        validationConflict
-          ? {
-              action,
-              filteredCandidates: candidates.length,
-              eligibleCandidates: 0,
-              changedCandidates: 0,
-              skippedCandidates: candidates.length,
-              automaticCandidates: 0,
-              reviewCandidates: 0,
-              overriddenDecisions: 0,
-            }
-          : buildConflationBulkDecisionResult(session.discovery.candidates, decisions, {
-              action,
-              filter: session.filter,
-            }).preview,
-      ]),
-    ) as Record<OsmConflationBulkAction, OsmConflationBulkDecisionPreview>;
-    const result: OsmConflationPage = {
-      bulkActions,
-      candidates: candidates
-        .slice(start, start + pageSize)
-        .map((candidate) =>
-          cloneConflationCandidateView(candidate, session.decisions.get(candidate.id)),
-        ),
-      page,
-      pageSize,
-      totalCandidates: candidates.length,
-      totalPages: Math.ceil(candidates.length / pageSize),
-      ...(validationConflict ? { validationConflict } : {}),
-    };
-    if (!options.groupBySource) return result;
-
-    const matchingIds = new Set(candidates.map((candidate) => candidate.id));
-    const matchingSources = new Set(
-      candidates.map((candidate) => `${candidate.entityType}:${candidate.sourceId}`),
-    );
-    const groups = new Map<string, OsmConflationSourceGroup>();
-    for (const candidate of session.discovery.candidates) {
-      const sourceKey = `${candidate.entityType}:${candidate.sourceId}`;
-      if (!matchingSources.has(sourceKey)) continue;
-      let group = groups.get(sourceKey);
-      if (!group) {
-        group = {
-          entityType: candidate.entityType,
-          sourceId: candidate.sourceId,
-          candidateIds: [],
-        };
-        groups.set(sourceKey, group);
-      }
-      group.candidateIds.push(candidate.id);
-    }
-    const pageGroups = [...groups.values()].slice(start, start + pageSize);
-    const pageIds = new Set(pageGroups.flatMap((group) => group.candidateIds));
-    return {
-      ...result,
-      candidates: session.discovery.candidates
-        .filter((candidate) => pageIds.has(candidate.id))
-        .map((candidate) => ({
-          ...cloneConflationCandidateView(candidate, session.decisions.get(candidate.id)),
-          matchesFilter: matchingIds.has(candidate.id),
-        })),
-      groups: pageGroups,
-      totalSources: groups.size,
-      totalPages: Math.ceil(groups.size / pageSize),
-    };
-  }
-
-  /** Record or replace one candidate decision and invalidate any generated changeset. */
-  setConflationDecision(baseOsmId: string, decision: OsmConflationDecision) {
-    const session = this.getConflationSession(baseOsmId);
-    // Validate before touching session state so malformed RPC input is atomic.
-    const next = [
-      ...[...session.decisions.values()].filter(
-        (current) => current.candidateId !== decision?.candidateId,
-      ),
-      decision,
-    ];
-    this.prepareConflationDecisions(baseOsmId, session, next);
-    this.invalidateGeneratedConflationChangeset(baseOsmId);
-    session.decisions.set(decision.candidateId, { ...decision });
-    session.summary = summarizeConflationCandidates(session.discovery.candidates, [
-      ...session.decisions.values(),
-    ]);
-    return { ...session.summary };
-  }
-
-  /** Replace every candidate decision and invalidate any generated changeset. */
-  setConflationDecisions(baseOsmId: string, decisions: OsmConflationDecision[]) {
-    const session = this.getConflationSession(baseOsmId);
-    // Build and validate the replacement set before discarding reviewed output.
-    this.prepareConflationDecisions(baseOsmId, session, decisions);
-    const next = new Map<string, OsmConflationDecision>();
-    for (const decision of decisions) {
-      next.set(decision.candidateId, { ...decision });
-    }
-    this.invalidateGeneratedConflationChangeset(baseOsmId);
-    session.decisions = next;
-    session.summary = summarizeConflationCandidates(session.discovery.candidates, [
-      ...next.values(),
-    ]);
-    return { ...session.summary };
-  }
-
-  /**
-   * Restore a previously retained review snapshot during worker recovery.
-   * Legacy source conflicts stay visible for correction; this never restores
-   * generated output or permits conflicted decisions to generate/apply changes.
-   */
-  restoreConflationReview(baseOsmId: string, decisions: OsmConflationDecision[]) {
-    const session = this.getConflationSession(baseOsmId);
-    this.prepareConflationDecisions(baseOsmId, session, decisions, true);
-    const summary = summarizeConflationCandidates(session.discovery.candidates, decisions);
-    const next = new Map(decisions.map((decision) => [decision.candidateId, { ...decision }]));
-    this.invalidateGeneratedConflationChangeset(baseOsmId);
-    session.decisions = next;
-    session.summary = summary;
-    return { ...summary };
-  }
-
-  /** Replace one imported feature's target choices atomically, preserving all unrelated decisions. */
-  setConflationSourceDecision(
-    baseOsmId: string,
-    source: Pick<OsmConflationCandidate, "entityType" | "sourceId">,
-    selected: OsmConflationDecision | null,
-  ): OsmConflationSourceDecisionResult {
-    const session = this.getConflationSession(baseOsmId);
-    const decisions = buildConflationSourceDecision(
-      session.discovery.candidates,
-      [...session.decisions.values()],
-      source,
-      selected,
-    );
-    this.prepareConflationDecisions(baseOsmId, session, decisions, true, true);
-    // The source helper permits an explicit correction even when a different
-    // legacy source still needs repair. Raw full-set updates remain strict.
-    const summary = summarizeConflationCandidates(session.discovery.candidates, decisions);
-    this.invalidateGeneratedConflationChangeset(baseOsmId);
-    session.decisions = new Map(
-      decisions.map((decision) => [decision.candidateId, { ...decision }]),
-    );
-    session.summary = summary;
-    return { decisions: decisions.map((decision) => ({ ...decision })), summary: { ...summary } };
-  }
-
-  /** Apply one action to every eligible candidate matching the supplied filter. */
-  applyConflationBulkDecision(
-    baseOsmId: string,
-    request: OsmConflationBulkDecisionRequest,
-  ): OsmConflationBulkDecisionResult {
-    const session = this.getConflationSession(baseOsmId);
-    const result = buildConflationBulkDecisionResult(
-      session.discovery.candidates,
-      [...session.decisions.values()],
-      request,
-    );
-    this.prepareConflationDecisions(baseOsmId, session, result.decisions);
-    if (result.preview.changedCandidates > 0) {
-      this.invalidateGeneratedConflationChangeset(baseOsmId);
-      session.decisions = new Map(
-        result.decisions.map((decision) => [decision.candidateId, { ...decision }]),
-      );
-    }
-    session.summary = summarizeConflationCandidates(session.discovery.candidates, result.decisions);
-    return {
-      decisions: result.decisions.map((decision) => ({ ...decision })),
-      preview: { ...result.preview },
-      summary: { ...session.summary },
-    };
-  }
-
-  /**
-   * Generate one cumulative direct, exact, and fuzzy changeset from the untouched inputs.
-   * Intersections remain a subsequent merge stage so routing diagnostics isolate conflation.
-   */
-  generateConflationChangeset(
-    baseOsmId: string,
-    mergeOptions: Partial<OsmMergeOptions> = {},
-  ): OsmConflationGenerationResult {
-    if (mergeOptions.createIntersections) {
-      throw Error(
-        "Generate and apply conflation before creating intersections; createIntersections must be false",
-      );
-    }
-    const session = this.getConflationSession(baseOsmId);
-    const base = this.get(baseOsmId);
-    const patch = this.get(session.patchOsmId);
-    const decisions = [...session.decisions.values()];
-    const conflation = {
-      ...session.discovery.options,
-      decisions,
-    };
-    const options: Partial<OsmMergeOptions> = {
-      ...mergeOptions,
-      createIntersections: false,
-      conflation,
-    };
-    const artifacts = generateConflationArtifactsFromTrustedDiscovery(
-      base,
-      patch,
-      options,
-      decisions,
-      session.discovery,
-      this.onProgress,
-    );
-    const diagnostics = routingDiagnostics(artifacts.ordinaryBaseline, artifacts.result);
-    // The full result may contain manually reviewed motor-network changes. Project
-    // automatic attachments alone so the automatic WALK-only CAR invariant is exact.
-    let hasAutomaticNetworkAttachment = false;
-    const automaticAttachmentDecisions: OsmConflationDecision[] = [];
-    for (const candidate of session.discovery.candidates) {
-      const decision = session.decisions.get(candidate.id);
-      const attachNetwork =
-        candidate.networkAttachment?.status === "automatic" &&
-        resolveConflationActions(candidate, decision).attachNetwork;
-      hasAutomaticNetworkAttachment ||= attachNetwork;
-      if (attachNetwork) {
-        automaticAttachmentDecisions.push({
-          candidateId: candidate.id,
-          action: "accept",
-          transferProperties: false,
-          attachNetwork: true,
-        });
-      } else if (
-        candidate.propertyTransfer.status === "automatic" ||
-        candidate.networkAttachment?.status === "automatic"
-      ) {
-        // A missing decision enables automatic actions. Explicitly reject only
-        // automatic candidates that must be absent from this attachment-only
-        // projection; review, blocked, and unmatched rows already apply nothing.
-        automaticAttachmentDecisions.push({
-          candidateId: candidate.id,
-          action: "reject",
-        });
-      }
-    }
-    if (hasAutomaticNetworkAttachment) {
-      try {
-        const automaticAttachment = generateConflationApplicationArtifactsFromTrustedDiscovery(
-          artifacts.ordinaryBaseline,
-          patch,
-          session.discovery,
-          base,
-          automaticAttachmentDecisions,
-        );
-        const automaticCarDelta = routingDelta(
-          diagnostics.car.before,
-          routingGraphStats(automaticAttachment.result, defaultHighwayFilter),
-        );
-        if (carTopologyChanged(automaticCarDelta)) {
-          throw Error(
-            "Automatic walk-only conflation changed the CAR graph; review the candidate instead",
-          );
-        }
-      } finally {
-        // The diagnostic projection deliberately omits manual removal choices.
-        // Restore assessments for the review snapshot the user actually selected.
-        refreshConflationWayRemovalAssessments(base, patch, session.discovery, decisions);
-      }
-    }
-
-    this.changesets.set(baseOsmId, {
-      kind: "conflation",
-      patchOsmId: session.patchOsmId,
-      changeset: artifacts.changeset,
-      result: artifacts.result,
-    });
-    // Candidate review does not imply changeset review. Defer the large filtered
-    // change list until a caller actually opens a changeset page; automatic runs
-    // apply the already validated materialized result without building it.
-    this.filteredChanges.delete(baseOsmId);
-    return {
-      stats: artifacts.changeset.stats,
-      routing: diagnostics,
-      outcome: structuredClone(artifacts.outcome),
-    };
-  }
-
-  /** Clear a review session and discard only a preview generated from that session. */
-  clearConflation(baseOsmId: string) {
-    this.invalidateGeneratedConflationChangeset(baseOsmId);
-    this.conflations.delete(baseOsmId);
-  }
-
   /**
    * Plan and apply a merge of two loaded Osm indexes in one call, without review. Replaces the
    * base Osm and deletes the patch Osm.
@@ -1280,7 +694,7 @@ export class OsmixWorker extends EventTarget {
    */
   planDeduplication(osmId: string) {
     const changeset = planWithinDatasetDeduplication(this.get(osmId), this.onProgress);
-    this.changesets.set(osmId, { kind: "ordinary", patchOsmId: osmId, changeset });
+    this.changesets.set(osmId, { patchOsmId: osmId, changeset });
     this.filteredChanges.delete(osmId);
     return changeset.stats;
   }
@@ -1289,28 +703,6 @@ export class OsmixWorker extends EventTarget {
     const session = this.plans.get(baseOsmId);
     if (!session) throw Error("No active merge plan");
     return session;
-  }
-
-  /**
-   * Generate a changeset comparing base and patch Osm instances.
-   * Stores the changeset internally and returns stats (counts by change type).
-   * Changeset is automatically sorted by the current filter settings.
-   */
-  async generateChangeset(
-    baseOsmId: string,
-    patchOsmId: string,
-    options: Partial<OsmChangesetOptions> = {},
-  ) {
-    validateOrdinaryChangesetOptions(options);
-    const changeset = generateChangeset(
-      this.get(baseOsmId),
-      this.get(patchOsmId),
-      options,
-      this.onProgress,
-    );
-    this.changesets.set(baseOsmId, { kind: "ordinary", patchOsmId, changeset });
-    this.filteredChanges.delete(baseOsmId);
-    return changeset.stats;
   }
 
   /**
@@ -1354,56 +746,11 @@ export class OsmixWorker extends EventTarget {
   applyChangesAndReplace(osmId: string) {
     const generated = this.changesets.get(osmId);
     if (!generated) throw Error("No active changeset");
-    const newOsm =
-      generated.kind === "conflation" ? generated.result : applyChangesetToOsm(generated.changeset);
+    const newOsm = applyChangesetToOsm(generated.changeset);
     this.set(osmId, newOsm);
     this.changesets.delete(osmId);
     this.filteredChanges.delete(osmId);
     return newOsm.id;
-  }
-
-  private getConflationSession(baseOsmId: string) {
-    const session = this.conflations.get(baseOsmId);
-    if (!session) throw Error("No active conflation session");
-    return session;
-  }
-
-  /** Assess the complete next snapshot before replacing decisions or their generated preview. */
-  private prepareConflationDecisions(
-    baseOsmId: string,
-    session: ConflationSession,
-    decisions: readonly OsmConflationDecision[],
-    retainedReview = false,
-    requireSelectedEligible = !retainedReview,
-  ) {
-    const base = this.get(baseOsmId);
-    const patch = this.get(session.patchOsmId);
-    try {
-      refreshConflationWayRemovalAssessments(
-        base,
-        patch,
-        session.discovery,
-        decisions,
-        requireSelectedEligible,
-      );
-      if (retainedReview) validateRetainedConflationReview(session.discovery.candidates, decisions);
-      else validateConflationDecisions(session.discovery.candidates, decisions);
-    } catch (error) {
-      // A failed source/shape validation must not leave assessments from a choice
-      // that was never saved. The previous reviewed preview remains applicable.
-      refreshConflationWayRemovalAssessments(base, patch, session.discovery, [
-        ...session.decisions.values(),
-      ]);
-      throw error;
-    }
-  }
-
-  private invalidateGeneratedConflationChangeset(baseOsmId: string) {
-    if (this.changesets.get(baseOsmId)?.kind !== "conflation") return;
-    // A reviewed changeset is a snapshot of its decisions. Never allow a later
-    // decision edit to apply that stale snapshot.
-    this.changesets.delete(baseOsmId);
-    this.filteredChanges.delete(baseOsmId);
   }
 
   /**

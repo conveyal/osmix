@@ -2,19 +2,14 @@ import { Osm } from "@osmix/core";
 import type { OsmTags } from "@osmix/types";
 import { describe, expect, it } from "vitest";
 
+import { summarizeConflationCandidates } from "../src/conflation.ts";
 import {
-  applyChangesetToOsm,
-  buildConflationBulkDecisionResult,
-  conflationEffectiveStatus,
   discoverConflationCandidates,
-  filterConflationCandidates,
-  generateConflationChangeset,
   merge,
   type OsmConflationDecision,
   type OsmConflationOptions,
-  summarizeConflationCandidates,
 } from "../src/index.ts";
-import { withMatchingDecisions } from "./helpers/plan.ts";
+import { findProposal, planAndApply, withMatchingDecisions } from "./helpers/plan.ts";
 
 type RelationKind = "none" | "route" | "restriction";
 type ConflictKind = "grade" | "access" | "protected" | "geometry" | "none";
@@ -148,38 +143,27 @@ describe("hard conflation blockers survive combined review reasons", () => {
         reasons: expect.arrayContaining([reason, "relation-member"]),
       },
     });
-    const bulk = buildConflationBulkDecisionResult(discovery.candidates, [], {
-      action: "transfer-properties",
-      filter: { entityType: "way" },
-    });
-    expect(bulk.decisions).toEqual([]);
-    expect(bulk.preview).toMatchObject({
-      filteredCandidates: 1,
-      eligibleCandidates: 0,
-      skippedCandidates: 1,
-      changedCandidates: 0,
-    });
     const baseline = await merge(
       base,
       patch,
       { mergeIdenticalPoints: false, createIntersections: false },
       () => {},
     );
-    const result = await merge(
-      base,
-      patch,
-      withMatchingDecisions(
-        base,
-        patch,
-        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
-        bulk.decisions,
-      ),
-      () => {},
-    );
+    // Accepting the blocked copy leaves it blocked.
+    const { plan, osm: result } = planAndApply(base, patch, {
+      mergeIdenticalPoints: false,
+      createIntersections: false,
+      matching: options,
+      decisions: [{ proposalId: "copy:w20>w10", action: "accept" }],
+    });
+    expect(findProposal(plan, "copy:w20>w10")).toMatchObject({
+      status: "blocked",
+      effect: "blocked",
+    });
     expect(entities(result)).toEqual(entities(baseline));
   });
 
-  it("makes explicit acceptance ineffective in generation and the public merge pipeline", async () => {
+  it("makes explicit acceptance ineffective in the plan and the merge", async () => {
     const { base, patch, options } = createWayFixture("grade", "source");
     const baseline = await merge(
       base,
@@ -187,9 +171,18 @@ describe("hard conflation blockers survive combined review reasons", () => {
       { mergeIdenticalPoints: false, createIntersections: false },
       () => {},
     );
-    const conflation = { ...options, decisions: [acceptWay] };
-    const changeset = generateConflationChangeset(base, patch, { directMerge: true, conflation });
-    expect(entities(applyChangesetToOsm(changeset))).toEqual(entities(baseline));
+    const planned = planAndApply(
+      base,
+      patch,
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [acceptWay],
+      ),
+    );
+    expect(findProposal(planned.plan, "copy:w20>w10").effect).toBe("blocked");
+    expect(entities(planned.osm)).toEqual(entities(baseline));
     const result = await merge(
       base,
       patch,
@@ -204,18 +197,25 @@ describe("hard conflation blockers survive combined review reasons", () => {
     expect(entities(result)).toEqual(entities(baseline));
   });
 
-  it("keeps blocked acceptance consistent in effective status, summary, and filtering", () => {
+  it("keeps blocked acceptance consistent in the summary and the plan", () => {
     const { base, patch, options } = createWayFixture("grade", "source", "restriction");
     const { candidates } = discoverConflationCandidates(base, patch, options);
-    expect(conflationEffectiveStatus(candidates[0]!, [acceptWay])).toBe("blocked");
     expect(summarizeConflationCandidates(candidates, [acceptWay])).toMatchObject({
       accepted: 0,
       blocked: 1,
     });
-    expect(filterConflationCandidates(candidates, { status: "blocked" }, [acceptWay])).toEqual(
-      candidates,
+    const { plan } = planAndApply(
+      base,
+      patch,
+      withMatchingDecisions(
+        base,
+        patch,
+        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
+        [acceptWay],
+      ),
     );
-    expect(filterConflationCandidates(candidates, { status: "accepted" }, [acceptWay])).toEqual([]);
+    expect(findProposal(plan, "copy:w20>w10").effect).toBe("blocked");
+    expect(plan.summary.features["needs-decision"]).toBe(0);
   });
 
   it("adds ambiguity evidence without relaxing blocked transfers", () => {
@@ -310,7 +310,6 @@ describe("hard conflation blockers survive combined review reasons", () => {
       transferProperties: false,
       attachNetwork: true,
     };
-    expect(conflationEffectiveStatus(candidate!, [blockedAttachment])).toBe("blocked");
     expect(summarizeConflationCandidates(discovery.candidates, [blockedAttachment])).toMatchObject({
       accepted: 0,
       blocked: 1,
@@ -333,16 +332,12 @@ describe("hard conflation blockers survive combined review reasons", () => {
       () => {},
     );
     expect(entities(blockedResult)).toEqual(entities(baseline));
-    const bulk = buildConflationBulkDecisionResult(discovery.candidates, [blockedAttachment], {
-      action: "transfer-properties",
-      filter: { entityType: "node" },
-    });
-    expect(bulk.decisions).toContainEqual({
+    const copyOnly: OsmConflationDecision = {
       candidateId: "node:101->1",
       action: "accept",
       transferProperties: true,
       attachNetwork: false,
-    });
+    };
     const result = await merge(
       base,
       patch,
@@ -350,7 +345,7 @@ describe("hard conflation blockers survive combined review reasons", () => {
         base,
         patch,
         { mergeIdenticalPoints: false, createIntersections: false, matching: options },
-        bulk.decisions,
+        [copyOnly],
       ),
       () => {},
     );

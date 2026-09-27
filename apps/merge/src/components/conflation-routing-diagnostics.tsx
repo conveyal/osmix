@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@osmix/ui";
-import type { OsmConflationRoutingDiagnostics, OsmConflationRoutingGraphStats } from "osmix";
+import type { PlanRoutingDelta, PlanRoutingStats } from "osmix";
 import { useId } from "react";
 
 const METRICS = [
@@ -17,7 +17,7 @@ const METRICS = [
   "routableNodes",
   "edges",
   "components",
-] as const satisfies readonly (keyof OsmConflationRoutingGraphStats)[];
+] as const satisfies readonly (keyof PlanRoutingStats)[];
 
 const METRIC_LABEL: Record<(typeof METRICS)[number], string> = {
   components: "Connected components",
@@ -35,7 +35,7 @@ function formatDelta(value: number) {
 export function ConflationRoutingDiagnostics({
   diagnostics,
 }: {
-  diagnostics: Pick<OsmConflationRoutingDiagnostics, "car" | "walk">;
+  diagnostics: { car: PlanRoutingDelta; walk: PlanRoutingDelta };
 }) {
   const descriptionId = useId();
   return (

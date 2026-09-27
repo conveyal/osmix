@@ -3,10 +3,9 @@ import { getFixtureFile, getFixtureFileReadStream, PBFs } from "@osmix/test-util
 import type { FeatureCollection, LineString, Point } from "geojson";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { fromPbf } from "../src/index";
+import { fromPbf, type MergePlanOptions, merge, type PlanDecision } from "../src/index";
 import { createRemote, OsmixDatasetLossError, OsmixRemote } from "../src/remote";
 import { createBlockedBridgeFixture, entitySnapshot } from "./conflation-blocked-fixture";
-import { stagedMerge } from "./staged-merge.ts";
 
 const monacoPbf = PBFs["monaco"]!;
 const occupiedMonacoTile: [number, number, number] = [17059, 11948, 15];
@@ -276,35 +275,29 @@ describe("OsmixRemote", () => {
   });
 
   describe("restart dataset recovery", () => {
-    const ordinaryOptions = { directMerge: true };
-    const propertyOptions = { propertyKeys: ["name"], attachNetwork: false };
+    const ordinaryOptions: MergePlanOptions = {
+      mergeIdenticalPoints: false,
+      createIntersections: false,
+    };
+    const planOptions: MergePlanOptions = {
+      ...ordinaryOptions,
+      matching: { propertyKeys: ["name"], attachNetwork: false, automatic: "none" },
+    };
+    const acceptCopy: PlanDecision = { proposalId: "copy:w20>w10", action: "accept" };
 
-    async function reviewedInputs(remote: RecoveryTestRemote, id: string) {
+    async function plannedInputs(remote: RecoveryTestRemote, id: string) {
       const base = createParallelFootway(`${id}-base`, 1, 10, 0, "Base path");
       const patch = createParallelFootway(`${id}-patch`, 11, 20, 0.000004, "Imported path");
-      const decision = {
-        candidateId: "way:20->10",
-        action: "accept" as const,
-        transferProperties: true,
-        attachNetwork: false,
-      };
-      const ordinaryResult = entitySnapshot(
-        await stagedMerge(base, patch, ordinaryOptions, () => {}),
-      );
-      const conflationResult = entitySnapshot(
-        await stagedMerge(
-          base,
-          patch,
-          { ...ordinaryOptions, conflation: { ...propertyOptions, decisions: [decision] } },
-          () => {},
-        ),
+      const ordinaryResult = entitySnapshot(await merge(base, patch, ordinaryOptions, () => {}));
+      const matchedResult = entitySnapshot(
+        await merge(base, patch, { ...planOptions, decisions: [acceptCopy] }, () => {}),
       );
       await remote.transferIn(base);
       await remote.transferIn(patch);
-      await remote.discoverConflation(base.id, patch.id, propertyOptions);
-      await remote.setConflationDecision(base.id, decision);
-      await remote.setConflationFilter(base.id, { status: "accepted" });
-      return { base, patch, decision, ordinaryResult, conflationResult };
+      await remote.planMerge(base.id, patch.id, planOptions);
+      const decided = await remote.setMergePlanDecisions(base.id, [acceptCopy]);
+      await remote.setMergePlanFilter(base.id, { kind: "copy-tags" });
+      return { base, patch, decided, ordinaryResult, matchedResult };
     }
 
     async function restartInputs(remote: RecoveryTestRemote, ids: string[]) {
@@ -373,59 +366,6 @@ describe("OsmixRemote", () => {
       expect(addProgressListener).toHaveBeenCalledOnce();
     });
 
-    it("restores conflation discovery, review decisions, filters, and generated changes", async () => {
-      using remote = new RecoveryTestRemote();
-      await remote.initializeWorkerPool(1, undefined, undefined, true);
-      const base = createParallelFootway("recovery-base", 1, 10, 0, "Base path");
-      const patch = createParallelFootway("recovery-patch", 11, 20, 0.000004, "Imported path");
-      await remote.transferIn(base);
-      await remote.transferIn(patch);
-      await remote.discoverConflation(base.id, patch.id, {
-        propertyKeys: ["name"],
-        attachNetwork: false,
-      });
-      const wayCandidate = (await remote.getConflationPage(base.id, 0, 100)).candidates.find(
-        (candidate) => candidate.entityType === "way",
-      );
-      if (!wayCandidate) throw Error("Expected a way conflation candidate");
-      const bulkResult = await remote.applyConflationBulkDecision(base.id, {
-        action: "reject",
-        filter: { entityType: "way" },
-      });
-      expect(bulkResult.decisions).toContainEqual({
-        candidateId: wayCandidate.id,
-        action: "reject",
-      });
-      await expect(
-        remote.setConflationDecision(base.id, {
-          candidateId: wayCandidate.id,
-          action: "invalid",
-        } as never),
-      ).rejects.toThrow(`Invalid conflation decision action for ${wayCandidate.id}`);
-      await remote.setConflationFilter(base.id, { status: "rejected" });
-      await remote.generateConflationChangeset(base.id, {
-        directMerge: true,
-        deduplicateNodes: true,
-        deduplicateWays: true,
-      });
-      const unchanged = await remote.applyConflationBulkDecision(base.id, {
-        action: "reject",
-        filter: { entityType: "way" },
-      });
-      expect(unchanged.preview.changedCandidates).toBe(0);
-
-      await remote.getWorker().clearConflation(base.id);
-      await remote.restoreForTest();
-
-      const restoredPage = await remote.getConflationPage(base.id, 0, 100);
-      expect(restoredPage.totalCandidates).toBe(1);
-      expect(restoredPage.candidates[0]?.decision).toEqual({
-        candidateId: wayCandidate.id,
-        action: "reject",
-      });
-      expect((await remote.getChangesetPage(base.id, 0, 100)).changes?.length).toBeGreaterThan(0);
-    });
-
     it("rebuilds a merge plan with its decisions and filter after a restart", async () => {
       using remote = new RecoveryTestRemote();
       await remote.initializeWorkerPool(1, undefined, undefined, true);
@@ -492,244 +432,111 @@ describe("OsmixRemote", () => {
       using remote = new RecoveryTestRemote();
       await remote.initializeWorkerPool(1, undefined, undefined, true);
       const { base, patch } = createBlockedBridgeFixture();
-      const options = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
-      const baseline = entitySnapshot(await stagedMerge(base, patch, options, () => {}));
+      const options: MergePlanOptions = { createIntersections: false };
+      const baseline = entitySnapshot(await merge(base, patch, options, () => {}));
       await remote.transferIn(base);
       await remote.transferIn(patch);
-      await remote.discoverConflation(base.id, patch.id, {
-        propertyKeys: ["name"],
-        attachNetwork: false,
+      await remote.planMerge(base.id, patch.id, {
+        ...options,
+        matching: { propertyKeys: ["name"], attachNetwork: false },
       });
-      const decision = {
-        candidateId: "way:20->10",
-        action: "accept" as const,
-        transferProperties: true,
-        attachNetwork: false,
-      };
-      await remote.setConflationDecision(base.id, decision);
-      await remote.setConflationFilter(base.id, { status: "blocked" });
-      await remote.generateConflationChangeset(base.id, options);
-      const changes = (await remote.getChangesetPage(base.id, 0, 100)).changes;
+      const decided = await remote.setMergePlanDecisions(base.id, [acceptCopy]);
+      await remote.setMergePlanFilter(base.id, { status: "blocked" });
+      const page = await remote.getMergePlanPage(base.id, 0, 1);
+      const osc = await remote.getMergePlanOsc(base.id);
 
-      await remote.getWorker().clearConflation(base.id);
+      await remote.getWorker().clearMergePlan(base.id);
       await remote.restoreForTest();
 
-      const page = await remote.getConflationPage(base.id, 0, 1);
-      expect(page.totalCandidates).toBe(1);
-      expect(page.candidates[0]).toMatchObject({
-        status: "blocked",
-        propertyTransfer: { status: "blocked" },
-        decision,
+      expect(await remote.getMergePlanOverview(base.id)).toEqual(decided);
+      expect(await remote.getMergePlanPage(base.id, 0, 1)).toEqual(page);
+      expect(page.total).toBe(1);
+      expect(
+        page.features[0]?.proposals.find(({ id }) => id === acceptCopy.proposalId),
+      ).toMatchObject({ status: "blocked", decision: "accept", effect: "blocked" });
+      const bulk = await remote.applyMergePlanBulk(base.id, {
+        action: "accept",
+        filter: { kind: "copy-tags" },
       });
-      expect(page.bulkActions["transfer-properties"]).toMatchObject({
-        filteredCandidates: 1,
-        eligibleCandidates: 0,
-        skippedCandidates: 1,
-      });
-      await expect(remote.getConflationSummary(base.id)).resolves.toMatchObject({
-        blocked: 1,
-        accepted: 0,
-      });
-      expect((await remote.getChangesetPage(base.id, 0, 100)).changes).toEqual(changes);
-      await remote.setConflationFilter(base.id, { status: "accepted" });
-      expect((await remote.getConflationPage(base.id, 0, 1)).totalCandidates).toBe(0);
-      await remote.applyChangesAndReplace(base.id);
+      expect(bulk.changed).toBe(0);
+      expect(await remote.getMergePlanOsc(base.id)).toBe(osc);
+      await remote.applyMergePlan(base.id);
       expect(entitySnapshot(await remote.transferOut(base.id))).toEqual(baseline);
     });
 
-    it.each(["ordinary", "conflation"] as const)(
-      "restores the latest %s preview with its filters and retained review decisions",
-      async (latest) => {
-        using remote = new RecoveryTestRemote();
-        await remote.initializeWorkerPool(1, undefined, undefined, true);
-        const { base, patch, decision, ordinaryResult, conflationResult } = await reviewedInputs(
-          remote,
-          `latest-${latest}`,
-        );
-        if (latest === "ordinary") {
-          await remote.generateConflationChangeset(base.id, ordinaryOptions);
-          await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
-        } else {
-          await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
-          await remote.generateConflationChangeset(base.id, ordinaryOptions);
-        }
-        const preview = await remote.getChangesetPage(base.id, 0, 100);
-        expect(preview.changes?.some((change) => change.changeType === "modify")).toBe(
-          latest === "conflation",
-        );
-        remote.setChangesetFilters(["modify"], ["way"]);
-        const filteredPreview = await remote.getChangesetPage(base.id, 0, 100);
+    it("keeps the prior plan recoverable when replanning fails", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const { base, patch, decided, matchedResult } = await plannedInputs(remote, "failed-plan");
+      const osc = await remote.getMergePlanOsc(base.id);
 
-        await restartInputs(remote, [base.id, patch.id]);
+      await expect(remote.planMerge(base.id, "missing-patch", planOptions)).rejects.toThrow(
+        "OSM not found for id: missing-patch",
+      );
+      expect(await remote.getMergePlanOverview(base.id)).toEqual(decided);
 
-        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(filteredPreview);
-        remote.setChangesetFilters(["create", "modify", "delete"], ["node", "way", "relation"]);
-        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
-        const reviewedPage = await remote.getConflationPage(base.id, 0, 100);
-        expect(reviewedPage.totalCandidates).toBe(1);
-        expect(reviewedPage.candidates[0]?.decision).toEqual(decision);
-        await remote.applyChangesAndReplace(base.id);
-        expect(entitySnapshot(await remote.get(base.id))).toEqual(
-          latest === "ordinary" ? ordinaryResult : conflationResult,
-        );
-      },
-    );
+      await restartInputs(remote, [base.id, patch.id]);
 
-    it.each(["ordinary", "conflation"] as const)(
-      "keeps the prior preview recoverable when replacing it with %s generation fails",
-      async (replacementKind) => {
-        using remote = new RecoveryTestRemote();
-        await remote.initializeWorkerPool(1, undefined, undefined, true);
-        const { base, patch, ordinaryResult, conflationResult } = await reviewedInputs(
-          remote,
-          `failed-${replacementKind}`,
-        );
-        if (replacementKind === "ordinary") {
-          await remote.generateConflationChangeset(base.id, ordinaryOptions);
-        } else {
-          await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
-        }
-        const preview = await remote.getChangesetPage(base.id, 0, 100);
+      expect(await remote.getMergePlanOverview(base.id)).toEqual(decided);
+      expect(await remote.getMergePlanOsc(base.id)).toBe(osc);
+      await remote.applyMergePlan(base.id);
+      expect(entitySnapshot(await remote.get(base.id))).toEqual(matchedResult);
+    });
 
-        if (replacementKind === "ordinary") {
-          await expect(
-            remote.generateChangeset(base.id, "missing-patch", ordinaryOptions),
-          ).rejects.toThrow("OSM not found for id: missing-patch");
-        } else {
-          await expect(
-            remote.generateConflationChangeset(base.id, { createIntersections: true }),
-          ).rejects.toThrow("createIntersections must be false");
-        }
-        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
-
-        await restartInputs(remote, [base.id, patch.id]);
-
-        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
-        await remote.applyChangesAndReplace(base.id);
-        expect(entitySnapshot(await remote.get(base.id))).toEqual(
-          replacementKind === "ordinary" ? conflationResult : ordinaryResult,
-        );
-      },
-    );
-
-    it.each(["ordinary", "conflation"] as const)(
-      "recovers filters selected before replacement %s generation",
-      async (latest) => {
-        using remote = new RecoveryTestRemote();
-        await remote.initializeWorkerPool(1, undefined, undefined, true);
-        const { base, patch, ordinaryResult, conflationResult } = await reviewedInputs(
-          remote,
-          `prior-filter-${latest}`,
-        );
-        if (latest === "ordinary") {
-          await remote.generateConflationChangeset(base.id, ordinaryOptions);
-        } else {
-          await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
-        }
-        remote.setChangesetFilters(["modify"], ["way"]);
-        if (latest === "ordinary") {
-          await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
-        } else {
-          await remote.generateConflationChangeset(base.id, ordinaryOptions);
-        }
-        const filteredPreview = await remote.getChangesetPage(base.id, 0, 100);
-        expect(filteredPreview.changes).toHaveLength(latest === "ordinary" ? 0 : 1);
-        expect(filteredPreview.changes?.every((change) => change.changeType === "modify")).toBe(
-          true,
-        );
-
-        await restartInputs(remote, [base.id, patch.id]);
-
-        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(filteredPreview);
-        await remote.applyChangesAndReplace(base.id);
-        expect(entitySnapshot(await remote.get(base.id))).toEqual(
-          latest === "ordinary" ? ordinaryResult : conflationResult,
-        );
-      },
-    );
-
-    it.each(["single decision", "all decisions", "bulk decision", "clear session"] as const)(
-      "preserves the latest ordinary preview when changing %s before recovery",
+    it.each(["decisions", "bulk decision", "clear plan"] as const)(
+      "journals a %s change for recovery",
       async (mutation) => {
         using remote = new RecoveryTestRemote();
         await remote.initializeWorkerPool(1, undefined, undefined, true);
-        const { base, patch, ordinaryResult, decision } = await reviewedInputs(
-          remote,
-          `ordinary-${mutation}`,
-        );
-        await remote.generateConflationChangeset(base.id, ordinaryOptions);
-        await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
-        const preview = await remote.getChangesetPage(base.id, 0, 100);
-        const rejected = { ...decision, action: "reject" as const };
+        const { base, patch, ordinaryResult } = await plannedInputs(remote, `journal-${mutation}`);
+        const rejected: PlanDecision = { ...acceptCopy, action: "reject" };
 
-        if (mutation === "single decision") {
-          await remote.setConflationDecision(base.id, rejected);
-        } else if (mutation === "all decisions") {
-          await remote.setConflationDecisions(base.id, [rejected]);
+        if (mutation === "decisions") {
+          await remote.setMergePlanDecisions(base.id, [rejected]);
         } else if (mutation === "bulk decision") {
-          await remote.applyConflationBulkDecision(base.id, {
+          const bulk = await remote.applyMergePlanBulk(base.id, {
             action: "reject",
-            filter: { entityType: "way" },
+            filter: { kind: "copy-tags" },
           });
+          expect(bulk.changed).toBe(1);
         } else {
-          await remote.clearConflation(base.id);
+          await remote.clearMergePlan(base.id);
         }
-        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
 
         await restartInputs(remote, [base.id, patch.id]);
 
-        expect(await remote.getChangesetPage(base.id, 0, 100)).toEqual(preview);
-        if (mutation === "clear session") {
-          await expect(remote.getConflationSummary(base.id)).rejects.toThrow(
-            "No active conflation session",
+        if (mutation === "clear plan") {
+          await expect(remote.getMergePlanOverview(base.id)).rejects.toThrow(
+            "No active merge plan",
           );
-        } else {
-          await remote.setConflationFilter(base.id, { status: "rejected" });
-          const page = await remote.getConflationPage(base.id, 0, 100);
-          expect(page.totalCandidates).toBe(1);
-          expect(page.candidates[0]?.decision?.action).toBe("reject");
+          return;
         }
-        await remote.applyChangesAndReplace(base.id);
+        expect((await remote.getMergePlanOverview(base.id)).decisions).toEqual([rejected]);
+        await remote.applyMergePlan(base.id);
         expect(entitySnapshot(await remote.get(base.id))).toEqual(ordinaryResult);
       },
     );
 
-    it.each(["ordinary", "conflation"] as const)(
-      "recovers independent base previews when the second generation is %s",
-      async (secondKind) => {
-        using remote = new RecoveryTestRemote();
-        await remote.initializeWorkerPool(1, undefined, undefined, true);
-        const first = await reviewedInputs(remote, "first");
-        const second = await reviewedInputs(remote, "second");
-        await remote.generateChangeset(first.base.id, first.patch.id, ordinaryOptions);
-        const firstPreview = await remote.getChangesetPage(first.base.id, 0, 100);
-        if (secondKind === "ordinary") {
-          await remote.generateChangeset(second.base.id, second.patch.id, ordinaryOptions);
-        } else {
-          await remote.generateConflationChangeset(second.base.id, ordinaryOptions);
-        }
-        const secondPreview = await remote.getChangesetPage(second.base.id, 0, 100);
+    it("recovers independent plans for different bases", async () => {
+      using remote = new RecoveryTestRemote();
+      await remote.initializeWorkerPool(1, undefined, undefined, true);
+      const first = await plannedInputs(remote, "first");
+      const second = await plannedInputs(remote, "second");
+      await remote.setMergePlanDecisions(first.base.id, []);
+      const firstOverview = await remote.getMergePlanOverview(first.base.id);
 
-        await restartInputs(remote, [
-          first.base.id,
-          first.patch.id,
-          second.base.id,
-          second.patch.id,
-        ]);
+      await restartInputs(remote, [first.base.id, first.patch.id, second.base.id, second.patch.id]);
 
-        expect(await remote.getChangesetPage(first.base.id, 0, 100)).toEqual(firstPreview);
-        expect(await remote.getChangesetPage(second.base.id, 0, 100)).toEqual(secondPreview);
-        await remote.applyChangesAndReplace(second.base.id);
-        expect(entitySnapshot(await remote.get(second.base.id))).toEqual(
-          secondKind === "ordinary" ? second.ordinaryResult : second.conflationResult,
-        );
-        // Applying one dataset must not forget another dataset's pending generation.
-        await restartInputs(remote, [first.base.id, first.patch.id]);
-        expect(await remote.getChangesetPage(first.base.id, 0, 100)).toEqual(firstPreview);
-        await remote.applyChangesAndReplace(first.base.id);
-        expect(entitySnapshot(await remote.get(first.base.id))).toEqual(first.ordinaryResult);
-      },
-    );
+      expect(await remote.getMergePlanOverview(first.base.id)).toEqual(firstOverview);
+      expect(await remote.getMergePlanOverview(second.base.id)).toEqual(second.decided);
+      await remote.applyMergePlan(second.base.id);
+      expect(entitySnapshot(await remote.get(second.base.id))).toEqual(second.matchedResult);
+      // Applying one plan must not forget another base's plan.
+      await restartInputs(remote, [first.base.id, first.patch.id]);
+      expect(await remote.getMergePlanOverview(first.base.id)).toEqual(firstOverview);
+      await remote.applyMergePlan(first.base.id);
+      expect(entitySnapshot(await remote.get(first.base.id))).toEqual(first.ordinaryResult);
+    });
 
     it.each([
       { action: "replace", input: "base" },
@@ -739,14 +546,11 @@ describe("OsmixRemote", () => {
       { action: "rename", input: "base" },
       { action: "rename", input: "patch" },
     ] as const)(
-      "does not revive previews after $action of the $input input",
+      "does not revive a plan after $action of the $input input",
       async ({ action, input }) => {
         using remote = new RecoveryTestRemote();
         await remote.initializeWorkerPool(1, undefined, undefined, true);
-        const { base, patch } = await reviewedInputs(remote, `invalidate-${action}-${input}`);
-        await remote.generateConflationChangeset(base.id, ordinaryOptions);
-        await remote.generateChangeset(base.id, patch.id, ordinaryOptions);
-        expect((await remote.getChangesetPage(base.id, 0, 100)).changes?.length).toBeGreaterThan(0);
+        const { base, patch } = await plannedInputs(remote, `invalidate-${action}-${input}`);
         const changedId = input === "base" ? base.id : patch.id;
 
         if (action === "replace") {
@@ -756,44 +560,23 @@ describe("OsmixRemote", () => {
         } else {
           await remote.rename(changedId, `${changedId}-renamed`);
         }
-        await expect(remote.getChangesetPage(base.id, 0, 100)).rejects.toThrow(
-          "No active changeset",
-        );
+        await expect(remote.getMergePlanOverview(base.id)).rejects.toThrow("No active merge plan");
 
         await remote.restoreForTest();
 
-        await expect(remote.getChangesetPage(base.id, 0, 100)).rejects.toThrow(
-          "No active changeset",
-        );
-        await expect(remote.getConflationSummary(base.id)).rejects.toThrow(
-          "No active conflation session",
-        );
+        await expect(remote.getMergePlanOverview(base.id)).rejects.toThrow("No active merge plan");
         if (action === "rename" && input === "base") {
-          await expect(remote.getChangesetPage(`${base.id}-renamed`, 0, 100)).rejects.toThrow(
-            "No active changeset",
+          await expect(remote.getMergePlanOverview(`${base.id}-renamed`)).rejects.toThrow(
+            "No active merge plan",
           );
         }
       },
     );
 
-    it("does not replay conflation state after a loader replaces an input ID", async () => {
+    it("does not replay a plan after a loader replaces an input ID", async () => {
       using remote = new RecoveryTestRemote();
       await remote.initializeWorkerPool(1, undefined, undefined, true);
-      const base = createParallelFootway("loader-base", 1, 10, 0, "Base path");
-      const patch = createParallelFootway("loader-patch", 11, 20, 0.000004, "Imported path");
-      await remote.transferIn(base);
-      await remote.transferIn(patch);
-      await remote.discoverConflation(base.id, patch.id, {
-        propertyKeys: ["name"],
-        attachNetwork: false,
-      });
-      const candidate = (await remote.getConflationPage(base.id, 0, 100)).candidates.find(
-        (row) => row.entityType === "way",
-      )!;
-      await remote.setConflationDecision(base.id, {
-        candidateId: candidate.id,
-        action: "reject",
-      });
+      const { base, patch } = await plannedInputs(remote, "loader");
 
       const replacement: FeatureCollection<Point> = {
         type: "FeatureCollection",
@@ -810,12 +593,10 @@ describe("OsmixRemote", () => {
       });
 
       await expect(remote.restoreForTest()).resolves.toBeUndefined();
-      await expect(remote.getConflationSummary(base.id)).rejects.toThrow(
-        "No active conflation session",
-      );
+      await expect(remote.getMergePlanOverview(base.id)).rejects.toThrow("No active merge plan");
     });
 
-    it("invalidates sessions for both sides of an overwriting rename", async () => {
+    it("invalidates plans for both sides of an overwriting rename", async () => {
       using remote = new RecoveryTestRemote();
       await remote.initializeWorkerPool(1, undefined, undefined, true);
       const from = createParallelFootway("rename-from", 1, 10, 0, "From");
@@ -823,22 +604,14 @@ describe("OsmixRemote", () => {
       const otherBase = createParallelFootway("rename-other-base", 21, 30, 0, "Other");
       const to = createParallelFootway("rename-to", 31, 40, 0.000004, "Destination");
       for (const osm of [from, fromPatch, otherBase, to]) await remote.transferIn(osm);
-      await remote.discoverConflation(from.id, fromPatch.id, {
-        propertyKeys: ["name"],
-        attachNetwork: false,
-      });
-      await remote.discoverConflation(otherBase.id, to.id, {
-        propertyKeys: ["name"],
-        attachNetwork: false,
-      });
+      await remote.planMerge(from.id, fromPatch.id, planOptions);
+      await remote.planMerge(otherBase.id, to.id, planOptions);
 
       await remote.rename(from.id, to.id);
       await expect(remote.restoreForTest()).resolves.toBeUndefined();
-      await expect(remote.getConflationSummary(from.id)).rejects.toThrow(
-        "No active conflation session",
-      );
-      await expect(remote.getConflationSummary(otherBase.id)).rejects.toThrow(
-        "No active conflation session",
+      await expect(remote.getMergePlanOverview(from.id)).rejects.toThrow("No active merge plan");
+      await expect(remote.getMergePlanOverview(otherBase.id)).rejects.toThrow(
+        "No active merge plan",
       );
     });
   });

@@ -2,25 +2,10 @@ import { Osm } from "@osmix/core";
 import type { OsmNode, OsmRelation, OsmWay } from "@osmix/types";
 import { describe, expect, it, vi } from "vitest";
 
-import { applyChangesetToOsm } from "../src/apply-changeset.ts";
-import {
-  buildConflationBulkDecisionResult,
-  discoverConflationCandidates,
-  filterConflationCandidates,
-  generateConflationApplicationChangeset,
-  generateConflationChangeset,
-  summarizeConflationCandidates,
-  validateConflationDecisions,
-} from "../src/conflation.ts";
-import { generateChangeset } from "../src/generate-changeset.ts";
-import * as publicChangeApi from "../src/index.ts";
+import { discoverConflationCandidates, summarizeConflationCandidates } from "../src/conflation.ts";
 import { merge } from "../src/merge.ts";
 import { applyPlan, planMerge } from "../src/plan/plan.ts";
-import type {
-  OsmConflationCandidate,
-  OsmConflationDecision,
-  OsmConflationOptions,
-} from "../src/types.ts";
+import type { OsmConflationOptions } from "../src/types.ts";
 import { withMatchingDecisions } from "./helpers/plan.ts";
 
 function createOsm(
@@ -46,14 +31,6 @@ const attachmentOptions: OsmConflationOptions = {
 };
 
 describe("safe fuzzy conflation discovery", () => {
-  it("keeps trusted generation capabilities out of the public package API", () => {
-    expect(publicChangeApi).not.toHaveProperty("discoverConflationCandidatesForTrustedMerge");
-    expect(publicChangeApi).not.toHaveProperty("generateConflationArtifactsFromTrustedDiscovery");
-    expect(publicChangeApi).not.toHaveProperty(
-      "generateConflationApplicationArtifactsFromTrustedDiscovery",
-    );
-  });
-
   it("drops a connected imported node only when it is untagged and nothing else uses it", async () => {
     const base = createOsm(
       "base",
@@ -146,16 +123,6 @@ describe("safe fuzzy conflation discovery", () => {
     expect(result.nodes.ids.has(101)).toBe(false);
     expect(result.ways.getById(10)?.refs).toEqual([2, 1]);
     expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
-    const cumulative = applyChangesetToOsm(
-      generateConflationChangeset(base, patch, {
-        directMerge: true,
-        conflation: attachmentOptions,
-      }),
-    );
-    expect([...cumulative.nodes].map((node) => node.id)).toEqual(
-      [...result.nodes].map((node) => node.id),
-    );
-    expect(cumulative.ways.getById(20)?.refs).toEqual(result.ways.getById(20)?.refs);
   });
 
   it("blocks an area-only school boundary vertex near a routing node", () => {
@@ -249,7 +216,7 @@ describe("safe fuzzy conflation discovery", () => {
     expect(manyToOne.every((candidate) => candidate.reasons.includes("many-to-one"))).toBe(true);
   });
 
-  it("keeps decision summaries and filters lightweight", () => {
+  it("keeps decision summaries lightweight", () => {
     const base = createOsm("base", [{ id: 1, lon: 0, lat: 0, tags: { name: "Base" } }]);
     const patch = createOsm("patch", [{ id: 101, lon: 0.000005, lat: 0, tags: { name: "Patch" } }]);
     const discovery = discoverConflationCandidates(base, patch, {
@@ -262,140 +229,12 @@ describe("safe fuzzy conflation discovery", () => {
       automatic: 0,
       rejected: 1,
     });
-    expect(
-      filterConflationCandidates(discovery.candidates, { status: "rejected" }, decisions),
-    ).toHaveLength(1);
 
     const accepted = [{ candidateId: "node:101->1", action: "accept" as const }];
     expect(summarizeConflationCandidates(discovery.candidates, accepted)).toMatchObject({
       total: 1,
       accepted: 1,
       automatic: 0,
-    });
-    expect(
-      filterConflationCandidates(discovery.candidates, { status: "accepted" }, accepted),
-    ).toHaveLength(1);
-  });
-
-  it("builds filter-wide action-specific decisions and skips ambiguous candidates", () => {
-    const automatic: OsmConflationCandidate = {
-      id: "node:101->1",
-      entityType: "node",
-      sourceId: 101,
-      targetId: 1,
-      status: "automatic",
-      reasons: [],
-      propertyTransfer: { status: "automatic", reasons: [] },
-      networkAttachment: { status: "automatic", reasons: [] },
-      evidence: {
-        distanceMeters: 0.5,
-        sourceRoutingFamilies: ["pedestrian"],
-        targetRoutingFamilies: ["pedestrian"],
-        tagDiff: [{ key: "name", patchValue: "Imported", protected: false, routing: false }],
-      },
-    };
-    const review: OsmConflationCandidate = {
-      ...structuredClone(automatic),
-      id: "node:102->2",
-      sourceId: 102,
-      targetId: 2,
-      status: "review",
-      reasons: ["routing-property"],
-      propertyTransfer: { status: "review", reasons: ["routing-property"] },
-    };
-    const ambiguous: OsmConflationCandidate = {
-      ...structuredClone(review),
-      id: "node:103->3",
-      sourceId: 103,
-      targetId: 3,
-      reasons: ["multiple-targets"],
-      propertyTransfer: { status: "review", reasons: ["multiple-targets"] },
-      networkAttachment: { status: "review", reasons: ["multiple-targets"] },
-    };
-    const blocked: OsmConflationCandidate = {
-      ...structuredClone(automatic),
-      id: "node:104->4",
-      sourceId: 104,
-      targetId: 4,
-      status: "blocked",
-      reasons: ["grade-conflict"],
-      propertyTransfer: { status: "blocked", reasons: ["grade-conflict"] },
-      networkAttachment: { status: "blocked", reasons: ["grade-conflict"] },
-    };
-    const candidates = [automatic, review, ambiguous, blocked];
-    const initialDecisions: OsmConflationDecision[] = [
-      { candidateId: review.id, action: "reject" },
-    ];
-
-    const propertyResult = buildConflationBulkDecisionResult(candidates, initialDecisions, {
-      action: "transfer-properties",
-      filter: { entityType: "node" },
-    });
-    expect(propertyResult.preview).toEqual({
-      action: "transfer-properties",
-      filteredCandidates: 4,
-      eligibleCandidates: 2,
-      changedCandidates: 2,
-      skippedCandidates: 2,
-      automaticCandidates: 1,
-      reviewCandidates: 1,
-      overriddenDecisions: 1,
-    });
-    expect(propertyResult.decisions).toEqual([
-      {
-        candidateId: automatic.id,
-        action: "accept",
-        transferProperties: true,
-        attachNetwork: undefined,
-      },
-      {
-        candidateId: review.id,
-        action: "accept",
-        transferProperties: true,
-        attachNetwork: false,
-      },
-    ]);
-    expect(propertyResult.summary).toMatchObject({ accepted: 2, blocked: 1, review: 1 });
-
-    const networkResult = buildConflationBulkDecisionResult(candidates, propertyResult.decisions, {
-      action: "attach-network",
-      filter: { status: "accepted" },
-    });
-    expect(networkResult.preview).toMatchObject({
-      filteredCandidates: 2,
-      eligibleCandidates: 2,
-      changedCandidates: 2,
-      skippedCandidates: 0,
-      overriddenDecisions: 2,
-    });
-    expect(networkResult.decisions.find((decision) => decision.candidateId === review.id)).toEqual({
-      candidateId: review.id,
-      action: "accept",
-      transferProperties: true,
-      attachNetwork: true,
-    });
-
-    const rejectResult = buildConflationBulkDecisionResult(candidates, networkResult.decisions, {
-      action: "reject",
-      filter: { status: "accepted" },
-    });
-    expect(rejectResult.preview).toMatchObject({
-      filteredCandidates: 2,
-      eligibleCandidates: 2,
-      changedCandidates: 2,
-      skippedCandidates: 0,
-      overriddenDecisions: 2,
-    });
-    expect(rejectResult.summary).toMatchObject({ rejected: 2, blocked: 1, review: 1 });
-
-    const scopedResult = buildConflationBulkDecisionResult(
-      candidates,
-      [...networkResult.decisions, { candidateId: blocked.id, action: "reject" }],
-      { action: "reject", filter: { sourceId: automatic.sourceId } },
-    );
-    expect(scopedResult.decisions).toContainEqual({
-      candidateId: blocked.id,
-      action: "reject",
     });
   });
 
@@ -418,74 +257,6 @@ describe("safe fuzzy conflation discovery", () => {
         propertyKeys: ["name"],
       } as unknown as OsmConflationOptions),
     ).toThrow("attachNetwork must be a boolean");
-  });
-
-  it("rejects stale, duplicate, and malformed decisions at the generation boundary", () => {
-    const base = createOsm("base", [{ id: 1, lon: 0, lat: 0, tags: { name: "Base" } }]);
-    const patch = createOsm("patch", [{ id: 101, lon: 0.000005, lat: 0, tags: { name: "Patch" } }]);
-    const conflation = { propertyKeys: ["name"], attachNetwork: false };
-    const discovery = discoverConflationCandidates(base, patch, conflation);
-    const generate = (decisions: readonly OsmConflationDecision[]) =>
-      generateConflationApplicationChangeset(base, patch, discovery, base, decisions);
-    const validDecisions: OsmConflationDecision[] = [
-      { candidateId: "node:101->1", action: "accept", transferProperties: true },
-    ];
-    const beforeValidation = structuredClone(validDecisions);
-    expect(() => validateConflationDecisions(discovery.candidates, validDecisions)).not.toThrow();
-    expect(validDecisions).toEqual(beforeValidation);
-
-    expect(() => generate([{ candidateId: "node:missing->1", action: "accept" }])).toThrow(
-      "Unknown conflation candidate: node:missing->1",
-    );
-    expect(() =>
-      generate([
-        { candidateId: "node:101->1", action: "accept" },
-        { candidateId: "node:101->1", action: "reject" },
-      ]),
-    ).toThrow("Duplicate conflation decision for node:101->1");
-    expect(() =>
-      generate([
-        { candidateId: "node:101->1", action: "approve" },
-      ] as unknown as OsmConflationDecision[]),
-    ).toThrow("Invalid conflation decision action for node:101->1");
-    expect(() =>
-      generate([
-        { candidateId: "node:101->1", action: "accept", transferProperties: "yes" },
-      ] as unknown as OsmConflationDecision[]),
-    ).toThrow("transferProperties must be a boolean for node:101->1");
-    expect(() =>
-      generate([
-        { candidateId: "node:101->1", action: "accept", attachNetwork: null },
-      ] as unknown as OsmConflationDecision[]),
-    ).toThrow("attachNetwork must be a boolean for node:101->1");
-    expect(() => generate({} as unknown as OsmConflationDecision[])).toThrow(
-      "Conflation decisions must be an array",
-    );
-
-    expect(() =>
-      generateConflationChangeset(base, patch, {
-        directMerge: true,
-        conflation: {
-          ...conflation,
-          decisions: [{ candidateId: "node:stale->1", action: "reject" }],
-        },
-      }),
-    ).toThrow("Unknown conflation candidate: node:stale->1");
-  });
-
-  it("rejects a fuzzy-only discovery from another merge session", () => {
-    const base = createOsm("base", [{ id: 1, lon: 0, lat: 0 }]);
-    const patch = createOsm("patch", [{ id: 101, lon: 0.000005, lat: 0 }]);
-    const otherBase = createOsm("other-base", [{ id: 2, lon: 0, lat: 0 }]);
-    const otherPatch = createOsm("other-patch", [{ id: 102, lon: 0.000005, lat: 0 }]);
-    const discovery = discoverConflationCandidates(otherBase, otherPatch, {
-      propertyKeys: ["name"],
-      attachNetwork: false,
-    });
-
-    expect(() => generateConflationApplicationChangeset(base, patch, discovery, base)).toThrow(
-      "Conflation discovery patch other-patch does not match patch",
-    );
   });
 
   it("reports decisions naming no proposal instead of applying them", async () => {
@@ -514,64 +285,6 @@ describe("safe fuzzy conflation discovery", () => {
       silent,
     );
     expect(applyPlan(plan).osm.contentHash()).toBe(applyPlan(undecided).osm.contentHash());
-  });
-
-  it("recomputes canonical candidates instead of trusting caller-mutated discovery data", () => {
-    const base = createOsm(
-      "base",
-      [
-        { id: 1, lon: 0, lat: 0 },
-        { id: 2, lon: -0.001, lat: 0 },
-      ],
-      [
-        {
-          id: 10,
-          refs: [2, 1],
-          tags: { highway: "footway", layer: "-1", tunnel: "yes" },
-        },
-      ],
-    );
-    const patch = createOsm(
-      "patch",
-      [
-        { id: 101, lon: 0.000005, lat: 0 },
-        { id: 102, lon: 0.001, lat: 0 },
-      ],
-      [{ id: 20, refs: [101, 102], tags: { highway: "footway" } }],
-    );
-    const discovery = discoverConflationCandidates(base, patch, attachmentOptions);
-    const forged = {
-      ...discovery,
-      candidates: discovery.candidates.map((candidate) =>
-        candidate.sourceId === 101
-          ? {
-              ...candidate,
-              targetId: 2,
-              status: "automatic" as const,
-              reasons: [],
-              networkAttachment: { status: "automatic" as const, reasons: [] },
-              evidence: { ...candidate.evidence, patchWayIds: [20] },
-            }
-          : candidate,
-      ),
-    };
-
-    const cumulative = applyChangesetToOsm(
-      generateConflationChangeset(
-        base,
-        patch,
-        { directMerge: true, conflation: attachmentOptions },
-        [],
-        forged,
-      ),
-    );
-    expect(cumulative.ways.getById(20)?.refs).toEqual([101, 102]);
-
-    const direct = applyChangesetToOsm(generateChangeset(base, patch, { directMerge: true }));
-    const fuzzyOnly = applyChangesetToOsm(
-      generateConflationApplicationChangeset(direct, patch, forged, base),
-    );
-    expect(fuzzyOnly.ways.getById(20)?.refs).toEqual([101, 102]);
   });
 });
 
@@ -1466,40 +1179,7 @@ describe("safe fuzzy topology gates", () => {
     expect(result.ways.getById(20)?.refs).toEqual([101, 102, 103]);
   });
 
-  it("generates equivalent fuzzy-only and cumulative changesets from canonical discovery", () => {
-    const base = createOsm("base", [{ id: 1, lon: 0, lat: 0, tags: { name: "Old" } }]);
-    const patch = createOsm("patch", [
-      { id: 101, lon: 0.000005, lat: 0, tags: { name: "Imported" } },
-    ]);
-    const conflation = { propertyKeys: ["name"], attachNetwork: false };
-    const discovery = discoverConflationCandidates(base, patch, conflation);
-
-    const cumulative = applyChangesetToOsm(
-      generateConflationChangeset(base, patch, { directMerge: true, conflation }, [], discovery),
-    );
-    const direct = applyChangesetToOsm(generateChangeset(base, patch, { directMerge: true }));
-    const fuzzyOnly = applyChangesetToOsm(
-      generateConflationApplicationChangeset(direct, patch, discovery, base),
-    );
-    expect(fuzzyOnly.nodes.getById(1)?.tags).toEqual(cumulative.nodes.getById(1)?.tags);
-    expect(fuzzyOnly.nodes.getById(101)).toEqual(cumulative.nodes.getById(101));
-  });
-
-  it("enforces the protected-base assertion inside the fuzzy-only generator", () => {
-    const originalBase = createOsm("base", [{ id: 1, lon: 0, lat: 0 }]);
-    const malformedBaseline = createOsm("base", []);
-    const patch = createOsm("patch", []);
-    const discovery = discoverConflationCandidates(originalBase, patch, {
-      propertyKeys: ["name"],
-      attachNetwork: false,
-    });
-
-    expect(() =>
-      generateConflationApplicationChangeset(malformedBaseline, patch, discovery, originalBase),
-    ).toThrow("Conflation changed protected base topology");
-  });
-
-  it("applies and validates the cumulative result before returning its changeset", () => {
+  it("validates the planned result before building it", async () => {
     const base = createOsm("base", []);
     const patch = createOsm(
       "patch",
@@ -1507,11 +1187,17 @@ describe("safe fuzzy topology gates", () => {
       [{ id: 20, refs: [101, 999], tags: { highway: "footway", name: "Imported" } }],
     );
 
-    expect(() =>
-      generateConflationChangeset(base, patch, {
-        directMerge: true,
-        conflation: { propertyKeys: ["name"], attachNetwork: false },
-      }),
-    ).toThrow("way 20 references missing node 999");
+    await expect(
+      merge(
+        base,
+        patch,
+        {
+          mergeIdenticalPoints: false,
+          createIntersections: false,
+          matching: { propertyKeys: ["name"], attachNetwork: false },
+        },
+        silent,
+      ),
+    ).rejects.toThrow("way 20 references missing node 999");
   });
 });

@@ -7,7 +7,7 @@ import {
   InfoTooltip,
   EmptyState,
 } from "@osmix/ui";
-import type { OsmConflationCandidateView } from "osmix";
+import type { OsmConflationCandidate } from "osmix";
 
 const ROUTING_FAMILY_LABEL = {
   "bicycle-shared": "Bicycle or shared-use",
@@ -17,7 +17,7 @@ const ROUTING_FAMILY_LABEL = {
 } as const;
 
 /** Missing measurements and an unmatched search express different evidence. */
-export function conflationDistanceLabel(candidate: OsmConflationCandidateView) {
+export function conflationDistanceLabel(candidate: OsmConflationCandidate) {
   if (candidate.targetId == null) {
     return candidate.reasons.includes("unsupported-way-chain")
       ? "Nearby segments cannot form one supported match"
@@ -33,7 +33,7 @@ function measurement(value: number, digits: number, unit: string) {
   return Number.isFinite(value) && value >= 0 ? `${value.toFixed(digits)}${unit}` : "Unavailable";
 }
 
-export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandidateView }) {
+export function CandidateEvidence({ candidate }: { candidate: OsmConflationCandidate }) {
   const { evidence } = candidate;
   const measurements = [
     ["Candidate distance", conflationDistanceLabel(candidate)],

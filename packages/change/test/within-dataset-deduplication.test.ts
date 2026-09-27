@@ -2,8 +2,8 @@ import { Osm } from "@osmix/core";
 import { describe, expect, it } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset.ts";
-import { generateChangeset } from "../src/generate-changeset.ts";
 import { planWithinDatasetDeduplication } from "../src/plan/deduplication.ts";
+import { stagedChanges } from "./helpers/changes.ts";
 
 const quiet = () => {};
 
@@ -55,12 +55,7 @@ describe("planWithinDatasetDeduplication", () => {
 
   it("finds what the staged same-dataset scan found", () => {
     const osm = duplicated();
-    const staged = generateChangeset(
-      osm,
-      osm,
-      { deduplicateNodes: true, deduplicateWays: true },
-      quiet,
-    );
+    const staged = stagedChanges(osm, osm, { deduplicateNodes: true, deduplicateWays: true });
     const planned = planWithinDatasetDeduplication(osm, quiet);
     expect(applyChangesetToOsm(planned).contentHash()).toBe(
       applyChangesetToOsm(staged).contentHash(),

@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 import { Osm } from "../src/index.ts";
 import { OsmixWorker } from "../src/worker.ts";
 
-const DEDUPLICATION_OPTIONS = { deduplicateNodes: true, deduplicateWays: true };
-
 /** Exposes the worker's dataset registry so the test can read the applied result. */
 class TestWorker extends OsmixWorker {
   dataset(osmId: string) {
@@ -55,7 +53,7 @@ function expectReferencesResolve(osm: Osm) {
 }
 
 async function scan(worker: TestWorker, osmId: string) {
-  return worker.generateChangeset(osmId, osmId, DEDUPLICATION_OPTIONS);
+  return worker.planDeduplication(osmId);
 }
 
 describe("within-dataset deduplication", () => {

@@ -10,11 +10,8 @@ import {
   type MergePlanOptions,
   OsmBlocksToPbfBytesTransformStream,
   OsmJsonToBlocksTransformStream,
-  OsmixWorker,
   planMerge,
-  type OsmConflationGenerationResult,
   type OsmConflationSummary,
-  type OsmMergeOptions,
   type OsmChangesetStats,
 } from "../src/index.ts";
 
@@ -80,16 +77,6 @@ interface MemorySnapshot {
   rss: number;
   heapUsed: number;
   peakRss: number;
-}
-
-class ProfileOsmixWorker extends OsmixWorker {
-  register(osm: Osm): void {
-    this.set(osm.id, osm);
-  }
-
-  read(osmId: string): Osm {
-    return this.get(osmId);
-  }
 }
 
 function roundMilliseconds(value: number): number {
@@ -284,22 +271,6 @@ async function collectFingerprints(
   };
 }
 
-function routingDiagnosticCounts(
-  diagnostics: OsmConflationGenerationResult["routing"],
-): MergeProfileOperationCounts {
-  const counts: MergeProfileOperationCounts = {};
-  for (const mode of ["car", "walk"] as const) {
-    for (const view of ["before", "after", "delta"] as const) {
-      for (const [key, value] of Object.entries(diagnostics[mode][view])) {
-        counts[
-          `${mode}${view[0]!.toUpperCase()}${view.slice(1)}${key[0]!.toUpperCase()}${key.slice(1)}`
-        ] = value;
-      }
-    }
-  }
-  return counts;
-}
-
 /**
  * Plan and apply a merge as `merge` does, recording each planner phase, the final checks and
  * the single build separately.
@@ -341,101 +312,6 @@ export async function profileMerge(
     stages: recorder.stages,
     inputs: { base: osmEntityCounts(base), patch: osmEntityCounts(patch) },
     output: osmEntityCounts(modifiedBase),
-    fingerprints,
-    wallDurationMs: roundMilliseconds(performance.now() - wallStarted),
-    processPeakRssBytes: memorySnapshot().peakRss,
-  };
-}
-
-/**
- * Profile the production worker conflation path, including routing diagnostics,
- * the automatic-attachment CAR projection, and installation of the materialized result.
- */
-export async function profileWorkerConflation(
-  base: Osm,
-  patch: Osm,
-  options: Partial<OsmMergeOptions>,
-  profileOptions: ProfileMergeOptions = {},
-): Promise<MergeProfileRun> {
-  if (!options.conflation) throw Error("Worker conflation profiling requires conflation options");
-  if (!options.directMerge) throw Error("Worker conflation profiling requires directMerge");
-  const recorder = new MergeProfileRecorder();
-  const wallStarted = performance.now();
-  const worker = new ProfileOsmixWorker();
-  await recorder.measure("register-worker-inputs", () => {
-    worker.register(base);
-    worker.register(patch);
-    return {
-      value: undefined,
-      operations: {
-        ...prefixedCounts("base", osmEntityCounts(base)),
-        ...prefixedCounts("patch", osmEntityCounts(patch)),
-      },
-    };
-  });
-
-  await recorder.measure("worker-discover-conflation-candidates", () => {
-    const summary = worker.discoverConflation(base.id, patch.id, options.conflation!);
-    return { value: undefined, operations: prefixedCounts("candidate", summary) };
-  });
-  const generation = await recorder.measure("worker-generate-conflation-changeset", () => {
-    const result = worker.generateConflationChangeset(base.id, {
-      directMerge: true,
-      deduplicateNodes: options.deduplicateNodes ?? false,
-      deduplicateWays: options.deduplicateWays ?? false,
-      createIntersections: false,
-    });
-    return {
-      value: result,
-      operations: {
-        ...changesetCounts(result.stats),
-        ...routingDiagnosticCounts(result.routing),
-      },
-    };
-  });
-  await recorder.measure("worker-apply-conflation-result", () => {
-    worker.applyChangesAndReplace(base.id);
-    const result = worker.read(base.id);
-    return {
-      value: undefined,
-      operations: {
-        ...changesetCounts(generation.stats),
-        ...prefixedCounts("output", osmEntityCounts(result)),
-      },
-    };
-  });
-
-  if (options.createIntersections) {
-    const stats = await recorder.measure("worker-create-safe-intersections", async () => {
-      const result = await worker.generateChangeset(base.id, patch.id, {
-        createIntersections: true,
-      });
-      return { value: result, operations: changesetCounts(result) };
-    });
-    await recorder.measure("worker-apply-intersection-changes", () => {
-      worker.applyChangesAndReplace(base.id);
-      const result = worker.read(base.id);
-      return {
-        value: undefined,
-        operations: {
-          ...changesetCounts(stats),
-          ...prefixedCounts("output", osmEntityCounts(result)),
-        },
-      };
-    });
-  }
-
-  const output = worker.read(base.id);
-  const fingerprints = await collectFingerprints(
-    recorder,
-    output,
-    profileOptions.fingerprint ?? true,
-  );
-  return {
-    run: profileOptions.run ?? 1,
-    stages: recorder.stages,
-    inputs: { base: osmEntityCounts(base), patch: osmEntityCounts(patch) },
-    output: osmEntityCounts(output),
     fingerprints,
     wallDurationMs: roundMilliseconds(performance.now() - wallStarted),
     processPeakRssBytes: memorySnapshot().peakRss,

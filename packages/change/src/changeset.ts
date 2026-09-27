@@ -24,11 +24,6 @@ import { normalizedWayDirection } from "@osmix/types/way-direction";
 import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 
 import {
-  assertChangesetInputIdentity,
-  changesetInputIdentity,
-  requireChangesetInputIdentity,
-} from "./changeset-inputs.ts";
-import {
   assertNoNewRoutingIntegrityIssues,
   inheritedRoutingIntegrityIssueKeys,
   junctionHasIncompatibleGrades,
@@ -52,14 +47,7 @@ import {
   withNonConflictingDescriptiveTags,
   withNonConflictingTags,
 } from "./rules/tags.ts";
-import type {
-  OsmChange,
-  OsmChanges,
-  OsmChangesetInputIdentity,
-  OsmChangesetRestoreContext,
-  OsmChangesetStats,
-  OsmEntityRef,
-} from "./types.ts";
+import type { OsmChange, OsmChangesetStats, OsmEntityRef } from "./types.ts";
 import {
   areWayTagsIntersectionCandidate,
   nearestNodeOnWay,
@@ -251,9 +239,6 @@ export class OsmChangeset {
   /** The planned state: base plus these changes, read without building it. */
   readonly overlay: PlanOverlay;
   private readonly routingIntegrityBaselineKeys: Set<string>;
-  private readonly baseInputIdentity: OsmChangesetInputIdentity | undefined;
-  private readonly patchInputIdentities: (OsmChangesetInputIdentity | undefined)[] = [];
-  private restoredWithoutInputContext = false;
 
   // Next node ID tracker for generating new IDs during intersection creation
   currentNodeId: number;
@@ -266,61 +251,11 @@ export class OsmChangeset {
   /** Imported points an intersection replaced and left unused, so they were dropped. */
   intersectionNodesRemoved = 0;
 
-  /** Restore changes and recompute integrity allowances from the recorded original inputs. */
-  static fromJson(base: Osm, json: OsmChanges, context?: OsmChangesetRestoreContext) {
-    if (json.osmId !== base.id)
-      throw Error("Changeset base input context mismatch: dataset ID differs");
-    const changeset = new OsmChangeset(base);
-    const validation = json.validationContext;
-    if (validation === undefined) {
-      if (context) {
-        throw Error(
-          "Changes-only JSON has no verifiable original input context; regenerate from the original inputs and export with toJSON()",
-        );
-      }
-      changeset.restoredWithoutInputContext = true;
-    } else {
-      if (validation?.version !== 1 || !Array.isArray(validation.patches)) {
-        throw Error(
-          "Unsupported changeset validation context version or format; regenerate and export with toJSON()",
-        );
-      }
-      assertChangesetInputIdentity(base, validation.base, "base");
-      const patches = context?.patches ?? [];
-      if (patches.length !== validation.patches.length) {
-        throw Error(
-          "Changeset original patch input context is missing or has the wrong count; pass { patches } in generation order to fromJson()",
-        );
-      }
-      for (const [index, patch] of patches.entries()) {
-        assertChangesetInputIdentity(patch, validation.patches[index]!, `patch ${index + 1}`);
-        changeset.inheritPatchIntegrity(patch);
-      }
-    }
-    const snapshot = structuredClone(json);
-    // Serialized node changes may move, delete, or supply a previously missing ref; replacing
-    // the records drops every geometry cache derived from them.
-    changeset.nodeChanges = snapshot.nodes;
-    changeset.wayChanges = snapshot.ways;
-    changeset.relationChanges = snapshot.relations;
-    for (const change of Object.values(snapshot.nodes)) {
-      changeset.currentNodeId = Math.max(changeset.currentNodeId, change.entity.id);
-    }
-    changeset.deduplicatedNodes = snapshot.stats.deduplicatedNodes;
-    changeset.deduplicatedNodesReplaced = snapshot.stats.deduplicatedNodesReplaced;
-    changeset.deduplicatedWays = snapshot.stats.deduplicatedWays;
-    changeset.intersectionPointsFound = snapshot.stats.intersectionPointsFound;
-    changeset.intersectionNodesCreated = snapshot.stats.intersectionNodesCreated;
-    changeset.intersectionNodesRemoved = snapshot.stats.intersectionNodesRemoved ?? 0;
-    return changeset;
-  }
-
   constructor(base: Osm) {
     this.osm = base;
     this.overlay = new PlanOverlay(base);
     this.currentNodeId = maximumId(base.nodes.ids) ?? EMPTY_ID;
     this.routingIntegrityBaselineKeys = routingIntegrityIssueKeys(base);
-    this.baseInputIdentity = changesetInputIdentity(base);
   }
 
   get nodeChanges() {
@@ -347,40 +282,9 @@ export class OsmChangeset {
     this.overlay.setRecords("relation", records);
   }
 
-  /** Export a detached JSON snapshot. Keep the original inputs for verified restoration. */
-  toJSON(): OsmChanges {
-    return structuredClone({
-      osmId: this.osm.id,
-      nodes: this.nodeChanges,
-      ways: this.wayChanges,
-      relations: this.relationChanges,
-      stats: this.stats,
-      ...(this.restoredWithoutInputContext
-        ? {}
-        : {
-            validationContext: {
-              version: 1 as const,
-              base: requireChangesetInputIdentity(this.baseInputIdentity, "base"),
-              patches: this.patchInputIdentities.map((identity, index) =>
-                requireChangesetInputIdentity(identity, `patch ${index + 1}`),
-              ),
-            },
-          }),
-    });
-  }
-
-  /** @internal Apply the same verified integrity policy to live and restored changesets. */
+  /** @internal Throw when `result` has routing-integrity problems the inputs did not. */
   assertValidResult(result: Osm): void {
-    try {
-      assertNoNewRoutingIntegrityIssues(this.routingIntegrityBaselineKeys, result);
-    } catch (cause) {
-      if (!this.restoredWithoutInputContext) throw cause;
-      const message = cause instanceof Error ? cause.message : String(cause);
-      throw Error(
-        `${message}. Changes-only JSON has no original patch input context; only inherited base issues can be verified. To preserve inherited patch issues, regenerate from the original inputs and export with toJSON()`,
-        { cause },
-      );
-    }
+    assertNoNewRoutingIntegrityIssues(this.routingIntegrityBaselineKeys, result);
   }
 
   /** @internal Everything a plan phase can change, to return to before rerunning it. */
@@ -422,10 +326,6 @@ export class OsmChangeset {
     )) {
       this.routingIntegrityBaselineKeys.add(key);
     }
-    this.patchInputIdentities.push(changesetInputIdentity(patch));
-    // Legacy restoration grants only base allowances. Once a real patch is added,
-    // base plus these recorded patches fully describes the current policy too.
-    this.restoredWithoutInputContext = false;
   }
 
   get stats(): OsmChangesetStats {

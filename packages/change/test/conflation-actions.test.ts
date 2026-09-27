@@ -2,21 +2,20 @@ import { Osm } from "@osmix/core";
 import { describe, expect, it } from "vitest";
 
 import {
-  buildConflationActionDecision,
-  buildConflationBulkDecisionResult,
-  conflationEffectiveStatus,
   discoverConflationCandidates,
-  filterConflationCandidates,
   resolveConflationActions,
   summarizeConflationCandidates,
 } from "../src/conflation.ts";
 import { merge } from "../src/merge.ts";
+import type { MergePlan, PlanProposalEffect } from "../src/plan/types.ts";
 import type {
   OsmConflationAutomatic,
+  OsmConflationCandidate,
   OsmConflationDecision,
   OsmConflationEffectiveStatus,
+  OsmConflationOptions,
 } from "../src/types.ts";
-import { withMatchingDecisions } from "./helpers/plan.ts";
+import { findProposal, planAndApply, withMatchingDecisions } from "./helpers/plan.ts";
 
 interface DecisionScenario {
   name: string;
@@ -146,15 +145,64 @@ function createFixture(
   return { base, patch, options, discovery, candidate };
 }
 
+/** The effective status of one candidate under `decisions`, as the review counts see it. */
+function effectiveStatus(
+  candidate: OsmConflationCandidate,
+  decisions: readonly OsmConflationDecision[],
+): OsmConflationEffectiveStatus {
+  const summary = summarizeConflationCandidates([candidate], decisions);
+  const statuses = ["accepted", "automatic", "review", "blocked", "unmatched", "rejected"] as const;
+  const status = statuses.find((key) => summary[key] === 1);
+  if (!status) throw Error(`No status for ${candidate.id}`);
+  return status;
+}
+
+/** Plan the fixture's merge with matching decisions written as candidate decisions. */
+function planFixture(
+  base: Osm,
+  patch: Osm,
+  matching: Omit<OsmConflationOptions, "decisions">,
+  decisions: readonly OsmConflationDecision[],
+) {
+  return planAndApply(
+    base,
+    patch,
+    withMatchingDecisions(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching },
+      decisions,
+    ),
+  );
+}
+
+/** What the plan does with the fixture's copy and connect proposals. */
+function actionEffects(plan: MergePlan) {
+  return {
+    copy: findProposal(plan, "copy:n101>n1").effect,
+    connect: findProposal(plan, "connect:n101>n1").effect,
+  };
+}
+
+function expectedEffect(selected: boolean, status: OsmConflationEffectiveStatus) {
+  if (selected) return "applied" satisfies PlanProposalEffect;
+  return status === "review" ? "needs-decision" : "skipped";
+}
+
 describe("resolved matching actions", () => {
-  it.each(scenarios)("resolves and generates $name consistently", async (scenario) => {
+  it.each(scenarios)("resolves and plans $name consistently", async (scenario) => {
     const { base, patch, options, candidate } = createFixture(false, scenario.automatic);
     const decisions = scenario.decision ? [scenario.decision] : [];
     expect(resolveConflationActions(candidate, scenario.decision)).toEqual({
       transferProperties: scenario.transferProperties,
       attachNetwork: scenario.attachNetwork,
     });
-    expect(conflationEffectiveStatus(candidate, decisions)).toBe(scenario.status);
+    expect(effectiveStatus(candidate, decisions)).toBe(scenario.status);
+    const { plan } = planFixture(base, patch, options, decisions);
+    expect(actionEffects(plan)).toEqual({
+      copy: expectedEffect(scenario.transferProperties, scenario.status),
+      connect: expectedEffect(scenario.attachNetwork, scenario.status),
+    });
     const result = await merge(
       base,
       patch,
@@ -174,7 +222,7 @@ describe("resolved matching actions", () => {
     expect(result.ways.getById(10)).toEqual(base.ways.getById(10));
   });
 
-  it("treats neither action as skipped in generated output, status, summaries, and filters", async () => {
+  it("treats neither action as skipped in the plan, its result, status, and summaries", () => {
     const { base, patch, options, discovery, candidate } = createFixture();
     const decision: OsmConflationDecision = {
       candidateId: candidate.id,
@@ -182,150 +230,73 @@ describe("resolved matching actions", () => {
       transferProperties: false,
       attachNetwork: false,
     };
-    const result = await merge(
-      base,
-      patch,
-      withMatchingDecisions(
-        base,
-        patch,
-        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
-        [decision],
-      ),
-      () => {},
-    );
+    const { plan, osm: result } = planFixture(base, patch, options, [decision]);
     expect(result.nodes.getById(1)?.tags).toEqual({ name: "Base" });
     expect(result.ways.getById(20)?.refs).toEqual([101, 102]);
-    expect(conflationEffectiveStatus(candidate, [decision])).toBe("rejected");
+    expect(actionEffects(plan)).toEqual({ copy: "skipped", connect: "skipped" });
+    expect(plan.matching?.outcome.summary).toMatchObject({ appliedFeatures: 0 });
+    expect(effectiveStatus(candidate, [decision])).toBe("rejected");
     expect(summarizeConflationCandidates(discovery.candidates, [decision])).toMatchObject({
       automatic: 0,
       rejected: 1,
     });
-    expect(
-      filterConflationCandidates(discovery.candidates, { status: "rejected" }, [decision]),
-    ).toContainEqual(candidate);
   });
 
-  it("changes one row choice while preserving the other, including automatic defaults", () => {
-    const { candidate } = createFixture();
-    const connectOnly = buildConflationActionDecision(
-      candidate,
-      undefined,
-      "transfer-properties",
-      false,
-    );
-    expect(connectOnly).toEqual({
-      candidateId: candidate.id,
-      action: "accept",
-      transferProperties: false,
-      attachNetwork: undefined,
-    });
-    expect(resolveConflationActions(candidate, connectOnly)).toEqual({
-      transferProperties: false,
-      attachNetwork: true,
-    });
-    const confirmation = buildConflationBulkDecisionResult([candidate], [connectOnly], {
-      action: "attach-network",
-      filter: {},
-    });
-    expect(confirmation.preview.changedCandidates).toBe(1);
-    expect(confirmation.decisions[0]?.attachNetwork).toBe(true);
-    const neither = buildConflationActionDecision(candidate, connectOnly, "attach-network", false);
-    expect(resolveConflationActions(candidate, neither)).toEqual({
-      transferProperties: false,
-      attachNetwork: false,
-    });
-    expect(conflationEffectiveStatus(candidate, [neither])).toBe("rejected");
-    const copyOnly = buildConflationActionDecision(candidate, neither, "transfer-properties", true);
-    expect(resolveConflationActions(candidate, copyOnly)).toEqual({
-      transferProperties: true,
-      attachNetwork: false,
-    });
-    const both = buildConflationActionDecision(candidate, copyOnly, "attach-network", true);
-    expect(resolveConflationActions(candidate, both)).toEqual({
-      transferProperties: true,
-      attachNetwork: true,
-    });
-    expect(resolveConflationActions(candidate)).toEqual(resolveConflationActions(candidate, both));
-  });
-
-  it.each(scenarios)("row and bulk choices agree after $name", (scenario) => {
-    const { candidate, discovery } = createFixture(false, scenario.automatic);
-    const actions = ["transfer-properties", "attach-network"] as const;
-    for (const action of actions) {
-      const row = buildConflationActionDecision(candidate, scenario.decision, action, true);
-      const bulk = buildConflationBulkDecisionResult(
-        discovery.candidates,
-        scenario.decision ? [scenario.decision] : [],
-        { action, filter: { sourceId: candidate.sourceId } },
-      );
-      const bulkDecision = bulk.decisions.find((decision) => decision.candidateId === candidate.id);
-      expect(bulk.preview.eligibleCandidates).toBe(1);
-      expect(resolveConflationActions(candidate, bulkDecision)).toEqual(
-        resolveConflationActions(candidate, row),
-      );
-      expect(resolveConflationActions(candidate, row)).toEqual({
-        transferProperties: action === "transfer-properties" || scenario.transferProperties,
-        attachNetwork: action === "attach-network" || scenario.attachNetwork,
-      });
-    }
-  });
-
-  it("never enables blocked attachment and preserves safe copying independently", async () => {
-    const { base, patch, options, candidate, discovery } = createFixture(true);
+  it("never enables blocked attachment and preserves safe copying independently", () => {
+    const { base, patch, options, candidate } = createFixture(true);
     expect(candidate.networkAttachment?.status).toBe("blocked");
     const legacy: OsmConflationDecision = { candidateId: candidate.id, action: "accept" };
     expect(resolveConflationActions(candidate, legacy)).toEqual({
       transferProperties: true,
       attachNetwork: false,
     });
-    const neither = buildConflationActionDecision(candidate, legacy, "transfer-properties", false);
-    const blockedOnly = buildConflationActionDecision(candidate, neither, "attach-network", true);
+    const blockedOnly: OsmConflationDecision = {
+      candidateId: candidate.id,
+      action: "accept",
+      transferProperties: false,
+      attachNetwork: true,
+    };
     expect(resolveConflationActions(candidate, blockedOnly)).toEqual({
       transferProperties: false,
       attachNetwork: false,
     });
-    expect(conflationEffectiveStatus(candidate, [blockedOnly])).toBe("blocked");
-    const row = buildConflationActionDecision(candidate, blockedOnly, "transfer-properties", true);
-    const bulk = buildConflationBulkDecisionResult(discovery.candidates, [blockedOnly], {
-      action: "transfer-properties",
-      filter: { sourceId: candidate.sourceId },
+    expect(effectiveStatus(candidate, [blockedOnly])).toBe("blocked");
+
+    // Accepting the blocked connection itself changes nothing.
+    const accepted = planAndApply(base, patch, {
+      mergeIdenticalPoints: false,
+      createIntersections: false,
+      matching: options,
+      decisions: [
+        { proposalId: "connect:n101>n1", action: "accept" },
+        { proposalId: "copy:n101>n1", action: "reject" },
+      ],
     });
-    expect(bulk.decisions).toEqual([row]);
-    expect(row).toMatchObject({ transferProperties: true, attachNetwork: false });
-    const blockedBulk = buildConflationBulkDecisionResult(discovery.candidates, [row], {
-      action: "attach-network",
-      filter: { sourceId: candidate.sourceId },
-    });
-    expect(blockedBulk.preview.eligibleCandidates).toBe(0);
-    expect(blockedBulk.decisions).toEqual([row]);
-    const result = await merge(
-      base,
-      patch,
-      withMatchingDecisions(
-        base,
-        patch,
-        { mergeIdenticalPoints: false, createIntersections: false, matching: options },
-        [row],
-      ),
-      () => {},
-    );
+    expect(actionEffects(accepted.plan)).toEqual({ copy: "skipped", connect: "blocked" });
+    expect(accepted.osm.ways.getById(20)?.refs).toEqual([101, 102]);
+
+    const copyOnly: OsmConflationDecision = {
+      candidateId: candidate.id,
+      action: "accept",
+      transferProperties: true,
+      attachNetwork: false,
+    };
+    const { plan, osm: result } = planFixture(base, patch, options, [copyOnly]);
+    expect(actionEffects(plan)).toEqual({ copy: "applied", connect: "blocked" });
     expect(result.nodes.getById(1)?.tags).toEqual({ name: "Imported" });
     expect(result.ways.getById(20)?.refs).toEqual([101, 102]);
   });
 
   it("keeps network attachment eligible when there are no tags to copy", () => {
-    const { candidate, discovery } = createFixture(false, "high-confidence", []);
+    const { base, patch, options, candidate } = createFixture(false, "high-confidence", []);
     expect(candidate.propertyTransfer.status).toBe("blocked");
     const decision: OsmConflationDecision = { candidateId: candidate.id, action: "accept" };
     expect(resolveConflationActions(candidate, decision)).toEqual({
       transferProperties: false,
       attachNetwork: true,
     });
-    const bulk = buildConflationBulkDecisionResult(discovery.candidates, [], {
-      action: "transfer-properties",
-      filter: { sourceId: candidate.sourceId },
-    });
-    expect(bulk.preview.eligibleCandidates).toBe(0);
-    expect(bulk.decisions).toEqual([]);
+    const { plan, osm: result } = planFixture(base, patch, options, [decision]);
+    expect(actionEffects(plan)).toEqual({ copy: "blocked", connect: "applied" });
+    expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
   });
 });

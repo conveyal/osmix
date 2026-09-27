@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  applyChangesetToOsm,
+  applyPlan,
   fromPbf,
-  generateChangeset,
-  generateConflationArtifacts,
   merge,
+  type MergePlanOptions,
   Osm,
-  type OsmConflationDecision,
+  type PlanDecision,
+  planMerge,
   type OsmNode,
   type OsmWay,
   toPbfBuffer,
@@ -66,69 +66,63 @@ describe("merge-process guide", () => {
     );
     const originalBase = entities(base);
     const originalPatch = entities(patch);
-    const direct = applyChangesetToOsm(generateChangeset(base, patch, { directMerge: true }));
+    const plan = (options: MergePlanOptions) => planMerge(base, patch, options, () => {});
+
+    // Direct changes only: every patch entity is added beside the base.
+    const direct = applyPlan(plan({ mergeIdenticalPoints: false, createIntersections: false })).osm;
     expect(entities(direct)).toEqual({
       nodes: [...originalBase.nodes, ...originalPatch.nodes],
       ways: [...originalBase.ways, ...originalPatch.ways],
       relations: [],
     });
 
-    const nodes = generateChangeset(base, patch, { directMerge: true, deduplicateNodes: true });
-    const nodeResult = applyChangesetToOsm(nodes);
-    expect([...nodeResult.nodes.sorted()].map((node) => node.id)).toEqual([1, 2, 201, 301, 302]);
-    expect(nodeResult.ways.getById(20)?.refs).toEqual([1, 2]);
-
-    const options = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
-    const exact = applyChangesetToOsm(generateChangeset(base, patch, options));
+    // Identity: 101 and 102 sit on 1 and 2, so they merge, and way 20 becomes way 10.
+    const identityPlan = plan({ createIntersections: false });
+    expect(
+      [...identityPlan.proposals.values()]
+        .filter((proposal) => proposal.kind === "exact-merge" || proposal.kind === "way-reconcile")
+        .map(({ id, effect }) => [id, effect]),
+    ).toEqual([
+      ["exact:n101>n1", "applied"],
+      ["exact:n102>n2", "applied"],
+      ["reconcile:w20>w10", "applied"],
+    ]);
+    const exact = applyPlan(identityPlan).osm;
+    expect([...exact.nodes.sorted()].map((node) => node.id)).toEqual([1, 2, 201, 301, 302]);
     expect([...exact.ways.sorted()]).toEqual([originalBase.ways[0], originalPatch.ways[1]]);
-    expect([...exact.nodes.sorted()]).toEqual([...nodeResult.nodes.sorted()]);
 
+    // Matching copies 201's tag onto 1; 201 itself stays.
     const conflation = { propertyKeys: ["tactile_paving"], attachNetwork: false };
-    const matching = generateConflationArtifacts(base, patch, { ...options, conflation });
-    expect(entities(matching.ordinaryBaseline)).toEqual(entities(exact));
-    expect(matching.result.nodes.getById(1)).toEqual({
+    const matchingPlan = plan({ createIntersections: false, matching: conflation });
+    const matching = applyPlan(matchingPlan).osm;
+    expect(matching.nodes.getById(1)).toEqual({
       id: 1,
       lon: 0,
       lat: 0,
       tags: { tactile_paving: "yes" },
     });
-    expect([...matching.result.ways.sorted()]).toEqual([...exact.ways.sorted()]);
-    expect(matching.result.nodes.getById(201)).toEqual(patch.nodes.getById(201));
-    expect(matching.outcome.features.find((feature) => feature.sourceId === 201)).toMatchObject({
-      copiedKeys: ["tactile_paving"],
-    });
+    expect([...matching.ways.sorted()]).toEqual([...exact.ways.sorted()]);
+    expect(matching.nodes.getById(201)).toEqual(patch.nodes.getById(201));
+    expect(
+      matchingPlan.matching?.outcome.features.find((feature) => feature.sourceId === 201),
+    ).toMatchObject({ copiedKeys: ["tactile_paving"] });
 
-    const final = applyChangesetToOsm(
-      generateChangeset(matching.result, patch, { createIntersections: true }),
-    );
-    expect(final.nodes.getById(303)).toEqual({
-      id: 303,
+    // Crossings: way 30 crosses way 10 at a new node, a new entity with a negative ID.
+    const final = await merge(base, patch, { matching: conflation }, () => {});
+    expect(final.nodes.getById(-1)).toEqual({
+      id: -1,
       lon: 0.00075,
       lat: 0,
       tags: { crossing: "yes" },
     });
     expect([...final.nodes.sorted()]).toEqual([
-      ...matching.result.nodes.sorted(),
-      final.nodes.getById(303),
+      final.nodes.getById(-1),
+      ...matching.nodes.sorted(),
     ]);
     expect([...final.ways.sorted()]).toEqual([
-      { id: 10, refs: [1, 303, 2], tags: { highway: "footway", name: "Base sidewalk" } },
-      { id: 30, refs: [301, 303, 302], tags: { highway: "footway", name: "New link" } },
+      { id: 10, refs: [1, -1, 2], tags: { highway: "footway", name: "Base sidewalk" } },
+      { id: 30, refs: [301, -1, 302], tags: { highway: "footway", name: "New link" } },
     ]);
-    // merge() plans the same result in one pass; its new crossing node is a new entity, so it
-    // gets a negative ID where the staged changeset allocated 303.
-    const merged = await merge(base, patch, { matching: conflation }, () => {});
-    expect(merged.nodes.getById(-1)).toEqual({ ...final.nodes.getById(303), id: -1 });
-    const renumber = (ref: number) => (ref === 303 ? -1 : ref);
-    const expected = entities(final);
-    expect(entities(merged)).toEqual({
-      nodes: [
-        { ...final.nodes.getById(303)!, id: -1 },
-        ...expected.nodes.filter((node) => node.id !== 303),
-      ],
-      ways: expected.ways.map((way) => ({ ...way, refs: way.refs.map(renumber) })),
-      relations: expected.relations,
-    });
     expect(entities(base)).toEqual(originalBase);
     expect(entities(patch)).toEqual(originalPatch);
     await expectEntityRoundTrip(final);
@@ -177,36 +171,28 @@ describe("merge-process guide", () => {
       const copy = action !== "connect";
       const connect = action !== "copy";
       const remove = action === "copy-connect-remove";
-      const decisions: OsmConflationDecision[] = [
-        {
-          candidateId: "way:20->10",
-          action: "accept",
-          transferProperties: copy,
-          attachNetwork: false,
-          removeWay: remove,
-        },
-        {
-          candidateId: "node:102->2",
-          action: "accept",
-          transferProperties: false,
-          attachNetwork: connect,
-        },
+      const decisions: PlanDecision[] = [
+        { proposalId: "copy:w20>w10", action: copy ? "accept" : "reject" },
+        { proposalId: "connect:n102>n2", action: connect ? "accept" : "reject" },
+        ...(remove ? [{ proposalId: "remove:w20>w10", action: "accept" as const }] : []),
       ];
-      const generated = generateConflationArtifacts(
+      const generated = planMerge(
         base,
         patch,
         {
-          directMerge: true,
-          conflation: {
+          mergeIdenticalPoints: false,
+          createIntersections: false,
+          matching: {
             propertyKeys: ["name"],
             attachNetwork: true,
             allowWayRemoval: true,
             automatic: "none",
           },
+          decisions,
         },
-        decisions,
+        () => {},
       );
-      const result = generated.result;
+      const result = applyPlan(generated).osm;
       expect([...result.ways.sorted()]).toEqual([
         {
           id: 10,
@@ -231,7 +217,8 @@ describe("merge-process guide", () => {
       ]);
       if (remove) {
         expect(
-          generated.outcome.features.find((feature) => feature.sourceId === 20)?.wayRemoval,
+          generated.matching?.outcome.features.find((feature) => feature.sourceId === 20)
+            ?.wayRemoval,
         ).toMatchObject({ orphanNodeIds: [], retainedTaggedNodeIds: [101] });
       }
       await expectEntityRoundTrip(result);

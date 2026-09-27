@@ -2,7 +2,7 @@ import { ChangesSummary, ChangesFilters } from "@osmix/app-components";
 import { type OsmixAppRemote, remoteAtom } from "@osmix/app-core";
 import { changesetStatsAtom } from "@osmix/app-core";
 import { createStore, Provider } from "jotai";
-import type { OsmConflationRoutingDiagnostics } from "osmix";
+import type { MergePlanOverview } from "osmix";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -55,7 +55,7 @@ describe("merge inline guidance", () => {
       after: { components: 1, edges: 4, nodes: 4, routableNodes: 4 },
       delta: { components: -1, edges: 2, nodes: 1, routableNodes: 1 },
     };
-    const diagnostics: OsmConflationRoutingDiagnostics = { car: mode, walk: mode };
+    const diagnostics: MergePlanOverview["diagnostics"]["routing"] = { car: mode, walk: mode };
     const html = renderToStaticMarkup(createElement(ConflationRoutingDiagnostics, { diagnostics }));
 
     expect(html).toContain("is the base dataset");

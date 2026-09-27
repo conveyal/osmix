@@ -2,11 +2,7 @@ import { getFixtureFileReadStream, PBFs } from "@osmix/test-utils/fixtures";
 import { describe, expect, it } from "vitest";
 
 import { fromPbf, merge, Osm, toPbfBuffer } from "../src/index.ts";
-import {
-  canonicalOsmSha256,
-  profileMerge,
-  profileWorkerConflation,
-} from "./merge-profile-harness.ts";
+import { canonicalOsmSha256, profileMerge } from "./merge-profile-harness.ts";
 import {
   createMonacoRoutingPatch,
   createSyntheticConflationRoutingInputs,
@@ -73,55 +69,6 @@ describe("merge performance harness", () => {
       intersectionPointsFound: 3,
       intersectionNodesCreated: 3,
       intersectionNodesRemoved: 0,
-    });
-  });
-
-  it("profiles worker conflation generation with routing safety diagnostics", async () => {
-    const { base, patch } = createSyntheticConflationRoutingInputs();
-    const report = await profileWorkerConflation(base, patch, {
-      directMerge: true,
-      deduplicateNodes: true,
-      deduplicateWays: true,
-      createIntersections: false,
-      conflation: {
-        propertyKeys: ["name"],
-        attachNetwork: true,
-        maxDistanceMeters: 1,
-        automatic: "high-confidence",
-      },
-    });
-
-    expect(report.stages.map(({ name }) => name)).toEqual([
-      "register-worker-inputs",
-      "worker-discover-conflation-candidates",
-      "worker-generate-conflation-changeset",
-      "worker-apply-conflation-result",
-      "fingerprint-canonical-entities",
-      "fingerprint-pbf-output",
-    ]);
-    expect(report.output).toEqual({ nodes: 82, ways: 80, relations: 0 });
-    expect(
-      report.stages.find(({ name }) => name === "worker-discover-conflation-candidates")
-        ?.operations,
-    ).toMatchObject({
-      candidateTotal: 81,
-      candidateAutomatic: 1,
-      candidateReview: 0,
-      candidateBlocked: 0,
-      candidateUnmatched: 80,
-    });
-    const generation = report.stages.find(
-      ({ name }) => name === "worker-generate-conflation-changeset",
-    )?.operations;
-    expect(generation).toMatchObject({
-      totalChanges: 82,
-      nodeChanges: 42,
-      wayChanges: 40,
-      carDeltaRoutableNodes: 0,
-      carDeltaEdges: 0,
-      carDeltaComponents: 0,
-      walkDeltaRoutableNodes: -1,
-      walkDeltaComponents: -1,
     });
   });
 

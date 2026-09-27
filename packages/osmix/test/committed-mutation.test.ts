@@ -42,44 +42,6 @@ function inputs() {
 }
 
 describe("committed remote mutations", () => {
-  it("identifies a committed changeset when synchronization fails and retries without reapplying", async () => {
-    const { base, patch } = inputs();
-    using remote = new SyncFailureRemote();
-    await remote.initializeWorkerPool(1, undefined, undefined, true);
-    await remote.transferIn(base);
-    await remote.transferIn(patch);
-    await remote.discoverConflation(base.id, patch.id, {
-      propertyKeys: ["tactile_paving"],
-      attachNetwork: false,
-    });
-    const generation = await remote.generateConflationChangeset(base.id, { directMerge: true });
-    const outcome = structuredClone(generation.outcome);
-    const apply = vi.spyOn(remote.getWorker(), "applyChangesAndReplace");
-    remote.failNextSynchronization = true;
-    await expect(remote.applyChangesAndReplace(base.id)).rejects.toMatchObject({
-      name: "OsmixCommittedMutationError",
-      committed: true,
-      operation: "applyChangesAndReplace",
-      osmId: base.id,
-      cause: { message: "Simulated result synchronization failure" },
-    });
-    expect(apply).toHaveBeenCalledTimes(1);
-    expect(await remote.getWorker().nodesGetById(base.id, 1)).toMatchObject({
-      tags: { tactile_paving: "yes" },
-    });
-    await expect(remote.getChangesetPage(base.id, 0, 100)).rejects.toThrow("No active changeset");
-    expect(generation.outcome).toEqual(outcome);
-
-    await remote.synchronizeDataset(base.id);
-    const actual = await remote.get(base.id);
-    expect(actual.nodes.getById(1)?.tags?.["tactile_paving"]).toBe("yes");
-    expect(actual.nodes.getById(101)?.tags?.["tactile_paving"]).toBe("yes");
-    expect(apply).toHaveBeenCalledTimes(1);
-    await remote.restartForTest();
-    expect([...(await remote.get(base.id)).nodes.sorted()]).toEqual([...actual.nodes.sorted()]);
-    expect(generation.outcome).toEqual(outcome);
-  });
-
   it("identifies a committed plan application and restores the result without the plan", async () => {
     const { base, patch } = inputs();
     using remote = new SyncFailureRemote();
@@ -182,21 +144,19 @@ describe("committed remote mutations", () => {
     await remote.initializeWorkerPool(1, undefined, undefined, true);
     await remote.transferIn(base);
     await remote.transferIn(patch);
-    await remote.discoverConflation(base.id, patch.id, {
-      propertyKeys: ["tactile_paving"],
-      attachNetwork: false,
+    const planned = await remote.planMerge(base.id, patch.id, {
+      matching: { propertyKeys: ["tactile_paving"], attachNetwork: false },
     });
-    const generation = await remote.generateConflationChangeset(base.id, { directMerge: true });
-    const apply = vi.spyOn(remote.getWorker(), "applyChangesAndReplace");
+    const apply = vi.spyOn(remote.getWorker(), "applyMergePlan");
     remote.failNextReplication = true;
-    await expect(remote.applyChangesAndReplace(base.id)).rejects.toMatchObject({
+    await expect(remote.applyMergePlan(base.id)).rejects.toMatchObject({
       committed: true,
-      operation: "applyChangesAndReplace",
+      operation: "applyMergePlan",
       osmId: base.id,
       cause: { name: "OsmixRemoteStateError", operation: "dataset replication" },
     });
     expect(apply).toHaveBeenCalledTimes(1);
-    expect(generation.outcome.summary.copiedTagValues).toBe(1);
+    expect(planned.matching?.outcome.summary.copiedTagValues).toBe(1);
     await expect(remote.synchronizeDataset(base.id)).rejects.toMatchObject({
       name: "OsmixRemoteStateError",
       operation: "dataset replication",

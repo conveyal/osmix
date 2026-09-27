@@ -11,7 +11,7 @@ import {
   type MergePlanFilter,
   type MergePlanOverview,
   type MergePlanPage,
-  type OsmConflationCandidateView,
+  type OsmConflationCandidate,
   Osm,
   OsmixWorker,
   type PatchIdMode,
@@ -148,10 +148,7 @@ const handlers = {
   patchIds: (mode: PatchIdMode) => store.replace(startSession(store.current.fixture, mode)),
 };
 
-const candidate = (
-  distanceMeters: number,
-  targetId: number | null,
-): OsmConflationCandidateView => ({
+const candidate = (distanceMeters: number, targetId: number | null): OsmConflationCandidate => ({
   id: `node:101->${targetId ?? "none"}`,
   entityType: "node",
   sourceId: 101,

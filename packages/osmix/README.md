@@ -41,12 +41,7 @@ import { createRemote } from "osmix";
 using remote = await createRemote();
 const monaco = await remote.fromPbf(monacoPbf);
 const patch = await remote.fromPbf(patchPbf, { id: "patch" });
-const merged = await monaco.merge(patch, {
-  directMerge: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-  createIntersections: true,
-});
+const merged = await monaco.merge(patch);
 const rasterTile = await merged.getRasterTile([10561, 22891, 16]);
 console.log(rasterTile.byteLength);
 ```
@@ -76,8 +71,8 @@ pnpm --filter osmix profile:merge -- --scenario eastern-washington --runs 1 \
   --output /tmp/eastern-washington-merge.json
 ```
 
-The Yakima scenario uses `OsmixWorker.generateConflationChangeset`. Its generation stage includes CAR/WALK
-routing diagnostics and the automatic network-attachment CAR safety projection.
+Each run records the plan's phases (`plan-direct`, `plan-identity`, `plan-matching`, `plan-crossings`,
+`plan-check`) and the single build (`apply-plan`).
 
 Yakima requires `fixtures/yakima-full.osm.pbf` and `fixtures/yakima.osw.pbf`. Eastern Washington requires
 `fixtures/osmix-e_wa_osm.pbf` and `fixtures/east_washington_sidewalk_proviso_1.pbf`. The existing Eastern
@@ -89,15 +84,10 @@ system. `processPeakRssBytes` is the process-lifetime high-water mark, so later 
 earlier run's peak. CI verifies operation counts and semantic fingerprints, but intentionally has no timing
 threshold or compressed-PBF byte golden.
 
-### Generate changes and review matching
+### Plan and review a merge
 
-Ordinary `generateChangeset(base, patch, options)`, `OsmixWorker.generateChangeset()`, and `remote.generateChangeset()` accept `Partial<OsmChangesetOptions>`, containing only direct merge, node/way reconciliation, and intersection options. They reject any defined `conflation` value instead of silently omitting matching; `conflation: undefined` remains equivalent to omission. Runtime validation also covers JavaScript and structurally wider typed objects. Rejection preserves the existing active preview, review decisions, and datasets.
-
-For direct API calls, use `generateConflationChangeset(base, patch, { directMerge: true, conflation })` to build a matching preview, or `merge(base, patch, { directMerge: true, conflation })` to run the high-level pipeline. See the [ordinary preview and matching API guidance](../change/README.md#generate-an-ordinary-preview).
-
-Proximity matching for independently created imports is available as a separate opt-in review session. The
-recommended defaults use a 1-meter radius and schedule high-confidence actions automatically. Discovery and
-decision changes do not update the base dataset:
+`merge()` plans and applies in one call. To review first, plan in the worker, page through the imported
+features, decide the proposals that need you, and apply. Nothing changes until `applyMergePlan()`:
 
 ```ts check-docs worker-pbf-inputs
 import { createRemote } from "osmix";
@@ -106,134 +96,43 @@ using remote = await createRemote();
 const base = await remote.fromPbf(monacoPbf);
 const patch = await remote.fromPbf(patchPbf, { id: "imported-data" });
 
-const summary = await remote.discoverConflation(base.id, patch.id, {
-  propertyKeys: ["name", "operator", "surface"],
-  attachNetwork: true,
+const plan = await remote.planMerge(base.id, patch.id, {
+  matching: { propertyKeys: ["name", "operator", "surface"], attachNetwork: true },
 });
-const page = await remote.getConflationPage(base.id, 0, 25, { groupBySource: true });
+console.log(plan.summary.features, plan.diagnostics.routing.car.delta);
 
-// Page previews cover every candidate matching the worker's current filter, not
-// just the rows returned on this page.
-console.log(page.bulkActions["transfer-properties"]);
-await remote.applyConflationBulkDecision(base.id, {
-  action: "transfer-properties",
-  filter: { status: "review" },
-});
-
-const generated = await remote.generateConflationChangeset(base.id, {
-  directMerge: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-});
-console.log(summary, generated.outcome.summary, generated.routing.car, generated.routing.walk);
-await remote.applyChangesAndReplace(base.id);
-```
-
-Worker and remote `generateConflationChangeset(baseId, mergeOptions)` use the matching configuration and decisions retained by `discoverConflation()` and the review session. Passing `mergeOptions.conflation` does not replace that configuration; start discovery with the intended matching options. Ordinary stage options such as `directMerge` and node/way reconciliation still come from `mergeOptions`. Generate and apply the cumulative matching preview before requesting intersections.
-
-The worker preserves discovery settings, filters, decisions, and generated changes across recoverable worker restarts. The [guide](../../docs/merge-process.md#matching-rules) defines independent action selection and the scope of routing checks. `resolveConflationActions(candidate, decision?)` returns scheduled flags; use `buildConflationActionDecision()` to construct a row update:
-
-```ts check-docs
-import {
-  buildConflationActionDecision,
-  type OsmConflationCandidate,
-  type OsmConflationDecision,
-} from "osmix";
-
-function chooseCopyTags(
-  candidate: OsmConflationCandidate,
-  current: OsmConflationDecision | undefined,
-  selected: boolean,
-) {
-  return buildConflationActionDecision(candidate, current, "transfer-properties", selected);
+// Features that need a decision come first.
+await remote.setMergePlanFilter(base.id, { outcome: "needs-decision" });
+const page = await remote.getMergePlanPage(base.id, 0, 25);
+const proposal = page.features[0]?.proposals.find((item) => item.status === "review");
+if (proposal) {
+  await remote.setMergePlanDecisions(base.id, [{ proposalId: proposal.id, action: "accept" }]);
 }
+
+const osc = await remote.getMergePlanOsc(base.id);
+const applied = await remote.applyMergePlan(base.id);
+console.log(osc.length, applied.summary.features);
 ```
 
-Persist the returned decision with `setConflationDecision()`. The `"attach-network"` action works the same
-way for Connect network; `"remove-way"` selects removal independently. The helper preserves other choices without converting an automatically scheduled connection into explicit approval for removal. For backward compatibility, omitted copying/connection flags
-on a manually constructed accept decision select those eligible actions. Removal always requires explicit `removeWay: true`.
+`setMergePlanDecisions()` replaces every decision and replans only the phases they affect.
+`applyMergePlanBulk(baseId, { action, filter })` accepts, rejects, or clears decisions for every proposal the
+filter matches; accepting skips proposals with alternatives, which need an individual choice.
+`getMergePlanFeature()` returns one feature's matching evidence and the geometry of the base entities its
+proposals target, and `getMergePlanLayer()` returns every imported feature as GeoJSON with its outcome. The
+plan's rules are in the [merge-process guide](../../docs/merge-process.md).
 
-`generateConflationChangeset()` stages selected actions; `applyChangesAndReplace()` installs the result. See [review controls](../../docs/merge-process.md#review-controls), [scheduling rules](../../docs/merge-process.md#mp-m5), and [result interpretation](../../docs/merge-process.md#reading-the-result).
+After a worker restart the remote rebuilds each plan from its inputs, options, and decisions, but only when
+the restored inputs have the content hashes the plan was made from; otherwise it throws
+`OsmixPlanRecoveryError` and the plan must be made again.
 
-Optional `evidence.featureTypeConflicts` contains conflicting keys and their original typed `baseValue` and `patchValue`, independently of selected-tag `tagDiff`. The [classification policy](../../docs/merge-process.md#mp-m4) specifies how those conflicts constrain actions.
+If `applyMergePlan()`, `applyChangesAndReplace()`, or `merge()` updates the control worker but then fails to
+synchronize or retrieve the result, it throws `OsmixCommittedMutationError`. Its enumerable fields include
+`committed: true`, `operation`, and the surviving result's `osmId`; `cause` retains the underlying error. Do
+not repeat the mutation. Await `remote.synchronizeDataset(error.osmId)`, then retrieve and refresh that
+result. Terminal worker-pool failures remain terminal; a new session must load the original inputs again.
 
-#### Preview explicit imported-way removal
-
-Start `discoverConflation()` with `allowWayRemoval: true` to expose `candidate.wayRemoval`; this capability is off by default and never schedules removal. The optional assessment and `OsmConflationWayRemovalPreview` identify the imported/base way, original attributes, newly orphaned points to clean, tagged points to retain, branch connections, and blocking nodes/relations. Removing an imported way also removes its remaining attributes; copying selected tags stays a separate decision.
-
-See the authoritative [removal prerequisites and cleanup scope](../../docs/merge-process.md#mp-r1). Worker pages reassess removal dependencies after decisions change, including on other pages.
-
-After discovery and reviewing the plan, schedule removal through the same atomic source-selection API:
-
-```ts check-docs
-import {
-  buildConflationActionDecision,
-  type OsmConflationCandidate,
-  type OsmConflationDecision,
-  type OsmixRemote,
-} from "osmix";
-
-async function previewReviewedRemoval(
-  remote: OsmixRemote,
-  baseId: string,
-  candidate: OsmConflationCandidate,
-  current: OsmConflationDecision | undefined,
-) {
-  const decision = buildConflationActionDecision(candidate, current, "remove-way", true);
-  await remote.setConflationSourceDecision(baseId, candidate, decision);
-  return remote.generateConflationChangeset(baseId, { directMerge: true });
-}
-```
-
-Inspect `result.outcome.features[].wayRemoval` before calling `applyChangesAndReplace()`. Optional `summary.wayRemovalActions` and `summary.removedOrphanNodes` count actual generated removals, not eligibility. `summary.removedConnectionOrphanNodes` counts untagged imported points dropped because a connection left them unused. The existing detached outcome carries removal details through application; review choices and the latest generation recover through the existing worker journal. Input replacement invalidates stale choices, and any decision edit invalidates its generated preview. If ordinary exact reconciliation already handled a reviewed source, clear its explicit removal choice and regenerate instead of attributing that separate operation to removal.
-
-#### Review alternative targets and correct choices
-
-Merge groups possible targets under their imported feature. Only one target can have scheduled matching
-actions, including when Copy tags and Connect network are selected independently. Choosing a target selects
-its eligible configured copying/connection actions; removal requires its own explicit choice. An eligible checkbox on an
-unselected alternative also switches to that target, using the selected action without requiring both.
-Turning every action off leaves no selected target. **Leave unmatched** clears every alternative's matching actions while retaining ordinary
-imported additions under the direct/exact merge rules.
-
-Use `setConflationSourceDecision(baseId, source, selected)` for paged review controls. `source` identifies
-one `{ entityType, sourceId }`; `selected` is the chosen candidate decision, or `null` to leave the imported
-feature unmatched. The worker uses its complete discovery to reject sibling targets and preserve decisions
-for other imported features. It returns `{ summary, decisions }`; replace the client decision snapshot with
-the returned complete array so sibling and off-page choices stay synchronized. The standalone
-`buildConflationSourceDecision(candidates, decisions, source, selected)` helper provides the same replacement
-for clients holding the full discovery candidate collection and complete decision snapshot. Do not pass only
-a page of candidates to that helper. Single-decision and batch worker updates reject conflicting effective targets before changing
-saved decisions or invalidating a generated preview. The error identifies the imported feature and candidate
-IDs; its `conflict` object provides `entityType`, `sourceId`, `candidateIds`, and `message` for focusing review
-on that feature. Bulk selection skips ambiguous alternatives; resolve them individually.
-
-Use `getConflationPage(baseId, page, pageSize, { groupBySource: true })` to keep all alternatives together.
-In this mode, `pageSize` and `totalPages` count imported features, `totalSources` reports the number of
-matching source groups, and `groups` lists each group's entity type, source ID, and candidate IDs.
-`candidates` includes every alternative for those paged groups. An alternative outside the current filters
-has `matchesFilter: false`; label it as context. `totalCandidates` still counts only candidates that match
-the filters, and bulk previews and actions remain restricted to those matching candidates. Omitting the
-fourth argument retains ordinary flat candidate paging.
-
-If an older session already contains conflicting choices, its candidates remain readable and the page
-includes `validationConflict` with an affected imported feature and candidate IDs. Explicit source updates
-can correct one feature at a time while preserving other sources' existing conflicts. They cannot introduce
-new conflicts or bypass checks for competing uses of a base target. Bulk previews report no eligible changes,
-and generation remains blocked, until every conflict is corrected through explicit target choices or
-**Leave unmatched**. Raw single-decision and full-set updates remain strict.
-
-Before applying a cumulative matching preview, **Back to matching** returns from reconciliation, the preview,
-or a generation failure with the original loaded inputs, options, and decisions preserved. Correct the
-identified imported feature and regenerate the preview without reloading either file. Retrying an unchanged
-invalid decision set continues to report its conflict. Once the cumulative changes have been applied,
-intersection failures use the intersection retry path; returning to matching is not an undo operation.
-
-#### Understand the completed merge
-
-Worker/remote `generateConflationChangeset()` returns an `outcome` report with the generated preview. Retain that report with its run. Use the authoritative [result definitions](../../docs/merge-process.md#reading-the-result) and [workflow recovery rules](../../docs/merge-process.md#application-workflows) to distinguish generated work, committed changes, and completed results.
-
-If `remote.applyChangesAndReplace()` or `remote.merge()` updates the control worker but then fails to synchronize or retrieve the result, it throws `OsmixCommittedMutationError`. Its enumerable fields include `committed: true`, `operation`, and the surviving result's `osmId`; `cause` retains the underlying error. Do not repeat the mutation. Await `remote.synchronizeDataset(error.osmId)`, then retrieve and refresh that result. Synchronization copies the already committed dataset without generating or applying another changeset. For `merge()`, the consumed patch is removed from recovery state before result synchronization. An error from a rejected worker mutation has no committed marker. Terminal worker-pool failures remain terminal; synchronization cannot repair them, and a new session must load the original inputs again.
+Inspect's duplicate fixes use `planDeduplication(osmId)`: the changes open in `getChangesetPage()` and apply
+with `applyChangesAndReplace()`.
 
 #### Which mode am I in?
 
@@ -388,18 +287,9 @@ If a dataset transfer, rename, or deletion broadcast fails after only some
 workers may have committed it, the pool is disposed and later calls reject with
 `OsmixRemoteStateError` rather than reading divergent state.
 
-Each base dataset has one active generated changeset. The latest successful call to `generateChangeset()`
-or `generateConflationChangeset()` replaces that base's previous preview. After recovering the inputs, a
-restarted control worker restores that latest preview and the current changeset filters; it does not replay
-an older generation over it. Other base datasets retain their own previews. Changeset filters apply to all
-active previews; candidate filters remain specific to their matching session.
-
-Candidate review is independent of the active preview. Generating an ordinary changeset retains an otherwise
-valid matching session and its decisions. Editing or clearing those decisions, starting a replacement matching
-session, or calling `clearConflation()` invalidates only a preview generated from that session; a newer ordinary
-preview remains available. Replacing, deleting, or renaming an input invalidates the review sessions and
-generated previews that depend on it, including a dataset overwritten by a rename. Rerun discovery or
-generation against the new inputs; recovery never revives the invalidated state.
+A restarted control worker rebuilds each active merge plan and each dataset's duplicate fixes from the
+recovered inputs, and restores the current changeset filters. A plan whose restored inputs differ from the
+ones it was made from is dropped with `OsmixPlanRecoveryError` after everything else is restored.
 
 #### Low-level worker pools
 
@@ -551,25 +441,19 @@ spec-compliant without staging everything in memory.
 - `remote.fromGeoJSON(data, options?)` - Load in worker.
 - `remote.getVectorTile(osmId, tile)` - Generate MVT in worker.
 - `remote.getRasterTile(osmId, tile, tileSize?)` - Generate raster in worker.
-- `remote.merge(baseId, patchId, options?)` - Merge datasets in worker (legacy).
+- `remote.merge(baseId, patchId, options?)` - Plan and apply a merge in one call.
 - `dataset.merge(patch, options?)` - Merge datasets via dataset handles.
-- `remote.discoverConflation(baseId, patchId, options)` - Start a non-mutating imported-data match session.
-- `remote.getConflationSummary(baseId)` - Retrieve decision-aware candidate counts.
-- `remote.setConflationFilter(baseId, filter)` / `remote.getConflationPage(...)` - Page through candidate
-  evidence and review state.
-- `remote.setConflationDecision(baseId, decision)` / `remote.setConflationDecisions(...)` - Persist individual
-  or batch review decisions.
-- `remote.setConflationSourceDecision(baseId, source, selected)` - Atomically replace one imported feature's
-  selected target, or leave it unmatched with `null`, preserving unrelated decisions.
-- `remote.applyConflationBulkDecision(baseId, request)` - Atomically apply an action to all candidates matching
-  the request's filter and return preview counts, the updated summary, and the complete decision snapshot.
-- `remote.generateChangeset(baseId, patchId, options)` - Build an ordinary changeset using `Partial<OsmChangesetOptions>` that replaces the active
-  preview for this base while retaining an otherwise valid matching session. Defined `conflation` options reject before replacing a preview.
-- `remote.generateConflationChangeset(baseId, mergeOptions)` - Build one cumulative direct, exact, and fuzzy
-  changeset using the reviewed session's matching configuration, replace the active preview for this base, and return routing diagnostics and an outcome report.
-- `remote.clearConflation(baseId)` - Discard the active review session and any preview generated from it;
-  retain a newer ordinary preview.
-- `remote.applyChangesAndReplace(baseId)` - Apply the latest active preview and replace its base dataset.
+- `remote.planMerge(baseId, patchId, options?)` - Plan a merge for review; returns its overview.
+- `remote.getMergePlanOverview(baseId)` / `remote.getMergePlanPage(baseId, page, pageSize)` /
+  `remote.setMergePlanFilter(baseId, filter)` - Read the plan and page through its imported features.
+- `remote.getMergePlanFeature(baseId, featureKey)` / `remote.getMergePlanLayer(baseId)` - One feature's
+  evidence, and every feature as GeoJSON with its outcome.
+- `remote.setMergePlanDecisions(baseId, decisions)` / `remote.applyMergePlanBulk(baseId, request)` - Decide
+  proposals and replan.
+- `remote.getMergePlanOsc(baseId)` - The plan as an osmChange document.
+- `remote.applyMergePlan(baseId)` / `remote.clearMergePlan(baseId)` - Apply or discard the plan.
+- `remote.planDeduplication(osmId)` - Find duplicates inside one dataset for the changeset pages.
+- `remote.applyChangesAndReplace(osmId)` - Apply the duplicate fixes and replace the dataset.
 - `remote.synchronizeDataset(osmId)` - Synchronize an already committed result after a reported
   `OsmixCommittedMutationError`, without generating or applying changes again.
 - `remote.search(osmId, key, val?)` - Search by tag.

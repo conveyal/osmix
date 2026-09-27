@@ -64,16 +64,11 @@ console.log(`Serialized ${pbfBytes.byteLength} bytes`);
 const patchResponse = await fetch("./monaco-patch.pbf");
 const patchPbf = new Uint8Array(await patchResponse.arrayBuffer());
 const patchOsm = await fromPbf(patchPbf);
-const mergedOsm = await merge(osm, patchOsm, {
-  directMerge: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-  createIntersections: true,
-});
+const mergedOsm = await merge(osm, patchOsm);
 console.log(mergedOsm.id);
 ```
 
-The [merge-process guide](docs/merge-process.md) is the authoritative reference for input identity, stage order, defaults, matching and intersection rules, worked examples, and known limitations. The API enables only the stages requested above; `merge(base, patch)` without options returns the base unchanged.
+The [merge-process guide](docs/merge-process.md) is the authoritative reference for input identity, the plan's phases, defaults, matching and intersection rules, worked examples, and known limitations. `merge(base, patch)` uses the Merge app's defaults: identical points merge into the base, crossings connect, and matching runs only when configured. To review a merge first, use `planMerge` and `applyPlan`.
 
 ### Use in a Web Worker
 

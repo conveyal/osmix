@@ -3,8 +3,8 @@ import type { OsmNode, OsmRelation, OsmWay } from "@osmix/types";
 import { describe, expect, it } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset.ts";
-import { generateChangeset } from "../src/generate-changeset.ts";
 import { merge } from "../src/merge.ts";
+import { stagedChanges } from "./helpers/changes.ts";
 
 function createOsm(
   id: string,
@@ -624,26 +624,16 @@ describe("routing-safe merge reconciliation", () => {
         },
       ],
     );
-    const changeset = generateChangeset(
+    const changeset = stagedChanges(
       base,
       createOsm("patch", [{ id: 1, lon: -1, lat: 0, tags: { name: "Unrelated" } }]),
       { directMerge: true },
-      silent,
     );
 
     expect(() => applyChangesetToOsm(changeset)).not.toThrow();
   });
 
-  it("rejects direct merge plus intersections in one generated changeset", () => {
-    const base = createOsm("base", []);
-    const patch = createOsm("patch", []);
-
-    expect(() =>
-      generateChangeset(base, patch, { directMerge: true, createIntersections: true }, silent),
-    ).toThrow("generateChangeset cannot combine directMerge with createIntersections");
-  });
-
-  it("keeps high-level and generated changeset reconciliation in parity", async () => {
+  it("keeps merge and staged changeset reconciliation in parity", async () => {
     const base = createOsm(
       "base",
       [
@@ -663,7 +653,7 @@ describe("routing-safe merge reconciliation", () => {
     const options = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
 
     const highLevel = await merge(base, patch, { createIntersections: false }, silent);
-    const generated = applyChangesetToOsm(generateChangeset(base, patch, options, silent));
+    const generated = applyChangesetToOsm(stagedChanges(base, patch, options));
 
     expect([...highLevel.nodes].map((node) => node.id)).toEqual(
       [...generated.nodes].map((node) => node.id),

@@ -167,11 +167,8 @@ describe("intersection creation preserves imported junctions", () => {
     const worker = new TestWorker();
     worker.setOsm(base);
     worker.setOsm(patch);
-    await worker.generateChangeset(base.id, patch.id, { directMerge: true });
-    worker.applyChangesAndReplace(base.id);
-    expectPortalConnected(worker.getOsm(base.id), patch);
-    await worker.generateChangeset(base.id, patch.id, { createIntersections: true });
-    worker.applyChangesAndReplace(base.id);
+    worker.planMerge(base.id, patch.id, { mergeIdenticalPoints: false });
+    worker.applyMergePlan(base.id);
     await expectPortalAfterReload(worker.getOsm(base.id), patch);
   });
 

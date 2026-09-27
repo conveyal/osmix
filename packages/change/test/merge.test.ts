@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { applyChangesetToOsm } from "../src/apply-changeset";
 import { OsmChangeset } from "../src/changeset";
-import { generateChangeset } from "../src/generate-changeset";
+import { stagedChanges } from "./helpers/changes.ts";
 
 const sizes = (osm: Osm) => ({
   nodes: osm.nodes.size,
@@ -62,7 +62,7 @@ describe("merge osm", () => {
       },
     });
 
-    changeset = generateChangeset(base, patch, {
+    changeset = stagedChanges(base, patch, {
       directMerge: true,
       deduplicateNodes: true,
       deduplicateWays: true,

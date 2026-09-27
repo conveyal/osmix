@@ -8,12 +8,12 @@ The rules describe the agreed, supported behavior of this revision. Explicit [kn
 
 - [Inputs and identity](#inputs-and-identity)
 - [Worked merge: a sidewalk survey](#worked-merge)
-- [Defaults and stage order](#defaults-and-stage-order)
+- [The plan: phases, proposals, decisions](#defaults-and-stage-order)
 - [Direct merge and exact reconciliation](#direct-and-exact-rules)
 - [Imported-data matching](#matching-rules)
 - [Copy, connect, and remove: the same geometry](#action-example)
 - [Intersection creation and validation](#intersections-and-validation)
-- [Automatic and reviewed workflows](#application-workflows)
+- [Review plan and Apply automatically](#application-workflows)
 - [Reading the result](#reading-the-result)
 - [Known gaps and follow-ups](#known-gaps)
 - [Regression evidence](#regression-evidence)
@@ -38,16 +38,16 @@ A **base** is the existing dataset. A **patch** contains additions and updates. 
 **MP-I1 — Patch IDs follow the OSM convention.** A positive patch ID names an existing entity: base node `10` and patch node `10` are the same entity even if their coordinates or tags differ, and the patch version replaces it. Matching does not arbitrate these edits by version or timestamp. A negative patch ID is a new feature. Before planning, negative patch IDs move below the base's lowest ID (with references and members), so independent imports that both number new features from `-1` never collide. When a patch's positive IDs are not meant as edits, read every patch ID as new (`patchIds: "new"`, **Treat all as new** in the app); the plan counts the patch entities that would replace base entities so this is visible before applying.
 
 <a id="mp-i2"></a>
-**MP-I2 — “Authoritative base” has stage-specific boundaries.** Same-ID direct updates can replace base coordinates, tags, references, and relation members. Exact reconciliation chooses base IDs as survivors. Imported-data matching preserves the geometry of the ordinary direct/exact result. Later intersection creation can insert references into base ways or remap a shared junction.
+**MP-I2 — “Authoritative base” has phase-specific boundaries.** Same-ID direct updates can replace base coordinates, tags, references, and relation members. Identical-point merges choose base IDs as survivors. Imported-data matching preserves the geometry of the planned state it reads. Crossings can insert references into base ways or remap a shared junction, but never merge two base nodes.
 
 <a id="mp-i3"></a>
 **MP-I3 — Load the capabilities the operation needs.** The app requires both inputs in Full mode for merging. Auto must resolve to Full; View supports inspection but not Merge. A View dataset must be reloaded in Full mode. Memory capacity and browser buffer limits can prevent a Full load. The library needs resolved entities, complete required references, and the indexes used by the selected operations. Application rebuilds indexes before later spatial stages. A missing reference can cause generation or validation to fail; merging is not a general repair operation for incomplete extracts.
 
 <a id="mp-i4"></a>
-**MP-I4 — Source files and loaded state are different.** Low-level `merge()` returns a result without modifying either input object. Worker/remote `merge()` installs the result in place of the loaded base and removes the loaded patch. The app also changes its in-memory workflow state as stages are applied. None of these operations overwrites the original source files. Download explicitly writes an output file.
+**MP-I4 — Source files and loaded state are different.** `planMerge()`, `applyPlan()` and `merge()` return results without modifying either input object. Worker/remote `applyMergePlan()` and `merge()` install the result in place of the loaded base and remove the loaded patch. None of these operations overwrites the original source files. Download explicitly writes an output file.
 
 <a id="mp-i5"></a>
-**MP-I5 — Remove duplicates inside each input before merging.** Merge does not scan or fix duplicates inside one file. Open each input in the Inspect app first. Its scan finds nodes at the same seven-decimal coordinate and ways with identical ordered references, using the same compatibility checks as exact reconciliation. Applying the scan deletes each duplicate in favor of the compatible entity with the highest ID and rewrites way references and relation members to that survivor. Download the cleaned PBF and load it in Merge. Duplicates left inside the patch are passed to direct merge unchanged.
+**MP-I5 — Remove duplicates inside each input before merging.** Merge does not scan or fix duplicates inside one file. Open each input in the Inspect app first. Its scan (`planWithinDatasetDeduplication`) finds nodes at the same seven-decimal coordinate and ways with identical ordered references, using the same compatibility checks as exact reconciliation. Applying the scan deletes each duplicate in favor of the compatible entity with the highest ID and rewrites way references and relation members to that survivor. Download the cleaned PBF and load it in Merge. Duplicates left inside the patch are passed to direct merge unchanged.
 
 ### Example MP-E2: new IDs never collide; positive IDs edit whole entities
 
@@ -99,51 +99,41 @@ flowchart LR
   end
 ```
 
-### 2. Enable the intended stages
+### 2. Configure matching
 
 ```ts check-docs change-context
 import { merge } from "osmix";
 
 const result = await merge(base, patch, {
-  directMerge: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-  conflation: {
-    propertyKeys: ["tactile_paving"],
-    attachNetwork: false,
-  },
-  createIntersections: true,
+  matching: { propertyKeys: ["tactile_paving"], attachNetwork: false },
 });
 console.log(result.nodes.size, result.ways.size);
 ```
 
-Here `base` and `patch` are the loaded datasets in the tables. Copying tactile-paving attributes is enabled; network attachment and explicit way removal are not. The exact stage can still reconcile an exact duplicate, and intersections can still connect crossing paths.
+Here `base` and `patch` are the loaded datasets in the tables. Copying tactile-paving attributes is enabled; network attachment and explicit way removal are not. By default identical points still merge into the base, and crossings still connect.
 
 ```mermaid
 flowchart TD
-  Inputs["Untouched base + patch"] --> Direct["Direct changes"]
-  Direct --> Nodes["Exact node reconciliation"]
-  Nodes --> Ways["Exact way reconciliation"]
-  Ways --> Ordinary["Apply and index ordinary result"]
-  Inputs --> Discovery["Discover matches against original base"]
-  Discovery --> Choices["Resolve automatic rules and saved choices"]
-  Ordinary --> Matching["Apply selected matching actions and validate"]
-  Choices --> Matching
-  Matching --> Crossings["Create intersections in the merged network"]
-  Crossings --> Final["Apply, validate, inspect, export"]
+  Inputs["Untouched base + patch"] --> Direct["Direct: add new features, apply same-ID edits"]
+  Direct --> Identity["Identity: merge identical points, then identical ways"]
+  Identity --> Matching["Matching: nearby base features for what is left"]
+  Matching --> Crossings["Crossings: connect ways that cross"]
+  Crossings --> Check["Check: routing topology and integrity"]
+  Check --> Apply["Apply: one build, then validate"]
 ```
 
-### 3. Follow every entity through the stages
+Every phase records its changes in one plan; nothing is built until the plan is applied.
 
-| Stage                        | Nodes present                   | Ways and references                                  | Attribute changes                                                                      |
-| ---------------------------- | ------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Direct merge                 | `1, 2, 101, 102, 201, 301, 302` | `10:[1,2]`, `20:[101,102]`, `30:[301,302]`           | All input tags retained on their separate entities                                     |
-| Exact nodes                  | `1, 2, 201, 301, 302`           | `20` becomes `[1,2]`; other ways unchanged           | None                                                                                   |
-| Exact ways / ordinary result | Same as above                   | `10:[1,2]`, `30:[301,302]`; `20` represented by `10` | Base name wins; `Survey sidewalk` does not replace `Base sidewalk`                     |
-| Imported-data matching       | Same as above                   | Unchanged                                            | Node `1` gains `tactile_paving=yes`; `201` remains with its original position and tags |
-| Intersections / final result | `-1, 1, 2, 201, 301, 302`       | `10:[1,-1,2]`, `30:[301,-1,302]`                     | New node `-1` at `(0.00075,0)` has `crossing=yes`                                      |
+### 3. Follow every entity through the phases
 
-Exact reconciliation uses coordinates and ordered references, so it can represent `101`, `102`, and `20` by base entities without proximity matching. Matching finds `201 → 1` from the original inputs. Copying its tag does not remove `201`. Intersection creation then adds a shared point; it retains both way IDs.
+| Phase     | Proposals (applied)                                   | Nodes present                   | Ways and references                                  | Attribute changes                                                                      |
+| --------- | ----------------------------------------------------- | ------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Direct    | `add:w20`, `add:w30`, `add:n201`                      | `1, 2, 101, 102, 201, 301, 302` | `10:[1,2]`, `20:[101,102]`, `30:[301,302]`           | All input tags retained on their separate entities                                     |
+| Identity  | `exact:n101>n1`, `exact:n102>n2`, `reconcile:w20>w10` | `1, 2, 201, 301, 302`           | `10:[1,2]`, `30:[301,302]`; `20` represented by `10` | Base name wins; `Survey sidewalk` does not replace `Base sidewalk`                     |
+| Matching  | `copy:n201>n1`                                        | Same as above                   | Unchanged                                            | Node `1` gains `tactile_paving=yes`; `201` remains with its original position and tags |
+| Crossings | `xnode:w30\|w10@0.0007500,0.0000000`                  | `-1, 1, 2, 201, 301, 302`       | `10:[1,-1,2]`, `30:[301,-1,302]`                     | New node `-1` at `(0.00075,0)` has `crossing=yes`                                      |
+
+Identical-point merges use coordinates and ordered references, so they represent `101`, `102`, and `20` by base entities without proximity matching. Matching then reads the planned state: `101` and `102` are already base points, so only `201 → 1` is a candidate. Copying its tag does not remove `201`. The crossing adds a shared point; it retains both way IDs.
 
 ```mermaid
 flowchart LR
@@ -158,37 +148,37 @@ The six final nodes and two ways, their tags, and their references are asserted 
 
 <a id="defaults-and-stage-order"></a>
 
-## Defaults and stage order
+## The plan: phases, proposals, decisions
 
 <a id="mp-o1"></a>
-**MP-O1 — `merge()` uses the app's defaults.** `merge()` plans and applies in one call (`applyPlan(planMerge(...))`). Options change the defaults: `mergeIdenticalPoints`, `createIntersections`, `matching`, `patchIds`, and `decisions`.
+**MP-O1 — One plan per merge, applied once.** `planMerge(base, patch, options)` runs the phases in order and records every change as pending records in one overlay of the base; no phase builds the dataset. `applyPlan(plan)` materializes the records in a single build and validates the result (MP-V1). `merge()` is `applyPlan(planMerge(...))` with the Merge app's defaults:
 
-| Setting                     | `merge()` in change/facade; worker/remote `merge()` | Merge app automatic path | App reviewed path                         |
-| --------------------------- | --------------------------------------------------- | ------------------------ | ----------------------------------------- |
-| Direct merge                | Always                                              | On                       | Included in cumulative generation         |
-| Exact nodes and ways        | On (`mergeIdenticalPoints`)                         | On                       | Controlled by exact reconciliation choice |
-| Imported-data matching      | Off until `matching` is configured                  | Off until configured     | Optional discovery and decisions          |
-| Intersections               | On (`createIntersections`)                          | On                       | Separate later stage                      |
-| Within-file duplicate fixes | Not part of merge                                   | Not run; use Inspect     | Not run; use Inspect ([MP-I5](#mp-i5))    |
-| Applying generated previews | Caller responsibility for generator APIs            | Performed by workflow    | Requires the workflow's apply action      |
+| Setting                     | Default                             | Option                           |
+| --------------------------- | ----------------------------------- | -------------------------------- |
+| Direct and same-ID changes  | Always                              | `patchIds` (MP-I1)               |
+| Identical points and ways   | Merged automatically                | `mergeIdenticalPoints`           |
+| Imported-data matching      | Off until configured                | `matching`                       |
+| Crossings                   | Connected automatically             | `createIntersections`            |
+| Within-file duplicate fixes | Not part of merge ([MP-I5](#mp-i5)) | `planWithinDatasetDeduplication` |
 
-Matching configuration requires `propertyKeys` and `attachNetwork`. An empty key list disables copying. Radius defaults to **1 m**, `automatic` defaults to `high-confidence`, and `allowWayRemoval` defaults to false. `automatic: "none"` requires individual decisions for otherwise automatic actions. At least one of copying, attachment, or removal assessment must be enabled. Radius must be positive and finite; keys must be nonempty strings. Duplicate keys are deduplicated and sorted.
+Matching configuration requires `propertyKeys` and `attachNetwork`. An empty key list disables copying. Radius defaults to **1 m**, `automatic` defaults to `high-confidence`, and `allowWayRemoval` defaults to false. `automatic: "none"` puts otherwise automatic actions in review. At least one of copying, attachment, or removal assessment must be enabled. Radius must be positive and finite; keys must be nonempty strings. Duplicate keys are deduplicated and sorted.
 
 The app's initial opt-in form selects Copy tags with `barrier,crossing,kerb,tactile_paving`, a 1 m radius, and Connect network and removal off. Routing-affecting keys still require review; selecting a key is not approval of every candidate.
 
 <a id="mp-o2"></a>
-**MP-O2 — Discovery and application use different baselines.** In a plan (`merge()`, `planMerge`), matching discovers candidates on the plan's state after the direct and identity phases: targets are base entities, and imported entities identity already merged are not sources. The staged worker path below compares untouched patch entities only with the original base. Imported features never become new discovery targets through transitive matching. The ordinary result is direct merge plus the enabled exact stages. Matching changes are applied against that result; intersections come afterward.
+**MP-O2 — Each phase reads the state the earlier phases planned.** Matching discovers candidates on the planned state after the direct and identity phases: targets are base entities, and imported entities an identical-point merge consumed are not sources, so they never get a second, stale proposal. Imported features never become matching targets, so matches are never transitive. Crossings read the planned state after matching, including connections it made.
 
-The reviewed UI may show discovery before the exact reconciliation choice. It later regenerates the cumulative result from untouched inputs. A direct preview is not an already committed result that subsequent generation blindly edits.
+<a id="mp-p1"></a>
+**MP-P1 — Every change is a proposal of one imported feature.** A feature is a patch way with its vertices (a shared vertex belongs to the first way that uses it), a patch node no patch way uses, or a patch relation. Each proposal has a kind (`add`, `same-id-replace`, `exact-merge`, `way-reconcile`, `connect`, `copy-tags`, `remove-way`, `crossing-snap`, `crossing-node`), a status (automatic, review, blocked), reasons, and an effect (applied, skipped, blocked, needs decision). A feature's outcome is the most important effect among its proposals: needs decision, removed, merged, connected, replaced, added, unchanged.
 
-| API composition                                                         | Supported behavior                                                                                                                      |
-| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `merge(base, patch, options)`                                           | Plans with the app's defaults, applies once, returns the final dataset                                                                  |
-| `generateChangeset(...)`                                                | Returns an ordinary preview; rejects a defined `conflation` option                                                                      |
-| Direct merge plus intersections in one ordinary generation              | Rejected: new ways must first be applied and indexed                                                                                    |
-| `generateConflationArtifacts(...)` / `generateConflationChangeset(...)` | Requires direct merge and matching configuration; may include exact stages; rejects intersection creation in that cumulative generation |
-| Matching without direct merge                                           | Rejected because ordinary imported additions must be preserved                                                                          |
-| Applying a preview                                                      | Distinct from discovering or generating it; only application changes the loaded workflow result                                         |
+<a id="mp-p2"></a>
+**MP-P2 — Proposal IDs are stable.** IDs are built from original patch IDs, base IDs and seven-decimal coordinates (`exact:n-5>n123`, `connect:n-5>n123`, `copy:w-9>w44`, `remove:w-9>w44`, `xnode:w-9|w44@7.4211234,43.7312345`), so a decision survives replans, the patch-ID remap, **Treat all as new**, and worker restarts.
+
+<a id="mp-p3"></a>
+**MP-P3 — Decisions include or leave out; they never override a block.** Accepting a review proposal includes it; rejecting any decidable proposal leaves it out; clearing a decision restores the rule (automatic proposals included, review proposals waiting). Blocked proposals cannot be accepted. Direct changes are not decided one by one; decisions on them are ignored. A decision naming a proposal the plan does not have is kept and reported in `staleDecisions`, because another decision can make the proposal return. A proposal waiting for a decision is left out when the plan is applied.
+
+<a id="mp-p4"></a>
+**MP-P4 — A decision replans from its phase.** Changing decisions replans from the earliest phase of the proposals they name, restoring that phase's starting state first; matching discovery is reused when the identity phase is unchanged. The result is the plan a fresh `planMerge` with the same decisions would make. A crossing never merges two points that have an exact-merge proposal, so rejecting or not yet accepting an identical-point merge keeps the points separate.
 
 <a id="direct-and-exact-rules"></a>
 
@@ -321,14 +311,14 @@ Thus base `amenity=cafe` versus patch `amenity=school` hard-blocks matching acti
 - Reject/Skip schedules no matching actions. Leave unmatched rejects every alternative for the source. Both retain ordinary imported additions. Clearing a saved choice restores discovery defaults, potentially rescheduling automatic actions.
 - API accept decisions with omitted copy/connect flags select eligible actions; specify false when an action is unwanted. Omitted removal never authorizes removal. Rejected decisions ignore action flags.
 - Several sources competing for one target require review. Multiple node copies can be chosen; overlapping values follow deterministic candidate order, and only surviving writes receive outcome credit. Multiple node attachments to one target or multiple way actions to one target are rejected.
-- Bulk copy/connect operates across the current filtered collection, not just the visible page, and skips ambiguous or many-to-one cases. Bulk operations do not select removal.
-- Generation validates decisions against the complete discovery, untouched inputs, and current options. Public generation recomputes evidence; editing a candidate object cannot authorize an unsafe action. Changing configuration or inputs requires rediscovery and a new preview.
+- Bulk choices apply to every feature the review's filter matches, not just the visible page. Bulk include skips proposals with alternatives; bulk choices never change blocked proposals.
+- Accepting two alternatives for one source makes planning fail with a conflict that names the source and candidates; choose one. Changing configuration or inputs requires a new plan.
 
 <a id="mp-r1"></a>
 
 ### MP-R1 — Explicit way removal
 
-Enable `allowWayRemoval: true` to assess removal. An individual accepted decision must additionally contain `removeWay: true`. Automatic matching, ordinary acceptance, copying tags, and bulk connection never supply removal consent.
+Enable `allowWayRemoval: true` to assess removal. Removal is a `remove-way` proposal that is never automatic: only an individual accept decision on it removes the way. Automatic matching, copying tags, and bulk choices never supply removal consent.
 
 > **Separate tag copying from geometry removal**
 > Copying attributes from a matched imported way previously removed that way, which could disconnect imported branches even when network attachment was disabled. Tag copying changes only selected tag values relative to the ordinary direct/exact merge baseline; removal is a separate, default-off choice that requires a supported equivalent base counterpart, verified retained connections, and a preview before application. Retaining overlapping imported geometry is the accepted result whenever removal cannot be established safely, so importing accessibility or descriptive attributes cannot silently discard the user's network.
@@ -342,10 +332,10 @@ Enable `allowWayRemoval: true` to assess removal. An individual accepted decisio
 | Relations             | Involved source/target ways or affected points in relations block; relation membership is not silently removed                                                                                                                                                  |
 | Branches              | Every retained branch connection must already reference the required base point or have an eligible **explicitly accepted** node attachment with `attachNetwork: true`                                                                                          |
 | Automatic connections | Insufficient as a removal prerequisite, even if they would otherwise be scheduled                                                                                                                                                                               |
-| Revalidation          | Recheck the actual ordinary baseline plus all selected connections/copies before deleting anything. An exact-stage replacement can make a saved removal obsolete; clear it and regenerate.                                                                      |
+| Revalidation          | Recheck the planned state, with every accepted connection and copy, before deleting anything. When an identical-way merge already reconciled the way, no removal proposal exists and a saved removal decision is stale.                                         |
 | Cleanup               | Remove only untagged imported nodes newly orphaned by this removal, with no remaining way/relation references. Retain base, tagged, unrelated, and still-referenced points. A point a connection replaced is dropped by the connection (MP-M2), not by removal. |
 
-The preview shows the source and retained way IDs, original source tags, newly orphaned node IDs, retained tagged node IDs, required branch connections, blocked node IDs, and blocking relation IDs. A blocked-node list can represent geometry/routing problems as well as missing attachments. Values on the removed way are lost unless retained separately; copying them is a separate selection.
+The removal's evidence shows the source and retained way IDs, original source tags, newly orphaned node IDs, retained tagged node IDs, required branch connections, blocked node IDs, and blocking relation IDs. A blocked-node list can represent geometry/routing problems as well as missing attachments. Values on the removed way are lost unless retained separately; copying them is a separate selection.
 
 <a id="action-example"></a>
 
@@ -384,14 +374,14 @@ The three rows have named [MP-E3 tests](../packages/osmix/test/merge-process.tes
 ## Intersection creation and validation
 
 <a id="mp-j1"></a>
-**MP-J1 — Intersections are a later connectivity operation.** Surviving patch way IDs are compared with the merged dataset, including other imported ways. Rebuilt indexes include direct additions and accepted attachments. Geometric crossings between eligible ways with equal grade signatures may become shared nodes. There is no new global base-only-versus-base-only cleanup pass.
+**MP-J1 — Crossings are the last planning phase.** Surviving imported ways are compared with every way in the planned state, including other imported ways and accepted connections, found through the overlay's spatial index of pending geometry. Candidate ways are visited in ID order. Geometric crossings between eligible ways with equal grade signatures may become shared nodes, each an automatic `crossing-snap` or `crossing-node` proposal that a decision can reject. There is no global base-only-versus-base-only cleanup pass.
 
 | Rule                    | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Way eligibility         | Highway/footway-style ways under the current predicate; truthy `building`, `landuse`, or `natural` tags exclude a way. The area limitation in G2 applies.                                                                                                                                                                                                                                                                   |
 | Grade                   | Equal normalized `layer`, `level`, `bridge`, `tunnel`, and `covered` context for a new crossing                                                                                                                                                                                                                                                                                                                             |
 | Existing close vertex   | May reuse a vertex strictly less than 1 m from the computed crossing; this threshold is independent of imported-data matching radius. Reuse follows the node-identity rulebook (see MP-X1): no tag conflict, no routing change to the surviving base node, and a whole junction final validation accepts. Two base nodes are never merged, and a base node always survives, so base nodes are never removed from base ways. |
-| New node                | If supported reuse is unavailable, allocate a new unused safe integer ID at the crossing                                                                                                                                                                                                                                                                                                                                    |
+| New node                | If supported reuse is unavailable, add a new node at the crossing. It is a new entity, so it gets the next negative ID below every node in the planned state.                                                                                                                                                                                                                                                               |
 | Result                  | Insert shared references into existing ordered ways; keep way IDs. This does not split a way into multiple way entities.                                                                                                                                                                                                                                                                                                    |
 | Replaced imported point | When a crossing reuses a close vertex in place of an imported one, the imported point is dropped when no relation still references it (every way was rewritten, and its tags are already merged into the survivor). Base points are never removed. Counted as `intersectionNodesRemoved`.                                                                                                                                   |
 | Crossing tag            | New crossing nodes receive `crossing=yes`. Reused/shared nodes can gain it if absent; an existing crossing value is retained.                                                                                                                                                                                                                                                                                               |
@@ -403,94 +393,69 @@ Turning off imported-data matching does **not** make the entire workflow coordin
 <a id="mp-v1"></a>
 **MP-V1 — Application rejects new supported integrity violations.** Checks cover missing node/way/relation references, highways with fewer than two distinct nodes, detached restriction members, and incompatible interior grade connections. Existing base defects may remain. Inherited patch grade issues have limited allowances; patch missing references, degenerate highways, and patch-only restriction defects do not exempt new failures in the result. This is validation against known issues, not a guarantee that either input or the result is error-free.
 
-Matching additionally verifies preservation of the ordinary-result base topology. The worker's automatic-attachment CAR check compares routable-node, directed-edge, and weak-component counts for the automatic-attachment projection. Its scope differs from direct library calls. Neither those counts nor integrity checks prove that all routes, restrictions, accessibility modes, or travel permissions are unchanged; see [G3](#gap-g3).
+The plan runs the same checks before anything is built: `plan.diagnostics.integrity` lists new problems and `applyPlan` refuses a plan with any. Matching also verifies that base geometry and relation topology are unchanged. An automatic connection that would rewrite a car-routable imported way moves to review with `drivable-network` (`plan.diagnostics.demoted`), and `plan.diagnostics.routing` compares CAR and WALK routable nodes, directed edges and weak components of the base and the planned result. Neither those counts nor integrity checks prove that all routes, restrictions, accessibility modes, or travel permissions are unchanged; see [G3](#gap-g3).
 
 <a id="mp-v2"></a>
-**MP-V2 — A saved preview is bound to its inputs.** Serialized changesets carry versioned input identities. Restore against the original base and the original patches in generation order. Changed entities, coordinates, references, tags, or ordering covered by that identity invalidate restoration. Legacy snapshots without input identity data must pass base-only validation; supplying patches cannot grant new inherited exemptions. Storage ordering can affect identity hashes, which detect inconsistent inputs but do not authenticate a saved file. The app’s Download JSON changes action exports a diagnostic change array, not a restorable changeset snapshot. An outcome report alone is not a changeset or a backup of the inputs. Worker recovery must restore the latest generated changeset and associated reviewed state before application.
+**MP-V2 — A plan is rebuilt, never restored.** Plans are not serialized. After a worker restart the remote rebuilds each plan from its inputs, options and decisions, and only when the restored inputs have the content hashes the plan was made from; otherwise it reports `OsmixPlanRecoveryError` and the merge must be planned again. Content hashes identify indexed storage, including string-table and entity order; they detect inconsistent inputs but do not authenticate them. The osmChange download describes a plan's changes; it is not a backup of the inputs.
 
 <a id="application-workflows"></a>
 
-## Automatic and reviewed workflows
+## Review plan and Apply automatically
 
-### Automatic merge
+Both entry points plan the same merge from the same settings; they differ only in whether the plan stops for decisions.
 
 1. Remove duplicates inside each input in Inspect ([MP-I5](#mp-i5)), load both inputs in Full mode, and inspect their roles and identity assumptions.
-2. Configure optional matching. Removal remains an individual review action; use the reviewed workflow to select it.
-3. Check "Run every stage automatically, without review" and start the merge. Intermediate user checkpoints are skipped.
-4. Generate and apply the direct/exact result, with selected automatic matching when enabled.
-5. Run and apply intersections.
-6. Refresh the completed dataset and read the prominent applied/unresolved summary before downloading.
+2. Configure optional matching, whether identical points merge automatically, and whether every patch feature is new.
+3. **Apply automatically** plans and applies in one task (Plan merge, Apply plan, Refresh result). Proposals waiting for a decision are left out and reported.
+4. **Review plan** plans and stops. The review lists one row per imported feature, decisions first, with its outcome, proposals, reasons and evidence; the map colours each feature by outcome. Include or leave out proposals, or choose for every feature a filter matches; each choice replans. **Download osmChange (.osc)** writes the plan without applying it.
+5. **Apply plan** builds the result once and validates it. A plan with routing-integrity problems cannot be applied.
+6. Refresh the merged dataset and read the completion summary before downloading.
 
 ```mermaid
 flowchart TD
-  Ready["Full inputs and configuration"] --> Generate["Generate cumulative result"]
-  Generate --> Apply["Apply: commit boundary"]
-  Generate -->|"cancel before apply"| Cancelled["Stop without committing generated result"]
-  Apply --> Intersections["Generate and apply intersections"]
-  Intersections --> Refresh["Refresh completed dataset"]
-  Refresh --> Summary["Applied and unresolved summary"]
+  Ready["Full inputs and settings"] --> Plan["Plan merge"]
+  Plan -->|"Apply automatically"| Apply["Apply plan: commit boundary"]
+  Plan -->|"Review plan"| Review["Review features, decide, replan"]
+  Review --> Apply
+  Plan -->|"cancel before apply"| Cancelled["Stop; nothing committed"]
+  Apply --> Refresh["Refresh merged dataset"]
+  Refresh --> Summary["Completion summary"]
   Summary --> Download["Download"]
-  Intersections -->|"failure after prior commit"| Retry["Retain committed result; retry remaining stage"]
-  Refresh -->|"failure"| RetryRefresh["Refresh merged dataset"]
+  Refresh -->|"failure"| RetryRefresh["Refresh merged dataset again"]
   RetryRefresh --> Refresh
 ```
 
-Automatic mode completes with unresolved work reported; it does not silently accept ambiguous or blocked candidates. Unresolved does not necessarily mean the imported entity was omitted. Direct additions can remain disconnected or have attributes still uncopied.
-
-### Review each merge stage
-
-1. Select inputs, leave "Run every stage automatically" unchecked, and start the merge. Within-file duplicates are fixed beforehand in Inspect ([MP-I5](#mp-i5)).
-2. Generate and inspect the direct preview. This has not committed the cumulative merge.
-3. If matching is enabled, discover candidates from the original inputs, inspect evidence, and select actions. Review all alternatives for a source together.
-4. Choose exact reconciliation and generate the cumulative direct/exact/matching preview. Recheck removal dependencies and actual outcomes. Editing choices requires a new preview.
-5. Apply the cumulative preview.
-6. Generate, inspect, and apply intersections against that result.
-7. Refresh, inspect the completion summary, and download.
-
-```mermaid
-flowchart TD
-  Inputs["Untouched inputs"] --> Direct["Direct preview"]
-  Direct --> Review["Optional matching review"]
-  Review --> Exact["Choose exact reconciliation"]
-  Exact --> Preview["Cumulative preview"]
-  Preview -->|"edit choices"| Review
-  Preview --> Apply["Apply"]
-  Apply --> Intersections["Intersection preview and apply"]
-  Intersections --> Result["Refresh and completion summary"]
-```
+When a patch's positive IDs name base entities, the review says how many and offers **Treat all as new**, which replans with every patch feature new (MP-I1).
 
 <a id="review-controls"></a>
 
 ### Review controls and removal prerequisites
 
-**Compare** changes the highlighted source/target pair without selecting matching actions. The map uses base circles/solid lines and imported diamonds/dashed lines at their actual coordinates. **Match evidence and attributes** exposes selectable coordinates, measured differences, base/imported values, and text explanations for protected or routing-affecting keys. For ways, the displayed coordinates identify the endpoints. Filters, target choices, independent action toggles, comparison, and expanded evidence are keyboard accessible; a short distance does not override a blocked action.
+**Show on map and evidence** opens a feature: the map fits it and highlights it, and the row shows its matching evidence (selectable coordinates, measured differences, base and imported values, and explanations for protected or routing-affecting keys). Clicking a feature on the map opens its row. Filters, choices and evidence are keyboard accessible; a short distance does not override a blocked proposal.
 
-With **Review redundant way removal** enabled, automatic merge is unavailable. Use **Review connection at imported point…** for a branch prerequisite. If its connection is already scheduled automatically, **Confirm connection for removal** records explicit consent without toggling it off and on. Return to the way and select **Remove imported way** once eligible. Review the complete **Way removal preview** before **Apply cumulative merge**. Editing any choice clears that preview and requires regeneration. Select **Copy tags** separately for source values that should remain on the base.
-
-An older session can contain conflicting target decisions. Its candidates remain readable so each affected source can be corrected or left unmatched. Generation and bulk scheduling stay blocked until the complete decision set is valid. Before application, **Back to matching** preserves the original inputs/options/decisions for correction; it is not an undo action after commit.
+With **Review redundant way removal** enabled, a removal proposal stays blocked until the connections it needs are included; include them, then include the removal. Select **Copy tags** separately for source values that should remain on the base. **Back to inputs** discards the plan; nothing was changed.
 
 <a id="mp-w1"></a>
 
 ### MP-W1 — Cancellation and recovery
 
-| Situation                                  | Meaning and next step                                                                                                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Cancellation before application            | Generated work can be abandoned without installing it. Cancellation is checked at workflow boundaries; a running worker operation may finish first.                |
-| Request arrives after commit               | It cannot roll back the committed dataset. Treat commit status as authoritative rather than assuming the cancellation request won the race.                        |
-| Intersections fail after merge application | Keep the committed cumulative result and expose the remaining-stage retry. Do not present a fully completed download.                                              |
-| Result committed but UI refresh fails      | Refresh the merged dataset; do not rerun the merge against changed inputs. Completion/download stays unavailable until refresh succeeds.                           |
-| Worker/replica recovery                    | Restore current inputs and the latest generated/reviewed state; synchronize committed data before refreshing. A stale earlier preview must not replace newer work. |
-| Input replacement or rediscovery           | Clear stale decisions, generated removal evidence, and completion as appropriate. A new extracted base must not inherit the previous merge's completion summary.   |
-| Restart from source                        | Original files remain available. Reloading starts a new workflow; this is distinct from rollback of already committed in-memory work.                              |
+| Situation                             | Meaning and next step                                                                                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cancellation before application       | The plan is discarded without installing it. Cancellation is checked at workflow boundaries; a running worker operation may finish first.   |
+| Request arrives after commit          | It cannot roll back the committed dataset. Treat commit status as authoritative rather than assuming the cancellation request won the race. |
+| Result committed but UI refresh fails | Refresh the merged dataset; do not rerun the merge against changed inputs. Completion/download stays unavailable until refresh succeeds.    |
+| Worker/replica recovery               | Rebuild the plan from current inputs, options and decisions (MP-V2); synchronize committed data before refreshing.                          |
+| Input replacement                     | Discard the plan, its decisions and completion. A new extracted base must not inherit the previous merge's completion summary.              |
+| Restart from source                   | Original files remain available. Reloading starts a new workflow; this is distinct from rollback of already committed in-memory work.       |
 
-These states are exercised by the [application workflow tests](../apps/merge/tests/merge-workflow.test.ts), [worker tests](../packages/osmix/test/conflation-way-removal.test.ts), and [real-browser journey](../apps/merge/e2e/merge-base-loading.spec.ts). The app's review order and worker recovery are application behavior, not extra default stages in the library API.
+These states are exercised by the [merge outcome tests](../apps/merge/tests/merge-outcome.test.ts), [worker plan sessions](../packages/osmix/test/worker-plan-lifecycle.test.ts), [remote recovery](../packages/osmix/test/remote.test.ts), and the [real-browser journey](../apps/merge/e2e/merge-base-loading.spec.ts).
 
 <a id="reading-the-result"></a>
 
 ## Reading the result
 
 <a id="mp-out1"></a>
-**MP-OUT1 — Count changes, not promises.** Candidate eligibility, scheduled actions, generated previews, and completed application are distinct. Matching outcomes compare the ordinary baseline with the matching result **before intersections**. A workflow reports them as completed only after its required application/stages and refresh succeed.
+**MP-OUT1 — Count changes, not promises.** Proposals, decisions, the plan, and the applied result are distinct. The completion summary counts imported features by outcome; the matching outcome compares the planned state before and after the matching phase, **before crossings**. A workflow reports them as completed only after the plan is applied and the result refreshed.
 
 | Report concept            | Interpretation                                                                                                                                                                   |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -508,7 +473,7 @@ These states are exercised by the [application workflow tests](../apps/merge/tes
 
 Do not add applied and unresolved counts as if they partitioned all imported data. A source can have successful copying and a blocked connection. Missing imported tag values are excluded from per-key present-value counts, while present uncopied values have explanations such as blocked, not selected, protected, no accepted target, or superseded. Exact reference reconciliation receives no fuzzy-attachment credit. Later intersections may change connectivity without changing the matching report.
 
-Download the PBF for the resulting dataset and use the changes/outcome report for review. **Start a new merge** clears both input slots, map selection, and the prior report; load the original files again to revise a completed merge. PBF entity round-trip tests do not validate all header metadata, and downloading a file does not upload changes to OpenStreetMap.
+Download the PBF for the resulting dataset and use the osmChange file and merge report for review. **Start a new merge** clears both input slots, map selection, and the prior report; load the original files again to revise a completed merge. PBF entity round-trip tests do not validate all header metadata, and downloading a file does not upload changes to OpenStreetMap.
 
 Negative IDs, the OSM convention for new entities, are exported unchanged. For tools that reject them, **Give new features positive IDs** renumbers each entity type's negative IDs after its highest ID, in −1, −2, … order, with every way ref and relation member following (`renumberNegativeIds`). The merge report then includes the `idMap` from each patch ID to its exported ID. Only the download is renumbered; the merged dataset keeps its IDs.
 
@@ -530,7 +495,7 @@ These entries are follow-up references for unresolved limitations. Their IDs are
 
 ### G3 — Routing safeguards have limited scope
 
-**Observed:** [Worker matching generation](../packages/osmix/src/worker.ts) includes the automatic-attachment CAR projection check. The direct library/facade merge function does not add it. [Integrity validation](../packages/change/src/integrity.ts) checks specific reference and topology issues, not every route or travel mode.
+**Observed:** The plan demotes automatic connections that would change the drivable network and reports CAR/WALK topology counts ([validation](../packages/change/src/plan/validate.ts)). [Integrity validation](../packages/change/src/integrity.ts) checks specific reference and topology issues, not every route or travel mode.
 
 **User impact:** Counts can agree while routes differ, and selected routing tags can intentionally change access. **Contract boundary:** Source geometry preservation is not universal routing equivalence. **Follow-up:** Define route/mode-specific acceptance criteria and validate representative journeys when that guarantee is required. Existing routing diagnostics remain evidence within their declared scope.
 
@@ -548,29 +513,30 @@ These entries are follow-up references for unresolved limitations. Their IDs are
 
 Rules above are the specification. Tests provide evidence for particular scenarios, not proof of every broad claim. The guide's named fixtures deliberately use small explicit data; the larger suite covers additional combinations. Rule anchors remain stable when prose moves.
 
-| Rules / scenario                                                               | Regression evidence                                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MP-I1, MP-D1: new-ID remap, whole replacement, omission                        | [Guide tests](../packages/osmix/test/merge-process.test.ts), `MP-E2 keeps new patch IDs clear of the base and applies positive IDs as whole edits`; [plan tests](../packages/change/test/merge-plan.test.ts)                                         |
-| MP-X1/X2, MP-M2, MP-J1: complete walkthrough and exported entities             | [Guide tests](../packages/osmix/test/merge-process.test.ts), `MP-E1 traces direct, exact, matching, and intersections through PBF reload`                                                                                                            |
-| MP-M2, MP-R1: action comparison on identical inputs                            | [Guide tests](../packages/osmix/test/merge-process.test.ts), `MP-E3 compares … on the same imported sidewalk and branch` (copy, connect, copy-connect-remove)                                                                                        |
-| MP-X1: conflicting sources sharing one survivor                                | [Exact node groups](../packages/change/test/exact-node-groups.test.ts)                                                                                                                                                                               |
-| MP-X2/X3: ordered geometry and direction aliases                               | [Way direction](../packages/change/test/way-direction.test.ts), [routing integrity](../packages/change/test/routing-integrity.test.ts)                                                                                                               |
-| MP-M1/M3: action-specific hard blocks and uncertain direction                  | [Matching blockers](../packages/change/test/conflation-blockers.test.ts), [matching cases](../packages/change/test/conflation.test.ts)                                                                                                               |
-| MP-M4: classification conflicts independent of copy keys                       | [Feature-type cases](../packages/change/test/conflation-feature-types.test.ts)                                                                                                                                                                       |
-| MP-M5: alternatives and independently selected actions                         | [Target selection](../packages/change/test/conflation-targets.test.ts), [action selection](../packages/change/test/conflation-actions.test.ts)                                                                                                       |
-| MP-R1: explicit branch dependency                                              | [Removal tests](../packages/change/test/conflation-way-removal.test.ts), `blocks a retained branch until its connection is explicitly selected`                                                                                                      |
-| MP-R1: stale deletion after exact reconciliation                               | [Removal tests](../packages/change/test/conflation-way-removal.test.ts), `rejects an exact-stage remap that makes the reviewed deletion obsolete`                                                                                                    |
-| MP-J1: restrictions and degenerate endpoint reuse                              | [Intersections](../packages/change/test/intersections.test.ts), `rewrites via-node relation members when coincident way nodes are unified`; `creates a dedicated node when endpoint reuse would collapse a short patch way`                          |
-| MP-V1/V2: reference validation and restored inputs                             | [Routing integrity](../packages/change/test/routing-integrity.test.ts), [serialization](../packages/change/test/changeset-serialization.test.ts)                                                                                                     |
-| MP-OUT1: partial outcomes and exact-versus-fuzzy credit                        | [Outcomes](../packages/change/test/conflation-outcomes.test.ts), `counts one copy action per source with multiple changed keys and keeps partial failures`; `does not credit fuzzy matching for refs already reconciled by the ordinary exact merge` |
-| MP-I5: within-file duplicates applied and re-scanned                           | [Within-dataset deduplication](../packages/osmix/test/within-dataset-deduplication.test.ts), [Inspect journey](../apps/inspect/e2e/inspect.spec.ts)                                                                                                  |
-| MP-W1: late cancellation, refresh recovery, new inputs                         | [Browser journey](../apps/merge/e2e/merge-base-loading.spec.ts), `a late cancellation preserves the committed exact result and replacing the base clears completion`                                                                                 |
-| MP-W1/MP-R1: removal preview and rediscovery                                   | [Browser journey](../apps/merge/e2e/merge-base-loading.spec.ts), `manual removal requires preview and rediscovery clears stale removal evidence before apply`                                                                                        |
-| MP-M3: connect network checks the whole resulting junction's grades (issue K1) | [Matching cases](../packages/change/test/conflation.test.ts), `blocks attaching into a junction that final validation rejects for mixed grades`                                                                                                      |
-| MP-M2: a connection drops the imported point it leaves unused                  | [Matching cases](../packages/change/test/conflation.test.ts), `drops a connected imported node only when it is untagged and nothing else uses it`                                                                                                    |
-| MP-J1: an intersection drops the imported point it replaces                    | [Intersections](../packages/change/test/intersections.test.ts), `drops an imported endpoint that a junction replacement leaves unused`                                                                                                               |
-| Negative IDs in PBF export, and opt-in positive IDs                            | [Negative IDs](../packages/osmix/test/negative-ids.test.ts), [renumbering](../packages/core/test/renumber.test.ts), MP-E2 in [guide tests](../packages/osmix/test/merge-process.test.ts)                                                             |
-| All stages on real data: one outcome per scenario against Monaco               | [Monaco scenario fixture](../packages/osmix/test/monaco-merge-patch.test.ts) (scenarios in [`@osmix/test-utils/monaco-merge-scenarios`](../packages/test-utils/src/monaco-merge-scenarios.ts); see [fixtures](../fixtures/README.md))                |
-| Automatic and reviewed workflows on the Monaco scenario patch                  | [Browser journey](../apps/merge/e2e/monaco-merge-patch.spec.ts), `the automatic workflow merges the Monaco scenario patch`; `the reviewed workflow removes the accepted duplicate footway`                                                           |
+| Rules / scenario                                                               | Regression evidence                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MP-I1, MP-D1: new-ID remap, whole replacement, omission                        | [Guide tests](../packages/osmix/test/merge-process.test.ts), `MP-E2 keeps new patch IDs clear of the base and applies positive IDs as whole edits`; [plan tests](../packages/change/test/merge-plan.test.ts)                                              |
+| MP-X1/X2, MP-M2, MP-J1: complete walkthrough and exported entities             | [Guide tests](../packages/osmix/test/merge-process.test.ts), `MP-E1 traces direct, exact, matching, and intersections through PBF reload`                                                                                                                 |
+| MP-O1/O2, MP-P1–P4: plans, proposals, decisions, replans                       | [Plan tests](../packages/change/test/merge-plan.test.ts), [plan matching](../packages/change/test/merge-plan-matching.test.ts), [replan equivalence](../packages/osmix/test/plan-replan.test.ts), [overlay](../packages/change/test/plan-overlay.test.ts) |
+| MP-M2, MP-R1: action comparison on identical inputs                            | [Guide tests](../packages/osmix/test/merge-process.test.ts), `MP-E3 compares … on the same imported sidewalk and branch` (copy, connect, copy-connect-remove)                                                                                             |
+| MP-X1: conflicting sources sharing one survivor                                | [Exact node groups](../packages/change/test/exact-node-groups.test.ts)                                                                                                                                                                                    |
+| MP-X2/X3: ordered geometry and direction aliases                               | [Way direction](../packages/change/test/way-direction.test.ts), [routing integrity](../packages/change/test/routing-integrity.test.ts)                                                                                                                    |
+| MP-M1/M3: action-specific hard blocks and uncertain direction                  | [Matching blockers](../packages/change/test/conflation-blockers.test.ts), [matching cases](../packages/change/test/conflation.test.ts)                                                                                                                    |
+| MP-M4: classification conflicts independent of copy keys                       | [Feature-type cases](../packages/change/test/conflation-feature-types.test.ts)                                                                                                                                                                            |
+| MP-M5: alternatives and independently selected actions                         | [Target selection](../packages/change/test/conflation-targets.test.ts), [action selection](../packages/change/test/conflation-actions.test.ts)                                                                                                            |
+| MP-R1: explicit branch dependency                                              | [Removal tests](../packages/change/test/conflation-way-removal.test.ts), `blocks a retained branch until its connection is explicitly selected`                                                                                                           |
+| MP-R1: stale deletion after exact reconciliation                               | [Removal tests](../packages/change/test/conflation-way-removal.test.ts), `reports a removal as stale once identical-point merges reconcile the way`                                                                                                       |
+| MP-J1: restrictions and degenerate endpoint reuse                              | [Intersections](../packages/change/test/intersections.test.ts), `rewrites via-node relation members when coincident way nodes are unified`; `creates a dedicated node when endpoint reuse would collapse a short patch way`                               |
+| MP-V1/V2: reference validation, plan diagnostics, rebuilt plans                | [Routing integrity](../packages/change/test/routing-integrity.test.ts), [plan diagnostics](../packages/change/test/merge-plan.test.ts), [remote recovery](../packages/osmix/test/remote.test.ts)                                                          |
+| MP-OUT1: partial outcomes and exact-versus-fuzzy credit                        | [Outcomes](../packages/change/test/conflation-outcomes.test.ts), `counts one copy action per source with multiple changed keys and keeps partial failures`; `does not credit matching for points the identical-point merge reconciled`                    |
+| MP-I5: within-file duplicates applied and re-scanned                           | [Within-dataset deduplication](../packages/osmix/test/within-dataset-deduplication.test.ts), [Inspect journey](../apps/inspect/e2e/inspect.spec.ts)                                                                                                       |
+| MP-W1: late cancellation, refresh recovery, new inputs                         | [Browser journey](../apps/merge/e2e/merge-base-loading.spec.ts), `a late cancellation preserves the committed exact result and replacing the base clears completion`                                                                                      |
+| MP-W1/MP-R1: a removal chosen in the review                                    | [Browser journey](../apps/merge/e2e/merge-base-loading.spec.ts), `a removal chosen in the review is applied and reported`; [plan review](../apps/merge/e2e/plan-review.spec.ts)                                                                           |
+| MP-M3: connect network checks the whole resulting junction's grades (issue K1) | [Matching cases](../packages/change/test/conflation.test.ts), `blocks attaching into a junction that final validation rejects for mixed grades`                                                                                                           |
+| MP-M2: a connection drops the imported point it leaves unused                  | [Matching cases](../packages/change/test/conflation.test.ts), `drops a connected imported node only when it is untagged and nothing else uses it`                                                                                                         |
+| MP-J1: an intersection drops the imported point it replaces                    | [Intersections](../packages/change/test/intersections.test.ts), `drops an imported endpoint that a junction replacement leaves unused`                                                                                                                    |
+| Negative IDs in PBF export, and opt-in positive IDs                            | [Negative IDs](../packages/osmix/test/negative-ids.test.ts), [renumbering](../packages/core/test/renumber.test.ts), MP-E2 in [guide tests](../packages/osmix/test/merge-process.test.ts)                                                                  |
+| All stages on real data: one outcome per scenario against Monaco               | [Monaco scenario fixture](../packages/osmix/test/monaco-merge-patch.test.ts) (scenarios in [`@osmix/test-utils/monaco-merge-scenarios`](../packages/test-utils/src/monaco-merge-scenarios.ts); see [fixtures](../fixtures/README.md))                     |
+| Automatic and reviewed workflows on the Monaco scenario patch                  | [Browser journey](../apps/merge/e2e/monaco-merge-patch.spec.ts), `the automatic workflow merges the Monaco scenario patch`; `the reviewed workflow removes the accepted duplicate footway`                                                                |
 
-Implementation entry points for maintainers: [pipeline](../packages/change/src/merge.ts), [direct/exact/intersections](../packages/change/src/changeset.ts), [matching](../packages/change/src/conflation.ts), [removal](../packages/change/src/internal/way-removal.ts), and [application orchestration](../apps/merge/src/lib/merge-workflow.ts). Use these to investigate discrepancies; update the behavioral contract deliberately rather than silently replacing it with whatever the code happens to do.
+Implementation entry points for maintainers: [planner](../packages/change/src/plan/plan.ts), [overlay](../packages/change/src/plan/overlay.ts), [node-identity rulebook](../packages/change/src/rules/node-identity.ts), [direct/identity/crossings](../packages/change/src/changeset.ts), [matching](../packages/change/src/conflation.ts), [removal](../packages/change/src/internal/way-removal.ts), [validation](../packages/change/src/plan/validate.ts), and the [Merge app](../apps/merge/src/blocks/merge.tsx). Use these to investigate discrepancies; update the behavioral contract deliberately rather than silently replacing it with whatever the code happens to do.

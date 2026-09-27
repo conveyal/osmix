@@ -1,14 +1,11 @@
-import type { OsmConflationCandidateView } from "osmix";
+import type { OsmConflationCandidate } from "osmix";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { CandidateEvidence } from "../src/components/conflation-candidate-evidence";
 
-function candidate(
-  distanceMeters: number,
-  targetId: number | null = 22,
-): OsmConflationCandidateView {
+function candidate(distanceMeters: number, targetId: number | null = 22): OsmConflationCandidate {
   return {
     id: "node:11->22",
     entityType: "node",
@@ -27,7 +24,7 @@ function candidate(
   };
 }
 
-const render = (value: OsmConflationCandidateView) =>
+const render = (value: OsmConflationCandidate) =>
   renderToStaticMarkup(createElement(CandidateEvidence, { candidate: value }));
 
 describe("matching evidence for imported features", () => {
