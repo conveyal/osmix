@@ -73,6 +73,7 @@ import {
   Router,
   RoutingGraph,
   type RoutingGraphTransferables,
+  routingTopologyStats,
   type WaySegment,
   defaultHighwayFilter,
   defaultPedestrianFilter,
@@ -245,50 +246,7 @@ function readConflationConflict(error: unknown): OsmConflationDecisionConflict |
 }
 
 function routingGraphStats(osm: Osm, filter: HighwayFilter): OsmConflationRoutingGraphStats {
-  const graph = new RoutingGraph(osm, filter);
-  const parent = new Int32Array(graph.size);
-  parent.fill(-1);
-  let routableNodes = 0;
-
-  for (let nodeIndex = 0; nodeIndex < graph.size; nodeIndex++) {
-    if (!graph.isRoutable(nodeIndex)) continue;
-    parent[nodeIndex] = nodeIndex;
-    routableNodes++;
-  }
-
-  const find = (nodeIndex: number): number => {
-    let root = nodeIndex;
-    while (parent[root] !== root) root = parent[root]!;
-    let cursor = nodeIndex;
-    while (parent[cursor] !== cursor) {
-      const next = parent[cursor]!;
-      parent[cursor] = root;
-      cursor = next;
-    }
-    return root;
-  };
-
-  for (let nodeIndex = 0; nodeIndex < graph.size; nodeIndex++) {
-    if (parent[nodeIndex] === -1) continue;
-    for (const edge of graph.getEdges(nodeIndex)) {
-      if (parent[edge.targetNodeIndex] === -1) continue;
-      const left = find(nodeIndex);
-      const right = find(edge.targetNodeIndex);
-      if (left !== right) parent[right] = left;
-    }
-  }
-
-  const roots = new Set<number>();
-  for (let nodeIndex = 0; nodeIndex < graph.size; nodeIndex++) {
-    if (parent[nodeIndex] !== -1) roots.add(find(nodeIndex));
-  }
-
-  return {
-    nodes: graph.size,
-    routableNodes,
-    edges: graph.edges,
-    components: roots.size,
-  };
+  return routingTopologyStats({ nodeCount: osm.nodes.size, ways: () => osm.ways }, filter);
 }
 
 function routingDelta(

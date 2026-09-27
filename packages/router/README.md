@@ -172,6 +172,14 @@ const router = new Router(osm, graph, { algorithm: "astar", metric: "time" });
 - `algorithm` - `"dijkstra"` | `"astar"` | `"bidirectional"` (default: `"astar"`)
 - `metric` - `"distance"` | `"time"` (default: `"distance"`)
 
+### `routingTopologyStats(source, filter)`
+
+Gives the counts a `RoutingGraph` built with `filter` would have (`nodes`, `routableNodes`, directed `edges` and weakly connected `components`) without building the graph. `source` is anything with a `nodeCount` and a `ways()` iterable of `{ tags, refs }`, so an `Osm` or a view of pending changes both work. Direction follows the graph, including the roundabout fallback.
+
+```ts schematic
+const stats = routingTopologyStats({ nodeCount: osm.nodes.size, ways: () => osm.ways }, filter);
+```
+
 ### Algorithms
 
 | Algorithm       | Optimal? | Speed   | Best For                               |

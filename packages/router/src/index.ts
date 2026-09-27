@@ -37,5 +37,6 @@
 export * from "./algorithms/index.ts";
 export * from "./graph.ts";
 export * from "./router.ts";
+export * from "./topology-stats.ts";
 export * from "./types.ts";
 export * from "./utils.ts";
