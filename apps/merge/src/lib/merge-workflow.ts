@@ -1,7 +1,4 @@
-import { WITHIN_DATASET_DIAGNOSTIC_OPTIONS } from "@osmix/app-core";
-
-export { WITHIN_DATASET_DIAGNOSTIC_OPTIONS };
-
+import { committedMutationOsmId } from "@osmix/app-core";
 import type {
   OsmChangesetOptions,
   OsmChangesetStats,
@@ -11,12 +8,6 @@ import type {
   OsmMergeOptions,
 } from "osmix";
 
-export type ChangesetReviewPurpose = "apply" | "diagnostic" | "preview";
-
-/**
- * A same-dataset comparison may surface suspicious entities for review, but its
- * proposed edits must never be applied automatically.
- */
 /** Reconcile entities from the patch against the base without normalizing either input. */
 export const CROSS_DATASET_RECONCILIATION_OPTIONS = {
   deduplicateNodes: true,
@@ -170,24 +161,6 @@ export async function runConflationAllSteps({
   return { generation, intersections, status: "completed", summary };
 }
 
-/** Identify a committed mutation whose replicas still need synchronization before refresh. */
-export function committedMutationOsmId(
-  error: unknown,
-  operation: "applyChangesAndReplace" | "merge",
-): string | null {
-  return error &&
-    typeof error === "object" &&
-    "committed" in error &&
-    error.committed === true &&
-    "operation" in error &&
-    error.operation === operation &&
-    "osmId" in error &&
-    typeof error.osmId === "string" &&
-    error.osmId.length > 0
-    ? error.osmId
-    : null;
-}
-
 /**
  * Restore any available candidate state, then leave the progress-only screen after a failed run.
  * Showing the review in a `finally` block keeps discovery failures themselves retryable.
@@ -208,10 +181,6 @@ export async function recoverConflationRunAllFailure({
     showReview();
   }
   return restoreFailure;
-}
-
-export function canApplyChangeset(purpose: ChangesetReviewPurpose): boolean {
-  return purpose === "apply";
 }
 
 /** Clear the patch overlay before showing the verified merged result. */

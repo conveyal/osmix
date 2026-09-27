@@ -77,7 +77,7 @@ in-stream extraction remains available. The app does not build the large index s
 
 The [merge-process guide](../../docs/merge-process.md) owns the merge rules, examples, and known limitations. Read its [input identity requirements](../../docs/merge-process.md#inputs-and-identity) before combining independently prepared imports.
 
-1. Load the base and patch in Full mode.
+1. Remove duplicates inside each input in [Inspect](../inspect/README.md), then load the base and patch in Full mode.
 2. Configure optional imported-data matching, check **Run every stage automatically, without review** or leave it off to review each stage, then choose **Start merge**.
 3. In the reviewed workflow, inspect previews and choose Copy tags, Connect network, and optional explicit Remove imported way independently.
 4. Complete application and intersection work, read the applied/unresolved summary, and download the result.

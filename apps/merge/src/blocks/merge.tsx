@@ -9,6 +9,7 @@ import {
   OsmInfoTable,
   SaveToDiskNotice,
   StoredOsmList,
+  appOrigin,
   useFlyToOsmBounds,
 } from "@osmix/app-components";
 import {
@@ -21,6 +22,9 @@ import {
   Tasks,
   selectOsmEntityAtom,
   osmLoadingAbortControllerAtom,
+  committedMutationOsmId,
+  saveChangesetJson,
+  writeJsonReport,
 } from "@osmix/app-core";
 import { useOsmixRemote } from "@osmix/app-core";
 import {
@@ -81,7 +85,6 @@ import {
   toOsmConflationOptions,
   validateConflationForm,
 } from "../lib/conflation-workflow";
-import { writeJsonArray, writeJsonReport } from "../lib/json-download";
 import {
   matchingReviewIssue,
   returnToMatchingReview,
@@ -89,13 +92,11 @@ import {
 } from "../lib/matching-review";
 import {
   completeMergeOptions,
-  committedMutationOsmId,
   finalizeVerifiedMerge,
   INTERSECTION_OPTIONS,
   recoverConflationRunAllFailure,
   runConflationAllSteps,
   verifiedBaseMergeOptions,
-  WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
 } from "../lib/merge-workflow";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import {
@@ -120,10 +121,6 @@ import {
 import { mergeAbortControllerAtom } from "../state/status";
 const STEPS = [
   "select-osm-pbf-files",
-  "inspect-base-osm",
-  "review-changeset",
-  "inspect-patch-osm",
-  "review-changeset",
   "direct-merge",
   "review-changeset",
   "match-imported-data",
@@ -136,8 +133,6 @@ const STEPS = [
 ] as const;
 
 type ChangesetReviewContext =
-  | { kind: "base-diagnostic" }
-  | { kind: "patch-diagnostic" }
   | { kind: "direct-preview" }
   | { kind: "cumulative"; exactReconciliation: boolean; matching: boolean }
   | { kind: "intersections" };
@@ -174,10 +169,6 @@ const makeMergedDownloadName = (baseName?: string | null, patchName?: string | n
 
 function reviewGuideId(context: ChangesetReviewContext): MergeStepGuideId {
   switch (context.kind) {
-    case "base-diagnostic":
-      return "review-base-diagnostic";
-    case "patch-diagnostic":
-      return "review-patch-diagnostic";
     case "direct-preview":
       return "review-direct";
     case "cumulative":
@@ -191,10 +182,6 @@ function reviewGuideId(context: ChangesetReviewContext): MergeStepGuideId {
 
 function reviewStepTitle(context: ChangesetReviewContext): string {
   switch (context.kind) {
-    case "base-diagnostic":
-      return "Review base diagnostic";
-    case "patch-diagnostic":
-      return "Review patch diagnostic";
     case "direct-preview":
       return "Review direct merge";
     case "cumulative":
@@ -208,10 +195,6 @@ function reviewStepTitle(context: ChangesetReviewContext): string {
 
 function reviewChangesetTitle(context: ChangesetReviewContext): string {
   switch (context.kind) {
-    case "base-diagnostic":
-      return "Base diagnostic candidates";
-    case "patch-diagnostic":
-      return "Patch diagnostic candidates";
     case "direct-preview":
       return "Direct-merge preview";
     case "cumulative":
@@ -538,33 +521,9 @@ export default function MergeBlock() {
 
   const downloadJsonChanges = async () => {
     setChangesDownloadError(null);
+    if (!changesetStats) return;
     try {
-      if (!changesetStats) return;
-      const fileHandle = await showSaveFilePickerWithFallback(
-        {
-          suggestedName: "osm-changes.json",
-        },
-        () => {
-          Tasks.message("Native save picker unavailable, falling back to browser download");
-        },
-      );
-      if (!fileHandle) return;
-      const stream = await fileHandle.createWritable();
-
-      const pageSize = 100_000;
-      const osmId = changesetStats.osmId;
-      async function* changePages() {
-        for (let page = 0; ; page++) {
-          const result = await remote.getChangesetPage(osmId, page, pageSize);
-          if (!result.changes || result.changes.length === 0) return;
-          yield result.changes;
-        }
-      }
-      await Tasks.run(
-        `Save ${changesetStats.totalChanges.toLocaleString()} changes as JSON`,
-        () => writeJsonArray(stream, changePages()),
-        { summary: () => `Saved ${fileHandle.name}` },
-      );
+      await saveChangesetJson(remote, changesetStats);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       setChangesDownloadError(
@@ -856,9 +815,6 @@ export default function MergeBlock() {
     if (!changesetStats) return true;
     return changesetStats.totalChanges === 0;
   }, [changesetStats]);
-  const isDiagnosticReview =
-    changesetReviewContext.kind === "base-diagnostic" ||
-    changesetReviewContext.kind === "patch-diagnostic";
   const isDirectPreviewReview = changesetReviewContext.kind === "direct-preview";
 
   const baseNeedsFull = base.osmInfo !== null && !hasFullNodeIndex(base.osmInfo);
@@ -874,8 +830,8 @@ export default function MergeBlock() {
           osmFile={patch}
           onClear={clearPatchOsm}
         />
-        <FullIndexRequired operation="Merge and duplicate detection" osmFile={base} />
-        <FullIndexRequired operation="Merge and duplicate detection" osmFile={patch} />
+        <FullIndexRequired operation="Merge" osmFile={base} />
+        <FullIndexRequired operation="Merge" osmFile={patch} />
       </div>
     );
   }
@@ -901,7 +857,6 @@ export default function MergeBlock() {
           <CardHeader>Merge pipeline</CardHeader>
           <CardContent className="flex flex-col gap-2">
             <ol className="list-decimal pl-4">
-              <li>Optionally inspect each input for possible internal duplicates</li>
               <li>Add patch entities and apply same-ID patch updates</li>
               <li>Optionally match nearby imported entities</li>
               <li>Optionally reconcile exact, compatible entities across the inputs</li>
@@ -909,11 +864,21 @@ export default function MergeBlock() {
               <li>Validate topology before exposing the merged result</li>
             </ol>
             <p>
-              The reviewed workflow pauses at diagnostic and changeset checkpoints. The automatic
-              workflow skips those checkpoints but uses the same safety validation.
+              The reviewed workflow pauses at changeset checkpoints. The automatic workflow skips
+              those checkpoints but uses the same safety validation.
             </p>
           </CardContent>
         </Card>
+
+        <Alert title="Check each input in Inspect first">
+          <p>
+            Merge does not scan inputs for duplicates inside one file. Open each file in the{" "}
+            <a href={appOrigin("inspect")} className="text-info underline">
+              Inspect app
+            </a>{" "}
+            to find and fix duplicate nodes and ways, then open the cleaned PBF here.
+          </p>
+        </Alert>
 
         <Card>
           <OsmInputCardHeader
@@ -1069,98 +1034,6 @@ export default function MergeBlock() {
         )}
       </Step>
 
-      <Step step="inspect-base-osm" title="Inspect base OSM" guideId="inspect-base">
-        <Card>
-          <CardHeader>Base OSM PBF</CardHeader>
-          <CardContent className="p-0">
-            <OsmInfoTable
-              defaultOpen={false}
-              osm={base.osm}
-              file={base.file}
-              fileInfo={base.fileInfo}
-            />
-          </CardContent>
-        </Card>
-        <StepActions aria-label="Base diagnostic actions">
-          <ActionButton
-            icon={<SkipForwardIcon />}
-            onAction={async () => {
-              setChangesetStats(null);
-              Tasks.message("Skipped base duplicate diagnostic");
-              goToStep("inspect-patch-osm");
-            }}
-            variant="outline"
-          >
-            Skip base diagnostic
-          </ActionButton>
-          <ActionButton
-            disabled={!base.osm}
-            icon={<SearchCodeIcon />}
-            onAction={() =>
-              startStepTask("Scan base OSM for duplicate entities", async () => {
-                if (!base.osm) throw Error("Base OSM is not loaded");
-                const changes = await remote.generateChangeset(
-                  base.osm.id,
-                  base.osm.id,
-                  WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
-                );
-                setChangesetReviewContext({ kind: "base-diagnostic" });
-                setChangesetStats(changes);
-                return changeStatsSummary(changes);
-              })
-            }
-          >
-            Scan base for duplicate candidates
-          </ActionButton>
-        </StepActions>
-      </Step>
-
-      <Step step="inspect-patch-osm" title="Inspect patch OSM" guideId="inspect-patch">
-        <Card>
-          <CardHeader>Patch OSM PBF</CardHeader>
-          <CardContent className="p-0">
-            <OsmInfoTable
-              defaultOpen={false}
-              osm={patch.osm}
-              file={patch.file}
-              fileInfo={patch.fileInfo}
-            />
-          </CardContent>
-        </Card>
-        <StepActions aria-label="Patch diagnostic actions">
-          <ActionButton
-            icon={<SkipForwardIcon />}
-            onAction={async () => {
-              setChangesetStats(null);
-              Tasks.message("Skipped patch duplicate diagnostic");
-              goToStep("direct-merge");
-            }}
-            variant="outline"
-          >
-            Skip patch diagnostic
-          </ActionButton>
-          <ActionButton
-            disabled={!patch.osm}
-            icon={<SearchCodeIcon />}
-            onAction={() =>
-              startStepTask("Scan patch OSM for duplicate entities", async () => {
-                if (!patch.osm) throw Error("Patch OSM is not loaded");
-                const patchChanges = await remote.generateChangeset(
-                  patch.osm.id,
-                  patch.osm.id,
-                  WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
-                );
-                setChangesetReviewContext({ kind: "patch-diagnostic" });
-                setChangesetStats(patchChanges);
-                return changeStatsSummary(patchChanges);
-              })
-            }
-          >
-            Scan patch for duplicate candidates
-          </ActionButton>
-        </StepActions>
-      </Step>
-
       <Step step="direct-merge" title="Direct merge" guideId="direct">
         <Card>
           <CardHeader>
@@ -1294,17 +1167,7 @@ export default function MergeBlock() {
           patch.osm ? (
             <BackToMatching onBack={returnToMatching} />
           ) : null}
-          {isDiagnosticReview ? (
-            <ActionButton
-              onAction={async () => {
-                setChangesetStats(null);
-                nextStep();
-              }}
-              icon={<ArrowRightIcon />}
-            >
-              Continue without applying
-            </ActionButton>
-          ) : isDirectPreviewReview ? (
+          {isDirectPreviewReview ? (
             <ActionButton
               onAction={async () => {
                 setChangesetStats(null);
@@ -1349,11 +1212,8 @@ export default function MergeBlock() {
                       completesVerifiedMerge,
                       applied.synchronize,
                     );
-                  } else if (changesetStats.osmId === patch.osm?.id) {
-                    if (applied.synchronize) await remote.synchronizeDataset(applied.osmId);
-                    await patch.setMergedOsm(applied.osmId);
                   } else {
-                    throw Error("Changeset OSM ID does not match base or patch OSM ID");
+                    throw Error("Changeset OSM ID does not match the base OSM ID");
                   }
                   if (completesVerifiedMerge) {
                     updateMergeOutcome({ type: "complete" });

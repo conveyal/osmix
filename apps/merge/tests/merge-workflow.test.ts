@@ -2,8 +2,6 @@ import type { OsmChangesetStats, OsmConflationGenerationResult, OsmConflationSum
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  canApplyChangeset,
-  committedMutationOsmId,
   COMPLETE_MERGE_OPTIONS,
   completeMergeOptions,
   CROSS_DATASET_RECONCILIATION_OPTIONS,
@@ -13,7 +11,6 @@ import {
   runConflationAllSteps,
   verifiedConflationMergeOptions,
   verifiedBaseMergeOptions,
-  WITHIN_DATASET_DIAGNOSTIC_OPTIONS,
 } from "../src/lib/merge-workflow";
 import { emptyMatchingOutcome } from "./fixtures/merge-outcome";
 
@@ -119,25 +116,6 @@ describe("merge workflow policy", () => {
     ).rejects.toThrow("Validation failed");
     expect(onBaseApplied).not.toHaveBeenCalled();
     expect(onIntersectionsApplied).not.toHaveBeenCalled();
-    expect(committedMutationOsmId({ osmId: "base", committed: false }, "merge")).toBeNull();
-    expect(
-      committedMutationOsmId({ osmId: "base", committed: true, operation: "merge" }, "merge"),
-    ).toBe("base");
-    expect(
-      committedMutationOsmId(
-        { osmId: "base", committed: true, operation: "merge" },
-        "applyChangesAndReplace",
-      ),
-    ).toBeNull();
-  });
-
-  it("keeps within-dataset duplicate scans diagnostic", () => {
-    expect(WITHIN_DATASET_DIAGNOSTIC_OPTIONS).toEqual({
-      deduplicateNodes: true,
-      deduplicateWays: true,
-    });
-    expect(canApplyChangeset("diagnostic")).toBe(false);
-    expect(canApplyChangeset("preview")).toBe(false);
   });
 
   it("uses the same cross-dataset reconciliation options in a complete merge", () => {
@@ -148,7 +126,6 @@ describe("merge workflow policy", () => {
       directMerge: true,
       createIntersections: true,
     });
-    expect(canApplyChangeset("apply")).toBe(true);
   });
 
   it("keeps exact-only defaults while adding explicitly configured conflation", () => {

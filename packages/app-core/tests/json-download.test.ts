@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { writeJsonArray, writeJsonReport } from "../src/lib/json-download";
+import { writeJsonArray, writeJsonReport } from "../src/lib/json-download.ts";
 
 async function* pagesOf(...pages: unknown[][]) {
   yield* pages;

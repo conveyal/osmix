@@ -48,6 +48,9 @@ For independently prepared GIS imports, verify that shared IDs actually refer to
 <a id="mp-i4"></a>
 **MP-I4 — Source files and loaded state are different.** Low-level `merge()` returns a result without modifying either input object. Worker/remote `merge()` installs the result in place of the loaded base and removes the loaded patch. The app also changes its in-memory workflow state as stages are applied. None of these operations overwrites the original source files. Download explicitly writes an output file.
 
+<a id="mp-i5"></a>
+**MP-I5 — Remove duplicates inside each input before merging.** Merge does not scan or fix duplicates inside one file. Open each input in the Inspect app first. Its scan finds nodes at the same seven-decimal coordinate and ways with identical ordered references, using the same compatibility checks as exact reconciliation. Applying the scan deletes each duplicate in favor of the compatible entity with the highest ID and rewrites way references and relation members to that survivor. Download the cleaned PBF and load it in Merge. Duplicates left inside the patch are passed to direct merge unchanged.
+
 ### Example MP-E2: a same-ID update is not a tag union
 
 These files have different dataset IDs but both contain node `-1`. Coordinates are `(longitude, latitude)`.
@@ -161,14 +164,14 @@ The six final nodes and two ways, their tags, and their references are asserted 
 <a id="mp-o1"></a>
 **MP-O1 — Choose stages explicitly at the API.** The facade re-exports the library merge behavior. It does not add app defaults.
 
-| Setting                      | `merge()` in change/facade; worker/remote `merge()` | Merge app automatic path | App reviewed path                         |
-| ---------------------------- | --------------------------------------------------- | ------------------------ | ----------------------------------------- |
-| Direct merge                 | Off                                                 | On                       | Included in cumulative generation         |
-| Exact nodes and ways         | Off                                                 | On                       | Controlled by exact reconciliation choice |
-| Imported-data matching       | Absent/off                                          | Off until configured     | Optional discovery and decisions          |
-| Intersections                | Off                                                 | On                       | Separate later stage                      |
-| Within-file diagnostic scans | Not part of merge                                   | Skipped                  | Optional; do not change inputs            |
-| Applying generated previews  | Caller responsibility for generator APIs            | Performed by workflow    | Requires the workflow's apply action      |
+| Setting                     | `merge()` in change/facade; worker/remote `merge()` | Merge app automatic path | App reviewed path                         |
+| --------------------------- | --------------------------------------------------- | ------------------------ | ----------------------------------------- |
+| Direct merge                | Off                                                 | On                       | Included in cumulative generation         |
+| Exact nodes and ways        | Off                                                 | On                       | Controlled by exact reconciliation choice |
+| Imported-data matching      | Absent/off                                          | Off until configured     | Optional discovery and decisions          |
+| Intersections               | Off                                                 | On                       | Separate later stage                      |
+| Within-file duplicate fixes | Not part of merge                                   | Not run; use Inspect     | Not run; use Inspect ([MP-I5](#mp-i5))    |
+| Applying generated previews | Caller responsibility for generator APIs            | Performed by workflow    | Requires the workflow's apply action      |
 
 Matching configuration requires `propertyKeys` and `attachNetwork`. An empty key list disables copying. Radius defaults to **1 m**, `automatic` defaults to `high-confidence`, and `allowWayRemoval` defaults to false. `automatic: "none"` requires individual decisions for otherwise automatic actions. At least one of copying, attachment, or removal assessment must be enabled. Radius must be positive and finite; keys must be nonempty strings. Duplicate keys are deduplicated and sorted.
 
@@ -407,9 +410,9 @@ Matching additionally verifies preservation of the ordinary-result base topology
 
 ### Automatic merge
 
-1. Load both inputs in Full mode and inspect their roles and identity assumptions.
+1. Remove duplicates inside each input in Inspect ([MP-I5](#mp-i5)), load both inputs in Full mode, and inspect their roles and identity assumptions.
 2. Configure optional matching. Removal remains an individual review action; use the reviewed workflow to select it.
-3. Check "Run every stage automatically, without review" and start the merge. Diagnostics and intermediate user checkpoints are skipped.
+3. Check "Run every stage automatically, without review" and start the merge. Intermediate user checkpoints are skipped.
 4. Generate and apply the direct/exact result, with selected automatic matching when enabled.
 5. Run and apply intersections.
 6. Refresh the completed dataset and read the prominent applied/unresolved summary before downloading.
@@ -432,7 +435,7 @@ Automatic mode completes with unresolved work reported; it does not silently acc
 
 ### Review each merge stage
 
-1. Select inputs, leave "Run every stage automatically" unchecked, and start the merge. Optionally run within-file duplicate diagnostics. Diagnostics change neither input.
+1. Select inputs, leave "Run every stage automatically" unchecked, and start the merge. Within-file duplicates are fixed beforehand in Inspect ([MP-I5](#mp-i5)).
 2. Generate and inspect the direct preview. This has not committed the cumulative merge.
 3. If matching is enabled, discover candidates from the original inputs, inspect evidence, and select actions. Review all alternatives for a source together.
 4. Choose exact reconciliation and generate the cumulative direct/exact/matching preview. Recheck removal dependencies and actual outcomes. Editing choices requires a new preview.
@@ -564,6 +567,7 @@ Rules above are the specification. Tests provide evidence for particular scenari
 | MP-J1: restrictions and degenerate endpoint reuse                              | [Intersections](../packages/change/test/intersections.test.ts), `rewrites via-node relation members when coincident way nodes are unified`; `creates a dedicated node when endpoint reuse would collapse a short patch way`                          |
 | MP-V1/V2: reference validation and restored inputs                             | [Routing integrity](../packages/change/test/routing-integrity.test.ts), [serialization](../packages/change/test/changeset-serialization.test.ts)                                                                                                     |
 | MP-OUT1: partial outcomes and exact-versus-fuzzy credit                        | [Outcomes](../packages/change/test/conflation-outcomes.test.ts), `counts one copy action per source with multiple changed keys and keeps partial failures`; `does not credit fuzzy matching for refs already reconciled by the ordinary exact merge` |
+| MP-I5: within-file duplicates applied and re-scanned                           | [Within-dataset deduplication](../packages/osmix/test/within-dataset-deduplication.test.ts), [Inspect journey](../apps/inspect/e2e/inspect.spec.ts)                                                                                                  |
 | MP-W1: late cancellation, refresh recovery, new inputs                         | [Browser journey](../apps/merge/e2e/merge-base-loading.spec.ts), `a late cancellation preserves the committed exact result and a new extracted base clears completion`                                                                               |
 | MP-W1/MP-R1: removal preview and rediscovery                                   | [Browser journey](../apps/merge/e2e/merge-base-loading.spec.ts), `manual removal requires preview and rediscovery clears stale removal evidence before apply`                                                                                        |
 

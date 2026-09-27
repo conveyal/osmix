@@ -1,7 +1,10 @@
 import type { OsmChangesetOptions } from "osmix";
 
-/** Detect duplicate nodes and ways inside one dataset without changing it. */
-export const WITHIN_DATASET_DIAGNOSTIC_OPTIONS = {
+/**
+ * Find exact duplicate nodes and ways inside one dataset. Generating the changeset leaves the
+ * dataset unchanged; applying it keeps the highest compatible ID and rewrites references to it.
+ */
+export const WITHIN_DATASET_DEDUPLICATION_OPTIONS = {
   deduplicateNodes: true,
   deduplicateWays: true,
 } as const satisfies Partial<OsmChangesetOptions>;

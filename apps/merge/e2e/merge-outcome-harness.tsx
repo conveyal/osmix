@@ -1,10 +1,10 @@
+import { writeJsonReport } from "@osmix/app-core";
 import { ActionButton, Button } from "@osmix/ui";
 import { useAtomValue, useSetAtom } from "jotai";
 import { Osm, OsmixWorker, type OsmConflationOptions, type OsmNode } from "osmix";
 import { useEffect, useState } from "react";
 
 import { MergeCompletionSummary } from "../src/components/merge-completion-summary";
-import { writeJsonReport } from "../src/lib/json-download";
 import { mergeCompletionAtom, updateMergeOutcomeAtom } from "../src/state/merge-outcome";
 
 type Scenario = "mixed" | "unresolved" | "zero";

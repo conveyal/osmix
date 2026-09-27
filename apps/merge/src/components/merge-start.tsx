@@ -57,7 +57,6 @@ export function MergeStart({
                 pausing for inspection and approval. One run:
               </p>
               <ul className="flex list-disc flex-col gap-1 pl-4">
-                <li>Skips the duplicate diagnostics for both inputs.</li>
                 <li>
                   Generates and applies the direct merge with exact reconciliation, without a
                   preview.

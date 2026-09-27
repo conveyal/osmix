@@ -14,11 +14,7 @@ import {
 const expectedGuideIds = [
   "select",
   "run-all",
-  "inspect-base",
-  "inspect-patch",
   "direct",
-  "review-base-diagnostic",
-  "review-patch-diagnostic",
   "review-direct",
   "review-cumulative-exact",
   "review-cumulative-without-exact",
@@ -32,11 +28,7 @@ const expectedGuideIds = [
 const expectedDiagrams = {
   select: "pipeline",
   "run-all": "pipeline",
-  "inspect-base": undefined,
-  "inspect-patch": undefined,
   direct: "direct-merge",
-  "review-base-diagnostic": undefined,
-  "review-patch-diagnostic": undefined,
   "review-direct": "direct-merge",
   "review-cumulative-exact": "exact-reconciliation",
   "review-cumulative-without-exact": "direct-merge",

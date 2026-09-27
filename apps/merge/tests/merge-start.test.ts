@@ -38,7 +38,7 @@ describe("MergeStart", () => {
     expect(html).toContain("Start merge");
     expect(html).toContain(AUTOMATIC_LABEL);
     // The details of what runs live in the tooltip, which renders only when open.
-    expect(html).not.toContain("Skips the duplicate diagnostics");
+    expect(html).not.toContain("Creates and applies safe intersections");
     expect(html).not.toContain("Unavailable while redundant way removal review is on");
   });
 

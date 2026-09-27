@@ -76,18 +76,15 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
     "monaco.pbf",
   );
 
+  // Within-file duplicates are fixed in Inspect before merging.
+  const inspectLink = page.getByRole("link", { name: "Inspect app" });
+  await expect(inspectLink).toBeVisible();
+  await expect(inspectLink).toHaveAttribute("href", /inspect/);
+
   // Automatic mode is off by default, so Start merge enters the reviewed workflow.
   await page.getByRole("button", { name: "Start merge" }).click();
-  await expect(page.getByRole("heading", { name: /^2\.\s*Inspect base OSM$/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Skip base diagnostic" })).toBeVisible();
-
-  await page.getByRole("button", { name: "Skip base diagnostic" }).click();
-  await expect(page.getByRole("heading", { name: /^4\.\s*Inspect patch OSM$/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Skip patch diagnostic" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^2\.\s*Direct merge$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Download JSON changes" })).toHaveCount(0);
-
-  await page.getByRole("button", { name: "Skip patch diagnostic" }).click();
-  await expect(page.getByRole("heading", { name: /^6\.\s*Direct merge$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Preview direct merge" })).toBeVisible();
 
   await page.getByRole("button", { name: "Preview direct merge" }).click();
@@ -246,8 +243,6 @@ test("manual removal requires preview and rediscovery clears stale removal evide
   await expect(automatic).not.toBeChecked();
   await expect(automatic).toHaveAccessibleDescription(/reviewed workflow/);
   await page.getByRole("button", { name: "Start merge" }).click();
-  await page.getByRole("button", { name: "Skip base diagnostic" }).click();
-  await page.getByRole("button", { name: "Skip patch diagnostic" }).click();
   await page.getByRole("button", { name: "Preview direct merge" }).click();
   await page.getByRole("button", { name: "Continue to matching and reconciliation" }).click();
   await page.getByRole("button", { name: "Discover match candidates" }).click();

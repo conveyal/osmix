@@ -682,7 +682,7 @@ export class OsmChangeset {
    * A blank target can accept incompatible sources independently. Validate the
    * complete group against itself before copying tags or rewriting references;
    * retaining every source in a conflicting group avoids choosing by input order.
-   * The supplied map must point directly to final survivors, including diagnostic
+   * The supplied map must point directly to final survivors, including
    * same-dataset replacement chains.
    */
   private removeConflictingNodeReplacements(
@@ -750,8 +750,8 @@ export class OsmChangeset {
 
   /**
    * Reconcile incoming nodes with unambiguous base nodes at the exact OSM coordinate.
-   * Cross-dataset reconciliation always preserves the base ID. Same-dataset diagnostic
-   * scans use the highest compatible ID as a deterministic candidate survivor.
+   * Cross-dataset reconciliation always preserves the base ID. Same-dataset deduplication
+   * uses the highest compatible ID as a deterministic survivor.
    */
   deduplicateNodes(nodes: Nodes) {
     const sameDataset = nodes === this.osm.nodes;

@@ -30,18 +30,28 @@ import { useId, useTransition } from "react";
 
 import { EntityContent } from "./entity-details.tsx";
 
-export default function ChangesSummary() {
+/**
+ * `changeset` describes a cross-dataset merge changeset. `deduplication` describes duplicates
+ * found inside one dataset, so it omits the intersection counts that scan never produces.
+ */
+export type ChangesSummaryVariant = "changeset" | "deduplication";
+
+export default function ChangesSummary({
+  variant = "changeset",
+}: {
+  variant?: ChangesSummaryVariant;
+}) {
   return (
     <Details>
       <DetailsSummary>Summary</DetailsSummary>
       <DetailsContent>
-        <ChangesSummaryTable />
+        <ChangesSummaryTable variant={variant} />
       </DetailsContent>
     </Details>
   );
 }
 
-function ChangesSummaryTable() {
+function ChangesSummaryTable({ variant }: { variant: ChangesSummaryVariant }) {
   const summary = useAtomValue(changesetStatsAtom);
   const reconciliationHelpId = useId();
   if (!summary || summary.totalChanges === 0) return <EmptyState>No changes found</EmptyState>;
@@ -67,7 +77,9 @@ function ChangesSummaryTable() {
           </TableRow>
 
           <TableRow>
-            <TableCell>Reconciled nodes</TableCell>
+            <TableCell>
+              {variant === "deduplication" ? "Duplicate nodes" : "Reconciled nodes"}
+            </TableCell>
             <TableCell>{summary.deduplicatedNodes.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
@@ -75,23 +87,39 @@ function ChangesSummaryTable() {
             <TableCell>{summary.deduplicatedNodesReplaced.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
-            <TableCell>Reconciled ways</TableCell>
+            <TableCell>
+              {variant === "deduplication" ? "Duplicate ways" : "Reconciled ways"}
+            </TableCell>
             <TableCell>{summary.deduplicatedWays.toLocaleString()}</TableCell>
           </TableRow>
-          <TableRow>
-            <TableCell>Intersection points found</TableCell>
-            <TableCell>{summary.intersectionPointsFound.toLocaleString()}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell>Intersection nodes created</TableCell>
-            <TableCell>{summary.intersectionNodesCreated.toLocaleString()}</TableCell>
-          </TableRow>
+          {variant === "changeset" ? (
+            <>
+              <TableRow>
+                <TableCell>Intersection points found</TableCell>
+                <TableCell>{summary.intersectionPointsFound.toLocaleString()}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Intersection nodes created</TableCell>
+                <TableCell>{summary.intersectionNodesCreated.toLocaleString()}</TableCell>
+              </TableRow>
+            </>
+          ) : null}
         </TableBody>
       </Table>
       <p className="border-t px-inset py-2 text-muted-foreground" id={reconciliationHelpId}>
-        Reconciliation resolves equivalent entities to one surviving entity instead of retaining
-        both. Node references rewritten counts way node references and relation node members changed
-        from a reconciled node ID to its surviving node ID.
+        {variant === "deduplication" ? (
+          <>
+            Each duplicate is removed in favor of the compatible entity with the highest ID. Node
+            references rewritten counts way node references and relation node members that would
+            change from a duplicate node ID to its surviving node ID.
+          </>
+        ) : (
+          <>
+            Reconciliation resolves equivalent entities to one surviving entity instead of retaining
+            both. Node references rewritten counts way node references and relation node members
+            changed from a reconciled node ID to its surviving node ID.
+          </>
+        )}
       </p>
     </>
   );

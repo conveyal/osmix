@@ -5,11 +5,7 @@ import { MergeGuideDiagram, type MergeGuideDiagramId } from "./merge-guide-diagr
 export const MERGE_STEP_GUIDE_IDS = [
   "select",
   "run-all",
-  "inspect-base",
-  "inspect-patch",
   "direct",
-  "review-base-diagnostic",
-  "review-patch-diagnostic",
   "review-direct",
   "review-cumulative-exact",
   "review-cumulative-without-exact",
@@ -68,7 +64,7 @@ export const MERGE_STEP_GUIDES = {
     ],
     mutations: [
       "The verified cumulative changeset is applied to the in-memory base, followed by a separate intersection changeset.",
-      "Diagnostic scans and intermediate review screens are skipped.",
+      "Intermediate review screens are skipped.",
     ],
     invariants: [
       "Only high-confidence automatic fuzzy matches apply without review; unresolved candidates are not silently accepted.",
@@ -78,34 +74,6 @@ export const MERGE_STEP_GUIDES = {
     warning:
       "Cancellation is best-effort. Osmix checks for it between supported stages, but a long worker operation may finish before the request is observed. Reload the untouched source inputs to undo a completed in-memory mutation.",
     diagram: "pipeline",
-  },
-  "inspect-base": {
-    summary:
-      "Scan the base for exact serialized-coordinate and ordered-reference duplicate candidates without changing the base.",
-    inputs: [
-      "Only the authoritative base OSM and its spatial indexes.",
-      "Nodes at the same seven-decimal OSM coordinate and ways with identical ordered references and compatible routing semantics.",
-    ],
-    mutations: ["None. The scan creates a diagnostic changeset for display but never applies it."],
-    invariants: [
-      "Nearby but non-identical entities are not reported as exact duplicates.",
-      "Base coordinates, references, tags, and relation members remain unchanged.",
-    ],
-    output: "A review-only list of possible exact duplicates inside the base dataset.",
-  },
-  "inspect-patch": {
-    summary:
-      "Scan the patch for exact serialized-coordinate and ordered-reference duplicate candidates without normalizing the imported data.",
-    inputs: [
-      "Only the imported patch OSM and its spatial indexes.",
-      "Nodes at the same seven-decimal OSM coordinate and ways with identical ordered references and compatible routing semantics.",
-    ],
-    mutations: ["None. The scan creates a diagnostic changeset for display but never applies it."],
-    invariants: [
-      "The patch is passed untouched to later cross-dataset merge stages.",
-      "Nearby but non-identical entities belong in the separate, opt-in imported-data matching workflow.",
-    ],
-    output: "A review-only list of possible exact duplicates inside the patch dataset.",
   },
   direct: {
     summary:
@@ -123,28 +91,6 @@ export const MERGE_STEP_GUIDES = {
     ],
     output: "A direct-merge changeset that can be inspected before later cumulative generation.",
     diagram: "direct-merge",
-  },
-  "review-base-diagnostic": {
-    summary:
-      "Inspect possible duplicates found inside the base; continuing discards this diagnostic changeset.",
-    inputs: ["The base-only scan results from the preceding diagnostic stage."],
-    mutations: ["None. Downloading or browsing the diagnostic records does not apply them."],
-    invariants: [
-      "No base entity coordinates, references, tags, or relation members are changed.",
-      "A displayed candidate is evidence for human review, not an automatic merge instruction.",
-    ],
-    output: "A reviewed diagnostic record; the workflow continues with the unchanged base.",
-  },
-  "review-patch-diagnostic": {
-    summary:
-      "Inspect possible duplicates found inside the patch; continuing keeps every patch entity unchanged.",
-    inputs: ["The patch-only scan results from the preceding diagnostic stage."],
-    mutations: ["None. Downloading or browsing the diagnostic records does not apply them."],
-    invariants: [
-      "The imported patch remains unchanged for direct merge and cross-dataset reconciliation.",
-      "A displayed candidate is evidence for human review, not an automatic merge instruction.",
-    ],
-    output: "A reviewed diagnostic record; the workflow continues with the unchanged patch.",
   },
   "review-direct": {
     summary:
