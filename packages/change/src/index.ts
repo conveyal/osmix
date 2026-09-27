@@ -51,7 +51,14 @@ export {
 export * from "./generate-changeset.ts";
 export * from "./merge.ts";
 export * from "./osc.ts";
-export { applyPlan, generateMergePlanOsc, type MergePlanResult, planMerge } from "./plan/plan.ts";
+export {
+  applyPlan,
+  generateMergePlanOsc,
+  getMergePlanCandidate,
+  type MergePlanResult,
+  planMerge,
+  setMergePlanDecisions,
+} from "./plan/plan.ts";
 export * from "./plan/types.ts";
 export * from "./types.ts";
 export * from "./utils.ts";

@@ -44,18 +44,23 @@ export function planMatching(
   base: Osm,
   planned: Osm,
   options: NonNullable<MergePlanOptions["matching"]>,
+  /** Discovery from an earlier run on the same state, reused when only decisions changed. */
+  cached?: { discovery: OsmConflationDiscovery; demoted: ReadonlySet<string> },
 ): {
   discovery: OsmConflationDiscovery;
+  demotedCandidates: ReadonlySet<string>;
   matching: NonNullable<MergePlan["matching"]>;
   demoted: string[];
 } {
   if ("decisions" in options) {
     throw Error("Decide matching proposals with plan decisions, not matching.decisions");
   }
-  const discovery = discoverPlannedConflationCandidates(base, planned, changeset.overlay, options);
-  const demoted = new Set(
-    demoteDrivableConnections(discovery, changeset.overlay).map(({ id }) => id),
-  );
+  const discovery =
+    cached?.discovery ??
+    discoverPlannedConflationCandidates(base, planned, changeset.overlay, options);
+  const demoted =
+    cached?.demoted ??
+    new Set(demoteDrivableConnections(discovery, changeset.overlay).map(({ id }) => id));
   const byCandidate: CandidateProposals[] = [];
   const propose = (
     candidate: OsmConflationCandidate,
@@ -112,6 +117,7 @@ export function planMatching(
   );
   return {
     discovery,
+    demotedCandidates: demoted,
     matching: { candidates: discovery.summary, outcome },
     demoted: demotedProposals,
   };

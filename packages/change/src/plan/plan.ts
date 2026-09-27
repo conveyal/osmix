@@ -12,17 +12,23 @@ import type { Osm } from "@osmix/core";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
 
 import { applyChangesetToOsm } from "../apply-changeset.ts";
-import { type CrossingInsertion, OsmChangeset } from "../changeset.ts";
+import { type CrossingInsertion, OsmChangeset, type OsmChangesetCheckpoint } from "../changeset.ts";
 import { generateOscChanges, type OscOptions } from "../osc.ts";
 import type { OsmChangesetStats } from "../types.ts";
-import type { OsmConflationDiscovery } from "../types.ts";
-import { entityToken, PlanBuilder } from "./builder.ts";
+import {
+  entityToken,
+  PLAN_PHASES,
+  PlanBuilder,
+  type PlanPhase,
+  PROPOSAL_PHASE,
+} from "./builder.ts";
 import { planMatching } from "./matching.ts";
 import { type PatchIdRemap, planPatchIdRemap, remappedCount, remapPatch } from "./remap.ts";
 import type {
   MergePlan,
   MergePlanOptions,
   MergePlanSummary,
+  PlanDecision,
   PlanInputIdentity,
   PlanProposalStatus,
 } from "./types.ts";
@@ -34,8 +40,13 @@ interface PlanState {
   /** The patch with planned IDs. */
   patch: Osm;
   remap: PatchIdRemap;
+  options: MergePlanOptions;
   changeset: OsmChangeset;
-  discovery?: OsmConflationDiscovery;
+  builder: PlanBuilder;
+  /** The changeset as each phase found it, to replan from that phase. */
+  checkpoints: Map<PlanPhase, OsmChangesetCheckpoint>;
+  matched?: ReturnType<typeof planMatching>;
+  log: (message: string) => void;
 }
 
 const planStates = new WeakMap<MergePlan, PlanState>();
@@ -56,8 +67,8 @@ function inputIdentity(osm: Osm): PlanInputIdentity {
 
 /**
  * Plan merging `patch` into `base`. Neither input changes. The plan is live: pass it to
- * `applyPlan` or `generateMergePlanOsc` in the same process. To change a decision, plan again
- * with the new decisions.
+ * `applyPlan` or `generateMergePlanOsc` in the same process, and change its decisions with
+ * `setMergePlanDecisions`.
  */
 export function planMerge(
   base: Osm,
@@ -65,65 +76,125 @@ export function planMerge(
   options: MergePlanOptions = {},
   onProgress: (progress: ProgressEvent) => void = logProgress,
 ): MergePlan {
-  const log = (message: string) => onProgress(progressEvent(message));
   const inputs = { base: inputIdentity(base), patch: inputIdentity(patch) };
   const resolved: MergePlanOptions = {
     ...options,
     patchIds: options.patchIds ?? "osm",
     mergeIdenticalPoints: options.mergeIdenticalPoints ?? true,
     createIntersections: options.createIntersections ?? true,
+    decisions: [...(options.decisions ?? [])],
   };
   const remap = planPatchIdRemap(base, patch, resolved.patchIds!);
   const planned = remapPatch(patch, remap);
-  const changeset = new OsmChangeset(base);
-  const builder = new PlanBuilder(remap, options.decisions);
+  const builder = new PlanBuilder(remap, resolved.decisions);
   builder.groupFeatures(patch);
-
-  log(`Planning direct changes from ${patch.id} to ${base.id}...`);
-  changeset.generateDirectChanges(planned);
-  builder.proposeDirectChanges(base, changeset);
-
-  log(`Planning identical points and ways from ${patch.id}...`);
-  planIdentity(builder, changeset, planned, resolved.mergeIdenticalPoints ? "automatic" : "review");
-
-  let matched: ReturnType<typeof planMatching> | undefined;
-  if (options.matching) {
-    log(`Planning matches from ${patch.id} to ${base.id}...`);
-    matched = planMatching(builder, changeset, base, planned, options.matching);
-  }
-
-  if (resolved.createIntersections) {
-    log(`Planning crossings for ${patch.id}...`);
-    planCrossings(builder, changeset, planned);
-  }
-
-  log("Checking the plan...");
-  const diagnostics = {
-    routing: planRoutingDiagnostics(base, changeset.overlay),
-    integrity: changeset.pendingIntegrityIssues(),
-    demoted: matched?.demoted ?? [],
+  const state: PlanState = {
+    base,
+    patch: planned,
+    remap,
+    options: resolved,
+    changeset: new OsmChangeset(base),
+    builder,
+    checkpoints: new Map(),
+    log: (message) => onProgress(progressEvent(message)),
   };
-  const { summary, staleDecisions } = builder.finish(base, planned, changeset, resolved);
-  const plan: MergePlan = {
+  const plan = {
     version: 1,
     inputs,
     options: resolved,
     idRemap: { mode: resolved.patchIds!, remapped: remappedCount(remap) },
     features: builder.features,
     proposals: builder.proposals,
-    summary,
-    staleDecisions,
-    ...(matched ? { matching: matched.matching } : {}),
-    diagnostics,
-  };
-  planStates.set(plan, {
-    base,
-    patch: planned,
-    remap,
-    changeset,
-    ...(matched ? { discovery: matched.discovery } : {}),
-  });
+  } as MergePlan;
+  runPhases(plan, state, "direct");
+  planStates.set(plan, state);
   return plan;
+}
+
+/**
+ * Replace a plan's decisions and replan in place. Only the phases a changed decision can
+ * affect run again, from the earliest; the result is the plan `planMerge` would make with
+ * these decisions.
+ */
+export function setMergePlanDecisions(plan: MergePlan, decisions: readonly PlanDecision[]) {
+  const state = planState(plan);
+  const before = new Map(plan.options.decisions?.map((d) => [d.proposalId, d.action]));
+  const after = new Map(decisions.map((d) => [d.proposalId, d.action]));
+  let from: PlanPhase | undefined;
+  for (const id of new Set([...before.keys(), ...after.keys()])) {
+    if (before.get(id) === after.get(id)) continue;
+    const proposal = plan.proposals.get(id);
+    // A decision naming no current proposal cannot change phases that do not run again.
+    if (!proposal) continue;
+    const phase = PROPOSAL_PHASE[proposal.kind];
+    // Direct changes are not decided, so their decisions change nothing.
+    if (phase === "direct") continue;
+    if (!from || PLAN_PHASES.indexOf(phase) < PLAN_PHASES.indexOf(from)) from = phase;
+  }
+  plan.options = { ...plan.options, decisions: [...decisions] };
+  state.options = plan.options;
+  state.builder.setDecisions(decisions);
+  if (!from) {
+    finishPlan(plan, state);
+    return plan;
+  }
+  state.builder.dropFrom(from);
+  state.changeset.restore(state.checkpoints.get(from)!);
+  runPhases(plan, state, from);
+  return plan;
+}
+
+/** Run the planner's phases from `from` to the end, then check and summarize the plan. */
+function runPhases(plan: MergePlan, state: PlanState, from: PlanPhase) {
+  const { base, patch, changeset, builder, options, log } = state;
+  const runs = (phase: PlanPhase) => PLAN_PHASES.indexOf(phase) >= PLAN_PHASES.indexOf(from);
+  const checkpoint = (phase: PlanPhase) => state.checkpoints.set(phase, changeset.checkpoint());
+
+  if (runs("direct")) {
+    checkpoint("direct");
+    log(`Planning direct changes from ${patch.id} to ${base.id}...`);
+    changeset.generateDirectChanges(patch);
+    builder.proposeDirectChanges(base, changeset);
+  }
+  if (runs("identity")) {
+    checkpoint("identity");
+    log(`Planning identical points and ways from ${patch.id}...`);
+    planIdentity(builder, changeset, patch, options.mergeIdenticalPoints ? "automatic" : "review");
+  }
+  if (runs("matching")) {
+    checkpoint("matching");
+    if (options.matching) {
+      log(`Planning matches from ${patch.id} to ${base.id}...`);
+      // Discovery reads the state after identity, which a matching decision does not change.
+      const cached =
+        from === "matching" && state.matched
+          ? { discovery: state.matched.discovery, demoted: state.matched.demotedCandidates }
+          : undefined;
+      state.matched = planMatching(builder, changeset, base, patch, options.matching, cached);
+    }
+  }
+  if (runs("crossings")) {
+    checkpoint("crossings");
+    if (options.createIntersections) {
+      log(`Planning crossings for ${patch.id}...`);
+      planCrossings(builder, changeset, patch);
+    }
+  }
+  finishPlan(plan, state);
+}
+
+function finishPlan(plan: MergePlan, state: PlanState) {
+  const { base, patch, changeset, builder, options, matched } = state;
+  state.log("Checking the plan...");
+  plan.diagnostics = {
+    routing: planRoutingDiagnostics(base, changeset.overlay),
+    integrity: changeset.pendingIntegrityIssues(),
+    demoted: matched?.demoted ?? [],
+  };
+  const { summary, staleDecisions } = builder.finish(base, patch, changeset, options);
+  plan.summary = summary;
+  plan.staleDecisions = staleDecisions;
+  if (matched) plan.matching = matched.matching;
 }
 
 /**
@@ -249,7 +320,9 @@ export function applyPlan(plan: MergePlan, newOsmId?: string): MergePlanResult {
 export function getMergePlanCandidate(plan: MergePlan, proposalId: string) {
   const proposal = plan.proposals.get(proposalId);
   if (!proposal || !("candidateId" in proposal)) return undefined;
-  return planState(plan).discovery?.candidates.find(({ id }) => id === proposal.candidateId);
+  return planState(plan).matched?.discovery.candidates.find(
+    ({ id }) => id === proposal.candidateId,
+  );
 }
 
 /** The plan's changes as an osmChange document. */

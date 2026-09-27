@@ -223,6 +223,23 @@ function flattenReplacementMap(replacementMap: ReplacementMap) {
   return flattenedMap;
 }
 
+/** @internal A copy of a changeset's records and counters. */
+export interface OsmChangesetCheckpoint {
+  nodes: Record<number, OsmChange<OsmEntityTypeMap["node"]>>;
+  ways: Record<number, OsmChange<OsmEntityTypeMap["way"]>>;
+  relations: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>;
+  counters: Pick<
+    OsmChangeset,
+    | "currentNodeId"
+    | "deduplicatedNodes"
+    | "deduplicatedNodesReplaced"
+    | "deduplicatedWays"
+    | "intersectionPointsFound"
+    | "intersectionNodesCreated"
+    | "intersectionNodesRemoved"
+  >;
+}
+
 /**
  * Tracks changes to an OSM dataset and provides utilities for deduplication and merging.
  *
@@ -364,6 +381,32 @@ export class OsmChangeset {
         { cause },
       );
     }
+  }
+
+  /** @internal Everything a plan phase can change, to return to before rerunning it. */
+  checkpoint(): OsmChangesetCheckpoint {
+    return {
+      nodes: { ...this.nodeChanges },
+      ways: { ...this.wayChanges },
+      relations: { ...this.relationChanges },
+      counters: {
+        currentNodeId: this.currentNodeId,
+        deduplicatedNodes: this.deduplicatedNodes,
+        deduplicatedNodesReplaced: this.deduplicatedNodesReplaced,
+        deduplicatedWays: this.deduplicatedWays,
+        intersectionPointsFound: this.intersectionPointsFound,
+        intersectionNodesCreated: this.intersectionNodesCreated,
+        intersectionNodesRemoved: this.intersectionNodesRemoved,
+      },
+    };
+  }
+
+  /** @internal Return to a checkpoint. The checkpoint stays valid for another restore. */
+  restore(checkpoint: OsmChangesetCheckpoint) {
+    this.nodeChanges = { ...checkpoint.nodes };
+    this.wayChanges = { ...checkpoint.ways };
+    this.relationChanges = { ...checkpoint.relations };
+    Object.assign(this, checkpoint.counters);
   }
 
   /** @internal New routing-integrity problems in the planned state, before any build. */

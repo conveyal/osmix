@@ -38,6 +38,22 @@ const PROPOSAL_OUTCOME: Record<PlanProposal["kind"], PlanOutcome> = {
   "crossing-node": "connected",
 };
 
+/** Planner phases in order. A decision replans from the phase of the proposal it names. */
+export const PLAN_PHASES = ["direct", "identity", "matching", "crossings"] as const;
+export type PlanPhase = (typeof PLAN_PHASES)[number];
+
+export const PROPOSAL_PHASE: Record<PlanProposal["kind"], PlanPhase> = {
+  add: "direct",
+  "same-id-replace": "direct",
+  "exact-merge": "identity",
+  "way-reconcile": "identity",
+  connect: "matching",
+  "copy-tags": "matching",
+  "remove-way": "matching",
+  "crossing-snap": "crossings",
+  "crossing-node": "crossings",
+};
+
 function proposalEffect(
   status: PlanProposalStatus,
   decision: PlanDecision["action"] | undefined,
@@ -62,7 +78,7 @@ export class PlanBuilder {
   /** Planned node ID to the feature it belongs to: its first way, or itself. */
   private readonly nodeFeatures = new Map<number, PlanFeature>();
   private readonly wayFeatures = new Map<number, PlanFeature>();
-  private readonly decisions: Map<string, PlanDecision["action"]>;
+  private decisions: Map<string, PlanDecision["action"]>;
   private readonly usedDecisions = new Set<string>();
   private readonly remap: PatchIdRemap;
 
@@ -74,6 +90,26 @@ export class PlanBuilder {
   /** The patch's ID for a planned ID, for proposal IDs that survive a remap. */
   originalToken(type: OsmEntityType, plannedId: number) {
     return entityToken(type, originalId(this.remap, type, plannedId));
+  }
+
+  /** Replace every decision; call `dropFrom` and rerun the affected phases after. */
+  setDecisions(decisions: readonly PlanDecision[]) {
+    this.decisions = new Map(decisions.map((decision) => [decision.proposalId, decision.action]));
+  }
+
+  /** Forget the proposals of `phase` and every later phase, so those phases can run again. */
+  dropFrom(phase: PlanPhase) {
+    const from = PLAN_PHASES.indexOf(phase);
+    const dropped = new Set<string>();
+    for (const [id, proposal] of this.proposals) {
+      if (PLAN_PHASES.indexOf(PROPOSAL_PHASE[proposal.kind]) < from) continue;
+      this.proposals.delete(id);
+      this.usedDecisions.delete(id);
+      dropped.add(id);
+    }
+    for (const feature of this.features) {
+      feature.proposalIds = feature.proposalIds.filter((id) => !dropped.has(id));
+    }
   }
 
   /** A decision on a proposal the plan has not made yet. */
@@ -134,7 +170,9 @@ export class PlanBuilder {
 
   /** Register a proposal with its decision applied, returning what it does. */
   propose(draft: ProposalDraft): PlanProposal {
-    const decision = this.decisions.get(draft.id);
+    // Direct changes are what the patch says; they are not decided one by one.
+    const decision =
+      PROPOSAL_PHASE[draft.kind] === "direct" ? undefined : this.decisions.get(draft.id);
     if (decision) this.usedDecisions.add(draft.id);
     const proposal = {
       ...draft,
@@ -192,12 +230,11 @@ export class PlanBuilder {
   finish(base: Osm, planned: Osm, changeset: OsmChangeset, options: MergePlanOptions) {
     // A created entity a merge consumed is not added after all.
     for (const proposal of this.proposals.values()) {
-      if (proposal.kind !== "add" || proposal.effect !== "applied") continue;
+      if (proposal.kind !== "add") continue;
       const change = changeset.changes(proposal.entity.type)[proposal.entity.id];
-      if (change?.changeType !== "create") {
-        proposal.effect = "skipped";
-        proposal.reasons.push("merged-into-base");
-      }
+      const added = change?.changeType === "create";
+      proposal.effect = added ? "applied" : "skipped";
+      proposal.reasons = added ? [] : ["merged-into-base"];
     }
     for (const feature of this.features) feature.outcome = this.featureOutcome(feature);
     return {
