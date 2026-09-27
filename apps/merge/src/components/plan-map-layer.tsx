@@ -11,7 +11,7 @@ import { useEffect } from "react";
 import { Layer, Source, useMap } from "react-map-gl/maplibre";
 
 import { OUTCOME_LABEL, OUTCOMES } from "../lib/merge-plan-workflow";
-import { planLayerAtom, selectedPlanFeatureAtom } from "../state/merge-plan";
+import { planLayerAtom, planOverviewAtom, selectedPlanFeatureAtom } from "../state/merge-plan";
 
 const SOURCE_ID = `${APPID}:merge-plan`;
 const LINES_ID = `${SOURCE_ID}:lines`;
@@ -115,12 +115,19 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
   );
 }
 
-/** The plan layer's key: each outcome's colour next to its name. */
-export function PlanLegend({ counts }: { counts: Record<PlanOutcome, number> }) {
+/**
+ * The plan layer's key, in the map legend under the dataset rows: each outcome's colour next
+ * to its name and count, for the outcomes the plan has. Shown while the plan layer is drawn.
+ */
+export function PlanLegend() {
+  const layer = useAtomValue(planLayerAtom);
+  const overview = useAtomValue(planOverviewAtom);
+  if (!layer || !overview) return null;
+  const counts = overview.summary.features;
   return (
-    <ul className="flex flex-col gap-1" aria-label="Plan map legend">
+    <ul className="flex flex-col border-t py-1" aria-label="Plan map legend">
       {OUTCOMES.filter((outcome) => counts[outcome] > 0).map((outcome) => (
-        <li key={outcome} className="flex items-center gap-2">
+        <li key={outcome} className="flex h-7 items-center gap-2 px-inset">
           <svg aria-hidden="true" width="24" height="12" viewBox="0 0 24 12">
             <line
               x1="1"

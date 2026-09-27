@@ -4,7 +4,7 @@ import { AppSidebar, Main, MapContent } from "@osmix/ui";
 import { useMemo } from "react";
 
 import MergeBlock from "../blocks/merge";
-import { PlanMapLayer } from "../components/plan-map-layer";
+import { PlanLegend, PlanMapLayer } from "../components/plan-map-layer";
 import { useSelectPlanFeature } from "../lib/use-select-plan-feature";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 
@@ -34,6 +34,7 @@ export default function Merge() {
             { osmFile: patch, role: "patch" },
           ]}
           initialViewState={initialViewState}
+          legend={<PlanLegend />}
         >
           <PlanMapLayer onSelect={selectPlanFeature} />
         </OsmixMap>

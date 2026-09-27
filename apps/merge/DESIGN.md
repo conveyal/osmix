@@ -28,7 +28,9 @@ tokens, spacing, primitives, map overlay primitives) lives in
 - `PlanMapLayer`, `PlanLegend` — imported features coloured by outcome
   (`--map-outcome-*`), with features that need a decision drawn wider and
   dashed so colour is never the only cue; clicking a feature opens its row.
-  The legend pairs each colour with its outcome name and count.
+  `PlanLegend` goes in the map legend (`OsmixMap`'s `legend`), under the dataset
+  rows, pairing each colour with its outcome name and count; the sidebar keeps
+  only the summary table.
 - `MergeResult` — the result step: the completion summary, the merged dataset
   card, routing topology, positive IDs, and downloads.
 - `StepActions` — the full-width vertical action footer for Merge workflow

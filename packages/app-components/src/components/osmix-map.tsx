@@ -55,11 +55,14 @@ export function OsmixMap({
   datasets,
   initialViewState,
   tools,
+  legend,
   children,
 }: {
   datasets: MapDataset[];
   initialViewState?: MapInitialViewState;
   tools?: { routing?: boolean };
+  /** Keys to the caller's own layers, shown in the legend under the dataset rows. */
+  legend?: ReactNode;
   children?: ReactNode;
 }) {
   const routing = tools?.routing === true;
@@ -103,7 +106,7 @@ export function OsmixMap({
         <MapOverlay
           toolbar={<MapToolbar routing={routing} />}
           inspector={<MapInspector />}
-          legend={<MapLegend />}
+          legend={<MapLegend>{legend}</MapLegend>}
         />
       </Basemap>
     </MapDatasetsContext>

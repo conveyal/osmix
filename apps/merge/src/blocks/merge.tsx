@@ -39,7 +39,6 @@ import { MergeResult } from "../components/merge-result";
 import { OsmInputCardHeader } from "../components/osm-input-card-header";
 import { PatchIdNotice } from "../components/patch-id-notice";
 import { PlanInputs } from "../components/plan-inputs";
-import { PlanLegend } from "../components/plan-map-layer";
 import { PLAN_PAGE_SIZE, PlanReview } from "../components/plan-review";
 import { PlanSummary } from "../components/plan-summary";
 import { StepActions } from "../components/step-actions";
@@ -578,7 +577,6 @@ export default function MergeBlock() {
             onChange={replanWithPatchIds}
           />
           <PlanSummary overview={overview} />
-          <PlanLegend counts={overview.summary.features} />
           <PlanReview
             detail={selected}
             filter={filter}

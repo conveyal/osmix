@@ -108,6 +108,10 @@ test("the reviewed workflow removes the accepted duplicate footway", async ({ pa
   await openMonacoMerge(page, { removal: true });
   await page.getByRole("button", { name: "Review plan" }).click();
   await expect(page.getByRole("region", { name: "Plan summary" })).toBeVisible();
+  // The plan layer's key sits in the map legend, not the sidebar.
+  await expect(
+    page.getByRole("group", { name: "Loaded data" }).getByLabel("Plan map legend"),
+  ).toContainText("Needs decision");
 
   // Filter the imported features to those with a removal proposal.
   await page.getByLabel("Proposal", { exact: true }).selectOption({ label: "Remove imported way" });

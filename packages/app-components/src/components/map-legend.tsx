@@ -7,6 +7,7 @@ import {
 import { IconButton } from "@osmix/ui";
 import { useAtom, useAtomValue, useStore } from "jotai";
 import { EyeIcon, EyeOffIcon, MaximizeIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { MIN_PICKABLE_ZOOM } from "../constants.ts";
 import { useFlyToOsmBounds } from "../hooks/map.ts";
@@ -19,10 +20,10 @@ import { MapRoleSymbol } from "./map-role-symbol.tsx";
  * The key to the loaded datasets, at the bottom of the map's left column (under the docked
  * inspector): one row per dataset with its role symbol, its label, a show/hide toggle and a fit
  * action. Rendered only while a dataset is loaded, and not while the inspector is docked to the
- * bottom edge (they would share the strip). Below the rows
- * it says when the map is zoomed out too far to select features.
+ * bottom edge (they would share the strip). Below the rows come the keys to the app's own layers
+ * (`children`), then a note when the map is zoomed out too far to select features.
  */
-export function MapLegend() {
+export function MapLegend({ children }: { children?: ReactNode }) {
   const datasets = useMapDatasets();
   const { docked } = useMapOverlayLayout();
   const { open } = useMapOverlayActions();
@@ -36,6 +37,7 @@ export function MapLegend() {
       {datasets.map((dataset) => (
         <LegendRow key={dataset.osmKey} dataset={dataset} showRole={datasets.length > 1} />
       ))}
+      {children}
       {zoom !== null && zoom < MIN_PICKABLE_ZOOM ? (
         <div className="px-inset py-1 text-muted-foreground">Zoom in to select features</div>
       ) : null}
