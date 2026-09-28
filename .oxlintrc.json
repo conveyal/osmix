@@ -70,11 +70,7 @@
     {
       "files": [
         "apps/app/src/**/*.ts",
-        "apps/inspect/src/**/*.ts",
-        "apps/extract/src/**/*.ts",
         "apps/app/src/**/*.tsx",
-        "apps/inspect/src/**/*.tsx",
-        "apps/extract/src/**/*.tsx",
         "packages/app-components/src/**/*.ts",
         "packages/app-components/src/**/*.tsx",
         "packages/ui/src/**/*.ts",
@@ -102,11 +98,7 @@
     {
       "files": [
         "apps/app/src/**/*.ts",
-        "apps/inspect/src/**/*.ts",
-        "apps/extract/src/**/*.ts",
         "apps/app/src/**/*.tsx",
-        "apps/inspect/src/**/*.tsx",
-        "apps/extract/src/**/*.tsx",
         "packages/app-components/src/**/*.ts",
         "packages/app-components/src/**/*.tsx"
       ],

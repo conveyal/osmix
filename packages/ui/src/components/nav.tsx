@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { cloneElement, type ReactElement, type ReactNode } from "react";
 
 import { setNavToolsAnchor } from "../state/layout.ts";
 import { IconButton } from "./icon-button.tsx";
@@ -9,10 +9,12 @@ import { Separator } from "./ui/separator.tsx";
  * rhythm. Left: `start` (the sidebar trigger), the brand, a rule, and `links`. Right: the map
  * tools slot (`OsmixMap` portals its toolbar there; hidden while empty), `controls`, a rule,
  * `end` and the GitHub link, then a rule and `trailing`. `controls` is for app-specific
- * controls and is empty by default.
+ * controls and is empty by default. `brandLink` (an anchor or router link element, without
+ * children) makes the brand a link, such as to the app's Home.
  */
 export function Nav({
   brand = "OSMIX",
+  brandLink,
   start,
   links,
   controls,
@@ -20,6 +22,7 @@ export function Nav({
   trailing,
 }: {
   brand?: ReactNode;
+  brandLink?: ReactElement<{ children?: ReactNode; className?: string; "data-slot"?: string }>;
   start?: ReactNode;
   links?: ReactNode;
   controls?: ReactNode;
@@ -33,13 +36,17 @@ export function Nav({
     >
       <div className="flex h-full shrink-0 items-center gap-3">
         {start}
-        <span
-          data-slot="nav-brand"
-          className="flex items-center gap-2 font-mono font-bold tracking-widest"
-        >
-          <span aria-hidden="true" className="brand-mark" />
-          <span>{brand}</span>
-        </span>
+        {brandLink ? (
+          cloneElement(brandLink, {
+            "data-slot": "nav-brand",
+            className: `${BRAND_CLASS} focus-ring`,
+            children: <NavBrandContent brand={brand} />,
+          })
+        ) : (
+          <span data-slot="nav-brand" className={BRAND_CLASS}>
+            <NavBrandContent brand={brand} />
+          </span>
+        )}
         {links ? (
           <>
             <NavSeparator />
@@ -77,6 +84,17 @@ export function Nav({
         ) : null}
       </div>
     </nav>
+  );
+}
+
+const BRAND_CLASS = "flex items-center gap-2 font-mono font-bold tracking-widest";
+
+function NavBrandContent({ brand }: { brand: ReactNode }) {
+  return (
+    <>
+      <span aria-hidden="true" className="brand-mark" />
+      <span>{brand}</span>
+    </>
   );
 }
 

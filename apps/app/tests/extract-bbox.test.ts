@@ -5,7 +5,7 @@ import {
   bboxesOverlap,
   DEFAULT_EXTRACT_BBOX,
   headerBboxToGeoBbox,
-} from "../src/lib/extract-bbox";
+} from "../src/pages/extract/lib/extract-bbox";
 
 describe("headerBboxToGeoBbox", () => {
   it("orders a PBF header bbox as [west, south, east, north]", () => {

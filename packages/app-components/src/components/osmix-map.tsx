@@ -49,15 +49,19 @@ function datasetLabel({ osmFile, label }: MapDataset): string {
  * dataset is loaded and visible, or its dataset is gone.
  *
  * `initialViewState` seeds the camera once, at mount; fit the map yourself after a load
- * (`useFlyToOsmBounds`).
+ * (`useFlyToOsmBounds`). The app keeps one map mounted across its pages; `active={false}`
+ * (a page without the map, such as Home, covers it) drops the overlay, so the toolbar leaves
+ * the nav, while the map and its sources stay loaded.
  */
 export function OsmixMap({
+  active = true,
   datasets,
   initialViewState,
   tools,
   legend,
   children,
 }: {
+  active?: boolean;
   datasets: MapDataset[];
   initialViewState?: MapInitialViewState;
   tools?: { routing?: boolean };
@@ -103,11 +107,13 @@ export function OsmixMap({
         <SelectedEntityLayer />
         {routing ? <RouteLayer /> : null}
         {children}
-        <MapOverlay
-          toolbar={<MapToolbar routing={routing} />}
-          inspector={<MapInspector />}
-          legend={<MapLegend>{legend}</MapLegend>}
-        />
+        {active ? (
+          <MapOverlay
+            toolbar={<MapToolbar routing={routing} />}
+            inspector={<MapInspector />}
+            legend={<MapLegend>{legend}</MapLegend>}
+          />
+        ) : null}
       </Basemap>
     </MapDatasetsContext>
   );

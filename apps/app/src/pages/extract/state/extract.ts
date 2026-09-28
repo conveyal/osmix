@@ -1,6 +1,11 @@
 import { atom } from "jotai";
-import type { GeoBbox2D } from "osmix";
+import type { ExtractStrategy, GeoBbox2D, OsmPbfHeaderBlock } from "osmix";
 
+import type { ExtractParameters } from "../components/extract-result-stats";
+import {
+  conveyalTagFilterEditorState,
+  type TagFilterEditorState,
+} from "../components/extract-tag-filter-editor";
 import { DEFAULT_EXTRACT_BBOX } from "../lib/extract-bbox";
 
 export const extractBboxAtom = atom<GeoBbox2D>(DEFAULT_EXTRACT_BBOX);
@@ -28,3 +33,21 @@ export type FileBounds =
  * outlines them while they are known, so a bbox that misses the file is visibly outside it.
  */
 export const fileBoundsAtom = atom<FileBounds>({ status: "none" });
+
+/** The bbox from before "Use the selected file's bounds" was turned on, to give back after. */
+export const bboxBeforeFileBoundsAtom = atom<GeoBbox2D | null>(null);
+
+/** The extract strategy chosen in step 3. */
+export const extractStrategyAtom = atom<ExtractStrategy>("complete_ways");
+
+/** The tag filter rules being edited in step 4. */
+export const extractTagFilterEditorAtom = atom<TagFilterEditorState>(conveyalTagFilterEditorState);
+
+/** The source PBF selected in step 1, not loaded: the extract streams it. */
+export const extractSourceFileAtom = atom<File | null>(null);
+
+/** The selected source's PBF header. */
+export const extractSourceHeaderAtom = atom<OsmPbfHeaderBlock | null>(null);
+
+/** The settings the current extract result was made with. */
+export const extractParametersAtom = atom<ExtractParameters | null>(null);

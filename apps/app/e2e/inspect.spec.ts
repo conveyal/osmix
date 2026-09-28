@@ -46,12 +46,12 @@ function createDuplicatedOsm() {
 }
 
 test("loads a PBF, renders the map, and runs duplicate diagnostics", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/inspect");
 
-  // The nav links to the sibling apps and marks this one as current.
-  const nav = page.getByRole("navigation").or(page.locator("body"));
-  await expect(nav.getByRole("link", { name: "Merge" })).toBeVisible();
-  await expect(page.getByText("Inspect", { exact: true }).first()).toBeVisible();
+  // The nav links to the other pages and marks this one as current.
+  const nav = page.getByRole("navigation");
+  await expect(nav.getByRole("link", { name: "Merge" })).toHaveAttribute("href", "/merge");
+  await expect(nav.getByText("Inspect", { exact: true })).toHaveAttribute("aria-current", "page");
 
   await loadPbf(page, MONACO_PBF);
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
@@ -87,7 +87,7 @@ test("loads a PBF, renders the map, and runs duplicate diagnostics", async ({ pa
 });
 
 test("applies duplicate fixes and downloads the deduplicated PBF", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/inspect");
   await loadPbf(page, {
     name: "duplicates.osm.pbf",
     mimeType: "application/octet-stream",

@@ -32,17 +32,9 @@ runs:
       shell: bash
       run: pnpm --filter @osmix/app exec playwright install --with-deps chromium
 
-    - name: Run browser worker tests
+    - name: Run app browser tests
       shell: bash
       run: pnpm --filter @osmix/app test:e2e
-
-    - name: Run inspect app browser tests
-      shell: bash
-      run: pnpm --filter @osmix/inspect test:e2e
-
-    - name: Run extract app browser tests
-      shell: bash
-      run: pnpm --filter @osmix/extract test:e2e
 
     - name: Upload browser failure diagnostics
       if: failure()
@@ -51,7 +43,5 @@ runs:
         name: browser-test-results
         path: |
           apps/app/test-results/
-          apps/inspect/test-results/
-          apps/extract/test-results/
         if-no-files-found: ignore
         retention-days: 7

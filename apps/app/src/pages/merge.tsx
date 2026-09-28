@@ -1,44 +1,21 @@
-import { type MapInitialViewState, OsmixMap, useFlyToOsmBounds } from "@osmix/app-components";
-import { useLoadFromUrl, useOsmFile } from "@osmix/app-core";
-import { AppSidebar, Main, MapContent } from "@osmix/ui";
-import { useMemo } from "react";
+import { useFlyToOsmBounds } from "@osmix/app-components";
+import { useLoadFromUrl } from "@osmix/app-core";
 
 import MergeBlock from "../blocks/merge";
-import { PlanLegend, PlanMapLayer } from "../components/plan-map-layer";
-import { useSelectPlanFeature } from "../lib/use-select-plan-feature";
-import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
+import { useBaseOsm } from "../lib/merge-slots";
+import { BASE_OSM_KEY } from "../settings";
 
-export default function Merge() {
-  const selectPlanFeature = useSelectPlanFeature();
-  const base = useOsmFile(BASE_OSM_KEY);
-  const patch = useOsmFile(PATCH_OSM_KEY);
+/** The Merge page's sidebar. The shared map shows the base and patch with the plan layer. */
+export function MergeSidebar() {
+  const base = useBaseOsm();
   const flyToOsmBounds = useFlyToOsmBounds();
 
-  // Open `?load=<hash>` from storage, or fall back to the most recently used dataset.
-  useLoadFromUrl({ loadFromStorage: base.loadFromStorage, onLoaded: flyToOsmBounds });
+  // Open `?load=<hash>` from storage as the base, or fall back to the most recently used dataset.
+  useLoadFromUrl({
+    osmKey: BASE_OSM_KEY,
+    loadFromStorage: base.loadFromStorage,
+    onLoaded: flyToOsmBounds,
+  });
 
-  const initialViewState: MapInitialViewState | undefined = useMemo(() => {
-    if (!base.osmInfo?.bbox) return undefined;
-    return { bounds: base.osmInfo.bbox, fitBoundsOptions: { padding: 100 } };
-  }, [base.osmInfo]);
-
-  return (
-    <Main>
-      <AppSidebar>
-        <MergeBlock />
-      </AppSidebar>
-      <MapContent>
-        <OsmixMap
-          datasets={[
-            { osmFile: base, role: "base" },
-            { osmFile: patch, role: "patch" },
-          ]}
-          initialViewState={initialViewState}
-          legend={<PlanLegend />}
-        >
-          <PlanMapLayer onSelect={selectPlanFeature} />
-        </OsmixMap>
-      </MapContent>
-    </Main>
-  );
+  return <MergeBlock />;
 }

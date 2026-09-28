@@ -1,9 +1,9 @@
 import {
-  appOrigin,
   FullIndexRequired,
   hasFullNodeIndex,
   OsmDatasetSection,
   OsmInfoTable,
+  pagePath,
   StoredOsmList,
   useFlyToOsmBounds,
 } from "@osmix/app-components";
@@ -17,7 +17,6 @@ import {
   TaskAlreadyRunningError,
   Tasks,
   type UseOsmFileReturn,
-  useOsmFile,
   useOsmixRemote,
   writeJsonReport,
 } from "@osmix/app-core";
@@ -32,6 +31,7 @@ import type {
   PlanDecision,
 } from "osmix";
 import { useState } from "react";
+import { Link } from "wouter";
 
 import { ConflationConfig } from "../components/conflation-config";
 import { MergeCompletionSummary } from "../components/merge-completion-summary";
@@ -49,6 +49,7 @@ import {
   makePlanOscName,
   withDecision,
 } from "../lib/merge-plan-workflow";
+import { useBaseOsm, usePatchOsm } from "../lib/merge-slots";
 import { useSelectPlanFeature } from "../lib/use-select-plan-feature";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import {
@@ -79,12 +80,8 @@ const STEP_NUMBER = { inputs: 1, review: 2, automatic: undefined, result: 3 } as
  */
 export default function MergeBlock() {
   const remote = useOsmixRemote();
-  const base = useOsmFile(BASE_OSM_KEY, {
-    distinctFrom: { osmKey: PATCH_OSM_KEY, label: "Patch" },
-  });
-  const patch = useOsmFile(PATCH_OSM_KEY, {
-    distinctFrom: { osmKey: BASE_OSM_KEY, label: "Base" },
-  });
+  const base = useBaseOsm();
+  const patch = usePatchOsm();
   const [step, setStep] = useAtom(mergeStepAtom);
   const completion = useAtomValue(mergeCompletionAtom);
   const runInputs = useAtomValue(mergeRunInputsAtom);
@@ -428,7 +425,12 @@ export default function MergeBlock() {
     const baseState = base.snapshot();
     const previousBaseId = await base.copyStateFrom(patch.snapshot(), { releasePrevious: false });
     await patch.copyStateFrom(baseState);
-    if (previousBaseId) await remote.delete(previousBaseId);
+    // Freeing waits for every worker, which may be drawing tiles; the swap need not.
+    if (previousBaseId) {
+      remote.delete(previousBaseId).catch((error: unknown) => {
+        console.error(`Failed to free dataset ${previousBaseId}`, error);
+      });
+    }
   };
 
   const baseNeedsFull = base.osmInfo !== null && !hasFullNodeIndex(base.osmInfo);
@@ -553,11 +555,12 @@ export default function MergeBlock() {
         {step === "inputs" ? (
           <Alert title="Check each input in Inspect first">
             <p>
-              Merge does not scan inputs for duplicates inside one file. Open each file in the{" "}
-              <a href={appOrigin("inspect")} className="text-info underline">
-                Inspect app
-              </a>{" "}
-              to find and fix duplicate nodes and ways, then open the cleaned PBF here.
+              Merge does not scan inputs for duplicates inside one file. Open each file in{" "}
+              <Link href={pagePath("inspect")} className="text-info underline">
+                Inspect
+              </Link>{" "}
+              to find and fix duplicate nodes and ways, then save the cleaned file and open it here
+              from the stored files.
             </p>
           </Alert>
         ) : null}

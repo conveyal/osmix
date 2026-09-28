@@ -6,6 +6,9 @@ export default defineConfig({
     "plan-review.spec.ts",
     "merge-base-loading.spec.ts",
     "monaco-merge-patch.spec.ts",
+    "inspect.spec.ts",
+    "extract.spec.ts",
+    "navigation.spec.ts",
     "worker-runtime.spec.ts",
   ],
   timeout: 120_000,
@@ -22,15 +25,21 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "merge-integration",
-      testMatch: ["merge-base-loading.spec.ts", "monaco-merge-patch.spec.ts"],
+      name: "app-integration",
+      testMatch: [
+        "merge-base-loading.spec.ts",
+        "monaco-merge-patch.spec.ts",
+        "inspect.spec.ts",
+        "extract.spec.ts",
+        "navigation.spec.ts",
+      ],
       use: { ...devices["Desktop Chrome"] },
     },
     {
       // Keep even the lightweight browser harness off the runner while the real
       // Merge journey is parsing PBFs and rendering MapLibre.
       name: "plan-review",
-      dependencies: ["merge-integration"],
+      dependencies: ["app-integration"],
       testMatch: ["plan-review.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },

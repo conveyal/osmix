@@ -1,30 +1,32 @@
-import { appOrigin, OSMIX_APPS, type OsmixAppId } from "../lib/app-origin.ts";
+import { Link } from "wouter";
+
+import { OSMIX_PAGES, type OsmixRoute } from "../lib/app-pages.ts";
 
 /**
- * Links to every Osmix app for the `Nav` shell's `links` slot. The current app is marked with
- * the per-app hue and is not a link; the others resolve to their sibling origin (`appOrigin`).
+ * Links to the app's pages for the `Nav` shell's `links` slot. The current page is marked with
+ * its hue and is not a link. Navigating keeps every page's state and the shared map.
  */
-export function AppLinks({ current }: { current: OsmixAppId }) {
+export function AppLinks({ current }: { current: OsmixRoute | null }) {
   return (
     <div className="flex h-full items-stretch gap-4">
-      {OSMIX_APPS.map((app) =>
-        app.id === current ? (
+      {OSMIX_PAGES.map((page) =>
+        page.id === current ? (
           <span
-            key={app.id}
+            key={page.id}
             className="flex items-center border-y-2 border-t-transparent border-b-app font-semibold text-foreground"
             aria-current="page"
           >
-            {app.label}
+            {page.label}
           </span>
         ) : (
-          <a
-            key={app.id}
-            href={appOrigin(app.id)}
+          <Link
+            key={page.id}
+            href={page.path}
             data-slot="app-link"
             className="flex items-center border-y-2 border-transparent text-muted-foreground focus-ring hover:text-foreground"
           >
-            {app.label}
-          </a>
+            {page.label}
+          </Link>
         ),
       )}
     </div>

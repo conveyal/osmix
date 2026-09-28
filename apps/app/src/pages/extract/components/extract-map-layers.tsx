@@ -1,7 +1,7 @@
 import { nominatimPlaceAtom, type NominatimResult } from "@osmix/app-components";
 import { useAtom, useAtomValue } from "jotai";
 import type { GeoBbox2D } from "osmix";
-import { useEffect, useEffectEvent } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 
 import { extractBboxAtom, fileBoundsAtom, useFileBoundsAtom } from "../state/extract";
 import ExtractBboxCornerMarkers, { bboxAfterCornerDrag } from "./extract-bbox-corner-markers";
@@ -33,8 +33,11 @@ export default function ExtractMapLayers() {
     const next = nominatimResultToBbox(result);
     if (next) setBbox(next);
   });
+  // Only places found while Extract is open: a search on another page must not move the bbox
+  // when Extract mounts again.
+  const placeAtMount = useRef(place);
   useEffect(() => {
-    if (place) applyPlace(place);
+    if (place && place !== placeAtMount.current) applyPlace(place);
   }, [place]);
 
   return (

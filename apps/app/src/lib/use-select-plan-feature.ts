@@ -1,10 +1,10 @@
 import { useMap, useMapPadding } from "@osmix/app-components";
-import { useOsmFile, useOsmixRemote } from "@osmix/app-core";
+import { useOsmixRemote } from "@osmix/app-core";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback } from "react";
 
-import { BASE_OSM_KEY } from "../settings";
 import { selectedPlanFeatureAtom } from "../state/merge-plan";
+import { useBaseOsm } from "./merge-slots";
 
 /**
  * Open an imported feature of the active plan: load its evidence and fit the map to it. Used
@@ -12,7 +12,7 @@ import { selectedPlanFeatureAtom } from "../state/merge-plan";
  */
 export function useSelectPlanFeature() {
   const remote = useOsmixRemote();
-  const base = useOsmFile(BASE_OSM_KEY);
+  const base = useBaseOsm();
   const setSelected = useSetAtom(selectedPlanFeatureAtom);
   const selected = useAtomValue(selectedPlanFeatureAtom);
   const map = useMap();

@@ -5,11 +5,13 @@ import { expect, test } from "@playwright/test";
 const MONACO_PBF = fileURLToPath(new URL("../../../fixtures/monaco.pbf", import.meta.url));
 
 test("extracts a bounding box from a PBF and offers the result for download", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/extract");
 
-  // The nav links to the sibling apps and marks this one as current.
-  await expect(page.getByRole("link", { name: "Merge" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Inspect" })).toBeVisible();
+  // The nav links to the other pages and marks this one as current.
+  const nav = page.getByRole("navigation");
+  await expect(nav.getByRole("link", { name: "Merge" })).toHaveAttribute("href", "/merge");
+  await expect(nav.getByRole("link", { name: "Inspect" })).toHaveAttribute("href", "/inspect");
+  await expect(nav.getByText("Extract", { exact: true })).toHaveAttribute("aria-current", "page");
 
   // Exactly one button is named "Search": the submit of the place search embedded in step 2.
   // The map's own search is closed by default (its toggle is "Open map search" and its submit
@@ -80,7 +82,7 @@ test("extracts a bounding box from a PBF and offers the result for download", as
 });
 
 test("extracts using the bounds recorded in the selected file's header", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/extract");
 
   const useFileBounds = page.getByRole("checkbox", { name: "Use the selected file's bounds" });
   await expect(useFileBounds).toBeDisabled();

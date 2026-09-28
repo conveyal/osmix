@@ -27,7 +27,8 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-map-gl": "catalog:",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "wouter": "catalog:"
   },
   "devDependencies": {
     "@osmix/shared": "workspace:*",

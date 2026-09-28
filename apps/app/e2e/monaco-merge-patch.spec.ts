@@ -38,7 +38,7 @@ async function openMonacoMerge(page: Page, { removal }: { removal: boolean }) {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, get: () => 1 });
   });
-  await page.goto("/");
+  await page.goto("/merge");
   await expect.poll(() => page.evaluate(() => window.osmWorker?.workerCount ?? 0)).toBe(1);
   const section = (text: string) =>
     page.locator('[data-slot="sidebar-section"]').filter({ hasText: text }).first();

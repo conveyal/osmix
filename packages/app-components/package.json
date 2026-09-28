@@ -38,7 +38,8 @@
     "maplibre-gl": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-map-gl": "catalog:"
+    "react-map-gl": "catalog:",
+    "wouter": "catalog:"
   },
   "engines": {
     "node": ">=24"

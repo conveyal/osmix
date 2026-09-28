@@ -1,11 +1,12 @@
 import {
-  appOrigin,
   NominatimSearch,
   OsmDatasetSection,
   OsmLoadDetails,
   OsmLoadFailurePanel,
   OsmPbfFileInput,
+  pagePath,
   SaveToDiskNotice,
+  useFlyToOsmBounds,
   useMap,
   useMapPadding,
 } from "@osmix/app-components";
@@ -35,14 +36,14 @@ import {
 } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
 import { DownloadIcon } from "lucide-react";
-import type { ExtractStrategy, GeoBbox2D, OsmPbfHeaderBlock } from "osmix";
+import type { ExtractStrategy } from "osmix";
 import { useId, useRef, useState } from "react";
+import { Link } from "wouter";
 
+import { EXTRACT_OSM_KEY } from "../../settings";
 import { type ExtractParameters, ExtractResultStats } from "./components/extract-result-stats";
 import ExtractTagFilterEditor, {
-  conveyalTagFilterEditorState,
   rulesFromEditorState,
-  type TagFilterEditorState,
 } from "./components/extract-tag-filter-editor";
 import { SourceFileInfo } from "./components/source-file-info";
 import {
@@ -53,10 +54,15 @@ import {
   isValidBbox,
   parseBboxString,
 } from "./lib/extract-bbox";
-import { OSM_KEY } from "./settings";
 import {
   automaticBboxAtom,
+  bboxBeforeFileBoundsAtom,
   extractBboxAtom,
+  extractParametersAtom,
+  extractSourceFileAtom,
+  extractSourceHeaderAtom,
+  extractStrategyAtom,
+  extractTagFilterEditorAtom,
   type FileBounds,
   fileBoundsAtom,
   useFileBoundsAtom,
@@ -114,7 +120,7 @@ function FileBoundsDescription({ fileBounds }: { fileBounds: FileBounds }) {
 }
 
 export function ExtractPanel() {
-  const extract = useOsmFile(OSM_KEY);
+  const extract = useOsmFile(EXTRACT_OSM_KEY);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
   const mapBounds = useAtomValue(mapBoundsAtom);
@@ -128,20 +134,20 @@ export function ExtractPanel() {
     setInputsBbox(bbox);
     setBboxInputs(bbox.map((v) => String(v)));
   }
-  const [strategy, setStrategy] = useState<ExtractStrategy>("complete_ways");
-  const [tagFilterEditor, setTagFilterEditor] = useState<TagFilterEditorState>(
-    conveyalTagFilterEditorState,
-  );
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [sourceHeader, setSourceHeader] = useState<OsmPbfHeaderBlock | null>(null);
-  const [extractParameters, setExtractParameters] = useState<ExtractParameters | null>(null);
+  // The form lives in atoms, so it survives navigating to another page and back.
+  const [strategy, setStrategy] = useAtom(extractStrategyAtom);
+  const [tagFilterEditor, setTagFilterEditor] = useAtom(extractTagFilterEditorAtom);
+  const [pendingFile, setPendingFile] = useAtom(extractSourceFileAtom);
+  const [sourceHeader, setSourceHeader] = useAtom(extractSourceHeaderAtom);
+  const [extractParameters, setExtractParameters] = useAtom(extractParametersAtom);
+  const flyToOsmBounds = useFlyToOsmBounds();
   const remote = useOsmixRemote();
   const map = useMap();
   const mapPadding = useMapPadding();
   const store = useStore();
   const [fileBounds, setFileBounds] = useAtom(fileBoundsAtom);
   const [useFileBounds, setUseFileBounds] = useAtom(useFileBoundsAtom);
-  const [bboxBeforeFileBounds, setBboxBeforeFileBounds] = useState<GeoBbox2D | null>(null);
+  const [bboxBeforeFileBounds, setBboxBeforeFileBounds] = useAtom(bboxBeforeFileBoundsAtom);
   const headerRequest = useRef(0);
   const findPlaceId = useId();
 
@@ -223,7 +229,7 @@ export function ExtractPanel() {
     if (!pendingFile || !canExtract) return;
     selectEntity(null, null);
     const abortController = new AbortController();
-    setLoadingState({ controller: abortController, osmKey: OSM_KEY });
+    setLoadingState({ controller: abortController, osmKey: EXTRACT_OSM_KEY });
     const parameters: ExtractParameters = {
       sourceName: pendingFile.name,
       bbox,
@@ -241,7 +247,10 @@ export function ExtractPanel() {
         },
         abortController,
       );
-      if (loaded) setExtractParameters(parameters);
+      if (loaded) {
+        setExtractParameters(parameters);
+        flyToOsmBounds(loaded);
+      }
     } finally {
       setLoadingState(null);
     }
@@ -485,7 +494,10 @@ export function ExtractPanel() {
           <div className="flex flex-col gap-2 p-inset">
             <SaveToDiskNotice />
             <p className="text-muted-foreground">
-              To merge this extract, export it and open it in <a href={appOrigin("merge")}>Merge</a>
+              To merge this extract, save it to storage, then open it from the stored files in{" "}
+              <Link href={pagePath("merge")} className="text-info underline">
+                Merge
+              </Link>
               .
             </p>
             <p className="text-muted-foreground">

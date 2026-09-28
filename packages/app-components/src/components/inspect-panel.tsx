@@ -8,9 +8,10 @@ import { SidebarSection } from "@osmix/ui";
 import { useSetAtom } from "jotai";
 import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
+import { Link } from "wouter";
 
 import { useFlyToOsmBounds } from "../hooks/map.ts";
-import { appOrigin } from "../lib/app-origin.ts";
+import { pagePath } from "../lib/app-pages.ts";
 import { DuplicateFixes } from "./duplicate-fixes.tsx";
 import { OsmDatasetSection } from "./osm-dataset-section.tsx";
 import { OsmSourceLinks } from "./osm-source-links.tsx";
@@ -40,10 +41,10 @@ export function InspectPanel({
       <>
         <SidebarSection title="Open a dataset">
           <p className="text-muted-foreground">
-            Open an OSM file to inspect, or extract a region with the{" "}
-            <a href={appOrigin("extract")} className="text-info underline">
-              Extract app
-            </a>
+            Open an OSM file to inspect, or cut a region out of a larger one in{" "}
+            <Link href={pagePath("extract")} className="text-info underline">
+              Extract
+            </Link>
           </p>
           <OsmSourceLinks
             openOsmPbfUrl={async (url) => {

@@ -38,7 +38,7 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
       get: () => 1,
     });
   });
-  await page.goto("/");
+  await page.goto("/merge");
   await expect.poll(() => page.evaluate(() => window.osmWorker?.workerCount ?? 0)).toBe(1);
 
   const baseSection = page
@@ -94,9 +94,8 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   );
 
   // Within-file duplicates are fixed in Inspect before merging.
-  const inspectLink = page.getByRole("link", { name: "Inspect app" });
-  await expect(inspectLink).toBeVisible();
-  await expect(inspectLink).toHaveAttribute("href", /inspect/);
+  const inspectLink = page.locator('[data-slot="alert"]').getByRole("link", { name: "Inspect" });
+  await expect(inspectLink).toHaveAttribute("href", "/inspect");
 
   // Review plan is the default entry point: nothing changes until the plan is applied.
   await page.getByRole("button", { name: "Review plan" }).click();
@@ -114,7 +113,7 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   // Development serves `fixtures/` as the public directory.
   const baseDatasetId = await page.evaluate(async () => {
     const bytes = await (await fetch("/monaco.pbf")).arrayBuffer();
-    return `main-${await window.osmWorker.hashBuffer(bytes)}`;
+    return `base-${await window.osmWorker.hashBuffer(bytes)}`;
   });
   expect(await page.evaluate((id) => window.osmWorker.has(id), baseDatasetId)).toBe(true);
   await baseSection.getByRole("button", { name: "Clear base OSM file" }).click();
@@ -151,7 +150,7 @@ async function openTinyMerge(page: Page, inputs: Awaited<ReturnType<typeof tinyI
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, get: () => 1 });
   });
-  await page.goto("/");
+  await page.goto("/merge");
   await expect.poll(() => page.evaluate(() => window.osmWorker?.workerCount ?? 0)).toBe(1);
   const baseSection = page
     .locator('[data-slot="sidebar-section"]')
@@ -356,10 +355,10 @@ test("swapping exchanges the inputs, or moves the only one, without reloading", 
   await swap.click();
   await expect(fileName(baseSection)).toHaveText("completion-patch.pbf");
   await expect(fileName(patchSection)).toHaveText("completion-base.pbf");
-  await expect.poll(() => has(`main-${hashes.patch}`)).toBe(true);
+  await expect.poll(() => has(`base-${hashes.patch}`)).toBe(true);
   await expect.poll(() => has(`patch-${hashes.base}`)).toBe(true);
   // The datasets the slots held before are freed.
-  await expect.poll(() => has(`main-${hashes.base}`)).toBe(false);
+  await expect.poll(() => has(`base-${hashes.base}`)).toBe(false);
   await expect.poll(() => has(`patch-${hashes.patch}`)).toBe(false);
 
   // With one input loaded, the swap moves it into the empty slot.

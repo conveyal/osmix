@@ -117,7 +117,14 @@ export {
   readMapColors,
   useMapColors,
 } from "./hooks/map-colors.ts";
-export { appOrigin, OSMIX_APPS, type OsmixAppId } from "./lib/app-origin.ts";
+export {
+  HOME_PATH,
+  OSMIX_PAGES,
+  type OsmixPageId,
+  type OsmixRoute,
+  pagePath,
+  routeForPath,
+} from "./lib/app-pages.ts";
 export {
   applyBasemapPreset,
   type BasemapLayerKind,
