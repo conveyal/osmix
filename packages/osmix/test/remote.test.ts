@@ -126,6 +126,45 @@ describe("OsmixRemote", () => {
     );
   });
 
+  describe("copy", () => {
+    it(
+      "registers a second id in every worker that survives replacing the original",
+      async () => {
+        using remote = new RecoveryTestRemote();
+        await remote.initializeWorkerPool(2);
+        const pbfData = await getFixtureFile(monacoPbf.url);
+        const original = await remote.fromPbf(pbfData.buffer, {
+          id: "copy-original",
+          loadProfile: "view",
+        });
+
+        await remote.copy(original.id, "copy-target");
+        expect(await remote.hasForTest("copy-target")).toEqual([true, true]);
+        expect(
+          (await remote.decisionsForTest("copy-target")).map((d) => d?.resolvedProfile),
+        ).toEqual(["view", "view"]);
+        const copied = await remote.get("copy-target");
+        expect(copied.id).toBe("copy-target");
+        expect(copied.info().stats.nodes).toBe(monacoPbf.nodes);
+
+        // Replacing or deleting the original leaves the copy intact.
+        await remote.delete(original.id);
+        expect(await remote.hasForTest(original.id)).toEqual([false, false]);
+        expect(await remote.hasForTest("copy-target")).toEqual([true, true]);
+
+        // A restarted worker gets the copy back from its retained shared buffers.
+        await remote.deleteFromWorkerForTest(1, "copy-target");
+        await remote.restoreWorkerForTest(1);
+        expect(await remote.hasForTest("copy-target")).toEqual([true, true]);
+
+        await expect(remote.copy("copy-target", "copy-target")).rejects.toThrow(
+          "Cannot copy dataset copy-target onto itself.",
+        );
+      },
+      workerTestTimeout,
+    );
+  });
+
   describe("fromGeoJSON", () => {
     it(
       "should preserve a full Uint8Array view",

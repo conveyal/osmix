@@ -64,16 +64,33 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   );
   await expect(baseSection).toContainText("14,286");
 
-  // Use the one Monaco PBF tracked by Git for both roles. The guidance harness
-  // covers distinct displayed filenames without depending on local-only files.
-  await loadPbf(patchSection, page, MONACO_PBF);
-  await expect(patchSection.locator('[data-slot="osm-input-file-name"]')).toHaveText("monaco.pbf");
+  // The same file cannot be both inputs: the patch refuses it and loads nothing.
+  await patchSection.getByRole("button", { name: "Open file" }).click();
+  const refusedChooser = page.waitForEvent("filechooser");
+  await page.getByRole("menuitem", { name: /^OSM PBF/ }).click();
+  await (await refusedChooser).setFiles(MONACO_PBF);
+  await expect(patchSection.getByRole("alert")).toContainText(
+    "monaco.pbf is already loaded as the Base.",
+  );
+  await expect(patchSection.getByRole("button", { name: "File info" })).toHaveCount(0);
+
+  // A re-encoded copy has the same entities in different bytes, so it is a different file.
+  // Every entity matches the base exactly.
+  const monacoCopy = {
+    name: "monaco-copy.pbf",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.from(await toPbfBuffer(await fromPbf(await readFile(MONACO_PBF)))),
+  };
+  await loadPbf(patchSection, page, monacoCopy);
+  await expect(patchSection.locator('[data-slot="osm-input-file-name"]')).toHaveText(
+    "monaco-copy.pbf",
+  );
   await expect(patchSection.getByRole("button", { name: "Export patch OSM as PBF" })).toBeVisible();
   await expect(patchSection.getByRole("button", { name: "Clear patch OSM file" })).toBeVisible();
   await expect(patchSection.getByRole("button", { name: "Save to storage" })).toHaveCount(0);
   await patchSection.getByRole("button", { name: "File info" }).click();
   await expect(patchSection.getByRole("row").filter({ hasText: "file name" })).toContainText(
-    "monaco.pbf",
+    "monaco-copy.pbf",
   );
 
   // Within-file duplicates are fixed in Inspect before merging.
@@ -85,13 +102,25 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   await page.getByRole("button", { name: "Review plan" }).click();
   await expect(page.getByRole("heading", { name: /^2\.\s*Review the plan$/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Plan summary" })).toBeVisible();
-  // The same file as base and patch: every positive ID names a base entity.
+  // The same entities as base and patch: every positive ID names a base entity.
   await expect(page.getByText(/patch entities replace base entities/)).toBeVisible();
   const actions = page.getByRole("group", { name: "Plan review actions" });
   await expect(actions.getByRole("button", { name: "Export osmChange (.osc)" })).toBeVisible();
   await expect(actions.getByRole("button", { name: "Apply plan" })).toBeEnabled();
   await actions.getByRole("button", { name: "Back to inputs" }).click();
   await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeVisible();
+
+  // Each slot owns its worker dataset (`<slot>-<file hash>`) and frees it when cleared.
+  // Development serves `fixtures/` as the public directory.
+  const baseDatasetId = await page.evaluate(async () => {
+    const bytes = await (await fetch("/monaco.pbf")).arrayBuffer();
+    return `main-${await window.osmWorker.hashBuffer(bytes)}`;
+  });
+  expect(await page.evaluate((id) => window.osmWorker.has(id), baseDatasetId)).toBe(true);
+  await baseSection.getByRole("button", { name: "Clear base OSM file" }).click();
+  await expect
+    .poll(() => page.evaluate((id) => window.osmWorker.has(id), baseDatasetId))
+    .toBe(false);
 });
 
 async function tinyInputs() {

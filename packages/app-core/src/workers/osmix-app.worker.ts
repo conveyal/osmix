@@ -156,13 +156,18 @@ export class OsmixAppWorker extends OsmixWorker {
     this.hashControllers.get(taskId)?.abort();
   }
 
-  /** Fetch, hash, and parse a PBF in one streaming pass inside this worker. */
+  /**
+   * Fetch, hash, and parse a PBF in one streaming pass inside this worker. The dataset is
+   * registered as `<idPrefix><fileHash>`.
+   */
   async fromPbfUrl({
     url,
     options = {},
+    idPrefix = "",
   }: {
     url: string;
     options?: Partial<OsmFromPbfOptions>;
+    idPrefix?: string;
   }): Promise<PbfUrlLoadResult> {
     const response = await fetch(url);
     if (!response.ok) {
@@ -189,10 +194,11 @@ export class OsmixAppWorker extends OsmixWorker {
       const fileHash = hasher.digest("hex");
       const provisional = this.get(provisionalId);
       const loadDecision = this.getLoadDecision(provisionalId);
-      const osm = new Osm({ ...provisional.transferables(), id: fileHash });
+      const osmId = `${idPrefix}${fileHash}`;
+      const osm = new Osm({ ...provisional.transferables(), id: osmId });
       this.delete(provisionalId);
-      this.set(fileHash, osm);
-      this.setLoadDecision(fileHash, loadDecision);
+      this.set(osmId, osm);
+      this.setLoadDecision(osmId, loadDecision);
       const existing = await this.findByHash(fileHash);
       return {
         info: osm.info(),

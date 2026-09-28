@@ -1403,6 +1403,34 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   }
 
   /**
+   * Register an `Osm` instance under a second ID in all workers, keeping the original. With
+   * SharedArrayBuffer-backed data both IDs share the same buffers, so the copy costs no memory
+   * for entities. Mutations that replace one ID (merges, applied changes) leave the other alone.
+   */
+  async copy(fromId: OsmId, toId: string): Promise<void> {
+    const from = this.getId(fromId);
+    if (from === toId) throw Error(`Cannot copy dataset ${from} onto itself.`);
+    const { loadDecision, transferables } = await this.runWithWorker(
+      async (worker) => ({
+        loadDecision: await worker.getLoadDecision(from),
+        transferables: await worker.getOsmBuffers(from),
+      }),
+      { lane: "control", retry: "once" },
+    );
+    this.invalidateMergeStateForDataset(toId);
+    const copiedTransferables = { ...transferables, id: toId };
+    this.unregisterDatasetForRecovery(toId);
+    this.datasetRestorers.set(toId, this.datasetRestorers.get(from) ?? null);
+    if (hasOnlySharedBackingBuffers(copiedTransferables)) {
+      this.retainedDatasets.set(toId, copiedTransferables);
+      this.retainedLoadDecisions.set(toId, loadDecision);
+    }
+    await this.broadcastStateChange("dataset copy", (worker) =>
+      worker.transferIn(copiedTransferables, loadDecision),
+    );
+  }
+
+  /**
    * Generate a Mapbox Vector Tile for the specified tile coordinates.
    * Delegates to an available worker for off-thread rendering.
    */

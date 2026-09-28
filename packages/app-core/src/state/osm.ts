@@ -5,18 +5,25 @@ import type { OsmEntity } from "osmix";
 
 import { nameDataset } from "../lib/dataset-names.ts";
 import type { OsmLoadFailure } from "../lib/osm-load-failure.ts";
+import { slotOsmId } from "../lib/slot-osm-id.ts";
 import type { StoredFileInfo } from "../workers/osmix-app.worker.ts";
 
 export const osmInfoAtomFamily = atomFamily((_id: string) => atom<OsmInfo | null>(null));
 export const osmAtomFamily = atomFamily((_id: string) => atom<Osm | null>(null));
 export const osmFileAtomFamily = atomFamily((_id: string) => atom<File | null>(null));
-/** A slot's file metadata. Setting it names the dataset in the Activity log (`nameDataset`). */
-export const osmFileInfoAtomFamily = atomFamily((_id: string) => {
+/**
+ * A slot's file metadata. Setting it names the slot's dataset, and the stored file it came from,
+ * in the Activity log (`nameDataset`).
+ */
+export const osmFileInfoAtomFamily = atomFamily((osmKey: string) => {
   const fileInfo = atom<StoredFileInfo | null>(null);
   return atom(
     (get) => get(fileInfo),
     (_get, set, next: StoredFileInfo | null) => {
-      if (next) nameDataset(next.fileHash, next.fileName);
+      if (next) {
+        nameDataset(next.fileHash, next.fileName);
+        nameDataset(slotOsmId(osmKey, next.fileHash), next.fileName);
+      }
       set(fileInfo, next);
     },
   );

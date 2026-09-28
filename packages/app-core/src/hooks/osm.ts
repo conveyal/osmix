@@ -1,8 +1,9 @@
-import { useAtom, useSetAtom } from "jotai";
+import { useAtom, useSetAtom, useStore } from "jotai";
 import type { GeoBbox2D } from "osmix";
 import type {
   ExtractStrategy,
   ExtractTagFilterRules,
+  Osm,
   OsmFileType,
   OsmInfo,
   OsmLoadProfile,
@@ -14,6 +15,7 @@ import { prepareMergedOsmState } from "../lib/merged-osm-state.ts";
 import { describeOsmLoadFailure, type OsmLoadFailureContext } from "../lib/osm-load-failure.ts";
 import { ensureOsmPbfDownloadName, suffixOsmPbfName } from "../lib/osm-pbf-download-name.ts";
 import { chooseSaveTarget, downloadBlob } from "../lib/save-file-picker.ts";
+import { slotOsmId, slotOsmIdPrefix } from "../lib/slot-osm-id.ts";
 import { canStoreBytes } from "../lib/storage-utils.ts";
 import type { OsmixAppRemote } from "../remote.ts";
 import { osmDatasetVersionAtomFamily } from "../state/osm-version.ts";
@@ -91,9 +93,43 @@ function cachedProfileIsUsable(
   return requestedProfile !== "full" || cachedInfo?.spatialIndexes.nodes.all === true;
 }
 
+/** A file refused because another slot that must hold a different file already holds it. */
+export class OsmSlotConflictError extends Error {
+  readonly code = "OSM_SLOT_CONFLICT";
+
+  constructor(fileName: string, label: string) {
+    super(`${fileName} is already loaded as the ${label}.`);
+    this.name = "OsmSlotConflictError";
+  }
+}
+
+export interface UseOsmFileOptions {
+  /**
+   * A slot that must never hold the same file as this one, with its name for error messages
+   * (Merge's base and patch name each other). Loads and copies of the file that slot holds are
+   * refused, except copies from that slot itself: a dataset moving between the two.
+   */
+  distinctFrom?: { osmKey: string; label: string };
+}
+
 export type UseOsmFileReturn = ReturnType<typeof useOsmFile>;
 
-export function useOsmFile(osmKey: string) {
+/** A slot's loaded state, as `snapshot` returns it and `copyStateFrom` takes it. */
+export interface OsmFileSnapshot {
+  /** The slot the snapshot was taken from. */
+  osmKey: string;
+  file: File | null;
+  fileInfo: StoredFileInfo | null;
+  osmInfo: OsmInfo | null;
+  isStored: boolean;
+  loadProfile: OsmLoadProfile;
+}
+
+/**
+ * The dataset in one slot (`osmKey`). The slot owns a private worker ID (`slotOsmId`), frees it
+ * when the dataset is replaced or cleared, and never shares it with another slot.
+ */
+export function useOsmFile(osmKey: string, options: UseOsmFileOptions = {}) {
   const [file, setFile] = useAtom(osmFileAtomFamily(osmKey));
   const [fileInfo, setFileInfo] = useAtom(osmFileInfoAtomFamily(osmKey));
   const [osm, setOsm] = useAtom(osmAtomFamily(osmKey));
@@ -106,6 +142,7 @@ export function useOsmFile(osmKey: string) {
     check: Awaited<ReturnType<typeof canStoreBytes>>;
   } | null>(null);
   const remote = useOsmixRemote();
+  const store = useStore();
   const bumpDatasetVersion = useSetAtom(osmDatasetVersionAtomFamily(osmKey));
   /** Announce that the dataset in this slot is being replaced or cleared. */
   const invalidateDataset = () => bumpDatasetVersion((version) => version + 1);
@@ -113,6 +150,26 @@ export function useOsmFile(osmKey: string) {
   // Track current load to prevent stale cancellations from clearing newer load state
   const currentLoadIdRef = useRef(0);
   const sourceUrlRef = useRef<string | null>(null);
+
+  /** This slot's worker ID for a file or content hash. */
+  const datasetIdFor = (key: string) => slotOsmId(osmKey, key);
+
+  /** Free a worker dataset this slot no longer holds. Only this slot ever uses its IDs. */
+  const releaseDataset = (id: string | null | undefined) => {
+    if (!id) return;
+    remote.delete(id).catch((error: unknown) => {
+      console.error(`Failed to free dataset ${id}`, error);
+    });
+  };
+
+  /** Refuse a file the `distinctFrom` slot already holds, unless it is moving from that slot. */
+  const assertDistinct = (fileHash: string, fileName: string, fromOsmKey?: string) => {
+    const other = options.distinctFrom;
+    if (!other || other.osmKey === fromOsmKey) return;
+    if (store.get(osmFileInfoAtomFamily(other.osmKey))?.fileHash === fileHash) {
+      throw new OsmSlotConflictError(fileName, other.label);
+    }
+  };
 
   useEffect(() => {
     if (isStored || !osmInfo) return;
@@ -147,6 +204,7 @@ export function useOsmFile(osmKey: string) {
     ) => {
       const loadId = ++currentLoadIdRef.current;
       invalidateDataset();
+      releaseDataset(osmInfo?.id);
       setFile(file);
       sourceUrlRef.current = null;
       setOsm(null);
@@ -158,6 +216,7 @@ export function useOsmFile(osmKey: string) {
       const signal = controller?.signal;
       const task = Tasks.start(`Open ${file.name}`, { controller });
       let loadCapabilities: Awaited<ReturnType<typeof getBrowserLoadCapabilities>> | undefined;
+      let datasetId: string | null = null;
       try {
         // Check cancellation before starting
         if (signal?.aborted) throw new LoadCancelledError();
@@ -169,6 +228,9 @@ export function useOsmFile(osmKey: string) {
 
         // Check after hashing
         if (signal?.aborted) throw new LoadCancelledError();
+        assertDistinct(fileHash, file.name);
+        const targetId = datasetIdFor(fileHash);
+        datasetId = targetId;
 
         const storedFileInfo: StoredFileInfo = {
           fileHash,
@@ -186,12 +248,12 @@ export function useOsmFile(osmKey: string) {
         const requestedProfile = profileOverride ?? loadProfile;
         if (existing && cachedProfileIsUsable(requestedProfile, existing.info)) {
           const stored = await task.runStep("Load cached version", async () => {
-            const stored = await remote.loadFromStorage(existing.fileHash, signal);
+            const stored = await remote.loadFromStorage(existing.fileHash, signal, targetId);
             // Check after loading from storage
             if (signal?.aborted) throw new LoadCancelledError();
             if (!stored) return null;
             // Get the Osm instance from worker (already has spatial indexes built)
-            return { stored, osm: await remote.get(stored.entry.fileHash) };
+            return { stored, osm: await remote.get(stored.info.id) };
           });
 
           if (stored) {
@@ -214,7 +276,7 @@ export function useOsmFile(osmKey: string) {
           return remote.fromFile(
             file,
             {
-              id: fileHash,
+              id: targetId,
               ...(pbfInput ? { loadProfile: requestedProfile, loadCapabilities } : {}),
             },
             fileType,
@@ -239,6 +301,7 @@ export function useOsmFile(osmKey: string) {
           // Only reset state if this is still the current load
           // (prevents stale cancellations from clearing newer load state)
           if (loadId === currentLoadIdRef.current) {
+            releaseDataset(datasetId);
             setFile(null);
             setFileInfo(null);
             setOsm(null);
@@ -274,6 +337,7 @@ export function useOsmFile(osmKey: string) {
     ) => {
       const loadId = ++currentLoadIdRef.current;
       invalidateDataset();
+      releaseDataset(osmInfo?.id);
       setFile(file);
       setOsm(null);
       setOsmInfo(null);
@@ -283,6 +347,7 @@ export function useOsmFile(osmKey: string) {
       if (file == null) return null;
       const signal = controller?.signal;
       const task = Tasks.start(`Extract from ${file.name}`, { controller });
+      let datasetId: string | null = null;
       try {
         if (signal?.aborted) throw new LoadCancelledError();
 
@@ -290,7 +355,8 @@ export function useOsmFile(osmKey: string) {
         // source's hash: that would replace a source loaded in another slot, and a saved extract
         // would be served from the cache when the full source is opened later. It loads under a
         // provisional id and is then renamed to its content hash.
-        const provisionalId = `extract-${crypto.randomUUID()}`;
+        const provisionalId = datasetIdFor(`extract-${crypto.randomUUID()}`);
+        datasetId = provisionalId;
         const extractFileName = suffixOsmPbfName(file.name, "extract");
         setFileInfo({ fileHash: provisionalId, fileName: extractFileName, fileSize: file.size });
 
@@ -316,11 +382,13 @@ export function useOsmFile(osmKey: string) {
           prepareMergedOsmState({
             currentFileInfo: null,
             currentOsm: null,
+            datasetIdFor,
             mergedFileName: extractFileName,
             newOsmId: extractedInfo.id,
             worker: remote,
           }),
         );
+        datasetId = prepared.osmInfo.id;
         if (prepared.kind !== "changed") {
           throw Error(`Extract ${extractedInfo.id} did not receive its own file info.`);
         }
@@ -337,6 +405,7 @@ export function useOsmFile(osmKey: string) {
       } catch (e) {
         if (signal?.aborted || e instanceof LoadCancelledError) {
           if (loadId === currentLoadIdRef.current) {
+            releaseDataset(datasetId);
             setFile(null);
             setFileInfo(null);
             setOsm(null);
@@ -363,6 +432,7 @@ export function useOsmFile(osmKey: string) {
     async (url: string, controller?: AbortController, profileOverride?: OsmLoadProfile) => {
       const loadId = ++currentLoadIdRef.current;
       invalidateDataset();
+      releaseDataset(osmInfo?.id);
       sourceUrlRef.current = url;
       setFile(null);
       setOsm(null);
@@ -371,6 +441,7 @@ export function useOsmFile(osmKey: string) {
       setLoadFailure(null);
       const signal = controller?.signal;
       const task = Tasks.start(`Open ${url}`, { controller });
+      let datasetId: string | null = null;
       try {
         if (signal?.aborted) throw new LoadCancelledError();
         const requestedProfile = profileOverride ?? loadProfile;
@@ -383,9 +454,17 @@ export function useOsmFile(osmKey: string) {
               loadCapabilities,
             },
             signal,
+            slotOsmIdPrefix(osmKey),
           );
         });
+        datasetId = result.info.id;
         if (signal?.aborted) throw new LoadCancelledError();
+        try {
+          assertDistinct(result.fileInfo.fileHash, result.fileInfo.fileName);
+        } catch (error) {
+          releaseDataset(datasetId);
+          throw error;
+        }
         const loadedOsm = await remote.get(result.info.id);
         if (signal?.aborted) throw new LoadCancelledError();
         setFileInfo(result.fileInfo);
@@ -399,6 +478,7 @@ export function useOsmFile(osmKey: string) {
       } catch (error) {
         if (signal?.aborted || error instanceof LoadCancelledError) {
           if (loadId === currentLoadIdRef.current) {
+            releaseDataset(datasetId);
             setFileInfo(null);
             setOsm(null);
             setOsmInfo(null);
@@ -442,16 +522,24 @@ export function useOsmFile(osmKey: string) {
     async (storageId: string, controller?: AbortController) => {
       const loadId = ++currentLoadIdRef.current;
       invalidateDataset();
+      releaseDataset(osmInfo?.id);
+      setOsm(null);
+      setOsmInfo(null);
+      setIsStored(false);
       setLoadFailure(null);
       const signal = controller?.signal;
       const task = Tasks.start("Open from browser storage", { controller });
+      const datasetId = datasetIdFor(storageId);
       try {
         // Check cancellation before starting
         if (signal?.aborted) throw new LoadCancelledError();
 
+        const entry = await remote.findByHash(storageId, signal);
+        if (entry) assertDistinct(entry.fileHash, entry.fileName);
+
         // Load from IndexedDB in the worker
         const stored = await task.runStep("Read stored dataset", async () => {
-          const stored = await remote.loadFromStorage(storageId, signal);
+          const stored = await remote.loadFromStorage(storageId, signal, datasetId);
           if (!stored) {
             throw new Error(`OSM dataset ${storageId} was not found in browser storage.`);
           }
@@ -462,16 +550,12 @@ export function useOsmFile(osmKey: string) {
         if (signal?.aborted) throw new LoadCancelledError();
 
         // Get the Osm instance from worker (already has spatial indexes built)
-        // Worker registers under fileHash, so use that as the ID
-        const osm = await remote.get(stored.entry.fileHash);
+        const osm = await remote.get(datasetId);
 
         // Final check before setting state
         if (signal?.aborted) throw new LoadCancelledError();
 
-        // Update osmInfo.id to match the storage key (fileHash) since that's where
-        // the worker has it registered. This ensures downloadOsm and other calls
-        // that use osmInfo.id will find the correct worker entry.
-        const osmInfo: OsmInfo = { ...stored.info, id: stored.entry.fileHash };
+        const osmInfo: OsmInfo = stored.info;
         setOsmInfo(osmInfo);
         setOsm(osm);
         setIsStored(true);
@@ -487,6 +571,7 @@ export function useOsmFile(osmKey: string) {
           // Only reset state if this is still the current load
           // (prevents stale cancellations from clearing newer load state)
           if (loadId === currentLoadIdRef.current) {
+            releaseDataset(datasetId);
             setFile(null);
             setFileInfo(null);
             setOsm(null);
@@ -588,28 +673,51 @@ export function useOsmFile(osmKey: string) {
     );
   });
 
+  /** This slot's loaded state, for `copyStateFrom` on another slot. */
+  const snapshot = (): OsmFileSnapshot => ({
+    osmKey,
+    file,
+    fileInfo,
+    osmInfo,
+    isStored,
+    loadProfile,
+  });
+
   /**
-   * Take over a snapshot of another `useOsmFile` slot's loaded state, load profile included, so
-   * a dataset moves between slots without reloading. Merge's "Use as base" moves the patch into
-   * an empty base slot this way. The caller clears the source slot itself.
+   * Take over a snapshot of another slot's loaded state, load profile included, so a dataset
+   * moves between slots without reloading. The dataset is copied to this slot's own worker ID
+   * over the same shared buffers. The caller clears the source slot when the dataset moves.
+   * `releasePrevious: false` keeps the dataset this slot held until now, for a caller that
+   * still needs it (a swap copies both ways before freeing either).
    */
   const copyStateFrom = useEffectEvent(
-    (source: {
-      file: File | null;
-      fileInfo: StoredFileInfo | null;
-      osm: ReturnType<typeof useOsmFile>["osm"];
-      osmInfo: ReturnType<typeof useOsmFile>["osmInfo"];
-      isStored: boolean;
-      loadProfile: OsmLoadProfile;
-    }) => {
+    async (source: OsmFileSnapshot, { releasePrevious = true } = {}) => {
+      const previousId = osmInfo?.id;
+      let copied: { osm: Osm; osmInfo: OsmInfo } | null = null;
+      if (source.osmInfo) {
+        if (!source.fileInfo) {
+          throw Error(`Dataset ${source.osmInfo.id} has no file info to copy into ${osmKey}.`);
+        }
+        assertDistinct(source.fileInfo.fileHash, source.fileInfo.fileName, source.osmKey);
+        const targetId = datasetIdFor(source.fileInfo.fileHash);
+        if (targetId !== source.osmInfo.id) await remote.copy(source.osmInfo.id, targetId);
+        copied = {
+          osm: await remote.get(targetId),
+          osmInfo: { ...source.osmInfo, id: targetId },
+        };
+      }
+      ++currentLoadIdRef.current;
       invalidateDataset();
+      if (releasePrevious && previousId !== copied?.osmInfo.id) releaseDataset(previousId);
+      sourceUrlRef.current = null;
       setFile(source.file);
       setFileInfo(source.fileInfo);
-      setOsm(source.osm);
-      setOsmInfo(source.osmInfo);
+      setOsm(copied?.osm ?? null);
+      setOsmInfo(copied?.osmInfo ?? null);
       setIsStored(source.isStored);
       setLoadProfile(source.loadProfile);
       setLoadFailure(null);
+      return previousId ?? null;
     },
   );
 
@@ -622,6 +730,7 @@ export function useOsmFile(osmKey: string) {
     const prepared = await prepareMergedOsmState({
       currentFileInfo: fileInfo,
       currentOsm: osm,
+      datasetIdFor,
       mergedFileName,
       newOsmId,
       worker: remote,
@@ -667,6 +776,7 @@ export function useOsmFile(osmKey: string) {
     loadOsmPbfUrl,
     osm,
     osmInfo,
+    snapshot,
     reloadWithFullProfile,
     reloadWithViewProfile,
     saveToStorage,

@@ -75,6 +75,21 @@ describe("OSM load failure diagnostics", () => {
     expect(nonRetryable.action).toBeUndefined();
   });
 
+  it("tells the user to pick another file when a slot refuses a duplicate", () => {
+    const failure = describeOsmLoadFailure(
+      Object.assign(Error("monaco.pbf is already loaded as the Base."), {
+        code: "OSM_SLOT_CONFLICT",
+      }),
+      { sourceName: "monaco.pbf" },
+    );
+    expect(failure).toMatchObject({
+      title: "Could not load monaco.pbf",
+      summary: "monaco.pbf is already loaded as the Base.",
+      suggestion: "Choose a different file.",
+    });
+    expect(failure.action).toBeUndefined();
+  });
+
   it("retains spatial-index and generic error messages", () => {
     const spatial = describeOsmLoadFailure(
       structuredError({

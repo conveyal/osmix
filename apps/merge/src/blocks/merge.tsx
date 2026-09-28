@@ -79,8 +79,12 @@ const STEP_NUMBER = { inputs: 1, review: 2, automatic: undefined, result: 3 } as
  */
 export default function MergeBlock() {
   const remote = useOsmixRemote();
-  const base = useOsmFile(BASE_OSM_KEY);
-  const patch = useOsmFile(PATCH_OSM_KEY);
+  const base = useOsmFile(BASE_OSM_KEY, {
+    distinctFrom: { osmKey: PATCH_OSM_KEY, label: "Patch" },
+  });
+  const patch = useOsmFile(PATCH_OSM_KEY, {
+    distinctFrom: { osmKey: BASE_OSM_KEY, label: "Base" },
+  });
   const [step, setStep] = useAtom(mergeStepAtom);
   const completion = useAtomValue(mergeCompletionAtom);
   const runInputs = useAtomValue(mergeRunInputsAtom);
@@ -418,16 +422,9 @@ export default function MergeBlock() {
   const usePatchAsBase = async () => {
     if (!patch.osm || base.osm) return;
     resetDerivedState();
-    const patchState = {
-      file: patch.file,
-      fileInfo: patch.fileInfo,
-      osm: patch.osm,
-      osmInfo: patch.osmInfo,
-      isStored: patch.isStored,
-      loadProfile: patch.loadProfile,
-    };
+    // Copy before clearing: clearing the patch frees its dataset.
+    await base.copyStateFrom(patch.snapshot());
     await patch.loadOsmFile(null);
-    base.copyStateFrom(patchState);
   };
 
   const baseNeedsFull = base.osmInfo !== null && !hasFullNodeIndex(base.osmInfo);
