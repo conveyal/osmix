@@ -1,21 +1,25 @@
 import {
   NominatimSearch,
   OsmDatasetSection,
+  OsmInfoTable,
   OsmLoadDetails,
   OsmLoadFailurePanel,
   OsmPbfFileInput,
   pagePath,
   SaveToDiskNotice,
+  StoredOsmList,
   useFlyToOsmBounds,
   useMap,
   useMapPadding,
 } from "@osmix/app-components";
 import {
+  useLoadFromUrl,
   useTasks,
   useOsmFile,
   mapBoundsAtom,
   selectOsmEntityAtom,
   osmLoadingAbortControllerAtom,
+  type UseOsmFileReturn,
   useOsmixRemote,
 } from "@osmix/app-core";
 import {
@@ -35,12 +39,12 @@ import {
   Step,
 } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
-import { DownloadIcon } from "lucide-react";
-import type { ExtractStrategy } from "osmix";
+import { DownloadIcon, XIcon } from "lucide-react";
+import type { ExtractStrategy, GeoBbox2D, OsmInfo } from "osmix";
 import { useId, useRef, useState } from "react";
 import { Link } from "wouter";
 
-import { EXTRACT_OSM_KEY } from "../../settings";
+import { EXTRACT_OSM_KEY, EXTRACT_SOURCE_OSM_KEY } from "../../settings";
 import { type ExtractParameters, ExtractResultStats } from "./components/extract-result-stats";
 import ExtractTagFilterEditor, {
   rulesFromEditorState,
@@ -113,14 +117,23 @@ function FileBoundsDescription({ fileBounds }: { fileBounds: FileBounds }) {
     case "ok":
       return (
         <>
-          From the file header: <span className="font-mono">{fileBounds.bbox.join(", ")}</span>
+          {fileBounds.from === "header" ? "From the file header" : "The dataset's extent"}:{" "}
+          <span className="font-mono">{fileBounds.bbox.join(", ")}</span>
         </>
       );
   }
 }
 
+/** Why the last extract failed, if it did. */
+function ExtractLoadFailure({ extract }: { extract: UseOsmFileReturn }) {
+  if (!extract.loadFailure) return null;
+  return <OsmLoadFailurePanel failure={extract.loadFailure} onDismiss={extract.clearLoadFailure} />;
+}
+
 export function ExtractPanel() {
   const extract = useOsmFile(EXTRACT_OSM_KEY);
+  // A source from storage (or another page) is loaded here; a PBF file is streamed instead.
+  const source = useOsmFile(EXTRACT_SOURCE_OSM_KEY);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
   const mapBounds = useAtomValue(mapBoundsAtom);
@@ -154,9 +167,17 @@ export function ExtractPanel() {
   // Only one task runs at a time, so any running task locks the extract controls.
   const isExtracting = current !== null;
 
+  const sourceDataset =
+    source.osm && source.osmInfo && source.fileInfo
+      ? { osmId: source.osmInfo.id, fileName: source.fileInfo.fileName }
+      : null;
   const bboxMissesFile =
     fileBounds.status === "ok" && isValidBbox(bbox) && !bboxesOverlap(bbox, fileBounds.bbox);
-  const canExtract = !!pendingFile && isValidBbox(bbox) && !bboxMissesFile && !isExtracting;
+  const canExtract =
+    (pendingFile !== null || sourceDataset !== null) &&
+    isValidBbox(bbox) &&
+    !bboxMissesFile &&
+    !isExtracting;
   const extractOsm = extract.osmInfo ? extract.osm : null;
 
   /** Turn off "use the file's bounds" and give back the bbox the user had before. */
@@ -167,11 +188,31 @@ export function ExtractPanel() {
     setUseFileBounds(false);
   };
 
+  /** Show a new source's bounds, and start an unedited bbox from them. */
+  const applySourceBounds = (sourceBbox: GeoBbox2D | null, from: "header" | "dataset") => {
+    setFileBounds(sourceBbox ? { status: "ok", bbox: sourceBbox, from } : { status: "missing" });
+    if (!sourceBbox) return;
+    // Read the bbox from the store: the closure's value predates `stopUsingFileBounds`.
+    const currentBbox = store.get(extractBboxAtom);
+    if (bboxesEqual(currentBbox, store.get(automaticBboxAtom))) {
+      // An unedited bbox starts from the file's bounds, ready to narrow. "Use the selected
+      // file's bounds" stays off, so the coordinates remain editable.
+      setBbox(sourceBbox);
+      store.set(automaticBboxAtom, sourceBbox);
+      map?.fitBounds(sourceBbox, { padding: mapPadding(40), maxDuration: 500 });
+    } else if (isValidBbox(currentBbox) && !bboxesOverlap(currentBbox, sourceBbox)) {
+      // An edited bbox that misses the file: show the file's outline and the warning together.
+      map?.fitBounds(sourceBbox, { padding: mapPadding(40), maxDuration: 500 });
+    }
+  };
+
+  /** Stream a PBF file as the source. Any source dataset is freed. */
   const selectFile = async (file: File | null) => {
     stopUsingFileBounds();
     setPendingFile(file);
     setSourceHeader(null);
     const request = ++headerRequest.current;
+    if (source.osmInfo) await source.loadOsmFile(null);
     if (!file) {
       setFileBounds({ status: "none" });
       return;
@@ -181,26 +222,49 @@ export function ExtractPanel() {
       const header = await remote.readHeader(file);
       if (request !== headerRequest.current) return;
       setSourceHeader(header);
-      const headerBbox = headerBboxToGeoBbox(header.bbox);
-      setFileBounds(headerBbox ? { status: "ok", bbox: headerBbox } : { status: "missing" });
-      if (!headerBbox) return;
-      // Read the bbox from the store: the closure's value predates `stopUsingFileBounds` above.
-      const currentBbox = store.get(extractBboxAtom);
-      if (bboxesEqual(currentBbox, store.get(automaticBboxAtom))) {
-        // An unedited bbox starts from the file's bounds, ready to narrow. "Use the selected
-        // file's bounds" stays off, so the coordinates remain editable.
-        setBbox(headerBbox);
-        store.set(automaticBboxAtom, headerBbox);
-        map?.fitBounds(headerBbox, { padding: mapPadding(40), maxDuration: 500 });
-      } else if (isValidBbox(currentBbox) && !bboxesOverlap(currentBbox, headerBbox)) {
-        // An edited bbox that misses the file: show the file's outline and the warning together.
-        map?.fitBounds(headerBbox, { padding: mapPadding(40), maxDuration: 500 });
-      }
+      applySourceBounds(headerBboxToGeoBbox(header.bbox), "header");
     } catch (error) {
       if (request !== headerRequest.current) return;
       const message = error instanceof Error ? error.message : String(error);
       setFileBounds({ status: "error", message });
     }
+  };
+
+  /**
+   * Load a source dataset: a stored file, a URL, or a file in another format, which the extract
+   * cannot stream. A selected PBF file is dropped.
+   */
+  const openSourceDataset = async (
+    load: (controller: AbortController) => Promise<OsmInfo | null>,
+  ) => {
+    stopUsingFileBounds();
+    ++headerRequest.current;
+    setPendingFile(null);
+    setSourceHeader(null);
+    setFileBounds({ status: "none" });
+    const controller = new AbortController();
+    setLoadingState({ controller, osmKey: EXTRACT_SOURCE_OSM_KEY });
+    try {
+      const info = await load(controller);
+      if (info) applySourceBounds(info.bbox, "dataset");
+      return info;
+    } finally {
+      setLoadingState(null);
+    }
+  };
+
+  // `?load=<hash>` opens a stored file as the source. Extract never opens one on its own.
+  useLoadFromUrl({
+    osmKey: EXTRACT_SOURCE_OSM_KEY,
+    loadFromStorage: (storageId) =>
+      openSourceDataset((controller) => source.loadFromStorage(storageId, controller)),
+    fallbackToMostRecent: false,
+  });
+
+  const clearSourceDataset = async () => {
+    stopUsingFileBounds();
+    setFileBounds({ status: "none" });
+    await source.loadOsmFile(null);
   };
 
   const changeUseFileBounds = (enabled: boolean) => {
@@ -226,20 +290,21 @@ export function ExtractPanel() {
   };
 
   const runExtract = async () => {
-    if (!pendingFile || !canExtract) return;
+    const extractSource = pendingFile ?? sourceDataset;
+    if (!extractSource || !canExtract) return;
     selectEntity(null, null);
     const abortController = new AbortController();
     setLoadingState({ controller: abortController, osmKey: EXTRACT_OSM_KEY });
     const parameters: ExtractParameters = {
-      sourceName: pendingFile.name,
+      sourceName: extractSource instanceof File ? extractSource.name : extractSource.fileName,
       bbox,
       strategy,
       tagFilter: rulesFromEditorState(tagFilterEditor),
     };
     setExtractParameters(null);
     try {
-      const loaded = await extract.loadExtractFromPbf(
-        pendingFile,
+      const loaded = await extract.loadExtract(
+        extractSource,
         {
           extractBbox: parameters.bbox,
           extractStrategy: parameters.strategy,
@@ -267,21 +332,79 @@ export function ExtractPanel() {
       {/* A finished extract replaces the form; clearing the result brings the form back. */}
       {extractOsm ? null : (
         <>
-          <Step number={1} title="Select OSM PBF file">
-            <OsmPbfFileInput
-              file={pendingFile}
-              setFile={selectFile}
-              pbfOnly
-              disabled={isExtracting}
-            />
-            {pendingFile ? <SourceFileInfo file={pendingFile} header={sourceHeader} /> : null}
-            {extract.loadFailure ? (
-              <OsmLoadFailurePanel
-                failure={extract.loadFailure}
-                onDismiss={extract.clearLoadFailure}
+          {pendingFile ? (
+            <Step number={1} title="Select OSM PBF file">
+              <OsmPbfFileInput
+                file={pendingFile}
+                setFile={selectFile}
+                pbfOnly
+                disabled={isExtracting}
               />
-            ) : null}
-          </Step>
+              <SourceFileInfo file={pendingFile} header={sourceHeader} />
+              <ExtractLoadFailure extract={extract} />
+            </Step>
+          ) : sourceDataset && source.osm ? (
+            <Step
+              number={1}
+              title="Select OSM PBF file"
+              flush
+              action={
+                <ActionButton
+                  variant="ghost"
+                  label="Clear source"
+                  icon={<XIcon aria-hidden="true" />}
+                  disabled={isExtracting}
+                  onAction={clearSourceDataset}
+                />
+              }
+            >
+              <p className="truncate px-inset pb-2 font-mono text-muted-foreground">
+                {sourceDataset.fileName}
+              </p>
+              <OsmInfoTable
+                defaultOpen={false}
+                osm={source.osm}
+                file={source.file}
+                fileInfo={source.fileInfo}
+              />
+              <div className="p-inset empty:hidden">
+                <ExtractLoadFailure extract={extract} />
+              </div>
+            </Step>
+          ) : (
+            <Step number={1} title="Select OSM PBF file" flush>
+              <p className="px-inset pb-2 text-muted-foreground">
+                A PBF file is read as it is extracted, never loaded whole. A stored file, a URL or
+                another format is loaded first.
+              </p>
+              <StoredOsmList
+                osmKey={EXTRACT_SOURCE_OSM_KEY}
+                loadFailure={source.loadFailure}
+                onDismissLoadFailure={source.clearLoadFailure}
+                onReloadView={source.reloadWithViewProfile}
+                openOsmPbfUrl={(url) =>
+                  openSourceDataset((controller) => source.loadOsmPbfUrl(url, controller))
+                }
+                openOsmFile={async (file, fileType) => {
+                  if (typeof file === "string") {
+                    return openSourceDataset((controller) =>
+                      source.loadFromStorage(file, controller),
+                    );
+                  }
+                  if (fileType === undefined || fileType === "pbf") {
+                    await selectFile(file);
+                    return null;
+                  }
+                  return openSourceDataset((controller) =>
+                    source.loadOsmFile(file, fileType, controller),
+                  );
+                }}
+              />
+              <div className="p-inset empty:hidden">
+                <ExtractLoadFailure extract={extract} />
+              </div>
+            </Step>
+          )}
 
           <Step number={2} title="Select bounding box">
             <Field>

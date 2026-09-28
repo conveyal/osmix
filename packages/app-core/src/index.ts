@@ -1,6 +1,14 @@
 export { DB_NAME, DB_VERSION, OSM_STORE, STORAGE_CHANNEL } from "./constants.ts";
 export { LOAD_FROM_URL_PARAM, useLoadFromUrl } from "./hooks/load-from-url.ts";
-export { LoadCancelledError, type UseOsmFileReturn, useOsmFile } from "./hooks/osm.ts";
+export {
+  type ExtractDatasetSource,
+  LoadCancelledError,
+  type OsmFileSnapshot,
+  OsmSlotConflictError,
+  type UseOsmFileOptions,
+  type UseOsmFileReturn,
+  useOsmFile,
+} from "./hooks/osm.ts";
 export { useOsmixRemote } from "./hooks/remote.ts";
 export { useTasks } from "./hooks/tasks.ts";
 export {

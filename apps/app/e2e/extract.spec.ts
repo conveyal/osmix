@@ -1,8 +1,16 @@
 import { fileURLToPath } from "node:url";
 
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const MONACO_PBF = fileURLToPath(new URL("../../../fixtures/monaco.pbf", import.meta.url));
+
+/** Select Monaco as the source PBF, which the extract streams. */
+async function openPbf(page: Page) {
+  await page.getByRole("button", { name: "Open file", exact: true }).click();
+  const chooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("menuitem", { name: /^OSM PBF/ }).click();
+  await (await chooserPromise).setFiles(MONACO_PBF);
+}
 
 test("extracts a bounding box from a PBF and offers the result for download", async ({ page }) => {
   await page.goto("/extract");
@@ -23,9 +31,7 @@ test("extracts a bounding box from a PBF and offers the result for download", as
   await page.getByRole("button", { name: "Parse", exact: true }).click();
   await page.getByRole("radio", { name: "Simple" }).check();
 
-  const chooserPromise = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Open file", exact: true }).click();
-  await (await chooserPromise).setFiles(MONACO_PBF);
+  await openPbf(page);
 
   const extractButton = page.getByRole("button", { name: "Extract", exact: true });
   await expect(extractButton).toBeEnabled();
@@ -90,9 +96,7 @@ test("extracts using the bounds recorded in the selected file's header", async (
 
   const minLon = page.locator("#extract-bbox-min-lon");
 
-  const chooserPromise = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Open file", exact: true }).click();
-  await (await chooserPromise).setFiles(MONACO_PBF);
+  await openPbf(page);
 
   // monaco.pbf records its bounds in the PBF header. The unedited default bbox starts from
   // them, still editable: "Use the selected file's bounds" stays off.
@@ -135,4 +139,55 @@ test("extracts using the bounds recorded in the selected file's header", async (
   await expect(useFileBounds).toBeFocused();
   await expect(minLon).toHaveValue(previousMinLon);
   await expect(minLon).toBeEnabled();
+});
+
+test("extracts from a stored dataset opened with ?load=, the same as from the file", async ({
+  page,
+}) => {
+  await page.goto("/extract");
+  // Extract a strict box from the streamed file first, for comparison.
+  await page.getByLabel("Paste bbox", { exact: false }).fill("7.415,43.73,7.425,43.74");
+  await page.getByRole("button", { name: "Parse", exact: true }).click();
+  await page.getByRole("radio", { name: "Simple" }).check();
+  await openPbf(page);
+  await page.getByRole("button", { name: "Extract", exact: true }).click();
+  const stats = page.getByRole("table", { name: "Extract statistics" });
+  await expect(stats).toBeVisible({ timeout: 120_000 });
+  const fromFile = await stats.innerText();
+
+  // Store the full source, then open it by hash as Extract's source.
+  const fileHash = await page.evaluate(async () => {
+    const bytes = await (await fetch("/monaco.pbf")).arrayBuffer();
+    const hash = await window.osmWorker.hashBuffer(bytes);
+    await window.osmWorker.fromPbf(bytes, { id: hash });
+    await window.osmWorker.storeCurrentOsm(hash, {
+      fileHash: hash,
+      fileName: "monaco.pbf",
+      fileSize: bytes.byteLength,
+    });
+    return hash;
+  });
+  await page.goto(`/extract?load=${fileHash}`);
+  const clearSource = page.getByRole("button", { name: "Clear source" });
+  await expect(clearSource).toBeVisible({ timeout: 60_000 });
+  await expect(page).toHaveURL(/\/extract$/);
+  // The source's bounds are known without reading a header.
+  await expect(
+    page.getByRole("checkbox", { name: "Use the selected file's bounds" }),
+  ).toBeEnabled();
+  await expect(page.locator("#extract-file-bounds-help")).toHaveText(
+    "The dataset's extent: 7.4053929, 43.7232244, 7.4447259, 43.7543687",
+  );
+
+  await page.getByLabel("Paste bbox", { exact: false }).fill("7.415,43.73,7.425,43.74");
+  await page.getByRole("button", { name: "Parse", exact: true }).click();
+  await page.getByRole("radio", { name: "Simple" }).check();
+  await page.getByRole("button", { name: "Extract", exact: true }).click();
+  await expect(stats).toBeVisible({ timeout: 120_000 });
+  expect(await stats.innerText()).toBe(fromFile);
+  await expect(page.getByRole("button", { name: "Save extract result to storage" })).toBeVisible();
+
+  // Clearing the result keeps the source dataset for another extract.
+  await page.getByRole("button", { name: "Clear extract result" }).click();
+  await expect(clearSource).toBeVisible();
 });

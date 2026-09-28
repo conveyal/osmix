@@ -165,6 +165,42 @@ describe("OsmixRemote", () => {
     );
   });
 
+  describe("extract", () => {
+    it(
+      "extracts a loaded dataset exactly as from its PBF, and keeps the source",
+      async () => {
+        using remote = await createRemote({ inProcess: true });
+        const pbfData = await getFixtureFile(monacoPbf.url);
+        const source = await remote.fromPbf(pbfData.slice().buffer, { id: "extract-source" });
+        const bbox: [number, number, number, number] = [7.415, 43.73, 7.425, 43.74];
+        const tagFilter = {
+          nodes: [],
+          ways: [{ key: "highway" }],
+          relations: [],
+        };
+        for (const extractStrategy of ["simple", "complete_ways", "smart"] as const) {
+          const options = { extractBbox: bbox, extractStrategy, extractTagFilter: tagFilter };
+          const fromLoaded = await remote.extract(source.id, {
+            ...options,
+            id: `loaded-${extractStrategy}`,
+          });
+          const fromFile = await remote.fromPbf(pbfData.slice().buffer, {
+            ...options,
+            id: `file-${extractStrategy}`,
+          });
+          expect(fromLoaded.stats).toEqual(fromFile.stats);
+          expect(fromLoaded.stats.ways).toBeGreaterThan(0);
+          expect(fromLoaded.stats.ways).toBeLessThan(monacoPbf.ways);
+        }
+        expect((await remote.get(source.id)).info().stats.nodes).toBe(monacoPbf.nodes);
+        await expect(
+          remote.extract(source.id, { id: source.id, extractBbox: bbox }),
+        ).rejects.toThrow("An extract of extract-source needs its own id.");
+      },
+      workerTestTimeout,
+    );
+  });
+
   describe("fromGeoJSON", () => {
     it(
       "should preserve a full Uint8Array view",

@@ -114,6 +114,12 @@ export interface UseOsmFileOptions {
 
 export type UseOsmFileReturn = ReturnType<typeof useOsmFile>;
 
+/** A dataset loaded in another slot, as the source of `loadExtract`. */
+export interface ExtractDatasetSource {
+  osmId: string;
+  fileName: string;
+}
+
 /** A slot's loaded state, as `snapshot` returns it and `copyStateFrom` takes it. */
 export interface OsmFileSnapshot {
   /** The slot the snapshot was taken from. */
@@ -325,9 +331,15 @@ export function useOsmFile(osmKey: string, options: UseOsmFileOptions = {}) {
     },
   );
 
-  const loadExtractFromPbf = useEffectEvent(
+  /**
+   * Extract a bbox from `source` into this slot: a PBF file, streamed without loading it whole,
+   * or a dataset already loaded in another slot (`osmId`), which stays as it is. Either way the
+   * bbox, strategy and tag filters behave the same, and the result gets its own content-hash id
+   * and a `<source>-extract.pbf` name.
+   */
+  const loadExtract = useEffectEvent(
     async (
-      file: File | null,
+      source: File | ExtractDatasetSource | null,
       extract: {
         extractBbox: GeoBbox2D;
         extractStrategy: ExtractStrategy;
@@ -338,42 +350,43 @@ export function useOsmFile(osmKey: string, options: UseOsmFileOptions = {}) {
       const loadId = ++currentLoadIdRef.current;
       invalidateDataset();
       releaseDataset(osmInfo?.id);
-      setFile(file);
+      setFile(null);
       setOsm(null);
       setOsmInfo(null);
       setFileInfo(null);
       setIsStored(false);
       setLoadFailure(null);
-      if (file == null) return null;
+      if (source == null) return null;
+      const sourceName = source instanceof File ? source.name : source.fileName;
       const signal = controller?.signal;
-      const task = Tasks.start(`Extract from ${file.name}`, { controller });
+      const task = Tasks.start(`Extract from ${sourceName}`, { controller });
+      const loadProfileForStrategy = extract.extractStrategy === "simple" ? loadProfile : "full";
       let datasetId: string | null = null;
       try {
         if (signal?.aborted) throw new LoadCancelledError();
 
         // The extract is a different dataset from its source, so it must never live under the
-        // source's hash: that would replace a source loaded in another slot, and a saved extract
-        // would be served from the cache when the full source is opened later. It loads under a
-        // provisional id and is then renamed to its content hash.
+        // source's hash: a saved extract would be served from the cache when the full source is
+        // opened later. It loads under a provisional id and is then renamed to its content hash.
         const provisionalId = datasetIdFor(`extract-${crypto.randomUUID()}`);
         datasetId = provisionalId;
-        const extractFileName = suffixOsmPbfName(file.name, "extract");
-        setFileInfo({ fileHash: provisionalId, fileName: extractFileName, fileSize: file.size });
+        const extractFileName = suffixOsmPbfName(sourceName, "extract");
+        setFileInfo({
+          fileHash: provisionalId,
+          fileName: extractFileName,
+          fileSize: source instanceof File ? source.size : 0,
+        });
 
         const extractedInfo = await task.runStep("Read PBF and apply extract", async () => {
           const loadCapabilities = await getBrowserLoadCapabilities();
-          return remote.fromFile(
-            file,
-            {
-              id: provisionalId,
-              extractBbox: extract.extractBbox,
-              extractStrategy: extract.extractStrategy,
-              extractTagFilter: extract.extractTagFilter,
-              loadProfile: extract.extractStrategy === "simple" ? loadProfile : "full",
-              loadCapabilities,
-            },
-            "pbf",
-          );
+          const options = {
+            id: provisionalId,
+            ...extract,
+            loadProfile: loadProfileForStrategy,
+            loadCapabilities,
+          };
+          if (source instanceof File) return remote.fromFile(source, options, "pbf");
+          return remote.extract(source.osmId, options);
         });
 
         if (signal?.aborted) throw new LoadCancelledError();
@@ -395,18 +408,16 @@ export function useOsmFile(osmKey: string, options: UseOsmFileOptions = {}) {
 
         if (signal?.aborted) throw new LoadCancelledError();
 
-        setFile(null);
         setFileInfo(prepared.fileInfo);
         setOsmInfo(prepared.osmInfo);
         setOsm(prepared.osm);
 
-        task.end(`${file.name} extracted`);
+        task.end(`${sourceName} extracted`);
         return prepared.osmInfo;
       } catch (e) {
         if (signal?.aborted || e instanceof LoadCancelledError) {
           if (loadId === currentLoadIdRef.current) {
             releaseDataset(datasetId);
-            setFile(null);
             setFileInfo(null);
             setOsm(null);
             setOsmInfo(null);
@@ -417,8 +428,8 @@ export function useOsmFile(osmKey: string, options: UseOsmFileOptions = {}) {
         }
         console.error(e);
         const failure = await describeLoadFailure(e, {
-          sourceName: file.name,
-          requestedProfile: extract.extractStrategy === "simple" ? loadProfile : "full",
+          sourceName,
+          requestedProfile: loadProfileForStrategy,
           allowViewRetry: false,
         });
         if (loadId === currentLoadIdRef.current) setLoadFailure(failure);
@@ -770,7 +781,7 @@ export function useOsmFile(osmKey: string, options: UseOsmFileOptions = {}) {
     isStored,
     loadFailure,
     loadProfile,
-    loadExtractFromPbf,
+    loadExtract,
     loadFromStorage,
     loadOsmFile,
     loadOsmPbfUrl,

@@ -24,7 +24,7 @@ import { extractBboxAtom } from "./pages/extract/state/extract";
 import { HomePage } from "./pages/home";
 import { InspectSidebar } from "./pages/inspect";
 import { MergeSidebar } from "./pages/merge";
-import { EXTRACT_OSM_KEY, INSPECT_OSM_KEY } from "./settings";
+import { EXTRACT_OSM_KEY, EXTRACT_SOURCE_OSM_KEY, INSPECT_OSM_KEY } from "./settings";
 
 /** What the shared map shows on a page, and the boxes that page is about. */
 interface PageMap {
@@ -41,6 +41,7 @@ function usePageMap(route: OsmixRoute): PageMap {
   const patch = usePatchOsm();
   const inspect = useOsmFile(INSPECT_OSM_KEY);
   const extract = useOsmFile(EXTRACT_OSM_KEY);
+  const extractSource = useOsmFile(EXTRACT_SOURCE_OSM_KEY);
   const extractBbox = useAtomValue(extractBboxAtom);
   const selectPlanFeature = useSelectPlanFeature();
   const boxes = (...infos: ({ bbox: GeoBbox2D | null } | null)[]) =>
@@ -60,9 +61,18 @@ function usePageMap(route: OsmixRoute): PageMap {
     case "inspect":
       return { datasets: [{ osmFile: inspect }], focus: boxes(inspect.osmInfo), routing: true };
     case "extract":
+      // The result, or else a source dataset under the bbox (a streamed file shows only its
+      // header bounds).
+      if (extract.osm) {
+        return {
+          datasets: [{ osmFile: extract, label: "Extract result" }],
+          focus: boxes(extract.osmInfo),
+          layers: <ExtractMapLayers />,
+        };
+      }
       return {
-        datasets: extract.osm ? [{ osmFile: extract, label: "Extract result" }] : [],
-        focus: extract.osmInfo?.bbox ? [extract.osmInfo.bbox] : [extractBbox],
+        datasets: extractSource.osm ? [{ osmFile: extractSource, label: "Source" }] : [],
+        focus: [extractBbox],
         layers: <ExtractMapLayers />,
       };
     case "home":

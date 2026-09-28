@@ -169,6 +169,22 @@ export class OsmixWorker extends EventTarget {
   }
 
   /**
+   * Create an extract of a loaded dataset under `options.id`, leaving the source untouched. The
+   * source streams back through the PBF reader with the extract options, so the bbox, strategy
+   * and tag filters behave exactly as when extracting from a PBF file.
+   */
+  async extract({
+    sourceId,
+    options,
+  }: {
+    sourceId: string;
+    options: Partial<OsmFromPbfOptions> & { id: string };
+  }) {
+    if (options.id === sourceId) throw Error(`An extract of ${sourceId} needs its own id.`);
+    return this.fromPbf({ data: toPbfStream(this.get(sourceId)), options });
+  }
+
+  /**
    * Serialize an Osm instance to PBF and pipe into the provided writable stream.
    * Stream is transferred from the main thread for zero-copy efficiency.
    */

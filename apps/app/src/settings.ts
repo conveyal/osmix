@@ -6,3 +6,5 @@ export const PATCH_OSM_KEY = "patch";
 export const INSPECT_OSM_KEY = "inspect";
 /** Extract's result. */
 export const EXTRACT_OSM_KEY = "extract";
+/** The dataset Extract cuts from, when it comes from storage or another page, not a file. */
+export const EXTRACT_SOURCE_OSM_KEY = "extract-source";

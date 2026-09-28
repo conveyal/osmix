@@ -6,7 +6,13 @@ import { ArrowRightIcon } from "lucide-react";
 import { Link } from "wouter";
 
 import { extractSourceFileAtom } from "../pages/extract/state/extract";
-import { BASE_OSM_KEY, EXTRACT_OSM_KEY, INSPECT_OSM_KEY, PATCH_OSM_KEY } from "../settings";
+import {
+  BASE_OSM_KEY,
+  EXTRACT_OSM_KEY,
+  EXTRACT_SOURCE_OSM_KEY,
+  INSPECT_OSM_KEY,
+  PATCH_OSM_KEY,
+} from "../settings";
 
 /** A link to a page, styled as an outline button. */
 function OpenPage({ page, label }: { page: Parameters<typeof pagePath>[0]; label: string }) {
@@ -30,7 +36,8 @@ export function HomePage() {
   const patch = useAtomValue(osmFileInfoAtomFamily(PATCH_OSM_KEY));
   const inspect = useAtomValue(osmFileInfoAtomFamily(INSPECT_OSM_KEY));
   const extract = useAtomValue(osmFileInfoAtomFamily(EXTRACT_OSM_KEY));
-  const extractSource = useAtomValue(extractSourceFileAtom);
+  const extractSourceFile = useAtomValue(extractSourceFileAtom);
+  const extractSource = useAtomValue(osmFileInfoAtomFamily(EXTRACT_SOURCE_OSM_KEY));
 
   return (
     <FullPage
@@ -83,7 +90,13 @@ export function HomePage() {
           "Save the result to open it in Inspect or Merge, or export it as a PBF",
         ]}
         status={openNow([
-          extract ? extract.fileName : extractSource ? `source ${extractSource.name}` : null,
+          extract
+            ? extract.fileName
+            : extractSourceFile
+              ? `source ${extractSourceFile.name}`
+              : extractSource
+                ? `source ${extractSource.fileName}`
+                : null,
         ])}
       >
         Cut a region out of a large PBF without loading the whole file.

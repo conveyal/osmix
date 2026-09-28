@@ -20,11 +20,14 @@ export const automaticBboxAtom = atom<GeoBbox2D>(DEFAULT_EXTRACT_BBOX);
 /** While true, the bbox is the selected file's header bounds and can't be edited or dragged. */
 export const useFileBoundsAtom = atom(false);
 
-/** What the selected file's PBF header says about its bounds. */
+/**
+ * The selected source's bounds: what a streamed PBF's header records, or a loaded dataset's
+ * extent.
+ */
 export type FileBounds =
   | { status: "none" }
   | { status: "reading" }
-  | { status: "ok"; bbox: GeoBbox2D }
+  | { status: "ok"; bbox: GeoBbox2D; from: "header" | "dataset" }
   | { status: "missing" }
   | { status: "error"; message: string };
 

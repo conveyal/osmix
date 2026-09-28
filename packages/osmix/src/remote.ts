@@ -23,7 +23,7 @@ import type {
 import { inspectBackingBuffers, isSharedArrayBuffer } from "@osmix/shared/backing-buffers";
 import type { Progress } from "@osmix/shared/progress";
 import { streamToBytes } from "@osmix/shared/stream-to-bytes";
-import type { LonLat, OsmEntityType, Tile } from "@osmix/types";
+import type { GeoBbox2D, LonLat, OsmEntityType, Tile } from "@osmix/types";
 import * as Comlink from "comlink";
 
 import {
@@ -915,6 +915,26 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
           }
         : null,
     );
+    await this.populateDatasetFromControl(osmInfo.id);
+    return this.wrap(osmInfo);
+  }
+
+  /**
+   * Create an extract of a loaded dataset under `options.id`, leaving the source untouched. The
+   * bbox, strategy and tag filters behave exactly as with `fromPbf` extract options. The result
+   * is recovered after a worker restart from its shared buffers, not by extracting again.
+   */
+  async extract(
+    sourceOsmId: OsmId,
+    options: Partial<OsmFromPbfOptions> & { id: string; extractBbox: GeoBbox2D },
+  ) {
+    const sourceId = this.getId(sourceOsmId);
+    const osmInfo = await this.runWithWorker(
+      (worker) => worker.extract({ sourceId, options: structuredClone(options) }),
+      { lane: "control", retry: "never" },
+    );
+    this.invalidateMergeStateForDataset(osmInfo.id);
+    this.datasetRestorers.set(osmInfo.id, null);
     await this.populateDatasetFromControl(osmInfo.id);
     return this.wrap(osmInfo);
   }
