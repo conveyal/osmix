@@ -45,3 +45,8 @@ export function headerBboxToGeoBbox(bbox: OsmPbfHeaderBlock["bbox"]): GeoBbox2D 
 export function bboxesOverlap(a: GeoBbox2D, b: GeoBbox2D): boolean {
   return a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
 }
+
+/** Whether two boxes have the same four coordinates. */
+export function bboxesEqual(a: GeoBbox2D, b: GeoBbox2D): boolean {
+  return a.every((value, i) => value === b[i]);
+}

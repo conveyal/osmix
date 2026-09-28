@@ -58,14 +58,22 @@ test("extracts using the bounds recorded in the selected file's header", async (
   await expect(page.getByText("Select a PBF file in step 1 first")).toBeVisible();
 
   const minLon = page.locator("#extract-bbox-min-lon");
-  const previousMinLon = await minLon.inputValue();
 
   const chooserPromise = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: "Open file", exact: true }).click();
   await (await chooserPromise).setFiles(MONACO_PBF);
 
-  // monaco.pbf records its bounds in the PBF header.
+  // monaco.pbf records its bounds in the PBF header. The unedited default bbox starts from
+  // them, still editable: "Use the selected file's bounds" stays off.
   await expect(useFileBounds).toBeEnabled();
+  await expect(minLon).toHaveValue("7.4053929");
+  await expect(page.locator("#extract-bbox-max-lat")).toHaveValue("43.7543687");
+  await expect(useFileBounds).not.toBeChecked();
+  await expect(minLon).toBeEnabled();
+  await minLon.fill("7.41");
+  await minLon.blur();
+  const previousMinLon = await minLon.inputValue();
+
   await useFileBounds.check();
   // The file's bbox replaces the coordinate inputs, which are hidden while it is in use.
   await expect(page.locator("#extract-file-bounds-help")).toHaveText(

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { bboxesOverlap, DEFAULT_EXTRACT_BBOX, headerBboxToGeoBbox } from "../src/lib/extract-bbox";
+import {
+  bboxesEqual,
+  bboxesOverlap,
+  DEFAULT_EXTRACT_BBOX,
+  headerBboxToGeoBbox,
+} from "../src/lib/extract-bbox";
 
 describe("headerBboxToGeoBbox", () => {
   it("orders a PBF header bbox as [west, south, east, north]", () => {
@@ -36,5 +41,12 @@ describe("bboxesOverlap", () => {
 
   it("treats touching edges as overlapping", () => {
     expect(bboxesOverlap([0, 0, 1, 1], [1, 0, 2, 1])).toBe(true);
+  });
+});
+
+describe("bboxesEqual", () => {
+  it("compares all four coordinates", () => {
+    expect(bboxesEqual([1, 2, 3, 4], [1, 2, 3, 4])).toBe(true);
+    expect(bboxesEqual([1, 2, 3, 4], [1, 2, 3, 5])).toBe(false);
   });
 });

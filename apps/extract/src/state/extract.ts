@@ -5,6 +5,13 @@ import { DEFAULT_EXTRACT_BBOX } from "../lib/extract-bbox";
 
 export const extractBboxAtom = atom<GeoBbox2D>(DEFAULT_EXTRACT_BBOX);
 
+/**
+ * The bbox the app last set on its own: the default, then a selected file's header bounds.
+ * While the bbox still equals it, the user hasn't edited it, so selecting another file may
+ * replace it with that file's bounds.
+ */
+export const automaticBboxAtom = atom<GeoBbox2D>(DEFAULT_EXTRACT_BBOX);
+
 /** While true, the bbox is the selected file's header bounds and can't be edited or dragged. */
 export const useFileBoundsAtom = atom(false);
 

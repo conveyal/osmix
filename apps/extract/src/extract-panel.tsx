@@ -48,6 +48,7 @@ import ExtractTagFilterEditor, {
 } from "./components/extract-tag-filter-editor";
 import { SourceFileInfo } from "./components/source-file-info";
 import {
+  bboxesEqual,
   bboxesOverlap,
   boundsLikeToBbox,
   headerBboxToGeoBbox,
@@ -56,6 +57,7 @@ import {
 } from "./lib/extract-bbox";
 import { OSM_KEY } from "./settings";
 import {
+  automaticBboxAtom,
   extractBboxAtom,
   type FileBounds,
   fileBoundsAtom,
@@ -177,10 +179,17 @@ export function ExtractPanel() {
       setSourceHeader(header);
       const headerBbox = headerBboxToGeoBbox(header.bbox);
       setFileBounds(headerBbox ? { status: "ok", bbox: headerBbox } : { status: "missing" });
-      // When the bbox misses the file, show the file's outline and the warning together. Read
-      // the bbox from the store: the closure's value predates `stopUsingFileBounds` above.
+      if (!headerBbox) return;
+      // Read the bbox from the store: the closure's value predates `stopUsingFileBounds` above.
       const currentBbox = store.get(extractBboxAtom);
-      if (headerBbox && isValidBbox(currentBbox) && !bboxesOverlap(currentBbox, headerBbox)) {
+      if (bboxesEqual(currentBbox, store.get(automaticBboxAtom))) {
+        // An unedited bbox starts from the file's bounds, ready to narrow. "Use the selected
+        // file's bounds" stays off, so the coordinates remain editable.
+        setBbox(headerBbox);
+        store.set(automaticBboxAtom, headerBbox);
+        map?.fitBounds(headerBbox, { padding: mapPadding(40), maxDuration: 500 });
+      } else if (isValidBbox(currentBbox) && !bboxesOverlap(currentBbox, headerBbox)) {
+        // An edited bbox that misses the file: show the file's outline and the warning together.
         map?.fitBounds(headerBbox, { padding: mapPadding(40), maxDuration: 500 });
       }
     } catch (error) {
