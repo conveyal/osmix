@@ -179,7 +179,7 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-Vite dev server ([apps/merge/vite.config.ts](../../apps/merge/vite.config.ts)). This is a schematic configuration fragment:
+Vite dev server ([apps/app/vite.config.ts](../../apps/app/vite.config.ts)). This is a schematic configuration fragment:
 
 ```ts schematic
 export default defineConfig({
@@ -192,7 +192,7 @@ export default defineConfig({
 });
 ```
 
-Vercel ([apps/merge/vercel.json](../../apps/merge/vercel.json)):
+Vercel ([apps/app/vercel.json](../../apps/app/vercel.json)):
 
 ```json
 {
@@ -324,7 +324,7 @@ application state; supply `restoreWorker` when restarted workers need datasets
 or derived indexes. A restoration error is preserved as the terminal slot error
 so queued work sees the actual cause.
 
-See [`MergeWorker`](../../apps/merge/src/workers/osm.worker.ts) for a real
+See [`MergeWorker`](../../apps/app/src/workers/osm.worker.ts) for a real
 example that adds IndexedDB storage.
 
 #### Behavior differences by mode

@@ -28,24 +28,24 @@ Fixture PBF files live in `fixtures/` at the repository root. During development
 ## Run the dev server
 
 ```sh
-pnpm run --filter @osmix/merge dev
+pnpm run --filter @osmix/app dev
 ```
 
-Vite runs through Portless at `https://merge.osmix.localhost`. Worktrees add a unique prefix to that hostname. Open the “Check system” dialog in the top navigation to confirm the page is secure and cross-origin isolated; polished raster rendering and large array allocations depend on it. Set `PORTLESS=0` to bypass Portless and run Vite directly.
+Vite runs through Portless at `https://app.osmix.localhost`. Worktrees add a unique prefix to that hostname. Open the “Check system” dialog in the top navigation to confirm the page is secure and cross-origin isolated; polished raster rendering and large array allocations depend on it. Set `PORTLESS=0` to bypass Portless and run Vite directly.
 
 ## Build for production
 
 ```sh
-pnpm run --filter @osmix/merge build
+pnpm run --filter @osmix/app build
 ```
 
-Artifacts land in `apps/merge/dist/`. Deploy behind an HTTPS origin that sends the same COOP/COEP headers configured in `vite.config.ts`.
+Artifacts land in `apps/app/dist/`. Deploy behind an HTTPS origin that sends the same COOP/COEP headers configured in `vite.config.ts`.
 
 ## End-to-end tests
 
 ```sh
 pnpm exec playwright install --with-deps   # first run
-pnpm run --filter @osmix/merge test:e2e
+pnpm run --filter @osmix/app test:e2e
 ```
 
 The worker harness loads `fixtures/monaco.pbf`; the guidance harness renders the real merge-step disclosure

@@ -69,10 +69,10 @@
     },
     {
       "files": [
-        "apps/merge/src/**/*.ts",
+        "apps/app/src/**/*.ts",
         "apps/inspect/src/**/*.ts",
         "apps/extract/src/**/*.ts",
-        "apps/merge/src/**/*.tsx",
+        "apps/app/src/**/*.tsx",
         "apps/inspect/src/**/*.tsx",
         "apps/extract/src/**/*.tsx",
         "packages/app-components/src/**/*.ts",
@@ -101,10 +101,10 @@
     },
     {
       "files": [
-        "apps/merge/src/**/*.ts",
+        "apps/app/src/**/*.ts",
         "apps/inspect/src/**/*.ts",
         "apps/extract/src/**/*.ts",
-        "apps/merge/src/**/*.tsx",
+        "apps/app/src/**/*.tsx",
         "apps/inspect/src/**/*.tsx",
         "apps/extract/src/**/*.tsx",
         "packages/app-components/src/**/*.ts",

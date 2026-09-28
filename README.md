@@ -149,11 +149,11 @@ pnpm run verify:workspace -- @osmix/core
 pnpm run verify:all
 ```
 
-**Workspace commands** support filtering: `pnpm --filter @osmix/merge dev`
+**Workspace commands** support filtering: `pnpm --filter @osmix/app dev`
 
-Development servers use [Portless](https://github.com/vercel-labs/portless) and stable HTTPS URLs: `merge.osmix.localhost`, `inspect.osmix.localhost`, `extract.osmix.localhost`, `bench.osmix.localhost`, `www.osmix.localhost`, `vt-server.osmix.localhost`, and `shortbread-server.osmix.localhost`. The first run creates and trusts a local certificate authority; run `pnpm exec portless trust` if trust setup was skipped. `pnpm run dev` at the repo root runs Portless once for the whole workspace. Portless starts every app's `dev` script and derives each route name from the package name (`@osmix/<name>` → `<name>.osmix.localhost`). Linked worktrees on a branch other than `main` add the sanitized branch name as a prefix, so concurrent checkouts do not compete for routes. Detached-HEAD worktrees get no prefix; create a branch or run `pnpm run dev` inside the app directory instead, which starts it without Portless.
+Development servers use [Portless](https://github.com/vercel-labs/portless) and stable HTTPS URLs: `app.osmix.localhost`, `inspect.osmix.localhost`, `extract.osmix.localhost`, `bench.osmix.localhost`, `www.osmix.localhost`, `vt-server.osmix.localhost`, and `shortbread-server.osmix.localhost`. The first run creates and trusts a local certificate authority; run `pnpm exec portless trust` if trust setup was skipped. `pnpm run dev` at the repo root runs Portless once for the whole workspace. Portless starts every app's `dev` script and derives each route name from the package name (`@osmix/<name>` → `<name>.osmix.localhost`). Linked worktrees on a branch other than `main` add the sanitized branch name as a prefix, so concurrent checkouts do not compete for routes. Detached-HEAD worktrees get no prefix; create a branch or run `pnpm run dev` inside the app directory instead, which starts it without Portless.
 
-Set `PORTLESS=0` to bypass the proxy and run the underlying development command directly, for example `PORTLESS=0 pnpm --filter @osmix/merge dev`. Portless proxy and certificate state are user-level state and are not stored in this repository.
+Set `PORTLESS=0` to bypass the proxy and run the underlying development command directly, for example `PORTLESS=0 pnpm --filter @osmix/app dev`. Portless proxy and certificate state are user-level state and are not stored in this repository.
 
 `verify:workspace` accepts a package name or path such as `apps/vt-server`, follows runtime and development workspace dependencies to include dependents, and runs formatting, typechecking, and tests in dependency order. It is check-only by default; pass `--write` only when formatting changes are intentional. `verify:all` excludes the browser benchmark app, whose benchmark script is not a package test.
 
@@ -164,7 +164,7 @@ Routing regressions use checked-in Monaco and small generated fixtures. Reports 
 ## Apps
 
 - **[www](apps/www/)** – Main site with interactive examples and package overview ([osmix.dev](https://osmix.dev))
-- **[merge](apps/merge/README.md)** – Interactive merge tool for OSM extracts with MapLibre visualization ([merge.osmix.dev](https://merge.osmix.dev))
+- **[merge](apps/app/README.md)** – Interactive merge tool for OSM extracts with MapLibre visualization ([merge.osmix.dev](https://merge.osmix.dev))
 - **[inspect](apps/inspect/README.md)** – Single-dataset viewer: load, search, diagnose duplicates, route ([inspect.osmix.dev](https://inspect.osmix.dev))
 - **[extract](apps/extract/README.md)** – Bounding-box extracts with strategy and tag filters ([extract.osmix.dev](https://extract.osmix.dev))
 - **[bench](apps/bench/README.md)** – Performance benchmarks comparing Osmix with DuckDB-wasm

@@ -1,6 +1,6 @@
 # Osmix UI Design System
 
-These are the conventions for `@osmix/ui`, `@osmix/app-components`, and every app built on them (`apps/merge`, `apps/inspect`, `apps/extract`). Read this before you make UI changes. Merge-specific rules are in `apps/merge/DESIGN.md`.
+These are the conventions for `@osmix/ui`, `@osmix/app-components`, and every app built on them (`apps/app`, `apps/inspect`, `apps/extract`). Read this before you make UI changes. Merge-specific rules are in `apps/app/DESIGN.md`.
 
 The design rules are kept in three places, in this order of strength:
 
@@ -196,7 +196,7 @@ If you need anything else, add a variant to the primitive.
 - Numbers in a column (counts, sizes, deltas) are right-aligned so they line up by place value: `TableCell numeric` and `TableHead numeric`. Key/value tables that mix text and numbers (File info) stay left-aligned. A list of labelled counts is a `Table`, not a `<dl>`.
 - Empty states are one sentence with no trailing period.
 - Errors say what failed and what to do next.
-- Use one name per concept (for example "Open file"; see `apps/merge/DESIGN.md` for the merge terms).
+- Use one name per concept (for example "Open file"; see `apps/app/DESIGN.md` for the merge terms).
 - **Export** writes a file the app generates (a PBF from the dataset in memory, an osmChange, a JSON report): "Export merged PBF", "Export {name} as PBF", "Export merge report (JSON)". Name the format when it is not obvious. **Download** is only for fetching from the network ("Download and open"). Tasks follow the same verbs ("Export x.pbf", "Exported x.pbf").
 
 ## Icons

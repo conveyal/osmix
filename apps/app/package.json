@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@osmix/merge",
+  "name": "@osmix/app",
   "private": true,
   "type": "module",
   "scripts": {

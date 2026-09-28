@@ -125,7 +125,7 @@ Options:
 - [`@osmix/core`](../core/README.md) – Typed-array index powering the change operations.
 - [`@osmix/pbf`](../pbf/README.md) – Streaming helpers used to read and write `.osm.pbf` data.
 - [`@osmix/json`](../json/README.md) – JSON entity adapters that pair with change workflows.
-- [Osmix Merge app](../../apps/merge/README.md) – Browser UI built on top of the change pipeline.
+- [Osmix Merge app](../../apps/app/README.md) – Browser UI built on top of the change pipeline.
 
 ## Environment and limitations
 

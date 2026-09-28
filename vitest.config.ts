@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 const appProjects = [
-  "apps/merge",
+  "apps/app",
   "apps/inspect",
   "apps/extract",
   "apps/bench/vite.config.ts",
