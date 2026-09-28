@@ -2,6 +2,7 @@ import {
   appOrigin,
   NominatimSearch,
   OsmDatasetCard,
+  OsmLoadDetails,
   OsmLoadFailurePanel,
   OsmPbfFileInput,
   SaveToDiskNotice,
@@ -36,14 +37,16 @@ import {
 } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
 import { DownloadIcon } from "lucide-react";
-import type { ExtractStrategy, GeoBbox2D } from "osmix";
+import type { ExtractStrategy, GeoBbox2D, OsmPbfHeaderBlock } from "osmix";
 import { useId, useRef, useState } from "react";
 
+import { type ExtractParameters, ExtractResultStats } from "./components/extract-result-stats";
 import ExtractTagFilterEditor, {
   conveyalTagFilterEditorState,
   rulesFromEditorState,
   type TagFilterEditorState,
 } from "./components/extract-tag-filter-editor";
+import { SourceFileInfo } from "./components/source-file-info";
 import {
   bboxesOverlap,
   boundsLikeToBbox,
@@ -130,6 +133,8 @@ export function ExtractPanel() {
     conveyalTagFilterEditorState,
   );
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [sourceHeader, setSourceHeader] = useState<OsmPbfHeaderBlock | null>(null);
+  const [extractParameters, setExtractParameters] = useState<ExtractParameters | null>(null);
   const remote = useOsmixRemote();
   const map = useMap();
   const mapPadding = useMapPadding();
@@ -146,7 +151,7 @@ export function ExtractPanel() {
   const bboxMissesFile =
     fileBounds.status === "ok" && isValidBbox(bbox) && !bboxesOverlap(bbox, fileBounds.bbox);
   const canExtract = !!pendingFile && isValidBbox(bbox) && !bboxMissesFile && !isExtracting;
-  const hasExtractResult = !!extract.osm && !!extract.osmInfo;
+  const extractOsm = extract.osmInfo ? extract.osm : null;
 
   /** Turn off "use the file's bounds" and give back the bbox the user had before. */
   const stopUsingFileBounds = () => {
@@ -159,6 +164,7 @@ export function ExtractPanel() {
   const selectFile = async (file: File | null) => {
     stopUsingFileBounds();
     setPendingFile(file);
+    setSourceHeader(null);
     const request = ++headerRequest.current;
     if (!file) {
       setFileBounds({ status: "none" });
@@ -168,6 +174,7 @@ export function ExtractPanel() {
     try {
       const header = await remote.readHeader(file);
       if (request !== headerRequest.current) return;
+      setSourceHeader(header);
       const headerBbox = headerBboxToGeoBbox(header.bbox);
       setFileBounds(headerBbox ? { status: "ok", bbox: headerBbox } : { status: "missing" });
       // When the bbox misses the file, show the file's outline and the warning together. Read
@@ -210,16 +217,24 @@ export function ExtractPanel() {
     selectEntity(null, null);
     const abortController = new AbortController();
     setLoadingState({ controller: abortController, osmKey: OSM_KEY });
+    const parameters: ExtractParameters = {
+      sourceName: pendingFile.name,
+      bbox,
+      strategy,
+      tagFilter: rulesFromEditorState(tagFilterEditor),
+    };
+    setExtractParameters(null);
     try {
-      await extract.loadExtractFromPbf(
+      const loaded = await extract.loadExtractFromPbf(
         pendingFile,
         {
-          extractBbox: bbox,
-          extractStrategy: strategy,
-          extractTagFilter: rulesFromEditorState(tagFilterEditor),
+          extractBbox: parameters.bbox,
+          extractStrategy: parameters.strategy,
+          extractTagFilter: parameters.tagFilter,
         },
         abortController,
       );
+      if (loaded) setExtractParameters(parameters);
     } finally {
       setLoadingState(null);
     }
@@ -227,6 +242,7 @@ export function ExtractPanel() {
 
   const clearExtract = async () => {
     selectEntity(null, null);
+    setExtractParameters(null);
     await extract.loadOsmFile(null);
   };
 
@@ -240,6 +256,7 @@ export function ExtractPanel() {
             pbfOnly
             disabled={isExtracting}
           />
+          {pendingFile ? <SourceFileInfo file={pendingFile} header={sourceHeader} /> : null}
           {extract.loadFailure ? (
             <OsmLoadFailurePanel
               failure={extract.loadFailure}
@@ -432,13 +449,19 @@ export function ExtractPanel() {
         </CardContent>
       </Card>
 
-      {hasExtractResult ? (
+      {extractOsm ? (
         <OsmDatasetCard
           title="Extract result"
           name="extract result"
           osmFile={extract}
           actions={{ download: false }}
           onClear={clearExtract}
+          details={
+            <>
+              <ExtractResultStats osm={extractOsm} parameters={extractParameters} />
+              <OsmLoadDetails osm={extractOsm} />
+            </>
+          }
           primaryAction={
             <ActionButton
               type="button"
@@ -454,8 +477,8 @@ export function ExtractPanel() {
           <div className="flex flex-col gap-2 p-inset">
             <SaveToDiskNotice />
             <p className="text-muted-foreground">
-              To merge this extract, download it and open it in{" "}
-              <a href={appOrigin("merge")}>Merge</a>.
+              To merge this extract, export it and open it in <a href={appOrigin("merge")}>Merge</a>
+              .
             </p>
           </div>
         </OsmDatasetCard>

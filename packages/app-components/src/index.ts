@@ -55,7 +55,11 @@ export {
   ChangesList,
   ChangesPagination,
 } from "./components/osm-changes-summary.tsx";
-export { default as OsmInfoTable } from "./components/osm-info-table.tsx";
+export {
+  default as OsmInfoTable,
+  OsmLoadDetails,
+  OsmLoadDetailsRows,
+} from "./components/osm-info-table.tsx";
 export { OsmLoadFailurePanel } from "./components/osm-load-failure.tsx";
 export {
   default as OsmPbfFileInput,

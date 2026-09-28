@@ -40,7 +40,13 @@ test("extracts a bounding box from a PBF and offers the result for download", as
     throw new Error(`OSM extraction failed: ${await failure.innerText()}`);
   }
   await expect(download).toBeEnabled();
-  await expect(page.getByRole("button", { name: "File info" })).toBeVisible();
+  // The selected file's info sits with the file; the result card describes the extract.
+  await page.getByRole("button", { name: "File info" }).click();
+  await expect(page.getByRole("table", { name: "Selected file" })).toContainText("monaco.pbf");
+  const stats = page.getByRole("table", { name: "Extract statistics" });
+  await expect(stats).toContainText("Simple");
+  await expect(stats).toContainText("7.415, 43.73, 7.425, 43.74");
+  await expect(page.getByRole("button", { name: "Load details" })).toBeVisible();
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
 });
 

@@ -19,7 +19,9 @@ import OsmInfoTable from "./osm-info-table.tsx";
  * "Export {name} as PBF" and "Clear {name}" (only with `onClear`).
  * `name` is the lowercase noun the labels use ("dataset", "extract result", "merged OSM").
  * `actions` turns an action off when the step already offers it. `primaryAction` sits above
- * the table, `children` below it. Fitting the map is the legend's and the toolbar's job.
+ * the table, `children` below it. `details` replaces the file name and the "File info" table,
+ * for a dataset that is not a file yet (an extract), whose file name and size would describe its
+ * source. Fitting the map is the legend's and the toolbar's job.
  */
 export function OsmDatasetCard({
   title,
@@ -28,6 +30,7 @@ export function OsmDatasetCard({
   onClear,
   actions,
   primaryAction,
+  details,
   children,
 }: {
   title: string;
@@ -36,6 +39,7 @@ export function OsmDatasetCard({
   onClear?: () => unknown;
   actions?: { download?: boolean; save?: boolean };
   primaryAction?: ReactNode;
+  details?: ReactNode;
   children?: ReactNode;
 }) {
   const { osm, file, fileInfo, isStored, canStore } = osmFile;
@@ -79,14 +83,14 @@ export function OsmDatasetCard({
           </CardAction>
         ) : null}
       </CardHeader>
-      {fileName ? (
+      {fileName && details === undefined ? (
         <CardDescription className="truncate border-b px-inset py-1 font-mono" title={fileName}>
           {fileName}
         </CardDescription>
       ) : null}
       <CardContent className="p-0">
         {primaryAction ? <div className="border-b p-inset">{primaryAction}</div> : null}
-        <OsmInfoTable defaultOpen={false} osm={osm} file={file} fileInfo={fileInfo} />
+        {details ?? <OsmInfoTable defaultOpen={false} osm={osm} file={file} fileInfo={fileInfo} />}
         {children}
       </CardContent>
     </Card>
