@@ -123,7 +123,9 @@ function InputGroupInput({ className, ...props }: React.ComponentProps<"input">)
     <Input
       data-slot="input-group-control"
       className={cn(
-        "flex-1 rounded-none border-0 bg-transparent focus-visible:outline-none",
+        // The group draws the focus ring around the input and its addons. `Input`'s own
+        // `focus-ring` uses a more specific selector, so turning it off needs `!`.
+        "flex-1 rounded-none border-0 bg-transparent focus-visible:outline-none!",
         className,
       )}
       {...props}
