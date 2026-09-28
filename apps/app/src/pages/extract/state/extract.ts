@@ -44,7 +44,10 @@ export const bboxBeforeFileBoundsAtom = atom<GeoBbox2D | null>(null);
 export const extractStrategyAtom = atom<ExtractStrategy>("complete_ways");
 
 /** The tag filter rules being edited in step 4. */
-export const extractTagFilterEditorAtom = atom<TagFilterEditorState>(conveyalTagFilterEditorState);
+// `conveyalTagFilterEditorState` is a factory: passed to `atom` it would make a read-only atom.
+export const extractTagFilterEditorAtom = atom<TagFilterEditorState>(
+  conveyalTagFilterEditorState(),
+);
 
 /** The source PBF selected in step 1, not loaded: the extract streams it. */
 export const extractSourceFileAtom = atom<File | null>(null);
