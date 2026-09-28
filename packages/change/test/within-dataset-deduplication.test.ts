@@ -39,6 +39,14 @@ describe("planWithinDatasetDeduplication", () => {
     const osm = duplicated();
     const changes = planWithinDatasetDeduplication(osm, quiet);
     expect(changes.stats).toMatchObject({ deduplicatedNodes: 2, deduplicatedWays: 1 });
+    // Nodes 1 and 2 and way 10 go; way 40 and relation 100 point at the survivors instead.
+    const { createChanges, modifyChanges, deleteChanges, totalChanges } = changes.stats;
+    expect({ createChanges, modifyChanges, deleteChanges }).toEqual({
+      createChanges: 0,
+      modifyChanges: 2,
+      deleteChanges: 3,
+    });
+    expect(createChanges + modifyChanges + deleteChanges).toBe(totalChanges);
     const cleaned = applyChangesetToOsm(changes);
     expect(cleaned.nodes.getById(1)).toBeNull();
     expect(cleaned.ways.getById(10)).toBeNull();

@@ -3,6 +3,9 @@ import {
   ActionButton,
   Button,
   bytesSizeToHuman,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   Menu,
   MenuContent,
   MenuItem,
@@ -31,7 +34,7 @@ import {
 } from "@osmix/ui";
 import { ChevronDownIcon, FileIcon, FilesIcon, LinkIcon, XIcon } from "lucide-react";
 import type { OsmFileType, OsmLoadProfile } from "osmix";
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 
 /** File type options with labels and accepted extensions */
 const FILE_TYPE_OPTIONS: {
@@ -141,6 +144,45 @@ function parseFileType(value: string): OsmFileType {
   return option.type;
 }
 
+/**
+ * The load profile, collapsed behind a small "Load profile: Auto" toggle that names the current
+ * choice. It is an expert setting, so it stays out of the way of "Open file". `trigger` is
+ * where the toggle goes (for example, in a row beside "Open from URL"); the selector opens below.
+ */
+export function OsmLoadProfileDisclosure({
+  disabled,
+  onChange,
+  trigger,
+  value,
+}: {
+  disabled?: boolean;
+  onChange: (profile: OsmLoadProfile) => void;
+  trigger?: (toggle: ReactNode) => ReactNode;
+  value: OsmLoadProfile;
+}) {
+  const selected = LOAD_PROFILE_OPTIONS.find((option) => option.value === value)!;
+  const toggle = (
+    <CollapsibleTrigger
+      className="group"
+      render={<Button variant="ghost" size="sm" disabled={disabled} />}
+    >
+      Load profile: {selected.label}
+      <ChevronDownIcon
+        aria-hidden="true"
+        className="transition-transform group-data-panel-open:rotate-180"
+      />
+    </CollapsibleTrigger>
+  );
+  return (
+    <Collapsible defaultOpen={false}>
+      {trigger ? trigger(toggle) : toggle}
+      <CollapsibleContent className="pt-2">
+        <OsmLoadProfileSelector disabled={disabled} value={value} onChange={onChange} />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export function OsmLoadProfileSelector({
   disabled,
   onChange,
@@ -176,16 +218,24 @@ export function OsmLoadProfileSelector({
   );
 }
 
+/**
+ * "Open file": the first action of every flow, so it is the primary (ink) button by default.
+ * Pass `primary={false}` when another slot's Open file is the next step (Merge's patch input
+ * while the base is still empty), so only one primary action shows at a time.
+ */
 export function OsmPbfSelectFileButton({
   disabled,
   pbfOnly,
+  primary = true,
   setFile,
 }: {
   disabled?: boolean;
   /** Skip format menu and open only `.pbf` / `.osm.pbf`. */
   pbfOnly?: boolean;
+  primary?: boolean;
   setFile: (file: File | null, fileType?: OsmFileType) => Promise<void>;
 }) {
+  const variant = primary ? "default" : "outline";
   const [isLoading, setIsLoading] = useState(false);
   const locked = useTaskLock();
 
@@ -208,7 +258,7 @@ export function OsmPbfSelectFileButton({
     return (
       <Button
         type="button"
-        variant="outline"
+        variant={variant}
         disabled={disabled || isLoading || locked}
         className="w-full"
         onClick={async () => {
@@ -229,7 +279,7 @@ export function OsmPbfSelectFileButton({
 
   return (
     <Menu>
-      <MenuTrigger variant="outline" disabled={disabled || isLoading || locked} className="flex-1">
+      <MenuTrigger variant={variant} disabled={disabled || isLoading || locked} className="w-full">
         <FilesIcon aria-hidden="true" />
         Open file
         <ChevronDownIcon aria-hidden="true" className="ml-auto" />
@@ -262,11 +312,10 @@ export function OsmPbfOpenUrlButton({
   const fileTypeId = useId();
   const urlId = useId();
 
+  // A secondary way in, so it stays quiet beside the primary "Open file".
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={<Button className="flex-1" variant="outline" disabled={disabled || locked} />}
-      >
+      <DialogTrigger render={<Button variant="ghost" size="sm" disabled={disabled || locked} />}>
         <LinkIcon aria-hidden="true" />
         Open from URL
       </DialogTrigger>

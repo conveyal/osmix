@@ -80,7 +80,12 @@ describe("merge inline guidance", () => {
 
   it("shows reconciliation and intersection statistics with labeled filter groups", () => {
     const html = renderWithStore(
-      createElement("div", null, createElement(ChangesSummary), createElement(ChangesFilters)),
+      createElement(
+        "div",
+        null,
+        createElement(ChangesSummary, { defaultOpen: true }),
+        createElement(ChangesFilters),
+      ),
       (store) => {
         store.set(remoteAtom, {
           getChangesetPage: vi.fn(),
@@ -92,6 +97,9 @@ describe("merge inline guidance", () => {
           nodeChanges: 10,
           wayChanges: 9,
           relationChanges: 6,
+          createChanges: 12,
+          modifyChanges: 8,
+          deleteChanges: 5,
           deduplicatedNodes: 3,
           deduplicatedNodesReplaced: 7,
           deduplicatedWays: 2,
@@ -108,8 +116,10 @@ describe("merge inline guidance", () => {
     expect(html).toContain("Intersection nodes created");
     expect(html).toContain("way node references and relation node members changed");
     expect(html).toContain("one surviving entity");
-    expect(html).toContain("<legend");
-    expect(html).toContain("Change type");
-    expect(html).toContain("Entity type");
+    expect(html).toContain("25 changes: 12 created, 8 modified, 5 deleted.");
+    expect(html.match(/<legend/g)).toHaveLength(2);
+    for (const label of ["Create", "Modify", "Delete", "Node", "Way", "Relation"]) {
+      expect(html).toContain(label);
+    }
   });
 });

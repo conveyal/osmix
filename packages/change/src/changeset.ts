@@ -329,15 +329,24 @@ export class OsmChangeset {
   }
 
   get stats(): OsmChangesetStats {
-    const nodeChanges = Object.values(this.nodeChanges).length;
-    const wayChanges = Object.values(this.wayChanges).length;
-    const relationChanges = Object.values(this.relationChanges).length;
+    const byType = { create: 0, modify: 0, delete: 0 };
+    const count = (changes: Record<number, OsmChange>) => {
+      const values = Object.values(changes);
+      for (const change of values) byType[change.changeType]++;
+      return values.length;
+    };
+    const nodeChanges = count(this.nodeChanges);
+    const wayChanges = count(this.wayChanges);
+    const relationChanges = count(this.relationChanges);
     return {
       osmId: this.osm.id,
       totalChanges: nodeChanges + wayChanges + relationChanges,
       nodeChanges,
       wayChanges,
       relationChanges,
+      createChanges: byType.create,
+      modifyChanges: byType.modify,
+      deleteChanges: byType.delete,
       deduplicatedNodes: this.deduplicatedNodes,
       deduplicatedNodesReplaced: this.deduplicatedNodesReplaced,
       deduplicatedWays: this.deduplicatedWays,

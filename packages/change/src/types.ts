@@ -344,6 +344,10 @@ export type OsmChangesetStats = {
   nodeChanges: number;
   wayChanges: number;
   relationChanges: number;
+  /** The same changes counted by change type; the three sum to `totalChanges`. */
+  createChanges: number;
+  modifyChanges: number;
+  deleteChanges: number;
   deduplicatedNodes: number;
   deduplicatedNodesReplaced: number;
   deduplicatedWays: number;

@@ -196,11 +196,14 @@ describe("worker merge plan sessions", () => {
       ],
     );
     worker.setOsm(dataset);
-    expect(worker.planDeduplication(dataset.id)).toMatchObject({
-      deduplicatedNodes: 1,
-      deduplicatedWays: 1,
-    });
-    expect(worker.getChangesetPage(dataset.id, 0, 10).changes?.length).toBeGreaterThan(0);
+    const stats = worker.planDeduplication(dataset.id);
+    expect(stats).toMatchObject({ deduplicatedNodes: 1, deduplicatedWays: 1 });
+    const page = worker.getChangesetPage(dataset.id, 0, 10);
+    expect(page.changes?.length).toBeGreaterThan(0);
+    expect(page.total).toBe(stats.totalChanges);
+    worker.setChangesetFilters(["delete"], ["node", "way", "relation"]);
+    expect(worker.getChangesetPage(dataset.id, 0, 10).total).toBe(stats.deleteChanges);
+    worker.setChangesetFilters(["create", "modify", "delete"], ["node", "way", "relation"]);
     worker.applyChangesAndReplace(dataset.id);
     expect(worker.getOsm(dataset.id).ways.size).toBe(1);
   });

@@ -50,7 +50,6 @@ export {
 } from "./components/nominatim-search.tsx";
 export {
   default as ChangesSummary,
-  ChangesExpandableList,
   ChangesFilters,
   ChangesList,
   ChangesPagination,
@@ -63,6 +62,7 @@ export {
 export { OsmLoadFailurePanel } from "./components/osm-load-failure.tsx";
 export {
   default as OsmPbfFileInput,
+  OsmLoadProfileDisclosure,
   OsmLoadProfileSelector,
   OsmPbfClearFileButton,
   OsmPbfSelectedFile,

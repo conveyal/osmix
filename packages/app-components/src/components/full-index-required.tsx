@@ -33,7 +33,7 @@ export function FullIndexRequired({
         </ActionButton>
       ) : (
         <p className="text-muted-foreground">
-          Select the original PBF again and choose Full under Advanced load profile.
+          Select the original PBF again with Load profile set to Full.
         </p>
       )}
     </Alert>

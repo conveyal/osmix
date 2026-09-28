@@ -250,16 +250,18 @@ export function DuplicateFixes({ osmFile }: { osmFile: UseOsmFileReturn }) {
       {candidates ? (
         <SidebarSection flush title="Duplicate candidates">
           <ChangesSummary variant="deduplication" />
-          <Suspense fallback={<LoadingState />}>
-            <Details>
-              <DetailsSummary>Changes</DetailsSummary>
-              <DetailsContent>
-                <ChangesFilters />
-                <ChangesList setSelectedEntity={(entity) => selectAndFlyToEntity(osm, entity)} />
+          {candidates.totalChanges > 0 ? (
+            <>
+              <ChangesFilters />
+              <Suspense fallback={<LoadingState className="border-t" />}>
+                <ChangesList
+                  duplicates
+                  setSelectedEntity={(entity) => selectAndFlyToEntity(osm, entity)}
+                />
                 <ChangesPagination />
-              </DetailsContent>
-            </Details>
-          </Suspense>
+              </Suspense>
+            </>
+          ) : null}
           {candidates.totalChanges > 0 ? (
             <div className="flex flex-col gap-2 border-t p-inset">
               {jsonError ? <Alert variant="destructive">{jsonError}</Alert> : null}

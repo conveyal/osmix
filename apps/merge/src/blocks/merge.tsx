@@ -479,6 +479,8 @@ export default function MergeBlock() {
       ) : (
         <StoredOsmList
           osmKey={osmKey}
+          // Base first: the patch's Open file is the primary action only once the base is loaded.
+          primary={kind === "base" || Boolean(base.osm)}
           loadFailure={file.loadFailure}
           onDismissLoadFailure={file.clearLoadFailure}
           onReloadView={file.reloadWithViewProfile}

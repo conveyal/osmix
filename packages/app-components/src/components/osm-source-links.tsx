@@ -48,6 +48,7 @@ export function OsmSourceLinks({
         </li>
       </ul>
       <ActionButton
+        variant="outline"
         className="w-full"
         icon={<FilesIcon aria-hidden="true" />}
         onAction={useExample}

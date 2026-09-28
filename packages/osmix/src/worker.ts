@@ -725,7 +725,8 @@ export class OsmixWorker extends EventTarget {
 
   /**
    * Retrieve a paginated subset of the filtered changeset.
-   * Returns changes for the specified page and the total number of pages.
+   * Returns changes for the specified page, how many changes pass the filters, and the number
+   * of pages.
    */
   getChangesetPage(osmId: string, page: number, pageSize: number) {
     const generated = this.changesets.get(osmId);
@@ -733,10 +734,8 @@ export class OsmixWorker extends EventTarget {
     if (!this.filteredChanges.has(osmId)) this.sortChangeset(osmId, generated.changeset);
     const filteredChanges = this.filteredChanges.get(osmId);
     const changes = filteredChanges?.slice(page * pageSize, (page + 1) * pageSize);
-    return {
-      changes,
-      totalPages: Math.ceil((filteredChanges?.length ?? 0) / pageSize),
-    };
+    const total = filteredChanges?.length ?? 0;
+    return { changes, total, totalPages: Math.ceil(total / pageSize) };
   }
 
   /**

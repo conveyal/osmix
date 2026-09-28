@@ -42,7 +42,7 @@ import { useEffectEvent, useRef, useState } from "react";
 
 import { OsmLoadFailurePanel } from "./osm-load-failure.tsx";
 import {
-  OsmLoadProfileSelector,
+  OsmLoadProfileDisclosure,
   OsmPbfOpenUrlButton,
   OsmPbfSelectFileButton,
 } from "./osm-pbf-file-input.tsx";
@@ -198,6 +198,8 @@ interface StoredOsmListProps {
   osmKey?: string;
   openOsmFile: (file: File | string, fileType?: OsmFileType) => Promise<OsmInfo | null>;
   openOsmPbfUrl?: (url: string) => Promise<OsmInfo | null>;
+  /** Whether "Open file" is the next step, and so the primary button. Defaults to true. */
+  primary?: boolean;
 }
 
 /**
@@ -213,6 +215,7 @@ export function StoredOsmList({
   osmKey,
   openOsmFile,
   openOsmPbfUrl,
+  primary = true,
 }: StoredOsmListProps) {
   const remote = useOsmixRemote();
   const { entries, estimatedBytes } = useStoredOsm(remote);
@@ -223,11 +226,11 @@ export function StoredOsmList({
 
   return (
     <>
-      <div className={isLoading ? "flex gap-2 px-inset pb-inset" : "flex gap-2 px-inset pb-2"}>
+      <div className="flex flex-col gap-1 px-inset pb-inset">
         {isLoading ? (
           <Button
             variant="destructive"
-            className="flex-1"
+            className="w-full"
             // The load holds the task lock until it actually stops, then clears this state.
             disabled={current?.status === "cancelling"}
             onClick={() => loadingState.controller.abort()}
@@ -238,26 +241,31 @@ export function StoredOsmList({
         ) : (
           <>
             <OsmPbfSelectFileButton
+              primary={primary}
               setFile={async (file, fileType) => {
                 if (file == null) return;
                 await openOsmFile(file, fileType);
               }}
             />
-            <OsmPbfOpenUrlButton
-              openPbfUrl={openOsmPbfUrl}
-              setFile={async (file, fileType) => {
-                if (file == null) return;
-                await openOsmFile(file, fileType);
-              }}
+            <OsmLoadProfileDisclosure
+              value={loadProfile}
+              onChange={setLoadProfile}
+              trigger={(toggle) => (
+                <div className="flex items-center justify-between gap-2">
+                  <OsmPbfOpenUrlButton
+                    openPbfUrl={openOsmPbfUrl}
+                    setFile={async (file, fileType) => {
+                      if (file == null) return;
+                      await openOsmFile(file, fileType);
+                    }}
+                  />
+                  {toggle}
+                </div>
+              )}
             />
           </>
         )}
       </div>
-      {!isLoading ? (
-        <div className="px-inset pb-inset">
-          <OsmLoadProfileSelector value={loadProfile} onChange={setLoadProfile} />
-        </div>
-      ) : null}
       {loadFailure && onDismissLoadFailure ? (
         <OsmLoadFailurePanel
           className="mx-inset mb-inset"

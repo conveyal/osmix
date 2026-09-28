@@ -21,6 +21,7 @@ import {
 } from "react";
 
 import { useFlyToEntity, useMap, useSelectAndFlyToEntity } from "../hooks/map.ts";
+import { entityTitle } from "../lib/change-labels.ts";
 import { exitRoutingModeAtom } from "../state/routing.ts";
 import EntityDetails from "./entity-details.tsx";
 import { type LoadedMapDataset, useMapDatasets } from "./map-datasets.tsx";
@@ -68,12 +69,6 @@ const ENTITY_ICONS: Record<OsmEntityType, typeof CircleDotIcon> = {
   way: SplineIcon,
   relation: ShapesIcon,
 };
-
-/** Sentence-case type name for a title. */
-function entityTitle(entity: OsmEntity): string {
-  const type = getEntityType(entity);
-  return `${type.charAt(0).toUpperCase()}${type.slice(1)} ${entity.id}`;
-}
 
 /** The element that gets focus when the inspector closes and nothing else claims it. */
 function focusMapCanvas(): void {
