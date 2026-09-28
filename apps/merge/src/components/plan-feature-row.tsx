@@ -24,7 +24,11 @@ export function PlanFeatureRow({
   /** The evidence, when this feature is the one open. */
   detail: MergePlanFeatureDetail | null;
   feature: MergePlanFeatureView;
-  onDecide: (proposalId: string, action: PlanDecision["action"] | null) => unknown;
+  onDecide: (
+    proposalId: string,
+    action: PlanDecision["action"] | null,
+    excludes: readonly string[],
+  ) => unknown;
   onSelect: (featureKey: string) => unknown;
 }) {
   const reference = planFeatureReference(feature);

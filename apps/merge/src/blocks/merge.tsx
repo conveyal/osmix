@@ -203,10 +203,14 @@ export default function MergeBlock() {
     });
   };
 
-  const decide = async (proposalId: string, action: PlanDecision["action"] | null) => {
+  const decide = async (
+    proposalId: string,
+    action: PlanDecision["action"] | null,
+    excludes: readonly string[],
+  ) => {
     if (!base.osm || !overview) return;
     const baseOsmId = base.osm.id;
-    const decisions = withDecision(overview.decisions, proposalId, action);
+    const decisions = withDecision(overview.decisions, proposalId, action, excludes);
     await runTask("Update plan", async () => {
       const next = await remote.setMergePlanDecisions(baseOsmId, decisions);
       await showPlan(baseOsmId, next, pageIndex);
@@ -222,7 +226,8 @@ export default function MergeBlock() {
       await showPlan(baseOsmId, result.overview, pageIndex);
       const skipped =
         result.skipped > 0
-          ? `; ${result.skipped.toLocaleString()} with alternatives need their own choice`
+          ? `; ${result.skipped.toLocaleString()} need their own choice (removals, or ` +
+            "proposals that exclude others)"
           : "";
       return `Updated ${result.changed.toLocaleString()} choices${skipped}`;
     });

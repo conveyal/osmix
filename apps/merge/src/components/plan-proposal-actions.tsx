@@ -37,7 +37,11 @@ export function PlanProposalActions({
   onDecide,
   proposal,
 }: {
-  onDecide: (proposalId: string, action: PlanDecision["action"] | null) => unknown;
+  onDecide: (
+    proposalId: string,
+    action: PlanDecision["action"] | null,
+    excludes: readonly string[],
+  ) => unknown;
   proposal: PlanProposal;
 }) {
   const taskLocked = useTaskLock();
@@ -57,6 +61,9 @@ export function PlanProposalActions({
           { value: "reject", label: "Leave out" },
         ];
   const alternatives = "alternatives" in proposal ? proposal.alternatives.length : 0;
+  const competitors = "competitors" in proposal ? proposal.competitors.length : 0;
+  const excludes =
+    "competitors" in proposal ? [...proposal.alternatives, ...proposal.competitors] : [];
   return (
     <div className="flex flex-col gap-1" data-proposal-id={proposal.id}>
       <div className="flex items-center gap-2">
@@ -79,6 +86,16 @@ export function PlanProposalActions({
           possible; include at most one.
         </p>
       ) : null}
+      {competitors > 0 && "target" in proposal ? (
+        <p className="text-muted-foreground">
+          {competitors.toLocaleString()} other imported {competitors === 1 ? "feature" : "features"}{" "}
+          can also{" "}
+          {proposal.kind === "connect"
+            ? `connect to base node ${proposal.target.id}`
+            : `change base way ${proposal.target.id}`}
+          ; include at most one. Including this one leaves the others out.
+        </p>
+      ) : null}
       {decidable ? (
         <fieldset className="flex flex-wrap gap-x-3" aria-label={`Choice: ${title}`}>
           {choices.map((option) => (
@@ -89,7 +106,11 @@ export function PlanProposalActions({
                 checked={choice === option.value}
                 disabled={taskLocked}
                 onChange={() =>
-                  void onDecide(proposal.id, option.value === "rule" ? null : option.value)
+                  void onDecide(
+                    proposal.id,
+                    option.value === "rule" ? null : option.value,
+                    excludes,
+                  )
                 }
               />
               {option.label}

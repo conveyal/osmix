@@ -18,7 +18,8 @@ import type {
   OsmConflationDiscovery,
 } from "../types.ts";
 import { entityToken, type PlanBuilder } from "./builder.ts";
-import type { MergePlan, MergePlanOptions, PlanProposal } from "./types.ts";
+import { findDecisionConflict } from "./decision-conflict.ts";
+import type { MatchingProposal, MergePlan, MergePlanOptions, PlanProposal } from "./types.ts";
 import { demoteDrivableConnections } from "./validate.ts";
 
 type MatchingKind = "connect" | "copy-tags" | "remove-way";
@@ -83,6 +84,7 @@ export function planMatching(
       target: { type, id: candidate.targetId },
       candidateId: candidate.id,
       alternatives: [],
+      competitors: [],
       status: assessment.status,
       reasons: [...assessment.reasons],
     });
@@ -109,6 +111,8 @@ export function planMatching(
     }
   }
   linkAlternatives(byCandidate);
+  const conflict = findDecisionConflict(builder.proposals, builder.decisionList());
+  if (conflict) throw conflict;
 
   const decisions = matchingDecisions(byCandidate);
   const outcome = applyPlannedConflation(changeset, base, planned, discovery, decisions);
@@ -169,6 +173,37 @@ function linkAlternatives(entries: readonly CandidateProposals[]) {
         if (!("alternatives" in proposal)) continue;
         proposal.alternatives = group.filter((other) => other !== proposal).map(({ id }) => id);
       }
+    }
+  }
+  linkCompetitors(entries);
+}
+
+/**
+ * Link proposals from different imported features that cannot all apply (MP-M5): one base
+ * node takes at most one connection, and one base way at most one feature's copy or removal.
+ * Several copies onto one base node can apply together, so they do not compete.
+ */
+function linkCompetitors(entries: readonly CandidateProposals[]) {
+  const byTarget = new Map<string, MatchingProposal[]>();
+  const add = (proposal: PlanProposal | undefined) => {
+    if (!proposal || !("competitors" in proposal)) return;
+    const { kind, target } = proposal;
+    // Copies onto one base node can all apply; everything else takes one feature.
+    if (kind === "copy-tags" && target.type === "node") return;
+    const slot = kind === "connect" ? `node:${target.id}` : `way:${target.id}`;
+    byTarget.set(slot, [...(byTarget.get(slot) ?? []), proposal]);
+  };
+  for (const { connect, copy, remove } of entries) {
+    add(connect);
+    add(copy);
+    add(remove);
+  }
+  const sourceKey = ({ source }: MatchingProposal) => `${source.type}:${source.id}`;
+  for (const group of byTarget.values()) {
+    for (const proposal of group) {
+      proposal.competitors = group
+        .filter((other) => sourceKey(other) !== sourceKey(proposal))
+        .map(({ id }) => id);
     }
   }
 }

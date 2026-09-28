@@ -118,10 +118,14 @@ function refresh(session: Session, overview: MergePlanOverview) {
 }
 
 const handlers = {
-  decide: (proposalId: string, action: PlanDecision["action"] | null) =>
+  decide: (
+    proposalId: string,
+    action: PlanDecision["action"] | null,
+    excludes: readonly string[],
+  ) =>
     store.mutate((session) => {
       session.calls.push(`decide:${proposalId}:${action ?? "clear"}`);
-      const decisions = withDecision(session.overview.decisions, proposalId, action);
+      const decisions = withDecision(session.overview.decisions, proposalId, action, excludes);
       refresh(session, session.worker.setMergePlanDecisions(session.baseId, decisions));
     }),
   bulk: (request: MergePlanBulkRequest) =>

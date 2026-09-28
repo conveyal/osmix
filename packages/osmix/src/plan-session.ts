@@ -71,7 +71,10 @@ export interface MergePlanBulkResult {
   overview: MergePlanOverview;
   /** Decisions this request added, replaced, or cleared. */
   changed: number;
-  /** Matching proposals left alone because they have alternatives to choose between. */
+  /**
+   * Proposals an accept left alone because they need their own choice: removals, and proposals
+   * with alternatives or competitors.
+   */
   skipped: number;
 }
 
@@ -226,7 +229,8 @@ export function planLayer(plan: MergePlan, patch: Osm): MergePlanLayer {
 
 /**
  * The decisions after a bulk request. Accepting applies only to proposals that need a
- * decision and have no alternatives; rejecting applies to every decidable proposal; clearing
+ * decision and exclude no others (no alternatives or competitors), never to a removal, which
+ * needs its own choice; rejecting applies to every decidable proposal; clearing
  * removes decisions. Proposals whose kind, status or reason differs from the filter's are
  * left alone.
  */
@@ -249,7 +253,13 @@ export function bulkDecisions(plan: MergePlan, request: MergePlanBulkRequest) {
       }
       if (request.action === "accept") {
         if (proposal.status !== "review") continue;
-        if ("alternatives" in proposal && proposal.alternatives.length > 0) {
+        // Removal needs its own consent (MP-R1); a proposal that excludes others needs a choice
+        // between them (MP-M5).
+        if (
+          proposal.kind === "remove-way" ||
+          ("competitors" in proposal &&
+            (proposal.alternatives.length > 0 || proposal.competitors.length > 0))
+        ) {
           skipped++;
           continue;
         }

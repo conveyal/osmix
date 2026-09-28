@@ -15,6 +15,7 @@ import {
   type PlanProposal,
   setMergePlanDecisions,
   toPbfBuffer,
+  MergePlanDecisionConflictError,
 } from "../src/index";
 import { withMatchingDecisions } from "./plan-decisions.ts";
 
@@ -383,11 +384,57 @@ describe("explicit way removal through the facade and worker", () => {
     expect(result.nodes.getById(2)?.tags?.["name"]).toBe("Branch connection");
   });
 
-  // BUG (plan decisions are not atomic): when `setMergePlanDecisions` throws for a decision set
-  // the matching rules reject, the live plan is left half-updated: `plan.options.decisions`
-  // already holds the rejected set and the proposals show it as applied, while the outcome and
-  // removal assessment are from before. The worker keeps that plan as its session.
-  it.skip("keeps the plan unchanged when a later aggregate mapping check rejects a decision set", () => {
+  it("links connections that compete for one base node, and bulk include skips them", () => {
+    const { base, patch } = inputs({ branch: true, extraContender: true });
+    const worker = workerFor(base, patch, {
+      ...removalOptions,
+      attachNetwork: true,
+      automatic: "none",
+    });
+    const connects = worker
+      .getMergePlanPage(base.id, 0, 100)
+      .features.flatMap(({ proposals }) => proposals)
+      .flatMap((proposal) =>
+        proposal.kind === "connect" && proposal.target.id === 1 ? [proposal] : [],
+      );
+    expect(connects.map((proposal) => [proposal.id, proposal.competitors])).toEqual([
+      ["connect:n101>n1", ["connect:n201>n1"]],
+      ["connect:n201>n1", ["connect:n101>n1"]],
+    ]);
+
+    // Include all shown leaves competing connections for their own choice (MP-M5) instead of
+    // including a set that planning must refuse.
+    const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
+    const included = result.overview.decisions
+      .filter(({ action }) => action === "accept")
+      .map(({ proposalId }) => proposalId);
+    expect(included).not.toContain("connect:n101>n1");
+    expect(included).not.toContain("connect:n201>n1");
+    expect(result.skipped).toBe(2);
+  });
+
+  it("refuses to plan with two competing connections included, naming both", () => {
+    const { base, patch } = inputs({ branch: true, extraContender: true });
+    const decisions: PlanDecision[] = [
+      { proposalId: "connect:n101>n1", action: "accept" },
+      { proposalId: "connect:n201>n1", action: "accept" },
+    ];
+    const matching = { ...removalOptions, attachNetwork: true, automatic: "none" as const };
+    expect(() => planMerge(base, patch, { ...direct, matching, decisions })).toThrow(
+      MergePlanDecisionConflictError,
+    );
+  });
+
+  it("never includes a removal in bulk (MP-R1)", () => {
+    const { base, patch } = inputs();
+    const worker = workerFor(base, patch);
+    expect(wayCandidate(worker, base.id).wayRemoval?.status).toBe("review");
+    const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
+    expect(result.overview.decisions).not.toContainEqual(acceptRemoval);
+    expect(result.skipped).toBe(1);
+  });
+
+  it("keeps the plan unchanged when two included connections compete for one base node", () => {
     const { base, patch } = inputs({ branch: true, extraContender: true });
     const worker = workerFor(base, patch, {
       ...removalOptions,
@@ -403,7 +450,9 @@ describe("explicit way removal through the facade and worker", () => {
         { proposalId: "connect:n101>n1", action: "accept" },
         { proposalId: "connect:n201>n1", action: "accept" },
       ]),
-    ).toThrow(/multiple node attachments/);
+    ).toThrow(
+      /^Imported node 101 \(on imported way 20\) and imported node 201 \(on imported way 40\) would both connect to base node 1,/,
+    );
     expect(worker.getMergePlanOverview(base.id)).toEqual(overview);
     expect(worker.getMergePlanPage(base.id, 0, 100)).toEqual(page);
     expect(worker.getMergePlanOsc(base.id)).toBe(osc);

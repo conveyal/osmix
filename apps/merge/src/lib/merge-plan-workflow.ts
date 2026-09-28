@@ -133,14 +133,24 @@ export function isDecidable(proposal: PlanProposal) {
   return proposal.kind !== "add" && proposal.kind !== "same-id-replace";
 }
 
-/** The decisions with `proposalId` set to `action`, or cleared when `action` is null. */
+/**
+ * The decisions with `proposalId` set to `action`, or cleared when `action` is null. Accepting
+ * also leaves out `excludes`: the proposal's alternatives and competitors.
+ */
 export function withDecision(
   decisions: readonly PlanDecision[],
   proposalId: string,
   action: PlanDecision["action"] | null,
+  excludes: readonly string[] = [],
 ): PlanDecision[] {
-  const rest = decisions.filter((decision) => decision.proposalId !== proposalId);
-  return action ? [...rest, { proposalId, action }] : rest;
+  // Including a proposal leaves out the ones it excludes (its alternatives and competitors),
+  // so the decisions never include two that cannot both apply (MP-M5).
+  const leaveOut = action === "accept" ? new Set(excludes) : new Set<string>();
+  const rest = decisions.filter(
+    (decision) => decision.proposalId !== proposalId && !leaveOut.has(decision.proposalId),
+  );
+  const leftOut = [...leaveOut].map((id) => ({ proposalId: id, action: "reject" as const }));
+  return action ? [...rest, ...leftOut, { proposalId, action }] : rest;
 }
 
 /** A feature's heading: its name, or its type and patch ID. */

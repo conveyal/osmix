@@ -268,7 +268,8 @@ describe("one selected target per imported feature", () => {
       { proposalId: "connect:n301>n1", action: "accept" },
     ];
     expect(() => planMerge(base, patch, matchingOptions(options, decisions), quiet)).toThrow(
-      "multiple node attachments to 1",
+      "would both connect to base node 1, which takes one connection. Include at most one: " +
+        "connect:n101>n1 or connect:n301>n1.",
     );
   });
 
@@ -294,7 +295,7 @@ describe("one selected target per imported feature", () => {
       { proposalId: "copy:w21>w10", action: "accept" },
     ];
     expect(() => planMerge(base, patch, matchingOptions(options, decisions), quiet)).toThrow(
-      "multiple ways for target 10",
+      "Imported way 20 and imported way 21 would both change base way 10",
     );
   });
 });

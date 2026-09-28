@@ -108,6 +108,7 @@ test("the reviewed workflow removes the accepted duplicate footway", async ({ pa
   await openMonacoMerge(page, { removal: true });
   await page.getByRole("button", { name: "Review plan" }).click();
   await expect(page.getByRole("region", { name: "Plan summary" })).toBeVisible();
+
   // The plan layer's key sits in the map legend, not the sidebar.
   await expect(
     page.getByRole("group", { name: "Loaded data" }).getByLabel("Plan map legend"),
@@ -134,6 +135,18 @@ test("the reviewed workflow removes the accepted duplicate footway", async ({ pa
   await expect(r1).toContainText("Removed");
   await r1.getByRole("button", { name: "Show on map and evidence" }).click();
   await expect(r1.getByRole("button", { name: "Showing on map" })).toBeVisible();
+
+  // Include all shown leaves choices that exclude each other alone: M7's two imported points
+  // can both connect to one base node, so each needs its own choice (MP-M5).
+  await page.getByLabel("Proposal", { exact: true }).selectOption({ label: "Connect network" });
+  await page.getByRole("button", { name: "Include all shown" }).click();
+  await expect(page.getByText(/^Updated \d+ choices; \d+ need their own choice/)).toBeVisible();
+  await expect(page.getByText("Choose for shown features failed")).toHaveCount(0);
+  await expect(
+    page.getByText(
+      /1 other imported feature can also connect to base node \d+; include at most one/,
+    ),
+  ).toHaveCount(2);
 
   // The plan downloads as osmChange without applying anything.
   const oscDownload = page.waitForEvent("download");

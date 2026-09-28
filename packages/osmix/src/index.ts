@@ -81,6 +81,7 @@ export {
   generateOscChanges,
   getMergePlanCandidate,
   merge,
+  MergePlanDecisionConflictError,
   OsmChangeset,
   camelCaseToSentenceCase,
   changeStatsSummary,

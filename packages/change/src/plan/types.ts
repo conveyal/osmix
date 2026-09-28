@@ -122,6 +122,12 @@ interface MatchingProposalBase extends PlanProposalBase {
   candidateId: string;
   /** Proposals of the same kind for the same source: accept at most one. */
   alternatives: string[];
+  /**
+   * Other imported features' proposals that cannot apply together with this one: connections
+   * to the same base node, or copies and removals against the same base way (MP-M5). Accept
+   * at most one of this proposal and its competitors.
+   */
+  competitors: string[];
 }
 
 /** A nearby imported point becomes a base point in the network (MP-M3). */
@@ -147,6 +153,9 @@ export interface CrossingProposal extends PlanProposalBase {
   ways: [EntityKey, EntityKey];
   point: [number, number];
 }
+
+/** A matching action: connect, copy tags or remove a way. */
+export type MatchingProposal = ConnectProposal | CopyTagsProposal | RemoveWayProposal;
 
 export type PlanProposal =
   | CrossingProposal

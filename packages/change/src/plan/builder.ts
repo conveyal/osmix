@@ -129,6 +129,11 @@ export class PlanBuilder {
     }
   }
 
+  /** The current decisions, as a list. */
+  decisionList(): PlanDecision[] {
+    return [...this.decisions].map(([proposalId, action]) => ({ proposalId, action }));
+  }
+
   /** A decision on a proposal the plan has not made yet. */
   decisionFor(proposalId: string) {
     return this.decisions.get(proposalId);

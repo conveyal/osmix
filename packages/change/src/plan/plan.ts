@@ -23,6 +23,7 @@ import {
   type PlanPhase,
   PROPOSAL_PHASE,
 } from "./builder.ts";
+import { findDecisionConflict } from "./decision-conflict.ts";
 import { planMatching } from "./matching.ts";
 import { type PatchIdRemap, planPatchIdRemap, remappedCount, remapPatch } from "./remap.ts";
 import type {
@@ -127,11 +128,16 @@ export function planMerge(
 /**
  * Replace a plan's decisions and replan in place. Only the phases a changed decision can
  * affect run again, from the earliest; the result is the plan `planMerge` would make with
- * these decisions.
+ * these decisions. A decision set that cannot apply throws and leaves the plan as it was:
+ * `MergePlanDecisionConflictError` for two included proposals that exclude each other,
+ * or the planner's own error, after replanning with the previous decisions.
  */
 export function setMergePlanDecisions(plan: MergePlan, decisions: readonly PlanDecision[]) {
+  const conflict = findDecisionConflict(plan.proposals, decisions);
+  if (conflict) throw conflict;
   const state = planState(plan);
-  const before = new Map(plan.options.decisions?.map((d) => [d.proposalId, d.action]));
+  const previous = plan.options.decisions ?? [];
+  const before = new Map(previous.map((d) => [d.proposalId, d.action]));
   const after = new Map(decisions.map((d) => [d.proposalId, d.action]));
   let from: PlanPhase | undefined;
   for (const id of new Set([...before.keys(), ...after.keys()])) {
@@ -144,16 +150,25 @@ export function setMergePlanDecisions(plan: MergePlan, decisions: readonly PlanD
     if (phase === "direct") continue;
     if (!from || PLAN_PHASES.indexOf(phase) < PLAN_PHASES.indexOf(from)) from = phase;
   }
-  plan.options = { ...plan.options, decisions: [...decisions] };
-  state.options = plan.options;
-  state.builder.setDecisions(decisions);
-  if (!from) {
-    finishPlan(plan, state);
-    return plan;
+  const replan = (next: readonly PlanDecision[]) => {
+    plan.options = { ...plan.options, decisions: [...next] };
+    state.options = plan.options;
+    state.builder.setDecisions(next);
+    if (!from) {
+      finishPlan(plan, state);
+      return;
+    }
+    state.builder.dropFrom(from);
+    state.changeset.restore(state.checkpoints.get(from)!);
+    runPhases(plan, state, from);
+  };
+  try {
+    replan(decisions);
+  } catch (error) {
+    // Replanning from the same phase with the previous decisions rebuilds the previous plan.
+    replan(previous);
+    throw error;
   }
-  state.builder.dropFrom(from);
-  state.changeset.restore(state.checkpoints.get(from)!);
-  runPhases(plan, state, from);
   return plan;
 }
 

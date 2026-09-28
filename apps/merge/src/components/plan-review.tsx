@@ -49,7 +49,11 @@ export function PlanReview({
   detail: MergePlanFeatureDetail | null;
   filter: MergePlanFilter;
   onBulk: (request: MergePlanBulkRequest) => unknown;
-  onDecide: (proposalId: string, action: PlanDecision["action"] | null) => unknown;
+  onDecide: (
+    proposalId: string,
+    action: PlanDecision["action"] | null,
+    excludes: readonly string[],
+  ) => unknown;
   onFilterChange: (filter: MergePlanFilter) => unknown;
   onPageChange: (page: number) => unknown;
   onSelect: (featureKey: string) => unknown;
@@ -136,7 +140,8 @@ export function PlanReview({
         </div>
         <p className="text-muted-foreground">
           Choices apply to the {shown} features shown. Include applies to proposals that need
-          review; a proposal with alternatives needs its own choice. Blocked proposals never change.
+          review; removals and proposals that exclude others need their own choice. Blocked
+          proposals never change.
         </p>
         {page.features.length === 0 ? (
           <EmptyState>No imported features match these filters</EmptyState>

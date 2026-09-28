@@ -44,6 +44,23 @@ describe("merge plan workflow", () => {
     expect(withDecision(decisions, "connect:n-2>n2", null)).toEqual([decisions[0]]);
   });
 
+  it("leaves out a proposal's alternatives and competitors when including it", () => {
+    const a = "connect:n-1001601>n5596424436";
+    const b = "connect:n-1001602>n5596424436";
+    const included = [{ proposalId: b, action: "accept" as const }];
+    // Including one competing connection replaces the other's inclusion with "leave out".
+    expect(withDecision(included, a, "accept", [b])).toEqual([
+      { proposalId: b, action: "reject" },
+      { proposalId: a, action: "accept" },
+    ]);
+    // Leaving one out, or clearing it, touches nothing else.
+    expect(withDecision(included, a, "reject", [b])).toEqual([
+      ...included,
+      { proposalId: a, action: "reject" },
+    ]);
+    expect(withDecision(included, a, null, [b])).toEqual(included);
+  });
+
   it("names every outcome and filterable proposal kind", () => {
     for (const outcome of OUTCOMES) {
       expect(OUTCOME_LABEL[outcome]).toBeTruthy();

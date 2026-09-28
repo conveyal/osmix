@@ -112,11 +112,7 @@ describe("alternative target review", () => {
     );
   });
 
-  // BUG (plan decisions are not atomic): `setMergePlanDecisions` in packages/change/src/plan
-  // stores the new decisions on the live plan before the matching rules reject them, so a
-  // refused decision set leaves the worker's plan half-updated (its decisions list the refused
-  // set; its proposals and OSC no longer match the last valid decisions).
-  it.skip("rejects a conflicting update before changing the plan", () => {
+  it("rejects a conflicting update before changing the plan", () => {
     const { worker, base } = setup();
     worker.setMergePlanDecisions(base.id, [first, unrelated]);
     const before = planState(worker, base.id);
@@ -161,7 +157,7 @@ describe("alternative target review", () => {
     try {
       await expect(
         remote.setMergePlanDecisions(base.id, [first, second, unrelated]),
-      ).rejects.toThrow(/node 101: node:101->1, node:101->2/i);
+      ).rejects.toThrow(/copy:n101>n1 and copy:n101>n2 are included, but imported node 101/);
     } finally {
       port1.close();
       port2.close();
