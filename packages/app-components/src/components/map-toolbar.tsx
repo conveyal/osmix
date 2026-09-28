@@ -1,4 +1,10 @@
-import { type BasemapStyleId, basemapPresetAtom, mapModeAtom } from "@osmix/app-core";
+import {
+  type BasemapStyleId,
+  basemapPresetAtom,
+  mapCenterAtom,
+  mapModeAtom,
+  zoomAtom,
+} from "@osmix/app-core";
 import {
   IconButton,
   Menu,
@@ -51,9 +57,38 @@ export function unionBboxes(bboxes: Iterable<GeoBbox2D | null | undefined>): Geo
   return union;
 }
 
+/** The map center as "lon, lat" to four decimals (about 10 m), selectable for copying. */
+function MapCenterReadout() {
+  const center = useAtomValue(mapCenterAtom);
+  return (
+    <span
+      data-slot="map-center"
+      title="Map center (longitude, latitude)"
+      className="px-2 font-mono whitespace-nowrap tabular-nums select-all"
+    >
+      {center ? `${center.lng.toFixed(4)}, ${center.lat.toFixed(4)}` : "--, --"}
+    </span>
+  );
+}
+
+/** The zoom level to two decimals, between the zoom buttons. */
+function MapZoomReadout() {
+  const zoom = useAtomValue(zoomAtom);
+  return (
+    <span
+      data-slot="map-zoom"
+      title="Zoom level"
+      className="font-mono whitespace-nowrap tabular-nums"
+    >
+      z{zoom === null ? "--" : zoom.toFixed(2)}
+    </span>
+  );
+}
+
 /**
- * The map tools, in the nav (`OsmixMap` portals them into its map-tools slot): zoom, fit to all
- * loaded data, then the search popover, the basemap menu and, with `routing`, the routing tool.
+ * The map tools, in the nav (`OsmixMap` portals them into its map-tools slot): the map center,
+ * zoom out, the zoom level, zoom in, fit to all loaded data, then the search popover, the
+ * basemap menu and, with `routing`, the routing tool.
  * The toolbar registers the routing tool with the overlay's Esc stack while it is active.
  */
 export function MapToolbar({
@@ -86,15 +121,18 @@ export function MapToolbar({
       aria-label="Map tools"
       className="flex h-full items-center gap-1"
     >
-      <IconButton
-        label="Zoom in"
-        icon={<PlusIcon aria-hidden="true" />}
-        onClick={() => map?.zoomIn()}
-      />
+      <MapCenterReadout />
+      <NavSeparator />
       <IconButton
         label="Zoom out"
         icon={<MinusIcon aria-hidden="true" />}
         onClick={() => map?.zoomOut()}
+      />
+      <MapZoomReadout />
+      <IconButton
+        label="Zoom in"
+        icon={<PlusIcon aria-hidden="true" />}
+        onClick={() => map?.zoomIn()}
       />
       <IconButton
         label="Fit map to all data"
