@@ -3,13 +3,24 @@ import { atomFamily } from "jotai-family";
 import type { Osm, OsmInfo, OsmLoadProfile } from "osmix";
 import type { OsmEntity } from "osmix";
 
+import { nameDataset } from "../lib/dataset-names.ts";
 import type { OsmLoadFailure } from "../lib/osm-load-failure.ts";
 import type { StoredFileInfo } from "../workers/osmix-app.worker.ts";
 
 export const osmInfoAtomFamily = atomFamily((_id: string) => atom<OsmInfo | null>(null));
 export const osmAtomFamily = atomFamily((_id: string) => atom<Osm | null>(null));
 export const osmFileAtomFamily = atomFamily((_id: string) => atom<File | null>(null));
-export const osmFileInfoAtomFamily = atomFamily((_id: string) => atom<StoredFileInfo | null>(null));
+/** A slot's file metadata. Setting it names the dataset in the Activity log (`nameDataset`). */
+export const osmFileInfoAtomFamily = atomFamily((_id: string) => {
+  const fileInfo = atom<StoredFileInfo | null>(null);
+  return atom(
+    (get) => get(fileInfo),
+    (_get, set, next: StoredFileInfo | null) => {
+      if (next) nameDataset(next.fileHash, next.fileName);
+      set(fileInfo, next);
+    },
+  );
+});
 export const osmStoredAtomFamily = atomFamily((_id: string) => atom<boolean>(false));
 /** Merge explicitly opts into automatic memory-aware PBF loading. */
 export const osmLoadProfileAtomFamily = atomFamily((_id: string) => atom<OsmLoadProfile>("auto"));

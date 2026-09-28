@@ -4,8 +4,11 @@
  * `TaskAlreadyRunningError`. Worker progress attaches to the innermost running node.
  *
  * This is an external store (not jotai) because worker callbacks and hooks outside React write to
- * it. Read it in components with `useTasks()`.
+ * it. Read it in components with `useTasks()`. Dataset IDs in recorded text become dataset names
+ * (`withDatasetNames`).
  */
+
+import { withDatasetNames } from "../lib/dataset-names.ts";
 
 export type TaskLevel = "info" | "warn" | "error";
 
@@ -280,20 +283,24 @@ export function createTaskStore({ now = () => Date.now() }: { now?: () => number
           throw error;
         }
       },
-      message(message, level = "info") {
+      message(text, level = "info") {
+        const message = withDatasetNames(text);
         const entry: TaskMessage = { kind: "message", id: makeId(), level, message, at: now() };
         updateNode(id, (node) => ({ ...node, children: [...node.children, entry] }));
         logToConsole(message, level);
       },
       detail(text) {
-        updateNode(id, (node) => ({ ...node, detail: text }));
+        updateNode(id, (node) => ({ ...node, detail: withDatasetNames(text) }));
       },
       end(summary) {
         finish(id, "done", summary === undefined ? {} : { summary });
       },
       fail(error, summary) {
         const taskError = toTaskError(error);
-        finish(id, "error", { summary: summary ?? taskError.message, error: taskError });
+        finish(id, "error", {
+          summary: withDatasetNames(summary ?? taskError.message),
+          error: taskError,
+        });
       },
       cancelled(summary) {
         finish(id, "cancelled", { summary: summary ?? "Cancelled" });
