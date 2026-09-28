@@ -2,7 +2,7 @@
 
 A Vite + React app for viewing a single OpenStreetMap PBF dataset in the browser: load a file or URL, browse stored datasets, search and select entities on the map, find and fix duplicate nodes and ways, and route between two points.
 
-Duplicate fixes are the step before merging: scan the dataset, review the candidates on the map, apply them, and download the cleaned PBF to open in Merge. Applying replaces the dataset open in the tab; the original file and any stored copy are unchanged. The rules are in [MP-I5](../../docs/merge-process.md#mp-i5).
+Duplicate fixes are the step before merging: scan the dataset, review the candidates on the map, apply them, and export the cleaned PBF to open in Merge. Applying replaces the dataset open in the tab; the original file and any stored copy are unchanged. The rules are in [MP-I5](../../docs/merge-process.md#mp-i5).
 
 It is the first consumer of the shared app packages besides the merge app:
 

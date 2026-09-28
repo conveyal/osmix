@@ -69,7 +69,7 @@ export function MergeResult({
               icon={<DownloadIcon />}
               onAction={() => base.downloadOsm(undefined, { renumberNegativeIds: positiveIds })}
             >
-              Download merged OSM PBF
+              Export merged PBF
             </ActionButton>
             <ActionButton icon={<ArrowLeftIcon />} variant="outline" onAction={onStartNew}>
               Start a new merge

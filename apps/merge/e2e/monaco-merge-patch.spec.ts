@@ -64,7 +64,7 @@ test("the automatic workflow merges the Monaco scenario patch", async ({ page })
   await expect(summary).toBeVisible({ timeout: 120_000 });
 
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download merged OSM PBF" }).click();
+  await page.getByRole("button", { name: "Export merged PBF" }).click();
   const path = await (await download).path();
   if (!path) throw Error("Missing merged PBF download");
   const merged = await fromPbf(await readFile(path), { id: "monaco-merged" });
@@ -87,14 +87,14 @@ test("the automatic workflow merges the Monaco scenario patch", async ({ page })
   // With positive IDs, the download has no negative IDs and the report maps each new one.
   await page.getByRole("checkbox", { name: "Give new features positive IDs" }).check();
   const positiveDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download merged OSM PBF" }).click();
+  await page.getByRole("button", { name: "Export merged PBF" }).click();
   const positivePath = await (await positiveDownload).path();
   if (!positivePath) throw Error("Missing positive-ID PBF download");
   const positive = await fromPbf(await readFile(positivePath), { id: "monaco-positive" });
   const ids = [...positive.nodes, ...positive.ways, ...positive.relations].map((e) => e.id);
   expect(ids.every((id) => id > 0)).toBe(true);
   const reportDownload = page.waitForEvent("download");
-  await summary.getByRole("button", { name: "Download merge report" }).click();
+  await summary.getByRole("button", { name: "Export merge report (JSON)" }).click();
   const reportPath = await (await reportDownload).path();
   if (!reportPath) throw Error("Missing merge report download");
   const report = JSON.parse(await readFile(reportPath, "utf8")) as {
@@ -137,7 +137,7 @@ test("the reviewed workflow removes the accepted duplicate footway", async ({ pa
 
   // The plan downloads as osmChange without applying anything.
   const oscDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download osmChange (.osc)" }).click();
+  await page.getByRole("button", { name: "Export osmChange (.osc)" }).click();
   const oscPath = await (await oscDownload).path();
   if (!oscPath) throw Error("Missing osmChange download");
   const osc = await readFile(oscPath, "utf8");

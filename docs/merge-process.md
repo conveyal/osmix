@@ -47,7 +47,7 @@ A **base** is the existing dataset. A **patch** contains additions and updates. 
 **MP-I4 — Source files and loaded state are different.** `planMerge()`, `applyPlan()` and `merge()` return results without modifying either input object. Worker/remote `applyMergePlan()` and `merge()` install the result in place of the loaded base and remove the loaded patch. None of these operations overwrites the original source files. Download explicitly writes an output file.
 
 <a id="mp-i5"></a>
-**MP-I5 — Remove duplicates inside each input before merging.** Merge does not scan or fix duplicates inside one file. Open each input in the Inspect app first. Its scan (`planWithinDatasetDeduplication`) finds nodes at the same seven-decimal coordinate and ways with identical ordered references, using the same compatibility checks as exact reconciliation. Applying the scan deletes each duplicate in favor of the compatible entity with the highest ID and rewrites way references and relation members to that survivor. Download the cleaned PBF and load it in Merge. Duplicates left inside the patch are passed to direct merge unchanged.
+**MP-I5 — Remove duplicates inside each input before merging.** Merge does not scan or fix duplicates inside one file. Open each input in the Inspect app first. Its scan (`planWithinDatasetDeduplication`) finds nodes at the same seven-decimal coordinate and ways with identical ordered references, using the same compatibility checks as exact reconciliation. Applying the scan deletes each duplicate in favor of the compatible entity with the highest ID and rewrites way references and relation members to that survivor. Export the cleaned PBF and load it in Merge. Duplicates left inside the patch are passed to direct merge unchanged.
 
 ### Example MP-E2: new IDs never collide; positive IDs edit whole entities
 
@@ -407,7 +407,7 @@ Both entry points plan the same merge from the same settings; they differ only i
 1. Remove duplicates inside each input in Inspect ([MP-I5](#mp-i5)), load both inputs in Full mode, and inspect their roles and identity assumptions.
 2. Configure optional matching, whether identical points merge automatically, and whether every patch feature is new.
 3. **Apply automatically** plans and applies in one task (Plan merge, Apply plan, Refresh result). Proposals waiting for a decision are left out and reported.
-4. **Review plan** plans and stops. The review lists one row per imported feature, decisions first, with its outcome, proposals, reasons and evidence; the map colours each feature by outcome. Include or leave out proposals, or choose for every feature a filter matches; each choice replans. **Download osmChange (.osc)** writes the plan without applying it.
+4. **Review plan** plans and stops. The review lists one row per imported feature, decisions first, with its outcome, proposals, reasons and evidence; the map colours each feature by outcome. Include or leave out proposals, or choose for every feature a filter matches; each choice replans. **Export osmChange (.osc)** writes the plan without applying it.
 5. **Apply plan** builds the result once and validates it. A plan with routing-integrity problems cannot be applied.
 6. Refresh the merged dataset and read the completion summary before downloading.
 

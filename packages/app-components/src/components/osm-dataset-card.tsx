@@ -16,7 +16,7 @@ import OsmInfoTable from "./osm-info-table.tsx";
 /**
  * The sidebar card for a loaded dataset: its file name, the "File info" table, and the dataset
  * actions: "Save {name} to storage" (only while the dataset can be stored and is not yet),
- * "Download {name}" and "Clear {name}" (only with `onClear`).
+ * "Export {name} as PBF" and "Clear {name}" (only with `onClear`).
  * `name` is the lowercase noun the labels use ("dataset", "extract result", "merged OSM").
  * `actions` turns an action off when the step already offers it. `primaryAction` sits above
  * the table, `children` below it. Fitting the map is the legend's and the toolbar's job.
@@ -62,7 +62,7 @@ export function OsmDatasetCard({
               {showDownload ? (
                 <ActionButton
                   variant="ghost"
-                  label={`Download ${name}`}
+                  label={`Export ${name} as PBF`}
                   icon={<DownloadIcon aria-hidden="true" />}
                   onAction={osmFile.downloadOsm}
                 />

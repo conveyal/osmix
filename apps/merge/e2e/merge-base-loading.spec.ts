@@ -55,7 +55,7 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
 
   await loadPbf(baseCard, page, MONACO_PBF);
   await expect(baseCard.locator('[data-slot="card-description"]')).toHaveText("monaco.pbf");
-  await expect(baseCard.getByRole("button", { name: "Download base OSM" })).toBeVisible();
+  await expect(baseCard.getByRole("button", { name: "Export base OSM as PBF" })).toBeVisible();
   await expect(baseCard.getByRole("button", { name: "Clear base OSM file" })).toBeVisible();
   const fileInfo = baseCard.getByRole("button", { name: "File info" });
   await fileInfo.click();
@@ -68,7 +68,7 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   // covers distinct displayed filenames without depending on local-only files.
   await loadPbf(patchCard, page, MONACO_PBF);
   await expect(patchCard.locator('[data-slot="card-description"]')).toHaveText("monaco.pbf");
-  await expect(patchCard.getByRole("button", { name: "Download patch OSM" })).toBeVisible();
+  await expect(patchCard.getByRole("button", { name: "Export patch OSM as PBF" })).toBeVisible();
   await expect(patchCard.getByRole("button", { name: "Clear patch OSM file" })).toBeVisible();
   await expect(patchCard.getByRole("button", { name: "Save to storage" })).toHaveCount(0);
   await patchCard.getByRole("button", { name: "File info" }).click();
@@ -88,7 +88,7 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   // The same file as base and patch: every positive ID names a base entity.
   await expect(page.getByText(/patch entities replace base entities/)).toBeVisible();
   const actions = page.getByRole("group", { name: "Plan review actions" });
-  await expect(actions.getByRole("button", { name: "Download osmChange (.osc)" })).toBeVisible();
+  await expect(actions.getByRole("button", { name: "Export osmChange (.osc)" })).toBeVisible();
   await expect(actions.getByRole("button", { name: "Apply plan" })).toBeEnabled();
   await actions.getByRole("button", { name: "Back to inputs" }).click();
   await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeVisible();
@@ -160,7 +160,7 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   await start.click();
   const summary = page.getByLabel("Merge completion summary");
   await expect(summary).toBeVisible();
-  await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export merged PBF" })).toBeVisible();
   await expect(summary.getByLabel("Applied matching actions").locator("dd")).toHaveText([
     "1",
     "1",
@@ -171,7 +171,7 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   await expect(summary.getByLabel("Imported features by outcome")).toContainText("Merged");
   await expect(summary).toContainText("completion-base.pbf + completion-patch.pbf");
   const downloadPromise = page.waitForEvent("download");
-  await summary.getByRole("button", { name: "Download merge report" }).click();
+  await summary.getByRole("button", { name: "Export merge report (JSON)" }).click();
   const reportFile = await (await downloadPromise).path();
   if (!reportFile) throw Error("Missing automatic merge report download");
   expect(JSON.parse(await readFile(reportFile, "utf8"))).toMatchObject({
@@ -189,7 +189,7 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   });
   // Automated Chromium cannot use the native save picker, so this covers the Blob download path.
   const pbfDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download merged OSM PBF" }).click();
+  await page.getByRole("button", { name: "Export merged PBF" }).click();
   const mergedPbf = await pbfDownload;
   expect(mergedPbf.suggestedFilename()).toMatch(/\.pbf$/);
   const mergedPbfPath = await mergedPbf.path();
@@ -238,7 +238,7 @@ test("a removal chosen in the review is applied and reported", async ({ page }) 
     completion.getByRole("region", { name: "Applied way removals", exact: true }),
   ).toContainText("Removed imported ways: 1");
   const download = page.waitForEvent("download");
-  await completion.getByRole("button", { name: "Download merge report" }).click();
+  await completion.getByRole("button", { name: "Export merge report (JSON)" }).click();
   const reportPath = await (await download).path();
   if (!reportPath) throw Error("Missing removal report download");
   expect(JSON.parse(await readFile(reportPath, "utf8"))).toMatchObject({
@@ -294,11 +294,11 @@ test("a late cancellation preserves the committed exact result and replacing the
   );
   await expect(summary).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Apply automatically" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Export merged PBF" })).toHaveCount(0);
   await page.getByRole("button", { name: "Refresh merged dataset" }).click();
   await expect(summary).toBeVisible();
   await expect(summary).toContainText("Imported-data matching was not enabled");
-  await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export merged PBF" })).toBeVisible();
 
   // Clearing the base from the "Merged OSM" card only empties the slot; nothing is promoted
   // into it. "Use as base" on the patch card is the explicit move, and it is disabled while a
@@ -309,5 +309,5 @@ test("a late cancellation preserves the committed exact result and replacing the
   await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeVisible();
   await expect(summary).toHaveCount(0);
   await expect(baseCard.getByRole("button", { name: "File info" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Download merged OSM PBF" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Export merged PBF" })).toHaveCount(0);
 });

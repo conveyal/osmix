@@ -4,7 +4,7 @@ A Vite + React app for cutting a bounding-box extract out of an OpenStreetMap PB
 
 Production: [extract.osmix.dev](https://extract.osmix.dev). Dev runs on `extract.osmix.localhost` through Portless. The app is built on the shared packages ([`@osmix/ui`](../../packages/ui), [`@osmix/app-core`](../../packages/app-core), [`@osmix/app-components`](../../packages/app-components)); `src/extract-panel.tsx` is the form, `src/app.tsx` composes it with `OsmixMap` (toolbar, map search, inspector, legend) and the extract's own layers: the bbox rectangle with draggable corners, and a long-dashed outline of the selected file's header bounds so a bbox that misses the file is visibly outside it.
 
-Each app runs on its own origin, so an extract is not shared with [Merge](../merge/README.md) automatically. Download it and open it there.
+Each app runs on its own origin, so an extract is not shared with [Merge](../merge/README.md) automatically. Export it and open it there.
 
 ## Run
 

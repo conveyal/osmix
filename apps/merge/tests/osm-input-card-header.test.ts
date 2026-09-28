@@ -43,7 +43,7 @@ describe("OsmInputCardHeader", () => {
 
   it("keeps the download and clear actions", () => {
     const html = render({ onUseAsBase: noop });
-    expect(html).toContain('aria-label="Download patch OSM"');
+    expect(html).toContain('aria-label="Export patch OSM as PBF"');
     expect(html).toContain('aria-label="Clear patch OSM file"');
   });
 });

@@ -522,7 +522,7 @@ export default function MergeBlock() {
     review:
       "Nothing has changed yet. Each imported feature shows what the plan does with it; choose where a proposal needs you, then apply.",
     automatic: "Planning and applying in one run. Progress and details are in Activity.",
-    result: "The merge is applied. Download the result, or start a new merge.",
+    result: "The merge is applied. Export the result, or start a new merge.",
   }[step];
 
   return (
@@ -604,7 +604,7 @@ export default function MergeBlock() {
               Back to inputs
             </ActionButton>
             <ActionButton icon={<DownloadIcon />} variant="outline" onAction={downloadOsc}>
-              Download osmChange (.osc)
+              Export osmChange (.osc)
             </ActionButton>
             <ActionButton
               icon={<MergeIcon />}

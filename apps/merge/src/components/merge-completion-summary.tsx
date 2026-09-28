@@ -246,7 +246,7 @@ export function MergeCompletionSummary({
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       setDownloadError(
-        `The report could not be saved. ${error instanceof Error ? error.message : "Try downloading it again."}`,
+        `The report could not be saved. ${error instanceof Error ? error.message : "Try exporting it again."}`,
       );
     }
   };
@@ -358,7 +358,7 @@ export function MergeCompletionSummary({
         ) : null}
         <div className="flex flex-col gap-2 border-t p-inset">
           <ActionButton icon={<DownloadIcon />} variant="outline" onAction={downloadReport}>
-            Download merge report
+            Export merge report (JSON)
           </ActionButton>
           {downloadError ? <Alert variant="destructive">{downloadError}</Alert> : null}
           <p className="wrap-break-word text-muted-foreground">

@@ -155,7 +155,7 @@ describe("task store", () => {
 
   it("only cancels tasks that were given a controller", () => {
     const { store } = makeStore();
-    const task = store.start("Download monaco.pbf");
+    const task = store.start("Export monaco.pbf");
     expect(store.getSnapshot().current?.cancellable).toBe(false);
     expect(() => store.cancel(task.id)).toThrow(/cannot be cancelled/);
     task.end();

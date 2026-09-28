@@ -29,7 +29,7 @@ test("extracts a bounding box from a PBF and offers the result for download", as
   await expect(extractButton).toBeEnabled();
   await extractButton.click();
 
-  const download = page.getByRole("button", { name: "Download extracted PBF" });
+  const download = page.getByRole("button", { name: "Export extract as PBF" });
   // The in-page Alert, not the error toast that also announces as \`alert\`.
   const failure = page.locator('[data-slot="alert"][role="alert"]');
   // Extraction crosses the worker boundary; wait for its outcome rather than the default limit.
@@ -78,7 +78,7 @@ test("extracts using the bounds recorded in the selected file's header", async (
   const extractButton = page.getByRole("button", { name: "Extract", exact: true });
   await expect(extractButton).toBeEnabled();
   await extractButton.click();
-  const download = page.getByRole("button", { name: "Download extracted PBF" });
+  const download = page.getByRole("button", { name: "Export extract as PBF" });
   await expect(download).toBeEnabled({ timeout: 120_000 });
 
   // Unchecking gives back the bbox from before, and the controls unlock. The embedded place

@@ -114,7 +114,7 @@ test("applies duplicate fixes and downloads the deduplicated PBF", async ({ page
 
   // Automated Chromium cannot use the native save picker, so this covers the Blob download path.
   const pbfDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download deduplicated PBF" }).click();
+  await page.getByRole("button", { name: "Export cleaned PBF" }).click();
   const download = await pbfDownload;
   expect(download.suggestedFilename()).toBe("osmix-duplicates-deduplicated.pbf");
   const downloadPath = await download.path();

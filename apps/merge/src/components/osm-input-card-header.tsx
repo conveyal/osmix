@@ -48,7 +48,7 @@ export function OsmInputCardHeader({
               ) : null}
               <ActionButton
                 icon={<DownloadIcon />}
-                label={`Download ${kind} OSM`}
+                label={`Export ${kind} OSM as PBF`}
                 onAction={onDownload}
                 variant="ghost"
               />

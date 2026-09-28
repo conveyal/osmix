@@ -80,7 +80,7 @@ The [merge-process guide](../../docs/merge-process.md) owns the merge rules, exa
 1. Remove duplicates inside each input in [Inspect](../inspect/README.md), then load the base and patch in Full mode.
 2. Configure optional imported-data matching and how identical points and patch IDs are handled, then choose **Review plan** or **Apply automatically**.
 3. In the review, each imported feature shows its outcome and proposals. Include or leave out the proposals that need you (Copy tags, Connect network, Remove imported way, identical-point merges, crossings), download the plan as osmChange, and **Apply plan**.
-4. Read the completion summary and download the result.
+4. Read the completion summary and export the result.
 
 See [Review plan and Apply automatically](../../docs/merge-process.md#application-workflows) for cancellation boundaries and recovery. Nothing changes until the plan is applied.
 
@@ -121,7 +121,7 @@ See [Australia-scale manual verification](./AUSTRALIA-PBF-CHECKLIST.md) for the 
 
 - **Secure context warnings** – If the system check reports a missing secure context, make sure you’re on `https://` (or `localhost`) and disable extensions that inject insecure content.
 - **File picker errors** – Exports try native `showSaveFilePicker` first, then automatically fall back to browser download when picker APIs are unavailable/restricted.
-- **Downloads built in memory** – Browsers without `showSaveFilePicker` (Firefox, Safari, and Brave by default) hold the whole PBF in memory before the download starts, and the app shows a note next to the download button. In Brave, enable `brave://flags/#file-system-access-api` and relaunch to save straight to disk.
+- **Exports built in memory** – Browsers without `showSaveFilePicker` (Firefox, Safari, and Brave by default) hold the whole PBF in memory before the file is saved, and the app shows a note next to the export button. In Brave, enable `brave://flags/#file-system-access-api` and relaunch to save straight to disk.
 - **Raster tiles missing** – Cross-origin isolation is required for OffscreenCanvas. Confirm the dev server sent the COOP/COEP headers listed in `vite.config.ts`.
 - **A control requires Full** – The dataset was loaded without an all-node index. Use the offered reload action
   and select Full; the app does not construct that index lazily.

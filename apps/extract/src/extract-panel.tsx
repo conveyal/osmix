@@ -447,7 +447,7 @@ export function ExtractPanel() {
               icon={<DownloadIcon aria-hidden="true" />}
               onAction={() => extract.downloadOsm()}
             >
-              Download extracted PBF
+              Export extract as PBF
             </ActionButton>
           }
         >

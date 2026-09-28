@@ -523,11 +523,11 @@ export function useOsmFile(osmKey: string) {
         if (error instanceof Error && error.name === "AbortError") return;
         console.error(error);
         const message = error instanceof Error ? error.message : String(error);
-        Tasks.message(`Download failed: ${message}`, "error");
+        Tasks.message(`Export failed: ${message}`, "error");
         return;
       }
       const task = Tasks.start(
-        `Download ${target.kind === "file" ? target.handle.name : target.name}`,
+        `Export ${target.kind === "file" ? target.handle.name : target.name}`,
       );
       try {
         let fileName: string;
@@ -542,11 +542,11 @@ export function useOsmFile(osmKey: string) {
           downloadBlob(blob, target.name);
           fileName = target.name;
         }
-        task.end(`Downloaded ${fileName}`);
+        task.end(`Exported ${fileName}`);
       } catch (error) {
         console.error(error);
         const message = error instanceof Error ? error.message : String(error);
-        task.fail(error, `Download failed: ${message}`);
+        task.fail(error, `Export failed: ${message}`);
       }
     },
   );

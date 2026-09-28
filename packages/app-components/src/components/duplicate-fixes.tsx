@@ -225,7 +225,7 @@ export function DuplicateFixes({ osmFile }: { osmFile: UseOsmFileReturn }) {
             >
               <p>
                 Removed {countDuplicates(appliedHere.stats.deduplicatedNodes, "node")} and{" "}
-                {countDuplicates(appliedHere.stats.deduplicatedWays, "way")}. Download the cleaned
+                {countDuplicates(appliedHere.stats.deduplicatedWays, "way")}. Export the cleaned
                 PBF, then open it in Merge.
               </p>
             </Alert>
@@ -236,7 +236,7 @@ export function DuplicateFixes({ osmFile }: { osmFile: UseOsmFileReturn }) {
                 icon={<DownloadIcon aria-hidden="true" />}
                 onAction={() => osmFile.downloadOsm()}
               >
-                Download deduplicated PBF
+                Export cleaned PBF
               </ActionButton>
               <SaveToDiskNotice />
             </>
@@ -276,7 +276,7 @@ export function DuplicateFixes({ osmFile }: { osmFile: UseOsmFileReturn }) {
                 variant="outline"
                 onAction={downloadJson}
               >
-                Download JSON changes
+                Export changes (JSON)
               </ActionButton>
               <Button
                 onClick={() => {
