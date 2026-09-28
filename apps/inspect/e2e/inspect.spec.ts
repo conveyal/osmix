@@ -81,8 +81,8 @@ test("loads a PBF, renders the map, and runs duplicate diagnostics", async ({ pa
   await expect(page.getByText("Duplicate candidates", { exact: true })).toBeVisible({
     timeout: 120_000,
   });
-  await expect(page.getByText("Summary", { exact: true })).toBeVisible();
-  // Monaco has no exact duplicates, so there is nothing to apply.
+  // Monaco has no exact duplicates, so there is nothing to summarize or apply.
+  await expect(page.getByText("No duplicate nodes or ways found")).toBeVisible();
   await expect(page.getByRole("button", { name: "Apply fixes" })).toHaveCount(0);
 });
 
