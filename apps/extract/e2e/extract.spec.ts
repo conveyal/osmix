@@ -40,14 +40,27 @@ test("extracts a bounding box from a PBF and offers the result for download", as
     throw new Error(`OSM extraction failed: ${await failure.innerText()}`);
   }
   await expect(download).toBeEnabled();
-  // The selected file's info sits with the file; the result card describes the extract.
-  await page.getByRole("button", { name: "File info" }).click();
-  await expect(page.getByRole("table", { name: "Selected file" })).toContainText("monaco.pbf");
+  // The result replaces the form and describes the extract, with its load details open.
+  await expect(page.getByText("Select OSM PBF file")).toHaveCount(0);
+  await expect(extractButton).toHaveCount(0);
   const stats = page.getByRole("table", { name: "Extract statistics" });
   await expect(stats).toContainText("Simple");
   await expect(stats).toContainText("7.415, 43.73, 7.425, 43.74");
-  await expect(page.getByRole("button", { name: "Load details" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Load details" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+
+  // Clearing the result brings the form back with the same file and settings; the selected
+  // file's info sits with the file.
+  await page.getByRole("button", { name: "Clear extract result" }).click();
+  await expect(download).toHaveCount(0);
+  await expect(page.locator("#extract-bbox-min-lon")).toHaveValue("7.415");
+  await expect(page.getByRole("radio", { name: "Simple" })).toBeChecked();
+  await page.getByRole("button", { name: "File info" }).click();
+  await expect(page.getByRole("table", { name: "Selected file" })).toContainText("monaco.pbf");
+  await expect(extractButton).toBeEnabled();
 });
 
 test("extracts using the bounds recorded in the selected file's header", async ({ page }) => {
@@ -95,8 +108,11 @@ test("extracts using the bounds recorded in the selected file's header", async (
   const download = page.getByRole("button", { name: "Export extract as PBF" });
   await expect(download).toBeEnabled({ timeout: 120_000 });
 
-  // Unchecking gives back the bbox from before, and the controls unlock. The embedded place
-  // search remounts with them and must not steal focus.
+  // Clearing the result brings the form back, still using the file's bounds. Unchecking gives
+  // back the bbox from before, and the controls unlock. The embedded place search remounts
+  // with them and must not steal focus.
+  await page.getByRole("button", { name: "Clear extract result" }).click();
+  await expect(useFileBounds).toBeChecked();
   await useFileBounds.uncheck();
   await expect(useFileBounds).toBeFocused();
   await expect(minLon).toHaveValue(previousMinLon);
