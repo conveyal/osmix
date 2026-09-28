@@ -52,6 +52,22 @@ test("extracts a bounding box from a PBF and offers the result for download", as
   );
   await expect(page.locator(".maplibregl-canvas")).toBeVisible();
 
+  // Saving stores the extract as its own dataset: keyed by its content hash and named for the
+  // extract, never under the source file's hash (which would shadow the full source in the
+  // cache).
+  await page.getByRole("button", { name: "Save extract result to storage" }).click();
+  await expect
+    .poll(() => page.evaluate(async () => (await window.osmWorker.listStoredOsm()).length))
+    .toBe(1);
+  const [stored] = await page.evaluate(() => window.osmWorker.listStoredOsm());
+  // Development serves `fixtures/` as the public directory.
+  const sourceHash = await page.evaluate(async () => {
+    const bytes = await (await fetch("/monaco.pbf")).arrayBuffer();
+    return window.osmWorker.hashBuffer(bytes);
+  });
+  expect(stored?.fileName).toBe("monaco-extract.pbf");
+  expect(stored?.fileHash).not.toBe(sourceHash);
+
   // Clearing the result brings the form back with the same file and settings; the selected
   // file's info sits with the file.
   await page.getByRole("button", { name: "Clear extract result" }).click();

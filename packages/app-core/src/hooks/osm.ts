@@ -12,7 +12,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { getBrowserLoadCapabilities } from "../lib/browser-capabilities.ts";
 import { prepareMergedOsmState } from "../lib/merged-osm-state.ts";
 import { describeOsmLoadFailure, type OsmLoadFailureContext } from "../lib/osm-load-failure.ts";
-import { ensureOsmPbfDownloadName } from "../lib/osm-pbf-download-name.ts";
+import { ensureOsmPbfDownloadName, suffixOsmPbfName } from "../lib/osm-pbf-download-name.ts";
 import { chooseSaveTarget, downloadBlob } from "../lib/save-file-picker.ts";
 import { canStoreBytes } from "../lib/storage-utils.ts";
 import type { OsmixAppRemote } from "../remote.ts";
@@ -276,6 +276,7 @@ export function useOsmFile(osmKey: string) {
       invalidateDataset();
       setFile(file);
       setOsm(null);
+      setOsmInfo(null);
       setFileInfo(null);
       setIsStored(false);
       setLoadFailure(null);
@@ -285,24 +286,20 @@ export function useOsmFile(osmKey: string) {
       try {
         if (signal?.aborted) throw new LoadCancelledError();
 
-        const fileHash = await task.runStep("Hash file", () =>
-          hashFileWithCancellation(remote, file, signal),
-        );
-        if (signal?.aborted) throw new LoadCancelledError();
+        // The extract is a different dataset from its source, so it must never live under the
+        // source's hash: that would replace a source loaded in another slot, and a saved extract
+        // would be served from the cache when the full source is opened later. It loads under a
+        // provisional id and is then renamed to its content hash.
+        const provisionalId = `extract-${crypto.randomUUID()}`;
+        const extractFileName = suffixOsmPbfName(file.name, "extract");
+        setFileInfo({ fileHash: provisionalId, fileName: extractFileName, fileSize: file.size });
 
-        const storedFileInfo: StoredFileInfo = {
-          fileHash,
-          fileName: file.name,
-          fileSize: file.size,
-        };
-        setFileInfo(storedFileInfo);
-
-        const osmInfo = await task.runStep("Read PBF and apply extract", async () => {
+        const extractedInfo = await task.runStep("Read PBF and apply extract", async () => {
           const loadCapabilities = await getBrowserLoadCapabilities();
           return remote.fromFile(
             file,
             {
-              id: fileHash,
+              id: provisionalId,
               extractBbox: extract.extractBbox,
               extractStrategy: extract.extractStrategy,
               extractTagFilter: extract.extractTagFilter,
@@ -315,15 +312,28 @@ export function useOsmFile(osmKey: string) {
 
         if (signal?.aborted) throw new LoadCancelledError();
 
-        setOsmInfo(osmInfo);
-        const osm = await remote.get(osmInfo.id);
+        const prepared = await task.runStep("Identify extract", () =>
+          prepareMergedOsmState({
+            currentFileInfo: null,
+            currentOsm: null,
+            mergedFileName: extractFileName,
+            newOsmId: extractedInfo.id,
+            worker: remote,
+          }),
+        );
+        if (prepared.kind !== "changed") {
+          throw Error(`Extract ${extractedInfo.id} did not receive its own file info.`);
+        }
 
         if (signal?.aborted) throw new LoadCancelledError();
 
-        setOsm(osm);
+        setFile(null);
+        setFileInfo(prepared.fileInfo);
+        setOsmInfo(prepared.osmInfo);
+        setOsm(prepared.osm);
 
         task.end(`${file.name} extracted`);
-        return osmInfo;
+        return prepared.osmInfo;
       } catch (e) {
         if (signal?.aborted || e instanceof LoadCancelledError) {
           if (loadId === currentLoadIdRef.current) {
