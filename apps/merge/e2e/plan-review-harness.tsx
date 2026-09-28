@@ -3,7 +3,7 @@
  * or map: input-card containment, the matching settings, the plan review against a real
  * in-page worker, and match evidence.
  */
-import { Button, Card, TaskLockProvider } from "@osmix/ui";
+import { Button, TaskLockProvider } from "@osmix/ui";
 import { createStore, Provider } from "jotai";
 import {
   type MergePlanBulkRequest,
@@ -23,7 +23,7 @@ import { createRoot } from "react-dom/client";
 import "../src/main.css";
 import { CandidateEvidence } from "../src/components/conflation-candidate-evidence";
 import { ConflationConfig } from "../src/components/conflation-config";
-import { OsmInputCardHeader } from "../src/components/osm-input-card-header";
+import { OsmInputSection } from "../src/components/osm-input-section";
 import { PatchIdNotice } from "../src/components/patch-id-notice";
 import { PlanInputs } from "../src/components/plan-inputs";
 import { PLAN_PAGE_SIZE, PlanReview } from "../src/components/plan-review";
@@ -184,16 +184,14 @@ function Harness() {
     <TaskLockProvider locked={false}>
       <main className="flex w-full max-w-[512px] flex-col gap-4 p-2" data-testid="harness-sidebar">
         <section data-testid="input-card-harness" className="flex flex-col gap-2">
-          <Card>
-            <OsmInputCardHeader
-              fileName="an-extremely-long-base-osm-filename-that-must-not-push-actions-outside-the-card.pbf"
-              kind="base"
-              loaded
-              onClear={async () => {}}
-              onDownload={async () => {}}
-              title="Base OSM — authoritative existing dataset"
-            />
-          </Card>
+          <OsmInputSection
+            fileName="an-extremely-long-base-osm-filename-that-must-not-push-actions-outside-the-section.pbf"
+            kind="base"
+            loaded
+            onClear={async () => {}}
+            onDownload={async () => {}}
+            title="Base OSM — authoritative existing dataset"
+          />
         </section>
         <Provider store={settingsStore}>
           <section data-testid="settings-harness" className="flex flex-col gap-2">

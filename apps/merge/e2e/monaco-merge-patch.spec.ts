@@ -20,13 +20,13 @@ function scenario(id: string) {
   return found;
 }
 
-async function loadFile(card: Locator, page: Page, menuItem: RegExp, path: string) {
-  await card.getByRole("button", { name: "Open file" }).click();
+async function loadFile(section: Locator, page: Page, menuItem: RegExp, path: string) {
+  await section.getByRole("button", { name: "Open file" }).click();
   const fileChooserPromise = page.waitForEvent("filechooser");
   await page.getByRole("menuitem", { name: menuItem }).click();
   await (await fileChooserPromise).setFiles(path);
-  const fileInfo = card.getByRole("button", { name: "File info" });
-  const loadFailure = card.getByRole("alert");
+  const fileInfo = section.getByRole("button", { name: "File info" });
+  const loadFailure = section.getByRole("alert");
   await expect(fileInfo.or(loadFailure)).toBeVisible({ timeout: 120_000 });
   if (await loadFailure.isVisible()) {
     throw new Error(`Load failed: ${await loadFailure.innerText()}`);
@@ -40,11 +40,16 @@ async function openMonacoMerge(page: Page, { removal }: { removal: boolean }) {
   });
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.osmWorker?.workerCount ?? 0)).toBe(1);
-  const card = (text: string) =>
-    page.locator('[data-slot="card"]').filter({ hasText: text }).first();
-  await loadFile(card("Base OSM — authoritative existing dataset"), page, /^OSM PBF/, MONACO_PBF);
+  const section = (text: string) =>
+    page.locator('[data-slot="sidebar-section"]').filter({ hasText: text }).first();
   await loadFile(
-    card("Patch OSM — imported additions and updates"),
+    section("Base OSM — authoritative existing dataset"),
+    page,
+    /^OSM PBF/,
+    MONACO_PBF,
+  );
+  await loadFile(
+    section("Patch OSM — imported additions and updates"),
     page,
     /^GeoJSON/,
     PATCH_GEOJSON,

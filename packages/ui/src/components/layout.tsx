@@ -5,7 +5,6 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
   SidebarInset,
   SidebarRail,
 } from "./ui/sidebar.tsx";
@@ -24,8 +23,9 @@ export function Main({ children }: { children: ReactNode }) {
 
 /**
  * The app sidebar: shadcn's `Sidebar`, below the nav, collapsing offcanvas (nav trigger, the
- * edge rail, or Cmd/Ctrl+B). Children scroll in one `ScrollArea` with the
- * inset gutter and `gap-2` rhythm; `footer` stays pinned below the scroll.
+ * edge rail, or Cmd/Ctrl+B). Children scroll in one `ScrollArea`, flush to the sidebar edges:
+ * they are `SidebarSection`s (or `Step`s), which own the inset and the dividers between them.
+ * `footer` stays pinned below the scroll.
  */
 export function AppSidebar({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   return (
@@ -34,9 +34,7 @@ export function AppSidebar({ children, footer }: { children: ReactNode; footer?:
       // Anchored to `Main`, not the viewport, so content above the row never sits under it.
       className="absolute h-full"
     >
-      <SidebarContent>
-        <SidebarGroup className="gap-2">{children}</SidebarGroup>
-      </SidebarContent>
+      <SidebarContent>{children}</SidebarContent>
       {footer ? <SidebarFooter className="gap-0 p-0">{footer}</SidebarFooter> : null}
       <SidebarRail />
     </Sidebar>

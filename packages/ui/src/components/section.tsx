@@ -6,7 +6,7 @@ import { Spinner } from "./ui/spinner.tsx";
 /**
  * The single section-title style: bold, uppercase, tracking-wide at the inherited
  * xs size. Never hand-write `font-bold uppercase` at call sites — use this (or
- * CardHeader/DetailsSummary, which apply the same role).
+ * SidebarSection/DetailsSummary, which apply the same role).
  */
 export function SectionTitle({ className, children }: { className?: string; children: ReactNode }) {
   return (

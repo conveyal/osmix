@@ -69,7 +69,7 @@ export {
   OsmPbfOpenUrlButton,
   OsmPbfSelectFileButton,
 } from "./components/osm-pbf-file-input.tsx";
-export { OsmDatasetCard } from "./components/osm-dataset-card.tsx";
+export { OsmDatasetSection } from "./components/osm-dataset-section.tsx";
 export { OsmSourceLinks } from "./components/osm-source-links.tsx";
 export { type MapDataset, OsmixMap } from "./components/osmix-map.tsx";
 export { OsmixMapSources } from "./components/osmix-map-sources.tsx";

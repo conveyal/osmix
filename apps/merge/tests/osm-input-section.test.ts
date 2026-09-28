@@ -2,13 +2,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { OsmInputCardHeader } from "../src/components/osm-input-card-header";
+import { OsmInputSection } from "../src/components/osm-input-section";
 
 const noop = async () => undefined;
 
-function render(props: Partial<Parameters<typeof OsmInputCardHeader>[0]> = {}) {
+function render(props: Partial<Parameters<typeof OsmInputSection>[0]> = {}) {
   return renderToStaticMarkup(
-    createElement(OsmInputCardHeader, {
+    createElement(OsmInputSection, {
       kind: "patch",
       loaded: true,
       onClear: noop,
@@ -23,8 +23,8 @@ const useAsBase = (html: string) => html.match(/<button[^>]*aria-label="Use as b
 /** The attribute, not the `disabled:` class variants every button carries. */
 const isDisabled = (button: string) => /\sdisabled=""/.test(button);
 
-describe("OsmInputCardHeader", () => {
-  it("offers one enabled Use as base on a patch card with a handler", () => {
+describe("OsmInputSection", () => {
+  it("offers one enabled Use as base on a patch section with a handler", () => {
     const buttons = useAsBase(render({ onUseAsBase: noop }));
     expect(buttons).toHaveLength(1);
     expect(isDisabled(buttons[0] ?? "")).toBe(false);
@@ -36,7 +36,7 @@ describe("OsmInputCardHeader", () => {
     expect(isDisabled(buttons[0] ?? "")).toBe(true);
   });
 
-  it("has no Use as base on a base card or without a handler", () => {
+  it("has no Use as base on a base section or without a handler", () => {
     expect(useAsBase(render({ kind: "base", onUseAsBase: noop }))).toHaveLength(0);
     expect(useAsBase(render())).toHaveLength(0);
   });

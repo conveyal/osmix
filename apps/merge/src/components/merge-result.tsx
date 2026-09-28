@@ -1,4 +1,4 @@
-import { OsmDatasetCard, SaveToDiskNotice } from "@osmix/app-components";
+import { OsmDatasetSection, SaveToDiskNotice } from "@osmix/app-components";
 import type { UseOsmFileReturn } from "@osmix/app-core";
 import { ActionButton, Checkbox, CheckboxLabel } from "@osmix/ui";
 import { ArrowLeftIcon, DownloadIcon, SaveIcon } from "lucide-react";
@@ -34,7 +34,7 @@ export function MergeResult({
       {summary}
       {base.osm ? (
         <>
-          <OsmDatasetCard
+          <OsmDatasetSection
             title="Merged OSM"
             name="merged OSM"
             osmFile={base}
@@ -44,37 +44,39 @@ export function MergeResult({
           {plan ? (
             <ConflationRoutingDiagnostics diagnostics={plan.diagnostics.routing} applied />
           ) : null}
-          <SaveToDiskNotice />
-          <div className="flex flex-col gap-1">
-            <CheckboxLabel className="min-h-8">
-              <Checkbox
-                checked={positiveIds}
-                aria-describedby="positive-ids-help"
-                onCheckedChange={onPositiveIdsChange}
-              />
-              Give new features positive IDs
-            </CheckboxLabel>
-            <p id="positive-ids-help" className="text-muted-foreground">
-              New features have negative IDs, the OSM convention for data not yet uploaded. Some
-              tools only accept positive IDs; the merge report then lists each change.
-            </p>
-          </div>
-          <StepActions aria-label="Merged OSM actions">
-            {!base.isStored && base.canStore ? (
-              <ActionButton icon={<SaveIcon />} onAction={base.saveToStorage} variant="outline">
-                Save to storage
+          <div className="flex flex-col gap-2 p-inset">
+            <SaveToDiskNotice />
+            <div className="flex flex-col gap-1">
+              <CheckboxLabel className="min-h-8">
+                <Checkbox
+                  checked={positiveIds}
+                  aria-describedby="positive-ids-help"
+                  onCheckedChange={onPositiveIdsChange}
+                />
+                Give new features positive IDs
+              </CheckboxLabel>
+              <p id="positive-ids-help" className="text-muted-foreground">
+                New features have negative IDs, the OSM convention for data not yet uploaded. Some
+                tools only accept positive IDs; the merge report then lists each change.
+              </p>
+            </div>
+            <StepActions aria-label="Merged OSM actions">
+              {!base.isStored && base.canStore ? (
+                <ActionButton icon={<SaveIcon />} onAction={base.saveToStorage} variant="outline">
+                  Save to storage
+                </ActionButton>
+              ) : null}
+              <ActionButton
+                icon={<DownloadIcon />}
+                onAction={() => base.downloadOsm(undefined, { renumberNegativeIds: positiveIds })}
+              >
+                Export merged PBF
               </ActionButton>
-            ) : null}
-            <ActionButton
-              icon={<DownloadIcon />}
-              onAction={() => base.downloadOsm(undefined, { renumberNegativeIds: positiveIds })}
-            >
-              Export merged PBF
-            </ActionButton>
-            <ActionButton icon={<ArrowLeftIcon />} variant="outline" onAction={onStartNew}>
-              Start a new merge
-            </ActionButton>
-          </StepActions>
+              <ActionButton icon={<ArrowLeftIcon />} variant="outline" onAction={onStartNew}>
+                Start a new merge
+              </ActionButton>
+            </StepActions>
+          </div>
         </>
       ) : null}
     </>

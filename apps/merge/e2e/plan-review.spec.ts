@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
   await expect(review(page)).toBeVisible();
 });
 
-test("input cards and plan actions stay contained at supported sidebar widths", async ({
+test("input sections and plan actions stay contained at supported sidebar widths", async ({
   page,
 }) => {
   for (const width of [448, 512]) {

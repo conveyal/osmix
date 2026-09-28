@@ -1,7 +1,5 @@
 import {
-  Card,
-  CardContent,
-  CardHeader,
+  SidebarSection,
   Table,
   TableBody,
   TableCell,
@@ -36,7 +34,7 @@ type RoutingDiagnostics = { car: PlanRoutingDelta; walk: PlanRoutingDelta };
 /**
  * CAR and WALK graph counts of the base and of the plan's result, without a frame: the
  * description, the table and the mode invariants. `applied` says the result is the merged
- * dataset rather than what the plan would apply. Place it flush inside a card or `Details`.
+ * dataset rather than what the plan would apply. Place it in a `flush` section or a `Details`.
  */
 export function RoutingTopology({
   diagnostics,
@@ -99,7 +97,7 @@ export function RoutingTopology({
   );
 }
 
-/** `RoutingTopology` in its own card, for the result step. */
+/** `RoutingTopology` in its own sidebar section, for the result step. */
 export function ConflationRoutingDiagnostics({
   diagnostics,
   applied = false,
@@ -108,11 +106,8 @@ export function ConflationRoutingDiagnostics({
   applied?: boolean;
 }) {
   return (
-    <Card>
-      <CardHeader>Routing topology impact</CardHeader>
-      <CardContent className="p-0">
-        <RoutingTopology diagnostics={diagnostics} applied={applied} />
-      </CardContent>
-    </Card>
+    <SidebarSection flush title="Routing topology impact">
+      <RoutingTopology diagnostics={diagnostics} applied={applied} />
+    </SidebarSection>
   );
 }

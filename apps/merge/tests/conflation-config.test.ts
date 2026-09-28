@@ -36,7 +36,8 @@ describe("matching settings accessibility", () => {
       expect(controlWithHelp(html, helpId)).toBeDefined();
       expect(html).toContain(`id="${helpId}"`);
     }
-    expect(html).toContain('aria-labelledby="conflation-settings-title"');
+    const titleId = html.match(/<section[^>]*aria-labelledby="([^"]+)"/)?.[1];
+    expect(html).toMatch(new RegExp(`<h2 id="${titleId}"[^>]*>.*Match imported data`));
     expect(html).toContain("Find possible matches between imported features");
     expect(html).toContain("Use attribute names, separated by commas or spaces");
     expect(html).not.toContain('aria-invalid="true"');

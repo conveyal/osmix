@@ -3,9 +3,6 @@ import {
   Details,
   DetailsContent,
   DetailsSummary,
-  Card,
-  CardContent,
-  CardHeader,
   EmptyState,
   Pager,
 } from "@osmix/ui";
@@ -112,7 +109,10 @@ export function WayRemovalDetails({
   );
 }
 
-/** Read the existing generated outcome; never create a second removal-preview state. */
+/**
+ * Read the existing generated outcome; never create a second removal-preview state. A `Details`
+ * that reaches the edges of the flush section it sits in (the merge completion summary).
+ */
 export function ConflationWayRemovalPreview({
   outcome,
   applied = false,
@@ -128,34 +128,36 @@ export function ConflationWayRemovalPreview({
   const pages = Math.ceil(removals.length / pageSize);
   const page = Math.min(requestedPage, Math.max(0, pages - 1));
   return (
-    <Card role="region" aria-label={applied ? "Applied way removals" : "Way removal preview"}>
-      <CardHeader>{applied ? "Applied way removals" : "Way removal preview"}</CardHeader>
-      <CardContent className="flex min-w-0 flex-col gap-2">
-        <p>
-          {applied ? "Removed imported ways" : "Imported ways to remove"}: {removals.length}.{" "}
-          {applied ? "Removed orphan points" : "Orphan points to remove"}:{" "}
-          {outcome.summary.removedOrphanNodes ?? 0}.
-        </p>
-        <p>
-          {applied
-            ? "These removals were accepted in the plan and applied with it."
-            : "These removals are planned. The dataset changes only when you apply the plan."}
-        </p>
-        {removals.length ? (
-          <ul className="flex min-w-0 flex-col divide-y" aria-label="Imported way removal plans">
-            {removals.slice(page * pageSize, (page + 1) * pageSize).map((preview) => (
-              <li key={preview.sourceWayId} className="min-w-0 py-2">
-                <WayRemovalDetails preview={preview} applied={applied} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState className="p-0">
-            No imported way was selected for this removal action
-          </EmptyState>
-        )}
-        <Pager label="Way removal pages" page={page} pageCount={pages} onPageChange={setPage} />
-      </CardContent>
-    </Card>
+    <section aria-label={applied ? "Applied way removals" : "Way removal preview"}>
+      <Details>
+        <DetailsSummary>{applied ? "Applied way removals" : "Way removal preview"}</DetailsSummary>
+        <DetailsContent className="flex min-w-0 flex-col gap-2 p-inset">
+          <p>
+            {applied ? "Removed imported ways" : "Imported ways to remove"}: {removals.length}.{" "}
+            {applied ? "Removed orphan points" : "Orphan points to remove"}:{" "}
+            {outcome.summary.removedOrphanNodes ?? 0}.
+          </p>
+          <p>
+            {applied
+              ? "These removals were accepted in the plan and applied with it."
+              : "These removals are planned. The dataset changes only when you apply the plan."}
+          </p>
+          {removals.length ? (
+            <ul className="flex min-w-0 flex-col divide-y" aria-label="Imported way removal plans">
+              {removals.slice(page * pageSize, (page + 1) * pageSize).map((preview) => (
+                <li key={preview.sourceWayId} className="min-w-0 py-2">
+                  <WayRemovalDetails preview={preview} applied={applied} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState className="p-0">
+              No imported way was selected for this removal action
+            </EmptyState>
+          )}
+          <Pager label="Way removal pages" page={page} pageCount={pages} onPageChange={setPage} />
+        </DetailsContent>
+      </Details>
+    </section>
   );
 }

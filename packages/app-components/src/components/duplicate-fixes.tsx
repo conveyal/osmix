@@ -14,9 +14,6 @@ import {
   ActionButton,
   Alert,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
   Details,
   DetailsContent,
   DetailsSummary,
@@ -28,6 +25,7 @@ import {
   DialogTitle,
   LoadingState,
   SectionTitle,
+  SidebarSection,
 } from "@osmix/ui";
 import { useAtom, useSetAtom } from "jotai";
 import { DownloadIcon, FileJsonIcon, SearchCodeIcon, WandSparklesIcon } from "lucide-react";
@@ -190,20 +188,17 @@ export function DuplicateFixes({ osmFile }: { osmFile: UseOsmFileReturn }) {
 
   return (
     <>
-      <Card>
-        <CardHeader>Duplicate nodes and ways</CardHeader>
-        <CardContent className="flex flex-col gap-2">
+      <SidebarSection flush title="Duplicate nodes and ways">
+        <div className="flex flex-col gap-2 px-inset pb-inset">
           <FullIndexRequired operation="Duplicate detection" osmFile={osmFile} />
           <p>
             Find nodes at the same OSM coordinate and ways with the same ordered nodes. Review the
             candidates on the map, apply them to remove the duplicates, then download the cleaned
             PBF. Do this for each input before you merge it.
           </p>
-        </CardContent>
-        <CardContent className="p-0">
-          <DuplicateScanGuide />
-        </CardContent>
-        <CardContent className="flex flex-col gap-2">
+        </div>
+        <DuplicateScanGuide />
+        <div className="flex flex-col gap-2 border-t p-inset">
           {pendingRefresh ? (
             <Alert variant="destructive" title="The fixed dataset needs to be refreshed">
               <p>{pendingRefresh.error}</p>
@@ -249,27 +244,24 @@ export function DuplicateFixes({ osmFile }: { osmFile: UseOsmFileReturn }) {
           >
             Find duplicate nodes and ways
           </ActionButton>
-        </CardContent>
-      </Card>
+        </div>
+      </SidebarSection>
 
       {candidates ? (
-        <Card>
-          <CardHeader>Duplicate candidates</CardHeader>
-          <CardContent className="p-0">
-            <ChangesSummary variant="deduplication" />
-            <Suspense fallback={<LoadingState />}>
-              <Details>
-                <DetailsSummary>Changes</DetailsSummary>
-                <DetailsContent>
-                  <ChangesFilters />
-                  <ChangesList setSelectedEntity={(entity) => selectAndFlyToEntity(osm, entity)} />
-                  <ChangesPagination />
-                </DetailsContent>
-              </Details>
-            </Suspense>
-          </CardContent>
+        <SidebarSection flush title="Duplicate candidates">
+          <ChangesSummary variant="deduplication" />
+          <Suspense fallback={<LoadingState />}>
+            <Details>
+              <DetailsSummary>Changes</DetailsSummary>
+              <DetailsContent>
+                <ChangesFilters />
+                <ChangesList setSelectedEntity={(entity) => selectAndFlyToEntity(osm, entity)} />
+                <ChangesPagination />
+              </DetailsContent>
+            </Details>
+          </Suspense>
           {candidates.totalChanges > 0 ? (
-            <CardContent className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 border-t p-inset">
               {jsonError ? <Alert variant="destructive">{jsonError}</Alert> : null}
               <ActionButton
                 icon={<FileJsonIcon aria-hidden="true" />}
@@ -287,9 +279,9 @@ export function DuplicateFixes({ osmFile }: { osmFile: UseOsmFileReturn }) {
                 <WandSparklesIcon aria-hidden="true" />
                 Apply fixes
               </Button>
-            </CardContent>
+            </div>
           ) : null}
-        </Card>
+        </SidebarSection>
       ) : null}
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

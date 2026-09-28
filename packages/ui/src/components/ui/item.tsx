@@ -35,12 +35,17 @@ const itemVariants = cva(
         default: "border-border bg-card",
         outline: "border-border",
         muted: "bg-muted/50",
+        // A divided row of a flush list in a sidebar section: no box, one divider below, and
+        // the paper tint when it is the current row.
+        row: "rounded-none border-0 border-b border-border last:border-b-0 aria-current:bg-muted",
       },
       size: {
         default: "gap-2 p-2",
         sm: "gap-2 px-2 py-1",
       },
     },
+    // Rows line their content up with the section's inset.
+    compoundVariants: [{ variant: "row", className: "px-inset" }],
     defaultVariants: {
       variant: "default",
       size: "default",

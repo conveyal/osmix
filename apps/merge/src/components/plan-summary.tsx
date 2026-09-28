@@ -1,11 +1,9 @@
 import {
   Alert,
-  Card,
-  CardContent,
-  CardHeader,
   Details,
   DetailsContent,
   DetailsSummary,
+  SidebarSection,
   Table,
   TableBody,
   TableCell,
@@ -22,64 +20,66 @@ import { RoutingTopology } from "./conflation-routing-diagnostics";
 export function PlanSummary({ overview }: { overview: MergePlanOverview }) {
   const { summary, diagnostics } = overview;
   return (
-    <>
-      {diagnostics.integrity.length > 0 ? (
-        <Alert variant="destructive" title="This plan would break routing and cannot be applied">
-          <ul className="list-disc pl-4">
-            {diagnostics.integrity.slice(0, 5).map((issue) => (
-              <li key={issue}>{issue}</li>
-            ))}
-          </ul>
-          {diagnostics.integrity.length > 5 ? (
-            <p>And {(diagnostics.integrity.length - 5).toLocaleString()} more.</p>
+    <SidebarSection flush title="Plan summary">
+      {diagnostics.integrity.length > 0 || overview.staleDecisions.length > 0 ? (
+        <div className="flex flex-col gap-2 px-inset pb-inset">
+          {diagnostics.integrity.length > 0 ? (
+            <Alert
+              variant="destructive"
+              title="This plan would break routing and cannot be applied"
+            >
+              <ul className="list-disc pl-4">
+                {diagnostics.integrity.slice(0, 5).map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+              {diagnostics.integrity.length > 5 ? (
+                <p>And {(diagnostics.integrity.length - 5).toLocaleString()} more.</p>
+              ) : null}
+              <p>Reject the proposals involved, or fix the inputs, then review again.</p>
+            </Alert>
           ) : null}
-          <p>Reject the proposals involved, or fix the inputs, then review again.</p>
-        </Alert>
-      ) : null}
-      {overview.staleDecisions.length > 0 ? (
-        <Alert title="Some decisions no longer apply">
-          <p>
-            {overview.staleDecisions.length.toLocaleString()} saved{" "}
-            {overview.staleDecisions.length === 1 ? "decision names" : "decisions name"} proposals
-            this plan no longer has, usually because another decision changed it. They are kept in
-            case the proposals return.
-          </p>
-        </Alert>
-      ) : null}
-      <Card role="region" aria-labelledby="plan-summary-title">
-        <CardHeader id="plan-summary-title">Plan summary</CardHeader>
-        <CardContent className="p-0">
-          <Table aria-label="Imported features by outcome">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Outcome</TableHead>
-                <TableHead numeric>Features</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {OUTCOMES.filter((outcome) => summary.features[outcome] > 0).map((outcome) => (
-                <TableRow key={outcome} title={OUTCOME_HELP[outcome]}>
-                  <TableCell>{OUTCOME_LABEL[outcome]}</TableCell>
-                  <TableCell numeric>{summary.features[outcome].toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {diagnostics.demoted.length > 0 ? (
-            <p className="border-t p-inset text-muted-foreground">
-              {diagnostics.demoted.length.toLocaleString()} automatic{" "}
-              {diagnostics.demoted.length === 1 ? "connection needs" : "connections need"} review
-              because they would change the drivable network.
-            </p>
+          {overview.staleDecisions.length > 0 ? (
+            <Alert title="Some decisions no longer apply">
+              <p>
+                {overview.staleDecisions.length.toLocaleString()} saved{" "}
+                {overview.staleDecisions.length === 1 ? "decision names" : "decisions name"}{" "}
+                proposals this plan no longer has, usually because another decision changed it. They
+                are kept in case the proposals return.
+              </p>
+            </Alert>
           ) : null}
-          <Details defaultOpen={false}>
-            <DetailsSummary>Routing topology impact</DetailsSummary>
-            <DetailsContent>
-              <RoutingTopology diagnostics={diagnostics.routing} />
-            </DetailsContent>
-          </Details>
-        </CardContent>
-      </Card>
-    </>
+        </div>
+      ) : null}
+      <Table aria-label="Imported features by outcome">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Outcome</TableHead>
+            <TableHead numeric>Features</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {OUTCOMES.filter((outcome) => summary.features[outcome] > 0).map((outcome) => (
+            <TableRow key={outcome} title={OUTCOME_HELP[outcome]}>
+              <TableCell>{OUTCOME_LABEL[outcome]}</TableCell>
+              <TableCell numeric>{summary.features[outcome].toLocaleString()}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {diagnostics.demoted.length > 0 ? (
+        <p className="border-t p-inset text-muted-foreground">
+          {diagnostics.demoted.length.toLocaleString()} automatic{" "}
+          {diagnostics.demoted.length === 1 ? "connection needs" : "connections need"} review
+          because they would change the drivable network.
+        </p>
+      ) : null}
+      <Details defaultOpen={false}>
+        <DetailsSummary>Routing topology impact</DetailsSummary>
+        <DetailsContent>
+          <RoutingTopology diagnostics={diagnostics.routing} />
+        </DetailsContent>
+      </Details>
+    </SidebarSection>
   );
 }

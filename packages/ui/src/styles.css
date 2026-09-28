@@ -30,8 +30,8 @@
   --text-sm: 0.875rem;
   --text-sm--line-height: calc(1.25 / 0.875);
 
-  /* The inset: padding from every edge-aligned surface (cards, steps, details, table edges,
-     sidebar groups) to its content, so text lines up at one edge. Inner rhythm stays gap-2. */
+  /* The inset: padding from every edge-aligned surface (sidebar sections, details, table
+     edges, dialogs) to its content, so text lines up at one edge. Inner rhythm stays gap-2. */
   --spacing-inset: 0.75rem;
 
   --radius-sm: calc(var(--radius) * 0.5);
@@ -138,8 +138,9 @@
   --warning: oklch(0.7 0.16 65);
   --info: oklch(0.55 0.19 258);
 
-  /* The shadcn sidebar's tokens, mapped onto the theme. */
-  --sidebar: var(--muted);
+  /* The shadcn sidebar's tokens, mapped onto the theme. The sidebar is the reading surface, so
+     it takes the card color; the map frame beside it keeps the muted paper. */
+  --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);

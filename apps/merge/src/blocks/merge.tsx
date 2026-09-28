@@ -2,7 +2,7 @@ import {
   appOrigin,
   FullIndexRequired,
   hasFullNodeIndex,
-  OsmDatasetCard,
+  OsmDatasetSection,
   OsmInfoTable,
   StoredOsmList,
   useFlyToOsmBounds,
@@ -21,7 +21,7 @@ import {
   useOsmixRemote,
   writeJsonReport,
 } from "@osmix/app-core";
-import { ActionButton, Alert, Card, CardContent, Step, useTaskLock } from "@osmix/ui";
+import { ActionButton, Alert, Step, useTaskLock } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { ArrowLeftIcon, DownloadIcon, MergeIcon } from "lucide-react";
 import type {
@@ -36,7 +36,7 @@ import { useState } from "react";
 import { ConflationConfig } from "../components/conflation-config";
 import { MergeCompletionSummary } from "../components/merge-completion-summary";
 import { MergeResult } from "../components/merge-result";
-import { OsmInputCardHeader } from "../components/osm-input-card-header";
+import { OsmInputSection } from "../components/osm-input-section";
 import { PatchIdNotice } from "../components/patch-id-notice";
 import { PlanInputs } from "../components/plan-inputs";
 import { PLAN_PAGE_SIZE, PlanReview } from "../components/plan-review";
@@ -434,85 +434,84 @@ export default function MergeBlock() {
   const patchNeedsFull = patch.osmInfo !== null && !hasFullNodeIndex(patch.osmInfo);
   if (baseNeedsFull || patchNeedsFull) {
     return (
-      <div className="flex flex-col gap-4">
-        <OsmDatasetCard
+      <>
+        <OsmDatasetSection
           title="Base OSM"
           name="base OSM"
           osmFile={base}
           onClear={() => void clearInput(base)}
         />
-        <OsmDatasetCard
+        <OsmDatasetSection
           title="Patch OSM"
           name="patch OSM"
           osmFile={patch}
           onClear={() => void clearInput(patch)}
         />
-        <FullIndexRequired operation="Merge" osmFile={base} />
-        <FullIndexRequired operation="Merge" osmFile={patch} />
-      </div>
+        <div className="flex flex-col gap-2 p-inset">
+          <FullIndexRequired operation="Merge" osmFile={base} />
+          <FullIndexRequired operation="Merge" osmFile={patch} />
+        </div>
+      </>
     );
   }
 
-  const inputCard = (file: UseOsmFileReturn, osmKey: string, kind: "base" | "patch") => (
-    <Card>
-      <OsmInputCardHeader
-        fileName={kind === "base" ? baseFileName : patchFileName}
-        kind={kind}
-        loaded={Boolean(file.osm)}
-        onClear={() => clearInput(file)}
-        onDownload={file.downloadOsm}
-        {...(kind === "patch" ? { onUseAsBase: usePatchAsBase, canUseAsBase: !base.osm } : {})}
-        title={
-          kind === "base"
-            ? "Base OSM — authoritative existing dataset"
-            : "Patch OSM — imported additions and updates"
-        }
-      />
-      <CardContent className="p-0">
-        {file.osm ? (
-          <OsmInfoTable
-            defaultOpen={false}
-            osm={file.osm}
-            file={file.file}
-            fileInfo={file.fileInfo}
-          />
-        ) : (
-          <StoredOsmList
-            osmKey={osmKey}
-            loadFailure={file.loadFailure}
-            onDismissLoadFailure={file.clearLoadFailure}
-            onReloadView={file.reloadWithViewProfile}
-            openOsmPbfUrl={async (url) => {
-              const controller = new AbortController();
-              setLoadingState({ controller, osmKey });
-              resetDerivedState();
-              try {
-                const osmInfo = await file.loadOsmPbfUrl(url, controller);
-                if (osmInfo) flyToOsmBounds(osmInfo);
-                return osmInfo;
-              } finally {
-                setLoadingState(null);
-              }
-            }}
-            openOsmFile={async (source, fileType) => {
-              const controller = new AbortController();
-              setLoadingState({ controller, osmKey });
-              resetDerivedState();
-              try {
-                const osmInfo =
-                  typeof source === "string"
-                    ? await file.loadFromStorage(source, controller)
-                    : await file.loadOsmFile(source, fileType, controller);
-                if (osmInfo) flyToOsmBounds(osmInfo);
-                return osmInfo;
-              } finally {
-                setLoadingState(null);
-              }
-            }}
-          />
-        )}
-      </CardContent>
-    </Card>
+  const inputSection = (file: UseOsmFileReturn, osmKey: string, kind: "base" | "patch") => (
+    <OsmInputSection
+      fileName={kind === "base" ? baseFileName : patchFileName}
+      kind={kind}
+      loaded={Boolean(file.osm)}
+      onClear={() => clearInput(file)}
+      onDownload={file.downloadOsm}
+      {...(kind === "patch" ? { onUseAsBase: usePatchAsBase, canUseAsBase: !base.osm } : {})}
+      title={
+        kind === "base"
+          ? "Base OSM — authoritative existing dataset"
+          : "Patch OSM — imported additions and updates"
+      }
+    >
+      {file.osm ? (
+        <OsmInfoTable
+          defaultOpen={false}
+          osm={file.osm}
+          file={file.file}
+          fileInfo={file.fileInfo}
+        />
+      ) : (
+        <StoredOsmList
+          osmKey={osmKey}
+          loadFailure={file.loadFailure}
+          onDismissLoadFailure={file.clearLoadFailure}
+          onReloadView={file.reloadWithViewProfile}
+          openOsmPbfUrl={async (url) => {
+            const controller = new AbortController();
+            setLoadingState({ controller, osmKey });
+            resetDerivedState();
+            try {
+              const osmInfo = await file.loadOsmPbfUrl(url, controller);
+              if (osmInfo) flyToOsmBounds(osmInfo);
+              return osmInfo;
+            } finally {
+              setLoadingState(null);
+            }
+          }}
+          openOsmFile={async (source, fileType) => {
+            const controller = new AbortController();
+            setLoadingState({ controller, osmKey });
+            resetDerivedState();
+            try {
+              const osmInfo =
+                typeof source === "string"
+                  ? await file.loadFromStorage(source, controller)
+                  : await file.loadOsmFile(source, fileType, controller);
+              if (osmInfo) flyToOsmBounds(osmInfo);
+              return osmInfo;
+            } finally {
+              setLoadingState(null);
+            }
+          }}
+        />
+      )}
+    </OsmInputSection>
   );
 
   const title = {
@@ -531,29 +530,24 @@ export default function MergeBlock() {
   }[step];
 
   return (
-    <div className="flex flex-col gap-4">
-      {pendingRefresh?.error ? (
-        <Alert variant="destructive" title="The merged dataset needs to be refreshed">
-          <p>{pendingRefresh.error}</p>
-          <p>
-            The worker already applied the plan. Refresh the displayed result before continuing or
-            downloading.
-          </p>
-          <ActionButton onAction={retryRefresh}>Refresh merged dataset</ActionButton>
-          <p>
-            If refreshing cannot recover the dataset, reload this page and load both original input
-            files to start again.
-          </p>
-        </Alert>
-      ) : null}
+    <>
       <Step number={STEP_NUMBER[step]} title={title}>
-        <CardContent>
-          <p>{intro}</p>
-        </CardContent>
-      </Step>
-
-      {step === "inputs" ? (
-        <>
+        {pendingRefresh?.error ? (
+          <Alert variant="destructive" title="The merged dataset needs to be refreshed">
+            <p>{pendingRefresh.error}</p>
+            <p>
+              The worker already applied the plan. Refresh the displayed result before continuing or
+              downloading.
+            </p>
+            <ActionButton onAction={retryRefresh}>Refresh merged dataset</ActionButton>
+            <p>
+              If refreshing cannot recover the dataset, reload this page and load both original
+              input files to start again.
+            </p>
+          </Alert>
+        ) : null}
+        <p>{intro}</p>
+        {step === "inputs" ? (
           <Alert title="Check each input in Inspect first">
             <p>
               Merge does not scan inputs for duplicates inside one file. Open each file in the{" "}
@@ -563,8 +557,20 @@ export default function MergeBlock() {
               to find and fix duplicate nodes and ways, then open the cleaned PBF here.
             </p>
           </Alert>
-          {inputCard(base, BASE_OSM_KEY, "base")}
-          {inputCard(patch, PATCH_OSM_KEY, "patch")}
+        ) : null}
+        {step === "review" && overview ? (
+          <PatchIdNotice
+            mode={patchIds}
+            replacesBase={overview.summary.replacesBase}
+            onChange={replanWithPatchIds}
+          />
+        ) : null}
+      </Step>
+
+      {step === "inputs" ? (
+        <>
+          {inputSection(base, BASE_OSM_KEY, "base")}
+          {inputSection(patch, PATCH_OSM_KEY, "patch")}
           <ConflationConfig />
           <PlanInputs
             disabled={!base.osm || !patch.osm || taskLocked}
@@ -576,11 +582,6 @@ export default function MergeBlock() {
 
       {step === "review" && overview && page ? (
         <>
-          <PatchIdNotice
-            mode={patchIds}
-            replacesBase={overview.summary.replacesBase}
-            onChange={replanWithPatchIds}
-          />
           <PlanSummary overview={overview} />
           <PlanReview
             detail={selected}
@@ -595,30 +596,32 @@ export default function MergeBlock() {
             }}
             onSelect={selectFeature}
           />
-          {downloadError ? <Alert variant="destructive">{downloadError}</Alert> : null}
-          <StepActions aria-label="Plan review actions">
-            <ActionButton
-              icon={<ArrowLeftIcon />}
-              variant="outline"
-              onAction={async () => {
-                if (base.osm) await remote.clearMergePlan(base.osm.id);
-                resetPlan();
-                goTo("inputs");
-              }}
-            >
-              Back to inputs
-            </ActionButton>
-            <ActionButton icon={<DownloadIcon />} variant="outline" onAction={downloadOsc}>
-              Export osmChange (.osc)
-            </ActionButton>
-            <ActionButton
-              icon={<MergeIcon />}
-              disabled={overview.diagnostics.integrity.length > 0 || pendingRefresh !== null}
-              onAction={applyReviewedPlan}
-            >
-              Apply plan
-            </ActionButton>
-          </StepActions>
+          <div className="flex flex-col gap-2 p-inset">
+            {downloadError ? <Alert variant="destructive">{downloadError}</Alert> : null}
+            <StepActions aria-label="Plan review actions">
+              <ActionButton
+                icon={<ArrowLeftIcon />}
+                variant="outline"
+                onAction={async () => {
+                  if (base.osm) await remote.clearMergePlan(base.osm.id);
+                  resetPlan();
+                  goTo("inputs");
+                }}
+              >
+                Back to inputs
+              </ActionButton>
+              <ActionButton icon={<DownloadIcon />} variant="outline" onAction={downloadOsc}>
+                Export osmChange (.osc)
+              </ActionButton>
+              <ActionButton
+                icon={<MergeIcon />}
+                disabled={overview.diagnostics.integrity.length > 0 || pendingRefresh !== null}
+                onAction={applyReviewedPlan}
+              >
+                Apply plan
+              </ActionButton>
+            </StepActions>
+          </div>
         </>
       ) : null}
 
@@ -637,7 +640,7 @@ export default function MergeBlock() {
           }
         />
       ) : null}
-    </div>
+    </>
   );
 }
 

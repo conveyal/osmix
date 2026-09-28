@@ -51,7 +51,7 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 ## Key Paths
 
 - UI: `apps/merge` (React 19 + Vite), `apps/inspect` (single-dataset viewer) and `apps/extract` (bbox extracts), each on its own origin and linked via `AppLinks`; app worker at `packages/app-core/src/workers/osmix-app.worker.ts`, created per app with `createOsmixAppRemote()` and shared through `remoteAtom`.
-- Shared UI conventions: `packages/ui/DESIGN.md` — read before UI changes; merge-specific rules in `apps/merge/DESIGN.md`. The theme is closed (only tokens produce CSS) and lint enforces call-site styling: use the primitives it lists (`AppSidebar`, `Step`, `Alert`, `NativeSelect`, `Radio`, `ScrollArea`, `IconButton`, `Pager`, `MapPanelHeader`, `useMapColors`) instead of styling at call sites.
+- Shared UI conventions: `packages/ui/DESIGN.md` — read before UI changes; merge-specific rules in `apps/merge/DESIGN.md`. The theme is closed (only tokens produce CSS) and lint enforces call-site styling: use the primitives it lists (`AppSidebar`, `SidebarSection`, `Step`, `Alert`, `NativeSelect`, `Radio`, `ScrollArea`, `IconButton`, `Pager`, `MapPanelHeader`, `useMapColors`) instead of styling at call sites.
 - The apps are desktop-only: windows 1024px and wider. Narrower windows get `SmallWindowAlert`; never add `sm:`/`md:`/`lg:`/`max-*` variants or phone layouts (`osmix/no-breakpoint-variant`). See "Supported viewports" in `packages/ui/DESIGN.md`.
 - Worker API: `packages/osmix/src/worker.ts`, `packages/osmix/src/remote.ts`.
 - Fixtures: `fixtures/` at repo root; loaded via `@osmix/test-utils/fixtures`.

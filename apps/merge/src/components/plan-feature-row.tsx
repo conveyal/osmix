@@ -37,10 +37,11 @@ export function PlanFeatureRow({
   return (
     <Item
       role="region"
+      variant="row"
       aria-label={reference}
       aria-current={detail ? "true" : undefined}
       data-outcome={feature.outcome}
-      className="flex-col items-stretch"
+      className="flex-col items-stretch py-inset"
     >
       <ItemContent>
         <div className="flex items-start justify-between gap-2">

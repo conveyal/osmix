@@ -6,7 +6,7 @@ tokens, spacing, primitives, map overlay primitives) lives in
 
 ## Merge-only components
 
-- `PlanInputs` — the input step's **Plan** card: "Merge points at identical
+- `PlanInputs` — the input step's **Plan** section: "Merge points at identical
   coordinates automatically" (on by default), "Treat every patch feature as
   new", and the two entry points in `StepActions`: **Apply automatically**
   (outline) then **Review plan** (default).
@@ -32,7 +32,7 @@ tokens, spacing, primitives, map overlay primitives) lives in
   rows, pairing each colour with its outcome name and count; the sidebar keeps
   only the summary table.
 - `MergeResult` — the result step: the completion summary, the merged dataset
-  card, routing topology, positive IDs, and downloads.
+  section, routing topology, positive IDs, and downloads.
 - `StepActions` — the full-width vertical action footer for Merge workflow
   stages. It keeps long decision labels contained in the sidebar.
 
@@ -52,7 +52,8 @@ variant.
 The workflow has three steps: **Choose the inputs**, **Review the plan**, and
 **Merged result**; **Apply automatically** replaces the review with one task
 whose steps are Plan merge, Apply plan and Refresh result. Each step opens with
-the shared `Step` card and one plain-language sentence. Nothing changes until
+the shared `Step` section and one plain-language sentence, followed by the
+step's notices (the Inspect hint, the patch ID notice). Nothing changes until
 the plan is applied; say so in the review.
 
 Use the merge terms consistently:

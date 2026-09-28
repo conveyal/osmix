@@ -18,6 +18,7 @@ export { default as ObjectToTableRows } from "./components/object-to-table.tsx";
 export { Pager } from "./components/pager.tsx";
 export { EmptyState, LoadingState, SectionTitle } from "./components/section.tsx";
 export { StatusDot, type StatusDotStatus } from "./components/status-dot.tsx";
+export { SidebarSection } from "./components/sidebar-section.tsx";
 export { Step } from "./components/step.tsx";
 export { TaskLockProvider, useTaskLock } from "./components/task-lock.tsx";
 export { Alert, alertVariants } from "./components/ui/alert.tsx";
@@ -27,14 +28,6 @@ export {
   ButtonGroupSeparator,
   buttonGroupVariants,
 } from "./components/ui/button-group.tsx";
-export {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "./components/ui/card.tsx";
 export { Checkbox, CheckboxLabel } from "./components/ui/checkbox.tsx";
 export {
   Collapsible,

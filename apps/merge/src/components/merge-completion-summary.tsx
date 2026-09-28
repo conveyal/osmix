@@ -4,13 +4,11 @@ import {
   Details,
   DetailsContent,
   DetailsSummary,
-  Card,
-  CardContent,
-  CardHeader,
   EmptyState,
   NativeSelect,
   NativeSelectOption,
   Pager,
+  SidebarSection,
   Table,
   TableBody,
   TableCell,
@@ -255,120 +253,118 @@ export function MergeCompletionSummary({
   };
 
   return (
-    <Card role="region" aria-label="Merge completion summary">
-      <CardHeader>
-        Merge complete
-        {undecided > 0 ? " · undecided proposals were left out" : ""}
-      </CardHeader>
-      <CardContent className="p-0">
+    <SidebarSection
+      flush
+      aria-label="Merge completion summary"
+      title={`Merge complete${undecided > 0 ? " · undecided proposals were left out" : ""}`}
+    >
+      <p className="px-inset pb-inset">
+        You can export the merged dataset. This report describes the completed run.
+      </p>
+      <CountTable
+        label="Imported features by outcome"
+        rows={OUTCOMES.filter((key) => features[key] > 0).map((key) => ({
+          label: OUTCOME_LABEL[key],
+          count: features[key],
+        }))}
+      />
+      {undecided > 0 ? (
         <p className="p-inset">
-          You can export the merged dataset. This report describes the completed run.
+          Proposals for {undecided.toLocaleString()} imported{" "}
+          {undecided === 1 ? "feature were" : "features were"} waiting for a decision and were left
+          out; the features themselves were still added.
         </p>
-        <CountTable
-          label="Imported features by outcome"
-          rows={OUTCOMES.filter((key) => features[key] > 0).map((key) => ({
-            label: OUTCOME_LABEL[key],
-            count: features[key],
-          }))}
-        />
-        {undecided > 0 ? (
-          <p className="p-inset">
-            Proposals for {undecided.toLocaleString()} imported{" "}
-            {undecided === 1 ? "feature were" : "features were"} waiting for a decision and were
-            left out; the features themselves were still added.
-          </p>
-        ) : null}
-        {summary ? (
-          <>
+      ) : null}
+      {summary ? (
+        <>
+          <CountTable
+            label="Applied matching actions"
+            className="border-t"
+            rows={[
+              { label: "Tag-copy actions", count: summary.tagCopyActions },
+              { label: "Attribute values updated", count: summary.copiedTagValues },
+              { label: "Network connections", count: summary.networkAttachmentActions },
+              { label: "Replaced points removed", count: summary.removedConnectionOrphanNodes },
+              ...(summary.wayRemovalActions !== undefined
+                ? [
+                    { label: "Imported ways removed", count: summary.wayRemovalActions },
+                    { label: "Orphan points removed", count: summary.removedOrphanNodes ?? 0 },
+                  ]
+                : []),
+              {
+                label: "Imported features unresolved",
+                count: summary.unresolvedFeatures,
+                strong: true,
+              },
+            ]}
+          />
+          <div className="flex flex-col gap-2 p-inset">
+            <p>
+              Imported features considered for matching: {summary.features.toLocaleString()}.{" "}
+              Intentionally skipped: {summary.skippedFeatures.toLocaleString()}. Resolved without
+              additional matching actions: {summary.unchangedFeatures.toLocaleString()}.
+            </p>
+            <p>
+              Actions count actual changes from matching, after the ordinary merge. One feature can
+              have several actions, or an applied action and another unresolved action.
+            </p>
+            <p>
+              These details record matching. Crossings planned after it can make more connections or
+              change the junction IDs used by a way.
+            </p>
+            {summary.features === 0 ? (
+              <p>
+                No imported features were considered for matching with these options. Ordinary merge
+                rules still applied.
+              </p>
+            ) : null}
+          </div>
+          {summary.unresolvedFeatures > 0 ? (
             <CountTable
-              label="Applied matching actions"
+              label="Unresolved imported features"
               className="border-t"
               rows={[
-                { label: "Tag-copy actions", count: summary.tagCopyActions },
-                { label: "Attribute values updated", count: summary.copiedTagValues },
-                { label: "Network connections", count: summary.networkAttachmentActions },
-                { label: "Replaced points removed", count: summary.removedConnectionOrphanNodes },
-                ...(summary.wayRemovalActions !== undefined
-                  ? [
-                      { label: "Imported ways removed", count: summary.wayRemovalActions },
-                      { label: "Orphan points removed", count: summary.removedOrphanNodes ?? 0 },
-                    ]
-                  : []),
-                {
-                  label: "Imported features unresolved",
-                  count: summary.unresolvedFeatures,
-                  strong: true,
-                },
+                { label: "Multiple possible targets", count: summary.ambiguousFeatures },
+                { label: "Blocked", count: summary.blockedFeatures },
+                { label: "No matching target", count: summary.unmatchedFeatures },
+                { label: "Choice still needed", count: summary.reviewFeatures },
               ]}
             />
-            <div className="flex flex-col gap-2 p-inset">
-              <p>
-                Imported features considered for matching: {summary.features.toLocaleString()}.{" "}
-                Intentionally skipped: {summary.skippedFeatures.toLocaleString()}. Resolved without
-                additional matching actions: {summary.unchangedFeatures.toLocaleString()}.
-              </p>
-              <p>
-                Actions count actual changes from matching, after the ordinary merge. One feature
-                can have several actions, or an applied action and another unresolved action.
-              </p>
-              <p>
-                These details record matching. Crossings planned after it can make more connections
-                or change the junction IDs used by a way.
-              </p>
-              {summary.features === 0 ? (
-                <p>
-                  No imported features were considered for matching with these options. Ordinary
-                  merge rules still applied.
-                </p>
-              ) : null}
-            </div>
-            {summary.unresolvedFeatures > 0 ? (
-              <CountTable
-                label="Unresolved imported features"
-                className="border-t"
-                rows={[
-                  { label: "Multiple possible targets", count: summary.ambiguousFeatures },
-                  { label: "Blocked", count: summary.blockedFeatures },
-                  { label: "No matching target", count: summary.unmatchedFeatures },
-                  { label: "Choice still needed", count: summary.reviewFeatures },
-                ]}
-              />
-            ) : null}
-          </>
-        ) : (
-          <p className="p-inset">
-            Imported-data matching was not enabled. The ordinary merge has completed.
-          </p>
-        )}
+          ) : null}
+        </>
+      ) : (
         <p className="p-inset">
-          Skipping or leaving a match unresolved does not itself discard the import. Explicit way
-          removals are listed separately. Other additions remain under ordinary merge rules; exact
-          reconciliation can represent an imported feature with a base ID.
+          Imported-data matching was not enabled. The ordinary merge has completed.
         </p>
-        {outcome ? (
-          <>
-            <FeatureOutcomes outcome={outcome} />
-            <UncopiedTags outcome={outcome} />
-            {outcome.features.some((feature) => feature.wayRemoval) ? (
-              <ConflationWayRemovalPreview outcome={outcome} applied />
-            ) : null}
-          </>
-        ) : null}
-        <div className="flex flex-col gap-2 border-t p-inset">
-          <ActionButton icon={<DownloadIcon />} variant="outline" onAction={downloadReport}>
-            Export merge report (JSON)
-          </ActionButton>
-          {downloadError ? <Alert variant="destructive">{downloadError}</Alert> : null}
-          <p className="wrap-break-word text-muted-foreground">
-            Inputs: {completion.inputs.baseName} + {completion.inputs.patchName}.
-          </p>
-          <p>
-            To change the matching choices, start a new merge and load the original base and import
-            files again.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+      )}
+      <p className="p-inset">
+        Skipping or leaving a match unresolved does not itself discard the import. Explicit way
+        removals are listed separately. Other additions remain under ordinary merge rules; exact
+        reconciliation can represent an imported feature with a base ID.
+      </p>
+      {outcome ? (
+        <>
+          <FeatureOutcomes outcome={outcome} />
+          <UncopiedTags outcome={outcome} />
+          {outcome.features.some((feature) => feature.wayRemoval) ? (
+            <ConflationWayRemovalPreview outcome={outcome} applied />
+          ) : null}
+        </>
+      ) : null}
+      <div className="flex flex-col gap-2 border-t p-inset">
+        <ActionButton icon={<DownloadIcon />} variant="outline" onAction={downloadReport}>
+          Export merge report (JSON)
+        </ActionButton>
+        {downloadError ? <Alert variant="destructive">{downloadError}</Alert> : null}
+        <p className="wrap-break-word text-muted-foreground">
+          Inputs: {completion.inputs.baseName} + {completion.inputs.patchName}.
+        </p>
+        <p>
+          To change the matching choices, start a new merge and load the original base and import
+          files again.
+        </p>
+      </div>
+    </SidebarSection>
   );
 }
 

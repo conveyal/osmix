@@ -1,7 +1,7 @@
 import {
   appOrigin,
   NominatimSearch,
-  OsmDatasetCard,
+  OsmDatasetSection,
   OsmLoadDetails,
   OsmLoadFailurePanel,
   OsmPbfFileInput,
@@ -21,8 +21,6 @@ import {
   ActionButton,
   Alert,
   Button,
-  Card,
-  CardContent,
   Checkbox,
   CheckboxLabel,
   Field,
@@ -256,221 +254,211 @@ export function ExtractPanel() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
       {/* A finished extract replaces the form; clearing the result brings the form back. */}
       {extractOsm ? null : (
         <>
           <Step number={1} title="Select OSM PBF file">
-            <CardContent className="flex flex-col gap-2">
-              <OsmPbfFileInput
-                file={pendingFile}
-                setFile={selectFile}
-                pbfOnly
-                disabled={isExtracting}
+            <OsmPbfFileInput
+              file={pendingFile}
+              setFile={selectFile}
+              pbfOnly
+              disabled={isExtracting}
+            />
+            {pendingFile ? <SourceFileInfo file={pendingFile} header={sourceHeader} /> : null}
+            {extract.loadFailure ? (
+              <OsmLoadFailurePanel
+                failure={extract.loadFailure}
+                onDismiss={extract.clearLoadFailure}
               />
-              {pendingFile ? <SourceFileInfo file={pendingFile} header={sourceHeader} /> : null}
-              {extract.loadFailure ? (
-                <OsmLoadFailurePanel
-                  failure={extract.loadFailure}
-                  onDismiss={extract.clearLoadFailure}
-                />
-              ) : null}
-            </CardContent>
+            ) : null}
           </Step>
 
           <Step number={2} title="Select bounding box">
-            <CardContent className="flex flex-col gap-2">
-              <Field>
-                <CheckboxLabel>
-                  <Checkbox
-                    checked={useFileBounds}
-                    disabled={fileBounds.status !== "ok" || isExtracting}
-                    aria-describedby="extract-file-bounds-help"
-                    onCheckedChange={changeUseFileBounds}
-                  />
-                  Use the selected file's bounds
-                </CheckboxLabel>
-                <FieldDescription id="extract-file-bounds-help">
-                  <FileBoundsDescription fileBounds={fileBounds} />
-                </FieldDescription>
-              </Field>
-              {!useFileBounds ? (
-                <>
-                  <p className="text-muted-foreground">
-                    Find a place, drag the corners on the map, or edit the coordinates below. The
-                    rectangle updates on the map.
-                  </p>
-                  <Field>
-                    <FieldLabel htmlFor={findPlaceId}>Find a place</FieldLabel>
-                    <NominatimSearch inputId={findPlaceId} label="Find a place" />
-                  </Field>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lon">
-                      Min longitude
-                      <Input
-                        id="extract-bbox-min-lon"
-                        type="number"
-                        step="any"
-                        value={bboxInputs[0]}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setBboxInputs((prev) => [v, prev[1], prev[2], prev[3]]);
-                          const n = Number.parseFloat(v);
-                          if (Number.isFinite(n)) setBbox((b) => [n, b[1], b[2], b[3]]);
-                        }}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lat">
-                      Min latitude
-                      <Input
-                        id="extract-bbox-min-lat"
-                        type="number"
-                        step="any"
-                        value={bboxInputs[1]}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setBboxInputs((prev) => [prev[0], v, prev[2], prev[3]]);
-                          const n = Number.parseFloat(v);
-                          if (Number.isFinite(n)) setBbox((b) => [b[0], n, b[2], b[3]]);
-                        }}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1" htmlFor="extract-bbox-max-lon">
-                      Max longitude
-                      <Input
-                        id="extract-bbox-max-lon"
-                        type="number"
-                        step="any"
-                        value={bboxInputs[2]}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setBboxInputs((prev) => [prev[0], prev[1], v, prev[3]]);
-                          const n = Number.parseFloat(v);
-                          if (Number.isFinite(n)) setBbox((b) => [b[0], b[1], n, b[3]]);
-                        }}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1" htmlFor="extract-bbox-max-lat">
-                      Max latitude
-                      <Input
-                        id="extract-bbox-max-lat"
-                        type="number"
-                        step="any"
-                        value={bboxInputs[3]}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setBboxInputs((prev) => [prev[0], prev[1], prev[2], v]);
-                          const n = Number.parseFloat(v);
-                          if (Number.isFinite(n)) setBbox((b) => [b[0], b[1], b[2], n]);
-                        }}
-                      />
-                    </label>
+            <Field>
+              <CheckboxLabel>
+                <Checkbox
+                  checked={useFileBounds}
+                  disabled={fileBounds.status !== "ok" || isExtracting}
+                  aria-describedby="extract-file-bounds-help"
+                  onCheckedChange={changeUseFileBounds}
+                />
+                Use the selected file's bounds
+              </CheckboxLabel>
+              <FieldDescription id="extract-file-bounds-help">
+                <FileBoundsDescription fileBounds={fileBounds} />
+              </FieldDescription>
+            </Field>
+            {!useFileBounds ? (
+              <>
+                <p className="text-muted-foreground">
+                  Find a place, drag the corners on the map, or edit the coordinates below. The
+                  rectangle updates on the map.
+                </p>
+                <Field>
+                  <FieldLabel htmlFor={findPlaceId}>Find a place</FieldLabel>
+                  <NominatimSearch inputId={findPlaceId} label="Find a place" />
+                </Field>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lon">
+                    Min longitude
+                    <Input
+                      id="extract-bbox-min-lon"
+                      type="number"
+                      step="any"
+                      value={bboxInputs[0]}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setBboxInputs((prev) => [v, prev[1], prev[2], prev[3]]);
+                        const n = Number.parseFloat(v);
+                        if (Number.isFinite(n)) setBbox((b) => [n, b[1], b[2], b[3]]);
+                      }}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1" htmlFor="extract-bbox-min-lat">
+                    Min latitude
+                    <Input
+                      id="extract-bbox-min-lat"
+                      type="number"
+                      step="any"
+                      value={bboxInputs[1]}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setBboxInputs((prev) => [prev[0], v, prev[2], prev[3]]);
+                        const n = Number.parseFloat(v);
+                        if (Number.isFinite(n)) setBbox((b) => [b[0], n, b[2], b[3]]);
+                      }}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1" htmlFor="extract-bbox-max-lon">
+                    Max longitude
+                    <Input
+                      id="extract-bbox-max-lon"
+                      type="number"
+                      step="any"
+                      value={bboxInputs[2]}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setBboxInputs((prev) => [prev[0], prev[1], v, prev[3]]);
+                        const n = Number.parseFloat(v);
+                        if (Number.isFinite(n)) setBbox((b) => [b[0], b[1], n, b[3]]);
+                      }}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1" htmlFor="extract-bbox-max-lat">
+                    Max latitude
+                    <Input
+                      id="extract-bbox-max-lat"
+                      type="number"
+                      step="any"
+                      value={bboxInputs[3]}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setBboxInputs((prev) => [prev[0], prev[1], prev[2], v]);
+                        const n = Number.parseFloat(v);
+                        if (Number.isFinite(n)) setBbox((b) => [b[0], b[1], b[2], n]);
+                      }}
+                    />
+                  </label>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-muted-foreground" htmlFor="extract-bbox-paste">
+                    Paste bbox <code className="font-mono">min_lon,min_lat,max_lon,max_lat</code>
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="extract-bbox-paste"
+                      value={bboxText}
+                      onChange={(e) => setBboxText(e.target.value)}
+                      placeholder="-122.5,47.2,-122.3,47.5"
+                    />
+                    <Button type="button" variant="outline" onClick={applyParsedBboxString}>
+                      Parse
+                    </Button>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-muted-foreground" htmlFor="extract-bbox-paste">
-                      Paste bbox <code className="font-mono">min_lon,min_lat,max_lon,max_lat</code>
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="extract-bbox-paste"
-                        value={bboxText}
-                        onChange={(e) => setBboxText(e.target.value)}
-                        placeholder="-122.5,47.2,-122.3,47.5"
-                      />
-                      <Button type="button" variant="outline" onClick={applyParsedBboxString}>
-                        Parse
-                      </Button>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={useMapViewAsBbox}
-                  >
-                    Use current map view as bbox
-                  </Button>
-                </>
-              ) : null}
-              {!isValidBbox(bbox) ? (
-                <Alert variant="destructive">
-                  Invalid bbox: the minimum must be less than the maximum for both longitude and
-                  latitude.
-                </Alert>
-              ) : null}
-              {bboxMissesFile ? (
-                <Alert variant="warning" title="The bounding box is outside this file">
-                  It doesn't overlap the file's bounds, so the extract would be empty. Move the box
-                  over the file's area or use the file's bounds.
-                </Alert>
-              ) : null}
-            </CardContent>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={useMapViewAsBbox}
+                >
+                  Use current map view as bbox
+                </Button>
+              </>
+            ) : null}
+            {!isValidBbox(bbox) ? (
+              <Alert variant="destructive">
+                Invalid bbox: the minimum must be less than the maximum for both longitude and
+                latitude.
+              </Alert>
+            ) : null}
+            {bboxMissesFile ? (
+              <Alert variant="warning" title="The bounding box is outside this file">
+                It doesn't overlap the file's bounds, so the extract would be empty. Move the box
+                over the file's area or use the file's bounds.
+              </Alert>
+            ) : null}
           </Step>
 
           <Step number={3} title="Extract strategy">
-            <CardContent className="flex flex-col gap-2">
-              <p className="text-muted-foreground">
-                See the{" "}
-                <a
-                  href="https://osmcode.org/osmium-tool/manual.html#creating-geographic-extracts"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Osmium Tool manual
-                </a>{" "}
-                for more information about each strategy. For usage with Conveyal, use "Complete
-                ways".
-              </p>
-              <fieldset className="flex flex-col gap-2">
-                <legend className="sr-only">Extract strategy</legend>
-                {STRATEGY_OPTIONS.map((opt) => {
-                  const labelId = `extract-strategy-${opt.value}-label`;
-                  return (
-                    <RadioCard key={opt.value}>
-                      {/* Name the radio by its label only, not the tooltip trigger's label. */}
-                      <Radio
-                        name="extract-strategy"
-                        aria-labelledby={labelId}
-                        checked={strategy === opt.value}
-                        onChange={() => setStrategy(opt.value)}
-                      />
-                      <span id={labelId} className="flex-1 font-medium">
-                        {opt.label}
-                      </span>
-                      <InfoTooltip label={`About the ${opt.label} extract strategy`} side="left">
-                        {opt.hint}
-                      </InfoTooltip>
-                    </RadioCard>
-                  );
-                })}
-              </fieldset>
-            </CardContent>
+            <p className="text-muted-foreground">
+              See the{" "}
+              <a
+                href="https://osmcode.org/osmium-tool/manual.html#creating-geographic-extracts"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Osmium Tool manual
+              </a>{" "}
+              for more information about each strategy. For usage with Conveyal, use "Complete
+              ways".
+            </p>
+            <fieldset className="flex flex-col gap-2">
+              <legend className="sr-only">Extract strategy</legend>
+              {STRATEGY_OPTIONS.map((opt) => {
+                const labelId = `extract-strategy-${opt.value}-label`;
+                return (
+                  <RadioCard key={opt.value}>
+                    {/* Name the radio by its label only, not the tooltip trigger's label. */}
+                    <Radio
+                      name="extract-strategy"
+                      aria-labelledby={labelId}
+                      checked={strategy === opt.value}
+                      onChange={() => setStrategy(opt.value)}
+                    />
+                    <span id={labelId} className="flex-1 font-medium">
+                      {opt.label}
+                    </span>
+                    <InfoTooltip label={`About the ${opt.label} extract strategy`} side="left">
+                      {opt.hint}
+                    </InfoTooltip>
+                  </RadioCard>
+                );
+              })}
+            </fieldset>
           </Step>
 
           <Step number={4} title="Tag filters">
-            <CardContent>
-              <ExtractTagFilterEditor state={tagFilterEditor} onChange={setTagFilterEditor} />
-            </CardContent>
+            <ExtractTagFilterEditor state={tagFilterEditor} onChange={setTagFilterEditor} />
           </Step>
 
-          <Card>
-            <CardContent>
-              <ActionButton
-                type="button"
-                size="lg"
-                className="w-full"
-                disabled={!canExtract}
-                onAction={runExtract}
-              >
-                Extract
-              </ActionButton>
-            </CardContent>
-          </Card>
+          <div className="p-inset">
+            <ActionButton
+              type="button"
+              size="lg"
+              className="w-full"
+              disabled={!canExtract}
+              onAction={runExtract}
+            >
+              Extract
+            </ActionButton>
+          </div>
         </>
       )}
 
       {extractOsm ? (
-        <OsmDatasetCard
+        <OsmDatasetSection
           title="Extract result"
           name="extract result"
           osmFile={extract}
@@ -505,8 +493,8 @@ export function ExtractPanel() {
               settings you used are kept.
             </p>
           </div>
-        </OsmDatasetCard>
+        </OsmDatasetSection>
       ) : null}
-    </div>
+    </>
   );
 }

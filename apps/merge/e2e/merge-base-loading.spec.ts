@@ -27,7 +27,7 @@ async function loadPbf(card: Locator, page: Page, path: PbfInput) {
 const MONACO_PBF = fileURLToPath(new URL("../../../fixtures/monaco.pbf", import.meta.url));
 
 test("loads both inputs once and reaches exact reconciliation", async ({ page }) => {
-  // Keep this worker-backed journey to one load per input. Input-card actions,
+  // Keep this worker-backed journey to one load per input. Input-section actions,
   // clearing, and responsive geometry run against the production header in the
   // guidance harness instead of repeating PBF parsing and MapLibre resizing here.
   // Multi-worker replication has dedicated coverage in worker-runtime.spec.ts;
@@ -41,38 +41,38 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.osmWorker?.workerCount ?? 0)).toBe(1);
 
-  const baseCard = page
-    .locator('[data-slot="card"]')
+  const baseSection = page
+    .locator('[data-slot="sidebar-section"]')
     .filter({ hasText: "Base OSM — authoritative existing dataset" })
     .first();
-  const patchCard = page
-    .locator('[data-slot="card"]')
+  const patchSection = page
+    .locator('[data-slot="sidebar-section"]')
     .filter({ hasText: "Patch OSM — imported additions and updates" })
     .first();
 
-  await expect(baseCard.getByRole("button", { name: "Open file" })).toBeVisible();
-  await expect(patchCard.getByRole("button", { name: "Open file" })).toBeVisible();
+  await expect(baseSection.getByRole("button", { name: "Open file" })).toBeVisible();
+  await expect(patchSection.getByRole("button", { name: "Open file" })).toBeVisible();
 
-  await loadPbf(baseCard, page, MONACO_PBF);
-  await expect(baseCard.locator('[data-slot="card-description"]')).toHaveText("monaco.pbf");
-  await expect(baseCard.getByRole("button", { name: "Export base OSM as PBF" })).toBeVisible();
-  await expect(baseCard.getByRole("button", { name: "Clear base OSM file" })).toBeVisible();
-  const fileInfo = baseCard.getByRole("button", { name: "File info" });
+  await loadPbf(baseSection, page, MONACO_PBF);
+  await expect(baseSection.locator('[data-slot="osm-input-file-name"]')).toHaveText("monaco.pbf");
+  await expect(baseSection.getByRole("button", { name: "Export base OSM as PBF" })).toBeVisible();
+  await expect(baseSection.getByRole("button", { name: "Clear base OSM file" })).toBeVisible();
+  const fileInfo = baseSection.getByRole("button", { name: "File info" });
   await fileInfo.click();
-  await expect(baseCard.getByRole("row").filter({ hasText: "file name" })).toContainText(
+  await expect(baseSection.getByRole("row").filter({ hasText: "file name" })).toContainText(
     "monaco.pbf",
   );
-  await expect(baseCard).toContainText("14,286");
+  await expect(baseSection).toContainText("14,286");
 
   // Use the one Monaco PBF tracked by Git for both roles. The guidance harness
   // covers distinct displayed filenames without depending on local-only files.
-  await loadPbf(patchCard, page, MONACO_PBF);
-  await expect(patchCard.locator('[data-slot="card-description"]')).toHaveText("monaco.pbf");
-  await expect(patchCard.getByRole("button", { name: "Export patch OSM as PBF" })).toBeVisible();
-  await expect(patchCard.getByRole("button", { name: "Clear patch OSM file" })).toBeVisible();
-  await expect(patchCard.getByRole("button", { name: "Save to storage" })).toHaveCount(0);
-  await patchCard.getByRole("button", { name: "File info" }).click();
-  await expect(patchCard.getByRole("row").filter({ hasText: "file name" })).toContainText(
+  await loadPbf(patchSection, page, MONACO_PBF);
+  await expect(patchSection.locator('[data-slot="osm-input-file-name"]')).toHaveText("monaco.pbf");
+  await expect(patchSection.getByRole("button", { name: "Export patch OSM as PBF" })).toBeVisible();
+  await expect(patchSection.getByRole("button", { name: "Clear patch OSM file" })).toBeVisible();
+  await expect(patchSection.getByRole("button", { name: "Save to storage" })).toHaveCount(0);
+  await patchSection.getByRole("button", { name: "File info" }).click();
+  await expect(patchSection.getByRole("row").filter({ hasText: "file name" })).toContainText(
     "monaco.pbf",
   );
 
@@ -124,24 +124,24 @@ async function openTinyMerge(page: Page, inputs: Awaited<ReturnType<typeof tinyI
   });
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.osmWorker?.workerCount ?? 0)).toBe(1);
-  const baseCard = page
-    .locator('[data-slot="card"]')
+  const baseSection = page
+    .locator('[data-slot="sidebar-section"]')
     .filter({ hasText: "Base OSM — authoritative existing dataset" })
     .first();
-  const patchCard = page
-    .locator('[data-slot="card"]')
+  const patchSection = page
+    .locator('[data-slot="sidebar-section"]')
     .filter({ hasText: "Patch OSM — imported additions and updates" })
     .first();
-  await loadPbf(baseCard, page, inputs.base);
-  await loadPbf(patchCard, page, inputs.patch);
-  return { baseCard, patchCard };
+  await loadPbf(baseSection, page, inputs.base);
+  await loadPbf(patchSection, page, inputs.patch);
+  return { baseSection, patchSection };
 }
 
 test("a tiny automatic matching merge retains its report and starts a clean new merge", async ({
   page,
 }) => {
   const inputs = await tinyInputs();
-  const { baseCard, patchCard } = await openTinyMerge(page, inputs);
+  const { baseSection, patchSection } = await openTinyMerge(page, inputs);
   await page.getByRole("checkbox", { name: "Enable proximity matching" }).check();
   await page.getByLabel("OSM tag keys to copy").fill("name");
   const radius = page.getByRole("spinbutton", { name: "Candidate search radius (meters)" });
@@ -153,8 +153,8 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   await expect(radius).toHaveAttribute("aria-invalid", "true");
   await expect(radius).toHaveAccessibleDescription(/greater than zero/i);
   await expect(page.getByLabel("Merge completion summary")).toHaveCount(0);
-  await expect(baseCard).toContainText(inputs.base.name);
-  await expect(patchCard).toContainText(inputs.patch.name);
+  await expect(baseSection).toContainText(inputs.base.name);
+  await expect(patchSection).toContainText(inputs.patch.name);
   await radius.fill("1");
   await expect(radius).not.toHaveAttribute("aria-invalid", "true");
   await start.click();
@@ -196,10 +196,10 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   await page.getByRole("button", { name: "Start a new merge" }).click();
   await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeVisible();
   await expect(summary).toHaveCount(0);
-  await expect(baseCard.getByRole("button", { name: "Open file" })).toBeVisible();
-  await expect(patchCard.getByRole("button", { name: "Open file" })).toBeVisible();
-  await expect(baseCard).not.toContainText("completion-base.pbf");
-  await expect(patchCard).not.toContainText("completion-patch.pbf");
+  await expect(baseSection.getByRole("button", { name: "Open file" })).toBeVisible();
+  await expect(patchSection.getByRole("button", { name: "Open file" })).toBeVisible();
+  await expect(baseSection).not.toContainText("completion-base.pbf");
+  await expect(patchSection).not.toContainText("completion-patch.pbf");
 });
 
 test("a removal chosen in the review is applied and reported", async ({ page }) => {
@@ -255,7 +255,7 @@ test("a late cancellation preserves the committed exact result and replacing the
   page,
 }) => {
   const inputs = await tinyInputs();
-  const { baseCard } = await openTinyMerge(page, inputs);
+  const { baseSection } = await openTinyMerge(page, inputs);
   // Hold only the return after the real worker commits, so cancellation exercises
   // the actual irreversible boundary without racing a tiny fixture's parse time.
   await page.evaluate(() => {
@@ -301,9 +301,9 @@ test("a late cancellation preserves the committed exact result and replacing the
   // base is loaded. Either way the base dataset changes, which must invalidate the completed
   // merge.
   await page.getByRole("button", { name: "Clear merged OSM" }).click();
-  await loadPbf(baseCard, page, inputs.base);
+  await loadPbf(baseSection, page, inputs.base);
   await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeVisible();
   await expect(summary).toHaveCount(0);
-  await expect(baseCard.getByRole("button", { name: "File info" })).toBeVisible();
+  await expect(baseSection.getByRole("button", { name: "File info" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Export merged PBF" })).toHaveCount(0);
 });

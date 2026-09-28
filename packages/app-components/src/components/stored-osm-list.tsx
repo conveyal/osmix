@@ -13,10 +13,6 @@ import {
   DetailsContent,
   DetailsSummary,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   IconButton,
   Input,
   Item,
@@ -35,7 +31,6 @@ import {
   CheckIcon,
   CircleStopIcon,
   DatabaseIcon,
-  FilesIcon,
   PencilIcon,
   RotateCcwIcon,
   Trash2Icon,
@@ -131,12 +126,7 @@ function StoredOsmItem({ entry, onLoad, isActive }: StoredOsmItemProps) {
   });
 
   return (
-    <Item
-      role="listitem"
-      variant="outline"
-      className={isActive ? "border-info/60 bg-info/5" : undefined}
-      aria-current={isActive ? "true" : undefined}
-    >
+    <Item role="listitem" variant="row" aria-current={isActive ? "true" : undefined}>
       <ItemHeader>
         {isRenaming ? (
           <Input
@@ -210,6 +200,11 @@ interface StoredOsmListProps {
   openOsmPbfUrl?: (url: string) => Promise<OsmInfo | null>;
 }
 
+/**
+ * Open a file or URL, pick the load profile, and restore from the files stored in IndexedDB.
+ * It has no frame of its own: place it in a `flush` `SidebarSection`, whose title names the slot
+ * it fills. The stored files are a divided list that reaches the section edges.
+ */
 export function StoredOsmList({
   activeOsmId,
   loadFailure,
@@ -227,82 +222,74 @@ export function StoredOsmList({
   const isLoading = loadingState !== null && (!osmKey || loadingState.osmKey === osmKey);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          <FilesIcon aria-hidden="true" className="size-3.5" />
-          Files
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="flex gap-2 p-inset">
-          {isLoading ? (
-            <Button
-              variant="destructive"
-              className="flex-1"
-              // The load holds the task lock until it actually stops, then clears this state.
-              disabled={current?.status === "cancelling"}
-              onClick={() => loadingState.controller.abort()}
-            >
-              <CircleStopIcon aria-hidden="true" />
-              {current?.status === "cancelling" ? "Cancelling…" : "Cancel loading"}
-            </Button>
-          ) : (
-            <>
-              <OsmPbfSelectFileButton
-                setFile={async (file, fileType) => {
-                  if (file == null) return;
-                  await openOsmFile(file, fileType);
-                }}
-              />
-              <OsmPbfOpenUrlButton
-                openPbfUrl={openOsmPbfUrl}
-                setFile={async (file, fileType) => {
-                  if (file == null) return;
-                  await openOsmFile(file, fileType);
-                }}
-              />
-            </>
-          )}
-        </div>
-        {!isLoading ? (
-          <div className="px-inset pb-inset">
-            <OsmLoadProfileSelector value={loadProfile} onChange={setLoadProfile} />
-          </div>
-        ) : null}
-        {loadFailure && onDismissLoadFailure ? (
-          <OsmLoadFailurePanel
-            className="mx-inset mb-inset"
-            failure={loadFailure}
-            onDismiss={onDismissLoadFailure}
-            onReloadView={onReloadView}
-          />
-        ) : null}
-        {entries.length > 0 && (
-          <Details>
-            <DetailsSummary>
-              <DatabaseIcon aria-hidden="true" className="size-3.5" />
-              Stored
-              <span className="text-muted-foreground">
-                &middot; {entries.length} &middot; {formatBytes(estimatedBytes)}
-              </span>
-            </DetailsSummary>
-            <DetailsContent>
-              <ItemGroup className="gap-2 p-inset">
-                {entries.map((entry) => (
-                  <StoredOsmItem
-                    key={entry.fileHash}
-                    entry={entry}
-                    onLoad={openOsmFile}
-                    isActive={entry.fileHash === activeOsmId}
-                  />
-                ))}
-              </ItemGroup>
-            </DetailsContent>
-          </Details>
+    <>
+      <div className={isLoading ? "flex gap-2 px-inset pb-inset" : "flex gap-2 px-inset pb-2"}>
+        {isLoading ? (
+          <Button
+            variant="destructive"
+            className="flex-1"
+            // The load holds the task lock until it actually stops, then clears this state.
+            disabled={current?.status === "cancelling"}
+            onClick={() => loadingState.controller.abort()}
+          >
+            <CircleStopIcon aria-hidden="true" />
+            {current?.status === "cancelling" ? "Cancelling…" : "Cancel loading"}
+          </Button>
+        ) : (
+          <>
+            <OsmPbfSelectFileButton
+              setFile={async (file, fileType) => {
+                if (file == null) return;
+                await openOsmFile(file, fileType);
+              }}
+            />
+            <OsmPbfOpenUrlButton
+              openPbfUrl={openOsmPbfUrl}
+              setFile={async (file, fileType) => {
+                if (file == null) return;
+                await openOsmFile(file, fileType);
+              }}
+            />
+          </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+      {!isLoading ? (
+        <div className="px-inset pb-inset">
+          <OsmLoadProfileSelector value={loadProfile} onChange={setLoadProfile} />
+        </div>
+      ) : null}
+      {loadFailure && onDismissLoadFailure ? (
+        <OsmLoadFailurePanel
+          className="mx-inset mb-inset"
+          failure={loadFailure}
+          onDismiss={onDismissLoadFailure}
+          onReloadView={onReloadView}
+        />
+      ) : null}
+      {entries.length > 0 && (
+        <Details>
+          <DetailsSummary>
+            <DatabaseIcon aria-hidden="true" className="size-3.5" />
+            Stored
+            <span className="text-muted-foreground">
+              &middot; {entries.length} &middot; {formatBytes(estimatedBytes)}
+            </span>
+          </DetailsSummary>
+          <DetailsContent>
+            <ItemGroup>
+              {entries.map((entry) => (
+                <StoredOsmItem
+                  key={entry.fileHash}
+                  entry={entry}
+                  onLoad={openOsmFile}
+                  isActive={entry.fileHash === activeOsmId}
+                />
+              ))}
+            </ItemGroup>
+          </DetailsContent>
+        </Details>
+      )}
+    </>
   );
 }
 
