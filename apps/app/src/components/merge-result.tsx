@@ -6,6 +6,7 @@ import type { MergePlanOverview } from "osmix";
 import type { ReactNode } from "react";
 
 import { ConflationRoutingDiagnostics } from "./conflation-routing-diagnostics";
+import { OpenInMenu } from "./open-in-menu";
 import { StepActions } from "./step-actions";
 
 /**
@@ -72,6 +73,7 @@ export function MergeResult({
               >
                 Export merged PBF
               </ActionButton>
+              <OpenInMenu osmFile={base} targets={["inspect", "extract"]} />
               <ActionButton icon={<ArrowLeftIcon />} variant="outline" onAction={onStartNew}>
                 Start a new merge
               </ActionButton>

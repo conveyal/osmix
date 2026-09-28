@@ -9,6 +9,7 @@ import {
 import { useSetAtom } from "jotai";
 import type { OsmFileType } from "osmix";
 
+import { OpenInMenu } from "../components/open-in-menu";
 import { INSPECT_OSM_KEY } from "../settings";
 
 /** The Inspect page's sidebar: one dataset. The shared map shows it with the routing tool. */
@@ -44,5 +45,11 @@ export function InspectSidebar() {
     }
   };
 
-  return <InspectPanel osmKey={INSPECT_OSM_KEY} openOsmFile={openOsmFile} />;
+  return (
+    <InspectPanel
+      osmKey={INSPECT_OSM_KEY}
+      openOsmFile={openOsmFile}
+      datasetAction={<OpenInMenu osmFile={osmFile} targets={["base", "patch", "extract"]} />}
+    />
+  );
 }

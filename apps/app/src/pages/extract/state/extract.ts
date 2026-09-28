@@ -57,3 +57,29 @@ export const extractSourceHeaderAtom = atom<OsmPbfHeaderBlock | null>(null);
 
 /** The settings the current extract result was made with. */
 export const extractParametersAtom = atom<ExtractParameters | null>(null);
+
+/**
+ * Make a dataset the next extract's source, as when it arrives from another page: forget any
+ * selected file, show the dataset's extent, and start an unedited bbox from it. The caller has
+ * put the dataset in the source slot.
+ */
+export const datasetAsExtractSourceAtom = atom(null, (get, set, extent: GeoBbox2D | null) => {
+  set(extractSourceFileAtom, null);
+  set(extractSourceHeaderAtom, null);
+  set(extractParametersAtom, null);
+  const before = get(bboxBeforeFileBoundsAtom);
+  if (get(useFileBoundsAtom) && before) set(extractBboxAtom, before);
+  set(useFileBoundsAtom, false);
+  set(bboxBeforeFileBoundsAtom, null);
+  set(
+    fileBoundsAtom,
+    extent ? { status: "ok", bbox: extent, from: "dataset" } : { status: "missing" },
+  );
+  if (!extent) return;
+  const current = get(extractBboxAtom);
+  const automatic = get(automaticBboxAtom);
+  if (current.every((value, i) => value === automatic[i])) {
+    set(extractBboxAtom, extent);
+    set(automaticBboxAtom, extent);
+  }
+});

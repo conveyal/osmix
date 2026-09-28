@@ -8,6 +8,7 @@ import { SidebarSection } from "@osmix/ui";
 import { useSetAtom } from "jotai";
 import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
+import type { ReactNode } from "react";
 import { Link } from "wouter";
 
 import { useFlyToOsmBounds } from "../hooks/map.ts";
@@ -20,12 +21,15 @@ import StoredOsmList from "./stored-osm-list.tsx";
 /**
  * Sidebar panel for inspecting one loaded dataset: source links and stored files while the
  * slot is empty, then the dataset section (file info, save, download, clear) and the within-dataset
- * duplicate fixes (scan, review, apply, download) once a dataset is loaded.
+ * duplicate fixes (scan, review, apply, download) once a dataset is loaded. `datasetAction`
+ * goes above the loaded dataset's info, such as a way to open it on another page.
  */
 export function InspectPanel({
+  datasetAction,
   osmKey,
   openOsmFile,
 }: {
+  datasetAction?: ReactNode;
   /** The osm slot this panel inspects. */
   osmKey: string;
   openOsmFile: (file: File | string, fileType?: OsmFileType) => Promise<OsmInfo | null>;
@@ -108,7 +112,13 @@ export function InspectPanel({
 
   return (
     <>
-      <OsmDatasetSection title="Dataset" name="dataset" osmFile={baseOsm} onClear={clearDataset} />
+      <OsmDatasetSection
+        title="Dataset"
+        name="dataset"
+        osmFile={baseOsm}
+        onClear={clearDataset}
+        primaryAction={datasetAction}
+      />
       <DuplicateFixes osmFile={baseOsm} />
     </>
   );

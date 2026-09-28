@@ -5,7 +5,6 @@ import {
   OsmLoadDetails,
   OsmLoadFailurePanel,
   OsmPbfFileInput,
-  pagePath,
   SaveToDiskNotice,
   StoredOsmList,
   useFlyToOsmBounds,
@@ -42,8 +41,8 @@ import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
 import { DownloadIcon, XIcon } from "lucide-react";
 import type { ExtractStrategy, GeoBbox2D, OsmInfo } from "osmix";
 import { useId, useRef, useState } from "react";
-import { Link } from "wouter";
 
+import { OpenInMenu } from "../../components/open-in-menu";
 import { EXTRACT_OSM_KEY, EXTRACT_SOURCE_OSM_KEY } from "../../settings";
 import { type ExtractParameters, ExtractResultStats } from "./components/extract-result-stats";
 import ExtractTagFilterEditor, {
@@ -616,13 +615,7 @@ export function ExtractPanel() {
         >
           <div className="flex flex-col gap-2 p-inset">
             <SaveToDiskNotice />
-            <p className="text-muted-foreground">
-              To merge this extract, save it to storage, then open it from the stored files in{" "}
-              <Link href={pagePath("merge")} className="text-info underline">
-                Merge
-              </Link>
-              .
-            </p>
+            <OpenInMenu osmFile={extract} targets={["inspect", "base", "patch"]} />
             <p className="text-muted-foreground">
               To change the file, bounding box, strategy or tag filters, clear this result. The
               settings you used are kept.

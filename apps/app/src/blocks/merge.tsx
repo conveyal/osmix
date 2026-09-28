@@ -559,8 +559,8 @@ export default function MergeBlock() {
               <Link href={pagePath("inspect")} className="text-info underline">
                 Inspect
               </Link>{" "}
-              to find and fix duplicate nodes and ways, then save the cleaned file and open it here
-              from the stored files.
+              to find and fix duplicate nodes and ways, then send the cleaned file here with its{" "}
+              <strong>Open in</strong> menu.
             </p>
           </Alert>
         ) : null}
