@@ -72,24 +72,29 @@ function observable(plan: MergePlan) {
 }
 
 describe("setMergePlanDecisions", () => {
-  it.each([1, 2, 3])("matches a fresh plan after random decisions (seed %i)", (seed) => {
-    const random = mulberry32(seed);
-    const plan = planMerge(base, patch, { matching }, quiet);
-    const decisions = new Map<string, PlanDecision["action"]>();
-    for (let step = 0; step < 6; step++) {
-      const decidable = [...plan.proposals.values()].filter(
-        (proposal) => proposal.kind !== "add" && proposal.kind !== "same-id-replace",
-      );
-      const proposal = decidable[Math.floor(random() * decidable.length)]!;
-      const roll = random();
-      if (roll < 0.2) decisions.delete(proposal.id);
-      else decisions.set(proposal.id, roll < 0.6 ? "accept" : "reject");
-      const list = [...decisions].map(([proposalId, action]) => ({ proposalId, action }));
-      setMergePlanDecisions(plan, list);
-      const fresh = planMerge(base, patch, { matching, decisions: list }, quiet);
-      expect(observable(plan), `step ${step}: ${proposal.id}`).toEqual(observable(fresh));
-    }
-  });
+  it.each([1, 2, 3])(
+    "matches a fresh plan after random decisions (seed %i)",
+    (seed) => {
+      const random = mulberry32(seed);
+      const plan = planMerge(base, patch, { matching }, quiet);
+      const decisions = new Map<string, PlanDecision["action"]>();
+      for (let step = 0; step < 6; step++) {
+        const decidable = [...plan.proposals.values()].filter(
+          (proposal) => proposal.kind !== "add" && proposal.kind !== "same-id-replace",
+        );
+        const proposal = decidable[Math.floor(random() * decidable.length)]!;
+        const roll = random();
+        if (roll < 0.2) decisions.delete(proposal.id);
+        else decisions.set(proposal.id, roll < 0.6 ? "accept" : "reject");
+        const list = [...decisions].map(([proposalId, action]) => ({ proposalId, action }));
+        setMergePlanDecisions(plan, list);
+        const fresh = planMerge(base, patch, { matching, decisions: list }, quiet);
+        expect(observable(plan), `step ${step}: ${proposal.id}`).toEqual(observable(fresh));
+      }
+      // Twelve Monaco plans: about 2s alone, but past the 5s default under a full parallel run.
+    },
+    30_000,
+  );
 
   it("matches a fresh plan after each kind of decision", () => {
     const plan = planMerge(base, patch, { matching }, quiet);
