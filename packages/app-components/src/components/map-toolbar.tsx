@@ -88,13 +88,14 @@ function MapZoomReadout() {
 /**
  * The map tools, in the nav (`OsmixMap` portals them into its map-tools slot): the map center,
  * zoom out, the zoom level, zoom in, fit to all loaded data, then the search popover, the
- * basemap menu and, with `routing`, the routing tool.
+ * basemap menu and the routing tool, which is disabled without `routing` so the toolbar keeps
+ * its shape across pages.
  * The toolbar registers the routing tool with the overlay's Esc stack while it is active.
  */
 export function MapToolbar({
   routing = false,
 }: {
-  /** Show the "Route between two points" tool (Inspect only). */
+  /** Enable the "Route between two points" tool (Inspect only). */
   routing?: boolean;
 }) {
   const map = useMap();
@@ -174,15 +175,13 @@ export function MapToolbar({
           </MenuCheckboxItem>
         </MenuContent>
       </Menu>
-      {routing ? (
-        <IconButton
-          label="Route between two points"
-          aria-pressed={routingActive}
-          disabled={!canRoute}
-          icon={<NavigationIcon aria-hidden="true" />}
-          onClick={() => (routingActive ? exitRouting() : enterRouting())}
-        />
-      ) : null}
+      <IconButton
+        label={routing ? "Route between two points" : "Route between two points (in Inspect)"}
+        aria-pressed={routingActive}
+        disabled={!routing || !canRoute}
+        icon={<NavigationIcon aria-hidden="true" />}
+        onClick={() => (routingActive ? exitRouting() : enterRouting())}
+      />
     </div>
   );
 }

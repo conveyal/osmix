@@ -1,6 +1,6 @@
 import { pagePath } from "@osmix/app-components";
 import { osmFileInfoAtomFamily } from "@osmix/app-core";
-import { buttonVariants, FeatureSection, FullPage } from "@osmix/ui";
+import { Button, FeatureSection, FullPage } from "@osmix/ui";
 import { useAtomValue } from "jotai";
 import { ArrowRightIcon } from "lucide-react";
 import { Link } from "wouter";
@@ -14,13 +14,13 @@ import {
   PATCH_OSM_KEY,
 } from "../settings";
 
-/** A link to a page, styled as an outline button. */
+/** A link to a page, rendered as an outline button. */
 function OpenPage({ page, label }: { page: Parameters<typeof pagePath>[0]; label: string }) {
   return (
-    <Link href={pagePath(page)} className={buttonVariants({ variant: "outline" })}>
+    <Button variant="outline" render={<Link href={pagePath(page)} />}>
       {label}
       <ArrowRightIcon aria-hidden="true" />
-    </Link>
+    </Button>
   );
 }
 

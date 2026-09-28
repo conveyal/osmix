@@ -79,10 +79,15 @@ test("pages keep their datasets, the map and stored files across navigation", as
     timeout: 60_000,
   });
   await sameMapCanvas(page);
+  // The routing tool stays in the toolbar, disabled outside Inspect.
+  await expect(
+    page.getByRole("button", { name: "Route between two points (in Inspect)" }),
+  ).toBeDisabled();
 
   // Back on Inspect the dataset is still open, and Home lists what each page holds.
   await nav.getByRole("link", { name: "Inspect" }).click();
   await expect(page.getByRole("button", { name: "Clear dataset" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Route between two points" })).toBeEnabled();
   await sameMapCanvas(page);
   await page.getByRole("link", { name: "Osmix home" }).click();
   const home = page.getByRole("main", { name: "Osmix" });
