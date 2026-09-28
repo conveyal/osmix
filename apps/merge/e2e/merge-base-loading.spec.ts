@@ -161,13 +161,9 @@ test("a tiny automatic matching merge retains its report and starts a clean new 
   const summary = page.getByLabel("Merge completion summary");
   await expect(summary).toBeVisible();
   await expect(page.getByRole("button", { name: "Export merged PBF" })).toBeVisible();
-  await expect(summary.getByLabel("Applied matching actions").locator("dd")).toHaveText([
-    "1",
-    "1",
-    "0",
-    "0",
-    "0",
-  ]);
+  // Counts are right-aligned numeric cells.
+  const counts = summary.getByRole("table", { name: "Applied matching actions" });
+  await expect(counts.locator('[data-numeric="true"]')).toHaveText(["1", "1", "0", "0", "0"]);
   await expect(summary.getByLabel("Imported features by outcome")).toContainText("Merged");
   await expect(summary).toContainText("completion-base.pbf + completion-patch.pbf");
   const downloadPromise = page.waitForEvent("download");

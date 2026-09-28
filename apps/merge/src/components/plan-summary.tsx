@@ -53,14 +53,14 @@ export function PlanSummary({ overview }: { overview: MergePlanOverview }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Outcome</TableHead>
-                <TableHead>Features</TableHead>
+                <TableHead numeric>Features</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {OUTCOMES.filter((outcome) => summary.features[outcome] > 0).map((outcome) => (
                 <TableRow key={outcome} title={OUTCOME_HELP[outcome]}>
                   <TableCell>{OUTCOME_LABEL[outcome]}</TableCell>
-                  <TableCell>{summary.features[outcome].toLocaleString()}</TableCell>
+                  <TableCell numeric>{summary.features[outcome].toLocaleString()}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

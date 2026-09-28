@@ -61,50 +61,50 @@ function ChangesSummaryTable({ variant }: { variant: ChangesSummaryVariant }) {
         <TableBody>
           <TableRow>
             <TableCell>Total changes</TableCell>
-            <TableCell>{summary.totalChanges.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.totalChanges.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Node changes</TableCell>
-            <TableCell>{summary.nodeChanges.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.nodeChanges.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Way changes</TableCell>
-            <TableCell>{summary.wayChanges.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.wayChanges.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Relation changes</TableCell>
-            <TableCell>{summary.relationChanges.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.relationChanges.toLocaleString()}</TableCell>
           </TableRow>
 
           <TableRow>
             <TableCell>
               {variant === "deduplication" ? "Duplicate nodes" : "Reconciled nodes"}
             </TableCell>
-            <TableCell>{summary.deduplicatedNodes.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.deduplicatedNodes.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Node references rewritten</TableCell>
-            <TableCell>{summary.deduplicatedNodesReplaced.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.deduplicatedNodesReplaced.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>
               {variant === "deduplication" ? "Duplicate ways" : "Reconciled ways"}
             </TableCell>
-            <TableCell>{summary.deduplicatedWays.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.deduplicatedWays.toLocaleString()}</TableCell>
           </TableRow>
           {variant === "changeset" ? (
             <>
               <TableRow>
                 <TableCell>Intersection points found</TableCell>
-                <TableCell>{summary.intersectionPointsFound.toLocaleString()}</TableCell>
+                <TableCell numeric>{summary.intersectionPointsFound.toLocaleString()}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>Intersection nodes created</TableCell>
-                <TableCell>{summary.intersectionNodesCreated.toLocaleString()}</TableCell>
+                <TableCell numeric>{summary.intersectionNodesCreated.toLocaleString()}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>Replaced imported points removed</TableCell>
-                <TableCell>{summary.intersectionNodesRemoved.toLocaleString()}</TableCell>
+                <TableCell numeric>{summary.intersectionNodesRemoved.toLocaleString()}</TableCell>
               </TableRow>
             </>
           ) : null}

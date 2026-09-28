@@ -11,6 +11,10 @@ import {
   NativeSelect,
   NativeSelectOption,
   Pager,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
 } from "@osmix/ui";
 import { DownloadIcon } from "lucide-react";
 import type { OsmConflationOutcomeReport } from "osmix";
@@ -179,18 +183,17 @@ function UncopiedTags({ outcome }: { outcome: OsmConflationOutcomeReport }) {
         </div>
         {tag ? (
           <>
-            <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 border-t p-inset">
-              <dt>Imported features with this tag</dt>
-              <dd>{tag.presentFeatures.toLocaleString()}</dd>
-              <dt>Copied to a base target</dt>
-              <dd>{tag.copiedFeatures.toLocaleString()}</dd>
-              <dt>Already equal when considered</dt>
-              <dd>{tag.alreadyEqualFeatures.toLocaleString()}</dd>
-              <dt>Satisfied by another copy</dt>
-              <dd>{tag.satisfiedByOtherCopyFeatures.toLocaleString()}</dd>
-              <dt>Not copied</dt>
-              <dd>{tag.uncopied.length.toLocaleString()}</dd>
-            </dl>
+            <CountTable
+              label={`Outcomes for ${tag.key}`}
+              className="border-t"
+              rows={[
+                { label: "Imported features with this tag", count: tag.presentFeatures },
+                { label: "Copied to a base target", count: tag.copiedFeatures },
+                { label: "Already equal when considered", count: tag.alreadyEqualFeatures },
+                { label: "Satisfied by another copy", count: tag.satisfiedByOtherCopyFeatures },
+                { label: "Not copied", count: tag.uncopied.length },
+              ]}
+            />
             <ul className="divide-y border-t" aria-label="Selected tag not copied details">
               {tag.uncopied.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((feature) => (
                 <li
@@ -258,51 +261,47 @@ export function MergeCompletionSummary({
         {undecided > 0 ? " · undecided proposals were left out" : ""}
       </CardHeader>
       <CardContent className="p-0">
-        <div className="flex flex-col gap-2 p-inset">
-          <p>You can download the merged dataset. This report describes the completed run.</p>
-          <dl
-            className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1"
-            aria-label="Imported features by outcome"
-          >
-            {OUTCOMES.filter((key) => features[key] > 0).map((key) => (
-              <div key={key} className="contents">
-                <dt>{OUTCOME_LABEL[key]}</dt>
-                <dd>{features[key].toLocaleString()}</dd>
-              </div>
-            ))}
-          </dl>
-          {undecided > 0 ? (
-            <p>
-              Proposals for {undecided.toLocaleString()} imported{" "}
-              {undecided === 1 ? "feature were" : "features were"} waiting for a decision and were
-              left out; the features themselves were still added.
-            </p>
-          ) : null}
-          {summary ? (
-            <>
-              <dl
-                className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1"
-                aria-label="Applied matching actions"
-              >
-                <dt>Tag-copy actions</dt>
-                <dd>{summary.tagCopyActions.toLocaleString()}</dd>
-                <dt>Attribute values updated</dt>
-                <dd>{summary.copiedTagValues.toLocaleString()}</dd>
-                <dt>Network connections</dt>
-                <dd>{summary.networkAttachmentActions.toLocaleString()}</dd>
-                <dt>Replaced points removed</dt>
-                <dd>{summary.removedConnectionOrphanNodes.toLocaleString()}</dd>
-                {summary.wayRemovalActions !== undefined ? (
-                  <>
-                    <dt>Imported ways removed</dt>
-                    <dd>{summary.wayRemovalActions.toLocaleString()}</dd>
-                    <dt>Orphan points removed</dt>
-                    <dd>{(summary.removedOrphanNodes ?? 0).toLocaleString()}</dd>
-                  </>
-                ) : null}
-                <dt className="font-semibold">Imported features unresolved</dt>
-                <dd className="font-semibold">{summary.unresolvedFeatures.toLocaleString()}</dd>
-              </dl>
+        <p className="p-inset">
+          You can export the merged dataset. This report describes the completed run.
+        </p>
+        <CountTable
+          label="Imported features by outcome"
+          rows={OUTCOMES.filter((key) => features[key] > 0).map((key) => ({
+            label: OUTCOME_LABEL[key],
+            count: features[key],
+          }))}
+        />
+        {undecided > 0 ? (
+          <p className="p-inset">
+            Proposals for {undecided.toLocaleString()} imported{" "}
+            {undecided === 1 ? "feature were" : "features were"} waiting for a decision and were
+            left out; the features themselves were still added.
+          </p>
+        ) : null}
+        {summary ? (
+          <>
+            <CountTable
+              label="Applied matching actions"
+              className="border-t"
+              rows={[
+                { label: "Tag-copy actions", count: summary.tagCopyActions },
+                { label: "Attribute values updated", count: summary.copiedTagValues },
+                { label: "Network connections", count: summary.networkAttachmentActions },
+                { label: "Replaced points removed", count: summary.removedConnectionOrphanNodes },
+                ...(summary.wayRemovalActions !== undefined
+                  ? [
+                      { label: "Imported ways removed", count: summary.wayRemovalActions },
+                      { label: "Orphan points removed", count: summary.removedOrphanNodes ?? 0 },
+                    ]
+                  : []),
+                {
+                  label: "Imported features unresolved",
+                  count: summary.unresolvedFeatures,
+                  strong: true,
+                },
+              ]}
+            />
+            <div className="flex flex-col gap-2 p-inset">
               <p>
                 Imported features considered for matching: {summary.features.toLocaleString()}.{" "}
                 Intentionally skipped: {summary.skippedFeatures.toLocaleString()}. Resolved without
@@ -322,31 +321,30 @@ export function MergeCompletionSummary({
                   merge rules still applied.
                 </p>
               ) : null}
-              {summary.unresolvedFeatures > 0 ? (
-                <dl
-                  className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 border-t pt-2"
-                  aria-label="Unresolved imported features"
-                >
-                  <dt>Multiple possible targets</dt>
-                  <dd>{summary.ambiguousFeatures.toLocaleString()}</dd>
-                  <dt>Blocked</dt>
-                  <dd>{summary.blockedFeatures.toLocaleString()}</dd>
-                  <dt>No matching target</dt>
-                  <dd>{summary.unmatchedFeatures.toLocaleString()}</dd>
-                  <dt>Choice still needed</dt>
-                  <dd>{summary.reviewFeatures.toLocaleString()}</dd>
-                </dl>
-              ) : null}
-            </>
-          ) : (
-            <p>Imported-data matching was not enabled. The ordinary merge has completed.</p>
-          )}
-          <p>
-            Skipping or leaving a match unresolved does not itself discard the import. Explicit way
-            removals are listed separately. Other additions remain under ordinary merge rules; exact
-            reconciliation can represent an imported feature with a base ID.
+            </div>
+            {summary.unresolvedFeatures > 0 ? (
+              <CountTable
+                label="Unresolved imported features"
+                className="border-t"
+                rows={[
+                  { label: "Multiple possible targets", count: summary.ambiguousFeatures },
+                  { label: "Blocked", count: summary.blockedFeatures },
+                  { label: "No matching target", count: summary.unmatchedFeatures },
+                  { label: "Choice still needed", count: summary.reviewFeatures },
+                ]}
+              />
+            ) : null}
+          </>
+        ) : (
+          <p className="p-inset">
+            Imported-data matching was not enabled. The ordinary merge has completed.
           </p>
-        </div>
+        )}
+        <p className="p-inset">
+          Skipping or leaving a match unresolved does not itself discard the import. Explicit way
+          removals are listed separately. Other additions remain under ordinary merge rules; exact
+          reconciliation can represent an imported feature with a base ID.
+        </p>
         {outcome ? (
           <>
             <FeatureOutcomes outcome={outcome} />
@@ -371,5 +369,31 @@ export function MergeCompletionSummary({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Label–count rows as a flush table, the counts right-aligned so they line up. */
+function CountTable({
+  label,
+  rows,
+  className,
+}: {
+  label: string;
+  rows: { label: string; count: number; strong?: boolean }[];
+  className?: string;
+}) {
+  return (
+    <Table aria-label={label} className={className}>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.label}>
+            <TableCell className={row.strong ? "font-semibold" : undefined}>{row.label}</TableCell>
+            <TableCell numeric className={row.strong ? "font-semibold" : undefined}>
+              {row.count.toLocaleString()}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

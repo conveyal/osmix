@@ -68,9 +68,9 @@ export function RoutingTopology({
         <TableHeader>
           <TableRow>
             <TableHead>Mode / metric</TableHead>
-            <TableHead>Base</TableHead>
-            <TableHead>{applied ? "Merged result" : "Planned result"}</TableHead>
-            <TableHead>Signed delta</TableHead>
+            <TableHead numeric>Base</TableHead>
+            <TableHead numeric>{applied ? "Merged result" : "Planned result"}</TableHead>
+            <TableHead numeric>Signed delta</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -82,9 +82,9 @@ export function RoutingTopology({
                   <TableCell>
                     {mode.toUpperCase()} / {METRIC_LABEL[metric]}
                   </TableCell>
-                  <TableCell>{value.before[metric].toLocaleString()}</TableCell>
-                  <TableCell>{value.after[metric].toLocaleString()}</TableCell>
-                  <TableCell>{formatDelta(value.delta[metric])}</TableCell>
+                  <TableCell numeric>{value.before[metric].toLocaleString()}</TableCell>
+                  <TableCell numeric>{value.after[metric].toLocaleString()}</TableCell>
+                  <TableCell numeric>{formatDelta(value.delta[metric])}</TableCell>
                 </TableRow>
               );
             }),

@@ -43,12 +43,19 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   );
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+/** `numeric` right-aligns the heading over a column of numbers. */
+function TableHead({
+  className,
+  numeric = false,
+  ...props
+}: React.ComponentProps<"th"> & { numeric?: boolean }) {
   return (
     <th
       data-slot="table-head"
+      data-numeric={numeric || undefined}
       className={cn(
         "px-2 py-1 text-left align-top font-mono font-bold tracking-wider text-muted-foreground uppercase first:pl-inset last:pr-inset",
+        numeric && "text-right",
         className,
       )}
       {...props}
@@ -57,14 +64,21 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
 }
 
 /**
- * `select-all` is intentional: clicking a cell selects its full value for copying.
+ * `select-all` is intentional: clicking a cell selects its full value for copying. `numeric`
+ * right-aligns a number so a column of them lines up by place value (digits are tabular).
  */
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({
+  className,
+  numeric = false,
+  ...props
+}: React.ComponentProps<"td"> & { numeric?: boolean }) {
   return (
     <td
       data-slot="table-cell"
+      data-numeric={numeric || undefined}
       className={cn(
         "overflow-hidden px-2 py-1 align-top font-mono text-ellipsis whitespace-nowrap select-all first:pl-inset last:pr-inset",
+        numeric && "text-right",
         className,
       )}
       {...props}
