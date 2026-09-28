@@ -225,7 +225,7 @@ async function pbfFingerprint(osm: Osm): Promise<{ sha256: string; bytes: number
     {
       ...osm.header,
       writingprogram: "@osmix/core",
-      osmosis_replication_timestamp: 1_700_000_000_000,
+      osmosis_replication_timestamp: 1_700_000_000,
     },
     sortedEntities(osm),
   )

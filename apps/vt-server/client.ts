@@ -113,7 +113,7 @@ async function loadNewOsmMap() {
 			<dd>${meta.header.optional_features.join(", ")}</dd>
 
 			<dt title="osmosis replication timestamp">timestamp</dt>
-			<dd>${new Date(meta.header.osmosis_replication_timestamp ?? 0).toISOString()}</dd>
+			<dd>${new Date((meta.header.osmosis_replication_timestamp ?? 0) * 1000).toISOString()}</dd>
 
 			<dt>bbox</dt>
 			<dd>${meta.bbox.join(", ")}</dd>
