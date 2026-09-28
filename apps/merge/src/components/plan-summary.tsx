@@ -16,7 +16,7 @@ import {
 import type { MergePlanOverview } from "osmix";
 
 import { OUTCOME_HELP, OUTCOME_LABEL, OUTCOMES } from "../lib/merge-plan-workflow";
-import { ConflationRoutingDiagnostics } from "./conflation-routing-diagnostics";
+import { RoutingTopology } from "./conflation-routing-diagnostics";
 
 /** What the plan does, by imported feature, and anything that stops it from applying. */
 export function PlanSummary({ overview }: { overview: MergePlanOverview }) {
@@ -72,14 +72,14 @@ export function PlanSummary({ overview }: { overview: MergePlanOverview }) {
               because they would change the drivable network.
             </p>
           ) : null}
+          <Details defaultOpen={false}>
+            <DetailsSummary>Routing topology impact</DetailsSummary>
+            <DetailsContent>
+              <RoutingTopology diagnostics={diagnostics.routing} />
+            </DetailsContent>
+          </Details>
         </CardContent>
       </Card>
-      <Details defaultOpen={false}>
-        <DetailsSummary>Routing topology</DetailsSummary>
-        <DetailsContent>
-          <ConflationRoutingDiagnostics diagnostics={diagnostics.routing} />
-        </DetailsContent>
-      </Details>
     </>
   );
 }

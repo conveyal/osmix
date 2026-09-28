@@ -31,62 +31,87 @@ function formatDelta(value: number) {
   return value.toLocaleString();
 }
 
-/** CAR and WALK graph counts of the base and of the result a merge plan would apply. */
-export function ConflationRoutingDiagnostics({
+type RoutingDiagnostics = { car: PlanRoutingDelta; walk: PlanRoutingDelta };
+
+/**
+ * CAR and WALK graph counts of the base and of the plan's result, without a frame: the
+ * description, the table and the mode invariants. `applied` says the result is the merged
+ * dataset rather than what the plan would apply. Place it flush inside a card or `Details`.
+ */
+export function RoutingTopology({
   diagnostics,
+  applied = false,
 }: {
-  diagnostics: { car: PlanRoutingDelta; walk: PlanRoutingDelta };
+  diagnostics: RoutingDiagnostics;
+  applied?: boolean;
 }) {
   const descriptionId = useId();
+  return (
+    <>
+      <div className="grid gap-1 p-inset text-muted-foreground" id={descriptionId}>
+        <p>
+          <span className="font-semibold">Before</span> is the base dataset.{" "}
+          <span className="font-semibold">After</span>{" "}
+          {applied
+            ? "is the merged result, with every proposal the plan included."
+            : "is the result the plan would apply, with every proposal it currently includes."}
+        </p>
+        <p>
+          All graph nodes include every node loaded into the mode-specific graph. Routable nodes
+          participate in at least one usable street; directed edges are traversable movements;
+          connected components are weakly connected groups calculated without edge direction.
+          Different components guarantee no route between them, but one component does not guarantee
+          travel in both directions. Delta is after minus before.
+        </p>
+      </div>
+      <Table aria-describedby={descriptionId}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Mode / metric</TableHead>
+            <TableHead>Base</TableHead>
+            <TableHead>{applied ? "Merged result" : "Planned result"}</TableHead>
+            <TableHead>Signed delta</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {(["car", "walk"] as const).flatMap((mode) =>
+            METRICS.map((metric) => {
+              const value = diagnostics[mode];
+              return (
+                <TableRow key={`${mode}-${metric}`}>
+                  <TableCell>
+                    {mode.toUpperCase()} / {METRIC_LABEL[metric]}
+                  </TableCell>
+                  <TableCell>{value.before[metric].toLocaleString()}</TableCell>
+                  <TableCell>{value.after[metric].toLocaleString()}</TableCell>
+                  <TableCell>{formatDelta(value.delta[metric])}</TableCell>
+                </TableRow>
+              );
+            }),
+          )}
+        </TableBody>
+      </Table>
+      <p className="border-t p-inset text-muted-foreground">
+        Automatic matching never changes CAR topology. Fewer WALK components can indicate the
+        intended new connections, but topology counts alone do not prove that routing is correct.
+      </p>
+    </>
+  );
+}
+
+/** `RoutingTopology` in its own card, for the result step. */
+export function ConflationRoutingDiagnostics({
+  diagnostics,
+  applied = false,
+}: {
+  diagnostics: RoutingDiagnostics;
+  applied?: boolean;
+}) {
   return (
     <Card>
       <CardHeader>Routing topology impact</CardHeader>
       <CardContent className="p-0">
-        <div className="grid gap-1 p-inset text-muted-foreground" id={descriptionId}>
-          <p>
-            <span className="font-semibold">Before</span> is the base dataset.{" "}
-            <span className="font-semibold">After</span> is the result the plan would apply, with
-            every proposal it currently includes.
-          </p>
-          <p>
-            All graph nodes include every node loaded into the mode-specific graph. Routable nodes
-            participate in at least one usable street; directed edges are traversable movements;
-            connected components are weakly connected groups calculated without edge direction.
-            Different components guarantee no route between them, but one component does not
-            guarantee travel in both directions. Delta is after minus before.
-          </p>
-        </div>
-        <Table aria-describedby={descriptionId}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Mode / metric</TableHead>
-              <TableHead>Base</TableHead>
-              <TableHead>Planned result</TableHead>
-              <TableHead>Signed delta</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(["car", "walk"] as const).flatMap((mode) =>
-              METRICS.map((metric) => {
-                const value = diagnostics[mode];
-                return (
-                  <TableRow key={`${mode}-${metric}`}>
-                    <TableCell>
-                      {mode.toUpperCase()} / {METRIC_LABEL[metric]}
-                    </TableCell>
-                    <TableCell>{value.before[metric].toLocaleString()}</TableCell>
-                    <TableCell>{value.after[metric].toLocaleString()}</TableCell>
-                    <TableCell>{formatDelta(value.delta[metric])}</TableCell>
-                  </TableRow>
-                );
-              }),
-            )}
-          </TableBody>
-        </Table>
-        <p className="border-t p-inset text-muted-foreground">
-          Automatic matching never changes CAR topology. Fewer WALK components can indicate the
-          intended new connections, but topology counts alone do not prove that routing is correct.
-        </p>
+        <RoutingTopology diagnostics={diagnostics} applied={applied} />
       </CardContent>
     </Card>
   );

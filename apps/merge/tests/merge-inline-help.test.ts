@@ -68,6 +68,14 @@ describe("merge inline guidance", () => {
     expect(html).toContain(">+2<");
     expect(html).toContain("Automatic matching never changes CAR topology");
     expect(html).toContain("do not prove that routing is correct");
+    expect(html).toContain("Planned result");
+
+    const applied = renderToStaticMarkup(
+      createElement(ConflationRoutingDiagnostics, { diagnostics, applied: true }),
+    );
+    expect(applied).toContain("is the merged result");
+    expect(applied).toContain("Merged result");
+    expect(applied).not.toContain("would apply");
   });
 
   it("shows reconciliation and intersection statistics with labeled filter groups", () => {
