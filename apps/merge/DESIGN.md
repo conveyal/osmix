@@ -6,6 +6,11 @@ tokens, spacing, primitives, map overlay primitives) lives in
 
 ## Merge-only components
 
+- `OsmInputSection` — one input's section: title, file name and file actions.
+  The patch section's title also holds **Swap base and patch**, which exchanges
+  the inputs, or moves the only loaded one into the other slot, without
+  reloading. The base and patch never hold the same file; loading or moving one
+  that the other slot holds is refused with an error.
 - `PlanInputs` — the input step's **Plan** section: "Merge points at identical
   coordinates automatically" (on by default), "Treat every patch feature as
   new", and the two entry points in `StepActions`: **Apply automatically**

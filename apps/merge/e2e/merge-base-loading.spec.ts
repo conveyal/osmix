@@ -326,13 +326,49 @@ test("a late cancellation preserves the committed exact result and replacing the
   await expect(page.getByRole("button", { name: "Export merged PBF" })).toBeVisible();
 
   // Clearing the base from the "Merged OSM" card only empties the slot; nothing is promoted
-  // into it. "Use as base" on the patch card is the explicit move, and it is disabled while a
-  // base is loaded. Either way the base dataset changes, which must invalidate the completed
-  // merge.
+  // into it. "Swap base and patch" is the explicit move. Either way the base dataset changes,
+  // which must invalidate the completed merge.
   await page.getByRole("button", { name: "Clear merged OSM" }).click();
   await loadPbf(baseSection, page, inputs.base);
   await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeVisible();
   await expect(summary).toHaveCount(0);
   await expect(baseSection.getByRole("button", { name: "File info" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Export merged PBF" })).toHaveCount(0);
+});
+
+test("swapping exchanges the inputs, or moves the only one, without reloading", async ({
+  page,
+}) => {
+  const inputs = await tinyInputs();
+  const { baseSection, patchSection } = await openTinyMerge(page, inputs);
+  const fileName = (section: Locator) => section.locator('[data-slot="osm-input-file-name"]');
+  const swap = page.getByRole("button", { name: "Swap base and patch" });
+  // Each slot's worker dataset is `<slot>-<file hash>`.
+  const hashes = await page.evaluate(
+    async ([base, patch]) => ({
+      base: await window.osmWorker.hashBuffer(new Uint8Array(base).buffer),
+      patch: await window.osmWorker.hashBuffer(new Uint8Array(patch).buffer),
+    }),
+    [[...inputs.base.buffer], [...inputs.patch.buffer]],
+  );
+  const has = (id: string) => page.evaluate((osmId) => window.osmWorker.has(osmId), id);
+
+  await swap.click();
+  await expect(fileName(baseSection)).toHaveText("completion-patch.pbf");
+  await expect(fileName(patchSection)).toHaveText("completion-base.pbf");
+  await expect.poll(() => has(`main-${hashes.patch}`)).toBe(true);
+  await expect.poll(() => has(`patch-${hashes.base}`)).toBe(true);
+  // The datasets the slots held before are freed.
+  await expect.poll(() => has(`main-${hashes.base}`)).toBe(false);
+  await expect.poll(() => has(`patch-${hashes.patch}`)).toBe(false);
+
+  // With one input loaded, the swap moves it into the empty slot.
+  await baseSection.getByRole("button", { name: "Clear base OSM file" }).click();
+  await expect(fileName(baseSection)).toHaveCount(0);
+  await swap.click();
+  await expect(fileName(baseSection)).toHaveText("completion-base.pbf");
+  await expect(fileName(patchSection)).toHaveCount(0);
+  await expect(patchSection.getByRole("button", { name: "Open file" })).toBeVisible();
+  await expect.poll(() => has(`patch-${hashes.base}`)).toBe(false);
+  await expect(page.getByRole("button", { name: "Review plan" })).toBeDisabled();
 });

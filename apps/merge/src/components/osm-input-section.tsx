@@ -1,5 +1,5 @@
 import { ActionButton, ButtonGroup, SidebarSection } from "@osmix/ui";
-import { ArrowUpIcon, DownloadIcon, XIcon } from "lucide-react";
+import { ArrowDownUpIcon, DownloadIcon, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 /**
@@ -8,28 +8,27 @@ import type { ReactNode } from "react";
  * its lightweight browser harness, so responsive and action behavior use the production
  * component without repeatedly loading Monaco. The section is `flush`; children pad themselves.
  *
- * A patch section given `onUseAsBase` offers "Use as base", the explicit way to move the patch
- * into the base slot; `canUseAsBase={false}` (the base slot is occupied) disables it.
+ * The section given `onSwap` (the patch, below the base) offers "Swap base and patch", which
+ * exchanges the two inputs, or moves the only loaded one into the other slot. It shows even
+ * while this slot is empty, since the other may hold a file.
  */
 export function OsmInputSection({
-  canUseAsBase = true,
   children,
   fileName,
   kind,
   loaded,
   onClear,
   onDownload,
-  onUseAsBase,
+  onSwap,
   title,
 }: {
-  canUseAsBase?: boolean;
   children?: ReactNode;
   fileName?: string;
   kind: "base" | "patch";
   loaded: boolean;
   onClear: () => Promise<unknown>;
   onDownload: () => Promise<unknown>;
-  onUseAsBase?: () => Promise<unknown>;
+  onSwap?: () => Promise<unknown>;
   title: string;
 }) {
   const kindLabel = kind === "base" ? "Base" : "Patch";
@@ -39,29 +38,32 @@ export function OsmInputSection({
       flush
       title={title}
       action={
-        loaded ? (
+        loaded || onSwap ? (
           <ButtonGroup aria-label={`${kindLabel} OSM file actions`}>
-            {kind === "patch" && onUseAsBase ? (
+            {onSwap ? (
               <ActionButton
-                icon={<ArrowUpIcon aria-hidden="true" />}
-                label="Use as base"
-                disabled={!canUseAsBase}
-                onAction={onUseAsBase}
+                icon={<ArrowDownUpIcon aria-hidden="true" />}
+                label="Swap base and patch"
+                onAction={onSwap}
                 variant="ghost"
               />
             ) : null}
-            <ActionButton
-              icon={<DownloadIcon />}
-              label={`Export ${kind} OSM as PBF`}
-              onAction={onDownload}
-              variant="ghost"
-            />
-            <ActionButton
-              icon={<XIcon />}
-              label={`Clear ${kind} OSM file`}
-              onAction={onClear}
-              variant="ghost"
-            />
+            {loaded ? (
+              <>
+                <ActionButton
+                  icon={<DownloadIcon />}
+                  label={`Export ${kind} OSM as PBF`}
+                  onAction={onDownload}
+                  variant="ghost"
+                />
+                <ActionButton
+                  icon={<XIcon />}
+                  label={`Clear ${kind} OSM file`}
+                  onAction={onClear}
+                  variant="ghost"
+                />
+              </>
+            ) : null}
           </ButtonGroup>
         ) : null
       }

@@ -418,13 +418,17 @@ export default function MergeBlock() {
     await file.loadOsmFile(null);
   };
 
-  /** Move the loaded patch into the empty base slot, so the next merge starts from it. */
-  const usePatchAsBase = async () => {
-    if (!patch.osm || base.osm) return;
+  /**
+   * Exchange the base and the patch, or move the only loaded one into the other slot. Both
+   * copies happen before either old dataset is freed, since each slot copies from the other.
+   */
+  const swapInputs = async () => {
+    if (!base.osm && !patch.osm) return;
     resetDerivedState();
-    // Copy before clearing: clearing the patch frees its dataset.
-    await base.copyStateFrom(patch.snapshot());
-    await patch.loadOsmFile(null);
+    const baseState = base.snapshot();
+    const previousBaseId = await base.copyStateFrom(patch.snapshot(), { releasePrevious: false });
+    await patch.copyStateFrom(baseState);
+    if (previousBaseId) await remote.delete(previousBaseId);
   };
 
   const baseNeedsFull = base.osmInfo !== null && !hasFullNodeIndex(base.osmInfo);
@@ -459,7 +463,7 @@ export default function MergeBlock() {
       loaded={Boolean(file.osm)}
       onClear={() => clearInput(file)}
       onDownload={file.downloadOsm}
-      {...(kind === "patch" ? { onUseAsBase: usePatchAsBase, canUseAsBase: !base.osm } : {})}
+      {...(kind === "patch" && (base.osm || patch.osm) ? { onSwap: swapInputs } : {})}
       title={
         kind === "base"
           ? "Base OSM — authoritative existing dataset"

@@ -19,30 +19,28 @@ function render(props: Partial<Parameters<typeof OsmInputSection>[0]> = {}) {
   );
 }
 
-const useAsBase = (html: string) => html.match(/<button[^>]*aria-label="Use as base"[^>]*>/g) ?? [];
-/** The attribute, not the `disabled:` class variants every button carries. */
-const isDisabled = (button: string) => /\sdisabled=""/.test(button);
+const swap = (html: string) =>
+  html.match(/<button[^>]*aria-label="Swap base and patch"[^>]*>/g) ?? [];
 
 describe("OsmInputSection", () => {
-  it("offers one enabled Use as base on a patch section with a handler", () => {
-    const buttons = useAsBase(render({ onUseAsBase: noop }));
-    expect(buttons).toHaveLength(1);
-    expect(isDisabled(buttons[0] ?? "")).toBe(false);
+  it("offers one Swap base and patch on a section with a handler", () => {
+    expect(swap(render({ onSwap: noop }))).toHaveLength(1);
+    expect(swap(render())).toHaveLength(0);
   });
 
-  it("disables Use as base while the base slot is occupied", () => {
-    const buttons = useAsBase(render({ onUseAsBase: noop, canUseAsBase: false }));
-    expect(buttons).toHaveLength(1);
-    expect(isDisabled(buttons[0] ?? "")).toBe(true);
+  it("offers the swap while its own slot is empty, without the file actions", () => {
+    const html = render({ loaded: false, onSwap: noop });
+    expect(swap(html)).toHaveLength(1);
+    expect(html).not.toContain('aria-label="Export patch OSM as PBF"');
+    expect(html).not.toContain('aria-label="Clear patch OSM file"');
   });
 
-  it("has no Use as base on a base section or without a handler", () => {
-    expect(useAsBase(render({ kind: "base", onUseAsBase: noop }))).toHaveLength(0);
-    expect(useAsBase(render())).toHaveLength(0);
+  it("has no actions while empty without a swap", () => {
+    expect(render({ loaded: false })).not.toContain("<button");
   });
 
   it("keeps the download and clear actions", () => {
-    const html = render({ onUseAsBase: noop });
+    const html = render({ onSwap: noop });
     expect(html).toContain('aria-label="Export patch OSM as PBF"');
     expect(html).toContain('aria-label="Clear patch OSM file"');
   });
