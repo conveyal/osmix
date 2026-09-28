@@ -58,8 +58,8 @@ Target repos (org `osmix-dev`):
 
 **apps**
 
-- Move `apps/{merge,inspect,extract}` + `packages/{ui,app-core,app-components}` with `packages/ui/DESIGN.md`, `apps/merge/DESIGN.md`, Playwright e2e, portless/multi-origin setup, `vercel.json`s.
-- Re-point the three Vercel projects to the new repo (root directories unchanged relative to repo root).
+- Move `apps/app` (and the redirect-only `apps/inspect`, `apps/extract`) + `packages/{ui,app-core,app-components}` with `packages/ui/DESIGN.md`, `apps/app/DESIGN.md`, Playwright e2e, portless setup, `vercel.json`s.
+- Re-point the app's Vercel project (and the two redirect projects, while they exist) to the new repo (root directories unchanged relative to repo root).
 - Split AGENTS.md: UI/app sections move to the apps repo; `docs/merge-process.md` stays in core (it governs `@osmix/change`), apps repo links to it.
 - Core cleanup: remove Tailwind/React/Playwright/`oxlint-tailwindcss` and UI catalog entries not used by www.
 

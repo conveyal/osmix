@@ -1,6 +1,16 @@
-# Osmix Merge
+# Osmix app
 
-Osmix Merge is a Vite + React app for comparing and reconciling OpenStreetMap PBF datasets. Its sibling apps, [Inspect](../inspect/README.md) and [Extract](../extract/README.md), are linked from the nav bar; each runs on its own origin with its own browser storage. It builds on [`@osmix/core`](../../packages/core/README.md) and [`@osmix/change`](../../packages/change/README.md) in a web worker, renders MapLibre raster and vector overlays, and guides you through a multi-step merge workflow that stays entirely in the browser.
+The Osmix app is a Vite + React app for working with OpenStreetMap PBF datasets entirely in the browser. It builds on [`@osmix/core`](../../packages/core/README.md) and [`@osmix/change`](../../packages/change/README.md) in web workers and renders MapLibre raster and vector overlays.
+
+## Pages
+
+Home (`/`) introduces the pages; the nav links them. One map stays mounted across pages, and each page keeps what it has open when you leave it.
+
+- **Merge** (`/merge`) – compare and reconcile a base and an imported patch in a multi-step workflow. **Swap base and patch** (in the patch section's title) exchanges the inputs without reloading them.
+- **Inspect** (`/inspect`) – search one dataset, find and fix duplicates, and route.
+- **Extract** (`/extract`) – cut a bounding box out of a PBF file (streamed, never loaded whole) or out of a stored or open dataset, with a strategy and tag filters.
+
+Files saved to browser storage open on every page. **Open in** sends a loaded dataset to another page without reloading it: from Inspect to Merge (as base or patch) or Extract, from an extract to Inspect or Merge, and from a merge result to Inspect or Extract. `?load=<file hash>` on a page opens that stored file there.
 
 ## Highlights
 
@@ -77,7 +87,7 @@ in-stream extraction remains available. The app does not build the large index s
 
 The [merge-process guide](../../docs/merge-process.md) owns the merge rules, examples, and known limitations. Read its [input identity requirements](../../docs/merge-process.md#inputs-and-identity) before combining independently prepared imports.
 
-1. Remove duplicates inside each input in [Inspect](../inspect/README.md), then load the base and patch in Full mode.
+1. Remove duplicates inside each input on the Inspect page and send it here with **Open in**, or load the base and patch in Full mode.
 2. Configure optional imported-data matching and how identical points and patch IDs are handled, then choose **Review plan** or **Apply automatically**.
 3. In the review, each imported feature shows its outcome and proposals. Include or leave out the proposals that need you (Copy tags, Connect network, Remove imported way, identical-point merges, crossings), download the plan as osmChange, and **Apply plan**.
 4. Read the completion summary and export the result.

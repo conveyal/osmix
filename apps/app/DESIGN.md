@@ -1,6 +1,6 @@
-# Merge App Design Notes
+# Merge Page Design Notes
 
-Rules specific to `apps/app`. The shared design system (typography, color
+Rules specific to the Merge page of `apps/app`. The shared design system (typography, color
 tokens, spacing, primitives, map overlay primitives) lives in
 [`packages/ui/DESIGN.md`](../../packages/ui/DESIGN.md); read that first.
 

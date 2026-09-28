@@ -49,7 +49,7 @@ to the tile bounds so you can pass raw OSM coordinates without pre-filtering.
 
 ### Display in Maplibre
 
-See the [example merge app](/apps/app/src/lib/osmix-raster-protocol.ts) for how to show raster tiles on a map.
+See the [Osmix app](/packages/app-components/src/lib/osmix-raster-protocol.ts) for how to show raster tiles on a map.
 
 ## API
 

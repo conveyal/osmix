@@ -251,4 +251,4 @@ When a rule has a real exception, disable it on that line and give the reason: `
 
 - **Dark mode:** add a `.dark` token block and a toggle, and review the white map-mark exceptions.
 - **Determinate progress:** extend `@osmix/shared` `Progress` with `percent?`, write it to the running step's `progress` field (already on `TaskNode`, not displayed yet), and pass a real `value` to `Progress`.
-- **Screenshot baselines:** add Playwright visual baselines for each app's main states once the theme has settled.
+- **Screenshot baselines:** add Playwright visual baselines for each page's main states once the theme has settled.
