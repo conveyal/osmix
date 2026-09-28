@@ -86,7 +86,7 @@ See [Review plan and Apply automatically](../../docs/merge-process.md#applicatio
 
 ## Map & rendering stack
 
-- **MapLibre** provides the background map, interaction controls, and pickable vector overlays for base, patch, and selected entities. The basemap is Carto Positron with labels on and roads off by default; switch the style, labels and roads from the map's Basemap menu (the previous code hid every basemap line and symbol layer).
+- **MapLibre** provides the background map, interaction controls, and pickable vector overlays for base, patch, and selected entities. The basemap is Carto Voyager with labels on and roads off by default; switch the style, labels and roads from the map's Basemap menu (the previous code hid every basemap line and symbol layer).
 - **Raster tiles** come from the worker’s `OsmixRasterTile` helper in [`@osmix/raster`](../../packages/raster/README.md), which draws ways and (at higher zoom levels) nodes onto an OffscreenCanvas before streaming the PNG bytes back to the UI thread.
 
 ## Worker architecture

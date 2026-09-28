@@ -71,7 +71,7 @@ The overlay draws patch ways and outlines with `line-dasharray: [1.2, 0.8]` (in 
 
 Below `MIN_PICKABLE_ZOOM` the raster preview draws both roles with solid lines; dashes exist only in the vector layers.
 
-The default basemap is Positron (`carto-positron`) with labels on and roads off. It's quiet, so data and status colours stand out. The style, labels and roads switch from the map's Basemap menu, and the choice persists as `basemapPresetAtom` (`@osmix/app-core`); nothing else about the map overlay persists.
+The default basemap is Voyager (`carto-voyager`) with labels on and roads off: enough colour to read the place, quiet enough that data and status colours stand out. The style, labels and roads switch from the map's Basemap menu, and the choice persists as `basemapPresetAtom` (`@osmix/app-core`); nothing else about the map overlay persists.
 
 ### Type
 

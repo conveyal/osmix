@@ -18,14 +18,14 @@ export interface BasemapPreset {
 }
 
 export const DEFAULT_BASEMAP_PRESET: BasemapPreset = {
-  style: "carto-positron",
+  style: "carto-voyager",
   labels: true,
   roads: false,
 };
 
 /**
  * The persisted basemap preset. `getOnInit` reads storage before the first render so the map
- * mounts with the stored style: without it the map would load Positron first and then
+ * mounts with the stored style: without it the map would load the default first and then
  * `setStyle` to the stored one, which removes and re-adds every Osmix source and layer.
  */
 export const basemapPresetAtom = atomWithStorage<BasemapPreset>(
