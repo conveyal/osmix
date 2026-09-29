@@ -38,7 +38,7 @@ import {
   Step,
 } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
-import { DownloadIcon, XIcon } from "lucide-react";
+import { DownloadIcon, SaveIcon, XIcon } from "lucide-react";
 import type { ExtractStrategy, GeoBbox2D, OsmInfo } from "osmix";
 import { useId, useRef, useState } from "react";
 
@@ -593,7 +593,7 @@ export function ExtractPanel() {
           title="Extract result"
           name="extract result"
           osmFile={extract}
-          actions={{ download: false }}
+          actions={{ download: false, save: false }}
           onClear={clearExtract}
           details={
             <>
@@ -602,25 +602,39 @@ export function ExtractPanel() {
             </>
           }
           primaryAction={
-            <ActionButton
-              type="button"
-              disabled={isExtracting}
-              className="w-full"
-              icon={<DownloadIcon aria-hidden="true" />}
-              onAction={() => extract.downloadOsm()}
-            >
-              Export extract as PBF
-            </ActionButton>
+            <div role="group" aria-label="Extract result actions" className="flex flex-col gap-2">
+              <ActionButton
+                type="button"
+                disabled={isExtracting}
+                className="w-full"
+                icon={<DownloadIcon aria-hidden="true" />}
+                onAction={() => extract.downloadOsm()}
+              >
+                Export extract as PBF
+              </ActionButton>
+              {!extract.isStored && extract.canStore ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <ActionButton
+                    variant="outline"
+                    className="w-full"
+                    icon={<SaveIcon aria-hidden="true" />}
+                    onAction={extract.saveToStorage}
+                  >
+                    Save to storage
+                  </ActionButton>
+                  <OpenInMenu osmFile={extract} targets={["inspect", "base", "patch"]} />
+                </div>
+              ) : (
+                <OpenInMenu osmFile={extract} targets={["inspect", "base", "patch"]} />
+              )}
+              <SaveToDiskNotice />
+            </div>
           }
         >
-          <div className="flex flex-col gap-2 p-inset">
-            <SaveToDiskNotice />
-            <OpenInMenu osmFile={extract} targets={["inspect", "base", "patch"]} />
-            <p className="text-muted-foreground">
-              To change the file, bounding box, strategy or tag filters, clear this result. The
-              settings you used are kept.
-            </p>
-          </div>
+          <p className="p-inset text-muted-foreground">
+            To change the file, bounding box, strategy or tag filters, clear this result. The
+            settings you used are kept.
+          </p>
         </OsmDatasetSection>
       ) : null}
     </>

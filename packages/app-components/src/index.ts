@@ -58,6 +58,7 @@ export {
   default as OsmInfoTable,
   OsmLoadDetails,
   OsmLoadDetailsRows,
+  OsmLoadDiagnostics,
 } from "./components/osm-info-table.tsx";
 export { OsmLoadFailurePanel } from "./components/osm-load-failure.tsx";
 export {

@@ -150,6 +150,7 @@ export {
   TableHead,
   TableHeader,
   TableRow,
+  TableRowHeader,
 } from "./components/ui/table.tsx";
 export {
   bytesSizeToHuman,

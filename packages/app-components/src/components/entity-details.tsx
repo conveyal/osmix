@@ -8,6 +8,7 @@ import {
   TableBody,
   TableCell,
   TableRow,
+  TableRowHeader,
 } from "@osmix/ui";
 import type { Osm } from "osmix";
 import { getRelationKindMetadata } from "osmix";
@@ -15,12 +16,6 @@ import type { OsmEntity, OsmEntityType, OsmNode, OsmRelation, OsmWay } from "osm
 import { isNode, isRelation, isWay } from "osmix";
 import type { ReactNode } from "react";
 import { Fragment } from "react/jsx-runtime";
-
-/**
- * Value cells wrap instead of widening the table: a way's refs list or a long tag value would
- * otherwise scroll the panel sideways. `wrap-anywhere` lets an unbroken value break too.
- */
-const VALUE_CELL = "whitespace-normal wrap-anywhere";
 
 /**
  * The details of one entity: its coordinates or refs, its tags and, with `osm`, a disclosure
@@ -118,12 +113,12 @@ export function NodeContent({ node }: { node: OsmNode }) {
     <Table>
       <TableBody>
         <TableRow>
-          <TableCell>lon</TableCell>
-          <TableCell className={VALUE_CELL}>{node.lon}</TableCell>
+          <TableRowHeader>lon</TableRowHeader>
+          <TableCell>{node.lon}</TableCell>
         </TableRow>
         <TableRow>
-          <TableCell>lat</TableCell>
-          <TableCell className={VALUE_CELL}>{node.lat}</TableCell>
+          <TableRowHeader>lat</TableRowHeader>
+          <TableCell>{node.lat}</TableCell>
         </TableRow>
         <TagList tags={node.tags} />
       </TableBody>
@@ -136,8 +131,10 @@ export function WayContent({ way }: { way: OsmWay }) {
     <Table>
       <TableBody>
         <TableRow>
-          <TableCell>refs</TableCell>
-          <TableCell className={VALUE_CELL}>{way.refs.join(", ")}</TableCell>
+          <TableRowHeader>refs</TableRowHeader>
+          <TableCell mono clamp>
+            {way.refs.join(", ")}
+          </TableCell>
         </TableRow>
         <TagList tags={way.tags} />
       </TableBody>
@@ -173,19 +170,19 @@ export function RelationContent({ relation }: { relation: OsmRelation }) {
     <Table>
       <TableBody>
         <TableRow>
-          <TableCell>kind</TableCell>
-          <TableCell className={VALUE_CELL}>{kindMetadata.kind}</TableCell>
+          <TableRowHeader>kind</TableRowHeader>
+          <TableCell>{kindMetadata.kind}</TableCell>
         </TableRow>
         {kindMetadata.description && (
           <TableRow>
-            <TableCell>description</TableCell>
-            <TableCell className={VALUE_CELL}>{kindMetadata.description}</TableCell>
+            <TableRowHeader>description</TableRowHeader>
+            <TableCell clamp>{kindMetadata.description}</TableCell>
           </TableRow>
         )}
         {relationMemberCount > 0 && (
           <TableRow>
-            <TableCell>nested relations</TableCell>
-            <TableCell className={VALUE_CELL}>{relationMemberCount}</TableCell>
+            <TableRowHeader>nested relations</TableRowHeader>
+            <TableCell>{relationMemberCount}</TableCell>
           </TableRow>
         )}
         <TagList tags={relation.tags} />
@@ -221,8 +218,10 @@ export function TagList({ tags }: { tags?: Record<string, unknown> }) {
     <>
       {entries.map(([k, v]) => (
         <TableRow key={k}>
-          <TableCell>{k}</TableCell>
-          <TableCell className={VALUE_CELL}>{String(v)}</TableCell>
+          <TableRowHeader className="font-mono">{k}</TableRowHeader>
+          <TableCell mono clamp>
+            {String(v)}
+          </TableCell>
         </TableRow>
       ))}
     </>
@@ -305,8 +304,8 @@ export function NodeListTable({
               Object.entries(node.tags).map(([k, v]) => (
                 <TableRow key={`${node.id}-${k}`}>
                   <TableCell />
-                  <TableCell>{k}</TableCell>
-                  <TableCell>{String(v)}</TableCell>
+                  <TableCell mono>{k}</TableCell>
+                  <TableCell mono>{String(v)}</TableCell>
                 </TableRow>
               ))}
           </Fragment>
@@ -376,8 +375,10 @@ export function RelationMemberListTable({
                   <TableRow key={`${member.type}-${member.ref}-${k}`}>
                     <TableCell />
                     <TableCell />
-                    <TableCell>{k}</TableCell>
-                    <TableCell colSpan={2}>{String(v)}</TableCell>
+                    <TableCell mono>{k}</TableCell>
+                    <TableCell mono colSpan={2}>
+                      {String(v)}
+                    </TableCell>
                   </TableRow>
                 ))}
             </Fragment>

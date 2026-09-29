@@ -1,4 +1,4 @@
-import { Table, TableBody, TableCell, TableRow } from "@osmix/ui";
+import { Table, TableBody, TableCell, TableRow, TableRowHeader } from "@osmix/ui";
 import type {
   ExtractStrategy,
   ExtractTagFilterRule,
@@ -39,6 +39,8 @@ export function ExtractResultStats({
   parameters: ExtractParameters | null;
 }) {
   const rows: [string, string][] = [];
+  const extractBbox = parameters?.bbox.join(", ");
+  const dataBounds = osm.bbox()?.join(", ") ?? "empty";
   if (parameters) {
     rows.push(
       ["source file", parameters.sourceName],
@@ -50,7 +52,7 @@ export function ExtractResultStats({
     ["nodes", osm.nodes.size.toLocaleString()],
     ["ways", osm.ways.size.toLocaleString()],
     ["relations", osm.relations.size.toLocaleString()],
-    ["data bounds", osm.bbox()?.join(", ") ?? "empty"],
+    ["data bounds", dataBounds === extractBbox ? "same as extract bbox" : dataBounds],
   );
   if (parameters) {
     rows.push(
@@ -64,8 +66,8 @@ export function ExtractResultStats({
       <TableBody>
         {rows.map(([label, value]) => (
           <TableRow key={label}>
-            <TableCell>{label}</TableCell>
-            <TableCell className="wrap-break-word whitespace-normal">{value}</TableCell>
+            <TableRowHeader>{label}</TableRowHeader>
+            <TableCell clamp>{value}</TableCell>
           </TableRow>
         ))}
       </TableBody>

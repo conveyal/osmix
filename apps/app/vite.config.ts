@@ -4,7 +4,12 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   base: "/",
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react({
+      compiler: true,
+    }),
+    tailwindcss(),
+  ],
   publicDir: process.env.NODE_ENV === "development" ? "../../fixtures" : undefined,
   server: {
     host: process.env.HOST,

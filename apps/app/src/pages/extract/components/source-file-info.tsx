@@ -7,6 +7,7 @@ import {
   TableBody,
   TableCell,
   TableRow,
+  TableRowHeader,
 } from "@osmix/ui";
 import type { OsmPbfHeaderBlock } from "osmix";
 
@@ -62,8 +63,8 @@ export function SourceFileInfo({ file, header }: { file: File; header: OsmPbfHea
           <TableBody>
             {rows.map(([label, value]) => (
               <TableRow key={label}>
-                <TableCell>{label}</TableCell>
-                <TableCell className="wrap-break-word whitespace-normal">{value}</TableCell>
+                <TableRowHeader>{label}</TableRowHeader>
+                <TableCell clamp>{value}</TableCell>
               </TableRow>
             ))}
           </TableBody>
