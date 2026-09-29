@@ -24,6 +24,7 @@ import { PlanSummary } from "../src/components/plan-summary";
 const render = (element: ReactElement) =>
   renderToStaticMarkup(createElement(Provider, { store: createStore() }, element));
 const noop = () => {};
+const asyncNoop = async () => {};
 
 const connect = (overrides: Partial<PlanProposal> = {}) =>
   ({
@@ -71,8 +72,8 @@ describe("plan components", () => {
     const html = render(
       createElement(PlanInputs, {
         disabled: false,
-        onApplyAutomatically: noop,
-        onReviewPlan: noop,
+        onApplyAutomatically: asyncNoop,
+        onReviewPlan: asyncNoop,
       }),
     );
     expect(html).toContain(MERGE_IDENTICAL_LABEL);

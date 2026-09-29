@@ -196,7 +196,11 @@ function Harness() {
         <Provider store={settingsStore}>
           <section data-testid="settings-harness" className="flex flex-col gap-2">
             <ConflationConfig />
-            <PlanInputs disabled={false} onApplyAutomatically={() => {}} onReviewPlan={() => {}} />
+            <PlanInputs
+              disabled={false}
+              onApplyAutomatically={async () => {}}
+              onReviewPlan={async () => {}}
+            />
           </section>
         </Provider>
         <section data-testid="plan-review-harness" className="flex flex-col gap-2">

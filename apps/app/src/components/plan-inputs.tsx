@@ -1,4 +1,4 @@
-import { Button, Checkbox, CheckboxLabel, SidebarSection } from "@osmix/ui";
+import { ActionButton, Checkbox, CheckboxLabel, SidebarSection } from "@osmix/ui";
 import { useAtom } from "jotai";
 import { ListChecksIcon, MergeIcon } from "lucide-react";
 
@@ -20,8 +20,8 @@ export function PlanInputs({
   onReviewPlan,
 }: {
   disabled: boolean;
-  onApplyAutomatically: () => unknown;
-  onReviewPlan: () => unknown;
+  onApplyAutomatically: () => Promise<unknown>;
+  onReviewPlan: () => Promise<unknown>;
 }) {
   const [mergeIdenticalPoints, setMergeIdenticalPoints] = useAtom(mergeIdenticalPointsAtom);
   const [patchIds, setPatchIds] = useAtom(patchIdModeAtom);
@@ -57,14 +57,21 @@ export function PlanInputs({
         </p>
       </div>
       <StepActions aria-label="Plan actions">
-        <Button variant="outline" disabled={disabled} onClick={() => void onApplyAutomatically()}>
-          <MergeIcon aria-hidden="true" />
+        <ActionButton
+          variant="outline"
+          disabled={disabled}
+          icon={<MergeIcon aria-hidden="true" />}
+          onAction={onApplyAutomatically}
+        >
           Apply automatically
-        </Button>
-        <Button disabled={disabled} onClick={() => void onReviewPlan()}>
-          <ListChecksIcon aria-hidden="true" />
+        </ActionButton>
+        <ActionButton
+          disabled={disabled}
+          icon={<ListChecksIcon aria-hidden="true" />}
+          onAction={onReviewPlan}
+        >
           Review plan
-        </Button>
+        </ActionButton>
       </StepActions>
       <p className="text-muted-foreground">
         Apply automatically plans and applies in one run. Proposals that need a decision are left
