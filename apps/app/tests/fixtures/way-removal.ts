@@ -27,7 +27,7 @@ export function createWayRemovalInputs({ branch = false, taggedNode = false } = 
   return { base, patch };
 }
 
-export class WayRemovalReviewWorker extends OsmixWorker {
+class WayRemovalReviewWorker extends OsmixWorker {
   add(osm: Osm) {
     this.set(osm.id, osm);
   }

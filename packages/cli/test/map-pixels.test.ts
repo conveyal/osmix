@@ -9,7 +9,6 @@ import {
   OsmTileLoader,
   renderMapPixels,
   SHIMMER_PERIOD,
-  TILE_LOADING_BASE,
   type TileImage,
 } from "../src/map-pixels.ts";
 
@@ -70,8 +69,7 @@ describe("renderMapPixels", () => {
     const pendingRegions: Array<{ bottom: number; left: number; right: number; top: number }> = [];
     const pixels = renderMapPixels(camera, viewport, getTile, pendingRegions);
 
-    expect(TILE_LOADING_BASE).toBe(MAP_BACKGROUND);
-    expect(pixel(pixels, viewport.width, 24, 0)).toEqual([...TILE_LOADING_BASE, 255]);
+    expect(pixel(pixels, viewport.width, 24, 0)).toEqual([...MAP_BACKGROUND, 255]);
     expect(pixel(pixels, viewport.width, 250, 0)).toEqual([80, 90, 100, 255]);
     expect(pendingRegions).toEqual([
       { bottom: 1, left: 0, right: 150, top: 0 },

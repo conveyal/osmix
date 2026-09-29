@@ -300,5 +300,3 @@ export function StoredOsmList({
     </>
   );
 }
-
-export default StoredOsmList;

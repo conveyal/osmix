@@ -2,7 +2,7 @@
 import type { OsmEntity } from "@osmix/types";
 import { normalizedWayDirection } from "@osmix/types/way-direction";
 
-export const DESCRIPTIVE_WAY_TAGS = new Set([
+const DESCRIPTIVE_WAY_TAGS = new Set([
   "alt_name",
   "int_name",
   "loc_name",
@@ -18,7 +18,7 @@ export const DESCRIPTIVE_WAY_TAGS = new Set([
   "wikipedia",
 ]);
 
-export const DESCRIPTIVE_WAY_TAG_PREFIXES = [
+const DESCRIPTIVE_WAY_TAG_PREFIXES = [
   "alt_name:",
   "name:",
   "note:",

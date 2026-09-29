@@ -40,7 +40,7 @@ Target repos (org `osmix-dev`):
 ## Phase 1 — `duckdb-comparison` (from `apps/bench`)
 
 - Copy `apps/bench` into the new repo; replace `workspace:*`/`catalog:` with published versions; consume `@osmix/config`.
-- Core cleanup: delete `apps/bench`; drop the DuckDB allowlist entry in `scripts/check-deps.ts:57-58`; trim unused catalog entries; update AGENTS.md (layout, commands note about benchmark exclusion).
+- Core cleanup: delete `apps/bench`; trim unused catalog entries; update AGENTS.md (layout, commands note about benchmark exclusion).
 
 ## Phase 2 — `tiles` (shortbread-server + vt-server)
 
@@ -70,7 +70,7 @@ Target repos (org `osmix-dev`):
 
 ## Verification
 
-- Core after each phase: `pnpm run verify:all`, `pnpm run check:deps`, CI green on `ci.yml` (Node/Bun/Deno runtime smoke).
+- Core after each phase: `pnpm run verify:all` (includes `knip`), CI green on `ci.yml` (Node/Bun/Deno runtime smoke).
 - Each new repo: fresh `pnpm install` resolves only published `@osmix/*` versions (no `workspace:`), then format/lint/typecheck/test green.
 - `tiles`: both servers boot and serve a tile from `monaco.pbf`.
 - `cli`: `test:executable` passes under Bun; a dry-run release builds executables.

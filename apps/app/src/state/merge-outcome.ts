@@ -1,7 +1,7 @@
 import { atom } from "jotai";
 import type { MergePlanOverview } from "osmix";
 
-export interface MergeRunInputs {
+interface MergeRunInputs {
   baseName: string;
   patchName: string;
   matchingEnabled: boolean;
@@ -41,10 +41,7 @@ export type MergeOutcomeEvent =
  * begin → planned → applied → refreshed → complete. A merge completes only after its plan was
  * applied and the result shown is the applied one; replanning after applying is refused.
  */
-export function reduceMergeOutcome(
-  state: MergeOutcomeState,
-  event: MergeOutcomeEvent,
-): MergeOutcomeState {
+function reduceMergeOutcome(state: MergeOutcomeState, event: MergeOutcomeEvent): MergeOutcomeState {
   switch (event.type) {
     case "begin":
       return { ...EMPTY_OUTCOME, inputs: { ...event.inputs } };

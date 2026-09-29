@@ -14,7 +14,6 @@
     "@osmix/core": "workspace:*",
     "@osmix/types": "workspace:*",
     "@osmix/vt": "workspace:*",
-    "comlink": "^4.4.2",
     "hono": "^4.13.8",
     "maplibre-gl": "catalog:",
     "osmix": "workspace:*"

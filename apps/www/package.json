@@ -10,7 +10,6 @@
     "typecheck": "tsc --build --noEmit"
   },
   "dependencies": {
-    "@osmix/core": "workspace:*",
     "@osmix/geo": "workspace:*",
     "@osmix/types": "workspace:*",
     "@shikijs/core": "4.4.3",

@@ -9,7 +9,7 @@ import { PbfReader } from "pbf";
 
 import type { QueryResult } from "../engines/types";
 
-export interface Comparable {
+interface Comparable {
   /** Short description of the answer, such as "1,234 ids". */
   summary: string;
   /** Answer items keyed for comparison, with a value that must also match. */
@@ -83,7 +83,7 @@ function tileItems(bytes: Uint8Array) {
 }
 
 /** Turn a result into keyed items plus a short summary. */
-export function toComparable(result: QueryResult): Comparable {
+function toComparable(result: QueryResult): Comparable {
   switch (result.kind) {
     case "ids": {
       const items = new Map<string, string>();

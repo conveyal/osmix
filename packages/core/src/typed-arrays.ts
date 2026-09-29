@@ -100,18 +100,10 @@ function getBufferType(BC: SharedArrayBufferConstructor | ArrayBufferConstructor
 export const IdArrayType = Float64Array;
 
 /**
- * Uint32Array for storing array indices.
- *
- * Internal indices into typed arrays never exceed 2^32 elements,
- * so Uint32Array provides the best balance of range and memory efficiency.
- */
-export const IndexArrayType = Uint32Array;
-
-/**
  * Initial buffer size for ResizeableTypedArray.
  * 1 MiB provides reasonable initial capacity while avoiding excessive memory allocation.
  */
-export const DEFAULT_BUFFER_SIZE = 2 ** 20; // 1 MiB
+const DEFAULT_BUFFER_SIZE = 2 ** 20; // 1 MiB
 
 /**
  * Auto-expanding typed array wrapper.

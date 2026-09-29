@@ -24,7 +24,7 @@ import { summarize, type TimingStats } from "./stats";
 export const ENGINE_NAMES: EngineName[] = ["Osmix", "DuckDB"];
 
 /** Larger GeoJSON exports are not kept for the maps; drawing them stalls the page. */
-export const MAP_GEOJSON_LIMIT = 25_000_000;
+const MAP_GEOJSON_LIMIT = 25_000_000;
 
 export interface BenchConfig {
   file: File;
@@ -51,7 +51,7 @@ export interface OperationResult {
   duckdbPlan: string | null;
 }
 
-export interface SetupResult {
+interface SetupResult {
   initializeMs: number;
   loadMs: number;
   load: LoadResult;

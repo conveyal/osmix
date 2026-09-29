@@ -24,13 +24,13 @@ const DATASET_LOAD_TIMEOUT_MS = 10 * 60_000;
 
 export type TileRenderingMode = "workers";
 
-export interface BackingBufferDiagnostics {
+interface BackingBufferDiagnostics {
   allShared: boolean;
   referenceCount: number;
   uniqueCount: number;
 }
 
-export interface StyledTileRendererDiagnostics {
+interface StyledTileRendererDiagnostics {
   datasetBuffers: BackingBufferDiagnostics;
   restartCount: number;
   semanticIndexBuffers: BackingBufferDiagnostics;

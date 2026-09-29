@@ -8,9 +8,9 @@ runs:
       shell: bash
       run: pnpm run typecheck
 
-    - name: Check workspace dependencies
+    - name: Check unused files, exports, and dependencies (knip)
       shell: bash
-      run: pnpm run check:deps
+      run: pnpm run knip
 
     - name: Build packages
       shell: bash

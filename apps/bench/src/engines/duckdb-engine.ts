@@ -49,7 +49,7 @@ function idsFrom(table: ArrowTable): Float64Array {
 }
 
 /** Pull operator names such as `RTREE_INDEX_SCAN` out of DuckDB's box-drawn plan. */
-export function planOperators(plan: string): string[] {
+function planOperators(plan: string): string[] {
   const operators: string[] = [];
   for (const line of plan.split("\n")) {
     const match = line.match(/^[│\s]*([A-Z][A-Z_]{2,})\s*│/);

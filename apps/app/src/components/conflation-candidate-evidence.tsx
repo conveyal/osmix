@@ -17,7 +17,7 @@ const ROUTING_FAMILY_LABEL = {
 } as const;
 
 /** Missing measurements and an unmatched search express different evidence. */
-export function conflationDistanceLabel(candidate: OsmConflationCandidate) {
+function conflationDistanceLabel(candidate: OsmConflationCandidate) {
   if (candidate.targetId == null) {
     return candidate.reasons.includes("unsupported-way-chain")
       ? "Nearby segments cannot form one supported match"

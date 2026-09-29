@@ -6,7 +6,7 @@
 - Add or extend tests and documentation when behavior or public APIs change.
 - Before changing merge rules, matching actions, or merge workflow states, read [docs/merge-process.md](docs/merge-process.md). Update its affected rules/examples and linked regression tests in the same PR.
 - Only run root tests before committing.
-- `pnpm run check:deps` validates workspace import/dependency alignment.
+- `pnpm run knip` must pass: it flags unused files, exports, and dependencies, and imports missing from `package.json`. Configure false positives (non-standard entry points) in `knip.json`; do not keep dead exports.
 
 ## Testing Notes
 
@@ -62,11 +62,11 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 - `pnpm install` to bootstrap; `pnpm run dev` (filterable) for local dev; `pnpm run build` for production bundles.
 - `pnpm run check` runs `oxfmt` then type-aware `oxlint` in one pass.
 - `pnpm run format:check` and `pnpm run lint:check` run non-mutating formatting and lint checks.
-- `pnpm run check:deps` flags undeclared or unused workspace dependencies.
+- `pnpm run knip` flags unused files, exports, and dependencies, and undeclared imports, across all workspaces.
 - `pnpm run test:verify-workspace` tests the workspace selector and required-script checks.
 - `pnpm run verify:workspace -- @osmix/core` verifies a workspace and its runtime/development dependents in dependency order.
 - `pnpm run verify:workspace -- apps/vt-server` accepts an app path selector and verifies that app's runtime graph.
-- `pnpm run verify:all` verifies every non-benchmark workspace, then runs dependency and Node smoke checks.
+- `pnpm run verify:all` verifies every non-benchmark workspace, then runs knip and Node smoke checks.
 
 `verify:workspace` is check-only by default. Pass `--write` when an explicit formatting write is intended. The benchmark app is excluded from the all-workspace contract because its browser benchmark is not a package test; select it explicitly when working on that app.
 

@@ -15,7 +15,7 @@ import type { PlanOverlay } from "./overlay.ts";
  * A view of one side of the planned state. `listed` is the input whose IDs make up the side,
  * enumerated in ascending ID order; `member` decides which current entities belong to it.
  */
-export function plannedSideView(
+function plannedSideView(
   overlay: PlanOverlay,
   listed: Osm,
   member: (type: OsmEntityType, id: number) => boolean,

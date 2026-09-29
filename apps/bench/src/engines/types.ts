@@ -26,8 +26,6 @@ export type QuerySpec =
   | { kind: "geojson" }
   | { kind: "tile"; tile: Tile; bbox: GeoBbox2D };
 
-export type QueryKind = QuerySpec["kind"];
-
 /** What a query returns to the main thread. */
 export type QueryResult =
   | { kind: "ids"; ids: Float64Array }

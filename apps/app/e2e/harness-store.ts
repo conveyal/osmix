@@ -1,11 +1,9 @@
-import { useSyncExternalStore } from "react";
-
 /**
  * Mutable session state for browser test harnesses.
  *
  * Harness sessions bundle workers, fixtures, and pending promise resolvers that tests poke at
  * directly. React state must stay immutable, so the session lives outside React as an external
- * store and components read it through `useHarnessSession`. Every `mutate`/`replace` notifies
+ * store and components read it through `useSyncExternalStore`. Every `mutate`/`replace` notifies
  * subscribers so the harness re-renders after each change.
  */
 export type HarnessStore<T> = {
@@ -45,9 +43,4 @@ export function createHarnessStore<T>(create: () => T): HarnessStore<T> {
     },
     getSnapshot: () => snapshot,
   };
-}
-
-/** Subscribe a harness component to the current session; re-renders after every mutation. */
-export function useHarnessSession<T>(store: HarnessStore<T>): T {
-  return useSyncExternalStore(store.subscribe, store.getSnapshot).session;
 }

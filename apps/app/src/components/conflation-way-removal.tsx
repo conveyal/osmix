@@ -14,7 +14,7 @@ function ids(values: number[]) {
 }
 
 /** Concrete consequences shared by candidate review and the generated/applied report. */
-export function WayRemovalDetails({
+function WayRemovalDetails({
   preview,
   applied = false,
   onReviewConnection,

@@ -4,7 +4,6 @@ import type { OsmTags } from "@osmix/types";
 import {
   type GtfsRoute,
   type GtfsStop,
-  type GtfsTrip,
   routeTypeToOsmRoute,
   wheelchairBoardingToOsm,
 } from "./types.ts";
@@ -176,25 +175,6 @@ export function routeToTags(route: GtfsRoute): OsmTags {
 
   // Route type as additional tag
   tags["gtfs:route_type"] = route.route_type;
-
-  return tags;
-}
-
-/**
- * Convert a GTFS trip to OSM tags.
- */
-export function tripToTags(trip: GtfsTrip): OsmTags {
-  const tags: OsmTags = {};
-  tags["ref:gtfs:trip_id"] = trip.trip_id;
-  if (trip.service_id) tags["ref:gtfs:service_id"] = trip.service_id;
-  if (trip.trip_headsign) tags["ref:gtfs:trip_headsign"] = trip.trip_headsign;
-  if (trip.trip_short_name) tags["ref:gtfs:trip_short_name"] = trip.trip_short_name;
-  if (trip.direction_id) tags["ref:gtfs:direction_id"] = trip.direction_id;
-  if (trip.block_id) tags["ref:gtfs:block_id"] = trip.block_id;
-  if (trip.shape_id) tags["ref:gtfs:shape_id"] = trip.shape_id;
-  if (trip.wheelchair_accessible)
-    tags["ref:gtfs:wheelchair_accessible"] = trip.wheelchair_accessible;
-  if (trip.bikes_allowed) tags["ref:gtfs:bikes_allowed"] = trip.bikes_allowed;
 
   return tags;
 }

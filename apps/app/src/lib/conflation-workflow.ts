@@ -39,7 +39,7 @@ export function parseConflationPropertyKeys(value: string): string[] {
   ].sort();
 }
 
-export const CONFLATION_ERROR_FIELD_IDS = {
+const CONFLATION_ERROR_FIELD_IDS = {
   actions: "conflation-property-transfer",
   propertyKeys: "conflation-property-keys",
   maxDistanceMeters: "conflation-distance",

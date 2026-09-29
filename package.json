@@ -22,15 +22,16 @@
     "verify:all": "node scripts/verify-workspace.ts --all",
     "verify:workspace": "node scripts/verify-workspace.ts",
     "check:docs": "node scripts/check-docs.ts",
-    "check:deps": "node scripts/check-deps.ts",
     "typecheck": "pnpm -r typecheck",
     "version": "changeset version && pnpm install",
-    "release": "node scripts/release.ts"
+    "release": "node scripts/release.ts",
+    "knip": "knip"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.3",
     "@shadcn/lint": "0.2.0",
     "@types/node": "catalog:",
+    "knip": "^6.38.0",
     "oxfmt": "^0.68.0",
     "oxlint": "1.83.0",
     "oxlint-tailwindcss": "1.13.0",

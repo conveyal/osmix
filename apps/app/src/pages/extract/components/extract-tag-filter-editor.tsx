@@ -31,7 +31,7 @@ function rulesToRows(rules: ExtractTagFilterRule[]): TagFilterEditorRow[] {
   return rules.map((rule) => newRow({ key: rule.key, value: rule.value ?? "" }));
 }
 
-export function editorStateFromRules(rules: ExtractTagFilterRules): TagFilterEditorState {
+function editorStateFromRules(rules: ExtractTagFilterRules): TagFilterEditorState {
   return {
     nodes: rulesToRows(rules.nodes),
     ways: rulesToRows(rules.ways),

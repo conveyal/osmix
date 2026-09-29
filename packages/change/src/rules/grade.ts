@@ -3,7 +3,7 @@ import type { OsmEntity, OsmTags } from "@osmix/types";
 
 import { EXACT_NODE_ACCESS_TAGS } from "./access.ts";
 
-export function normalizedGradeValue(value: number | string | undefined, defaultValue: string) {
+function normalizedGradeValue(value: number | string | undefined, defaultValue: string) {
   const normalized = String(value ?? "");
   if (normalized === "" || normalized === "0" || normalized === "false" || normalized === "no") {
     return defaultValue;
@@ -22,7 +22,7 @@ export function routingGradeSignature(tags?: OsmTags) {
   ].join("|");
 }
 
-export const GRADE_TAG_DEFAULTS = {
+const GRADE_TAG_DEFAULTS = {
   bridge: "no",
   covered: "no",
   layer: "0",

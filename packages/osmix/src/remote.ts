@@ -370,7 +370,7 @@ export async function createRemote<T extends OsmixWorker = OsmixWorker>({
  * TypeScript source (monorepo dev) and from the built `dist` output
  * (published package in Node, CDNs, and unbundled ESM).
  */
-export function defaultWorkerUrl(): URL {
+function defaultWorkerUrl(): URL {
   return defaultOsmixWorkerUrl(import.meta.url);
 }
 

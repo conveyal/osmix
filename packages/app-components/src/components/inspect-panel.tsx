@@ -16,7 +16,7 @@ import { pagePath } from "../lib/app-pages.ts";
 import { DuplicateFixes } from "./duplicate-fixes.tsx";
 import { OsmDatasetSection } from "./osm-dataset-section.tsx";
 import { OsmSourceLinks } from "./osm-source-links.tsx";
-import StoredOsmList from "./stored-osm-list.tsx";
+import { StoredOsmList } from "./stored-osm-list.tsx";
 
 /**
  * Sidebar panel for inspecting one loaded dataset: source links and stored files while the

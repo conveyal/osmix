@@ -5,7 +5,7 @@
  */
 import type { Osm } from "@osmix/core";
 
-export type MergeEntityKind = "node" | "way" | "relation";
+type MergeEntityKind = "node" | "way" | "relation";
 
 export interface MergeProvenance {
   /** In the base input, including base entities a same-ID patch entity updates. */

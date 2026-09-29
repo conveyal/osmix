@@ -6,17 +6,13 @@ import { accessSignature, ROUTING_ACCESS_KEYS } from "./access.ts";
 import { isAreaWay } from "./area.ts";
 import { routingGradeSignature } from "./grade.ts";
 
-export const PEDESTRIAN_HIGHWAYS = new Set(["corridor", "footway", "path", "pedestrian", "steps"]);
+const PEDESTRIAN_HIGHWAYS = new Set(["corridor", "footway", "path", "pedestrian", "steps"]);
 
-export const BICYCLE_HIGHWAYS = new Set(["cycleway"]);
+const BICYCLE_HIGHWAYS = new Set(["cycleway"]);
 
-export const NON_MOTOR_HIGHWAYS = new Set([
-  ...PEDESTRIAN_HIGHWAYS,
-  ...BICYCLE_HIGHWAYS,
-  "bridleway",
-]);
+const NON_MOTOR_HIGHWAYS = new Set([...PEDESTRIAN_HIGHWAYS, ...BICYCLE_HIGHWAYS, "bridleway"]);
 
-export const PROTECTED_KEYS = new Set([
+const PROTECTED_KEYS = new Set([
   "area",
   "bridge",
   "covered",
@@ -27,7 +23,7 @@ export const PROTECTED_KEYS = new Set([
   "type",
 ]);
 
-export const ROUTING_KEYS = new Set([
+const ROUTING_KEYS = new Set([
   ...ROUTING_ACCESS_KEYS,
   "barrier",
   "crossing",

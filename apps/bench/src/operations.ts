@@ -23,9 +23,9 @@ export interface Operation {
 }
 
 /** Zoom of the benchmark vector tile: street level, where tiles are dense. */
-export const TILE_ZOOM = 14;
-export const NEAREST_COUNT = 5;
-export const TAG_KEY = "highway";
+const TILE_ZOOM = 14;
+const NEAREST_COUNT = 5;
+const TAG_KEY = "highway";
 
 /** Square bboxes centered on the dataset, sized as a share of its shorter side. */
 export function testGeometry(bbox: GeoBbox2D) {
