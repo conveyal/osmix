@@ -1,4 +1,4 @@
-import type { ClassValue } from "clsx";
+import type { ClassValue } from "cn";
 import { ChevronDownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 

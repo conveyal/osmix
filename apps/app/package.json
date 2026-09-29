@@ -16,7 +16,6 @@
     "@osmix/app-core": "workspace:*",
     "@osmix/ui": "workspace:*",
     "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
     "comlink": "catalog:",
     "dequal": "catalog:",
     "jotai": "catalog:",
@@ -27,7 +26,6 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-map-gl": "catalog:",
-    "tailwind-merge": "^3.7.0",
     "wouter": "catalog:"
   },
   "devDependencies": {
