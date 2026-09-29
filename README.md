@@ -2,6 +2,8 @@
 
 > High-performance OpenStreetMap tools for TypeScript and JavaScript environments.
 
+![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/conveyal/osmix)
+
 ## Introduction
 
 Osmix is a collection of composable libraries for reading, querying, merging, and transforming OpenStreetMap PBF data in browsers and Node.js. Built on streaming APIs and Web Workers, Osmix handles large extracts efficiently with spatial indexing, vector tile generation, and in-browser merge workflows.
