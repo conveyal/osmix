@@ -1,6 +1,7 @@
 import { buildRelationRings } from "@osmix/geo/relation-multipolygon";
 import type { OsmPbfRelation } from "@osmix/pbf";
 import { assertValue } from "@osmix/shared/assert";
+import { BitSet } from "@osmix/shared/bit-set";
 import type { ContentHasher } from "@osmix/shared/content-hasher";
 import type {
   GeoBbox2D,
@@ -25,6 +26,7 @@ import { around as geoAround } from "geoflatbush";
 
 import { Entities, type EntitiesTransferables, isValidSpatialBbox } from "./entities.ts";
 import { type IdOrIndex, Ids } from "./ids.ts";
+import { MAX_RELATION_MEMBERS, MAX_UINT32_OFFSET, assertCapacity } from "./limits.ts";
 import type { Nodes } from "./nodes.ts";
 import type StringTable from "./stringtable.ts";
 import { Tags } from "./tags.ts";
@@ -55,7 +57,7 @@ export class Relations extends Entities<OsmRelation> {
   private stringTable: StringTable;
 
   private memberStart: RTA<Uint32Array>;
-  private memberCount: RTA<Uint16Array>; // Maximum 65,535 members per relation
+  private memberCount: RTA<Uint16Array>; // Maximum MAX_RELATION_MEMBERS (65,535) per relation
 
   // Store the ID of the member because relations have other relations as members.
   private memberRefs: RTA<Float64Array>;
@@ -74,8 +76,9 @@ export class Relations extends Entities<OsmRelation> {
   private nodes: Nodes;
   private ways: Ways;
 
-  // Lazily computed relation way membership. Invalidated whenever relations change.
-  private wayMemberIdsCache: ReadonlySet<number> | null = null;
+  // Lazily computed relation way membership keyed by way index. Invalidated whenever relations
+  // change, and rebuilt if the way count no longer matches.
+  private wayMemberCache: BitSet | null = null;
 
   /**
    * Create a new Relations index.
@@ -114,11 +117,28 @@ export class Relations extends Entities<OsmRelation> {
     this.stringTable = stringTable;
   }
 
+  /** Reject a relation whose member count would wrap `memberCount` or `memberStart`. */
+  private assertMemberCapacity(relationId: number, memberCount: number) {
+    assertCapacity(
+      "relation-members",
+      memberCount,
+      MAX_RELATION_MEMBERS,
+      () => `Relation ${relationId}`,
+    );
+    assertCapacity(
+      "total-relation-members",
+      this.memberRefs.length + memberCount,
+      MAX_UINT32_OFFSET,
+      () => `The dataset (at relation ${relationId})`,
+    );
+  }
+
   /**
    * Add a single relation to the index.
    */
   addRelation(relation: OsmRelation) {
-    this.wayMemberIdsCache = null;
+    this.wayMemberCache = null;
+    this.assertMemberCapacity(relation.id, relation.members.length);
     const relationIndex = this.addEntity(relation.id, relation.tags ?? {});
     this.memberStart.push(this.memberRefs.length);
     this.memberCount.push(relation.members.length);
@@ -138,7 +158,7 @@ export class Relations extends Entities<OsmRelation> {
     blockStringIndexMap: Uint32Array,
     filter?: (relation: OsmRelation) => OsmRelation | null,
   ): number {
-    this.wayMemberIdsCache = null;
+    this.wayMemberCache = null;
     const blockToStringTable = (k: number) => {
       const index = blockStringIndexMap[k];
       if (index === undefined) throw Error("Tag key not found");
@@ -190,6 +210,7 @@ export class Relations extends Entities<OsmRelation> {
           })
         : null;
       if (filter && filteredRelation === null) continue;
+      this.assertMemberCapacity(relation.id, filteredRelation?.members.length ?? memberRefs.length);
       added++;
 
       this.addEntity(relation.id, tagKeys, tagValues);
@@ -221,10 +242,12 @@ export class Relations extends Entities<OsmRelation> {
    * Build the spatial index for relations.
    * Handles nested relations by resolving all descendant nodes and ways.
    * If bbox data already exists (e.g., loaded from storage), reuses it.
+   * Returns the existing index when it is already built.
    */
   buildSpatialIndex() {
     if (!this.nodes.isReady()) throw Error("Node index is not ready.");
     if (!this.ways.isReady()) throw Error("Way index is not ready.");
+    if (this.spatialIndexBuilt) return this.spatialIndex;
     if (this.size === 0) {
       this.spatialIndex = new Flatbush(1, 128, Float64Array, BufferConstructor);
       this.spatialIndexBuilt = true;
@@ -377,30 +400,35 @@ export class Relations extends Entities<OsmRelation> {
   }
 
   /**
-   * Get all way IDs that are members of relations, including nested relations.
+   * Check whether a way is a member of any relation, including through nested relations.
    * Used to exclude these ways from individual rendering.
+   *
+   * Membership is computed once and cached as one bit per way index. Requires the way ID index.
    */
-  getWayMemberIds(): ReadonlySet<number> {
-    if (this.wayMemberIdsCache !== null) return this.wayMemberIdsCache;
+  isWayMember(wayIndex: number): boolean {
+    return this.getWayMembers().has(wayIndex);
+  }
 
-    const wayIds = new Set<number>();
+  private getWayMembers(): BitSet {
+    if (this.wayMemberCache !== null && this.wayMemberCache.size === this.ways.size) {
+      return this.wayMemberCache;
+    }
+
+    const members = new BitSet(this.ways.size);
+    const getRelation = (relId: number) => {
+      const relIndex = this.ids.getIndexFromId(relId);
+      if (relIndex === -1) return null;
+      return this.getByIndex(relIndex);
+    };
     for (let i = 0; i < this.size; i++) {
-      const relation = this.getByIndex(i);
-      const resolved = resolveRelationMembers(
-        relation,
-        (relId) => {
-          const relIndex = this.ids.getIndexFromId(relId);
-          if (relIndex === -1) return null;
-          return this.getByIndex(relIndex);
-        },
-        10, // max depth
-      );
+      const resolved = resolveRelationMembers(this.getByIndex(i), getRelation, 10);
       for (const wayId of resolved.ways) {
-        wayIds.add(wayId);
+        const wayIndex = this.ways.ids.getIndexFromId(wayId);
+        if (wayIndex !== -1) members.add(wayIndex);
       }
     }
-    this.wayMemberIdsCache = wayIds;
-    return this.wayMemberIdsCache;
+    this.wayMemberCache = members;
+    return members;
   }
 
   /**
@@ -517,7 +545,7 @@ export class Relations extends Entities<OsmRelation> {
   /**
    * Get the approximate memory requirements for a given number of relations in bytes.
    */
-  static getBytesRequired(count: number) {
+  static getBytesRequired(count: number, memberCount = 0, tagCount = 0) {
     if (count === 0) return 0;
     // Approximate members per relation
     let numNodes = count;
@@ -532,9 +560,12 @@ export class Relations extends Entities<OsmRelation> {
 
     return (
       Ids.getBytesRequired(count) +
-      Tags.getBytesRequired(count) +
+      Tags.getBytesRequired(count, count, tagCount) +
       count * Uint32Array.BYTES_PER_ELEMENT + // memberStart
       count * Uint16Array.BYTES_PER_ELEMENT + // memberCount
+      memberCount * Float64Array.BYTES_PER_ELEMENT + // memberRefs
+      memberCount * Uint8Array.BYTES_PER_ELEMENT + // memberTypes
+      memberCount * Uint32Array.BYTES_PER_ELEMENT + // memberRoles
       count * 4 * Float64Array.BYTES_PER_ELEMENT + // bbox
       spatialIndexBytes
     );

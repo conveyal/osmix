@@ -2,6 +2,8 @@
 
 > High-performance OpenStreetMap tools for TypeScript and JavaScript environments.
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/conveyal/osmix)
+
 ## Introduction
 
 Osmix is a collection of composable libraries for reading, querying, merging, and transforming OpenStreetMap PBF data in browsers and Node.js. Built on streaming APIs and Web Workers, Osmix handles large extracts efficiently with spatial indexing, vector tile generation, and in-browser merge workflows.
@@ -15,7 +17,9 @@ Osmix is a collection of composable libraries for reading, querying, merging, an
 - Generate raster and vector tiles
 - Worker-based processing for responsive UIs
 
-**Try it:** [merge.osmix.dev](https://merge.osmix.dev) · **Docs & examples:** [osmix.dev](https://osmix.dev)
+**Limits:** datasets live in memory, at about 5× the PBF file size. In a browser, files up to about 500 MB load with all features, and up to about 1 GB with reduced features. See [docs/limits.md](docs/limits.md) for all limits.
+
+**Try it:** [app.osmix.dev](https://app.osmix.dev) · **Docs & examples:** [osmix.dev](https://osmix.dev)
 
 ## Quick Start
 
@@ -64,16 +68,11 @@ console.log(`Serialized ${pbfBytes.byteLength} bytes`);
 const patchResponse = await fetch("./monaco-patch.pbf");
 const patchPbf = new Uint8Array(await patchResponse.arrayBuffer());
 const patchOsm = await fromPbf(patchPbf);
-const mergedOsm = await merge(osm, patchOsm, {
-  directMerge: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-  createIntersections: true,
-});
+const mergedOsm = await merge(osm, patchOsm);
 console.log(mergedOsm.id);
 ```
 
-The [merge-process guide](docs/merge-process.md) is the authoritative reference for input identity, stage order, defaults, matching and intersection rules, worked examples, and known limitations. The API enables only the stages requested above; `merge(base, patch)` without options returns the base unchanged.
+The [merge-process guide](docs/merge-process.md) is the authoritative reference for input identity, the plan's phases, defaults, matching and intersection rules, worked examples, and known limitations. `merge(base, patch)` uses the Merge app's defaults: identical points merge into the base, crossings connect, and matching runs only when configured. To review a merge first, use `planMerge` and `applyPlan`.
 
 ### Use in a Web Worker
 
@@ -154,11 +153,11 @@ pnpm run verify:workspace -- @osmix/core
 pnpm run verify:all
 ```
 
-**Workspace commands** support filtering: `pnpm --filter @osmix/merge dev`
+**Workspace commands** support filtering: `pnpm --filter @osmix/app dev`
 
-Development servers use [Portless](https://github.com/vercel-labs/portless) and stable HTTPS URLs: `merge.osmix.localhost`, `inspect.osmix.localhost`, `extract.osmix.localhost`, `bench.osmix.localhost`, `www.osmix.localhost`, `vt.osmix.localhost`, and `shortbread.osmix.localhost`. The first run creates and trusts a local certificate authority; run `pnpm exec portless trust` if trust setup was skipped. Branch-backed worktrees add the sanitized branch name as a prefix, while detached worktrees add their Git worktree ID, so concurrent checkouts do not compete for routes. Filtered commands retain the same naming convention.
+Development servers use [Portless](https://github.com/vercel-labs/portless) and stable HTTPS URLs: `app.osmix.localhost`, `bench.osmix.localhost`, `www.osmix.localhost`, `vt-server.osmix.localhost`, and `shortbread-server.osmix.localhost`. The first run creates and trusts a local certificate authority; run `pnpm exec portless trust` if trust setup was skipped. `pnpm run dev` at the repo root runs Portless once for the whole workspace. Portless starts every app's `dev` script and derives each route name from the package name (`@osmix/<name>` → `<name>.osmix.localhost`). Linked worktrees on a branch other than `main` add the sanitized branch name as a prefix, so concurrent checkouts do not compete for routes. Detached-HEAD worktrees get no prefix; create a branch or run `pnpm run dev` inside the app directory instead, which starts it without Portless.
 
-Set `PORTLESS=0` to bypass the proxy and run the underlying development command directly, for example `PORTLESS=0 pnpm --filter @osmix/merge dev`. Portless proxy and certificate state are user-level state and are not stored in this repository.
+Set `PORTLESS=0` to bypass the proxy and run the underlying development command directly, for example `PORTLESS=0 pnpm --filter @osmix/app dev`. Portless proxy and certificate state are user-level state and are not stored in this repository.
 
 `verify:workspace` accepts a package name or path such as `apps/vt-server`, follows runtime and development workspace dependencies to include dependents, and runs formatting, typechecking, and tests in dependency order. It is check-only by default; pass `--write` only when formatting changes are intentional. `verify:all` excludes the browser benchmark app, whose benchmark script is not a package test.
 
@@ -169,9 +168,10 @@ Routing regressions use checked-in Monaco and small generated fixtures. Reports 
 ## Apps
 
 - **[www](apps/www/)** – Main site with interactive examples and package overview ([osmix.dev](https://osmix.dev))
-- **[merge](apps/merge/README.md)** – Interactive merge tool for OSM extracts with MapLibre visualization ([merge.osmix.dev](https://merge.osmix.dev))
-- **[inspect](apps/inspect/README.md)** – Single-dataset viewer: load, search, diagnose duplicates, route ([inspect.osmix.dev](https://inspect.osmix.dev))
-- **[extract](apps/extract/README.md)** – Bounding-box extracts with strategy and tag filters ([extract.osmix.dev](https://extract.osmix.dev))
+- **[app](apps/app/README.md)** – The Osmix app ([app.osmix.dev](https://app.osmix.dev)), with three pages that share browser storage and one map:
+  - **Merge** – reconcile an imported patch into a base dataset, reviewing every change
+  - **Inspect** – one dataset: search, diagnose and fix duplicates, route
+  - **Extract** – bounding-box extracts with strategy and tag filters, from a PBF file or a stored dataset
 - **[bench](apps/bench/README.md)** – Performance benchmarks comparing Osmix with DuckDB-wasm
 - **[vt-server](apps/vt-server/README.md)** – Example vector tile server implementation
 - **[shortbread](apps/shortbread/)** – Shortbread schema vector tile server demo

@@ -3,10 +3,7 @@
  * @module
  */
 
-import type { Osm } from "@osmix/core";
 import type { OsmEntity, OsmEntityType, OsmEntityTypeMap, OsmTags } from "@osmix/types";
-
-import type { OsmChangeset } from "./changeset.ts";
 
 /**
  * Reference to an OSM entity with its origin dataset.
@@ -45,22 +42,12 @@ export type OsmChange<T extends OsmEntity = OsmEntity> = {
   refs?: OsmEntityRef[];
 };
 
-/**
- * Options for the high-level `merge()` function.
- * All options default to `false` - enable only the stages you need.
- */
-export interface OsmMergeOptions {
-  directMerge: boolean;
-  deduplicateNodes: boolean;
-  deduplicateWays: boolean;
-  createIntersections: boolean;
-
-  /** Optional, explicitly configured cross-dataset proximity conflation. */
-  conflation?: OsmConflationOptions;
+/** Pending changes by entity type, keyed by entity ID. An `OsmChangeset` is one. */
+export interface OsmChangeRecords {
+  nodeChanges: Record<number, OsmChange<OsmEntityTypeMap["node"]>>;
+  wayChanges: Record<number, OsmChange<OsmEntityTypeMap["way"]>>;
+  relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>;
 }
-
-/** Stages supported by ordinary changeset generation; matching uses its own generator. */
-export type OsmChangesetOptions = Omit<OsmMergeOptions, "conflation">;
 
 /** Entity kinds supported by fuzzy conflation. */
 export type OsmConflationEntityType = "node" | "way";
@@ -236,7 +223,7 @@ export interface OsmConflationDecisionConflict {
   message: string;
 }
 
-/** Why an imported feature still needs matching review after generation. */
+/** Why an imported feature still still needs a matching decision after planning. */
 export type OsmConflationUnresolvedKind = "ambiguous" | "blocked" | "unmatched" | "review";
 
 /** Why a present, configured imported tag did not produce a surviving copy. */
@@ -291,6 +278,8 @@ export interface OsmConflationOutcomeSummary {
   tagCopyActions: number;
   copiedTagValues: number;
   networkAttachmentActions: number;
+  /** Untagged imported points dropped because a connection left them unused. */
+  removedConnectionOrphanNodes: number;
   wayRemovalActions?: number;
   removedOrphanNodes?: number;
   unresolvedFeatures: number;
@@ -325,42 +314,6 @@ export interface OsmConflationOutcomeReport {
   retainedImports: OsmConflationRetainedImports;
 }
 
-/** Generated matching changes and the actual before/after result used by the outcome report. */
-export interface OsmConflationArtifacts {
-  changeset: OsmChangeset;
-  ordinaryBaseline: Osm;
-  result: Osm;
-  outcome: OsmConflationOutcomeReport;
-}
-
-/** A filter-wide review operation performed atomically in the conflation worker. */
-export type OsmConflationBulkAction = "transfer-properties" | "attach-network" | "reject";
-
-/** Stable input for applying one bulk decision to all candidates matching a filter. */
-export interface OsmConflationBulkDecisionRequest {
-  action: OsmConflationBulkAction;
-  filter: OsmConflationCandidateFilter;
-}
-
-/** Counts shown before confirming a filter-wide decision. */
-export interface OsmConflationBulkDecisionPreview {
-  action: OsmConflationBulkAction;
-  filteredCandidates: number;
-  eligibleCandidates: number;
-  changedCandidates: number;
-  skippedCandidates: number;
-  automaticCandidates: number;
-  reviewCandidates: number;
-  overriddenDecisions: number;
-}
-
-/** Atomic result returned after a filter-wide decision is applied. */
-export interface OsmConflationBulkDecisionResult {
-  decisions: OsmConflationDecision[];
-  preview: OsmConflationBulkDecisionPreview;
-  summary: OsmConflationSummary;
-}
-
 /** Counts used to present discovery and review progress. */
 export interface OsmConflationSummary {
   total: number;
@@ -381,15 +334,6 @@ export interface OsmConflationDiscovery {
   summary: OsmConflationSummary;
 }
 
-/** Serializable filters used by paged worker APIs. */
-export interface OsmConflationCandidateFilter {
-  entityType?: OsmConflationEntityType;
-  status?: OsmConflationEffectiveStatus;
-  reason?: OsmConflationReasonCode;
-  sourceId?: number;
-  targetId?: number | null;
-}
-
 /**
  * Statistics from a changeset operation.
  * Provides counts of changes and deduplication results.
@@ -400,42 +344,15 @@ export type OsmChangesetStats = {
   nodeChanges: number;
   wayChanges: number;
   relationChanges: number;
+  /** The same changes counted by change type; the three sum to `totalChanges`. */
+  createChanges: number;
+  modifyChanges: number;
+  deleteChanges: number;
   deduplicatedNodes: number;
   deduplicatedNodesReplaced: number;
   deduplicatedWays: number;
   intersectionPointsFound: number;
   intersectionNodesCreated: number;
+  /** Imported points an intersection replaced and left unused, so they were dropped. */
+  intersectionNodesRemoved: number;
 };
-
-/**
- * Serializable representation of all changes in a changeset.
- * Used for JSON export/import of changeset state.
- */
-export type OsmChanges = {
-  osmId: string;
-  nodes: Record<number, OsmChange<OsmEntityTypeMap["node"]>>;
-  ways: Record<number, OsmChange<OsmEntityTypeMap["way"]>>;
-  relations: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>;
-  stats: OsmChangesetStats;
-  /** Omitted by legacy changes-only JSON, which can verify only existing base issues. */
-  validationContext?: OsmChangesetValidationContext;
-};
-
-/** Storage identity of an immutable, indexed merge input; not an authenticity signature. */
-export interface OsmChangesetInputIdentity {
-  id: string;
-  contentHash: string;
-  contentHashVersion: number;
-}
-
-/** Input bindings used to recompute integrity policy; never a list of issue exemptions. */
-export interface OsmChangesetValidationContext {
-  version: 1;
-  base: OsmChangesetInputIdentity;
-  patches: OsmChangesetInputIdentity[];
-}
-
-/** Original immutable patch inputs, in the order passed to generateDirectChanges(). */
-export interface OsmChangesetRestoreContext {
-  patches: readonly Osm[];
-}

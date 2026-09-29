@@ -2,12 +2,20 @@ import { pointToTile } from "@mapbox/tilebelt";
 import { VectorTile } from "@mapbox/vector-tile";
 import { Osm } from "@osmix/core";
 import { llToTilePx } from "@osmix/geo/tile";
+import { assertValue } from "@osmix/shared/assert";
 import type { GeoBbox2D, Tile } from "@osmix/types";
 import { decodeZigzag } from "@osmix/types/zigzag";
 import { PbfReader } from "pbf";
 import { describe, expect, it, vi } from "vitest";
 
 import { OsmixVtEncoder } from "./encode.ts";
+
+/** Bbox of a test dataset that is known to contain nodes. */
+function datasetBbox(dataset: Osm): GeoBbox2D {
+  const bbox = dataset.bbox();
+  assertValue(bbox, "Test dataset has no nodes");
+  return bbox;
+}
 
 const osm = new Osm();
 osm.nodes.addNode({
@@ -64,6 +72,14 @@ function bboxToTile(bbox: GeoBbox2D, z = 8): Tile {
 }
 
 describe("OsmixVtEncoder", () => {
+  it("returns an empty tile for a dataset without nodes", () => {
+    const empty = new Osm();
+    empty.buildIndexes();
+    empty.buildSpatialIndexes();
+
+    expect(new OsmixVtEncoder(empty).getTile([0, 0, 0]).byteLength).toBe(0);
+  });
+
   it("encodes nodes from a tagged-only spatial index", () => {
     const testOsm = new Osm();
     testOsm.nodes.addNode({ id: 1, lat: 40, lon: -74, tags: { name: "Tagged" } });
@@ -73,7 +89,7 @@ describe("OsmixVtEncoder", () => {
     const allNodeQuery = vi.spyOn(testOsm.nodes, "findIndexesWithinBbox");
 
     const features = Array.from(
-      new OsmixVtEncoder(testOsm).nodeFeatures(testOsm.bbox(), ([lon, lat]) => [lon, lat]),
+      new OsmixVtEncoder(testOsm).nodeFeatures(datasetBbox(testOsm), ([lon, lat]) => [lon, lat]),
     );
 
     expect(features.map(({ id }) => id)).toEqual([1]);
@@ -81,7 +97,7 @@ describe("OsmixVtEncoder", () => {
   });
 
   it("encodes nodes and ways with expected metadata", () => {
-    const bbox = osm.bbox();
+    const bbox = datasetBbox(osm);
     const tile = bboxToTile(bbox);
     const encoder = new OsmixVtEncoder(osm);
     const result = encoder.getTile(tile);
@@ -137,7 +153,7 @@ describe("OsmixVtEncoder", () => {
     testOsm.buildIndexes();
     testOsm.buildSpatialIndexes();
 
-    const bbox = testOsm.bbox();
+    const bbox = datasetBbox(testOsm);
     const tile = bboxToTile(bbox);
     const encoder = new OsmixVtEncoder(testOsm);
     const result = encoder.getTile(tile);
@@ -173,7 +189,7 @@ describe("OsmixVtEncoder", () => {
     testOsm.buildIndexes();
     testOsm.buildSpatialIndexes();
 
-    const bbox = testOsm.bbox();
+    const bbox = datasetBbox(testOsm);
     const tile = bboxToTile(bbox);
     const encoder = new OsmixVtEncoder(testOsm);
 
@@ -205,7 +221,7 @@ describe("OsmixVtEncoder", () => {
     testOsm.buildIndexes();
     testOsm.buildSpatialIndexes();
 
-    const bbox = testOsm.bbox();
+    const bbox = datasetBbox(testOsm);
     const tile = bboxToTile(bbox);
     const encoder = new OsmixVtEncoder(testOsm);
 
@@ -341,7 +357,7 @@ describe("OsmixVtEncoder", () => {
     testOsm.buildIndexes();
     testOsm.buildSpatialIndexes();
 
-    const bbox = testOsm.bbox();
+    const bbox = datasetBbox(testOsm);
     const tile = bboxToTile(bbox);
     const encoder = new OsmixVtEncoder(testOsm);
 
@@ -389,7 +405,7 @@ describe("OsmixVtEncoder", () => {
     testOsm.buildIndexes();
     testOsm.buildSpatialIndexes();
 
-    const bbox = testOsm.bbox();
+    const bbox = datasetBbox(testOsm);
     const tile = bboxToTile(bbox);
     const encoder = new OsmixVtEncoder(testOsm);
     const result = encoder.getTile(tile);
@@ -444,7 +460,7 @@ describe("OsmixVtEncoder", () => {
     testOsm.buildIndexes();
     testOsm.buildSpatialIndexes();
 
-    const bbox = testOsm.bbox();
+    const bbox = datasetBbox(testOsm);
     const tile = bboxToTile(bbox);
     const encoder = new OsmixVtEncoder(testOsm);
 
@@ -474,7 +490,7 @@ describe("OsmixVtEncoder", () => {
     testOsm.buildIndexes();
     testOsm.buildSpatialIndexes();
 
-    const bbox = testOsm.bbox();
+    const bbox = datasetBbox(testOsm);
     const tile = bboxToTile(bbox);
     const encoder = new OsmixVtEncoder(testOsm);
     const result = encoder.getTile(tile);

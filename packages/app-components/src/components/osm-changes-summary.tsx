@@ -4,93 +4,185 @@ import {
   changeTypeFilterAtom,
   entityTypeFilterAtom,
   pageAtom,
+  pageSizeAtom,
+  selectedEntityAtom,
   startIndexAtom,
 } from "@osmix/app-core";
 import {
   cn,
+  Checkbox,
+  CheckboxLabel,
   Details,
   DetailsContent,
   DetailsSummary,
   EmptyState,
-  Button,
-  Checkbox,
-  CheckboxLabel,
+  Item,
+  Pager,
+  StatusDot,
+  type StatusDotStatus,
   Table,
   TableBody,
   TableCell,
   TableRow,
 } from "@osmix/ui";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import type { OsmChange } from "osmix";
-import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from "osmix";
+import { ChevronDownIcon } from "lucide-react";
+import type {
+  OsmChange,
+  OsmChangesetStats,
+  OsmChangeTypes,
+  OsmEntity,
+  OsmEntityType,
+  OsmNode,
+  OsmRelation,
+  OsmWay,
+} from "osmix";
 import { getEntityType, isNode, isRelation, isWay } from "osmix";
 import { useId, useTransition } from "react";
 
+import { changeDescription, changeTypeLabel, entityTypeLabel } from "../lib/change-labels.ts";
 import { EntityContent } from "./entity-details.tsx";
 
-export default function ChangesSummary() {
+/**
+ * `changeset` describes a cross-dataset merge changeset. `deduplication` describes duplicates
+ * found inside one dataset, so it omits the intersection counts that scan never produces.
+ */
+export type ChangesSummaryVariant = "changeset" | "deduplication";
+
+function plural(count: number, noun: string) {
+  return `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/** One sentence that says what the changes do, before any table. */
+export function changesLead(summary: OsmChangesetStats, variant: ChangesSummaryVariant): string {
+  if (variant === "deduplication") {
+    const found = [
+      summary.deduplicatedNodes > 0 ? plural(summary.deduplicatedNodes, "duplicate node") : null,
+      summary.deduplicatedWays > 0 ? plural(summary.deduplicatedWays, "duplicate way") : null,
+    ].filter(Boolean);
+    const rewritten =
+      summary.deduplicatedNodesReplaced > 0
+        ? ` Applying them rewrites ${plural(summary.deduplicatedNodesReplaced, "node reference")}.`
+        : "";
+    return `${found.join(" and ")}.${rewritten}`;
+  }
+  const kinds = [
+    summary.createChanges > 0 ? `${summary.createChanges.toLocaleString()} created` : null,
+    summary.modifyChanges > 0 ? `${summary.modifyChanges.toLocaleString()} modified` : null,
+    summary.deleteChanges > 0 ? `${summary.deleteChanges.toLocaleString()} deleted` : null,
+  ].filter(Boolean);
+  return `${plural(summary.totalChanges, "change")}: ${kinds.join(", ")}.`;
+}
+
+/**
+ * The lead sentence, then the full counts in a closed "Summary" disclosure. Place it in a
+ * `flush` section.
+ */
+export default function ChangesSummary({
+  defaultOpen = false,
+  variant = "changeset",
+}: {
+  defaultOpen?: boolean;
+  variant?: ChangesSummaryVariant;
+}) {
+  const summary = useAtomValue(changesetStatsAtom);
+  if (!summary || summary.totalChanges === 0) {
+    return (
+      <EmptyState>
+        {variant === "deduplication" ? "No duplicate nodes or ways found" : "No changes found"}
+      </EmptyState>
+    );
+  }
   return (
-    <Details>
-      <DetailsSummary>Summary</DetailsSummary>
-      <DetailsContent>
-        <ChangesSummaryTable />
-      </DetailsContent>
-    </Details>
+    <>
+      <p className="px-inset pb-inset">{changesLead(summary, variant)}</p>
+      <Details defaultOpen={defaultOpen}>
+        <DetailsSummary>Summary</DetailsSummary>
+        <DetailsContent>
+          <ChangesSummaryTable summary={summary} variant={variant} />
+        </DetailsContent>
+      </Details>
+    </>
   );
 }
 
-function ChangesSummaryTable() {
-  const summary = useAtomValue(changesetStatsAtom);
+function ChangesSummaryTable({
+  summary,
+  variant,
+}: {
+  summary: OsmChangesetStats;
+  variant: ChangesSummaryVariant;
+}) {
   const reconciliationHelpId = useId();
-  if (!summary || summary.totalChanges === 0) return <EmptyState>No changes found</EmptyState>;
   return (
     <>
       <Table aria-describedby={reconciliationHelpId}>
         <TableBody>
           <TableRow>
             <TableCell>Total changes</TableCell>
-            <TableCell>{summary.totalChanges.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.totalChanges.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Node changes</TableCell>
-            <TableCell>{summary.nodeChanges.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.nodeChanges.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Way changes</TableCell>
-            <TableCell>{summary.wayChanges.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.wayChanges.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Relation changes</TableCell>
-            <TableCell>{summary.relationChanges.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.relationChanges.toLocaleString()}</TableCell>
           </TableRow>
 
           <TableRow>
-            <TableCell>Reconciled nodes</TableCell>
-            <TableCell>{summary.deduplicatedNodes.toLocaleString()}</TableCell>
+            <TableCell>
+              {variant === "deduplication" ? "Duplicate nodes" : "Reconciled nodes"}
+            </TableCell>
+            <TableCell numeric>{summary.deduplicatedNodes.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Node references rewritten</TableCell>
-            <TableCell>{summary.deduplicatedNodesReplaced.toLocaleString()}</TableCell>
+            <TableCell numeric>{summary.deduplicatedNodesReplaced.toLocaleString()}</TableCell>
           </TableRow>
           <TableRow>
-            <TableCell>Reconciled ways</TableCell>
-            <TableCell>{summary.deduplicatedWays.toLocaleString()}</TableCell>
+            <TableCell>
+              {variant === "deduplication" ? "Duplicate ways" : "Reconciled ways"}
+            </TableCell>
+            <TableCell numeric>{summary.deduplicatedWays.toLocaleString()}</TableCell>
           </TableRow>
-          <TableRow>
-            <TableCell>Intersection points found</TableCell>
-            <TableCell>{summary.intersectionPointsFound.toLocaleString()}</TableCell>
-          </TableRow>
-          <TableRow>
-            <TableCell>Intersection nodes created</TableCell>
-            <TableCell>{summary.intersectionNodesCreated.toLocaleString()}</TableCell>
-          </TableRow>
+          {variant === "changeset" ? (
+            <>
+              <TableRow>
+                <TableCell>Intersection points found</TableCell>
+                <TableCell numeric>{summary.intersectionPointsFound.toLocaleString()}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Intersection nodes created</TableCell>
+                <TableCell numeric>{summary.intersectionNodesCreated.toLocaleString()}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Replaced imported points removed</TableCell>
+                <TableCell numeric>{summary.intersectionNodesRemoved.toLocaleString()}</TableCell>
+              </TableRow>
+            </>
+          ) : null}
         </TableBody>
       </Table>
-      <p className="border-t p-2 text-muted-foreground" id={reconciliationHelpId}>
-        Reconciliation resolves equivalent entities to one surviving entity instead of retaining
-        both. Node references rewritten counts way node references and relation node members changed
-        from a reconciled node ID to its surviving node ID.
+      <p className="border-t px-inset py-2 text-muted-foreground" id={reconciliationHelpId}>
+        {variant === "deduplication" ? (
+          <>
+            Each duplicate is removed in favor of the compatible entity with the highest ID. Node
+            references rewritten counts way node references and relation node members that would
+            change from a duplicate node ID to its surviving node ID.
+          </>
+        ) : (
+          <>
+            Reconciliation resolves equivalent entities to one surviving entity instead of retaining
+            both. Node references rewritten counts way node references and relation node members
+            changed from a reconciled node ID to its surviving node ID.
+          </>
+        )}
       </p>
     </>
   );
@@ -98,10 +190,14 @@ function ChangesSummaryTable() {
 
 function FilterCheckbox<T extends string>({
   value,
+  label,
+  count,
   filter,
   setFilter,
 }: {
   value: T;
+  label: string;
+  count: number;
   filter: T[];
   setFilter: (filter: T[]) => void;
 }) {
@@ -123,79 +219,184 @@ function FilterCheckbox<T extends string>({
           });
         }}
       />
-      {value}
+      {label}
+      <span className="text-muted-foreground">{count.toLocaleString()}</span>
     </CheckboxLabel>
   );
 }
 
+/**
+ * One filter group, with each option's count. Options with nothing to show are left out, and
+ * a group with fewer than two options left is not shown: a single checkbox filters nothing.
+ */
+function FilterGroup<T extends string>({
+  legend,
+  options,
+  filter,
+  setFilter,
+  label,
+}: {
+  legend: string;
+  options: readonly (readonly [T, number])[];
+  filter: T[];
+  setFilter: (filter: T[]) => void;
+  label: (value: T) => string;
+}) {
+  const shown = options.filter(([, count]) => count > 0);
+  if (shown.length < 2) return null;
+  return (
+    <fieldset className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <legend className="pb-1 text-muted-foreground">{legend}</legend>
+      {shown.map(([value, count]) => (
+        <FilterCheckbox
+          key={value}
+          value={value}
+          label={label(value)}
+          count={count}
+          filter={filter}
+          setFilter={setFilter}
+        />
+      ))}
+    </fieldset>
+  );
+}
+
+/**
+ * Filters by change type and entity type, each option with its count from the changeset stats.
+ * Renders nothing when no group has two or more options to choose between.
+ */
 export function ChangesFilters() {
+  const summary = useAtomValue(changesetStatsAtom);
   const [changeTypeFilter, setChangeTypeFilter] = useAtom(changeTypeFilterAtom);
   const [entityTypeFilter, setEntityTypeFilter] = useAtom(entityTypeFilterAtom);
+  if (!summary) return null;
+  const changeTypes = [
+    ["create", summary.createChanges],
+    ["modify", summary.modifyChanges],
+    ["delete", summary.deleteChanges],
+  ] as const satisfies readonly (readonly [OsmChangeTypes, number])[];
+  const entityTypes = [
+    ["node", summary.nodeChanges],
+    ["way", summary.wayChanges],
+    ["relation", summary.relationChanges],
+  ] as const satisfies readonly (readonly [OsmEntityType, number])[];
+  const hasChoice = [changeTypes, entityTypes].some(
+    (options) => options.filter(([, count]) => count > 0).length >= 2,
+  );
+  if (!hasChoice) return null;
 
   return (
-    <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 px-2 py-2">
-      <fieldset className="flex flex-wrap items-center gap-2">
-        <legend className="font-bold">Change type</legend>
-        {(["create", "modify", "delete"] as const).map((value) => (
-          <FilterCheckbox
-            key={value}
-            value={value}
-            filter={changeTypeFilter}
-            setFilter={setChangeTypeFilter}
-          />
-        ))}
-      </fieldset>
-      <fieldset className="flex flex-wrap items-center gap-2">
-        <legend className="font-bold">Entity type</legend>
-        {(["node", "way", "relation"] as const).map((value) => (
-          <FilterCheckbox
-            key={value}
-            value={value}
-            filter={entityTypeFilter}
-            setFilter={setEntityTypeFilter}
-          />
-        ))}
-      </fieldset>
+    <div
+      data-slot="changes-filters"
+      className="flex flex-wrap justify-between gap-x-4 gap-y-2 border-t px-inset py-2"
+    >
+      <FilterGroup
+        legend="Change"
+        options={changeTypes}
+        filter={changeTypeFilter}
+        setFilter={setChangeTypeFilter}
+        label={changeTypeLabel}
+      />
+      <FilterGroup
+        legend="Entity"
+        options={entityTypes}
+        filter={entityTypeFilter}
+        setFilter={setEntityTypeFilter}
+        label={entityTypeLabel}
+      />
     </div>
   );
 }
 
-const CHANGE_TYPE_COLOR = {
-  create: "text-success",
-  modify: "text-warning",
-  delete: "text-destructive",
+const CHANGE_TYPE_STATUS: Record<OsmChangeTypes, StatusDotStatus> = {
+  create: "ok",
+  modify: "warn",
+  delete: "error",
 };
 
+function isSameEntity(a: OsmEntity | null, b: OsmEntity) {
+  return a !== null && a.id === b.id && getEntityType(a) === getEntityType(b);
+}
+
+/**
+ * The page of changes as a divided list. A row shows its change type (a status dot and the
+ * word), the entity, and a line on what it relates to. Clicking a row selects the entity on the
+ * map; the selected row is the current one, tinted and expanded to show its diff. Clearing the
+ * selection (Esc on the map) collapses it.
+ */
 export function ChangesList({
+  duplicates = false,
   setSelectedEntity,
 }: {
+  /** Describe deletions as duplicates of the entity that replaces them. */
+  duplicates?: boolean;
   setSelectedEntity: (entity: OsmEntity) => void;
 }) {
-  const changes = useAtomValue(changesAtom)?.changes;
+  const page = useAtomValue(changesAtom);
   const startIndex = useAtomValue(startIndexAtom);
+  const pageSize = useAtomValue(pageSizeAtom);
+  const selected = useAtomValue(selectedEntityAtom);
+  const changes = page?.changes ?? [];
+  const total = page?.total ?? 0;
 
+  if (changes.length === 0) {
+    return <EmptyState className="border-t">No changes match these filters</EmptyState>;
+  }
   return (
-    <div className="flex flex-col">
-      {changes?.map(({ changeType, entity, refs }, i) => {
-        const changeTypeColor = CHANGE_TYPE_COLOR[changeType];
-        const entityType = getEntityType(entity);
-        return (
-          <button
-            key={`${entityType}-${entity.id}`}
-            className={cn(
-              "pl-2 py-1 font-bold cursor-pointer w-full text-left select-text hover:bg-accent",
-              changeTypeColor,
-            )}
-            onClick={() => setSelectedEntity(entity)}
-            type="button"
-            tabIndex={0}
-          >
-            {startIndex + i + 1}. {changeType.toUpperCase()} {entityType.toUpperCase()} {entity.id}{" "}
-            {refs && `(${refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")})`}
-          </button>
-        );
-      })}
-    </div>
+    <>
+      <p className="border-t px-inset py-2 text-muted-foreground" aria-live="polite">
+        {(startIndex + 1).toLocaleString()}–
+        {Math.min(startIndex + pageSize, total).toLocaleString()} of {plural(total, "change")}
+      </p>
+      <div role="list" aria-label="Changes" className="flex flex-col border-t">
+        {changes.map((change) => {
+          const { changeType, entity } = change;
+          const current = isSameEntity(selected, entity);
+          return (
+            <Item
+              key={`${getEntityType(entity)}-${entity.id}`}
+              role="listitem"
+              variant="row"
+              aria-current={current ? "true" : undefined}
+              className="flex-col items-stretch gap-0 p-0"
+            >
+              <button
+                type="button"
+                aria-expanded={current}
+                className="flex w-full cursor-pointer items-start gap-2 px-inset py-2 text-left focus-ring"
+                onClick={() => setSelectedEntity(entity)}
+              >
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="flex items-center gap-2">
+                    <StatusDot status={CHANGE_TYPE_STATUS[changeType]} />
+                    <span className="font-semibold">{changeTypeLabel(changeType)}</span>
+                    <span>
+                      {entityTypeLabel(getEntityType(entity))}{" "}
+                      <span className="font-mono">{entity.id}</span>
+                    </span>
+                  </span>
+                  <span className="truncate text-muted-foreground">
+                    {changeDescription(change, { duplicates })}
+                  </span>
+                </span>
+                <ChevronDownIcon
+                  aria-hidden="true"
+                  className={cn(
+                    "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
+                    current && "rotate-180",
+                  )}
+                />
+              </button>
+              {current ? (
+                <div data-slot="change-diff" className="border-t">
+                  <AugmentedDiffContent change={change} />
+                </div>
+              ) : null}
+            </Item>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -770,15 +971,10 @@ function CreatedEntityContent({ entity }: { entity: OsmEntity }) {
  * Shows a unified diff with additions, deletions, and modifications highlighted.
  */
 function AugmentedDiffContent({ change }: { change: OsmChange }) {
-  const { changeType, entity, oldEntity, refs } = change;
+  const { changeType, entity, oldEntity } = change;
 
   return (
     <>
-      {refs && (
-        <div className="p-2 border-b">
-          Related: {refs.map((ref) => `${ref.type} ${ref.id}`).join(", ")}
-        </div>
-      )}
       {changeType === "modify" && oldEntity ? (
         <EntityDiff oldEntity={oldEntity} newEntity={entity} />
       ) : changeType === "delete" && oldEntity ? (
@@ -792,65 +988,18 @@ function AugmentedDiffContent({ change }: { change: OsmChange }) {
   );
 }
 
-export function ChangesExpandableList() {
-  const changes = useAtomValue(changesAtom)?.changes;
-  const startIndex = useAtomValue(startIndexAtom);
-
-  return (
-    <div className="flex flex-col">
-      {changes?.map((change, i) => {
-        const { changeType, entity } = change;
-        const changeTypeColor = CHANGE_TYPE_COLOR[changeType];
-        const entityType = getEntityType(entity);
-        const summaryLabel = `${startIndex + i + 1}. ${changeType.toUpperCase()} ${entityType.toUpperCase()} ${entity.id}`;
-        return (
-          <Details key={`${entityType}-${entity.id}`} defaultOpen={false}>
-            <DetailsSummary className={cn(changeTypeColor)}>{summaryLabel}</DetailsSummary>
-
-            <DetailsContent className="w-full overflow-scroll inset-shadow">
-              <AugmentedDiffContent change={change} />
-            </DetailsContent>
-          </Details>
-        );
-      })}
-    </div>
-  );
-}
-
 export function ChangesPagination() {
   const [currentPage, setCurrentPage] = useAtom(pageAtom);
   const totalPages = useAtomValue(changesAtom)?.totalPages ?? 0;
-  const [, startTransition] = useTransition();
-  const goToNextPage = () => {
-    startTransition(() => {
-      if (currentPage < totalPages - 1) {
-        setCurrentPage(currentPage + 1);
-      }
-    });
-  };
-  const goToPrevPage = () => {
-    startTransition(() => {
-      if (currentPage > 0) {
-        setCurrentPage(currentPage - 1);
-      }
-    });
-  };
+  const [isPending, startTransition] = useTransition();
   return (
-    <div className="flex items-center justify-between">
-      <Button variant="ghost" size="icon-sm" onClick={goToPrevPage} disabled={currentPage <= 0}>
-        <ArrowLeft />
-      </Button>
-      <span className="text-muted-foreground">
-        {(totalPages === 0 ? 0 : currentPage + 1).toLocaleString()} of {totalPages.toLocaleString()}
-      </span>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={goToNextPage}
-        disabled={currentPage >= totalPages - 1}
-      >
-        <ArrowRight />
-      </Button>
-    </div>
+    <Pager
+      className="border-t px-inset py-2"
+      label="Changes pages"
+      page={currentPage}
+      pageCount={totalPages}
+      disabled={isPending}
+      onPageChange={(page) => startTransition(() => setCurrentPage(page))}
+    />
   );
 }

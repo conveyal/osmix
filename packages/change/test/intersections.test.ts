@@ -57,6 +57,7 @@ describe("intersection geometry integrity", () => {
     expect(changeset.stats).toMatchObject({
       intersectionPointsFound: 2,
       intersectionNodesCreated: 2,
+      intersectionNodesRemoved: 0,
       nodeChanges: 2,
       wayChanges: 3,
     });
@@ -139,19 +140,91 @@ describe("intersection geometry integrity", () => {
     patch.buildIndexes();
     const changeset = new OsmChangeset(osm);
 
-    changeset.createIntersectionsForWays(patch.ways);
+    changeset.createIntersectionsForWays(patch.ways, patch.nodes.ids);
 
     const result = applyChangesetToOsm(changeset);
     expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
     expect(result.ways.getById(20)?.refs).toEqual([2, 6]);
-    expect(result.nodes.getById(2)?.tags).toEqual({
-      access: "private",
-      barrier: "gate",
-      crossing: "yes",
-    });
+    // The ways meet end to end: a junction, not a crossing, so node 2 gains no crossing tag.
+    expect(result.nodes.getById(2)?.tags).toEqual({ access: "private", barrier: "gate" });
   });
 
-  it("preserves a shared base node ID when the patch endpoint adds routing tags", () => {
+  it("joins a way ending on another without tagging the junction as a crossing", () => {
+    const osm = new Osm({ id: "t-junction" });
+    for (const node of [
+      { id: 1, lon: -1, lat: 0 },
+      { id: 2, lon: 0, lat: 0 },
+      { id: 3, lon: 1, lat: 0 },
+      { id: 5, lon: 0.5, lat: 0 },
+      { id: 6, lon: 0.5, lat: 1 },
+    ]) {
+      osm.nodes.addNode(node);
+    }
+    osm.ways.addWay({ id: 10, refs: [1, 2, 3], tags: { highway: "residential" } });
+    osm.ways.addWay({ id: 20, refs: [5, 6], tags: { highway: "footway" } });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+    const patch = new Osm({ id: "patch" });
+    patch.nodes.addNode({ id: 5, lon: 0.5, lat: 0 });
+    patch.nodes.addNode({ id: 6, lon: 0.5, lat: 1 });
+    patch.ways.addWay({ id: 20, refs: [5, 6], tags: { highway: "footway" } });
+    patch.buildIndexes();
+    const changeset = new OsmChangeset(osm);
+
+    changeset.createIntersectionsForWays(patch.ways, patch.nodes.ids);
+
+    const result = applyChangesetToOsm(changeset);
+    expect(result.ways.getById(10)?.refs).toEqual([1, 2, 5, 3]);
+    expect(result.nodes.getById(5)?.tags).toBeUndefined();
+  });
+
+  it("drops an imported endpoint that a junction replacement leaves unused", () => {
+    const build = (withRelation: boolean) => {
+      const osm = new Osm({ id: "merged" });
+      for (const node of [
+        { id: 1, lon: -1, lat: 0 },
+        { id: 2, lon: 0, lat: 0 },
+        { id: 5, lon: 0, lat: 0 },
+        { id: 6, lon: 0, lat: 1 },
+      ]) {
+        osm.nodes.addNode(node);
+      }
+      osm.ways.addWay({ id: 10, refs: [1, 2], tags: { highway: "service" } });
+      osm.ways.addWay({ id: 20, refs: [5, 6], tags: { highway: "service" } });
+      if (withRelation) {
+        osm.relations.addRelation({
+          id: 30,
+          members: [{ type: "node", ref: 5, role: "stop" }],
+          tags: { type: "route" },
+        });
+      }
+      osm.buildIndexes();
+      osm.buildSpatialIndexes();
+      const patch = new Osm({ id: "patch" });
+      patch.nodes.addNode({ id: 5, lon: 0, lat: 0 });
+      patch.nodes.addNode({ id: 6, lon: 0, lat: 1 });
+      patch.ways.addWay({ id: 20, refs: [5, 6], tags: { highway: "service" } });
+      patch.buildIndexes();
+      const changeset = new OsmChangeset(osm);
+      changeset.createIntersectionsForWays(patch.ways, patch.nodes.ids);
+      return { changeset, result: applyChangesetToOsm(changeset) };
+    };
+
+    const unused = build(false);
+    expect(unused.result.ways.getById(20)?.refs).toEqual([2, 6]);
+    expect(unused.result.nodes.ids.has(5)).toBe(false);
+    expect(unused.changeset.stats.intersectionNodesRemoved).toBe(1);
+
+    // A relation still names the imported point, so it stays.
+    const referenced = build(true);
+    expect(referenced.result.ways.getById(20)?.refs).toEqual([2, 6]);
+    expect(referenced.result.nodes.ids.has(5)).toBe(true);
+    expect(referenced.changeset.stats.intersectionNodesRemoved).toBe(0);
+  });
+
+  // A crossing snap must not change routing on existing ways: an imported gate endpoint does not
+  // merge into an ungated base junction (the same rule keeps exact scenario X5 separate).
+  it("keeps an imported gate endpoint off an ungated base junction", () => {
     const osm = new Osm({ id: "shared-base-endpoint" });
     for (const node of [
       { id: 1, lon: -1, lat: 0 },
@@ -175,13 +248,46 @@ describe("intersection geometry integrity", () => {
     patch.buildIndexes();
     const changeset = new OsmChangeset(osm);
 
-    changeset.createIntersectionsForWays(patch.ways);
+    changeset.createIntersectionsForWays(patch.ways, patch.nodes.ids);
 
     const result = applyChangesetToOsm(changeset);
     expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
     expect(result.ways.getById(11)?.refs).toEqual([2, 3]);
-    expect(result.ways.getById(20)?.refs).toEqual([2, 6]);
-    expect(result.nodes.getById(2)?.tags).toEqual({ barrier: "gate", crossing: "yes" });
+    expect(result.ways.getById(20)?.refs).toEqual([5, 6]);
+    expect(result.nodes.getById(2)?.tags).toBeUndefined();
+  });
+
+  it("never merges two base nodes at a crossing", () => {
+    // An imported way already ends at base node 7, which sits on top of base node 2. Snapping the
+    // crossing would remove one base node from base ways, and taking node 2 into the imported way
+    // would leave a zero-length segment, so the crossing is skipped.
+    const osm = new Osm({ id: "merged" });
+    for (const node of [
+      { id: 1, lon: -1, lat: 0 },
+      { id: 2, lon: 0, lat: 0 },
+      { id: 7, lon: 0, lat: 0 },
+      { id: 8, lon: 0, lat: -1 },
+      { id: 6, lon: 0, lat: 1 },
+    ]) {
+      osm.nodes.addNode(node);
+    }
+    osm.ways.addWay({ id: 10, refs: [1, 2], tags: { highway: "service" } });
+    osm.ways.addWay({ id: 12, refs: [8, 7], tags: { highway: "service" } });
+    osm.ways.addWay({ id: 20, refs: [7, 6], tags: { highway: "service" } });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+    const patch = new Osm({ id: "patch" });
+    patch.nodes.addNode({ id: 6, lon: 0, lat: 1 });
+    patch.ways.addWay({ id: 20, refs: [7, 6], tags: { highway: "service" } });
+    patch.buildIndexes();
+    const changeset = new OsmChangeset(osm);
+
+    changeset.createIntersectionsForWays(patch.ways, patch.nodes.ids);
+
+    const result = applyChangesetToOsm(changeset);
+    expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
+    expect(result.ways.getById(12)?.refs).toEqual([8, 7]);
+    expect(result.nodes.ids.has(2) && result.nodes.ids.has(7)).toBe(true);
   });
 
   it("creates a dedicated node when endpoint reuse would collapse a short patch way", async () => {
@@ -204,22 +310,56 @@ describe("intersection geometry integrity", () => {
     patch.buildIndexes();
 
     const progress: string[] = [];
-    const result = await merge(
-      base,
-      patch,
-      { createIntersections: true, directMerge: true },
-      (event) => progress.push(event.detail.msg),
+    const result = await merge(base, patch, { mergeIdenticalPoints: false }, (event) =>
+      progress.push(event.detail.msg),
     );
 
     const baseWay = result.ways.getById(10)!;
     const patchWay = result.ways.getById(20)!;
-    const generatedRefs = patchWay.refs.filter((ref) => ref > 102);
+    // New crossing nodes get negative IDs.
+    const generatedRefs = patchWay.refs.filter((ref) => ref < 0);
 
     expect(patchWay.refs).toContain(2);
     expect(generatedRefs).toHaveLength(1);
     expect(baseWay.refs).toContain(generatedRefs[0]!);
     expect(new Set(patchWay.refs).size).toBe(patchWay.refs.length);
     expect(progress).toContain("Intersection creation progress: 1 of 1 ways checked");
+  });
+
+  // A positive patch ID names a base node (MP-I1), so the patch editing node 5 does not make it
+  // imported: a crossing must not replace it with another base node and drop it. The imported
+  // way takes base node 2 instead, and only node 2, which both ways pass through, is a crossing.
+  it("keeps a base node the patch edits by ID at a crossing near another base node", async () => {
+    const base = new Osm({ id: "same-id-crossing-base" });
+    for (const node of [
+      { id: 1, lon: -0.001, lat: 0 },
+      { id: 2, lon: 0, lat: 0 },
+      { id: 3, lon: 0.001, lat: 0 },
+      // About 0.33 m from base node 2, where the patch way crosses way 10.
+      { id: 5, lon: 0, lat: 0.000003 },
+      { id: 6, lon: 0, lat: 0.001 },
+    ]) {
+      base.nodes.addNode(node);
+    }
+    base.ways.addWay({ id: 10, refs: [1, 2, 3], tags: { highway: "footway" } });
+    base.ways.addWay({ id: 20, refs: [5, 6], tags: { highway: "footway" } });
+    base.buildIndexes();
+    base.buildSpatialIndexes();
+
+    const patch = new Osm({ id: "same-id-crossing-patch" });
+    patch.nodes.addNode({ id: 5, lon: 0, lat: 0.000003, tags: { note: "surveyed" } });
+    patch.nodes.addNode({ id: -1, lon: 0, lat: -0.001 });
+    patch.ways.addWay({ id: -1, refs: [5, -1], tags: { highway: "footway" } });
+    patch.buildIndexes();
+
+    const result = await merge(base, patch, {}, () => {});
+
+    expect(result.nodes.getById(5)?.tags).toEqual({ note: "surveyed" });
+    expect(result.nodes.getById(2)?.tags).toEqual({ crossing: "yes" });
+    expect(result.ways.getById(10)?.refs).toEqual([1, 2, 3]);
+    expect(result.ways.getById(20)?.refs).toEqual([5, 6]);
+    const imported = [...result.ways].find((way) => way.id < 0)!;
+    expect(imported.refs).toEqual([5, 2, imported.refs[2]]);
   });
 
   it("reports every patch way after exact reconciliation removes an equivalent way", async () => {
@@ -235,16 +375,7 @@ describe("intersection geometry integrity", () => {
     patch.buildIndexes();
 
     const progress: string[] = [];
-    const result = await merge(
-      base,
-      patch,
-      {
-        createIntersections: true,
-        deduplicateWays: true,
-        directMerge: true,
-      },
-      (event) => progress.push(event.detail.msg),
-    );
+    const result = await merge(base, patch, {}, (event) => progress.push(event.detail.msg));
 
     expect(result.ways.ids.has(20)).toBe(false);
     expect(progress).toContain("Intersection creation progress: 1 of 1 ways checked");
@@ -328,6 +459,7 @@ describe("intersection geometry integrity", () => {
     expect(changeset.stats).toMatchObject({
       intersectionPointsFound: 0,
       intersectionNodesCreated: 0,
+      intersectionNodesRemoved: 0,
       nodeChanges: 0,
       wayChanges: 1,
     });

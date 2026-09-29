@@ -1,0 +1,118 @@
+import type { OsmConflationCandidate } from "osmix";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+
+import { CandidateEvidence } from "../src/components/conflation-candidate-evidence";
+
+function candidate(distanceMeters: number, targetId: number | null = 22): OsmConflationCandidate {
+  return {
+    id: "node:11->22",
+    entityType: "node",
+    sourceId: 11,
+    targetId,
+    status: targetId == null ? "unmatched" : "review",
+    reasons: [],
+    propertyTransfer: { status: "review", reasons: [] },
+    networkAttachment: null,
+    evidence: {
+      distanceMeters,
+      sourceRoutingFamilies: ["pedestrian"],
+      targetRoutingFamilies: ["pedestrian"],
+      tagDiff: [],
+    },
+  };
+}
+
+const render = (value: OsmConflationCandidate) =>
+  renderToStaticMarkup(createElement(CandidateEvidence, { candidate: value }));
+
+describe("matching evidence for imported features", () => {
+  it("shows finite distances with units, including a coincident match", () => {
+    expect(render(candidate(0.25))).toContain("0.250 m");
+    expect(render(candidate(0))).toContain("0.000 m");
+  });
+
+  it("explains unmatched searches without showing an infinite distance", () => {
+    const html = render(candidate(Infinity, null));
+    expect(html).toContain("No eligible base target within search radius");
+    expect(html).not.toContain("Infinity");
+  });
+
+  it.each([Infinity, -Infinity, Number.NaN, -1])(
+    "distinguishes an unavailable distance (%s) from an unmatched search",
+    (distance) => {
+      const html = render(candidate(distance));
+      expect(html).toContain("Distance unavailable for this target");
+      expect(html).not.toContain("No eligible base target within search radius");
+    },
+  );
+
+  it("handles a missing measurement in restored evidence without throwing", () => {
+    const value = candidate(0.25);
+    Reflect.deleteProperty(value.evidence, "distanceMeters");
+    expect(render(value)).toContain("Distance unavailable for this target");
+  });
+
+  it("explains unsupported nearby segments without claiming the search found nothing", () => {
+    const value = candidate(Infinity, null);
+    value.reasons = ["unsupported-way-chain"];
+    expect(render(value)).toContain("Nearby segments cannot form one supported match");
+  });
+
+  it("makes attribute restrictions explicit and preserves full selectable values", () => {
+    const value = candidate(0.25);
+    value.evidence.tagDiff = [
+      { key: "layer", baseValue: "0", patchValue: "1", protected: true, routing: false },
+      {
+        key: "crossing",
+        baseValue: "unmarked",
+        patchValue: "traffic_signals",
+        protected: false,
+        routing: true,
+      },
+      {
+        key: "description",
+        patchValue: "A long imported description with exact details that must remain readable",
+        protected: false,
+        routing: false,
+      },
+    ];
+    const html = render(value);
+    expect(html).toContain("Base value");
+    expect(html).toContain("Imported value");
+    expect(html).toContain("Protected attribute: this value cannot be copied");
+    expect(html).toContain("Affects travel: review before copying");
+    expect(html).toContain(
+      "A long imported description with exact details that must remain readable",
+    );
+  });
+
+  it("shows conflicting feature classifications independently of selected copy attributes", () => {
+    const value = candidate(0.25);
+    value.evidence.tagDiff = [
+      { key: "name", baseValue: "Cafe", patchValue: "School", protected: false, routing: false },
+    ];
+    value.evidence.featureTypeConflicts = [
+      { key: "amenity", baseValue: "cafe", patchValue: "school" },
+      { key: "building", baseValue: "commercial", patchValue: "school" },
+    ];
+
+    const html = render(value);
+    const conflicts = html
+      .split('aria-label="Feature type conflict"')[1]
+      ?.split('aria-label="Attribute differences"')[0];
+    expect(conflicts).toBeDefined();
+    expect(conflicts).toContain("These classifications block matching actions");
+    expect(conflicts).toContain("even when they are not selected for copying");
+    expect(conflicts).toContain("amenity");
+    expect(conflicts).toContain("building");
+    expect(conflicts).toContain("Base classification");
+    expect(conflicts).toContain("Imported classification");
+    expect(conflicts).toContain("cafe");
+    expect(conflicts).toContain("commercial");
+    expect(conflicts).toContain("school");
+    expect(html).toContain('aria-label="Attribute differences"');
+    expect(html).toContain("name");
+  });
+});

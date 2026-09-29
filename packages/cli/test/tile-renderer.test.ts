@@ -131,7 +131,7 @@ describe("CLI tile workers", () => {
     const worker = new CliTileWorker();
     const info = await worker.fromPbfFile(fixture, {
       id: "metadata-worker",
-      buildSpatialIndexes: ["way", "relation"],
+      spatialIndexes: { nodes: [], ways: true, relations: true },
     });
 
     expect(info).toMatchObject({

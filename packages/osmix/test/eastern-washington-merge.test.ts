@@ -62,17 +62,7 @@ describe("Eastern Washington full merge", () => {
       expect(sizes(patch)).toEqual({ nodes: 1_107_476, relations: 0, ways: 368_648 });
 
       const progress: string[] = [];
-      const merged = await merge(
-        base,
-        patch,
-        {
-          createIntersections: true,
-          deduplicateNodes: true,
-          deduplicateWays: true,
-          directMerge: true,
-        },
-        (event) => progress.push(event.detail.msg),
-      );
+      const merged = await merge(base, patch, {}, (event) => progress.push(event.detail.msg));
       base = null;
       patch = null;
 

@@ -35,7 +35,9 @@ export default function writeVtPbf(layers: VtPbfLayer[]) {
   for (const layer of layers) {
     pbf.writeMessage(3, writeLayer, layer);
   }
-  return pbf.finish().buffer as ArrayBuffer;
+  // finish() returns a view of the writer's buffer, which has spare capacity past the tile.
+  const bytes = pbf.finish();
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 function writeLayer(layer: VtPbfLayer, pbf: PbfWriter) {

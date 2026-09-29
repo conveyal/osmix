@@ -1,16 +1,25 @@
 import { Layer, Source } from "react-map-gl/maplibre";
 
 import { APPID, MIN_PICKABLE_ZOOM, RASTER_TILE_SIZE } from "../constants.ts";
-import { osmixIdToTileUrl } from "../lib/osmix-raster-protocol.ts";
+import { osmixIdToTileUrl, type RasterColorRole } from "../lib/osmix-raster-protocol.ts";
 
+/**
+ * Raster preview of a dataset below `MIN_PICKABLE_ZOOM`, drawn in the `role` map color. The
+ * role prefixes the source id, so one file loaded in both Merge slots gets two sources.
+ * `visible={false}` keeps the layer mounted but hidden.
+ */
 export default function OsmixRasterSource({
   osmId,
+  role = "base",
   tileSize = RASTER_TILE_SIZE,
+  visible = true,
 }: {
   osmId: string;
+  role?: RasterColorRole;
   tileSize?: number;
+  visible?: boolean;
 }) {
-  const id = `${APPID}:${osmId}:${tileSize}:raster`;
+  const id = `${APPID}:${role}:${osmId}:${tileSize}:raster`;
   return (
     <Source
       // react-map-gl treats a source ID as immutable. Merging replaces the base
@@ -19,10 +28,16 @@ export default function OsmixRasterSource({
       key={id}
       id={id}
       type="raster"
-      tiles={[osmixIdToTileUrl(osmId, tileSize)]}
+      tiles={[osmixIdToTileUrl(osmId, tileSize, role)]}
       tileSize={tileSize / 2}
     >
-      <Layer id={id} type="raster" source={id} maxzoom={MIN_PICKABLE_ZOOM} />
+      <Layer
+        id={id}
+        type="raster"
+        source={id}
+        maxzoom={MIN_PICKABLE_ZOOM}
+        layout={{ visibility: visible ? "visible" : "none" }}
+      />
     </Source>
   );
 }

@@ -27,13 +27,6 @@ import {
   roundTripRoutingOsm,
 } from "./synthetic-routing-fixture.ts";
 
-const ALL_MERGE_STEPS = {
-  createIntersections: true,
-  deduplicateNodes: true,
-  deduplicateWays: true,
-  directMerge: true,
-} as const;
-
 function canonicalOsmDigest(osm: Osm): string {
   const hash = createHash("sha256");
   const updateEntities = (type: string, entities: Iterable<OsmEntity>): void => {
@@ -133,10 +126,10 @@ describe("routing after a Monaco merge", () => {
     const emptyPatch = new Osm({ id: "empty-patch" });
     emptyPatch.buildIndexes();
     emptyPatch.buildSpatialIndexes();
-    merged = await merge(raw, emptyPatch, ALL_MERGE_STEPS, () => undefined);
+    merged = await merge(raw, emptyPatch, {}, () => undefined);
     roundTripped = await roundTripRoutingOsm(merged, "monaco-merged-roundtrip");
     const syntheticPatch = await roundTripRoutingOsm(createMonacoRoutingPatch(raw));
-    patched = await merge(raw, syntheticPatch, ALL_MERGE_STEPS, () => undefined);
+    patched = await merge(raw, syntheticPatch, {}, () => undefined);
     patchedRoundTripped = await roundTripRoutingOsm(patched, "monaco-synthetic-patch-roundtrip");
 
     rawReports = new RoutingTestHarness(raw).runAll(MONACO_ROUTING_CASES);

@@ -6,7 +6,7 @@
 /* MapLibre renders these elements outside React, so they are styled here rather than with
    utility classes. Tokens come from @osmix/ui/styles.css, which apps import first. */
 .maplibregl-map {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--text-xs);
 }
 
@@ -18,16 +18,19 @@
   background-color: var(--color-accent);
 }
 
+/* Hover tooltips draw above the overlay panels (the overlay root is z-10). */
 .osmix-overlay-popup {
+  z-index: 20;
   max-width: 320px;
   pointer-events: none;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-raised);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0;
 }
 
 .osmix-overlay-popup .maplibregl-popup-content {
-  background-color: var(--background);
+  background-color: var(--card);
   border-radius: var(--radius);
   color: var(--foreground);
   font-family: var(--font-mono);

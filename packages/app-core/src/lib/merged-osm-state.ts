@@ -10,6 +10,8 @@ interface MergedOsmWorker {
 interface PrepareMergedOsmStateOptions {
   currentOsm: Osm | null;
   currentFileInfo: StoredFileInfo | null;
+  /** The worker ID for a content hash. Slots use `slotOsmId`; the default is the hash itself. */
+  datasetIdFor?: (contentHash: string) => string;
   mergedFileName?: string;
   newOsmId: string;
   now?: Date;
@@ -39,6 +41,7 @@ export type PreparedMergedOsmState =
 export async function prepareMergedOsmState({
   currentOsm,
   currentFileInfo,
+  datasetIdFor = (contentHash) => contentHash,
   mergedFileName,
   newOsmId,
   now = new Date(),
@@ -54,10 +57,11 @@ export async function prepareMergedOsmState({
     }
 
     const contentHash = mergedOsm.contentHash();
-    if (newOsmId !== contentHash) {
-      await worker.rename(newOsmId, contentHash);
-      retryOsmId = contentHash;
-      mergedOsm = await worker.get(contentHash);
+    const datasetId = datasetIdFor(contentHash);
+    if (newOsmId !== datasetId) {
+      await worker.rename(newOsmId, datasetId);
+      retryOsmId = datasetId;
+      mergedOsm = await worker.get(datasetId);
     }
 
     const refreshedInfo = mergedOsm.info();
@@ -76,7 +80,7 @@ export async function prepareMergedOsmState({
       fileInfo,
       kind: "changed",
       osm: mergedOsm,
-      osmInfo: { ...refreshedInfo, id: contentHash },
+      osmInfo: { ...refreshedInfo, id: datasetId },
     };
   } catch (error) {
     throw Object.assign(

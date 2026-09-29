@@ -8,9 +8,10 @@
  * @module
  */
 
-import type { IdOrIndex, Nodes, Osm, Ways } from "@osmix/core";
+import type { Nodes, Osm, Ways } from "@osmix/core";
 import { toMicroDegrees } from "@osmix/geo/coordinates";
 import type {
+  GeoBbox2D,
   OsmEntity,
   OsmEntityType,
   OsmEntityTypeMap,
@@ -18,33 +19,37 @@ import type {
   OsmRelation,
   OsmWay,
 } from "@osmix/types";
-import { entityPropertiesEqual, getEntityType } from "@osmix/types/utils";
+import { entityPropertiesEqual } from "@osmix/types/utils";
 import { normalizedWayDirection } from "@osmix/types/way-direction";
 import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 
 import {
-  assertChangesetInputIdentity,
-  changesetInputIdentity,
-  requireChangesetInputIdentity,
-} from "./changeset-inputs.ts";
-import {
   assertNoNewRoutingIntegrityIssues,
   inheritedRoutingIntegrityIssueKeys,
   junctionHasIncompatibleGrades,
+  newRoutingIntegrityIssues,
   restrictionTopologyIssues,
   routingIntegrityIssueKeys,
 } from "./integrity.ts";
-import type {
-  OsmChange,
-  OsmChanges,
-  OsmChangesetInputIdentity,
-  OsmChangesetRestoreContext,
-  OsmChangesetStats,
-  OsmEntityRef,
-} from "./types.ts";
+import { PlanOverlay } from "./plan/overlay.ts";
+import { accessSignature, barrierSignature, NODE_ROUTING_CRITICAL_TAGS } from "./rules/access.ts";
+import { refsWouldCollapse } from "./rules/collapse.ts";
+import {
+  assessNodeIdentity,
+  assessNodeTags,
+  canDropReplacedNode,
+  mergesTags,
+  wayPairJoinable,
+} from "./rules/node-identity.ts";
+import {
+  isDescriptiveWayTag,
+  routingSemanticTagsEqual,
+  withNonConflictingDescriptiveTags,
+  withNonConflictingTags,
+} from "./rules/tags.ts";
+import type { OsmChange, OsmChangesetStats, OsmEntityRef } from "./types.ts";
 import {
   areWayTagsIntersectionCandidate,
-  cleanCoords,
   nearestNodeOnWay,
   removeDuplicateAdjacentRelationMembers,
   removeDuplicateAdjacentWayRefs,
@@ -63,16 +68,23 @@ interface NodeCandidate {
   patchNode: OsmNode;
 }
 
-interface WayCoordinateCacheEntry {
-  cleaned?: [number, number][];
-  coordinates: [number, number][] | null;
-  nodeCoordinateRevision: number;
-  wayRevision: number;
+/** How crossing insertion finds candidate ways: in the state crossings started from. */
+interface CrossingSearch {
+  /** A way's bounding box in the starting state, or null when it is absent there. */
+  startBbox(wayId: number): GeoBbox2D | null;
+  /** Ways whose starting bounding box intersects `bbox`, in ascending ID order. */
+  near(bbox: GeoBbox2D): number[];
 }
 
-interface IntersectionMetadata {
-  eligible: Uint8Array;
-  gradeIds: Int32Array;
+/** One crossing about to be inserted, offered to an `accept` callback. */
+export interface CrossingInsertion {
+  /** `snap` reuses an existing vertex; `node` creates a new crossing node. */
+  kind: "snap" | "node";
+  wayId: number;
+  otherWayId: number;
+  point: [number, number];
+  /** Two existing vertices that become one: `replaced` is rewritten to `survivor`. */
+  merges?: { replaced: number; survivor: number };
 }
 
 interface IntersectionJunctionReplacement {
@@ -80,86 +92,36 @@ interface IntersectionJunctionReplacement {
   restrictions: OsmRelation[];
 }
 
+/** Two close vertices at a crossing that become one: `replaced` is rewritten to `survivor`. */
+interface IntersectionNodeResolution {
+  keepWayNode: boolean;
+  replaced: OsmNode;
+  survivor: OsmNode;
+}
+
 const EMPTY_ID = -1;
-const DESCRIPTIVE_WAY_TAGS = new Set([
-  "alt_name",
-  "int_name",
-  "loc_name",
-  "name",
-  "note",
-  "official_name",
-  "old_name",
-  "operator",
-  "ref",
-  "short_name",
-  "source",
-  "wikidata",
-  "wikipedia",
-]);
-const DESCRIPTIVE_WAY_TAG_PREFIXES = [
-  "alt_name:",
-  "name:",
-  "note:",
-  "official_name:",
-  "old_name:",
-  "operator:",
-  "source:",
-] as const;
-const GRADE_AND_ACCESS_TAGS = [
-  "access",
-  "barrier",
-  "bicycle",
-  "foot",
-  "horse",
-  "motor_vehicle",
-  "motorcar",
-  "vehicle",
-] as const;
-const GRADE_TAG_DEFAULTS = {
-  bridge: "no",
-  covered: "no",
-  layer: "0",
-  level: "",
-  tunnel: "no",
-} as const;
-const NODE_ROUTING_CRITICAL_TAGS = [
-  "access",
-  "barrier",
-  "bicycle",
-  "foot",
-  "ford",
-  "highway",
-  "horse",
-  "motor_vehicle",
-  "motorcar",
-  "vehicle",
-] as const;
+
+/** Whether `nodeId` is the first or last node of an open way. */
+function wayEndsAt(way: OsmWay, nodeId: number) {
+  const first = way.refs[0];
+  const last = way.refs.at(-1);
+  if (first === last) return false;
+  return first === nodeId || last === nodeId;
+}
+
+/** Whether two nodes differ in vertical context, access or barriers (group consistency). */
+function nodeSignaturesDiffer(a: OsmNode["tags"], b: OsmNode["tags"]) {
+  return (
+    routingGradeSignature(a) !== routingGradeSignature(b) ||
+    accessSignature(a) !== accessSignature(b) ||
+    barrierSignature(a) !== barrierSignature(b)
+  );
+}
 
 function sameOsmCoordinate(a: OsmNode, b: OsmNode) {
   return (
     toMicroDegrees(a.lon) === toMicroDegrees(b.lon) &&
     toMicroDegrees(a.lat) === toMicroDegrees(b.lat)
-  );
-}
-
-function hasAnyTagConflict(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
-  if (!a || !b) return false;
-  return Object.entries(a).some(([key, value]) => b[key] != null && b[key] !== value);
-}
-
-function isDescriptiveWayTag(key: string) {
-  return (
-    DESCRIPTIVE_WAY_TAGS.has(key) ||
-    DESCRIPTIVE_WAY_TAG_PREFIXES.some((prefix) => key.startsWith(prefix))
-  );
-}
-
-function routingSemanticTagsEqual(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
-  const direction = normalizedWayDirection(a);
-  if (direction === "unsupported" || direction !== normalizedWayDirection(b)) return false;
-  const keys = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
-  return [...keys].every(
-    (key) => key === "oneway" || isDescriptiveWayTag(key) || a?.[key] === b?.[key],
   );
 }
 
@@ -189,46 +151,6 @@ function exactWayHash(way: OsmWay) {
     hash = hashText(hash, `${key.length}:${key}${String(value).length}:${String(value)}`);
   }
   return hash;
-}
-
-function hasConflictingGradeOrAccessTags(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
-  if (GRADE_AND_ACCESS_TAGS.some((key) => String(a?.[key] ?? "") !== String(b?.[key] ?? ""))) {
-    return true;
-  }
-  return Object.entries(GRADE_TAG_DEFAULTS).some(
-    ([key, defaultValue]) => String(a?.[key] ?? defaultValue) !== String(b?.[key] ?? defaultValue),
-  );
-}
-
-function wayContextsCompatible(a: OsmWay, b: OsmWay) {
-  return (
-    !hasConflictingGradeOrAccessTags(a.tags, b.tags) &&
-    (a.tags?.["highway"] == null) === (b.tags?.["highway"] == null)
-  );
-}
-
-function withNonConflictingTags<T extends OsmEntity>(base: T, patch: T): T {
-  if (!patch.tags) return base;
-  const tags = { ...base.tags };
-  let changed = false;
-  for (const [key, value] of Object.entries(patch.tags)) {
-    if (tags[key] != null) continue;
-    tags[key] = value;
-    changed = true;
-  }
-  return changed ? { ...base, tags } : base;
-}
-
-function withNonConflictingDescriptiveTags<T extends OsmEntity>(base: T, patch: T): T {
-  if (!patch.tags) return base;
-  const tags = { ...base.tags };
-  let changed = false;
-  for (const [key, value] of Object.entries(patch.tags)) {
-    if (!isDescriptiveWayTag(key) || tags[key] != null) continue;
-    tags[key] = value;
-    changed = true;
-  }
-  return changed ? { ...base, tags } : base;
 }
 
 function nodeRoutingTagCount(node: OsmNode) {
@@ -305,6 +227,23 @@ function flattenReplacementMap(replacementMap: ReplacementMap) {
   return flattenedMap;
 }
 
+/** @internal A copy of a changeset's records and counters. */
+export interface OsmChangesetCheckpoint {
+  nodes: Record<number, OsmChange<OsmEntityTypeMap["node"]>>;
+  ways: Record<number, OsmChange<OsmEntityTypeMap["way"]>>;
+  relations: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>;
+  counters: Pick<
+    OsmChangeset,
+    | "currentNodeId"
+    | "deduplicatedNodes"
+    | "deduplicatedNodesReplaced"
+    | "deduplicatedWays"
+    | "intersectionPointsFound"
+    | "intersectionNodesCreated"
+    | "intersectionNodesRemoved"
+  >;
+}
+
 /**
  * Tracks changes to an OSM dataset and provides utilities for deduplication and merging.
  *
@@ -312,15 +251,10 @@ function flattenReplacementMap(replacementMap: ReplacementMap) {
  * and relations. It is optimized to minimize full entity retrieval until necessary.
  */
 export class OsmChangeset {
-  nodeChanges: Record<number, OsmChange<OsmEntityTypeMap["node"]>> = {};
-  wayChanges: Record<number, OsmChange<OsmEntityTypeMap["way"]>> = {};
-  relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]>> = {};
-
   osm: Osm;
+  /** The planned state: base plus these changes, read without building it. */
+  readonly overlay: PlanOverlay;
   private readonly routingIntegrityBaselineKeys: Set<string>;
-  private readonly baseInputIdentity: OsmChangesetInputIdentity | undefined;
-  private readonly patchInputIdentities: (OsmChangesetInputIdentity | undefined)[] = [];
-  private restoredWithoutInputContext = false;
 
   // Next node ID tracker for generating new IDs during intersection creation
   currentNodeId: number;
@@ -330,104 +264,74 @@ export class OsmChangeset {
   deduplicatedWays = 0;
   intersectionPointsFound = 0;
   intersectionNodesCreated = 0;
-
-  /** Revisions keep geometry caches correct while intersections rewrite ways in place. */
-  private nodeCoordinateRevision = 0;
-  private readonly wayGeometryRevisions = new Map<number, number>();
-  private pendingWayIdsByNode: Map<number, Set<number>> | undefined;
-  private readonly pendingWayRefs = new Map<number, readonly number[]>();
-  private readonly wayCoordinateCache = new Map<number, WayCoordinateCacheEntry>();
-
-  /** Restore changes and recompute integrity allowances from the recorded original inputs. */
-  static fromJson(base: Osm, json: OsmChanges, context?: OsmChangesetRestoreContext) {
-    if (json.osmId !== base.id)
-      throw Error("Changeset base input context mismatch: dataset ID differs");
-    const changeset = new OsmChangeset(base);
-    const validation = json.validationContext;
-    if (validation === undefined) {
-      if (context) {
-        throw Error(
-          "Changes-only JSON has no verifiable original input context; regenerate from the original inputs and export with toJSON()",
-        );
-      }
-      changeset.restoredWithoutInputContext = true;
-    } else {
-      if (validation?.version !== 1 || !Array.isArray(validation.patches)) {
-        throw Error(
-          "Unsupported changeset validation context version or format; regenerate and export with toJSON()",
-        );
-      }
-      assertChangesetInputIdentity(base, validation.base, "base");
-      const patches = context?.patches ?? [];
-      if (patches.length !== validation.patches.length) {
-        throw Error(
-          "Changeset original patch input context is missing or has the wrong count; pass { patches } in generation order to fromJson()",
-        );
-      }
-      for (const [index, patch] of patches.entries()) {
-        assertChangesetInputIdentity(patch, validation.patches[index]!, `patch ${index + 1}`);
-        changeset.inheritPatchIntegrity(patch);
-      }
-    }
-    const snapshot = structuredClone(json);
-    changeset.nodeChanges = snapshot.nodes;
-    changeset.wayChanges = snapshot.ways;
-    changeset.relationChanges = snapshot.relations;
-    for (const change of Object.values(snapshot.nodes)) {
-      changeset.currentNodeId = Math.max(changeset.currentNodeId, change.entity.id);
-    }
-    changeset.deduplicatedNodes = snapshot.stats.deduplicatedNodes;
-    changeset.deduplicatedNodesReplaced = snapshot.stats.deduplicatedNodesReplaced;
-    changeset.deduplicatedWays = snapshot.stats.deduplicatedWays;
-    changeset.intersectionPointsFound = snapshot.stats.intersectionPointsFound;
-    changeset.intersectionNodesCreated = snapshot.stats.intersectionNodesCreated;
-    // Serialized node changes may move, delete, or supply a previously missing
-    // ref. Conservatively disable packed base-coordinate reuse for this instance.
-    if (Object.keys(json.nodes).length > 0) changeset.nodeCoordinateRevision++;
-    return changeset;
-  }
+  /** Imported points an intersection replaced and left unused, so they were dropped. */
+  intersectionNodesRemoved = 0;
 
   constructor(base: Osm) {
     this.osm = base;
+    this.overlay = new PlanOverlay(base);
     this.currentNodeId = maximumId(base.nodes.ids) ?? EMPTY_ID;
     this.routingIntegrityBaselineKeys = routingIntegrityIssueKeys(base);
-    this.baseInputIdentity = changesetInputIdentity(base);
   }
 
-  /** Export a detached JSON snapshot. Keep the original inputs for verified restoration. */
-  toJSON(): OsmChanges {
-    return structuredClone({
-      osmId: this.osm.id,
-      nodes: this.nodeChanges,
-      ways: this.wayChanges,
-      relations: this.relationChanges,
-      stats: this.stats,
-      ...(this.restoredWithoutInputContext
-        ? {}
-        : {
-            validationContext: {
-              version: 1 as const,
-              base: requireChangesetInputIdentity(this.baseInputIdentity, "base"),
-              patches: this.patchInputIdentities.map((identity, index) =>
-                requireChangesetInputIdentity(identity, `patch ${index + 1}`),
-              ),
-            },
-          }),
-    });
+  get nodeChanges() {
+    return this.overlay.nodeChanges;
   }
 
-  /** @internal Apply the same verified integrity policy to live and restored changesets. */
+  set nodeChanges(records: Record<number, OsmChange<OsmEntityTypeMap["node"]>>) {
+    this.overlay.setRecords("node", records);
+  }
+
+  get wayChanges() {
+    return this.overlay.wayChanges;
+  }
+
+  set wayChanges(records: Record<number, OsmChange<OsmEntityTypeMap["way"]>>) {
+    this.overlay.setRecords("way", records);
+  }
+
+  get relationChanges() {
+    return this.overlay.relationChanges;
+  }
+
+  set relationChanges(records: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>) {
+    this.overlay.setRecords("relation", records);
+  }
+
+  /** @internal Throw when `result` has routing-integrity problems the inputs did not. */
   assertValidResult(result: Osm): void {
-    try {
-      assertNoNewRoutingIntegrityIssues(this.routingIntegrityBaselineKeys, result);
-    } catch (cause) {
-      if (!this.restoredWithoutInputContext) throw cause;
-      const message = cause instanceof Error ? cause.message : String(cause);
-      throw Error(
-        `${message}. Changes-only JSON has no original patch input context; only inherited base issues can be verified. To preserve inherited patch issues, regenerate from the original inputs and export with toJSON()`,
-        { cause },
-      );
-    }
+    assertNoNewRoutingIntegrityIssues(this.routingIntegrityBaselineKeys, result);
+  }
+
+  /** @internal Everything a plan phase can change, to return to before rerunning it. */
+  checkpoint(): OsmChangesetCheckpoint {
+    return {
+      nodes: { ...this.nodeChanges },
+      ways: { ...this.wayChanges },
+      relations: { ...this.relationChanges },
+      counters: {
+        currentNodeId: this.currentNodeId,
+        deduplicatedNodes: this.deduplicatedNodes,
+        deduplicatedNodesReplaced: this.deduplicatedNodesReplaced,
+        deduplicatedWays: this.deduplicatedWays,
+        intersectionPointsFound: this.intersectionPointsFound,
+        intersectionNodesCreated: this.intersectionNodesCreated,
+        intersectionNodesRemoved: this.intersectionNodesRemoved,
+      },
+    };
+  }
+
+  /** @internal Return to a checkpoint. The checkpoint stays valid for another restore. */
+  restore(checkpoint: OsmChangesetCheckpoint) {
+    this.nodeChanges = { ...checkpoint.nodes };
+    this.wayChanges = { ...checkpoint.ways };
+    this.relationChanges = { ...checkpoint.relations };
+    Object.assign(this, checkpoint.counters);
+  }
+
+  /** @internal New routing-integrity problems in the planned state, before any build. */
+  pendingIntegrityIssues(): string[] {
+    return newRoutingIntegrityIssues(this.routingIntegrityBaselineKeys, this.overlay.reader());
   }
 
   private inheritPatchIntegrity(patch: Osm) {
@@ -438,46 +342,48 @@ export class OsmChangeset {
     )) {
       this.routingIntegrityBaselineKeys.add(key);
     }
-    this.patchInputIdentities.push(changesetInputIdentity(patch));
-    // Legacy restoration grants only base allowances. Once a real patch is added,
-    // base plus these recorded patches fully describes the current policy too.
-    this.restoredWithoutInputContext = false;
   }
 
   get stats(): OsmChangesetStats {
-    const nodeChanges = Object.values(this.nodeChanges).length;
-    const wayChanges = Object.values(this.wayChanges).length;
-    const relationChanges = Object.values(this.relationChanges).length;
+    const byType = { create: 0, modify: 0, delete: 0 };
+    const count = (changes: Record<number, OsmChange>) => {
+      const values = Object.values(changes);
+      for (const change of values) byType[change.changeType]++;
+      return values.length;
+    };
+    const nodeChanges = count(this.nodeChanges);
+    const wayChanges = count(this.wayChanges);
+    const relationChanges = count(this.relationChanges);
     return {
       osmId: this.osm.id,
       totalChanges: nodeChanges + wayChanges + relationChanges,
       nodeChanges,
       wayChanges,
       relationChanges,
+      createChanges: byType.create,
+      modifyChanges: byType.modify,
+      deleteChanges: byType.delete,
       deduplicatedNodes: this.deduplicatedNodes,
       deduplicatedNodesReplaced: this.deduplicatedNodesReplaced,
       deduplicatedWays: this.deduplicatedWays,
       intersectionPointsFound: this.intersectionPointsFound,
       intersectionNodesCreated: this.intersectionNodesCreated,
+      intersectionNodesRemoved: this.intersectionNodesRemoved,
     };
   }
 
   changes<T extends OsmEntityType>(type: T): Record<number, OsmChange<OsmEntityTypeMap[T]>> {
-    switch (type) {
-      case "node":
-        return this.nodeChanges as Record<number, OsmChange<OsmEntityTypeMap[T]>>;
-      case "way":
-        return this.wayChanges as Record<number, OsmChange<OsmEntityTypeMap[T]>>;
-      case "relation":
-        return this.relationChanges as Record<number, OsmChange<OsmEntityTypeMap[T]>>;
-    }
+    return this.overlay.changes(type);
   }
+
+  /** 1 allocates above every node (staged changesets); -1 allocates below (plans). */
+  private nodeIdStep: 1 | -1 = 1;
 
   nextNodeId() {
     if (!Number.isSafeInteger(this.currentNodeId)) {
       throw Error("Cannot allocate node ID outside the safe integer range");
     }
-    const nextId = this.currentNodeId + 1;
+    const nextId = this.currentNodeId + this.nodeIdStep;
     if (!Number.isSafeInteger(nextId)) {
       throw Error("Cannot allocate node ID outside the safe integer range");
     }
@@ -489,19 +395,7 @@ export class OsmChangeset {
   }
 
   create(entity: OsmEntity, osmId: string, refs?: OsmEntityRef[]) {
-    this.recordCreate(entity, osmId, refs);
-    const type = getEntityType(entity);
-    if (type === "node") this.nodeCoordinateRevision++;
-    if (type === "way") this.invalidateWayGeometry(entity.id);
-  }
-
-  private recordCreate(entity: OsmEntity, osmId: string, refs?: OsmEntityRef[]) {
-    this.changes(getEntityType(entity))[entity.id] = {
-      changeType: "create",
-      entity,
-      osmId,
-      refs, // Refs can come from other datasets, useful for tracking provenance
-    };
+    this.overlay.create(entity, osmId, refs);
   }
 
   /**
@@ -516,46 +410,11 @@ export class OsmChangeset {
     id: number,
     modify: (entity: OsmEntityTypeMap[T]) => OsmEntityTypeMap[T],
   ): void {
-    if (this.changes(type)[id]?.changeType === "delete") {
-      throw Error(`Cannot modify ${type} ${id}: entity is scheduled for deletion`);
-    }
-
-    const changes = this.changes(type);
-    const change = changes[id];
-    const changeEntity = change ? (change.entity as OsmEntityTypeMap[T]) : undefined;
-    const existingEntity = changeEntity ?? this.getEntity(type, id);
-    if (existingEntity == null) throw Error("Entity not found");
-
-    // For augmented diffs: capture the original entity from the base dataset
-    // if this is the first modification (not an update to an existing change).
-    // If we already have a change, preserve the original oldEntity.
-    const oldEntity = change?.oldEntity ?? (changeEntity ? undefined : existingEntity);
-
-    const modifiedEntity = modify(existingEntity);
-    changes[id] = {
-      changeType: change?.changeType ?? "modify",
-      entity: modifiedEntity,
-      osmId: this.osm.id, // If we're modifying an entity, it must exist in the base OSM
-      oldEntity,
-    };
-
-    if (type === "node") {
-      const previous = existingEntity as OsmNode;
-      const next = modifiedEntity as OsmNode;
-      if (previous.lon !== next.lon || previous.lat !== next.lat) {
-        this.nodeCoordinateRevision++;
-      }
-    } else if (type === "way") {
-      const previous = existingEntity as OsmWay;
-      const next = modifiedEntity as OsmWay;
-      if (!dequal(previous.refs, next.refs)) this.invalidateWayGeometry(id);
-    }
+    this.overlay.modify(type, id, modify);
   }
 
   getEntity<T extends OsmEntityType>(type: T, id: number): OsmEntityTypeMap[T] | undefined {
-    if (type === "node") return this.osm.nodes.get({ id }) as OsmEntityTypeMap[T];
-    if (type === "way") return this.osm.ways.get({ id }) as OsmEntityTypeMap[T];
-    if (type === "relation") return this.osm.relations.get({ id }) as OsmEntityTypeMap[T];
+    return this.overlay.baseEntity(type, id);
   }
 
   /**
@@ -565,79 +424,32 @@ export class OsmChangeset {
    * capturing its state before removal.
    */
   delete(entity: OsmEntity, refs?: OsmEntityRef[]) {
-    this.changes(getEntityType(entity))[entity.id] = {
-      changeType: "delete",
-      entity,
-      refs,
-      osmId: this.osm.id,
-      oldEntity: entity, // For augmented diffs: capture the entity being deleted
-    };
-    const type = getEntityType(entity);
-    if (type === "node") this.nodeCoordinateRevision++;
-    if (type === "way") this.invalidateWayGeometry(entity.id);
+    this.overlay.delete(entity, refs);
   }
 
-  private invalidateWayGeometry(wayId: number) {
-    this.wayGeometryRevisions.set(wayId, (this.wayGeometryRevisions.get(wayId) ?? 0) + 1);
-    this.wayCoordinateCache.delete(wayId);
-    this.updatePendingWayIncidence(wayId);
+  private currentWays() {
+    return this.overlay.ways();
   }
 
-  private updatePendingWayIncidence(wayId: number) {
-    const index = this.pendingWayIdsByNode;
-    if (!index) return;
-    for (const ref of this.pendingWayRefs.get(wayId) ?? []) {
-      const wayIds = index.get(ref);
-      wayIds?.delete(wayId);
-      if (wayIds?.size === 0) index.delete(ref);
-    }
-    this.pendingWayRefs.delete(wayId);
-    const change = this.wayChanges[wayId];
-    if (!change || change.changeType === "delete") return;
-    this.pendingWayRefs.set(wayId, change.entity.refs);
-    for (const ref of change.entity.refs) {
-      const wayIds = index.get(ref) ?? new Set<number>();
-      wayIds.add(wayId);
-      index.set(ref, wayIds);
-    }
+  private currentRelations() {
+    return this.overlay.relations();
   }
 
-  private *currentWays() {
-    for (const way of this.osm.ways) {
-      const current = this.getCurrentWay(way);
-      if (current) yield current;
-    }
-    for (const change of Object.values(this.wayChanges)) {
-      // Existing IDs were already yielded in base insertion order. Object-key
-      // order matches the former Map append order for patch-created entities.
-      if (this.osm.ways.ids.has(change.entity.id) || change.changeType === "delete") continue;
-      yield change.entity;
-    }
-  }
-
-  private *currentRelations() {
-    for (const relation of this.osm.relations) {
-      const change = this.relationChanges[relation.id];
-      if (change?.changeType === "delete") continue;
-      yield change?.entity ?? relation;
-    }
-    for (const change of Object.values(this.relationChanges)) {
-      if (this.osm.relations.ids.has(change.entity.id) || change.changeType === "delete") continue;
-      yield change.entity;
-    }
-  }
-
-  private nodeContextsCompatible(patchNode: OsmNode, baseNode: OsmNode, waysByNode: WaysByNode) {
-    if (hasAnyTagConflict(patchNode.tags, baseNode.tags)) return false;
-    if (hasConflictingGradeOrAccessTags(patchNode.tags, baseNode.tags)) return false;
-
-    const patchWays = waysByNode.get(patchNode.id) ?? [];
-    const baseWays = waysByNode.get(baseNode.id) ?? [];
-    if (patchWays.length === 0 || baseWays.length === 0) return true;
-
-    return patchWays.every((patchWay) =>
-      baseWays.every((baseWay) => wayContextsCompatible(patchWay, baseWay)),
+  private nodeContextsCompatible(
+    patchNode: OsmNode,
+    baseNode: OsmNode,
+    waysByNode: WaysByNode,
+    sameDataset: boolean,
+  ) {
+    const assessment = assessNodeIdentity(
+      "exact",
+      patchNode,
+      baseNode,
+      waysByNode.get(patchNode.id) ?? [],
+      waysByNode.get(baseNode.id) ?? [],
+      { sourceIsImported: !sameDataset },
     );
+    return assessment.hardReasons.length === 0;
   }
 
   /**
@@ -682,7 +494,7 @@ export class OsmChangeset {
    * A blank target can accept incompatible sources independently. Validate the
    * complete group against itself before copying tags or rewriting references;
    * retaining every source in a conflicting group avoids choosing by input order.
-   * The supplied map must point directly to final survivors, including diagnostic
+   * The supplied map must point directly to final survivors, including
    * same-dataset replacement chains.
    */
   private removeConflictingNodeReplacements(
@@ -702,31 +514,74 @@ export class OsmChangeset {
   }
 
   private nodeReplacementGroupCompatible(group: readonly number[], waysByNode: WaysByNode) {
-    const firstNode = this.getCurrentNode(group[0]!);
+    const survivorId = group[0]!;
+    const firstNode = this.getCurrentNode(survivorId);
     if (!firstNode) return false;
     const tagValues = new Map<string, string | number>();
-    const incidentWayGroups: (readonly OsmWay[])[] = [];
     for (const id of group) {
       const node = this.getCurrentNode(id);
-      if (!node || hasConflictingGradeOrAccessTags(firstNode.tags, node.tags)) return false;
+      if (!node || nodeSignaturesDiffer(firstNode.tags, node.tags)) return false;
       for (const [key, value] of Object.entries(node.tags ?? {})) {
         const previous = tagValues.get(key);
         if (previous !== undefined && previous !== value) return false;
         tagValues.set(key, value);
       }
-      const ways = waysByNode.get(id);
-      if (ways?.length) incidentWayGroups.push(ways);
     }
 
-    // One existing junction may already join different grades. Isolated sources
-    // add no way context. With two incident sets, compatibility across every pair
-    // requires all contexts to agree; equality against one representative proves
-    // that in linear time, without repeatedly comparing coincident source nodes.
-    if (incidentWayGroups.length < 2) return true;
-    const firstWay = incidentWayGroups[0]![0]!;
-    return incidentWayGroups.every((ways) =>
-      ways.every((way) => wayContextsCompatible(firstWay, way)),
-    );
+    // The survivor's own junction may already mix contexts (a footway and a private road);
+    // each source's ways only need one way there they can join. A blank survivor has no ways,
+    // so the sources' ways must agree with each other instead.
+    const survivorWays = waysByNode.get(survivorId) ?? [];
+    const sourceWays = group.slice(1).flatMap((id) => waysByNode.get(id) ?? []);
+    if (sourceWays.length === 0) return true;
+    const reference = survivorWays.length > 0 ? survivorWays : [sourceWays[0]!];
+    if (!sourceWays.every((way) => reference.some((other) => wayPairJoinable(way, other)))) {
+      return false;
+    }
+    // Every source joins one survivor: the whole resulting junction must pass final validation.
+    const rewritten = [...survivorWays, ...sourceWays].map((way) => ({
+      ...way,
+      refs: way.refs.map((ref) => (group.includes(ref) ? survivorId : ref)),
+    }));
+    return !junctionHasIncompatibleGrades(survivorId, [
+      ...new Map(rewritten.map((way) => [way.id, way])).values(),
+    ]);
+  }
+
+  /**
+   * Relation node members follow a merged node. A turn restriction must stay valid after that:
+   * drop any replacement that would break one (MP-X1), before anything is rewritten.
+   */
+  private removeRestrictionBreakingNodeReplacements(replacementMap: ReplacementMap) {
+    if (replacementMap.size === 0) return;
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const relation of this.currentRelations()) {
+        if (relation.tags?.["type"] !== "restriction") continue;
+        const replaced = relation.members.filter(
+          (member) => member.type === "node" && replacementMap.has(member.ref),
+        );
+        if (replaced.length === 0) continue;
+        const proposed = {
+          ...relation,
+          members: relation.members.map((member) =>
+            member.type === "node" && replacementMap.has(member.ref)
+              ? { ...member, ref: replacementMap.get(member.ref)! }
+              : member,
+          ),
+        };
+        const issues = restrictionTopologyIssues(proposed, (id) => {
+          const stored = this.wayChanges[id]?.entity ?? this.osm.ways.getById(id);
+          const way = stored ? this.getCurrentWay(stored) : null;
+          if (!way) return null;
+          return { ...way, refs: way.refs.map((ref) => replacementMap.get(ref) ?? ref) };
+        });
+        if (issues.length === 0) continue;
+        for (const member of replaced) replacementMap.delete(member.ref);
+        changed = true;
+      }
+    }
   }
 
   private reconcileNodeTags(patchNode: OsmNode, baseNodeId: number) {
@@ -739,7 +594,7 @@ export class OsmChangeset {
   private deleteReconciledNode(node: OsmNode, survivorId: number) {
     const pendingChange = this.nodeChanges[node.id];
     if (pendingChange?.changeType === "create") {
-      delete this.nodeChanges[node.id];
+      this.overlay.discard("node", node.id);
     } else {
       const storedNode = this.osm.nodes.getById(node.id);
       if (!storedNode) return;
@@ -750,10 +605,20 @@ export class OsmChangeset {
 
   /**
    * Reconcile incoming nodes with unambiguous base nodes at the exact OSM coordinate.
-   * Cross-dataset reconciliation always preserves the base ID. Same-dataset diagnostic
-   * scans use the highest compatible ID as a deterministic candidate survivor.
+   * Cross-dataset reconciliation always preserves the base ID. Same-dataset deduplication
+   * uses the highest compatible ID as a deterministic survivor.
    */
   deduplicateNodes(nodes: Nodes) {
+    const replacementMap = this.planNodeReplacements(nodes);
+    this.applyNodeReplacements(replacementMap);
+    return replacementMap;
+  }
+
+  /**
+   * @internal The safe exact node replacements for `nodes` (source ID to survivor ID), without
+   * recording them. Any subset of the result is also safe to apply.
+   */
+  planNodeReplacements(nodes: Nodes): ReplacementMap {
     const sameDataset = nodes === this.osm.nodes;
     let replacementMap: ReplacementMap = new Map();
     const exactCandidates: NodeCandidate[] = [];
@@ -778,8 +643,9 @@ export class OsmChangeset {
             (!sameDataset || baseNode.id > patchNode.id) &&
             this.nodeChanges[baseNode.id]?.changeType !== "delete" &&
             sameOsmCoordinate(currentPatchNode, baseNode) &&
-            !hasAnyTagConflict(currentPatchNode.tags, baseNode.tags) &&
-            !hasConflictingGradeOrAccessTags(currentPatchNode.tags, baseNode.tags),
+            assessNodeTags("exact", currentPatchNode.tags, baseNode.tags, {
+              sourceIsImported: !sameDataset,
+            }).hardReasons.length === 0,
         );
 
       if (candidateNodes.length === 0) continue;
@@ -793,7 +659,7 @@ export class OsmChangeset {
     const waysByNode = this.currentWaysByNode(contextNodeIds);
     for (const { baseNodes, patchNode } of exactCandidates) {
       const compatibleNodes = baseNodes.filter((baseNode) =>
-        this.nodeContextsCompatible(patchNode, baseNode, waysByNode),
+        this.nodeContextsCompatible(patchNode, baseNode, waysByNode, sameDataset),
       );
       if (compatibleNodes.length === 0 || (!sameDataset && compatibleNodes.length !== 1)) continue;
       const baseNode = sameDataset
@@ -806,7 +672,13 @@ export class OsmChangeset {
     replacementMap = flattenReplacementMap(replacementMap);
     this.removeConflictingNodeReplacements(replacementMap, waysByNode);
     this.removeUnsafeNodeReplacements(replacementMap);
-    if (replacementMap.size === 0) return replacementMap;
+    this.removeRestrictionBreakingNodeReplacements(replacementMap);
+    return replacementMap;
+  }
+
+  /** @internal Record exact node replacements from `planNodeReplacements`. */
+  applyNodeReplacements(replacementMap: ReplacementMap) {
+    if (replacementMap.size === 0) return;
     this.applyNodeReplacementsToWays(replacementMap);
     this.applyNodeReplacementsToRelations(replacementMap);
 
@@ -816,7 +688,6 @@ export class OsmChangeset {
       this.reconcileNodeTags(patchNode, baseNodeId);
       this.deleteReconciledNode(patchNode, baseNodeId);
     }
-    return replacementMap;
   }
 
   /**
@@ -889,32 +760,7 @@ export class OsmChangeset {
   }
 
   private incidentWaysAtNode(nodeId: number) {
-    const ways = new Map<number, OsmWay>();
-    const node = this.osm.nodes.getById(nodeId);
-    if (node) {
-      // Query immutable geometry, then resolve pending changes. Include every
-      // kind of way: a bridge can share an existing surface junction even though
-      // it is not eligible for a new surface crossing.
-      for (const index of this.osm.ways.intersects([node.lon, node.lat, node.lon, node.lat])) {
-        const way = this.getCurrentWay(this.osm.ways.getByIndex(index));
-        if (way?.refs.includes(nodeId)) ways.set(way.id, way);
-      }
-    }
-    // Earlier intersections can move a way outside its indexed bbox or attach
-    // it to a newly created node. Such ways must participate in later plans.
-    if (!this.pendingWayIdsByNode) {
-      this.pendingWayIdsByNode = new Map();
-      for (const change of Object.values(this.wayChanges)) {
-        this.updatePendingWayIncidence(change.entity.id);
-      }
-    }
-    for (const wayId of this.pendingWayIdsByNode.get(nodeId) ?? []) {
-      const change = this.wayChanges[wayId];
-      if (change && change.changeType !== "delete" && change.entity.refs.includes(nodeId)) {
-        ways.set(change.entity.id, change.entity);
-      }
-    }
-    return [...ways.values()];
+    return this.overlay.waysAtNode(nodeId);
   }
 
   private planIntersectionNodeReplacement(replaced: OsmNode, survivor: OsmNode) {
@@ -981,8 +827,37 @@ export class OsmChangeset {
     intersectingWayNode: OsmNode,
     wayIsPatch: boolean,
     intersectingWayIsPatch: boolean,
-  ) {
-    if (hasAnyTagConflict(wayNode.tags, intersectingWayNode.tags)) return null;
+    patchNodeIds: { has(id: number): boolean } | undefined,
+  ): IntersectionNodeResolution | "keep-both" | null {
+    const imported = (id: number) => patchNodeIds?.has(id) ?? false;
+    // A survivor-to-be that is imported cannot be told apart from base here without patch IDs;
+    // check whichever direction adds tags to existing data.
+    const [importedNode, existingNode] = imported(wayNode.id)
+      ? [wayNode, intersectingWayNode]
+      : [intersectingWayNode, wayNode];
+    const oneImported = imported(wayNode.id) !== imported(intersectingWayNode.id);
+    if (
+      assessNodeTags("crossing", importedNode.tags, existingNode.tags, {
+        sourceIsImported: oneImported,
+      }).hardReasons.length
+    ) {
+      return null;
+    }
+    // Never merge two base nodes: that would remove a base node from base ways.
+    if (
+      patchNodeIds &&
+      !patchNodeIds.has(wayNode.id) &&
+      !patchNodeIds.has(intersectingWayNode.id)
+    ) {
+      return "keep-both";
+    }
+    // A base node always survives a crossing snap.
+    if (patchNodeIds && patchNodeIds.has(wayNode.id) !== patchNodeIds.has(intersectingWayNode.id)) {
+      const keepWayNode = !patchNodeIds.has(wayNode.id);
+      return keepWayNode
+        ? { keepWayNode, replaced: intersectingWayNode, survivor: wayNode }
+        : { keepWayNode, replaced: wayNode, survivor: intersectingWayNode };
+    }
 
     const wayRoutingTags = nodeRoutingTagCount(wayNode);
     const intersectingRoutingTags = nodeRoutingTagCount(intersectingWayNode);
@@ -1012,8 +887,40 @@ export class OsmChangeset {
     survivorNodeId: number,
   ) {
     const refs = way.refs.map((ref) => (ref === replacedNodeId ? survivorNodeId : ref));
-    if (refs.some((ref, index) => index > 0 && ref === refs[index - 1])) return true;
-    return new Set(refs).size < 2;
+    return refsWouldCollapse(refs);
+  }
+
+  /**
+   * Drop an imported point a junction replacement left unused (MP-J1). Its tags were merged into
+   * the survivor and every way was rewritten, so only an imported point used by patch ways alone,
+   * and by no relation, goes; base points and still-referenced ones stay.
+   */
+  private dropReplacedIntersectionNode(
+    replaced: OsmNode,
+    survivorId: number,
+    patchNodeIds: { has(id: number): boolean } | undefined,
+  ) {
+    const referencedByRelation = [...this.currentRelations()].some((relation) =>
+      relation.members.some((member) => member.type === "node" && member.ref === replaced.id),
+    );
+    const droppable = canDropReplacedNode({
+      imported: patchNodeIds?.has(replaced.id) ?? false,
+      tagged: Object.keys(replaced.tags ?? {}).length > 0,
+      tagsMerged: mergesTags("crossing"),
+      // The replacement rewrote every incident way, so no way still uses the replaced node.
+      referencedByWay: false,
+      referencedByRelation,
+    });
+    if (!droppable) return;
+    // On a plan the imported node is still a pending create; forget it instead.
+    if (this.nodeChanges[replaced.id]?.changeType === "create") {
+      this.overlay.discard("node", replaced.id);
+    } else {
+      const storedNode = this.osm.nodes.getById(replaced.id);
+      if (!storedNode) return;
+      this.delete(storedNode, [{ type: "node", id: survivorId, osmId: this.osm.id }]);
+    }
+    this.intersectionNodesRemoved++;
   }
 
   private mergeNodeTags(survivor: OsmNode, replaced: OsmNode) {
@@ -1022,7 +929,15 @@ export class OsmChangeset {
     return merged;
   }
 
-  private markNodeAsCrossing(nodeId: number) {
+  /**
+   * Tag a node both ways pass through with a default `crossing=yes`. A node where either way
+   * ends is a junction, such as one path continuing another or meeting it, not a crossing.
+   */
+  private markNodeAsCrossing(nodeId: number, wayId: number, otherWayId: number) {
+    for (const id of [wayId, otherWayId]) {
+      const way = this.overlay.getWay(id);
+      if (!way || wayEndsAt(way, nodeId)) return;
+    }
     const node = this.getCurrentNode(nodeId);
     // Intersection discovery can supply a missing default, but must not erase
     // a specific crossing value supplied by the base or an earlier tag copy.
@@ -1036,7 +951,15 @@ export class OsmChangeset {
   /**
    * De-duplicate the ways within this OSM changeset.
    */
-  *deduplicateWaysGenerator(ways: Ways, replacementMap: ReplacementMap = new Map()) {
+  /**
+   * @param accept - Called with each exact way match; returning false leaves the pair
+   * separate. Every match is accepted without it.
+   */
+  *deduplicateWaysGenerator(
+    ways: Ways,
+    replacementMap: ReplacementMap = new Map(),
+    accept?: (patchWayId: number, baseWayId: number) => boolean,
+  ) {
     const dedupedIdPairs = new IdPairs();
     const sameDataset = ways === this.osm.ways;
     const exactWayIndex = sameDataset ? undefined : this.buildCrossDatasetExactWayIndex();
@@ -1048,6 +971,7 @@ export class OsmChangeset {
         dedupedIdPairs,
         replacementMap,
         exactWayIndex,
+        accept,
       );
     }
   }
@@ -1113,7 +1037,7 @@ export class OsmChangeset {
   private deleteReconciledWay(way: OsmWay, survivorId: number) {
     const pendingChange = this.wayChanges[way.id];
     if (pendingChange?.changeType === "create") {
-      delete this.wayChanges[way.id];
+      this.overlay.discard("way", way.id);
     } else {
       const storedWay = this.osm.ways.getById(way.id);
       if (!storedWay) return;
@@ -1128,6 +1052,7 @@ export class OsmChangeset {
     dedupedIdPairs: IdPairs,
     replacementMap: ReplacementMap,
     exactWayIndex?: ExactWayIndex,
+    accept?: (patchWayId: number, baseWayId: number) => boolean,
   ) {
     if (!this.osm.ways.ids.has(patchWay.id) && this.wayChanges[patchWay.id] == null) return 0;
     if (!sameDataset && this.wayChanges[patchWay.id]?.changeType !== "create") return 0;
@@ -1166,6 +1091,7 @@ export class OsmChangeset {
     const baseWay = sameDataset ? candidates.toSorted((a, b) => b.id - a.id)[0] : candidates[0];
     const currentBaseWay = this.getCurrentWay(baseWay!);
     if (!currentBaseWay) return 0;
+    if (accept && !accept(patchWay.id, currentBaseWay.id)) return 0;
 
     const mergedWay = withNonConflictingDescriptiveTags(currentBaseWay, currentPatchWay);
     if (mergedWay !== currentBaseWay) this.modify("way", currentBaseWay.id, () => mergedWay);
@@ -1194,73 +1120,116 @@ export class OsmChangeset {
    * Generator that creates intersection nodes for ways that cross each other.
    * Yields statistics for each way processed, including intersection points found and nodes created.
    *
+   * Candidate ways come from the base dataset's spatial index; use it when the base already
+   * contains the ways to process.
+   *
    * @param ways - The ways to process for intersections
    * @yields Statistics object with `intersectionsFound` and `intersectionsCreated` counts
    */
-  *createIntersectionsForWaysGenerator(ways: Ways) {
+  *createIntersectionsForWaysGenerator(ways: Ways, patchNodeIds?: { has(id: number): boolean }) {
+    yield* this.createIntersections(ways, this.osmCrossingSearch(), patchNodeIds);
+  }
+
+  createIntersectionsForWays(ways: Ways, patchNodeIds?: { has(id: number): boolean }) {
+    for (const _ of this.createIntersectionsForWaysGenerator(ways, patchNodeIds));
+  }
+
+  /**
+   * @internal Insert crossings for `ways` found on the planned state: the base plus every
+   * pending change, read through the overlay as it stood when this call began. `accept` can
+   * skip individual crossings.
+   */
+  *createPlannedIntersections(
+    ways: Ways,
+    patchNodeIds: { has(id: number): boolean },
+    accept?: (crossing: CrossingInsertion) => boolean,
+  ) {
+    // New crossing nodes are new entities, so they get negative IDs, below every node the
+    // planned state holds.
+    let minimum = 0;
+    for (const node of this.overlay.nodes()) minimum = Math.min(minimum, node.id);
+    this.currentNodeId = minimum;
+    this.nodeIdStep = -1;
+    // A patch node with a base node's ID edits that base node (MP-I1); it is not imported.
+    const importedNodeIds = {
+      has: (id: number) => patchNodeIds.has(id) && !this.osm.nodes.ids.has(id),
+    };
+    yield* this.createIntersections(ways, this.overlayCrossingSearch(), importedNodeIds, accept);
+  }
+
+  private *createIntersections(
+    ways: Ways,
+    search: CrossingSearch,
+    patchNodeIds?: { has(id: number): boolean },
+    accept?: (crossing: CrossingInsertion) => boolean,
+  ) {
     const wayIdPairs = new IdPairs();
     const patchWayIds = new Set<number>();
     for (const way of ways) patchWayIds.add(way.id);
-    const metadata = this.buildIntersectionMetadata();
+    const grades = new Map<number, string | null>();
     for (const way of ways) {
       // Yield once per input way so callers can report complete progress even
       // when exact reconciliation already removed an equivalent patch way.
-      if (!this.osm.ways.ids.has(way.id)) {
+      if (!search.startBbox(way.id)) {
         yield;
         continue;
       }
       yield this.createIntersectionsForWayInternal(
-        { id: way.id },
+        way.id,
         wayIdPairs,
         patchWayIds,
-        metadata,
+        search,
+        grades,
+        patchNodeIds,
+        accept,
       );
     }
   }
 
-  createIntersectionsForWays(ways: Ways) {
-    for (const _ of this.createIntersectionsForWaysGenerator(ways));
+  private osmCrossingSearch(): CrossingSearch {
+    return {
+      startBbox: (wayId) => {
+        const [index] = this.osm.ways.ids.idOrIndex({ id: wayId });
+        return index < 0 ? null : this.osm.ways.getEntityBbox({ index });
+      },
+      // ID order keeps crossing node IDs independent of the spatial index's layout.
+      near: (bbox) =>
+        this.osm.ways
+          .intersects(bbox)
+          .map((index) => this.osm.ways.ids.at(index))
+          .sort((a, b) => a - b),
+    };
   }
 
-  private getCurrentWay(way: OsmWay): OsmWay | null {
-    const change = this.wayChanges[way.id];
-    if (change?.changeType === "delete") return null;
-    return change?.entity ?? way;
-  }
-
-  private getCurrentNode(id: number): OsmNode | null {
-    const change = this.nodeChanges[id];
-    if (change?.changeType === "delete") return null;
-    return change?.entity ?? this.osm.nodes.getById(id);
+  private overlayCrossingSearch(): CrossingSearch {
+    const start = this.overlay.snapshot();
+    return {
+      startBbox: (wayId) => {
+        const way = start.getWay(wayId);
+        return way ? start.wayBbox(way) : null;
+      },
+      near: (bbox) => start.waysIntersecting(bbox).map((way) => way.id),
+    };
   }
 
   /**
-   * Precompute the immutable tag checks used for every spatial candidate. Way
-   * refs change during insertion, but intersection eligibility and grade do not.
+   * A way's grade signature when it can take a new crossing, or null when it cannot. Crossing
+   * insertion rewrites refs only, so tags, and this, are fixed for the whole pass.
    */
-  private buildIntersectionMetadata(): IntersectionMetadata {
-    const eligible = new Uint8Array(this.osm.ways.size);
-    const gradeIds = new Int32Array(this.osm.ways.size);
-    const grades = new Map<string, number>();
-    let nextGradeId = 1;
+  private crossingGrade(wayId: number, grades: Map<number, string | null>) {
+    if (grades.has(wayId)) return grades.get(wayId)!;
+    const tags = this.overlay.getWay(wayId)?.tags;
+    const grade = areWayTagsIntersectionCandidate(tags) ? routingGradeSignature(tags) : null;
+    grades.set(wayId, grade);
+    return grade;
+  }
 
-    for (let index = 0; index < this.osm.ways.size; index++) {
-      const wayId = this.osm.ways.ids.at(index);
-      const change = this.wayChanges[wayId];
-      if (change?.changeType === "delete") continue;
-      const tags = change ? change.entity.tags : this.osm.ways.tags.getTags(index);
-      if (!areWayTagsIntersectionCandidate(tags)) continue;
-      eligible[index] = 1;
-      const grade = routingGradeSignature(tags);
-      let gradeId = grades.get(grade);
-      if (gradeId === undefined) {
-        gradeId = nextGradeId++;
-        grades.set(grade, gradeId);
-      }
-      gradeIds[index] = gradeId;
-    }
+  private getCurrentWay(way: OsmWay): OsmWay | null {
+    return this.overlay.currentWay(way);
+  }
 
-    return { eligible, gradeIds };
+  private getCurrentNode(id: number): OsmNode | null {
+    return this.overlay.getNode(id);
   }
 
   /**
@@ -1268,55 +1237,11 @@ export class OsmChangeset {
    * Returns null when any ref is genuinely unavailable instead of substituting geometry.
    */
   private getWayCoordinates(way: OsmWay): [number, number][] | null {
-    const wayRevision = this.wayGeometryRevisions.get(way.id) ?? 0;
-    const cached = this.wayCoordinateCache.get(way.id);
-    if (
-      cached &&
-      cached.wayRevision === wayRevision &&
-      cached.nodeCoordinateRevision === this.nodeCoordinateRevision
-    ) {
-      return cached.coordinates;
-    }
-
-    // Unchanged base geometry can resolve packed node indexes directly. This
-    // avoids one binary ID lookup per ref in the intersection hot path. Match
-    // the fallback's missing-ref behavior by requiring every ref to resolve.
-    if (this.nodeCoordinateRevision === 0 && this.wayChanges[way.id] === undefined) {
-      const [wayIndex] = this.osm.ways.ids.idOrIndex({ id: way.id });
-      if (wayIndex !== -1) {
-        const coordinates = this.osm.ways.getResolvedCoordinates(wayIndex);
-        if (coordinates.length !== way.refs.length) return null;
-        this.wayCoordinateCache.set(way.id, {
-          coordinates,
-          nodeCoordinateRevision: this.nodeCoordinateRevision,
-          wayRevision,
-        });
-        return coordinates;
-      }
-    }
-
-    const coordinates: [number, number][] = [];
-    for (const ref of way.refs) {
-      const node = this.getCurrentNode(ref);
-      // Do not cache unresolved geometry: a later node creation can make this
-      // same set of refs resolvable without changing the way revision.
-      if (!node) return null;
-      coordinates.push([node.lon, node.lat]);
-    }
-    this.wayCoordinateCache.set(way.id, {
-      coordinates,
-      nodeCoordinateRevision: this.nodeCoordinateRevision,
-      wayRevision,
-    });
-    return coordinates;
+    return this.overlay.wayCoordinates(way);
   }
 
   private getCleanWayCoordinates(way: OsmWay): [number, number][] | null {
-    const coordinates = this.getWayCoordinates(way);
-    if (!coordinates) return null;
-    const cached = this.wayCoordinateCache.get(way.id);
-    if (!cached) return cleanCoords(coordinates);
-    return (cached.cleaned ??= cleanCoords(coordinates));
+    return this.overlay.cleanWayCoordinates(way);
   }
 
   /**
@@ -1326,67 +1251,50 @@ export class OsmChangeset {
    * - Calculates intersection points.
    * - Inserts existing nodes or creates new intersection nodes at the crossing points.
    */
-  createIntersectionsForWay(wayIdOrIndex: IdOrIndex, wayIdPairs: IdPairs) {
-    return this.createIntersectionsForWayInternal(
-      wayIdOrIndex,
-      wayIdPairs,
-      null,
-      this.buildIntersectionMetadata(),
-    );
-  }
-
   private createIntersectionsForWayInternal(
-    wayIdOrIndex: IdOrIndex,
+    wayId: number,
     wayIdPairs: IdPairs,
-    patchWayIds: ReadonlySet<number> | null,
-    metadata: IntersectionMetadata,
+    patchWayIds: ReadonlySet<number>,
+    search: CrossingSearch,
+    grades: Map<number, string | null>,
+    patchNodeIds?: { has(id: number): boolean },
+    accept?: (crossing: CrossingInsertion) => boolean,
   ) {
     let intersectionsFound = 0;
     let intersectionsCreated = 0;
 
-    // Get the actual way from the OSM data (which may have been modified by deduplication)
-    const [wayIndex] = this.osm.ways.ids.idOrIndex(wayIdOrIndex);
-    if (wayIndex >= 0 && metadata.eligible[wayIndex] !== 1) return;
-    const baseWay = this.osm.ways.getByIndex(wayIndex);
-    const initialWay = this.getCurrentWay(baseWay);
+    const initialGrade = this.crossingGrade(wayId, grades);
+    if (initialGrade == null) return;
+    const initialWay = this.overlay.getWay(wayId);
     if (!initialWay) return;
 
     const initialWayCoordinates = this.getWayCoordinates(initialWay);
     if (!initialWayCoordinates || initialWayCoordinates.length < 2) return;
 
-    // Check for intersecting ways. Since the way exists in the base OSM, there will always be at least one way.
-    const bbox = this.osm.ways.getEntityBbox({ index: wayIndex });
-    const initialGradeId = metadata.gradeIds[wayIndex];
-    const intersectingWayIndexes = this.osm.ways.intersects(bbox, (intersectingWayIndex) => {
-      const intersectingWayId = this.osm.ways.ids.at(intersectingWayIndex);
-      if (intersectingWayId == null || intersectingWayId === initialWay.id) return false;
+    const bbox = search.startBbox(wayId);
+    if (!bbox) return;
+    const intersectingWayIds = search.near(bbox).filter((intersectingWayId) => {
+      if (intersectingWayId === initialWay.id) return false;
       if (wayIdPairs.has(initialWay.id, intersectingWayId)) return false;
 
       // The old loop recorded every spatial pair before checking routing and
       // grade compatibility. Keep that side effect while avoiding entity and
       // coordinate work for pairs that can never connect.
-      if (
-        metadata.eligible[intersectingWayIndex] !== 1 ||
-        metadata.gradeIds[intersectingWayIndex] !== initialGradeId
-      ) {
+      if (this.crossingGrade(intersectingWayId, grades) !== initialGrade) {
         wayIdPairs.add(initialWay.id, intersectingWayId);
         return false;
       }
       return true;
     });
-    if (intersectingWayIndexes.length === 0) return;
+    if (intersectingWayIds.length === 0) return;
 
-    for (const intersectingWayIndex of intersectingWayIndexes) {
-      const intersectingWayId = this.osm.ways.ids.at(intersectingWayIndex);
-
-      // Skip self and null ways
-      if (intersectingWayId == null || intersectingWayId === initialWay.id) continue;
+    for (const intersectingWayId of intersectingWayIds) {
       if (wayIdPairs.has(initialWay.id, intersectingWayId)) continue;
       wayIdPairs.add(initialWay.id, intersectingWayId);
 
       // Skip ways that aren't applicable for connecting
-      const way = this.getCurrentWay(baseWay);
-      const intersectingWay = this.getCurrentWay(this.osm.ways.getByIndex(intersectingWayIndex));
+      const way = this.overlay.getWay(wayId);
+      const intersectingWay = this.overlay.getWay(intersectingWayId);
       if (!way || !intersectingWay) continue;
       if (!waysShouldConnect(way.tags, intersectingWay.tags)) continue;
 
@@ -1409,7 +1317,7 @@ export class OsmChangeset {
 
       const intersectingPoints = waysIntersect(coordinates, intersectingWayCoords);
       for (const pt of intersectingPoints) {
-        const currentWay = this.getCurrentWay(baseWay);
+        const currentWay = this.overlay.getWay(wayId);
         // Reuse the already decoded base entity; getCurrentWay still selects any
         // pending rewrite made by an earlier point in this same pair.
         const currentIntersectingWay = this.getCurrentWay(intersectingWay);
@@ -1432,38 +1340,65 @@ export class OsmChangeset {
           intersectingWayNodeId != null &&
           wayNodeId === intersectingWayNodeId
         ) {
-          this.markNodeAsCrossing(wayNodeId);
+          this.markNodeAsCrossing(wayNodeId, currentWay.id, currentIntersectingWay.id);
           continue;
         }
 
-        let endpointResolution: ReturnType<OsmChangeset["chooseIntersectionNode"]> | undefined;
+        let endpointResolution: IntersectionNodeResolution | undefined;
         let junctionReplacement: IntersectionJunctionReplacement | null = null;
         let createDedicatedIntersection = false;
+        let spliceIntersectingWayNode = false;
         if (wayNodeId != null && intersectingWayNodeId != null) {
           const wayNode = this.getCurrentNode(wayNodeId);
           const intersectingWayNode = this.getCurrentNode(intersectingWayNodeId);
           if (!wayNode || !intersectingWayNode) continue;
-          endpointResolution = this.chooseIntersectionNode(
+          const choice = this.chooseIntersectionNode(
             wayNode,
             intersectingWayNode,
-            patchWayIds?.has(currentWay.id) ?? false,
-            patchWayIds?.has(currentIntersectingWay.id) ?? false,
+            patchWayIds.has(currentWay.id),
+            patchWayIds.has(currentIntersectingWay.id),
+            patchNodeIds,
           );
-          if (!endpointResolution) continue;
-          const plan = this.planIntersectionNodeReplacement(
-            endpointResolution.replaced,
-            endpointResolution.survivor,
-          );
-          junctionReplacement = plan.replacement;
-          if (!junctionReplacement) {
-            // A shared junction must remain intact if even one incident way or
-            // restriction cannot follow the replacement. The isolated short-way
-            // fallback can still insert the geometric intersection independently.
-            if (!plan.canCreateDedicatedIntersection) continue;
-            endpointResolution = undefined;
-            createDedicatedIntersection = true;
+          if (!choice) continue;
+          if (choice === "keep-both") {
+            // Two base nodes both stay: the imported way takes the other way's vertex, unless
+            // that vertex sits on one of its own and would leave a zero-length segment.
+            const { lon, lat } = intersectingWayNode;
+            if (currentWayCoordinates.some(([x, y]) => x === lon && y === lat)) continue;
+            spliceIntersectingWayNode = true;
+          } else {
+            endpointResolution = choice;
+            const plan = this.planIntersectionNodeReplacement(choice.replaced, choice.survivor);
+            junctionReplacement = plan.replacement;
+            if (!junctionReplacement) {
+              // A shared junction must remain intact if even one incident way or
+              // restriction cannot follow the replacement. The isolated short-way
+              // fallback can still insert the geometric intersection independently.
+              if (!plan.canCreateDedicatedIntersection) continue;
+              endpointResolution = undefined;
+              createDedicatedIntersection = true;
+            }
           }
         }
+
+        const snaps =
+          (endpointResolution && junctionReplacement) ||
+          (!createDedicatedIntersection && (wayNodeId != null || intersectingWayNodeId != null));
+        const insertion: CrossingInsertion = {
+          kind: snaps ? "snap" : "node",
+          wayId: currentWay.id,
+          otherWayId: currentIntersectingWay.id,
+          point: pt,
+          ...(endpointResolution && junctionReplacement
+            ? {
+                merges: {
+                  replaced: endpointResolution.replaced.id,
+                  survivor: endpointResolution.survivor.id,
+                },
+              }
+            : {}),
+        };
+        if (accept && !accept(insertion)) continue;
 
         intersectionsFound++;
 
@@ -1478,7 +1413,8 @@ export class OsmChangeset {
           for (const relation of junctionReplacement.restrictions) {
             this.modify("relation", relation.id, () => relation);
           }
-          this.markNodeAsCrossing(survivor.id);
+          this.markNodeAsCrossing(survivor.id, currentWay.id, currentIntersectingWay.id);
+          this.dropReplacedIntersectionNode(endpointResolution.replaced, survivor.id, patchNodeIds);
         } else if (createDedicatedIntersection) {
           intersectionsCreated++;
           const newIntersectionNode = this.createIntersectionNode(
@@ -1488,18 +1424,18 @@ export class OsmChangeset {
           );
           this.spliceNodeIntoWay(currentWay, newIntersectionNode);
           this.spliceNodeIntoWay(currentIntersectingWay, newIntersectionNode);
-        } else if (wayNodeId != null) {
+        } else if (wayNodeId != null && !spliceIntersectingWayNode) {
           const wayNode = this.getCurrentNode(wayNodeId);
           if (wayNode == null) throw Error(`Way node ${String(wayNodeId)} not found`);
           this.spliceNodeIntoWay(currentIntersectingWay, wayNode);
-          this.markNodeAsCrossing(wayNode.id);
+          this.markNodeAsCrossing(wayNode.id, currentWay.id, currentIntersectingWay.id);
         } else if (intersectingWayNodeId != null) {
           const intersectingWayNode = this.getCurrentNode(intersectingWayNodeId);
           if (intersectingWayNode == null)
             throw Error(`Intersecting way node ${String(intersectingWayNodeId)} not found`);
 
           this.spliceNodeIntoWay(currentWay, intersectingWayNode);
-          this.markNodeAsCrossing(intersectingWayNode.id);
+          this.markNodeAsCrossing(intersectingWayNode.id, currentWay.id, currentIntersectingWay.id);
         } else {
           intersectionsCreated++;
           const newIntersectionNode = this.createIntersectionNode(
@@ -1537,10 +1473,15 @@ export class OsmChangeset {
     };
     // The new maximum ID cannot be referenced by existing base ways, so adding
     // it does not invalidate any cached geometry until each way is spliced.
-    this.recordCreate(node, this.osm.id, [
-      { type: "way", id: way.id, osmId: this.osm.id },
-      { type: "way", id: intersectingWay.id, osmId: this.osm.id },
-    ]);
+    this.overlay.create(
+      node,
+      this.osm.id,
+      [
+        { type: "way", id: way.id, osmId: this.osm.id },
+        { type: "way", id: intersectingWay.id, osmId: this.osm.id },
+      ],
+      { unreferenced: true },
+    );
     return node;
   }
 

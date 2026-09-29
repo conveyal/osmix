@@ -1,39 +1,36 @@
 # @osmix/bench
 
-Performance benchmark app comparing Osmix vs DuckDB-wasm for OSM data operations.
+A browser benchmark of Osmix against DuckDB-wasm on OSM PBF data. Both engines load the same file and answer the same queries. A query is only timed after both engines return the same answer.
 
-## Overview
+Read [METHODOLOGY.md](METHODOLOGY.md) for how each engine is set up, what each query means, and where the comparison has limits.
 
-This app provides experimental benchmarking of Osmix and DuckDB-wasm across multiple OSM operations:
+## What it measures
 
-- **Load Speed**: Time to load and index OSM PBF files
-- **Bbox Queries**: Small, Medium, and Large bounding box queries
-- **Nearest Neighbor**: Find N nearest nodes to a point
-- **Vector Tile Generation**: Planned support for streaming Mapbox Vector Tiles from benchmarked data.
-- **GeoJSON Export**: Convert query results to GeoJSON format
+- **Setup:** initialize each engine, and load a PBF until every query below can run. Load is split into each engine's own phases.
+- **Queries:** node and way bbox queries at three sizes, way bbox queries with exact line intersection, 5 nearest nodes, a tag filter, a tag aggregation, GeoJSON export, and one vector tile.
+
+For each query the page shows median, p95, and cold times; the exact DuckDB SQL and its plan operators; and how Osmix answers it.
 
 ## Usage
 
-### Development
-
 ```bash
-pnpm run dev
+pnpm --filter @osmix/bench run dev
 ```
 
-Automatically loads `fixtures/monaco.pbf` and runs benchmarks.
+In development, "Use monaco.pbf" loads `fixtures/monaco.pbf`. Use the file picker for larger extracts; METHODOLOGY.md lists some. Tick "Single-threaded Osmix" to give Osmix one worker, matching DuckDB-wasm's single thread.
 
-### Custom Files
+## Code
 
-Click "Select PBF File" to load your own OSM PBF file. Benchmarks run automatically after loading.
+- `src/operations.ts`: every query, its meaning, and each engine's approach.
+- `src/engines/duckdb-sql.ts`: all DuckDB SQL. The page shows these strings.
+- `src/engines/duckdb-engine.ts`, `src/engines/osmix-engine.ts`: the two engines behind one `BenchEngine` interface.
+- `src/engines/osmix-queries.ts`, `src/workers/osmix-bench.worker.ts`: Osmix queries, run in an Osmix worker.
+- `src/harness/`: the runner, answer comparison, and statistics.
 
-## Dependencies
+## Tests
 
-- `@osmix/core`, `@osmix/json`, `@osmix/pbf` - Osmix packages
-- `@duckdb/duckdb-wasm` - DuckDB WebAssembly with spatial extension
-- `maplibre-gl` - Map visualization
+```bash
+pnpm --filter @osmix/bench run test
+```
 
-## Known limitations
-
-- Vector tile generation uses [`@osmix/vt`](../../packages/vt/README.md) with bbox-projected tiles for preview; not a drop-in replacement for server tiles.
-- Bounding-box queries support `includeTags`; nearest-neighbor returns ids and geometry only.
-- Benchmarks execute entirely in the browser and do not persist results; refresh to reset runs.
+The tests run in a browser. `test/parity.test.ts` runs every query on `monaco.pbf` and fails if the engines' answers differ. Browser tests are skipped in CI.

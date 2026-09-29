@@ -2,14 +2,14 @@
 
 This folder contains implementation-ready follow-up tasks that were deliberately left outside the Australia-scale PBF loading work. The filenames preserve the original recommendation numbers so discussion, pull requests, and future planning can refer to stable task identifiers.
 
-| Task                                                                | Title                                                                   | Status                   | Relationship                                                                                                      |
-| ------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| [004](./004-immutable-base-overlay-merging-and-streaming-export.md) | Keep the base immutable with overlay-based merging and streaming export | Ready for implementation | Recommended next step for reducing merge-time peak memory                                                         |
-| [005](./005-conditional-chunked-disk-storage.md)                    | Evaluate and conditionally implement chunked disk-backed storage        | Decision-gated           | Start with measurement after Task 004; implement only if persistent interactive access is a confirmed requirement |
+| Task                                                                | Title                                                            | Status         | Relationship                                                                                                              |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| [004](./004-immutable-base-overlay-merging-and-streaming-export.md) | Measure merge memory, then stream the merged PBF from the plan   | Step 1 ready   | The Merge plan's overlay already removed repeated copies; this measures the one remaining build and removes it for export |
+| [005](./005-conditional-chunked-disk-storage.md)                    | Evaluate and conditionally implement chunked disk-backed storage | Decision-gated | Start with measurement after Task 004; implement only if persistent interactive access is a confirmed requirement         |
 
 ## Ordering
 
-Task 004 should be completed before making a product decision on Task 005. Overlay-based merging removes repeated whole-dataset copies and may make the target Australia-plus-local-patch workflow practical without introducing an on-disk database. Its measurements will also show whether remaining failures are caused by persistence, working-set pressure, or individual typed-array column limits.
+Task 004 should be completed before making a product decision on Task 005. The Merge plan's overlay already removed repeated whole-dataset copies, and streaming export from the plan may make the target Australia-plus-local-patch workflow practical without an on-disk database. Task 004's measurements will also show whether remaining failures are caused by persistence, working-set pressure, or individual typed-array column limits.
 
 Task 005 intentionally begins with a go/no-go decision. It should not be treated as an automatic continuation of Task 004. Browser disk storage introduces a second storage engine, schema/versioning obligations, cache eviction behavior, and substantially more complex query execution. Those costs are justified only if users need large datasets to remain interactively queryable across sessions without reloading the source PBF, or if required datasets cannot be represented by the current in-memory columns.
 

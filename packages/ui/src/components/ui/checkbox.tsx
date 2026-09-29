@@ -9,10 +9,11 @@ function Checkbox({ className, ...props }: React.ComponentProps<typeof BaseCheck
     <BaseCheckbox.Root
       data-slot="checkbox"
       className={cn(
-        "peer size-3.5 shrink-0 cursor-pointer rounded-sm border border-input bg-background shadow-xs outline-none",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "peer size-3.5 shrink-0 cursor-pointer rounded-sm border border-input bg-card focus-ring",
         "data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground",
-        "disabled:cursor-not-allowed disabled:opacity-50",
+        // Base UI renders the root as a <span>, which never matches :disabled (shadcn keeps the
+        // Radix-era disabled: classes); its data-disabled attribute is what marks the state.
+        "disabled:cursor-not-allowed disabled:opacity-50 data-disabled:cursor-not-allowed data-disabled:opacity-50",
         className,
       )}
       {...props}
@@ -31,7 +32,10 @@ function CheckboxLabel({ className, ...props }: React.ComponentProps<"label">) {
   return (
     <label
       data-slot="checkbox-label"
-      className={cn("inline-flex cursor-pointer items-center gap-1.5", className)}
+      className={cn(
+        "inline-flex cursor-pointer items-center gap-1.5 has-data-disabled:cursor-not-allowed has-data-disabled:opacity-50",
+        className,
+      )}
       {...props}
     />
   );

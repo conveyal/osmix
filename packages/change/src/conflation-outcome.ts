@@ -1,5 +1,6 @@
 import type { Osm } from "@osmix/core";
 
+import { inputProvenance } from "./provenance.ts";
 import type {
   OsmConflationCandidate,
   OsmConflationDecision,
@@ -15,12 +16,15 @@ import type {
   OsmConflationUnresolvedKind,
   OsmConflationWayRemovalPreview,
 } from "./types.ts";
+import type { DatasetReader } from "./views.ts";
 
 /** Actual changing writers, rather than assignments that merely repeat an existing value. */
 export interface ConflationApplicationTrace {
   tagWriters: Map<string, string>;
   alreadyEqualTagValues: Set<string>;
   wayRemovals?: Map<string, OsmConflationWayRemovalPreview>;
+  /** Imported nodes a connection left unused (untagged, unreferenced), so they were dropped. */
+  connectionOrphanNodeIds: Set<number>;
 }
 
 export function conflationTagTargetKey(candidate: OsmConflationCandidate, key: string): string {
@@ -31,7 +35,7 @@ export function conflationTagSourceKey(candidate: OsmConflationCandidate, key: s
   return `${candidate.id}:${key}`;
 }
 
-function entity(osm: Osm, entityType: OsmConflationEntityType, id: number) {
+function entity(osm: DatasetReader, entityType: OsmConflationEntityType, id: number) {
   return entityType === "node" ? osm.nodes.getById(id) : osm.ways.getById(id);
 }
 
@@ -46,8 +50,8 @@ function explicitlySkipped(decision: OsmConflationDecision | undefined): boolean
 }
 
 function actualWayRemoval(
-  baseline: Osm,
-  result: Osm,
+  baseline: DatasetReader,
+  result: DatasetReader,
   preview: OsmConflationWayRemovalPreview | undefined,
 ): OsmConflationWayRemovalPreview | undefined {
   if (!preview || !baseline.ways.ids.has(preview.sourceWayId)) return undefined;
@@ -74,7 +78,8 @@ function actualWayRemoval(
   };
 }
 
-function retainedImports(base: Osm, patch: Osm, baseline: Osm, result: Osm) {
+function retainedImports(base: Osm, patch: Osm, baseline: DatasetReader, result: DatasetReader) {
+  const provenance = inputProvenance(base, patch);
   const counts: OsmConflationRetainedImports = {
     originalIds: { nodes: 0, ways: 0, relations: 0 },
     ordinaryAdditions: { nodes: 0, ways: 0, relations: 0 },
@@ -83,7 +88,8 @@ function retainedImports(base: Osm, patch: Osm, baseline: Osm, result: Osm) {
     for (const source of patch[type]) {
       if (!result[type].ids.has(source.id)) continue;
       counts.originalIds[type]++;
-      if (!base[type].ids.has(source.id) && baseline[type].ids.has(source.id))
+      const kind = type === "nodes" ? "node" : type === "ways" ? "way" : "relation";
+      if (provenance.isImported(kind, source.id) && baseline[type].ids.has(source.id))
         counts.ordinaryAdditions[type]++;
     }
   }
@@ -125,8 +131,8 @@ function unresolvedKind(
 export function createConflationOutcomeReport(
   base: Osm,
   patch: Osm,
-  ordinaryBaseline: Osm,
-  result: Osm,
+  ordinaryBaseline: DatasetReader,
+  result: DatasetReader,
   discovery: OsmConflationDiscovery,
   decisions: readonly OsmConflationDecision[],
   trace: ConflationApplicationTrace,
@@ -146,9 +152,10 @@ export function createConflationOutcomeReport(
   // Unmatched candidates have no attachment evidence. Inspect actual ordinary
   // imports too, so an unattached endpoint is still reported as unresolved.
   const sourceWays = new Map<number, number[]>();
+  const provenance = inputProvenance(base, patch);
   if (discovery.options.attachNetwork) {
     for (const importedWay of patch.ways) {
-      if (base.ways.ids.has(importedWay.id)) continue;
+      if (!provenance.isImported("way", importedWay.id)) continue;
       const way = ordinaryBaseline.ways.getById(importedWay.id);
       if (!way) continue;
       for (const sourceId of new Set(way.refs)) {
@@ -328,6 +335,9 @@ export function createConflationOutcomeReport(
       copiedTagValues: features.reduce((count, feature) => count + feature.copiedKeys.length, 0),
       networkAttachmentActions: features.filter((feature) => feature.connectedWayIds.length > 0)
         .length,
+      removedConnectionOrphanNodes: [...trace.connectionOrphanNodeIds].filter(
+        (id) => ordinaryBaseline.nodes.ids.has(id) && !result.nodes.ids.has(id),
+      ).length,
       unresolvedFeatures: features.filter((feature) => feature.unresolved != null).length,
       ambiguousFeatures: features.filter((feature) => feature.unresolved === "ambiguous").length,
       blockedFeatures: features.filter((feature) => feature.unresolved === "blocked").length,

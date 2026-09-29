@@ -12,6 +12,7 @@ import {
 } from "react-map-gl/maplibre";
 
 import { APPID } from "../constants.ts";
+import { type MapColors, useMapColors } from "../hooks/map-colors.ts";
 import { useMap } from "../hooks/map.ts";
 
 const SOURCE_ID = `${APPID}:selected-entity`;
@@ -19,40 +20,43 @@ const LINE_ID = `${APPID}:selected-line`;
 const POINTS_ID = `${APPID}:selected-points`;
 const OUTLINE_ID = `${LINE_ID}:outline`;
 
-const selectionColorExpression: ExpressionSpecification = [
-  "case",
-  ["has", "color"],
-  ["to-color", ["get", "color"]],
-  "red",
-];
-
-const linePaint: LineLayerSpecification["paint"] = {
-  "line-color": selectionColorExpression,
-  "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 2, 18, 10],
-  "line-opacity": 1,
-};
-
-const outlinePaint: LineLayerSpecification["paint"] = {
-  "line-color": "white",
-  "line-width": ["interpolate", ["linear"], ["zoom"], 12, 1, 14, 3, 18, 15],
-};
-
 const lineLayout: LineLayerSpecification["layout"] = {
   "line-cap": "round",
   "line-join": "round",
 };
 
-const circlePaint: CircleLayerSpecification["paint"] = {
-  "circle-color": "white",
-  "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 3, 18, 6],
-  "circle-stroke-color": selectionColorExpression,
-  "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 2],
-};
-
 const circleLayout: CircleLayerSpecification["layout"] = {};
+
+/** Selection paint: the feature's own `color` when present, else `selected`, over a casing. */
+function selectionPaints(colors: MapColors) {
+  const selectionColor: ExpressionSpecification = [
+    "case",
+    ["has", "color"],
+    ["to-color", ["get", "color"]],
+    colors.selected,
+  ];
+  const line: LineLayerSpecification["paint"] = {
+    "line-color": selectionColor,
+    "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 2, 18, 10],
+    "line-opacity": 1,
+  };
+  const outline: LineLayerSpecification["paint"] = {
+    "line-color": colors.casing,
+    "line-width": ["interpolate", ["linear"], ["zoom"], 12, 1, 14, 3, 18, 15],
+  };
+  const circle: CircleLayerSpecification["paint"] = {
+    "circle-color": colors.casing,
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 3, 18, 6],
+    "circle-stroke-color": selectionColor,
+    "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 2],
+  };
+  return { line, outline, circle };
+}
 
 export default function SelectedEntityLayer() {
   const map = useMap();
+  const colors = useMapColors();
+  const paints = useMemo(() => selectionPaints(colors), [colors]);
   const selectedOsm = useAtomValue(selectedOsmAtom);
   const selectedEntity = useAtomValue(selectedEntityAtom);
   const geojson: GeoJSON.GeoJSON = useMemo(() => {
@@ -89,9 +93,9 @@ export default function SelectedEntityLayer() {
 
   return (
     <Source id={SOURCE_ID} type="geojson" data={geojson}>
-      <Layer id={OUTLINE_ID} type="line" layout={lineLayout} paint={outlinePaint} />
-      <Layer id={LINE_ID} type="line" paint={linePaint} layout={lineLayout} />
-      <Layer id={POINTS_ID} type="circle" paint={circlePaint} layout={circleLayout} />
+      <Layer id={OUTLINE_ID} type="line" layout={lineLayout} paint={paints.outline} />
+      <Layer id={LINE_ID} type="line" paint={paints.line} layout={lineLayout} />
+      <Layer id={POINTS_ID} type="circle" paint={paints.circle} layout={circleLayout} />
     </Source>
   );
 }

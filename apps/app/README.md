@@ -1,0 +1,163 @@
+# Osmix app
+
+The Osmix app is a Vite + React app for working with OpenStreetMap PBF datasets entirely in the browser. It builds on [`@osmix/core`](../../packages/core/README.md) and [`@osmix/change`](../../packages/change/README.md) in web workers and renders MapLibre raster and vector overlays.
+
+## Pages
+
+Home (`/`) introduces the pages; the nav links them. One map stays mounted across pages, and each page keeps what it has open when you leave it.
+
+- **Merge** (`/merge`) – compare and reconcile a base and an imported patch in a multi-step workflow. **Swap base and patch** (in the patch section's title) exchanges the inputs without reloading them.
+- **Inspect** (`/inspect`) – search one dataset, find and fix duplicates, and route.
+- **Extract** (`/extract`) – cut a bounding box out of a PBF file (streamed, never loaded whole) or out of a stored or open dataset, with a strategy and tag filters.
+
+Files saved to browser storage open on every page. **Open in** sends a loaded dataset to another page without reloading it: from Inspect to Merge (as base or patch) or Extract, from an extract to Inspect or Merge, and from a merge result to Inspect or Extract. `?load=<file hash>` on a page opens that stored file there.
+
+## Highlights
+
+- Load authoritative base and imported patch `.osm.pbf` files, preview differences, and step through direct
+  merge, exact reconciliation, optional imported-data matching, and intersection creation.
+- Select Auto, Full, or View loading according to the dataset and available browser memory.
+- Visualize both datasets with raster previews produced on the worker thread plus interactive vector overlays for selected entities.
+- Opt in to reviewed, one-meter proximity matching for importing selected properties or attaching compatible imported networks without rewriting base geometry.
+- Built-in Nominatim search, entity lookups, and task logging keep large merges manageable.
+
+## Prerequisites
+
+- Node.js 20+ and pnpm
+- Modern Chromium-based browser (Chrome/Edge ≥ 119 recommended). Safari/Firefox lack the `showSaveFilePicker` API and stable OffscreenCanvas transfer support.
+- Running over `https://` or `http://localhost` so COOP/COEP headers can enable `crossOriginIsolated` mode for the worker raster pipeline.
+
+## Install
+
+```sh
+pnpm install
+```
+
+Fixture PBF files live in `fixtures/` at the repository root. During development Vite serves this directory as the public asset folder (`publicDir`), so URLs like `./monaco.pbf` resolve without extra copying.
+
+## Run the dev server
+
+```sh
+pnpm run --filter @osmix/app dev
+```
+
+Vite runs through Portless at `https://app.osmix.localhost`. Worktrees add a unique prefix to that hostname. Open the “Check system” dialog in the top navigation to confirm the page is secure and cross-origin isolated; polished raster rendering and large array allocations depend on it. Set `PORTLESS=0` to bypass Portless and run Vite directly.
+
+## Build for production
+
+```sh
+pnpm run --filter @osmix/app build
+```
+
+Artifacts land in `apps/app/dist/`. Deploy behind an HTTPS origin that sends the same COOP/COEP headers configured in `vite.config.ts`.
+
+## End-to-end tests
+
+```sh
+pnpm exec playwright install --with-deps   # first run
+pnpm run --filter @osmix/app test:e2e
+```
+
+The worker harness loads `fixtures/monaco.pbf`; the guidance harness renders the real merge-step disclosure
+components and checks keyboard interaction, state isolation, and layout at both sidebar widths (448px and 512px).
+
+## Core workflow
+
+### Loading profiles
+
+The PBF input's Advanced selector defaults to **Auto**:
+
+- **Full** builds all-node and tagged-node indexes plus way and relation indexes.
+- **View** omits the all-node index but retains tagged-node, way, and relation indexes for map rendering,
+  tag search, and node/way/relation inspection.
+- **Auto** selects Full only when its all-node index is at most 256 MiB, its projected typed-buffer peak is
+  within the smaller of 4 GiB and 40% of the reported device-memory class, and each allocation is below 80%
+  of the tested active-buffer ceiling. It otherwise selects View.
+
+File information shows the requested and selected profiles, available spatial capabilities, memory
+projections, storage estimate, budgets, and selection reasons. Check System distinguishes the reported device
+memory class from separately tested `ArrayBuffer` and `SharedArrayBuffer` ceilings; typed-array element counts
+are derived from those tested byte ceilings.
+
+When View omits the all-node index, merge, exact node/way reconciliation, complete/smart extraction, routing, and
+other all-node-dependent controls are disabled with an explanation and a **Reload using Full** action. Simple
+in-stream extraction remains available. The app does not build the large index synchronously on first use.
+
+### Merge workflow
+
+The [merge-process guide](../../docs/merge-process.md) owns the merge rules, examples, and known limitations. Read its [input identity requirements](../../docs/merge-process.md#inputs-and-identity) before combining independently prepared imports.
+
+1. Remove duplicates inside each input on the Inspect page and send it here with **Open in**, or load the base and patch in Full mode.
+2. Configure optional imported-data matching and how identical points and patch IDs are handled, then choose **Review plan** or **Apply automatically**.
+3. In the review, each imported feature shows its outcome and proposals. Include or leave out the proposals that need you (Copy tags, Connect network, Remove imported way, identical-point merges, crossings), download the plan as osmChange, and **Apply plan**.
+4. Read the completion summary and export the result.
+
+See [Review plan and Apply automatically](../../docs/merge-process.md#application-workflows) for cancellation boundaries and recovery. Nothing changes until the plan is applied.
+
+## Map & rendering stack
+
+- **MapLibre** provides the background map, interaction controls, and pickable vector overlays for base, patch, and selected entities. The basemap is Carto Voyager with labels on and roads off by default; switch the style, labels and roads from the map's Basemap menu (the previous code hid every basemap line and symbol layer).
+- **Raster tiles** come from the worker’s `OsmixRasterTile` helper in [`@osmix/raster`](../../packages/raster/README.md), which draws ways and (at higher zoom levels) nodes onto an OffscreenCanvas before streaming the PNG bytes back to the UI thread.
+
+## Worker architecture
+
+- All heavy operations (PBF ingest, change generation, routing, and tile rendering) run in a managed worker pool, keeping the main thread responsive. Cross-origin-isolated browsers reserve one logical core for the UI and use up to four workers.
+- Stateful loading, IndexedDB writes, and changesets stay on the control worker. Read-only tiles and queries use available compute workers, with queued MapLibre tile requests cancelled when the map no longer needs them.
+- Workers cache `Osmix` instances keyed by dataset id, share their backing buffers, expose change pagination, and return transferable typed arrays whenever possible.
+- If a single non-shared worker restarts, datasets previously loaded from IndexedDB are reconstructed with a read-only replay before the slot accepts more work. One-shot mutations and IndexedDB writes are never retried.
+- Active imported-data discovery options, filters, and review decisions are replayed after a recoverable control-worker restart while both untouched inputs still exist. Applying the cumulative merge invalidates that review session.
+- Local PBF files are hashed incrementally from `File.stream()` in a worker, avoiding a second whole-file
+  input buffer. PBF URLs are hashed while the parser consumes a single response, then re-keyed to the final
+  lowercase SHA-256 without copying the dataset buffers.
+- Worker progress is proxied back to the shared `Tasks` store: it attaches to the running task and shows in the task toast and the Activity sheet.
+- Failed dataset loads remain visible beside their source controls and in Activity. The inline panel explains
+  the failing phase, required and tested buffer sizes when available, an actionable next step, and expandable
+  technical details; handled load failures do not leave an unhandled UI rejection.
+
+## Data loading tips
+
+- Before a picked PBF loads, the app estimates from its size whether it will load in View mode or fail. It then holds the file behind a warning with **Open in Extract** (Extract streams the file and cuts a region without loading it), **Load anyway** and **Cancel**. The thresholds are in `packages/app-core/src/lib/file-size-guidance.ts`. PBF URLs are not checked, because their size is known only after the download starts.
+- The **Limits** page (`/limits`, linked from Home and Check System) explains which file sizes load with which features. [docs/limits.md](../../docs/limits.md) has the full list and measurements.
+- Upload local `.osm.pbf` / `.geojson` / `.json` / `.zip` (Shapefile) files, or use **Open from URL** for hosted files (the host must allow browser downloads via CORS).
+- Adjust the defaults in `src/settings.ts` if you want the app to reference local dev fixtures by URL.
+- Large extracts work best in a cross-origin-isolated Chromium browser with `SharedArrayBuffer`. Use Check
+  System to inspect the reported memory class and tested buffer ceilings before loading.
+- IndexedDB uses schema version 3. Upgrading intentionally recreates the OSM store and clears incompatible
+  version 1/2 datasets. Persistence is offered only when the exact storable transfer size fits the available
+  quota; the compressed PBF file size is not used as a proxy.
+- Changes and temporary files never leave the browser unless you explicitly download them.
+
+See [Australia-scale manual verification](./AUSTRALIA-PBF-CHECKLIST.md) for the large-file acceptance run.
+
+## Troubleshooting
+
+- **Secure context warnings** – If the system check reports a missing secure context, make sure you’re on `https://` (or `localhost`) and disable extensions that inject insecure content.
+- **File picker errors** – Exports try native `showSaveFilePicker` first, then automatically fall back to browser download when picker APIs are unavailable/restricted.
+- **Exports built in memory** – Browsers without `showSaveFilePicker` (Firefox, Safari, and Brave by default) hold the whole PBF in memory before the file is saved, and the app shows a note next to the export button. In Brave, enable `brave://flags/#file-system-access-api` and relaunch to save straight to disk.
+- **Raster tiles missing** – Cross-origin isolation is required for OffscreenCanvas. Confirm the dev server sent the COOP/COEP headers listed in `vite.config.ts`.
+- **A control requires Full** – The dataset was loaded without an all-node index. Use the offered reload action
+  and select Full; the app does not construct that index lazily.
+- **A core typed-array allocation failed** – The panel identifies the mandatory entity column and compares its
+  single-buffer requirement with the current browser's tested ceiling. Auto, Full, and View retain core entity
+  columns, so use a smaller regional extract when the panel says changing profiles cannot help.
+- **A file was merged with an older Osmix release** – Older merges may have normalized each input before
+  combining them, which can change routing topology. Regenerate the output from the original base and patch
+  PBFs; the resulting file cannot be repaired reliably after references have been rewritten.
+- **A merge reports new routing-integrity problems** – The result was rejected before replacing the base.
+  Inspect the reported entity IDs for missing references, degenerate highways, or detached turn restrictions,
+  then correct the source data rather than discarding the affected restriction.
+- **A restriction reports a detached via node** – Inspect the reported restriction, via node, and from/to way
+  IDs. The via node must belong to the participating ways at their shared junction; correct those references in
+  the source data and rerun the merge.
+- **A proximity candidate is blocked** – Review its reason code and map comparison. Grade conflicts,
+  restrictions, relation membership, and changes that would collapse a way cannot be overridden. Multiple
+  targets and other uncertain candidates require an explicit accepted target or can be left unchanged.
+
+## Related packages
+
+- [`@osmix/change`](../../packages/change/README.md) – Change and merge machinery powering the worker steps.
+- [`@osmix/load`](../../packages/load/README.md) – PBF loading, geographic extracts, and export.
+- [`@osmix/pbf`](../../packages/pbf/README.md) – Low-level PBF parsing and streaming primitives.
+- [`@osmix/json`](../../packages/json/README.md) – JSON ↔ PBF transforms and GeoJSON helpers.
+- [`@osmix/core`](../../packages/core/README.md) – Typed-array OSM index.
+- [`@osmix/raster`](../../packages/raster/README.md) – Raster map helpers used for the preview tiles.

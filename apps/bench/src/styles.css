@@ -15,7 +15,6 @@ table {
   border-collapse: collapse;
   margin: 1rem 0;
   border: 1px solid black;
-  table-layout: fixed;
 }
 
 th,
@@ -24,43 +23,6 @@ td {
   padding: 0.5rem 0.75rem;
   vertical-align: top;
   border: 1px solid black;
-}
-
-.tooltip {
-  text-decoration: underline dashed;
-  cursor: help;
-  position: relative;
-  display: inline-block;
-
-  > .tooltiptext {
-    position: absolute;
-    visibility: hidden;
-    background-color: black;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid black;
-    border-radius: 2px;
-    box-shadow: 0 0 2px 0 rgba(0, 0, 0, 0.1);
-    white-space: nowrap;
-    z-index: 1000;
-    left: 105%;
-    top: calc(-0.25rem - 1px);
-
-    &::after {
-      content: " ";
-      position: absolute;
-      top: 50%;
-      right: 100%; /* To the left of the tooltip */
-      margin-top: -5px;
-      border-width: 5px;
-      border-style: solid;
-      border-color: transparent black transparent transparent;
-    }
-  }
-
-  &:hover > .tooltiptext {
-    visibility: visible;
-  }
 }
 
 .map-control-table {
@@ -97,9 +59,112 @@ h3 {
   margin-bottom: 0.5rem;
 }
 
-.map-container {
-  width: 100%;
-  height: 400px;
+.hint {
+  color: #555;
+  font-size: 0.85em;
+  margin-top: 0.25rem;
+}
+
+fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
   border: 1px solid black;
-  margin: 1rem 0;
+}
+
+.log {
+  border: 1px solid black;
+  padding: 0.5rem 1rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.mismatch {
+  color: #b00020;
+}
+
+tr.mismatch td {
+  background: #fde8ea;
+}
+
+.queries td:not(:first-child) {
+  white-space: nowrap;
+}
+
+.detail-row > td {
+  padding-top: 0;
+  border-top: none;
+}
+
+.detail-row summary {
+  cursor: pointer;
+  color: #555;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 0.5rem 1rem;
+}
+
+dt {
+  font-weight: bold;
+}
+
+dd {
+  margin: 0;
+}
+
+dd code {
+  background: #f4f4f4;
+  padding: 0 0.2rem;
+}
+
+dd pre {
+  background: #f4f4f4;
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+table.phases {
+  margin: 0.5rem 0 0;
+  table-layout: auto;
+}
+
+table.phases td {
+  padding: 0.1rem 0.4rem;
+}
+
+.maps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.map-container {
+  position: relative;
+  height: 500px;
+  border: 1px solid black;
+}
+
+.map-title {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 1;
+  background: white;
+  padding: 0.1rem 0.4rem;
+}
+
+.map-inspector {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 1;
+  background: white;
+  width: 220px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 0.1rem 0.2rem;
 }

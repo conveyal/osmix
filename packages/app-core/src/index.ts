@@ -1,8 +1,16 @@
 export { DB_NAME, DB_VERSION, OSM_STORE, STORAGE_CHANNEL } from "./constants.ts";
 export { LOAD_FROM_URL_PARAM, useLoadFromUrl } from "./hooks/load-from-url.ts";
-export { useLog } from "./hooks/log.ts";
-export { LoadCancelledError, type UseOsmFileReturn, useOsmFile } from "./hooks/osm.ts";
+export {
+  type ExtractDatasetSource,
+  LoadCancelledError,
+  type OsmFileSnapshot,
+  OsmSlotConflictError,
+  type UseOsmFileOptions,
+  type UseOsmFileReturn,
+  useOsmFile,
+} from "./hooks/osm.ts";
 export { useOsmixRemote } from "./hooks/remote.ts";
+export { useTasks } from "./hooks/tasks.ts";
 export {
   createStorageStore,
   useStorageBroadcast,
@@ -11,9 +19,17 @@ export {
 export {
   type BrowserLoadCapabilities,
   getBrowserLoadCapabilities,
+  reportedDeviceMemoryBytes,
 } from "./lib/browser-capabilities.ts";
-export { WITHIN_DATASET_DIAGNOSTIC_OPTIONS } from "./lib/changeset-options.ts";
+export { committedMutationOsmId } from "./lib/committed-mutation.ts";
 export { fetchOsmFileFromUrl } from "./lib/fetch-osm-file.ts";
+export {
+  BROWSER_MAX_PBF_BYTES,
+  FULL_PROFILE_MAX_PBF_BYTES,
+  isPbfFile,
+  type OsmFileSizeGuidance,
+  osmFileSizeGuidance,
+} from "./lib/file-size-guidance.ts";
 export {
   mergedOsmRefreshRetryId,
   type PreparedMergedOsmState,
@@ -26,14 +42,17 @@ export {
   type OsmLoadFailureContext,
   type OsmLoadFailureTechnicalDetails,
 } from "./lib/osm-load-failure.ts";
-export { ensureOsmPbfDownloadName } from "./lib/osm-pbf-download-name.ts";
+export { saveChangesetJson, writeJsonArray, writeJsonReport } from "./lib/json-download.ts";
+export { ensureOsmPbfDownloadName, suffixOsmPbfName } from "./lib/osm-pbf-download-name.ts";
 export { createThrottledProgressLogger } from "./lib/progress-log.ts";
 export {
+  getSaveFileSupport,
+  hasNativeSaveFilePicker,
+  type SaveFileSupport,
   shouldRetrySavePickerWithPolyfill,
   showSaveFilePickerWithFallback,
 } from "./lib/save-file-picker.ts";
 export { canStoreBytes, type StorageCheck } from "./lib/storage-utils.ts";
-export { isStreamCloneable } from "./lib/stream-transfer.ts";
 export { createOsmixAppRemote, OsmixAppRemote, type OsmixAppRemoteOptions } from "./remote.ts";
 export {
   changesAtom,
@@ -46,14 +65,17 @@ export {
   pageSizeAtom,
   startIndexAtom,
 } from "./state/changes.ts";
-export { Log, type Status, type StatusType } from "./state/log.ts";
 export {
-  layerControlIsOpenAtom,
+  type BasemapPreset,
+  type BasemapStyleId,
+  basemapPresetAtom,
+  datasetVisibleAtomFamily,
+  DEFAULT_BASEMAP_PRESET,
   mapBoundsAtom,
   mapCenterAtom,
-  osmFileControlIsOpenAtom,
-  routingControlIsOpenAtom,
-  searchControlIsOpenAtom,
+  type MapInset,
+  mapInsetAtom,
+  mapModeAtom,
   zoomAtom,
 } from "./state/map.ts";
 export {
@@ -66,15 +88,34 @@ export {
   osmStoredAtomFamily,
   selectedEntityAtom,
   selectedOsmAtom,
+  type SelectionOrigin,
+  selectionOriginAtom,
   selectOsmEntityAtom,
 } from "./state/osm.ts";
 export { osmDatasetVersionAtomFamily } from "./state/osm-version.ts";
 export { remoteAtom } from "./state/remote.ts";
+export { osmLoadingAbortControllerAtom } from "./state/status.ts";
 export {
-  actionPendingAtom,
-  activeTasksAtom,
-  osmLoadingAbortControllerAtom,
-} from "./state/status.ts";
+  type ActivityEntry,
+  createTaskStore,
+  innermostOpenNode,
+  isCancellationError,
+  isTaskNode,
+  isTaskOpen,
+  openNodePath,
+  TASK_HISTORY_LIMIT,
+  TaskAlreadyRunningError,
+  type TaskError,
+  type TaskHandle,
+  type TaskLevel,
+  type TaskMessage,
+  type TaskNode,
+  Tasks,
+  type TasksSnapshot,
+  type TaskStartOptions,
+  type TaskStatus,
+  type TaskStore,
+} from "./state/tasks.ts";
 export type {
   OsmixAppWorker,
   OsmixDB,

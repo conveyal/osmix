@@ -1,7 +1,9 @@
 import type { Osm } from "@osmix/core";
 import type { OsmRelation, OsmWay } from "@osmix/types";
 
+import { inputProvenance } from "./provenance.ts";
 import { routingGradeSignature } from "./utils.ts";
+import type { DatasetReader } from "./views.ts";
 
 type IntegrityIssue = {
   key: string;
@@ -165,8 +167,9 @@ export function junctionHasIncompatibleGrades(nodeId: number, ways: readonly Osm
   return incompatibleGradePairs(incident).length > 0;
 }
 
-function collectRoutingIntegrityIssues(osm: Osm): readonly IntegrityIssue[] {
-  const cachedIssues = routingIntegrityIssuesByOsm.get(osm);
+function collectRoutingIntegrityIssues(osm: Osm | DatasetReader): readonly IntegrityIssue[] {
+  const finalized = "isReady" in osm && osm.isReady() ? osm : undefined;
+  const cachedIssues = finalized && routingIntegrityIssuesByOsm.get(finalized);
   if (cachedIssues) return cachedIssues;
 
   const issues: IntegrityIssue[] = [];
@@ -230,7 +233,7 @@ function collectRoutingIntegrityIssues(osm: Osm): readonly IntegrityIssue[] {
     issues.push(...restrictionTopologyIssues(relation, (id) => osm.ways.getById(id)));
   }
 
-  if (osm.isReady()) routingIntegrityIssuesByOsm.set(osm, issues);
+  if (finalized) routingIntegrityIssuesByOsm.set(finalized, issues);
   return issues;
 }
 
@@ -254,6 +257,7 @@ export function inheritedRoutingIntegrityIssueKeys(
   baseKeys: ReadonlySet<string> = routingIntegrityIssueKeys(base),
 ) {
   const keys = new Set(baseKeys);
+  const provenance = inputProvenance(base, patch);
   for (const issue of collectRoutingIntegrityIssues(patch)) {
     // Missing references and degenerate highways in a patch are never inherited:
     // accepting them would allow malformed input to pass through unchanged.
@@ -265,16 +269,22 @@ export function inheritedRoutingIntegrityIssueKeys(
     if (kind === "restriction") continue;
     const id = Number(idText);
     const collidesWithBase =
-      kind === "node"
-        ? base.nodes.ids.has(id)
-        : kind === "way"
-          ? base.ways.ids.has(id)
-          : kind === "relation" || kind === "restriction"
-            ? base.relations.ids.has(id)
-            : false;
+      kind === "node" || kind === "way" || kind === "relation"
+        ? provenance.isBase(kind, id)
+        : false;
     if (!collidesWithBase) keys.add(issue.key);
   }
   return keys;
+}
+
+/** Routing-integrity problems in `merged` that are not in `baselineKeys`, described. */
+export function newRoutingIntegrityIssues(
+  baselineKeys: ReadonlySet<string>,
+  merged: Osm | DatasetReader,
+): string[] {
+  return collectRoutingIntegrityIssues(merged)
+    .filter((issue) => !baselineKeys.has(issue.key))
+    .map((issue) => issue.description);
 }
 
 /** Throw when a merge introduces routing-integrity issues not present in the base dataset. */
@@ -296,8 +306,8 @@ export function assertNoNewRoutingIntegrityIssues(baselineKeys: ReadonlySet<stri
  */
 export function assertConflationPreservesBaseTopology(
   originalBase: Osm,
-  ordinaryBaseline: Osm,
-  conflated: Osm,
+  ordinaryBaseline: DatasetReader,
+  conflated: DatasetReader,
 ) {
   const violations: string[] = [];
   for (const original of originalBase.nodes) {

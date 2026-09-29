@@ -4,6 +4,9 @@ import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { OsmNode, OsmTags, OsmWay } from "@osmix/types";
 import { normalizedWayDirection } from "@osmix/types/way-direction";
 
+import { inputProvenance } from "../provenance.ts";
+import { canDropReplacedNode } from "../rules/node-identity.ts";
+import { isDescriptiveWayTag } from "../rules/tags.ts";
 import type {
   OsmConflationCandidate,
   OsmConflationDecision,
@@ -13,31 +16,8 @@ import type {
   OsmConflationWayRemovalAssessment,
   OsmConflationWayRemovalPreview,
 } from "../types.ts";
+import type { DatasetReader } from "../views.ts";
 
-const DESCRIPTIVE_KEYS = new Set([
-  "alt_name",
-  "int_name",
-  "loc_name",
-  "name",
-  "note",
-  "official_name",
-  "old_name",
-  "operator",
-  "ref",
-  "short_name",
-  "source",
-  "wikidata",
-  "wikipedia",
-]);
-const DESCRIPTIVE_PREFIXES = [
-  "alt_name:",
-  "name:",
-  "note:",
-  "official_name:",
-  "old_name:",
-  "operator:",
-  "source:",
-];
 const MATCH_BLOCKERS = new Set<OsmConflationReasonCode>([
   "feature-type-conflict",
   "geometry-mismatch",
@@ -52,12 +32,7 @@ const MATCH_BLOCKERS = new Set<OsmConflationReasonCode>([
 function semanticTagsEqual(left: OsmTags | undefined, right: OsmTags | undefined, way: boolean) {
   const keys = new Set([...Object.keys(left ?? {}), ...Object.keys(right ?? {})]);
   return [...keys].every((key) => {
-    if (
-      (way && key === "oneway") ||
-      DESCRIPTIVE_KEYS.has(key) ||
-      DESCRIPTIVE_PREFIXES.some((prefix) => key.startsWith(prefix))
-    )
-      return true;
+    if ((way && key === "oneway") || isDescriptiveWayTag(key)) return true;
     return String(left?.[key] ?? "") === String(right?.[key] ?? "");
   });
 }
@@ -73,8 +48,7 @@ function hasRelativeDirection(tags: OsmTags | undefined) {
       key.split(":").some((part) => relative.has(part) || part === "direction")
     )
       return true;
-    if (DESCRIPTIVE_KEYS.has(key) || DESCRIPTIVE_PREFIXES.some((prefix) => key.startsWith(prefix)))
-      return false;
+    if (isDescriptiveWayTag(key)) return false;
     return String(value)
       .toLowerCase()
       .split(/[^a-z]+/)
@@ -109,8 +83,9 @@ export function assessWayRemovals(
     candidate: OsmConflationCandidate,
     decision?: OsmConflationDecision,
   ) => OsmConflationResolvedActions,
-  current?: Osm,
+  current?: DatasetReader,
 ) {
+  const provenance = inputProvenance(base, patch);
   const results = new Map<string, OsmConflationWayRemovalAssessment>();
   if (
     !discovery.options.allowWayRemoval ||
@@ -151,7 +126,7 @@ export function assessWayRemovals(
     for (const way of current.ways) ways.set(way.id, way);
   } else {
     for (const [id, way] of ways) {
-      if (base.ways.ids.has(id)) continue;
+      if (provenance.isBase("way", id)) continue;
       ways.set(id, {
         ...way,
         refs: way.refs.map((ref) => {
@@ -213,7 +188,13 @@ export function assessWayRemovals(
       blockingRelationIds: [],
       sourceTags: { ...source?.tags },
     };
-    if (!source || !target || !currentSource || !currentTarget || base.ways.ids.has(source.id)) {
+    if (
+      !source ||
+      !target ||
+      !currentSource ||
+      !currentTarget ||
+      provenance.isBase("way", source.id)
+    ) {
       reasons.add("way-removal-topology-conflict");
       results.set(candidate.id, { status: "blocked", reasons: [...reasons].toSorted(), preview });
       continue;
@@ -311,7 +292,7 @@ export function assessWayRemovals(
         preview.blockedNodeIds.push(ref);
       }
       if (
-        (base.nodes.ids.has(ref) && paired !== ref) ||
+        (provenance.isBase("node", ref) && paired !== ref) ||
         (attachments.has(ref) && attachments.get(ref)?.target !== paired)
       ) {
         reasons.add("way-removal-topology-conflict");
@@ -325,7 +306,7 @@ export function assessWayRemovals(
       if (!branches.length) continue;
       const attachment = paired === undefined ? undefined : nodeCandidates.get(`${ref}:${paired}`);
       const decision = attachment ? decisions.get(attachment.id) : undefined;
-      const existing = ref === paired && base.nodes.ids.has(ref);
+      const existing = ref === paired && provenance.isBase("node", ref);
       const explicit =
         existing ||
         (decision?.action === "accept" &&
@@ -357,20 +338,21 @@ export function assessWayRemovals(
       }
     }
     for (const ref of new Set([...source.refs, ...currentSource.refs])) {
-      if (base.nodes.ids.has(ref) || !patch.nodes.ids.has(ref)) continue;
+      if (!provenance.isImported("node", ref)) continue;
       if (Object.keys(nodeAt(ref)?.tags ?? {}).length) preview.retainedTaggedNodeIds.push(ref);
     }
     for (const ref of new Set(currentSource.refs)) {
-      if (
-        base.nodes.ids.has(ref) ||
-        !patch.nodes.ids.has(ref) ||
-        !nodeAt(ref) ||
-        Object.keys(nodeAt(ref)?.tags ?? {}).length
-      )
-        continue;
-      if ([...(currentIncidence.get(ref) ?? [])].some((id) => id !== source.id)) continue;
-      if (relationsByMember.has(`node:${ref}`)) continue;
-      preview.orphanNodeIds.push(ref);
+      const node = nodeAt(ref);
+      const droppable =
+        node != null &&
+        canDropReplacedNode({
+          imported: provenance.isImported("node", ref),
+          tagged: Object.keys(node.tags ?? {}).length > 0,
+          tagsMerged: false,
+          referencedByWay: [...(currentIncidence.get(ref) ?? [])].some((id) => id !== source.id),
+          referencedByRelation: relationsByMember.has(`node:${ref}`),
+        });
+      if (droppable) preview.orphanNodeIds.push(ref);
     }
     preview.blockedNodeIds = [...new Set(preview.blockedNodeIds)].toSorted((a, b) => a - b);
     preview.blockingRelationIds.sort((a, b) => a - b);

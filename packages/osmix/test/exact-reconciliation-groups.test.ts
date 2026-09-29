@@ -11,7 +11,7 @@ import {
   toPbfBuffer,
 } from "../src/index";
 
-const options = { directMerge: true, deduplicateNodes: true, deduplicateWays: true };
+const options = { createIntersections: false };
 
 function dataset(id: string, nodes: OsmNode[], ways: OsmWay[] = [], relations: OsmRelation[] = []) {
   const osm = new Osm({ id });

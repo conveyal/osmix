@@ -64,6 +64,7 @@ export function createShortbreadServerApp({
 
   app.get("/meta.json", async (c) => {
     const { bbox, header, stats } = state.dataset;
+    if (bbox === null) return c.json({ error: `${state.filename} contains no nodes` }, 422);
     const center = [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2];
     return c.json({
       filename: state.filename,
@@ -78,7 +79,7 @@ export function createShortbreadServerApp({
   });
 
   app.get("/style.json", (c) => {
-    const origin = new URL(c.req.url).origin;
+    const origin = requestOrigin(c.req.url, c.req.header());
     const style: StyleSpecification = Versatiles.colorful({
       tiles: [`${origin}/tiles/{z}/{x}/{y}`],
       recolor: { gamma: 2, tint: 1, tintColor: "#3b82f6" },
@@ -150,4 +151,18 @@ export function createShortbreadServerApp({
 
   app.notFound((c) => c.text("Not found", 404));
   return app;
+}
+
+/**
+ * Origin the browser used to reach this server. Behind a TLS-terminating proxy such as Portless,
+ * the request arrives over plain HTTP, so prefer the proxy's `X-Forwarded-*` headers. Otherwise
+ * tile URLs in the style would be `http://` on an `https://` page and fail CORS.
+ */
+function requestOrigin(requestUrl: string, headers: Record<string, string>): string {
+  const url = new URL(requestUrl);
+  const proto = headers["x-forwarded-proto"]?.split(",")[0]?.trim();
+  const host = headers["x-forwarded-host"]?.split(",")[0]?.trim();
+  if (proto) url.protocol = `${proto}:`;
+  if (host) url.host = host;
+  return url.origin;
 }

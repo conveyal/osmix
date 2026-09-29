@@ -2,5 +2,9 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "sortPackageJson": true,
   "sortImports": true,
-  "ignorePatterns": []
+  "ignorePatterns": [],
+  "sortTailwindcss": {
+    "stylesheet": "packages/ui/src/styles.css",
+    "functions": ["cn", "cva"]
+  }
 }
