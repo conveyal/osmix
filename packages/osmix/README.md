@@ -395,7 +395,7 @@ await toPbfStream(downtown).pipeTo(fileWritableStream);
 ```
 
 `createExtract` can either clip ways/members to the bbox (`strategy: "simple"`)
-or include complete ways/relations. `toPbfStream` and `toPbfBuffer`
+or include complete ways/relations. No strategy removes members from a turn restriction: a restriction the extract would cut is dropped, or completed under `"smart"`. `toPbfStream` and `toPbfBuffer`
 reuse the streaming builders from `@osmix/json`/`@osmix/pbf`, so outputs stay
 spec-compliant without staging everything in memory.
 
@@ -417,7 +417,7 @@ spec-compliant without staging everything in memory.
 - `createExtract(osm, bbox, strategy?)` - Create geographic extract.
   - `"simple"` - Strict spatial cut.
   - `"complete_ways"` - Include complete way geometry.
-  - `"smart"` - Complete ways + resolved multipolygons.
+  - `"smart"` - Complete ways + resolved multipolygons and turn restrictions.
 
 ### Tiles
 

@@ -251,6 +251,7 @@ export {
   OsmLoadCapacityError,
   OsmSpatialIndexBuildError,
   projectOsmLoad,
+  pruneUnreferencedNodes,
   readOsmPbfHeader,
   relationMatchesExtractTagRules,
   startCreateOsmFromPbf,

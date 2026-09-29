@@ -12,7 +12,9 @@ import { BitSet } from "@osmix/shared/bit-set";
 import { logProgress, type ProgressEvent, progressEvent } from "@osmix/shared/progress";
 import type { GeoBbox2D, OsmRelation, OsmRelationMember } from "@osmix/types";
 import { resolveRelationMembers } from "@osmix/types/relation-kind";
-import { isMultipolygonRelation } from "@osmix/types/utils";
+import { isMultipolygonRelation, isRestrictionRelation } from "@osmix/types/utils";
+
+import { sortedIndexes } from "./sorted-indexes.ts";
 
 const MAX_RELATION_DEPTH = 10;
 
@@ -31,19 +33,25 @@ export type ExtractStrategy = "simple" | "complete_ways" | "smart";
  * 1. Selects all nodes inside the bbox.
  * 2. Selects ways with at least one node inside the bbox, filtering refs to only include nodes inside the bbox.
  * 3. Selects relations with at least one member inside the bbox, filtering members to only include nodes and ways inside the bbox.
+ *    Turn restrictions that would lose a member are dropped.
  *
  * Strategy "complete_ways":
  * 1. Selects all nodes inside the bbox.
  * 2. Selects ways with at least one node inside the bbox, adding missing way nodes from outside the bbox. All ways will be reference complete.
  * 3. Selects relations with at least one member inside the bbox leaving out any members that are not inside the bbox. Relations are not reference complete.
+ *    Turn restrictions that would lose a member are dropped.
  *
  * Strategy "smart":
  * 1 & 2. Same as "complete_ways".
- * 3. Selects relations with at least one member inside the bbox, adding missing relation members from outside the bbox. Relations are reference complete. Members that the source itself lacks (e.g. boundaries cut by a regional file) are dropped and reported through `onProgress`.
+ * 3. Selects relations with at least one member inside the bbox. Multipolygons and turn restrictions get their missing members added from outside the bbox, so they are reference complete. Multipolygon members that the source itself lacks (e.g. boundaries cut by a regional file) are dropped and reported through `onProgress`; a turn restriction missing a member from the source is dropped.
  *
  * The "complete_ways" strategy preserves way geometry integrity but includes entities outside the bbox.
  * The "simple" strategy creates a strict spatial cut but may result in incomplete geometries.
  * Both strategies handle nested relations by resolving all descendant members.
+ *
+ * A turn restriction with a member removed would restrict the wrong turn, while one whose
+ * members are all listed can be skipped by routers when a member is absent. So no strategy
+ * removes members from a turn restriction.
  *
  * Selection does not depend on entity order: ways are selected by nodes inside the bbox only, and
  * relations are selected and filtered against the nodes and ways chosen for ways. Membership is
@@ -130,9 +138,18 @@ export function createExtract(
     if (member.type === "way") return osm.ways.ids.getIndexFromId(member.ref);
     return osm.relations.ids.getIndexFromId(member.ref);
   };
+  /** Whether a member stays in a relation that is not reference complete. */
+  const isMemberSelected = (member: OsmRelationMember): boolean => {
+    if (member.type === "node") return isNodeSelected(member.ref);
+    if (member.type === "way") return isWaySelected(member.ref);
+    // Include a nested relation if it has intersecting members
+    const nestedIndex = osm.relations.ids.getIndexFromId(member.ref);
+    return nestedIndex !== -1 && intersectingRelations.has(nestedIndex);
+  };
   // Regional files cut large relations (country and maritime boundaries) at the region edge, so
   // members missing from the source are skipped rather than treated as errors.
   let skippedMembers = 0;
+  let droppedRestrictions = 0;
   /** Mark a relation reference complete, recursively adding its members to the emit sets. */
   const addCompleteRelation = (relationIndex: number, relation: OsmRelation): void => {
     if (completeRelations.has(relationIndex)) return;
@@ -159,12 +176,31 @@ export function createExtract(
     // Resolve nested relations to get all descendant nodes and ways
     const resolved = resolveRelationMembers(relation, getRelation, MAX_RELATION_DEPTH);
     if (!resolved.nodes.some(isNodeSelected) && !resolved.ways.some(isWaySelected)) continue;
+    if (isRestrictionRelation(relation)) {
+      // Smart completes restrictions, which are local, so only members the source lacks cut
+      // them. Other strategies keep a restriction only when every member is selected.
+      const cut =
+        strategy === "smart"
+          ? relation.members.some((member) => memberIndex(member) === -1)
+          : !relation.members.every(isMemberSelected);
+      if (cut) {
+        droppedRestrictions++;
+        continue;
+      }
+    }
     intersectingRelations.add(relationIndex);
     selectedRelations.add(relationIndex);
-    if (strategy === "smart" && isMultipolygonRelation(relation)) {
+    if (strategy === "smart" && isRestrictionRelation(relation)) {
+      addCompleteRelation(relationIndex, relation);
+    } else if (strategy === "smart" && isMultipolygonRelation(relation)) {
       // Add relation and recursively add direct members even if they're outside the bbox
       addCompleteRelation(relationIndex, relation);
     }
+  }
+  if (droppedRestrictions > 0) {
+    onProgress(
+      progressEvent(`Dropped ${droppedRestrictions} turn restrictions cut by the extract.`),
+    );
   }
   if (skippedMembers > 0) {
     onProgress(
@@ -206,16 +242,7 @@ export function createExtract(
     // Filter out members that are outside the selection
     extracted.relations.addRelation({
       ...relation,
-      members: relation.members.filter((m) => {
-        if (m.type === "node") return isNodeSelected(m.ref);
-        if (m.type === "way") return isWaySelected(m.ref);
-        if (m.type === "relation") {
-          // Include nested relation if it has intersecting members
-          const nestedIndex = osm.relations.ids.getIndexFromId(m.ref);
-          return nestedIndex !== -1 && intersectingRelations.has(nestedIndex);
-        }
-        return false;
-      }),
+      members: relation.members.filter(isMemberSelected),
     });
   }
 
@@ -231,14 +258,4 @@ function hasRefIn(refIndexes: Uint32Array, nodes: BitSet): boolean {
     if (nodeIndex !== MISSING_NODE_INDEX && nodes.has(nodeIndex)) return true;
   }
   return false;
-}
-
-/** Indexes of the set bits, ordered by the entity ID at each index. */
-function sortedIndexes(set: BitSet, ids: { at(index: number): number }): Uint32Array {
-  const indexes = new Uint32Array(set.count);
-  let position = 0;
-  set.forEach((index) => {
-    indexes[position++] = index;
-  });
-  return indexes.sort((a, b) => ids.at(a) - ids.at(b));
 }

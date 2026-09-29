@@ -457,6 +457,64 @@ describe("extract", () => {
     expect(complete.nodes.ids.has(2)).toBe(false);
   });
 
+  test("turn restrictions are never extracted with members removed", () => {
+    const osm = new Osm({ id: "restrictions" });
+    osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }); // inside
+    osm.nodes.addNode({ id: 2, lat: 0, lon: 0.5 }); // inside
+    osm.nodes.addNode({ id: 3, lat: 0, lon: 2 }); // outside
+    osm.nodes.addNode({ id: 4, lat: 0, lon: 3 }); // outside
+    osm.nodes.addNode({ id: 5, lat: 0.5, lon: 0.5 }); // inside
+    osm.ways.addWay({ id: 10, refs: [1, 2], tags: { highway: "residential" } });
+    osm.ways.addWay({ id: 11, refs: [2, 3], tags: { highway: "residential" } });
+    osm.ways.addWay({ id: 12, refs: [3, 4], tags: { highway: "residential" } }); // outside
+    osm.ways.addWay({ id: 13, refs: [2, 5], tags: { highway: "residential" } });
+    const tags = { type: "restriction", restriction: "no_left_turn" };
+    // `to` way lies outside the bbox.
+    osm.relations.addRelation({
+      id: 500,
+      members: [
+        { type: "way", ref: 10, role: "from" },
+        { type: "way", ref: 11, role: "via" },
+        { type: "way", ref: 12, role: "to" },
+      ],
+      tags,
+    });
+    // Entirely inside the bbox.
+    osm.relations.addRelation({
+      id: 501,
+      members: [
+        { type: "way", ref: 10, role: "from" },
+        { type: "node", ref: 2, role: "via" },
+        { type: "way", ref: 13, role: "to" },
+      ],
+      tags,
+    });
+    // `to` way is missing from the source.
+    osm.relations.addRelation({
+      id: 502,
+      members: [
+        { type: "way", ref: 10, role: "from" },
+        { type: "node", ref: 2, role: "via" },
+        { type: "way", ref: 999, role: "to" },
+      ],
+      tags,
+    });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+
+    for (const strategy of ["simple", "complete_ways"] as const) {
+      const extracted = createExtract(osm, TEST_BBOX, strategy, () => {});
+      expect(Array.from(extracted.relations.ids.sorted)).toEqual([501]);
+      expect(extracted.relations.getById(501)?.members).toHaveLength(3);
+    }
+
+    const smart = createExtract(osm, TEST_BBOX, "smart", () => {});
+    expect(Array.from(smart.relations.ids.sorted)).toEqual([500, 501]);
+    expect(smart.relations.getById(500)?.members.map((m) => m.ref)).toEqual([10, 11, 12]);
+    expect(smart.ways.ids.has(12)).toBe(true);
+    expect(smart.nodes.ids.has(4)).toBe(true);
+  });
+
   test("complete_ways does not chain ways through outside nodes of other ways", () => {
     const osm = new Osm({ id: "chain" });
     osm.nodes.addNode({ id: 1, lat: 0, lon: 0 }); // inside

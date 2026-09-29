@@ -59,10 +59,12 @@ export function conveyalTagFilterEditorState(): TagFilterEditorState {
 
 function TagFilterSection({
   title,
+  description,
   rows,
   onChange,
 }: {
   title: string;
+  description?: string;
   rows: TagFilterEditorRow[];
   onChange: (rows: TagFilterEditorRow[]) => void;
 }) {
@@ -82,6 +84,7 @@ function TagFilterSection({
           One rule: required. Multiple: match any.
         </span>
       </div>
+      {description ? <p className="text-muted-foreground">{description}</p> : null}
       {rows.length === 0 ? <EmptyState>No rules, so no tag filter</EmptyState> : null}
       <ul className="flex flex-col gap-1">
         {rows.map((row) => (
@@ -147,6 +150,7 @@ export default function ExtractTagFilterEditor({
       </Button>
       <TagFilterSection
         title="Nodes"
+        description="Standalone nodes to keep. Nodes on kept ways and relations are always kept."
         rows={state.nodes}
         onChange={(rows) => setSection("nodes", rows)}
       />
