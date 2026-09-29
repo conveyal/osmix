@@ -157,7 +157,11 @@ class CliStyledTileRemote extends OsmixRemote<CliTileWorker> {
     this.shortbreadIndexBuffers = null;
 
     const info = await this.runWithWorker(
-      (worker) => worker.fromPbfFile(filePath, { id, buildSpatialIndexes: ["way", "relation"] }),
+      (worker) =>
+        worker.fromPbfFile(filePath, {
+          id,
+          spatialIndexes: { nodes: [], ways: true, relations: true },
+        }),
       {
         lane: "control",
         retry: "once",
@@ -287,7 +291,7 @@ class CliStyledTileRemote extends OsmixRemote<CliTileWorker> {
     this.progressReporter?.("Reloading the map after a worker restart…");
     this.datasetInfo = await worker.fromPbfFile(this.loadSource.filePath, {
       id: this.loadSource.id,
-      buildSpatialIndexes: ["way", "relation"],
+      spatialIndexes: { nodes: [], ways: true, relations: true },
     });
     await worker.cancelTilesBefore(this.generationGate.generation);
   }
