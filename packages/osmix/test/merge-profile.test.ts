@@ -111,10 +111,10 @@ describe("merge performance harness", () => {
     });
     // One build for the whole merge.
     expect(report.stages.filter(({ name }) => name.startsWith("apply"))).toHaveLength(1);
-    // Unchanged from the staged pipeline: planning is neutral on this merge.
+    // The patch way extends from a base node: a junction, so that node gains no crossing tag.
     expect(report.fingerprints).toMatchObject({
-      contentHash: "c941a5b8",
-      canonicalSha256: "4f47037cf117c361dfc36113a7734eebd37b0f4a9e4d84861dc0ca5e3527ea5d",
+      contentHash: "762396c7",
+      canonicalSha256: "07e51056eb80db03ec2786cc2d3c996453a9c0db06d290d31539e0693c5b2cb0",
     });
     // The compressed byte stream can vary with Node's zlib version. Reports keep
     // that useful same-runtime fingerprint, while CI locks semantic output above.

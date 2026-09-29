@@ -101,22 +101,23 @@ describe("merge osm", () => {
 
       // Endpoint reuse updates whole junctions. Unsafe shared substitutions are
       // skipped; only isolated endpoints can use a dedicated intersection fallback.
-      // Existing crossing values are retained, avoiding 68 crossing-only updates.
+      // Existing crossing values are retained, avoiding 68 crossing-only updates, and a
+      // junction where either way ends is not tagged as a crossing.
       // Candidate ways are visited in ID order, so these counts do not depend on the
       // spatial index's layout.
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 9_522,
-        nodeChanges: 5_863,
+        totalChanges: 6_732,
+        nodeChanges: 3_073,
         wayChanges: 3_659,
         relationChanges: 0,
         createChanges: 2_602,
-        modifyChanges: 6_780,
+        modifyChanges: 3_990,
         deleteChanges: 140,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
-        intersectionPointsFound: 3_082,
+        intersectionPointsFound: 3_083,
         intersectionNodesCreated: 2_602,
         intersectionNodesRemoved: 140,
       });
@@ -166,13 +167,8 @@ describe("merge osm", () => {
         ).not.toHaveLength(0);
       }
 
-      expect(baseOsm.nodes.getById(2135545)).toEqual({
-        ...testNode,
-        tags: {
-          ...testNode.tags,
-          crossing: "yes",
-        },
-      });
+      // A kerb where a sidewalk link ends is a junction, not a crossing: its tags are unchanged.
+      expect(baseOsm.nodes.getById(2135545)).toEqual(testNode);
     },
     // This optional integration fixture loads and indexes nearly one million
     // entities before creating intersections. Keep enough headroom for a full

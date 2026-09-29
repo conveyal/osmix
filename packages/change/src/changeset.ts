@@ -92,7 +92,23 @@ interface IntersectionJunctionReplacement {
   restrictions: OsmRelation[];
 }
 
+/** Two close vertices at a crossing that become one: `replaced` is rewritten to `survivor`. */
+interface IntersectionNodeResolution {
+  keepWayNode: boolean;
+  replaced: OsmNode;
+  survivor: OsmNode;
+}
+
 const EMPTY_ID = -1;
+
+/** Whether `nodeId` is the first or last node of an open way. */
+function wayEndsAt(way: OsmWay, nodeId: number) {
+  const first = way.refs[0];
+  const last = way.refs.at(-1);
+  if (first === last) return false;
+  return first === nodeId || last === nodeId;
+}
+
 /** Whether two nodes differ in vertical context, access or barriers (group consistency). */
 function nodeSignaturesDiffer(a: OsmNode["tags"], b: OsmNode["tags"]) {
   return (
@@ -812,7 +828,7 @@ export class OsmChangeset {
     wayIsPatch: boolean,
     intersectingWayIsPatch: boolean,
     patchNodeIds: { has(id: number): boolean } | undefined,
-  ) {
+  ): IntersectionNodeResolution | "keep-both" | null {
     const imported = (id: number) => patchNodeIds?.has(id) ?? false;
     // A survivor-to-be that is imported cannot be told apart from base here without patch IDs;
     // check whichever direction adds tags to existing data.
@@ -833,7 +849,7 @@ export class OsmChangeset {
       !patchNodeIds.has(wayNode.id) &&
       !patchNodeIds.has(intersectingWayNode.id)
     ) {
-      return null;
+      return "keep-both";
     }
     // A base node always survives a crossing snap.
     if (patchNodeIds && patchNodeIds.has(wayNode.id) !== patchNodeIds.has(intersectingWayNode.id)) {
@@ -913,7 +929,15 @@ export class OsmChangeset {
     return merged;
   }
 
-  private markNodeAsCrossing(nodeId: number) {
+  /**
+   * Tag a node both ways pass through with a default `crossing=yes`. A node where either way
+   * ends is a junction, such as one path continuing another or meeting it, not a crossing.
+   */
+  private markNodeAsCrossing(nodeId: number, wayId: number, otherWayId: number) {
+    for (const id of [wayId, otherWayId]) {
+      const way = this.overlay.getWay(id);
+      if (!way || wayEndsAt(way, nodeId)) return;
+    }
     const node = this.getCurrentNode(nodeId);
     // Intersection discovery can supply a missing default, but must not erase
     // a specific crossing value supplied by the base or an earlier tag copy.
@@ -1126,7 +1150,11 @@ export class OsmChangeset {
     for (const node of this.overlay.nodes()) minimum = Math.min(minimum, node.id);
     this.currentNodeId = minimum;
     this.nodeIdStep = -1;
-    yield* this.createIntersections(ways, this.overlayCrossingSearch(), patchNodeIds, accept);
+    // A patch node with a base node's ID edits that base node (MP-I1); it is not imported.
+    const importedNodeIds = {
+      has: (id: number) => patchNodeIds.has(id) && !this.osm.nodes.ids.has(id),
+    };
+    yield* this.createIntersections(ways, this.overlayCrossingSearch(), importedNodeIds, accept);
   }
 
   private *createIntersections(
@@ -1312,37 +1340,44 @@ export class OsmChangeset {
           intersectingWayNodeId != null &&
           wayNodeId === intersectingWayNodeId
         ) {
-          this.markNodeAsCrossing(wayNodeId);
+          this.markNodeAsCrossing(wayNodeId, currentWay.id, currentIntersectingWay.id);
           continue;
         }
 
-        let endpointResolution: ReturnType<OsmChangeset["chooseIntersectionNode"]> | undefined;
+        let endpointResolution: IntersectionNodeResolution | undefined;
         let junctionReplacement: IntersectionJunctionReplacement | null = null;
         let createDedicatedIntersection = false;
+        let spliceIntersectingWayNode = false;
         if (wayNodeId != null && intersectingWayNodeId != null) {
           const wayNode = this.getCurrentNode(wayNodeId);
           const intersectingWayNode = this.getCurrentNode(intersectingWayNodeId);
           if (!wayNode || !intersectingWayNode) continue;
-          endpointResolution = this.chooseIntersectionNode(
+          const choice = this.chooseIntersectionNode(
             wayNode,
             intersectingWayNode,
             patchWayIds.has(currentWay.id),
             patchWayIds.has(currentIntersectingWay.id),
             patchNodeIds,
           );
-          if (!endpointResolution) continue;
-          const plan = this.planIntersectionNodeReplacement(
-            endpointResolution.replaced,
-            endpointResolution.survivor,
-          );
-          junctionReplacement = plan.replacement;
-          if (!junctionReplacement) {
-            // A shared junction must remain intact if even one incident way or
-            // restriction cannot follow the replacement. The isolated short-way
-            // fallback can still insert the geometric intersection independently.
-            if (!plan.canCreateDedicatedIntersection) continue;
-            endpointResolution = undefined;
-            createDedicatedIntersection = true;
+          if (!choice) continue;
+          if (choice === "keep-both") {
+            // Two base nodes both stay: the imported way takes the other way's vertex, unless
+            // that vertex sits on one of its own and would leave a zero-length segment.
+            const { lon, lat } = intersectingWayNode;
+            if (currentWayCoordinates.some(([x, y]) => x === lon && y === lat)) continue;
+            spliceIntersectingWayNode = true;
+          } else {
+            endpointResolution = choice;
+            const plan = this.planIntersectionNodeReplacement(choice.replaced, choice.survivor);
+            junctionReplacement = plan.replacement;
+            if (!junctionReplacement) {
+              // A shared junction must remain intact if even one incident way or
+              // restriction cannot follow the replacement. The isolated short-way
+              // fallback can still insert the geometric intersection independently.
+              if (!plan.canCreateDedicatedIntersection) continue;
+              endpointResolution = undefined;
+              createDedicatedIntersection = true;
+            }
           }
         }
 
@@ -1378,7 +1413,7 @@ export class OsmChangeset {
           for (const relation of junctionReplacement.restrictions) {
             this.modify("relation", relation.id, () => relation);
           }
-          this.markNodeAsCrossing(survivor.id);
+          this.markNodeAsCrossing(survivor.id, currentWay.id, currentIntersectingWay.id);
           this.dropReplacedIntersectionNode(endpointResolution.replaced, survivor.id, patchNodeIds);
         } else if (createDedicatedIntersection) {
           intersectionsCreated++;
@@ -1389,18 +1424,18 @@ export class OsmChangeset {
           );
           this.spliceNodeIntoWay(currentWay, newIntersectionNode);
           this.spliceNodeIntoWay(currentIntersectingWay, newIntersectionNode);
-        } else if (wayNodeId != null) {
+        } else if (wayNodeId != null && !spliceIntersectingWayNode) {
           const wayNode = this.getCurrentNode(wayNodeId);
           if (wayNode == null) throw Error(`Way node ${String(wayNodeId)} not found`);
           this.spliceNodeIntoWay(currentIntersectingWay, wayNode);
-          this.markNodeAsCrossing(wayNode.id);
+          this.markNodeAsCrossing(wayNode.id, currentWay.id, currentIntersectingWay.id);
         } else if (intersectingWayNodeId != null) {
           const intersectingWayNode = this.getCurrentNode(intersectingWayNodeId);
           if (intersectingWayNode == null)
             throw Error(`Intersecting way node ${String(intersectingWayNodeId)} not found`);
 
           this.spliceNodeIntoWay(currentWay, intersectingWayNode);
-          this.markNodeAsCrossing(intersectingWayNode.id);
+          this.markNodeAsCrossing(intersectingWayNode.id, currentWay.id, currentIntersectingWay.id);
         } else {
           intersectionsCreated++;
           const newIntersectionNode = this.createIntersectionNode(
