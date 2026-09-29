@@ -12,6 +12,7 @@ export function SmallWindowAlert() {
       shape="banner"
       variant="warning"
       title="Osmix needs a wider window"
+      // oxlint-disable-next-line shadcn/no-restyle -- a custom @utility it cannot classify
       className="small-window-only"
     >
       These apps are built for desktop windows at least 1024px wide. Widen the window or use a

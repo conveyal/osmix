@@ -247,7 +247,7 @@ function SelectEntityButton({
     <Button
       variant="link"
       size="xs"
-      className="h-auto p-0"
+      className="h-auto"
       aria-label={`Select ${type} ${id}`}
       onClick={onSelect}
     >

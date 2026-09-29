@@ -92,7 +92,54 @@
             ]
           }
         ],
-        "osmix/no-breakpoint-variant": "error"
+        "osmix/no-breakpoint-variant": "error",
+        "shadcn/no-inline-styles": [
+          "error",
+          {
+            "message": "Style with tokens and layout classes; pass dynamic values through CSS custom properties. MapLibre paint objects are not DOM style."
+          }
+        ],
+        "shadcn/no-restyle": [
+          "error",
+          {
+            "allow": [
+              "layout",
+              "spacing",
+              "*-inset",
+              "truncate",
+              "text-foreground",
+              "text-muted-foreground",
+              "text-destructive",
+              "text-success",
+              "text-warning",
+              "text-info",
+              "font-mono",
+              "font-semibold",
+              "font-medium",
+              "border",
+              "border-t",
+              "border-b",
+              "border-l",
+              "border-r",
+              "border-x",
+              "border-y",
+              "bg-muted",
+              "bg-info",
+              "bg-success",
+              "bg-warning",
+              "bg-destructive"
+            ],
+            "contracts": [
+              {
+                "pattern": "^(Button|ActionButton|IconButton)$",
+                "allow": ["layout", "*-inset"],
+                "message": {
+                  "spacing": "{{component}} sets its own padding. Use a size ({{sizes}}), or margin here or gap on the parent."
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -200,18 +247,14 @@
             ]
           }
         ],
-        "react/forbid-dom-props": [
-          "error",
-          {
-            "forbid": [
-              {
-                "propName": "style",
-                "message": "Style with tokens and layout classes; MapLibre paint objects are not DOM style."
-              }
-            ]
-          }
-        ],
-        "osmix/no-icon-size-button": "error"
+        "osmix/no-icon-size-button": "error",
+        "shadcn/require-static-classes": "error"
+      }
+    },
+    {
+      "files": ["packages/ui/src/components/**"],
+      "rules": {
+        "shadcn/no-restyle": "off"
       }
     },
     {
@@ -221,7 +264,8 @@
         "packages/app-components/src/components/app-links.tsx"
       ],
       "rules": {
-        "tailwindcss/no-restricted-classes": "off"
+        "tailwindcss/no-restricted-classes": "off",
+        "shadcn/no-restyle": "off"
       }
     },
     {

@@ -26,8 +26,12 @@ const buttonVariants = cva(
         "icon-xs": "size-6",
         "icon-sm": "size-7",
         "icon-lg": "size-9",
+        // A full-width list row whose label may wrap (search results).
+        row: "h-auto w-full justify-start px-2 py-1.5 text-left whitespace-normal",
       },
     },
+    // Links sit inline with text, so they drop the size's horizontal padding.
+    compoundVariants: [{ variant: "link", className: "px-0 has-[>svg]:px-0" }],
     defaultVariants: {
       variant: "default",
       size: "default",

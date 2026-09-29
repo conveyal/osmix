@@ -121,7 +121,7 @@ function ToastList() {
             <div className="flex items-center gap-3">{actions}</div>
           ) : toast.actionProps ? (
             <ToastPrimitive.Action
-              render={<Button variant="link" size="xs" className="self-start px-0" />}
+              render={<Button variant="link" size="xs" className="self-start" />}
             />
           ) : null}
         </ToastPrimitive.Content>

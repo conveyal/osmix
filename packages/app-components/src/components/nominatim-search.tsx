@@ -195,11 +195,7 @@ export function NominatimSearch({
           <ul className="flex flex-col p-1">
             {results.map((result) => (
               <li key={result.place_id}>
-                <Button
-                  variant="ghost"
-                  className="h-auto w-full justify-start px-2 py-1.5 text-left whitespace-normal"
-                  onClick={() => handleSelect(result)}
-                >
+                <Button variant="ghost" size="row" onClick={() => handleSelect(result)}>
                   {result.display_name}
                 </Button>
               </li>

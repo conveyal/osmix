@@ -208,8 +208,8 @@ function RunningTaskTitle({ taskId }: { taskId: string }) {
       <span className="min-w-0 flex-1 truncate" title={label}>
         {label}
       </span>
-      <span aria-hidden="true">
-        <ElapsedTimer startedAt={task.startedAt} className="font-normal text-muted-foreground" />
+      <span aria-hidden="true" className="font-normal">
+        <ElapsedTimer startedAt={task.startedAt} className="text-muted-foreground" />
       </span>
     </span>
   );
@@ -227,14 +227,13 @@ function RunningTaskActions({ taskId }: { taskId: string }) {
         <Button
           variant="link"
           size="xs"
-          className="px-0"
           disabled={cancelling}
           onClick={() => Tasks.cancel(task.id)}
         >
           {cancelling ? "Cancelling…" : "Cancel"}
         </Button>
       ) : null}
-      <Button variant="link" size="xs" className="px-0" onClick={() => setSheetOpen(true)}>
+      <Button variant="link" size="xs" onClick={() => setSheetOpen(true)}>
         Details
       </Button>
     </>
