@@ -195,10 +195,14 @@ core-storage limit from an optional spatial-index failure.
 
 - Requires Web Streams, `TextEncoder`/`TextDecoder`, `CompressionStream`/`DecompressionStream` (Bun, Node 24+, modern browsers).
 - Uses ES2024 resizable `ArrayBuffer` and growable `SharedArrayBuffer` when available.
-- Every individual typed-array column must still fit in one fixed buffer when entity indexes are finalized.
+- Every individual typed-array column must still fit in one fixed buffer when entity indexes are finalized. Columns grow by doubling, so a column that needs slightly more than 2 GiB asks for a 4 GiB buffer.
+- One way holds at most 65,535 node refs (`MAX_WAY_REFS`), one relation at most 65,535 members (`MAX_RELATION_MEMBERS`) and one string at most 65,535 UTF-8 bytes (`MAX_STRING_BYTES`). Totals of way refs, relation members and string bytes must each fit in `Uint32` offsets. Past a limit, the add method throws `OsmCapacityError` instead of storing a wrapped value.
+- IDs are `Float64` (exact to ±2^53) and entity indexes are `Uint32`. The string table keeps a JavaScript `Map` of unique strings, which V8 limits to about 16.7 million entries.
+- Memory after a load is about 16 bytes for each node (plus 4 for each spatial index that holds it), about 82 bytes plus 4 for each ref for each way, about 82 bytes plus 13 for each member for each relation, and 12 bytes for each tag. `Nodes`, `Ways` and `Relations.getBytesRequired` give these estimates.
 - Coordinates stored as `Int32Array` microdegrees (1e-7 degree precision, ~1cm at equator); converted to degrees at API boundaries.
 - Algorithms that need arbitrary untagged-node lookup require the all-node spatial capability. Build it
   explicitly or load with the Full profile from `@osmix/load`.
+- See [docs/limits.md](../../docs/limits.md) for all limits and for measured memory use.
 
 ## Related Packages
 

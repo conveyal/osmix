@@ -229,6 +229,8 @@ for await (const entity of stream) {
 - `"simple"` in-stream bbox filtering may leave incomplete way geometry at boundaries; prefer `"complete_ways"` or `"smart"` for topology-safe extracts.
 - `createExtract` selects ways only by their nodes inside the bbox and adds entities in ascending ID order. With `"smart"`, multipolygon members missing from the source file (for example boundaries cut at a regional file's edge) are dropped and reported through `onProgress`. Membership is tracked as bitsets over source entity indexes, so memory scales with the source dataset (about 1 bit per entity per tracking set) rather than hitting JS `Set` limits.
 - Tag filtering on dense nodes may drop refs when nodes precede ways in a block; use post-load `createExtract` when reference completeness matters.
+- Auto selects Full only when the all-node index is at most 256 MiB (67,108,864 nodes), the projected typed-array peak is below both 4 GiB and 40% of the device memory, and each allocation is below 80% of the tested buffer ceiling. The values are exported as `AUTO_LOAD_PROFILE_LIMITS`.
+- Memory after a Full load is about 5× the PBF file size. The peak during the load is about 6× to 7×. See [docs/limits.md](../../docs/limits.md#measured-memory-use) for measurements.
 - View supports simple in-stream extraction. Complete/smart extraction, deduplication, routing, and other
   arbitrary-node spatial operations require Full; callers must reload or explicitly build the all-node
   capability.

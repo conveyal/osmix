@@ -26,6 +26,7 @@ import { around as geoAround } from "geoflatbush";
 
 import { Entities, type EntitiesTransferables, isValidSpatialBbox } from "./entities.ts";
 import { type IdOrIndex, Ids } from "./ids.ts";
+import { MAX_RELATION_MEMBERS, MAX_UINT32_OFFSET, assertCapacity } from "./limits.ts";
 import type { Nodes } from "./nodes.ts";
 import type StringTable from "./stringtable.ts";
 import { Tags } from "./tags.ts";
@@ -56,7 +57,7 @@ export class Relations extends Entities<OsmRelation> {
   private stringTable: StringTable;
 
   private memberStart: RTA<Uint32Array>;
-  private memberCount: RTA<Uint16Array>; // Maximum 65,535 members per relation
+  private memberCount: RTA<Uint16Array>; // Maximum MAX_RELATION_MEMBERS (65,535) per relation
 
   // Store the ID of the member because relations have other relations as members.
   private memberRefs: RTA<Float64Array>;
@@ -116,11 +117,28 @@ export class Relations extends Entities<OsmRelation> {
     this.stringTable = stringTable;
   }
 
+  /** Reject a relation whose member count would wrap `memberCount` or `memberStart`. */
+  private assertMemberCapacity(relationId: number, memberCount: number) {
+    assertCapacity(
+      "relation-members",
+      memberCount,
+      MAX_RELATION_MEMBERS,
+      () => `Relation ${relationId}`,
+    );
+    assertCapacity(
+      "total-relation-members",
+      this.memberRefs.length + memberCount,
+      MAX_UINT32_OFFSET,
+      () => `The dataset (at relation ${relationId})`,
+    );
+  }
+
   /**
    * Add a single relation to the index.
    */
   addRelation(relation: OsmRelation) {
     this.wayMemberCache = null;
+    this.assertMemberCapacity(relation.id, relation.members.length);
     const relationIndex = this.addEntity(relation.id, relation.tags ?? {});
     this.memberStart.push(this.memberRefs.length);
     this.memberCount.push(relation.members.length);
@@ -192,6 +210,7 @@ export class Relations extends Entities<OsmRelation> {
           })
         : null;
       if (filter && filteredRelation === null) continue;
+      this.assertMemberCapacity(relation.id, filteredRelation?.members.length ?? memberRefs.length);
       added++;
 
       this.addEntity(relation.id, tagKeys, tagValues);
@@ -526,7 +545,7 @@ export class Relations extends Entities<OsmRelation> {
   /**
    * Get the approximate memory requirements for a given number of relations in bytes.
    */
-  static getBytesRequired(count: number) {
+  static getBytesRequired(count: number, memberCount = 0, tagCount = 0) {
     if (count === 0) return 0;
     // Approximate members per relation
     let numNodes = count;
@@ -541,9 +560,12 @@ export class Relations extends Entities<OsmRelation> {
 
     return (
       Ids.getBytesRequired(count) +
-      Tags.getBytesRequired(count) +
+      Tags.getBytesRequired(count, count, tagCount) +
       count * Uint32Array.BYTES_PER_ELEMENT + // memberStart
       count * Uint16Array.BYTES_PER_ELEMENT + // memberCount
+      memberCount * Float64Array.BYTES_PER_ELEMENT + // memberRefs
+      memberCount * Uint8Array.BYTES_PER_ELEMENT + // memberTypes
+      memberCount * Uint32Array.BYTES_PER_ELEMENT + // memberRoles
       count * 4 * Float64Array.BYTES_PER_ELEMENT + // bbox
       spatialIndexBytes
     );

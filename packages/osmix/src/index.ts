@@ -162,8 +162,12 @@ export type {
 // --- @osmix/core ---
 export {
   BufferConstructor,
+  MAX_RELATION_MEMBERS,
+  MAX_STRING_BYTES,
+  MAX_WAY_REFS,
   Nodes,
   Osm,
+  OsmCapacityError,
   OsmEntityIndexBuildError,
   negativeIdMap,
   Relations,
@@ -177,6 +181,7 @@ export type {
   BufferType,
   NodeSpatialIndexKind,
   IdOrIndex,
+  OsmCapacityLimit,
   OsmEntityIndexComponent,
   OsmIdMap,
   OsmInfo,
@@ -229,6 +234,7 @@ export {
 
 // --- @osmix/load ---
 export {
+  AUTO_LOAD_PROFILE_LIMITS,
   CONVEYAL_EXTRACT_TAG_FILTERS,
   createExtract,
   buildOsmSpatialIndexesForProfile,

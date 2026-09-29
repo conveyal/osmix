@@ -1,10 +1,11 @@
-import { pagePath } from "@osmix/app-components";
+import { LIMITS_PATH, pagePath } from "@osmix/app-components";
 import { osmFileInfoAtomFamily } from "@osmix/app-core";
-import { Button, FeatureSection, FullPage } from "@osmix/ui";
+import { BulletList, Button, FeatureSection, FullPage, FullPageSection } from "@osmix/ui";
 import { useAtomValue } from "jotai";
 import { ArrowRightIcon } from "lucide-react";
 import { Link } from "wouter";
 
+import { LIMITS_SUMMARY } from "../lib/limits";
 import { extractSourceFileAtom } from "../pages/extract/state/extract";
 import {
   BASE_OSM_KEY,
@@ -16,8 +17,12 @@ import {
 
 /** A link to a page, rendered as an outline button. */
 function OpenPage({ page, label }: { page: Parameters<typeof pagePath>[0]; label: string }) {
+  return <PageButton href={pagePath(page)} label={label} />;
+}
+
+function PageButton({ href, label }: { href: string; label: string }) {
   return (
-    <Button variant="outline" render={<Link href={pagePath(page)} />}>
+    <Button variant="outline" render={<Link href={href} />}>
       {label}
       <ArrowRightIcon aria-hidden="true" />
     </Button>
@@ -101,6 +106,13 @@ export function HomePage() {
       >
         Cut a region out of a large PBF without loading the whole file.
       </FeatureSection>
+      <FullPageSection
+        title="Limits"
+        action={<PageButton href={LIMITS_PATH} label="See all limits" />}
+      >
+        <p>Osmix keeps each dataset in your browser's memory, so memory sets the largest file.</p>
+        <BulletList items={LIMITS_SUMMARY} />
+      </FullPageSection>
     </FullPage>
   );
 }

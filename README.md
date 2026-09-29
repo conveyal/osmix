@@ -2,7 +2,7 @@
 
 > High-performance OpenStreetMap tools for TypeScript and JavaScript environments.
 
-![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/conveyal/osmix)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/conveyal/osmix)
 
 ## Introduction
 
@@ -16,6 +16,8 @@ Osmix is a collection of composable libraries for reading, querying, merging, an
 - Cross-platform – ESM-native, runs in Node.js, Bun, Deno, and browsers
 - Generate raster and vector tiles
 - Worker-based processing for responsive UIs
+
+**Limits:** datasets live in memory, at about 5× the PBF file size. In a browser, files up to about 500 MB load with all features, and up to about 1 GB with reduced features. See [docs/limits.md](docs/limits.md) for all limits.
 
 **Try it:** [app.osmix.dev](https://app.osmix.dev) · **Docs & examples:** [osmix.dev](https://osmix.dev)
 

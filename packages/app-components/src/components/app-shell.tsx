@@ -16,7 +16,7 @@ import { MapProvider } from "react-map-gl/maplibre";
 import { Link, useLocation } from "wouter";
 
 import type { OsmixAppStore } from "../bootstrap.ts";
-import { HOME_PATH, type OsmixRoute, routeForPath } from "../lib/app-pages.ts";
+import { HOME_PATH, isFullPageRoute, type OsmixRoute, routeForPath } from "../lib/app-pages.ts";
 import { ActivityButton } from "./activity-button.tsx";
 import { ActivitySheet } from "./activity-sheet.tsx";
 import { AppLinks } from "./app-links.tsx";
@@ -25,13 +25,13 @@ import { SmallWindowAlert } from "./small-window-alert.tsx";
 import { TaskToasts } from "./task-toasts.tsx";
 
 /**
- * The standard top bar: the sidebar trigger (not on Home, which has no sidebar), the brand
+ * The standard top bar: the sidebar trigger (not on Home or Limits, which have no sidebar), the brand
  * (a link to Home), links to the pages, the system check, then Activity.
  */
 export function OsmixNav({ current }: { current: OsmixRoute | null }) {
   return (
     <Nav
-      start={current === "home" ? null : <SidebarTrigger />}
+      start={current === null || isFullPageRoute(current) ? null : <SidebarTrigger />}
       brandLink={<Link href={HOME_PATH} aria-label="Osmix home" />}
       links={<AppLinks current={current} />}
       end={<BrowserCheck />}
@@ -44,14 +44,14 @@ export function OsmixNav({ current }: { current: OsmixRoute | null }) {
  * Root of the Osmix app: StrictMode, the jotai store, an error boundary, the map provider,
  * the task lock, toasts and the Activity sheet, and the standard nav above the app content.
  * The current page (from the location) selects the nav's hue (`--app-hue`, via `data-app` on
- * the document element; Home has none) and highlights its link.
+ * the document element; Home and Limits have none) and highlights its link.
  */
 export function OsmixAppShell({ store, children }: { store: OsmixAppStore; children: ReactNode }) {
   const [location] = useLocation();
   const route = routeForPath(location);
   useLayoutEffect(() => {
     const root = document.documentElement;
-    if (route && route !== "home") root.dataset.app = route;
+    if (route && !isFullPageRoute(route)) root.dataset.app = route;
     else delete root.dataset.app;
   }, [route]);
 

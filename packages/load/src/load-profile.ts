@@ -168,10 +168,22 @@ export function normalizeOsmSpatialIndexSelection(
   };
 }
 
-const ALL_NODE_SPATIAL_INDEX_LIMIT = 256 * MIB;
-const ABSOLUTE_TYPED_ARRAY_PEAK_LIMIT = 4 * GIB;
-const DEVICE_MEMORY_FRACTION = 0.4;
-const BUFFER_HEADROOM_FRACTION = 0.8;
+/** Thresholds the Auto profile uses to choose Full over View. */
+export const AUTO_LOAD_PROFILE_LIMITS = {
+  /** Largest all-node spatial index Auto builds (4 bytes per node, so 64Mi nodes). */
+  allNodeSpatialIndexBytes: 256 * MIB,
+  /** Largest projected typed-array peak Auto accepts, whatever the device memory. */
+  typedArrayPeakBytes: 4 * GIB,
+  /** Share of the reported device memory the projected peak may use. */
+  deviceMemoryFraction: 0.4,
+  /** Share of the tested largest buffer that one allocation may use. */
+  bufferHeadroomFraction: 0.8,
+} as const;
+
+const ALL_NODE_SPATIAL_INDEX_LIMIT = AUTO_LOAD_PROFILE_LIMITS.allNodeSpatialIndexBytes;
+const ABSOLUTE_TYPED_ARRAY_PEAK_LIMIT = AUTO_LOAD_PROFILE_LIMITS.typedArrayPeakBytes;
+const DEVICE_MEMORY_FRACTION = AUTO_LOAD_PROFILE_LIMITS.deviceMemoryFraction;
+const BUFFER_HEADROOM_FRACTION = AUTO_LOAD_PROFILE_LIMITS.bufferHeadroomFraction;
 
 function flatbushNodeCount(count: number, nodeSize = 128): number {
   if (count === 0) return 0;

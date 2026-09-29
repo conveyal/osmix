@@ -10,7 +10,7 @@ export {
 export { Details, DetailsContent, DetailsSummary } from "./components/details.tsx";
 export { ElapsedTimer } from "./components/elapsed-timer.tsx";
 export { ErrorBoundary } from "./components/error-boundary.tsx";
-export { FeatureSection, FullPage } from "./components/full-page.tsx";
+export { BulletList, FeatureSection, FullPage, FullPageSection } from "./components/full-page.tsx";
 export { InfoTooltip } from "./components/info-tooltip.tsx";
 export { AppSidebar, Main, MapContent } from "./components/layout.tsx";
 export { IconButton } from "./components/icon-button.tsx";

@@ -50,6 +50,7 @@ import {
   withDecision,
 } from "../lib/merge-plan-workflow";
 import { useBaseOsm, usePatchOsm } from "../lib/merge-slots";
+import { useOpenFileInExtract } from "../lib/open-in";
 import { useSelectPlanFeature } from "../lib/use-select-plan-feature";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import {
@@ -95,6 +96,7 @@ export default function MergeBlock() {
   const [page, setPage] = useAtom(planPageAtom);
   const [pageIndex, setPageIndex] = useAtom(planPageIndexAtom);
   const setLayer = useSetAtom(planLayerAtom);
+  const openFileInExtract = useOpenFileInExtract();
   const [selected, setSelected] = useAtom(selectedPlanFeatureAtom);
   const resetPlan = useSetAtom(resetMergePlanAtom);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
@@ -487,6 +489,7 @@ export default function MergeBlock() {
           loadFailure={file.loadFailure}
           onDismissLoadFailure={file.clearLoadFailure}
           onReloadView={file.reloadWithViewProfile}
+          onOpenInExtract={openFileInExtract}
           openOsmPbfUrl={async (url) => {
             const controller = new AbortController();
             setLoadingState({ controller, osmKey });

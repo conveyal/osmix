@@ -3,7 +3,10 @@ import { type OsmFileSnapshot, Tasks, useOsmFile } from "@osmix/app-core";
 import { useSetAtom } from "jotai";
 import { useLocation } from "wouter";
 
-import { datasetAsExtractSourceAtom } from "../pages/extract/state/extract";
+import {
+  datasetAsExtractSourceAtom,
+  extractIncomingFileAtom,
+} from "../pages/extract/state/extract";
 import { EXTRACT_OSM_KEY, EXTRACT_SOURCE_OSM_KEY, INSPECT_OSM_KEY } from "../settings";
 import { useBaseOsm, usePatchOsm } from "./merge-slots";
 
@@ -45,5 +48,21 @@ export function useOpenIn() {
       setExtractSourceDataset(dataset.osmInfo?.bbox ?? null);
     }
     navigate(pagePath(target === "base" || target === "patch" ? "merge" : target));
+  };
+}
+
+/**
+ * Hand a PBF that is too large to load to Extract, which streams it: clear any previous extract
+ * result, give the file to Extract as its source, and go there.
+ */
+export function useOpenFileInExtract() {
+  const extract = useOsmFile(EXTRACT_OSM_KEY);
+  const setIncomingFile = useSetAtom(extractIncomingFileAtom);
+  const [, navigate] = useLocation();
+
+  return async (file: File) => {
+    await extract.loadOsmFile(null);
+    setIncomingFile(file);
+    navigate(pagePath("extract"));
   };
 }

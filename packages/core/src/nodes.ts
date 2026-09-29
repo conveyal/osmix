@@ -416,12 +416,12 @@ export class Nodes extends Entities<OsmNode> {
   /**
    * Get the approximate memory requirements for a given number of nodes in bytes.
    */
-  static getBytesRequired(count: number, taggedCount = count) {
+  static getBytesRequired(count: number, taggedCount = count, tagCount = 0) {
     if (count === 0) return 0;
 
     return (
       Ids.getBytesRequired(count) +
-      Tags.getBytesRequired(count, taggedCount) +
+      Tags.getBytesRequired(count, taggedCount, tagCount) +
       count * Int32Array.BYTES_PER_ELEMENT + // lons (stored in microdegrees)
       count * Int32Array.BYTES_PER_ELEMENT + // lats (stored in microdegrees)
       Nodes.getSpatialIndexBytesRequired(count) +

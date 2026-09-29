@@ -1,6 +1,7 @@
 import {
   type MapDataset,
   type MapInitialViewState,
+  isFullPageRoute,
   OsmixMap,
   routeForPath,
   type OsmixRoute,
@@ -23,6 +24,7 @@ import { ExtractPanel } from "./pages/extract/extract-panel";
 import { extractBboxAtom } from "./pages/extract/state/extract";
 import { HomePage } from "./pages/home";
 import { InspectSidebar } from "./pages/inspect";
+import { LimitsPage } from "./pages/limits";
 import { MergeSidebar } from "./pages/merge";
 import { EXTRACT_OSM_KEY, EXTRACT_SOURCE_OSM_KEY, INSPECT_OSM_KEY } from "./settings";
 
@@ -76,6 +78,7 @@ function usePageMap(route: OsmixRoute): PageMap {
         layers: <ExtractMapLayers />,
       };
     case "home":
+    case "limits":
       return { datasets: [], focus: [] };
   }
 }
@@ -89,6 +92,7 @@ function PageSidebar({ route }: { route: OsmixRoute }) {
     case "extract":
       return <ExtractPanel />;
     case "home":
+    case "limits":
       return null;
   }
 }
@@ -96,7 +100,7 @@ function PageSidebar({ route }: { route: OsmixRoute }) {
 /**
  * The app: Home and three pages over one map. The map is mounted once and never unmounted, so
  * its camera, tiles and loaded sources survive navigation; each page supplies its sidebar and
- * what the map shows. Home covers the row with an introduction while the map idles below it.
+ * what the map shows. Home and Limits cover the row with a full page while the map idles below.
  */
 export function App() {
   const [location] = useLocation();
@@ -141,12 +145,13 @@ function AppRoutes({ route }: { route: OsmixRoute }) {
   return (
     <Main>
       {route === "home" ? <HomePage /> : null}
+      {route === "limits" ? <LimitsPage /> : null}
       <AppSidebar>
         <PageSidebar route={route} />
       </AppSidebar>
       <MapContent>
         <OsmixMap
-          active={route !== "home"}
+          active={!isFullPageRoute(route)}
           datasets={page.datasets}
           initialViewState={initialViewState}
           legend={page.legend}

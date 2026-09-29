@@ -496,6 +496,7 @@ spec-compliant without staging everything in memory.
   with and without Web Workers and `SharedArrayBuffer`.
 - `fromPbf` expects dense-node blocks; sparse node encodings are not yet supported.
 - Raster helpers rely on `OffscreenCanvas` + `ImageData`.
+- Datasets live in memory. After a load, a dataset uses about 5× its PBF file size; the load peak is about 6× to 7×. In a browser, files up to about 500 MB load with all features, and up to about 1 GB with the View profile. One way or relation holds at most 65,535 refs or members (`OsmCapacityError`). The router does not model turn restrictions or access tags. See [docs/limits.md](../../docs/limits.md).
 
 ## Development
 

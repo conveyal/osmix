@@ -10,6 +10,7 @@ import { useSetAtom } from "jotai";
 import type { OsmFileType } from "osmix";
 
 import { OpenInMenu } from "../components/open-in-menu";
+import { useOpenFileInExtract } from "../lib/open-in";
 import { INSPECT_OSM_KEY } from "../settings";
 
 /** The Inspect page's sidebar: one dataset. The shared map shows it with the routing tool. */
@@ -19,6 +20,7 @@ export function InspectSidebar() {
   const selectEntity = useSetAtom(selectOsmEntityAtom);
   const setChangesetStats = useSetAtom(changesetStatsAtom);
   const setLoadingState = useSetAtom(osmLoadingAbortControllerAtom);
+  const openFileInExtract = useOpenFileInExtract();
 
   // Open `?load=<hash>` from storage, or fall back to the most recently used dataset.
   useLoadFromUrl({
@@ -49,6 +51,7 @@ export function InspectSidebar() {
     <InspectPanel
       osmKey={INSPECT_OSM_KEY}
       openOsmFile={openOsmFile}
+      onOpenInExtract={openFileInExtract}
       datasetAction={<OpenInMenu osmFile={osmFile} targets={["base", "patch", "extract"]} />}
     />
   );

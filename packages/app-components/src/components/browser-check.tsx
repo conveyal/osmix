@@ -13,6 +13,9 @@ import {
   Spinner,
 } from "@osmix/ui";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
+
+import { LIMITS_PATH } from "../lib/app-pages.ts";
 
 type SystemIssue = {
   id: "secure-context" | "cross-origin-isolated" | "device-memory";
@@ -67,13 +70,14 @@ function useSystemIssues() {
 
 export default function BrowserCheck() {
   const { issues } = useSystemIssues();
+  const [open, setOpen] = useState(false);
   const hoverText =
     issues.length === 0
       ? "No system issues detected"
       : issues.map((i) => `• ${i.title}: ${i.detail}`).join("\n");
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button size="sm" variant="ghost" />}>
         Check system
         {issues.length > 0 ? <StatusDot status="error" title={hoverText} /> : null}
@@ -103,6 +107,13 @@ export default function BrowserCheck() {
           <DeviceMemory />
           <StorageEstimate />
           <MaxArraySizes />
+          <p className="text-muted-foreground">
+            The file sizes that load with each feature are on the{" "}
+            <Link href={LIMITS_PATH} className="text-info underline" onClick={() => setOpen(false)}>
+              Limits page
+            </Link>
+            .
+          </p>
         </div>
       </DialogContent>
     </Dialog>

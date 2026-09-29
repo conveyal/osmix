@@ -28,11 +28,15 @@ export function InspectPanel({
   datasetAction,
   osmKey,
   openOsmFile,
+  onOpenInExtract,
 }: {
   datasetAction?: ReactNode;
   /** The osm slot this panel inspects. */
   osmKey: string;
+  /** Load a picked file or a stored one (by hash) into the slot. */
   openOsmFile: (file: File | string, fileType?: OsmFileType) => Promise<OsmInfo | null>;
+  /** Cut a region out of a PBF too large to inspect, without loading it. */
+  onOpenInExtract?: (file: File) => unknown;
 }) {
   const flyToOsmBounds = useFlyToOsmBounds();
   const baseOsm = useOsmFile(osmKey);
@@ -81,23 +85,8 @@ export function InspectPanel({
                 setLoadingState(null);
               }
             }}
-            openOsmFile={async (file) => {
-              const abortController = new AbortController();
-              setLoadingState({
-                controller: abortController,
-                osmKey: osmKey,
-              });
-              try {
-                const osmInfo =
-                  typeof file === "string"
-                    ? await baseOsm.loadFromStorage(file, abortController)
-                    : await baseOsm.loadOsmFile(file, undefined, abortController);
-                if (osmInfo) flyToOsmBounds(osmInfo);
-                return osmInfo;
-              } finally {
-                setLoadingState(null);
-              }
-            }}
+            openOsmFile={openOsmFile}
+            onOpenInExtract={onOpenInExtract}
           />
         </SidebarSection>
       </>

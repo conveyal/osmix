@@ -123,6 +123,8 @@ export {
   OSMIX_PAGES,
   type OsmixPageId,
   type OsmixRoute,
+  isFullPageRoute,
+  LIMITS_PATH,
   pagePath,
   routeForPath,
 } from "./lib/app-pages.ts";

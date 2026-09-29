@@ -983,6 +983,9 @@ importers:
       '@osmix/geo':
         specifier: workspace:*
         version: link:../geo
+      '@osmix/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@osmix/types':
         specifier: workspace:*
         version: link:../types
@@ -990,9 +993,6 @@ importers:
       '@osmix/load':
         specifier: workspace:*
         version: link:../load
-      '@osmix/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@osmix/test-utils':
         specifier: workspace:*
         version: link:../test-utils

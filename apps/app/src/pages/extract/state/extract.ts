@@ -52,6 +52,12 @@ export const extractTagFilterEditorAtom = atom<TagFilterEditorState>(
 /** The source PBF selected in step 1, not loaded: the extract streams it. */
 export const extractSourceFileAtom = atom<File | null>(null);
 
+/**
+ * A PBF handed to Extract from another page ("Open in Extract" on a file too large to load).
+ * The Extract panel takes it as its source when it mounts, then clears this.
+ */
+export const extractIncomingFileAtom = atom<File | null>(null);
+
 /** The selected source's PBF header. */
 export const extractSourceHeaderAtom = atom<OsmPbfHeaderBlock | null>(null);
 

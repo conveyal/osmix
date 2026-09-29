@@ -116,6 +116,8 @@ See [Review plan and Apply automatically](../../docs/merge-process.md#applicatio
 
 ## Data loading tips
 
+- Before a picked PBF loads, the app estimates from its size whether it will load in View mode or fail. It then holds the file behind a warning with **Open in Extract** (Extract streams the file and cuts a region without loading it), **Load anyway** and **Cancel**. The thresholds are in `packages/app-core/src/lib/file-size-guidance.ts`. PBF URLs are not checked, because their size is known only after the download starts.
+- The **Limits** page (`/limits`, linked from Home and Check System) explains which file sizes load with which features. [docs/limits.md](../../docs/limits.md) has the full list and measurements.
 - Upload local `.osm.pbf` / `.geojson` / `.json` / `.zip` (Shapefile) files, or use **Open from URL** for hosted files (the host must allow browser downloads via CORS).
 - Adjust the defaults in `src/settings.ts` if you want the app to reference local dev fixtures by URL.
 - Large extracts work best in a cross-origin-isolated Chromium browser with `SharedArrayBuffer`. Use Check

@@ -40,7 +40,7 @@ import {
 import { useAtom, useAtomValue, useSetAtom, useStore } from "jotai";
 import { DownloadIcon, SaveIcon, XIcon } from "lucide-react";
 import type { ExtractStrategy, GeoBbox2D, OsmInfo } from "osmix";
-import { useId, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 
 import { OpenInMenu } from "../../components/open-in-menu";
 import { EXTRACT_OSM_KEY, EXTRACT_SOURCE_OSM_KEY } from "../../settings";
@@ -61,6 +61,7 @@ import {
   automaticBboxAtom,
   bboxBeforeFileBoundsAtom,
   extractBboxAtom,
+  extractIncomingFileAtom,
   extractParametersAtom,
   extractSourceFileAtom,
   extractSourceHeaderAtom,
@@ -150,6 +151,7 @@ export function ExtractPanel() {
   const [strategy, setStrategy] = useAtom(extractStrategyAtom);
   const [tagFilterEditor, setTagFilterEditor] = useAtom(extractTagFilterEditorAtom);
   const [pendingFile, setPendingFile] = useAtom(extractSourceFileAtom);
+  const [incomingFile, setIncomingFile] = useAtom(extractIncomingFileAtom);
   const [sourceHeader, setSourceHeader] = useAtom(extractSourceHeaderAtom);
   const [extractParameters, setExtractParameters] = useAtom(extractParametersAtom);
   const flyToOsmBounds = useFlyToOsmBounds();
@@ -228,6 +230,15 @@ export function ExtractPanel() {
       setFileBounds({ status: "error", message });
     }
   };
+
+  // Take a file handed over from another page ("Open in Extract") as the source.
+  const takeIncomingFile = useEffectEvent((file: File) => {
+    setIncomingFile(null);
+    void selectFile(file);
+  });
+  useEffect(() => {
+    if (incomingFile) takeIncomingFile(incomingFile);
+  }, [incomingFile]);
 
   /**
    * Load a source dataset: a stored file, a URL, or a file in another format, which the extract
@@ -378,6 +389,8 @@ export function ExtractPanel() {
               </p>
               <StoredOsmList
                 osmKey={EXTRACT_SOURCE_OSM_KEY}
+                // A picked PBF is streamed, not loaded, so its size needs no warning.
+                warnLargePbf={false}
                 loadFailure={source.loadFailure}
                 onDismissLoadFailure={source.clearLoadFailure}
                 onReloadView={source.reloadWithViewProfile}

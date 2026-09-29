@@ -36,6 +36,21 @@
         </p>
       </section>
 
+      <section id="limits">
+        <h2>Limits</h2>
+        <p>
+          Osmix keeps each dataset in memory, at about 5&times; the PBF file size. In a browser,
+          files up to about 500 MB load with every feature, and files up to about 1 GB load with the
+          map, search and inspection only. The router reads the <code>highway</code>,
+          <code>oneway</code> and <code>maxspeed</code> tags, and does not model turn restrictions
+          or access tags. See the
+          <a href="https://app.osmix.dev/limits" target="_blank">limits in the app</a> or
+          <a href="https://github.com/conveyal/osmix/blob/main/docs/limits.md" target="_blank"
+            >every limit, with measurements</a
+          >.
+        </p>
+      </section>
+
       <section id="installation">
         <h2>Installation</h2>
         <p>Install the <code>osmix</code> package with your package manager of choice.</p>

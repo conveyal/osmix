@@ -1,4 +1,8 @@
 import {
+  isPbfFile,
+  type OsmFileSizeGuidance,
+  osmFileSizeGuidance,
+  reportedDeviceMemoryBytes,
   type StoredOsmEntry,
   useStoredOsm,
   osmLoadProfileAtomFamily,
@@ -40,6 +44,7 @@ import type { OsmInfo } from "osmix";
 import type { OsmFileType } from "osmix";
 import { useEffectEvent, useRef, useState } from "react";
 
+import { OsmFileSizeWarning } from "./osm-file-size-warning.tsx";
 import { OsmLoadFailurePanel } from "./osm-load-failure.tsx";
 import {
   OsmLoadProfileDisclosure,
@@ -198,8 +203,25 @@ interface StoredOsmListProps {
   osmKey?: string;
   openOsmFile: (file: File | string, fileType?: OsmFileType) => Promise<OsmInfo | null>;
   openOsmPbfUrl?: (url: string) => Promise<OsmInfo | null>;
+  /**
+   * Cut a region out of a PBF that is too large for this page, without loading it. Offered in
+   * the size warning when present.
+   */
+  onOpenInExtract?: (file: File) => unknown;
+  /**
+   * Whether to warn, before loading, about a PBF whose size predicts View mode or a failure.
+   * Defaults to true. Off where a PBF is streamed rather than loaded (Extract's source).
+   */
+  warnLargePbf?: boolean;
   /** Whether "Open file" is the next step, and so the primary button. Defaults to true. */
   primary?: boolean;
+}
+
+/** A picked file held back by the size warning until the user chooses what to do. */
+interface HeldFile {
+  file: File;
+  fileType?: OsmFileType;
+  guidance: Exclude<OsmFileSizeGuidance, { level: "full" }>;
 }
 
 /**
@@ -215,6 +237,8 @@ export function StoredOsmList({
   osmKey,
   openOsmFile,
   openOsmPbfUrl,
+  onOpenInExtract,
+  warnLargePbf = true,
   primary = true,
 }: StoredOsmListProps) {
   const remote = useOsmixRemote();
@@ -223,6 +247,22 @@ export function StoredOsmList({
   const { current } = useTasks();
   const [loadProfile, setLoadProfile] = useAtom(osmLoadProfileAtomFamily(osmKey ?? "default"));
   const isLoading = loadingState !== null && (!osmKey || loadingState.osmKey === osmKey);
+  const [heldFile, setHeldFile] = useState<HeldFile | null>(null);
+
+  /** Load a picked file, or hold a large PBF back behind the size warning. */
+  const openPickedFile = async (file: File, fileType?: OsmFileType) => {
+    setHeldFile(null);
+    if (warnLargePbf && isPbfFile(file, fileType)) {
+      const guidance = osmFileSizeGuidance(file.size, reportedDeviceMemoryBytes());
+      // A View-sized file needs no warning when the user already chose View.
+      const expected = guidance.level === "view" && loadProfile === "view";
+      if (guidance.level !== "full" && !expected) {
+        setHeldFile({ file, fileType, guidance });
+        return;
+      }
+    }
+    await openOsmFile(file, fileType);
+  };
 
   return (
     <>
@@ -244,7 +284,7 @@ export function StoredOsmList({
               primary={primary}
               setFile={async (file, fileType) => {
                 if (file == null) return;
-                await openOsmFile(file, fileType);
+                await openPickedFile(file, fileType);
               }}
             />
             <OsmLoadProfileDisclosure
@@ -256,7 +296,7 @@ export function StoredOsmList({
                     openPbfUrl={openOsmPbfUrl}
                     setFile={async (file, fileType) => {
                       if (file == null) return;
-                      await openOsmFile(file, fileType);
+                      await openPickedFile(file, fileType);
                     }}
                   />
                   {toggle}
@@ -266,6 +306,26 @@ export function StoredOsmList({
           </>
         )}
       </div>
+      {heldFile ? (
+        <OsmFileSizeWarning
+          className="mx-inset mb-inset"
+          fileName={heldFile.file.name}
+          guidance={heldFile.guidance}
+          onCancel={() => setHeldFile(null)}
+          onLoadAnyway={async () => {
+            setHeldFile(null);
+            await openOsmFile(heldFile.file, heldFile.fileType);
+          }}
+          onOpenInExtract={
+            onOpenInExtract
+              ? () => {
+                  setHeldFile(null);
+                  return onOpenInExtract(heldFile.file);
+                }
+              : undefined
+          }
+        />
+      ) : null}
       {loadFailure && onDismissLoadFailure ? (
         <OsmLoadFailurePanel
           className="mx-inset mb-inset"

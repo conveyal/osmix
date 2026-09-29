@@ -9,6 +9,8 @@ describe("app pages", () => {
     expect(routeForPath("/merge")).toBe("merge");
     expect(routeForPath("/inspect/")).toBe("inspect");
     expect(routeForPath("/extract")).toBe("extract");
+    expect(routeForPath("/limits")).toBe("limits");
+    expect(routeForPath("/limits/")).toBe("limits");
   });
 
   it("does not match unknown or nested paths", () => {

@@ -19,9 +19,17 @@ export {
 export {
   type BrowserLoadCapabilities,
   getBrowserLoadCapabilities,
+  reportedDeviceMemoryBytes,
 } from "./lib/browser-capabilities.ts";
 export { committedMutationOsmId } from "./lib/committed-mutation.ts";
 export { fetchOsmFileFromUrl } from "./lib/fetch-osm-file.ts";
+export {
+  BROWSER_MAX_PBF_BYTES,
+  FULL_PROFILE_MAX_PBF_BYTES,
+  isPbfFile,
+  type OsmFileSizeGuidance,
+  osmFileSizeGuidance,
+} from "./lib/file-size-guidance.ts";
 export {
   mergedOsmRefreshRetryId,
   type PreparedMergedOsmState,
