@@ -59,7 +59,7 @@ For Australia:
 - The highest resident memory of the Node process was 5,871 MiB.
 - The data that the app saves in IndexedDB is 3,906 MiB.
 
-Italy loads in Node. We did not test it in a browser, and we expect it to fail there. It has more than 268 million nodes, so its node ID column needs a 4 GiB buffer (see [Buffer limits](#buffer-limits)).
+Italy loads in Node. We did not test it in a browser, and we expect it to fail there. It has more than 268 million nodes, so its node ID column needs more than 2 GiB in one buffer (see [Buffer limits](#buffer-limits)).
 
 A PBF file uses about 7 to 11 bytes for each node. Use this value to estimate the node count of a file from its size.
 
@@ -83,8 +83,8 @@ Unsorted IDs add 12 bytes for each entity.
 
 The peak during a load is higher than these values for three reasons:
 
-- Each typed-array column doubles in size when it becomes full. During the copy, the old and the new buffers both exist.
-- Compaction copies a `SharedArrayBuffer` column to its exact size.
+- A column that grows beyond its 4 GiB reservation, or that has no reservation, grows by copying. During the copy, the old and the new buffers both exist.
+- Compaction copies a `SharedArrayBuffer` column to its exact size, because a `SharedArrayBuffer` cannot shrink.
 - The tag index uses JavaScript arrays until it is built.
 
 ## Hard limits
@@ -108,7 +108,9 @@ OSM itself limits a way to 2,000 nodes and a tag value to 255 characters. Thus, 
 
 ### Buffer limits
 
-Each typed-array column is one buffer. A column grows by doubling: 1 MiB, 2 MiB, 4 MiB and more. Thus a column that needs slightly more than 2 GiB asks for a 4 GiB buffer.
+Each typed-array column is one buffer. A new column starts at 64 KiB and reserves 4 GiB of address space, so it grows in place without a copy. Reserved space uses no memory until data is written to it. A column doubles until 256 MiB, then grows by 1.5×. Thus a column that needs slightly more than 2 GiB asks for about 2.3 GiB, not 4 GiB.
+
+If the browser refuses the reservation, the column grows by allocating a new buffer and copying. Chromium has room for about 250 reservations of 4 GiB, and a load builds about 35 columns at a time.
 
 The largest buffer that a JavaScript engine gives is different in each browser. Check System tests buffers up to 4 GiB. If the largest buffer is 2 GiB, these are the practical limits:
 

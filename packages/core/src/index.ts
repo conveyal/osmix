@@ -37,6 +37,7 @@ export * from "./stringtable.ts";
 export * from "./tags.ts";
 export {
   BufferConstructor,
+  ResizeableTypedArray,
   TypedBufferAllocationError,
   type BufferType,
   type TypedBufferAllocationOperation,

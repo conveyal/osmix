@@ -195,7 +195,7 @@ core-storage limit from an optional spatial-index failure.
 
 - Requires Web Streams, `TextEncoder`/`TextDecoder`, `CompressionStream`/`DecompressionStream` (Bun, Node 24+, modern browsers).
 - Uses ES2024 resizable `ArrayBuffer` and growable `SharedArrayBuffer` when available.
-- Every individual typed-array column must still fit in one fixed buffer when entity indexes are finalized. Columns grow by doubling, so a column that needs slightly more than 2 GiB asks for a 4 GiB buffer.
+- Every individual typed-array column must still fit in one fixed buffer when entity indexes are finalized. A column reserves 4 GiB of address space and grows in place: it doubles up to 256 MiB, then grows by 1.5×. Where a reservation is refused, it grows by copying. `ResizeableTypedArray.capacityBytesFor` gives the size a column reaches.
 - One way holds at most 65,535 node refs (`MAX_WAY_REFS`), one relation at most 65,535 members (`MAX_RELATION_MEMBERS`) and one string at most 65,535 UTF-8 bytes (`MAX_STRING_BYTES`). Totals of way refs, relation members and string bytes must each fit in `Uint32` offsets. Past a limit, the add method throws `OsmCapacityError` instead of storing a wrapped value.
 - IDs are `Float64` (exact to ±2^53) and entity indexes are `Uint32`. The string table keeps a JavaScript `Map` of unique strings, which V8 limits to about 16.7 million entries.
 - Memory after a load is about 16 bytes for each node (plus 4 for each spatial index that holds it), about 82 bytes plus 4 for each ref for each way, about 82 bytes plus 13 for each member for each relation, and 12 bytes for each tag. `Nodes`, `Ways` and `Relations.getBytesRequired` give these estimates.

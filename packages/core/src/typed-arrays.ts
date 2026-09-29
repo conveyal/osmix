@@ -40,7 +40,7 @@ export type TypedArray<B extends BufferType = BufferType> =
  * Constructor interface for typed arrays.
  */
 export interface TypedArrayConstructor<T extends TypedArray<BufferType> = TypedArray<BufferType>> {
-  new (buffer: BufferType): T;
+  new (buffer: BufferType, byteOffset?: number, length?: number): T;
   readonly BYTES_PER_ELEMENT: number;
   readonly name: string;
 }
@@ -84,7 +84,9 @@ export class TypedBufferAllocationError extends Error {
   }
 }
 
-function getBufferType(BC: SharedArrayBufferConstructor | ArrayBufferConstructor): TypedBufferType {
+type BufferConstructorType = SharedArrayBufferConstructor | ArrayBufferConstructor;
+
+function getBufferType(BC: BufferConstructorType): TypedBufferType {
   return typeof SharedArrayBuffer !== "undefined" && BC === SharedArrayBuffer
     ? "shared-array-buffer"
     : "array-buffer";
@@ -99,55 +101,60 @@ function getBufferType(BC: SharedArrayBufferConstructor | ArrayBufferConstructor
  */
 export const IdArrayType = Float64Array;
 
+const MiB = 2 ** 20;
+
+/** Starting capacity of a new column. Growth is in place, so small columns stay small. */
+const INITIAL_BYTES = 64 * 1024;
+
 /**
- * Initial buffer size for ResizeableTypedArray.
- * 1 MiB provides reasonable initial capacity while avoiding excessive memory allocation.
+ * Address space a growing column reserves so that it grows in place, without copying.
+ * Reserved pages hold no memory until written. Chromium's V8 sandbox has room for about 250
+ * reservations of this size, and a load builds about 35 columns at once. A reservation that
+ * fails falls back to growing by reallocation.
  */
-const DEFAULT_BUFFER_SIZE = 2 ** 20; // 1 MiB
+const GROWTH_RESERVE_BYTES = 4 * 2 ** 30;
+
+/** Above this size a column grows by 1.5× instead of 2×, so it overshoots less. */
+const DOUBLING_LIMIT_BYTES = 256 * MiB;
 
 /**
  * Auto-expanding typed array wrapper.
  *
- * - `push()` appends elements, doubling buffer size as needed.
- * - `compact()` shrinks buffer to fit data.
- * - Supports growable SharedArrayBuffer and resizable ArrayBuffer.
+ * - `push()` / `pushMany()` append, growing the buffer in place when the runtime supports
+ *   growable buffers, otherwise by reallocating.
+ * - `array` is a view of the stored items only; `compact()` shrinks the buffer to fit them.
+ * - `from()` wraps a finished (transferred) buffer, which can still grow.
  */
 export class ResizeableTypedArray<TA extends TypedArray> {
   /** The typed array constructor for this instance */
-  ArrayType: TypedArrayConstructor<TA>;
-  /** The current typed array view into the buffer */
-  array: TA;
-  /** Number of items actually stored (may be less than array.length) */
-  items = 0;
-
-  /** The underlying ArrayBuffer or SharedArrayBuffer */
-  buffer: BufferType;
-  /** Current buffer size in bytes */
-  bufferSize: number;
-  /** Maximum byte length for growable buffers */
-  maxByteLength: number;
-
+  readonly ArrayType: TypedArrayConstructor<TA>;
   /** Buffer constructor (SharedArrayBuffer or ArrayBuffer) */
-  BC: SharedArrayBufferConstructor | ArrayBufferConstructor;
+  private readonly BC: BufferConstructorType;
+  /** View of the whole buffer: stored items, then spare capacity. */
+  private view: TA;
+  /** Number of items actually stored (may be less than the capacity). */
+  private items = 0;
 
   /**
-   * Reconstruct a ResizeableTypedArray from an existing buffer.
-   *
-   * Used after transferring buffers between workers. The resulting array
-   * is considered "compacted" with items = array.length.
-   *
-   * @param ArrayType - The typed array constructor.
-   * @param buffer - The existing buffer to wrap.
-   * @returns A new ResizeableTypedArray wrapping the buffer.
+   * The buffer size a new column reaches when it is filled one `push` at a time to
+   * `requiredBytes`, for projecting peak memory before a load.
+   */
+  static capacityBytesFor(requiredBytes: number, bytesPerElement: number): number {
+    let bytes = INITIAL_BYTES;
+    while (bytes < requiredBytes) {
+      bytes = nextByteLength(bytes, bytes + bytesPerElement, bytesPerElement);
+    }
+    return bytes;
+  }
+
+  /**
+   * Wrap an existing buffer, as after transferring it between workers. Every element of the
+   * buffer is a stored item. Nothing is allocated until the array grows.
    */
   static from<TA extends TypedArray>(ArrayType: TypedArrayConstructor<TA>, buffer: BufferType) {
-    const rta = new ResizeableTypedArray<TA>(
-      ArrayType,
-      isSharedArrayBuffer(buffer) ? SharedArrayBuffer : ArrayBuffer,
-    );
-    rta.buffer = buffer;
-    rta.array = new ArrayType(buffer);
-    rta.items = rta.array.length;
+    const BC = isSharedArrayBuffer(buffer) ? SharedArrayBuffer : ArrayBuffer;
+    const rta = new ResizeableTypedArray<TA>(ArrayType, BC, new ArrayType(buffer));
+    rta.items = rta.view.length;
     return rta;
   }
 
@@ -159,20 +166,143 @@ export class ResizeableTypedArray<TA extends TypedArray> {
    */
   constructor(
     ArrayType: TypedArrayConstructor<TA>,
-    BC: SharedArrayBufferConstructor | ArrayBufferConstructor = BufferConstructor,
+    BC: BufferConstructorType = BufferConstructor,
+    /** @internal A view to wrap instead of allocating; used by `from()`. */
+    view?: TA,
   ) {
     this.ArrayType = ArrayType;
-    this.bufferSize = DEFAULT_BUFFER_SIZE;
-    this.maxByteLength = DEFAULT_BUFFER_SIZE * 2;
     this.BC = BC;
-    try {
-      this.buffer = new BC(this.bufferSize, {
-        maxByteLength: this.maxByteLength,
-      });
-    } catch (cause) {
-      throw this.allocationError("create", this.bufferSize, cause);
+    this.view = view ?? new ArrayType(this.allocate("create", INITIAL_BYTES, GROWTH_RESERVE_BYTES));
+  }
+
+  /** The stored items. Before `compact()`, a view that excludes the spare capacity. */
+  get array(): TA {
+    return this.items === this.view.length ? this.view : (this.view.subarray(0, this.items) as TA);
+  }
+
+  /** The underlying buffer, including any spare capacity. */
+  get buffer(): BufferType {
+    return this.view.buffer as BufferType;
+  }
+
+  get length() {
+    return this.items;
+  }
+
+  /** Number of items the current buffer can hold before it must grow. */
+  get capacity() {
+    return this.view.length;
+  }
+
+  /** Iterate over the stored values. */
+  [Symbol.iterator](): ArrayIterator<number> {
+    return this.array[Symbol.iterator]();
+  }
+
+  /**
+   * Get the value at an index. Handles negative indices.
+   */
+  at(index: number): number {
+    if (index >= 0 && index < this.items) return this.view[index]!;
+    if (index < 0 && index >= -this.items) return this.view[this.items + index]!;
+    throw Error(`Index out of bounds: ${index}. Length: ${this.items}`);
+  }
+
+  /**
+   * Get a copy of a range of the stored items.
+   */
+  slice(start: number, end: number) {
+    return this.array.slice(start, end);
+  }
+
+  /**
+   * Push a value to the end of the array.
+   */
+  push(value: number): number {
+    if (this.items === this.view.length) this.ensureCapacity(this.items + 1);
+    this.view[this.items] = value;
+    return this.items++;
+  }
+
+  /**
+   * Set a value at a specific index. Expands array if needed.
+   */
+  set(index: number, value: number) {
+    if (index < 0) throw Error("Index out of bounds");
+    if (index >= this.items) {
+      this.ensureCapacity(index + 1);
+      this.items = index + 1;
     }
-    this.array = new this.ArrayType(this.buffer);
+    this.view[index] = value;
+  }
+
+  /**
+   * Push multiple values to the end of the array.
+   */
+  pushMany(values: ArrayLike<number>) {
+    this.ensureCapacity(this.items + values.length);
+    this.view.set(values, this.items);
+    this.items += values.length;
+  }
+
+  /**
+   * Shrink the buffer to exactly fit stored items.
+   * Buffer becomes fixed-length after compacting.
+   */
+  compact() {
+    const requiredBytes = this.items * this.ArrayType.BYTES_PER_ELEMENT;
+    const buffer = this.buffer;
+    let compacted: BufferType;
+    try {
+      compacted = isSharedArrayBuffer(buffer)
+        ? // A SharedArrayBuffer cannot shrink: copy the items into a fixed-size buffer.
+          buffer.slice(0, requiredBytes)
+        : buffer.transferToFixedLength(requiredBytes);
+    } catch (cause) {
+      throw this.allocationError("compact", requiredBytes, cause);
+    }
+    this.view = new this.ArrayType(compacted);
+    return this.view;
+  }
+
+  /** Make room for `count` items: grow in place if the buffer can, otherwise reallocate. */
+  private ensureCapacity(count: number) {
+    if (count <= this.view.length) return;
+    const bytesPerElement = this.ArrayType.BYTES_PER_ELEMENT;
+    const buffer = this.buffer;
+    const byteLength = nextByteLength(buffer.byteLength, count * bytesPerElement, bytesPerElement);
+    if (buffer.maxByteLength >= byteLength && growInPlace(buffer, byteLength)) {
+      // A resized buffer keeps a length-tracking view: take a fresh fixed-length one.
+      this.view = new this.ArrayType(buffer, 0, byteLength / bytesPerElement);
+      return;
+    }
+    const next = this.allocate("grow", byteLength, GROWTH_RESERVE_BYTES);
+    const view = new this.ArrayType(next, 0, byteLength / bytesPerElement);
+    view.set(this.array);
+    this.view = view;
+  }
+
+  /**
+   * Allocate `byteLength` bytes that can grow in place up to `reserveBytes` when the runtime
+   * allows. A failed reservation falls back to a buffer that doubles once, then to fixed size.
+   */
+  private allocate(
+    operation: TypedBufferAllocationOperation,
+    byteLength: number,
+    reserveBytes: number,
+  ): BufferType {
+    for (const maxByteLength of [Math.max(reserveBytes, byteLength), byteLength * 2]) {
+      try {
+        return new this.BC(byteLength, { maxByteLength });
+      } catch {
+        // The runtime refused the reservation: try a smaller one, then a fixed buffer.
+      }
+    }
+    try {
+      return new this.BC(byteLength);
+    } catch (cause) {
+      throw this.allocationError(operation, byteLength, cause);
+    }
   }
 
   private allocationError(
@@ -192,119 +322,32 @@ export class ResizeableTypedArray<TA extends TypedArray> {
       cause,
     );
   }
+}
 
-  /**
-   * Iterate over the array values.
-   */
-  [Symbol.iterator](): ArrayIterator<number> {
-    return this.array[Symbol.iterator]();
-  }
+/**
+ * The next buffer size for a column that needs `requiredBytes`: double while small, then grow
+ * by 1.5×, and never less than required. Rounded up to a multiple of 8 bytes so every element
+ * type divides it.
+ */
+function nextByteLength(currentBytes: number, requiredBytes: number, bytesPerElement: number) {
+  const current = Math.max(currentBytes, bytesPerElement);
+  const grown = current < DOUBLING_LIMIT_BYTES ? current * 2 : Math.ceil(current * 1.5);
+  return Math.ceil(Math.max(grown, requiredBytes) / 8) * 8;
+}
 
-  /**
-   * Double the buffer capacity.
-   * Uses in-place grow/resize if supported, otherwise allocates new buffer and copies.
-   */
-  expandArray() {
-    this.bufferSize *= 2;
-    try {
-      if (this.bufferSize > this.buffer.maxByteLength) {
-        // Need a completely new buffer with larger maxByteLength
-        this.maxByteLength *= 2;
-        const newBuffer = new this.BC(this.bufferSize, {
-          maxByteLength: this.maxByteLength,
-        });
-        const newArray = new this.ArrayType(newBuffer);
-        newArray.set(this.array);
-        this.buffer = newBuffer;
-        this.array = newArray;
-      } else {
-        // Can grow/resize the existing buffer in place
-        if (isSharedArrayBuffer(this.buffer) && this.buffer.growable) {
-          this.buffer.grow(this.bufferSize);
-        } else if (this.buffer instanceof ArrayBuffer && this.buffer.resizable) {
-          this.buffer.resize(this.bufferSize);
-        } else {
-          throw Error("Buffer is not growable or resizable");
-        }
-      }
-    } catch (cause) {
-      throw this.allocationError("grow", this.bufferSize, cause);
+/** Grow a growable or resizable buffer to `byteLength`. False if it cannot grow in place. */
+function growInPlace(buffer: BufferType, byteLength: number): boolean {
+  try {
+    if (isSharedArrayBuffer(buffer)) {
+      if (!buffer.growable) return false;
+      buffer.grow(byteLength);
+      return true;
     }
-  }
-
-  /**
-   * Get the value at an index. Handles negative indices.
-   */
-  at(index: number): number {
-    if (index < -this.length || index >= this.length)
-      throw Error(`Index out of bounds: ${index}. Length: ${this.length}`);
-    if (index < 0) return this.at(this.length + index);
-    const result = this.array[index];
-    if (result === undefined) throw Error(`No value at index: ${index}`);
-    return result;
-  }
-
-  /**
-   * Get a slice of the array.
-   */
-  slice(start: number, end: number) {
-    return this.array.slice(start, end);
-  }
-
-  get length() {
-    return this.items;
-  }
-
-  /**
-   * Push a value to the end of the array.
-   */
-  push(value: number): number {
-    if (this.length >= this.array.length) {
-      this.expandArray();
-    }
-    this.array[this.items++] = value;
-    return this.length - 1;
-  }
-
-  /**
-   * Set a value at a specific index. Expands array if needed.
-   */
-  set(index: number, value: number) {
-    if (index < 0) throw Error("Index out of bounds");
-    if (index >= this.length) {
-      while (index >= this.array.length) this.expandArray();
-      this.items = index + 1;
-    }
-    this.array[index] = value;
-  }
-
-  /**
-   * Push multiple values to the end of the array.
-   */
-  pushMany(values: number[] | TypedArray) {
-    while (this.length + values.length > this.array.length) this.expandArray();
-    this.array.set(values, this.length);
-    this.items += values.length;
-  }
-
-  /**
-   * Shrink the buffer to exactly fit stored items.
-   * Buffer becomes fixed-length after compacting.
-   */
-  compact() {
-    const requiredBytes = this.length * this.ArrayType.BYTES_PER_ELEMENT;
-    try {
-      if (isSharedArrayBuffer(this.buffer)) {
-        // SharedArrayBuffer uses slice() to create a new fixed-size buffer
-        this.buffer = this.buffer.slice(0, requiredBytes);
-      } else {
-        // ArrayBuffer uses transferToFixedLength() to detach and resize
-        this.buffer = this.buffer.transferToFixedLength(requiredBytes);
-      }
-    } catch (cause) {
-      throw this.allocationError("compact", requiredBytes, cause);
-    }
-    this.array = new this.ArrayType(this.buffer);
-    return this.array;
+    if (!buffer.resizable) return false;
+    buffer.resize(byteLength);
+    return true;
+  } catch {
+    // Committing the pages failed: fall back to reallocating, which reports its own error.
+    return false;
   }
 }
