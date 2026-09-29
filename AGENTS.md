@@ -18,7 +18,7 @@
 
 Layering (low → high):
 
-`@osmix/types` + `@osmix/geo` + `@osmix/shared` → `@osmix/pbf` + `@osmix/json` → `@osmix/load` → `@osmix/core` → converters (`geojson`, `geoparquet`, `gtfs`, `shapefile`, `change`, `router`, `vt`, `shortbread`, `raster`; `change` uses `router` for routing topology) → `osmix` facade → apps.
+`@osmix/types` + `@osmix/geo` + `@osmix/shared` → `@osmix/pbf` + `@osmix/json` → `@osmix/load` → `@osmix/core` → converters (`geojson`, `geoparquet`, `gtfs`, `shapefile`, `change`, `router`, `vt`, `shortbread`, `raster`; `change` uses `router` for routing topology) → `osmix` facade → apps and `@osmix/cli`.
 
 | Package                                                | Role                                                                         |
 | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
@@ -37,6 +37,8 @@ Layering (low → high):
 | `osmix`                                                | Curated facade + worker/Comlink orchestration (`OsmixRemote`, `OsmixWorker`) |
 | `@osmix/ui`                                            | Private: shared React primitives, layout shell, design tokens (`styles.css`) |
 | `@osmix/app-core`                                      | Private: app worker/remote, IndexedDB storage, jotai atoms, `useOsmFile`     |
+| `@osmix/app-components`                                | Private: MapLibre integration and OSM domain components shared by the apps   |
+| `@osmix/cli`                                           | `osmix` command: terminal map viewer for OSM PBF files                       |
 
 **App import rule:** apps import `osmix` for runtime APIs and re-exported types, plus the private app-tier packages (`@osmix/ui`, `@osmix/app-core`, `@osmix/app-components`). Use other granular `@osmix/*` packages only when a symbol is not exposed by the facade (e.g. benchmarks, servers, or tests).
 
