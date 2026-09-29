@@ -231,10 +231,13 @@
       }
     }
   ],
-  "jsPlugins": ["oxlint-tailwindcss", "./scripts/lint/osmix-design.ts"],
+  "jsPlugins": ["oxlint-tailwindcss", "@shadcn/lint", "./scripts/lint/osmix-design.ts"],
   "settings": {
     "tailwindcss": {
       "entryPoint": "packages/ui/src/styles.css"
+    },
+    "shadcn": {
+      "ui": "@osmix/ui"
     }
   }
 }
