@@ -32,17 +32,26 @@ describe("merge plan workflow", () => {
   });
 
   it("builds plan options from the input settings", () => {
-    expect(buildMergePlanOptions({ mergeIdenticalPoints: true, patchIds: "osm" })).toEqual({
-      mergeIdenticalPoints: true,
-      patchIds: "osm",
-    });
+    expect(
+      buildMergePlanOptions({
+        automation: "recommended",
+        mergeIdenticalPoints: true,
+        patchIds: "osm",
+      }),
+    ).toEqual({ automation: "recommended", mergeIdenticalPoints: true, patchIds: "osm" });
     const matching = { propertyKeys: ["kerb"], attachNetwork: true };
     const options = buildMergePlanOptions({
+      automation: "aggressive",
       matching,
       mergeIdenticalPoints: false,
       patchIds: "new",
     });
-    expect(options).toEqual({ mergeIdenticalPoints: false, patchIds: "new", matching });
+    expect(options).toEqual({
+      automation: "aggressive",
+      mergeIdenticalPoints: false,
+      patchIds: "new",
+      matching,
+    });
     // The worker keeps its own copy of the keys.
     expect(options.matching?.propertyKeys).not.toBe(matching.propertyKeys);
   });

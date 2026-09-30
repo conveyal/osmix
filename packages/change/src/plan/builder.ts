@@ -291,10 +291,14 @@ export class PlanBuilder {
     const summary: MergePlanSummary = {
       features,
       proposals: { automatic: 0, review: 0, blocked: 0 },
+      automated: 0,
       replacesBase: 0,
     };
     for (const feature of this.features) summary.features[feature.outcome]++;
-    for (const proposal of this.proposals.values()) summary.proposals[proposal.status]++;
+    for (const proposal of this.proposals.values()) {
+      summary.proposals[proposal.status]++;
+      if (proposal.automated) summary.automated++;
+    }
     if (options.patchIds === "new") return summary;
     for (const [ids, baseIds] of [
       [planned.nodes.ids, base.nodes.ids],

@@ -88,7 +88,7 @@ in-stream extraction remains available. The app does not build the large index s
 The [merge-process guide](../../docs/merge-process.md) owns the merge rules, examples, and known limitations. Read its [input identity requirements](../../docs/merge-process.md#inputs-and-identity) before combining independently prepared imports.
 
 1. Remove duplicates inside each input on the Inspect page and send it here with **Open in**, or load the base and patch in Full mode.
-2. Configure optional imported-data matching and how identical points and patch IDs are handled, then choose **Review plan** or **Apply automatically**.
+2. Configure optional imported-data matching, how identical points and patch IDs are handled, and how much the automation level decides for you, then choose **Review plan** or **Apply automatically**.
 3. In the review, each imported feature shows its outcome and proposals. Include or leave out the proposals that need you (Copy tags, Connect network, Remove imported way, identical-point merges, crossings), download the plan as osmChange, and **Apply plan**.
 4. Read the completion summary and export the result.
 

@@ -307,10 +307,20 @@ function excludedBy(proposal: PlanProposal): readonly string[] {
   return "competitors" in proposal ? [...proposal.alternatives, ...proposal.competitors] : [];
 }
 
+type Decisions = ReadonlyMap<string, PlanDecision["action"]>;
+
+/** A proposal's decision: a person's (from `decisions`), else the automation level's. */
+function decisionOf(plan: MergePlan, id: string, decisions: Decisions) {
+  const own = decisions.get(id);
+  if (own) return own;
+  const proposal = plan.proposals.get(id);
+  return proposal?.automated ? proposal.decision : undefined;
+}
+
 /** An undecided review proposal no included alternative or competitor has already left out. */
-function isWaiting(proposal: PlanProposal, decisions: ReadonlyMap<string, PlanDecision["action"]>) {
-  if (proposal.status !== "review" || decisions.has(proposal.id)) return false;
-  return !excludedBy(proposal).some((id) => decisions.get(id) === "accept");
+function isWaiting(plan: MergePlan, proposal: PlanProposal, decisions: Decisions) {
+  if (proposal.status !== "review" || decisionOf(plan, proposal.id, decisions)) return false;
+  return !excludedBy(proposal).some((id) => decisionOf(plan, id, decisions) === "accept");
 }
 
 /**
@@ -318,14 +328,11 @@ function isWaiting(proposal: PlanProposal, decisions: ReadonlyMap<string, PlanDe
  * consent (MP-R1), and a proposal that excludes others needs a choice between them (MP-M5).
  * Blocked proposals and ones already left out are not choices.
  */
-function needsOwnChoice(
-  plan: MergePlan,
-  proposal: PlanProposal,
-  decisions: ReadonlyMap<string, PlanDecision["action"]>,
-) {
+function needsOwnChoice(plan: MergePlan, proposal: PlanProposal, decisions: Decisions) {
   if (proposal.kind === "remove-way") return true;
   return excludedBy(proposal).some(
-    (id) => plan.proposals.get(id)?.status !== "blocked" && decisions.get(id) !== "reject",
+    (id) =>
+      plan.proposals.get(id)?.status !== "blocked" && decisionOf(plan, id, decisions) !== "reject",
   );
 }
 
@@ -333,7 +340,8 @@ function needsOwnChoice(
  * The decisions after a bulk request, and what it does counted in features. Accepting applies
  * only to review proposals that need no choice of their own, never to a removal; rejecting
  * applies to every decidable proposal; clearing removes decisions. A bulk accept or reject never
- * replaces a decision already made. Proposals whose kind, status or reason differs from the
+ * replaces a person's decision; leaving out can replace the automation level's, and clearing
+ * removes only a person's. Proposals whose kind, status or reason differs from the
  * filter's are left alone.
  */
 export function bulkDecisions(plan: MergePlan, request: MergePlanBulkRequest) {
@@ -353,14 +361,14 @@ export function bulkDecisions(plan: MergePlan, request: MergePlanBulkRequest) {
       }
       if (decisions.has(proposal.id)) continue;
       if (action === "accept") {
-        if (proposal.status !== "review" || !isWaiting(proposal, decisions)) continue;
+        if (proposal.status !== "review" || !isWaiting(plan, proposal, decisions)) continue;
         if (needsOwnChoice(plan, proposal, decisions)) continue;
       }
       decisions.set(proposal.id, action);
       featureChanged = true;
     }
     if (featureChanged) changed++;
-    if (proposals.some((proposal) => isWaiting(proposal, decisions))) waiting++;
+    if (proposals.some((proposal) => isWaiting(plan, proposal, decisions))) waiting++;
   }
   return {
     decisions: [...decisions].map(([proposalId, action]) => ({ proposalId, action })),
@@ -392,7 +400,7 @@ export function waitingFeatures(plan: MergePlan, filter: MergePlanFilter) {
   let waiting = 0;
   for (const feature of filteredFeatures(plan, filter)) {
     const proposals = bulkProposals(plan, feature, filter);
-    if (proposals.some((proposal) => isWaiting(proposal, decisions))) waiting++;
+    if (proposals.some((proposal) => isWaiting(plan, proposal, decisions))) waiting++;
   }
   return waiting;
 }

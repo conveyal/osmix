@@ -1,14 +1,17 @@
 import { Radio, RadioLabel, StatusDot, type StatusDotStatus, useTaskLock } from "@osmix/ui";
+import { useAtomValue } from "jotai";
 import type { PlanDecision, PlanProposal } from "osmix";
 import { useId } from "react";
 
 import {
+  AUTOMATION_LABEL,
   PROPOSAL_EFFECT_LABEL,
   PROPOSAL_KIND_LABEL,
   PROPOSAL_STATUS_LABEL,
   isDecidable,
   planReasonLabel,
 } from "../lib/merge-plan-workflow";
+import { planOverviewAtom } from "../state/merge-plan";
 
 const EFFECT_DOT: Record<PlanProposal["effect"], StatusDotStatus> = {
   applied: "ok",
@@ -31,7 +34,8 @@ export function proposalTitle(proposal: PlanProposal) {
 /**
  * One proposal: what it does, whether it is in the plan and why, and the choice for it. An
  * automatic proposal is included unless left out; one that needs review waits for a choice; a
- * blocked one shows its reasons and takes no choice.
+ * blocked one shows its reasons and takes no choice. A choice the automation level made shows
+ * as its rule, which a person's choice replaces.
  */
 export function PlanProposalActions({
   onDecide,
@@ -45,21 +49,33 @@ export function PlanProposalActions({
   proposal: PlanProposal;
 }) {
   const taskLocked = useTaskLock();
+  const automation = useAtomValue(planOverviewAtom)?.options.automation ?? "recommended";
   const name = useId();
   const title = proposalTitle(proposal);
   const decidable = isDecidable(proposal) && proposal.status !== "blocked";
-  const choice: Choice = proposal.decision ?? "rule";
+  const choice: Choice = proposal.automated ? "rule" : (proposal.decision ?? "rule");
+  const automated = proposal.automated
+    ? `${proposal.decision === "accept" ? "Include" : "Leave out"} (${AUTOMATION_LABEL[automation]})`
+    : null;
   const choices: { value: Choice; label: string }[] =
     proposal.status === "automatic"
       ? [
           { value: "rule", label: "Include (automatic)" },
           { value: "reject", label: "Leave out" },
         ]
-      : [
-          { value: "rule", label: "Decide later" },
-          { value: "accept", label: "Include" },
-          { value: "reject", label: "Leave out" },
-        ];
+      : automated
+        ? [
+            { value: "rule", label: automated },
+            {
+              value: proposal.decision === "accept" ? "reject" : "accept",
+              label: proposal.decision === "accept" ? "Leave out" : "Include",
+            },
+          ]
+        : [
+            { value: "rule", label: "Decide later" },
+            { value: "accept", label: "Include" },
+            { value: "reject", label: "Leave out" },
+          ];
   const alternatives = "alternatives" in proposal ? proposal.alternatives.length : 0;
   const competitors = "competitors" in proposal ? proposal.competitors.length : 0;
   const excludes =
@@ -72,6 +88,7 @@ export function PlanProposalActions({
       </div>
       <p className="text-muted-foreground">
         {PROPOSAL_STATUS_LABEL[proposal.status]} · {PROPOSAL_EFFECT_LABEL[proposal.effect]}
+        {proposal.automated ? ` · Decided by ${AUTOMATION_LABEL[automation]}` : null}
       </p>
       {proposal.reasons.length > 0 ? (
         <ul className="list-disc pl-4 text-muted-foreground">

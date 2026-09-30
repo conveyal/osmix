@@ -17,6 +17,16 @@ import type {
  */
 export type PatchIdMode = "osm" | "new";
 
+/**
+ * How much the planner decides without a person (MP-M6):
+ * - `conservative`: every matching action waits for review (`matching.automatic: "none"`).
+ * - `recommended`: high-confidence actions apply, and points of one imported way competing for
+ *   one base point are settled by the nearest with a clear margin.
+ * - `aggressive`: also settles every other choice between candidates the same way, and copies
+ *   routing-affecting tags that have no competing choice.
+ */
+export type MergePlanAutomation = "conservative" | "recommended" | "aggressive";
+
 export interface MergePlanOptions {
   /** How patch IDs are read. Defaults to `osm`. */
   patchIds?: PatchIdMode;
@@ -35,7 +45,12 @@ export interface MergePlanOptions {
    * Off unless configured. Decide its proposals with `decisions`, not `matching.decisions`.
    */
   matching?: Omit<OsmConflationOptions, "decisions">;
-  /** Decisions on proposals, by proposal ID. The plan is rebuilt with them applied. */
+  /** How much the planner decides without a person. Defaults to `recommended`. */
+  automation?: MergePlanAutomation;
+  /**
+   * Decisions a person made on proposals, by proposal ID. The plan is rebuilt with them
+   * applied; the automation level never changes them.
+   */
   decisions?: readonly PlanDecision[];
 }
 
@@ -83,6 +98,8 @@ interface PlanProposalBase {
   status: PlanProposalStatus;
   reasons: string[];
   decision?: PlanDecision["action"];
+  /** The decision was made by the automation level, not a person; a person can change it. */
+  automated?: true;
   effect: PlanProposalEffect;
 }
 
@@ -186,6 +203,8 @@ export interface PlanFeature {
 export interface MergePlanSummary {
   features: Record<PlanOutcome, number>;
   proposals: Record<PlanProposalStatus, number>;
+  /** Proposals the automation level decided. */
+  automated: number;
   /** Patch entities whose positive ID names an existing base entity, so they edit it. */
   replacesBase: number;
 }

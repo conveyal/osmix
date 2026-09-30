@@ -119,6 +119,19 @@ describe("plan components", () => {
     expect(blocked).toContain("Allowed travel is incompatible");
   });
 
+  it("shows a choice the automation level made as its rule, which a person can change", () => {
+    const html = render(
+      createElement(PlanProposalActions, {
+        proposal: connect({ decision: "accept", automated: true, effect: "applied" }),
+        onDecide: noop,
+      }),
+    );
+    expect(html).toContain("Decided by Recommended");
+    expect(html).toContain("Include (Recommended)");
+    expect(html).toContain("Leave out");
+    expect(html.match(/type="radio"/g)).toHaveLength(2);
+  });
+
   it("names a feature row by its imported ID and shows its outcome", () => {
     const html = render(
       createElement(PlanFeatureRow, {
@@ -170,6 +183,7 @@ describe("plan components", () => {
       summary: {
         features: outcomes({ added: 2, "needs-decision": 1 }),
         proposals: { automatic: 2, review: 1, blocked: 0 },
+        automated: 0,
         replacesBase: 0,
       },
       diagnostics: {

@@ -113,6 +113,7 @@ export type {
   CrossingProposal,
   ExactMergeProposal,
   MergePlan,
+  MergePlanAutomation,
   MergePlanOptions,
   MergePlanResult,
   MergePlanSummary,

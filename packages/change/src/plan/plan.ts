@@ -95,6 +95,10 @@ export function planMerge(
     patchIds: options.patchIds ?? "osm",
     mergeIdenticalPoints: options.mergeIdenticalPoints ?? true,
     createIntersections: options.createIntersections ?? true,
+    automation: options.automation ?? "recommended",
+    ...(options.matching && options.automation === "conservative"
+      ? { matching: { ...options.matching, automatic: "none" as const } }
+      : {}),
     decisions: [...(options.decisions ?? [])],
   };
   const remap = planPatchIdRemap(base, patch, resolved.patchIds!);
@@ -200,7 +204,15 @@ function runPhases(plan: MergePlan, state: PlanState, from: PlanPhase) {
         from === "matching" && state.matched
           ? { discovery: state.matched.discovery, demoted: state.matched.demotedCandidates }
           : undefined;
-      state.matched = planMatching(builder, changeset, base, patch, options.matching, cached);
+      state.matched = planMatching(
+        builder,
+        changeset,
+        base,
+        patch,
+        options.matching,
+        options.automation ?? "recommended",
+        cached,
+      );
     }
   });
   phase("crossings", () => {

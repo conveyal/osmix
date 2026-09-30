@@ -63,6 +63,7 @@ import {
   updateMergeOutcomeAtom,
 } from "../state/merge-outcome";
 import {
+  automationLevelAtom,
   conflationFormAtom,
   mergeIdenticalPointsAtom,
   patchIdModeAtom,
@@ -94,6 +95,7 @@ export default function MergeBlock() {
   const updateOutcome = useSetAtom(updateMergeOutcomeAtom);
   const conflationForm = useAtomValue(conflationFormAtom);
   const mergeIdenticalPoints = useAtomValue(mergeIdenticalPointsAtom);
+  const automation = useAtomValue(automationLevelAtom);
   const [patchIds, setPatchIds] = useAtom(patchIdModeAtom);
   const [overview, setOverview] = useAtom(planOverviewAtom);
   const [filter, setFilter] = useAtom(planFilterAtom);
@@ -142,6 +144,7 @@ export default function MergeBlock() {
     }
     return {
       ...buildMergePlanOptions({
+        automation,
         matching: toOsmConflationOptions(conflationForm),
         mergeIdenticalPoints,
         patchIds: mode,

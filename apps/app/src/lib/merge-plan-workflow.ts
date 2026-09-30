@@ -1,4 +1,5 @@
 import type {
+  MergePlanAutomation,
   MergePlanBulkCounts,
   MergePlanBulkRequest,
   MergePlanOptions,
@@ -14,15 +15,18 @@ import type {
 
 /** Plan options from the input step's settings. */
 export function buildMergePlanOptions({
+  automation,
   matching,
   mergeIdenticalPoints,
   patchIds,
 }: {
+  automation: MergePlanAutomation;
   matching?: OsmConflationOptions;
   mergeIdenticalPoints: boolean;
   patchIds: PatchIdMode;
 }): MergePlanOptions {
   return {
+    automation,
     mergeIdenticalPoints,
     patchIds,
     ...(matching ? { matching: { ...matching, propertyKeys: [...matching.propertyKeys] } } : {}),
@@ -212,3 +216,34 @@ export function bulkResultMessage(
   if (waiting === 0) return done;
   return `${done}; ${features(waiting)} still ${waiting === 1 ? "needs" : "need"} a decision`;
 }
+
+/** The automation levels, least to most, with what each decides for you. */
+export const AUTOMATION_OPTIONS: readonly {
+  value: MergePlanAutomation;
+  label: string;
+  help: string;
+}[] = [
+  {
+    value: "conservative",
+    label: "Conservative",
+    help: "Every matching change waits for your review.",
+  },
+  {
+    value: "recommended",
+    label: "Recommended",
+    help:
+      "High-confidence changes apply. When several points of one imported way reach the same " +
+      "base point, the clearly nearest one connects.",
+  },
+  {
+    value: "aggressive",
+    label: "Aggressive",
+    help:
+      "Also picks the clearly nearest candidate in every other choice, and copies routing tags " +
+      "(such as kerb or crossing) that have no competing choice.",
+  },
+];
+
+export const AUTOMATION_LABEL = Object.fromEntries(
+  AUTOMATION_OPTIONS.map(({ value, label }) => [value, label]),
+) as Record<MergePlanAutomation, string>;

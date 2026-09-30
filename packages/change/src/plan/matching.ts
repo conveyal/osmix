@@ -17,9 +17,16 @@ import type {
   OsmConflationDecision,
   OsmConflationDiscovery,
 } from "../types.ts";
+import { automateMatching } from "./automation.ts";
 import { entityToken, type PlanBuilder } from "./builder.ts";
 import { findDecisionConflict } from "./decision-conflict.ts";
-import type { MatchingProposal, MergePlan, MergePlanOptions, PlanProposal } from "./types.ts";
+import type {
+  MatchingProposal,
+  MergePlan,
+  MergePlanAutomation,
+  MergePlanOptions,
+  PlanProposal,
+} from "./types.ts";
 import { demoteDrivableConnections } from "./validate.ts";
 
 type MatchingKind = "connect" | "copy-tags" | "remove-way";
@@ -45,6 +52,7 @@ export function planMatching(
   base: Osm,
   planned: Osm,
   options: NonNullable<MergePlanOptions["matching"]>,
+  automation: MergePlanAutomation,
   /** Discovery from an earlier run on the same state, reused when only decisions changed. */
   cached?: { discovery: OsmConflationDiscovery; demoted: ReadonlySet<string> },
 ): {
@@ -89,6 +97,7 @@ export function planMatching(
       reasons: [...assessment.reasons],
     });
   };
+  const candidates = new Map(discovery.candidates.map((candidate) => [candidate.id, candidate]));
   for (const candidate of discovery.candidates) {
     byCandidate.push({
       candidate,
@@ -100,6 +109,12 @@ export function planMatching(
       connect: propose(candidate, "connect", candidate.networkAttachment),
       copy: propose(candidate, "copy-tags", candidate.propertyTransfer),
     });
+  }
+  // Automation settles choices before removal is assessed, since removal depends on which
+  // connections apply. It needs the alternatives and competitors linked first.
+  if (automation !== "conservative" && options.automatic !== "none") {
+    linkAlternatives(byCandidate);
+    automateMatching(automation, builder.proposals, candidates);
   }
   // Removal eligibility depends on which connections are accepted, so assess it last.
   const draft = matchingDecisions(byCandidate, (id) => builder.decisionFor(id));

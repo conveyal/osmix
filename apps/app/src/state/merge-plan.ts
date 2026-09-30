@@ -1,6 +1,7 @@
 import { atom } from "jotai";
 import type { GeoBbox2D } from "osmix";
 import type {
+  MergePlanAutomation,
   MergePlanBulkPreview,
   MergePlanFeatureDetail,
   MergePlanFilter,
@@ -21,6 +22,9 @@ export const conflationFormAtom = atom<ConflationFormState>({
 
 /** "Merge points at identical coordinates automatically". On by default; kept for the session. */
 export const mergeIdenticalPointsAtom = atom(true);
+
+/** How much the planner decides without you; see `AUTOMATION_OPTIONS`. Kept for the session. */
+export const automationLevelAtom = atom<MergePlanAutomation>("recommended");
 
 /** How patch IDs are read: the OSM convention, or every feature as new. */
 export const patchIdModeAtom = atom<PatchIdMode>("osm");

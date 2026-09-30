@@ -82,7 +82,10 @@ the plan no longer has are listed in `plan.staleDecisions`.
 - `matching` (optional): match imported features to nearby base features. `propertyKeys` and
   `attachNetwork` are required; `maxDistanceMeters` defaults to `1`, `automatic` to `"high-confidence"`,
   and `allowWayRemoval` to false (removal is always a manual choice).
-- `decisions`: `{ proposalId, action: "accept" | "reject" }[]`.
+- `automation` (`"conservative"`, `"recommended"` or `"aggressive"`, default `"recommended"`): how much the
+  planner decides without a person. Its decisions are marked `automated` on the proposals and are replaced by
+  any decision in `decisions`; see MP-M6 in the merge-process guide.
+- `decisions`: `{ proposalId, action: "accept" | "reject" }[]`, a person's decisions.
 
 ### Discover matching candidates
 
