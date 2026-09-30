@@ -33,7 +33,7 @@ import {
   type WorkerRuntime,
 } from "./capabilities.ts";
 import { installStructuredComlinkErrorTransferHandler } from "./comlink-errors.ts";
-import type { MergePlanBulkRequest, MergePlanFilter } from "./plan-session.ts";
+import type { MergeMatchingFilter, MergePlanBulkRequest, MergePlanFilter } from "./plan-session.ts";
 import type { DrawToRasterTileOptions } from "./raster.ts";
 import { supportsReadableStreamTransfer, transfer } from "./utils.ts";
 import {
@@ -111,7 +111,9 @@ type PlanDatasetProxyMethodName =
   | "setMergePlanFilter"
   | "getMergePlanPage"
   | "getMergePlanFeature"
-  | "getMergePlanLayer"
+  | "getMergePlanTile"
+  | "getMergeMatchingPage"
+  | "getMergeUncopiedTagPage"
   | "getMergePlanOsc"
   | "setMergePlanDecisions"
   | "applyMergePlanBulk"
@@ -1717,11 +1719,42 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     );
   }
 
-  getMergePlanLayer(baseOsmId: OsmId) {
-    return this.runWithWorker((worker) => worker.getMergePlanLayer(this.getId(baseOsmId)), {
+  /**
+   * One vector tile of the plan's imported features with their current outcomes (see
+   * `PLAN_TILE_LAYERS`). Plans live on the control worker, so tiles are drawn there. Empty when
+   * no plan is open.
+   */
+  getMergePlanTile(baseOsmId: OsmId, tile: Tile, signal?: AbortSignal) {
+    return this.runWithWorker((worker) => worker.getMergePlanTile(this.getId(baseOsmId), tile), {
       lane: "control",
       retry: "once",
+      signal,
     });
+  }
+
+  /**
+   * One page of the matching outcome's features, from the open plan or, once it is applied, the
+   * applied plan until the next plan or clear for this base. Throws when neither remains, such
+   * as after a worker restart.
+   */
+  getMergeMatchingPage(
+    baseOsmId: OsmId,
+    filter: MergeMatchingFilter,
+    page: number,
+    pageSize: number,
+  ) {
+    return this.runWithWorker(
+      (worker) => worker.getMergeMatchingPage(this.getId(baseOsmId), filter, page, pageSize),
+      { lane: "control", retry: "once" },
+    );
+  }
+
+  /** One page of the features whose value for tag `key` was not copied; see above. */
+  getMergeUncopiedTagPage(baseOsmId: OsmId, key: string, page: number, pageSize: number) {
+    return this.runWithWorker(
+      (worker) => worker.getMergeUncopiedTagPage(this.getId(baseOsmId), key, page, pageSize),
+      { lane: "control", retry: "once" },
+    );
   }
 
   getMergePlanOsc(baseOsmId: OsmId) {

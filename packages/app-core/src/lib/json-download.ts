@@ -9,10 +9,51 @@ interface JsonWritable {
   abort(reason?: unknown): Promise<void>;
 }
 
-/** Finish an object report only after every byte has been written successfully. */
+/** An array a report writes page by page as it is read, so it is never held in one string. */
+class StreamedArray {
+  readonly pages: () => AsyncIterable<readonly unknown[]>;
+  constructor(pages: () => AsyncIterable<readonly unknown[]>) {
+    this.pages = pages;
+  }
+}
+
+/** A value for {@link writeJsonReport} that becomes a JSON array of every page's items. */
+export function streamedArray(pages: () => AsyncIterable<readonly unknown[]>): unknown {
+  return new StreamedArray(pages);
+}
+
+/**
+ * Finish an object report only after every byte has been written successfully. Arrays made with
+ * {@link streamedArray} are written as their pages are read.
+ */
 export async function writeJsonReport(stream: JsonWritable, value: unknown): Promise<void> {
   try {
-    await stream.write(`${JSON.stringify(value, null, 2)}\n`);
+    // Each streamed array is stringified as a token no report value can contain, then split out.
+    const arrays: StreamedArray[] = [];
+    const nonce = crypto.randomUUID();
+    const json = JSON.stringify(
+      value,
+      (_key, item: unknown) =>
+        item instanceof StreamedArray ? `\u0000${nonce}:${arrays.push(item) - 1}\u0000` : item,
+      2,
+    );
+    const parts = json.split(new RegExp(`"\\\\u0000${nonce}:(\\d+)\\\\u0000"`));
+    for (const [index, part] of parts.entries()) {
+      if (index % 2 === 0) {
+        await stream.write(part);
+        continue;
+      }
+      await stream.write("[");
+      let first = true;
+      for await (const page of arrays[Number(part)]!.pages()) {
+        for (const item of page) {
+          await stream.write(`${first ? "" : ","}\n${JSON.stringify(item)}`);
+          first = false;
+        }
+      }
+      await stream.write(first ? "]" : "\n]");
+    }
+    await stream.write("\n");
     await stream.close();
   } catch (error) {
     try {

@@ -1,4 +1,4 @@
-import { APPID, useMapColors } from "@osmix/app-components";
+import { APPID, MIN_PICKABLE_ZOOM, planTileUrl, useMapColors } from "@osmix/app-components";
 import { useAtomValue } from "jotai";
 import type {
   CircleLayerSpecification,
@@ -6,12 +6,12 @@ import type {
   LineLayerSpecification,
   MapLayerMouseEvent,
 } from "maplibre-gl";
-import type { PlanOutcome } from "osmix";
+import { PLAN_TILE_LAYERS, type PlanOutcome } from "osmix";
 import { useEffect } from "react";
 import { Layer, Source, useMap } from "react-map-gl/maplibre";
 
 import { OUTCOME_LABEL, OUTCOMES } from "../lib/merge-plan-workflow";
-import { planLayerAtom, planOverviewAtom, selectedPlanFeatureAtom } from "../state/merge-plan";
+import { planMapAtom, planOverviewAtom, selectedPlanFeatureAtom } from "../state/merge-plan";
 
 const SOURCE_ID = `${APPID}:merge-plan`;
 const LINES_ID = `${SOURCE_ID}:lines`;
@@ -50,17 +50,18 @@ function outcomeColor(colors: ReturnType<typeof useMapColors>): ExpressionSpecif
 /**
  * The plan on the map: every imported feature coloured by outcome, with features that need a
  * decision drawn wider and dashed, so colour is never the only cue. Clicking a feature opens
- * its row in the review.
+ * its row in the review. The worker draws the tiles from the live plan, from the zoom where
+ * features become selectable; a new revision refetches them after the plan changes.
  */
 export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => unknown }) {
-  const layer = useAtomValue(planLayerAtom);
+  const planMap = useAtomValue(planMapAtom);
   const selected = useAtomValue(selectedPlanFeatureAtom);
   const colors = useMapColors();
   const map = useMap().current;
 
   useEffect(() => {
-    if (!map || !layer) return;
-    const layers = [LINES_ID, POINTS_ID];
+    if (!map || !planMap) return;
+    const layers = [LINES_ID, `${LINES_ID}:decision`, POINTS_ID];
     const handleClick = (event: MapLayerMouseEvent) => {
       const key = event.features?.[0]?.properties?.["featureKey"];
       if (typeof key === "string") void onSelect(key);
@@ -69,9 +70,9 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
     return () => {
       map.off("click", layers, handleClick);
     };
-  }, [map, layer, onSelect]);
+  }, [map, planMap, onSelect]);
 
-  if (!layer) return null;
+  if (!planMap) return null;
   const color = outcomeColor(colors);
   const isSelected: ExpressionSpecification = ["==", ["get", "featureKey"], selected?.key ?? ""];
   const decision: ExpressionSpecification = ["==", ["get", "outcome"], "needs-decision"];
@@ -86,29 +87,39 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
     "circle-stroke-width": 1.5,
   };
   return (
-    <Source id={SOURCE_ID} type="geojson" data={layer}>
+    <Source
+      key={planMap.baseOsmId}
+      id={SOURCE_ID}
+      type="vector"
+      tiles={[planTileUrl(planMap.baseOsmId, planMap.revision)]}
+      minzoom={MIN_PICKABLE_ZOOM}
+      maxzoom={14}
+      {...(planMap.bounds ? { bounds: planMap.bounds } : {})}
+    >
       <Layer
         id={`${SOURCE_ID}:casing`}
         type="line"
-        filter={["==", ["geometry-type"], "LineString"]}
+        source-layer={PLAN_TILE_LAYERS.ways}
         paint={{ "line-color": colors.casing, "line-width": ["case", isSelected, 11, 6] }}
       />
       <Layer
         id={LINES_ID}
         type="line"
-        filter={["all", ["==", ["geometry-type"], "LineString"], ["!", decision]]}
+        source-layer={PLAN_TILE_LAYERS.ways}
+        filter={["!", decision]}
         paint={linePaint}
       />
       <Layer
         id={`${LINES_ID}:decision`}
         type="line"
-        filter={["all", ["==", ["geometry-type"], "LineString"], decision]}
+        source-layer={PLAN_TILE_LAYERS.ways}
+        filter={decision}
         paint={{ ...linePaint, "line-dasharray": [1.5, 1] }}
       />
       <Layer
         id={POINTS_ID}
         type="circle"
-        filter={["==", ["geometry-type"], "Point"]}
+        source-layer={PLAN_TILE_LAYERS.nodes}
         paint={pointPaint}
       />
     </Source>
@@ -120,9 +131,9 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
  * to its name and count, for the outcomes the plan has. Shown while the plan layer is drawn.
  */
 export function PlanLegend() {
-  const layer = useAtomValue(planLayerAtom);
+  const planMap = useAtomValue(planMapAtom);
   const overview = useAtomValue(planOverviewAtom);
-  if (!layer || !overview) return null;
+  if (!planMap || !overview) return null;
   const counts = overview.summary.features;
   return (
     <ul className="flex flex-col border-t py-1" aria-label="Plan map legend">

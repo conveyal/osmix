@@ -256,8 +256,8 @@ declare global {
       readState: () => {
         decisions: PlanDecision[];
         calls: string[];
-        features: Record<string, string>;
       };
+      outcome: (featureKey: string) => string;
     };
   }
 }
@@ -266,12 +266,9 @@ window.planReviewHarness = {
   readState: () => ({
     decisions: store.current.overview.decisions,
     calls: [...store.current.calls],
-    features: Object.fromEntries(
-      store.current.worker
-        .getMergePlanLayer(store.current.baseId)
-        .features.map(({ properties }) => [properties.featureKey, properties.outcome]),
-    ),
   }),
+  outcome: (featureKey) =>
+    store.current.worker.getMergePlanFeature(store.current.baseId, featureKey).outcome,
 };
 
 createRoot(document.getElementById("root")!).render(<Harness />);

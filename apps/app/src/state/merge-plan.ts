@@ -1,8 +1,8 @@
 import { atom } from "jotai";
+import type { GeoBbox2D } from "osmix";
 import type {
   MergePlanFeatureDetail,
   MergePlanFilter,
-  MergePlanLayer,
   MergePlanOverview,
   MergePlanPage,
   PatchIdMode,
@@ -28,7 +28,19 @@ export const planOverviewAtom = atom<MergePlanOverview | null>(null);
 export const planFilterAtom = atom<MergePlanFilter>({});
 export const planPageAtom = atom<MergePlanPage | null>(null);
 export const planPageIndexAtom = atom(0);
-export const planLayerAtom = atom<MergePlanLayer | null>(null);
+/**
+ * The plan drawn on the map from worker tiles. `revision` changes whenever outcomes may have, so
+ * the map fetches fresh tiles; `bounds` limits tile requests to the patch.
+ */
+let planRevision = 0;
+/** A revision no earlier plan map used, so tile URLs are never reused across plans. */
+export const nextPlanRevision = () => ++planRevision;
+
+export const planMapAtom = atom<{
+  baseOsmId: string;
+  revision: number;
+  bounds?: GeoBbox2D;
+} | null>(null);
 /** The feature whose evidence is open, highlighted on the map. */
 export const selectedPlanFeatureAtom = atom<MergePlanFeatureDetail | null>(null);
 
@@ -38,6 +50,6 @@ export const resetMergePlanAtom = atom(null, (_get, set) => {
   set(planFilterAtom, {});
   set(planPageAtom, null);
   set(planPageIndexAtom, 0);
-  set(planLayerAtom, null);
+  set(planMapAtom, null);
   set(selectedPlanFeatureAtom, null);
 });

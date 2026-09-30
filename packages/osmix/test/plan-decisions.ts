@@ -1,10 +1,14 @@
 import {
   type MergePlanOptions,
   type OsmConflationDecision,
+  type OsmConflationOutcomeReport,
   type PlanDecision,
   planMerge,
 } from "@osmix/change";
 import type { Osm } from "@osmix/core";
+
+import type { MergePlanOverview } from "../src/index.ts";
+import type { OsmixWorker } from "../src/worker.ts";
 
 /**
  * Plan options with matching decisions written as candidate decisions, the form the scenario
@@ -40,4 +44,28 @@ export function withMatchingDecisions(
     if (!known.has(id)) throw Error(`Unknown conflation candidate: ${id}`);
   }
   return { ...options, decisions: result };
+}
+
+const ALL = Number.MAX_SAFE_INTEGER;
+
+/**
+ * The complete matching outcome of `overview`, read back from the worker's pages: the report
+ * the overview summarizes, for tests that assert on its feature and tag lists.
+ */
+export function fullMatchingOutcome(
+  worker: Pick<OsmixWorker, "getMergeMatchingPage" | "getMergeUncopiedTagPage">,
+  baseId: string,
+  overview: MergePlanOverview,
+): OsmConflationOutcomeReport {
+  const outcome = overview.matching?.outcome;
+  if (!outcome) throw Error("Expected a matching outcome");
+  const { tags, wayRemovalFeatures: _, ...rest } = outcome;
+  return {
+    ...rest,
+    features: worker.getMergeMatchingPage(baseId, "all", 0, ALL).features,
+    tags: tags.map(({ uncopiedFeatures: _count, ...tag }) => ({
+      ...tag,
+      uncopied: worker.getMergeUncopiedTagPage(baseId, tag.key, 0, ALL).features,
+    })),
+  };
 }

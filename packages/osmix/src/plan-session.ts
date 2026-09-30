@@ -1,11 +1,15 @@
 /**
  * Views of a live merge plan for the worker's paged, serializable API: an overview, filtered
- * feature pages, one feature's evidence, a map layer, and bulk decisions.
+ * feature pages, one feature's evidence, and bulk decisions. `plan-tiles.ts` draws the map.
  */
 import {
   getMergePlanCandidate,
   type MergePlan,
   type OsmConflationCandidate,
+  type OsmConflationOutcomeFeature,
+  type OsmConflationOutcomeReport,
+  type OsmConflationTagOutcome,
+  type OsmConflationUncopiedTagFeature,
   PLAN_OUTCOME_PRIORITY,
   type PlanDecision,
   type PlanFeature,
@@ -16,6 +20,22 @@ import {
 import type { Osm } from "@osmix/core";
 import type { LonLat, OsmTags } from "@osmix/types";
 
+/** A tag's matching outcome, with a count in place of its list of values not copied. */
+export type MergePlanTagOutcome = Omit<OsmConflationTagOutcome, "uncopied"> & {
+  uncopiedFeatures: number;
+};
+
+/**
+ * The matching outcome without its per-feature lists, which can hold an entry for every imported
+ * feature: read those a page at a time with `getMergeMatchingPage` and
+ * `getMergeUncopiedTagPage`.
+ */
+export type MergePlanMatchingOutcome = Omit<OsmConflationOutcomeReport, "features" | "tags"> & {
+  tags: MergePlanTagOutcome[];
+  /** Features whose matching removes the imported way. */
+  wayRemovalFeatures: number;
+};
+
 /** Everything about a plan except its features, for headers and summaries. */
 export interface MergePlanOverview {
   inputs: MergePlan["inputs"];
@@ -23,7 +43,10 @@ export interface MergePlanOverview {
   idRemap: MergePlan["idRemap"];
   summary: MergePlan["summary"];
   diagnostics: MergePlan["diagnostics"];
-  matching?: MergePlan["matching"];
+  matching?: {
+    candidates: NonNullable<MergePlan["matching"]>["candidates"];
+    outcome: MergePlanMatchingOutcome;
+  };
   decisions: PlanDecision[];
   staleDecisions: string[];
   featureCount: number;
@@ -78,16 +101,19 @@ export interface MergePlanBulkResult {
   skipped: number;
 }
 
-/** GeoJSON of the plan's imported features, coloured by outcome on the map. */
-export interface MergePlanLayer {
-  type: "FeatureCollection";
-  features: {
-    type: "Feature";
-    geometry:
-      | { type: "Point"; coordinates: LonLat }
-      | { type: "LineString"; coordinates: LonLat[] };
-    properties: { featureKey: string; outcome: PlanOutcome };
-  }[];
+/** Which matching outcome features a page shows. */
+export type MergeMatchingFilter = "unresolved" | "skipped" | "way-removal" | "all";
+
+export interface MergeMatchingPage {
+  features: OsmConflationOutcomeFeature[];
+  total: number;
+  totalPages: number;
+}
+
+export interface MergeUncopiedTagPage {
+  features: OsmConflationUncopiedTagFeature[];
+  total: number;
+  totalPages: number;
 }
 
 const DIRECT_KINDS = new Set<PlanProposal["kind"]>(["add", "same-id-replace"]);
@@ -99,11 +125,75 @@ export function planOverview(plan: MergePlan): MergePlanOverview {
     idRemap: plan.idRemap,
     summary: plan.summary,
     diagnostics: plan.diagnostics,
-    ...(plan.matching ? { matching: plan.matching } : {}),
+    ...(plan.matching
+      ? {
+          matching: {
+            candidates: plan.matching.candidates,
+            outcome: matchingOutcome(plan.matching.outcome),
+          },
+        }
+      : {}),
     decisions: [...(plan.options.decisions ?? [])],
     staleDecisions: plan.staleDecisions,
     featureCount: plan.features.length,
   });
+}
+
+function matchingOutcome(report: OsmConflationOutcomeReport): MergePlanMatchingOutcome {
+  const { features, tags, ...rest } = report;
+  return {
+    ...rest,
+    tags: tags.map(({ uncopied, ...tag }) => ({ ...tag, uncopiedFeatures: uncopied.length })),
+    wayRemovalFeatures: features.filter((feature) => feature.wayRemoval).length,
+  };
+}
+
+function pageOf<T>(items: readonly T[], page: number, pageSize: number) {
+  const totalPages = Math.ceil(items.length / pageSize);
+  return {
+    features: items.slice(page * pageSize, (page + 1) * pageSize),
+    total: items.length,
+    totalPages,
+  };
+}
+
+function matchesMatchingFilter(feature: OsmConflationOutcomeFeature, filter: MergeMatchingFilter) {
+  switch (filter) {
+    case "unresolved":
+      return feature.unresolved !== null;
+    case "skipped":
+      return feature.skipped;
+    case "way-removal":
+      return feature.wayRemoval !== undefined;
+    case "all":
+      return true;
+  }
+}
+
+/** One page of the matching outcome's features that match `filter`, in report order. */
+export function matchingPage(
+  report: OsmConflationOutcomeReport,
+  filter: MergeMatchingFilter,
+  page: number,
+  pageSize: number,
+): MergeMatchingPage {
+  const features =
+    filter === "all"
+      ? report.features
+      : report.features.filter((feature) => matchesMatchingFilter(feature, filter));
+  return structuredClone(pageOf(features, page, pageSize));
+}
+
+/** One page of the imported features whose value for tag `key` was not copied. */
+export function uncopiedTagPage(
+  report: OsmConflationOutcomeReport,
+  key: string,
+  page: number,
+  pageSize: number,
+): MergeUncopiedTagPage {
+  const tag = report.tags.find((candidate) => candidate.key === key);
+  if (!tag) throw Error(`No tag ${key} in this matching outcome`);
+  return structuredClone(pageOf(tag.uncopied, page, pageSize));
 }
 
 function proposalsOf(plan: MergePlan, feature: PlanFeature) {
@@ -203,28 +293,6 @@ export function planFeatureDetail(
     coordinates: coordinates(patch, feature.type, feature.originalId),
     targets,
   };
-}
-
-export function planLayer(plan: MergePlan, patch: Osm): MergePlanLayer {
-  const features: MergePlanLayer["features"] = [];
-  for (const feature of plan.features) {
-    const points = coordinates(patch, feature.type, feature.originalId);
-    const properties = { featureKey: feature.key, outcome: feature.outcome };
-    if (feature.type === "node" && points[0]) {
-      features.push({
-        type: "Feature",
-        geometry: { type: "Point", coordinates: points[0] },
-        properties,
-      });
-    } else if (feature.type === "way" && points.length >= 2) {
-      features.push({
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: points },
-        properties,
-      });
-    }
-  }
-  return { type: "FeatureCollection", features };
 }
 
 /**

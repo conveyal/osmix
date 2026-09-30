@@ -1,6 +1,10 @@
+import { pointToTile } from "@mapbox/tilebelt";
+import { VectorTile } from "@mapbox/vector-tile";
+import type { Tile } from "@osmix/types";
+import { PbfReader } from "pbf";
 import { describe, expect, it } from "vitest";
 
-import { Osm, type MergePlanOptions } from "../src/index.ts";
+import { Osm, PLAN_TILE_LAYERS, type MergePlanOptions } from "../src/index.ts";
 import { OsmixWorker } from "../src/worker.ts";
 
 class TestWorker extends OsmixWorker {
@@ -24,6 +28,17 @@ function osm(
   result.buildIndexes();
   result.buildSpatialIndexes();
   return result;
+}
+
+/** Each plan tile layer's feature properties, in tile order. */
+function planTileFeatures(data: ArrayBuffer) {
+  const tile = new VectorTile(new PbfReader(new Uint8Array(data)));
+  const properties = (name: string) => {
+    const layer = tile.layers[name];
+    if (!layer) return [];
+    return Array.from({ length: layer.length }, (_, i) => layer.feature(i).properties);
+  };
+  return { ways: properties(PLAN_TILE_LAYERS.ways), nodes: properties(PLAN_TILE_LAYERS.nodes) };
 }
 
 /**
@@ -114,14 +129,27 @@ describe("worker merge plan sessions", () => {
     );
   });
 
-  it("draws the imported features coloured by outcome", () => {
+  it("draws the imported features as tiles coloured by their current outcome", () => {
     const { worker, base } = planned();
-    const layer = worker.getMergePlanLayer(base.id);
-    expect(layer.features.map((feature) => [feature.geometry.type, feature.properties])).toEqual([
-      ["LineString", { featureKey: "way:-1", outcome: "needs-decision" }],
-      ["LineString", { featureKey: "way:-2", outcome: "added" }],
-      ["Point", { featureKey: "node:-4", outcome: "merged" }],
+    const covering = pointToTile(0.005, 0.005, 10) as Tile;
+    expect(planTileFeatures(worker.getMergePlanTile(base.id, covering))).toEqual({
+      ways: [
+        { featureKey: "way:-1", outcome: "needs-decision" },
+        { featureKey: "way:-2", outcome: "added" },
+      ],
+      nodes: [{ featureKey: "node:-4", outcome: "merged" }],
+    });
+    expect(worker.getMergePlanTile(base.id, pointToTile(90, 45, 10) as Tile).byteLength).toBe(0);
+
+    worker.setMergePlanDecisions(base.id, [{ proposalId: "exact:n-4>n3", action: "reject" }]);
+    const decided = worker.getMergePlanFeature(base.id, "node:-4").outcome;
+    expect(decided).not.toBe("merged");
+    expect(planTileFeatures(worker.getMergePlanTile(base.id, covering)).nodes).toEqual([
+      { featureKey: "node:-4", outcome: decided },
     ]);
+
+    worker.clearMergePlan(base.id);
+    expect(worker.getMergePlanTile(base.id, covering).byteLength).toBe(0);
   });
 
   it("replans with decisions and applies them in bulk", () => {

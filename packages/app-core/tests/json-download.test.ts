@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { writeJsonArray, writeJsonReport } from "../src/lib/json-download.ts";
+import { streamedArray, writeJsonArray, writeJsonReport } from "../src/lib/json-download.ts";
 
 async function* pagesOf(...pages: unknown[][]) {
   yield* pages;
@@ -55,9 +55,37 @@ describe("completed merge report download", () => {
     const close = vi.fn(async () => {});
     const abort = vi.fn(async () => {});
     await writeJsonReport({ write, close, abort }, report);
-    expect(JSON.parse(write.mock.calls[0][0])).toEqual(report);
+    expect(JSON.parse(write.mock.calls.map(([value]) => value).join(""))).toEqual(report);
     expect(close).toHaveBeenCalledOnce();
     expect(abort).not.toHaveBeenCalled();
+  });
+
+  it("writes streamed arrays page by page in place, including empty ones", async () => {
+    const written: string[] = [];
+    async function* pages() {
+      yield [{ id: 1 }, { id: 2 }];
+      yield [];
+      yield [{ id: 3, note: "\u0000 is data" }];
+    }
+    async function* none() {}
+    await writeJsonReport(
+      {
+        write: async (value) => void written.push(value),
+        close: async () => {},
+        abort: async () => {},
+      },
+      {
+        version: 2,
+        plan: { features: streamedArray(pages), tags: [{ uncopied: streamedArray(none) }] },
+      },
+    );
+    expect(JSON.parse(written.join(""))).toEqual({
+      version: 2,
+      plan: {
+        features: [{ id: 1 }, { id: 2 }, { id: 3, note: "\u0000 is data" }],
+        tags: [{ uncopied: [] }],
+      },
+    });
   });
 
   it("reports final close failures instead of claiming that the report was saved", async () => {

@@ -43,8 +43,10 @@
   },
   "devDependencies": {
     "@mapbox/tilebelt": "^2.0.3",
+    "@mapbox/vector-tile": "^3.0.0",
     "@osmix/test-utils": "workspace:*",
     "@types/geojson": "catalog:",
+    "pbf": "catalog:",
     "typescript": "catalog:",
     "vitest": "^5.0.1"
   },

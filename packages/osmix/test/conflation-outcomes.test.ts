@@ -12,6 +12,7 @@ import {
   planMerge,
   type PlanDecision,
 } from "../src/index";
+import { fullMatchingOutcome } from "./plan-decisions.ts";
 
 class TestWorker extends OsmixWorker {
   add(osm: Osm) {
@@ -54,8 +55,7 @@ function outcomeOf(worker: TestWorker, baseId: string, decisions?: PlanDecision[
   const overview = decisions
     ? worker.setMergePlanDecisions(baseId, decisions)
     : worker.getMergePlanOverview(baseId);
-  if (!overview.matching) throw Error("Expected a matching outcome");
-  return overview.matching.outcome;
+  return fullMatchingOutcome(worker, baseId, overview);
 }
 
 const reject301: PlanDecision = { proposalId: "copy:n301>n4", action: "reject" };
@@ -228,6 +228,26 @@ describe("matching plan outcomes", () => {
     expect([...actual.relations.sorted()]).toEqual([]);
   });
 
+  it("summarizes the lists in the overview and pages them from the worker", () => {
+    const { worker, base } = propertyInputs("mixed");
+    const overview = worker.setMergePlanDecisions(base.id, [reject301]);
+    const outcome = fullMatchingOutcome(worker, base.id, overview);
+    expect(overview.matching?.outcome.tags).toEqual(
+      outcome.tags.map(({ uncopied, ...tag }) => ({ ...tag, uncopiedFeatures: uncopied.length })),
+    );
+    expect(overview.matching?.outcome.wayRemovalFeatures).toBe(0);
+    const unresolved = outcome.features.filter((feature) => feature.unresolved !== null);
+    const first = worker.getMergeMatchingPage(base.id, "unresolved", 0, 2);
+    expect(first).toEqual({ features: unresolved.slice(0, 2), total: 3, totalPages: 2 });
+    expect(worker.getMergeMatchingPage(base.id, "unresolved", 1, 2).features).toEqual(
+      unresolved.slice(2),
+    );
+    expect(worker.getMergeMatchingPage(base.id, "skipped", 0, 10).total).toBe(1);
+    expect(() => worker.getMergeUncopiedTagPage(base.id, "missing", 0, 10)).toThrow(
+      "No tag missing in this matching outcome",
+    );
+  });
+
   it("reports an all-unresolved review without claiming its imported attributes were copied", () => {
     const { worker, base, patch, options } = propertyInputs("applied");
     worker.planMerge(base.id, patch.id, planOptions({ ...options, automatic: "none" }));
@@ -292,7 +312,12 @@ describe("matching plan outcomes", () => {
     await remote.transferIn(base);
     await remote.transferIn(patch);
     const planned = await remote.planMerge(base.id, patch.id, planOptions(options));
-    expect(planned.matching?.outcome).toEqual(outcome);
+    expect(planned.matching?.outcome).toEqual(
+      worker.getMergePlanOverview(base.id).matching?.outcome,
+    );
+    expect((await remote.getMergeMatchingPage(base.id, "all", 0, 10)).features).toEqual(
+      outcome.features,
+    );
     const retained = structuredClone(planned.matching?.outcome);
     const osc = await remote.getMergePlanOsc(base.id);
     await remote.restartForTest();

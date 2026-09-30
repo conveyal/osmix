@@ -118,8 +118,9 @@ console.log(osc.length, applied.summary.features);
 `applyMergePlanBulk(baseId, { action, filter })` accepts, rejects, or clears decisions for every proposal the
 filter matches; accepting skips proposals with alternatives, which need an individual choice.
 `getMergePlanFeature()` returns one feature's matching evidence and the geometry of the base entities its
-proposals target, and `getMergePlanLayer()` returns every imported feature as GeoJSON with its outcome. The
-plan's rules are in the [merge-process guide](../../docs/merge-process.md).
+proposals target, and `getMergePlanTile(baseId, tile)` draws the imported features as a vector tile, with a
+`ways` and a `nodes` layer (`PLAN_TILE_LAYERS`) whose features carry `featureKey` and their current `outcome`, so
+a map can show a plan of any size. The plan's rules are in the [merge-process guide](../../docs/merge-process.md).
 
 After a worker restart the remote rebuilds each plan from its inputs, options, and decisions, but only when
 the restored inputs have the content hashes the plan was made from; otherwise it throws
@@ -446,8 +447,14 @@ spec-compliant without staging everything in memory.
 - `remote.planMerge(baseId, patchId, options?)` - Plan a merge for review; returns its overview.
 - `remote.getMergePlanOverview(baseId)` / `remote.getMergePlanPage(baseId, page, pageSize)` /
   `remote.setMergePlanFilter(baseId, filter)` - Read the plan and page through its imported features.
-- `remote.getMergePlanFeature(baseId, featureKey)` / `remote.getMergePlanLayer(baseId)` - One feature's
-  evidence, and every feature as GeoJSON with its outcome.
+- `remote.getMergePlanFeature(baseId, featureKey)` / `remote.getMergePlanTile(baseId, tile, signal?)` - One
+  feature's evidence, and a vector tile of the imported features with their current outcomes.
+- `remote.getMergeMatchingPage(baseId, filter, page, pageSize)` /
+  `remote.getMergeUncopiedTagPage(baseId, key, page, pageSize)` - The matching outcome's per-feature lists,
+  which the overview only counts (`matching.outcome.tags[].uncopiedFeatures`, `wayRemovalFeatures`) because they
+  can hold an entry for every imported feature. `filter` is `"unresolved"`, `"skipped"`, `"way-removal"` or
+  `"all"`. After `applyMergePlan` they stay readable for the completed merge until the next plan or
+  `clearMergePlan` for that base.
 - `remote.setMergePlanDecisions(baseId, decisions)` / `remote.applyMergePlanBulk(baseId, request)` - Decide
   proposals and replan.
 - `remote.getMergePlanOsc(baseId)` - The plan as an osmChange document.

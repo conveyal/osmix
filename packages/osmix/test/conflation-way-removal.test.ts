@@ -18,6 +18,7 @@ import {
   MergePlanDecisionConflictError,
 } from "../src/index";
 import { withMatchingDecisions } from "./plan-decisions.ts";
+import { fullMatchingOutcome } from "./plan-decisions.ts";
 
 const wayCandidateId = "way:20->10";
 const removeId = "remove:w20>w10";
@@ -125,9 +126,7 @@ function proposal(worker: TestWorker, baseId: string, id: string): PlanProposal 
 }
 
 function outcomeOf(worker: TestWorker, baseId: string) {
-  const outcome = worker.getMergePlanOverview(baseId).matching?.outcome;
-  if (!outcome) throw Error("Expected a matching outcome");
-  return outcome;
+  return fullMatchingOutcome(worker, baseId, worker.getMergePlanOverview(baseId));
 }
 
 describe("explicit way removal through the facade and worker", () => {
@@ -488,10 +487,10 @@ describe("explicit way removal through the facade and worker", () => {
     const page = await remote.getMergePlanPage(base.id, 0, 1);
     expect(page.features.map(({ key }) => key)).toEqual(["way:20"]);
     const expectedOutcome = structuredClone(decided.matching?.outcome);
+    const removals = await remote.getMergeMatchingPage(base.id, "way-removal", 0, 10);
+    const expectedRemovals = structuredClone(removals);
     const osc = await remote.getMergePlanOsc(base.id);
-    const mutable = decided.matching?.outcome.features.find(
-      (feature) => feature.sourceId === 20,
-    )?.wayRemoval;
+    const mutable = removals.features.find((feature) => feature.sourceId === 20)?.wayRemoval;
     if (!mutable) throw Error("Expected planned removal report");
     mutable.orphanNodeIds.push(103);
     mutable.connections[0]!.retainedWayIds.length = 0;
@@ -500,12 +499,23 @@ describe("explicit way removal through the facade and worker", () => {
     expect(await remote.getMergePlanOsc(base.id)).toBe(osc);
     const recovered = await remote.getMergePlanOverview(base.id);
     expect(recovered.matching?.outcome).toEqual(expectedOutcome);
+    expect(await remote.getMergeMatchingPage(base.id, "way-removal", 0, 10)).toEqual(
+      expectedRemovals,
+    );
     await remote.applyMergePlan(base.id);
     const result = await remote.get(base.id);
     expect(result.ways.ids.has(20)).toBe(false);
     expect(result.ways.getById(30)?.refs).toEqual([2, 103]);
     expect(recovered.matching?.outcome).toEqual(expectedOutcome);
     await expect(remote.getMergePlanOverview(base.id)).rejects.toThrow("No active merge plan");
+    // The applied outcome's details stay readable for the completed merge until cleared.
+    expect(await remote.getMergeMatchingPage(base.id, "way-removal", 0, 10)).toEqual(
+      expectedRemovals,
+    );
+    await remote.clearMergePlan(base.id);
+    await expect(remote.getMergeMatchingPage(base.id, "all", 0, 10)).rejects.toThrow(
+      "The matching details of this merge are no longer available",
+    );
   });
 
   it("invalidates a removal plan when an input is replaced under the same ID", async () => {

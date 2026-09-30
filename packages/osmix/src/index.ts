@@ -25,15 +25,20 @@ export {
 } from "./remote.ts";
 export { OsmixWorker, type RouteResult, type WaySegment } from "./worker.ts";
 export type {
+  MergeMatchingFilter,
+  MergeMatchingPage,
+  MergeUncopiedTagPage,
   MergePlanBulkRequest,
   MergePlanBulkResult,
   MergePlanFeatureDetail,
   MergePlanFeatureView,
   MergePlanFilter,
-  MergePlanLayer,
+  MergePlanMatchingOutcome,
   MergePlanOverview,
   MergePlanPage,
+  MergePlanTagOutcome,
 } from "./plan-session.ts";
+export { PLAN_TILE_LAYERS } from "./plan-tiles.ts";
 export { drawToRasterTile, type DrawToRasterTileOptions } from "./raster.ts";
 export {
   canShareArrayBuffers,

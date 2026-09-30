@@ -33,6 +33,8 @@ tokens, spacing, primitives, map overlay primitives) lives in
 - `PlanMapLayer`, `PlanLegend` — imported features coloured by outcome
   (`--map-outcome-*`), with features that need a decision drawn wider and
   dashed so colour is never the only cue; clicking a feature opens its row.
+  The worker draws the plan as `@osmix/plan` vector tiles from zoom 11, where
+  features become selectable, so a plan of any size stays on the map.
   `PlanLegend` goes in the map legend (`OsmixMap`'s `legend`), under the dataset
   rows, pairing each colour with its outcome name and count; the sidebar keeps
   only the summary table.

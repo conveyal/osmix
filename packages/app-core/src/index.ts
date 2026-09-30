@@ -42,7 +42,12 @@ export {
   type OsmLoadFailureContext,
   type OsmLoadFailureTechnicalDetails,
 } from "./lib/osm-load-failure.ts";
-export { saveChangesetJson, writeJsonArray, writeJsonReport } from "./lib/json-download.ts";
+export {
+  saveChangesetJson,
+  streamedArray,
+  writeJsonArray,
+  writeJsonReport,
+} from "./lib/json-download.ts";
 export { ensureOsmPbfDownloadName, suffixOsmPbfName } from "./lib/osm-pbf-download-name.ts";
 export { createThrottledProgressLogger } from "./lib/progress-log.ts";
 export {

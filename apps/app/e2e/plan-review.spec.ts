@@ -1,6 +1,8 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const readState = (page: Page) => page.evaluate(() => window.planReviewHarness.readState());
+const outcome = (page: Page, featureKey: string) =>
+  page.evaluate((key) => window.planReviewHarness.outcome(key), featureKey);
 const review = (page: Page) => page.getByTestId("plan-review-harness");
 const feature = (page: Page, name: string) =>
   review(page).getByRole("region", { name, exact: true });
@@ -79,7 +81,7 @@ test("choices on a feature replan it, and removal waits for its connections", as
     .locator('[data-proposal-id="copy:w20>w10"]')
     .getByRole("radio", { name: "Leave out", exact: true })
     .check();
-  await expect.poll(async () => (await readState(page)).features["way:20"]).toBe("removed");
+  await expect.poll(async () => outcome(page, "way:20")).toBe("removed");
 
   await removal.getByRole("radio", { name: "Decide later", exact: true }).check();
   await expect
@@ -122,10 +124,10 @@ test("the patch ID notice counts replaced base entities and replans every featur
   await review(page).getByRole("button", { name: "Load patch ID fixture" }).click();
   const notice = review(page).getByText("2 patch entities replace base entities");
   await expect(notice).toBeVisible();
-  await expect.poll(async () => (await readState(page)).features["node:1"]).toBe("replaced");
+  await expect.poll(async () => outcome(page, "node:1")).toBe("replaced");
   await review(page).getByRole("checkbox", { name: "Treat all as new" }).check();
   await expect(review(page).getByText("Every patch feature is read as new")).toBeVisible();
-  await expect.poll(async () => (await readState(page)).features["node:1"]).toBe("added");
+  await expect.poll(async () => outcome(page, "node:1")).toBe("added");
 });
 
 test("finite, unavailable, and unmatched distances remain distinct", async ({ page }) => {

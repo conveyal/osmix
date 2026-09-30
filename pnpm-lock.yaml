@@ -924,12 +924,18 @@ importers:
       '@mapbox/tilebelt':
         specifier: ^2.0.3
         version: 2.0.3
+      '@mapbox/vector-tile':
+        specifier: ^3.0.0
+        version: 3.0.0
       '@osmix/test-utils':
         specifier: workspace:*
         version: link:../test-utils
       '@types/geojson':
         specifier: 'catalog:'
         version: 7946.0.16
+      pbf:
+        specifier: 'catalog:'
+        version: 5.1.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { ConflationWayRemovalPreview } from "../src/components/conflation-way-removal";
+import { WAY_REMOVAL_PAGE_SIZE, WayRemovalSection } from "../src/components/conflation-way-removal";
 import { createWayRemovalSession } from "./fixtures/way-removal";
 
 describe("imported-way removal in a plan", () => {
@@ -18,7 +18,7 @@ describe("imported-way removal in a plan", () => {
   });
 
   it("reports an applied removal with its counterpart, cleanup and connections", () => {
-    const { overview } = createWayRemovalSession({
+    const { worker, base, overview } = createWayRemovalSession({
       branch: true,
       decisions: [
         { proposalId: "connect:n101>n1", action: "accept" },
@@ -28,8 +28,15 @@ describe("imported-way removal in a plan", () => {
     });
     const outcome = overview.matching?.outcome;
     if (!outcome) throw Error("Expected a matching outcome");
+    const page = worker.getMergeMatchingPage(base.id, "way-removal", 0, WAY_REMOVAL_PAGE_SIZE);
     const html = renderToStaticMarkup(
-      createElement(ConflationWayRemovalPreview, { outcome, applied: true }),
+      createElement(WayRemovalSection, {
+        outcome,
+        applied: true,
+        loaded: { page },
+        page: 0,
+        onPageChange: () => {},
+      }),
     );
     expect(html).toContain('aria-label="Applied way removals"');
     expect(html).toContain("Removed imported ways: 1");

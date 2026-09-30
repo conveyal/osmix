@@ -48,7 +48,7 @@ Test mocks: `@osmix/core/mocks` (not re-exported from the main `@osmix/core` ent
 
 - In-browser merge: Comlink workers host `osmix` (`OsmixWorker`) to keep the React UI responsive.
 - `@osmix/pbf` + `@osmix/json` stream PBF blocks to entities; `@osmix/load` builds `Osm` indexes from PBF; `@osmix/core` indexes and ships transferables to dodge clone costs.
-- MapLibre uses custom raster and vector tile protocols (`registerOsmixProtocols(remote)` in `@osmix/app-components`) and renders vector overlays for node/way previews. Call `installMaplibreWorker()` before the first map mounts.
+- MapLibre uses custom raster and vector tile protocols (`registerOsmixProtocols(remote)` in `@osmix/app-components`) and renders vector overlays for node/way previews. Merge draws its plan from `@osmix/plan` tiles that the worker builds from the live plan, never as one GeoJSON layer. Call `installMaplibreWorker()` before the first map mounts.
 
 ## Key Paths
 

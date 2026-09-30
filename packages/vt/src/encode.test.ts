@@ -8,7 +8,7 @@ import { decodeZigzag } from "@osmix/types/zigzag";
 import { PbfReader } from "pbf";
 import { describe, expect, it, vi } from "vitest";
 
-import { OsmixVtEncoder } from "./encode.ts";
+import { clipTileLine, OsmixVtEncoder } from "./encode.ts";
 
 /** Bbox of a test dataset that is known to contain nodes. */
 function datasetBbox(dataset: Osm): GeoBbox2D {
@@ -514,5 +514,31 @@ describe("OsmixVtEncoder", () => {
       }
       expect(found).toBe(true);
     }
+  });
+});
+
+describe("clipTileLine", () => {
+  it("clips to the tile plus its buffer, then rounds and drops repeated points", () => {
+    expect(
+      clipTileLine([
+        [100.4, 100],
+        [100.2, 100],
+        [5000, 100],
+      ]),
+    ).toEqual([
+      [
+        [100, 100],
+        [4160, 100],
+      ],
+    ]);
+  });
+
+  it("drops a line that stays outside the buffer", () => {
+    expect(
+      clipTileLine([
+        [-500, -500],
+        [-400, -500],
+      ]),
+    ).toEqual([]);
   });
 });

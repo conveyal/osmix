@@ -1,3 +1,4 @@
+import { useOsmixRemote } from "@osmix/app-core";
 import {
   ActionButton,
   Alert,
@@ -5,6 +6,7 @@ import {
   DetailsContent,
   DetailsSummary,
   EmptyState,
+  LoadingState,
   NativeSelect,
   NativeSelectOption,
   Pager,
@@ -15,10 +17,11 @@ import {
   TableRow,
 } from "@osmix/ui";
 import { DownloadIcon } from "lucide-react";
-import type { OsmConflationOutcomeReport } from "osmix";
+import type { MergeMatchingFilter, MergePlanMatchingOutcome } from "osmix";
 import { useId, useState } from "react";
 
 import { OUTCOME_LABEL, OUTCOMES, planReasonLabel } from "../lib/merge-plan-workflow";
+import { useWorkerPage } from "../lib/use-worker-page";
 import type { MergeCompletion } from "../state/merge-outcome";
 import { ConflationWayRemovalPreview } from "./conflation-way-removal";
 
@@ -37,20 +40,38 @@ const TAG_REASON_LABELS = {
   superseded: "A later copy replaced this value",
 } as const;
 
-type FeatureFilter = "unresolved" | "skipped" | "all";
+type FeatureFilter = Exclude<MergeMatchingFilter, "way-removal">;
 
-function FeatureOutcomes({ outcome }: { outcome: OsmConflationOutcomeReport }) {
+/** Loading and failure states of a worker page, or null once the page is shown. */
+function PageStatus({ state }: { state: { error?: string } | null }) {
+  if (state === null) return <LoadingState className="border-t" />;
+  if (state.error !== undefined) {
+    return (
+      <Alert variant="destructive" className="m-inset">
+        These details could not be loaded. {state.error}
+      </Alert>
+    );
+  }
+  return null;
+}
+
+function FeatureOutcomes({
+  baseOsmId,
+  outcome,
+}: {
+  baseOsmId: string;
+  outcome: MergePlanMatchingOutcome;
+}) {
+  const remote = useOsmixRemote();
   const filterId = useId();
   const [filter, setFilter] = useState<FeatureFilter>(
     outcome.summary.unresolvedFeatures > 0 ? "unresolved" : "all",
   );
-  const [requestedPage, setPage] = useState(0);
-  const features = outcome.features.filter(
-    (feature) =>
-      filter === "all" || (filter === "unresolved" ? feature.unresolved !== null : feature.skipped),
+  const [page, setPage] = useState(0);
+  const loaded = useWorkerPage(`${filter}:${page}`, () =>
+    remote.getMergeMatchingPage(baseOsmId, filter, page, PAGE_SIZE),
   );
-  const pages = Math.ceil(features.length / PAGE_SIZE);
-  const page = Math.min(requestedPage, Math.max(0, pages - 1));
+  const features = loaded?.page?.features ?? [];
   const filterOptions: readonly { value: FeatureFilter; label: string }[] = [
     {
       value: "unresolved",
@@ -86,11 +107,13 @@ function FeatureOutcomes({ outcome }: { outcome: OsmConflationOutcomeReport }) {
             ))}
           </NativeSelect>
         </div>
-        {features.length === 0 ? (
+        <PageStatus state={loaded} />
+        {loaded?.page && features.length === 0 ? (
           <EmptyState>No imported features in this category</EmptyState>
-        ) : (
+        ) : null}
+        {features.length > 0 ? (
           <ul className="divide-y border-t" aria-label="Imported feature outcome details">
-            {features.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((feature) => (
+            {features.map((feature) => (
               <li
                 key={`${feature.entityType}:${feature.sourceId}`}
                 className="flex flex-col gap-1 px-inset py-2 wrap-break-word"
@@ -130,12 +153,12 @@ function FeatureOutcomes({ outcome }: { outcome: OsmConflationOutcomeReport }) {
               </li>
             ))}
           </ul>
-        )}
+        ) : null}
         <Pager
           className="border-t px-inset py-2"
           label="Imported feature outcome pages"
           page={page}
-          pageCount={pages}
+          pageCount={loaded?.page?.totalPages ?? 0}
           onPageChange={setPage}
         />
       </DetailsContent>
@@ -143,15 +166,26 @@ function FeatureOutcomes({ outcome }: { outcome: OsmConflationOutcomeReport }) {
   );
 }
 
-function UncopiedTags({ outcome }: { outcome: OsmConflationOutcomeReport }) {
+function UncopiedTags({
+  baseOsmId,
+  outcome,
+}: {
+  baseOsmId: string;
+  outcome: MergePlanMatchingOutcome;
+}) {
+  const remote = useOsmixRemote();
   const tagSelectId = useId();
   const [key, setKey] = useState(
-    outcome.tags.find((tag) => tag.uncopied.length > 0)?.key ?? outcome.tags[0]?.key ?? "",
+    outcome.tags.find((tag) => tag.uncopiedFeatures > 0)?.key ?? outcome.tags[0]?.key ?? "",
   );
-  const [requestedPage, setPage] = useState(0);
+  const [page, setPage] = useState(0);
   const tag = outcome.tags.find((tag) => tag.key === key);
-  const pages = Math.ceil((tag?.uncopied.length ?? 0) / PAGE_SIZE);
-  const page = Math.min(requestedPage, Math.max(0, pages - 1));
+  const loaded = useWorkerPage(`${key}:${page}`, async () =>
+    tag && tag.uncopiedFeatures > 0
+      ? remote.getMergeUncopiedTagPage(baseOsmId, key, page, PAGE_SIZE)
+      : { features: [], total: 0, totalPages: 0 },
+  );
+  const uncopied = loaded?.page?.features ?? [];
   if (outcome.tags.length === 0) return null;
   return (
     <Details defaultOpen={false}>
@@ -189,11 +223,12 @@ function UncopiedTags({ outcome }: { outcome: OsmConflationOutcomeReport }) {
                 { label: "Copied to a base target", count: tag.copiedFeatures },
                 { label: "Already equal when considered", count: tag.alreadyEqualFeatures },
                 { label: "Satisfied by another copy", count: tag.satisfiedByOtherCopyFeatures },
-                { label: "Not copied", count: tag.uncopied.length },
+                { label: "Not copied", count: tag.uncopiedFeatures },
               ]}
             />
+            <PageStatus state={loaded} />
             <ul className="divide-y border-t" aria-label="Selected tag not copied details">
-              {tag.uncopied.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((feature) => (
+              {uncopied.map((feature) => (
                 <li
                   key={`${feature.entityType}:${feature.sourceId}`}
                   className="flex flex-col gap-1 px-inset py-2 wrap-break-word"
@@ -210,14 +245,14 @@ function UncopiedTags({ outcome }: { outcome: OsmConflationOutcomeReport }) {
                 </li>
               ))}
             </ul>
-            {tag.uncopied.length === 0 ? (
+            {tag.uncopiedFeatures === 0 ? (
               <EmptyState>Every present value is satisfied in the result</EmptyState>
             ) : null}
             <Pager
               className="border-t px-inset py-2"
               label="Selected tag detail pages"
               page={page}
-              pageCount={pages}
+              pageCount={loaded?.page?.totalPages ?? 0}
               onPageChange={setPage}
             />
           </>
@@ -236,6 +271,7 @@ export function MergeCompletionSummary({
   onDownloadReport: () => Promise<unknown>;
 }) {
   const outcome = completion.plan.matching?.outcome ?? null;
+  const baseOsmId = completion.plan.inputs.base.id;
   const summary = outcome?.summary;
   const features = completion.plan.summary.features;
   const undecided = features["needs-decision"];
@@ -344,10 +380,10 @@ export function MergeCompletionSummary({
       </p>
       {outcome ? (
         <>
-          <FeatureOutcomes outcome={outcome} />
-          <UncopiedTags outcome={outcome} />
-          {outcome.features.some((feature) => feature.wayRemoval) ? (
-            <ConflationWayRemovalPreview outcome={outcome} applied />
+          <FeatureOutcomes baseOsmId={baseOsmId} outcome={outcome} />
+          <UncopiedTags baseOsmId={baseOsmId} outcome={outcome} />
+          {outcome.wayRemovalFeatures > 0 ? (
+            <ConflationWayRemovalPreview baseOsmId={baseOsmId} outcome={outcome} applied />
           ) : null}
         </>
       ) : null}

@@ -136,6 +136,7 @@ export {
 } from "./lib/basemap-layers.ts";
 export { type EntityQuery, getOsmixEntityByStringId, parseEntityQuery } from "./lib/entity-id.ts";
 export { installMaplibreWorker } from "./lib/maplibre-worker.ts";
+export { planTileUrl } from "./lib/osmix-plan-protocol.ts";
 export { registerOsmixProtocols } from "./lib/osmix-protocols.ts";
 export {
   addOsmixRasterProtocol,

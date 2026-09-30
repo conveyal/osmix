@@ -10,6 +10,9 @@ export const RASTER_TILE_SIZE = 256;
 
 export const VECTOR_PROTOCOL_NAME = "@osmix/vector";
 
+/** Vector tiles of an open merge plan, coloured by outcome. */
+export const PLAN_PROTOCOL_NAME = "@osmix/plan";
+
 /**
  * Style URL per `BasemapStyleId`. `satisfies` asserts the keys match the id union exactly; the
  * default is `DEFAULT_BASEMAP_PRESET` in `@osmix/app-core`.

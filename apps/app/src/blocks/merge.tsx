@@ -49,6 +49,7 @@ import {
   makePlanOscName,
   withDecision,
 } from "../lib/merge-plan-workflow";
+import { mergeOutcomeReport } from "../lib/merge-report";
 import { useBaseOsm, usePatchOsm } from "../lib/merge-slots";
 import { useOpenFileInExtract } from "../lib/open-in";
 import { useSelectPlanFeature } from "../lib/use-select-plan-feature";
@@ -65,7 +66,8 @@ import {
   mergeIdenticalPointsAtom,
   patchIdModeAtom,
   planFilterAtom,
-  planLayerAtom,
+  nextPlanRevision,
+  planMapAtom,
   planOverviewAtom,
   planPageAtom,
   planPageIndexAtom,
@@ -95,7 +97,7 @@ export default function MergeBlock() {
   const [filter, setFilter] = useAtom(planFilterAtom);
   const [page, setPage] = useAtom(planPageAtom);
   const [pageIndex, setPageIndex] = useAtom(planPageIndexAtom);
-  const setLayer = useSetAtom(planLayerAtom);
+  const setPlanMap = useSetAtom(planMapAtom);
   const openFileInExtract = useOpenFileInExtract();
   const [selected, setSelected] = useAtom(selectedPlanFeatureAtom);
   const resetPlan = useSetAtom(resetMergePlanAtom);
@@ -153,17 +155,20 @@ export default function MergeBlock() {
     setPageIndex(Math.min(requested, last));
   };
 
-  /** Show a new or replanned plan: its overview, the current page, the map layer, the open row. */
+  /** Show a new or replanned plan: its overview, the current page, the open row, fresh tiles. */
   const showPlan = async (baseOsmId: string, next: MergePlanOverview, pageNumber: number) => {
     setOverview(next);
     updateOutcome({ type: "planned", plan: next });
-    const [layer, detail] = await Promise.all([
-      remote.getMergePlanLayer(baseOsmId),
+    const [detail] = await Promise.all([
       selected ? remote.getMergePlanFeature(baseOsmId, selected.key) : null,
       loadPage(baseOsmId, pageNumber),
     ]);
-    setLayer(layer);
     setSelected(detail);
+    setPlanMap({
+      baseOsmId,
+      revision: nextPlanRevision(),
+      ...(patch.osmInfo?.bbox ? { bounds: patch.osmInfo.bbox } : {}),
+    });
   };
 
   const beginRun = () =>
@@ -397,15 +402,16 @@ export default function MergeBlock() {
     // With positive IDs, the report maps each new feature's patch ID to its exported ID.
     const idMap =
       positiveIds && base.osmInfo ? { idMap: await remote.negativeIdMap(base.osmInfo.id) } : {};
-    await writeJsonReport(stream, {
-      format: "osmix-merge-outcome",
-      version: 2,
-      ...completion,
-      ...idMap,
-    });
+    await writeJsonReport(stream, { ...mergeOutcomeReport(completion, remote), ...idMap });
+  };
+
+  /** Free the matching outcome the worker keeps for the completed merge's details. */
+  const forgetCompletion = async () => {
+    if (completion) await remote.clearMergePlan(completion.plan.inputs.base.id);
   };
 
   const startNewMerge = async () => {
+    await forgetCompletion();
     await Promise.all([base.loadOsmFile(null), patch.loadOsmFile(null)]);
     resetDerivedState();
     goTo("inputs");
@@ -413,6 +419,7 @@ export default function MergeBlock() {
 
   const clearInput = async (file: UseOsmFileReturn) => {
     if (overview && base.osm) await remote.clearMergePlan(base.osm.id);
+    await forgetCompletion();
     resetDerivedState();
     await file.loadOsmFile(null);
   };

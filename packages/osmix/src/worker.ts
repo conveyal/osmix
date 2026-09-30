@@ -31,6 +31,7 @@ import {
   type OsmChange,
   type OsmChangeset,
   type OsmChangeTypes,
+  type OsmConflationOutcomeReport,
   type MergePlanOptions,
 } from "@osmix/change";
 import {
@@ -66,6 +67,8 @@ interface PlanSession {
   patchOsmId: string;
   plan: MergePlan;
   filter: MergePlanFilter;
+  /** Built on the first tile request; the plan's feature list never changes. */
+  tileIndex?: PlanTileIndex;
 }
 
 /** Changes waiting to be reviewed page by page and applied: Inspect's duplicate fixes. */
@@ -97,12 +100,15 @@ import {
   bulkDecisions,
   type MergePlanBulkRequest,
   type MergePlanBulkResult,
+  type MergeMatchingFilter,
   type MergePlanFilter,
+  matchingPage,
   planFeatureDetail,
-  planLayer,
   planOverview,
   planPage,
+  uncopiedTagPage,
 } from "./plan-session.ts";
+import { type PlanTileIndex, planTile, planTileIndex } from "./plan-tiles.ts";
 import { type DrawToRasterTileOptions, drawToRasterTile } from "./raster.ts";
 import { transfer } from "./utils.ts";
 
@@ -119,6 +125,8 @@ export class OsmixWorker extends EventTarget {
   private graphs = new Map<string, RoutingGraph>();
   private changesets = new Map<string, GeneratedChangeset>();
   private plans = new Map<string, PlanSession>();
+  /** An applied plan's matching outcome by base id, for the completed merge's details. */
+  private appliedMatching = new Map<string, OsmConflationOutcomeReport>();
   private changeTypes: OsmChangeTypes[] = ["create", "modify", "delete"];
   private entityTypes: OsmEntityType[] = ["node", "way", "relation"];
   private filteredChanges = new Map<string, OsmChange[]>();
@@ -631,6 +639,7 @@ export class OsmixWorker extends EventTarget {
    */
   planMerge(baseOsmId: string, patchOsmId: string, options: MergePlanOptions = {}) {
     const plan = planMerge(this.get(baseOsmId), this.get(patchOsmId), options, this.onProgress);
+    this.appliedMatching.delete(baseOsmId);
     this.plans.set(baseOsmId, { patchOsmId, plan, filter: {} });
     return planOverview(plan);
   }
@@ -661,10 +670,18 @@ export class OsmixWorker extends EventTarget {
     );
   }
 
-  /** The imported features as GeoJSON, each with its feature key and outcome. */
-  getMergePlanLayer(baseOsmId: string) {
-    const session = this.getPlanSession(baseOsmId);
-    return planLayer(session.plan, this.get(session.patchOsmId));
+  /**
+   * One vector tile of the imported features, each with its feature key and current outcome.
+   * Empty when no plan is open, since tile requests can outlive a cleared or applied plan.
+   */
+  getMergePlanTile(baseOsmId: string, tile: Tile) {
+    const session = this.plans.get(baseOsmId);
+    if (!session) return new ArrayBuffer(0);
+    const patch = this.get(session.patchOsmId);
+    session.tileIndex ??= planTileIndex(session.plan, patch);
+    const data = planTile(session.plan, patch, session.tileIndex, tile);
+    if (data.byteLength === 0) return data;
+    return Comlink.transfer(data, [data]);
   }
 
   /** Replace every decision and replan the phases they affect. */
@@ -694,14 +711,42 @@ export class OsmixWorker extends EventTarget {
   applyMergePlan(baseOsmId: string) {
     const session = this.getPlanSession(baseOsmId);
     const { osm, summary, stats } = applyPlan(session.plan);
+    if (session.plan.matching) this.appliedMatching.set(baseOsmId, session.plan.matching.outcome);
     this.plans.delete(baseOsmId);
     this.set(baseOsmId, new Osm(osm.transferables()));
     this.delete(session.patchOsmId);
     return { osmId: baseOsmId, summary, stats };
   }
 
+  /** Forget the plan for this base, and the matching outcome kept after applying one. */
   clearMergePlan(baseOsmId: string) {
     this.plans.delete(baseOsmId);
+    this.appliedMatching.delete(baseOsmId);
+  }
+
+  /**
+   * One page of the matching outcome's features: the open plan's, or after
+   * {@link applyMergePlan}, the applied plan's until the next plan or clear for this base.
+   */
+  getMergeMatchingPage(
+    baseOsmId: string,
+    filter: MergeMatchingFilter,
+    page: number,
+    pageSize: number,
+  ) {
+    return matchingPage(this.getMatchingReport(baseOsmId), filter, page, pageSize);
+  }
+
+  /** One page of the features whose value for tag `key` was not copied; see above. */
+  getMergeUncopiedTagPage(baseOsmId: string, key: string, page: number, pageSize: number) {
+    return uncopiedTagPage(this.getMatchingReport(baseOsmId), key, page, pageSize);
+  }
+
+  private getMatchingReport(baseOsmId: string) {
+    const report =
+      this.plans.get(baseOsmId)?.plan.matching?.outcome ?? this.appliedMatching.get(baseOsmId);
+    if (!report) throw Error("The matching details of this merge are no longer available");
+    return report;
   }
 
   /**

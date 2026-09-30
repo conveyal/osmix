@@ -1,13 +1,22 @@
+import { useOsmixRemote } from "@osmix/app-core";
 import {
   ActionButton,
   Details,
   DetailsContent,
   DetailsSummary,
+  Alert,
   EmptyState,
+  LoadingState,
   Pager,
 } from "@osmix/ui";
-import type { OsmConflationOutcomeReport, OsmConflationWayRemovalPreview } from "osmix";
+import type {
+  MergeMatchingPage,
+  MergePlanMatchingOutcome,
+  OsmConflationWayRemovalPreview,
+} from "osmix";
 import { useState } from "react";
+
+import { useWorkerPage, type WorkerPageState } from "../lib/use-worker-page";
 
 function ids(values: number[]) {
   return values.length ? values.join(", ") : "none";
@@ -114,26 +123,57 @@ function WayRemovalDetails({
  * that reaches the edges of the flush section it sits in (the merge completion summary).
  */
 export function ConflationWayRemovalPreview({
+  baseOsmId,
   outcome,
   applied = false,
 }: {
-  outcome: OsmConflationOutcomeReport;
+  baseOsmId: string;
+  outcome: MergePlanMatchingOutcome;
   applied?: boolean;
 }) {
-  const [requestedPage, setPage] = useState(0);
-  const removals = outcome.features.flatMap((feature) =>
+  const remote = useOsmixRemote();
+  const [page, setPage] = useState(0);
+  const loaded = useWorkerPage(String(page), () =>
+    remote.getMergeMatchingPage(baseOsmId, "way-removal", page, WAY_REMOVAL_PAGE_SIZE),
+  );
+  return (
+    <WayRemovalSection
+      outcome={outcome}
+      applied={applied}
+      loaded={loaded}
+      page={page}
+      onPageChange={setPage}
+    />
+  );
+}
+
+export const WAY_REMOVAL_PAGE_SIZE = 10;
+
+/** The way removal section for one loaded page (or its loading or failed state). */
+export function WayRemovalSection({
+  outcome,
+  applied,
+  loaded,
+  page,
+  onPageChange,
+}: {
+  outcome: MergePlanMatchingOutcome;
+  applied: boolean;
+  loaded: WorkerPageState<MergeMatchingPage> | null;
+  page: number;
+  onPageChange: (page: number) => void;
+}) {
+  const removals = (loaded?.page?.features ?? []).flatMap((feature) =>
     feature.wayRemoval ? [feature.wayRemoval] : [],
   );
-  const pageSize = 10;
-  const pages = Math.ceil(removals.length / pageSize);
-  const page = Math.min(requestedPage, Math.max(0, pages - 1));
   return (
     <section aria-label={applied ? "Applied way removals" : "Way removal preview"}>
       <Details>
         <DetailsSummary>{applied ? "Applied way removals" : "Way removal preview"}</DetailsSummary>
         <DetailsContent className="flex min-w-0 flex-col gap-2 p-inset">
           <p>
-            {applied ? "Removed imported ways" : "Imported ways to remove"}: {removals.length}.{" "}
+            {applied ? "Removed imported ways" : "Imported ways to remove"}:{" "}
+            {outcome.wayRemovalFeatures.toLocaleString()}.{" "}
             {applied ? "Removed orphan points" : "Orphan points to remove"}:{" "}
             {outcome.summary.removedOrphanNodes ?? 0}.
           </p>
@@ -142,20 +182,30 @@ export function ConflationWayRemovalPreview({
               ? "These removals were accepted in the plan and applied with it."
               : "These removals are planned. The dataset changes only when you apply the plan."}
           </p>
+          {loaded === null ? <LoadingState /> : null}
+          {loaded?.error !== undefined ? (
+            <Alert variant="destructive">These details could not be loaded. {loaded.error}</Alert>
+          ) : null}
           {removals.length ? (
             <ul className="flex min-w-0 flex-col divide-y" aria-label="Imported way removal plans">
-              {removals.slice(page * pageSize, (page + 1) * pageSize).map((preview) => (
+              {removals.map((preview) => (
                 <li key={preview.sourceWayId} className="min-w-0 py-2">
                   <WayRemovalDetails preview={preview} applied={applied} />
                 </li>
               ))}
             </ul>
-          ) : (
+          ) : null}
+          {outcome.wayRemovalFeatures === 0 ? (
             <EmptyState className="p-0">
               No imported way was selected for this removal action
             </EmptyState>
-          )}
-          <Pager label="Way removal pages" page={page} pageCount={pages} onPageChange={setPage} />
+          ) : null}
+          <Pager
+            label="Way removal pages"
+            page={page}
+            pageCount={loaded?.page?.totalPages ?? 0}
+            onPageChange={onPageChange}
+          />
         </DetailsContent>
       </Details>
     </section>

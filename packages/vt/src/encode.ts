@@ -44,6 +44,36 @@ function dedupePoints(points: XY[]): XY[] {
   return result;
 }
 
+/** Round a tile-space point and clamp it to the tile extent plus `buffer`. */
+export function clampTilePoint(xy: XY, extent = DEFAULT_EXTENT, buffer = DEFAULT_BUFFER): XY {
+  return [
+    Math.round(clamp(xy[0], -buffer, extent + buffer)),
+    Math.round(clamp(xy[1], -buffer, extent + buffer)),
+  ];
+}
+
+/**
+ * Clip a projected polyline to the tile extent plus `buffer`, then round, clamp and dedupe its
+ * points. Returns the parts that keep at least two points.
+ */
+export function clipTileLine(
+  points: XY[],
+  extent = DEFAULT_EXTENT,
+  buffer = DEFAULT_BUFFER,
+): XY[][] {
+  const parts: XY[][] = [];
+  for (const segment of clipPolyline(points, [
+    -buffer,
+    -buffer,
+    extent + buffer,
+    extent + buffer,
+  ])) {
+    const part = dedupePoints(segment.map((xy) => clampTilePoint(xy, extent, buffer)));
+    if (part.length >= 2) parts.push(part);
+  }
+  return parts;
+}
+
 /**
  * Returns a projection function that converts [lon, lat] to [x, y] pixel coordinates
  * relative to the given tile. The extent determines the resolution of the tile
@@ -62,6 +92,7 @@ export class OsmixVtEncoder {
   readonly relationLayerName: string;
   private readonly osm: OsmReader;
   private readonly extent: number;
+  private readonly buffer: number;
   private readonly extentBbox: [number, number, number, number];
 
   static layerNames(id: string) {
@@ -78,6 +109,7 @@ export class OsmixVtEncoder {
     const min = -buffer;
     const max = extent + buffer;
     this.extent = extent;
+    this.buffer = buffer;
     this.extentBbox = [min, min, max, max];
 
     const layerName = `@osmix:${osm.id}`;
@@ -197,14 +229,7 @@ export class OsmixVtEncoder {
           }
         }
       } else {
-        const clippedSegmentsRaw = this.clipProjectedPolyline(points);
-        for (const segment of clippedSegmentsRaw) {
-          const rounded = segment.map((xy) => this.clampAndRoundPoint(xy));
-          const deduped = dedupePoints(rounded);
-          if (deduped.length >= 2) {
-            geometry.push(deduped);
-          }
-        }
+        geometry.push(...clipTileLine(points, this.extent, this.buffer));
       }
       if (geometry.length === 0) continue;
       yield {
@@ -312,14 +337,7 @@ export class OsmixVtEncoder {
         for (const lineString of lineStrings) {
           const geometry: VtSimpleFeatureGeometry = [];
           const points: XY[] = lineString.map((ll) => proj(ll));
-          const clippedSegmentsRaw = this.clipProjectedPolyline(points);
-          for (const segment of clippedSegmentsRaw) {
-            const rounded = segment.map((xy) => this.clampAndRoundPoint(xy));
-            const deduped = dedupePoints(rounded);
-            if (deduped.length >= 2) {
-              geometry.push(deduped);
-            }
-          }
+          geometry.push(...clipTileLine(points, this.extent, this.buffer));
           if (geometry.length === 0) continue;
 
           yield {
@@ -354,9 +372,7 @@ export class OsmixVtEncoder {
   }
 
   clampAndRoundPoint(xy: XY): XY {
-    const clampedX = Math.round(clamp(xy[0], this.extentBbox[0], this.extentBbox[2]));
-    const clampedY = Math.round(clamp(xy[1], this.extentBbox[1], this.extentBbox[3]));
-    return [clampedX, clampedY] as XY;
+    return clampTilePoint(xy, this.extent, this.buffer);
   }
 }
 
