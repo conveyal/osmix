@@ -124,14 +124,19 @@ describe("alternative target review", () => {
 
   it("skips ambiguous alternatives in bulk even when one target is already selected", () => {
     const { worker, base } = setup();
-    for (const decisions of [[], [first, unrelated]]) {
-      worker.setMergePlanDecisions(base.id, decisions);
+    // Undecided, the feature waits for a choice between its alternatives; once one is included,
+    // the other is left out and nothing waits.
+    for (const [decisions, waiting] of [
+      [[], 1],
+      [[first, unrelated], 0],
+    ] as const) {
+      worker.setMergePlanDecisions(base.id, [...decisions]);
       const before = planState(worker, base.id);
       const result = worker.applyMergePlanBulk(base.id, {
         action: "accept",
         filter: { kind: "copy-tags" },
       });
-      expect(result).toMatchObject({ changed: 0, skipped: 2 });
+      expect(result).toMatchObject({ changed: 0, waiting });
       expect(planState(worker, base.id)).toEqual(before);
     }
   });
@@ -179,7 +184,7 @@ describe("alternative target review", () => {
       action: "accept",
       filter: { kind: "copy-tags" },
     });
-    expect(bulk).toMatchObject({ changed: 0, skipped: 2 });
+    expect(bulk).toMatchObject({ changed: 0, waiting: 0 });
 
     await remote.restartForTest();
 

@@ -117,6 +117,7 @@ type PlanDatasetProxyMethodName =
   | "getMergePlanOsc"
   | "setMergePlanDecisions"
   | "applyMergePlanBulk"
+  | "previewMergePlanBulk"
   | "applyMergePlan"
   | "clearMergePlan";
 
@@ -1788,6 +1789,17 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
     });
     state.decisions = result.overview.decisions;
     return structuredClone(result);
+  }
+
+  /**
+   * What accepting, rejecting, and clearing would do to the features `filter` shows (by default
+   * the filter set with {@link setMergePlanFilter}), counted in features, without deciding.
+   */
+  previewMergePlanBulk(baseOsmId: OsmId, filter?: MergePlanFilter) {
+    return this.runWithWorker(
+      (worker) => worker.previewMergePlanBulk(this.getId(baseOsmId), filter),
+      { lane: "control", retry: "once" },
+    );
   }
 
   /**

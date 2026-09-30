@@ -116,7 +116,9 @@ console.log(osc.length, applied.summary.features);
 
 `setMergePlanDecisions()` replaces every decision and replans only the phases they affect.
 `applyMergePlanBulk(baseId, { action, filter })` accepts, rejects, or clears decisions for every proposal the
-filter matches; accepting skips proposals with alternatives, which need an individual choice.
+filter matches, never replacing a decision already made; accepting skips removals and proposals with an
+alternative or competitor still to choose between. Its result, and `previewMergePlanBulk()`'s, count imported
+features.
 `getMergePlanFeature()` returns one feature's matching evidence and the geometry of the base entities its
 proposals target, and `getMergePlanTile(baseId, tile)` draws the imported features as a vector tile, with a
 `ways` and a `nodes` layer (`PLAN_TILE_LAYERS`) whose features carry `featureKey` and their current `outcome`, so
@@ -456,7 +458,9 @@ spec-compliant without staging everything in memory.
   `"all"`. After `applyMergePlan` they stay readable for the completed merge until the next plan or
   `clearMergePlan` for that base.
 - `remote.setMergePlanDecisions(baseId, decisions)` / `remote.applyMergePlanBulk(baseId, request)` - Decide
-  proposals and replan.
+  proposals and replan. Bulk results count imported features: `changed` and `waiting` (still needing a decision).
+- `remote.previewMergePlanBulk(baseId, filter?)` - What accepting, rejecting and clearing would each do to the
+  features the filter shows, without deciding.
 - `remote.getMergePlanOsc(baseId)` - The plan as an osmChange document.
 - `remote.applyMergePlan(baseId)` / `remote.clearMergePlan(baseId)` - Apply or discard the plan.
 - `remote.planDeduplication(osmId)` - Find duplicates inside one dataset for the changeset pages.

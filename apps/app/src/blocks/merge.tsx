@@ -45,6 +45,7 @@ import { StepActions } from "../components/step-actions";
 import { firstInvalidConflationInputId, toOsmConflationOptions } from "../lib/conflation-workflow";
 import {
   buildMergePlanOptions,
+  bulkResultMessage,
   makeMergedDownloadName,
   makePlanOscName,
   withDecision,
@@ -70,6 +71,7 @@ import {
   planMapAtom,
   planOverviewAtom,
   planPageAtom,
+  planBulkPreviewAtom,
   planPageIndexAtom,
   resetMergePlanAtom,
   selectedPlanFeatureAtom,
@@ -97,6 +99,7 @@ export default function MergeBlock() {
   const [filter, setFilter] = useAtom(planFilterAtom);
   const [page, setPage] = useAtom(planPageAtom);
   const [pageIndex, setPageIndex] = useAtom(planPageIndexAtom);
+  const [bulkPreview, setBulkPreview] = useAtom(planBulkPreviewAtom);
   const setPlanMap = useSetAtom(planMapAtom);
   const openFileInExtract = useOpenFileInExtract();
   const [selected, setSelected] = useAtom(selectedPlanFeatureAtom);
@@ -155,13 +158,21 @@ export default function MergeBlock() {
     setPageIndex(Math.min(requested, last));
   };
 
-  /** Show a new or replanned plan: its overview, the current page, the open row, fresh tiles. */
+  const loadBulkPreview = async (baseOsmId: string) => {
+    setBulkPreview(await remote.previewMergePlanBulk(baseOsmId));
+  };
+
+  /**
+   * Show a new or replanned plan: its overview, the current page, what bulk choices would do,
+   * the open row, fresh tiles.
+   */
   const showPlan = async (baseOsmId: string, next: MergePlanOverview, pageNumber: number) => {
     setOverview(next);
     updateOutcome({ type: "planned", plan: next });
     const [detail] = await Promise.all([
       selected ? remote.getMergePlanFeature(baseOsmId, selected.key) : null,
       loadPage(baseOsmId, pageNumber),
+      loadBulkPreview(baseOsmId),
     ]);
     setSelected(detail);
     setPlanMap({
@@ -232,12 +243,7 @@ export default function MergeBlock() {
     await runTask("Choose for shown features", async () => {
       const result = await remote.applyMergePlanBulk(baseOsmId, request);
       await showPlan(baseOsmId, result.overview, pageIndex);
-      const skipped =
-        result.skipped > 0
-          ? `; ${result.skipped.toLocaleString()} need their own choice (removals, or ` +
-            "proposals that exclude others)"
-          : "";
-      return `Updated ${result.changed.toLocaleString()} choices${skipped}`;
+      return bulkResultMessage(request.action, result);
     });
   };
 
@@ -246,7 +252,7 @@ export default function MergeBlock() {
     const baseOsmId = base.osm.id;
     await remote.setMergePlanFilter(baseOsmId, next);
     setFilter(next);
-    await loadPage(baseOsmId, 0);
+    await Promise.all([loadPage(baseOsmId, 0), loadBulkPreview(baseOsmId)]);
   };
 
   const downloadOsc = async () => {
@@ -602,6 +608,7 @@ export default function MergeBlock() {
           <PlanReview
             detail={selected}
             filter={filter}
+            preview={bulkPreview}
             page={page}
             pageIndex={pageIndex}
             onBulk={applyBulk}

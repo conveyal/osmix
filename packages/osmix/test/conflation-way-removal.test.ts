@@ -37,6 +37,7 @@ function inputs({
   taggedNode = false,
   taggedBranch = false,
   extraContender = false,
+  blockedContender = false,
 } = {}) {
   const base = new Osm({ id: "removal-base" });
   base.nodes.addNode({ id: 1, lon: 0, lat: 0 });
@@ -63,10 +64,12 @@ function inputs({
     tags: { highway: "footway", name: "Imported trunk" },
   });
   if (branch) patch.ways.addWay({ id: 30, refs: [102, 103], tags: { highway: "footway" } });
-  if (extraContender) {
+  if (extraContender || blockedContender) {
     patch.nodes.addNode({ id: 201, lon: 0, lat: 0.000003 });
     patch.nodes.addNode({ id: 202, lon: -0.001, lat: 0.000003 });
-    patch.ways.addWay({ id: 40, refs: [201, 202], tags: { highway: "footway" } });
+    // On another layer the contender's connection is blocked by the grade rule.
+    const tags = { highway: "footway", ...(blockedContender ? { layer: "1" } : {}) };
+    patch.ways.addWay({ id: 40, refs: [201, 202], tags });
   }
   for (const osm of [base, patch]) {
     osm.buildIndexes();
@@ -401,7 +404,7 @@ describe("explicit way removal through the facade and worker", () => {
       ["connect:n201>n1", ["connect:n101>n1"]],
     ]);
 
-    // Include all shown leaves competing connections for their own choice (MP-M5) instead of
+    // Bulk include leaves competing connections for their own choice (MP-M5) instead of
     // including a set that planning must refuse.
     const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
     const included = result.overview.decisions
@@ -409,7 +412,75 @@ describe("explicit way removal through the facade and worker", () => {
       .map(({ proposalId }) => proposalId);
     expect(included).not.toContain("connect:n101>n1");
     expect(included).not.toContain("connect:n201>n1");
-    expect(result.skipped).toBe(2);
+    expect(result.waiting).toBe(2);
+  });
+
+  it("counts bulk choices in features and previews them before deciding", () => {
+    const { base, patch } = inputs({ branch: true, extraContender: true });
+    const worker = workerFor(base, patch, {
+      ...removalOptions,
+      attachNetwork: true,
+      automatic: "none",
+    });
+    const preview = worker.previewMergePlanBulk(base.id, {});
+    const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
+    expect(preview.accept).toEqual({ changed: result.changed, waiting: result.waiting });
+    expect(preview.accept).toEqual({ changed: 1, waiting: 2 });
+    expect(preview.reject).toEqual({ changed: 2, waiting: 0 });
+    expect(preview.clear.changed).toBe(0);
+  });
+
+  it("includes a proposal in bulk when its only competitor is blocked", () => {
+    const { base, patch } = inputs({ branch: true, blockedContender: true });
+    const worker = workerFor(base, patch, {
+      ...removalOptions,
+      attachNetwork: true,
+      automatic: "none",
+    });
+    expect(proposal(worker, base.id, "connect:n201>n1").status).toBe("blocked");
+    expect(proposal(worker, base.id, "connect:n101>n1")).toMatchObject({
+      status: "review",
+      competitors: ["connect:n201>n1"],
+    });
+    const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
+    expect(result.overview.decisions).toContainEqual({
+      proposalId: "connect:n101>n1",
+      action: "accept",
+    });
+  });
+
+  it("counts what still waits after the replan a bulk choice causes", () => {
+    const { base, patch } = inputs({ branch: true });
+    const worker = workerFor(base, patch, {
+      ...removalOptions,
+      attachNetwork: true,
+      automatic: "none",
+    });
+    expect(proposal(worker, base.id, removeId).status).toBe("blocked");
+    // Including the connections makes the removal reviewable, and it still needs its own choice.
+    const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
+    expect(proposal(worker, base.id, removeId).status).toBe("review");
+    expect(result.waiting).toBe(1);
+    expect(worker.previewMergePlanBulk(base.id, {}).accept).toEqual({ changed: 0, waiting: 1 });
+  });
+
+  it("never replaces a decision in bulk, and a left-out competitor frees the other", () => {
+    const { base, patch } = inputs({ branch: true, extraContender: true });
+    const worker = workerFor(base, patch, {
+      ...removalOptions,
+      attachNetwork: true,
+      automatic: "none",
+    });
+    worker.setMergePlanDecisions(base.id, [{ proposalId: "connect:n201>n1", action: "reject" }]);
+    const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
+    expect(result.overview.decisions).toContainEqual({
+      proposalId: "connect:n201>n1",
+      action: "reject",
+    });
+    expect(result.overview.decisions).toContainEqual({
+      proposalId: "connect:n101>n1",
+      action: "accept",
+    });
   });
 
   it("refuses to plan with two competing connections included, naming both", () => {
@@ -430,7 +501,7 @@ describe("explicit way removal through the facade and worker", () => {
     expect(wayCandidate(worker, base.id).wayRemoval?.status).toBe("review");
     const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
     expect(result.overview.decisions).not.toContainEqual(acceptRemoval);
-    expect(result.skipped).toBe(1);
+    expect(result.waiting).toBe(1);
   });
 
   it("keeps the plan unchanged when two included connections compete for one base node", () => {

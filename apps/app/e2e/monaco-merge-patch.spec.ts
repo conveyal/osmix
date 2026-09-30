@@ -141,11 +141,14 @@ test("the reviewed workflow removes the accepted duplicate footway", async ({ pa
   await r1.getByRole("button", { name: "Show on map and evidence" }).click();
   await expect(r1.getByRole("button", { name: "Showing on map" })).toBeVisible();
 
-  // Include all shown leaves choices that exclude each other alone: M7's two imported points
-  // can both connect to one base node, so each needs its own choice (MP-M5).
+  // Include leaves choices that exclude each other alone: M7's two imported points can both
+  // connect to one base node, so each needs its own choice (MP-M5). Counts are in features.
   await page.getByLabel("Proposal", { exact: true }).selectOption({ label: "Connect network" });
-  await page.getByRole("button", { name: "Include all shown" }).click();
-  await expect(page.getByText(/^Updated \d+ choices; \d+ need their own choice/)).toBeVisible();
+  await expect(page.getByText(/After Include, \d+ still need their own choice/)).toBeVisible();
+  await page.getByRole("button", { name: /^Include \d+ features?$/ }).click();
+  await expect(
+    page.getByText(/^Included \d+ features?; \d+ features? still needs? a decision/),
+  ).toBeVisible();
   await expect(page.getByText("Choose for shown features failed")).toHaveCount(0);
   await expect(
     page.getByText(

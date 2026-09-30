@@ -53,7 +53,7 @@ describe("worker hard match blockers", () => {
       action: "accept",
       filter: { kind: "copy-tags" },
     });
-    expect(bulk).toMatchObject({ changed: 0, skipped: 0 });
+    expect(bulk).toMatchObject({ changed: 0, waiting: 0 });
     expect(bulk.overview.decisions).toEqual([]);
     expect(bulk.overview.summary.proposals.blocked).toBe(overview.summary.proposals.blocked);
   });

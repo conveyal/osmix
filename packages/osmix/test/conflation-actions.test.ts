@@ -190,7 +190,7 @@ describe("scheduled matching actions", () => {
     });
   });
 
-  it.each(["undecided", "rejected", "connect-only"] as const)(
+  it.each(["undecided", "connect-left-out", "connect-only"] as const)(
     "makes row and bulk copy acceptance equivalent from %s",
     (initial) => {
       // Bulk acceptance applies to proposals that need a decision, so nothing is automatic.
@@ -200,13 +200,7 @@ describe("scheduled matching actions", () => {
       const prior: PlanDecision[] =
         initial === "undecided"
           ? []
-          : [
-              { proposalId: copyId, action: "reject" },
-              {
-                proposalId: connectId,
-                action: initial === "connect-only" ? "accept" : "reject",
-              },
-            ];
+          : [{ proposalId: connectId, action: initial === "connect-only" ? "accept" : "reject" }];
       row.worker.setMergePlanDecisions(row.base.id, prior);
       bulk.worker.setMergePlanDecisions(bulk.base.id, prior);
       row.worker.setMergePlanDecisions(row.base.id, [
@@ -217,7 +211,7 @@ describe("scheduled matching actions", () => {
         action: "accept",
         filter: { kind: "copy-tags" },
       });
-      expect(result).toMatchObject({ changed: 1, skipped: 0 });
+      expect(result).toMatchObject({ changed: 1 });
       const expected = { transferProperties: true, attachNetwork: initial === "connect-only" };
       for (const { worker, base, patch } of [row, bulk]) {
         const { connect, copy } = entranceProposals(
@@ -236,6 +230,21 @@ describe("scheduled matching actions", () => {
       }
     },
   );
+
+  it("keeps a copy that was left out when copies are included in bulk", () => {
+    const options = { ...planOptions, matching: { ...matching, automatic: "none" as const } };
+    const { worker, base } = setupWorker(false, options);
+    worker.setMergePlanDecisions(base.id, [{ proposalId: copyId, action: "reject" }]);
+    const result = worker.applyMergePlanBulk(base.id, {
+      action: "accept",
+      filter: { kind: "copy-tags" },
+    });
+    expect(result.changed).toBe(0);
+    expect(
+      entranceProposals(result.overview && worker.getMergePlanPage(base.id, 0, 10).features).copy
+        .effect,
+    ).toBe("skipped");
+  });
 
   it("keeps a blocked connection out of the result while an eligible tag copy applies", () => {
     const { worker, base, patch } = setupWorker(true);

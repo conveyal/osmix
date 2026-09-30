@@ -95,11 +95,12 @@ test("filters narrow the rows and bulk choices apply to what is shown", async ({
     .selectOption({ label: "Connect network" });
   // Both connections are on way 20: a shared vertex belongs to the first way that uses it.
   await expect(review(page).getByRole("region", { name: /^Imported way/ })).toHaveCount(1);
-  await review(page).getByRole("button", { name: "Include all shown" }).click();
+  // Counts are in features: both connections are on the one imported way.
+  await review(page).getByRole("button", { name: "Include 1 feature" }).click();
   await expect
     .poll(async () => (await readState(page)).decisions.map(({ action }) => action))
     .toEqual(["accept", "accept"]);
-  await review(page).getByRole("button", { name: "Clear choices" }).click();
+  await review(page).getByRole("button", { name: "Clear choices for 1 feature" }).click();
   await expect.poll(async () => (await readState(page)).decisions).toEqual([]);
   await review(page).getByLabel("Outcome", { exact: true }).selectOption({ label: "Removed" });
   await expect(review(page)).toContainText("No imported features match these filters");

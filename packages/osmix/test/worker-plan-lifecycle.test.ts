@@ -169,8 +169,9 @@ describe("worker merge plan sessions", () => {
       action: "accept",
     });
 
+    // Both decisions are on the one imported way, and bulk results count features.
     const cleared = worker.applyMergePlanBulk(base.id, { action: "clear", filter: {} });
-    expect(cleared.changed).toBe(2);
+    expect(cleared.changed).toBe(1);
     expect(cleared.overview.decisions).toEqual([]);
 
     const rejected = worker.applyMergePlanBulk(base.id, {

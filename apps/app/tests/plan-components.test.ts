@@ -146,9 +146,17 @@ describe("plan components", () => {
         onSelect: noop,
         page,
         pageIndex: 0,
+        preview: {
+          accept: { changed: 3, waiting: 2 },
+          reject: { changed: 1, waiting: 0 },
+          clear: { changed: 0, waiting: 4 },
+        },
       }),
     );
     expect(html).toContain("No imported features match these filters");
+    expect(html).toContain("Include 3 features");
+    expect(html).toContain("Leave out 1 feature");
+    expect(html).toContain("After Include, 2 still need their own choice");
     expect(html).toContain("All proposals");
   });
 

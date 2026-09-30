@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildMergePlanOptions,
+  bulkActionLabel,
+  bulkResultMessage,
   FILTERABLE_KINDS,
   isDecidable,
   makeMergedDownloadName,
@@ -16,6 +18,19 @@ import {
 } from "../src/lib/merge-plan-workflow";
 
 describe("merge plan workflow", () => {
+  it("counts bulk choices in features", () => {
+    expect(bulkActionLabel("accept", 12_400)).toBe("Include 12,400 features");
+    expect(bulkActionLabel("reject", 1)).toBe("Leave out 1 feature");
+    expect(bulkActionLabel("clear", 0)).toBe("Clear choices for 0 features");
+    expect(bulkResultMessage("accept", { changed: 12_400, waiting: 19_183 })).toBe(
+      "Included 12,400 features; 19,183 features still need a decision",
+    );
+    expect(bulkResultMessage("reject", { changed: 3, waiting: 0 })).toBe("Left out 3 features");
+    expect(bulkResultMessage("accept", { changed: 0, waiting: 1 })).toBe(
+      "No shown feature changed; 1 feature still needs a decision",
+    );
+  });
+
   it("builds plan options from the input settings", () => {
     expect(buildMergePlanOptions({ mergeIdenticalPoints: true, patchIds: "osm" })).toEqual({
       mergeIdenticalPoints: true,

@@ -569,11 +569,14 @@ describe("OsmixRemote", () => {
         if (mutation === "decisions") {
           await remote.setMergePlanDecisions(base.id, [rejected]);
         } else if (mutation === "bulk decision") {
-          const bulk = await remote.applyMergePlanBulk(base.id, {
-            action: "reject",
-            filter: { kind: "copy-tags" },
-          });
-          expect(bulk.changed).toBe(1);
+          // A bulk choice never replaces a decision, so clear the planned accept first.
+          for (const action of ["clear", "reject"] as const) {
+            const bulk = await remote.applyMergePlanBulk(base.id, {
+              action,
+              filter: { kind: "copy-tags" },
+            });
+            expect(bulk.changed).toBe(1);
+          }
         } else {
           await remote.clearMergePlan(base.id);
         }

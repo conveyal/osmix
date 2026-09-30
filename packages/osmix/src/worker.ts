@@ -98,6 +98,7 @@ import { dequal } from "dequal/lite";
 import { installStructuredComlinkErrorTransferHandler } from "./comlink-errors.ts";
 import {
   bulkDecisions,
+  bulkPreview,
   type MergePlanBulkRequest,
   type MergePlanBulkResult,
   type MergeMatchingFilter,
@@ -107,6 +108,7 @@ import {
   planOverview,
   planPage,
   uncopiedTagPage,
+  waitingFeatures,
 } from "./plan-session.ts";
 import { type PlanTileIndex, planTile, planTileIndex } from "./plan-tiles.ts";
 import { type DrawToRasterTileOptions, drawToRasterTile } from "./raster.ts";
@@ -694,9 +696,24 @@ export class OsmixWorker extends EventTarget {
   /** Accept, reject, or clear decisions for every proposal the filter matches. */
   applyMergePlanBulk(baseOsmId: string, request: MergePlanBulkRequest): MergePlanBulkResult {
     const { plan } = this.getPlanSession(baseOsmId);
-    const { decisions, changed, skipped } = bulkDecisions(plan, request);
-    if (changed > 0) setMergePlanDecisions(plan, decisions);
-    return { overview: planOverview(plan), changed, skipped };
+    const { decisions, changed, waiting } = bulkDecisions(plan, request);
+    if (changed === 0) return { overview: planOverview(plan), changed, waiting };
+    setMergePlanDecisions(plan, decisions);
+    // The replan can put new proposals in review, so count what still waits afterwards.
+    return {
+      overview: planOverview(plan),
+      changed,
+      waiting: waitingFeatures(plan, request.filter),
+    };
+  }
+
+  /**
+   * What each bulk action would do to the features `filter` shows, without deciding. Defaults to
+   * the filter set with {@link setMergePlanFilter}.
+   */
+  previewMergePlanBulk(baseOsmId: string, filter?: MergePlanFilter) {
+    const session = this.getPlanSession(baseOsmId);
+    return bulkPreview(session.plan, filter ?? session.filter);
   }
 
   /** The plan as an osmChange document. */

@@ -90,16 +90,23 @@ export interface MergePlanBulkRequest {
   filter: MergePlanFilter;
 }
 
-export interface MergePlanBulkResult {
-  overview: MergePlanOverview;
-  /** Decisions this request added, replaced, or cleared. */
+/** What a bulk request does to the features its filter shows, counted in features. */
+export interface MergePlanBulkCounts {
+  /** Features with at least one decision the request adds, replaces, or clears. */
   changed: number;
   /**
-   * Proposals an accept left alone because they need their own choice: removals, and proposals
-   * with alternatives or competitors.
+   * Features that still wait for a decision afterwards: removals, choices between competing
+   * proposals, and proposals the request leaves alone.
    */
-  skipped: number;
+  waiting: number;
 }
+
+export interface MergePlanBulkResult extends MergePlanBulkCounts {
+  overview: MergePlanOverview;
+}
+
+/** What each bulk action would do to the features a filter shows, before choosing one. */
+export type MergePlanBulkPreview = Record<MergePlanBulkRequest["action"], MergePlanBulkCounts>;
 
 /** Which matching outcome features a page shows. */
 export type MergeMatchingFilter = "unresolved" | "skipped" | "way-removal" | "all";
@@ -295,51 +302,106 @@ export function planFeatureDetail(
   };
 }
 
+/** The proposals and base entities another decision on `proposal` would leave out (MP-M5). */
+function excludedBy(proposal: PlanProposal): readonly string[] {
+  return "competitors" in proposal ? [...proposal.alternatives, ...proposal.competitors] : [];
+}
+
+/** An undecided review proposal no included alternative or competitor has already left out. */
+function isWaiting(proposal: PlanProposal, decisions: ReadonlyMap<string, PlanDecision["action"]>) {
+  if (proposal.status !== "review" || decisions.has(proposal.id)) return false;
+  return !excludedBy(proposal).some((id) => decisions.get(id) === "accept");
+}
+
 /**
- * The decisions after a bulk request. Accepting applies only to proposals that need a
- * decision and exclude no others (no alternatives or competitors), never to a removal, which
- * needs its own choice; rejecting applies to every decidable proposal; clearing
- * removes decisions. Proposals whose kind, status or reason differs from the filter's are
- * left alone.
+ * Whether including `proposal` needs a choice only a person can make: removal needs its own
+ * consent (MP-R1), and a proposal that excludes others needs a choice between them (MP-M5).
+ * Blocked proposals and ones already left out are not choices.
+ */
+function needsOwnChoice(
+  plan: MergePlan,
+  proposal: PlanProposal,
+  decisions: ReadonlyMap<string, PlanDecision["action"]>,
+) {
+  if (proposal.kind === "remove-way") return true;
+  return excludedBy(proposal).some(
+    (id) => plan.proposals.get(id)?.status !== "blocked" && decisions.get(id) !== "reject",
+  );
+}
+
+/**
+ * The decisions after a bulk request, and what it does counted in features. Accepting applies
+ * only to review proposals that need no choice of their own, never to a removal; rejecting
+ * applies to every decidable proposal; clearing removes decisions. A bulk accept or reject never
+ * replaces a decision already made. Proposals whose kind, status or reason differs from the
+ * filter's are left alone.
  */
 export function bulkDecisions(plan: MergePlan, request: MergePlanBulkRequest) {
   const decisions = new Map(
     (plan.options.decisions ?? []).map((decision) => [decision.proposalId, decision.action]),
   );
   let changed = 0;
-  let skipped = 0;
-  const { filter } = request;
+  let waiting = 0;
+  const { action, filter } = request;
   for (const feature of filteredFeatures(plan, filter)) {
-    for (const proposal of proposalsOf(plan, feature)) {
-      if (DIRECT_KINDS.has(proposal.kind) || proposal.status === "blocked") continue;
-      if (filter.kind && proposal.kind !== filter.kind) continue;
-      if (filter.status && proposal.status !== filter.status) continue;
-      if (filter.reason && !proposal.reasons.includes(filter.reason)) continue;
-      if (request.action === "clear") {
-        if (decisions.delete(proposal.id)) changed++;
+    const proposals = bulkProposals(plan, feature, filter);
+    let featureChanged = false;
+    for (const proposal of proposals) {
+      if (action === "clear") {
+        if (decisions.delete(proposal.id)) featureChanged = true;
         continue;
       }
-      if (request.action === "accept") {
-        if (proposal.status !== "review") continue;
-        // Removal needs its own consent (MP-R1); a proposal that excludes others needs a choice
-        // between them (MP-M5).
-        if (
-          proposal.kind === "remove-way" ||
-          ("competitors" in proposal &&
-            (proposal.alternatives.length > 0 || proposal.competitors.length > 0))
-        ) {
-          skipped++;
-          continue;
-        }
+      if (decisions.has(proposal.id)) continue;
+      if (action === "accept") {
+        if (proposal.status !== "review" || !isWaiting(proposal, decisions)) continue;
+        if (needsOwnChoice(plan, proposal, decisions)) continue;
       }
-      if (decisions.get(proposal.id) === request.action) continue;
-      decisions.set(proposal.id, request.action);
-      changed++;
+      decisions.set(proposal.id, action);
+      featureChanged = true;
     }
+    if (featureChanged) changed++;
+    if (proposals.some((proposal) => isWaiting(proposal, decisions))) waiting++;
   }
   return {
     decisions: [...decisions].map(([proposalId, action]) => ({ proposalId, action })),
     changed,
-    skipped,
+    waiting,
   };
+}
+
+/** A feature's decidable proposals that match the filter's kind, status and reason. */
+function bulkProposals(plan: MergePlan, feature: PlanFeature, filter: MergePlanFilter) {
+  return proposalsOf(plan, feature).filter(
+    (proposal) =>
+      !DIRECT_KINDS.has(proposal.kind) &&
+      proposal.status !== "blocked" &&
+      (!filter.kind || proposal.kind === filter.kind) &&
+      (!filter.status || proposal.status === filter.status) &&
+      (!filter.reason || proposal.reasons.includes(filter.reason)),
+  );
+}
+
+/**
+ * Features `filter` shows that still wait for a decision in the plan as it stands, counting
+ * proposals a replan created after the decisions that caused it.
+ */
+export function waitingFeatures(plan: MergePlan, filter: MergePlanFilter) {
+  const decisions = new Map(
+    (plan.options.decisions ?? []).map((decision) => [decision.proposalId, decision.action]),
+  );
+  let waiting = 0;
+  for (const feature of filteredFeatures(plan, filter)) {
+    const proposals = bulkProposals(plan, feature, filter);
+    if (proposals.some((proposal) => isWaiting(proposal, decisions))) waiting++;
+  }
+  return waiting;
+}
+
+/** What each bulk action would do to the features `filter` shows. */
+export function bulkPreview(plan: MergePlan, filter: MergePlanFilter): MergePlanBulkPreview {
+  const counts = (action: MergePlanBulkRequest["action"]) => {
+    const { changed, waiting } = bulkDecisions(plan, { action, filter });
+    return { changed, waiting };
+  };
+  return { accept: counts("accept"), reject: counts("reject"), clear: counts("clear") };
 }

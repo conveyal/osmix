@@ -28,8 +28,10 @@ tokens, spacing, primitives, map overlay primitives) lives in
   (automatic)** / **Leave out** for automatic proposals, **Decide later** /
   **Include** / **Leave out** for proposals that need review. Blocked
   proposals show reasons and no choice. Filters (outcome, proposal kind) and
-  bulk choices apply to the features shown; bulk Include skips proposals with
-  alternatives.
+  bulk choices apply to the features shown. Each bulk button names how many
+  features it would change ("Include 12,400 features") and results are counted
+  in features; bulk Include skips removals and choices between competing
+  proposals, and no bulk choice replaces a decision already made.
 - `PlanMapLayer`, `PlanLegend` — imported features coloured by outcome
   (`--map-outcome-*`), with features that need a decision drawn wider and
   dashed so colour is never the only cue; clicking a feature opens its row.

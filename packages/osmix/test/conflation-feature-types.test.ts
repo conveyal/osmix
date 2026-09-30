@@ -193,7 +193,7 @@ describe("feature classification conflicts through the public facade and worker"
         action: "accept",
         filter: { kind, reason: "feature-type-conflict" },
       });
-      expect(bulk).toMatchObject({ changed: 0, skipped: 0 });
+      expect(bulk).toMatchObject({ changed: 0, waiting: 0 });
       expect(bulk.overview.decisions).toEqual(acceptBoth);
     }
     expect(worker.getMergePlanOverview(base.id).matching?.outcome.summary).toMatchObject({

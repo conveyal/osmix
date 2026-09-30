@@ -6,6 +6,7 @@
 import { Button, TaskLockProvider } from "@osmix/ui";
 import { createStore, Provider } from "jotai";
 import {
+  type MergePlanBulkPreview,
   type MergePlanBulkRequest,
   type MergePlanFeatureDetail,
   type MergePlanFilter,
@@ -66,6 +67,7 @@ interface Session {
   filter: MergePlanFilter;
   page: MergePlanPage;
   pageIndex: number;
+  preview: MergePlanBulkPreview;
   detail: MergePlanFeatureDetail | null;
   calls: string[];
 }
@@ -101,6 +103,7 @@ function startSession(fixture: FixtureName, mode: PatchIdMode = "osm"): Session 
     filter: {},
     page: worker.getMergePlanPage(base.id, 0, PLAN_PAGE_SIZE),
     pageIndex: 0,
+    preview: worker.previewMergePlanBulk(base.id, {}),
     detail: null,
     calls: [],
   };
@@ -112,6 +115,7 @@ const store = createHarnessStore(() => startSession("removal"));
 function refresh(session: Session, overview: MergePlanOverview) {
   session.overview = overview;
   session.page = session.worker.getMergePlanPage(session.baseId, session.pageIndex, PLAN_PAGE_SIZE);
+  session.preview = session.worker.previewMergePlanBulk(session.baseId, session.filter);
   if (session.detail) {
     session.detail = session.worker.getMergePlanFeature(session.baseId, session.detail.key);
   }
@@ -231,6 +235,7 @@ function Harness() {
             filter={session.filter}
             page={session.page}
             pageIndex={session.pageIndex}
+            preview={session.preview}
             onBulk={handlers.bulk}
             onDecide={handlers.decide}
             onFilterChange={handlers.filter}

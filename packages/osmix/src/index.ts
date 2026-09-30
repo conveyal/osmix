@@ -28,6 +28,8 @@ export type {
   MergeMatchingFilter,
   MergeMatchingPage,
   MergeUncopiedTagPage,
+  MergePlanBulkCounts,
+  MergePlanBulkPreview,
   MergePlanBulkRequest,
   MergePlanBulkResult,
   MergePlanFeatureDetail,

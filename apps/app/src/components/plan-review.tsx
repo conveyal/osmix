@@ -9,6 +9,7 @@ import {
 } from "@osmix/ui";
 import { CheckCheckIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import type {
+  MergePlanBulkPreview,
   MergePlanBulkRequest,
   MergePlanFeatureDetail,
   MergePlanFilter,
@@ -20,6 +21,7 @@ import type {
 import { useId } from "react";
 
 import {
+  bulkActionLabel,
   FILTERABLE_KINDS,
   OUTCOME_LABEL,
   OUTCOMES,
@@ -28,6 +30,18 @@ import {
 import { PlanFeatureRow } from "./plan-feature-row";
 
 export const PLAN_PAGE_SIZE = 10;
+
+const BULK_ACTIONS = [
+  { action: "accept", icon: <CheckCheckIcon />, variant: "outline" },
+  { action: "reject", icon: <XIcon />, variant: "outline" },
+  { action: "clear", icon: <RotateCcwIcon />, variant: "ghost" },
+] as const;
+
+const BULK_LOADING_LABEL = {
+  accept: "Include shown",
+  reject: "Leave out shown",
+  clear: "Clear choices",
+} as const;
 
 /**
  * The plan, one row per imported feature: filters by outcome and proposal kind, choices for
@@ -43,6 +57,7 @@ export function PlanReview({
   onSelect,
   page,
   pageIndex,
+  preview,
 }: {
   detail: MergePlanFeatureDetail | null;
   filter: MergePlanFilter;
@@ -57,6 +72,8 @@ export function PlanReview({
   onSelect: (featureKey: string) => unknown;
   page: MergePlanPage;
   pageIndex: number;
+  /** What each bulk choice would do; null while it loads. */
+  preview: MergePlanBulkPreview | null;
 }) {
   const taskLocked = useTaskLock();
   const outcomeId = useId();
@@ -110,35 +127,28 @@ export function PlanReview({
           </div>
         </div>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Choices for shown features">
-          <ActionButton
-            size="sm"
-            variant="outline"
-            icon={<CheckCheckIcon />}
-            onAction={async () => onBulk({ action: "accept", filter })}
-          >
-            Include all shown
-          </ActionButton>
-          <ActionButton
-            size="sm"
-            variant="outline"
-            icon={<XIcon />}
-            onAction={async () => onBulk({ action: "reject", filter })}
-          >
-            Leave out all shown
-          </ActionButton>
-          <ActionButton
-            size="sm"
-            variant="ghost"
-            icon={<RotateCcwIcon />}
-            onAction={async () => onBulk({ action: "clear", filter })}
-          >
-            Clear choices
-          </ActionButton>
+          {BULK_ACTIONS.map(({ action, icon, variant }) => {
+            const changed = preview?.[action].changed ?? 0;
+            return (
+              <ActionButton
+                key={action}
+                size="sm"
+                variant={variant}
+                icon={icon}
+                disabled={preview === null || changed === 0}
+                onAction={async () => onBulk({ action, filter })}
+              >
+                {preview === null ? BULK_LOADING_LABEL[action] : bulkActionLabel(action, changed)}
+              </ActionButton>
+            );
+          })}
         </div>
         <p className="text-muted-foreground">
-          Choices apply to the {shown} features shown. Include applies to proposals that need
-          review; removals and proposals that exclude others need their own choice. Blocked
-          proposals never change.
+          Choices apply to the {shown} features shown and keep every choice already made.{" "}
+          {preview && preview.accept.waiting > 0
+            ? `After Include, ${preview.accept.waiting.toLocaleString()} still need their own choice: removals and choices between competing proposals. `
+            : null}
+          Blocked proposals never change.
         </p>
       </div>
       {page.features.length === 0 ? (

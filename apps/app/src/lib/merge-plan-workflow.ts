@@ -1,4 +1,6 @@
 import type {
+  MergePlanBulkCounts,
+  MergePlanBulkRequest,
   MergePlanOptions,
   OsmConflationOptions,
   PatchIdMode,
@@ -189,4 +191,24 @@ export function makeMergedDownloadName(baseName?: string | null, patchName?: str
 /** The osmChange download's suggested name. */
 export function makePlanOscName(baseName?: string | null, patchName?: string | null) {
   return makeMergedDownloadName(baseName, patchName).replace(/\.pbf$/, ".osc");
+}
+
+const features = (count: number) =>
+  `${count.toLocaleString()} ${count === 1 ? "feature" : "features"}`;
+
+/** A bulk choice's button label, with how many shown features it would change. */
+export function bulkActionLabel(action: MergePlanBulkRequest["action"], changed: number) {
+  const verb = { accept: "Include", reject: "Leave out", clear: "Clear choices for" }[action];
+  return `${verb} ${features(changed)}`;
+}
+
+/** What a bulk choice did, in features, for the task's outcome. */
+export function bulkResultMessage(
+  action: MergePlanBulkRequest["action"],
+  { changed, waiting }: MergePlanBulkCounts,
+) {
+  const verb = { accept: "Included", reject: "Left out", clear: "Cleared choices for" }[action];
+  const done = changed === 0 ? "No shown feature changed" : `${verb} ${features(changed)}`;
+  if (waiting === 0) return done;
+  return `${done}; ${features(waiting)} still ${waiting === 1 ? "needs" : "need"} a decision`;
 }
