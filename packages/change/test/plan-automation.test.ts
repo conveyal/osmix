@@ -2,7 +2,12 @@ import { Osm } from "@osmix/core";
 import type { OsmNode, OsmWay } from "@osmix/types";
 import { describe, expect, it } from "vitest";
 
-import { planMerge, setMergePlanDecisions } from "../src/plan/plan.ts";
+import {
+  getMergePlanChoices,
+  pickNearestMergePlanDecisions,
+  planMerge,
+  setMergePlanDecisions,
+} from "../src/plan/plan.ts";
 import type { MergePlanAutomation, MergePlanOptions } from "../src/plan/types.ts";
 import { findProposal } from "./helpers/plan.ts";
 
@@ -159,6 +164,34 @@ describe("automation levels (MP-M6)", () => {
     });
   });
 
+  it("never leaves a removal competing with a copy it settled", () => {
+    // Two imported copies of base way 10. The automated copy's competing removal is blocked,
+    // since any competition blocks removal, so nothing waits and nothing conflicts.
+    const patch = osm(
+      "patch",
+      [
+        { id: 101, lon: 0, lat: 0.1 * M },
+        { id: 102, lon: 0, lat: -0.001 + 0.1 * M },
+        { id: 201, lon: 0.6 * M, lat: 0 },
+        { id: 202, lon: 0.6 * M, lat: -0.001 },
+      ],
+      [
+        { id: 20, refs: [102, 101], tags: { highway: "footway", name: "A" } },
+        { id: 40, refs: [202, 201], tags: { highway: "footway", name: "B" } },
+      ],
+    );
+    const planned = plan(patch, "aggressive", {
+      matching: { ...matching, propertyKeys: ["name"], allowWayRemoval: true },
+    });
+    const removals = [...planned.proposals.values()].filter(({ kind }) => kind === "remove-way");
+    expect(removals.length).toBeGreaterThan(0);
+    for (const removal of removals) {
+      expect(removal.status).toBe("blocked");
+      expect(removal.reasons).toContain("many-to-one");
+    }
+    expect(planned.summary.features["needs-decision"]).toBe(0);
+  });
+
   it("never decides a removal (MP-R1)", () => {
     const patch = osm(
       "patch",
@@ -174,5 +207,66 @@ describe("automation levels (MP-M6)", () => {
     const removals = [...planned.proposals.values()].filter(({ kind }) => kind === "remove-way");
     expect(removals.length).toBeGreaterThan(0);
     for (const removal of removals) expect(removal.decision).toBeUndefined();
+  });
+});
+
+describe("choices that still wait (MP-M7)", () => {
+  const sumsToNeedsDecision = (planned: ReturnType<typeof plan>) => {
+    const { counts } = getMergePlanChoices(planned);
+    const sum = Object.values(counts).reduce((total, count) => total + count, 0);
+    expect(sum).toBe(planned.summary.features["needs-decision"]);
+    return counts;
+  };
+
+  it("puts a near tie, a clear choice, a bend and a routing tag copy in their groups", () => {
+    expect(sumsToNeedsDecision(plan(sameWay(0.4, 0.6), "recommended"))).toMatchObject({ tie: 1 });
+    // Way 30 bends away from the base way; way 20 wins the clear choice.
+    expect(sumsToNeedsDecision(plan(twoWays(), "recommended"))).toMatchObject({
+      nearest: 1,
+      bend: 1,
+    });
+    const kerb = osm("patch", [{ id: 101, lon: 0.2 * M, lat: 0, tags: { kerb: "lowered" } }], []);
+    expect(sumsToNeedsDecision(plan(kerb, "recommended"))).toMatchObject({ "routing-tags": 1 });
+    expect(sumsToNeedsDecision(plan(sameWay(0.1, 0.7), "conservative"))).toMatchObject({
+      nearest: 1,
+    });
+  });
+
+  it("leaves a choice to a person when its clear winner bends sharply", () => {
+    const patch = osm(
+      "patch",
+      [
+        { id: 101, lon: 0, lat: 0.7 * M },
+        { id: 102, lon: 0, lat: 0.001 },
+        { id: 201, lon: 0.1 * M, lat: 0 },
+        { id: 202, lon: 0.001, lat: 0 },
+      ],
+      [
+        { id: 20, refs: [101, 102], tags: { highway: "footway" } },
+        { id: 30, refs: [201, 202], tags: { highway: "footway" } },
+      ],
+    );
+    const planned = plan(patch, "aggressive");
+    expect(findProposal(planned, "connect:n201>n1").reasons).toContain("bearing-mismatch");
+    expect(sumsToNeedsDecision(planned)).toMatchObject({ nearest: 0, tie: 1, bend: 1 });
+    expect(pickNearestMergePlanDecisions(planned, ["connect:n101>n1", "connect:n201>n1"])).toEqual(
+      [],
+    );
+  });
+
+  it("picks the clearly nearest as a person's decisions, like the aggressive level", () => {
+    const planned = plan(twoWays(), "recommended");
+    const { proposals } = getMergePlanChoices(planned);
+    const nearest = [...proposals].filter(([, group]) => group === "nearest").map(([id]) => id);
+    const decisions = pickNearestMergePlanDecisions(planned, nearest);
+    expect(decisions).toEqual([
+      { proposalId: "connect:n101>n1", action: "accept" },
+      { proposalId: "connect:n201>n1", action: "reject" },
+    ]);
+    setMergePlanDecisions(planned, decisions);
+    expect(planned.summary.features["needs-decision"]).toBe(0);
+    expect(
+      pickNearestMergePlanDecisions(plan(sameWay(0.4, 0.6), "recommended"), ["connect:n101>n1"]),
+    ).toEqual([]);
   });
 });

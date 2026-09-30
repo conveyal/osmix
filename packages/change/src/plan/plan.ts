@@ -23,6 +23,7 @@ import {
   type PlanPhase,
   PROPOSAL_PHASE,
 } from "./builder.ts";
+import { pickNearestDecisions, type PlanChoices, planChoices } from "./choices.ts";
 import { findDecisionConflict } from "./decision-conflict.ts";
 import { planMatching } from "./matching.ts";
 import { type PatchIdRemap, planPatchIdRemap, remappedCount, remapPatch } from "./remap.ts";
@@ -314,8 +315,12 @@ function planCrossings(
     if (!feature) throw Error(`Crossing way ${crossing.wayId} is not an imported way`);
     const point = crossing.point.map((value) => value.toFixed(7)).join(",");
     const kind = crossing.kind === "snap" ? "crossing-snap" : "crossing-node";
+    const id = `${crossing.kind === "snap" ? "xsnap" : "xnode"}:${wayToken(crossing.wayId)}|${wayToken(crossing.otherWayId)}@${point}`;
+    // A way passing through an imported vertex crosses both segments beside it at one point:
+    // that is one crossing, already proposed and inserted once.
+    if (builder.proposals.has(id)) return false;
     const proposal = builder.propose({
-      id: `${crossing.kind === "snap" ? "xsnap" : "xnode"}:${wayToken(crossing.wayId)}|${wayToken(crossing.otherWayId)}@${point}`,
+      id,
       kind,
       feature: feature.key,
       ways: [
@@ -388,6 +393,25 @@ export function getMergePlanCandidate(plan: MergePlan, proposalId: string) {
   return planState(plan).matched?.discovery.candidates.find(
     ({ id }) => id === proposal.candidateId,
   );
+}
+
+function planCandidates(plan: MergePlan) {
+  const candidates = planState(plan).matched?.discovery.candidates ?? [];
+  return new Map(candidates.map((candidate) => [candidate.id, candidate]));
+}
+
+/** Why each imported feature still waits for a decision, one group per feature (MP-M7). */
+export function getMergePlanChoices(plan: MergePlan): PlanChoices {
+  return planChoices(plan, planCandidates(plan));
+}
+
+/**
+ * A person's decisions picking the clearly nearest candidate among the choices of
+ * `proposalIds`, by the automation levels' margin (MP-M6). Pass them to
+ * `setMergePlanDecisions` with the plan's other decisions.
+ */
+export function pickNearestMergePlanDecisions(plan: MergePlan, proposalIds: Iterable<string>) {
+  return pickNearestDecisions(plan, planCandidates(plan), proposalIds);
 }
 
 /** The plan's changes as an osmChange document. */

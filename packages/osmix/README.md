@@ -459,8 +459,11 @@ spec-compliant without staging everything in memory.
   `clearMergePlan` for that base.
 - `remote.setMergePlanDecisions(baseId, decisions)` / `remote.applyMergePlanBulk(baseId, request)` - Decide
   proposals and replan. Bulk results count imported features: `changed` and `waiting` (still needing a decision).
-- `remote.previewMergePlanBulk(baseId, filter?)` - What accepting, rejecting and clearing would each do to the
-  features the filter shows, without deciding.
+- `remote.previewMergePlanBulk(baseId, filter?)` - What accepting, rejecting, clearing and picking the nearest
+  would each do to the features the filter shows, without deciding.
+- `filter.group` and `overview.choices` - Why each feature that needs a decision waits, one group per feature
+  (MP-M7); the `pick-nearest` bulk action includes the clearly nearest candidate of each shown choice and leaves
+  out its rivals. Plan tiles carry each feature's `group`.
 - `remote.getMergePlanOsc(baseId)` - The plan as an osmChange document.
 - `remote.applyMergePlan(baseId)` / `remote.clearMergePlan(baseId)` - Apply or discard the plan.
 - `remote.planDeduplication(osmId)` - Find duplicates inside one dataset for the changeset pages.

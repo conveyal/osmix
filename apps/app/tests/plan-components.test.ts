@@ -20,6 +20,7 @@ import {
 import { PlanProposalActions } from "../src/components/plan-proposal-actions";
 import { PlanReview } from "../src/components/plan-review";
 import { PlanSummary } from "../src/components/plan-summary";
+import { SuggestedChoices } from "../src/components/suggested-choices";
 
 const render = (element: ReactElement) =>
   renderToStaticMarkup(createElement(Provider, { store: createStore() }, element));
@@ -163,11 +164,14 @@ describe("plan components", () => {
           accept: { changed: 3, waiting: 2 },
           reject: { changed: 1, waiting: 0 },
           clear: { changed: 0, waiting: 4 },
+          "pick-nearest": { changed: 2, waiting: 1 },
         },
       }),
     );
     expect(html).toContain("No imported features match these filters");
     expect(html).toContain("Include 3 features");
+    expect(html).toContain("Pick nearest for 2 features");
+    expect(html).toContain("Waiting because");
     expect(html).toContain("Leave out 1 feature");
     expect(html).toContain("After Include, 2 still need their own choice");
     expect(html).toContain("All proposals");
@@ -192,6 +196,15 @@ describe("plan components", () => {
         demoted: [],
       },
       decisions: [],
+      choices: {
+        removal: 0,
+        individual: 0,
+        bend: 0,
+        tie: 0,
+        nearest: 0,
+        "routing-tags": 0,
+        other: 1,
+      },
       staleDecisions: [],
       featureCount: 3,
     } as MergePlanOverview;
@@ -200,5 +213,29 @@ describe("plan components", () => {
     expect(html).toContain("way -1 references missing node -99");
     expect(html).toContain("Needs decision");
     expect(html).not.toContain("Replaced");
+  });
+
+  it("groups what still needs a decision, largest first, with a way to show each", () => {
+    const html = render(
+      createElement(SuggestedChoices, {
+        choices: {
+          removal: 1,
+          individual: 0,
+          bend: 4_063,
+          tie: 20,
+          nearest: 15_359,
+          "routing-tags": 8_727,
+          other: 0,
+        },
+        group: "bend",
+        onShow: noop,
+      }),
+    );
+    expect(html.indexOf("Choices with a clear nearest (15,359)")).toBeLessThan(
+      html.indexOf("Routing tag copies (8,727)"),
+    );
+    expect(html).not.toContain("Needs a closer look");
+    expect(html).toContain('aria-label="Show Connections that bend sharply"');
+    expect(html).toContain('aria-pressed="true"');
   });
 });

@@ -7,7 +7,8 @@ import {
   SidebarSection,
   useTaskLock,
 } from "@osmix/ui";
-import { CheckCheckIcon, RotateCcwIcon, XIcon } from "lucide-react";
+import { CheckCheckIcon, LocateFixedIcon, RotateCcwIcon, XIcon } from "lucide-react";
+import { PLAN_CHOICE_GROUPS, type PlanChoiceGroup } from "osmix";
 import type {
   MergePlanBulkPreview,
   MergePlanBulkRequest,
@@ -22,6 +23,7 @@ import { useId } from "react";
 
 import {
   bulkActionLabel,
+  CHOICE_GROUP_LABEL,
   FILTERABLE_KINDS,
   OUTCOME_LABEL,
   OUTCOMES,
@@ -32,12 +34,14 @@ import { PlanFeatureRow } from "./plan-feature-row";
 export const PLAN_PAGE_SIZE = 10;
 
 const BULK_ACTIONS = [
+  { action: "pick-nearest", icon: <LocateFixedIcon />, variant: "outline" },
   { action: "accept", icon: <CheckCheckIcon />, variant: "outline" },
   { action: "reject", icon: <XIcon />, variant: "outline" },
   { action: "clear", icon: <RotateCcwIcon />, variant: "ghost" },
 ] as const;
 
 const BULK_LOADING_LABEL = {
+  "pick-nearest": "Pick nearest",
   accept: "Include shown",
   reject: "Leave out shown",
   clear: "Clear choices",
@@ -78,6 +82,7 @@ export function PlanReview({
   const taskLocked = useTaskLock();
   const outcomeId = useId();
   const kindId = useId();
+  const groupId = useId();
   const shown = page.total.toLocaleString();
   return (
     <SidebarSection flush title="Imported features">
@@ -125,10 +130,33 @@ export function PlanReview({
               ))}
             </NativeSelect>
           </div>
+          <div className="col-span-2 flex flex-col gap-1">
+            <label htmlFor={groupId}>Waiting because</label>
+            <NativeSelect
+              className="w-full"
+              id={groupId}
+              value={filter.group ?? ""}
+              disabled={taskLocked}
+              onChange={(event) => {
+                const group = event.target.value as PlanChoiceGroup | "";
+                const { group: _group, ...rest } = filter;
+                void onFilterChange(group ? { ...rest, group } : rest);
+              }}
+            >
+              <NativeSelectOption value="">Any reason</NativeSelectOption>
+              {PLAN_CHOICE_GROUPS.map((group) => (
+                <NativeSelectOption key={group} value={group}>
+                  {CHOICE_GROUP_LABEL[group]}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Choices for shown features">
           {BULK_ACTIONS.map(({ action, icon, variant }) => {
             const changed = preview?.[action].changed ?? 0;
+            // Picking the nearest is offered only where a clear nearest exists.
+            if (action === "pick-nearest" && changed === 0) return null;
             return (
               <ActionButton
                 key={action}

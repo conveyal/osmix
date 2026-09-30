@@ -17,10 +17,15 @@ import {
   TableRow,
 } from "@osmix/ui";
 import { DownloadIcon } from "lucide-react";
-import type { MergeMatchingFilter, MergePlanMatchingOutcome } from "osmix";
+import { type MergeMatchingFilter, type MergePlanMatchingOutcome, PLAN_CHOICE_GROUPS } from "osmix";
 import { useId, useState } from "react";
 
-import { OUTCOME_LABEL, OUTCOMES, planReasonLabel } from "../lib/merge-plan-workflow";
+import {
+  CHOICE_GROUP_LABEL,
+  OUTCOME_LABEL,
+  OUTCOMES,
+  planReasonLabel,
+} from "../lib/merge-plan-workflow";
 import { useWorkerPage } from "../lib/use-worker-page";
 import type { MergeCompletion } from "../state/merge-outcome";
 import { ConflationWayRemovalPreview } from "./conflation-way-removal";
@@ -305,11 +310,23 @@ export function MergeCompletionSummary({
         }))}
       />
       {undecided > 0 ? (
-        <p className="p-inset">
-          Proposals for {undecided.toLocaleString()} imported{" "}
-          {undecided === 1 ? "feature were" : "features were"} waiting for a decision and were left
-          out; the features themselves were still added.
-        </p>
+        <>
+          <p className="p-inset">
+            Proposals for {undecided.toLocaleString()} imported{" "}
+            {undecided === 1 ? "feature were" : "features were"} waiting for a decision and were
+            left out; the features themselves were still added.
+          </p>
+          <CountTable
+            label="Left out, by why they waited"
+            className="border-t"
+            rows={PLAN_CHOICE_GROUPS.filter((group) => completion.plan.choices[group] > 0).map(
+              (group) => ({
+                label: CHOICE_GROUP_LABEL[group],
+                count: completion.plan.choices[group],
+              }),
+            )}
+          />
+        </>
       ) : null}
       {summary ? (
         <>

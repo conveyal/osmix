@@ -24,6 +24,12 @@ tokens, spacing, primitives, map overlay primitives) lives in
 - `PlanSummary` — features by outcome, a destructive `Alert` when the plan
   would break routing (Apply is disabled), stale decisions, demoted
   connections, and routing topology in a `Details`.
+- `SuggestedChoices` — above the feature list: the groups of features that
+  need a decision (MP-M7), largest first, each with its count, a line on what
+  it means and **Show**, which sets the "Waiting because" filter so the list,
+  the map and the bulk buttons apply to that group. **Pick nearest for N
+  features** joins the bulk buttons when the shown features have a clear
+  nearest. The result lists what was left out by the same groups.
 - `PlanReview`, `PlanFeatureRow`, `PlanProposalActions` — one row per imported
   feature (a way with its vertices, a point, or a relation) named
   "Imported <type> <patch ID>", with its outcome, each proposal's status,

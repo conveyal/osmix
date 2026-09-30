@@ -267,6 +267,46 @@ describe("crossing proposals", () => {
     expect(osm.ways.getById(10)?.refs).toEqual([1, 2]);
     expect(osm.ways.getById(-1)?.refs).toEqual([-1, -2]);
   });
+  it("proposes one crossing where a base way passes through an imported vertex", () => {
+    // From the eastern Washington sidewalk import: the base footway passes within 1e-7° of
+    // imported vertex 3864880, so both imported segments beside it report the same crossing.
+    const base = dataset(
+      "base",
+      [
+        { id: -2633087, lon: -119.3678777, lat: 46.2984253 },
+        { id: -2633088, lon: -119.3678903, lat: 46.298442 },
+        { id: -2633089, lon: -119.3679106, lat: 46.298456 },
+      ],
+      [{ id: -217907, refs: [-2633087, -2633088, -2633089], tags: { highway: "footway" } }],
+    );
+    const patch = dataset(
+      "patch",
+      [
+        { id: 3864890, lon: -119.3679, lat: 46.2984489 },
+        { id: 3864892, lon: -119.3678929, lat: 46.2984437 },
+        { id: 3864880, lon: -119.3678872, lat: 46.2984379 },
+        { id: 3864881, lon: -119.3678765, lat: 46.2984179 },
+      ],
+      [
+        {
+          id: 1899848,
+          refs: [3864890, 3864892, 3864880, 3864881],
+          tags: { highway: "footway", footway: "sidewalk" },
+        },
+      ],
+    );
+    const plan = planMerge(
+      base,
+      patch,
+      { matching: { propertyKeys: ["kerb"], attachNetwork: true, automatic: "none" } },
+      quiet,
+    );
+    const crossings = [...plan.proposals.values()].filter(({ id }) =>
+      id.includes("@-119.3678872,"),
+    );
+    expect(crossings).toHaveLength(1);
+    expect(() => applyPlan(plan)).not.toThrow();
+  });
 });
 
 describe("plan diagnostics", () => {

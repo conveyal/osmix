@@ -42,6 +42,7 @@ import { PlanInputs } from "../components/plan-inputs";
 import { PLAN_PAGE_SIZE, PlanReview } from "../components/plan-review";
 import { PlanSummary } from "../components/plan-summary";
 import { StepActions } from "../components/step-actions";
+import { SuggestedChoices } from "../components/suggested-choices";
 import { firstInvalidConflationInputId, toOsmConflationOptions } from "../lib/conflation-workflow";
 import {
   buildMergePlanOptions,
@@ -608,6 +609,14 @@ export default function MergeBlock() {
       {step === "review" && overview && page ? (
         <>
           <PlanSummary overview={overview} />
+          <SuggestedChoices
+            choices={overview.choices}
+            group={filter.group}
+            onShow={async (group) => {
+              const { group: _group, ...rest } = filter;
+              await changeFilter(group ? { ...rest, group } : rest);
+            }}
+          />
           <PlanReview
             detail={selected}
             filter={filter}

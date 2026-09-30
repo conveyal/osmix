@@ -4,6 +4,7 @@
  */
 import {
   getMergePlanCandidate,
+  getMergePlanChoices,
   type MergePlan,
   type OsmConflationCandidate,
   type OsmConflationOutcomeFeature,
@@ -11,6 +12,9 @@ import {
   type OsmConflationTagOutcome,
   type OsmConflationUncopiedTagFeature,
   PLAN_OUTCOME_PRIORITY,
+  pickNearestMergePlanDecisions,
+  type PlanChoiceGroup,
+  type PlanChoices,
   type PlanDecision,
   type PlanFeature,
   type PlanOutcome,
@@ -50,6 +54,8 @@ export interface MergePlanOverview {
   decisions: PlanDecision[];
   staleDecisions: string[];
   featureCount: number;
+  /** Features that need a decision, by why they wait; the counts sum to that outcome's. */
+  choices: Record<PlanChoiceGroup, number>;
 }
 
 /** Which features a page shows. Every set field must match. */
@@ -61,6 +67,8 @@ export interface MergePlanFilter {
   status?: PlanProposalStatus;
   /** Features with at least one proposal with this reason. */
   reason?: string;
+  /** Features that wait for a decision for this reason, and only their proposals in it. */
+  group?: PlanChoiceGroup;
 }
 
 /** A feature row: the feature, its proposals, and a label from the patch's tags. */
@@ -86,7 +94,11 @@ export interface MergePlanFeatureDetail extends MergePlanFeatureView {
 }
 
 export interface MergePlanBulkRequest {
-  action: "accept" | "reject" | "clear";
+  /**
+   * `pick-nearest` includes the clearly nearest candidate of each choice the filter shows and
+   * leaves out its rivals, as a person's decisions (MP-M6's margin).
+   */
+  action: "accept" | "reject" | "clear" | "pick-nearest";
   filter: MergePlanFilter;
 }
 
@@ -143,7 +155,20 @@ export function planOverview(plan: MergePlan): MergePlanOverview {
     decisions: [...(plan.options.decisions ?? [])],
     staleDecisions: plan.staleDecisions,
     featureCount: plan.features.length,
+    choices: choicesOf(plan).counts,
   });
+}
+
+const cachedChoices = new WeakMap<MergePlan["summary"], PlanChoices>();
+
+/** The plan's choice groups, computed once per planned state (each replan makes a new summary). */
+export function choicesOf(plan: MergePlan) {
+  let choices = cachedChoices.get(plan.summary);
+  if (!choices) {
+    choices = getMergePlanChoices(plan);
+    cachedChoices.set(plan.summary, choices);
+  }
+  return choices;
 }
 
 function matchingOutcome(report: OsmConflationOutcomeReport): MergePlanMatchingOutcome {
@@ -209,6 +234,7 @@ function proposalsOf(plan: MergePlan, feature: PlanFeature) {
 
 function matchesFilter(plan: MergePlan, feature: PlanFeature, filter: MergePlanFilter) {
   if (filter.outcome && feature.outcome !== filter.outcome) return false;
+  if (filter.group && choicesOf(plan).features.get(feature.key) !== filter.group) return false;
   if (!filter.kind && !filter.status && !filter.reason) return true;
   return proposalsOf(plan, feature).some(
     (proposal) =>
@@ -351,6 +377,7 @@ export function bulkDecisions(plan: MergePlan, request: MergePlanBulkRequest) {
   let changed = 0;
   let waiting = 0;
   const { action, filter } = request;
+  if (action === "pick-nearest") return pickNearest(plan, filter, decisions);
   for (const feature of filteredFeatures(plan, filter)) {
     const proposals = bulkProposals(plan, feature, filter);
     let featureChanged = false;
@@ -377,12 +404,41 @@ export function bulkDecisions(plan: MergePlan, request: MergePlanBulkRequest) {
   };
 }
 
-/** A feature's decidable proposals that match the filter's kind, status and reason. */
+/**
+ * Pick the clearly nearest candidate of each choice the filter shows. Rivals can belong to
+ * features the filter does not show, and are left out all the same.
+ */
+function pickNearest(
+  plan: MergePlan,
+  filter: MergePlanFilter,
+  decisions: Map<string, PlanDecision["action"]>,
+) {
+  const shown = filteredFeatures(plan, filter);
+  const ids = shown.flatMap((feature) => bulkProposals(plan, feature, filter).map(({ id }) => id));
+  const changed = new Set<string>();
+  for (const { proposalId, action } of pickNearestMergePlanDecisions(plan, ids)) {
+    if (decisions.has(proposalId)) continue;
+    decisions.set(proposalId, action);
+    changed.add(plan.proposals.get(proposalId)!.feature);
+  }
+  const waiting = shown.filter((feature) =>
+    bulkProposals(plan, feature, filter).some((proposal) => isWaiting(plan, proposal, decisions)),
+  ).length;
+  return {
+    decisions: [...decisions].map(([proposalId, action]) => ({ proposalId, action })),
+    changed: changed.size,
+    waiting,
+  };
+}
+
+/** A feature's decidable proposals that match the filter's kind, status, reason and group. */
 function bulkProposals(plan: MergePlan, feature: PlanFeature, filter: MergePlanFilter) {
+  const groups = filter.group ? choicesOf(plan).proposals : undefined;
   return proposalsOf(plan, feature).filter(
     (proposal) =>
       !DIRECT_KINDS.has(proposal.kind) &&
       proposal.status !== "blocked" &&
+      (!groups || groups.get(proposal.id) === filter.group) &&
       (!filter.kind || proposal.kind === filter.kind) &&
       (!filter.status || proposal.status === filter.status) &&
       (!filter.reason || proposal.reasons.includes(filter.reason)),
@@ -411,5 +467,10 @@ export function bulkPreview(plan: MergePlan, filter: MergePlanFilter): MergePlan
     const { changed, waiting } = bulkDecisions(plan, { action, filter });
     return { changed, waiting };
   };
-  return { accept: counts("accept"), reject: counts("reject"), clear: counts("clear") };
+  return {
+    accept: counts("accept"),
+    reject: counts("reject"),
+    clear: counts("clear"),
+    "pick-nearest": counts("pick-nearest"),
+  };
 }

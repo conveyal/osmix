@@ -134,10 +134,10 @@ describe("worker merge plan sessions", () => {
     const covering = pointToTile(0.005, 0.005, 10) as Tile;
     expect(planTileFeatures(worker.getMergePlanTile(base.id, covering))).toEqual({
       ways: [
-        { featureKey: "way:-1", outcome: "needs-decision" },
-        { featureKey: "way:-2", outcome: "added" },
+        { featureKey: "way:-1", outcome: "needs-decision", group: "other" },
+        { featureKey: "way:-2", outcome: "added", group: "" },
       ],
-      nodes: [{ featureKey: "node:-4", outcome: "merged" }],
+      nodes: [{ featureKey: "node:-4", outcome: "merged", group: "" }],
     });
     expect(worker.getMergePlanTile(base.id, pointToTile(90, 45, 10) as Tile).byteLength).toBe(0);
 
@@ -145,7 +145,7 @@ describe("worker merge plan sessions", () => {
     const decided = worker.getMergePlanFeature(base.id, "node:-4").outcome;
     expect(decided).not.toBe("merged");
     expect(planTileFeatures(worker.getMergePlanTile(base.id, covering)).nodes).toEqual([
-      { featureKey: "node:-4", outcome: decided },
+      { featureKey: "node:-4", outcome: decided, group: "" },
     ]);
 
     worker.clearMergePlan(base.id);

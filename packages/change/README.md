@@ -87,6 +87,10 @@ the plan no longer has are listed in `plan.staleDecisions`.
   any decision in `decisions`; see MP-M6 in the merge-process guide.
 - `decisions`: `{ proposalId, action: "accept" | "reject" }[]`, a person's decisions.
 
+`getMergePlanChoices(plan)` groups the features that need a decision by why they wait (MP-M7), and
+`pickNearestMergePlanDecisions(plan, proposalIds)` returns a person's decisions picking the clearly nearest
+candidate of each choice, by the automation levels' margin.
+
 ### Discover matching candidates
 
 `discoverConflationCandidates(base, patch, options)` returns the matching candidates between two untouched

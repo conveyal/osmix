@@ -11,7 +11,12 @@ import { useEffect } from "react";
 import { Layer, Source, useMap } from "react-map-gl/maplibre";
 
 import { OUTCOME_LABEL, OUTCOMES } from "../lib/merge-plan-workflow";
-import { planMapAtom, planOverviewAtom, selectedPlanFeatureAtom } from "../state/merge-plan";
+import {
+  planFilterAtom,
+  planMapAtom,
+  planOverviewAtom,
+  selectedPlanFeatureAtom,
+} from "../state/merge-plan";
 
 const SOURCE_ID = `${APPID}:merge-plan`;
 const LINES_ID = `${SOURCE_ID}:lines`;
@@ -55,6 +60,7 @@ function outcomeColor(colors: ReturnType<typeof useMapColors>): ExpressionSpecif
  */
 export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => unknown }) {
   const planMap = useAtomValue(planMapAtom);
+  const group = useAtomValue(planFilterAtom).group;
   const selected = useAtomValue(selectedPlanFeatureAtom);
   const colors = useMapColors();
   const map = useMap().current;
@@ -76,6 +82,10 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
   const color = outcomeColor(colors);
   const isSelected: ExpressionSpecification = ["==", ["get", "featureKey"], selected?.key ?? ""];
   const decision: ExpressionSpecification = ["==", ["get", "outcome"], "needs-decision"];
+  // Showing one group of features that wait narrows the map to it too.
+  const shown: ExpressionSpecification = group
+    ? ["==", ["get", "group"], group]
+    : ["literal", true];
   const linePaint: LineLayerSpecification["paint"] = {
     "line-color": color,
     "line-width": ["case", isSelected, 7, decision, 5, 3],
@@ -100,26 +110,28 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
         id={`${SOURCE_ID}:casing`}
         type="line"
         source-layer={PLAN_TILE_LAYERS.ways}
+        filter={shown}
         paint={{ "line-color": colors.casing, "line-width": ["case", isSelected, 11, 6] }}
       />
       <Layer
         id={LINES_ID}
         type="line"
         source-layer={PLAN_TILE_LAYERS.ways}
-        filter={["!", decision]}
+        filter={["all", shown, ["!", decision]]}
         paint={linePaint}
       />
       <Layer
         id={`${LINES_ID}:decision`}
         type="line"
         source-layer={PLAN_TILE_LAYERS.ways}
-        filter={decision}
+        filter={["all", shown, decision]}
         paint={{ ...linePaint, "line-dasharray": [1.5, 1] }}
       />
       <Layer
         id={POINTS_ID}
         type="circle"
         source-layer={PLAN_TILE_LAYERS.nodes}
+        filter={shown}
         paint={pointPaint}
       />
     </Source>

@@ -15,7 +15,10 @@ import {
   writeVtPbf,
 } from "@osmix/vt";
 
-/** Tile layer names; each feature carries `featureKey` and `outcome` properties. */
+/**
+ * Tile layer names; each feature carries `featureKey`, `outcome` and `group` (why it waits, or
+ * empty) properties.
+ */
 export const PLAN_TILE_LAYERS = { ways: "ways", nodes: "nodes" } as const;
 
 const EXTENT = 4096;
@@ -51,6 +54,7 @@ export function planTile(
   patch: Osm,
   index: PlanTileIndex,
   tile: Tile,
+  groups: ReadonlyMap<string, string> = new Map(),
 ): ArrayBuffer {
   const bbox = tileToBbox(tile);
   const patchBbox = patch.bbox();
@@ -69,7 +73,11 @@ export function planTile(
       yield {
         id: position,
         type: 2,
-        properties: { featureKey: feature.key, outcome: feature.outcome },
+        properties: {
+          featureKey: feature.key,
+          outcome: feature.outcome,
+          group: groups.get(feature.key) ?? "",
+        },
         geometry,
       };
     }
@@ -87,7 +95,11 @@ export function planTile(
       yield {
         id: position,
         type: 1,
-        properties: { featureKey: feature.key, outcome: feature.outcome },
+        properties: {
+          featureKey: feature.key,
+          outcome: feature.outcome,
+          group: groups.get(feature.key) ?? "",
+        },
         geometry: [[point]],
       };
     }

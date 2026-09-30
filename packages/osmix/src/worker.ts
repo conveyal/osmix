@@ -99,6 +99,7 @@ import { installStructuredComlinkErrorTransferHandler } from "./comlink-errors.t
 import {
   bulkDecisions,
   bulkPreview,
+  choicesOf,
   type MergePlanBulkRequest,
   type MergePlanBulkResult,
   type MergeMatchingFilter,
@@ -681,7 +682,13 @@ export class OsmixWorker extends EventTarget {
     if (!session) return new ArrayBuffer(0);
     const patch = this.get(session.patchOsmId);
     session.tileIndex ??= planTileIndex(session.plan, patch);
-    const data = planTile(session.plan, patch, session.tileIndex, tile);
+    const data = planTile(
+      session.plan,
+      patch,
+      session.tileIndex,
+      tile,
+      choicesOf(session.plan).features,
+    );
     if (data.byteLength === 0) return data;
     return Comlink.transfer(data, [data]);
   }

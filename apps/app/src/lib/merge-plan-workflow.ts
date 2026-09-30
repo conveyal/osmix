@@ -5,6 +5,7 @@ import type {
   MergePlanOptions,
   OsmConflationOptions,
   PatchIdMode,
+  PlanChoiceGroup,
   PlanDecision,
   PlanFeature,
   PlanOutcome,
@@ -202,7 +203,12 @@ const features = (count: number) =>
 
 /** A bulk choice's button label, with how many shown features it would change. */
 export function bulkActionLabel(action: MergePlanBulkRequest["action"], changed: number) {
-  const verb = { accept: "Include", reject: "Leave out", clear: "Clear choices for" }[action];
+  const verb = {
+    accept: "Include",
+    reject: "Leave out",
+    clear: "Clear choices for",
+    "pick-nearest": "Pick nearest for",
+  }[action];
   return `${verb} ${features(changed)}`;
 }
 
@@ -211,7 +217,12 @@ export function bulkResultMessage(
   action: MergePlanBulkRequest["action"],
   { changed, waiting }: MergePlanBulkCounts,
 ) {
-  const verb = { accept: "Included", reject: "Left out", clear: "Cleared choices for" }[action];
+  const verb = {
+    accept: "Included",
+    reject: "Left out",
+    clear: "Cleared choices for",
+    "pick-nearest": "Picked the nearest for",
+  }[action];
   const done = changed === 0 ? "No shown feature changed" : `${verb} ${features(changed)}`;
   if (waiting === 0) return done;
   return `${done}; ${features(waiting)} still ${waiting === 1 ? "needs" : "need"} a decision`;
@@ -247,3 +258,30 @@ export const AUTOMATION_OPTIONS: readonly {
 export const AUTOMATION_LABEL = Object.fromEntries(
   AUTOMATION_OPTIONS.map(({ value, label }) => [value, label]),
 ) as Record<MergePlanAutomation, string>;
+
+/** Why features wait for a decision, in words, most in need of a person first (MP-M7). */
+export const CHOICE_GROUP_LABEL: Record<PlanChoiceGroup, string> = {
+  removal: "Removals",
+  individual: "Needs a closer look",
+  bend: "Connections that bend sharply",
+  tie: "Choices to make yourself",
+  nearest: "Choices with a clear nearest",
+  "routing-tags": "Routing tag copies",
+  other: "Other proposals",
+};
+
+export const CHOICE_GROUP_HELP: Record<PlanChoiceGroup, string> = {
+  removal: "Removing an imported way needs its own Include on its row.",
+  individual:
+    "They change the drivable network, travel restrictions, a relation or a tagged point. " +
+    "Decide each on its row.",
+  bend:
+    "The imported line would bend more than 30° to connect. Spot-check a few on the map, then " +
+    "include or leave them out together.",
+  tie:
+    "No candidate is clearly the one: they are about equally near, or the nearest bends sharply " +
+    "or needs a closer look. Leaving them out keeps the imported points unconnected.",
+  nearest: "One candidate is clearly nearest. Pick nearest includes it and leaves out the others.",
+  "routing-tags": "Copying kerb, crossing or barrier values can change who can travel where.",
+  other: "Proposals waiting for another reason.",
+};
