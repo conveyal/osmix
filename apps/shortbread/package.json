@@ -17,7 +17,7 @@
     "@osmix/shared": "workspace:*",
     "@osmix/shortbread": "workspace:*",
     "@osmix/types": "workspace:*",
-    "@versatiles/style": "^5.13.1",
+    "@versatiles/style": "^6.0.3",
     "comlink": "^4.4.2",
     "hono": "^4.13.8",
     "maplibre-gl": "catalog:",
