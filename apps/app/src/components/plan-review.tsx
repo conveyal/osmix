@@ -70,6 +70,7 @@ export function PlanReview({
     proposalId: string,
     action: PlanDecision["action"] | null,
     excludes: readonly string[],
+    together?: readonly string[],
   ) => unknown;
   onFilterChange: (filter: MergePlanFilter) => unknown;
   onPageChange: (page: number) => unknown;

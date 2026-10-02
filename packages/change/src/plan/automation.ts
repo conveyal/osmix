@@ -35,7 +35,8 @@ export function isDecidable(proposal: PlanProposal | undefined): proposal is Dec
   );
 }
 
-function decide(proposal: PlanProposal, action: "accept" | "reject") {
+/** Record a level's decision on a proposal. */
+export function decide(proposal: PlanProposal, action: "accept" | "reject") {
   proposal.decision = action;
   proposal.automated = true;
   proposal.effect = action === "accept" ? "applied" : "skipped";

@@ -28,6 +28,7 @@ export function PlanFeatureRow({
     proposalId: string,
     action: PlanDecision["action"] | null,
     excludes: readonly string[],
+    together?: readonly string[],
   ) => unknown;
   onSelect: (featureKey: string) => unknown;
 }) {

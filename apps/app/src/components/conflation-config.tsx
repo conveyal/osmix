@@ -146,6 +146,56 @@ export function ConflationConfig() {
             counterpart, connections, and orphan-point cleanup before applying. No geometry is
             removed automatically.
           </p>
+          <CheckboxLabel className="min-h-8">
+            <Checkbox
+              checked={form.allowWayReplacement}
+              id="conflation-way-replacement"
+              aria-describedby={`conflation-replacement-help${errors.actions ? " conflation-actions-error" : ""}`}
+              aria-invalid={errors.actions ? true : undefined}
+              onCheckedChange={(allowWayReplacement) => {
+                updateForm((current) => ({ ...current, allowWayReplacement }));
+              }}
+            />
+            Replace base ways the import traces
+          </CheckboxLabel>
+          <p id="conflation-replacement-help" className="text-muted-foreground">
+            Keep imported ways in place of the base ways they trace, deleting the base ways.
+            Junctions and relations move to the imported ways. Waits for your review unless the
+            automation level is Aggressive; a change of level or layer always waits.
+          </p>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="conflation-replacement-tolerance">Replacement tolerance (meters)</label>
+            <Input
+              id="conflation-replacement-tolerance"
+              name="matching-replacement-tolerance"
+              aria-describedby={`conflation-replacement-tolerance-help${errors.replacementToleranceMeters ? " conflation-replacement-tolerance-error" : ""}`}
+              aria-invalid={errors.replacementToleranceMeters ? true : undefined}
+              disabled={!form.allowWayReplacement}
+              min="0"
+              step="any"
+              type="number"
+              inputMode="decimal"
+              value={
+                Number.isFinite(form.replacementToleranceMeters)
+                  ? form.replacementToleranceMeters
+                  : ""
+              }
+              onChange={(event) => {
+                updateForm((current) => ({
+                  ...current,
+                  replacementToleranceMeters: event.target.valueAsNumber,
+                }));
+              }}
+            />
+            <p id="conflation-replacement-tolerance-help" className="text-muted-foreground">
+              How far apart an imported and a base way may be, everywhere along them.
+            </p>
+            {errors.replacementToleranceMeters ? (
+              <p id="conflation-replacement-tolerance-error" className="text-destructive">
+                {errors.replacementToleranceMeters}
+              </p>
+            ) : null}
+          </div>
           {errors.actions ? (
             <p id="conflation-actions-error" className="text-destructive">
               {errors.actions}

@@ -6,6 +6,8 @@ export interface ConflationFormState {
   propertyKeys: string;
   attachNetwork: boolean;
   allowWayRemoval: boolean;
+  allowWayReplacement: boolean;
+  replacementToleranceMeters: number;
   maxDistanceMeters: number;
 }
 
@@ -24,6 +26,8 @@ export const DEFAULT_CONFLATION_FORM_STATE: ConflationFormState = {
   propertyKeys: DEFAULT_CONFLATION_PROPERTY_KEYS.join(", "),
   attachNetwork: false,
   allowWayRemoval: false,
+  allowWayReplacement: false,
+  replacementToleranceMeters: 1,
   maxDistanceMeters: 1,
 };
 
@@ -43,6 +47,7 @@ const CONFLATION_ERROR_FIELD_IDS = {
   actions: "conflation-property-transfer",
   propertyKeys: "conflation-property-keys",
   maxDistanceMeters: "conflation-distance",
+  replacementToleranceMeters: "conflation-replacement-tolerance",
 } as const;
 
 export type ConflationFormErrors = Partial<Record<keyof typeof CONFLATION_ERROR_FIELD_IDS, string>>;
@@ -54,8 +59,20 @@ export function conflationFormErrors(state: ConflationFormState): ConflationForm
   if (!Number.isFinite(state.maxDistanceMeters) || state.maxDistanceMeters <= 0) {
     errors.maxDistanceMeters = "Match distance must be greater than zero.";
   }
-  if (!state.transferProperties && !state.attachNetwork && !state.allowWayRemoval) {
-    errors.actions = "Select Copy tags, Connect network, or Review redundant way removal.";
+  if (
+    state.allowWayReplacement &&
+    (!Number.isFinite(state.replacementToleranceMeters) || state.replacementToleranceMeters <= 0)
+  ) {
+    errors.replacementToleranceMeters = "Replacement tolerance must be greater than zero.";
+  }
+  if (
+    !state.transferProperties &&
+    !state.attachNetwork &&
+    !state.allowWayRemoval &&
+    !state.allowWayReplacement
+  ) {
+    errors.actions =
+      "Select Copy tags, Connect network, Review redundant way removal, or Replace base ways the import traces.";
   }
   if (state.transferProperties && parseConflationPropertyKeys(state.propertyKeys).length === 0) {
     errors.propertyKeys = "Enter at least one OSM tag key to copy.";
@@ -66,13 +83,24 @@ export function conflationFormErrors(state: ConflationFormState): ConflationForm
 /** Return the first configuration problem that must be resolved before discovery. */
 export function validateConflationForm(state: ConflationFormState): string | null {
   const errors = conflationFormErrors(state);
-  return errors.actions ?? errors.propertyKeys ?? errors.maxDistanceMeters ?? null;
+  return (
+    errors.actions ??
+    errors.propertyKeys ??
+    errors.maxDistanceMeters ??
+    errors.replacementToleranceMeters ??
+    null
+  );
 }
 
 /** Focus the same first problem that blocks discovery when a workflow is started. */
 export function firstInvalidConflationInputId(state: ConflationFormState): string | null {
   const errors = conflationFormErrors(state);
-  for (const field of ["actions", "propertyKeys", "maxDistanceMeters"] as const) {
+  for (const field of [
+    "actions",
+    "propertyKeys",
+    "maxDistanceMeters",
+    "replacementToleranceMeters",
+  ] as const) {
     if (errors[field]) return CONFLATION_ERROR_FIELD_IDS[field];
   }
   return null;
@@ -89,6 +117,9 @@ export function toOsmConflationOptions(
     propertyKeys: state.transferProperties ? parseConflationPropertyKeys(state.propertyKeys) : [],
     attachNetwork: state.attachNetwork,
     ...(state.allowWayRemoval ? { allowWayRemoval: true } : {}),
+    ...(state.allowWayReplacement
+      ? { allowWayReplacement: true, replacementToleranceMeters: state.replacementToleranceMeters }
+      : {}),
     maxDistanceMeters: state.maxDistanceMeters,
     automatic: "high-confidence",
   };

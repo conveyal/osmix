@@ -85,6 +85,13 @@ describe("merge plan workflow", () => {
     expect(withDecision(included, a, null, [b])).toEqual(included);
   });
 
+  it("decides a way replacement's set as one, dropping its members' earlier decisions", () => {
+    const leftOut = [{ proposalId: "replace:w30>w10", action: "reject" as const }];
+    expect(withDecision(leftOut, "replace:w20>w10", "accept", [], ["replace:w30>w10"])).toEqual([
+      { proposalId: "replace:w20>w10", action: "accept" },
+    ]);
+  });
+
   it("names every outcome and filterable proposal kind", () => {
     for (const outcome of OUTCOMES) {
       expect(OUTCOME_LABEL[outcome]).toBeTruthy();

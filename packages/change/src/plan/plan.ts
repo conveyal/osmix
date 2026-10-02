@@ -203,7 +203,11 @@ function runPhases(plan: MergePlan, state: PlanState, from: PlanPhase) {
       // Discovery reads the state after identity, which a matching decision does not change.
       const cached =
         from === "matching" && state.matched
-          ? { discovery: state.matched.discovery, demoted: state.matched.demotedCandidates }
+          ? {
+              discovery: state.matched.discovery,
+              demoted: state.matched.demotedCandidates,
+              ...(state.matched.replacements ? { replacements: state.matched.replacements } : {}),
+            }
           : undefined;
       state.matched = planMatching(
         builder,

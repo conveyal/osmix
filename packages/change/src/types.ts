@@ -179,6 +179,14 @@ export interface OsmConflationOptions {
   attachNetwork: boolean;
   /** Enable manual removal review; never selects a removal by itself. */
   allowWayRemoval?: boolean;
+  /**
+   * Propose replacing base ways with imported ways that trace them (MP-R2): the imported ways
+   * are kept and the base ways deleted. Never decided without a person unless the automation
+   * level allows it.
+   */
+  allowWayReplacement?: boolean;
+  /** How far apart, in meters, an imported and a base way may be to replace. Defaults to 1. */
+  replacementToleranceMeters?: number;
   maxDistanceMeters?: number;
   automatic?: OsmConflationAutomatic;
   decisions?: OsmConflationDecision[];
@@ -190,6 +198,9 @@ export interface ResolvedOsmConflationOptions {
   attachNetwork: boolean;
   /** Enable manual removal review; never selects a removal by itself. */
   allowWayRemoval?: boolean;
+  allowWayReplacement?: boolean;
+  /** Present when `allowWayReplacement` is. */
+  replacementToleranceMeters?: number;
   maxDistanceMeters: number;
   automatic: OsmConflationAutomatic;
 }

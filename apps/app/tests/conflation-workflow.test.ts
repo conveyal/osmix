@@ -30,7 +30,8 @@ describe("conflation workflow configuration", () => {
     expect(firstInvalidConflationInputId(correctedRadius)).toBe("conflation-property-keys");
     const noActions = { ...correctedRadius, transferProperties: false };
     expect(conflationFormErrors(noActions)).toEqual({
-      actions: "Select Copy tags, Connect network, or Review redundant way removal.",
+      actions:
+        "Select Copy tags, Connect network, Review redundant way removal, or Replace base ways the import traces.",
     });
     expect(firstInvalidConflationInputId(noActions)).toBe("conflation-property-transfer");
     expect(firstInvalidConflationInputId({ ...noActions, attachNetwork: true })).toBeNull();
@@ -45,6 +46,8 @@ describe("conflation workflow configuration", () => {
       propertyKeys: "barrier, crossing, kerb, tactile_paving",
       attachNetwork: false,
       allowWayRemoval: false,
+      allowWayReplacement: false,
+      replacementToleranceMeters: 1,
       maxDistanceMeters: 1,
     });
     expect(parseConflationPropertyKeys(DEFAULT_CONFLATION_FORM_STATE.propertyKeys)).toEqual([
@@ -68,7 +71,9 @@ describe("conflation workflow configuration", () => {
         enabled: true,
         transferProperties: false,
       }),
-    ).toBe("Select Copy tags, Connect network, or Review redundant way removal.");
+    ).toBe(
+      "Select Copy tags, Connect network, Review redundant way removal, or Replace base ways the import traces.",
+    );
   });
 
   it("requires explicit property keys when property transfer is enabled", () => {
@@ -113,6 +118,29 @@ describe("conflation workflow configuration", () => {
       maxDistanceMeters: 1,
       automatic: "high-confidence",
     });
+  });
+
+  it("enables way replacement with its own tolerance", () => {
+    const state = {
+      ...DEFAULT_CONFLATION_FORM_STATE,
+      enabled: true,
+      transferProperties: false,
+      propertyKeys: "",
+      allowWayReplacement: true,
+      replacementToleranceMeters: 1.5,
+    };
+    expect(validateConflationForm(state)).toBeNull();
+    expect(toOsmConflationOptions(state)).toEqual({
+      propertyKeys: [],
+      attachNetwork: false,
+      allowWayReplacement: true,
+      replacementToleranceMeters: 1.5,
+      maxDistanceMeters: 1,
+      automatic: "high-confidence",
+    });
+    expect(validateConflationForm({ ...state, replacementToleranceMeters: 0 })).toBe(
+      "Replacement tolerance must be greater than zero.",
+    );
   });
 
   it("builds explicit high-confidence property-transfer options", () => {

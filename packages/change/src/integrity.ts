@@ -300,19 +300,29 @@ export function assertNoNewRoutingIntegrityIssues(baselineKeys: ReadonlySet<stri
   throw Error(`Merge introduced routing-integrity problems: ${descriptions.join("; ")}${suffix}`);
 }
 
+/** Base entities an included way replacement may delete or, for relations, re-member (MP-R2). */
+export interface ReplacedBaseEntities {
+  ways: ReadonlySet<number>;
+  nodes: ReadonlySet<number>;
+  relations: ReadonlySet<number>;
+}
+
 /**
  * Ensure fuzzy conflation did not rewrite geometry or relation topology that already existed in
  * the base. Same-ID patch updates are compared at the ordinary-merge baseline, not the raw base.
+ * `replaced` names the only base entities an included way replacement may delete or re-member.
  */
 export function assertConflationPreservesBaseTopology(
   originalBase: Osm,
   ordinaryBaseline: DatasetReader,
   conflated: DatasetReader,
+  replaced?: ReplacedBaseEntities,
 ) {
   const violations: string[] = [];
   for (const original of originalBase.nodes) {
     const baseline = ordinaryBaseline.nodes.getById(original.id);
     const result = conflated.nodes.getById(original.id);
+    if (baseline && !result && replaced?.nodes.has(original.id)) continue;
     if (!baseline || !result) {
       violations.push(`base node ${original.id} was removed`);
       continue;
@@ -324,6 +334,7 @@ export function assertConflationPreservesBaseTopology(
   for (const original of originalBase.ways) {
     const baseline = ordinaryBaseline.ways.getById(original.id);
     const result = conflated.ways.getById(original.id);
+    if (baseline && !result && replaced?.ways.has(original.id)) continue;
     if (!baseline || !result) {
       violations.push(`base way ${original.id} was removed`);
       continue;
@@ -342,6 +353,7 @@ export function assertConflationPreservesBaseTopology(
       violations.push(`base relation ${original.id} was removed`);
       continue;
     }
+    if (replaced?.relations.has(original.id)) continue;
     if (
       baseline.members.length !== result.members.length ||
       baseline.members.some((member, index) => {

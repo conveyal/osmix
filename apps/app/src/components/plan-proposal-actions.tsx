@@ -45,6 +45,7 @@ export function PlanProposalActions({
     proposalId: string,
     action: PlanDecision["action"] | null,
     excludes: readonly string[],
+    together?: readonly string[],
   ) => unknown;
   proposal: PlanProposal;
 }) {
@@ -78,8 +79,10 @@ export function PlanProposalActions({
           ];
   const alternatives = "alternatives" in proposal ? proposal.alternatives.length : 0;
   const competitors = "competitors" in proposal ? proposal.competitors.length : 0;
-  const excludes =
-    "competitors" in proposal ? [...proposal.alternatives, ...proposal.competitors] : [];
+  const excludes = [
+    ...("competitors" in proposal ? [...proposal.alternatives, ...proposal.competitors] : []),
+    ...(proposal.excludes ?? []),
+  ];
   return (
     <div className="flex flex-col gap-1" data-proposal-id={proposal.id}>
       <div className="flex items-center gap-2">
@@ -127,6 +130,7 @@ export function PlanProposalActions({
                     proposal.id,
                     option.value === "rule" ? null : option.value,
                     excludes,
+                    proposal.kind === "replace-way" ? proposal.set : [],
                   )
                 }
               />

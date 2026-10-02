@@ -328,19 +328,38 @@ export function planFeatureDetail(
   };
 }
 
-/** The proposals and base entities another decision on `proposal` would leave out (MP-M5). */
+/**
+ * The proposals including `proposal` would leave out: its alternatives and competitors (MP-M5),
+ * and what it and a way replacement exclude (MP-R2).
+ */
 function excludedBy(proposal: PlanProposal): readonly string[] {
-  return "competitors" in proposal ? [...proposal.alternatives, ...proposal.competitors] : [];
+  const choices =
+    "competitors" in proposal ? [...proposal.alternatives, ...proposal.competitors] : [];
+  return [...choices, ...(proposal.excludes ?? [])];
 }
 
 type Decisions = ReadonlyMap<string, PlanDecision["action"]>;
 
-/** A proposal's decision: a person's (from `decisions`), else the automation level's. */
+/**
+ * A proposal's decision: a person's (from `decisions`, or on another member of its way
+ * replacement set, MP-R2), else the automation level's.
+ */
 function decisionOf(plan: MergePlan, id: string, decisions: Decisions) {
   const own = decisions.get(id);
   if (own) return own;
   const proposal = plan.proposals.get(id);
+  const together = proposal?.kind === "replace-way" ? setDecision(proposal.set, decisions) : null;
+  if (together) return together;
   return proposal?.automated ? proposal.decision : undefined;
+}
+
+/** A person's decision on any member of a way replacement set. */
+function setDecision(set: readonly string[], decisions: Decisions) {
+  for (const id of set) {
+    const decision = decisions.get(id);
+    if (decision) return decision;
+  }
+  return null;
 }
 
 /** An undecided review proposal no included alternative or competitor has already left out. */
@@ -351,11 +370,16 @@ function isWaiting(plan: MergePlan, proposal: PlanProposal, decisions: Decisions
 
 /**
  * Whether including `proposal` needs a choice only a person can make: removal needs its own
- * consent (MP-R1), and a proposal that excludes others needs a choice between them (MP-M5).
+ * consent (MP-R1), and a proposal that excludes others needs a choice between them (MP-M5). A
+ * way replacement (MP-R2) needs one only when something it excludes is included.
  * Blocked proposals and ones already left out are not choices.
  */
 function needsOwnChoice(plan: MergePlan, proposal: PlanProposal, decisions: Decisions) {
   if (proposal.kind === "remove-way") return true;
+  // A replacement leaves out what it excludes by itself, unless someone included one of those.
+  if (proposal.kind === "replace-way") {
+    return excludedBy(proposal).some((id) => decisionOf(plan, id, decisions) === "accept");
+  }
   return excludedBy(proposal).some(
     (id) =>
       plan.proposals.get(id)?.status !== "blocked" && decisionOf(plan, id, decisions) !== "reject",
@@ -387,6 +411,8 @@ export function bulkDecisions(plan: MergePlan, request: MergePlanBulkRequest) {
         continue;
       }
       if (decisions.has(proposal.id)) continue;
+      // A set member decided already decides this one (MP-R2).
+      if (proposal.kind === "replace-way" && setDecision(proposal.set, decisions)) continue;
       if (action === "accept") {
         if (proposal.status !== "review" || !isWaiting(plan, proposal, decisions)) continue;
         if (needsOwnChoice(plan, proposal, decisions)) continue;

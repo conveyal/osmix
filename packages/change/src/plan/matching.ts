@@ -11,6 +11,7 @@ import {
   discoverPlannedConflationCandidates,
   refreshConflationWayRemovalAssessments,
 } from "../conflation.ts";
+import { inputProvenance } from "../provenance.ts";
 import type {
   OsmConflationActionAssessment,
   OsmConflationCandidate,
@@ -20,6 +21,14 @@ import type {
 import { automateMatching } from "./automation.ts";
 import { entityToken, type PlanBuilder } from "./builder.ts";
 import { findDecisionConflict } from "./decision-conflict.ts";
+import { discoverWayReplacements, type WayReplacementDiscovery } from "./replacement.ts";
+import {
+  applyWayReplacements,
+  leaveOutExcluded,
+  linkReplacementExclusions,
+  proposeWayReplacements,
+  settleReplacementSets,
+} from "./replacing.ts";
 import type {
   MatchingProposal,
   MergePlan,
@@ -28,6 +37,7 @@ import type {
   PlanProposal,
 } from "./types.ts";
 import { demoteDrivableConnections } from "./validate.ts";
+import { plannedMatchingViews } from "./views.ts";
 
 type MatchingKind = "connect" | "copy-tags" | "remove-way";
 
@@ -54,10 +64,15 @@ export function planMatching(
   options: NonNullable<MergePlanOptions["matching"]>,
   automation: MergePlanAutomation,
   /** Discovery from an earlier run on the same state, reused when only decisions changed. */
-  cached?: { discovery: OsmConflationDiscovery; demoted: ReadonlySet<string> },
+  cached?: {
+    discovery: OsmConflationDiscovery;
+    demoted: ReadonlySet<string>;
+    replacements?: WayReplacementDiscovery;
+  },
 ): {
   discovery: OsmConflationDiscovery;
   demotedCandidates: ReadonlySet<string>;
+  replacements?: WayReplacementDiscovery;
   matching: NonNullable<MergePlan["matching"]>;
   demoted: string[];
 } {
@@ -110,6 +125,19 @@ export function planMatching(
       copy: propose(candidate, "copy-tags", candidate.propertyTransfer),
     });
   }
+  // Replacements (MP-R2) settle first: an included one leaves out the connections it makes
+  // unnecessary, so automation never picks one of those.
+  const level = options.automatic === "none" ? "conservative" : automation;
+  const replacementDiscovery = discovery.options.allowWayReplacement
+    ? (cached?.replacements ?? discoverPlannedReplacements(changeset, base, planned, discovery))
+    : undefined;
+  const replacements = replacementDiscovery
+    ? proposeWayReplacements(builder, replacementDiscovery)
+    : [];
+  const wayRefs = (id: number) => changeset.overlay.getWay(id)?.refs ?? [];
+  linkReplacementExclusions(replacements, builder.proposals, wayRefs);
+  const replacing = settleReplacementSets(replacements, level);
+  leaveOutExcluded(replacing, builder.proposals);
   // Automation settles choices before removal is assessed, since removal depends on which
   // connections apply. It needs the alternatives and competitors linked first.
   if (automation !== "conservative" && options.automatic !== "none") {
@@ -126,17 +154,28 @@ export function planMatching(
     }
   }
   linkAlternatives(byCandidate);
+  linkReplacementExclusions(replacements, builder.proposals, wayRefs);
+  leaveOutExcluded(replacing, builder.proposals);
   const conflict = findDecisionConflict(builder.proposals, builder.decisionList());
   if (conflict) throw conflict;
 
   const decisions = matchingDecisions(byCandidate);
+  const kept = replacing.flatMap(({ group }) => group.importedWayIds);
+  const refsBefore = new Map(kept.map((id) => [id, [...wayRefs(id)]]));
   const outcome = applyPlannedConflation(changeset, base, planned, discovery, decisions);
+  applyWayReplacements(
+    changeset,
+    base,
+    replacing.map(({ group }) => group),
+    refsBefore,
+  );
   const demotedProposals = byCandidate.flatMap(({ candidate, connect }) =>
     connect && demoted.has(candidate.id) ? [connect.id] : [],
   );
   return {
     discovery,
     demotedCandidates: demoted,
+    ...(replacementDiscovery ? { replacements: replacementDiscovery } : {}),
     matching: { candidates: discovery.summary, outcome },
     demoted: demotedProposals,
   };
@@ -221,4 +260,22 @@ function linkCompetitors(entries: readonly CandidateProposals[]) {
         .map(({ id }) => id);
     }
   }
+}
+
+/** Find the replacements on the state matching reads, at the discovery's tolerance (MP-R2). */
+function discoverPlannedReplacements(
+  changeset: OsmChangeset,
+  base: Osm,
+  planned: Osm,
+  discovery: OsmConflationDiscovery,
+) {
+  const { baseView, patchView } = plannedMatchingViews(
+    changeset.overlay,
+    base,
+    planned,
+    inputProvenance(base, planned),
+  );
+  const tolerance = discovery.options.replacementToleranceMeters;
+  if (tolerance == null) throw Error("Way replacement needs a replacement tolerance");
+  return discoverWayReplacements(baseView, patchView, tolerance);
 }

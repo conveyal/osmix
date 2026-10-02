@@ -100,6 +100,11 @@ interface PlanProposalBase {
   decision?: PlanDecision["action"];
   /** The decision was made by the automation level, not a person; a person can change it. */
   automated?: true;
+  /**
+   * Proposals of other kinds that cannot apply together with this one, such as the connections a
+   * way replacement makes unnecessary (MP-R2). Accept at most one of this and each excluded.
+   */
+  excludes?: string[];
   effect: PlanProposalEffect;
 }
 
@@ -162,6 +167,20 @@ export interface RemoveWayProposal extends MatchingProposalBase {
   kind: "remove-way";
 }
 
+/**
+ * An imported way is kept in place of the base ways it traces, which are deleted (MP-R2). The
+ * imported ways kept in place of the same base ways are one set: they are decided together.
+ */
+export interface ReplaceWayProposal extends PlanProposalBase {
+  kind: "replace-way";
+  /** The imported way kept. Planned ID. */
+  source: EntityKey;
+  /** The base ways deleted, in chain order. */
+  replaces: EntityKey[];
+  /** The proposals for the other imported ways kept with this one, decided together. */
+  set: string[];
+}
+
 /** An imported way and a way it crosses share a node at the crossing (MP-J1). */
 export interface CrossingProposal extends PlanProposalBase {
   /** `crossing-snap` reuses an existing vertex; `crossing-node` adds a new node. */
@@ -182,7 +201,8 @@ export type PlanProposal =
   | WayReconcileProposal
   | ConnectProposal
   | CopyTagsProposal
-  | RemoveWayProposal;
+  | RemoveWayProposal
+  | ReplaceWayProposal;
 
 /** One imported feature: a way with its vertices, a standalone node, or a relation. */
 export interface PlanFeature {

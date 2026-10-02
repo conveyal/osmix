@@ -1,6 +1,7 @@
 /**
  * Included proposals that exclude each other (MP-M5): alternatives for one imported feature,
- * and competitors from different features for one base target.
+ * competitors from different features for one base target, and proposals of other kinds a way
+ * replacement leaves out (MP-R2).
  */
 import type { MatchingProposal, PlanDecision, PlanProposal } from "./types.ts";
 
@@ -48,6 +49,14 @@ export function findDecisionConflict(
   );
   for (const id of [...included].sort()) {
     const proposal = proposals.get(id);
+    const excluded = proposal?.excludes?.find((other) => other > id && included.has(other));
+    if (excluded) {
+      return new MergePlanDecisionConflictError(
+        `Both ${id} and ${excluded} are included, but they cannot both apply: including one ` +
+          `leaves the other out. Include at most one of them.`,
+        [id, excluded],
+      );
+    }
     if (!proposal || !("competitors" in proposal)) continue;
     const alternative = proposal.alternatives.find((other) => other > id && included.has(other));
     if (alternative) {

@@ -230,10 +230,11 @@ export default function MergeBlock() {
     proposalId: string,
     action: PlanDecision["action"] | null,
     excludes: readonly string[],
+    together: readonly string[] = [],
   ) => {
     if (!base.osm || !overview) return;
     const baseOsmId = base.osm.id;
-    const decisions = withDecision(overview.decisions, proposalId, action, excludes);
+    const decisions = withDecision(overview.decisions, proposalId, action, excludes, together);
     await runTask("Update plan", async () => {
       const next = await remote.setMergePlanDecisions(baseOsmId, decisions);
       await showPlan(baseOsmId, next, pageIndex);

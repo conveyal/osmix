@@ -60,7 +60,9 @@ export const OUTCOME_HELP: Record<PlanOutcome, string> = {
   removed: "The imported way is removed in favor of its base counterpart",
   merged: "Joins a base feature, or copies tags onto one",
   connected: "Shares a node with the base network",
-  replaced: "Its positive ID edits a base entity with the same ID",
+  replaced:
+    "Its positive ID edits a base entity with the same ID, or it is kept in place of base ways " +
+    "it traces",
   added: "Added as a new feature",
   unchanged: "Identical to the base entity with the same ID",
 };
@@ -73,6 +75,7 @@ export const PROPOSAL_KIND_LABEL: Record<PlanProposal["kind"], string> = {
   connect: "Connect network",
   "copy-tags": "Copy tags",
   "remove-way": "Remove imported way",
+  "replace-way": "Replace base way",
   "crossing-snap": "Connect at crossing vertex",
   "crossing-node": "Add crossing node",
 };
@@ -98,6 +101,7 @@ export const FILTERABLE_KINDS: readonly PlanProposal["kind"][] = [
   "connect",
   "copy-tags",
   "remove-way",
+  "replace-way",
   "crossing-snap",
   "crossing-node",
 ];
@@ -108,17 +112,25 @@ const REASON_LABEL: Record<string, string> = {
   "exact-match": "Handled by an identical-point merge",
   "feature-type-conflict": "Feature classifications conflict",
   "geometry-mismatch": "Geometry differs",
+  "grade-change": "Would change the base point's level or layer",
   "grade-conflict": "Features are on incompatible levels",
   "length-mismatch": "Lengths differ",
   "many-to-one": "Multiple imported features share one base target",
   "merged-into-base": "Merged into a base feature instead",
-  "grade-change": "Would change the base point's level or layer",
   "multiple-targets": "Multiple possible base targets",
   "no-transferable-properties": "No selected tags differ",
   "node-context-conflict": "Connected paths have incompatible context",
   "non-routing-target": "Base target is not routable",
   "protected-tag": "Protected structural tag differs",
   "relation-member": "Feature belongs to an OSM relation",
+  "replacement-anchor-shared":
+    "A neighbouring replacement pairs a shared junction with a different imported point",
+  "replacement-relation-member": "A point the replacement would delete belongs to a relation",
+  "replacement-anchor-unpaired": "A base junction or tagged point is too far from the imported way",
+  "replacement-direction-ambiguous": "Cannot tell which way the imported way runs",
+  "replacement-duplicate-node": "The imported way would pass through one point twice",
+  "replacement-end-unpaired": "The base way's end is too far from the imported way's end",
+  "replacement-restriction": "A turn restriction uses the base way",
   "routing-family-conflict": "Allowed travel is incompatible",
   "routing-property": "Tag affects travel and requires review",
   "same-id": "Handled as a same-ID update",
@@ -143,19 +155,23 @@ export function isDecidable(proposal: PlanProposal) {
 
 /**
  * The decisions with `proposalId` set to `action`, or cleared when `action` is null. Accepting
- * also leaves out `excludes`: the proposal's alternatives and competitors.
+ * also leaves out `excludes`: the proposal's alternatives, competitors and what it excludes.
+ * `together` are proposals decided with it (a way replacement's set, MP-R2): their own
+ * decisions are dropped, since the plan gives them this one.
  */
 export function withDecision(
   decisions: readonly PlanDecision[],
   proposalId: string,
   action: PlanDecision["action"] | null,
   excludes: readonly string[] = [],
+  together: readonly string[] = [],
 ): PlanDecision[] {
   // Including a proposal leaves out the ones it excludes (its alternatives and competitors),
   // so the decisions never include two that cannot both apply (MP-M5).
   const leaveOut = action === "accept" ? new Set(excludes) : new Set<string>();
+  const decidedTogether = new Set(together);
   const rest = decisions.filter(
-    (decision) => decision.proposalId !== proposalId && !leaveOut.has(decision.proposalId),
+    ({ proposalId: id }) => id !== proposalId && !leaveOut.has(id) && !decidedTogether.has(id),
   );
   const leftOut = [...leaveOut].map((id) => ({ proposalId: id, action: "reject" as const }));
   return action ? [...rest, ...leftOut, { proposalId, action }] : rest;
@@ -264,6 +280,7 @@ export const AUTOMATION_LABEL = Object.fromEntries(
 export const CHOICE_GROUP_LABEL: Record<PlanChoiceGroup, string> = {
   removal: "Removals",
   individual: "Needs a closer look",
+  replacement: "Base ways to replace",
   bend: "Connections that bend sharply",
   tie: "Choices to make yourself",
   nearest: "Choices with a clear nearest",
@@ -277,6 +294,9 @@ export const CHOICE_GROUP_HELP: Record<PlanChoiceGroup, string> = {
     "They change a point's grade (layer or level), the drivable network, travel restrictions, " +
     "a relation or a tagged point. " +
     "Decide each on its row.",
+  replacement:
+    "Imported ways that trace base ways. Including keeps the imported ways and deletes the base " +
+    "ways; junctions and relations move to the imported ways.",
   bend:
     "The imported line would bend more than 30° to connect. Spot-check a few on the map, then " +
     "include or leave them out together.",

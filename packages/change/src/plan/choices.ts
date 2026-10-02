@@ -19,6 +19,7 @@ import type { MergePlan, PlanDecision, PlanProposal } from "./types.ts";
  * - `removal`: removing an imported way (MP-R1).
  * - `individual`: a change of grade, the drivable network, travel restrictions, relations, a
  *   tagged point's context or protected tags.
+ * - `replacement`: keeping imported ways in place of the base ways they trace (MP-R2).
  * - `bend`: a connection that bends more than 30°.
  * - `tie`: a choice no candidate can settle: none wins by a clear margin, or the one that does
  *   bends sharply or needs a closer look itself.
@@ -30,6 +31,7 @@ import type { MergePlan, PlanDecision, PlanProposal } from "./types.ts";
 export const PLAN_CHOICE_GROUPS = [
   "removal",
   "individual",
+  "replacement",
   "bend",
   "tie",
   "nearest",
@@ -39,9 +41,9 @@ export const PLAN_CHOICE_GROUPS = [
 export type PlanChoiceGroup = (typeof PLAN_CHOICE_GROUPS)[number];
 
 const INDIVIDUAL_REASONS = new Set([
+  "grade-change",
   "drivable-network",
   "routing-family-conflict",
-  "grade-change",
   "relation-member",
   "node-context-conflict",
   "protected-tag",
@@ -81,6 +83,7 @@ export function planChoices(
   const groupOf = (proposal: PlanProposal): PlanChoiceGroup => {
     if (proposal.kind === "remove-way") return "removal";
     if (proposal.reasons.some((reason) => INDIVIDUAL_REASONS.has(reason))) return "individual";
+    if (proposal.kind === "replace-way") return "replacement";
     if (proposal.reasons.includes("bearing-mismatch")) return "bend";
     if (isDecidable(proposal)) {
       const rivals = choiceRivals(proposal, plan.proposals);

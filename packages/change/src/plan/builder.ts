@@ -34,6 +34,7 @@ const PROPOSAL_OUTCOME: Record<PlanProposal["kind"], PlanOutcome> = {
   connect: "connected",
   "copy-tags": "merged",
   "remove-way": "removed",
+  "replace-way": "replaced",
   "crossing-snap": "connected",
   "crossing-node": "connected",
 };
@@ -50,11 +51,12 @@ export const PROPOSAL_PHASE: Record<PlanProposal["kind"], PlanPhase> = {
   connect: "matching",
   "copy-tags": "matching",
   "remove-way": "matching",
+  "replace-way": "matching",
   "crossing-snap": "crossings",
   "crossing-node": "crossings",
 };
 
-function proposalEffect(
+export function proposalEffect(
   status: PlanProposalStatus,
   decision: PlanDecision["action"] | undefined,
 ): PlanProposalEffect {

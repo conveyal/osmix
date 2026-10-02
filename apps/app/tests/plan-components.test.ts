@@ -199,6 +199,7 @@ describe("plan components", () => {
       choices: {
         removal: 0,
         individual: 0,
+        replacement: 0,
         bend: 0,
         tie: 0,
         nearest: 0,
@@ -221,6 +222,7 @@ describe("plan components", () => {
         choices: {
           removal: 1,
           individual: 0,
+          replacement: 0,
           bend: 4_063,
           tie: 20,
           nearest: 15_359,

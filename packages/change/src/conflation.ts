@@ -22,6 +22,7 @@ import { accessSignature } from "./rules/access.ts";
 import { isAreaWay } from "./rules/area.ts";
 import { hasAdjacentDuplicateRefs, hasTooFewDistinctRefs } from "./rules/collapse.ts";
 import { routingGradeSignature } from "./rules/grade.ts";
+import { lineBbox, lineLength, symmetricLineDistance } from "./rules/line-geometry.ts";
 import {
   assessJunction,
   assessNodeTags,
@@ -58,7 +59,6 @@ import { type DatasetView, type EntityRelationContext, osmDatasetView } from "./
 const DEFAULT_MAX_DISTANCE_METERS = 1;
 const MAX_BEARING_DIFFERENCE_DEGREES = 30;
 const MAX_LENGTH_DIFFERENCE_RATIO = 0.05;
-const SAMPLE_INTERVAL_METERS = 5;
 
 type DiscoveryContext = {
   base: Osm;
@@ -85,6 +85,17 @@ function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOp
   if (options.allowWayRemoval !== undefined && typeof options.allowWayRemoval !== "boolean") {
     throw Error("Conflation allowWayRemoval must be a boolean");
   }
+  if (
+    options.allowWayReplacement !== undefined &&
+    typeof options.allowWayReplacement !== "boolean"
+  ) {
+    throw Error("Conflation allowWayReplacement must be a boolean");
+  }
+  const replacementToleranceMeters =
+    options.replacementToleranceMeters ?? DEFAULT_MAX_DISTANCE_METERS;
+  if (!Number.isFinite(replacementToleranceMeters) || replacementToleranceMeters <= 0) {
+    throw Error("Conflation replacementToleranceMeters must be a positive finite number");
+  }
   if (options.automatic != null && !["high-confidence", "none"].includes(options.automatic)) {
     throw Error("Conflation automatic must be high-confidence or none");
   }
@@ -93,15 +104,23 @@ function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOp
     throw Error("Conflation maxDistanceMeters must be a positive finite number");
   }
   const propertyKeys = [...new Set(options.propertyKeys)].toSorted();
-  if (propertyKeys.length === 0 && !options.attachNetwork && !options.allowWayRemoval) {
+  if (
+    propertyKeys.length === 0 &&
+    !options.attachNetwork &&
+    !options.allowWayRemoval &&
+    !options.allowWayReplacement
+  ) {
     throw Error(
-      "Conflation requires at least one property key, network attachment, or explicit way removal",
+      "Conflation requires at least one property key, network attachment, explicit way removal, or way replacement",
     );
   }
   return {
     propertyKeys,
     attachNetwork: options.attachNetwork,
     ...(options.allowWayRemoval ? { allowWayRemoval: true } : {}),
+    ...(options.allowWayReplacement
+      ? { allowWayReplacement: true, replacementToleranceMeters }
+      : {}),
     maxDistanceMeters,
     automatic: options.automatic ?? "high-confidence",
   };
@@ -265,88 +284,6 @@ function nodePropertyAssessment(
     assessment.status = "review";
   }
   return assessment;
-}
-
-function lineLength(coordinates: readonly LonLat[]) {
-  let total = 0;
-  for (let index = 1; index < coordinates.length; index++) {
-    total += haversineDistance(coordinates[index - 1]!, coordinates[index]!);
-  }
-  return total;
-}
-
-function interpolate(a: LonLat, b: LonLat, parameter: number): LonLat {
-  return [a[0] + (b[0] - a[0]) * parameter, a[1] + (b[1] - a[1]) * parameter];
-}
-
-function sampleLine(coordinates: readonly LonLat[]) {
-  if (coordinates.length <= 1) return [...coordinates];
-  const result: LonLat[] = [coordinates[0]!];
-  for (let index = 1; index < coordinates.length; index++) {
-    const start = coordinates[index - 1]!;
-    const end = coordinates[index]!;
-    const length = haversineDistance(start, end);
-    const samples = Math.floor(length / SAMPLE_INTERVAL_METERS);
-    for (let sample = 1; sample <= samples; sample++) {
-      const distance = sample * SAMPLE_INTERVAL_METERS;
-      if (distance >= length) break;
-      result.push(interpolate(start, end, distance / length));
-    }
-    result.push(end);
-  }
-  return result;
-}
-
-function pointSegmentDistance(point: LonLat, start: LonLat, end: LonLat) {
-  const latitudeRadians = (point[1] * Math.PI) / 180;
-  const xScale = 111_320 * Math.cos(latitudeRadians);
-  const yScale = 110_574;
-  const startX = (start[0] - point[0]) * xScale;
-  const startY = (start[1] - point[1]) * yScale;
-  const endX = (end[0] - point[0]) * xScale;
-  const endY = (end[1] - point[1]) * yScale;
-  const dx = endX - startX;
-  const dy = endY - startY;
-  const denominator = dx * dx + dy * dy;
-  const parameter =
-    denominator === 0 ? 0 : Math.max(0, Math.min(1, -(startX * dx + startY * dy) / denominator));
-  return Math.hypot(startX + parameter * dx, startY + parameter * dy);
-}
-
-function pointLineDistance(point: LonLat, line: readonly LonLat[]) {
-  let minimum = Number.POSITIVE_INFINITY;
-  for (let index = 1; index < line.length; index++) {
-    minimum = Math.min(minimum, pointSegmentDistance(point, line[index - 1]!, line[index]!));
-  }
-  return minimum;
-}
-
-function symmetricLineDistance(a: readonly LonLat[], b: readonly LonLat[]) {
-  let maximum = 0;
-  for (const point of sampleLine(a)) maximum = Math.max(maximum, pointLineDistance(point, b));
-  for (const point of sampleLine(b)) maximum = Math.max(maximum, pointLineDistance(point, a));
-  return maximum;
-}
-
-function lineBbox(
-  coordinates: readonly LonLat[],
-  paddingMeters: number,
-): [number, number, number, number] {
-  let minLon = Number.POSITIVE_INFINITY;
-  let minLat = Number.POSITIVE_INFINITY;
-  let maxLon = Number.NEGATIVE_INFINITY;
-  let maxLat = Number.NEGATIVE_INFINITY;
-  for (const [lon, lat] of coordinates) {
-    minLon = Math.min(minLon, lon);
-    minLat = Math.min(minLat, lat);
-    maxLon = Math.max(maxLon, lon);
-    maxLat = Math.max(maxLat, lat);
-  }
-  const middleLat = (minLat + maxLat) / 2;
-  const latPadding = paddingMeters / 110_574;
-  const lonPadding =
-    paddingMeters / (111_320 * Math.max(0.01, Math.cos((middleLat * Math.PI) / 180)));
-  return [minLon - lonPadding, minLat - latPadding, maxLon + lonPadding, maxLat + latPadding];
 }
 
 function bearing(from: LonLat, to: LonLat) {
@@ -1187,7 +1124,7 @@ function validateAcceptedMappings(
 }
 
 /** Cancel a pending import or delete an entity already present in the application baseline. */
-function removeImportedEntity(changeset: OsmChangeset, entity: OsmNode | OsmWay) {
+export function removeImportedEntity(changeset: OsmChangeset, entity: OsmNode | OsmWay) {
   const type = "refs" in entity ? "way" : "node";
   const wasCreated = changeset.changes(type)[entity.id]?.changeType === "create";
   // Use delete to invalidate geometry/incidence caches before cancelling a create.
