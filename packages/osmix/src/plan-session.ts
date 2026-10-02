@@ -91,6 +91,8 @@ export interface MergePlanFeatureDetail extends MergePlanFeatureView {
   coordinates: LonLat[];
   /** Coordinates of each base entity a proposal targets, by proposal ID. */
   targets: Record<string, LonLat[]>;
+  /** Coordinates of each base way a way replacement deletes, by proposal ID (MP-R2). */
+  replaces: Record<string, LonLat[][]>;
 }
 
 export interface MergePlanBulkRequest {
@@ -313,11 +315,15 @@ export function planFeatureDetail(
   if (!feature) throw Error(`No feature ${featureKey} in this merge plan`);
   const candidates: Record<string, OsmConflationCandidate> = {};
   const targets: Record<string, LonLat[]> = {};
+  const replaces: Record<string, LonLat[][]> = {};
   for (const proposal of proposalsOf(plan, feature)) {
     const candidate = getMergePlanCandidate(plan, proposal.id);
     if (candidate) candidates[proposal.id] = structuredClone(candidate);
     if ("target" in proposal) {
       targets[proposal.id] = coordinates(base, proposal.target.type, proposal.target.id);
+    }
+    if (proposal.kind === "replace-way") {
+      replaces[proposal.id] = proposal.replaces.map(({ type, id }) => coordinates(base, type, id));
     }
   }
   return {
@@ -325,6 +331,7 @@ export function planFeatureDetail(
     candidates,
     coordinates: coordinates(patch, feature.type, feature.originalId),
     targets,
+    replaces,
   };
 }
 

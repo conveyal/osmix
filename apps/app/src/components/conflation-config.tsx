@@ -41,7 +41,7 @@ export function ConflationConfig() {
         <div className="flex flex-col gap-2 border-t pt-2">
           <p>
             OSM tags are feature attributes, such as surface type or kerb height. Copy tags, connect
-            paths, and review geometry removal independently.
+            paths, review geometry removal, and replace base ways independently.
           </p>
           <div className="flex items-center gap-1">
             <CheckboxLabel className="min-h-8">

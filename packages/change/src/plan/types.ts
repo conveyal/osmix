@@ -83,9 +83,9 @@ export type PlanOutcome =
 export const PLAN_OUTCOME_PRIORITY: readonly PlanOutcome[] = [
   "needs-decision",
   "removed",
+  "replaced",
   "merged",
   "connected",
-  "replaced",
   "added",
   "unchanged",
 ];
@@ -179,6 +179,8 @@ export interface ReplaceWayProposal extends PlanProposalBase {
   replaces: EntityKey[];
   /** The proposals for the other imported ways kept with this one, decided together. */
   set: string[];
+  /** The other imported ways kept with this one, by their patch IDs, in chain order. */
+  together: EntityKey[];
 }
 
 /** An imported way and a way it crosses share a node at the crossing (MP-J1). */

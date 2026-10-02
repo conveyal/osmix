@@ -46,6 +46,17 @@ test("matching settings expose names, help, and field-specific errors", async ({
   await radius.fill("0");
   await expect(radius).toHaveAttribute("aria-invalid", "true");
   await expect(radius).toHaveAccessibleDescription(/greater than zero/);
+  const replace = settings.getByRole("checkbox", { name: "Replace base ways the import traces" });
+  const tolerance = settings.getByRole("spinbutton", { name: "Replacement tolerance (meters)" });
+  await expect(tolerance).toBeDisabled();
+  await replace.check();
+  await expect(tolerance).toBeEnabled();
+  await expect(tolerance).toHaveValue("1");
+  await tolerance.fill("0");
+  await expect(tolerance).toHaveAttribute("aria-invalid", "true");
+  await expect(tolerance).toHaveAccessibleDescription(/Replacement tolerance must be greater/);
+  await tolerance.fill("1.5");
+  await expect(tolerance).not.toHaveAttribute("aria-invalid", "true");
   const identical = page.getByRole("checkbox", {
     name: "Merge points at identical coordinates automatically",
   });

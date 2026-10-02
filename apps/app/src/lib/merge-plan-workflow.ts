@@ -38,9 +38,9 @@ export function buildMergePlanOptions({
 export const OUTCOMES: readonly PlanOutcome[] = [
   "needs-decision",
   "removed",
+  "replaced",
   "merged",
   "connected",
-  "replaced",
   "added",
   "unchanged",
 ];
@@ -128,6 +128,10 @@ const REASON_LABEL: Record<string, string> = {
   "replacement-relation-member": "A point the replacement would delete belongs to a relation",
   "replacement-anchor-unpaired": "A base junction or tagged point is too far from the imported way",
   "replacement-direction-ambiguous": "Cannot tell which way the imported way runs",
+  "replacement-direction-tag-conflict":
+    "Side or direction tags (such as sidewalk or incline) disagree with the base way",
+  "replacement-direction-tag-reversed":
+    "The imported way runs the other way and lacks the base way's side or direction tags",
   "replacement-duplicate-node": "The imported way would pass through one point twice",
   "replacement-end-unpaired": "The base way's end is too far from the imported way's end",
   "replacement-restriction": "A turn restriction uses the base way",

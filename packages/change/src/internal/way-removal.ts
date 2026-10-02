@@ -5,6 +5,7 @@ import type { OsmNode, OsmTags, OsmWay } from "@osmix/types";
 import { normalizedWayDirection } from "@osmix/types/way-direction";
 
 import { inputProvenance } from "../provenance.ts";
+import { isDirectionRelativeTag } from "../rules/direction.ts";
 import { canDropReplacedNode } from "../rules/node-identity.ts";
 import { isDescriptiveWayTag } from "../rules/tags.ts";
 import type {
@@ -39,21 +40,10 @@ function semanticTagsEqual(left: OsmTags | undefined, right: OsmTags | undefined
 
 /** Values can be way-relative too: sidewalk=left and direction=forward change on reversal. */
 function hasRelativeDirection(tags: OsmTags | undefined) {
-  const relative = new Set(["forward", "backward", "left", "right", "opposite"]);
-  return Object.entries(tags ?? {}).some(([key, value]) => {
-    if (key === "oneway") return false; // Its normalized orientation is checked separately.
-    if (
-      key === "incline" ||
-      key.startsWith("oneway:") ||
-      key.split(":").some((part) => relative.has(part) || part === "direction")
-    )
-      return true;
-    if (isDescriptiveWayTag(key)) return false;
-    return String(value)
-      .toLowerCase()
-      .split(/[^a-z]+/)
-      .some((part) => relative.has(part));
-  });
+  // `oneway`'s normalized orientation is checked separately.
+  return Object.entries(tags ?? {}).some(
+    ([key, value]) => key !== "oneway" && isDirectionRelativeTag(key, String(value)),
+  );
 }
 
 function distance(left: OsmNode | undefined, right: OsmNode | undefined) {

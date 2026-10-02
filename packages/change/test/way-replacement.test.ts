@@ -58,6 +58,48 @@ function importedLine(
   );
 }
 
+/**
+ * Base way 10 ends at junction 3 on base way 12, which runs north to south. With an optional
+ * extra base point on way 12 between 7 and 3.
+ */
+function sharedJunctionBase(extra: OsmNode[] = []) {
+  return osm(
+    "base",
+    [
+      { id: 1, lon: 0, lat: 0 },
+      { id: 3, lon: 0.001, lat: 0 },
+      { id: 7, lon: 0.001, lat: 0.0005 },
+      { id: 8, lon: 0.001, lat: -0.0005 },
+      ...extra,
+    ],
+    [
+      { id: 10, refs: [1, 3], tags: footway },
+      { id: 12, refs: [7, ...extra.map(({ id }) => id), 3, 8], tags: footway },
+    ],
+  );
+}
+
+/**
+ * Imported way 20 ends 0.5 m from junction 3 at vertex 105, which imported way 40 also passes
+ * through, but 40 has vertex 106 nearer to 3.
+ */
+function sharedJunctionPatch() {
+  return osm(
+    "patch",
+    [
+      { id: 101, lon: 0, lat: 0.5 * M },
+      { id: 105, lon: 0.001, lat: 0.5 * M },
+      { id: 106, lon: 0.001, lat: -0.2 * M },
+      { id: 201, lon: 0.001, lat: 0.0005 },
+      { id: 202, lon: 0.001, lat: -0.0005 },
+    ],
+    [
+      { id: 20, refs: [101, 105], tags: footway },
+      { id: 40, refs: [201, 105, 106, 202], tags: footway },
+    ],
+  );
+}
+
 describe("way replacement discovery (MP-R2)", () => {
   it("keeps the imported way in place of the base way, joined to the base way's ends", () => {
     const { groups, misses } = discover(baseLine(), importedLine());
@@ -82,22 +124,65 @@ describe("way replacement discovery (MP-R2)", () => {
     ]);
   });
 
-  it("keeps the imported way's own direction, and base direction tags only when it agrees", () => {
-    const base = osm(
-      "base",
-      [
-        { id: 1, lon: 0, lat: 0 },
-        { id: 3, lon: 0.001, lat: 0 },
-      ],
-      [{ id: 10, refs: [1, 3], tags: { ...footway, name: "Main Street", incline: "up" } }],
-    );
-    const [reversed] = discover(base, importedLine(true)).groups;
+  it("keeps the imported way's own direction", () => {
+    const [reversed] = discover(baseLine(), importedLine(true)).groups;
     expect(reversed?.refs).toEqual([{ wayId: 20, refs: [3, 104, 103, 102, 1] }]);
-    expect(reversed?.wayTags).toEqual([{ wayId: 20, tags: { ...footway, name: "Main Street" } }]);
-    const [same] = discover(base, importedLine()).groups;
-    expect(same?.wayTags).toEqual([
-      { wayId: 20, tags: { ...footway, name: "Main Street", incline: "up" } },
-    ]);
+  });
+
+  describe("direction- and side-relative tags", () => {
+    /** One base and one imported footway along the equator, with the given extra tags. */
+    const pair = (baseTags: object, importedTags: object, reversed = false) => {
+      const base = osm(
+        "base",
+        [
+          { id: 1, lon: 0, lat: 0 },
+          { id: 3, lon: 0.001, lat: 0 },
+        ],
+        [{ id: 10, refs: [1, 3], tags: { ...footway, ...baseTags } }],
+      );
+      const patch = osm(
+        "patch",
+        [
+          { id: 101, lon: 0, lat: M },
+          { id: 102, lon: 0.001, lat: M },
+        ],
+        [
+          {
+            id: 20,
+            refs: reversed ? [102, 101] : [101, 102],
+            tags: { ...footway, ...importedTags },
+          },
+        ],
+      );
+      const [group] = discover(base, patch).groups;
+      return { status: group?.status, reasons: group?.reasons, tags: group?.wayTags[0]?.tags };
+    };
+
+    it("inherits a base direction tag the imported way lacks only when it runs the same way", () => {
+      expect(pair({ incline: "up", name: "Main" }, {})).toMatchObject({
+        status: "review",
+        tags: { ...footway, incline: "up", name: "Main" },
+      });
+      expect(pair({ incline: "up", name: "Main" }, {}, true)).toMatchObject({
+        status: "blocked",
+        reasons: ["replacement-direction-tag-reversed"],
+      });
+    });
+
+    it("compares values read in the base way's direction", () => {
+      expect(pair({ sidewalk: "left" }, { sidewalk: "right" }, true).status).toBe("review");
+      expect(pair({ incline: "5%" }, { incline: "-5%" }, true).status).toBe("review");
+      expect(pair({ "cycleway:left": "lane" }, { "cycleway:right": "lane" }, true).status).toBe(
+        "review",
+      );
+      expect(pair({ sidewalk: "left" }, { sidewalk: "right" })).toMatchObject({
+        status: "blocked",
+        reasons: ["replacement-direction-tag-conflict"],
+      });
+      expect(pair({ incline: "0.034" }, { incline: "0.051" }).reasons).toEqual([
+        "replacement-direction-tag-conflict",
+      ]);
+    });
   });
 
   it("keeps a junction with another way, paired with the nearest imported vertex", () => {
@@ -279,37 +364,26 @@ describe("way replacement discovery (MP-R2)", () => {
     });
   });
 
-  it("blocks groups that pair a junction they share with different imported vertices", () => {
-    // Base way 10 ends at junction 3 on base way 12. Imported way 20 ends 0.5 m from 3 at
-    // vertex 105, which imported way 40 also passes through, but 40 has vertex 106 nearer to 3.
-    const base = osm(
-      "base",
-      [
-        { id: 1, lon: 0, lat: 0 },
-        { id: 3, lon: 0.001, lat: 0 },
-        { id: 7, lon: 0.001, lat: 0.0005 },
-        { id: 8, lon: 0.001, lat: -0.0005 },
-      ],
-      [
-        { id: 10, refs: [1, 3], tags: footway },
-        { id: 12, refs: [7, 3, 8], tags: footway },
-      ],
-    );
-    const patch = osm(
-      "patch",
-      [
-        { id: 101, lon: 0, lat: 0.5 * M },
-        { id: 105, lon: 0.001, lat: 0.5 * M },
-        { id: 106, lon: 0.001, lat: -0.2 * M },
-        { id: 201, lon: 0.001, lat: 0.0005 },
-        { id: 202, lon: 0.001, lat: -0.0005 },
-      ],
-      [
-        { id: 20, refs: [101, 105], tags: footway },
-        { id: 40, refs: [201, 105, 106, 202], tags: footway },
-      ],
-    );
-    const { groups } = discover(base, patch, 1);
+  it("pairs a shared junction with the imported way's end in every group", () => {
+    const [ended, through] = discover(sharedJunctionBase(), sharedJunctionPatch(), 1).groups;
+    expect(ended).toMatchObject({
+      id: "replace:w20>w10",
+      status: "review",
+      refs: [{ wayId: 20, refs: [1, 3] }],
+    });
+    // Way 40 has vertex 106 nearer to junction 3, but 105 is where way 20 ends.
+    expect(through).toMatchObject({
+      id: "replace:w40>w12",
+      status: "review",
+      refs: [{ wayId: 40, refs: [7, 3, 106, 8] }],
+    });
+    expect(through?.anchors).toContainEqual({ baseNodeId: 3, importedNodeId: 105 });
+  });
+
+  it("blocks a shared junction whose end pairing comes out of order in the other group", () => {
+    // Tagged base point 9 on way 12 takes vertex 105 first, so junction 3 cannot follow it.
+    const base = sharedJunctionBase([{ id: 9, lon: 0.001, lat: 0.5 * M, tags: { kerb: "flush" } }]);
+    const { groups } = discover(base, sharedJunctionPatch(), 1);
     expect(groups.map(({ id, status, reasons }) => ({ id, status, reasons }))).toEqual([
       { id: "replace:w20>w10", status: "blocked", reasons: ["replacement-anchor-shared"] },
       { id: "replace:w40>w12", status: "blocked", reasons: ["replacement-anchor-shared"] },

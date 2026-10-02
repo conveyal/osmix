@@ -14,6 +14,7 @@ import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { LonLat, OsmTags, OsmWay } from "@osmix/types";
 
 import { isAreaWay } from "../rules/area.ts";
+import { directionRelativeTags, reverseDirectionTags } from "../rules/direction.ts";
 import { routingGradeSignature } from "../rules/grade.ts";
 import { lineBbox, pointLineDistance, sampleLine } from "../rules/line-geometry.ts";
 import { assessNodeTags, mergeImportedTags } from "../rules/node-identity.ts";
@@ -26,6 +27,8 @@ type WayReplacementReason =
   | "replacement-end-unpaired"
   | "replacement-anchor-unpaired"
   | "replacement-anchor-shared"
+  | "replacement-direction-tag-conflict"
+  | "replacement-direction-tag-reversed"
   | "replacement-restriction"
   | "replacement-relation-member"
   | "replacement-duplicate-node"
@@ -193,7 +196,7 @@ export function discoverWayReplacements(
     }
   }
 
-  const groups: WayReplacementGroup[] = [];
+  const assessed: Assessed[] = [];
   const misses: WayReplacementMiss[] = [];
   for (const keys of components.groups()) {
     const importedKeys = keys.filter((key) => key.startsWith("i")).toSorted();
@@ -226,79 +229,141 @@ export function discoverWayReplacements(
       miss("not-a-chain");
       continue;
     }
-    groups.push(assessGroup(baseView, patchView, importedChain, baseChain, tolerance));
+    const assess = (forced?: ReadonlyMap<number, number>) =>
+      assessGroup(baseView, patchView, importedChain, baseChain, tolerance, forced);
+    const vertices = new Set(importedChain.flatMap(({ way }) => way.refs));
+    assessed.push({ group: assess(), assess, vertices });
   }
-  blockInconsistentAnchors(groups);
+  const groups = reconcileSharedAnchors(assessed);
   groups.sort((a, b) => a.id.localeCompare(b.id));
   return { groups, misses };
 }
 
 type Chain = { way: OsmWay; reversed: boolean }[];
 
+/** A group with what reassessing it needs. */
+interface Assessed {
+  group: WayReplacementGroup;
+  /** Assess again, pairing each listed base anchor with the listed imported vertex. */
+  assess: (forced?: ReadonlyMap<number, number>) => WayReplacementGroup;
+  /** The imported vertices of the group's ways. */
+  vertices: ReadonlySet<number>;
+}
+
 /**
- * Groups that meet at a base junction or an imported vertex must pair it the same way, since
- * applying one group's pairing rewrites every way at the vertex. Block every group that pairs a
- * shared point differently from another.
+ * Groups that meet at a base junction must pair it the same way, since applying one group's
+ * pairing rewrites every way at the imported vertex. Where one group pairs the junction with
+ * an imported way's end, that pairing wins: every other group whose ways include the vertex is
+ * assessed again with the junction paired to it. Two groups pairing one junction with
+ * different ends, or pairings that still conflict, block every group involved.
  */
-function blockInconsistentAnchors(groups: WayReplacementGroup[]) {
-  const byBase = new Map<number, Set<string>>();
-  const byImported = new Map<number, Set<string>>();
-  const groupsAt = new Map<string, WayReplacementGroup[]>();
-  const add = (
-    map: Map<number, Set<string>>,
-    id: number,
-    pairing: string,
-    group: WayReplacementGroup,
-  ) => {
-    map.set(id, (map.get(id) ?? new Set()).add(pairing));
-    const key = `${map === byBase ? "b" : "i"}${id}`;
-    groupsAt.set(key, [...(groupsAt.get(key) ?? []), group]);
-  };
-  for (const group of groups) {
-    for (const { baseNodeId, importedNodeId } of group.anchors) {
-      add(byBase, baseNodeId, String(importedNodeId), group);
-      if (importedNodeId != null) add(byImported, importedNodeId, String(baseNodeId), group);
+function reconcileSharedAnchors(assessed: Assessed[]): WayReplacementGroup[] {
+  const atAnchor = new Map<number, { entry: Assessed; vertex: number | null; end: boolean }[]>();
+  for (const entry of assessed) {
+    const { anchors } = entry.group;
+    anchors.forEach(({ baseNodeId, importedNodeId }, index) => {
+      const end = index === 0 || index === anchors.length - 1;
+      const pairings = atAnchor.get(baseNodeId) ?? [];
+      atAnchor.set(baseNodeId, [...pairings, { entry, vertex: importedNodeId, end }]);
+    });
+  }
+  const forced = new Map<Assessed, Map<number, number>>();
+  const blocked = new Set<Assessed>();
+  for (const [anchor, pairings] of atAnchor) {
+    if (pairings.length < 2) continue;
+    const ends = new Set(
+      pairings.flatMap(({ vertex, end }) => (end && vertex != null ? vertex : [])),
+    );
+    if (ends.size > 1) {
+      for (const { entry } of pairings) blocked.add(entry);
+      continue;
+    }
+    const [vertex] = ends;
+    if (vertex == null) continue;
+    for (const pairing of pairings) {
+      if (pairing.vertex === vertex || !pairing.entry.vertices.has(vertex)) continue;
+      forced.set(pairing.entry, (forced.get(pairing.entry) ?? new Map()).set(anchor, vertex));
     }
   }
-  for (const [map, prefix] of [
-    [byBase, "b"],
-    [byImported, "i"],
-  ] as const) {
-    for (const [id, pairings] of map) {
-      if (pairings.size < 2) continue;
-      for (const group of groupsAt.get(`${prefix}${id}`) ?? []) {
-        if (group.reasons.includes("replacement-anchor-shared")) continue;
-        group.reasons = [...group.reasons, "replacement-anchor-shared" as const].toSorted();
-        group.status = "blocked";
+  for (const [entry, pairings] of forced) entry.group = entry.assess(pairings);
+  for (const entry of findConflicts(assessed)) blocked.add(entry);
+  for (const { group } of blocked) {
+    if (group.reasons.includes("replacement-anchor-shared")) continue;
+    group.reasons = [...group.reasons, "replacement-anchor-shared" as const].toSorted();
+    group.status = "blocked";
+  }
+  return assessed.map(({ group }) => group);
+}
+
+/**
+ * Groups whose pairings still conflict: one imported vertex paired with two base anchors, or
+ * one base anchor paired with two vertices where either group's ways include the other's.
+ */
+function findConflicts(assessed: readonly Assessed[]): Set<Assessed> {
+  const conflicts = new Set<Assessed>();
+  const byVertex = new Map<number, { entry: Assessed; anchor: number }[]>();
+  const byAnchor = new Map<number, { entry: Assessed; vertex: number | null }[]>();
+  for (const entry of assessed) {
+    for (const { baseNodeId: anchor, importedNodeId: vertex } of entry.group.anchors) {
+      byAnchor.set(anchor, [...(byAnchor.get(anchor) ?? []), { entry, vertex }]);
+      if (vertex != null)
+        byVertex.set(vertex, [...(byVertex.get(vertex) ?? []), { entry, anchor }]);
+    }
+  }
+  for (const pairings of byVertex.values()) {
+    if (new Set(pairings.map(({ anchor }) => anchor)).size < 2) continue;
+    for (const { entry } of pairings) conflicts.add(entry);
+  }
+  for (const pairings of byAnchor.values()) {
+    for (const a of pairings) {
+      for (const b of pairings) {
+        if (a === b || a.vertex === b.vertex) continue;
+        const crosses =
+          (a.vertex != null && b.entry.vertices.has(a.vertex)) ||
+          (b.vertex != null && a.entry.vertices.has(b.vertex));
+        if (crosses) conflicts.add(a.entry).add(b.entry);
       }
     }
   }
-}
-
-/** Tag keys whose meaning depends on which way the way runs. */
-function isDirectionRelative(key: string) {
-  return (
-    key === "oneway" ||
-    key === "incline" ||
-    key.startsWith("oneway:") ||
-    key
-      .split(":")
-      .some((part) => ["forward", "backward", "left", "right", "direction"].includes(part))
-  );
+  return conflicts;
 }
 
 /**
  * The base tags every way of the chain agrees on, which a kept imported way inherits when it
- * lacks them. Direction-relative keys are left out unless the imported way runs the same way.
+ * lacks them. Direction-relative tags only reach a kept way that runs the same way as each base
+ * way; otherwise the replacement is blocked first.
  */
-function baseTagsAgreed(chain: Chain, sameDirection: boolean): OsmTags {
+function baseTagsAgreed(chain: Chain): OsmTags {
   const [first, ...rest] = chain.map(({ way }) => way.tags ?? {});
   const agreed: OsmTags = {};
   for (const [key, value] of Object.entries(first ?? {})) {
-    if (!sameDirection && isDirectionRelative(key)) continue;
     if (rest.every((tags) => tags[key] === value)) agreed[key] = value;
   }
   return agreed;
+}
+
+/**
+ * Compare a kept way's direction- and side-relative tags with a base way's, read in the base
+ * way's direction: a value they both have must agree, and a reversed kept way cannot take one
+ * only the base way has.
+ */
+function directionTagReasons(
+  kept: OsmTags | undefined,
+  base: OsmTags | undefined,
+  sameDirection: boolean,
+): WayReplacementReason[] {
+  const keptTags = directionRelativeTags(kept);
+  const asBase = sameDirection ? keptTags : reverseDirectionTags(keptTags);
+  const reasons: WayReplacementReason[] = [];
+  for (const [key, value] of Object.entries(directionRelativeTags(base))) {
+    const keptValue = asBase[key];
+    if (keptValue == null) {
+      if (!sameDirection) reasons.push("replacement-direction-tag-reversed");
+    } else if (keptValue !== value) {
+      reasons.push("replacement-direction-tag-conflict");
+    }
+  }
+  return reasons;
 }
 
 /** How far `point` is from a segment, in meters, and how far along it (0–1) the nearest point is. */
@@ -324,6 +389,8 @@ function assessGroup(
   importedChain: Chain,
   baseChain: Chain,
   tolerance: number,
+  /** Base anchors that must pair with the given imported vertex, to agree with a neighbour. */
+  forced?: ReadonlyMap<number, number>,
 ): WayReplacementGroup {
   const reasons = new Set<WayReplacementReason>();
   const reviewReasons = new Set<"grade-change">();
@@ -385,6 +452,17 @@ function assessGroup(
     const vertices = first ? [0] : last ? [lastVertex] : range(previous + 1, lastVertex);
     let position = -1;
     let nearest = Number.POSITIVE_INFINITY;
+    const required = forced?.get(id);
+    if (required != null) {
+      // A neighbour pairs this anchor with its way's end; pair it the same way or not at all.
+      const vertex = importedRefs.indexOf(required);
+      if (!vertices.includes(vertex) || meters(point, importedPoint(vertex)) > tolerance) {
+        reasons.add("replacement-anchor-shared");
+        anchors.push({ baseNodeId: id, importedNodeId: null });
+        continue;
+      }
+      vertices.splice(0, vertices.length, vertex);
+    }
     for (const vertex of vertices) {
       const distance = meters(point, importedPoint(vertex));
       if (distance <= tolerance && distance < nearest) {
@@ -450,7 +528,12 @@ function assessGroup(
   const refs: WayReplacementGroup["refs"] = [];
   const wayTags: WayReplacementGroup["wayTags"] = [];
   const kept = new Set(anchors.map(({ baseNodeId }) => baseNodeId));
-  if (!reasons.has("replacement-end-unpaired") && !reasons.has("replacement-anchor-unpaired")) {
+  const unplaced = [
+    "replacement-end-unpaired",
+    "replacement-anchor-unpaired",
+    "replacement-anchor-shared",
+  ];
+  if (!unplaced.some((reason) => reasons.has(reason as WayReplacementReason))) {
     const byVertex = new Map(
       placed
         .filter(({ position }) => Number.isInteger(position))
@@ -472,10 +555,15 @@ function assessGroup(
       const next = forward ? stretch : stretch.toReversed();
       if (new Set(next).size !== next.length) reasons.add("replacement-duplicate-node");
       refs.push({ wayId: way.id, refs: next });
-      // The imported way runs the same way as every base way when the line direction it follows
-      // matches each base way's own.
-      const sameDirection = lineDirection.every((alongLine) => alongLine === forward);
-      const tags = { ...baseTagsAgreed(baseChain, sameDirection), ...way.tags };
+      // The imported way runs the same way as a base way when the line direction it follows
+      // matches the base way's own.
+      baseChain.forEach(({ way: base }, index) => {
+        const sameDirection = lineDirection[index] === forward;
+        for (const reason of directionTagReasons(way.tags, base.tags, sameDirection)) {
+          reasons.add(reason);
+        }
+      });
+      const tags = { ...baseTagsAgreed(baseChain), ...way.tags };
       if (
         baseChain.some(
           ({ way: base }) => routingGradeSignature(base.tags) !== routingGradeSignature(tags),

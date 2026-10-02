@@ -25,6 +25,10 @@ type Choice = PlanDecision["action"] | "rule";
 /** What the proposal changes, in words: its kind and the base entity it involves. */
 export function proposalTitle(proposal: PlanProposal) {
   const kind = PROPOSAL_KIND_LABEL[proposal.kind];
+  if (proposal.kind === "replace-way") {
+    const ids = proposal.replaces.map(({ id }) => id).join(", ");
+    return proposal.replaces.length === 1 ? `Replace base way ${ids}` : `Replace base ways ${ids}`;
+  }
   if ("target" in proposal)
     return `${kind} with base ${proposal.target.type} ${proposal.target.id}`;
   if ("ways" in proposal) return `${kind} with ${proposal.ways[1].type} ${proposal.ways[1].id}`;
@@ -99,6 +103,12 @@ export function PlanProposalActions({
             <li key={reason}>{planReasonLabel(reason)}</li>
           ))}
         </ul>
+      ) : null}
+      {proposal.kind === "replace-way" && proposal.together.length > 0 ? (
+        <p className="text-muted-foreground">
+          Decided together with imported {proposal.together.length === 1 ? "way" : "ways"}{" "}
+          {proposal.together.map(({ id }) => id).join(", ")}.
+        </p>
       ) : null}
       {alternatives > 0 ? (
         <p className="text-muted-foreground">

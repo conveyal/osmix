@@ -117,4 +117,18 @@ describe("bulk choices and way replacement (MP-R2)", () => {
     );
     expect(replacements).toEqual([{ proposalId: "replace:w20>w10", action: "accept" }]);
   });
+
+  it("gives a selected feature the coordinates of the base ways it would replace", () => {
+    const { worker, baseId } = workerFor();
+    const detail = worker.getMergePlanFeature(baseId, "way:20");
+    expect(detail.replaces).toEqual({
+      "replace:w20>w10": [
+        [
+          [0, 0],
+          [0.0005, 0],
+          [0.001, 0],
+        ],
+      ],
+    });
+  });
 });

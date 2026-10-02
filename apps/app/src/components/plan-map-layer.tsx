@@ -6,7 +6,7 @@ import type {
   LineLayerSpecification,
   MapLayerMouseEvent,
 } from "maplibre-gl";
-import { PLAN_TILE_LAYERS, type PlanOutcome } from "osmix";
+import { type MergePlanFeatureDetail, PLAN_TILE_LAYERS, type PlanOutcome } from "osmix";
 import { useEffect } from "react";
 import { Layer, Source, useMap } from "react-map-gl/maplibre";
 
@@ -19,6 +19,7 @@ import {
 } from "../state/merge-plan";
 
 const SOURCE_ID = `${APPID}:merge-plan`;
+const SELECTION_ID = `${APPID}:merge-plan-selection`;
 const LINES_ID = `${SOURCE_ID}:lines`;
 const POINTS_ID = `${SOURCE_ID}:points`;
 
@@ -79,6 +80,7 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
   }, [map, planMap, onSelect]);
 
   if (!planMap) return null;
+  const replaced = replacedLines(selected);
   const color = outcomeColor(colors);
   const isSelected: ExpressionSpecification = ["==", ["get", "featureKey"], selected?.key ?? ""];
   const decision: ExpressionSpecification = ["==", ["get", "outcome"], "needs-decision"];
@@ -97,45 +99,78 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
     "circle-stroke-width": 1.5,
   };
   return (
-    <Source
-      key={planMap.baseOsmId}
-      id={SOURCE_ID}
-      type="vector"
-      tiles={[planTileUrl(planMap.baseOsmId, planMap.revision)]}
-      minzoom={MIN_PICKABLE_ZOOM}
-      maxzoom={14}
-      {...(planMap.bounds ? { bounds: planMap.bounds } : {})}
-    >
-      <Layer
-        id={`${SOURCE_ID}:casing`}
-        type="line"
-        source-layer={PLAN_TILE_LAYERS.ways}
-        filter={shown}
-        paint={{ "line-color": colors.casing, "line-width": ["case", isSelected, 11, 6] }}
-      />
-      <Layer
-        id={LINES_ID}
-        type="line"
-        source-layer={PLAN_TILE_LAYERS.ways}
-        filter={["all", shown, ["!", decision]]}
-        paint={linePaint}
-      />
-      <Layer
-        id={`${LINES_ID}:decision`}
-        type="line"
-        source-layer={PLAN_TILE_LAYERS.ways}
-        filter={["all", shown, decision]}
-        paint={{ ...linePaint, "line-dasharray": [1.5, 1] }}
-      />
-      <Layer
-        id={POINTS_ID}
-        type="circle"
-        source-layer={PLAN_TILE_LAYERS.nodes}
-        filter={shown}
-        paint={pointPaint}
-      />
-    </Source>
+    <>
+      {replaced.features.length > 0 ? (
+        // The base ways the selected feature would replace, as base data: solid, in base ink,
+        // under the plan's lines.
+        <Source id={SELECTION_ID} type="geojson" data={replaced}>
+          <Layer
+            id={`${SELECTION_ID}:casing`}
+            type="line"
+            paint={{ "line-color": colors.casing, "line-width": 9 }}
+          />
+          <Layer
+            id={`${SELECTION_ID}:lines`}
+            type="line"
+            paint={{ "line-color": colors.base, "line-width": 5 }}
+          />
+        </Source>
+      ) : null}
+      <Source
+        key={planMap.baseOsmId}
+        id={SOURCE_ID}
+        type="vector"
+        tiles={[planTileUrl(planMap.baseOsmId, planMap.revision)]}
+        minzoom={MIN_PICKABLE_ZOOM}
+        maxzoom={14}
+        {...(planMap.bounds ? { bounds: planMap.bounds } : {})}
+      >
+        <Layer
+          id={`${SOURCE_ID}:casing`}
+          type="line"
+          source-layer={PLAN_TILE_LAYERS.ways}
+          filter={shown}
+          paint={{ "line-color": colors.casing, "line-width": ["case", isSelected, 11, 6] }}
+        />
+        <Layer
+          id={LINES_ID}
+          type="line"
+          source-layer={PLAN_TILE_LAYERS.ways}
+          filter={["all", shown, ["!", decision]]}
+          paint={linePaint}
+        />
+        <Layer
+          id={`${LINES_ID}:decision`}
+          type="line"
+          source-layer={PLAN_TILE_LAYERS.ways}
+          filter={["all", shown, decision]}
+          paint={{ ...linePaint, "line-dasharray": [1.5, 1] }}
+        />
+        <Layer
+          id={POINTS_ID}
+          type="circle"
+          source-layer={PLAN_TILE_LAYERS.nodes}
+          filter={shown}
+          paint={pointPaint}
+        />
+      </Source>
+    </>
   );
+}
+
+/** The base ways the selected feature's replacements would delete, as GeoJSON lines. */
+function replacedLines(
+  selected: MergePlanFeatureDetail | null,
+): GeoJSON.FeatureCollection<GeoJSON.LineString> {
+  const lines = Object.values(selected?.replaces ?? {}).flat();
+  return {
+    type: "FeatureCollection",
+    features: lines.map((coordinates) => ({
+      type: "Feature",
+      properties: {},
+      geometry: { type: "LineString", coordinates },
+    })),
+  };
 }
 
 /**
@@ -145,8 +180,10 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
 export function PlanLegend() {
   const planMap = useAtomValue(planMapAtom);
   const overview = useAtomValue(planOverviewAtom);
+  const selected = useAtomValue(selectedPlanFeatureAtom);
   if (!planMap || !overview) return null;
   const counts = overview.summary.features;
+  const replacing = replacedLines(selected).features.length;
   return (
     <ul className="flex flex-col border-t py-1" aria-label="Plan map legend">
       {OUTCOMES.filter((outcome) => counts[outcome] > 0).map((outcome) => (
@@ -167,6 +204,14 @@ export function PlanLegend() {
           </span>
         </li>
       ))}
+      {replacing > 0 ? (
+        <li className="flex h-7 items-center gap-2 px-inset">
+          <svg aria-hidden="true" width="24" height="12" viewBox="0 0 24 12">
+            <line x1="1" y1="6" x2="23" y2="6" stroke="var(--map-base)" strokeWidth={3} />
+          </svg>
+          <span>Base {replacing === 1 ? "way" : "ways"} the selected feature replaces</span>
+        </li>
+      ) : null}
     </ul>
   );
 }

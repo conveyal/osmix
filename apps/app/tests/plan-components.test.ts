@@ -120,6 +120,27 @@ describe("plan components", () => {
     expect(blocked).toContain("Allowed travel is incompatible");
   });
 
+  it("names the base ways a replacement deletes and the imported ways decided with it", () => {
+    const replace = {
+      id: "replace:w20>w10,w11",
+      kind: "replace-way",
+      feature: "way:20",
+      source: { type: "way", id: 20 },
+      replaces: [
+        { type: "way", id: 10 },
+        { type: "way", id: 11 },
+      ],
+      set: ["replace:w30>w10,w11"],
+      together: [{ type: "way", id: 30 }],
+      status: "review",
+      reasons: [],
+      effect: "needs-decision",
+    } as PlanProposal;
+    const html = render(createElement(PlanProposalActions, { proposal: replace, onDecide: noop }));
+    expect(html).toContain("Replace base ways 10, 11");
+    expect(html).toContain("Decided together with imported way 30.");
+  });
+
   it("shows a choice the automation level made as its rule, which a person can change", () => {
     const html = render(
       createElement(PlanProposalActions, {

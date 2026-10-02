@@ -108,7 +108,12 @@ export class PlanBuilder {
 
   /** The patch's ID for a planned ID, for proposal IDs that survive a remap. */
   originalToken(type: OsmEntityType, plannedId: number) {
-    return entityToken(type, originalId(this.remap, type, plannedId));
+    return entityToken(type, this.originalId(type, plannedId));
+  }
+
+  /** The patch's ID for a planned ID. */
+  originalId(type: OsmEntityType, plannedId: number) {
+    return originalId(this.remap, type, plannedId);
   }
 
   /** Replace every decision; call `dropFrom` and rerun the affected phases after. */

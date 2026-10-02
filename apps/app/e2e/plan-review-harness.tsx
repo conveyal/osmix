@@ -126,10 +126,17 @@ const handlers = {
     proposalId: string,
     action: PlanDecision["action"] | null,
     excludes: readonly string[],
+    together: readonly string[] = [],
   ) =>
     store.mutate((session) => {
       session.calls.push(`decide:${proposalId}:${action ?? "clear"}`);
-      const decisions = withDecision(session.overview.decisions, proposalId, action, excludes);
+      const decisions = withDecision(
+        session.overview.decisions,
+        proposalId,
+        action,
+        excludes,
+        together,
+      );
       refresh(session, session.worker.setMergePlanDecisions(session.baseId, decisions));
     }),
   bulk: (request: MergePlanBulkRequest) =>

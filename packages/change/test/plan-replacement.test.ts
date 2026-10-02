@@ -196,4 +196,66 @@ describe("way replacement in a plan (MP-R2)", () => {
       }),
     ).toThrow(MergePlanDecisionConflictError);
   });
+
+  it("applies neighbouring replacements that share a junction without repeating it", () => {
+    const sharedBase = osm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 3, lon: 0.001, lat: 0 },
+        { id: 7, lon: 0.001, lat: 0.0005 },
+        { id: 8, lon: 0.001, lat: -0.0005 },
+      ],
+      [
+        { id: 10, refs: [1, 3], tags: footway },
+        { id: 12, refs: [7, 3, 8], tags: footway },
+      ],
+    );
+    const sharedPatch = osm(
+      "patch",
+      [
+        { id: 101, lon: 0, lat: 0.5 * M },
+        { id: 105, lon: 0.001, lat: 0.5 * M },
+        { id: 106, lon: 0.001, lat: -0.2 * M },
+        { id: 201, lon: 0.001, lat: 0.0005 },
+        { id: 202, lon: 0.001, lat: -0.0005 },
+      ],
+      [
+        { id: 20, refs: [101, 105], tags: footway },
+        { id: 40, refs: [201, 105, 106, 202], tags: footway },
+      ],
+    );
+    const { plan, osm: merged } = planAndApply(sharedBase, sharedPatch, options("aggressive"));
+    expect(findProposal(plan, "replace:w20>w10").effect).toBe("applied");
+    expect(findProposal(plan, "replace:w40>w12").effect).toBe("applied");
+    expect(merged.ways.getById(20)?.refs).toEqual([1, 3]);
+    expect(merged.ways.getById(40)?.refs).toEqual([7, 3, 106, 8]);
+    expect(merged.ways.getById(10)).toBeNull();
+    expect(merged.ways.getById(12)).toBeNull();
+  });
+
+  it("reports a kept way that also connects elsewhere as replaced", () => {
+    // Base path 13 ends 0.3 m from imported vertex 103, away from the replaced way.
+    const withPath = osm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 0.0005, lat: 0 },
+        { id: 3, lon: 0.001, lat: 0 },
+        { id: 5, lon: 0.0005, lat: 0.8 * M },
+        { id: 6, lon: 0.0005, lat: 0.001 },
+      ],
+      [
+        { id: 10, refs: [1, 2, 3], tags: footway },
+        { id: 13, refs: [5, 6], tags: footway },
+      ],
+    );
+    const { plan, osm: merged } = planAndApply(withPath, patch(), {
+      ...options("aggressive"),
+      decisions: [{ proposalId: "connect:n103>n5", action: "accept" }],
+    });
+    expect(findProposal(plan, "connect:n103>n5").effect).toBe("applied");
+    expect(plan.features.find(({ key }) => key === "way:20")?.outcome).toBe("replaced");
+    expect(merged.ways.getById(20)?.refs).toEqual([1, 102, 5, 104, 3]);
+  });
 });

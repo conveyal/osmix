@@ -45,6 +45,9 @@ export function proposeWayReplacements(
         source: { type: "way", id: wayId },
         replaces: group.baseWayIds.map((id) => ({ type: "way", id })),
         set: ids.filter((_, other) => other !== index),
+        together: group.importedWayIds
+          .filter((_, other) => other !== index)
+          .map((id) => ({ type: "way" as const, id: builder.originalId("way", id) })),
         status: group.status,
         reasons: [...group.reasons, ...group.reviewReasons],
       }) as ReplaceWayProposal;

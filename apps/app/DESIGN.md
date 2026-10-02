@@ -49,6 +49,10 @@ tokens, spacing, primitives, map overlay primitives) lives in
   `PlanLegend` goes in the map legend (`OsmixMap`'s `legend`), under the dataset
   rows, pairing each colour with its outcome name and count; the sidebar keeps
   only the summary table.
+  When the selected feature would replace base ways, those base ways are drawn
+  as base data (solid, `--map-base`, over a casing) under the plan's lines, and
+  the legend adds a row for them; the row names them and the imported ways
+  decided with it.
 - `MergeResult` — the result step: the completion summary, the merged dataset
   section, routing topology, positive IDs, and downloads.
 - `StepActions` — the full-width vertical action footer for Merge workflow
