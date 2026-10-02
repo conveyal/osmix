@@ -100,6 +100,31 @@ test("choices on a feature replan it, and removal waits for its connections", as
     .not.toContain("remove:w20>w10");
 });
 
+test("a way replacement names what it replaces and is decided as one set", async ({ page }) => {
+  await review(page).getByRole("button", { name: "Load replacement fixture" }).click();
+  const first = feature(page, "Imported way 20").locator('[data-proposal-id="replace:w20>w10"]');
+  const second = feature(page, "Imported way 30").locator('[data-proposal-id="replace:w30>w10"]');
+  await expect(first).toContainText("Replace base way 10");
+  await expect(first).toContainText("Decided together with imported way 30.");
+  await expect(second).toContainText("Decided together with imported way 20.");
+
+  // Including one includes the set, and leaves out the connections it makes unnecessary.
+  await first.getByRole("radio", { name: "Include", exact: true }).check();
+  await expect(first).toContainText("In the plan");
+  await expect(second).toContainText("In the plan");
+  await expect.poll(async () => outcome(page, "way:30")).toBe("replaced");
+
+  // A choice on another member replaces the first, rather than conflicting with it.
+  await second.getByRole("radio", { name: "Leave out", exact: true }).check();
+  await expect(first).toContainText("Left out");
+  await expect
+    .poll(async () => (await readState(page)).decisions)
+    .toContainEqual({ proposalId: "replace:w30>w10", action: "reject" });
+  expect((await readState(page)).decisions.map(({ proposalId }) => proposalId)).not.toContain(
+    "replace:w20>w10",
+  );
+});
+
 test("filters narrow the rows and bulk choices apply to what is shown", async ({ page }) => {
   await review(page)
     .getByLabel("Proposal", { exact: true })

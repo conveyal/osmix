@@ -55,7 +55,40 @@ function patchIdInputs() {
   return { base, patch };
 }
 
-type FixtureName = "removal" | "patch-ids";
+/**
+ * A base footway with imported sidewalks 0.5 m north of it, split in two with different
+ * surfaces: one way replacement set of two imported ways (MP-R2).
+ */
+function replacementInputs() {
+  const meter = 1 / 111_320;
+  const base = new Osm({ id: "replace-base" });
+  for (const [id, lon] of [
+    [1, 0],
+    [2, 0.0005],
+    [3, 0.001],
+  ] as const) {
+    base.nodes.addNode({ id, lon, lat: 0 });
+  }
+  base.ways.addWay({ id: 10, refs: [1, 2, 3], tags: { highway: "footway" } });
+  const patch = new Osm({ id: "replace-patch" });
+  for (const [id, lon] of [
+    [101, 0],
+    [102, 0.0005],
+    [103, 0.001],
+  ] as const) {
+    patch.nodes.addNode({ id, lon, lat: 0.5 * meter });
+  }
+  const sidewalk = { highway: "footway", footway: "sidewalk" };
+  patch.ways.addWay({ id: 20, refs: [101, 102], tags: { ...sidewalk, surface: "asphalt" } });
+  patch.ways.addWay({ id: 30, refs: [102, 103], tags: { ...sidewalk, surface: "concrete" } });
+  for (const osm of [base, patch]) {
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+  }
+  return { base, patch };
+}
+
+type FixtureName = "removal" | "patch-ids" | "replacement";
 
 interface Session {
   fixture: FixtureName;
@@ -74,7 +107,11 @@ interface Session {
 
 function startSession(fixture: FixtureName, mode: PatchIdMode = "osm"): Session {
   const { base, patch } =
-    fixture === "removal" ? createWayRemovalInputs({ branch: true }) : patchIdInputs();
+    fixture === "removal"
+      ? createWayRemovalInputs({ branch: true })
+      : fixture === "replacement"
+        ? replacementInputs()
+        : patchIdInputs();
   const worker = new HarnessWorker();
   worker.add(base);
   worker.add(patch);
@@ -91,7 +128,17 @@ function startSession(fixture: FixtureName, mode: PatchIdMode = "osm"): Session 
             automatic: "none" as const,
           },
         }
-      : {}),
+      : fixture === "replacement"
+        ? {
+            automation: "conservative" as const,
+            matching: {
+              propertyKeys: [],
+              attachNetwork: true,
+              allowWayReplacement: true,
+              maxDistanceMeters: 1,
+            },
+          }
+        : {}),
   });
   return {
     fixture,
@@ -229,6 +276,13 @@ function Harness() {
               onClick={() => store.replace(startSession("patch-ids"))}
             >
               Load patch ID fixture
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => store.replace(startSession("replacement"))}
+            >
+              Load replacement fixture
             </Button>
           </div>
           <PatchIdNotice
