@@ -40,7 +40,11 @@ tokens, spacing, primitives, map overlay primitives) lives in
   bulk choices apply to the features shown. Each bulk button names how many
   features it would change ("Include 12,400 features") and results are counted
   in features; bulk Include skips removals and choices between competing
-  proposals, and no bulk choice replaces a decision already made.
+  proposals, and no bulk choice replaces a decision already made. Row choices
+  collect in a draft, each marked "Choice not applied yet", until an `Alert`
+  above the rows applies them in one replan (**Apply N choices**) or drops
+  them (**Discard**); bulk buttons, export and **Apply plan** are disabled
+  meanwhile. Selecting a feature on the map turns the list to its page.
 - `PlanMapLayer`, `PlanLegend` — imported features coloured by outcome
   (`--map-outcome-*`), with features that need a decision drawn wider and
   dashed so colour is never the only cue; clicking a feature opens its row.

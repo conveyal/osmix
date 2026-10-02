@@ -111,6 +111,7 @@ type PlanDatasetProxyMethodName =
   | "setMergePlanFilter"
   | "getMergePlanPage"
   | "getMergePlanFeature"
+  | "getMergePlanFeaturePage"
   | "getMergePlanTile"
   | "getMergeMatchingPage"
   | "getMergeUncopiedTagPage"
@@ -1709,6 +1710,14 @@ export class OsmixRemote<T extends OsmixWorker = OsmixWorker> {
   getMergePlanPage(baseOsmId: OsmId, page: number, pageSize: number) {
     return this.runWithWorker(
       (worker) => worker.getMergePlanPage(this.getId(baseOsmId), page, pageSize),
+      { lane: "control", retry: "once" },
+    );
+  }
+
+  /** The review page a feature is on under the current filter, or null when it is hidden. */
+  getMergePlanFeaturePage(baseOsmId: OsmId, featureKey: string, pageSize: number) {
+    return this.runWithWorker(
+      (worker) => worker.getMergePlanFeaturePage(this.getId(baseOsmId), featureKey, pageSize),
       { lane: "control", retry: "once" },
     );
   }

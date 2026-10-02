@@ -290,6 +290,17 @@ export function planPage(
   };
 }
 
+/** The page `featureKey` is on under `filter`, or null when the filter hides it. */
+export function planFeaturePage(
+  plan: MergePlan,
+  filter: MergePlanFilter,
+  featureKey: string,
+  pageSize: number,
+): number | null {
+  const index = filteredFeatures(plan, filter).findIndex(({ key }) => key === featureKey);
+  return index === -1 ? null : Math.floor(index / pageSize);
+}
+
 function coordinates(osm: Osm, type: PlanFeature["type"], id: number): LonLat[] {
   if (type === "node") {
     const node = osm.nodes.getById(id);

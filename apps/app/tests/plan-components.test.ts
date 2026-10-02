@@ -21,6 +21,7 @@ import { PlanProposalActions } from "../src/components/plan-proposal-actions";
 import { PlanReview } from "../src/components/plan-review";
 import { PlanSummary } from "../src/components/plan-summary";
 import { SuggestedChoices } from "../src/components/suggested-choices";
+import { planDraftAtom, planOverviewAtom } from "../src/state/merge-plan";
 
 const render = (element: ReactElement) =>
   renderToStaticMarkup(createElement(Provider, { store: createStore() }, element));
@@ -166,6 +167,52 @@ describe("plan components", () => {
     expect(html).toContain('aria-label="Imported way -1"');
     expect(html).toContain("Harbour Walk");
     expect(html).toContain("Needs decision");
+  });
+
+  it("shows row choices waiting to be applied, and holds bulk choices until then", () => {
+    const page: MergePlanPage = { features: [], total: 0, totalPages: 0 };
+    const html = render(
+      createElement(PlanReview, {
+        detail: null,
+        filter: {},
+        onBulk: noop,
+        onDecide: noop,
+        onFilterChange: noop,
+        onPageChange: noop,
+        onSelect: noop,
+        page,
+        pageIndex: 0,
+        pending: { count: 3, onApply: noop, onDiscard: noop },
+        preview: {
+          accept: { changed: 3, waiting: 0 },
+          reject: { changed: 1, waiting: 0 },
+          clear: { changed: 0, waiting: 0 },
+          "pick-nearest": { changed: 0, waiting: 0 },
+        },
+      }),
+    );
+    expect(html).toContain("3 choices not applied yet");
+    expect(html).toContain("Apply 3 choices");
+    expect(html).toContain("Discard");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*Include 3 features/);
+  });
+
+  it("marks a row's choice that is not applied yet", () => {
+    const store = createStore();
+    store.set(planOverviewAtom, { decisions: [], options: {} } as unknown as MergePlanOverview);
+    store.set(planDraftAtom, {
+      decisions: [{ proposalId: "connect:n-2>n2", action: "accept" }],
+      chosen: ["connect:n-2>n2"],
+    });
+    const html = renderToStaticMarkup(
+      createElement(
+        Provider,
+        { store },
+        createElement(PlanProposalActions, { proposal: connect(), onDecide: noop }),
+      ),
+    );
+    expect(html).toContain("Choice not applied yet");
+    expect(html).toMatch(/value="accept"[^>]*checked|checked[^>]*value="accept"/);
   });
 
   it("lists features with filters and says when none match", () => {

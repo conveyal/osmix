@@ -11,7 +11,7 @@ import {
   isDecidable,
   planReasonLabel,
 } from "../lib/merge-plan-workflow";
-import { planOverviewAtom } from "../state/merge-plan";
+import { planOverviewAtom, planPendingChoicesAtom } from "../state/merge-plan";
 
 const EFFECT_DOT: Record<PlanProposal["effect"], StatusDotStatus> = {
   applied: "ok",
@@ -55,10 +55,17 @@ export function PlanProposalActions({
 }) {
   const taskLocked = useTaskLock();
   const automation = useAtomValue(planOverviewAtom)?.options.automation ?? "recommended";
+  const pendingChoices = useAtomValue(planPendingChoicesAtom);
   const name = useId();
   const title = proposalTitle(proposal);
   const decidable = isDecidable(proposal) && proposal.status !== "blocked";
-  const choice: Choice = proposal.automated ? "rule" : (proposal.decision ?? "rule");
+  // A choice not sent to the planner yet shows as chosen, marked as not applied.
+  const pending = pendingChoices.has(proposal.id);
+  const choice: Choice = pending
+    ? (pendingChoices.get(proposal.id) ?? "rule")
+    : proposal.automated
+      ? "rule"
+      : (proposal.decision ?? "rule");
   const automated = proposal.automated
     ? `${proposal.decision === "accept" ? "Include" : "Leave out"} (${AUTOMATION_LABEL[automation]})`
     : null;
@@ -96,6 +103,7 @@ export function PlanProposalActions({
       <p className="text-muted-foreground">
         {PROPOSAL_STATUS_LABEL[proposal.status]} · {PROPOSAL_EFFECT_LABEL[proposal.effect]}
         {proposal.automated ? ` · Decided by ${AUTOMATION_LABEL[automation]}` : null}
+        {pending ? " · Choice not applied yet" : null}
       </p>
       {proposal.reasons.length > 0 ? (
         <ul className="list-disc pl-4 text-muted-foreground">

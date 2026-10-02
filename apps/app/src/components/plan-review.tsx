@@ -1,5 +1,7 @@
 import {
   ActionButton,
+  Alert,
+  Button,
   EmptyState,
   NativeSelect,
   NativeSelectOption,
@@ -7,7 +9,7 @@ import {
   SidebarSection,
   useTaskLock,
 } from "@osmix/ui";
-import { CheckCheckIcon, LocateFixedIcon, RotateCcwIcon, XIcon } from "lucide-react";
+import { CheckCheckIcon, CheckIcon, LocateFixedIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import { PLAN_CHOICE_GROUPS, type PlanChoiceGroup } from "osmix";
 import type {
   MergePlanBulkPreview,
@@ -61,6 +63,7 @@ export function PlanReview({
   onSelect,
   page,
   pageIndex,
+  pending = null,
   preview,
 }: {
   detail: MergePlanFeatureDetail | null;
@@ -77,6 +80,11 @@ export function PlanReview({
   onSelect: (featureKey: string) => unknown;
   page: MergePlanPage;
   pageIndex: number;
+  /**
+   * Row choices not applied yet, which replan together: how many, and how to apply or discard
+   * them. Choices for shown features wait until they are applied or discarded.
+   */
+  pending?: { count: number; onApply: () => unknown; onDiscard: () => unknown } | null;
   /** What each bulk choice would do; null while it loads. */
   preview: MergePlanBulkPreview | null;
 }) {
@@ -164,7 +172,7 @@ export function PlanReview({
                 size="sm"
                 variant={variant}
                 icon={icon}
-                disabled={preview === null || changed === 0}
+                disabled={preview === null || changed === 0 || pending !== null}
                 onAction={async () => onBulk({ action, filter })}
               >
                 {preview === null ? BULK_LOADING_LABEL[action] : bulkActionLabel(action, changed)}
@@ -179,6 +187,27 @@ export function PlanReview({
             : null}
           Blocked proposals never change.
         </p>
+        {pending ? (
+          <Alert role="status" className="flex flex-col gap-2">
+            <p>
+              {pending.count.toLocaleString()} {pending.count === 1 ? "choice" : "choices"} not
+              applied yet. Make more, then apply them together; the plan updates once.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton size="sm" icon={<CheckIcon />} onAction={async () => pending.onApply()}>
+                Apply {pending.count.toLocaleString()} {pending.count === 1 ? "choice" : "choices"}
+              </ActionButton>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={taskLocked}
+                onClick={() => void pending.onDiscard()}
+              >
+                Discard
+              </Button>
+            </div>
+          </Alert>
+        ) : null}
       </div>
       {page.features.length === 0 ? (
         <EmptyState className="border-t">No imported features match these filters</EmptyState>

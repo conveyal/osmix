@@ -251,12 +251,17 @@ test("a removal chosen in the review is applied and reported", async ({ page }) 
   const feature = page.getByRole("region", { name: "Imported way 20", exact: true });
   await expect(feature).toContainText("Needs decision");
   const removal = feature.locator('[data-proposal-id="remove:w20>w10"]');
-  // The choice replans in the worker; the radio follows the plan once it returns.
+  // Row choices collect until applied together; the plan cannot be applied meanwhile.
   const include = removal.getByRole("radio", { name: "Include", exact: true });
   await include.click();
   await expect(include).toBeChecked();
+  await expect(removal).toContainText("Choice not applied yet");
+  const applyPlan = page.getByRole("button", { name: "Apply plan", exact: true });
+  await expect(applyPlan).toBeDisabled();
+  await page.getByRole("button", { name: "Apply 1 choice", exact: true }).click();
   await expect(feature).toContainText("Removed");
-  await page.getByRole("button", { name: "Apply plan", exact: true }).click();
+  await expect(removal).not.toContainText("Choice not applied yet");
+  await applyPlan.click();
   const completion = page.getByRole("region", { name: "Merge completion summary", exact: true });
   await expect(
     completion.getByRole("region", { name: "Applied way removals", exact: true }),

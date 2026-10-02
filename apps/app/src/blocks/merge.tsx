@@ -74,7 +74,9 @@ import {
   planOverviewAtom,
   planPageAtom,
   planBulkPreviewAtom,
+  planDraftAtom,
   planPageIndexAtom,
+  planPendingChoicesAtom,
   resetMergePlanAtom,
   selectedPlanFeatureAtom,
 } from "../state/merge-plan";
@@ -103,6 +105,8 @@ export default function MergeBlock() {
   const [page, setPage] = useAtom(planPageAtom);
   const [pageIndex, setPageIndex] = useAtom(planPageIndexAtom);
   const [bulkPreview, setBulkPreview] = useAtom(planBulkPreviewAtom);
+  const [draft, setDraft] = useAtom(planDraftAtom);
+  const pendingChoices = useAtomValue(planPendingChoicesAtom);
   const setPlanMap = useSetAtom(planMapAtom);
   const openFileInExtract = useOpenFileInExtract();
   const [selected, setSelected] = useAtom(selectedPlanFeatureAtom);
@@ -213,7 +217,7 @@ export default function MergeBlock() {
 
   const replanWithPatchIds = async (mode: PatchIdMode) => {
     if (!base.osm || !patch.osm) return;
-    const options = planOptions(mode, overview?.decisions);
+    const options = planOptions(mode, draft?.decisions ?? overview?.decisions);
     if (!options) return;
     const baseOsmId = base.osm.id;
     const patchOsmId = patch.osm.id;
@@ -221,24 +225,43 @@ export default function MergeBlock() {
     await runTask("Plan merge", async () => {
       const planned = await remote.planMerge(baseOsmId, patchOsmId, options);
       await remote.setMergePlanFilter(baseOsmId, filter);
+      setDraft(null);
       await showPlan(baseOsmId, planned, 0);
       return mode === "new" ? "Replanned with every patch feature new" : "Replanned";
     });
   };
 
-  const decide = async (
+  /** Add a row choice to the draft; the plan updates when the draft is applied. */
+  const decide = (
     proposalId: string,
     action: PlanDecision["action"] | null,
     excludes: readonly string[],
     together: readonly string[] = [],
   ) => {
-    if (!base.osm || !overview) return;
+    if (!overview) return;
+    const decisions = withDecision(
+      draft?.decisions ?? overview.decisions,
+      proposalId,
+      action,
+      excludes,
+      together,
+    );
+    const chosen = [...new Set([...(draft?.chosen ?? []), proposalId])];
+    setDraft({ decisions, chosen });
+  };
+
+  /** How many row choices the draft changes, counting each chosen proposal once. */
+  const draftCount = draft ? draft.chosen.filter((id) => pendingChoices.has(id)).length : 0;
+
+  const applyDraft = async () => {
+    if (!base.osm || !draft) return;
     const baseOsmId = base.osm.id;
-    const decisions = withDecision(overview.decisions, proposalId, action, excludes, together);
+    const count = draftCount;
     await runTask("Update plan", async () => {
-      const next = await remote.setMergePlanDecisions(baseOsmId, decisions);
+      const next = await remote.setMergePlanDecisions(baseOsmId, draft.decisions);
+      setDraft(null);
       await showPlan(baseOsmId, next, pageIndex);
-      return "Plan updated";
+      return `Applied ${count.toLocaleString()} ${count === 1 ? "choice" : "choices"}`;
     });
   };
 
@@ -626,6 +649,11 @@ export default function MergeBlock() {
             pageIndex={pageIndex}
             onBulk={applyBulk}
             onDecide={decide}
+            pending={
+              draftCount > 0
+                ? { count: draftCount, onApply: applyDraft, onDiscard: () => setDraft(null) }
+                : null
+            }
             onFilterChange={changeFilter}
             onPageChange={async (next) => {
               if (base.osm) await loadPage(base.osm.id, next);
@@ -646,12 +674,21 @@ export default function MergeBlock() {
               >
                 Back to inputs
               </ActionButton>
-              <ActionButton icon={<DownloadIcon />} variant="outline" onAction={downloadOsc}>
+              <ActionButton
+                icon={<DownloadIcon />}
+                variant="outline"
+                disabled={draftCount > 0}
+                onAction={downloadOsc}
+              >
                 Export osmChange (.osc)
               </ActionButton>
               <ActionButton
                 icon={<MergeIcon />}
-                disabled={overview.diagnostics.integrity.length > 0 || pendingRefresh !== null}
+                disabled={
+                  overview.diagnostics.integrity.length > 0 ||
+                  pendingRefresh !== null ||
+                  draftCount > 0
+                }
                 onAction={applyReviewedPlan}
               >
                 Apply plan

@@ -115,6 +115,15 @@ describe("worker merge plan sessions", () => {
     expect(worker.getMergePlanPage(base.id, 0, 10).totalPages).toBe(1);
   });
 
+  it("finds the page a feature is on under the current filter", () => {
+    const { worker, base } = planned();
+    expect(worker.getMergePlanFeaturePage(base.id, "way:-1", 2)).toBe(0);
+    expect(worker.getMergePlanFeaturePage(base.id, "way:-2", 2)).toBe(1);
+    worker.setMergePlanFilter(base.id, { kind: "exact-merge" });
+    expect(worker.getMergePlanFeaturePage(base.id, "node:-4", 2)).toBe(0);
+    expect(worker.getMergePlanFeaturePage(base.id, "way:-2", 2)).toBeNull();
+  });
+
   it("shows one feature's evidence and target geometry", () => {
     const { worker, base } = planned();
     const detail = worker.getMergePlanFeature(base.id, "way:-1");

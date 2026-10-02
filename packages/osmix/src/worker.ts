@@ -107,6 +107,7 @@ import {
   matchingPage,
   planFeatureDetail,
   planOverview,
+  planFeaturePage,
   planPage,
   uncopiedTagPage,
   waitingFeatures,
@@ -660,6 +661,12 @@ export class OsmixWorker extends EventTarget {
   getMergePlanPage(baseOsmId: string, page: number, pageSize: number) {
     const session = this.getPlanSession(baseOsmId);
     return planPage(session.plan, this.get(session.patchOsmId), session.filter, page, pageSize);
+  }
+
+  /** The page of `pageSize` a feature is on under the current filter, or null when hidden. */
+  getMergePlanFeaturePage(baseOsmId: string, featureKey: string, pageSize: number) {
+    const session = this.getPlanSession(baseOsmId);
+    return planFeaturePage(session.plan, session.filter, featureKey, pageSize);
   }
 
   /** One feature with the evidence and geometry behind its proposals. */
