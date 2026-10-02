@@ -1306,8 +1306,10 @@ export function applyPlannedConflation(
   planned: Osm,
   discovery: OsmConflationDiscovery,
   decisions: readonly OsmConflationDecision[],
+  /** The planned state now, read-only, when the caller holds one; otherwise a copy. */
+  current?: PlanOverlay,
 ) {
-  const snapshot = changeset.overlay.snapshot();
+  const snapshot = current ?? changeset.overlay.snapshot();
   const before = snapshot.reader();
   const trace = applyDiscoveredConflation(changeset, base, planned, discovery, decisions);
   const after = changeset.overlay.reader();

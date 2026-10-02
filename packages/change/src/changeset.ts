@@ -332,6 +332,11 @@ export class OsmChangeset {
     };
   }
 
+  /** @internal The planned state at a checkpoint, read-only, sharing its records. */
+  checkpointState(checkpoint: OsmChangesetCheckpoint): PlanOverlay {
+    return PlanOverlay.frozen(this.osm, checkpoint);
+  }
+
   /** @internal Return to a checkpoint. The checkpoint stays valid for another restore. */
   restore(checkpoint: OsmChangesetCheckpoint) {
     this.nodeChanges = { ...checkpoint.nodes };
@@ -1184,6 +1189,8 @@ export class OsmChangeset {
     ways: Ways,
     patchNodeIds: { has(id: number): boolean },
     accept?: (crossing: CrossingInsertion) => boolean,
+    /** The planned state now, read-only, when the caller holds one; otherwise a copy. */
+    start?: PlanOverlay,
   ) {
     // New crossing nodes are new entities, so they get negative IDs, below every node the
     // planned state holds.
@@ -1193,7 +1200,12 @@ export class OsmChangeset {
     const importedNodeIds = {
       has: (id: number) => patchNodeIds.has(id) && !this.osm.nodes.ids.has(id),
     };
-    yield* this.createIntersections(ways, this.overlayCrossingSearch(), importedNodeIds, accept);
+    yield* this.createIntersections(
+      ways,
+      this.overlayCrossingSearch(start ?? this.overlay.snapshot()),
+      importedNodeIds,
+      accept,
+    );
   }
 
   private *createIntersections(
@@ -1240,8 +1252,7 @@ export class OsmChangeset {
     };
   }
 
-  private overlayCrossingSearch(): CrossingSearch {
-    const start = this.overlay.snapshot();
+  private overlayCrossingSearch(start: PlanOverlay): CrossingSearch {
     const cache = this.crossingCache;
     cache.begin(start);
     return {

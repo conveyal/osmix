@@ -21,6 +21,7 @@ import type {
 import { automateMatching } from "./automation.ts";
 import { entityToken, type PlanBuilder } from "./builder.ts";
 import { findDecisionConflict } from "./decision-conflict.ts";
+import type { PlanOverlay } from "./overlay.ts";
 import { discoverWayReplacements, type WayReplacementDiscovery } from "./replacement.ts";
 import {
   applyWayReplacements,
@@ -63,6 +64,8 @@ export function planMatching(
   planned: Osm,
   options: NonNullable<MergePlanOptions["matching"]>,
   automation: MergePlanAutomation,
+  /** The planned state as matching starts, read-only; matching reports against it. */
+  start: PlanOverlay,
   /** Discovery from an earlier run on the same state, reused when only decisions changed. */
   cached?: {
     discovery: OsmConflationDiscovery;
@@ -162,12 +165,13 @@ export function planMatching(
   const decisions = matchingDecisions(byCandidate);
   const kept = replacing.flatMap(({ group }) => group.importedWayIds);
   const refsBefore = new Map(kept.map((id) => [id, [...wayRefs(id)]]));
-  const outcome = applyPlannedConflation(changeset, base, planned, discovery, decisions);
+  const outcome = applyPlannedConflation(changeset, base, planned, discovery, decisions, start);
   applyWayReplacements(
     changeset,
     base,
     replacing.map(({ group }) => group),
     refsBefore,
+    start,
   );
   const demotedProposals = byCandidate.flatMap(({ candidate, connect }) =>
     connect && demoted.has(candidate.id) ? [connect.id] : [],

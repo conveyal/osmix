@@ -265,6 +265,26 @@ export class PlanOverlay {
     }
   }
 
+  /**
+   * A read-only view of records nothing will change, such as a checkpoint's, over `base`. It
+   * shares them instead of copying; never record changes through it.
+   */
+  static frozen(
+    base: Osm,
+    records: {
+      nodes: ChangeRecords<"node">;
+      ways: ChangeRecords<"way">;
+      relations: ChangeRecords<"relation">;
+    },
+  ): PlanOverlay {
+    const view = new PlanOverlay(base);
+    view.nodeChanges = records.nodes;
+    view.wayChanges = records.ways;
+    view.relationChanges = records.relations;
+    if (Object.keys(records.nodes).length > 0) view.nodeCoordinateRevision++;
+    return view;
+  }
+
   /** A copy of the current records over the same base, unaffected by later changes. */
   snapshot(): PlanOverlay {
     const copy = new PlanOverlay(this.base);
