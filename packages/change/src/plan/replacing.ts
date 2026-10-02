@@ -191,7 +191,7 @@ export function applyWayReplacements(
 ) {
   if (groups.length === 0) return;
   const overlay = changeset.overlay;
-  const before = overlay.snapshot().reader();
+  const before = overlay.snapshot();
   const replaced = {
     ways: new Set(groups.flatMap(({ baseWayIds }) => baseWayIds)),
     nodes: new Set<number>(),
@@ -277,7 +277,7 @@ export function applyWayReplacements(
       replaced.nodes.add(id);
     }
   }
-  assertConflationPreservesBaseTopology(base, before, overlay.reader(), replaced);
+  assertConflationPreservesBaseTopology(base, before, overlay, replaced);
 }
 
 /**

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { applyChangesetToOsm } from "../src/apply-changeset.ts";
 import { OsmChangeset } from "../src/changeset.ts";
 import { GridIndex } from "../src/plan/grid-index.ts";
-import type { PlanOverlay } from "../src/plan/overlay.ts";
+import { PlanOverlay } from "../src/plan/overlay.ts";
 
 function mulberry32(seed: number): () => number {
   let state = seed;
@@ -197,8 +197,39 @@ describe("PlanOverlay", () => {
   });
 });
 
+describe("PlanOverlay.minNodeId", () => {
+  it("is the lowest current node ID, skipping deleted nodes, or 0", () => {
+    const osm = new Osm({ id: "base" });
+    for (const id of [-5, -3, 2]) osm.nodes.addNode({ id, lon: 0, lat: 0 });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+    const overlay = new PlanOverlay(osm);
+    expect(overlay.minNodeId()).toBe(-5);
+    overlay.delete(osm.nodes.getById(-5)!);
+    expect(overlay.minNodeId()).toBe(-3);
+    overlay.create({ id: -10, lon: 0, lat: 0 }, "patch");
+    expect(overlay.minNodeId()).toBe(-10);
+    const positive = new Osm({ id: "positive" });
+    positive.nodes.addNode({ id: 4, lon: 0, lat: 0 });
+    positive.buildIndexes();
+    expect(new PlanOverlay(positive).minNodeId()).toBe(0);
+  });
+});
+
 describe("GridIndex", () => {
-  it("moves, removes, and always returns boxes spanning many cells", () => {
+  it("returns only boxes that intersect the query, sharing a cell or not", () => {
+    const grid = new GridIndex(0.01);
+    grid.set(1, [0, 0, 0.001, 0.001]);
+    grid.set(2, [0.005, 0.005, 0.006, 0.006]);
+    grid.set(3, [2, 2, 3, 3]);
+    // 1 and 2 share a cell; 3 spans too many cells to be gridded.
+    expect([...grid.query([0.0005, 0.0005, 0.002, 0.002])]).toEqual([1]);
+    expect([...grid.query([0.001, 0.001, 0.005, 0.005])].sort((a, b) => a - b)).toEqual([1, 2]);
+    expect([...grid.query([2.5, 2.5, 2.5, 2.5])]).toEqual([3]);
+    expect([...grid.query([1, 1, 1.5, 1.5])]).toEqual([]);
+  });
+
+  it("moves, removes, and returns boxes spanning many cells", () => {
     const grid = new GridIndex(0.01);
     grid.set(1, [0, 0, 0.001, 0.001]);
     grid.set(2, [0, 0, 1, 1]);

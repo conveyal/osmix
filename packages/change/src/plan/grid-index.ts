@@ -1,8 +1,9 @@
 /**
  * A mutable hash grid of bounding boxes. The planner overlay keeps pending geometry here, since
- * the base dataset's packed spatial indexes cannot change. Queries return candidates; callers
- * re-test them against current geometry.
+ * the base dataset's packed spatial indexes cannot change. Queries return the IDs whose stored
+ * box intersects the query box; callers keep the stored boxes current.
  */
+import { bboxContainsOrIntersects } from "@osmix/geo/bbox-intersects";
 import type { GeoBbox2D } from "@osmix/types";
 
 /** About 1 km at the equator: pending changes are sparse, and queries are small. */
@@ -15,6 +16,7 @@ export class GridIndex {
   private readonly cells = new Map<number, Set<number>>();
   private readonly entryCells = new Map<number, number[]>();
   private readonly oversized = new Set<number>();
+  private readonly boxes = new Map<number, GeoBbox2D>();
 
   private readonly cellDegrees: number;
 
@@ -33,6 +35,7 @@ export class GridIndex {
   /** Insert `id`, or move it to `bbox`. */
   set(id: number, bbox: GeoBbox2D) {
     this.remove(id);
+    this.boxes.set(id, bbox);
     const [minX, minY, maxX, maxY] = this.cellRange(bbox);
     if ((maxX - minX + 1) * (maxY - minY + 1) > MAX_CELLS_PER_ENTRY) {
       this.oversized.add(id);
@@ -55,6 +58,7 @@ export class GridIndex {
   }
 
   remove(id: number) {
+    this.boxes.delete(id);
     if (this.oversized.delete(id)) return;
     const keys = this.entryCells.get(id);
     if (!keys) return;
@@ -66,13 +70,18 @@ export class GridIndex {
     this.entryCells.delete(id);
   }
 
-  /** IDs whose box may intersect `bbox`, in no particular order. */
+  /** IDs whose stored box intersects or touches `bbox`, in no particular order. */
   query(bbox: GeoBbox2D): Set<number> {
-    const result = new Set(this.oversized);
+    const result = new Set<number>();
+    const test = (id: number) => {
+      if (!result.has(id) && bboxContainsOrIntersects(this.boxes.get(id)!, bbox)) result.add(id);
+    };
+    for (const id of this.oversized) test(id);
     const [minX, minY, maxX, maxY] = this.cellRange(bbox);
     for (let x = minX; x <= maxX; x++) {
       for (let y = minY; y <= maxY; y++) {
-        for (const id of this.cells.get(x * CELL_KEY_STRIDE + y) ?? []) result.add(id);
+        const cell = this.cells.get(x * CELL_KEY_STRIDE + y);
+        if (cell) for (const id of cell) test(id);
       }
     }
     return result;

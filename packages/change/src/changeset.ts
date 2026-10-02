@@ -31,6 +31,7 @@ import {
   restrictionTopologyIssues,
   routingIntegrityIssueKeys,
 } from "./integrity.ts";
+import { CrossingCache } from "./plan/crossing-cache.ts";
 import { PlanOverlay } from "./plan/overlay.ts";
 import { accessSignature, barrierSignature, NODE_ROUTING_CRITICAL_TAGS } from "./rules/access.ts";
 import { refsWouldCollapse } from "./rules/collapse.ts";
@@ -73,9 +74,13 @@ interface NodeCandidate {
 interface CrossingSearch {
   /** A way's bounding box in the starting state, or null when it is absent there. */
   startBbox(wayId: number): GeoBbox2D | null;
-  /** Ways whose starting bounding box intersects `bbox`, in ascending ID order. */
-  near(bbox: GeoBbox2D): number[];
+  /** Ways whose starting bounding box intersects `wayId`'s box `bbox`, in ascending ID order. */
+  near(bbox: GeoBbox2D, wayId: number): number[];
+  /** Where two ways' lines cross; `waysIntersect` unless the search can reuse a result. */
+  intersect?(wayId: number, line: Line, otherId: number, other: Line): [number, number][];
 }
+
+type Line = [number, number][];
 
 /** One crossing about to be inserted, offered to an `accept` callback. */
 export interface CrossingInsertion {
@@ -262,6 +267,8 @@ export class OsmChangeset {
 
   // Next node ID tracker for generating new IDs during intersection creation
   currentNodeId: number;
+  /** Crossing work a replan can reuse; it holds no records, so restoring never touches it. */
+  private readonly crossingCache = new CrossingCache();
 
   deduplicatedNodes = 0;
   deduplicatedNodesReplaced = 0;
@@ -1180,9 +1187,7 @@ export class OsmChangeset {
   ) {
     // New crossing nodes are new entities, so they get negative IDs, below every node the
     // planned state holds.
-    let minimum = 0;
-    for (const node of this.overlay.nodes()) minimum = Math.min(minimum, node.id);
-    this.currentNodeId = minimum;
+    this.currentNodeId = this.overlay.minNodeId();
     this.nodeIdStep = -1;
     // A patch node with a base node's ID edits that base node (MP-I1); it is not imported.
     const importedNodeIds = {
@@ -1237,12 +1242,16 @@ export class OsmChangeset {
 
   private overlayCrossingSearch(): CrossingSearch {
     const start = this.overlay.snapshot();
+    const cache = this.crossingCache;
+    cache.begin(start);
     return {
       startBbox: (wayId) => {
         const way = start.getWay(wayId);
         return way ? start.wayBbox(way) : null;
       },
-      near: (bbox) => start.waysIntersecting(bbox).map((way) => way.id),
+      near: (bbox, wayId) => cache.nearWays(wayId, bbox, (box) => start.wayIdsIntersecting(box)),
+      intersect: (wayId, line, otherId, other) =>
+        cache.crossingPoints(wayId, line, otherId, other, waysIntersect),
     };
   }
 
@@ -1307,7 +1316,7 @@ export class OsmChangeset {
 
     const bbox = search.startBbox(wayId);
     if (!bbox) return;
-    const intersectingWayIds = search.near(bbox).filter((intersectingWayId) => {
+    const intersectingWayIds = search.near(bbox, wayId).filter((intersectingWayId) => {
       if (intersectingWayId === initialWay.id) return false;
       if (wayIdPairs.has(initialWay.id, intersectingWayId)) return false;
 
@@ -1349,7 +1358,9 @@ export class OsmChangeset {
       // Skip ways that are geometrically equal
       if (dequal(coordinates, intersectingWayCoords)) continue;
 
-      const intersectingPoints = waysIntersect(coordinates, intersectingWayCoords);
+      const intersectingPoints = search.intersect
+        ? search.intersect(wayId, coordinates, intersectingWayId, intersectingWayCoords)
+        : waysIntersect(coordinates, intersectingWayCoords);
       for (const pt of intersectingPoints) {
         const currentWay = this.overlay.getWay(wayId);
         // Reuse the already decoded base entity; getCurrentWay still selects any

@@ -32,19 +32,26 @@ function delta(before: RoutingTopologyStats, after: RoutingTopologyStats): PlanR
   };
 }
 
-/** CAR and WALK topology of the base and of the planned result. */
-export function planRoutingDiagnostics(base: Osm, overlay: PlanOverlay) {
-  const baseSource = { nodeCount: base.nodes.size, ways: () => base.ways };
+/** CAR and WALK topology of a dataset that does not change, computed once per plan. */
+export interface BaseRoutingStats {
+  car: RoutingTopologyStats;
+  walk: RoutingTopologyStats;
+}
+
+export function baseRoutingStats(base: Osm): BaseRoutingStats {
+  const source = { nodeCount: base.nodes.size, ways: () => base.ways };
+  return {
+    car: routingTopologyStats(source, defaultHighwayFilter),
+    walk: routingTopologyStats(source, walkFilter),
+  };
+}
+
+/** CAR and WALK topology of the base (computed once) and of the planned result. */
+export function planRoutingDiagnostics(baseStats: BaseRoutingStats, overlay: PlanOverlay) {
   const plannedSource = { nodeCount: overlay.nodeCount, ways: () => overlay.ways() };
   return {
-    car: delta(
-      routingTopologyStats(baseSource, defaultHighwayFilter),
-      routingTopologyStats(plannedSource, defaultHighwayFilter),
-    ),
-    walk: delta(
-      routingTopologyStats(baseSource, walkFilter),
-      routingTopologyStats(plannedSource, walkFilter),
-    ),
+    car: delta(baseStats.car, routingTopologyStats(plannedSource, defaultHighwayFilter)),
+    walk: delta(baseStats.walk, routingTopologyStats(plannedSource, walkFilter)),
   };
 }
 

@@ -1307,10 +1307,11 @@ export function applyPlannedConflation(
   discovery: OsmConflationDiscovery,
   decisions: readonly OsmConflationDecision[],
 ) {
-  const before = changeset.overlay.snapshot().reader();
+  const snapshot = changeset.overlay.snapshot();
+  const before = snapshot.reader();
   const trace = applyDiscoveredConflation(changeset, base, planned, discovery, decisions);
   const after = changeset.overlay.reader();
-  assertConflationPreservesBaseTopology(base, before, after);
+  assertConflationPreservesBaseTopology(base, snapshot, changeset.overlay);
   return createConflationOutcomeReport(
     base,
     planned,

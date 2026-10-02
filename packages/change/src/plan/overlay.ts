@@ -8,7 +8,6 @@
  * kept current as records change.
  */
 import type { Osm } from "@osmix/core";
-import { bboxContainsOrIntersects } from "@osmix/geo/bbox-intersects";
 import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type {
   GeoBbox2D,
@@ -208,6 +207,24 @@ export class PlanOverlay {
     delete this.changes(type)[id];
     if (type === "node") this.nodeMoved(id);
     if (type === "way") this.invalidateWayGeometry(id);
+  }
+
+  /** The lowest current node ID, or 0 when there is none below it, without reading nodes. */
+  minNodeId(): number {
+    let minimum = 0;
+    const sorted = this.base.nodes.ids.sorted;
+    for (let index = 0; index < sorted.length; index++) {
+      // Sorted ascending: the first base node not deleted is the lowest.
+      const id = sorted[index]!;
+      if (id >= minimum) break;
+      if (this.nodeChanges[id]?.changeType === "delete") continue;
+      minimum = id;
+      break;
+    }
+    for (const change of Object.values(this.nodeChanges)) {
+      if (change.changeType !== "delete") minimum = Math.min(minimum, change.entity.id);
+    }
+    return minimum;
   }
 
   /** Current nodes: base order first, then created nodes in record order. */
@@ -418,18 +435,22 @@ export class PlanOverlay {
 
   /** Current ways whose bounding box intersects `bbox`, in ID order. */
   waysIntersecting(bbox: GeoBbox2D): OsmWay[] {
+    return this.wayIdsIntersecting(bbox).flatMap((id) => this.getWay(id) ?? []);
+  }
+
+  /**
+   * IDs of current ways whose bounding box intersects `bbox`, in ID order, without reading the
+   * ways. Pending ways are tested against the box the grid keeps current for them.
+   */
+  wayIdsIntersecting(bbox: GeoBbox2D): number[] {
     const geometry = this.pendingGeometry();
-    const ways: OsmWay[] = [];
+    const ids: number[] = [];
     for (const index of this.base.ways.intersects(bbox)) {
       const id = this.base.ways.ids.at(index);
-      if (!geometry.trackedWays.has(id)) ways.push(this.base.ways.getByIndex(index));
+      if (!geometry.trackedWays.has(id)) ids.push(id);
     }
-    for (const id of geometry.ways.query(bbox)) {
-      const way = this.getWay(id);
-      const wayBbox = way ? this.wayBbox(way) : null;
-      if (way && wayBbox && bboxContainsOrIntersects(wayBbox, bbox)) ways.push(way);
-    }
-    return ways.sort((a, b) => a.id - b.id);
+    for (const id of geometry.ways.query(bbox)) ids.push(id);
+    return ids.sort((a, b) => a - b);
   }
 
   private pendingIncidence() {

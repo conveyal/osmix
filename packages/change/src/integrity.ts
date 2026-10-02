@@ -1,6 +1,7 @@
 import type { Osm } from "@osmix/core";
 import type { OsmRelation, OsmWay } from "@osmix/types";
 
+import type { PlanOverlay } from "./plan/overlay.ts";
 import { inputProvenance } from "./provenance.ts";
 import { routingGradeSignature } from "./utils.ts";
 import type { DatasetReader } from "./views.ts";
@@ -311,49 +312,61 @@ export interface ReplacedBaseEntities {
  * Ensure fuzzy conflation did not rewrite geometry or relation topology that already existed in
  * the base. Same-ID patch updates are compared at the ordinary-merge baseline, not the raw base.
  * `replaced` names the only base entities an included way replacement may delete or re-member.
+ *
+ * Both states are overlays of the base, so only entities with a record in either can differ;
+ * those are all that is checked.
  */
 export function assertConflationPreservesBaseTopology(
   originalBase: Osm,
-  ordinaryBaseline: DatasetReader,
-  conflated: DatasetReader,
+  ordinaryBaseline: PlanOverlay,
+  conflated: PlanOverlay,
   replaced?: ReplacedBaseEntities,
 ) {
   const violations: string[] = [];
-  for (const original of originalBase.nodes) {
-    const baseline = ordinaryBaseline.nodes.getById(original.id);
-    const result = conflated.nodes.getById(original.id);
-    if (baseline && !result && replaced?.nodes.has(original.id)) continue;
+  const changed = (type: "node" | "way" | "relation") =>
+    new Set(
+      [...Object.keys(ordinaryBaseline.changes(type)), ...Object.keys(conflated.changes(type))].map(
+        Number,
+      ),
+    );
+  for (const id of changed("node")) {
+    if (!originalBase.nodes.ids.has(id)) continue;
+    const baseline = ordinaryBaseline.getNode(id);
+    const result = conflated.getNode(id);
+    if (baseline && !result && replaced?.nodes.has(id)) continue;
     if (!baseline || !result) {
-      violations.push(`base node ${original.id} was removed`);
+      violations.push(`base node ${id} was removed`);
       continue;
     }
     if (baseline.lon !== result.lon || baseline.lat !== result.lat) {
-      violations.push(`base node ${original.id} coordinates changed`);
+      violations.push(`base node ${id} coordinates changed`);
     }
   }
-  for (const original of originalBase.ways) {
-    const baseline = ordinaryBaseline.ways.getById(original.id);
-    const result = conflated.ways.getById(original.id);
-    if (baseline && !result && replaced?.ways.has(original.id)) continue;
+  for (const id of changed("way")) {
+    if (!originalBase.ways.ids.has(id)) continue;
+    const baseline = ordinaryBaseline.getWay(id);
+    const result = conflated.getWay(id);
+    if (baseline && !result && replaced?.ways.has(id)) continue;
     if (!baseline || !result) {
-      violations.push(`base way ${original.id} was removed`);
+      violations.push(`base way ${id} was removed`);
       continue;
     }
     if (
       baseline.refs.length !== result.refs.length ||
       baseline.refs.some((ref, index) => ref !== result.refs[index])
     ) {
-      violations.push(`base way ${original.id} references changed`);
+      violations.push(`base way ${id} references changed`);
     }
   }
-  for (const original of originalBase.relations) {
-    const baseline = ordinaryBaseline.relations.getById(original.id);
-    const result = conflated.relations.getById(original.id);
+  for (const id of changed("relation")) {
+    if (!originalBase.relations.ids.has(id)) continue;
+    const baseline = ordinaryBaseline.getRelation(id);
+    const result = conflated.getRelation(id);
     if (!baseline || !result) {
-      violations.push(`base relation ${original.id} was removed`);
+      violations.push(`base relation ${id} was removed`);
       continue;
     }
-    if (replaced?.relations.has(original.id)) continue;
+    if (replaced?.relations.has(id)) continue;
     if (
       baseline.members.length !== result.members.length ||
       baseline.members.some((member, index) => {
@@ -366,7 +379,7 @@ export function assertConflationPreservesBaseTopology(
         );
       })
     ) {
-      violations.push(`base relation ${original.id} members changed`);
+      violations.push(`base relation ${id} members changed`);
     }
   }
   if (violations.length === 0) return;

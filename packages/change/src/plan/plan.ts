@@ -35,7 +35,7 @@ import type {
   PlanInputIdentity,
   PlanProposalStatus,
 } from "./types.ts";
-import { planRoutingDiagnostics } from "./validate.ts";
+import { type BaseRoutingStats, baseRoutingStats, planRoutingDiagnostics } from "./validate.ts";
 
 /** The live state behind a plan. Plans are rebuilt from their inputs, never deserialized. */
 interface PlanState {
@@ -49,6 +49,8 @@ interface PlanState {
   /** The changeset as each phase found it, to replan from that phase. */
   checkpoints: Map<PlanPhase, OsmChangesetCheckpoint>;
   matched?: ReturnType<typeof planMatching>;
+  /** The base's routing topology; the base does not change while planning. */
+  baseRouting?: BaseRoutingStats;
   log: (message: string) => void;
   hooks: MergePlanHooks;
 }
@@ -244,7 +246,10 @@ function checkPlan(plan: MergePlan, state: PlanState) {
   const { base, patch, changeset, builder, options, matched } = state;
   state.log("Checking the plan...");
   plan.diagnostics = {
-    routing: planRoutingDiagnostics(base, changeset.overlay),
+    routing: planRoutingDiagnostics(
+      (state.baseRouting ??= baseRoutingStats(base)),
+      changeset.overlay,
+    ),
     integrity: changeset.pendingIntegrityIssues(),
     demoted: matched?.demoted ?? [],
   };
