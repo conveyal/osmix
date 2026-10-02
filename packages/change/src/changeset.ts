@@ -37,6 +37,7 @@ import { refsWouldCollapse } from "./rules/collapse.ts";
 import {
   assessNodeIdentity,
   assessNodeTags,
+  mergeImportedTags,
   canDropReplacedNode,
   mergesTags,
   wayPairJoinable,
@@ -85,6 +86,8 @@ export interface CrossingInsertion {
   point: [number, number];
   /** Two existing vertices that become one: `replaced` is rewritten to `survivor`. */
   merges?: { replaced: number; survivor: number };
+  /** Why the snap needs a person before it applies, such as `grade-change` (MP-X1). */
+  reviewReasons?: string[];
 }
 
 interface IntersectionJunctionReplacement {
@@ -97,6 +100,7 @@ interface IntersectionNodeResolution {
   keepWayNode: boolean;
   replaced: OsmNode;
   survivor: OsmNode;
+  reviewReasons?: string[];
 }
 
 const EMPTY_ID = -1;
@@ -515,10 +519,15 @@ export class OsmChangeset {
 
   private nodeReplacementGroupCompatible(group: readonly number[], waysByNode: WaysByNode) {
     const survivorId = group[0]!;
-    const firstNode = this.getCurrentNode(survivorId);
+    if (!this.getCurrentNode(survivorId)) return false;
+    // Imported values replace the survivor's (MP-X1), so imported sources only need to agree
+    // with each other; within one dataset the survivor's own values must agree too.
+    const imported = group.slice(1).every((id) => this.nodeChanges[id]?.changeType === "create");
+    const agreeing = imported ? group.slice(1) : group;
+    const firstNode = this.getCurrentNode(agreeing[0]!);
     if (!firstNode) return false;
     const tagValues = new Map<string, string | number>();
-    for (const id of group) {
+    for (const id of agreeing) {
       const node = this.getCurrentNode(id);
       if (!node || nodeSignaturesDiffer(firstNode.tags, node.tags)) return false;
       for (const [key, value] of Object.entries(node.tags ?? {})) {
@@ -587,8 +596,23 @@ export class OsmChangeset {
   private reconcileNodeTags(patchNode: OsmNode, baseNodeId: number) {
     const baseNode = this.getCurrentNode(baseNodeId);
     if (!baseNode) return;
-    const mergedNode = withNonConflictingTags(baseNode, patchNode);
+    const mergedNode = this.withMergedTags(baseNode, patchNode);
     if (mergedNode !== baseNode) this.modify("node", baseNodeId, () => mergedNode);
+  }
+
+  /**
+   * The survivor with `source`'s tags merged in. An imported source's values win (MP-X1);
+   * within one dataset only values the survivor lacks are added.
+   */
+  private withMergedTags(survivor: OsmNode, source: OsmNode): OsmNode {
+    if (this.nodeChanges[source.id]?.changeType !== "create") {
+      return withNonConflictingTags(survivor, source);
+    }
+    const tags = mergeImportedTags(survivor.tags, source.tags);
+    const same =
+      Object.keys(tags).length === Object.keys(survivor.tags ?? {}).length &&
+      Object.entries(tags).every(([key, value]) => survivor.tags?.[key] === value);
+    return same ? survivor : { ...survivor, tags };
   }
 
   private deleteReconciledNode(node: OsmNode, survivorId: number) {
@@ -616,9 +640,10 @@ export class OsmChangeset {
 
   /**
    * @internal The safe exact node replacements for `nodes` (source ID to survivor ID), without
-   * recording them. Any subset of the result is also safe to apply.
+   * recording them. Any subset of the result is also safe to apply. `reviewReasons` receives,
+   * by source ID, why a replacement needs a person first (`grade-change`, MP-X1).
    */
-  planNodeReplacements(nodes: Nodes): ReplacementMap {
+  planNodeReplacements(nodes: Nodes, reviewReasons?: Map<number, string[]>): ReplacementMap {
     const sameDataset = nodes === this.osm.nodes;
     let replacementMap: ReplacementMap = new Map();
     const exactCandidates: NodeCandidate[] = [];
@@ -647,6 +672,15 @@ export class OsmChangeset {
               sourceIsImported: !sameDataset,
             }).hardReasons.length === 0,
         );
+      if (reviewReasons && candidateNodes.length === 1) {
+        const { reviewReasons: reasons } = assessNodeTags(
+          "exact",
+          currentPatchNode.tags,
+          candidateNodes[0]!.tags,
+          { sourceIsImported: !sameDataset },
+        );
+        if (reasons.length > 0) reviewReasons.set(currentPatchNode.id, reasons);
+      }
 
       if (candidateNodes.length === 0) continue;
       exactCandidates.push({ baseNodes: candidateNodes, patchNode: currentPatchNode });
@@ -836,13 +870,13 @@ export class OsmChangeset {
       ? [wayNode, intersectingWayNode]
       : [intersectingWayNode, wayNode];
     const oneImported = imported(wayNode.id) !== imported(intersectingWayNode.id);
-    if (
-      assessNodeTags("crossing", importedNode.tags, existingNode.tags, {
-        sourceIsImported: oneImported,
-      }).hardReasons.length
-    ) {
-      return null;
-    }
+    const tagAssessment = assessNodeTags("crossing", importedNode.tags, existingNode.tags, {
+      sourceIsImported: oneImported,
+    });
+    if (tagAssessment.hardReasons.length) return null;
+    const reviewReasons = tagAssessment.reviewReasons.length
+      ? { reviewReasons: [...tagAssessment.reviewReasons] }
+      : {};
     // Never merge two base nodes: that would remove a base node from base ways.
     if (
       patchNodeIds &&
@@ -855,8 +889,8 @@ export class OsmChangeset {
     if (patchNodeIds && patchNodeIds.has(wayNode.id) !== patchNodeIds.has(intersectingWayNode.id)) {
       const keepWayNode = !patchNodeIds.has(wayNode.id);
       return keepWayNode
-        ? { keepWayNode, replaced: intersectingWayNode, survivor: wayNode }
-        : { keepWayNode, replaced: wayNode, survivor: intersectingWayNode };
+        ? { keepWayNode, replaced: intersectingWayNode, survivor: wayNode, ...reviewReasons }
+        : { keepWayNode, replaced: wayNode, survivor: intersectingWayNode, ...reviewReasons };
     }
 
     const wayRoutingTags = nodeRoutingTagCount(wayNode);
@@ -874,7 +908,7 @@ export class OsmChangeset {
 
     const survivor = keepWayNode ? wayNode : intersectingWayNode;
     const replaced = keepWayNode ? intersectingWayNode : wayNode;
-    return { keepWayNode, replaced, survivor };
+    return { keepWayNode, replaced, survivor, ...reviewReasons };
   }
 
   /**
@@ -924,7 +958,7 @@ export class OsmChangeset {
   }
 
   private mergeNodeTags(survivor: OsmNode, replaced: OsmNode) {
-    const merged = withNonConflictingTags(survivor, replaced);
+    const merged = this.withMergedTags(survivor, replaced);
     if (merged !== survivor) this.modify("node", survivor.id, () => merged);
     return merged;
   }
@@ -1395,10 +1429,14 @@ export class OsmChangeset {
                   replaced: endpointResolution.replaced.id,
                   survivor: endpointResolution.survivor.id,
                 },
+                ...(endpointResolution.reviewReasons
+                  ? { reviewReasons: endpointResolution.reviewReasons }
+                  : {}),
               }
             : {}),
         };
-        if (accept && !accept(insertion)) continue;
+        // Without a plan to review it in, a snap that needs a person does not happen.
+        if (accept ? !accept(insertion) : insertion.reviewReasons?.length) continue;
 
         intersectionsFound++;
 

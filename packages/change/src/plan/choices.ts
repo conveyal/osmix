@@ -17,8 +17,8 @@ import type { MergePlan, PlanDecision, PlanProposal } from "./types.ts";
  * Why a feature waits, most in need of a person first. A feature is in the group of its most
  * pressing waiting proposal:
  * - `removal`: removing an imported way (MP-R1).
- * - `individual`: the drivable network, travel restrictions, relations, a tagged point's context
- *   or protected tags.
+ * - `individual`: a change of grade, the drivable network, travel restrictions, relations, a
+ *   tagged point's context or protected tags.
  * - `bend`: a connection that bends more than 30°.
  * - `tie`: a choice no candidate can settle: none wins by a clear margin, or the one that does
  *   bends sharply or needs a closer look itself.
@@ -41,6 +41,7 @@ export type PlanChoiceGroup = (typeof PLAN_CHOICE_GROUPS)[number];
 const INDIVIDUAL_REASONS = new Set([
   "drivable-network",
   "routing-family-conflict",
+  "grade-change",
   "relation-member",
   "node-context-conflict",
   "protected-tag",

@@ -104,22 +104,23 @@ describe("merge osm", () => {
       // Existing crossing values are retained, avoiding 68 crossing-only updates, and a
       // junction where either way ends is not tagged as a crossing.
       // Candidate ways are visited in ID order, so these counts do not depend on the
-      // spatial index's layout.
+      // spatial index's layout. Imported endpoints with routing tags (such as a gate) snap to
+      // base junctions too, taking their tags (MP-X1).
       expect(changeset.stats).toEqual({
         osmId: baseOsm.id,
-        totalChanges: 6_732,
-        nodeChanges: 3_073,
-        wayChanges: 3_659,
+        totalChanges: 6_745,
+        nodeChanges: 3_082,
+        wayChanges: 3_663,
         relationChanges: 0,
-        createChanges: 2_602,
-        modifyChanges: 3_990,
-        deleteChanges: 140,
+        createChanges: 2_600,
+        modifyChanges: 3_999,
+        deleteChanges: 146,
         deduplicatedNodes: 0,
         deduplicatedNodesReplaced: 0,
         deduplicatedWays: 0,
-        intersectionPointsFound: 3_083,
-        intersectionNodesCreated: 2_602,
-        intersectionNodesRemoved: 140,
+        intersectionPointsFound: 3_089,
+        intersectionNodesCreated: 2_600,
+        intersectionNodesRemoved: 146,
       });
 
       baseOsm = applyChangesetToOsm(changeset);

@@ -222,9 +222,9 @@ describe("intersection geometry integrity", () => {
     expect(referenced.changeset.stats.intersectionNodesRemoved).toBe(0);
   });
 
-  // A crossing snap must not change routing on existing ways: an imported gate endpoint does not
-  // merge into an ungated base junction (the same rule keeps exact scenario X5 separate).
-  it("keeps an imported gate endpoint off an ungated base junction", () => {
+  // An imported point's values win a crossing snap (MP-X1): an imported gate endpoint joins an
+  // ungated base junction and brings its gate.
+  it("joins an imported gate endpoint to an ungated base junction, adding its gate", () => {
     const osm = new Osm({ id: "shared-base-endpoint" });
     for (const node of [
       { id: 1, lon: -1, lat: 0 },
@@ -253,8 +253,8 @@ describe("intersection geometry integrity", () => {
     const result = applyChangesetToOsm(changeset);
     expect(result.ways.getById(10)?.refs).toEqual([1, 2]);
     expect(result.ways.getById(11)?.refs).toEqual([2, 3]);
-    expect(result.ways.getById(20)?.refs).toEqual([5, 6]);
-    expect(result.nodes.getById(2)?.tags).toBeUndefined();
+    expect(result.ways.getById(20)?.refs).toEqual([2, 6]);
+    expect(result.nodes.getById(2)?.tags).toEqual({ barrier: "gate" });
   });
 
   it("never merges two base nodes at a crossing", () => {

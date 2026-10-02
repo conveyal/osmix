@@ -152,6 +152,38 @@ function importedDuplicate() {
 }
 
 describe("identity proposals", () => {
+  it("lets imported values win an identical-point merge, and waits on a grade change", () => {
+    const base = dataset("base", [{ id: 1, lon: 0, lat: 0, tags: { kerb: "raised" } }]);
+    const kerb = dataset("patch", [
+      { id: -1, lon: 0, lat: 0, tags: { kerb: "lowered", barrier: "kerb" } },
+    ]);
+    const merged = planMerge(base, kerb, {}, quiet);
+    expect(merged.proposals.get("exact:n-1>n1")).toMatchObject({ status: "automatic" });
+    expect(applyPlan(merged).osm.nodes.getById(1)?.tags).toEqual({
+      kerb: "lowered",
+      barrier: "kerb",
+    });
+
+    const upstairs = dataset("patch", [{ id: -1, lon: 0, lat: 0, tags: { level: "1" } }]);
+    const waiting = planMerge(base, upstairs, {}, quiet);
+    expect(waiting.proposals.get("exact:n-1>n1")).toMatchObject({
+      status: "review",
+      reasons: ["grade-change"],
+      effect: "needs-decision",
+    });
+    expect(applyPlan(waiting).osm.nodes.getById(1)?.tags).toEqual({ kerb: "raised" });
+    const accepted = planMerge(
+      base,
+      upstairs,
+      { decisions: [{ proposalId: "exact:n-1>n1", action: "accept" }] },
+      quiet,
+    );
+    expect(applyPlan(accepted).osm.nodes.getById(1)?.tags).toEqual({
+      kerb: "raised",
+      level: "1",
+    });
+  });
+
   it("merges identical points and the way they make identical automatically", () => {
     const plan = planMerge(baseRoad(), importedDuplicate(), {}, quiet);
     expect([...plan.proposals.values()].map(({ id, effect }) => [id, effect])).toEqual([
@@ -267,6 +299,40 @@ describe("crossing proposals", () => {
     expect(osm.ways.getById(10)?.refs).toEqual([1, 2]);
     expect(osm.ways.getById(-1)?.refs).toEqual([-1, -2]);
   });
+  it("snaps a crossing that changes grade only after a decision, under one proposal", () => {
+    const base = dataset(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 3, lon: 0.0005, lat: 0 },
+        { id: 2, lon: 0.001, lat: 0 },
+      ],
+      [{ id: 10, refs: [1, 3, 2], tags: { highway: "footway" } }],
+    );
+    // The imported vertex sits on the base way, so both segments beside it report the crossing,
+    // just either side of zero latitude.
+    const patch = dataset(
+      "patch",
+      [
+        { id: -1, lon: 0.0005, lat: -0.001 },
+        { id: -2, lon: 0.0005, lat: 0.000002, tags: { level: "1" } },
+        { id: -3, lon: 0.0005, lat: 0.001 },
+      ],
+      [{ id: -1, refs: [-1, -2, -3], tags: { highway: "footway" } }],
+    );
+    const plan = planMerge(base, patch, {}, quiet);
+    const snaps = [...plan.proposals.values()].filter(({ kind }) => kind === "crossing-snap");
+    expect(snaps).toEqual([
+      expect.objectContaining({
+        id: "xsnap:w-1|w10@0.0005000,0.0000000",
+        status: "review",
+        reasons: ["grade-change"],
+        effect: "needs-decision",
+      }),
+    ]);
+    expect(applyPlan(plan).osm.ways.getById(-1)?.refs).toEqual([-1, -2, -3]);
+  });
+
   it("proposes one crossing where a base way passes through an imported vertex", () => {
     // From the eastern Washington sidewalk import: the base footway passes within 1e-7° of
     // imported vertex 3864880, so both imported segments beside it report the same crossing.

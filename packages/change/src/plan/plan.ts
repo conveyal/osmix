@@ -262,7 +262,8 @@ function planIdentity(
   status: PlanProposalStatus,
 ) {
   const accepted = new Map<number, number>();
-  for (const [sourceId, targetId] of changeset.planNodeReplacements(planned.nodes)) {
+  const review = new Map<number, string[]>();
+  for (const [sourceId, targetId] of changeset.planNodeReplacements(planned.nodes, review)) {
     const feature = builder.featureOfNode(sourceId);
     if (!feature) throw Error(`Exact match source ${sourceId} is not an imported point`);
     const proposal = builder.propose({
@@ -271,8 +272,9 @@ function planIdentity(
       feature: feature.key,
       source: { type: "node", id: sourceId },
       target: { type: "node", id: targetId },
-      status,
-      reasons: [],
+      // A merge that changes the base point's grade always waits for a person (MP-X1).
+      status: review.has(sourceId) ? "review" : status,
+      reasons: review.get(sourceId) ?? [],
     });
     if (proposal.effect === "applied") accepted.set(sourceId, targetId);
   }
@@ -313,7 +315,7 @@ function planCrossings(
     if (crossing.merges && exactMergeProposed(builder, planned, crossing.merges)) return false;
     const feature = builder.featureOfWay(crossing.wayId);
     if (!feature) throw Error(`Crossing way ${crossing.wayId} is not an imported way`);
-    const point = crossing.point.map((value) => value.toFixed(7)).join(",");
+    const point = crossing.point.map(coordinateToken).join(",");
     const kind = crossing.kind === "snap" ? "crossing-snap" : "crossing-node";
     const id = `${crossing.kind === "snap" ? "xsnap" : "xnode"}:${wayToken(crossing.wayId)}|${wayToken(crossing.otherWayId)}@${point}`;
     // A way passing through an imported vertex crosses both segments beside it at one point:
@@ -328,8 +330,9 @@ function planCrossings(
         { type: "way", id: crossing.otherWayId },
       ],
       point: crossing.point,
-      status: "automatic",
-      reasons: [],
+      // A snap that changes the base point's grade always waits for a person (MP-X1).
+      status: crossing.reviewReasons?.length ? "review" : "automatic",
+      reasons: crossing.reviewReasons ?? [],
     });
     return proposal.effect === "applied";
   };
@@ -342,6 +345,12 @@ function planCrossings(
     logEverySecond();
   }
   if (checked > 0) log(progress());
+}
+
+/** A coordinate at stored precision, with a value that rounds to zero written as `0`. */
+function coordinateToken(value: number) {
+  const rounded = Math.round(value * 1e7) / 1e7;
+  return (rounded === 0 ? 0 : rounded).toFixed(7);
 }
 
 function exactMergeProposed(

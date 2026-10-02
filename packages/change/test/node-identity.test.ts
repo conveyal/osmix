@@ -92,12 +92,12 @@ describe("exact reconciliation uses the rulebook", () => {
     expect(result.nodes.ids.has(101)).toBe(false);
   });
 
-  it("keeps an imported point separate when it would add an access tag", async () => {
+  it("adds an imported point's access tag to the base point it merges into", async () => {
     const base = dataset("base", [{ id: 1, lon: 0, lat: 0 }]);
     const patch = dataset("patch", [{ id: 101, lon: 0, lat: 0, tags: { wheelchair: "yes" } }]);
     const result = await exactMerge(base, patch);
-    expect(result.nodes.ids.has(101)).toBe(true);
-    expect(result.nodes.getById(1)?.tags).toBeUndefined();
+    expect(result.nodes.ids.has(101)).toBe(false);
+    expect(result.nodes.getById(1)?.tags).toEqual({ wheelchair: "yes" });
   });
 
   it("joins a footway into a junction that also has a private road", async () => {

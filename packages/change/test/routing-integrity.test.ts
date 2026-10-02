@@ -77,7 +77,7 @@ describe("routing-safe merge reconciliation", () => {
     expect(result.ways.getById(21)?.refs).toEqual([102, 103]);
   });
 
-  it("rejects conflicting node tags and preserves non-conflicting descriptive tags", async () => {
+  it("lets imported node values win a conflict and keeps descriptive tags", async () => {
     const base = createOsm(
       "base",
       [
@@ -102,8 +102,10 @@ describe("routing-safe merge reconciliation", () => {
 
     const result = await merge(base, patch, { createIntersections: false }, silent);
 
-    expect(result.nodes.ids.has(101)).toBe(true);
-    expect(result.ways.getById(20)?.refs).toEqual([101, 103]);
+    // The base ID survives with the imported value (MP-X1).
+    expect(result.nodes.ids.has(101)).toBe(false);
+    expect(result.nodes.getById(1)?.tags).toEqual({ amenity: "school" });
+    expect(result.ways.getById(20)?.refs).toEqual([1, 103]);
     expect(result.nodes.ids.has(102)).toBe(false);
     expect(result.nodes.getById(3)?.tags).toEqual({ name: "Patch endpoint" });
     expect(result.ways.getById(21)?.refs).toEqual([3, 103]);

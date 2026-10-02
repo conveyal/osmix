@@ -22,6 +22,7 @@ import { hasAnyTagConflict } from "./tags.ts";
 export type NodeIdentityKind = "exact" | "connect" | "crossing";
 
 export type NodeIdentityReason =
+  | "grade-change"
   | "grade-conflict"
   | "node-context-conflict"
   | "routing-family-conflict"
@@ -38,6 +39,11 @@ export interface NodeIdentityAssessment {
 }
 
 const GRADE_KEYS = ["layer", "level", "bridge", "tunnel", "covered"] as const;
+
+/** The survivor's tags after merging an imported point into it: the imported values win. */
+export function mergeImportedTags(survivor: OsmTags | undefined, imported: OsmTags | undefined) {
+  return { ...survivor, ...imported };
+}
 
 /** Whether the survivor absorbs the source's tags for this kind of identity. */
 export function mergesTags(kind: NodeIdentityKind) {
@@ -57,11 +63,12 @@ export function wayPairJoinable(a: OsmWay, b: OsmWay) {
 }
 
 /**
- * Node-level checks. Kinds that merge tags must not change routing on the survivor's existing
- * ways: with `sourceIsImported`, the survivor's grade, access and barrier signatures must be the
- * same after the merge (the imported point may not add a gate, but may join at one); within one
- * dataset both sides are existing data, so the signatures must be equal. A connection keeps the
- * source's tags behind, so its node routing controls must match exactly.
+ * Node-level checks. When a kind that merges tags merges an imported point into existing data,
+ * the imported values win: they replace conflicting values and may add access and barrier tags.
+ * Only a change to the survivor's grade needs a person (`grade-change`, a review reason). Within
+ * one dataset both sides are existing data, so their tags must agree and their signatures be
+ * equal. A connection keeps the source's tags behind, so its node routing controls must match
+ * exactly.
  */
 export function assessNodeTags(
   kind: NodeIdentityKind,
@@ -72,16 +79,22 @@ export function assessNodeTags(
   const hardReasons: NodeIdentityReason[] = [];
   const reviewReasons: NodeIdentityReason[] = [];
   if (mergesTags(kind)) {
-    // Merging tags must not silently pick one of two values.
+    if (options.sourceIsImported) {
+      if (
+        routingGradeSignature(mergeImportedTags(target, source)) !== routingGradeSignature(target)
+      ) {
+        reviewReasons.push("grade-change");
+      }
+      return { hardReasons, reviewReasons };
+    }
+    // Within one dataset, merging must not silently pick one of two existing values.
     if (hasAnyTagConflict(source, target)) hardReasons.push("tag-conflict");
-    const merged = { ...source, ...target };
-    const after = options.sourceIsImported ? merged : source;
-    if (routingGradeSignature(after) !== routingGradeSignature(target)) {
+    if (routingGradeSignature(source) !== routingGradeSignature(target)) {
       hardReasons.push("grade-conflict");
     }
     if (
-      accessSignature(after) !== accessSignature(target) ||
-      barrierSignature(after) !== barrierSignature(target)
+      accessSignature(source) !== accessSignature(target) ||
+      barrierSignature(source) !== barrierSignature(target)
     ) {
       hardReasons.push("routing-family-conflict");
     }

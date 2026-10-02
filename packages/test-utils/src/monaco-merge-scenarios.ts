@@ -264,7 +264,7 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
   {
     id: "X2",
     stage: "exact",
-    description: "A Point exactly on a marked crossing, calling it uncontrolled, is kept",
+    description: "A Point exactly on a marked crossing, calling it uncontrolled, sets that value",
     features: [
       {
         id: id(6, 1),
@@ -272,7 +272,14 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
         tags: { highway: "crossing", crossing: "uncontrolled" },
       },
     ],
-    stages: [{ kind: "node-kept", feature: id(6, 1) }],
+    stages: [
+      {
+        kind: "node-reconciled",
+        feature: id(6, 1),
+        baseNode: 21918589,
+        mergedTags: { highway: "crossing", crossing: "uncontrolled" },
+      },
+    ],
     candidates: [],
   },
   {
@@ -313,7 +320,7 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
   {
     id: "X5",
     stage: "exact",
-    description: "A gate exactly on an ungated footway node is kept (access differs)",
+    description: "A gate exactly on an ungated footway node becomes that node, adding the gate",
     features: [
       {
         id: id(9, 1),
@@ -321,7 +328,14 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
         tags: { barrier: "gate" },
       },
     ],
-    stages: [{ kind: "node-kept", feature: id(9, 1) }],
+    stages: [
+      {
+        kind: "node-reconciled",
+        feature: id(9, 1),
+        baseNode: 1690205051,
+        mergedTags: { barrier: "gate" },
+      },
+    ],
     candidates: [],
   },
 

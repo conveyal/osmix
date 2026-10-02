@@ -68,6 +68,7 @@ export type OsmConflationReasonCode =
   | "exact-match"
   | "feature-type-conflict"
   | "geometry-mismatch"
+  | "grade-change"
   | "grade-conflict"
   | "length-mismatch"
   | "many-to-one"

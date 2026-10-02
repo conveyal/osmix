@@ -112,6 +112,7 @@ const REASON_LABEL: Record<string, string> = {
   "length-mismatch": "Lengths differ",
   "many-to-one": "Multiple imported features share one base target",
   "merged-into-base": "Merged into a base feature instead",
+  "grade-change": "Would change the base point's level or layer",
   "multiple-targets": "Multiple possible base targets",
   "no-transferable-properties": "No selected tags differ",
   "node-context-conflict": "Connected paths have incompatible context",
@@ -273,7 +274,8 @@ export const CHOICE_GROUP_LABEL: Record<PlanChoiceGroup, string> = {
 export const CHOICE_GROUP_HELP: Record<PlanChoiceGroup, string> = {
   removal: "Removing an imported way needs its own Include on its row.",
   individual:
-    "They change the drivable network, travel restrictions, a relation or a tagged point. " +
+    "They change a point's grade (layer or level), the drivable network, travel restrictions, " +
+    "a relation or a tagged point. " +
     "Decide each on its row.",
   bend:
     "The imported line would bend more than 30° to connect. Spot-check a few on the map, then " +
