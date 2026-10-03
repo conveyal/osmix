@@ -97,6 +97,7 @@ export function generateOscChanges(changeset: OsmChangeRecords, options: Partial
   let del = "";
 
   for (const node of Object.values(changeset.nodeChanges)) {
+    if (!node) continue;
     if (node.changeType === "create") {
       create += nodeToXml(node.entity);
     } else if (node.changeType === "modify") {
@@ -115,6 +116,7 @@ export function generateOscChanges(changeset: OsmChangeRecords, options: Partial
   }
 
   for (const way of Object.values(changeset.wayChanges)) {
+    if (!way) continue;
     if (way.changeType === "create") {
       create += wayToXml(way.entity);
     } else if (way.changeType === "modify") {
@@ -133,6 +135,7 @@ export function generateOscChanges(changeset: OsmChangeRecords, options: Partial
   }
 
   for (const relation of Object.values(changeset.relationChanges)) {
+    if (!relation) continue;
     if (relation.changeType === "create") {
       create += relationToXml(relation.entity);
     } else if (relation.changeType === "modify") {

@@ -21,7 +21,7 @@ import type {
 import { automateMatching } from "./automation.ts";
 import { entityToken, type PlanBuilder } from "./builder.ts";
 import { findDecisionConflict } from "./decision-conflict.ts";
-import type { PlanOverlay } from "./overlay.ts";
+import type { EarlierState } from "./overlay.ts";
 import { discoverWayReplacements, type WayReplacementDiscovery } from "./replacement.ts";
 import {
   applyWayReplacements,
@@ -64,8 +64,8 @@ export function planMatching(
   planned: Osm,
   options: NonNullable<MergePlanOptions["matching"]>,
   automation: MergePlanAutomation,
-  /** The planned state as matching starts, read-only; matching reports against it. */
-  start: PlanOverlay,
+  /** The planned state as matching starts, read by ID; matching reports against it. */
+  start: EarlierState,
   /** Discovery from an earlier run on the same state, reused when only decisions changed. */
   cached?: {
     discovery: OsmConflationDiscovery;

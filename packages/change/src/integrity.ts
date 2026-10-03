@@ -1,7 +1,7 @@
 import type { Osm } from "@osmix/core";
 import type { OsmRelation, OsmWay } from "@osmix/types";
 
-import type { PlanOverlay } from "./plan/overlay.ts";
+import type { EarlierState, PlanOverlay } from "./plan/overlay.ts";
 import { inputProvenance } from "./provenance.ts";
 import { routingGradeSignature } from "./utils.ts";
 import type { DatasetReader } from "./views.ts";
@@ -461,17 +461,12 @@ export interface ReplacedBaseEntities {
  */
 export function assertConflationPreservesBaseTopology(
   originalBase: Osm,
-  ordinaryBaseline: PlanOverlay,
+  ordinaryBaseline: EarlierState,
   conflated: PlanOverlay,
   replaced?: ReplacedBaseEntities,
 ) {
   const violations: string[] = [];
-  const changed = (type: "node" | "way" | "relation") =>
-    new Set(
-      [...Object.keys(ordinaryBaseline.changes(type)), ...Object.keys(conflated.changes(type))].map(
-        Number,
-      ),
-    );
+  const changed = (type: "node" | "way" | "relation") => ordinaryBaseline.changedIds(type);
   for (const id of changed("node")) {
     if (!originalBase.nodes.ids.has(id)) continue;
     const baseline = ordinaryBaseline.getNode(id);

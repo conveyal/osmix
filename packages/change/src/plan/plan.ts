@@ -26,7 +26,6 @@ import {
 import { pickNearestDecisions, type PlanChoices, planChoices } from "./choices.ts";
 import { findDecisionConflict } from "./decision-conflict.ts";
 import { planMatching } from "./matching.ts";
-import type { PlanOverlay } from "./overlay.ts";
 import { type PatchIdRemap, planPatchIdRemap, remappedCount, remapPatch } from "./remap.ts";
 import type {
   MergePlan,
@@ -196,7 +195,10 @@ function runPhases(plan: MergePlan, state: PlanState, from: PlanPhase, restored 
   const runs = (phase: PlanPhase) => PLAN_PHASES.indexOf(phase) >= PLAN_PHASES.indexOf(from);
   const phase = (name: PlanPhase, run: () => void) => {
     if (!runs(name)) return;
-    if (!(restored && name === from)) state.checkpoints.set(name, changeset.checkpoint());
+    // The direct phase never reruns, so its writes need no journal: the first mark follows it.
+    if (name !== "direct" && !(restored && name === from)) {
+      state.checkpoints.set(name, changeset.checkpoint());
+    }
     if (hooks.phase) hooks.phase(name, run, () => changeset.stats);
     else run();
   };
@@ -237,13 +239,7 @@ function runPhases(plan: MergePlan, state: PlanState, from: PlanPhase, restored 
   phase("crossings", () => {
     if (options.createIntersections) {
       log(`Creating intersections from ${patch.id}...`);
-      planCrossings(
-        builder,
-        changeset,
-        patch,
-        log,
-        changeset.checkpointState(state.checkpoints.get("crossings")!),
-      );
+      planCrossings(builder, changeset, patch, log);
     }
   });
   finishPlan(plan, state);
@@ -343,8 +339,6 @@ function planCrossings(
   changeset: OsmChangeset,
   planned: Osm,
   log: (message: string) => void,
-  /** The planned state as crossings start, read-only. */
-  start: PlanOverlay,
 ) {
   const wayToken = (id: number) =>
     planned.ways.ids.has(id) ? builder.originalToken("way", id) : entityToken("way", id);
@@ -379,12 +373,8 @@ function planCrossings(
   const progress = () =>
     `Intersection creation progress: ${checked.toLocaleString()} of ${planned.ways.size.toLocaleString()} ways checked`;
   const logEverySecond = throttle(() => log(progress()), 1_000);
-  for (const _ of changeset.createPlannedIntersections(
-    planned.ways,
-    planned.nodes.ids,
-    accept,
-    start,
-  )) {
+  // Crossings read their starting state while they write: the one copy a replan takes.
+  for (const _ of changeset.createPlannedIntersections(planned.ways, planned.nodes.ids, accept)) {
     checked++;
     logEverySecond();
   }

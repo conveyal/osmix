@@ -43,10 +43,11 @@ export type OsmChange<T extends OsmEntity = OsmEntity> = {
 };
 
 /** Pending changes by entity type, keyed by entity ID. An `OsmChangeset` is one. */
+/** Change records by ID; `undefined` marks a dropped record, read as no change. */
 export interface OsmChangeRecords {
-  nodeChanges: Record<number, OsmChange<OsmEntityTypeMap["node"]>>;
-  wayChanges: Record<number, OsmChange<OsmEntityTypeMap["way"]>>;
-  relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>;
+  nodeChanges: Record<number, OsmChange<OsmEntityTypeMap["node"]> | undefined>;
+  wayChanges: Record<number, OsmChange<OsmEntityTypeMap["way"]> | undefined>;
+  relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]> | undefined>;
 }
 
 /** Entity kinds supported by fuzzy conflation. */

@@ -32,7 +32,12 @@ import {
   routingIntegrityIssueKeys,
 } from "./integrity.ts";
 import { CrossingCache } from "./plan/crossing-cache.ts";
-import { PlanOverlay } from "./plan/overlay.ts";
+import {
+  type ChangeRecords,
+  type EarlierState,
+  type OverlayMark,
+  PlanOverlay,
+} from "./plan/overlay.ts";
 import { accessSignature, barrierSignature, NODE_ROUTING_CRITICAL_TAGS } from "./rules/access.ts";
 import { refsWouldCollapse } from "./rules/collapse.ts";
 import {
@@ -236,14 +241,13 @@ function flattenReplacementMap(replacementMap: ReplacementMap) {
   return flattenedMap;
 }
 
-/** @internal A copy of a changeset's records and counters. */
+/** @internal A mark in a changeset's journal, and its counters then. */
 export interface OsmChangesetCheckpoint {
-  nodes: Record<number, OsmChange<OsmEntityTypeMap["node"]>>;
-  ways: Record<number, OsmChange<OsmEntityTypeMap["way"]>>;
-  relations: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>;
+  mark: OverlayMark;
   counters: Pick<
     OsmChangeset,
     | "currentNodeId"
+    | "nodeIdStep"
     | "deduplicatedNodes"
     | "deduplicatedNodesReplaced"
     | "deduplicatedWays"
@@ -289,24 +293,12 @@ export class OsmChangeset {
     return this.overlay.nodeChanges;
   }
 
-  set nodeChanges(records: Record<number, OsmChange<OsmEntityTypeMap["node"]>>) {
-    this.overlay.setRecords("node", records);
-  }
-
   get wayChanges() {
     return this.overlay.wayChanges;
   }
 
-  set wayChanges(records: Record<number, OsmChange<OsmEntityTypeMap["way"]>>) {
-    this.overlay.setRecords("way", records);
-  }
-
   get relationChanges() {
     return this.overlay.relationChanges;
-  }
-
-  set relationChanges(records: Record<number, OsmChange<OsmEntityTypeMap["relation"]>>) {
-    this.overlay.setRecords("relation", records);
   }
 
   /** @internal Throw when `result` has routing-integrity problems the inputs did not. */
@@ -314,14 +306,16 @@ export class OsmChangeset {
     assertNoNewRoutingIntegrityIssues(this.routingIntegrityBaselineKeys, result);
   }
 
-  /** @internal Everything a plan phase can change, to return to before rerunning it. */
+  /**
+   * @internal Mark everything a plan phase can change, to return to before rerunning it. Writes
+   * after the first checkpoint are journaled; nothing is copied.
+   */
   checkpoint(): OsmChangesetCheckpoint {
     return {
-      nodes: { ...this.nodeChanges },
-      ways: { ...this.wayChanges },
-      relations: { ...this.relationChanges },
+      mark: this.overlay.mark(),
       counters: {
         currentNodeId: this.currentNodeId,
+        nodeIdStep: this.nodeIdStep,
         deduplicatedNodes: this.deduplicatedNodes,
         deduplicatedNodesReplaced: this.deduplicatedNodesReplaced,
         deduplicatedWays: this.deduplicatedWays,
@@ -332,16 +326,14 @@ export class OsmChangeset {
     };
   }
 
-  /** @internal The planned state at a checkpoint, read-only, sharing its records. */
-  checkpointState(checkpoint: OsmChangesetCheckpoint): PlanOverlay {
-    return PlanOverlay.frozen(this.osm, checkpoint);
+  /** @internal The planned state at a checkpoint, read by ID while later writes continue. */
+  checkpointState(checkpoint: OsmChangesetCheckpoint): EarlierState {
+    return this.overlay.stateAt(checkpoint.mark);
   }
 
   /** @internal Return to a checkpoint. The checkpoint stays valid for another restore. */
   restore(checkpoint: OsmChangesetCheckpoint) {
-    this.nodeChanges = { ...checkpoint.nodes };
-    this.wayChanges = { ...checkpoint.ways };
-    this.relationChanges = { ...checkpoint.relations };
+    this.overlay.undoTo(checkpoint.mark);
     Object.assign(this, checkpoint.counters);
   }
 
@@ -362,10 +354,14 @@ export class OsmChangeset {
 
   get stats(): OsmChangesetStats {
     const byType = { create: 0, modify: 0, delete: 0 };
-    const count = (changes: Record<number, OsmChange>) => {
-      const values = Object.values(changes);
-      for (const change of values) byType[change.changeType]++;
-      return values.length;
+    const count = (changes: Record<number, OsmChange | undefined>) => {
+      let records = 0;
+      for (const change of Object.values(changes)) {
+        if (!change) continue;
+        byType[change.changeType]++;
+        records++;
+      }
+      return records;
     };
     const nodeChanges = count(this.nodeChanges);
     const wayChanges = count(this.wayChanges);
@@ -388,12 +384,12 @@ export class OsmChangeset {
     };
   }
 
-  changes<T extends OsmEntityType>(type: T): Record<number, OsmChange<OsmEntityTypeMap[T]>> {
+  changes<T extends OsmEntityType>(type: T): ChangeRecords<T> {
     return this.overlay.changes(type);
   }
 
   /** 1 allocates above every node (staged changesets); -1 allocates below (plans). */
-  private nodeIdStep: 1 | -1 = 1;
+  nodeIdStep: 1 | -1 = 1;
 
   nextNodeId() {
     if (!Number.isSafeInteger(this.currentNodeId)) {

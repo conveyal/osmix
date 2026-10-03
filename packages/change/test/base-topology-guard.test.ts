@@ -2,7 +2,7 @@ import { Osm } from "@osmix/core";
 import { describe, expect, it } from "vitest";
 
 import { assertConflationPreservesBaseTopology } from "../src/integrity.ts";
-import { PlanOverlay } from "../src/plan/overlay.ts";
+import { PlanOverlay, snapshotState } from "../src/plan/overlay.ts";
 
 function base() {
   const osm = new Osm({ id: "base" });
@@ -24,7 +24,7 @@ describe("base topology guard (MP-I2)", () => {
   it("allows tag changes and rejects geometry, removal and membership changes", () => {
     const osm = base();
     const after = new PlanOverlay(osm);
-    const before = after.snapshot();
+    const before = after.stateAt(after.mark());
     after.modify("way", 10, (way) => ({ ...way, tags: { highway: "footway", name: "Main" } }));
     expect(() => assertConflationPreservesBaseTopology(osm, before, after)).not.toThrow();
 
@@ -38,8 +38,9 @@ describe("base topology guard (MP-I2)", () => {
 
   it("allows only the deletions and relation edits an included replacement names", () => {
     const osm = base();
+    // A copied state works as the earlier state too.
     const after = new PlanOverlay(osm);
-    const before = after.snapshot();
+    const before = snapshotState(after.snapshot(), after);
     after.delete(osm.ways.getById(10)!);
     after.delete(osm.nodes.getById(2)!);
     after.modify("relation", 50, (relation) => ({ ...relation, members: [] }));

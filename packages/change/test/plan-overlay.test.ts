@@ -108,7 +108,7 @@ function* currentNodes(overlay: PlanOverlay): Generator<OsmNode> {
     if (current) yield current;
   }
   for (const change of Object.values(overlay.nodeChanges)) {
-    if (change.changeType === "create") yield change.entity;
+    if (change?.changeType === "create") yield change.entity;
   }
 }
 

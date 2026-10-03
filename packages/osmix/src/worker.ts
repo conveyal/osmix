@@ -852,21 +852,21 @@ export class OsmixWorker extends EventTarget {
     const filteredChanges: OsmChange[] = [];
     if (this.entityTypes.includes("node")) {
       for (const change of Object.values(changeset.nodeChanges)) {
-        if (this.changeTypes.includes(change.changeType)) {
+        if (change && this.changeTypes.includes(change.changeType)) {
           filteredChanges.push(change);
         }
       }
     }
     if (this.entityTypes.includes("way")) {
       for (const change of Object.values(changeset.wayChanges)) {
-        if (this.changeTypes.includes(change.changeType)) {
+        if (change && this.changeTypes.includes(change.changeType)) {
           filteredChanges.push(change);
         }
       }
     }
     if (this.entityTypes.includes("relation")) {
       for (const change of Object.values(changeset.relationChanges)) {
-        if (this.changeTypes.includes(change.changeType)) {
+        if (change && this.changeTypes.includes(change.changeType)) {
           filteredChanges.push(change);
         }
       }

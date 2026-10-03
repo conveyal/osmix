@@ -13,7 +13,7 @@ import { mergeImportedTags } from "../rules/node-identity.ts";
 import { decide } from "./automation.ts";
 import { entityToken, proposalEffect, type PlanBuilder } from "./builder.ts";
 import { MergePlanDecisionConflictError } from "./decision-conflict.ts";
-import type { PlanOverlay } from "./overlay.ts";
+import type { EarlierState } from "./overlay.ts";
 import type { WayReplacementDiscovery, WayReplacementGroup } from "./replacement.ts";
 import type { MergePlanAutomation, PlanProposal, ReplaceWayProposal } from "./types.ts";
 
@@ -190,7 +190,7 @@ export function applyWayReplacements(
   groups: readonly WayReplacementGroup[],
   refsBefore: ReadonlyMap<number, readonly number[]>,
   /** The planned state before matching applied; base entities may differ only as allowed. */
-  before: PlanOverlay,
+  before: EarlierState,
 ) {
   if (groups.length === 0) return;
   const overlay = changeset.overlay;

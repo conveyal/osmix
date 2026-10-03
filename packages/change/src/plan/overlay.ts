@@ -24,16 +24,42 @@ import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 import type { OsmChange, OsmEntityRef } from "../types.ts";
 import { cleanCoords } from "../utils.ts";
 import type { DatasetReader, EntityReader } from "../views.ts";
+
+/** An earlier state of an overlay, read by ID, with the IDs that may differ from now. */
+export interface EarlierState {
+  getNode(id: number): OsmNode | null;
+  getWay(id: number): OsmWay | null;
+  getRelation(id: number): OsmRelation | null;
+  /** Entities that may read differently now than in this state. */
+  changedIds(type: OsmEntityType): Iterable<number>;
+}
 import { GridIndex } from "./grid-index.ts";
 
-type ChangeRecords<T extends OsmEntityType> = Record<number, OsmChange<OsmEntityTypeMap[T]>>;
+/**
+ * Pending records by ID. A record a plan dropped stays as an `undefined` tombstone, so undoing
+ * the drop puts it back in its place and created entities keep their order.
+ */
+export type ChangeRecords<T extends OsmEntityType> = Record<
+  number,
+  OsmChange<OsmEntityTypeMap[T]> | undefined
+>;
 
 interface WayCoordinateCacheEntry {
   cleaned?: [number, number][];
   coordinates: [number, number][] | null;
-  nodeCoordinateRevision: number;
   wayRevision: number;
 }
+
+/** One record write: what the record was before, and whether its key existed. */
+interface JournalEntry {
+  type: OsmEntityType;
+  id: number;
+  previous: OsmChange | undefined;
+  existed: boolean;
+}
+
+/** A position in the journal to undo back to. */
+export type OverlayMark = number;
 
 /** Pending geometry, built on the first spatial query and maintained on every change after. */
 interface PendingGeometry {
@@ -52,12 +78,13 @@ export class PlanOverlay {
   relationChanges: ChangeRecords<"relation"> = {};
 
   /** Revisions keep geometry caches correct while phases rewrite ways in place. */
-  private nodeCoordinateRevision = 0;
   private readonly wayGeometryRevisions = new Map<number, number>();
   private pendingWayIdsByNode: Map<number, Set<number>> | undefined;
   private readonly pendingWayRefs = new Map<number, readonly number[]>();
   private readonly wayCoordinateCache = new Map<number, WayCoordinateCacheEntry>();
   private geometry: PendingGeometry | undefined;
+  /** Record writes since the first mark, to undo back to a mark; null before any mark. */
+  private journal: JournalEntry[] | null = null;
 
   readonly base: Osm;
 
@@ -76,21 +103,100 @@ export class PlanOverlay {
     }
   }
 
-  /** Replace one type's records wholesale (restoring a snapshot), dropping derived caches. */
-  setRecords<T extends OsmEntityType>(type: T, records: ChangeRecords<T>) {
-    if (type === "node") {
-      this.nodeChanges = records as ChangeRecords<"node">;
-      // Keep packed base-coordinate reuse while no node record exists.
-      if (Object.keys(records).length > 0) this.nodeCoordinateRevision++;
-    } else if (type === "way") {
-      this.wayChanges = records as ChangeRecords<"way">;
-      this.wayCoordinateCache.clear();
-      this.pendingWayIdsByNode = undefined;
-      this.pendingWayRefs.clear();
-    } else {
-      this.relationChanges = records as ChangeRecords<"relation">;
+  /**
+   * Mark the current state. Writes from here on are journaled, so `undoTo` can return here; a
+   * mark stays valid through any number of undos to it.
+   */
+  mark(): OverlayMark {
+    this.journal ??= [];
+    return this.journal.length;
+  }
+
+  /**
+   * Return to `mark` by undoing every write since, newest first. Derived state follows each
+   * undone write as it followed the write itself, so caches for untouched ways stay valid.
+   */
+  undoTo(mark: OverlayMark) {
+    const journal = this.journal;
+    if (!journal || mark > journal.length) throw Error(`No overlay mark ${mark} to undo to`);
+    while (journal.length > mark) {
+      const { type, id, previous, existed } = journal.pop()!;
+      const records = this.changes(type) as Record<number, OsmChange | undefined>;
+      const before = type === "node" ? this.getNode(id) : null;
+      if (existed) records[id] = previous;
+      else delete records[id];
+      if (type === "node") this.nodeChanged(id, before);
+      else if (type === "way") this.invalidateWayGeometry(id);
     }
-    this.geometry = undefined;
+  }
+
+  /**
+   * The state at `mark`, read by ID while later writes continue: an entity written since reads
+   * as it was then. Valid until an undo to `mark` or earlier.
+   */
+  stateAt(mark: OverlayMark): EarlierState {
+    const journal = this.journal;
+    if (!journal) throw Error("No overlay mark to read");
+    const first = {
+      node: new Map<number, OsmChange | undefined>(),
+      way: new Map(),
+      relation: new Map(),
+    };
+    let cursor = mark;
+    const sync = () => {
+      for (; cursor < journal.length; cursor++) {
+        const { type, id, previous } = journal[cursor]!;
+        const seen = first[type] as Map<number, OsmChange | undefined>;
+        if (!seen.has(id)) seen.set(id, previous);
+      }
+    };
+    const read = <T extends OsmEntity>(
+      type: OsmEntityType,
+      id: number,
+      current: (id: number) => T | null,
+      base: (id: number) => T | null,
+    ): T | null => {
+      sync();
+      const seen = first[type] as Map<number, OsmChange | undefined>;
+      if (!seen.has(id)) return current(id);
+      const change = seen.get(id);
+      if (!change) return base(id);
+      return change.changeType === "delete" ? null : (change.entity as T);
+    };
+    return {
+      getNode: (id) =>
+        read(
+          "node",
+          id,
+          (key) => this.getNode(key),
+          (key) => this.base.nodes.getById(key),
+        ),
+      getWay: (id) =>
+        read(
+          "way",
+          id,
+          (key) => this.getWay(key),
+          (key) => this.base.ways.getById(key),
+        ),
+      getRelation: (id) =>
+        read(
+          "relation",
+          id,
+          (key) => this.getRelation(key),
+          (key) => this.base.relations.getById(key),
+        ),
+      changedIds: (type) => {
+        sync();
+        return first[type].keys();
+      },
+    };
+  }
+
+  /** Write one record, journaling what it replaces; `undefined` leaves a tombstone. */
+  private write(type: OsmEntityType, id: number, next: OsmChange | undefined) {
+    const records = this.changes(type) as Record<number, OsmChange | undefined>;
+    this.journal?.push({ type, id, previous: records[id], existed: id in records });
+    records[id] = next;
   }
 
   /** The entity as stored in the base, ignoring records. */
@@ -136,16 +242,17 @@ export class PlanOverlay {
     options: { unreferenced?: boolean } = {},
   ) {
     const type = getEntityType(entity);
-    this.changes(type)[entity.id] = {
+    const before = type === "node" && !options.unreferenced ? this.getNode(entity.id) : null;
+    this.write(type, entity.id, {
       changeType: "create",
       entity,
       osmId,
       refs, // Refs can come from other datasets, useful for tracking provenance
-    };
+    });
     if (type === "node" && options.unreferenced) {
       const node = entity as OsmNode;
       this.geometry?.nodes.set(node.id, [node.lon, node.lat, node.lon, node.lat]);
-    } else if (type === "node") this.nodeMoved(entity.id);
+    } else if (type === "node") this.nodeChanged(entity.id, before);
     if (type === "way") this.invalidateWayGeometry(entity.id);
   }
 
@@ -169,19 +276,15 @@ export class PlanOverlay {
     const oldEntity = change?.oldEntity ?? (changeEntity ? undefined : existingEntity);
 
     const modifiedEntity = modify(existingEntity);
-    changes[id] = {
+    this.write(type, id, {
       changeType: change?.changeType ?? "modify",
       entity: modifiedEntity,
       osmId: this.base.id, // If we're modifying an entity, it must exist in the base OSM
       oldEntity,
-    };
+    });
 
-    if (type === "node") {
-      const previous = existingEntity as OsmNode;
-      const next = modifiedEntity as OsmNode;
-      if (previous.lon !== next.lon || previous.lat !== next.lat) this.nodeMoved(id);
-      else this.geometry?.nodes.set(id, [next.lon, next.lat, next.lon, next.lat]);
-    } else if (type === "way") {
+    if (type === "node") this.nodeChanged(id, existingEntity as OsmNode);
+    else if (type === "way") {
       const previous = existingEntity as OsmWay;
       const next = modifiedEntity as OsmWay;
       if (!dequal(previous.refs, next.refs)) this.invalidateWayGeometry(id);
@@ -191,22 +294,24 @@ export class PlanOverlay {
   /** Schedule an entity for deletion, keeping it as `oldEntity` for augmented diffs. */
   delete(entity: OsmEntity, refs?: OsmEntityRef[]) {
     const type = getEntityType(entity);
-    this.changes(type)[entity.id] = {
+    const before = type === "node" ? this.getNode(entity.id) : null;
+    this.write(type, entity.id, {
       changeType: "delete",
       entity,
       refs,
       osmId: this.base.id,
       oldEntity: entity,
-    };
-    if (type === "node") this.nodeMoved(entity.id);
+    });
+    if (type === "node") this.nodeChanged(entity.id, before);
     if (type === "way") this.invalidateWayGeometry(entity.id);
   }
 
   /** Forget a pending record, so the entity reads as it is in the base (or as absent). */
   discard(type: OsmEntityType, id: number) {
-    if (!(id in this.changes(type))) return;
-    delete this.changes(type)[id];
-    if (type === "node") this.nodeMoved(id);
+    if (this.changes(type)[id] === undefined) return;
+    const before = type === "node" ? this.getNode(id) : null;
+    this.write(type, id, undefined);
+    if (type === "node") this.nodeChanged(id, before);
     if (type === "way") this.invalidateWayGeometry(id);
   }
 
@@ -223,7 +328,7 @@ export class PlanOverlay {
       break;
     }
     for (const change of Object.values(this.nodeChanges)) {
-      if (change.changeType !== "delete") minimum = Math.min(minimum, change.entity.id);
+      if (change && change.changeType !== "delete") minimum = Math.min(minimum, change.entity.id);
     }
     return minimum;
   }
@@ -236,7 +341,9 @@ export class PlanOverlay {
       yield change?.entity ?? node;
     }
     for (const change of Object.values(this.nodeChanges)) {
-      if (this.base.nodes.ids.has(change.entity.id) || change.changeType === "delete") continue;
+      if (!change || this.base.nodes.ids.has(change.entity.id) || change.changeType === "delete") {
+        continue;
+      }
       yield change.entity;
     }
   }
@@ -248,7 +355,9 @@ export class PlanOverlay {
       if (current) yield current;
     }
     for (const change of Object.values(this.wayChanges)) {
-      if (this.base.ways.ids.has(change.entity.id) || change.changeType === "delete") continue;
+      if (!change || this.base.ways.ids.has(change.entity.id) || change.changeType === "delete") {
+        continue;
+      }
       yield change.entity;
     }
   }
@@ -261,29 +370,15 @@ export class PlanOverlay {
       yield change?.entity ?? relation;
     }
     for (const change of Object.values(this.relationChanges)) {
-      if (this.base.relations.ids.has(change.entity.id) || change.changeType === "delete") continue;
+      if (
+        !change ||
+        this.base.relations.ids.has(change.entity.id) ||
+        change.changeType === "delete"
+      ) {
+        continue;
+      }
       yield change.entity;
     }
-  }
-
-  /**
-   * A read-only view of records nothing will change, such as a checkpoint's, over `base`. It
-   * shares them instead of copying; never record changes through it.
-   */
-  static frozen(
-    base: Osm,
-    records: {
-      nodes: ChangeRecords<"node">;
-      ways: ChangeRecords<"way">;
-      relations: ChangeRecords<"relation">;
-    },
-  ): PlanOverlay {
-    const view = new PlanOverlay(base);
-    view.nodeChanges = records.nodes;
-    view.wayChanges = records.ways;
-    view.relationChanges = records.relations;
-    if (Object.keys(records.nodes).length > 0) view.nodeCoordinateRevision++;
-    return view;
   }
 
   /** A copy of the current records over the same base, unaffected by later changes. */
@@ -292,7 +387,6 @@ export class PlanOverlay {
     copy.nodeChanges = { ...this.nodeChanges };
     copy.wayChanges = { ...this.wayChanges };
     copy.relationChanges = { ...this.relationChanges };
-    if (Object.keys(copy.nodeChanges).length > 0) copy.nodeCoordinateRevision++;
     return copy;
   }
 
@@ -327,6 +421,7 @@ export class PlanOverlay {
   get nodeCount() {
     let count = this.base.nodes.size;
     for (const change of Object.values(this.nodeChanges)) {
+      if (!change) continue;
       const inBase = this.base.nodes.ids.has(change.entity.id);
       if (change.changeType === "create" && !inBase) count++;
       else if (change.changeType === "delete" && inBase) count--;
@@ -370,26 +465,19 @@ export class PlanOverlay {
   wayCoordinates(way: OsmWay): [number, number][] | null {
     const wayRevision = this.wayGeometryRevisions.get(way.id) ?? 0;
     const cached = this.wayCoordinateCache.get(way.id);
-    if (
-      cached &&
-      cached.wayRevision === wayRevision &&
-      cached.nodeCoordinateRevision === this.nodeCoordinateRevision
-    ) {
-      return cached.coordinates;
-    }
+    if (cached && cached.wayRevision === wayRevision) return cached.coordinates;
 
     // Unchanged base geometry can resolve packed node indexes directly, avoiding one binary ID
     // lookup per ref. Match the fallback's missing-ref behavior by requiring every ref.
-    if (this.nodeCoordinateRevision === 0 && this.wayChanges[way.id] === undefined) {
+    if (
+      this.wayChanges[way.id] === undefined &&
+      way.refs.every((ref) => this.nodeChanges[ref] === undefined)
+    ) {
       const [wayIndex] = this.base.ways.ids.idOrIndex({ id: way.id });
       if (wayIndex !== -1) {
         const coordinates = this.base.ways.getResolvedCoordinates(wayIndex);
         if (coordinates.length !== way.refs.length) return null;
-        this.wayCoordinateCache.set(way.id, {
-          coordinates,
-          nodeCoordinateRevision: this.nodeCoordinateRevision,
-          wayRevision,
-        });
+        this.wayCoordinateCache.set(way.id, { coordinates, wayRevision });
         return coordinates;
       }
     }
@@ -402,11 +490,7 @@ export class PlanOverlay {
       if (!node) return null;
       coordinates.push([node.lon, node.lat]);
     }
-    this.wayCoordinateCache.set(way.id, {
-      coordinates,
-      nodeCoordinateRevision: this.nodeCoordinateRevision,
-      wayRevision,
-    });
+    this.wayCoordinateCache.set(way.id, { coordinates, wayRevision });
     return coordinates;
   }
 
@@ -485,8 +569,8 @@ export class PlanOverlay {
   private pendingIncidence() {
     if (!this.pendingWayIdsByNode) {
       this.pendingWayIdsByNode = new Map();
-      for (const change of Object.values(this.wayChanges)) {
-        this.updatePendingWayIncidence(change.entity.id);
+      for (const key of Object.keys(this.wayChanges)) {
+        this.updatePendingWayIncidence(Number(key));
       }
     }
     return this.pendingWayIdsByNode;
@@ -502,6 +586,7 @@ export class PlanOverlay {
     this.geometry = geometry;
     const movedNodes: number[] = [];
     for (const change of Object.values(this.nodeChanges)) {
+      if (!change) continue;
       const node = change.entity;
       if (change.changeType !== "delete") {
         geometry.nodes.set(node.id, [node.lon, node.lat, node.lon, node.lat]);
@@ -514,7 +599,9 @@ export class PlanOverlay {
         movedNodes.push(node.id);
       }
     }
-    for (const change of Object.values(this.wayChanges)) this.trackWay(change.entity.id);
+    for (const key of Object.keys(this.wayChanges)) {
+      if (this.wayChanges[Number(key)]) this.trackWay(Number(key));
+    }
     for (const id of movedNodes) {
       for (const way of this.waysAtNode(id)) this.trackWay(way.id);
     }
@@ -532,17 +619,29 @@ export class PlanOverlay {
     else geometry.ways.remove(id);
   }
 
-  /** A node's position changed, appeared or disappeared: its ways' geometry follows. */
-  private nodeMoved(id: number) {
-    this.nodeCoordinateRevision++;
-    const geometry = this.geometry;
-    if (!geometry) return;
+  /**
+   * A node record was written. When its position changed, appeared or disappeared, the ways at
+   * it lose their cached coordinates and their geometry follows; other ways keep theirs.
+   */
+  private nodeChanged(id: number, before: OsmNode | null) {
     const node = this.getNode(id);
-    if (node) geometry.nodes.set(id, [node.lon, node.lat, node.lon, node.lat]);
-    else geometry.nodes.remove(id);
+    const geometry = this.geometry;
+    // The node grid holds nodes with a live record; the base index answers for the rest.
+    if (geometry) {
+      const record = this.nodeChanges[id];
+      if (node && record && record.changeType !== "delete") {
+        geometry.nodes.set(id, [node.lon, node.lat, node.lon, node.lat]);
+      } else geometry.nodes.remove(id);
+    }
+    const moved = !before || !node || before.lon !== node.lon || before.lat !== node.lat;
+    if (!moved || (!geometry && this.wayCoordinateCache.size === 0)) return;
     // Base geometry at the base position plus pending incidence finds every way at the node,
     // including ways whose bbox a deleted vertex no longer counts toward.
-    for (const way of this.waysAtNode(id)) this.trackWay(way.id);
+    for (const way of this.waysAtNode(id)) {
+      this.wayGeometryRevisions.set(way.id, (this.wayGeometryRevisions.get(way.id) ?? 0) + 1);
+      this.wayCoordinateCache.delete(way.id);
+      this.trackWay(way.id);
+    }
   }
 
   private invalidateWayGeometry(wayId: number) {
@@ -570,4 +669,34 @@ export class PlanOverlay {
       index.set(ref, wayIds);
     }
   }
+}
+
+/** A copied state as an earlier state of `live`: what either has a record for may differ. */
+export function snapshotState(snapshot: PlanOverlay, live: PlanOverlay): EarlierState {
+  return {
+    getNode: (id) => snapshot.getNode(id),
+    getWay: (id) => snapshot.getWay(id),
+    getRelation: (id) => snapshot.getRelation(id),
+    changedIds: (type) =>
+      new Set(
+        [...Object.keys(snapshot.changes(type)), ...Object.keys(live.changes(type))].map(Number),
+      ),
+  };
+}
+
+/** An earlier state read by ID; it has no order to iterate in, so iterating throws. */
+export function earlierStateReader(state: EarlierState, id: string): DatasetReader {
+  const table = <T>(getById: (id: number) => T | null): EntityReader<T> => ({
+    getById,
+    ids: { has: (key) => getById(key) != null },
+    [Symbol.iterator]: () => {
+      throw Error("An earlier plan state is read by ID only");
+    },
+  });
+  return {
+    id,
+    nodes: table((key) => state.getNode(key)),
+    ways: table((key) => state.getWay(key)),
+    relations: table((key) => state.getRelation(key)),
+  };
 }

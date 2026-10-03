@@ -15,7 +15,12 @@ import {
 import { assertConflationPreservesBaseTopology, restrictionTopologyIssues } from "./integrity.ts";
 import { featureTypeConflicts } from "./internal/feature-classification.ts";
 import { assessWayRemovals } from "./internal/way-removal.ts";
-import type { PlanOverlay } from "./plan/overlay.ts";
+import {
+  type EarlierState,
+  earlierStateReader,
+  type PlanOverlay,
+  snapshotState,
+} from "./plan/overlay.ts";
 import { plannedMatchingViews } from "./plan/views.ts";
 import { inputProvenance, type MergeProvenance } from "./provenance.ts";
 import { accessSignature } from "./rules/access.ts";
@@ -1126,10 +1131,10 @@ function validateAcceptedMappings(
 /** Cancel a pending import or delete an entity already present in the application baseline. */
 export function removeImportedEntity(changeset: OsmChangeset, entity: OsmNode | OsmWay) {
   const type = "refs" in entity ? "way" : "node";
-  const wasCreated = changeset.changes(type)[entity.id]?.changeType === "create";
-  // Use delete to invalidate geometry/incidence caches before cancelling a create.
-  changeset.delete(entity);
-  if (wasCreated) delete changeset.changes(type)[entity.id];
+  // A pending import is dropped (a journaled tombstone); anything else is deleted.
+  if (changeset.changes(type)[entity.id]?.changeType === "create") {
+    changeset.overlay.discard(type, entity.id);
+  } else changeset.delete(entity);
 }
 
 /**
@@ -1306,14 +1311,14 @@ export function applyPlannedConflation(
   planned: Osm,
   discovery: OsmConflationDiscovery,
   decisions: readonly OsmConflationDecision[],
-  /** The planned state now, read-only, when the caller holds one; otherwise a copy. */
-  current?: PlanOverlay,
+  /** The planned state now, read by ID while matching writes; otherwise a copy is taken. */
+  current?: EarlierState,
 ) {
-  const snapshot = current ?? changeset.overlay.snapshot();
-  const before = snapshot.reader();
+  const earlier = current ?? snapshotState(changeset.overlay.snapshot(), changeset.overlay);
+  const before = earlierStateReader(earlier, changeset.osm.id);
   const trace = applyDiscoveredConflation(changeset, base, planned, discovery, decisions);
   const after = changeset.overlay.reader();
-  assertConflationPreservesBaseTopology(base, snapshot, changeset.overlay);
+  assertConflationPreservesBaseTopology(base, earlier, changeset.overlay);
   return createConflationOutcomeReport(
     base,
     planned,

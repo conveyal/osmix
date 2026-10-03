@@ -15,7 +15,7 @@ import type { OsmChangeRecords } from "./types.ts";
 
 function hasOwnChanges(changes: Record<number, unknown>) {
   for (const key in changes) {
-    if (Object.hasOwn(changes, key)) return true;
+    if (Object.hasOwn(changes, key) && changes[Number(key)] !== undefined) return true;
   }
   return false;
 }
@@ -104,7 +104,8 @@ export function materializeChanges(
   // Add nodes from patch
   for (const idText in nodeChanges) {
     if (!Object.hasOwn(nodeChanges, idText)) continue;
-    const change = nodeChanges[Number(idText)]!;
+    const change = nodeChanges[Number(idText)];
+    if (!change) continue;
     if (change.changeType === "create") {
       osm.nodes.addNode(change.entity);
       continue;
@@ -131,7 +132,8 @@ export function materializeChanges(
   // Add ways from patch
   for (const idText in wayChanges) {
     if (!Object.hasOwn(wayChanges, idText)) continue;
-    const change = wayChanges[Number(idText)]!;
+    const change = wayChanges[Number(idText)];
+    if (!change) continue;
     if (change.changeType === "create") {
       osm.ways.addWay(change.entity);
       continue;
@@ -156,7 +158,8 @@ export function materializeChanges(
   // Add relations from patch
   for (const idText in relationChanges) {
     if (!Object.hasOwn(relationChanges, idText)) continue;
-    const change = relationChanges[Number(idText)]!;
+    const change = relationChanges[Number(idText)];
+    if (!change) continue;
     if (change.changeType === "create") {
       osm.relations.addRelation(change.entity);
       continue;
