@@ -168,6 +168,62 @@ export function junctionHasIncompatibleGrades(nodeId: number, ways: readonly Osm
   return incompatibleGradePairs(incident).length > 0;
 }
 
+/** Missing nodes and degenerate highways of one way. */
+function wayIntegrityIssues(way: OsmWay, hasNode: (id: number) => boolean): IntegrityIssue[] {
+  const issues: IntegrityIssue[] = [];
+  for (const ref of way.refs) {
+    if (hasNode(ref)) continue;
+    issues.push({
+      key: `way:${way.id}:missing-node:${ref}`,
+      description: `way ${way.id} references missing node ${ref}`,
+    });
+  }
+  if (way.tags?.["highway"] != null && new Set(way.refs).size < 2) {
+    issues.push({
+      key: `way:${way.id}:degenerate-highway`,
+      description: `highway way ${way.id} has fewer than two distinct nodes`,
+    });
+  }
+  return issues;
+}
+
+/** How a highway way meets `nodeId`, for the grade rule; null for other ways. */
+function incidentHighway(way: OsmWay, nodeId: number): IncidentHighway | null {
+  if (way.tags?.["highway"] == null || !way.refs.includes(nodeId)) return null;
+  return {
+    way,
+    gradeSignature: routingGradeSignature(way.tags),
+    interior: way.refs.slice(1, -1).includes(nodeId),
+    endpoint: way.refs[0] === nodeId || way.refs.at(-1) === nodeId,
+  };
+}
+
+/** Grade-separated highways joined at one node. */
+function gradeIntegrityIssues(nodeId: number, ways: readonly IncidentHighway[]): IntegrityIssue[] {
+  return incompatibleGradePairs(ways).map(([firstWayId, secondWayId]) => ({
+    key: `node:${nodeId}:incompatible-grade:${firstWayId}:${secondWayId}`,
+    description: `node ${nodeId} newly connects grade-separated highways ${firstWayId} and ${secondWayId}`,
+  }));
+}
+
+/** Missing members and restriction topology of one relation. */
+function relationIntegrityIssues(
+  relation: OsmRelation,
+  exists: (type: "node" | "way" | "relation", id: number) => boolean,
+  getWay: (id: number) => OsmWay | null | undefined,
+): IntegrityIssue[] {
+  const issues: IntegrityIssue[] = [];
+  for (const member of relation.members) {
+    if (exists(member.type, member.ref)) continue;
+    issues.push({
+      key: `relation:${relation.id}:missing-${member.type}:${member.ref}`,
+      description: `relation ${relation.id} references missing ${member.type} ${member.ref}`,
+    });
+  }
+  issues.push(...restrictionTopologyIssues(relation, getWay));
+  return issues;
+}
+
 function collectRoutingIntegrityIssues(osm: Osm | DatasetReader): readonly IntegrityIssue[] {
   const finalized = "isReady" in osm && osm.isReady() ? osm : undefined;
   const cachedIssues = finalized && routingIntegrityIssuesByOsm.get(finalized);
@@ -175,67 +231,154 @@ function collectRoutingIntegrityIssues(osm: Osm | DatasetReader): readonly Integ
 
   const issues: IntegrityIssue[] = [];
   const highwayWaysByNode = new Map<number, IncidentHighway[]>();
+  const hasNode = (id: number) => osm.nodes.ids.has(id);
 
   for (const way of osm.ways) {
-    for (const ref of way.refs) {
-      if (osm.nodes.ids.has(ref)) continue;
-      issues.push({
-        key: `way:${way.id}:missing-node:${ref}`,
-        description: `way ${way.id} references missing node ${ref}`,
-      });
-    }
-    const distinctRefs = new Set(way.refs);
-    if (way.tags?.["highway"] != null && distinctRefs.size < 2) {
-      issues.push({
-        key: `way:${way.id}:degenerate-highway`,
-        description: `highway way ${way.id} has fewer than two distinct nodes`,
-      });
-    }
-    if (way.tags?.["highway"] != null) {
-      const gradeSignature = routingGradeSignature(way.tags);
-      const interiorRefs = new Set(way.refs.slice(1, -1));
-      const endpointRefs = new Set([way.refs[0], way.refs.at(-1)]);
-      for (const ref of distinctRefs) {
-        const incidentWays = highwayWaysByNode.get(ref) ?? [];
-        incidentWays.push({
-          way,
-          gradeSignature,
-          interior: interiorRefs.has(ref),
-          endpoint: endpointRefs.has(ref),
-        });
-        highwayWaysByNode.set(ref, incidentWays);
-      }
+    issues.push(...wayIntegrityIssues(way, hasNode));
+    if (way.tags?.["highway"] == null) continue;
+    for (const ref of new Set(way.refs)) {
+      const incident = highwayWaysByNode.get(ref) ?? [];
+      incident.push(incidentHighway(way, ref)!);
+      highwayWaysByNode.set(ref, incident);
     }
   }
 
   for (const [nodeId, ways] of highwayWaysByNode) {
-    for (const [firstWayId, secondWayId] of incompatibleGradePairs(ways)) {
-      issues.push({
-        key: `node:${nodeId}:incompatible-grade:${firstWayId}:${secondWayId}`,
-        description: `node ${nodeId} newly connects grade-separated highways ${firstWayId} and ${secondWayId}`,
-      });
-    }
+    issues.push(...gradeIntegrityIssues(nodeId, ways));
   }
 
+  const exists = (type: "node" | "way" | "relation", id: number) =>
+    type === "node"
+      ? osm.nodes.ids.has(id)
+      : type === "way"
+        ? osm.ways.ids.has(id)
+        : osm.relations.ids.has(id);
   for (const relation of osm.relations) {
-    for (const member of relation.members) {
-      const exists =
-        member.type === "node"
-          ? osm.nodes.ids.has(member.ref)
-          : member.type === "way"
-            ? osm.ways.ids.has(member.ref)
-            : osm.relations.ids.has(member.ref);
-      if (exists) continue;
-      issues.push({
-        key: `relation:${relation.id}:missing-${member.type}:${member.ref}`,
-        description: `relation ${relation.id} references missing ${member.type} ${member.ref}`,
-      });
-    }
-    issues.push(...restrictionTopologyIssues(relation, (id) => osm.ways.getById(id)));
+    issues.push(...relationIntegrityIssues(relation, exists, (id) => osm.ways.getById(id)));
   }
 
   if (finalized) routingIntegrityIssuesByOsm.set(finalized, issues);
   return issues;
+}
+
+/** Base relations by member, `type:id` → relation IDs; built once per base. */
+const relationsByMemberByOsm = new WeakMap<Osm, Map<string, number[]>>();
+
+function relationsByMember(base: Osm) {
+  let index = relationsByMemberByOsm.get(base);
+  if (index) return index;
+  index = new Map();
+  for (const relation of base.relations) {
+    for (const { type, ref } of relation.members) {
+      const key = `${type}:${ref}`;
+      const ids = index.get(key);
+      if (ids) {
+        if (ids.at(-1) !== relation.id) ids.push(relation.id);
+      } else index.set(key, [relation.id]);
+    }
+  }
+  relationsByMemberByOsm.set(base, index);
+  return index;
+}
+
+/** Whether a way meets `nodeId` the same way in both versions, for the grade rule. */
+function sameIncidence(before: OsmWay | null, after: OsmWay | null, nodeId: number) {
+  const a = before ? incidentHighway(before, nodeId) : null;
+  const b = after ? incidentHighway(after, nodeId) : null;
+  if (!a || !b) return a === b;
+  return (
+    a.interior === b.interior && a.endpoint === b.endpoint && a.gradeSignature === b.gradeSignature
+  );
+}
+
+/**
+ * Routing-integrity problems in an overlay that are not in `baselineKeys`, sorted by key. Only
+ * what the overlay's records touch can differ from the base, whose issues the baseline holds:
+ * - ways with a record, and ways at a base node with a record (a deleted node goes missing);
+ * - for the grade rule, every node of a created way, and each node where a changed or deleted
+ *   base way now meets it differently (position, presence or grade);
+ * - relations with a record, or with a changed or deleted member.
+ * The full scan in `assertValidResult` still checks the built result.
+ */
+export function newOverlayIntegrityIssues(
+  baselineKeys: ReadonlySet<string>,
+  overlay: PlanOverlay,
+): string[] {
+  const base = overlay.base;
+  const issues: IntegrityIssue[] = [];
+  const hasNode = (id: number) => overlay.getNode(id) != null;
+  const changedWays = new Set<number>();
+  const checkedWays = new Set<number>();
+  const gradeNodes = new Set<number>();
+  for (const key of Object.keys(overlay.wayChanges)) {
+    const id = Number(key);
+    if (!overlay.wayChanges[id]) continue;
+    changedWays.add(id);
+    const way = overlay.getWay(id);
+    if (way) checkedWays.add(id);
+    const before = base.ways.getById(id);
+    if (!before) {
+      for (const ref of way?.refs ?? []) gradeNodes.add(ref);
+      continue;
+    }
+    for (const ref of new Set([...before.refs, ...(way?.refs ?? [])])) {
+      if (!sameIncidence(before, way, ref)) gradeNodes.add(ref);
+    }
+  }
+  const changedNodes: number[] = [];
+  for (const key of Object.keys(overlay.nodeChanges)) {
+    const id = Number(key);
+    if (!overlay.nodeChanges[id]) continue;
+    changedNodes.push(id);
+    if (!base.nodes.ids.has(id)) continue;
+    for (const way of overlay.waysAtNode(id)) checkedWays.add(way.id);
+  }
+
+  for (const id of checkedWays) {
+    const way = overlay.getWay(id);
+    if (way) issues.push(...wayIntegrityIssues(way, hasNode));
+  }
+  for (const nodeId of gradeNodes) {
+    // A node only created ways use needs no spatial query, and fewer than two ways never
+    // conflict; most imported vertices are both.
+    if (!base.nodes.ids.has(nodeId) && overlay.pendingWayIdsAt(nodeId).size < 2) continue;
+    const incident = overlay
+      .waysAtNode(nodeId)
+      .flatMap((way) => incidentHighway(way, nodeId) ?? []);
+    if (incident.length < 2) continue;
+    issues.push(...gradeIntegrityIssues(nodeId, incident));
+  }
+
+  const members = relationsByMember(base);
+  const relations = new Set<number>();
+  for (const key of Object.keys(overlay.relationChanges)) {
+    const id = Number(key);
+    if (overlay.relationChanges[id]) relations.add(id);
+  }
+  const addMembersOf = (type: string, id: number) => {
+    for (const relationId of members.get(`${type}:${id}`) ?? []) relations.add(relationId);
+  };
+  for (const id of changedWays) addMembersOf("way", id);
+  for (const id of changedNodes) addMembersOf("node", id);
+  // Relations that contain a changed relation, and so on up: a Set visits what is added.
+  for (const id of relations) addMembersOf("relation", id);
+  const exists = (type: "node" | "way" | "relation", id: number) =>
+    type === "node"
+      ? overlay.getNode(id) != null
+      : type === "way"
+        ? overlay.getWay(id) != null
+        : overlay.getRelation(id) != null;
+  for (const id of relations) {
+    const relation = overlay.getRelation(id);
+    if (relation) {
+      issues.push(...relationIntegrityIssues(relation, exists, (wayId) => overlay.getWay(wayId)));
+    }
+  }
+
+  return issues
+    .filter((issue) => !baselineKeys.has(issue.key))
+    .toSorted((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    .map((issue) => issue.description);
 }
 
 export function routingIntegrityIssueKeys(osm: Osm) {

@@ -27,7 +27,7 @@ import {
   assertNoNewRoutingIntegrityIssues,
   inheritedRoutingIntegrityIssueKeys,
   junctionHasIncompatibleGrades,
-  newRoutingIntegrityIssues,
+  newOverlayIntegrityIssues,
   restrictionTopologyIssues,
   routingIntegrityIssueKeys,
 } from "./integrity.ts";
@@ -347,7 +347,7 @@ export class OsmChangeset {
 
   /** @internal New routing-integrity problems in the planned state, before any build. */
   pendingIntegrityIssues(): string[] {
-    return newRoutingIntegrityIssues(this.routingIntegrityBaselineKeys, this.overlay.reader());
+    return newOverlayIntegrityIssues(this.routingIntegrityBaselineKeys, this.overlay);
   }
 
   private inheritPatchIntegrity(patch: Osm) {

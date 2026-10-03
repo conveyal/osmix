@@ -44,6 +44,7 @@ interface PendingGeometry {
 }
 
 const METERS_PER_DEGREE_LAT = 111_320;
+const EMPTY_IDS: ReadonlySet<number> = new Set();
 
 export class PlanOverlay {
   nodeChanges: ChangeRecords<"node"> = {};
@@ -352,6 +353,14 @@ export class PlanOverlay {
       }
     }
     return [...ways.values()];
+  }
+
+  /**
+   * IDs of pending (created or changed) ways whose current refs include `nodeId`. For a node
+   * the base does not have, these are every way at it, without a spatial query.
+   */
+  pendingWayIdsAt(nodeId: number): ReadonlySet<number> {
+    return this.pendingIncidence().get(nodeId) ?? EMPTY_IDS;
   }
 
   /**

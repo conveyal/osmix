@@ -36,7 +36,12 @@ import type {
   PlanInputIdentity,
   PlanProposalStatus,
 } from "./types.ts";
-import { type BaseRoutingStats, baseRoutingStats, planRoutingDiagnostics } from "./validate.ts";
+import {
+  type BaseRoutingStats,
+  baseRoutingStats,
+  PlannedRoutingStats,
+  planRoutingDiagnostics,
+} from "./validate.ts";
 
 /** The live state behind a plan. Plans are rebuilt from their inputs, never deserialized. */
 interface PlanState {
@@ -52,6 +57,8 @@ interface PlanState {
   matched?: ReturnType<typeof planMatching>;
   /** The base's routing topology; the base does not change while planning. */
   baseRouting?: BaseRoutingStats;
+  /** The planned result's routing topology, kept proportional to the plan's changes. */
+  plannedRouting?: PlannedRoutingStats;
   log: (message: string) => void;
   hooks: MergePlanHooks;
 }
@@ -253,12 +260,22 @@ function finishPlan(plan: MergePlan, state: PlanState) {
   else checkPlan(plan, state);
 }
 
+/** Base ways a way replacement may delete, whether or not it is decided yet. */
+function replaceableBaseWays(plan: MergePlan) {
+  const ids: number[] = [];
+  for (const proposal of plan.proposals.values()) {
+    if (proposal.kind === "replace-way") for (const { id } of proposal.replaces) ids.push(id);
+  }
+  return ids;
+}
+
 function checkPlan(plan: MergePlan, state: PlanState) {
   const { base, patch, changeset, builder, options, matched } = state;
   state.log("Checking the plan...");
   plan.diagnostics = {
     routing: planRoutingDiagnostics(
       (state.baseRouting ??= baseRoutingStats(base)),
+      (state.plannedRouting ??= new PlannedRoutingStats(base, replaceableBaseWays(plan))),
       changeset.overlay,
     ),
     integrity: changeset.pendingIntegrityIssues(),

@@ -22,6 +22,26 @@ export interface RoutingTopologySource {
 }
 
 /**
+ * Directed edges one way adds for `filter` (two per segment, one when one-way), or null when
+ * the filter does not route it. Direction follows the router: an unsupported one-way value
+ * counts as forward on a roundabout and as two-way elsewhere.
+ */
+export function routingWayEdges(
+  way: { tags?: OsmTags | undefined; refs: readonly number[] },
+  filter: HighwayFilter,
+): number | null {
+  if (!filter(way.tags) || way.refs.length < 2) return null;
+  const normalized = normalizedWayDirection(way.tags);
+  const direction =
+    normalized === "unsupported"
+      ? way.tags?.["junction"] === "roundabout"
+        ? "forward"
+        : "both"
+      : normalized;
+  return (direction === "both" ? 2 : 1) * (way.refs.length - 1);
+}
+
+/**
  * The same counts `RoutingGraph` would give for `filter`, computed from ways alone, without
  * building the graph (no coordinates, speeds or CSR arrays). Direction follows the router: an
  * unsupported one-way value counts as forward on a roundabout and as two-way elsewhere.
@@ -51,19 +71,12 @@ export function routingTopologyStats(
   };
   let edges = 0;
   for (const way of source.ways()) {
-    if (!filter(way.tags) || way.refs.length < 2) continue;
-    const normalized = normalizedWayDirection(way.tags);
-    const direction =
-      normalized === "unsupported"
-        ? way.tags?.["junction"] === "roundabout"
-          ? "forward"
-          : "both"
-        : normalized;
-    const perSegment = direction === "both" ? 2 : 1;
+    const wayEdges = routingWayEdges(way, filter);
+    if (wayEdges == null) continue;
     for (let index = 0; index < way.refs.length - 1; index++) {
       union(way.refs[index]!, way.refs[index + 1]!);
-      edges += perSegment;
     }
+    edges += wayEdges;
   }
   const roots = new Set<number>();
   for (const id of parent.keys()) roots.add(find(id));
