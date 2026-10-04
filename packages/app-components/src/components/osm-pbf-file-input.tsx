@@ -441,7 +441,8 @@ export function OsmPbfClearFileButton({
   );
 }
 
-function showFileSelector(accept: string) {
+/** Open the browser file picker for one file of `accept` types; null when cancelled. */
+export function showFileSelector(accept: string) {
   const input = document.createElement("input");
   input.type = "file";
   input.accept = accept;

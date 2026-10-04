@@ -45,6 +45,12 @@ tokens, spacing, primitives, map overlay primitives) lives in
   above the rows applies them in one replan (**Apply N choices**) or drops
   them (**Discard**); bulk buttons, export and **Apply plan** are disabled
   meanwhile. Selecting a feature on the map turns the list to its page.
+- `SavedChoices` — "Your choices", below the summary: choices are saved in the
+  browser for the two input files as they are applied; an `Alert` offers
+  **Restore N choices** / **Discard** when the same files were reviewed
+  before, and **Export choices (.json)** / **Import choices** move them
+  between browsers. Restore, export and import wait while row choices are
+  pending.
 - `PlanMapLayer`, `PlanLegend` — imported features coloured by outcome
   (`--map-outcome-*`), with features that need a decision drawn wider and
   dashed so colour is never the only cue; clicking a feature opens its row.

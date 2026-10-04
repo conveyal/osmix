@@ -57,6 +57,7 @@ export {
   shouldRetrySavePickerWithPolyfill,
   showSaveFilePickerWithFallback,
 } from "./lib/save-file-picker.ts";
+export { mergeDecisionsKey, type SavedMergeDecisions } from "./lib/merge-decisions.ts";
 export { canStoreBytes, type StorageCheck } from "./lib/storage-utils.ts";
 export { createOsmixAppRemote, OsmixAppRemote, type OsmixAppRemoteOptions } from "./remote.ts";
 export {

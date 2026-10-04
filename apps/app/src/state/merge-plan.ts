@@ -1,3 +1,4 @@
+import type { SavedMergeDecisions } from "@osmix/app-core";
 import { atom } from "jotai";
 import type { GeoBbox2D } from "osmix";
 import type {
@@ -73,6 +74,8 @@ export const planPendingChoicesAtom = atom((get) => {
   }
   return pending;
 });
+/** Decisions saved from an earlier review of the same files, offered back until answered. */
+export const savedChoicesOfferAtom = atom<SavedMergeDecisions | null>(null);
 /** The feature whose evidence is open, highlighted on the map. */
 export const selectedPlanFeatureAtom = atom<MergePlanFeatureDetail | null>(null);
 
@@ -86,4 +89,5 @@ export const resetMergePlanAtom = atom(null, (_get, set) => {
   set(planMapAtom, null);
   set(selectedPlanFeatureAtom, null);
   set(planDraftAtom, null);
+  set(savedChoicesOfferAtom, null);
 });

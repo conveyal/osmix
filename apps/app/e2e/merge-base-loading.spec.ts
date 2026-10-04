@@ -284,6 +284,59 @@ test("a removal chosen in the review is applied and reported", async ({ page }) 
   });
 });
 
+test("choices are saved for the files, offered back, exported and imported", async ({ page }) => {
+  const { base, patch } = createWayRemovalInputs();
+  await openTinyMerge(page, {
+    base: {
+      name: "saved-base.pbf",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from(await toPbfBuffer(base)),
+    },
+    patch: {
+      name: "saved-patch.pbf",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from(await toPbfBuffer(patch)),
+    },
+  });
+  await page.getByRole("checkbox", { name: "Enable proximity matching" }).check();
+  await page.getByRole("checkbox", { name: "Copy tags", exact: true }).uncheck();
+  await page.getByRole("checkbox", { name: "Review redundant way removal" }).check();
+  const reviewPlan = page.getByRole("button", { name: "Review plan" });
+  await reviewPlan.click();
+  const removal = () =>
+    page
+      .getByRole("region", { name: "Imported way 20", exact: true })
+      .locator('[data-proposal-id="remove:w20>w10"]');
+  await removal().getByRole("radio", { name: "Include", exact: true }).click();
+  await page.getByRole("button", { name: "Apply 1 choice", exact: true }).click();
+  await expect(removal()).toContainText("In the plan");
+
+  // Leaving the review keeps the choice; planning the same files again offers it back.
+  await page.getByRole("button", { name: "Back to inputs" }).click();
+  await reviewPlan.click();
+  await expect(page.getByText("1 choice saved from your last review of these files")).toBeVisible();
+  await expect(removal()).not.toContainText("In the plan");
+  await page.getByRole("button", { name: "Restore 1 choice", exact: true }).click();
+  await expect(removal()).toContainText("In the plan");
+
+  // Export, undo the choice, and import it back.
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export choices (.json)" }).click();
+  const exported = await (await download).path();
+  if (!exported) throw Error("Missing choices download");
+  expect(JSON.parse(await readFile(exported, "utf8"))).toMatchObject({
+    format: "osmix-merge-decisions",
+    decisions: [{ proposalId: "remove:w20>w10", action: "accept" }],
+  });
+  await removal().getByRole("radio", { name: "Decide later", exact: true }).click();
+  await page.getByRole("button", { name: "Apply 1 choice", exact: true }).click();
+  await expect(removal()).not.toContainText("In the plan");
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Import choices" }).click();
+  await (await chooser).setFiles(exported);
+  await expect(removal()).toContainText("In the plan");
+});
+
 test("a late cancellation preserves the committed exact result and replacing the base clears completion", async ({
   page,
 }) => {

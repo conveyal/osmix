@@ -69,6 +69,7 @@ export {
   OsmPbfSelectedFile,
   OsmPbfOpenUrlButton,
   OsmPbfSelectFileButton,
+  showFileSelector,
 } from "./components/osm-pbf-file-input.tsx";
 export { OsmDatasetSection } from "./components/osm-dataset-section.tsx";
 export { OsmSourceLinks } from "./components/osm-source-links.tsx";

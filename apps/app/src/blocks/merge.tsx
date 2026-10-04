@@ -4,11 +4,13 @@ import {
   OsmDatasetSection,
   OsmInfoTable,
   pagePath,
+  showFileSelector,
   StoredOsmList,
   useFlyToOsmBounds,
 } from "@osmix/app-components";
 import {
   committedMutationOsmId,
+  mergeDecisionsKey,
   mergedOsmRefreshRetryId,
   osmLoadingAbortControllerAtom,
   selectOsmEntityAtom,
@@ -41,9 +43,15 @@ import { PatchIdNotice } from "../components/patch-id-notice";
 import { PlanInputs } from "../components/plan-inputs";
 import { PLAN_PAGE_SIZE, PlanReview } from "../components/plan-review";
 import { PlanSummary } from "../components/plan-summary";
+import { SavedChoices } from "../components/saved-choices";
 import { StepActions } from "../components/step-actions";
 import { SuggestedChoices } from "../components/suggested-choices";
 import { firstInvalidConflationInputId, toOsmConflationOptions } from "../lib/conflation-workflow";
+import {
+  mergeDecisionsFile,
+  parseMergeDecisionsFile,
+  sameInputs,
+} from "../lib/merge-decisions-file";
 import {
   buildMergePlanOptions,
   bulkResultMessage,
@@ -75,6 +83,7 @@ import {
   planPageAtom,
   planBulkPreviewAtom,
   planDraftAtom,
+  savedChoicesOfferAtom,
   planPageIndexAtom,
   planPendingChoicesAtom,
   resetMergePlanAtom,
@@ -106,6 +115,7 @@ export default function MergeBlock() {
   const [pageIndex, setPageIndex] = useAtom(planPageIndexAtom);
   const [bulkPreview, setBulkPreview] = useAtom(planBulkPreviewAtom);
   const [draft, setDraft] = useAtom(planDraftAtom);
+  const [savedOffer, setSavedOffer] = useAtom(savedChoicesOfferAtom);
   const pendingChoices = useAtomValue(planPendingChoicesAtom);
   const setPlanMap = useSetAtom(planMapAtom);
   const openFileInExtract = useOpenFileInExtract();
@@ -200,6 +210,42 @@ export default function MergeBlock() {
       },
     });
 
+  /** Where a plan's decisions are saved: its input files' content and patch-ID mode. */
+  const savedChoicesKey = (plan: MergePlanOverview) =>
+    mergeDecisionsKey(
+      plan.inputs.base.contentHash,
+      plan.inputs.patch.contentHash,
+      plan.options.patchIds ?? "osm",
+    );
+
+  /** Save a plan's decisions for its input files; with none, forget any saved ones. */
+  const saveChoices = async (plan: MergePlanOverview) => {
+    const key = savedChoicesKey(plan);
+    setSavedOffer(null);
+    if (plan.decisions.length === 0) {
+      await remote.deleteSavedMergeDecisions(key);
+      return;
+    }
+    await remote.saveMergeDecisions({
+      key,
+      baseContentHash: plan.inputs.base.contentHash,
+      patchContentHash: plan.inputs.patch.contentHash,
+      patchIds: plan.options.patchIds ?? "osm",
+      ...(base.fileInfo?.fileHash ? { baseFileHash: base.fileInfo.fileHash } : {}),
+      ...(patch.fileInfo?.fileHash ? { patchFileHash: patch.fileInfo.fileHash } : {}),
+      decisions: plan.decisions,
+      savedAt: Date.now(),
+    });
+  };
+
+  /** Replan with `decisions`, show the result and save it; returns the new plan. */
+  const replanWith = async (baseOsmId: string, decisions: readonly PlanDecision[]) => {
+    const next = await remote.setMergePlanDecisions(baseOsmId, [...decisions]);
+    await showPlan(baseOsmId, next, pageIndex);
+    await saveChoices(next);
+    return next;
+  };
+
   const reviewPlan = async () => {
     const options = planOptions();
     if (!options || !base.osm || !patch.osm) return;
@@ -211,7 +257,59 @@ export default function MergeBlock() {
       const planned = await remote.planMerge(baseOsmId, patchOsmId, options);
       await showPlan(baseOsmId, planned, 0);
       goTo("review");
+      const saved = await remote.getSavedMergeDecisions(savedChoicesKey(planned));
+      if (saved && saved.decisions.length > 0) setSavedOffer(saved);
       return `Planned ${planned.featureCount.toLocaleString()} imported features`;
+    });
+  };
+
+  const restoreSavedChoices = async () => {
+    if (!base.osm || !savedOffer) return;
+    const baseOsmId = base.osm.id;
+    const { decisions } = savedOffer;
+    await runTask("Restore choices", async () => {
+      const next = await replanWith(baseOsmId, decisions);
+      return `Restored ${choicesText(decisions.length)}${staleText(next)}`;
+    });
+  };
+
+  const discardSavedChoices = async () => {
+    if (!savedOffer) return;
+    await remote.deleteSavedMergeDecisions(savedOffer.key);
+    setSavedOffer(null);
+  };
+
+  const exportChoices = async () => {
+    if (!overview) return;
+    const fileHandle = await showSaveFilePickerWithFallback({
+      suggestedName: makePlanOscName(baseFileName, patchFileName).replace(
+        /\.osc$/,
+        "-choices.json",
+      ),
+    });
+    if (!fileHandle) return;
+    await writeJsonReport(
+      await fileHandle.createWritable(),
+      mergeDecisionsFile(overview, {
+        base: baseFileName ?? "Base dataset",
+        patch: patchFileName ?? "Imported dataset",
+      }),
+    );
+  };
+
+  const importChoices = async () => {
+    if (!base.osm || !overview) return;
+    const selected = await showFileSelector(".json,application/json");
+    if (!selected) return;
+    const baseOsmId = base.osm.id;
+    const current = overview;
+    await runTask("Import choices", async () => {
+      const file = parseMergeDecisionsFile(await selected.text());
+      const next = await replanWith(baseOsmId, file.decisions);
+      const elsewhere = sameInputs(file, current)
+        ? ""
+        : ` made on other files (${file.inputs.base.name}, ${file.inputs.patch.name})`;
+      return `Imported ${choicesText(file.decisions.length)}${elsewhere}${staleText(next)}`;
     });
   };
 
@@ -227,6 +325,7 @@ export default function MergeBlock() {
       await remote.setMergePlanFilter(baseOsmId, filter);
       setDraft(null);
       await showPlan(baseOsmId, planned, 0);
+      await saveChoices(planned);
       return mode === "new" ? "Replanned with every patch feature new" : "Replanned";
     });
   };
@@ -258,10 +357,9 @@ export default function MergeBlock() {
     const baseOsmId = base.osm.id;
     const count = draftCount;
     await runTask("Update plan", async () => {
-      const next = await remote.setMergePlanDecisions(baseOsmId, draft.decisions);
+      await replanWith(baseOsmId, draft.decisions);
       setDraft(null);
-      await showPlan(baseOsmId, next, pageIndex);
-      return `Applied ${count.toLocaleString()} ${count === 1 ? "choice" : "choices"}`;
+      return `Applied ${choicesText(count)}`;
     });
   };
 
@@ -271,6 +369,7 @@ export default function MergeBlock() {
     await runTask("Choose for shown features", async () => {
       const result = await remote.applyMergePlanBulk(baseOsmId, request);
       await showPlan(baseOsmId, result.overview, pageIndex);
+      await saveChoices(result.overview);
       return bulkResultMessage(request.action, result);
     });
   };
@@ -633,6 +732,14 @@ export default function MergeBlock() {
       {step === "review" && overview && page ? (
         <>
           <PlanSummary overview={overview} />
+          <SavedChoices
+            disabled={draftCount > 0}
+            offered={savedOffer?.decisions.length ?? null}
+            onDiscardOffer={discardSavedChoices}
+            onExport={exportChoices}
+            onImport={importChoices}
+            onRestore={restoreSavedChoices}
+          />
           <SuggestedChoices
             choices={overview.choices}
             group={filter.group}
@@ -718,6 +825,15 @@ export default function MergeBlock() {
 }
 
 /** Run one step of the workflow as a task. A failure is recorded by the task and stays here. */
+const choicesText = (count: number) =>
+  `${count.toLocaleString()} ${count === 1 ? "choice" : "choices"}`;
+
+/** How many of a plan's decisions name no proposal it has, for a task's outcome. */
+const staleText = (plan: MergePlanOverview) =>
+  plan.staleDecisions.length > 0
+    ? `; ${plan.staleDecisions.length.toLocaleString()} no longer apply to this plan`
+    : "";
+
 async function runTask(title: string, fn: (task: TaskHandle) => Promise<string>) {
   try {
     await Tasks.run(title, fn, { summary: (summary) => summary });

@@ -16,6 +16,7 @@ import {
   transfer,
 } from "osmix";
 
+import type { SavedMergeDecisions } from "./lib/merge-decisions.ts";
 import type {
   OsmixAppWorker,
   PbfUrlLoadResult,
@@ -235,6 +236,27 @@ export class OsmixAppRemote extends OsmixRemote<OsmixAppWorker> {
   /**
    * Delete a stored Osm entry from IndexedDB.
    */
+  getSavedMergeDecisions(key: string): Promise<SavedMergeDecisions | null> {
+    return this.runWithWorker((worker) => worker.getSavedMergeDecisions(key), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
+  saveMergeDecisions(saved: SavedMergeDecisions): Promise<void> {
+    return this.runWithWorker((worker) => worker.saveMergeDecisions(saved), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
+  deleteSavedMergeDecisions(key: string): Promise<void> {
+    return this.runWithWorker((worker) => worker.deleteSavedMergeDecisions(key), {
+      lane: "control",
+      retry: "once",
+    });
+  }
+
   deleteStoredOsm(id: string): Promise<void> {
     return this.runWithWorker((worker) => worker.deleteStoredOsm(id), {
       lane: "control",
