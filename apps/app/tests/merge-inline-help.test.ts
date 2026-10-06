@@ -31,6 +31,7 @@ describe("merge inline guidance", () => {
         allowWayRemoval: false,
         allowWayReplacement: false,
         replacementToleranceMeters: 1,
+        traceLengthMeters: 10,
         maxDistanceMeters: 1,
       });
     });

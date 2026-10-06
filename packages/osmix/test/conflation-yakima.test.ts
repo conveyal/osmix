@@ -95,18 +95,26 @@ describe("Yakima fuzzy conflation", () => {
       expect(discovery.options).toEqual({
         propertyKeys: ["barrier", "crossing", "kerb", "tactile_paving"],
         attachNetwork: true,
+        traceLengthMeters: 10,
         maxDistanceMeters: 1,
         automatic: "high-confidence",
       });
       expect(discovery.summary).toEqual({
         total: 11_689,
         accepted: 0,
-        automatic: 145,
-        review: 212,
-        blocked: 88,
+        automatic: 72,
+        review: 138,
+        blocked: 235,
         unmatched: 11_244,
         rejected: 0,
       });
+      // Points along OSW sidewalks drawn beside the OSM sidewalks are copies of those paths,
+      // not junctions (MP-M1): the 147 blocked since that rule.
+      expect(
+        discovery.candidates.filter((candidate) =>
+          candidate.networkAttachment?.reasons.includes("traces-base-way"),
+        ),
+      ).toHaveLength(147);
 
       const matched = discovery.candidates.filter((candidate) => candidate.targetId != null);
       const targetCountBySource = new Map<number, number>();
@@ -170,16 +178,19 @@ describe("Yakima fuzzy conflation", () => {
         kerb: "raised",
       });
 
+      // An OSW sidewalk point beside the same OSM sidewalk: the OSW way runs along it, so the
+      // point is a copy of that path and is not connected to it (MP-M1).
       const sidewalk = getCandidate(discovery, "node:2213758->8075647920");
       expectNonExact(sidewalk, base, patch);
       expect(sidewalk).toMatchObject({
-        status: "automatic",
+        status: "blocked",
         propertyTransfer: {
           status: "blocked",
           reasons: ["no-transferable-properties"],
         },
-        networkAttachment: { status: "automatic", reasons: [] },
+        networkAttachment: { status: "blocked", reasons: ["traces-base-way"] },
       });
+      expect(sidewalk.evidence.tracedLengthMeters).toBeGreaterThanOrEqual(10);
       expect(
         getIncidentWays(patch, sidewalk.sourceId).find((way) => way.id === 848575)?.tags,
       ).toMatchObject({ footway: "sidewalk", highway: "footway" });

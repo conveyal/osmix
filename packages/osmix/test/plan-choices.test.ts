@@ -25,8 +25,9 @@ function osm(
 }
 
 /**
- * A base footway ending at node 1; two imported footways ending 0.1 m north and 0.7 m east of
- * it (the second bends away); and an imported kerb near base node 3.
+ * A base footway ending at node 1; an imported footway ending 0.1 m north of it, one running
+ * east-west through a point 0.7 m east of it (a point along a way that bends away); and an
+ * imported kerb near base node 3.
  */
 function planned() {
   const base = osm(
@@ -43,13 +44,14 @@ function planned() {
     [
       { id: 101, lon: 0, lat: 0.1 * M },
       { id: 102, lon: 0, lat: 0.001 },
+      { id: 203, lon: -0.001, lat: 0 },
       { id: 201, lon: 0.7 * M, lat: 0 },
       { id: 202, lon: 0.001, lat: 0 },
       { id: 301, lon: 0.01 + 0.2 * M, lat: 0, tags: { kerb: "lowered" } },
     ],
     [
       { id: 20, refs: [101, 102], tags: { highway: "footway" } },
-      { id: 30, refs: [201, 202], tags: { highway: "footway" } },
+      { id: 30, refs: [203, 201, 202], tags: { highway: "footway" } },
     ],
   );
   const worker = new TestWorker();

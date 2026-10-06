@@ -82,6 +82,7 @@ export type OsmConflationReasonCode =
   | "routing-family-conflict"
   | "routing-property"
   | "same-id"
+  | "traces-base-way"
   | "unsupported-way-chain"
   | "way-removal-connection-required"
   | "way-removal-topology-conflict"
@@ -115,6 +116,8 @@ export interface OsmConflationEvidence {
   featureTypeConflicts?: OsmConflationFeatureTypeConflict[];
   patchWayIds?: number[];
   bearingDifferenceDegrees?: number;
+  /** How far the imported way runs along the target's base way through the source (MP-M1). */
+  tracedLengthMeters?: number;
   endpointDistancesMeters?: [number, number];
   lengthDifferenceRatio?: number;
   maxGeometryDistanceMeters?: number;
@@ -188,6 +191,11 @@ export interface OsmConflationOptions {
   allowWayReplacement?: boolean;
   /** How far apart, in meters, an imported and a base way may be to replace. Defaults to 1. */
   replacementToleranceMeters?: number;
+  /**
+   * How far, in meters, an imported way must run along a base way for its points not to be
+   * connected to that way: it is a copy of the same path (MP-M1). Defaults to 10.
+   */
+  traceLengthMeters?: number;
   maxDistanceMeters?: number;
   automatic?: OsmConflationAutomatic;
   decisions?: OsmConflationDecision[];
@@ -202,6 +210,7 @@ export interface ResolvedOsmConflationOptions {
   allowWayReplacement?: boolean;
   /** Present when `allowWayReplacement` is. */
   replacementToleranceMeters?: number;
+  traceLengthMeters: number;
   maxDistanceMeters: number;
   automatic: OsmConflationAutomatic;
 }

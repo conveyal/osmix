@@ -27,7 +27,12 @@ import { accessSignature } from "./rules/access.ts";
 import { isAreaWay } from "./rules/area.ts";
 import { hasAdjacentDuplicateRefs, hasTooFewDistinctRefs } from "./rules/collapse.ts";
 import { routingGradeSignature } from "./rules/grade.ts";
-import { lineBbox, lineLength, symmetricLineDistance } from "./rules/line-geometry.ts";
+import {
+  lineBbox,
+  lineLength,
+  symmetricLineDistance,
+  tracedLengthThrough,
+} from "./rules/line-geometry.ts";
 import {
   assessJunction,
   assessNodeTags,
@@ -63,6 +68,7 @@ import { type DatasetView, type EntityRelationContext, osmDatasetView } from "./
 // cross-dataset workflow. Proximity alone never authorizes a topology change.
 const DEFAULT_MAX_DISTANCE_METERS = 1;
 const MAX_BEARING_DIFFERENCE_DEGREES = 30;
+const DEFAULT_TRACE_LENGTH_METERS = 10;
 const MAX_LENGTH_DIFFERENCE_RATIO = 0.05;
 
 type DiscoveryContext = {
@@ -96,6 +102,10 @@ function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOp
   ) {
     throw Error("Conflation allowWayReplacement must be a boolean");
   }
+  const traceLengthMeters = options.traceLengthMeters ?? DEFAULT_TRACE_LENGTH_METERS;
+  if (!Number.isFinite(traceLengthMeters) || traceLengthMeters <= 0) {
+    throw Error("Conflation traceLengthMeters must be a positive finite number");
+  }
   const replacementToleranceMeters =
     options.replacementToleranceMeters ?? DEFAULT_MAX_DISTANCE_METERS;
   if (!Number.isFinite(replacementToleranceMeters) || replacementToleranceMeters <= 0) {
@@ -126,6 +136,7 @@ function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOp
     ...(options.allowWayReplacement
       ? { allowWayReplacement: true, replacementToleranceMeters }
       : {}),
+    traceLengthMeters,
     maxDistanceMeters,
     automatic: options.automatic ?? "high-confidence",
   };
@@ -373,6 +384,57 @@ function connectionBreaksRestriction(
   return false;
 }
 
+/** Whether `nodeId` is only at an open way's first or last position. */
+function isWayEnd(way: OsmWay, nodeId: number) {
+  const first = way.refs[0];
+  const last = way.refs.at(-1);
+  if (first === last) return false;
+  return way.refs.every(
+    (ref, index) => ref !== nodeId || index === 0 || index === way.refs.length - 1,
+  );
+}
+
+/**
+ * The longest stretch of an imported way, through `source` as an interior point, that stays
+ * within the matching radius of a compatible base way at the target. Counting stops at the
+ * trace length, which is all the rule needs.
+ */
+function tracedLengthAlongBase(
+  context: DiscoveryContext,
+  source: OsmNode,
+  sourceWays: readonly OsmWay[],
+  targetWays: readonly OsmWay[],
+) {
+  const { maxDistanceMeters, traceLengthMeters } = context.options;
+  const coordinates = (view: DatasetView, way: OsmWay) => {
+    const line: LonLat[] = [];
+    for (const ref of way.refs) {
+      const node = view.getNode(ref);
+      if (!node) return null;
+      line.push([node.lon, node.lat]);
+    }
+    return line;
+  };
+  let longest = 0;
+  for (const sourceWay of sourceWays) {
+    const index = sourceWay.refs.indexOf(source.id);
+    if (index <= 0 || index >= sourceWay.refs.length - 1) continue;
+    const line = coordinates(context.patchView, sourceWay);
+    if (!line) continue;
+    for (const targetWay of targetWays) {
+      if (!wayContextsCompatible(sourceWay, targetWay)) continue;
+      const baseLine = coordinates(context.baseView, targetWay);
+      if (!baseLine || baseLine.length < 2) continue;
+      longest = Math.max(
+        longest,
+        tracedLengthThrough(line, index, baseLine, maxDistanceMeters, traceLengthMeters),
+      );
+      if (longest >= traceLengthMeters) return longest;
+    }
+  }
+  return longest;
+}
+
 function nodeAttachmentAssessment(
   context: DiscoveryContext,
   source: OsmNode,
@@ -441,7 +503,15 @@ function nodeAttachmentAssessment(
     }).map(toReasonCode),
   );
 
-  const sourceSegments = nodeSegments(context.patchView, source.id, sourceWays);
+  // An interior point of an imported way that runs along the target's base way is a copy of
+  // that path, not a point where paths meet: connecting it would weld two parallel lines.
+  const tracedLength = tracedLengthAlongBase(context, source, sourceWays, targetWays);
+  if (tracedLength >= context.options.traceLengthMeters) hardReasons.push("traces-base-way");
+
+  // A path's end meets another at whatever angle the corner has; only points along a way
+  // must line up with the base way they join.
+  const wayEnd = sourceWays.every((way) => isWayEnd(way, source.id));
+  const sourceSegments = wayEnd ? [] : nodeSegments(context.patchView, source.id, sourceWays);
   const targetSegments = nodeSegments(context.baseView, target.id, targetWays);
   let maximumMinimumBearingDifference = 0;
   // Every imported incident segment needs at least one compatible base segment.
@@ -458,9 +528,10 @@ function nodeAttachmentAssessment(
     maximumMinimumBearingDifference = Math.max(maximumMinimumBearingDifference, minimum);
   }
   if (
-    sourceSegments.length === 0 ||
-    !Number.isFinite(maximumMinimumBearingDifference) ||
-    maximumMinimumBearingDifference > MAX_BEARING_DIFFERENCE_DEGREES
+    !wayEnd &&
+    (sourceSegments.length === 0 ||
+      !Number.isFinite(maximumMinimumBearingDifference) ||
+      maximumMinimumBearingDifference > MAX_BEARING_DIFFERENCE_DEGREES)
   ) {
     reviewReasons.push("bearing-mismatch");
   }
@@ -476,9 +547,11 @@ function nodeAttachmentAssessment(
     assessment: { status, reasons },
     evidence: {
       patchWayIds: sourceWays.map((way) => way.id).toSorted((a, b) => a - b),
-      bearingDifferenceDegrees: Number.isFinite(maximumMinimumBearingDifference)
-        ? roundEvidence(maximumMinimumBearingDifference)
-        : undefined,
+      bearingDifferenceDegrees:
+        !wayEnd && Number.isFinite(maximumMinimumBearingDifference)
+          ? roundEvidence(maximumMinimumBearingDifference)
+          : undefined,
+      ...(tracedLength > 0 ? { tracedLengthMeters: roundEvidence(tracedLength) } : {}),
     },
   };
 }
@@ -767,21 +840,29 @@ function discoverWayCandidates(context: DiscoveryContext) {
 
 function applyManyToOneClassification(candidates: OsmConflationCandidate[]) {
   // Candidate discovery is local to each source. Enforce the batch-wide one-to-one
-  // invariant only after all otherwise plausible pairs are known.
+  // invariant only after all otherwise plausible pairs are known. A point of a copy of the
+  // base path, with nothing else to do at the target, competes with nothing (MP-M1).
   const sourcesByTarget = new Map<string, Set<number>>();
   for (const candidate of candidates) {
-    if (candidate.targetId == null) continue;
+    if (candidate.targetId == null || tracesOnly(candidate)) continue;
     const key = `${candidate.entityType}:${candidate.targetId}`;
     const sources = sourcesByTarget.get(key) ?? new Set();
     sources.add(candidate.sourceId);
     sourcesByTarget.set(key, sources);
   }
   for (const candidate of candidates) {
-    if (candidate.targetId == null) continue;
+    if (candidate.targetId == null || tracesOnly(candidate)) continue;
     if ((sourcesByTarget.get(`${candidate.entityType}:${candidate.targetId}`)?.size ?? 0) <= 1)
       continue;
     addReviewReason(candidate, "many-to-one");
   }
+}
+
+/** A candidate whose only action is a connection blocked as a copy of the base path. */
+function tracesOnly(candidate: OsmConflationCandidate) {
+  if (!candidate.networkAttachment?.reasons.includes("traces-base-way")) return false;
+  const transfer = candidate.propertyTransfer.status;
+  return transfer === "blocked" || transfer === "unmatched";
 }
 
 /** Discover fuzzy candidates strictly between untouched patch and immutable base inputs. */

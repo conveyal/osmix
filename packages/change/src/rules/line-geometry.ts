@@ -86,3 +86,42 @@ export function lineBbox(
     paddingMeters / (111_320 * Math.max(0.01, Math.cos((middleLat * Math.PI) / 180)));
   return [minLon - lonPadding, minLat - latPadding, maxLon + lonPadding, maxLat + latPadding];
 }
+
+/** Spacing of the points `tracedLengthThrough` checks: fine, so a short divergence is seen. */
+const TRACE_STEP_METERS = 1;
+
+/**
+ * How far `line` stays within `tolerance` meters of `other` through its vertex `vertexIndex`:
+ * the length of the unbroken stretch around the vertex, walking both ways until a point falls
+ * outside. 0 when the vertex itself is outside. Stops counting at `enough`.
+ */
+export function tracedLengthThrough(
+  line: readonly LonLat[],
+  vertexIndex: number,
+  other: readonly LonLat[],
+  tolerance: number,
+  enough = Number.POSITIVE_INFINITY,
+) {
+  const vertex = line[vertexIndex];
+  if (!vertex || pointLineDistance(vertex, other) > tolerance) return 0;
+  let total = 0;
+  for (const step of [1, -1]) {
+    for (let index = vertexIndex; index + step >= 0 && index + step < line.length; index += step) {
+      const start = line[index]!;
+      const end = line[index + step]!;
+      const length = haversineDistance(start, end);
+      const steps = Math.max(1, Math.ceil(length / TRACE_STEP_METERS));
+      let inside = steps;
+      for (let sample = 1; sample <= steps; sample++) {
+        if (pointLineDistance(interpolate(start, end, sample / steps), other) > tolerance) {
+          inside = sample - 1;
+          break;
+        }
+      }
+      total += (length * inside) / steps;
+      if (inside < steps || total >= enough) break;
+    }
+    if (total >= enough) break;
+  }
+  return total;
+}

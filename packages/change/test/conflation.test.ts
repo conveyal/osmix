@@ -917,9 +917,27 @@ describe("safe fuzzy topology gates", () => {
       ],
       [{ id: 10, refs: [2, 1], tags: { highway: "footway" } }],
     );
-    const perpendicular = discoverConflationCandidates(
+    // A way's end meets the base path at a corner: no bearing check (MP-M1).
+    const corner = discoverConflationCandidates(
       surfaceBase,
       patch,
+      attachmentOptions,
+    ).candidates.find((candidate) => candidate.sourceId === 101);
+    expect(corner?.reasons).not.toContain("bearing-mismatch");
+    expect(corner?.evidence.bearingDifferenceDegrees).toBeUndefined();
+    // A point along a way that crosses the base path at right angles does need review.
+    const throughPatch = createOsm(
+      "through",
+      [
+        { id: 100, lon: -0.001, lat: 0 },
+        { id: 101, lon: 0.000005, lat: 0 },
+        { id: 102, lon: 0.001, lat: 0 },
+      ],
+      [{ id: 20, refs: [100, 101, 102], tags: { highway: "footway" } }],
+    );
+    const perpendicular = discoverConflationCandidates(
+      surfaceBase,
+      throughPatch,
       attachmentOptions,
     ).candidates.find((candidate) => candidate.sourceId === 101);
     expect(perpendicular?.status).toBe("review");

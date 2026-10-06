@@ -48,19 +48,23 @@ function sameWay(a: number, b: number) {
   );
 }
 
-/** Two imported footways ending 0.1 m north and 0.7 m east of node 1. */
+/**
+ * An imported footway ending 0.1 m north of node 1, and one running east-west through a point
+ * 0.7 m east of it: a point along a way at right angles to the base way, so it bends.
+ */
 function twoWays() {
   return osm(
     "patch",
     [
       { id: 101, lon: 0, lat: 0.1 * M },
       { id: 102, lon: 0, lat: 0.001 },
+      { id: 203, lon: -0.001, lat: 0 },
       { id: 201, lon: 0.7 * M, lat: 0 },
       { id: 202, lon: 0.001, lat: 0 },
     ],
     [
       { id: 20, refs: [101, 102], tags: { highway: "footway" } },
-      { id: 30, refs: [201, 202], tags: { highway: "footway" } },
+      { id: 30, refs: [203, 201, 202], tags: { highway: "footway" } },
     ],
   );
 }
@@ -238,12 +242,13 @@ describe("choices that still wait (MP-M7)", () => {
       [
         { id: 101, lon: 0, lat: 0.7 * M },
         { id: 102, lon: 0, lat: 0.001 },
+        { id: 203, lon: -0.001, lat: 0 },
         { id: 201, lon: 0.1 * M, lat: 0 },
         { id: 202, lon: 0.001, lat: 0 },
       ],
       [
         { id: 20, refs: [101, 102], tags: { highway: "footway" } },
-        { id: 30, refs: [201, 202], tags: { highway: "footway" } },
+        { id: 30, refs: [203, 201, 202], tags: { highway: "footway" } },
       ],
     );
     const planned = plan(patch, "aggressive");

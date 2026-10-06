@@ -129,6 +129,36 @@ export function ConflationConfig() {
             Join eligible imported paths to existing base points. This changes how the paths
             connect.
           </p>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="conflation-trace-length">Treat as the same path after (m)</label>
+            <Input
+              id="conflation-trace-length"
+              name="matching-trace-length"
+              aria-describedby={`conflation-trace-length-help${errors.traceLengthMeters ? " conflation-trace-length-error" : ""}`}
+              aria-invalid={errors.traceLengthMeters ? true : undefined}
+              disabled={!form.attachNetwork}
+              min="0"
+              step="any"
+              type="number"
+              inputMode="decimal"
+              value={Number.isFinite(form.traceLengthMeters) ? form.traceLengthMeters : ""}
+              onChange={(event) => {
+                updateForm((current) => ({
+                  ...current,
+                  traceLengthMeters: event.target.valueAsNumber,
+                }));
+              }}
+            />
+            <p id="conflation-trace-length-help" className="text-muted-foreground">
+              An imported path that runs this far along a base path is a copy of it; its points
+              aren't connected to that path.
+            </p>
+            {errors.traceLengthMeters ? (
+              <p id="conflation-trace-length-error" className="text-destructive">
+                {errors.traceLengthMeters}
+              </p>
+            ) : null}
+          </div>
           <CheckboxLabel className="min-h-8">
             <Checkbox
               checked={form.allowWayRemoval}

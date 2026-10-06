@@ -8,6 +8,8 @@ export interface ConflationFormState {
   allowWayRemoval: boolean;
   allowWayReplacement: boolean;
   replacementToleranceMeters: number;
+  /** How far an imported path runs along a base path before it is a copy of it (MP-M1). */
+  traceLengthMeters: number;
   maxDistanceMeters: number;
 }
 
@@ -20,6 +22,9 @@ export const DEFAULT_CONFLATION_PROPERTY_KEYS = [
   "tactile_paving",
 ] as const;
 
+/** The planner's default; the option is sent only when the form differs from it. */
+const DEFAULT_TRACE_LENGTH_METERS = 10;
+
 export const DEFAULT_CONFLATION_FORM_STATE: ConflationFormState = {
   enabled: false,
   transferProperties: true,
@@ -28,6 +33,7 @@ export const DEFAULT_CONFLATION_FORM_STATE: ConflationFormState = {
   allowWayRemoval: false,
   allowWayReplacement: false,
   replacementToleranceMeters: 1,
+  traceLengthMeters: DEFAULT_TRACE_LENGTH_METERS,
   maxDistanceMeters: 1,
 };
 
@@ -48,6 +54,7 @@ const CONFLATION_ERROR_FIELD_IDS = {
   propertyKeys: "conflation-property-keys",
   maxDistanceMeters: "conflation-distance",
   replacementToleranceMeters: "conflation-replacement-tolerance",
+  traceLengthMeters: "conflation-trace-length",
 } as const;
 
 export type ConflationFormErrors = Partial<Record<keyof typeof CONFLATION_ERROR_FIELD_IDS, string>>;
@@ -64,6 +71,12 @@ export function conflationFormErrors(state: ConflationFormState): ConflationForm
     (!Number.isFinite(state.replacementToleranceMeters) || state.replacementToleranceMeters <= 0)
   ) {
     errors.replacementToleranceMeters = "Replacement tolerance must be greater than zero.";
+  }
+  if (
+    state.attachNetwork &&
+    (!Number.isFinite(state.traceLengthMeters) || state.traceLengthMeters <= 0)
+  ) {
+    errors.traceLengthMeters = "Same-path length must be greater than zero.";
   }
   if (
     !state.transferProperties &&
@@ -88,6 +101,7 @@ export function validateConflationForm(state: ConflationFormState): string | nul
     errors.propertyKeys ??
     errors.maxDistanceMeters ??
     errors.replacementToleranceMeters ??
+    errors.traceLengthMeters ??
     null
   );
 }
@@ -100,6 +114,7 @@ export function firstInvalidConflationInputId(state: ConflationFormState): strin
     "propertyKeys",
     "maxDistanceMeters",
     "replacementToleranceMeters",
+    "traceLengthMeters",
   ] as const) {
     if (errors[field]) return CONFLATION_ERROR_FIELD_IDS[field];
   }
@@ -119,6 +134,9 @@ export function toOsmConflationOptions(
     ...(state.allowWayRemoval ? { allowWayRemoval: true } : {}),
     ...(state.allowWayReplacement
       ? { allowWayReplacement: true, replacementToleranceMeters: state.replacementToleranceMeters }
+      : {}),
+    ...(state.attachNetwork && state.traceLengthMeters !== DEFAULT_TRACE_LENGTH_METERS
+      ? { traceLengthMeters: state.traceLengthMeters }
       : {}),
     maxDistanceMeters: state.maxDistanceMeters,
     automatic: "high-confidence",

@@ -48,6 +48,7 @@ describe("conflation workflow configuration", () => {
       allowWayRemoval: false,
       allowWayReplacement: false,
       replacementToleranceMeters: 1,
+      traceLengthMeters: 10,
       maxDistanceMeters: 1,
     });
     expect(parseConflationPropertyKeys(DEFAULT_CONFLATION_FORM_STATE.propertyKeys)).toEqual([
@@ -118,6 +119,17 @@ describe("conflation workflow configuration", () => {
       maxDistanceMeters: 1,
       automatic: "high-confidence",
     });
+  });
+
+  it("sends the same-path length only when it differs from the planner's default", () => {
+    const state = { ...DEFAULT_CONFLATION_FORM_STATE, enabled: true, attachNetwork: true };
+    expect(toOsmConflationOptions(state)).not.toHaveProperty("traceLengthMeters");
+    expect(toOsmConflationOptions({ ...state, traceLengthMeters: 25 })).toMatchObject({
+      traceLengthMeters: 25,
+    });
+    expect(validateConflationForm({ ...state, traceLengthMeters: 0 })).toBe(
+      "Same-path length must be greater than zero.",
+    );
   });
 
   it("enables way replacement with its own tolerance", () => {

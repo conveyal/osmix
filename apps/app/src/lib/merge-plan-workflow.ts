@@ -137,6 +137,7 @@ const REASON_LABEL: Record<string, string> = {
   "replacement-restriction": "A turn restriction uses the base way",
   "routing-family-conflict": "Allowed travel is incompatible",
   "routing-property": "Tag affects travel and requires review",
+  "traces-base-way": "Runs along this base path; replace it instead of connecting",
   "same-id": "Handled as a same-ID update",
   "unsupported-way-chain": "Matching one feature to several paths is unsupported",
   "would-collapse-way": "Connection would collapse a path",
@@ -302,8 +303,8 @@ export const CHOICE_GROUP_HELP: Record<PlanChoiceGroup, string> = {
     "Imported ways that trace base ways. Including keeps the imported ways and deletes the base " +
     "ways; junctions and relations move to the imported ways.",
   bend:
-    "The imported line would bend more than 30° to connect. Spot-check a few on the map, then " +
-    "include or leave them out together.",
+    "A point along the imported line would join the base path at more than 30°. A path's end " +
+    "may meet at any angle. Spot-check a few on the map, then include or leave them out together.",
   tie:
     "No candidate is clearly the one: they are about equally near, or the nearest bends sharply " +
     "or needs a closer look. Leaving them out keeps the imported points unconnected.",

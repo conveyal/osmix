@@ -216,12 +216,16 @@ function matchingDecisions(
   return decisions;
 }
 
+/** A connection blocked as a copy of the base path is never a choice (MP-M1). */
+const tracesBase = (proposal: PlanProposal) =>
+  proposal.status === "blocked" && proposal.reasons.includes("traces-base-way");
+
 function linkAlternatives(entries: readonly CandidateProposals[]) {
   for (const kind of ["connect", "copy", "remove"] as const) {
     const bySource = new Map<string, PlanProposal[]>();
     for (const entry of entries) {
       const proposal = entry[kind];
-      if (!proposal || !("alternatives" in proposal)) continue;
+      if (!proposal || !("alternatives" in proposal) || tracesBase(proposal)) continue;
       const key = `${proposal.source.type}:${proposal.source.id}`;
       bySource.set(key, [...(bySource.get(key) ?? []), proposal]);
     }
@@ -244,7 +248,7 @@ function linkAlternatives(entries: readonly CandidateProposals[]) {
 function linkCompetitors(entries: readonly CandidateProposals[]) {
   const byTarget = new Map<string, MatchingProposal[]>();
   const add = (proposal: PlanProposal | undefined) => {
-    if (!proposal || !("competitors" in proposal)) return;
+    if (!proposal || !("competitors" in proposal) || tracesBase(proposal)) return;
     const { kind, target } = proposal;
     // Copies onto one base node can all apply; everything else takes one feature.
     if (kind === "copy-tags" && target.type === "node") return;
