@@ -133,10 +133,11 @@ test("the reviewed workflow removes the accepted duplicate footway", async ({ pa
 
   const r1Id = scenario("R1").features[0]!.id;
   const r1 = page.getByRole("region", { name: `Imported way ${r1Id}`, exact: true });
-  // The choice replans in the worker; the radio follows the plan once it returns.
+  // Row choices collect until applied together; applying replans once.
   const include = removal(r1Id).getByRole("radio", { name: "Include", exact: true });
   await include.click();
   await expect(include).toBeChecked();
+  await page.getByRole("button", { name: "Apply 1 choice", exact: true }).click();
   await expect(r1).toContainText("Removed");
   await r1.getByRole("button", { name: "Show on map and evidence" }).click();
   await expect(r1.getByRole("button", { name: "Showing on map" })).toBeVisible();
