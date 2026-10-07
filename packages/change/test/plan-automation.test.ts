@@ -114,12 +114,21 @@ describe("automation levels (MP-M6)", () => {
     expect(planned.summary.features["needs-decision"]).toBe(1);
   });
 
-  it("settles competing imported features only when aggressive", () => {
-    expect(plan(twoWays(), "recommended").summary.automated).toBe(0);
-    const aggressive = plan(twoWays(), "aggressive");
-    expect(decisionOf(aggressive, "connect:n101>n1").decision).toBe("accept");
-    // Leaving the farther feature out is safe even though it bends away (bearing mismatch).
-    expect(decisionOf(aggressive, "connect:n201>n1").decision).toBe("reject");
+  it("lets points of different imported ways share a base point at every level (MP-M5)", () => {
+    for (const level of ["recommended", "aggressive"] as const) {
+      const planned = plan(twoWays(), level);
+      expect(findProposal(planned, "connect:n101>n1")).toMatchObject({
+        competitors: [],
+        effect: "applied",
+      });
+      // Way 30's point waits only for its own reason: it bends onto the base way.
+      expect(findProposal(planned, "connect:n201>n1")).toMatchObject({
+        competitors: [],
+        reasons: ["bearing-mismatch"],
+        effect: "needs-decision",
+      });
+      expect(planned.summary.automated).toBe(0);
+    }
   });
 
   it("never replaces a person's choice, and a rival they left out still competes", () => {
@@ -224,9 +233,9 @@ describe("choices that still wait (MP-M7)", () => {
 
   it("puts a near tie, a clear choice, a bend and a routing tag copy in their groups", () => {
     expect(sumsToNeedsDecision(plan(sameWay(0.4, 0.6), "recommended"))).toMatchObject({ tie: 1 });
-    // Way 30 bends away from the base way; way 20 wins the clear choice.
+    // Way 30 bends onto the base way; way 20 connects without a choice.
     expect(sumsToNeedsDecision(plan(twoWays(), "recommended"))).toMatchObject({
-      nearest: 1,
+      nearest: 0,
       bend: 1,
     });
     const kerb = osm("patch", [{ id: 101, lon: 0.2 * M, lat: 0, tags: { kerb: "lowered" } }], []);
@@ -244,29 +253,31 @@ describe("choices that still wait (MP-M7)", () => {
         { id: 102, lon: 0, lat: 0.001 },
         { id: 203, lon: -0.001, lat: 0 },
         { id: 201, lon: 0.1 * M, lat: 0 },
+        { id: 204, lon: 0.7 * M, lat: 0 },
         { id: 202, lon: 0.001, lat: 0 },
       ],
-      [
-        { id: 20, refs: [101, 102], tags: { highway: "footway" } },
-        { id: 30, refs: [203, 201, 202], tags: { highway: "footway" } },
-      ],
+      [{ id: 30, refs: [203, 201, 204, 202], tags: { highway: "footway" } }],
     );
+    // Two points of one way compete for node 1; the nearer bends onto the base way.
     const planned = plan(patch, "aggressive");
     expect(findProposal(planned, "connect:n201>n1").reasons).toContain("bearing-mismatch");
-    expect(sumsToNeedsDecision(planned)).toMatchObject({ nearest: 0, tie: 1, bend: 1 });
-    expect(pickNearestMergePlanDecisions(planned, ["connect:n101>n1", "connect:n201>n1"])).toEqual(
+    expect(findProposal(planned, "connect:n201>n1")).toMatchObject({
+      competitors: ["connect:n204>n1"],
+    });
+    expect(sumsToNeedsDecision(planned)).toMatchObject({ nearest: 0, bend: 1 });
+    expect(pickNearestMergePlanDecisions(planned, ["connect:n201>n1", "connect:n204>n1"])).toEqual(
       [],
     );
   });
 
   it("picks the clearly nearest as a person's decisions, like the aggressive level", () => {
-    const planned = plan(twoWays(), "recommended");
+    const planned = plan(sameWay(0.1, 0.7), "conservative");
     const { proposals } = getMergePlanChoices(planned);
     const nearest = [...proposals].filter(([, group]) => group === "nearest").map(([id]) => id);
     const decisions = pickNearestMergePlanDecisions(planned, nearest);
     expect(decisions).toEqual([
       { proposalId: "connect:n101>n1", action: "accept" },
-      { proposalId: "connect:n201>n1", action: "reject" },
+      { proposalId: "connect:n102>n1", action: "reject" },
     ]);
     setMergePlanDecisions(planned, decisions);
     expect(planned.summary.features["needs-decision"]).toBe(0);

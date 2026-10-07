@@ -115,7 +115,7 @@ const REASON_LABEL: Record<string, string> = {
   "grade-change": "Would change the base point's level or layer",
   "grade-conflict": "Features are on incompatible levels",
   "length-mismatch": "Lengths differ",
-  "many-to-one": "Multiple imported features share one base target",
+  "many-to-one": "Other imported points or features also target this base point or way",
   "merged-into-base": "Merged into a base feature instead",
   "multiple-targets": "Multiple possible base targets",
   "no-transferable-properties": "No selected tags differ",

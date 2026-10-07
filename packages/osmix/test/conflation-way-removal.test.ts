@@ -78,6 +78,30 @@ function inputs({
   return { base, patch };
 }
 
+/** Two points of one imported way, 0.4 m and 0.3 m from base node 1: they compete for it. */
+function sameWayContender() {
+  const base = new Osm({ id: "contender-base" });
+  base.nodes.addNode({ id: 1, lon: 0, lat: 0 });
+  base.nodes.addNode({ id: 2, lon: 0.001, lat: 0 });
+  base.ways.addWay({ id: 10, refs: [1, 2], tags: { highway: "footway" } });
+  const patch = new Osm({ id: "contender-patch" });
+  patch.nodes.addNode({ id: 201, lon: -0.000003, lat: 0 });
+  patch.nodes.addNode({ id: 101, lon: 0, lat: 0.000004 });
+  patch.nodes.addNode({ id: 102, lon: 0, lat: 0.001 });
+  patch.ways.addWay({ id: 20, refs: [201, 101, 102], tags: { highway: "footway" } });
+  for (const osm of [base, patch]) {
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+  }
+  return { base, patch };
+}
+
+const contenderOptions: OsmConflationOptions = {
+  propertyKeys: [],
+  attachNetwork: true,
+  automatic: "none",
+};
+
 function entities(osm: Osm) {
   return {
     nodes: [...osm.nodes.sorted()],
@@ -386,51 +410,42 @@ describe("explicit way removal through the facade and worker", () => {
     expect(result.nodes.getById(2)?.tags?.["name"]).toBe("Branch connection");
   });
 
-  it("links connections that compete for one base node, and bulk include skips them", () => {
+  it("connects points of different imported ways to one base node, and bulk includes both", () => {
     const { base, patch } = inputs({ branch: true, extraContender: true });
     const worker = workerFor(base, patch, {
       ...removalOptions,
       attachNetwork: true,
       automatic: "none",
     });
-    const connects = worker
-      .getMergePlanPage(base.id, 0, 100)
-      .features.flatMap(({ proposals }) => proposals)
-      .flatMap((proposal) =>
-        proposal.kind === "connect" && proposal.target.id === 1 ? [proposal] : [],
-      );
-    expect(connects.map((proposal) => [proposal.id, proposal.competitors])).toEqual([
-      ["connect:n101>n1", ["connect:n201>n1"]],
-      ["connect:n201>n1", ["connect:n101>n1"]],
-    ]);
-
-    // Bulk include leaves competing connections for their own choice (MP-M5) instead of
-    // including a set that planning must refuse.
+    for (const id of ["connect:n101>n1", "connect:n201>n1"]) {
+      expect(proposal(worker, base.id, id).competitors).toEqual([]);
+    }
     const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
+    const included = result.overview.decisions
+      .filter(({ action }) => action === "accept")
+      .map(({ proposalId }) => proposalId);
+    expect(included).toEqual(expect.arrayContaining(["connect:n101>n1", "connect:n201>n1"]));
+  });
+
+  it("links points of one imported way that compete for a base node, and bulk skips them", () => {
+    const { base, patch } = sameWayContender();
+    const worker = workerFor(base, patch, contenderOptions);
+    expect(proposal(worker, base.id, "connect:n101>n1").competitors).toEqual(["connect:n201>n1"]);
+    expect(proposal(worker, base.id, "connect:n201>n1").competitors).toEqual(["connect:n101>n1"]);
+    // Bulk include leaves competing connections for their own choice (MP-M5) instead of
+    // including a set that planning must refuse; counts are in features.
+    const preview = worker.previewMergePlanBulk(base.id, {});
+    const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
+    expect(preview.accept).toEqual({ changed: result.changed, waiting: result.waiting });
     const included = result.overview.decisions
       .filter(({ action }) => action === "accept")
       .map(({ proposalId }) => proposalId);
     expect(included).not.toContain("connect:n101>n1");
     expect(included).not.toContain("connect:n201>n1");
-    expect(result.waiting).toBe(2);
+    expect(result.waiting).toBe(1);
   });
 
-  it("counts bulk choices in features and previews them before deciding", () => {
-    const { base, patch } = inputs({ branch: true, extraContender: true });
-    const worker = workerFor(base, patch, {
-      ...removalOptions,
-      attachNetwork: true,
-      automatic: "none",
-    });
-    const preview = worker.previewMergePlanBulk(base.id, {});
-    const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
-    expect(preview.accept).toEqual({ changed: result.changed, waiting: result.waiting });
-    expect(preview.accept).toEqual({ changed: 1, waiting: 2 });
-    expect(preview.reject).toEqual({ changed: 2, waiting: 0 });
-    expect(preview.clear.changed).toBe(0);
-  });
-
-  it("includes a proposal in bulk when its only competitor is blocked", () => {
+  it("includes a proposal in bulk when the only other point near its base node is blocked", () => {
     const { base, patch } = inputs({ branch: true, blockedContender: true });
     const worker = workerFor(base, patch, {
       ...removalOptions,
@@ -440,7 +455,7 @@ describe("explicit way removal through the facade and worker", () => {
     expect(proposal(worker, base.id, "connect:n201>n1").status).toBe("blocked");
     expect(proposal(worker, base.id, "connect:n101>n1")).toMatchObject({
       status: "review",
-      competitors: ["connect:n201>n1"],
+      competitors: [],
     });
     const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
     expect(result.overview.decisions).toContainEqual({
@@ -465,12 +480,8 @@ describe("explicit way removal through the facade and worker", () => {
   });
 
   it("never replaces a decision in bulk, and a left-out competitor frees the other", () => {
-    const { base, patch } = inputs({ branch: true, extraContender: true });
-    const worker = workerFor(base, patch, {
-      ...removalOptions,
-      attachNetwork: true,
-      automatic: "none",
-    });
+    const { base, patch } = sameWayContender();
+    const worker = workerFor(base, patch, contenderOptions);
     worker.setMergePlanDecisions(base.id, [{ proposalId: "connect:n201>n1", action: "reject" }]);
     const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
     expect(result.overview.decisions).toContainEqual({
@@ -484,15 +495,14 @@ describe("explicit way removal through the facade and worker", () => {
   });
 
   it("refuses to plan with two competing connections included, naming both", () => {
-    const { base, patch } = inputs({ branch: true, extraContender: true });
+    const { base, patch } = sameWayContender();
     const decisions: PlanDecision[] = [
       { proposalId: "connect:n101>n1", action: "accept" },
       { proposalId: "connect:n201>n1", action: "accept" },
     ];
-    const matching = { ...removalOptions, attachNetwork: true, automatic: "none" as const };
-    expect(() => planMerge(base, patch, { ...direct, matching, decisions })).toThrow(
-      MergePlanDecisionConflictError,
-    );
+    expect(() =>
+      planMerge(base, patch, { ...direct, matching: contenderOptions, decisions }),
+    ).toThrow(MergePlanDecisionConflictError);
   });
 
   it("never includes a removal in bulk (MP-R1)", () => {
@@ -505,13 +515,8 @@ describe("explicit way removal through the facade and worker", () => {
   });
 
   it("keeps the plan unchanged when two included connections compete for one base node", () => {
-    const { base, patch } = inputs({ branch: true, extraContender: true });
-    const worker = workerFor(base, patch, {
-      ...removalOptions,
-      attachNetwork: true,
-      automatic: "none",
-    });
-    worker.setMergePlanDecisions(base.id, [acceptBranch, acceptRemoval]);
+    const { base, patch } = sameWayContender();
+    const worker = workerFor(base, patch, contenderOptions);
     const overview = worker.getMergePlanOverview(base.id);
     const page = worker.getMergePlanPage(base.id, 0, 100);
     const osc = worker.getMergePlanOsc(base.id);
@@ -521,12 +526,11 @@ describe("explicit way removal through the facade and worker", () => {
         { proposalId: "connect:n201>n1", action: "accept" },
       ]),
     ).toThrow(
-      /^Imported node 101 \(on imported way 20\) and imported node 201 \(on imported way 40\) would both connect to base node 1,/,
+      /^Imported node 101 \(on imported way 20\) and imported node 201 \(on imported way 20\) would both connect to base node 1, but they are points of one imported way or would join different grades there/,
     );
     expect(worker.getMergePlanOverview(base.id)).toEqual(overview);
     expect(worker.getMergePlanPage(base.id, 0, 100)).toEqual(page);
     expect(worker.getMergePlanOsc(base.id)).toBe(osc);
-    expect(wayCandidate(worker, base.id).wayRemoval?.status).toBe("review");
   });
 
   it("records a removal decision as stale when removal is not enabled", () => {

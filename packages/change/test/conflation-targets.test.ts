@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { discoverConflationCandidates, resolveConflationActions } from "../src/conflation.ts";
 import { merge } from "../src/merge.ts";
-import { planMerge } from "../src/plan/plan.ts";
+import { applyPlan, planMerge } from "../src/plan/plan.ts";
 import type { MergePlanOptions, PlanDecision } from "../src/plan/types.ts";
 import type { OsmConflationDecision } from "../src/types.ts";
 import { findProposal, planAndApply, withMatchingDecisions } from "./helpers/plan.ts";
@@ -246,30 +246,51 @@ describe("one selected target per imported feature", () => {
     ).toThrow("Unknown conflation candidate");
   });
 
-  it("still rejects two source attachments to the same base node", () => {
+  it("connects two imported ways to one base node, but not two points of one way", () => {
     const base = new Osm({ id: "base" });
     base.nodes.addNode({ id: 1, lon: 0, lat: 0 });
     base.nodes.addNode({ id: 2, lon: -0.001, lat: 0 });
     base.ways.addWay({ id: 10, refs: [2, 1], tags: { highway: "footway" } });
     base.buildIndexes();
     base.buildSpatialIndexes();
-    const patch = new Osm({ id: "patch" });
-    patch.nodes.addNode({ id: 101, lon: 0.000003, lat: 0 });
-    patch.nodes.addNode({ id: 102, lon: 0.001, lat: 0 });
-    patch.nodes.addNode({ id: 301, lon: 0, lat: 0.000003 });
-    patch.nodes.addNode({ id: 302, lon: 0, lat: 0.001 });
-    patch.ways.addWay({ id: 20, refs: [101, 102], tags: { highway: "footway" } });
-    patch.ways.addWay({ id: 30, refs: [301, 302], tags: { highway: "footway" } });
-    patch.buildIndexes();
-    patch.buildSpatialIndexes();
+    const twoWays = new Osm({ id: "patch" });
+    twoWays.nodes.addNode({ id: 101, lon: 0.000003, lat: 0 });
+    twoWays.nodes.addNode({ id: 102, lon: 0.001, lat: 0 });
+    twoWays.nodes.addNode({ id: 301, lon: 0, lat: 0.000003 });
+    twoWays.nodes.addNode({ id: 302, lon: 0, lat: 0.001 });
+    twoWays.ways.addWay({ id: 20, refs: [101, 102], tags: { highway: "footway" } });
+    twoWays.ways.addWay({ id: 30, refs: [301, 302], tags: { highway: "footway" } });
+    twoWays.buildIndexes();
+    twoWays.buildSpatialIndexes();
     const options = { propertyKeys: [], attachNetwork: true };
+    // An import gap: both ways end next to base node 1, and both connect there (MP-M5).
+    const shared = planMerge(base, twoWays, matchingOptions(options), quiet);
+    for (const id of ["connect:n101>n1", "connect:n301>n1"]) {
+      expect(shared.proposals.get(id)).toMatchObject({
+        status: "automatic",
+        competitors: [],
+        effect: "applied",
+      });
+    }
+    const merged = applyPlan(shared).osm;
+    expect(merged.ways.getById(20)?.refs[0]).toBe(1);
+    expect(merged.ways.getById(30)?.refs[0]).toBe(1);
+
+    // Two points of one way would loop it through node 1: one connection only.
+    const oneWay = new Osm({ id: "patch" });
+    oneWay.nodes.addNode({ id: 103, lon: 0, lat: 0.000003 });
+    oneWay.nodes.addNode({ id: 101, lon: 0.000003, lat: 0 });
+    oneWay.nodes.addNode({ id: 102, lon: 0.001, lat: 0 });
+    oneWay.ways.addWay({ id: 20, refs: [103, 101, 102], tags: { highway: "footway" } });
+    oneWay.buildIndexes();
+    oneWay.buildSpatialIndexes();
     const decisions: PlanDecision[] = [
       { proposalId: "connect:n101>n1", action: "accept" },
-      { proposalId: "connect:n301>n1", action: "accept" },
+      { proposalId: "connect:n103>n1", action: "accept" },
     ];
-    expect(() => planMerge(base, patch, matchingOptions(options, decisions), quiet)).toThrow(
-      "would both connect to base node 1, which takes one connection. Include at most one: " +
-        "connect:n101>n1 or connect:n301>n1.",
+    expect(() => planMerge(base, oneWay, matchingOptions(options, decisions), quiet)).toThrow(
+      "would both connect to base node 1, but they are points of one imported way or would " +
+        "join different grades there. Include at most one",
     );
   });
 

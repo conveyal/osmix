@@ -12,7 +12,11 @@ import {
   createConflationOutcomeReport,
   type ConflationApplicationTrace,
 } from "./conflation-outcome.ts";
-import { assertConflationPreservesBaseTopology, restrictionTopologyIssues } from "./integrity.ts";
+import {
+  assertConflationPreservesBaseTopology,
+  junctionHasIncompatibleGrades,
+  restrictionTopologyIssues,
+} from "./integrity.ts";
 import { featureTypeConflicts } from "./internal/feature-classification.ts";
 import { assessWayRemovals } from "./internal/way-removal.ts";
 import {
@@ -838,24 +842,90 @@ function discoverWayCandidates(context: DiscoveryContext) {
   return candidates;
 }
 
-function applyManyToOneClassification(candidates: OsmConflationCandidate[]) {
-  // Candidate discovery is local to each source. Enforce the batch-wide one-to-one
-  // invariant only after all otherwise plausible pairs are known. A point of a copy of the
-  // base path, with nothing else to do at the target, competes with nothing (MP-M1).
-  const sourcesByTarget = new Map<string, Set<number>>();
+function applyManyToOneClassification(
+  context: DiscoveryContext,
+  candidates: OsmConflationCandidate[],
+) {
+  // Candidate discovery is local to each source. Enforce the batch-wide invariants only after
+  // all otherwise plausible pairs are known. A point of a copy of the base path, with nothing
+  // else to do at the target, competes with nothing (MP-M1).
+  const byTarget = new Map<string, OsmConflationCandidate[]>();
   for (const candidate of candidates) {
     if (candidate.targetId == null || tracesOnly(candidate)) continue;
     const key = `${candidate.entityType}:${candidate.targetId}`;
-    const sources = sourcesByTarget.get(key) ?? new Set();
-    sources.add(candidate.sourceId);
-    sourcesByTarget.set(key, sources);
+    byTarget.set(key, [...(byTarget.get(key) ?? []), candidate]);
   }
-  for (const candidate of candidates) {
-    if (candidate.targetId == null || tracesOnly(candidate)) continue;
-    if ((sourcesByTarget.get(`${candidate.entityType}:${candidate.targetId}`)?.size ?? 0) <= 1)
+  for (const group of byTarget.values()) {
+    const targetId = group[0]!.targetId!;
+    if (group[0]!.entityType === "way") {
+      // One base way takes one imported way's copy or removal.
+      if (group.length > 1)
+        for (const candidate of group) addReviewReason(candidate, "many-to-one");
       continue;
-    addReviewReason(candidate, "many-to-one");
+    }
+    // Copies onto one base node are a choice between their values.
+    const copying = group.filter(({ propertyTransfer }) => actionable(propertyTransfer));
+    if (copying.length > 1) {
+      for (const candidate of copying) {
+        markReview(candidate, candidate.propertyTransfer, "many-to-one");
+      }
+    }
+    // Connections share the base node unless they conflict (MP-M5).
+    const connecting = group.filter(({ networkAttachment }) => actionable(networkAttachment));
+    for (const candidate of connecting) {
+      const rivals = connecting.filter(
+        (other) => other !== candidate && connectionsConflict(context, candidate, other, targetId),
+      );
+      if (rivals.length === 0) continue;
+      candidate.connectionRivals = rivals.map(({ id }) => id);
+      markReview(candidate, candidate.networkAttachment, "many-to-one");
+    }
   }
+}
+
+function actionable(assessment: OsmConflationActionAssessment | null) {
+  return assessment?.status === "automatic" || assessment?.status === "review";
+}
+
+/** Add a review reason to one action, and to the candidate as `addReviewReason` does. */
+function markReview(
+  candidate: OsmConflationCandidate,
+  assessment: OsmConflationActionAssessment | null,
+  reason: OsmConflationReasonCode,
+) {
+  if (!assessment) return;
+  if (assessment.status === "automatic") assessment.status = "review";
+  assessment.reasons = uniqueReasons([...assessment.reasons, reason]);
+  candidate.reasons = uniqueReasons([...candidate.reasons, reason]);
+  if (candidate.status === "automatic") candidate.status = "review";
+}
+
+/**
+ * Whether two connections to one base node cannot both apply: their sources share an imported
+ * way (connecting both would collapse or loop it), or the junction they would make together,
+ * with the base highways there, joins different grades (each alone may pass, e.g. a bridge
+ * ending at the node and a surface path through it). Pairs are enough: another way at the node
+ * can only add a same-grade continuation, which never makes a junction worse.
+ */
+function connectionsConflict(
+  context: DiscoveryContext,
+  a: OsmConflationCandidate,
+  b: OsmConflationCandidate,
+  targetId: number,
+) {
+  const aWays = a.evidence.patchWayIds ?? [];
+  const bWays = new Set(b.evidence.patchWayIds ?? []);
+  if (aWays.some((id) => bWays.has(id))) return true;
+  const sources = new Set([a.sourceId, b.sourceId]);
+  const rewritten = [...new Set([...aWays, ...bWays])].flatMap((id) => {
+    const way = context.patchView.getWay(id);
+    if (!way?.tags?.["highway"]) return [];
+    return [{ ...way, refs: way.refs.map((ref) => (sources.has(ref) ? targetId : ref)) }];
+  });
+  const baseHighways = context.baseView
+    .waysAtNode(targetId)
+    .filter((way) => way.tags?.["highway"] != null);
+  return junctionHasIncompatibleGrades(targetId, [...baseHighways, ...rewritten]);
 }
 
 /** A candidate whose only action is a connection blocked as a copy of the base path. */
@@ -920,7 +990,7 @@ function discoverOnViews(
       a.sourceId - b.sourceId ||
       (a.targetId ?? Number.POSITIVE_INFINITY) - (b.targetId ?? Number.POSITIVE_INFINITY),
   );
-  applyManyToOneClassification(candidates);
+  applyManyToOneClassification(context, candidates);
   const discovery = {
     baseOsmId: base.id,
     patchOsmId: patch.id,
@@ -1182,7 +1252,7 @@ function validateAcceptedMappings(
 ) {
   const conflict = findDecisionConflict(candidates, decisions, preservedSourceConflicts);
   if (conflict) throw Object.assign(Error(conflict.message), { conflict });
-  const attachmentTargets = new Set<number>();
+  const attached = new Set<string>();
   const wayTargets = new Set<number>();
   for (const candidate of candidates) {
     const decision = decisions.get(candidate.id);
@@ -1195,10 +1265,14 @@ function validateAcceptedMappings(
     if (candidate.targetId == null)
       throw Error(`Conflation accepted unmatched candidate ${candidate.id}`);
     if (attach) {
-      if (attachmentTargets.has(candidate.targetId)) {
-        throw Error(`Conflation accepted multiple node attachments to ${candidate.targetId}`);
+      // A base node takes several connections, but never two that conflict (MP-M5).
+      const rival = candidate.connectionRivals?.find((id) => attached.has(id));
+      if (rival) {
+        throw Error(
+          `Conflation accepted connections ${rival} and ${candidate.id} that cannot share base node ${candidate.targetId}`,
+        );
       }
-      attachmentTargets.add(candidate.targetId);
+      attached.add(candidate.id);
     }
     if (candidate.entityType === "way" && (transfer || removeWay)) {
       if (wayTargets.has(candidate.targetId)) {

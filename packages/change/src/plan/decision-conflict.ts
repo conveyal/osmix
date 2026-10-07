@@ -73,7 +73,8 @@ export function findDecisionConflict(
       const target = proposal.target;
       const what =
         proposal.kind === "connect"
-          ? `connect to base node ${target.id}, which takes one connection`
+          ? `connect to base node ${target.id}, but they are points of one imported way or ` +
+            `would join different grades there`
           : `change base way ${target.id}, which takes one imported way's copy or removal`;
       return new MergePlanDecisionConflictError(
         `${capitalize(sourceReference(proposal))} and ` +

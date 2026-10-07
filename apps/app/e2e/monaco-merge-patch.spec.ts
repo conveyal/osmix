@@ -142,20 +142,17 @@ test("the reviewed workflow removes the accepted duplicate footway", async ({ pa
   await r1.getByRole("button", { name: "Show on map and evidence" }).click();
   await expect(r1.getByRole("button", { name: "Showing on map" })).toBeVisible();
 
-  // Include leaves choices that exclude each other alone: M7's two imported points can both
-  // connect to one base node, so each needs its own choice (MP-M5). Counts are in features.
+  // Include leaves a choice between a point's possible targets alone (MP-M5). M7's two
+  // footway spurs, on different imported ways, end near one base node: both can connect there,
+  // so neither waits on the other. Counts are in features.
   await page.getByLabel("Proposal", { exact: true }).selectOption({ label: "Connect network" });
-  await expect(page.getByText(/After Include, \d+ still need their own choice/)).toBeVisible();
+  await expect(page.getByText(/After Include, 1 still need their own choice/)).toBeVisible();
   await page.getByRole("button", { name: /^Include \d+ features?$/ }).click();
   await expect(
-    page.getByText(/^Included \d+ features?; \d+ features? still needs? a decision/),
+    page.getByText(/^Included \d+ features?; 1 feature still needs a decision/),
   ).toBeVisible();
   await expect(page.getByText("Choose for shown features failed")).toHaveCount(0);
-  await expect(
-    page.getByText(
-      /1 other imported feature can also connect to base node \d+; include at most one/,
-    ),
-  ).toHaveCount(2);
+  await expect(page.getByText(/can also connect to base node/)).toHaveCount(0);
 
   // The plan downloads as osmChange without applying anything.
   const oscDownload = page.waitForEvent("download");

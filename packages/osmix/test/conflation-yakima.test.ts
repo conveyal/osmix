@@ -102,8 +102,9 @@ describe("Yakima fuzzy conflation", () => {
       expect(discovery.summary).toEqual({
         total: 11_689,
         accepted: 0,
-        automatic: 72,
-        review: 138,
+        // A connection no longer competes with another point copying tags onto its target (MP-M5).
+        automatic: 78,
+        review: 132,
         blocked: 235,
         unmatched: 11_244,
         rejected: 0,

@@ -241,22 +241,32 @@ function linkAlternatives(entries: readonly CandidateProposals[]) {
 }
 
 /**
- * Link proposals from different imported features that cannot all apply (MP-M5): one base
- * node takes at most one connection, and one base way at most one feature's copy or removal.
- * Several copies onto one base node can apply together, so they do not compete.
+ * Link proposals that cannot all apply (MP-M5). A base node takes several connections, but
+ * not two from one imported way or two that would join different grades there (discovery's
+ * `connectionRivals`). A base way takes one
+ * imported way's copy or removal. Several copies onto one base node can apply together, so
+ * they do not compete.
  */
 function linkCompetitors(entries: readonly CandidateProposals[]) {
+  const connectByCandidate = new Map(
+    entries.flatMap(({ candidate, connect }) => (connect ? [[candidate.id, connect]] : [])),
+  );
+  for (const { candidate, connect } of entries) {
+    if (!connect || !("competitors" in connect) || tracesBase(connect)) continue;
+    connect.competitors = (candidate.connectionRivals ?? []).flatMap((id) => {
+      const rival = connectByCandidate.get(id);
+      return rival && !tracesBase(rival) ? [rival.id] : [];
+    });
+  }
   const byTarget = new Map<string, MatchingProposal[]>();
   const add = (proposal: PlanProposal | undefined) => {
     if (!proposal || !("competitors" in proposal) || tracesBase(proposal)) return;
     const { kind, target } = proposal;
-    // Copies onto one base node can all apply; everything else takes one feature.
-    if (kind === "copy-tags" && target.type === "node") return;
-    const slot = kind === "connect" ? `node:${target.id}` : `way:${target.id}`;
+    if (kind === "connect" || (kind === "copy-tags" && target.type === "node")) return;
+    const slot = `way:${target.id}`;
     byTarget.set(slot, [...(byTarget.get(slot) ?? []), proposal]);
   };
-  for (const { connect, copy, remove } of entries) {
-    add(connect);
+  for (const { copy, remove } of entries) {
     add(copy);
     add(remove);
   }

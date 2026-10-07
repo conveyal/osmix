@@ -126,11 +126,10 @@ export function PlanProposalActions({
       ) : null}
       {competitors > 0 && "target" in proposal ? (
         <p className="text-muted-foreground">
-          {competitors.toLocaleString()} other imported {competitors === 1 ? "feature" : "features"}{" "}
-          can also{" "}
+          {competitors.toLocaleString()} other imported{" "}
           {proposal.kind === "connect"
-            ? `connect to base node ${proposal.target.id}`
-            : `change base way ${proposal.target.id}`}
+            ? `${competitors === 1 ? "point" : "points"} can also connect to base node ${proposal.target.id}`
+            : `${competitors === 1 ? "feature" : "features"} can also change base way ${proposal.target.id}`}
           ; include at most one. Including this one leaves the others out.
         </p>
       ) : null}

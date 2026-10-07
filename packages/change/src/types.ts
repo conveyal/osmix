@@ -174,6 +174,12 @@ export interface OsmConflationCandidate {
   propertyTransfer: OsmConflationActionAssessment;
   networkAttachment: OsmConflationActionAssessment | null;
   wayRemoval?: OsmConflationWayRemovalAssessment;
+  /**
+   * Node candidates whose connection cannot share this candidate's base node: points of the
+   * same imported way, or of ways whose junction there would join different grades (MP-M5).
+   * Absent when the connection competes with none.
+   */
+  connectionRivals?: string[];
   evidence: OsmConflationEvidence;
 }
 
