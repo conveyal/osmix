@@ -425,7 +425,7 @@ export interface MergePlanResult {
 export function applyPlan(plan: MergePlan, newOsmId?: string): MergePlanResult {
   const { changeset } = planState(plan);
   if (plan.diagnostics.integrity.length > 0) {
-    const shown = plan.diagnostics.integrity.slice(0, 10);
+    const shown = plan.diagnostics.integrity.slice(0, 10).map(({ description }) => description);
     const omitted = plan.diagnostics.integrity.length - shown.length;
     throw Error(
       `Merge introduced routing-integrity problems: ${shown.join("; ")}${omitted > 0 ? `; and ${omitted} more` : ""}`,

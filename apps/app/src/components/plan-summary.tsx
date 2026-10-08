@@ -1,5 +1,6 @@
 import {
   Alert,
+  Button,
   Details,
   DetailsContent,
   DetailsSummary,
@@ -16,8 +17,17 @@ import type { MergePlanOverview } from "osmix";
 import { OUTCOME_HELP, OUTCOME_LABEL, OUTCOMES } from "../lib/merge-plan-workflow";
 import { RoutingTopology } from "./conflation-routing-diagnostics";
 
-/** What the plan does, by imported feature, and anything that stops it from applying. */
-export function PlanSummary({ overview }: { overview: MergePlanOverview }) {
+/**
+ * What the plan does, by imported feature, and anything that stops it from applying. Each
+ * integrity issue that concerns an imported feature offers **Show**, which opens that feature.
+ */
+export function PlanSummary({
+  overview,
+  onShowFeature,
+}: {
+  overview: MergePlanOverview;
+  onShowFeature?: (featureKey: string) => unknown;
+}) {
   const { summary, diagnostics } = overview;
   return (
     <SidebarSection flush title="Plan summary">
@@ -28,9 +38,21 @@ export function PlanSummary({ overview }: { overview: MergePlanOverview }) {
               variant="destructive"
               title="This plan would break routing and cannot be applied"
             >
-              <ul className="list-disc pl-4">
-                {diagnostics.integrity.slice(0, 5).map((issue) => (
-                  <li key={issue}>{issue}</li>
+              <ul className="flex flex-col gap-1">
+                {diagnostics.integrity.slice(0, 5).map(({ description, featureKey }) => (
+                  <li key={description} className="flex items-start justify-between gap-2">
+                    <span className="min-w-0 wrap-break-word">{description}</span>
+                    {featureKey && onShowFeature ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={`Show the feature: ${description}`}
+                        onClick={() => void onShowFeature(featureKey)}
+                      >
+                        Show
+                      </Button>
+                    ) : null}
+                  </li>
                 ))}
               </ul>
               {diagnostics.integrity.length > 5 ? (

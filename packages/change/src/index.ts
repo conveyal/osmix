@@ -42,6 +42,7 @@ export {
   setMergePlanDecisions,
 } from "./plan/plan.ts";
 export type { PlanTagChange, PlanTagChanges } from "./plan/tag-changes.ts";
+export type { PlanIntegrityEntity, PlanIntegrityIssue } from "./integrity.ts";
 export { PLAN_CHOICE_GROUPS, type PlanChoiceGroup, type PlanChoices } from "./plan/choices.ts";
 export { planWithinDatasetDeduplication } from "./plan/deduplication.ts";
 export { MergePlanDecisionConflictError } from "./plan/decision-conflict.ts";

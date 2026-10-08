@@ -774,7 +774,14 @@ export default function MergeBlock() {
 
       {step === "review" && overview && page ? (
         <>
-          <PlanSummary overview={overview} />
+          <PlanSummary
+            overview={overview}
+            onShowFeature={async (featureKey) => {
+              // The issue blocks Apply, so reach its row even if the filters hide it.
+              await changeFilter({});
+              await selectFeature(featureKey);
+            }}
+          />
           <SavedChoices
             disabled={draftCount > 0}
             offered={savedOffer?.decisions.length ?? null}

@@ -429,7 +429,13 @@ describe("plan components", () => {
       },
       diagnostics: {
         routing: { car: delta, walk: delta },
-        integrity: ["way -1 references missing node -99"],
+        integrity: [
+          {
+            description: "way -1 references missing node -99",
+            entities: [{ type: "way", id: -1 }],
+            featureKey: "way:-1",
+          },
+        ],
         demoted: [],
       },
       decisions: [],
@@ -446,9 +452,11 @@ describe("plan components", () => {
       staleDecisions: [],
       featureCount: 3,
     } as MergePlanOverview;
-    const html = render(createElement(PlanSummary, { overview }));
+    const html = render(createElement(PlanSummary, { overview, onShowFeature: noop }));
     expect(html).toContain("This plan would break routing and cannot be applied");
     expect(html).toContain("way -1 references missing node -99");
+    // An issue that concerns an imported feature can open it.
+    expect(html).toContain('aria-label="Show the feature: way -1 references missing node -99"');
     expect(html).toContain("Needs decision");
     expect(html).not.toContain("Replaced");
   });

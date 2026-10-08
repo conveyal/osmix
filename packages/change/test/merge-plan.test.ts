@@ -407,7 +407,9 @@ describe("plan diagnostics", () => {
     patch.buildIndexes();
     patch.buildSpatialIndexes();
     const plan = planMerge(base, patch, {}, quiet);
-    expect(plan.diagnostics.integrity).toEqual(["way -1 references missing node -99"]);
+    expect(plan.diagnostics.integrity).toEqual([
+      { description: "way -1 references missing node -99", entities: [{ type: "way", id: -1 }] },
+    ]);
     expect(() => applyPlan(plan)).toThrow(
       "Merge introduced routing-integrity problems: way -1 references missing node -99",
     );

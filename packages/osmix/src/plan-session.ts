@@ -20,6 +20,7 @@ import {
   type PlanOutcome,
   type PlanProposal,
   type PlanProposalStatus,
+  type PlanIntegrityIssue,
   type PlanTagChanges,
   proposalTagChanges,
 } from "@osmix/change";
@@ -48,7 +49,14 @@ export interface MergePlanOverview {
   options: MergePlan["options"];
   idRemap: MergePlan["idRemap"];
   summary: MergePlan["summary"];
-  diagnostics: MergePlan["diagnostics"];
+  diagnostics: Omit<MergePlan["diagnostics"], "integrity"> & {
+    /**
+     * New routing-integrity problems, each with the key of the imported feature it concerns:
+     * the first entity it names that an imported feature owns (the feature itself, or one of
+     * its vertices). Absent when it names only base entities.
+     */
+    integrity: (PlanIntegrityIssue & { featureKey?: string })[];
+  };
   matching?: {
     candidates: NonNullable<MergePlan["matching"]>["candidates"];
     outcome: MergePlanMatchingOutcome;
@@ -156,7 +164,7 @@ export function planOverview(plan: MergePlan): MergePlanOverview {
     options: plan.options,
     idRemap: plan.idRemap,
     summary: plan.summary,
-    diagnostics: plan.diagnostics,
+    diagnostics: { ...plan.diagnostics, integrity: integrityOf(plan) },
     ...(plan.matching
       ? {
           matching: {
@@ -171,6 +179,40 @@ export function planOverview(plan: MergePlan): MergePlanOverview {
     choices: choicesOf(plan).counts,
   });
 }
+
+const cachedIntegrity = new WeakMap<
+  MergePlan["diagnostics"],
+  MergePlanOverview["diagnostics"]["integrity"]
+>();
+
+/**
+ * The plan's integrity issues with the imported feature each concerns: the first entity it names
+ * that a feature is, or has as a vertex. Computed once per planned state.
+ */
+function integrityOf(plan: MergePlan) {
+  const cached = cachedIntegrity.get(plan.diagnostics);
+  if (cached) return cached;
+  const named = new Set(
+    plan.diagnostics.integrity.flatMap(({ entities }) => entities.map(entityKeyOf)),
+  );
+  const owner = new Map<string, string>();
+  for (const feature of plan.features) {
+    const own = entityKeyOf(feature);
+    if (named.has(own) && !owner.has(own)) owner.set(own, feature.key);
+    for (const id of feature.vertexIds ?? []) {
+      const vertex = entityKeyOf({ type: "node", id });
+      if (named.has(vertex) && !owner.has(vertex)) owner.set(vertex, feature.key);
+    }
+  }
+  const integrity = plan.diagnostics.integrity.map((issue: PlanIntegrityIssue) => {
+    const featureKey = issue.entities.map((entity) => owner.get(entityKeyOf(entity))).find(Boolean);
+    return featureKey ? { ...issue, featureKey } : issue;
+  });
+  cachedIntegrity.set(plan.diagnostics, integrity);
+  return integrity;
+}
+
+const entityKeyOf = ({ type, id }: { type: string; id: number }) => `${type}:${id}`;
 
 const cachedChoices = new WeakMap<MergePlan["summary"], PlanChoices>();
 

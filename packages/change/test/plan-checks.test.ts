@@ -149,9 +149,12 @@ describe("scoped plan checks (MP-V1)", () => {
       for (let step = 0; step < 60; step++) {
         randomWrite(overlay, random, next);
         const full = newRoutingIntegrityIssues(baseline, overlay.reader()).toSorted();
-        expect(newOverlayIntegrityIssues(baseline, overlay).toSorted(), `step ${step}`).toEqual(
+        const issues = newOverlayIntegrityIssues(baseline, overlay);
+        expect(issues.map(({ description }) => description).toSorted(), `step ${step}`).toEqual(
           full,
         );
+        // Every issue names at least one entity, for the review to find its feature.
+        expect(issues.every(({ entities }) => entities.length > 0)).toBe(true);
         expect(planned.stats(overlay), `step ${step}`).toEqual(fullStats(overlay));
       }
     },
@@ -168,9 +171,18 @@ describe("scoped plan checks (MP-V1)", () => {
     // Shortening the restriction's from way detaches it from its via node.
     overlay.modify("way", 100, (way) => ({ ...way, refs: way.refs.slice(0, 2) }));
     const issues = newOverlayIntegrityIssues(baseline, overlay);
-    expect(issues).toEqual(newRoutingIntegrityIssues(baseline, overlay.reader()).toSorted());
-    expect(issues.some((issue) => issue.includes("references missing node 8"))).toBe(true);
-    expect(issues.some((issue) => issue.startsWith("restriction 500 via node"))).toBe(true);
+    const descriptions = issues.map(({ description }) => description);
+    expect(descriptions).toEqual(newRoutingIntegrityIssues(baseline, overlay.reader()).toSorted());
+    expect(issues).toContainEqual({
+      description: expect.stringContaining("references missing node 8"),
+      entities: [{ type: "way", id: expect.any(Number) }],
+    });
+    // A detached via node names the node, the restriction's from and to ways, and itself.
+    const detached = issues.find(({ description }) =>
+      description.startsWith("restriction 500 via node"),
+    );
+    expect(detached?.entities[0]).toEqual({ type: "node", id: expect.any(Number) });
+    expect(detached?.entities.at(-1)).toEqual({ type: "relation", id: 500 });
   });
 
   it("sorts issues by key, independent of the order changes were made", () => {

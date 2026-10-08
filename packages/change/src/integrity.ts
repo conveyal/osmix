@@ -9,7 +9,21 @@ import type { DatasetReader } from "./views.ts";
 type IntegrityIssue = {
   key: string;
   description: string;
+  /** The entities the issue is about, planned IDs, most specific first. */
+  entities: PlanIntegrityEntity[];
 };
+
+/** An entity an integrity issue names. */
+export interface PlanIntegrityEntity {
+  type: "node" | "way" | "relation";
+  id: number;
+}
+
+/** A new routing-integrity problem in a planned state, with the entities it is about. */
+export interface PlanIntegrityIssue {
+  description: string;
+  entities: PlanIntegrityEntity[];
+}
 
 type IncidentHighway = {
   way: OsmWay;
@@ -95,18 +109,21 @@ export function restrictionTopologyIssues(
     issues.push({
       key: `restriction:${relation.id}:missing-from`,
       description: `restriction ${relation.id} has no existing from way`,
+      entities: [{ type: "relation", id: relation.id }],
     });
   }
   if (toWays.length === 0) {
     issues.push({
       key: `restriction:${relation.id}:missing-to`,
       description: `restriction ${relation.id} has no existing to way`,
+      entities: [{ type: "relation", id: relation.id }],
     });
   }
   if (viaNodes.length === 0 && viaWays.length === 0) {
     issues.push({
       key: `restriction:${relation.id}:missing-via`,
       description: `restriction ${relation.id} has no existing via member`,
+      entities: [{ type: "relation", id: relation.id }],
     });
   }
 
@@ -119,6 +136,11 @@ export function restrictionTopologyIssues(
       issues.push({
         key: `restriction:${relation.id}:detached-via-node:${viaNode.ref}`,
         description: `restriction ${relation.id} via node ${viaNode.ref} is detached from its from/to ways (from: [${fromIds}]; to: [${toIds}]); keep the via node referenced by both sides`,
+        entities: [
+          { type: "node", id: viaNode.ref },
+          ...[...fromWays, ...toWays].map((way) => ({ type: "way" as const, id: way.id })),
+          { type: "relation", id: relation.id },
+        ],
       });
     }
   }
@@ -133,6 +155,11 @@ export function restrictionTopologyIssues(
       issues.push({
         key: `restriction:${relation.id}:detached-via-way-chain`,
         description: `restriction ${relation.id} has a disconnected via-way chain`,
+        entities: [
+          ...viaWays.map((way) => ({ type: "way" as const, id: way.id })),
+          ...[...fromWays, ...toWays].map((way) => ({ type: "way" as const, id: way.id })),
+          { type: "relation", id: relation.id },
+        ],
       });
     }
   }
@@ -176,12 +203,14 @@ function wayIntegrityIssues(way: OsmWay, hasNode: (id: number) => boolean): Inte
     issues.push({
       key: `way:${way.id}:missing-node:${ref}`,
       description: `way ${way.id} references missing node ${ref}`,
+      entities: [{ type: "way", id: way.id }],
     });
   }
   if (way.tags?.["highway"] != null && new Set(way.refs).size < 2) {
     issues.push({
       key: `way:${way.id}:degenerate-highway`,
       description: `highway way ${way.id} has fewer than two distinct nodes`,
+      entities: [{ type: "way", id: way.id }],
     });
   }
   return issues;
@@ -203,6 +232,11 @@ function gradeIntegrityIssues(nodeId: number, ways: readonly IncidentHighway[]):
   return incompatibleGradePairs(ways).map(([firstWayId, secondWayId]) => ({
     key: `node:${nodeId}:incompatible-grade:${firstWayId}:${secondWayId}`,
     description: `node ${nodeId} newly connects grade-separated highways ${firstWayId} and ${secondWayId}`,
+    entities: [
+      { type: "node", id: nodeId },
+      { type: "way", id: firstWayId },
+      { type: "way", id: secondWayId },
+    ],
   }));
 }
 
@@ -218,6 +252,7 @@ function relationIntegrityIssues(
     issues.push({
       key: `relation:${relation.id}:missing-${member.type}:${member.ref}`,
       description: `relation ${relation.id} references missing ${member.type} ${member.ref}`,
+      entities: [{ type: "relation", id: relation.id }],
     });
   }
   issues.push(...restrictionTopologyIssues(relation, getWay));
@@ -303,7 +338,7 @@ function sameIncidence(before: OsmWay | null, after: OsmWay | null, nodeId: numb
 export function newOverlayIntegrityIssues(
   baselineKeys: ReadonlySet<string>,
   overlay: PlanOverlay,
-): string[] {
+): PlanIntegrityIssue[] {
   const base = overlay.base;
   const issues: IntegrityIssue[] = [];
   const hasNode = (id: number) => overlay.getNode(id) != null;
@@ -378,7 +413,7 @@ export function newOverlayIntegrityIssues(
   return issues
     .filter((issue) => !baselineKeys.has(issue.key))
     .toSorted((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
-    .map((issue) => issue.description);
+    .map(({ description, entities }) => ({ description, entities }));
 }
 
 export function routingIntegrityIssueKeys(osm: Osm) {

@@ -4,6 +4,7 @@
  */
 import type { GeoBbox2D, OsmEntityType } from "@osmix/types";
 
+import type { PlanIntegrityIssue } from "../integrity.ts";
 import type {
   OsmConflationOptions,
   OsmConflationOutcomeReport,
@@ -257,8 +258,11 @@ export interface MergePlan {
   diagnostics: {
     /** CAR and WALK routing topology of the base and of the planned result. */
     routing: { car: PlanRoutingDelta; walk: PlanRoutingDelta };
-    /** New routing-integrity problems; applying the plan fails while any remain. */
-    integrity: string[];
+    /**
+     * New routing-integrity problems, each with the entities it names (planned IDs); applying
+     * the plan fails while any remain.
+     */
+    integrity: PlanIntegrityIssue[];
     /** Automatic connections moved to review because they would change the drivable network. */
     demoted: string[];
   };

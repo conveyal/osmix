@@ -25,7 +25,9 @@ tokens, spacing, primitives, map overlay primitives) lives in
   replace base entities, with the count and **Treat all as new**, which
   replans.
 - `PlanSummary` — features by outcome, a destructive `Alert` when the plan
-  would break routing (Apply is disabled), stale decisions, demoted
+  would break routing (Apply is disabled) listing each issue, with **Show** for
+  one that concerns an imported feature (it clears the filters and opens the
+  feature's row), stale decisions, demoted
   connections, and routing topology in a `Details`.
 - `SuggestedChoices` — above the feature list: the groups of features that
   need a decision (MP-M7), largest first, each with its count, a line on what
