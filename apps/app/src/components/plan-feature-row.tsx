@@ -9,7 +9,7 @@ import {
   planFeatureTitle,
 } from "../lib/merge-plan-workflow";
 import { CandidateEvidence } from "./conflation-candidate-evidence";
-import { PlanProposalActions, proposalTitle } from "./plan-proposal-actions";
+import { matchedPair, PlanProposalActions, proposalTitle } from "./plan-proposal-actions";
 
 /**
  * One imported feature in the review: its outcome, the choices it needs, and, once opened,
@@ -35,6 +35,14 @@ export function PlanFeatureRow({
   const reference = planFeatureReference(feature);
   const decisions = feature.proposals.filter(isDecidable);
   const direct = feature.proposals.filter((proposal) => !isDecidable(proposal));
+  // Proposals for the same pair (a connection and a copy) share one candidate's evidence.
+  const evidence = new Map(
+    Object.entries(detail?.candidates ?? {}).map(([proposalId, candidate]) => {
+      const proposal = feature.proposals.find(({ id }) => id === proposalId);
+      const pair = (proposal && matchedPair(proposal)) ?? proposalId;
+      return [candidate.id, { candidate, pair }] as const;
+    }),
+  );
   return (
     <Item
       role="region"
@@ -67,14 +75,12 @@ export function PlanFeatureRow({
           <MapPinIcon aria-hidden="true" />
           {detail ? "Showing on map" : "Show on map and evidence"}
         </Button>
-        {detail
-          ? Object.entries(detail.candidates).map(([proposalId, candidate]) => (
-              <section key={proposalId} aria-label={`Evidence: ${proposalId}`}>
-                <SectionTitle>Evidence</SectionTitle>
-                <CandidateEvidence candidate={candidate} />
-              </section>
-            ))
-          : null}
+        {[...evidence.values()].map(({ candidate, pair }) => (
+          <section key={candidate.id} aria-label={`Evidence: ${pair}`}>
+            <SectionTitle>Evidence: {pair}</SectionTitle>
+            <CandidateEvidence candidate={candidate} />
+          </section>
+        ))}
       </ItemContent>
     </Item>
   );

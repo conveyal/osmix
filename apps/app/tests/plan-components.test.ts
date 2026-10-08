@@ -3,6 +3,7 @@ import type {
   MergePlanFeatureView,
   MergePlanOverview,
   MergePlanPage,
+  OsmConflationCandidate,
   PlanOutcome,
   PlanProposal,
 } from "osmix";
@@ -167,6 +168,44 @@ describe("plan components", () => {
     expect(html).toContain('aria-label="Imported way -1"');
     expect(html).toContain("Harbour Walk");
     expect(html).toContain("Needs decision");
+  });
+
+  it("shows a pair's evidence once, named by the points it compares", () => {
+    const copy = connect({ id: "copy:n-2>n2", kind: "copy-tags" } as Partial<PlanProposal>);
+    const candidate = {
+      id: "node:-2->2",
+      entityType: "node",
+      sourceId: -2,
+      targetId: 2,
+      status: "review",
+      reasons: [],
+      propertyTransfer: { status: "review", reasons: [] },
+      networkAttachment: { status: "review", reasons: [] },
+      evidence: {
+        distanceMeters: 0.4,
+        sourceRoutingFamilies: [],
+        targetRoutingFamilies: [],
+        tagDiff: [],
+      },
+    } as unknown as OsmConflationCandidate;
+    const view = feature("needs-decision", [connect(), copy]);
+    const html = render(
+      createElement(PlanFeatureRow, {
+        detail: {
+          ...view,
+          candidates: { "connect:n-2>n2": candidate, "copy:n-2>n2": candidate },
+          coordinates: [],
+          targets: {},
+          replaces: {},
+        },
+        feature: view,
+        onDecide: noop,
+        onSelect: noop,
+      }),
+    );
+    expect(html).toContain("Copy tags from imported point -2 to base node 2");
+    expect(html.match(/aria-label="Evidence: /g)).toHaveLength(1);
+    expect(html).toContain("Evidence: imported point -2 and base node 2");
   });
 
   it("shows row choices waiting to be applied, and holds bulk choices until then", () => {

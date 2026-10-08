@@ -39,6 +39,15 @@ function importedSource({
   return `imported ${ENTITY_WORD[source.type]} ${token}`;
 }
 
+/**
+ * The two entities a matching proposal compares, in words: "imported point 18752 and base node
+ * -27". A connection and a copy for the same pair share their evidence.
+ */
+export function matchedPair(proposal: PlanProposal) {
+  if (!("target" in proposal) || !("source" in proposal)) return null;
+  return `${importedSource(proposal)} and base ${proposal.target.type} ${proposal.target.id}`;
+}
+
 /** What the proposal changes, in words: its kind and the entities it involves. */
 export function proposalTitle(proposal: PlanProposal) {
   const kind = PROPOSAL_KIND_LABEL[proposal.kind];
