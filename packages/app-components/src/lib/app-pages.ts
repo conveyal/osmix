@@ -36,7 +36,9 @@ export function pagePath(id: OsmixPageId): string {
  * slash is ignored; paths below a page (`/merge/x`) are not pages.
  */
 export function routeForPath(path: string): OsmixRoute | null {
-  const normalized = path.length > 1 ? path.replace(/\/+$/, "") : path;
+  let end = path.length;
+  while (end > 1 && path[end - 1] === "/") end--;
+  const normalized = path.slice(0, end);
   if (normalized === HOME_PATH || normalized === "") return "home";
   if (normalized === LIMITS_PATH) return "limits";
   return OSMIX_PAGES.find((page) => page.path === normalized)?.id ?? null;

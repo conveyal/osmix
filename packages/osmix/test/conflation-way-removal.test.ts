@@ -418,7 +418,7 @@ describe("explicit way removal through the facade and worker", () => {
       automatic: "none",
     });
     for (const id of ["connect:n101>n1", "connect:n201>n1"]) {
-      expect(proposal(worker, base.id, id).competitors).toEqual([]);
+      expect(proposal(worker, base.id, id)).toMatchObject({ competitors: [] });
     }
     const result = worker.applyMergePlanBulk(base.id, { action: "accept", filter: {} });
     const included = result.overview.decisions
@@ -430,8 +430,12 @@ describe("explicit way removal through the facade and worker", () => {
   it("links points of one imported way that compete for a base node, and bulk skips them", () => {
     const { base, patch } = sameWayContender();
     const worker = workerFor(base, patch, contenderOptions);
-    expect(proposal(worker, base.id, "connect:n101>n1").competitors).toEqual(["connect:n201>n1"]);
-    expect(proposal(worker, base.id, "connect:n201>n1").competitors).toEqual(["connect:n101>n1"]);
+    expect(proposal(worker, base.id, "connect:n101>n1")).toMatchObject({
+      competitors: ["connect:n201>n1"],
+    });
+    expect(proposal(worker, base.id, "connect:n201>n1")).toMatchObject({
+      competitors: ["connect:n101>n1"],
+    });
     // Bulk include leaves competing connections for their own choice (MP-M5) instead of
     // including a set that planning must refuse; counts are in features.
     const preview = worker.previewMergePlanBulk(base.id, {});
