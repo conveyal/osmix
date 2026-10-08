@@ -254,6 +254,10 @@ function finishPlan(plan: MergePlan, state: PlanState) {
       () => changeset.stats,
     );
   else checkPlan(plan, state);
+  // Between plans, nothing searches the planned state: review reads the plan, and a replan
+  // rebuilds what it searches. Holding the grid, way coordinates and ways-by-node index while
+  // a person reviews cost about 1.5 GB on the Washington import (T34).
+  changeset.overlay.releaseDerived();
 }
 
 /** Base ways a way replacement may delete, whether or not it is decided yet. */
