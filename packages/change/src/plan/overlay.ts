@@ -348,6 +348,7 @@ export class PlanOverlay {
     const existingEntity = changeEntity ?? this.baseEntity(type, id);
     if (existingEntity == null) throw Error("Entity not found");
     const oldEntity = change?.oldEntity ?? (changeEntity ? undefined : existingEntity);
+    const hadOwnRecord = changes.hasOverride(id);
 
     const modifiedEntity = modify(existingEntity);
     this.write(type, id, {
@@ -362,6 +363,9 @@ export class PlanOverlay {
       const previous = existingEntity as OsmWay;
       const next = modifiedEntity as OsmWay;
       if (!dequal(previous.refs, next.refs)) this.invalidateWayGeometry(id);
+      // A layer way read through the patch's index until now; with a record of its own, the
+      // index of pending ways by node must list it even though its refs did not change.
+      else if (!hadOwnRecord) this.updatePendingWayIncidence(id);
     }
   }
 

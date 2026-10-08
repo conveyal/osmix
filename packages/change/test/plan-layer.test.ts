@@ -133,6 +133,17 @@ describe("patch layer", () => {
     expect(overlay.waysAtNode(2).map(({ id }) => id)).toEqual([10]);
   });
 
+  it("still finds a layer way at its nodes after a change to its tags alone", () => {
+    // Regression: a tag-only change gave the way a record of its own, which layer reads skip,
+    // but left it out of the pending ways by node, so a crossing snap missed it (T35).
+    const overlay = layered();
+    expect(overlay.waysAtNode(-1).map(({ id }) => id)).toEqual([-1]);
+    overlay.modify("way", -1, (way) => ({ ...way, tags: { ...way.tags, surface: "concrete" } }));
+    expect(overlay.waysAtNode(-1).map(({ id }) => id)).toEqual([-1]);
+    expect(overlay.waysAtNode(2).map(({ id }) => id)).toEqual([10, -1]);
+    expect([...overlay.pendingWayIdsAt(-1)]).toEqual([-1]);
+  });
+
   it("counts records by change type as listing them would, overrides and drops included", () => {
     const overlay = layered();
     const listed = () => {
