@@ -24,7 +24,8 @@ import {
  * The planner's whole output on the Monaco scenario patch, as digests recorded before T35 read
  * the patch as a layer. A change to how the planner stores its state must leave every one
  * as it is. When a change to merge rules alters the output on purpose, record the new digests
- * here and say why in the commit.
+ * here and say why in the commit. T36 blocks a replacement that joined grade-separated highways
+ * (`replacement-grade-conflict`): Aggressive no longer includes it, so its plan applies.
  */
 
 let base: Osm;
@@ -72,10 +73,9 @@ describe("merge plan output on Monaco", () => {
         ]),
       ),
     ).toEqual({
-      conservative: { plan: "3d6f7b5dd1f6def4", applied: "42770a36", osc: "20e8e321a6d4d07c" },
-      recommended: { plan: "4ef0c6e461fa7d96", applied: "03605608", osc: "9c68884088a19925" },
-      // A replacement Aggressive includes joins grade-separated highways: see T36.
-      aggressive: { plan: "13ce70bc7d5cdbd5", applied: "refused", osc: "e8b7cbb5f9cbb0f1" },
+      conservative: { plan: "e584762ca976dc37", applied: "42770a36", osc: "20e8e321a6d4d07c" },
+      recommended: { plan: "df7e2ffb149d98fa", applied: "03605608", osc: "9c68884088a19925" },
+      aggressive: { plan: "41e8f195f02c9aba", applied: "43d93040", osc: "d552c3eecfb84fe8" },
     });
   });
 
@@ -100,7 +100,7 @@ describe("merge plan output on Monaco", () => {
     const fresh = planMerge(base, patch, { ...matching, decisions }, quiet);
     expect(digest(plan)).toEqual(digest(fresh));
     expect(digest(plan)).toEqual({
-      plan: "de736a5c5b629695",
+      plan: "552e741601f205c1",
       applied: "7d9928ef",
       osc: "573b7d76ae274a6a",
     });

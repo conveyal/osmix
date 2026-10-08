@@ -13,6 +13,7 @@
 import { haversineDistance } from "@osmix/geo/haversine-distance";
 import type { LonLat, OsmTags, OsmWay } from "@osmix/types";
 
+import { junctionIncompatibleGradePairs } from "../integrity.ts";
 import { isAreaWay } from "../rules/area.ts";
 import { directionRelativeTags, reverseDirectionTags } from "../rules/direction.ts";
 import { routingGradeSignature } from "../rules/grade.ts";
@@ -32,6 +33,7 @@ type WayReplacementReason =
   | "replacement-restriction"
   | "replacement-relation-member"
   | "replacement-duplicate-node"
+  | "replacement-grade-conflict"
   | "routing-family-conflict";
 
 /** An imported and a base chain that trace each other, and what replacing would do. */
@@ -527,6 +529,7 @@ function assessGroup(
   // anchors between. Each imported way keeps the stretch between its own ends.
   const refs: WayReplacementGroup["refs"] = [];
   const wayTags: WayReplacementGroup["wayTags"] = [];
+  const keptWays: OsmWay[] = [];
   const kept = new Set(anchors.map(({ baseNodeId }) => baseNodeId));
   const unplaced = [
     "replacement-end-unpaired",
@@ -572,6 +575,10 @@ function assessGroup(
         reviewReasons.add("grade-change");
       }
       wayTags.push({ wayId: way.id, tags });
+      keptWays.push({ ...way, refs: next, tags });
+    }
+    if (anchorsJoinNewGrades(baseView, patchView, anchors, chainWays, keptWays)) {
+      reasons.add("replacement-grade-conflict");
     }
   }
   const releasedNodeIds = baseRefs.filter((id) => !kept.has(id));
@@ -592,4 +599,42 @@ function assessGroup(
     refs,
     releasedNodeIds,
   };
+}
+
+/**
+ * Whether replacing joins, at some anchor, two highways across grades that the planned state
+ * does not join there: final validation refuses such a junction. At an anchor the replaced ways
+ * give way to the kept ways, and imported ways at the vertex it takes the place of move to it.
+ */
+function anchorsJoinNewGrades(
+  baseView: DatasetView,
+  patchView: DatasetView,
+  anchors: WayReplacementGroup["anchors"],
+  replaced: ReadonlySet<number>,
+  keptWays: readonly OsmWay[],
+) {
+  const kept = new Set(keptWays.map(({ id }) => id));
+  const pairKey = ([a, b]: [number, number]) => `${a}:${b}`;
+  for (const { baseNodeId: id, importedNodeId } of anchors) {
+    const before = new Map<number, OsmWay>();
+    for (const way of [...baseView.waysAtNode(id), ...patchView.waysAtNode(id)]) {
+      before.set(way.id, way);
+    }
+    const after = new Map<number, OsmWay>();
+    for (const [wayId, way] of before) {
+      if (!replaced.has(wayId) && !kept.has(wayId)) after.set(wayId, way);
+    }
+    if (importedNodeId != null && importedNodeId !== id) {
+      for (const way of patchView.waysAtNode(importedNodeId)) {
+        if (kept.has(way.id)) continue;
+        const refs = way.refs.map((ref) => (ref === importedNodeId ? id : ref));
+        after.set(way.id, { ...way, refs });
+      }
+    }
+    for (const way of keptWays) after.set(way.id, way);
+    const existing = new Set(junctionIncompatibleGradePairs(id, [...before.values()]).map(pairKey));
+    const pairs = junctionIncompatibleGradePairs(id, [...after.values()]);
+    if (pairs.some((pair) => !existing.has(pairKey(pair)))) return true;
+  }
+  return false;
 }

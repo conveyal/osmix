@@ -364,6 +364,33 @@ describe("way replacement discovery (MP-R2)", () => {
     });
   });
 
+  it("blocks a replacement that joins highways across grades at an anchor (T36)", () => {
+    // A bridge ends at the join of base ways 10 and 11: every way ends there, a portal. The
+    // imported way runs through the join, which final validation refuses.
+    const base = (bridge: Record<string, string>) =>
+      osm(
+        "base",
+        [
+          { id: 1, lon: 0, lat: 0 },
+          { id: 2, lon: 0.0005, lat: 0 },
+          { id: 3, lon: 0.001, lat: 0 },
+          { id: 4, lon: 0.0005, lat: 0.0005 },
+        ],
+        [
+          { id: 10, refs: [1, 2], tags: footway },
+          { id: 11, refs: [2, 3], tags: footway },
+          { id: 12, refs: [4, 2], tags: { ...footway, ...bridge } },
+        ],
+      );
+    const [blocked] = discover(base({ bridge: "yes", layer: "1" }), importedLine()).groups;
+    expect(blocked).toMatchObject({
+      id: "replace:w20>w10,w11",
+      status: "blocked",
+      reasons: ["replacement-grade-conflict"],
+    });
+    expect(discover(base({}), importedLine()).groups[0]).toMatchObject({ status: "review" });
+  });
+
   it("pairs a shared junction with the imported way's end in every group", () => {
     const [ended, through] = discover(sharedJunctionBase(), sharedJunctionPatch(), 1).groups;
     expect(ended).toMatchObject({

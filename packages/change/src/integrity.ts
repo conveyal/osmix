@@ -182,17 +182,17 @@ function incompatibleGradePairs(ways: readonly IncidentHighway[]): [number, numb
   return pairs;
 }
 
+/**
+ * @internal The way ID pairs a proposed junction joins across grades, smaller ID first, with the
+ * same portal rules as final validation.
+ */
+export function junctionIncompatibleGradePairs(nodeId: number, ways: readonly OsmWay[]) {
+  return incompatibleGradePairs(ways.flatMap((way) => incidentHighway(way, nodeId) ?? []));
+}
+
 /** @internal Check a proposed junction with the same portal rules as final validation. */
 export function junctionHasIncompatibleGrades(nodeId: number, ways: readonly OsmWay[]) {
-  const incident = ways
-    .filter((way) => way.tags?.["highway"] != null && way.refs.includes(nodeId))
-    .map((way) => ({
-      way,
-      gradeSignature: routingGradeSignature(way.tags),
-      interior: way.refs.slice(1, -1).includes(nodeId),
-      endpoint: way.refs[0] === nodeId || way.refs.at(-1) === nodeId,
-    }));
-  return incompatibleGradePairs(incident).length > 0;
+  return junctionIncompatibleGradePairs(nodeId, ways).length > 0;
 }
 
 /** Missing nodes and degenerate highways of one way. */

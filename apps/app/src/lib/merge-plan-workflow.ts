@@ -144,6 +144,8 @@ const REASON_LABEL: Record<string, string> = {
     "The imported way runs the other way and lacks the base way's side or direction tags",
   "replacement-duplicate-node": "The imported way would pass through one point twice",
   "replacement-end-unpaired": "The base way's end is too far from the imported way's end",
+  "replacement-grade-conflict":
+    "The imported way would join a base path on another level or layer at a junction",
   "replacement-restriction": "A turn restriction uses the base way",
   "routing-family-conflict": "Allowed travel is incompatible",
   "routing-property": "Tag affects travel and requires review",
