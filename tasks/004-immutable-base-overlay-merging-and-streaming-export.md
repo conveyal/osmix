@@ -2,7 +2,19 @@
 
 ## Status
 
-Step 1 (measurement) is ready. Step 2 (streaming export) depends on the result of step 1. Step 3 is deferred.
+Step 1 is partly done for large imports (T34, below). Step 2 (streaming export) depends on the rest of step 1. Step 3 is deferred.
+
+### Results so far: large imports (T34, 2026-10-08)
+
+`apps/bench` `plan-memory` measures heap per planner phase in Node. Chromium stores the same plan in about 0.59 of Node's heap, and caps the heap at about 3.7 GB.
+
+| Base + patch (patch entities)  | Node heap after planning | Peak    | Apply                                  |
+| ------------------------------ | ------------------------ | ------- | -------------------------------------- |
+| Washington, before T34 (1.48M) | 6.50 GB                  | 6.50 GB | crashed the browser tab                |
+| Washington, after T34          | 4.01 GB                  | 5.31 GB | 15 s; plans and applies in the browser |
+| Seattle, after T34 (2.08M)     | 6.35 GB                  | 8.34 GB | does not fit; Merge refuses it         |
+
+For these imports **planning**, not apply, sets the peak: one or more JS objects per imported entity (change records, proposals, candidates) plus the structures built to search them. Step 2 would not help; the planner's own memory is T34's subject. A structural fix (read the patch as a second read-only layer, with records only for changed entities) is the next step if larger imports must plan in the browser.
 
 ## Summary
 

@@ -2,10 +2,10 @@
 
 This folder contains implementation-ready follow-up tasks that were deliberately left outside the Australia-scale PBF loading work. The filenames preserve the original recommendation numbers so discussion, pull requests, and future planning can refer to stable task identifiers.
 
-| Task                                                                | Title                                                            | Status         | Relationship                                                                                                              |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [004](./004-immutable-base-overlay-merging-and-streaming-export.md) | Measure merge memory, then stream the merged PBF from the plan   | Step 1 ready   | The Merge plan's overlay already removed repeated copies; this measures the one remaining build and removes it for export |
-| [005](./005-conditional-chunked-disk-storage.md)                    | Evaluate and conditionally implement chunked disk-backed storage | Decision-gated | Start with measurement after Task 004; implement only if persistent interactive access is a confirmed requirement         |
+| Task                                                                | Title                                                            | Status                   | Relationship                                                                                                              |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| [004](./004-immutable-base-overlay-merging-and-streaming-export.md) | Measure merge memory, then stream the merged PBF from the plan   | Step 1 partly done (T34) | The Merge plan's overlay already removed repeated copies; this measures the one remaining build and removes it for export |
+| [005](./005-conditional-chunked-disk-storage.md)                    | Evaluate and conditionally implement chunked disk-backed storage | Decision-gated           | Start with measurement after Task 004; implement only if persistent interactive access is a confirmed requirement         |
 
 ## Ordering
 
