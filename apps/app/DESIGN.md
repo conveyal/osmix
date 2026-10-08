@@ -34,7 +34,8 @@ tokens, spacing, primitives, map overlay primitives) lives in
 - `PlanReview`, `PlanFeatureRow`, `PlanProposalActions` — one row per imported
   feature (a way with its vertices, a point, or a relation) named
   "Imported <type> <patch ID>", with its outcome, each proposal's status,
-  effect and reasons, and a radio group per decidable proposal: **Include
+  effect and reasons (a connection or copy names its imported point or way and
+  its base target, since one way's points can share a target), and a radio group per decidable proposal: **Include
   (automatic)** / **Leave out** for automatic proposals, **Decide later** /
   **Include** / **Leave out** for proposals that need review. Blocked
   proposals show reasons and no choice. Filters (outcome, proposal kind) and

@@ -99,7 +99,7 @@ describe("plan components", () => {
       createElement(PlanProposalActions, { proposal: connect(), onDecide: noop }),
     );
     expect(review.match(/type="radio"/g)).toHaveLength(3);
-    expect(review).toContain("Connect network with base node 2");
+    expect(review).toContain("Connect imported point -2 to base node 2");
     const automatic = render(
       createElement(PlanProposalActions, {
         proposal: connect({ status: "automatic", effect: "applied" }),

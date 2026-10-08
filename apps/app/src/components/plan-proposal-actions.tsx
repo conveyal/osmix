@@ -21,15 +21,36 @@ const EFFECT_DOT: Record<PlanProposal["effect"], StatusDotStatus> = {
 
 type Choice = PlanDecision["action"] | "rule";
 
-/** What the proposal changes, in words: its kind and the base entity it involves. */
+const ENTITY_WORD = { node: "point", way: "way", relation: "relation" } as const;
+
+/**
+ * The imported entity a matching proposal starts from, by its patch ID, from the proposal ID
+ * (`connect:n18752>n-27` → "imported point 18752"). One way's row can hold several points'
+ * proposals to the same base node, so each names its point.
+ */
+function importedSource({
+  id,
+  source,
+}: {
+  id: string;
+  source: { type: keyof typeof ENTITY_WORD };
+}) {
+  const token = id.slice(id.indexOf(":") + 2, id.indexOf(">"));
+  return `imported ${ENTITY_WORD[source.type]} ${token}`;
+}
+
+/** What the proposal changes, in words: its kind and the entities it involves. */
 export function proposalTitle(proposal: PlanProposal) {
   const kind = PROPOSAL_KIND_LABEL[proposal.kind];
   if (proposal.kind === "replace-way") {
     const ids = proposal.replaces.map(({ id }) => id).join(", ");
     return proposal.replaces.length === 1 ? `Replace base way ${ids}` : `Replace base ways ${ids}`;
   }
-  if ("target" in proposal)
-    return `${kind} with base ${proposal.target.type} ${proposal.target.id}`;
+  const target = "target" in proposal ? `base ${proposal.target.type} ${proposal.target.id}` : "";
+  if (proposal.kind === "connect") return `Connect ${importedSource(proposal)} to ${target}`;
+  if (proposal.kind === "copy-tags")
+    return `Copy tags from ${importedSource(proposal)} to ${target}`;
+  if ("target" in proposal) return `${kind} with ${target}`;
   if ("ways" in proposal) return `${kind} with ${proposal.ways[1].type} ${proposal.ways[1].id}`;
   return kind;
 }
