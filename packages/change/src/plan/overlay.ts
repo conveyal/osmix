@@ -69,6 +69,15 @@ interface PendingGeometry {
 }
 
 const METERS_PER_DEGREE_LAT = 111_320;
+
+/**
+ * Coordinates of ways nothing has changed, read from packed columns, kept in a bounded
+ * direct-mapped cache: a phase reads the same nearby ways again and again, but caching every way
+ * it touched held the whole plan's geometry as arrays (T35).
+ */
+const PACKED_COORDINATES_SLOTS = 1 << 15;
+const packedSlot = (id: number) =>
+  (Math.imul(id | 0, 0x9e3779b1) >>> 17) & (PACKED_COORDINATES_SLOTS - 1);
 const EMPTY_IDS: ReadonlySet<number> = new Set();
 
 export class PlanOverlay {
@@ -80,7 +89,14 @@ export class PlanOverlay {
   private readonly wayGeometryRevisions = new Map<number, number>();
   private pendingWayIdsByNode: Map<number, Set<number>> | undefined;
   private readonly pendingWayRefs = new Map<number, readonly number[]>();
+  /** Coordinates of ways with a record, or at a changed node. */
   private readonly wayCoordinateCache = new Map<number, WayCoordinateCacheEntry>();
+  private packedCoordinateIds = new Float64Array(PACKED_COORDINATES_SLOTS).fill(Number.NaN);
+  /** Whether any packed coordinates are cached, so a moved node must invalidate them. */
+  private packedCached = false;
+  private packedCoordinates: (WayCoordinateCacheEntry | undefined)[] = Array.from({
+    length: PACKED_COORDINATES_SLOTS,
+  });
   private geometry: PendingGeometry | undefined;
   /** Record writes since the first mark, to undo back to a mark; null before any mark. */
   private journal: JournalEntry[] | null = null;
@@ -462,6 +478,9 @@ export class PlanOverlay {
     this.geometry = undefined;
     this.pendingWayIdsByNode = undefined;
     this.wayCoordinateCache.clear();
+    this.packedCoordinateIds.fill(Number.NaN);
+    this.packedCoordinates = Array.from({ length: PACKED_COORDINATES_SLOTS });
+    this.packedCached = false;
   }
 
   /** The planned state read by ID, as the materialized dataset would read. */
@@ -577,13 +596,18 @@ export class PlanOverlay {
     return ids;
   }
 
+  /** How many times way `id`'s geometry has changed in this overlay; equal means unchanged. */
+  wayRevision(id: number): number {
+    return this.wayGeometryRevisions.get(id) ?? 0;
+  }
+
   /**
    * A way's current coordinates, or null when any ref is unavailable; geometry is never
    * substituted.
    */
   wayCoordinates(way: OsmWay): [number, number][] | null {
     const wayRevision = this.wayGeometryRevisions.get(way.id) ?? 0;
-    const cached = this.wayCoordinateCache.get(way.id);
+    const cached = this.cachedCoordinates(way.id);
     if (cached && cached.wayRevision === wayRevision) return cached.coordinates;
 
     // Unchanged base geometry can resolve packed node indexes directly, avoiding one binary ID
@@ -596,7 +620,7 @@ export class PlanOverlay {
       if (wayIndex !== -1) {
         const coordinates = this.base.ways.getResolvedCoordinates(wayIndex);
         if (coordinates.length !== way.refs.length) return null;
-        this.wayCoordinateCache.set(way.id, { coordinates, wayRevision });
+        this.cachePackedCoordinates(way.id, { coordinates, wayRevision });
         return coordinates;
       }
     }
@@ -613,7 +637,7 @@ export class PlanOverlay {
         const coordinates = patch.ways.getResolvedCoordinates(wayIndex);
         // A patch way with repeated refs reads with them removed; resolve those by node.
         if (coordinates.length === way.refs.length) {
-          this.wayCoordinateCache.set(way.id, { coordinates, wayRevision });
+          this.cachePackedCoordinates(way.id, { coordinates, wayRevision });
           return coordinates;
         }
       }
@@ -635,9 +659,28 @@ export class PlanOverlay {
   cleanWayCoordinates(way: OsmWay): [number, number][] | null {
     const coordinates = this.wayCoordinates(way);
     if (!coordinates) return null;
-    const cached = this.wayCoordinateCache.get(way.id);
-    if (!cached) return cleanCoords(coordinates);
+    const cached = this.cachedCoordinates(way.id);
+    if (!cached || cached.coordinates !== coordinates) return cleanCoords(coordinates);
     return (cached.cleaned ??= cleanCoords(coordinates));
+  }
+
+  private cachedCoordinates(id: number): WayCoordinateCacheEntry | undefined {
+    const slot = packedSlot(id);
+    if (this.packedCoordinateIds[slot] === id) return this.packedCoordinates[slot];
+    return this.wayCoordinateCache.get(id);
+  }
+
+  private cachePackedCoordinates(id: number, entry: WayCoordinateCacheEntry) {
+    const slot = packedSlot(id);
+    this.packedCoordinateIds[slot] = id;
+    this.packedCoordinates[slot] = entry;
+    this.packedCached = true;
+  }
+
+  private forgetCoordinates(id: number) {
+    this.wayCoordinateCache.delete(id);
+    const slot = packedSlot(id);
+    if (this.packedCoordinateIds[slot] === id) this.packedCoordinateIds[slot] = Number.NaN;
   }
 
   /** The bounding box of a way's resolvable refs, or null when none resolve. */
@@ -790,19 +833,19 @@ export class PlanOverlay {
       } else geometry.nodes.remove(id);
     }
     const moved = !before || !node || before.lon !== node.lon || before.lat !== node.lat;
-    if (!moved || (!geometry && this.wayCoordinateCache.size === 0)) return;
+    if (!moved || (!geometry && this.wayCoordinateCache.size === 0 && !this.packedCached)) return;
     // Base geometry at the base position plus pending incidence finds every way at the node,
     // including ways whose bbox a deleted vertex no longer counts toward.
     for (const way of this.waysAtNode(id)) {
       this.wayGeometryRevisions.set(way.id, (this.wayGeometryRevisions.get(way.id) ?? 0) + 1);
-      this.wayCoordinateCache.delete(way.id);
+      this.forgetCoordinates(way.id);
       this.trackWay(way.id);
     }
   }
 
   private invalidateWayGeometry(wayId: number) {
     this.wayGeometryRevisions.set(wayId, (this.wayGeometryRevisions.get(wayId) ?? 0) + 1);
-    this.wayCoordinateCache.delete(wayId);
+    this.forgetCoordinates(wayId);
     this.updatePendingWayIncidence(wayId);
     this.trackWay(wayId);
   }

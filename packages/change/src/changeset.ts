@@ -1271,7 +1271,13 @@ export class OsmChangeset {
       },
       near: (bbox, wayId) => cache.nearWays(wayId, bbox, (box) => start.wayIdsIntersecting(box)),
       intersect: (wayId, line, otherId, other) =>
-        cache.crossingPoints(wayId, line, otherId, other, waysIntersect),
+        cache.crossingPoints(
+          wayId,
+          this.overlay.wayRevision(wayId),
+          otherId,
+          this.overlay.wayRevision(otherId),
+          () => waysIntersect(line, other),
+        ),
     };
   }
 

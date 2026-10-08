@@ -64,25 +64,15 @@ describe("CrossingCache", () => {
     expect(cache.nearWays(10, box, () => [10, 99])).toEqual([10, 99]);
   });
 
-  it("reuses crossing points only while both lines are unchanged", () => {
+  it("reuses crossing points only while both ways' geometry is unchanged", () => {
     const cache = new CrossingCache();
     cache.begin(new PlanOverlay(base));
-    const line: [number, number][] = [
-      [0, 0],
-      [1, 0],
-    ];
-    const other: [number, number][] = [
-      [0.5, -1],
-      [0.5, 1],
-    ];
     const at = (x: number) => () => [[x, 0]] as [number, number][];
-    expect(cache.crossingPoints(10, line, 20, other, at(0.5))).toEqual([[0.5, 0]]);
-    expect(cache.crossingPoints(10, line, 20, other, fail)).toEqual([[0.5, 0]]);
-    const moved: [number, number][] = [
-      [0.6, -1],
-      [0.6, 1],
-    ];
-    expect(cache.crossingPoints(10, line, 20, moved, at(0.6))).toEqual([[0.6, 0]]);
+    // Revisions count geometry changes: equal revisions mean the same lines.
+    expect(cache.crossingPoints(10, 0, 20, 0, at(0.5))).toEqual([[0.5, 0]]);
+    expect(cache.crossingPoints(10, 0, 20, 0, fail)).toEqual([[0.5, 0]]);
+    expect(cache.crossingPoints(10, 0, 20, 1, at(0.6))).toEqual([[0.6, 0]]);
+    expect(cache.crossingPoints(10, 1, 20, 1, at(0.7))).toEqual([[0.7, 0]]);
   });
 });
 

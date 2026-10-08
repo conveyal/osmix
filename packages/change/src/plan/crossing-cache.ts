@@ -10,8 +10,6 @@ import { dequal } from "dequal";
 
 import type { PlanOverlay } from "./overlay.ts";
 
-type Line = [number, number][];
-
 interface NearEntry {
   bbox: GeoBbox2D;
   ids: number[];
@@ -19,8 +17,9 @@ interface NearEntry {
 }
 
 interface PairEntry {
-  line: Line;
-  other: Line;
+  /** The two ways' geometry revisions the points were found at. */
+  revision: number;
+  otherRevision: number;
   points: [number, number][];
   pass: number;
 }
@@ -82,26 +81,27 @@ export class CrossingCache {
   }
 
   /**
-   * Where two lines cross, as `intersect` finds them, reused while both lines are unchanged.
-   * Only pairs that cross are kept: most pairs of nearby ways do not, and keeping both lines
-   * of each such pair held a copy of the plan's geometry (T34).
+   * Where two ways cross, as `intersect` finds them, reused while neither way's geometry has
+   * changed (its revision in the planned state is the same). Only pairs that cross are kept:
+   * most pairs of nearby ways do not, and an entry holds no coordinates (T34, T35).
    */
   crossingPoints(
     wayId: number,
-    line: Line,
+    revision: number,
     otherId: number,
-    other: Line,
-    intersect: (line: Line, other: Line) => [number, number][],
+    otherRevision: number,
+    intersect: () => [number, number][],
   ): [number, number][] {
     const key = `${wayId}:${otherId}`;
     const entry = this.pairs.get(key);
-    if (entry && dequal(entry.line, line) && dequal(entry.other, other)) {
+    if (entry && entry.revision === revision && entry.otherRevision === otherRevision) {
       entry.pass = this.pass;
       return entry.points;
     }
-    const points = intersect(line, other);
-    if (points.length > 0) this.pairs.set(key, { line, other, points, pass: this.pass });
-    else this.pairs.delete(key);
+    const points = intersect();
+    if (points.length > 0) {
+      this.pairs.set(key, { revision, otherRevision, points, pass: this.pass });
+    } else this.pairs.delete(key);
     return points;
   }
 }
