@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { useId } from "react";
 
 import { cn } from "../lib/utils.ts";
@@ -13,6 +13,7 @@ import { cn } from "../lib/utils.ts";
  * `px-inset` (or `p-inset`) as they did inside a flush card.
  *
  * The section is a labelled region named by its title; pass `aria-label` for another name.
+ * `ref` reaches the section element, for example to scroll it into view.
  */
 export function SidebarSection({
   "aria-label": ariaLabel,
@@ -21,6 +22,7 @@ export function SidebarSection({
   className,
   flush = false,
   number,
+  ref,
   title,
 }: {
   "aria-label"?: string;
@@ -29,11 +31,13 @@ export function SidebarSection({
   className?: string;
   flush?: boolean;
   number?: number;
+  ref?: Ref<HTMLElement>;
   title: ReactNode;
 }) {
   const titleId = useId();
   return (
     <section
+      ref={ref}
       data-slot="sidebar-section"
       aria-label={ariaLabel}
       aria-labelledby={ariaLabel ? undefined : titleId}

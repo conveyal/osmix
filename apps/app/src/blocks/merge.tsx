@@ -32,7 +32,7 @@ import type {
   PatchIdMode,
   PlanDecision,
 } from "osmix";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 
 import { ConflationConfig } from "../components/conflation-config";
@@ -130,6 +130,12 @@ export default function MergeBlock() {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   /** Why the last change to the plan in review failed; the plan is unchanged. */
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const stepRef = useRef<HTMLElement>(null);
+
+  // Each step starts at its top: the sidebar keeps its scroll, which belonged to the last step.
+  useEffect(() => {
+    stepRef.current?.scrollIntoView({ block: "start" });
+  }, [step]);
 
   const baseFileName = base.file?.name ?? base.fileInfo?.fileName;
   const patchFileName = patch.file?.name ?? patch.fileInfo?.fileName;
@@ -708,7 +714,7 @@ export default function MergeBlock() {
 
   return (
     <>
-      <Step number={STEP_NUMBER[step]} title={title}>
+      <Step ref={stepRef} number={STEP_NUMBER[step]} title={title}>
         {pendingRefresh?.error ? (
           <Alert variant="destructive" title="The merged dataset needs to be refreshed">
             <p>{pendingRefresh.error}</p>

@@ -99,7 +99,8 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
 
   // Review plan is the default entry point: nothing changes until the plan is applied.
   await page.getByRole("button", { name: "Review plan" }).click();
-  await expect(page.getByRole("heading", { name: /^2\.\s*Review the plan$/ })).toBeVisible();
+  // The review opens at its top, not at the scroll the inputs step left behind.
+  await expect(page.getByRole("heading", { name: /^2\.\s*Review the plan$/ })).toBeInViewport();
   await expect(page.getByRole("region", { name: "Plan summary" })).toBeVisible();
   // The same entities as base and patch: every positive ID names a base entity.
   await expect(page.getByText(/patch entities replace base entities/)).toBeVisible();
@@ -107,7 +108,7 @@ test("loads both inputs once and reaches exact reconciliation", async ({ page })
   await expect(actions.getByRole("button", { name: "Export osmChange (.osc)" })).toBeVisible();
   await expect(actions.getByRole("button", { name: "Apply plan" })).toBeEnabled();
   await actions.getByRole("button", { name: "Back to inputs" }).click();
-  await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^1\.\s*Choose the inputs$/ })).toBeInViewport();
 
   // Each slot owns its worker dataset (`<slot>-<file hash>`) and frees it when cleared.
   // Development serves `fixtures/` as the public directory.
