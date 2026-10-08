@@ -62,8 +62,9 @@ test("extracts a bounding box from a PBF and offers the result for download", as
 
   // Saving stores the extract as its own dataset: keyed by its content hash and named for the
   // extract, never under the source file's hash (which would shadow the full source in the
-  // cache).
-  await page.getByRole("button", { name: "Save extract result to storage" }).click();
+  // cache). The result's actions offer the save beside the export, not in the section header.
+  const resultActions = page.getByRole("group", { name: "Extract result actions" });
+  await resultActions.getByRole("button", { name: "Save to storage", exact: true }).click();
   await expect
     .poll(() => page.evaluate(async () => (await window.osmWorker.listStoredOsm()).length))
     .toBe(1);
@@ -185,7 +186,11 @@ test("extracts from a stored dataset opened with ?load=, the same as from the fi
   await page.getByRole("button", { name: "Extract", exact: true }).click();
   await expect(stats).toBeVisible({ timeout: 120_000 });
   expect(await stats.innerText()).toBe(fromFile);
-  await expect(page.getByRole("button", { name: "Save extract result to storage" })).toBeVisible();
+  await expect(
+    page
+      .getByRole("group", { name: "Extract result actions" })
+      .getByRole("button", { name: "Save to storage", exact: true }),
+  ).toBeVisible();
 
   // Clearing the result keeps the source dataset for another extract.
   await page.getByRole("button", { name: "Clear extract result" }).click();
