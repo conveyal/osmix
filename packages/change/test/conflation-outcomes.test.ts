@@ -499,7 +499,8 @@ describe("actual conflation outcomes", () => {
     expect(outcome.summary).toMatchObject({
       features: 2,
       appliedFeatures: 0,
-      unresolvedFeatures: 2,
+      // The remote point has nothing nearby: an outcome, not unresolved work (MP-OUT1).
+      unresolvedFeatures: 1,
       reviewFeatures: 1,
       unmatchedFeatures: 1,
     });

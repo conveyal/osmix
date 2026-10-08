@@ -34,7 +34,7 @@ const PAGE_SIZE = 10;
 const UNRESOLVED_LABELS = {
   ambiguous: "Multiple possible targets",
   blocked: "Matching action blocked",
-  unmatched: "No matching target",
+  unmatched: "No base feature nearby",
   review: "Choice still needed",
 } as const;
 const TAG_REASON_LABELS = {
@@ -81,6 +81,10 @@ function FeatureOutcomes({
     {
       value: "unresolved",
       label: `Unresolved (${outcome.summary.unresolvedFeatures.toLocaleString()})`,
+    },
+    {
+      value: "unmatched",
+      label: `No base feature nearby (${outcome.summary.unmatchedFeatures.toLocaleString()})`,
     },
     {
       value: "skipped",
@@ -353,9 +357,10 @@ export function MergeCompletionSummary({
           />
           <div className="flex flex-col gap-2 p-inset">
             <p>
-              Imported features considered for matching: {summary.features.toLocaleString()}.{" "}
-              Intentionally skipped: {summary.skippedFeatures.toLocaleString()}. Resolved without
-              additional matching actions: {summary.unchangedFeatures.toLocaleString()}.
+              Imported features considered for matching: {summary.features.toLocaleString()}. No
+              base feature nearby: {summary.unmatchedFeatures.toLocaleString()}. Intentionally
+              skipped: {summary.skippedFeatures.toLocaleString()}. Resolved without additional
+              matching actions: {summary.unchangedFeatures.toLocaleString()}.
             </p>
             <p>
               Actions count actual changes from matching, after the ordinary merge. One feature can
@@ -379,7 +384,6 @@ export function MergeCompletionSummary({
               rows={[
                 { label: "Multiple possible targets", count: summary.ambiguousFeatures },
                 { label: "Blocked", count: summary.blockedFeatures },
-                { label: "No matching target", count: summary.unmatchedFeatures },
                 { label: "Choice still needed", count: summary.reviewFeatures },
               ]}
             />

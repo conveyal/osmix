@@ -123,7 +123,11 @@ export interface MergePlanBulkResult extends MergePlanBulkCounts {
 export type MergePlanBulkPreview = Record<MergePlanBulkRequest["action"], MergePlanBulkCounts>;
 
 /** Which matching outcome features a page shows. */
-export type MergeMatchingFilter = "unresolved" | "skipped" | "way-removal" | "all";
+/**
+ * Which matching outcomes a page lists: work still needing a person (`unresolved`), sources with
+ * no base feature within the matching radius (`unmatched`), skipped ones, removals, or all.
+ */
+export type MergeMatchingFilter = "unresolved" | "unmatched" | "skipped" | "way-removal" | "all";
 
 export interface MergeMatchingPage {
   features: OsmConflationOutcomeFeature[];
@@ -194,7 +198,9 @@ function pageOf<T>(items: readonly T[], page: number, pageSize: number) {
 function matchesMatchingFilter(feature: OsmConflationOutcomeFeature, filter: MergeMatchingFilter) {
   switch (filter) {
     case "unresolved":
-      return feature.unresolved !== null;
+      return feature.unresolved !== null && feature.unresolved !== "unmatched";
+    case "unmatched":
+      return feature.unresolved === "unmatched";
     case "skipped":
       return feature.skipped;
     case "way-removal":

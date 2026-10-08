@@ -153,7 +153,7 @@ describe("matching plan outcomes", () => {
         appliedFeatures: 1,
         tagCopyActions: 1,
         copiedTagValues: 1,
-        unresolvedFeatures: 3,
+        unresolvedFeatures: 2,
         ambiguousFeatures: 1,
         blockedFeatures: 1,
         unmatchedFeatures: 1,
@@ -236,12 +236,20 @@ describe("matching plan outcomes", () => {
       outcome.tags.map(({ uncopied, ...tag }) => ({ ...tag, uncopiedFeatures: uncopied.length })),
     );
     expect(overview.matching?.outcome.wayRemovalFeatures).toBe(0);
-    const unresolved = outcome.features.filter((feature) => feature.unresolved !== null);
-    const first = worker.getMergeMatchingPage(base.id, "unresolved", 0, 2);
-    expect(first).toEqual({ features: unresolved.slice(0, 2), total: 3, totalPages: 2 });
-    expect(worker.getMergeMatchingPage(base.id, "unresolved", 1, 2).features).toEqual(
-      unresolved.slice(2),
+    // A source with nothing nearby is listed on its own, not as unresolved work (MP-OUT1).
+    const unresolved = outcome.features.filter(
+      (feature) => feature.unresolved !== null && feature.unresolved !== "unmatched",
     );
+    const first = worker.getMergeMatchingPage(base.id, "unresolved", 0, 1);
+    expect(first).toEqual({ features: unresolved.slice(0, 1), total: 2, totalPages: 2 });
+    expect(worker.getMergeMatchingPage(base.id, "unresolved", 1, 1).features).toEqual(
+      unresolved.slice(1),
+    );
+    expect(worker.getMergeMatchingPage(base.id, "unmatched", 0, 10)).toEqual({
+      features: outcome.features.filter((feature) => feature.unresolved === "unmatched"),
+      total: 1,
+      totalPages: 1,
+    });
     expect(worker.getMergeMatchingPage(base.id, "skipped", 0, 10).total).toBe(1);
     expect(() => worker.getMergeUncopiedTagPage(base.id, "missing", 0, 10)).toThrow(
       "No tag missing in this matching outcome",
@@ -354,7 +362,7 @@ describe("matching plan outcomes", () => {
         appliedFeatures: 2,
         tagCopyActions: 2,
         copiedTagValues: 2,
-        unresolvedFeatures: 2,
+        unresolvedFeatures: 1,
         blockedFeatures: 1,
         unmatchedFeatures: 1,
         skippedFeatures: 1,

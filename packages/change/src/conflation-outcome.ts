@@ -338,7 +338,10 @@ export function createConflationOutcomeReport(
       removedConnectionOrphanNodes: [...trace.connectionOrphanNodeIds].filter(
         (id) => ordinaryBaseline.nodes.ids.has(id) && !result.nodes.ids.has(id),
       ).length,
-      unresolvedFeatures: features.filter((feature) => feature.unresolved != null).length,
+      // Nothing nearby is an outcome, not work left to do (MP-OUT1).
+      unresolvedFeatures: features.filter(
+        (feature) => feature.unresolved != null && feature.unresolved !== "unmatched",
+      ).length,
       ambiguousFeatures: features.filter((feature) => feature.unresolved === "ambiguous").length,
       blockedFeatures: features.filter((feature) => feature.unresolved === "blocked").length,
       unmatchedFeatures: features.filter((feature) => feature.unresolved === "unmatched").length,

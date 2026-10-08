@@ -104,7 +104,13 @@ test("the automatic workflow merges the Monaco scenario patch", async ({ page })
   if (!reportPath) throw Error("Missing merge report download");
   const report = JSON.parse(await readFile(reportPath, "utf8")) as {
     idMap: { ways: Record<string, number> };
+    plan: { matching: { outcome: { summary: { unmatchedFeatures: number } } } };
   };
+  // Nothing nearby is its own count, on screen and in the report, not unresolved work.
+  const { unmatchedFeatures } = report.plan.matching.outcome.summary;
+  await expect(summary).toContainText(
+    `No base feature nearby: ${unmatchedFeatures.toLocaleString("en-US")}.`,
+  );
   const a1 = report.idMap.ways[String(scenarioFeatureId(17, 1))];
   expect(positive.ways.getById(a1!)?.refs[0]).toBe(6487733397);
 });

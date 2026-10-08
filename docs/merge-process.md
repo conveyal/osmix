@@ -512,19 +512,20 @@ These states are exercised by the [merge outcome tests](../apps/app/tests/merge-
 <a id="mp-out1"></a>
 **MP-OUT1 — Count changes, not promises.** Proposals, decisions, the plan, and the applied result are distinct. The completion summary counts imported features by outcome; the matching outcome compares the planned state before and after the matching phase, **before crossings**. A workflow reports them as completed only after the plan is applied and the result refreshed.
 
-| Report concept            | Interpretation                                                                                                                                                                   |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Proposal count            | Proposed source/target pairs. Several proposals can describe one imported source.                                                                                                |
-| Considered feature count  | Unique imported nodes/ways considered by matching; not all imported entities                                                                                                     |
-| Copied action             | One source with one or more surviving copied values; copying three keys is one action                                                                                            |
-| Connection action         | One matched imported node with one or more actually changed way references; imported points it leaves unused are dropped and counted separately (`removedConnectionOrphanNodes`) |
-| Removal action            | One explicitly removed imported way; newly cleaned orphan points are counted separately                                                                                          |
-| Already equal             | Selected value was already present; no copy action occurred                                                                                                                      |
-| Superseded copy           | Another included source owns the surviving value; the overwritten copy does not receive surviving-copy credit                                                                    |
-| Unresolved                | A source has ambiguous, review, blocked, or unmatched work. A source can also have an applied action.                                                                            |
-| Left out                  | Every matching proposal of the feature was left out (`skippedFeatures`); separate from unresolved work                                                                           |
-| Retained imported feature | Retained under the reported stage's ordinary/matching rules; not evidence that copying or network connection happened                                                            |
-| Original ID absent        | May mean exact representation under a base ID, explicit removal, or cleanup of a point a connection or intersection replaced. Determine which stage changed it.                  |
+| Report concept            | Interpretation                                                                                                                                                                    |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Proposal count            | Proposed source/target pairs. Several proposals can describe one imported source.                                                                                                 |
+| Considered feature count  | Unique imported nodes/ways considered by matching; not all imported entities                                                                                                      |
+| Copied action             | One source with one or more surviving copied values; copying three keys is one action                                                                                             |
+| Connection action         | One matched imported node with one or more actually changed way references; imported points it leaves unused are dropped and counted separately (`removedConnectionOrphanNodes`)  |
+| Removal action            | One explicitly removed imported way; newly cleaned orphan points are counted separately                                                                                           |
+| Already equal             | Selected value was already present; no copy action occurred                                                                                                                       |
+| Superseded copy           | Another included source owns the surviving value; the overwritten copy does not receive surviving-copy credit                                                                     |
+| Unresolved                | A source has ambiguous, review or blocked work that needs a person (`unresolvedFeatures`). A source can also have an applied action.                                              |
+| No base feature nearby    | No base feature lies within the matching radius (`unmatchedFeatures`, per feature `unresolved: "unmatched"`). An outcome, not work left to do, so it is not counted as unresolved |
+| Left out                  | Every matching proposal of the feature was left out (`skippedFeatures`); separate from unresolved work                                                                            |
+| Retained imported feature | Retained under the reported stage's ordinary/matching rules; not evidence that copying or network connection happened                                                             |
+| Original ID absent        | May mean exact representation under a base ID, explicit removal, or cleanup of a point a connection or intersection replaced. Determine which stage changed it.                   |
 
 Do not add applied and unresolved counts as if they partitioned all imported data. A source can have successful copying and a blocked connection. Missing imported tag values are excluded from per-key present-value counts, while present uncopied values have explanations such as blocked, not selected, protected, no included target, or superseded. Exact reference reconciliation receives no fuzzy-attachment credit. Later intersections may change connectivity without changing the matching report.
 
