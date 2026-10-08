@@ -296,7 +296,9 @@ describe("resolved matching actions", () => {
       attachNetwork: true,
     });
     const { plan, osm: result } = planFixture(base, patch, options, [decision]);
-    expect(actionEffects(plan)).toEqual({ copy: "blocked", connect: "applied" });
+    // With no tags to copy there is no copy proposal (MP-M3), only the connection.
+    expect(plan.proposals.has("copy:n101>n1")).toBe(false);
+    expect(findProposal(plan, "connect:n101>n1").effect).toBe("applied");
     expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
   });
 });

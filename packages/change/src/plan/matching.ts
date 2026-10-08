@@ -95,6 +95,9 @@ export function planMatching(
     assessment: OsmConflationActionAssessment | null | undefined,
   ) => {
     if (!assessment || assessment.status === "unmatched" || candidate.targetId == null) return;
+    // Copying selected tags that already agree, or that the source lacks, changes nothing, so
+    // it is not a proposal (MP-M3).
+    if (kind === "copy-tags" && nothingToCopy(assessment)) return;
     const type = candidate.entityType;
     const feature =
       type === "node"
@@ -238,6 +241,11 @@ function linkAlternatives(entries: readonly CandidateProposals[]) {
     }
   }
   linkCompetitors(entries);
+}
+
+/** A copy assessment blocked only because no selected tag differs. */
+function nothingToCopy({ status, reasons }: OsmConflationActionAssessment) {
+  return status === "blocked" && reasons.every((reason) => reason === "no-transferable-properties");
 }
 
 /**
