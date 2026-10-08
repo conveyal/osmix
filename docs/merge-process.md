@@ -181,6 +181,8 @@ The app's initial opt-in form selects Copy tags with `barrier,crossing,kerb,tact
 <a id="mp-p4"></a>
 **MP-P4 — A decision replans from its phase.** Changing decisions replans from the earliest phase of the proposals they name, restoring that phase's starting state first; matching discovery is reused when the identity phase is unchanged. The result is the plan a fresh `planMerge` with the same decisions would make. A crossing never merges two points that have an exact-merge proposal, so rejecting or not yet accepting an identical-point merge keeps the points separate.
 
+Between plans the planner keeps the records, the proposals and matching discovery, but not what it builds to search the planned state (the pending spatial grid, way coordinates, the ways-by-node index): a replan rebuilds them. The crossings phase reuses only the crossing points of pairs that cross; other pairs are tested again. Both bound memory on large imports; see "Large imports" under [Review plan and Apply automatically](#review-plan-and-apply-automatically).
+
 <a id="direct-and-exact-rules"></a>
 
 ## Direct merge and exact reconciliation
@@ -477,6 +479,8 @@ flowchart TD
 ```
 
 When a patch's positive IDs name base entities, the review says how many and offers **Treat all as new**, which replans with every patch feature new (MP-I1).
+
+**Large imports.** The plan lives in the plan worker's heap, which Chromium caps at about 3.7 GB; running out crashes the tab. Planning peaks at about 2.1 KB of heap per imported entity with matching and 1.4 KB without (measured with `apps/bench` plan-memory). Merge estimates the peak from the patch's entity count and refuses to plan above 3.5 GB, saying how much the import needs and whether it fits without matching. Washington's 1.48M-entity sidewalk import fits with matching; Seattle's 2.08M-entity import does not. Split a larger import with Extract.
 
 <a id="review-controls"></a>
 

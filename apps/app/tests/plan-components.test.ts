@@ -84,6 +84,21 @@ describe("plan components", () => {
     expect(html.indexOf("Apply automatically")).toBeLessThan(html.indexOf("Review plan"));
   });
 
+  it("refuses to plan an import too large for the browser, and says why", () => {
+    const html = render(
+      createElement(PlanInputs, {
+        disabled: false,
+        onApplyAutomatically: asyncNoop,
+        onReviewPlan: asyncNoop,
+        tooLarge: "Planning needs about 4.4 GB of memory.",
+      }),
+    );
+    expect(html).toContain("This import is too large to plan in the browser");
+    expect(html).toContain("Planning needs about 4.4 GB of memory.");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*Apply automatically/);
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*Review plan/);
+  });
+
   it("says how many base entities the patch replaces, and hides when none", () => {
     expect(
       render(createElement(PatchIdNotice, { mode: "osm", onChange: noop, replacesBase: 0 })),

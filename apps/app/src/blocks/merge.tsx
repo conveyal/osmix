@@ -62,6 +62,7 @@ import {
 import { mergeOutcomeReport } from "../lib/merge-report";
 import { useBaseOsm, usePatchOsm } from "../lib/merge-slots";
 import { useOpenFileInExtract } from "../lib/open-in";
+import { planTooLargeReason } from "../lib/plan-memory";
 import { useSelectPlanFeature } from "../lib/use-select-plan-feature";
 import { BASE_OSM_KEY, PATCH_OSM_KEY } from "../settings";
 import {
@@ -160,8 +161,14 @@ export default function MergeBlock() {
     selectEntity(null, null);
   };
 
+  // Planning an import too large for the browser's heap would crash the tab (T34).
+  const tooLarge = patch.osmInfo
+    ? planTooLargeReason(patch.osmInfo.stats, conflationForm.enabled)
+    : null;
+
   /** Plan options from the settings, or null after focusing the first invalid field. */
   const planOptions = (mode: PatchIdMode = patchIds, decisions?: PlanDecision[]) => {
+    if (tooLarge) return null;
     const invalid = firstInvalidConflationInputId(conflationForm);
     if (invalid) {
       document.getElementById(invalid)?.focus();
@@ -760,6 +767,7 @@ export default function MergeBlock() {
             disabled={!base.osm || !patch.osm || taskLocked}
             onApplyAutomatically={applyAutomatically}
             onReviewPlan={reviewPlan}
+            tooLarge={tooLarge}
           />
         </>
       ) : null}

@@ -1,4 +1,12 @@
-import { ActionButton, Checkbox, CheckboxLabel, Radio, RadioCard, SidebarSection } from "@osmix/ui";
+import {
+  ActionButton,
+  Alert,
+  Checkbox,
+  CheckboxLabel,
+  Radio,
+  RadioCard,
+  SidebarSection,
+} from "@osmix/ui";
 import { useAtom } from "jotai";
 import { ListChecksIcon, MergeIcon } from "lucide-react";
 
@@ -17,14 +25,16 @@ export const TREAT_AS_NEW_LABEL = "Treat every patch feature as new";
 /**
  * The end of the input step: how the plan reads the inputs, then its two entry points. Both
  * plan the same merge; **Review plan** stops for decisions, **Apply automatically** applies
- * the plan as it stands.
+ * the plan as it stands. `tooLarge` says why the browser cannot plan this import; both wait.
  */
 export function PlanInputs({
   disabled,
   onApplyAutomatically,
   onReviewPlan,
+  tooLarge = null,
 }: {
   disabled: boolean;
+  tooLarge?: string | null;
   onApplyAutomatically: () => Promise<unknown>;
   onReviewPlan: () => Promise<unknown>;
 }) {
@@ -90,17 +100,22 @@ export function PlanInputs({
           in the review.
         </p>
       </fieldset>
+      {tooLarge ? (
+        <Alert variant="destructive" title="This import is too large to plan in the browser">
+          <p>{tooLarge}</p>
+        </Alert>
+      ) : null}
       <StepActions aria-label="Plan actions">
         <ActionButton
           variant="outline"
-          disabled={disabled}
+          disabled={disabled || tooLarge !== null}
           icon={<MergeIcon aria-hidden="true" />}
           onAction={onApplyAutomatically}
         >
           Apply automatically
         </ActionButton>
         <ActionButton
-          disabled={disabled}
+          disabled={disabled || tooLarge !== null}
           icon={<ListChecksIcon aria-hidden="true" />}
           onAction={onReviewPlan}
         >

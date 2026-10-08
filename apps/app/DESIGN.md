@@ -17,7 +17,9 @@ tokens, spacing, primitives, map overlay primitives) lives in
   new", the **Automation** level (`RadioCard`s: Conservative, Recommended by
   default, Aggressive, each with its help text), and the two entry points in
   `StepActions`: **Apply automatically** (outline) then **Review plan**
-  (default). A proposal the level decided shows "Decided by <level>" in the
+  (default). When the patch is too large to plan in the browser's heap, a
+  destructive `Alert` says how much memory it needs and both actions are
+  disabled. A proposal the level decided shows "Decided by <level>" in the
   review, and its first choice is the level's rule.
 - `PatchIdNotice` — a warning `Alert` in the review when positive patch IDs
   replace base entities, with the count and **Treat all as new**, which
