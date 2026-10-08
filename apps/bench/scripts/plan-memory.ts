@@ -2,7 +2,7 @@
  * Planner memory and time per phase, for one base and patch PBF (Task T34, tasks/004).
  *
  *   pnpm --filter @osmix/bench run plan-memory -- <base.pbf> <patch.pbf> [--apply] [--replan]
- *     [--no-matching] [--digest] [--automation=<level>]
+ *     [--no-matching] [--digest] [--automation=<level>] [--fresh]
  *
  * Relative paths resolve against `fixtures/`. Matching runs with the settings of the
  * Washington review: copy the default keys, connect, replace and review removals, 1 m radius,
@@ -14,6 +14,9 @@
  * `--replan` times one replan after a decision, as review does; `--apply` builds the result;
  * `--no-matching` plans the direct, identity and crossings phases only; `--digest` prints the
  * plan's digests (`@osmix/test-utils/plan-digest`) last, to show a planner change altered nothing.
+ * `--fresh` (with `--replan`) replans twice more, leaving out an automatic crossing and then an
+ * automatic connection, and fails unless the result's digests equal a fresh plan's with the same
+ * decisions (MP-P4): replans reuse work, and must not change what they produce.
  */
 import { createReadStream } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
@@ -34,7 +37,7 @@ const [baseFile, patchFile] = args.filter((arg) => !arg.startsWith("--"));
 if (!baseFile || !patchFile) {
   throw Error(
     "Usage: plan-memory <base.pbf> <patch.pbf> [--apply] [--replan] [--no-matching] [--digest] " +
-      "[--automation=<level>]",
+      "[--automation=<level>] [--fresh]",
   );
 }
 const gc = globalThis.gc;
@@ -120,6 +123,41 @@ if (flags.has("--replan")) {
   started = performance.now();
   setMergePlanDecisions(plan, [{ proposalId: waiting.id, action: "accept" }]);
   measure("replanned", { ms: Math.round(performance.now() - started), decided: waiting.id });
+}
+
+if (flags.has("--fresh")) {
+  if (!flags.has("--replan")) throw Error("--fresh compares replans; pass --replan too");
+  const automatic = (kinds: string[]) =>
+    [...plan.proposals.values()].find(
+      ({ kind, status, effect }) =>
+        kinds.includes(kind) && status === "automatic" && effect === "applied",
+    );
+  // Leave out a crossing (a replan from crossings), then a connection (from matching), each
+  // reusing what the passes before kept.
+  for (const kinds of [["crossing-snap", "crossing-node"], ["connect"]]) {
+    const proposal = automatic(kinds);
+    if (!proposal) throw Error(`No automatic ${kinds.join(" or ")} proposal to leave out`);
+    const decisions = [
+      ...(plan.options.decisions ?? []),
+      { proposalId: proposal.id, action: "reject" as const },
+    ];
+    started = performance.now();
+    setMergePlanDecisions(plan, decisions);
+    measure("replanned", { ms: Math.round(performance.now() - started), decided: proposal.id });
+  }
+  const fresh = planMerge(base, patch, { ...plan.options }, quiet);
+  const digestOf = (planned: typeof plan) =>
+    planDigest(
+      planned,
+      planned.diagnostics.integrity.length > 0 ? "refused" : applyPlan(planned).osm,
+      generateMergePlanOsc(planned),
+    );
+  const replanned = digestOf(plan);
+  const planned = digestOf(fresh);
+  console.log(JSON.stringify({ label: "fresh", replanned, planned }));
+  if (JSON.stringify(replanned) !== JSON.stringify(planned)) {
+    throw Error("A replan made a different plan than a fresh plan with the same decisions");
+  }
 }
 
 if (flags.has("--apply")) {
