@@ -64,6 +64,28 @@ describe("CrossingCache", () => {
     expect(cache.nearWays(10, box, () => [10, 99])).toEqual([10, 99]);
   });
 
+  it("keeps each way's near ways as boxes change and lists grow and shrink", () => {
+    const cache = new CrossingCache();
+    const overlay = new PlanOverlay(base);
+    // Each way's box and list change every few passes; a list's length varies with both.
+    const boxOf = (way: number, pass: number) => {
+      const version = Math.floor(pass / (1 + (way % 4)));
+      return [way, version, way + 1, version + 1] as [number, number, number, number];
+    };
+    const idsOf = (way: number, version: number) =>
+      Array.from({ length: (way * 7 + version * 13) % 40 }, (_, index) => way * 100 + index);
+    for (let pass = 0; pass < 30; pass++) {
+      cache.begin(overlay);
+      for (let way = 0; way < 300; way++) {
+        const box = boxOf(way, pass);
+        const expected = idsOf(way, box[1]);
+        const unchanged = pass > 0 && boxOf(way, pass - 1)[1] === box[1];
+        const search = unchanged ? fail : () => [...expected];
+        expect(cache.nearWays(way, box, search)).toEqual(expected);
+      }
+    }
+  });
+
   it("reuses crossing points only while both ways' geometry is unchanged", () => {
     const cache = new CrossingCache();
     cache.begin(new PlanOverlay(base));
