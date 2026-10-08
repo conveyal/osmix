@@ -341,15 +341,20 @@ export function newOverlayIntegrityIssues(
 ): PlanIntegrityIssue[] {
   const base = overlay.base;
   const issues: IntegrityIssue[] = [];
-  const hasNode = (id: number) => overlay.getNode(id) != null;
+  const hasNode = (id: number) => overlay.hasNode(id);
   const changedWays = new Set<number>();
   const checkedWays = new Set<number>();
   const gradeNodes = new Set<number>();
+  // Ways with a record are checked from it here, so each is decoded once.
   for (const id of overlay.wayChanges.keys()) {
-    if (!overlay.wayChanges.get(id)) continue;
+    const change = overlay.wayChanges.get(id);
+    if (!change) continue;
     changedWays.add(id);
-    const way = overlay.getWay(id);
-    if (way) checkedWays.add(id);
+    const way = change.changeType === "delete" ? null : change.entity;
+    if (way) {
+      checkedWays.add(id);
+      issues.push(...wayIntegrityIssues(way, hasNode));
+    }
     const before = base.ways.getById(id);
     if (!before) {
       for (const ref of way?.refs ?? []) gradeNodes.add(ref);
@@ -368,6 +373,7 @@ export function newOverlayIntegrityIssues(
   }
 
   for (const id of checkedWays) {
+    if (changedWays.has(id)) continue;
     const way = overlay.getWay(id);
     if (way) issues.push(...wayIntegrityIssues(way, hasNode));
   }

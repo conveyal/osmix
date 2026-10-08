@@ -11,6 +11,18 @@ import { removeDuplicateAdjacentWayRefs } from "../utils.ts";
 
 const MAX_INDEX_KEY = 4_294_967_294;
 
+/**
+ * Recently read layer entities kept decoded, per type. Phases read nearby entities again and
+ * again (crossings test each way against its neighbours); a bound keeps this from becoming the
+ * copy of the patch the layer replaced. Entities are never mutated in place, so sharing one
+ * decoded object between reads is safe, as sharing a stored record was.
+ */
+const DECODED_CACHE_SIZE = 1 << 15;
+const DECODED_CACHE_MASK = DECODED_CACHE_SIZE - 1;
+
+/** A slot for `id` in the decoded cache: one entity per slot, replaced on a miss. */
+const slotOf = (id: number) => (Math.imul(id | 0, 0x9e3779b1) >>> 17) & DECODED_CACHE_MASK;
+
 type Entities<T extends OsmEntityType> = Osm[`${T}s`];
 
 /** One entity type's layer over `base`; ways read as the direct phase recorded them. */
@@ -32,16 +44,25 @@ function layerOf<T extends OsmEntityType>(
   }
   indexIds.sort((a, b) => a - b);
   const has = (id: number) => ids.has(id) && !baseIds.has(id);
+  const cachedIds = new Float64Array(DECODED_CACHE_SIZE).fill(Number.NaN);
+  const cached: (OsmEntityTypeMap[T] | undefined)[] = Array.from({ length: DECODED_CACHE_SIZE });
+  const decode = (id: number) => {
+    const entity = entities.getById(id) as OsmEntityTypeMap[T] | null;
+    if (!entity || type !== "way") return entity;
+    return removeDuplicateAdjacentWayRefs(entity as OsmEntityTypeMap["way"]) as OsmEntityTypeMap[T];
+  };
   return {
     osmId: patch.id,
     has,
     get: (id) => {
+      const slot = slotOf(id);
+      if (cachedIds[slot] === id) return cached[slot]!;
       if (!has(id)) return null;
-      const entity = entities.getById(id) as OsmEntityTypeMap[T] | null;
-      if (!entity || type !== "way") return entity;
-      return removeDuplicateAdjacentWayRefs(
-        entity as OsmEntityTypeMap["way"],
-      ) as OsmEntityTypeMap[T];
+      const entity = decode(id);
+      if (!entity) return null;
+      cachedIds[slot] = id;
+      cached[slot] = entity;
+      return entity;
     },
     indexIds: Float64Array.from(indexIds),
     otherIds: Float64Array.from(otherIds),

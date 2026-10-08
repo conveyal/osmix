@@ -7,7 +7,9 @@
  * Relative paths resolve against `fixtures/`. Matching runs with the settings of the
  * Washington review: copy the default keys, connect, replace and review removals, 1 m radius,
  * Recommended automation. Each line on stdout is one JSON measurement taken after two forced
- * garbage collections; `heapMb` is the V8 heap, `arrayBuffersMb` the typed columns.
+ * garbage collections; `heapMb` is the V8 heap, `arrayBuffersMb` the typed columns, `cpuMs` the
+ * process CPU time since the previous line, which other load on the machine affects less than
+ * `ms`.
  * `--replan` times one replan after a decision, as review does; `--apply` builds the result;
  * `--no-matching` plans the direct, identity and crossings phases only; `--digest` prints the
  * plan's digests (`@osmix/test-utils/plan-digest`) last, to show a planner change altered nothing.
@@ -36,7 +38,10 @@ const stream = (file: string) =>
   Readable.toWeb(createReadStream(path(file))) as unknown as ReadableStream<Uint8Array>;
 const mb = (bytes: number) => Math.round(bytes / 1e6);
 
+let cpuBefore = process.cpuUsage();
+
 function measure(label: string, extra: Record<string, unknown> = {}) {
+  const cpu = process.cpuUsage(cpuBefore);
   gc!();
   gc!();
   const { heapUsed, arrayBuffers, rss } = process.memoryUsage();
@@ -45,8 +50,10 @@ function measure(label: string, extra: Record<string, unknown> = {}) {
     heapMb: mb(heapUsed),
     arrayBuffersMb: mb(arrayBuffers),
     rssMb: mb(rss),
+    cpuMs: Math.round((cpu.user + cpu.system) / 1000),
     ...extra,
   };
+  cpuBefore = process.cpuUsage();
   console.log(JSON.stringify(row));
 }
 

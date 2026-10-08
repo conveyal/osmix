@@ -260,6 +260,15 @@ export class PlanOverlay {
     return change?.entity ?? this.base.nodes.getById(id);
   }
 
+  /** Whether node `id` is in the planned state, without decoding it. */
+  hasNode(id: number): boolean {
+    if (this.nodeChanges.hasOverride(id)) {
+      const change = this.nodeChanges.get(id);
+      return change ? change.changeType !== "delete" : this.base.nodes.ids.has(id);
+    }
+    return this.nodeChanges.layerRecord(id) !== undefined || this.base.nodes.ids.has(id);
+  }
+
   getWay(id: number): OsmWay | null {
     const change = this.wayChanges.get(id);
     if (change?.changeType === "delete") return null;
