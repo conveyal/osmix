@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "@osmix/shared/tsconfig/app.json",
   "compilerOptions": {
-    "types": ["vite/client"]
+    "types": ["vite/client", "node"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "scripts"]
 }

@@ -27,6 +27,14 @@ In development, "Use monaco.pbf" loads `fixtures/monaco.pbf`. Use the file picke
 - `src/engines/osmix-queries.ts`, `src/workers/osmix-bench.worker.ts`: Osmix queries, run in an Osmix worker.
 - `src/harness/`: the runner, answer comparison, and statistics.
 
+## Planner memory
+
+```bash
+pnpm --filter @osmix/bench run plan-memory -- osmix-e_wa_osm.pbf east_washington_sidewalk_proviso_1.pbf --replan --apply
+```
+
+Plans a merge of two PBFs in Node, with matching set up as in the Washington review, and prints one JSON line per planner phase: V8 heap, typed-array bytes, RSS, time and change count, each after a forced garbage collection. Relative paths resolve against `fixtures/`. `--replan` times one replan after a decision; `--apply` builds the result. Chromium stores the same plan in about 0.59 of Node's heap (measured on the Spokane pair), and its heap limit is about 3.7 GB.
+
 ## Tests
 
 ```bash

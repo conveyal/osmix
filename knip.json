@@ -6,6 +6,9 @@
     "apps/app": {
       "entry": ["e2e/*.tsx"]
     },
+    "apps/bench": {
+      "entry": ["scripts/*.ts"]
+    },
     "packages/cli": {
       "entry": ["scripts/*.ts", "src/cli.worker.ts"]
     }

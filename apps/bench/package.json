@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "plan-memory": "node --expose-gc --max-old-space-size=16000 scripts/plan-memory.ts",
     "test": "VITEST_INCLUDE_APPS=1 pnpm -w exec vitest run --project '@osmix/bench*'",
     "typecheck": "tsc --build --noEmit"
   },
