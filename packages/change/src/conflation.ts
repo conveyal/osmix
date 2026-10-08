@@ -62,6 +62,7 @@ import type {
   OsmConflationOptions,
   OsmConflationReasonCode,
   OsmConflationResolvedActions,
+  OsmConflationRoutingFamily,
   OsmConflationSummary,
   OsmConflationTagDiff,
   ResolvedOsmConflationOptions,
@@ -144,6 +145,39 @@ function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOp
     maxDistanceMeters,
     automatic: options.automatic ?? "high-confidence",
   };
+}
+
+/**
+ * Most imported entities have nothing nearby, and each unmatched candidate used to carry its
+ * own copies of the same empty assessment and evidence (1.36M of them on a regional import,
+ * T34). They share frozen ones instead, by the only things that differ: the reasons and the
+ * source's routing families. They are frozen, so code that mutates one throws instead of
+ * changing every candidate.
+ */
+const NO_ITEMS = Object.freeze([]) as never[];
+const UNMATCHED: OsmConflationActionAssessment = Object.freeze({
+  status: "unmatched",
+  reasons: NO_ITEMS,
+});
+const UNMATCHED_CHAIN: OsmConflationActionAssessment = Object.freeze({
+  status: "unmatched",
+  reasons: Object.freeze(["unsupported-way-chain"]) as OsmConflationReasonCode[],
+});
+const unmatchedEvidenceByFamilies = new Map<string, OsmConflationEvidence>();
+
+function unmatchedEvidence(sourceRoutingFamilies: OsmConflationRoutingFamily[]) {
+  const key = sourceRoutingFamilies.join(",");
+  let evidence = unmatchedEvidenceByFamilies.get(key);
+  if (!evidence) {
+    evidence = Object.freeze({
+      distanceMeters: Number.POSITIVE_INFINITY,
+      sourceRoutingFamilies: Object.freeze(sourceRoutingFamilies) as OsmConflationRoutingFamily[],
+      targetRoutingFamilies: NO_ITEMS,
+      tagDiff: NO_ITEMS,
+    });
+    unmatchedEvidenceByFamilies.set(key, evidence);
+  }
+  return evidence;
 }
 
 function candidateId(entityType: "node" | "way", sourceId: number, targetId: number | null) {
@@ -617,17 +651,10 @@ function discoverNodeCandidates(context: DiscoveryContext) {
         sourceId: source.id,
         targetId: null,
         status: "unmatched",
-        reasons: [],
-        propertyTransfer: { status: "unmatched", reasons: [] },
-        networkAttachment: context.options.attachNetwork
-          ? { status: "unmatched", reasons: [] }
-          : null,
-        evidence: {
-          distanceMeters: Number.POSITIVE_INFINITY,
-          sourceRoutingFamilies: routingFamilies(patchWays),
-          targetRoutingFamilies: [],
-          tagDiff: [],
-        },
+        reasons: UNMATCHED.reasons,
+        propertyTransfer: UNMATCHED,
+        networkAttachment: context.options.attachNetwork ? UNMATCHED : null,
+        evidence: unmatchedEvidence(routingFamilies(patchWays)),
       });
       continue;
     }
@@ -780,23 +807,17 @@ function discoverWayCandidates(context: DiscoveryContext) {
     if (matches.length === 0) {
       // Multiple nearby base ways may represent a segmented equivalent. This version
       // deliberately reports that case instead of guessing a one-to-many mapping.
-      const reasons: OsmConflationReasonCode[] =
-        nearbyWays.length > 1 ? ["unsupported-way-chain"] : [];
+      const assessment = nearbyWays.length > 1 ? UNMATCHED_CHAIN : UNMATCHED;
       candidates.push({
         id: candidateId("way", source.id, null),
         entityType: "way",
         sourceId: source.id,
         targetId: null,
         status: "unmatched",
-        reasons,
-        propertyTransfer: { status: "unmatched", reasons },
+        reasons: assessment.reasons,
+        propertyTransfer: assessment,
         networkAttachment: null,
-        evidence: {
-          distanceMeters: Number.POSITIVE_INFINITY,
-          sourceRoutingFamilies: [wayRoutingFamily(source)],
-          targetRoutingFamilies: [],
-          tagDiff: [],
-        },
+        evidence: unmatchedEvidence([wayRoutingFamily(source)]),
       });
       continue;
     }
