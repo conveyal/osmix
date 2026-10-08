@@ -2,12 +2,14 @@
  * Planner memory and time per phase, for one base and patch PBF (Task T34, tasks/004).
  *
  *   pnpm --filter @osmix/bench run plan-memory -- <base.pbf> <patch.pbf> [--apply] [--replan]
+ *     [--no-matching]
  *
  * Relative paths resolve against `fixtures/`. Matching runs with the settings of the
  * Washington review: copy the default keys, connect, replace and review removals, 1 m radius,
  * Recommended automation. Each line on stdout is one JSON measurement taken after two forced
  * garbage collections; `heapMb` is the V8 heap, `arrayBuffersMb` the typed columns.
- * `--replan` times one replan after a decision, as review does; `--apply` builds the result.
+ * `--replan` times one replan after a decision, as review does; `--apply` builds the result;
+ * `--no-matching` plans the direct, identity and crossings phases only.
  */
 import { createReadStream } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
@@ -20,7 +22,7 @@ const args = process.argv.slice(2).filter((arg) => arg !== "--");
 const flags = new Set(args.filter((arg) => arg.startsWith("--")));
 const [baseFile, patchFile] = args.filter((arg) => !arg.startsWith("--"));
 if (!baseFile || !patchFile) {
-  throw Error("Usage: plan-memory <base.pbf> <patch.pbf> [--apply] [--replan]");
+  throw Error("Usage: plan-memory <base.pbf> <patch.pbf> [--apply] [--replan] [--no-matching]");
 }
 const gc = globalThis.gc;
 if (!gc) throw Error("Run with node --expose-gc so measurements follow a full collection");
@@ -59,15 +61,19 @@ const plan = planMerge(
     automation: "recommended",
     mergeIdenticalPoints: true,
     patchIds: "osm",
-    matching: {
-      propertyKeys: ["barrier", "crossing", "kerb", "tactile_paving"],
-      attachNetwork: true,
-      allowWayRemoval: true,
-      allowWayReplacement: true,
-      replacementToleranceMeters: 1,
-      maxDistanceMeters: 1,
-      automatic: "high-confidence",
-    },
+    ...(flags.has("--no-matching")
+      ? {}
+      : {
+          matching: {
+            propertyKeys: ["barrier", "crossing", "kerb", "tactile_paving"],
+            attachNetwork: true,
+            allowWayRemoval: true,
+            allowWayReplacement: true,
+            replacementToleranceMeters: 1,
+            maxDistanceMeters: 1,
+            automatic: "high-confidence" as const,
+          },
+        }),
   },
   quiet,
   {
