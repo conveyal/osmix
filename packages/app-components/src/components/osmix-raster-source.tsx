@@ -2,22 +2,25 @@ import { Layer, Source } from "react-map-gl/maplibre";
 
 import { APPID, MIN_PICKABLE_ZOOM, RASTER_TILE_SIZE } from "../constants.ts";
 import { osmixIdToTileUrl, type RasterColorRole } from "../lib/osmix-raster-protocol.ts";
+import { FADED_OPACITY } from "./osmix-vector-overlay.tsx";
 
 /**
  * Raster preview of a dataset below `MIN_PICKABLE_ZOOM`, drawn in the `role` map color. The
  * role prefixes the source id, so one file loaded in both Merge slots gets two sources.
- * `visible={false}` keeps the layer mounted but hidden.
+ * `visible={false}` keeps the layer mounted but hidden; `faded` draws it behind the page's layers.
  */
 export default function OsmixRasterSource({
   osmId,
   role = "base",
   tileSize = RASTER_TILE_SIZE,
   visible = true,
+  faded = false,
 }: {
   osmId: string;
   role?: RasterColorRole;
   tileSize?: number;
   visible?: boolean;
+  faded?: boolean;
 }) {
   const id = `${APPID}:${role}:${osmId}:${tileSize}:raster`;
   return (
@@ -37,6 +40,7 @@ export default function OsmixRasterSource({
         source={id}
         maxzoom={MIN_PICKABLE_ZOOM}
         layout={{ visibility: visible ? "visible" : "none" }}
+        paint={{ "raster-opacity": faded ? FADED_OPACITY : 1 }}
       />
     </Source>
   );

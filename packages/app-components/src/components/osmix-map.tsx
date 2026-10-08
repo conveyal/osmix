@@ -59,9 +59,15 @@ export function OsmixMap({
   initialViewState,
   tools,
   legend,
+  fadeDatasets = false,
   children,
 }: {
   active?: boolean;
+  /**
+   * Fade every dataset's preview and overlay, so the caller's layers stand out: Merge sets it
+   * while a plan feature is selected.
+   */
+  fadeDatasets?: boolean;
   datasets: MapDataset[];
   initialViewState?: MapInitialViewState;
   tools?: { routing?: boolean };
@@ -102,7 +108,11 @@ export function OsmixMap({
       <RoutingHygiene datasets={loaded} routing={routing} />
       <Basemap initialViewState={initialViewState}>
         {loaded.map((dataset) => (
-          <DatasetSources key={`${dataset.role}:${dataset.osm.id}`} dataset={dataset} />
+          <DatasetSources
+            key={`${dataset.role}:${dataset.osm.id}`}
+            dataset={dataset}
+            faded={fadeDatasets}
+          />
         ))}
         <SelectedEntityLayer />
         {routing ? <RouteLayer /> : null}
@@ -120,12 +130,12 @@ export function OsmixMap({
 }
 
 /** The raster preview and the interactive overlay for one loaded dataset. */
-function DatasetSources({ dataset }: { dataset: LoadedMapDataset }) {
+function DatasetSources({ dataset, faded }: { dataset: LoadedMapDataset; faded: boolean }) {
   const { role, osm, visible } = dataset;
   return (
     <>
-      <OsmixRasterSource osmId={osm.id} role={role} visible={visible} />
-      <OsmixVectorOverlay osm={osm} role={role} visible={visible} />
+      <OsmixRasterSource osmId={osm.id} role={role} visible={visible} faded={faded} />
+      <OsmixVectorOverlay osm={osm} role={role} visible={visible} faded={faded} />
     </>
   );
 }

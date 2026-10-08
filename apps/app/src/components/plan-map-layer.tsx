@@ -23,6 +23,8 @@ const SELECTION_ID = `${APPID}:merge-plan-selection`;
 const TARGETS_ID = `${APPID}:merge-plan-targets`;
 const LINES_ID = `${SOURCE_ID}:lines`;
 const POINTS_ID = `${SOURCE_ID}:points`;
+/** The plan's lowest layer: the selection's base lines go under it, above the faded inputs. */
+const PLAN_BOTTOM_ID = `${SOURCE_ID}:casing`;
 
 const OUTCOME_TOKEN: Record<PlanOutcome, string> = {
   "needs-decision": "--map-outcome-decision",
@@ -97,56 +99,11 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
   const pointPaint: CircleLayerSpecification["paint"] = {
     "circle-color": color,
     "circle-radius": ["case", isSelected, 8, decision, 6, 4],
-    "circle-stroke-color": colors.casing,
-    "circle-stroke-width": 1.5,
+    "circle-stroke-color": ["case", isSelected, colors.selected, colors.casing],
+    "circle-stroke-width": ["case", isSelected, 3, 1.5],
   };
   return (
     <>
-      {replaced.features.length > 0 ? (
-        // The base ways the selected feature would replace, as base data: solid, in base ink,
-        // under the plan's lines.
-        <Source id={SELECTION_ID} type="geojson" data={replaced}>
-          <Layer
-            id={`${SELECTION_ID}:casing`}
-            type="line"
-            paint={{ "line-color": colors.casing, "line-width": 9 }}
-          />
-          <Layer
-            id={`${SELECTION_ID}:lines`}
-            type="line"
-            paint={{ "line-color": colors.base, "line-width": 5 }}
-          />
-        </Source>
-      ) : null}
-      {targets.features.length > 0 ? (
-        // The base features the selected feature's proposals match, as base data: solid lines
-        // and hollow points in base ink, like the base dataset's own legend symbols.
-        <Source id={TARGETS_ID} type="geojson" data={targets}>
-          <Layer
-            id={`${TARGETS_ID}:casing`}
-            type="line"
-            filter={["==", ["geometry-type"], "LineString"]}
-            paint={{ "line-color": colors.casing, "line-width": 7 }}
-          />
-          <Layer
-            id={`${TARGETS_ID}:lines`}
-            type="line"
-            filter={["==", ["geometry-type"], "LineString"]}
-            paint={{ "line-color": colors.base, "line-width": 3 }}
-          />
-          <Layer
-            id={`${TARGETS_ID}:points`}
-            type="circle"
-            filter={["==", ["geometry-type"], "Point"]}
-            paint={{
-              "circle-color": colors.casing,
-              "circle-radius": 7,
-              "circle-stroke-color": colors.base,
-              "circle-stroke-width": 3,
-            }}
-          />
-        </Source>
-      ) : null}
       <Source
         key={planMap.baseOsmId}
         id={SOURCE_ID}
@@ -161,7 +118,10 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
           type="line"
           source-layer={PLAN_TILE_LAYERS.ways}
           filter={shown}
-          paint={{ "line-color": colors.casing, "line-width": ["case", isSelected, 11, 6] }}
+          paint={{
+            "line-color": ["case", isSelected, colors.selected, colors.casing],
+            "line-width": ["case", isSelected, 13, 6],
+          }}
         />
         <Layer
           id={LINES_ID}
@@ -185,6 +145,57 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
           paint={pointPaint}
         />
       </Source>
+      {/* After the plan source, so their layers can go under its lowest one by ID. */}
+      {replaced.features.length > 0 ? (
+        // The base ways the selected feature would replace, as base data: solid, in base ink,
+        // cased in the selection color, under the plan's lines and above the faded inputs.
+        <Source id={SELECTION_ID} type="geojson" data={replaced}>
+          <Layer
+            id={`${SELECTION_ID}:casing`}
+            type="line"
+            beforeId={PLAN_BOTTOM_ID}
+            paint={{ "line-color": colors.selected, "line-width": 11 }}
+          />
+          <Layer
+            id={`${SELECTION_ID}:lines`}
+            type="line"
+            beforeId={PLAN_BOTTOM_ID}
+            paint={{ "line-color": colors.base, "line-width": 5 }}
+          />
+        </Source>
+      ) : null}
+      {targets.features.length > 0 ? (
+        // The base features the selected feature's proposals match, as base data: solid lines
+        // and hollow points in base ink, like the base dataset's own legend symbols.
+        <Source id={TARGETS_ID} type="geojson" data={targets}>
+          <Layer
+            id={`${TARGETS_ID}:casing`}
+            type="line"
+            beforeId={PLAN_BOTTOM_ID}
+            filter={["==", ["geometry-type"], "LineString"]}
+            paint={{ "line-color": colors.selected, "line-width": 9 }}
+          />
+          <Layer
+            id={`${TARGETS_ID}:lines`}
+            type="line"
+            beforeId={PLAN_BOTTOM_ID}
+            filter={["==", ["geometry-type"], "LineString"]}
+            paint={{ "line-color": colors.base, "line-width": 3 }}
+          />
+          {/* Points go on top: a base node under an imported vertex would otherwise hide. */}
+          <Layer
+            id={`${TARGETS_ID}:points`}
+            type="circle"
+            filter={["==", ["geometry-type"], "Point"]}
+            paint={{
+              "circle-color": colors.casing,
+              "circle-radius": 8,
+              "circle-stroke-color": colors.base,
+              "circle-stroke-width": 3,
+            }}
+          />
+        </Source>
+      ) : null}
     </>
   );
 }

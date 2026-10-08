@@ -27,6 +27,7 @@ import { InspectSidebar } from "./pages/inspect";
 import { LimitsPage } from "./pages/limits";
 import { MergeSidebar } from "./pages/merge";
 import { EXTRACT_OSM_KEY, EXTRACT_SOURCE_OSM_KEY, INSPECT_OSM_KEY } from "./settings";
+import { selectedPlanFeatureAtom } from "./state/merge-plan";
 
 /** What the shared map shows on a page, and the boxes that page is about. */
 interface PageMap {
@@ -35,6 +36,8 @@ interface PageMap {
   legend?: ReactNode;
   layers?: ReactNode;
   routing?: boolean;
+  /** Fade the datasets behind the page's layers. */
+  fadeDatasets?: boolean;
 }
 
 /** The shared map's content for each route. Every slot's hook runs on every page. */
@@ -46,6 +49,8 @@ function usePageMap(route: OsmixRoute): PageMap {
   const extractSource = useOsmFile(EXTRACT_SOURCE_OSM_KEY);
   const extractBbox = useAtomValue(extractBboxAtom);
   const selectPlanFeature = useSelectPlanFeature();
+  // An open plan feature, its targets and the ways it replaces stand out over both inputs.
+  const planFeatureOpen = useAtomValue(selectedPlanFeatureAtom) !== null;
   const boxes = (...infos: ({ bbox: GeoBbox2D | null } | null)[]) =>
     infos.flatMap((info) => (info?.bbox ? [info.bbox] : []));
 
@@ -59,6 +64,7 @@ function usePageMap(route: OsmixRoute): PageMap {
         focus: boxes(base.osmInfo, patch.osmInfo),
         legend: <PlanLegend />,
         layers: <PlanMapLayer onSelect={selectPlanFeature} />,
+        fadeDatasets: planFeatureOpen,
       };
     case "inspect":
       return { datasets: [{ osmFile: inspect }], focus: boxes(inspect.osmInfo), routing: true };
@@ -155,6 +161,7 @@ function AppRoutes({ route }: { route: OsmixRoute }) {
           datasets={page.datasets}
           initialViewState={initialViewState}
           legend={page.legend}
+          fadeDatasets={page.fadeDatasets === true}
           tools={{ routing: page.routing === true }}
         >
           {page.layers}

@@ -24,6 +24,9 @@ import { osmixIdToTileUrl } from "../lib/osmix-vector-protocol.ts";
 
 const DEFAULT_TOOLTIP_CLASS = "osmix-overlay-tooltip";
 
+/** A faded dataset's opacity: still readable as context, clearly behind the page's layers. */
+export const FADED_OPACITY = 0.4;
+
 const tooltipTemplate = ({ id, type }: { id: number; type: string }) =>
   `<div class="${DEFAULT_TOOLTIP_CLASS}">${type}/${id}</div>`;
 
@@ -44,39 +47,40 @@ const outlineWidth: ExpressionSpecification = ["interpolate", ["linear"], ["zoom
  * dashed, matching the legend; nodes stay circles for both roles because a MapLibre `circle`
  * layer cannot draw diamonds.
  */
-function overlayPaints(colors: MapColors, role: OsmixOverlayRole) {
+function overlayPaints(colors: MapColors, role: OsmixOverlayRole, opacity: number) {
   const color = colors[role];
   const dashes: Pick<LineLayerSpecification["paint"] & object, "line-dasharray"> =
     role === "patch" ? { "line-dasharray": [1.2, 0.8] } : {};
   const ways: LineLayerSpecification["paint"] = {
     "line-color": ["case", isHovered, colors.hover, featureColor(color)],
-    "line-opacity": 1,
+    "line-opacity": opacity,
     "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 2, 18, 10],
     ...dashes,
   };
   const wayPolygons: FillLayerSpecification["paint"] = {
     "fill-color": ["case", isHovered, colors.hover, featureColor(color)],
-    "fill-opacity": 0.25,
+    "fill-opacity": 0.25 * opacity,
   };
   const wayPolygonsOutline: LineLayerSpecification["paint"] = {
     "line-color": featureColor(color),
-    "line-opacity": 0.5,
+    "line-opacity": 0.5 * opacity,
     "line-width": outlineWidth,
     ...dashes,
   };
   const relationPolygons: FillLayerSpecification["paint"] = {
     "fill-color": ["case", isHovered, colors.hover, color],
-    "fill-opacity": 0.25,
+    "fill-opacity": 0.25 * opacity,
   };
   const relationPolygonsOutline: LineLayerSpecification["paint"] = {
     "line-color": color,
-    "line-opacity": 0.5,
+    "line-opacity": 0.5 * opacity,
     "line-width": outlineWidth,
     ...dashes,
   };
   const nodes: CircleLayerSpecification["paint"] = {
     "circle-color": ["case", isHovered, colors.hover, color],
-    "circle-opacity": 1,
+    "circle-opacity": opacity,
+    "circle-stroke-opacity": opacity,
     "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 3, 18, 6],
     "circle-stroke-color": colors.casing,
     "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 18, 2],
@@ -108,14 +112,18 @@ export default function OsmixVectorOverlay({
   osm,
   role = "base",
   visible = true,
+  faded = false,
 }: {
   osm: Osm;
   role?: OsmixOverlayRole;
   visible?: boolean;
+  /** Draw the dataset faded, so a page's own layers stand out above it. */
+  faded?: boolean;
 }) {
   const map = useMap();
   const colors = useMapColors();
-  const paints = useMemo(() => overlayPaints(colors, role), [colors, role]);
+  const opacity = faded ? FADED_OPACITY : 1;
+  const paints = useMemo(() => overlayPaints(colors, role, opacity), [colors, role, opacity]);
   const selectEntity = useSetAtom(selectOsmEntityAtom);
   const mode = useAtomValue(mapModeAtom);
   const popupRef = useRef<Popup | null>(null);

@@ -69,6 +69,10 @@ tokens, spacing, primitives, map overlay primitives) lives in
   The selected feature's base targets (the base points and ways its proposals
   match) are drawn as base data: hollow points and solid lines in `--map-base`
   over a casing, each target once, with a legend row.
+  While a feature is selected, both inputs fade (`OsmixMap` `fadeDatasets`), and
+  the selected feature, its targets and the base ways it replaces get a
+  `--map-selected` casing; their base lines sit under the plan's lines, the
+  target points above them.
   When the selected feature would replace base ways, those base ways are drawn
   as base data (solid, `--map-base`, over a casing) under the plan's lines, and
   the legend adds a row for them; the row names them and the imported ways
