@@ -1147,7 +1147,7 @@ function currentEntity<T extends "node" | "way" | "relation">(
   type: T,
   id: number,
 ) {
-  const change = changeset.changes(type)[id];
+  const change = changeset.changes(type).get(id);
   if (change?.changeType === "delete") return null;
   return change?.entity ?? changeset.getEntity(type, id) ?? null;
 }
@@ -1288,7 +1288,7 @@ function validateAcceptedMappings(
 export function removeImportedEntity(changeset: OsmChangeset, entity: OsmNode | OsmWay) {
   const type = "refs" in entity ? "way" : "node";
   // A pending import is dropped (a journaled tombstone); anything else is deleted.
-  if (changeset.changes(type)[entity.id]?.changeType === "create") {
+  if (changeset.changes(type).get(entity.id)?.changeType === "create") {
     changeset.overlay.discard(type, entity.id);
   } else changeset.delete(entity);
 }

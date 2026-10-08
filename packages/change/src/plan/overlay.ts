@@ -21,6 +21,7 @@ import type {
 import { getEntityType } from "@osmix/types/utils";
 import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 
+import { ChangeRecordTable } from "../change-records.ts";
 import type { OsmChange, OsmEntityRef } from "../types.ts";
 import { cleanCoords } from "../utils.ts";
 import type { DatasetReader, EntityReader } from "../views.ts";
@@ -39,10 +40,7 @@ import { GridIndex } from "./grid-index.ts";
  * Pending records by ID. A record a plan dropped stays as an `undefined` tombstone, so undoing
  * the drop puts it back in its place and created entities keep their order.
  */
-export type ChangeRecords<T extends OsmEntityType> = Record<
-  number,
-  OsmChange<OsmEntityTypeMap[T]> | undefined
->;
+export type ChangeRecords<T extends OsmEntityType> = ChangeRecordTable<OsmEntityTypeMap[T]>;
 
 interface WayCoordinateCacheEntry {
   cleaned?: [number, number][];
@@ -73,9 +71,9 @@ const METERS_PER_DEGREE_LAT = 111_320;
 const EMPTY_IDS: ReadonlySet<number> = new Set();
 
 export class PlanOverlay {
-  nodeChanges: ChangeRecords<"node"> = {};
-  wayChanges: ChangeRecords<"way"> = {};
-  relationChanges: ChangeRecords<"relation"> = {};
+  nodeChanges: ChangeRecords<"node"> = new ChangeRecordTable();
+  wayChanges: ChangeRecords<"way"> = new ChangeRecordTable();
+  relationChanges: ChangeRecords<"relation"> = new ChangeRecordTable();
 
   /** Revisions keep geometry caches correct while phases rewrite ways in place. */
   private readonly wayGeometryRevisions = new Map<number, number>();
@@ -121,10 +119,10 @@ export class PlanOverlay {
     if (!journal || mark > journal.length) throw Error(`No overlay mark ${mark} to undo to`);
     while (journal.length > mark) {
       const { type, id, previous, existed } = journal.pop()!;
-      const records = this.changes(type) as Record<number, OsmChange | undefined>;
+      const records = this.changes(type) as ChangeRecordTable;
       const before = type === "node" ? this.getNode(id) : null;
-      if (existed) records[id] = previous;
-      else delete records[id];
+      if (existed) records.set(id, previous);
+      else records.delete(id);
       if (type === "node") this.nodeChanged(id, before);
       else if (type === "way") this.invalidateWayGeometry(id);
     }
@@ -194,9 +192,9 @@ export class PlanOverlay {
 
   /** Write one record, journaling what it replaces; `undefined` leaves a tombstone. */
   private write(type: OsmEntityType, id: number, next: OsmChange | undefined) {
-    const records = this.changes(type) as Record<number, OsmChange | undefined>;
-    this.journal?.push({ type, id, previous: records[id], existed: id in records });
-    records[id] = next;
+    const records = this.changes(type) as ChangeRecordTable;
+    this.journal?.push({ type, id, previous: records.get(id), existed: records.has(id) });
+    records.set(id, next);
   }
 
   /** The entity as stored in the base, ignoring records. */
@@ -207,26 +205,26 @@ export class PlanOverlay {
   }
 
   getNode(id: number): OsmNode | null {
-    const change = this.nodeChanges[id];
+    const change = this.nodeChanges.get(id);
     if (change?.changeType === "delete") return null;
     return change?.entity ?? this.base.nodes.getById(id);
   }
 
   getWay(id: number): OsmWay | null {
-    const change = this.wayChanges[id];
+    const change = this.wayChanges.get(id);
     if (change?.changeType === "delete") return null;
     return change?.entity ?? this.base.ways.getById(id);
   }
 
   getRelation(id: number): OsmRelation | null {
-    const change = this.relationChanges[id];
+    const change = this.relationChanges.get(id);
     if (change?.changeType === "delete") return null;
     return change?.entity ?? this.base.relations.getById(id);
   }
 
   /** The current version of an already decoded way; skips a second base lookup. */
   currentWay(way: OsmWay): OsmWay | null {
-    const change = this.wayChanges[way.id];
+    const change = this.wayChanges.get(way.id);
     if (change?.changeType === "delete") return null;
     return change?.entity ?? way;
   }
@@ -266,7 +264,7 @@ export class PlanOverlay {
     modify: (entity: OsmEntityTypeMap[T]) => OsmEntityTypeMap[T],
   ): void {
     const changes = this.changes(type);
-    const change = changes[id];
+    const change = changes.get(id);
     if (change?.changeType === "delete") {
       throw Error(`Cannot modify ${type} ${id}: entity is scheduled for deletion`);
     }
@@ -308,7 +306,7 @@ export class PlanOverlay {
 
   /** Forget a pending record, so the entity reads as it is in the base (or as absent). */
   discard(type: OsmEntityType, id: number) {
-    if (this.changes(type)[id] === undefined) return;
+    if (this.changes(type).get(id) === undefined) return;
     const before = type === "node" ? this.getNode(id) : null;
     this.write(type, id, undefined);
     if (type === "node") this.nodeChanged(id, before);
@@ -323,12 +321,12 @@ export class PlanOverlay {
       // Sorted ascending: the first base node not deleted is the lowest.
       const id = sorted[index]!;
       if (id >= minimum) break;
-      if (this.nodeChanges[id]?.changeType === "delete") continue;
+      if (this.nodeChanges.get(id)?.changeType === "delete") continue;
       minimum = id;
       break;
     }
-    for (const change of Object.values(this.nodeChanges)) {
-      if (change && change.changeType !== "delete") minimum = Math.min(minimum, change.entity.id);
+    for (const change of this.nodeChanges.values()) {
+      if (change.changeType !== "delete") minimum = Math.min(minimum, change.entity.id);
     }
     return minimum;
   }
@@ -336,12 +334,12 @@ export class PlanOverlay {
   /** Current nodes: base order first, then created nodes in record order. */
   *nodes(): Generator<OsmNode> {
     for (const node of this.base.nodes) {
-      const change = this.nodeChanges[node.id];
+      const change = this.nodeChanges.get(node.id);
       if (change?.changeType === "delete") continue;
       yield change?.entity ?? node;
     }
-    for (const change of Object.values(this.nodeChanges)) {
-      if (!change || this.base.nodes.ids.has(change.entity.id) || change.changeType === "delete") {
+    for (const change of this.nodeChanges.values()) {
+      if (this.base.nodes.ids.has(change.entity.id) || change.changeType === "delete") {
         continue;
       }
       yield change.entity;
@@ -354,8 +352,8 @@ export class PlanOverlay {
       const current = this.currentWay(way);
       if (current) yield current;
     }
-    for (const change of Object.values(this.wayChanges)) {
-      if (!change || this.base.ways.ids.has(change.entity.id) || change.changeType === "delete") {
+    for (const change of this.wayChanges.values()) {
+      if (this.base.ways.ids.has(change.entity.id) || change.changeType === "delete") {
         continue;
       }
       yield change.entity;
@@ -365,16 +363,12 @@ export class PlanOverlay {
   /** Current relations: base order first, then created relations in record order. */
   *relations(): Generator<OsmRelation> {
     for (const relation of this.base.relations) {
-      const change = this.relationChanges[relation.id];
+      const change = this.relationChanges.get(relation.id);
       if (change?.changeType === "delete") continue;
       yield change?.entity ?? relation;
     }
-    for (const change of Object.values(this.relationChanges)) {
-      if (
-        !change ||
-        this.base.relations.ids.has(change.entity.id) ||
-        change.changeType === "delete"
-      ) {
+    for (const change of this.relationChanges.values()) {
+      if (this.base.relations.ids.has(change.entity.id) || change.changeType === "delete") {
         continue;
       }
       yield change.entity;
@@ -384,9 +378,9 @@ export class PlanOverlay {
   /** A copy of the current records over the same base, unaffected by later changes. */
   snapshot(): PlanOverlay {
     const copy = new PlanOverlay(this.base);
-    copy.nodeChanges = { ...this.nodeChanges };
-    copy.wayChanges = { ...this.wayChanges };
-    copy.relationChanges = { ...this.relationChanges };
+    copy.nodeChanges = this.nodeChanges.copy();
+    copy.wayChanges = this.wayChanges.copy();
+    copy.relationChanges = this.relationChanges.copy();
     return copy;
   }
 
@@ -430,8 +424,7 @@ export class PlanOverlay {
   /** How many nodes the planned dataset has. */
   get nodeCount() {
     let count = this.base.nodes.size;
-    for (const change of Object.values(this.nodeChanges)) {
-      if (!change) continue;
+    for (const change of this.nodeChanges.values()) {
       const inBase = this.base.nodes.ids.has(change.entity.id);
       if (change.changeType === "create" && !inBase) count++;
       else if (change.changeType === "delete" && inBase) count--;
@@ -452,7 +445,7 @@ export class PlanOverlay {
       }
     }
     for (const wayId of this.pendingIncidence().get(nodeId) ?? []) {
-      const change = this.wayChanges[wayId];
+      const change = this.wayChanges.get(wayId);
       if (change && change.changeType !== "delete" && change.entity.refs.includes(nodeId)) {
         ways.set(change.entity.id, change.entity);
       }
@@ -480,8 +473,8 @@ export class PlanOverlay {
     // Unchanged base geometry can resolve packed node indexes directly, avoiding one binary ID
     // lookup per ref. Match the fallback's missing-ref behavior by requiring every ref.
     if (
-      this.wayChanges[way.id] === undefined &&
-      way.refs.every((ref) => this.nodeChanges[ref] === undefined)
+      this.wayChanges.get(way.id) === undefined &&
+      way.refs.every((ref) => this.nodeChanges.get(ref) === undefined)
     ) {
       const [wayIndex] = this.base.ways.ids.idOrIndex({ id: way.id });
       if (wayIndex !== -1) {
@@ -536,7 +529,7 @@ export class PlanOverlay {
     const matches: { distance: number; node: OsmNode }[] = [];
     for (const index of this.base.nodes.findIndexesWithinRadius(lon, lat, meters / 1_000)) {
       const node = this.base.nodes.getByIndex(index);
-      if (this.nodeChanges[node.id]) continue;
+      if (this.nodeChanges.get(node.id)) continue;
       matches.push({ distance: haversineDistance([lon, lat], [node.lon, node.lat]), node });
     }
     const latDelta = (meters / METERS_PER_DEGREE_LAT) * 1.01;
@@ -579,9 +572,7 @@ export class PlanOverlay {
   private pendingIncidence() {
     if (!this.pendingWayIdsByNode) {
       this.pendingWayIdsByNode = new Map();
-      for (const key of Object.keys(this.wayChanges)) {
-        this.updatePendingWayIncidence(Number(key));
-      }
+      for (const id of this.wayChanges.keys()) this.updatePendingWayIncidence(id);
     }
     return this.pendingWayIdsByNode;
   }
@@ -595,8 +586,7 @@ export class PlanOverlay {
     };
     this.geometry = geometry;
     const movedNodes: number[] = [];
-    for (const change of Object.values(this.nodeChanges)) {
-      if (!change) continue;
+    for (const change of this.nodeChanges.values()) {
       const node = change.entity;
       if (change.changeType !== "delete") {
         geometry.nodes.set(node.id, [node.lon, node.lat, node.lon, node.lat]);
@@ -609,8 +599,8 @@ export class PlanOverlay {
         movedNodes.push(node.id);
       }
     }
-    for (const key of Object.keys(this.wayChanges)) {
-      if (this.wayChanges[Number(key)]) this.trackWay(Number(key));
+    for (const id of this.wayChanges.keys()) {
+      if (this.wayChanges.get(id)) this.trackWay(id);
     }
     for (const id of movedNodes) {
       for (const way of this.waysAtNode(id)) this.trackWay(way.id);
@@ -638,7 +628,7 @@ export class PlanOverlay {
     const geometry = this.geometry;
     // The node grid holds nodes with a live record; the base index answers for the rest.
     if (geometry) {
-      const record = this.nodeChanges[id];
+      const record = this.nodeChanges.get(id);
       if (node && record && record.changeType !== "delete") {
         geometry.nodes.set(id, [node.lon, node.lat, node.lon, node.lat]);
       } else geometry.nodes.remove(id);
@@ -670,7 +660,7 @@ export class PlanOverlay {
       if (wayIds?.size === 0) index.delete(ref);
     }
     this.pendingWayRefs.delete(wayId);
-    const change = this.wayChanges[wayId];
+    const change = this.wayChanges.get(wayId);
     if (!change || change.changeType === "delete") return;
     this.pendingWayRefs.set(wayId, change.entity.refs);
     for (const ref of change.entity.refs) {
@@ -687,10 +677,7 @@ export function snapshotState(snapshot: PlanOverlay, live: PlanOverlay): Earlier
     getNode: (id) => snapshot.getNode(id),
     getWay: (id) => snapshot.getWay(id),
     getRelation: (id) => snapshot.getRelation(id),
-    changedIds: (type) =>
-      new Set(
-        [...Object.keys(snapshot.changes(type)), ...Object.keys(live.changes(type))].map(Number),
-      ),
+    changedIds: (type) => new Set([...snapshot.changes(type).keys(), ...live.changes(type).keys()]),
   };
 }
 

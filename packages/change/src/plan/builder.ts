@@ -223,7 +223,7 @@ export class PlanBuilder {
    */
   proposeDirectChanges(base: Osm, changeset: OsmChangeset) {
     const direct = (featureKey: string, type: OsmEntityType, id: number) => {
-      const change = changeset.changes(type)[id];
+      const change = changeset.changes(type).get(id);
       if (!change) return;
       const entity = { type, id };
       if (change.changeType === "create") {
@@ -260,7 +260,7 @@ export class PlanBuilder {
     // A created entity a merge consumed is not added after all.
     for (const proposal of this.proposals.values()) {
       if (proposal.kind !== "add") continue;
-      const change = changeset.changes(proposal.entity.type)[proposal.entity.id];
+      const change = changeset.changes(proposal.entity.type).get(proposal.entity.id);
       const added = change?.changeType === "create";
       proposal.effect = added ? "applied" : "skipped";
       proposal.reasons = added ? [] : ["merged-into-base"];

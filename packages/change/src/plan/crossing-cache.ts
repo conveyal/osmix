@@ -133,7 +133,5 @@ function changedWays(previous: PlanOverlay, current: PlanOverlay) {
 }
 
 function recordIds(previous: PlanOverlay, current: PlanOverlay, type: "node" | "way") {
-  return new Set(
-    [...Object.keys(previous.changes(type)), ...Object.keys(current.changes(type))].map(Number),
-  );
+  return new Set([...previous.changes(type).keys(), ...current.changes(type).keys()]);
 }

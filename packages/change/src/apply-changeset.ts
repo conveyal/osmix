@@ -9,15 +9,13 @@
 
 import { Osm } from "@osmix/core";
 
+import type { ChangeRecordTable } from "./change-records.ts";
 import type { OsmChangeset } from "./changeset.ts";
 import { reuseRoutingIntegrityAnalysis } from "./integrity.ts";
 import type { OsmChangeRecords } from "./types.ts";
 
-function hasOwnChanges(changes: Record<number, unknown>) {
-  for (const key in changes) {
-    if (Object.hasOwn(changes, key) && changes[Number(key)] !== undefined) return true;
-  }
-  return false;
+function hasOwnChanges(changes: ChangeRecordTable) {
+  return !changes.values().next().done;
 }
 
 function isEmpty(changes: OsmChangeRecords) {
@@ -91,7 +89,7 @@ export function materializeChanges(
 
   // Add nodes from base, modifying and deleting as needed
   for (const node of baseOsm.nodes) {
-    const change = nodeChanges[node.id];
+    const change = nodeChanges.get(node.id);
     if (change) {
       if (change.changeType === "delete") continue; // Don't add deleted nodes
       if (change.changeType === "create")
@@ -102,22 +100,19 @@ export function materializeChanges(
 
   // All remaining node changes should be create
   // Add nodes from patch
-  for (const idText in nodeChanges) {
-    if (!Object.hasOwn(nodeChanges, idText)) continue;
-    const change = nodeChanges[Number(idText)];
-    if (!change) continue;
+  for (const change of nodeChanges.values()) {
     if (change.changeType === "create") {
       osm.nodes.addNode(change.entity);
       continue;
     }
-    if (!baseOsm.nodes.ids.has(Number(idText))) {
+    if (!baseOsm.nodes.ids.has(change.entity.id)) {
       throw Error("Changeset still contains node changes in incorrect stage.");
     }
   }
 
   // Add ways from base, modifying and deleting as needed
   for (const way of baseOsm.ways) {
-    const change = wayChanges[way.id];
+    const change = wayChanges.get(way.id);
     if (change) {
       if (change.changeType === "delete") continue; // Don't add deleted ways
       if (change.changeType === "create") {
@@ -130,22 +125,19 @@ export function materializeChanges(
 
   // All remaining way changes should be create
   // Add ways from patch
-  for (const idText in wayChanges) {
-    if (!Object.hasOwn(wayChanges, idText)) continue;
-    const change = wayChanges[Number(idText)];
-    if (!change) continue;
+  for (const change of wayChanges.values()) {
     if (change.changeType === "create") {
       osm.ways.addWay(change.entity);
       continue;
     }
-    if (!baseOsm.ways.ids.has(Number(idText))) {
+    if (!baseOsm.ways.ids.has(change.entity.id)) {
       throw Error("Changeset still contains way changes in incorrect stage.");
     }
   }
 
   // Add relations from base, modifying and deleting as needed
   for (const relation of baseOsm.relations) {
-    const change = relationChanges[relation.id];
+    const change = relationChanges.get(relation.id);
     if (change) {
       if (change.changeType === "delete") continue; // Don't add deleted relations
       if (change.changeType === "create") {
@@ -156,15 +148,12 @@ export function materializeChanges(
   }
 
   // Add relations from patch
-  for (const idText in relationChanges) {
-    if (!Object.hasOwn(relationChanges, idText)) continue;
-    const change = relationChanges[Number(idText)];
-    if (!change) continue;
+  for (const change of relationChanges.values()) {
     if (change.changeType === "create") {
       osm.relations.addRelation(change.entity);
       continue;
     }
-    if (!baseOsm.relations.ids.has(Number(idText))) {
+    if (!baseOsm.relations.ids.has(change.entity.id)) {
       throw Error("Changeset still contains relation changes in incorrect stage.");
     }
   }

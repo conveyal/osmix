@@ -54,7 +54,7 @@ function randomChange(random: () => number, changeset: OsmChangeset, nextId: { v
   const nodes = [...currentNodes(overlay)];
   const ways = [...overlay.ways()];
   const created = (type: "node" | "way", id: number) =>
-    changeset.changes(type)[id]?.changeType === "create";
+    changeset.changes(type).get(id)?.changeType === "create";
   const referenced = new Set(ways.flatMap((way) => way.refs));
   const roll = random();
   if (roll < 0.15) {
@@ -107,7 +107,7 @@ function* currentNodes(overlay: PlanOverlay): Generator<OsmNode> {
     const current = overlay.getNode(node.id);
     if (current) yield current;
   }
-  for (const change of Object.values(overlay.nodeChanges)) {
+  for (const change of overlay.nodeChanges.values()) {
     if (change?.changeType === "create") yield change.entity;
   }
 }
@@ -125,7 +125,7 @@ function expectOverlayMatches(random: () => number, changeset: OsmChangeset) {
 
   expect(overlay.nodeCount).toBe(result.nodes.size);
   for (const node of result.nodes) expect(overlay.getNode(node.id)).toMatchObject(node);
-  for (const id of Object.keys(overlay.nodeChanges).map(Number)) {
+  for (const id of overlay.nodeChanges.keys()) {
     expect(overlay.getNode(id) ?? null).toEqual(result.nodes.getById(id) ?? null);
   }
   const overlayWays = [...overlay.ways()].map(comparableWay).sort((a, b) => a.id - b.id);

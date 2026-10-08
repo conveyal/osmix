@@ -44,7 +44,7 @@ function randomWrite(overlay: PlanOverlay, random: () => number, next: { id: num
   const nodes = [...overlay.nodes()].map(({ id }) => id);
   const ways = [...overlay.ways()].map(({ id }) => id);
   const created = (type: "node" | "way", id: number) =>
-    overlay.changes(type)[id]?.changeType === "create";
+    overlay.changes(type).get(id)?.changeType === "create";
   const roll = random();
   if (roll < 0.2) {
     const id = --next.id;
@@ -101,7 +101,7 @@ function observe(overlay: PlanOverlay) {
   ];
   return {
     records: (["node", "way", "relation"] as const).map((type) =>
-      Object.entries(overlay.changes(type)),
+      [...overlay.changes(type).keys()].map((id) => [id, overlay.changes(type).get(id)]),
     ),
     nodes: [...overlay.nodes()],
     ways: [...overlay.ways()].map((way) => [way, overlay.wayCoordinates(way)]),
@@ -154,10 +154,10 @@ describe("journaled overlay (MP-P4)", () => {
     overlay.create({ id: -2, lon: 0, lat: 0 }, "patch");
     const mark = overlay.mark();
     overlay.discard("node", -1);
-    expect(Object.keys(overlay.nodeChanges)).toEqual(["-1", "-2"]);
+    expect([...overlay.nodeChanges.keys()]).toEqual([-1, -2]);
     expect(overlay.getNode(-1)).toBeNull();
     overlay.undoTo(mark);
-    expect(Object.keys(overlay.nodeChanges)).toEqual(["-1", "-2"]);
+    expect([...overlay.nodeChanges.keys()]).toEqual([-1, -2]);
     expect(overlay.getNode(-1)).toMatchObject({ id: -1 });
   });
 

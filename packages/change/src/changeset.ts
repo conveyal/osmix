@@ -23,6 +23,7 @@ import { entityPropertiesEqual } from "@osmix/types/utils";
 import { normalizedWayDirection } from "@osmix/types/way-direction";
 import { dequal } from "dequal"; // dequal/lite does not work with `TypedArray`s
 
+import type { ChangeRecordTable } from "./change-records.ts";
 import {
   assertNoNewRoutingIntegrityIssues,
   inheritedRoutingIntegrityIssueKeys,
@@ -55,7 +56,7 @@ import {
   withNonConflictingDescriptiveTags,
   withNonConflictingTags,
 } from "./rules/tags.ts";
-import type { OsmChange, OsmChangesetStats, OsmEntityRef } from "./types.ts";
+import type { OsmChangesetStats, OsmEntityRef } from "./types.ts";
 import {
   areWayTagsIntersectionCandidate,
   nearestNodeOnWay,
@@ -364,10 +365,9 @@ export class OsmChangeset {
 
   get stats(): OsmChangesetStats {
     const byType = { create: 0, modify: 0, delete: 0 };
-    const count = (changes: Record<number, OsmChange | undefined>) => {
+    const count = (changes: ChangeRecordTable) => {
       let records = 0;
-      for (const change of Object.values(changes)) {
-        if (!change) continue;
+      for (const change of changes.values()) {
         byType[change.changeType]++;
         records++;
       }
@@ -409,7 +409,7 @@ export class OsmChangeset {
     if (!Number.isSafeInteger(nextId)) {
       throw Error("Cannot allocate node ID outside the safe integer range");
     }
-    if (containsId(this.osm.nodes.ids, nextId) || this.nodeChanges[nextId]) {
+    if (containsId(this.osm.nodes.ids, nextId) || this.nodeChanges.get(nextId)) {
       throw Error(`Cannot allocate node ID ${nextId}: ID already exists`);
     }
     this.currentNodeId = nextId;
@@ -540,7 +540,9 @@ export class OsmChangeset {
     if (!this.getCurrentNode(survivorId)) return false;
     // Imported values replace the survivor's (MP-X1), so imported sources only need to agree
     // with each other; within one dataset the survivor's own values must agree too.
-    const imported = group.slice(1).every((id) => this.nodeChanges[id]?.changeType === "create");
+    const imported = group
+      .slice(1)
+      .every((id) => this.nodeChanges.get(id)?.changeType === "create");
     const agreeing = imported ? group.slice(1) : group;
     const firstNode = this.getCurrentNode(agreeing[0]!);
     if (!firstNode) return false;
@@ -599,7 +601,7 @@ export class OsmChangeset {
           ),
         };
         const issues = restrictionTopologyIssues(proposed, (id) => {
-          const stored = this.wayChanges[id]?.entity ?? this.osm.ways.getById(id);
+          const stored = this.wayChanges.get(id)?.entity ?? this.osm.ways.getById(id);
           const way = stored ? this.getCurrentWay(stored) : null;
           if (!way) return null;
           return { ...way, refs: way.refs.map((ref) => replacementMap.get(ref) ?? ref) };
@@ -623,7 +625,7 @@ export class OsmChangeset {
    * within one dataset only values the survivor lacks are added.
    */
   private withMergedTags(survivor: OsmNode, source: OsmNode): OsmNode {
-    if (this.nodeChanges[source.id]?.changeType !== "create") {
+    if (this.nodeChanges.get(source.id)?.changeType !== "create") {
       return withNonConflictingTags(survivor, source);
     }
     const tags = mergeImportedTags(survivor.tags, source.tags);
@@ -634,7 +636,7 @@ export class OsmChangeset {
   }
 
   private deleteReconciledNode(node: OsmNode, survivorId: number) {
-    const pendingChange = this.nodeChanges[node.id];
+    const pendingChange = this.nodeChanges.get(node.id);
     if (pendingChange?.changeType === "create") {
       this.overlay.discard("node", node.id);
     } else {
@@ -668,8 +670,8 @@ export class OsmChangeset {
     const contextNodeIds = new Set<number>();
 
     for (const patchNode of nodes) {
-      if (this.nodeChanges[patchNode.id]?.changeType === "delete") continue;
-      if (!sameDataset && this.nodeChanges[patchNode.id]?.changeType !== "create") continue;
+      if (this.nodeChanges.get(patchNode.id)?.changeType === "delete") continue;
+      if (!sameDataset && this.nodeChanges.get(patchNode.id)?.changeType !== "create") continue;
       const currentPatchNode = this.getCurrentNode(patchNode.id);
       if (!currentPatchNode) continue;
 
@@ -684,7 +686,7 @@ export class OsmChangeset {
           (baseNode) =>
             baseNode.id !== patchNode.id &&
             (!sameDataset || baseNode.id > patchNode.id) &&
-            this.nodeChanges[baseNode.id]?.changeType !== "delete" &&
+            this.nodeChanges.get(baseNode.id)?.changeType !== "delete" &&
             sameOsmCoordinate(currentPatchNode, baseNode) &&
             assessNodeTags("exact", currentPatchNode.tags, baseNode.tags, {
               sourceIsImported: !sameDataset,
@@ -863,7 +865,7 @@ export class OsmChangeset {
         }),
       };
       const issues = restrictionTopologyIssues(proposed, (id) => {
-        const change = this.wayChanges[id];
+        const change = this.wayChanges.get(id);
         if (change?.changeType === "delete") return null;
         return combinedWays.get(id) ?? change?.entity ?? this.osm.ways.getById(id);
       });
@@ -965,7 +967,7 @@ export class OsmChangeset {
     });
     if (!droppable) return;
     // On a plan the imported node is still a pending create; forget it instead.
-    if (this.nodeChanges[replaced.id]?.changeType === "create") {
+    if (this.nodeChanges.get(replaced.id)?.changeType === "create") {
       this.overlay.discard("node", replaced.id);
     } else {
       const storedNode = this.osm.nodes.getById(replaced.id);
@@ -1016,7 +1018,7 @@ export class OsmChangeset {
     const sameDataset = ways === this.osm.ways;
     const exactWayIndex = sameDataset ? undefined : this.buildCrossDatasetExactWayIndex();
     for (const way of ways) {
-      if (this.wayChanges[way.id]?.changeType === "delete") continue;
+      if (this.wayChanges.get(way.id)?.changeType === "delete") continue;
       yield this.deduplicateWayAgainstBase(
         way,
         sameDataset,
@@ -1087,7 +1089,7 @@ export class OsmChangeset {
   }
 
   private deleteReconciledWay(way: OsmWay, survivorId: number) {
-    const pendingChange = this.wayChanges[way.id];
+    const pendingChange = this.wayChanges.get(way.id);
     if (pendingChange?.changeType === "create") {
       this.overlay.discard("way", way.id);
     } else {
@@ -1106,10 +1108,10 @@ export class OsmChangeset {
     exactWayIndex?: ExactWayIndex,
     accept?: (patchWayId: number, baseWayId: number) => boolean,
   ) {
-    if (!this.osm.ways.ids.has(patchWay.id) && this.wayChanges[patchWay.id] == null) return 0;
-    if (!sameDataset && this.wayChanges[patchWay.id]?.changeType !== "create") return 0;
+    if (!this.osm.ways.ids.has(patchWay.id) && this.wayChanges.get(patchWay.id) == null) return 0;
+    if (!sameDataset && this.wayChanges.get(patchWay.id)?.changeType !== "create") return 0;
     const currentPatchWay =
-      this.getCurrentWay(patchWay) ?? this.wayChanges[patchWay.id]?.entity ?? patchWay;
+      this.getCurrentWay(patchWay) ?? this.wayChanges.get(patchWay.id)?.entity ?? patchWay;
     const indexed = exactWayIndex?.get(exactWayHash(currentPatchWay));
     if (exactWayIndex && indexed === undefined) return 0;
     const indexedCandidates =

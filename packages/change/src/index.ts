@@ -25,6 +25,7 @@
  */
 
 export * from "./apply-changeset.ts";
+export { ChangeRecordTable } from "./change-records.ts";
 export * from "./changeset.ts";
 export { discoverConflationCandidates } from "./conflation.ts";
 export * from "./merge.ts";

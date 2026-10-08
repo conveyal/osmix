@@ -87,9 +87,8 @@ export class PlannedRoutingStats {
   stats(overlay: PlanOverlay): { car: RoutingTopologyStats; walk: RoutingTopologyStats } {
     const created: OsmWay[] = [];
     let grew = false;
-    for (const key of Object.keys(overlay.wayChanges)) {
-      const id = Number(key);
-      const change = overlay.wayChanges[id];
+    for (const id of overlay.wayChanges.keys()) {
+      const change = overlay.wayChanges.get(id);
       if (!change) continue;
       if (this.base.ways.ids.has(id)) {
         if (!this.excluded.has(id)) {

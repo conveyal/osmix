@@ -463,8 +463,8 @@ describe("intersection geometry integrity", () => {
       nodeChanges: 0,
       wayChanges: 1,
     });
-    expect(changeset.nodeChanges).toEqual({});
-    expect(changeset.wayChanges[11]).toBeUndefined();
-    expect(changeset.wayChanges[12]).toBeUndefined();
+    expect(changeset.nodeChanges.size).toBe(0);
+    expect(changeset.wayChanges.get(11)).toBeUndefined();
+    expect(changeset.wayChanges.get(12)).toBeUndefined();
   });
 });

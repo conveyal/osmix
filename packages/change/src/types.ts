@@ -5,6 +5,8 @@
 
 import type { OsmEntity, OsmEntityType, OsmEntityTypeMap, OsmTags } from "@osmix/types";
 
+import type { ChangeRecordTable } from "./change-records.ts";
+
 /**
  * Reference to an OSM entity with its origin dataset.
  * Used to track provenance when merging multiple datasets.
@@ -42,12 +44,14 @@ export type OsmChange<T extends OsmEntity = OsmEntity> = {
   refs?: OsmEntityRef[];
 };
 
-/** Pending changes by entity type, keyed by entity ID. An `OsmChangeset` is one. */
-/** Change records by ID; `undefined` marks a dropped record, read as no change. */
+/**
+ * Pending changes by entity type, keyed by entity ID. An `OsmChangeset` is one. A dropped record
+ * reads as no change.
+ */
 export interface OsmChangeRecords {
-  nodeChanges: Record<number, OsmChange<OsmEntityTypeMap["node"]> | undefined>;
-  wayChanges: Record<number, OsmChange<OsmEntityTypeMap["way"]> | undefined>;
-  relationChanges: Record<number, OsmChange<OsmEntityTypeMap["relation"]> | undefined>;
+  nodeChanges: ChangeRecordTable<OsmEntityTypeMap["node"]>;
+  wayChanges: ChangeRecordTable<OsmEntityTypeMap["way"]>;
+  relationChanges: ChangeRecordTable<OsmEntityTypeMap["relation"]>;
 }
 
 /** Entity kinds supported by fuzzy conflation. */

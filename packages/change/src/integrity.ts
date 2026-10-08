@@ -345,9 +345,8 @@ export function newOverlayIntegrityIssues(
   const changedWays = new Set<number>();
   const checkedWays = new Set<number>();
   const gradeNodes = new Set<number>();
-  for (const key of Object.keys(overlay.wayChanges)) {
-    const id = Number(key);
-    if (!overlay.wayChanges[id]) continue;
+  for (const id of overlay.wayChanges.keys()) {
+    if (!overlay.wayChanges.get(id)) continue;
     changedWays.add(id);
     const way = overlay.getWay(id);
     if (way) checkedWays.add(id);
@@ -361,9 +360,8 @@ export function newOverlayIntegrityIssues(
     }
   }
   const changedNodes: number[] = [];
-  for (const key of Object.keys(overlay.nodeChanges)) {
-    const id = Number(key);
-    if (!overlay.nodeChanges[id]) continue;
+  for (const id of overlay.nodeChanges.keys()) {
+    if (!overlay.nodeChanges.get(id)) continue;
     changedNodes.push(id);
     if (!base.nodes.ids.has(id)) continue;
     for (const way of overlay.waysAtNode(id)) checkedWays.add(way.id);
@@ -386,9 +384,8 @@ export function newOverlayIntegrityIssues(
 
   const members = relationsByMember(base);
   const relations = new Set<number>();
-  for (const key of Object.keys(overlay.relationChanges)) {
-    const id = Number(key);
-    if (overlay.relationChanges[id]) relations.add(id);
+  for (const id of overlay.relationChanges.keys()) {
+    if (overlay.relationChanges.get(id)) relations.add(id);
   }
   const addMembersOf = (type: string, id: number) => {
     for (const relationId of members.get(`${type}:${id}`) ?? []) relations.add(relationId);

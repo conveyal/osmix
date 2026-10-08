@@ -13,7 +13,7 @@ describe("augmented diffs", () => {
     changeset.generateDirectChanges(patch);
 
     // Way 1 is modified (exists in both base and patch with different tags)
-    const wayChange = changeset.wayChanges[1];
+    const wayChange = changeset.wayChanges.get(1);
     if (!wayChange) throw new Error("wayChange is undefined");
     expect(wayChange.changeType).toBe("modify");
     expect(wayChange.entity.tags).toEqual({
@@ -34,7 +34,7 @@ describe("augmented diffs", () => {
     const nodeToDelete = base.nodes.getById(0)!;
     changeset.delete(nodeToDelete);
 
-    const nodeChange = changeset.nodeChanges[0];
+    const nodeChange = changeset.nodeChanges.get(0);
     if (!nodeChange) throw new Error("nodeChange is undefined");
     expect(nodeChange.changeType).toBe("delete");
     expect(nodeChange.oldEntity).toBeDefined();
@@ -49,7 +49,7 @@ describe("augmented diffs", () => {
     changeset.generateDirectChanges(patch);
 
     // Way 2 is created (only exists in patch)
-    const wayChange = changeset.wayChanges[2];
+    const wayChange = changeset.wayChanges.get(2);
     if (!wayChange) throw new Error("wayChange is undefined");
     expect(wayChange.changeType).toBe("create");
     expect(wayChange.oldEntity).toBeUndefined();
@@ -65,7 +65,7 @@ describe("augmented diffs", () => {
       tags: { ...way.tags, surface: "asphalt" },
     }));
 
-    const firstChange = changeset.wayChanges[1];
+    const firstChange = changeset.wayChanges.get(1);
     if (!firstChange) throw new Error("firstChange is undefined");
     expect(firstChange.oldEntity?.tags).toEqual({ highway: "primary" });
     expect(firstChange.entity.tags).toEqual({
@@ -79,7 +79,7 @@ describe("augmented diffs", () => {
       tags: { ...way.tags, lanes: "2" },
     }));
 
-    const secondChange = changeset.wayChanges[1];
+    const secondChange = changeset.wayChanges.get(1);
     if (!secondChange) throw new Error("secondChange is undefined");
     expect(secondChange.oldEntity?.tags).toEqual({ highway: "primary" });
     expect(secondChange.entity.tags).toEqual({
