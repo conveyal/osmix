@@ -4,4 +4,4 @@
 "@osmix/cli": patch
 ---
 
-Remove the deprecated `buildSpatialIndexes` load option. Choose spatial indexes with `loadProfile` (`"auto"`, `"full"`, or `"view"`) or, for an exact selection, `spatialIndexes`. For example, `buildSpatialIndexes: ["way", "relation"]` becomes `spatialIndexes: { nodes: [], ways: true, relations: true }`.
+**Breaking:** remove the deprecated `buildSpatialIndexes` load option. Choose spatial indexes with `loadProfile` (`"auto"`, `"full"`, or `"view"`) or, for an exact selection, `spatialIndexes`. For example, `buildSpatialIndexes: ["way", "relation"]` becomes `spatialIndexes: { nodes: [], ways: true, relations: true }`.
