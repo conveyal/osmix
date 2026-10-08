@@ -2,27 +2,31 @@
  * Planner memory and time per phase, for one base and patch PBF (Task T34, tasks/004).
  *
  *   pnpm --filter @osmix/bench run plan-memory -- <base.pbf> <patch.pbf> [--apply] [--replan]
- *     [--no-matching]
+ *     [--no-matching] [--digest]
  *
  * Relative paths resolve against `fixtures/`. Matching runs with the settings of the
  * Washington review: copy the default keys, connect, replace and review removals, 1 m radius,
  * Recommended automation. Each line on stdout is one JSON measurement taken after two forced
  * garbage collections; `heapMb` is the V8 heap, `arrayBuffersMb` the typed columns.
  * `--replan` times one replan after a decision, as review does; `--apply` builds the result;
- * `--no-matching` plans the direct, identity and crossings phases only.
+ * `--no-matching` plans the direct, identity and crossings phases only; `--digest` prints the
+ * plan's digests (`@osmix/test-utils/plan-digest`) last, to show a planner change altered nothing.
  */
 import { createReadStream } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { Readable } from "node:stream";
 
-import { applyPlan, fromPbf, planMerge, setMergePlanDecisions } from "osmix";
+import { planDigest } from "@osmix/test-utils/plan-digest";
+import { applyPlan, fromPbf, generateMergePlanOsc, planMerge, setMergePlanDecisions } from "osmix";
 
 const FIXTURES = resolve(import.meta.dirname, "../../../fixtures");
 const args = process.argv.slice(2).filter((arg) => arg !== "--");
 const flags = new Set(args.filter((arg) => arg.startsWith("--")));
 const [baseFile, patchFile] = args.filter((arg) => !arg.startsWith("--"));
 if (!baseFile || !patchFile) {
-  throw Error("Usage: plan-memory <base.pbf> <patch.pbf> [--apply] [--replan] [--no-matching]");
+  throw Error(
+    "Usage: plan-memory <base.pbf> <patch.pbf> [--apply] [--replan] [--no-matching] [--digest]",
+  );
 }
 const gc = globalThis.gc;
 if (!gc) throw Error("Run with node --expose-gc so measurements follow a full collection");
@@ -112,4 +116,14 @@ if (flags.has("--apply")) {
     nodes: osm.nodes.size,
     ways: osm.ways.size,
   });
+}
+
+if (flags.has("--digest")) {
+  const refused = plan.diagnostics.integrity.length > 0;
+  const digest = planDigest(
+    plan,
+    refused ? "refused" : applyPlan(plan).osm,
+    generateMergePlanOsc(plan),
+  );
+  console.log(JSON.stringify({ label: "digest", ...digest }));
 }

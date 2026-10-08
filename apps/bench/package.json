@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@osmix/shared": "workspace:*",
+    "@osmix/test-utils": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "^6.1.1",

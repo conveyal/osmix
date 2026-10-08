@@ -393,6 +393,9 @@ importers:
       '@osmix/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@osmix/test-utils':
+        specifier: workspace:*
+        version: link:../../packages/test-utils
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
