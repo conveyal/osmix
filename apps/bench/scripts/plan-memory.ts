@@ -2,11 +2,12 @@
  * Planner memory and time per phase, for one base and patch PBF (Task T34, tasks/004).
  *
  *   pnpm --filter @osmix/bench run plan-memory -- <base.pbf> <patch.pbf> [--apply] [--replan]
- *     [--no-matching] [--digest]
+ *     [--no-matching] [--digest] [--automation=<level>]
  *
  * Relative paths resolve against `fixtures/`. Matching runs with the settings of the
  * Washington review: copy the default keys, connect, replace and review removals, 1 m radius,
- * Recommended automation. Each line on stdout is one JSON measurement taken after two forced
+ * Recommended automation unless `--automation=conservative|recommended|aggressive` says otherwise.
+ * Each line on stdout is one JSON measurement taken after two forced
  * garbage collections; `heapMb` is the V8 heap, `arrayBuffersMb` the typed columns, `cpuMs` the
  * process CPU time since the previous line, which other load on the machine affects less than
  * `ms`.
@@ -24,10 +25,16 @@ import { applyPlan, fromPbf, generateMergePlanOsc, planMerge, setMergePlanDecisi
 const FIXTURES = resolve(import.meta.dirname, "../../../fixtures");
 const args = process.argv.slice(2).filter((arg) => arg !== "--");
 const flags = new Set(args.filter((arg) => arg.startsWith("--")));
+const automationFlag = [...flags].find((flag) => flag.startsWith("--automation="));
+const automation = automationFlag?.slice("--automation=".length) ?? "recommended";
+if (automation !== "conservative" && automation !== "recommended" && automation !== "aggressive") {
+  throw Error(`Unknown automation level ${automation}`);
+}
 const [baseFile, patchFile] = args.filter((arg) => !arg.startsWith("--"));
 if (!baseFile || !patchFile) {
   throw Error(
-    "Usage: plan-memory <base.pbf> <patch.pbf> [--apply] [--replan] [--no-matching] [--digest]",
+    "Usage: plan-memory <base.pbf> <patch.pbf> [--apply] [--replan] [--no-matching] [--digest] " +
+      "[--automation=<level>]",
   );
 }
 const gc = globalThis.gc;
@@ -69,7 +76,7 @@ const plan = planMerge(
   base,
   patch,
   {
-    automation: "recommended",
+    automation,
     mergeIdenticalPoints: true,
     patchIds: "osm",
     ...(flags.has("--no-matching")
