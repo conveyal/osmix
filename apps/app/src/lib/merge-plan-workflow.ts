@@ -80,18 +80,28 @@ export const PROPOSAL_KIND_LABEL: Record<PlanProposal["kind"], string> = {
   "crossing-node": "Add crossing node",
 };
 
-export const PROPOSAL_STATUS_LABEL: Record<PlanProposalStatus, string> = {
+const PROPOSAL_STATUS_LABEL: Record<PlanProposalStatus, string> = {
   automatic: "Automatic",
   review: "Needs review",
   blocked: "Blocked",
 };
 
-export const PROPOSAL_EFFECT_LABEL: Record<PlanProposalEffect, string> = {
+const PROPOSAL_EFFECT_LABEL: Record<PlanProposalEffect, string> = {
   applied: "In the plan",
   skipped: "Left out",
   blocked: "Blocked",
   "needs-decision": "Waiting for a decision",
 };
+
+/**
+ * A proposal's status and what it does in the plan, as one line: "Needs review · Waiting for a
+ * decision". A blocked proposal is blocked in both senses, so it says so once.
+ */
+export function proposalStatusText(proposal: Pick<PlanProposal, "status" | "effect">) {
+  const status = PROPOSAL_STATUS_LABEL[proposal.status];
+  const effect = PROPOSAL_EFFECT_LABEL[proposal.effect];
+  return status === effect ? status : `${status} · ${effect}`;
+}
 
 /** Proposal kinds a review filter can pick, in pipeline order. */
 export const FILTERABLE_KINDS: readonly PlanProposal["kind"][] = [

@@ -5,11 +5,10 @@ import { useId } from "react";
 
 import {
   AUTOMATION_LABEL,
-  PROPOSAL_EFFECT_LABEL,
   PROPOSAL_KIND_LABEL,
-  PROPOSAL_STATUS_LABEL,
   isDecidable,
   planReasonLabel,
+  proposalStatusText,
 } from "../lib/merge-plan-workflow";
 import { planOverviewAtom, planPendingChoicesAtom } from "../state/merge-plan";
 
@@ -101,7 +100,7 @@ export function PlanProposalActions({
         <span className="font-medium">{title}</span>
       </div>
       <p className="text-muted-foreground">
-        {PROPOSAL_STATUS_LABEL[proposal.status]} · {PROPOSAL_EFFECT_LABEL[proposal.effect]}
+        {proposalStatusText(proposal)}
         {proposal.automated ? ` · Decided by ${AUTOMATION_LABEL[automation]}` : null}
         {pending ? " · Choice not applied yet" : null}
       </p>

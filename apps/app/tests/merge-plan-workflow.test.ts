@@ -14,6 +14,7 @@ import {
   planFeatureTitle,
   planReasonLabel,
   PROPOSAL_KIND_LABEL,
+  proposalStatusText,
   withDecision,
 } from "../src/lib/merge-plan-workflow";
 
@@ -101,6 +102,16 @@ describe("merge plan workflow", () => {
     expect(planReasonLabel("drivable-network")).toBe("Drivable network requires review");
     // A reason code the app does not know yet still reads as words.
     expect(planReasonLabel("some-new-reason")).toBe("some new reason");
+  });
+
+  it("says a proposal's status and effect once each, and blocked only once", () => {
+    expect(proposalStatusText({ status: "review", effect: "needs-decision" })).toBe(
+      "Needs review · Waiting for a decision",
+    );
+    expect(proposalStatusText({ status: "automatic", effect: "applied" })).toBe(
+      "Automatic · In the plan",
+    );
+    expect(proposalStatusText({ status: "blocked", effect: "blocked" })).toBe("Blocked");
   });
 
   it("decides everything except direct changes", () => {
