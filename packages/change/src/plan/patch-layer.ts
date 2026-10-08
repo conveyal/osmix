@@ -36,30 +36,37 @@ function layerOf<T extends OsmEntityType>(
   const ids = entities.ids;
   const indexIds: number[] = [];
   const otherIds: number[] = [];
+  // Whether each patch entity, by index, is in the layer: a read then looks its ID up once.
+  const inLayer = new Uint8Array(entities.size);
   for (let index = 0; index < entities.size; index++) {
     const id = ids.at(index);
     if (baseIds.has(id)) continue;
+    inLayer[index] = 1;
     if (Number.isInteger(id) && id >= 0 && id <= MAX_INDEX_KEY) indexIds.push(id);
     else otherIds.push(id);
   }
   indexIds.sort((a, b) => a - b);
-  const has = (id: number) => ids.has(id) && !baseIds.has(id);
+  /** The patch index of layer entity `id`, or -1. */
+  const indexOf = (id: number) => {
+    const index = ids.getIndexFromId(id);
+    return index >= 0 && inLayer[index] === 1 ? index : -1;
+  };
   const cachedIds = new Float64Array(DECODED_CACHE_SIZE).fill(Number.NaN);
   const cached: (OsmEntityTypeMap[T] | undefined)[] = Array.from({ length: DECODED_CACHE_SIZE });
-  const decode = (id: number) => {
-    const entity = entities.getById(id) as OsmEntityTypeMap[T] | null;
-    if (!entity || type !== "way") return entity;
+  const decode = (index: number) => {
+    const entity = entities.getByIndex(index) as OsmEntityTypeMap[T];
+    if (type !== "way") return entity;
     return removeDuplicateAdjacentWayRefs(entity as OsmEntityTypeMap["way"]) as OsmEntityTypeMap[T];
   };
   return {
     osmId: patch.id,
-    has,
+    has: (id) => indexOf(id) >= 0,
     get: (id) => {
       const slot = slotOf(id);
       if (cachedIds[slot] === id) return cached[slot]!;
-      if (!has(id)) return null;
-      const entity = decode(id);
-      if (!entity) return null;
+      const index = indexOf(id);
+      if (index < 0) return null;
+      const entity = decode(index);
       cachedIds[slot] = id;
       cached[slot] = entity;
       return entity;

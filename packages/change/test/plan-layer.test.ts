@@ -132,4 +132,30 @@ describe("patch layer", () => {
     expect(overlay.waysAtNode(1).map(({ id }) => id)).toEqual([10, -1]);
     expect(overlay.waysAtNode(2).map(({ id }) => id)).toEqual([10]);
   });
+
+  it("counts records by change type as listing them would, overrides and drops included", () => {
+    const overlay = layered();
+    const listed = () => {
+      const counts = { create: 0, modify: 0, delete: 0 };
+      for (const table of [overlay.nodeChanges, overlay.wayChanges]) {
+        for (const change of table.values()) counts[change.changeType]++;
+      }
+      return counts;
+    };
+    const counted = () => {
+      const nodes = overlay.nodeChanges.countByType();
+      const ways = overlay.wayChanges.countByType();
+      return {
+        create: nodes.create + ways.create,
+        modify: nodes.modify + ways.modify,
+        delete: nodes.delete + ways.delete,
+      };
+    };
+    expect(counted()).toEqual({ create: 3, modify: 0, delete: 0 });
+    overlay.modify("way", -1, (way) => ({ ...way, refs: [-1, 1] }));
+    overlay.discard("node", -2);
+    overlay.modify("node", 1, (node) => ({ ...node, lon: 0.0001 }));
+    expect(counted()).toEqual(listed());
+    expect(counted()).toEqual({ create: 2, modify: 1, delete: 0 });
+  });
 });

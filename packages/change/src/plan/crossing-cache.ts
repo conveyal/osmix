@@ -1,8 +1,9 @@
 /**
  * Work the crossings phase can reuse across replans (MP-P4). A decision changes a few ways, but
- * the phase searches and intersects every imported way again. Both steps cached here are pure:
- * the ways near a box in the phase's starting state, and the points where two lines cross. So a
- * replan that reuses them finds exactly what a fresh plan finds.
+ * the phase searches every imported way's box again. The search is pure: the ways near a box in
+ * the phase's starting state. So a replan that reuses it finds exactly what a fresh plan finds.
+ * Where two lines cross is computed again: keeping it saved little time on Washington (2.6 s of
+ * a 105 s replan) for 330 MB (T35).
  */
 import { bboxContainsOrIntersects } from "@osmix/geo/bbox-intersects";
 import type { GeoBbox2D } from "@osmix/types";
@@ -10,21 +11,12 @@ import { dequal } from "dequal";
 
 import type { PlanOverlay } from "./overlay.ts";
 
-interface PairEntry {
-  /** The two ways' geometry revisions the points were found at. */
-  revision: number;
-  otherRevision: number;
-  points: [number, number][];
-  pass: number;
-}
-
 export class CrossingCache {
   private pass = 0;
   private start: PlanOverlay | undefined;
   /** Ways whose geometry differs from the previous pass's start, with their current box. */
   private changed = new Map<number, GeoBbox2D | null>();
   private readonly near = new NearWays();
-  private readonly pairs = new Map<string, PairEntry>();
 
   /** Start a pass on `start`, the planned state the phase reads, and forget what it cannot use. */
   begin(start: PlanOverlay) {
@@ -36,9 +28,6 @@ export class CrossingCache {
     this.near.retain(
       (id, pass) => previous != null && pass === this.pass - 1 && !this.changed.has(id),
     );
-    for (const [key, entry] of this.pairs) {
-      if (entry.pass !== this.pass - 1) this.pairs.delete(key);
-    }
   }
 
   /** Ways near `wayId`'s box `bbox` in the start, as `search` finds them, in ascending ID order. */
@@ -59,12 +48,11 @@ export class CrossingCache {
     return ids;
   }
 
-  /** Forget every pass: the next one searches and intersects from scratch. */
+  /** Forget every pass: the next one searches from scratch. */
   clear() {
     this.start = undefined;
     this.changed = new Map();
     this.near.clear();
-    this.pairs.clear();
   }
 
   /**
@@ -73,31 +61,6 @@ export class CrossingCache {
    */
   end() {
     this.start?.releaseDerived();
-  }
-
-  /**
-   * Where two ways cross, as `intersect` finds them, reused while neither way's geometry has
-   * changed (its revision in the planned state is the same). Only pairs that cross are kept:
-   * most pairs of nearby ways do not, and an entry holds no coordinates (T34, T35).
-   */
-  crossingPoints(
-    wayId: number,
-    revision: number,
-    otherId: number,
-    otherRevision: number,
-    intersect: () => [number, number][],
-  ): [number, number][] {
-    const key = `${wayId}:${otherId}`;
-    const entry = this.pairs.get(key);
-    if (entry && entry.revision === revision && entry.otherRevision === otherRevision) {
-      entry.pass = this.pass;
-      return entry.points;
-    }
-    const points = intersect();
-    if (points.length > 0) {
-      this.pairs.set(key, { revision, otherRevision, points, pass: this.pass });
-    } else this.pairs.delete(key);
-    return points;
   }
 }
 

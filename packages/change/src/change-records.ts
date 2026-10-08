@@ -54,7 +54,8 @@ export class ChangeRecordTable<T extends OsmEntity = OsmEntity> {
 
   /** The record for `id`, or undefined when there is none or it was dropped. */
   get(id: number): OsmChange<T> | undefined {
-    if (this.records.has(id)) return this.records.get(id);
+    const own = this.records.get(id);
+    if (own !== undefined || this.records.has(id)) return own;
     return this.layerRecord(id);
   }
 
@@ -138,9 +139,24 @@ export class ChangeRecordTable<T extends OsmEntity = OsmEntity> {
   /** The layer's record for `id`, ignoring any record of its own. */
   layerRecord(id: number): OsmChange<T> | undefined {
     const layer = this.layer;
-    if (!layer?.has(id)) return undefined;
-    const entity = layer.get(id);
-    return entity ? { changeType: "create", entity, osmId: layer.osmId } : undefined;
+    const entity = layer?.get(id);
+    return entity ? { changeType: "create", entity, osmId: layer!.osmId } : undefined;
+  }
+
+  /**
+   * How many records (own or the layer's) there are of each change type, as `values()` would
+   * list them, without decoding the layer's entities: each one not overridden is a create.
+   */
+  countByType(): Record<OsmChange["changeType"], number> {
+    const counts = { create: 0, modify: 0, delete: 0 };
+    const layer = this.layer;
+    let overridden = 0;
+    for (const [id, change] of this.records) {
+      if (layer?.has(id)) overridden++;
+      if (change) counts[change.changeType]++;
+    }
+    if (layer) counts.create += layer.indexIds.length + layer.otherIds.length - overridden;
+    return counts;
   }
 }
 

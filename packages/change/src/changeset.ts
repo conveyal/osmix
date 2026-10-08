@@ -83,11 +83,7 @@ interface CrossingSearch {
   startBbox(wayId: number): GeoBbox2D | null;
   /** Ways whose starting bounding box intersects `wayId`'s box `bbox`, in ascending ID order. */
   near(bbox: GeoBbox2D, wayId: number): number[];
-  /** Where two ways' lines cross; `waysIntersect` unless the search can reuse a result. */
-  intersect?(wayId: number, line: Line, otherId: number, other: Line): [number, number][];
 }
-
-type Line = [number, number][];
 
 /** One crossing about to be inserted, offered to an `accept` callback. */
 export interface CrossingInsertion {
@@ -366,12 +362,11 @@ export class OsmChangeset {
   get stats(): OsmChangesetStats {
     const byType = { create: 0, modify: 0, delete: 0 };
     const count = (changes: ChangeRecordTable) => {
-      let records = 0;
-      for (const change of changes.values()) {
-        byType[change.changeType]++;
-        records++;
-      }
-      return records;
+      const counts = changes.countByType();
+      byType.create += counts.create;
+      byType.modify += counts.modify;
+      byType.delete += counts.delete;
+      return counts.create + counts.modify + counts.delete;
     };
     const nodeChanges = count(this.nodeChanges);
     const wayChanges = count(this.wayChanges);
@@ -1270,14 +1265,6 @@ export class OsmChangeset {
         return way ? start.wayBbox(way) : null;
       },
       near: (bbox, wayId) => cache.nearWays(wayId, bbox, (box) => start.wayIdsIntersecting(box)),
-      intersect: (wayId, line, otherId, other) =>
-        cache.crossingPoints(
-          wayId,
-          this.overlay.wayRevision(wayId),
-          otherId,
-          this.overlay.wayRevision(otherId),
-          () => waysIntersect(line, other),
-        ),
     };
   }
 
@@ -1384,9 +1371,7 @@ export class OsmChangeset {
       // Skip ways that are geometrically equal
       if (dequal(coordinates, intersectingWayCoords)) continue;
 
-      const intersectingPoints = search.intersect
-        ? search.intersect(wayId, coordinates, intersectingWayId, intersectingWayCoords)
-        : waysIntersect(coordinates, intersectingWayCoords);
+      const intersectingPoints = waysIntersect(coordinates, intersectingWayCoords);
       for (const pt of intersectingPoints) {
         const currentWay = this.overlay.getWay(wayId);
         // Reuse the already decoded base entity; getCurrentWay still selects any

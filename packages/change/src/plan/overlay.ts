@@ -596,11 +596,6 @@ export class PlanOverlay {
     return ids;
   }
 
-  /** How many times way `id`'s geometry has changed in this overlay; equal means unchanged. */
-  wayRevision(id: number): number {
-    return this.wayGeometryRevisions.get(id) ?? 0;
-  }
-
   /**
    * A way's current coordinates, or null when any ref is unavailable; geometry is never
    * substituted.

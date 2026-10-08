@@ -85,17 +85,6 @@ describe("CrossingCache", () => {
       }
     }
   });
-
-  it("reuses crossing points only while both ways' geometry is unchanged", () => {
-    const cache = new CrossingCache();
-    cache.begin(new PlanOverlay(base));
-    const at = (x: number) => () => [[x, 0]] as [number, number][];
-    // Revisions count geometry changes: equal revisions mean the same lines.
-    expect(cache.crossingPoints(10, 0, 20, 0, at(0.5))).toEqual([[0.5, 0]]);
-    expect(cache.crossingPoints(10, 0, 20, 0, fail)).toEqual([[0.5, 0]]);
-    expect(cache.crossingPoints(10, 0, 20, 1, at(0.6))).toEqual([[0.6, 0]]);
-    expect(cache.crossingPoints(10, 1, 20, 1, at(0.7))).toEqual([[0.7, 0]]);
-  });
 });
 
 describe("crossings after a replan (MP-P4)", () => {

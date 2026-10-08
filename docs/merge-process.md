@@ -181,7 +181,7 @@ The app's initial opt-in form selects Copy tags with `barrier,crossing,kerb,tact
 <a id="mp-p4"></a>
 **MP-P4 — A decision replans from its phase.** Changing decisions replans from the earliest phase of the proposals they name, restoring that phase's starting state first; matching discovery is reused when the identity phase is unchanged. The result is the plan a fresh `planMerge` with the same decisions would make. A crossing never merges two points that have an exact-merge proposal, so rejecting or not yet accepting an identical-point merge keeps the points separate.
 
-Between plans the planner keeps the records, the proposals and matching discovery, but not what it builds to search the planned state (the pending spatial grid, way coordinates, the ways-by-node index): a replan rebuilds them. The crossings phase reuses only the crossing points of pairs that cross; other pairs are tested again. Both bound memory on large imports; see "Large imports" under [Review plan and Apply automatically](#review-plan-and-apply-automatically).
+Between plans the planner keeps the records, the proposals and matching discovery, but not what it builds to search the planned state (the pending spatial grid, way coordinates, the ways-by-node index): a replan rebuilds them. The crossings phase reuses each imported way's nearby ways, corrected for the ways a decision moved, and tests every pair for crossings again. Both bound memory on large imports; see "Large imports" under [Review plan and Apply automatically](#review-plan-and-apply-automatically).
 
 <a id="direct-and-exact-rules"></a>
 
