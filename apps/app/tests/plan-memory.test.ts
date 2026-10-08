@@ -6,24 +6,27 @@ import {
   planTooLargeReason,
 } from "../src/lib/plan-memory";
 
-// Imports measured for T34 (apps/bench plan-memory and Chromium over CDP).
+// Imports measured for T35 (apps/bench plan-memory and Chromium over CDP).
 const washington = { nodes: 1_107_476, ways: 368_648, relations: 0 };
 const seattle = { nodes: 1_529_956, ways: 546_928, relations: 0 };
 
 describe("plan memory", () => {
-  it("lets Washington's sidewalk import plan with matching", () => {
-    expect(estimatePlanHeapBytes(washington, true)).toBeLessThan(PLAN_HEAP_BUDGET_BYTES);
-    expect(planTooLargeReason(washington, true)).toBeNull();
+  it("lets Washington's and Seattle's imports plan with matching", () => {
+    for (const stats of [washington, seattle]) {
+      expect(estimatePlanHeapBytes(stats, true)).toBeLessThan(PLAN_HEAP_BUDGET_BYTES);
+      expect(planTooLargeReason(stats, true)).toBeNull();
+    }
   });
 
-  it("refuses Seattle's import with matching, and says what would fit", () => {
-    const reason = planTooLargeReason(seattle, true);
+  it("refuses a larger import with matching, and says it fits without", () => {
+    const larger = { nodes: 2_200_000, ways: 800_000, relations: 0 };
+    const reason = planTooLargeReason(larger, true);
     expect(reason).toMatch(
-      /Planning 2,076,884 imported entities with matching needs about 4\.4 GB/,
+      /Planning 3,000,000 imported entities with matching needs about 4\.2 GB/,
     );
     expect(reason).toMatch(/the browser allows 3\.5 GB, so the tab would crash/);
     expect(reason).toMatch(/or plan it without matching\.$/);
-    expect(planTooLargeReason(seattle, false)).toBeNull();
+    expect(planTooLargeReason(larger, false)).toBeNull();
   });
 
   it("does not suggest turning matching off when that would not fit either", () => {

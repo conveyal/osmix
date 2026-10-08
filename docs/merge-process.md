@@ -480,7 +480,7 @@ flowchart TD
 
 When a patch's positive IDs name base entities, the review says how many and offers **Treat all as new**, which replans with every patch feature new (MP-I1).
 
-**Large imports.** The plan lives in the plan worker's heap, which Chromium caps at about 3.7 GB; running out crashes the tab. Planning peaks at about 2.1 KB of heap per imported entity with matching and 1.4 KB without (measured with `apps/bench` plan-memory). Merge estimates the peak from the patch's entity count and refuses to plan above 3.5 GB, saying how much the import needs and whether it fits without matching. Washington's 1.48M-entity sidewalk import fits with matching; Seattle's 2.08M-entity import does not. Split a larger import with Extract.
+**Large imports.** The plan lives in the plan worker's heap, which Chromium caps at about 3.7 GB; running out crashes the tab. Planning peaks, a replan included, at about 1.4 KB of heap per imported entity with matching and 0.8 KB without (measured in Chromium; `apps/bench` plan-memory measures the same phases in Node). Untouched imported entities are read from the patch, not stored again in the plan. Merge estimates the peak from the patch's entity count and refuses to plan above 3.5 GB, saying how much the import needs and whether it fits without matching. Washington's 1.48M-entity sidewalk import and Seattle's 2.08M-entity import fit with matching; about 2.5M entities is the limit with matching. Split a larger import with Extract.
 
 <a id="review-controls"></a>
 

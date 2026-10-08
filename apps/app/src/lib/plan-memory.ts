@@ -4,16 +4,17 @@
  * GB; running out crashes the tab rather than failing the task. So Merge estimates the planning
  * peak from the import's size and refuses imports that would not fit.
  *
- * Measured with `apps/bench` plan-memory (Node) and Chromium over CDP, which stores the same
- * plan in about 0.59 of Node's heap. Peak heap per imported entity, in Chromium: 2.1 KB with
- * matching (Washington: 1.48M entities, 3.1 GB) and 1.4 KB without. Seattle's 2.08M-entity
- * import peaks at about 4.9 GB with matching and does not fit.
+ * Measured with `apps/bench` plan-memory (Node) and Chromium over CDP after T35, which reads
+ * untouched imports from the patch instead of storing a record for each. Peak heap per imported
+ * entity in Chromium, a replan included: 1.38 KB with matching (Seattle: 2.08M entities,
+ * 2.9 GB; Washington: 1.48M, 1.6 GB) and 0.77 KB without (Seattle, 1.6 GB). The larger import
+ * sets each figure, rounded up.
  */
 
 /** Heap the planning peak may reach; Chromium's limit less room for the rest of the worker. */
 export const PLAN_HEAP_BUDGET_BYTES = 3.5e9;
 
-const PEAK_BYTES_PER_IMPORTED_ENTITY = { matching: 2_120, direct: 1_420 } as const;
+const PEAK_BYTES_PER_IMPORTED_ENTITY = { matching: 1_400, direct: 800 } as const;
 
 /** The planning peak, in bytes, for an import of `stats` entities. */
 export function estimatePlanHeapBytes(

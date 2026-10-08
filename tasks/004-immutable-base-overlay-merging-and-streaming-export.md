@@ -2,19 +2,21 @@
 
 ## Status
 
-Step 1 is partly done for large imports (T34, below). Step 2 (streaming export) depends on the rest of step 1. Step 3 is deferred.
+Step 1 is partly done for large imports (T34 and T35, below). Step 2 (streaming export) depends on the rest of step 1. Step 3 is deferred.
 
-### Results so far: large imports (T34, 2026-10-08)
+### Results so far: large imports (T34 and T35, 2026-10-08 and 2026-10-09)
 
-`apps/bench` `plan-memory` measures heap per planner phase in Node. Chromium stores the same plan in about 0.59 of Node's heap, and caps the heap at about 3.7 GB.
+`apps/bench` `plan-memory` measures heap per planner phase in Node; Chromium over CDP stores the same plan in about 0.6 of Node's heap, and caps the heap at about 3.7 GB in a worker.
 
-| Base + patch (patch entities)  | Node heap after planning | Peak    | Apply                                  |
-| ------------------------------ | ------------------------ | ------- | -------------------------------------- |
-| Washington, before T34 (1.48M) | 6.50 GB                  | 6.50 GB | crashed the browser tab                |
-| Washington, after T34          | 4.01 GB                  | 5.31 GB | 15 s; plans and applies in the browser |
-| Seattle, after T34 (2.08M)     | 6.35 GB                  | 8.34 GB | does not fit; Merge refuses it         |
+| Base + patch (patch entities)  | Node heap after planning | Peak    | Apply                                                                                            |
+| ------------------------------ | ------------------------ | ------- | ------------------------------------------------------------------------------------------------ |
+| Washington, before T34 (1.48M) | 6.50 GB                  | 6.50 GB | crashed the browser tab                                                                          |
+| Washington, after T34          | 4.01 GB                  | 5.31 GB | 15 s; plans and applies in the browser                                                           |
+| Seattle, after T34 (2.08M)     | 6.35 GB                  | 8.34 GB | does not fit; Merge refuses it                                                                   |
+| Washington, after T35          | 2.15 GB                  | 2.88 GB | Chromium peak 1.6 GB, a replan included                                                          |
+| Seattle, after T35             | 3.98 GB                  | 4.59 GB | Chromium peak 2.9 GB; plans in the browser, but 129 integrity issues refuse Apply, as before T35 |
 
-For these imports **planning**, not apply, sets the peak: one or more JS objects per imported entity (change records, proposals, candidates) plus the structures built to search them. Step 2 would not help; the planner's own memory is T34's subject. A structural fix (read the patch as a second read-only layer, with records only for changed entities) is the next step if larger imports must plan in the browser.
+For these imports **planning**, not apply, sets the peak: one or more JS objects per imported entity (change records, proposals, candidates) plus the structures built to search them. Step 2 would not help. T35 read the patch as a read-only layer of the plan, with records only for changed entities, and kept the crossings cache and search indexes in typed arrays; the plan's output is unchanged (digests in `packages/osmix/test/plan-digest.test.ts`, and for Washington and Seattle in T35's notes). What remains per imported entity is mostly proposals, features, matching candidates and the matching outcome report.
 
 ## Summary
 
