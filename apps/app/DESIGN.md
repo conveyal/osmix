@@ -12,7 +12,8 @@ tokens, spacing, primitives, map overlay primitives) lives in
   reloading. The base and patch never hold the same file; loading or moving one
   that the other slot holds is refused with an error.
 - `PlanInputs` — the input step's **Plan** section: "Merge points at identical
-  coordinates automatically" (on by default), "Treat every patch feature as
+  coordinates automatically" (on by default; choosing Conservative turns it
+  off and any other level turns it back on), "Treat every patch feature as
   new", the **Automation** level (`RadioCard`s: Conservative, Recommended by
   default, Aggressive, each with its help text), and the two entry points in
   `StepActions`: **Apply automatically** (outline) then **Review plan**
@@ -44,7 +45,10 @@ tokens, spacing, primitives, map overlay primitives) lives in
   collect in a draft, each marked "Choice not applied yet", until an `Alert`
   above the rows applies them in one replan (**Apply N choices**) or drops
   them (**Discard**); bulk buttons, export and **Apply plan** are disabled
-  meanwhile. Selecting a feature on the map turns the list to its page.
+  meanwhile. When a change to the plan fails, such as choices that cannot
+  apply together, a destructive `Alert` above the rows says why, names the
+  proposals, and the plan and the draft stay as they were. Selecting a
+  feature on the map turns the list to its page.
 - `SavedChoices` — "Your choices", below the summary: choices are saved in the
   browser for the two input files as they are applied; an `Alert` offers
   **Restore N choices** / **Discard** when the same files were reviewed
@@ -99,40 +103,33 @@ Use the merge terms consistently:
   coordinates or ordered geometry and routing context agree.
 - **Imported-data matching** is the optional proximity workflow. A **candidate**
   proposes a correspondence; it does not select every eligible action.
-- **Alternative targets** belong together under their imported feature. Show
-  at most one selected target and an explicit **Leave unmatched** choice.
-  Choosing a target selects its eligible configured copying and connection actions;
-  removal requires its own explicit choice. Independent action controls can refine
-  the selection. Keep eligible actions available on unselected
-  alternatives: selecting one switches the target using that action choice.
-  Replacing a target preserves other imported features' decisions. Use the group's
-  **Leave unmatched** control to clear its choice, rather than per-alternative
-  **Skip match** controls. Keep alternatives outside current filters visible as
-  labeled context; bulk actions still apply only to matching rows.
+- **Alternatives** are competing proposals for one imported feature, such as
+  several base targets for one point. Including one leaves the others out;
+  **Decide later** leaves them all waiting. Alternatives outside the current
+  filters stay visible on their feature's row; bulk choices still apply only
+  to the features shown.
 - **OSM tags** are feature attributes, such as `surface=asphalt` or
   `kerb=lowered`. Use **Copy tags** in controls; **property transfer** is the API
   term. Copying tags preserves imported geometry, including matched ways and
   their connecting nodes.
 - **Connect network** is an independent choice that changes connectivity by
-  rewriting accepted references in patch-created ways, dropping each replaced
+  rewriting included references in patch-created ways, dropping each replaced
   imported point that is untagged and no longer used. **Network attachment**
   is the API term. Changing an action must preserve the other choices on the
   same target.
-- **Remove imported way** is a separate, default-off geometry change. It requires
-  an equivalent retained base counterpart and verified retained connections;
-  copying attributes or choosing a target must never schedule it. Show the exact
-  imported/base way IDs, affected branches, accepted connection prerequisites,
-  and orphan-node cleanup before selection and in the generated preview before
-  application. Explain that remaining attributes leave with the removed way and
-  that copying selected attributes is a separate choice. If removal is blocked,
-  explain how to review the required connection or keep the imported geometry.
-- **Scheduled** describes what the current choices include in the next
-  matching preview. Applying that preview is a separate step. **Automatic** means scheduled by the matching rules; it
-  never means already applied. Keep discovery eligibility distinct from the
-  actions currently scheduled, and show blocked actions with their reasons.
-- **Skip match** schedules no matching actions. Imported additions remain
-  subject to the ordinary direct/exact merge rules. Use **Skipped** for the
-  user-facing status while retaining `rejected` in saved decisions and APIs.
+- **Remove imported way** is a separate, default-off geometry change. Its
+  proposal requires an equivalent retained base counterpart and verified
+  retained connections, and stays blocked, with reasons, until the connections
+  it needs are included. Copying tags or including a connection never includes
+  it; it needs its own **Include** on its row, at every automation level, and
+  no bulk choice includes it. The completed merge lists each applied removal
+  with its imported and base way IDs, cleaned orphan points and connections.
+- **Automatic** means the automation level included or left out a proposal;
+  nothing changes until the plan is applied. Show blocked proposals with their
+  reasons.
+- **Leave out** applies none of a proposal's changes. The imported feature
+  remains subject to the ordinary direct and exact merge rules. Saved
+  decisions and APIs keep the stable value `reject`.
 - **Intersection creation** connects compatible same-grade crossings while
   preserving existing shared junctions, including bridge and tunnel entrances.
   New grade-separated interior crossings remain disconnected, and unsafe
@@ -161,20 +158,20 @@ Compare base and imported geometry using both shape and color: a base circle and
 
 Associate controls with visible labels and persistent concise help through `aria-describedby`; optional popovers may add detail. Match filters and the completion summary's pickers use `NativeSelect` with a `<label htmlFor>`; a filter's "All …" option has the empty value and clears that filter. Associate field errors with the relevant input and mark it invalid. Expose selection and expanded states, retain visible keyboard focus, and give evidence a named region. During a pending choice, keep eligible radios and checkboxes focusable, expose their temporary disabled state, and block repeated changes in their handlers; permanently ineligible controls remain disabled. Focus indicators must remain visible in forced-colors mode. Explain protected and routing-affecting attributes in text as well as row styling. Keep evidence and long attribute values readable at 448 px and 512 px (the sidebar widths at 1024px and 1280px windows); use stacked values when a three-column diff would force horizontal scrolling.
 
-Provide **Back to matching** from reconciliation, failed cumulative generation,
-and the cumulative matching preview before application. Returning preserves the
-loaded original inputs, options, and saved decisions. Show the affected imported
-feature when a decision conflict needs correction. After changes are applied,
-intersection recovery must not imply a return to the original matching state.
+**Back to inputs** discards the plan in review; nothing has changed, and the
+loaded inputs, settings and saved choices remain. **Apply automatically** stops
+before applying when the plan has integrity issues and opens it in the review,
+where the issues are listed. A failed automatic run returns to the inputs and
+drops its plan.
 
-Removal previews belong to the generated changeset and become stale when any
-matching decision changes, including a connection on another page. Clear stale
-preview evidence and require regeneration before application. Never describe a
-scheduled removal as already applied, and never provide automatic or bulk removal.
+A proposal's effect, removals included, always describes the current plan:
+every applied choice replans, so a choice on one feature can change another
+feature's proposals. Never describe a planned change as already applied, and
+never apply removals automatically or in bulk.
 
-After a successful merge, show the matching outcome before download controls. Identify it as evidence from after matching and before intersection creation. Targets, connected ways, explicit way removals, outstanding work, and retained IDs describe that stage; later intersections can add connections or remap junctions. Do not present the report as a final-reference snapshot or credit intersection effects as matching. Count actual tag-copy actions, network connections, and explicit removals separately from imported features considered for matching. Count each imported feature once regardless of its number of alternative targets. Unresolved features need attention; intentional skips are a separate category. A partially completed feature can contribute both an applied action and unresolved work. Values already present on the base are not failed copies.
+After a successful merge, show the matching outcome before download controls. Identify it as evidence from after matching and before intersection creation. Targets, connected ways, explicit way removals, outstanding work, and retained IDs describe that stage; later intersections can add connections or remap junctions. Do not present the report as a final-reference snapshot or credit intersection effects as matching. Count actual tag-copy actions, network connections, and explicit removals separately from imported features considered for matching. Count each imported feature once regardless of its number of alternative targets. Unresolved features need attention; proposals left out on purpose are a separate category. A partially completed feature can contribute both an applied action and unresolved work. Values already present on the base are not failed copies.
 
-Keep the completion summary prominent and concise. Provide paged details for ambiguous, blocked, unmatched, and skipped features, including selected tag values not copied to a base target and available reasons. Distinguish ordinary retained imports from explicitly removed ways and cleaned orphan points, and show replaced points a connection removed as "Replaced points removed". Below the summary, **Give new features positive IDs** (off by default) renumbers negative IDs in the downloaded PBF for tools that reject them; the report then includes the `idMap`. Keep graph diagnostics secondary; they do not prove route correctness. Show completion only after all required application and intersection stages succeed and the displayed result is refreshed. If refresh fails after application, offer a refresh-only retry and prevent advancement or reapplication until it succeeds. Retain that run's readable report until **Start a new merge** clears both input slots and the selected map state. Instruct users to reload the original base and import files to revise a completed merge; the merged result must not be reused as an implicit retry input.
+Keep the completion summary prominent and concise. Provide paged details for ambiguous, blocked, unmatched, and left-out features, including selected tag values not copied to a base target and available reasons. Distinguish ordinary retained imports from explicitly removed ways and cleaned orphan points, and show replaced points a connection removed as "Replaced points removed". Below the summary, **Give new features positive IDs** (off by default) renumbers negative IDs in the downloaded PBF for tools that reject them; the report then includes the `idMap`. Keep graph diagnostics secondary; they do not prove route correctness. Show completion only after all required application and intersection stages succeed and the displayed result is refreshed. If refresh fails after application, offer a refresh-only retry and prevent advancement or reapplication until it succeeds. Retain that run's readable report until **Start a new merge** clears both input slots and the selected map state. Instruct users to reload the original base and import files to revise a completed merge; the merged result must not be reused as an implicit retry input.
 
 `Details` is the shared disclosure primitive. Its open-state styles target Base
 UI's `data-panel-open` attribute. Disclosure triggers remain keyboard
