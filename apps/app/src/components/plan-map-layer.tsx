@@ -20,6 +20,7 @@ import {
 
 const SOURCE_ID = `${APPID}:merge-plan`;
 const SELECTION_ID = `${APPID}:merge-plan-selection`;
+const TARGETS_ID = `${APPID}:merge-plan-targets`;
 const LINES_ID = `${SOURCE_ID}:lines`;
 const POINTS_ID = `${SOURCE_ID}:points`;
 
@@ -81,6 +82,7 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
 
   if (!planMap) return null;
   const replaced = replacedLines(selected);
+  const targets = targetFeatures(selected);
   const color = outcomeColor(colors);
   const isSelected: ExpressionSpecification = ["==", ["get", "featureKey"], selected?.key ?? ""];
   const decision: ExpressionSpecification = ["==", ["get", "outcome"], "needs-decision"];
@@ -113,6 +115,35 @@ export function PlanMapLayer({ onSelect }: { onSelect: (featureKey: string) => u
             id={`${SELECTION_ID}:lines`}
             type="line"
             paint={{ "line-color": colors.base, "line-width": 5 }}
+          />
+        </Source>
+      ) : null}
+      {targets.features.length > 0 ? (
+        // The base features the selected feature's proposals match, as base data: solid lines
+        // and hollow points in base ink, like the base dataset's own legend symbols.
+        <Source id={TARGETS_ID} type="geojson" data={targets}>
+          <Layer
+            id={`${TARGETS_ID}:casing`}
+            type="line"
+            filter={["==", ["geometry-type"], "LineString"]}
+            paint={{ "line-color": colors.casing, "line-width": 7 }}
+          />
+          <Layer
+            id={`${TARGETS_ID}:lines`}
+            type="line"
+            filter={["==", ["geometry-type"], "LineString"]}
+            paint={{ "line-color": colors.base, "line-width": 3 }}
+          />
+          <Layer
+            id={`${TARGETS_ID}:points`}
+            type="circle"
+            filter={["==", ["geometry-type"], "Point"]}
+            paint={{
+              "circle-color": colors.casing,
+              "circle-radius": 7,
+              "circle-stroke-color": colors.base,
+              "circle-stroke-width": 3,
+            }}
           />
         </Source>
       ) : null}
@@ -174,6 +205,29 @@ function replacedLines(
 }
 
 /**
+ * The base entities the selected feature's proposals target, once each: a base node as a point,
+ * a base way as a line. Relations have no coordinates and are not drawn.
+ */
+function targetFeatures(selected: MergePlanFeatureDetail | null): GeoJSON.FeatureCollection {
+  const seen = new Set<string>();
+  const features: GeoJSON.Feature[] = [];
+  for (const coordinates of Object.values(selected?.targets ?? {})) {
+    const key = JSON.stringify(coordinates);
+    if (coordinates.length === 0 || seen.has(key)) continue;
+    seen.add(key);
+    features.push({
+      type: "Feature",
+      properties: {},
+      geometry:
+        coordinates.length === 1
+          ? { type: "Point", coordinates: coordinates[0]! }
+          : { type: "LineString", coordinates },
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+/**
  * The plan layer's key, in the map legend under the dataset rows: each outcome's colour next
  * to its name and count, for the outcomes the plan has. Shown while the plan layer is drawn.
  */
@@ -184,6 +238,7 @@ export function PlanLegend() {
   if (!planMap || !overview) return null;
   const counts = overview.summary.features;
   const replacing = replacedLines(selected).features.length;
+  const matched = targetFeatures(selected).features.length;
   return (
     <ul className="flex flex-col border-t py-1" aria-label="Plan map legend">
       {OUTCOMES.filter((outcome) => counts[outcome] > 0).map((outcome) => (
@@ -204,6 +259,22 @@ export function PlanLegend() {
           </span>
         </li>
       ))}
+      {matched > 0 ? (
+        <li className="flex h-7 items-center gap-2 px-inset">
+          <svg aria-hidden="true" width="24" height="12" viewBox="0 0 24 12">
+            <line x1="1" y1="6" x2="23" y2="6" stroke="var(--map-base)" strokeWidth={2} />
+            <circle
+              cx="12"
+              cy="6"
+              r="4"
+              fill="var(--map-casing)"
+              stroke="var(--map-base)"
+              strokeWidth={2}
+            />
+          </svg>
+          <span>Base {matched === 1 ? "feature" : "features"} the selected feature matches</span>
+        </li>
+      ) : null}
       {replacing > 0 ? (
         <li className="flex h-7 items-center gap-2 px-inset">
           <svg aria-hidden="true" width="24" height="12" viewBox="0 0 24 12">

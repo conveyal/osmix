@@ -1,5 +1,6 @@
 import { createStore, Provider } from "jotai";
 import type {
+  MergePlanFeatureDetail,
   MergePlanFeatureView,
   MergePlanOverview,
   MergePlanPage,
@@ -18,11 +19,17 @@ import {
   PlanInputs,
   TREAT_AS_NEW_LABEL,
 } from "../src/components/plan-inputs";
+import { PlanLegend } from "../src/components/plan-map-layer";
 import { PlanProposalActions } from "../src/components/plan-proposal-actions";
 import { PlanReview } from "../src/components/plan-review";
 import { PlanSummary } from "../src/components/plan-summary";
 import { SuggestedChoices } from "../src/components/suggested-choices";
-import { planDraftAtom, planOverviewAtom } from "../src/state/merge-plan";
+import {
+  planDraftAtom,
+  planMapAtom,
+  planOverviewAtom,
+  selectedPlanFeatureAtom,
+} from "../src/state/merge-plan";
 
 const render = (element: ReactElement) =>
   renderToStaticMarkup(createElement(Provider, { store: createStore() }, element));
@@ -276,6 +283,30 @@ describe("plan components", () => {
       "Imported point -9 would join different grades with this point at base node 2.",
     );
     expect(html).toContain("Include at most one; including this one leaves the others out.");
+  });
+
+  it("keys the selected feature's base targets in the legend, each target once", () => {
+    const store = createStore();
+    store.set(planMapAtom, { baseOsmId: "base", revision: 1 });
+    store.set(planOverviewAtom, {
+      summary: { features: outcomes({ connected: 1 }) },
+    } as unknown as MergePlanOverview);
+    store.set(selectedPlanFeatureAtom, {
+      ...feature("connected", []),
+      candidates: {},
+      coordinates: [],
+      // A connection and a copy to one base node are one target.
+      targets: { "connect:n-2>n2": [[0, 0]], "copy:n-2>n2": [[0, 0]] },
+      replaces: {},
+    } as MergePlanFeatureDetail);
+    const html = renderToStaticMarkup(
+      createElement(Provider, { store }, createElement(PlanLegend)),
+    );
+    expect(html).toContain("Base feature the selected feature matches");
+    store.set(selectedPlanFeatureAtom, null);
+    expect(
+      renderToStaticMarkup(createElement(Provider, { store }, createElement(PlanLegend))),
+    ).not.toContain("the selected feature matches");
   });
 
   it("marks a row's choice that is not applied yet", () => {

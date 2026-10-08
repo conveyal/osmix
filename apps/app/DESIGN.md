@@ -66,6 +66,9 @@ tokens, spacing, primitives, map overlay primitives) lives in
   `PlanLegend` goes in the map legend (`OsmixMap`'s `legend`), under the dataset
   rows, pairing each colour with its outcome name and count; the sidebar keeps
   only the summary table.
+  The selected feature's base targets (the base points and ways its proposals
+  match) are drawn as base data: hollow points and solid lines in `--map-base`
+  over a casing, each target once, with a legend row.
   When the selected feature would replace base ways, those base ways are drawn
   as base data (solid, `--map-base`, over a casing) under the plan's lines, and
   the legend adds a row for them; the row names them and the imported ways
