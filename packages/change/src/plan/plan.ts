@@ -425,6 +425,9 @@ export function applyPlan(plan: MergePlan, newOsmId?: string): MergePlanResult {
       `Merge introduced routing-integrity problems: ${shown.join("; ")}${omitted > 0 ? `; and ${omitted} more` : ""}`,
     );
   }
+  // The build reads records only. Search caches rebuild if the plan is used again, so free them
+  // before the result needs room (T34).
+  changeset.releaseSearchCaches();
   const osm = applyChangesetToOsm(changeset, newOsmId);
   return { osm, summary: plan.summary, stats: changeset.stats };
 }

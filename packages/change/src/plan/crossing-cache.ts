@@ -65,7 +65,27 @@ export class CrossingCache {
     return ids;
   }
 
-  /** Where two lines cross, as `intersect` finds them, reused while both lines are unchanged. */
+  /** Forget every pass: the next one searches and intersects from scratch. */
+  clear() {
+    this.start = undefined;
+    this.changed = new Map();
+    this.near.clear();
+    this.pairs.clear();
+  }
+
+  /**
+   * The pass is over. Its start is kept only to compare with the next pass's start, so the
+   * spatial grid and coordinates it built for searching are released.
+   */
+  end() {
+    this.start?.releaseDerived();
+  }
+
+  /**
+   * Where two lines cross, as `intersect` finds them, reused while both lines are unchanged.
+   * Only pairs that cross are kept: most pairs of nearby ways do not, and keeping both lines
+   * of each such pair held a copy of the plan's geometry (T34).
+   */
   crossingPoints(
     wayId: number,
     line: Line,
@@ -80,7 +100,8 @@ export class CrossingCache {
       return entry.points;
     }
     const points = intersect(line, other);
-    this.pairs.set(key, { line, other, points, pass: this.pass });
+    if (points.length > 0) this.pairs.set(key, { line, other, points, pass: this.pass });
+    else this.pairs.delete(key);
     return points;
   }
 }

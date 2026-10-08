@@ -390,6 +390,16 @@ export class PlanOverlay {
     return copy;
   }
 
+  /**
+   * Drop what this overlay builds from its records to search them: the pending spatial grid,
+   * the ways-by-node index and cached way coordinates. Reads rebuild them when needed.
+   */
+  releaseDerived() {
+    this.geometry = undefined;
+    this.pendingWayIdsByNode = undefined;
+    this.wayCoordinateCache.clear();
+  }
+
   /** The planned state read by ID, as the materialized dataset would read. */
   reader(): DatasetReader {
     const table = <T>(

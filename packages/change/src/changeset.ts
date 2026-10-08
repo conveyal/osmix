@@ -337,6 +337,15 @@ export class OsmChangeset {
     Object.assign(this, checkpoint.counters);
   }
 
+  /**
+   * @internal Free what the planned state builds to search itself, and the crossings phase's
+   * reuse cache. Both rebuild when needed; a replan after this redoes the crossing tests.
+   */
+  releaseSearchCaches() {
+    this.overlay.releaseDerived();
+    this.crossingCache.clear();
+  }
+
   /** @internal New routing-integrity problems in the planned state, before any build. */
   pendingIntegrityIssues(): string[] {
     return newOverlayIntegrityIssues(this.routingIntegrityBaselineKeys, this.overlay);
@@ -1202,6 +1211,7 @@ export class OsmChangeset {
       importedNodeIds,
       accept,
     );
+    this.crossingCache.end();
   }
 
   private *createIntersections(
