@@ -1,4 +1,5 @@
 import { Osm } from "@osmix/core";
+import { bboxContainsOrIntersects } from "@osmix/geo/bbox-intersects";
 import type { GeoBbox2D, OsmNode, OsmWay } from "@osmix/types";
 import { describe, expect, it } from "vitest";
 
@@ -240,5 +241,35 @@ describe("GridIndex", () => {
     grid.remove(2);
     expect([...grid.query([0.5, 0.5, 0.5, 0.5])]).toEqual([1]);
     expect(grid.size).toBe(1);
+  });
+
+  it("answers as a scan of every box would, as entries move and leave", () => {
+    const random = mulberry32(7);
+    const grid = new GridIndex(0.01);
+    const boxes = new Map<number, [number, number, number, number]>();
+    const randomBox = (): [number, number, number, number] => {
+      const [x, y] = [random() * 0.2, random() * 0.2];
+      // Points, small boxes and boxes too big to grid.
+      const size = [0, 0.004, 0.03, 0.2][Math.floor(random() * 4)]!;
+      return [x, y, x + size, y + size];
+    };
+    for (let step = 0; step < 3000; step++) {
+      const id = Math.floor(random() * 200);
+      if (random() < 0.3) {
+        grid.remove(id);
+        boxes.delete(id);
+      } else {
+        const box = randomBox();
+        grid.set(id, box);
+        boxes.set(id, box);
+      }
+      if (step % 50 !== 0) continue;
+      const query = randomBox();
+      const scanned = [...boxes]
+        .filter(([, box]) => bboxContainsOrIntersects(box, query))
+        .map(([id]) => id);
+      expect([...grid.query(query)].sort((a, b) => a - b)).toEqual(scanned.sort((a, b) => a - b));
+      expect(grid.size).toBe(boxes.size);
+    }
   });
 });

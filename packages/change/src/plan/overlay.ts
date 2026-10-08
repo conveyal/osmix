@@ -87,7 +87,8 @@ export class PlanOverlay {
 
   /** Revisions keep geometry caches correct while phases rewrite ways in place. */
   private readonly wayGeometryRevisions = new Map<number, number>();
-  private pendingWayIdsByNode: Map<number, Set<number>> | undefined;
+  /** Pending ways by the node IDs they use: one way as its ID, several as a list (T35). */
+  private pendingWayIdsByNode: Map<number, number | number[]> | undefined;
   private readonly pendingWayRefs = new Map<number, readonly number[]>();
   /** Coordinates of ways with a record, or at a changed node. */
   private readonly wayCoordinateCache = new Map<number, WayCoordinateCacheEntry>();
@@ -541,7 +542,7 @@ export class PlanOverlay {
         if (way?.refs.includes(nodeId)) ways.set(way.id, way);
       }
     }
-    for (const wayId of this.pendingIncidence().get(nodeId) ?? []) {
+    for (const wayId of idsOf(this.pendingIncidence().get(nodeId))) {
       const change = this.wayChanges.get(wayId);
       if (change && change.changeType !== "delete" && change.entity.refs.includes(nodeId)) {
         ways.set(change.entity.id, change.entity);
@@ -589,9 +590,9 @@ export class PlanOverlay {
    * the base does not have, these are every way at it, without a spatial query.
    */
   pendingWayIdsAt(nodeId: number): ReadonlySet<number> {
-    const own = this.pendingIncidence().get(nodeId) ?? EMPTY_IDS;
-    if (!this.patch) return own;
-    const ids = new Set(own);
+    const own = this.pendingIncidence().get(nodeId);
+    if (!this.patch && own === undefined) return EMPTY_IDS;
+    const ids = new Set(idsOf(own));
     for (const way of this.layerWaysAt(nodeId)) ids.add(way.id);
     return ids;
   }
@@ -850,20 +851,30 @@ export class PlanOverlay {
     if (!index) return;
     for (const ref of this.pendingWayRefs.get(wayId) ?? []) {
       const wayIds = index.get(ref);
-      wayIds?.delete(wayId);
-      if (wayIds?.size === 0) index.delete(ref);
+      if (wayIds === wayId) index.delete(ref);
+      else if (Array.isArray(wayIds)) {
+        const rest = wayIds.filter((id) => id !== wayId);
+        if (rest.length === 0) index.delete(ref);
+        else index.set(ref, rest.length === 1 ? rest[0]! : rest);
+      }
     }
     this.pendingWayRefs.delete(wayId);
     const change = this.wayChanges.hasOverride(wayId) ? this.wayChanges.get(wayId) : undefined;
     if (!change || change.changeType === "delete") return;
     this.pendingWayRefs.set(wayId, change.entity.refs);
     for (const ref of change.entity.refs) {
-      const wayIds = index.get(ref) ?? new Set<number>();
-      wayIds.add(wayId);
-      index.set(ref, wayIds);
+      const wayIds = index.get(ref);
+      if (wayIds === undefined) index.set(ref, wayId);
+      else if (typeof wayIds === "number") {
+        if (wayIds !== wayId) index.set(ref, [wayIds, wayId]);
+      } else if (!wayIds.includes(wayId)) wayIds.push(wayId);
     }
   }
 }
+
+/** The way IDs of one node's pending incidence. */
+const idsOf = (wayIds: number | number[] | undefined): readonly number[] =>
+  wayIds === undefined ? [] : typeof wayIds === "number" ? [wayIds] : wayIds;
 
 /** A copied state as an earlier state of `live`: what either has a record for may differ. */
 export function snapshotState(snapshot: PlanOverlay, live: PlanOverlay): EarlierState {

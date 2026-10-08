@@ -14,9 +14,19 @@ const CELL_KEY_STRIDE = 1 << 17;
 
 export class GridIndex {
   private readonly cells = new Map<number, Set<number>>();
-  private readonly entryCells = new Map<number, number[]>();
   private readonly oversized = new Set<number>();
-  private readonly boxes = new Map<number, GeoBbox2D>();
+  /**
+   * Each entry's slot in typed arrays: its box, and the first cell it is in (NaN when
+   * oversized), with any further cells in a short list. An object and two arrays per entry
+   * cost several times as much on large plans (T35).
+   */
+  private readonly slots = new Map<number, number>();
+  private readonly freeSlots: number[] = [];
+  private boxes = new Float64Array(0);
+  private firstCells = new Float64Array(0);
+  private moreCells: (number[] | undefined)[] = [];
+  /** One entry's box, for testing it without allocating. */
+  private readonly box: GeoBbox2D = [0, 0, 0, 0];
 
   private readonly cellDegrees: number;
 
@@ -25,23 +35,27 @@ export class GridIndex {
   }
 
   get size() {
-    return this.entryCells.size + this.oversized.size;
+    return this.slots.size;
   }
 
   has(id: number) {
-    return this.entryCells.has(id) || this.oversized.has(id);
+    return this.slots.has(id);
   }
 
   /** Insert `id`, or move it to `bbox`. */
   set(id: number, bbox: GeoBbox2D) {
     this.remove(id);
-    this.boxes.set(id, bbox);
+    const slot = this.freeSlots.pop() ?? this.slots.size;
+    this.slots.set(id, slot);
+    this.reserve(slot + 1);
+    this.boxes.set(bbox, slot * 4);
     const [minX, minY, maxX, maxY] = this.cellRange(bbox);
     if ((maxX - minX + 1) * (maxY - minY + 1) > MAX_CELLS_PER_ENTRY) {
+      this.firstCells[slot] = Number.NaN;
       this.oversized.add(id);
       return;
     }
-    const keys: number[] = [];
+    let more: number[] | undefined;
     for (let x = minX; x <= maxX; x++) {
       for (let y = minY; y <= maxY; y++) {
         const key = x * CELL_KEY_STRIDE + y;
@@ -51,30 +65,33 @@ export class GridIndex {
           this.cells.set(key, cell);
         }
         cell.add(id);
-        keys.push(key);
+        if (x === minX && y === minY) this.firstCells[slot] = key;
+        else (more ??= []).push(key);
       }
     }
-    this.entryCells.set(id, keys);
+    this.moreCells[slot] = more;
   }
 
   remove(id: number) {
-    this.boxes.delete(id);
+    const slot = this.slots.get(id);
+    if (slot === undefined) return;
+    this.slots.delete(id);
+    this.freeSlots.push(slot);
     if (this.oversized.delete(id)) return;
-    const keys = this.entryCells.get(id);
-    if (!keys) return;
-    for (const key of keys) {
-      const cell = this.cells.get(key)!;
-      cell.delete(id);
-      if (cell.size === 0) this.cells.delete(key);
-    }
-    this.entryCells.delete(id);
+    this.leaveCell(this.firstCells[slot]!, id);
+    for (const key of this.moreCells[slot] ?? []) this.leaveCell(key, id);
+    this.moreCells[slot] = undefined;
   }
 
   /** IDs whose stored box intersects or touches `bbox`, in no particular order. */
   query(bbox: GeoBbox2D): Set<number> {
     const result = new Set<number>();
+    const box = this.box;
     const test = (id: number) => {
-      if (!result.has(id) && bboxContainsOrIntersects(this.boxes.get(id)!, bbox)) result.add(id);
+      if (result.has(id)) return;
+      const at = this.slots.get(id)! * 4;
+      for (let i = 0; i < 4; i++) box[i] = this.boxes[at + i]!;
+      if (bboxContainsOrIntersects(box, bbox)) result.add(id);
     };
     for (const id of this.oversized) test(id);
     const [minX, minY, maxX, maxY] = this.cellRange(bbox);
@@ -85,6 +102,24 @@ export class GridIndex {
       }
     }
     return result;
+  }
+
+  private leaveCell(key: number, id: number) {
+    const cell = this.cells.get(key)!;
+    cell.delete(id);
+    if (cell.size === 0) this.cells.delete(key);
+  }
+
+  /** Room for `size` slots. */
+  private reserve(size: number) {
+    if (size <= this.firstCells.length) return;
+    const capacity = Math.max(size, this.firstCells.length * 2, 1024);
+    const boxes = new Float64Array(capacity * 4);
+    boxes.set(this.boxes);
+    this.boxes = boxes;
+    const firstCells = new Float64Array(capacity);
+    firstCells.set(this.firstCells);
+    this.firstCells = firstCells;
   }
 
   private cellRange(bbox: GeoBbox2D): GeoBbox2D {
