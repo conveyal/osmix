@@ -133,5 +133,9 @@ function changedWays(previous: PlanOverlay, current: PlanOverlay) {
 }
 
 function recordIds(previous: PlanOverlay, current: PlanOverlay, type: "node" | "way") {
-  return new Set([...previous.changes(type).keys(), ...current.changes(type).keys()]);
+  // Only records of their own can differ: both states read untouched imports from one patch.
+  return new Set([
+    ...previous.changes(type).overrideKeys(),
+    ...current.changes(type).overrideKeys(),
+  ]);
 }

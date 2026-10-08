@@ -1596,8 +1596,10 @@ export class OsmChangeset {
    * - Call `deduplicateNodes()` and `deduplicateWays()` afterward for conservative cross-dataset
    *   reconciliation and relation-member rewrites.
    */
-  generateDirectChanges(patch: Osm) {
+  generateDirectChanges(patch: Osm, { layer = false }: { layer?: boolean } = {}) {
     this.inheritPatchIntegrity(patch);
+    // With a layer, entities the base lacks are read from the patch, not recorded (T35).
+    if (layer) this.overlay.usePatchLayer(patch);
 
     // Reset the current node ID to the highest node ID in the base or patch.
     const maximums = [maximumId(this.osm.nodes.ids), maximumId(patch.nodes.ids)].filter(
@@ -1616,7 +1618,7 @@ export class OsmChangeset {
           // Replace the existing entity with the patch entity
           this.modify("way", way.id, (_existingWay) => removeDuplicateAdjacentWayRefs(way));
         }
-      } else {
+      } else if (!layer) {
         // Create the way
         this.create(removeDuplicateAdjacentWayRefs(way), patch.id);
       }
@@ -1630,7 +1632,7 @@ export class OsmChangeset {
           // Replace the existing entity with the patch entity
           this.modify("node", node.id, (_existingNode) => node);
         }
-      } else {
+      } else if (!layer) {
         this.create(node, patch.id);
       }
     }
@@ -1642,7 +1644,7 @@ export class OsmChangeset {
           // Replace the existing entity with the patch entity
           this.modify("relation", relation.id, (_existingRelation) => relation);
         }
-      } else {
+      } else if (!layer) {
         this.create(relation, patch.id);
       }
     }

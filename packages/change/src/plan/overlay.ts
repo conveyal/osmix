@@ -25,6 +25,7 @@ import { ChangeRecordTable } from "../change-records.ts";
 import type { OsmChange, OsmEntityRef } from "../types.ts";
 import { cleanCoords } from "../utils.ts";
 import type { DatasetReader, EntityReader } from "../views.ts";
+import { patchLayers } from "./patch-layer.ts";
 
 /** An earlier state of an overlay, read by ID, with the IDs that may differ from now. */
 export interface EarlierState {
@@ -83,11 +84,47 @@ export class PlanOverlay {
   private geometry: PendingGeometry | undefined;
   /** Record writes since the first mark, to undo back to a mark; null before any mark. */
   private journal: JournalEntry[] | null = null;
+  /** The patch, when its untouched entities are read from it rather than stored (T35). */
+  private patch: Osm | undefined;
+  /**
+   * Layer ways by the nodes they reference that the patch lacks (base nodes): the patch's way
+   * index places a way by its own nodes only, so it cannot find these.
+   */
+  private layerWaysByForeignNode = new Map<number, number[]>();
 
   readonly base: Osm;
 
   constructor(base: Osm) {
     this.base = base;
+  }
+
+  /**
+   * Read `patch`'s entities the base does not have from the patch itself, as create records,
+   * instead of storing one record each (T35). A phase that changes one writes a record of its
+   * own over it; dropping one writes a dropped record. Call before any record is written.
+   * Spatial queries read the patch's all-node and way indexes, built here if it lacks them.
+   */
+  usePatchLayer(patch: Osm) {
+    if (this.nodeChanges.size + this.wayChanges.size + this.relationChanges.size > 0) {
+      throw Error("A patch layer must come before any record");
+    }
+    patch.nodes.buildSpatialIndex("all");
+    patch.ways.buildSpatialIndex();
+    const layers = patchLayers(this.base, patch);
+    this.patch = patch;
+    for (let index = 0; index < patch.ways.size; index++) {
+      const way = patch.ways.getByIndex(index);
+      if (this.base.ways.ids.has(way.id)) continue;
+      for (const ref of new Set(way.refs)) {
+        if (patch.nodes.ids.has(ref)) continue;
+        const ways = this.layerWaysByForeignNode.get(ref) ?? [];
+        ways.push(way.id);
+        this.layerWaysByForeignNode.set(ref, ways);
+      }
+    }
+    this.nodeChanges = new ChangeRecordTable(layers.node);
+    this.wayChanges = new ChangeRecordTable(layers.way);
+    this.relationChanges = new ChangeRecordTable(layers.relation);
   }
 
   changes<T extends OsmEntityType>(type: T): ChangeRecords<T> {
@@ -136,16 +173,16 @@ export class PlanOverlay {
     const journal = this.journal;
     if (!journal) throw Error("No overlay mark to read");
     const first = {
-      node: new Map<number, OsmChange | undefined>(),
-      way: new Map(),
-      relation: new Map(),
+      node: new Map<number, JournalEntry>(),
+      way: new Map<number, JournalEntry>(),
+      relation: new Map<number, JournalEntry>(),
     };
     let cursor = mark;
     const sync = () => {
       for (; cursor < journal.length; cursor++) {
-        const { type, id, previous } = journal[cursor]!;
-        const seen = first[type] as Map<number, OsmChange | undefined>;
-        if (!seen.has(id)) seen.set(id, previous);
+        const entry = journal[cursor]!;
+        const seen = first[entry.type];
+        if (!seen.has(entry.id)) seen.set(entry.id, entry);
       }
     };
     const read = <T extends OsmEntity>(
@@ -155,9 +192,15 @@ export class PlanOverlay {
       base: (id: number) => T | null,
     ): T | null => {
       sync();
-      const seen = first[type] as Map<number, OsmChange | undefined>;
-      if (!seen.has(id)) return current(id);
-      const change = seen.get(id);
+      const entry = first[type].get(id);
+      if (!entry) return current(id);
+      // No record of its own then: as the layer has it, else as the base has it.
+      if (!entry.existed) {
+        const layered = this.changes(type).layerRecord(id);
+        if (layered) return layered.entity as T;
+        return base(id);
+      }
+      const change = entry.previous;
       if (!change) return base(id);
       return change.changeType === "delete" ? null : (change.entity as T);
     };
@@ -193,8 +236,15 @@ export class PlanOverlay {
   /** Write one record, journaling what it replaces; `undefined` leaves a tombstone. */
   private write(type: OsmEntityType, id: number, next: OsmChange | undefined) {
     const records = this.changes(type) as ChangeRecordTable;
-    this.journal?.push({ type, id, previous: records.get(id), existed: records.has(id) });
-    records.set(id, next);
+    // The journal records a key's own record; a layer entity without one reads from the layer.
+    this.journal?.push({
+      type,
+      id,
+      previous: records.get(id),
+      existed: records.hasOverride(id),
+    });
+    // Writes before the first mark are the direct phase's, which came first in record order.
+    records.set(id, next, { direct: this.journal === null });
   }
 
   /** The entity as stored in the base, ignoring records. */
@@ -325,8 +375,17 @@ export class PlanOverlay {
       minimum = id;
       break;
     }
-    for (const change of this.nodeChanges.values()) {
+    for (const change of this.nodeChanges.overrideValues()) {
       if (change.changeType !== "delete") minimum = Math.min(minimum, change.entity.id);
+    }
+    // Untouched layer nodes, lowest first; a dropped one does not count.
+    const patchSorted = this.patch?.nodes.ids.sorted ?? [];
+    for (let index = 0; index < patchSorted.length; index++) {
+      const id = patchSorted[index]!;
+      if (id >= minimum) break;
+      if (this.base.nodes.ids.has(id) || this.nodeChanges.hasOverride(id)) continue;
+      minimum = id;
+      break;
     }
     return minimum;
   }
@@ -378,6 +437,8 @@ export class PlanOverlay {
   /** A copy of the current records over the same base, unaffected by later changes. */
   snapshot(): PlanOverlay {
     const copy = new PlanOverlay(this.base);
+    copy.patch = this.patch;
+    copy.layerWaysByForeignNode = this.layerWaysByForeignNode;
     copy.nodeChanges = this.nodeChanges.copy();
     copy.wayChanges = this.wayChanges.copy();
     copy.relationChanges = this.relationChanges.copy();
@@ -424,7 +485,15 @@ export class PlanOverlay {
   /** How many nodes the planned dataset has. */
   get nodeCount() {
     let count = this.base.nodes.size;
-    for (const change of this.nodeChanges.values()) {
+    const patchNodes = this.patch?.nodes;
+    // Layer nodes count unless their own record drops or deletes them.
+    if (patchNodes) {
+      for (let index = 0; index < patchNodes.size; index++) {
+        const id = patchNodes.ids.at(index);
+        if (!this.base.nodes.ids.has(id) && !this.nodeChanges.hasOverride(id)) count++;
+      }
+    }
+    for (const change of this.nodeChanges.overrideValues()) {
       const inBase = this.base.nodes.ids.has(change.entity.id);
       if (change.changeType === "create" && !inBase) count++;
       else if (change.changeType === "delete" && inBase) count--;
@@ -450,7 +519,41 @@ export class PlanOverlay {
         ways.set(change.entity.id, change.entity);
       }
     }
+    for (const way of this.layerWaysAt(nodeId)) ways.set(way.id, way);
     return [...ways.values()];
+  }
+
+  /**
+   * Untouched layer ways that reference `nodeId`, found through the patch's way index at the
+   * node's positions (in the base, in the patch, and now).
+   */
+  private *layerWaysAt(nodeId: number): Generator<OsmWay> {
+    const patch = this.patch;
+    if (!patch) return;
+    const positions = new Map<string, [number, number]>();
+    for (const node of [
+      this.base.nodes.getById(nodeId),
+      patch.nodes.getById(nodeId),
+      this.getNode(nodeId),
+    ]) {
+      if (node) positions.set(`${node.lon},${node.lat}`, [node.lon, node.lat]);
+    }
+    const seen = new Set<number>();
+    for (const id of this.layerWaysByForeignNode.get(nodeId) ?? []) {
+      if (this.wayChanges.hasOverride(id)) continue;
+      seen.add(id);
+      const way = this.wayChanges.get(id)?.entity;
+      if (way?.refs.includes(nodeId)) yield way;
+    }
+    for (const [lon, lat] of positions.values()) {
+      for (const index of patch.ways.intersects([lon, lat, lon, lat])) {
+        const id = patch.ways.ids.at(index);
+        if (seen.has(id) || this.wayChanges.hasOverride(id)) continue;
+        seen.add(id);
+        const way = this.wayChanges.get(id)?.entity;
+        if (way?.refs.includes(nodeId)) yield way;
+      }
+    }
   }
 
   /**
@@ -458,7 +561,11 @@ export class PlanOverlay {
    * the base does not have, these are every way at it, without a spatial query.
    */
   pendingWayIdsAt(nodeId: number): ReadonlySet<number> {
-    return this.pendingIncidence().get(nodeId) ?? EMPTY_IDS;
+    const own = this.pendingIncidence().get(nodeId) ?? EMPTY_IDS;
+    if (!this.patch) return own;
+    const ids = new Set(own);
+    for (const way of this.layerWaysAt(nodeId)) ids.add(way.id);
+    return ids;
   }
 
   /**
@@ -482,6 +589,24 @@ export class PlanOverlay {
         if (coordinates.length !== way.refs.length) return null;
         this.wayCoordinateCache.set(way.id, { coordinates, wayRevision });
         return coordinates;
+      }
+    }
+    // An untouched layer way over untouched layer nodes reads its packed patch coordinates.
+    const patch = this.patch;
+    if (
+      patch &&
+      !this.wayChanges.hasOverride(way.id) &&
+      this.wayChanges.get(way.id) !== undefined &&
+      way.refs.every((ref) => !this.nodeChanges.hasOverride(ref) && !this.base.nodes.ids.has(ref))
+    ) {
+      const [wayIndex] = patch.ways.ids.idOrIndex({ id: way.id });
+      if (wayIndex !== -1) {
+        const coordinates = patch.ways.getResolvedCoordinates(wayIndex);
+        // A patch way with repeated refs reads with them removed; resolve those by node.
+        if (coordinates.length === way.refs.length) {
+          this.wayCoordinateCache.set(way.id, { coordinates, wayRevision });
+          return coordinates;
+        }
       }
     }
 
@@ -532,6 +657,16 @@ export class PlanOverlay {
       if (this.nodeChanges.get(node.id)) continue;
       matches.push({ distance: haversineDistance([lon, lat], [node.lon, node.lat]), node });
     }
+    // Untouched layer nodes come from the patch's index; the grid holds every node with a record.
+    const patch = this.patch;
+    if (patch) {
+      for (const index of patch.nodes.findIndexesWithinRadius(lon, lat, meters / 1_000)) {
+        const id = patch.nodes.ids.at(index);
+        if (this.base.nodes.ids.has(id) || this.nodeChanges.hasOverride(id)) continue;
+        const node = patch.nodes.getByIndex(index);
+        matches.push({ distance: haversineDistance([lon, lat], [node.lon, node.lat]), node });
+      }
+    }
     const latDelta = (meters / METERS_PER_DEGREE_LAT) * 1.01;
     const lonDelta = Math.min(180, latDelta / Math.max(Math.cos((lat * Math.PI) / 180), 1e-6));
     for (const id of geometry.nodes.query([
@@ -565,6 +700,14 @@ export class PlanOverlay {
       const id = this.base.ways.ids.at(index);
       if (!geometry.trackedWays.has(id)) ids.push(id);
     }
+    const patch = this.patch;
+    if (patch) {
+      for (const index of patch.ways.intersects(bbox)) {
+        const id = patch.ways.ids.at(index);
+        if (this.base.ways.ids.has(id) || geometry.trackedWays.has(id)) continue;
+        if (this.wayChanges.get(id) !== undefined) ids.push(id);
+      }
+    }
     for (const id of geometry.ways.query(bbox)) ids.push(id);
     return ids.sort((a, b) => a - b);
   }
@@ -572,7 +715,7 @@ export class PlanOverlay {
   private pendingIncidence() {
     if (!this.pendingWayIdsByNode) {
       this.pendingWayIdsByNode = new Map();
-      for (const id of this.wayChanges.keys()) this.updatePendingWayIncidence(id);
+      for (const id of this.wayChanges.overrideKeys()) this.updatePendingWayIncidence(id);
     }
     return this.pendingWayIdsByNode;
   }
@@ -586,22 +729,26 @@ export class PlanOverlay {
     };
     this.geometry = geometry;
     const movedNodes: number[] = [];
-    for (const change of this.nodeChanges.values()) {
+    for (const change of this.nodeChanges.overrideValues()) {
       const node = change.entity;
       if (change.changeType !== "delete") {
         geometry.nodes.set(node.id, [node.lon, node.lat, node.lon, node.lat]);
       }
-      const base = this.base.nodes.getById(node.id);
+      const before = this.base.nodes.getById(node.id) ?? this.patch?.nodes.getById(node.id);
       if (
         change.changeType === "delete" ||
-        (base && (base.lon !== node.lon || base.lat !== node.lat))
+        (before && (before.lon !== node.lon || before.lat !== node.lat))
       ) {
         movedNodes.push(node.id);
       }
     }
-    for (const id of this.wayChanges.keys()) {
-      if (this.wayChanges.get(id)) this.trackWay(id);
+    // A dropped layer node is gone from where the patch index finds it.
+    for (const id of this.nodeChanges.overrideKeys()) {
+      if (!this.nodeChanges.get(id) && this.patch?.nodes.ids.has(id)) movedNodes.push(id);
     }
+    for (const id of this.wayChanges.overrideKeys()) this.trackWay(id);
+    // The patch's index boxes a way by its own nodes; one that also uses base nodes is boxed here.
+    for (const ids of this.layerWaysByForeignNode.values()) for (const id of ids) this.trackWay(id);
     for (const id of movedNodes) {
       for (const way of this.waysAtNode(id)) this.trackWay(way.id);
     }
@@ -628,7 +775,7 @@ export class PlanOverlay {
     const geometry = this.geometry;
     // The node grid holds nodes with a live record; the base index answers for the rest.
     if (geometry) {
-      const record = this.nodeChanges.get(id);
+      const record = this.nodeChanges.hasOverride(id) ? this.nodeChanges.get(id) : undefined;
       if (node && record && record.changeType !== "delete") {
         geometry.nodes.set(id, [node.lon, node.lat, node.lon, node.lat]);
       } else geometry.nodes.remove(id);
@@ -660,7 +807,7 @@ export class PlanOverlay {
       if (wayIds?.size === 0) index.delete(ref);
     }
     this.pendingWayRefs.delete(wayId);
-    const change = this.wayChanges.get(wayId);
+    const change = this.wayChanges.hasOverride(wayId) ? this.wayChanges.get(wayId) : undefined;
     if (!change || change.changeType === "delete") return;
     this.pendingWayRefs.set(wayId, change.entity.refs);
     for (const ref of change.entity.refs) {
@@ -677,7 +824,8 @@ export function snapshotState(snapshot: PlanOverlay, live: PlanOverlay): Earlier
     getNode: (id) => snapshot.getNode(id),
     getWay: (id) => snapshot.getWay(id),
     getRelation: (id) => snapshot.getRelation(id),
-    changedIds: (type) => new Set([...snapshot.changes(type).keys(), ...live.changes(type).keys()]),
+    changedIds: (type) =>
+      new Set([...snapshot.changes(type).overrideKeys(), ...live.changes(type).overrideKeys()]),
   };
 }
 

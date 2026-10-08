@@ -206,7 +206,7 @@ function runPhases(plan: MergePlan, state: PlanState, from: PlanPhase, restored 
 
   phase("direct", () => {
     log(`Planning direct changes from ${patch.id} to ${base.id}...`);
-    changeset.generateDirectChanges(patch);
+    changeset.generateDirectChanges(patch, { layer: true });
     builder.proposeDirectChanges(base, changeset);
   });
   phase("identity", () => {
