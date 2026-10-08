@@ -183,6 +183,7 @@ describe("plan components", () => {
         page,
         pageIndex: 0,
         pending: { count: 3, onApply: noop, onDiscard: noop },
+        error: "These choices cannot apply together, so the plan is unchanged.",
         preview: {
           accept: { changed: 3, waiting: 0 },
           reject: { changed: 1, waiting: 0 },
@@ -191,6 +192,9 @@ describe("plan components", () => {
         },
       }),
     );
+    // A failed apply keeps the choices and says why, next to them.
+    expect(html).toContain("The plan was not updated");
+    expect(html).toContain("These choices cannot apply together");
     expect(html).toContain("3 choices not applied yet");
     expect(html).toContain("Apply 3 choices");
     expect(html).toContain("Discard");

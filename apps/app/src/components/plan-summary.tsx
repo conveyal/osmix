@@ -36,7 +36,7 @@ export function PlanSummary({ overview }: { overview: MergePlanOverview }) {
               {diagnostics.integrity.length > 5 ? (
                 <p>And {(diagnostics.integrity.length - 5).toLocaleString()} more.</p>
               ) : null}
-              <p>Reject the proposals involved, or fix the inputs, then review again.</p>
+              <p>Leave out the proposals involved, or fix the inputs, then review again.</p>
             </Alert>
           ) : null}
           {overview.staleDecisions.length > 0 ? (

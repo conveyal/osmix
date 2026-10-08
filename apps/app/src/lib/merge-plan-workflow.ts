@@ -259,7 +259,9 @@ export const AUTOMATION_OPTIONS: readonly {
   {
     value: "conservative",
     label: "Conservative",
-    help: "Every matching change waits for your review.",
+    help:
+      "Every change waits for your review. Choosing it also turns off merging points at " +
+      "identical coordinates.",
   },
   {
     value: "recommended",

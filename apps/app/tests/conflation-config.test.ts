@@ -76,13 +76,13 @@ describe("matching settings accessibility", () => {
     expect(controlWithHelp(html, "conflation-keys-help")).not.toContain('aria-invalid="true"');
   });
 
-  it("keeps geometry removal off and explains its manual preview requirement", () => {
+  it("keeps geometry removal off and explains that each removal waits for review", () => {
     const html = renderConfig();
     const removal = controlWithHelp(html, "conflation-removal-help");
     expect(removal).toContain('aria-checked="false"');
     expect(html).toContain("Review redundant way removal");
-    expect(html).toContain("Manual review only.");
-    expect(html).toContain("No geometry is removed automatically.");
+    expect(html).toContain("Each removal waits for its own Include in the review");
+    expect(html).toContain("nothing is removed automatically.");
     const removalOnly = renderConfig({
       transferProperties: false,
       allowWayRemoval: true,

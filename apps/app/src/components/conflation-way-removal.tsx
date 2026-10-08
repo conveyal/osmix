@@ -1,6 +1,5 @@
 import { useOsmixRemote } from "@osmix/app-core";
 import {
-  ActionButton,
   Details,
   DetailsContent,
   DetailsSummary,
@@ -22,29 +21,19 @@ function ids(values: number[]) {
   return values.length ? values.join(", ") : "none";
 }
 
-/** Concrete consequences shared by candidate review and the generated/applied report. */
-function WayRemovalDetails({
-  preview,
-  applied = false,
-  onReviewConnection,
-}: {
-  preview: OsmConflationWayRemovalPreview;
-  applied?: boolean;
-  onReviewConnection?: (sourceNodeId: number) => Promise<void>;
-}) {
+/** What one applied removal did: its counterpart, the points it cleaned up and its connections. */
+function WayRemovalDetails({ preview }: { preview: OsmConflationWayRemovalPreview }) {
   return (
     <section
       className="flex min-w-0 flex-col gap-2 wrap-break-word"
       aria-label={`Removal details for imported way ${preview.sourceWayId}`}
     >
       <p className="font-semibold">
-        {applied ? "Removed" : "Remove"} imported way {preview.sourceWayId};{" "}
-        {applied ? "retained" : "retain"} base way {preview.retainedWayId}.
+        Removed imported way {preview.sourceWayId}; retained base way {preview.retainedWayId}.
       </p>
       <p>
-        {applied ? "Removed newly orphaned points" : "Newly orphaned points to remove"}:{" "}
-        {ids(preview.orphanNodeIds)}. Only untagged imported points with no remaining references are
-        included.
+        Removed newly orphaned points: {ids(preview.orphanNodeIds)}. Only untagged imported points
+        with no remaining references are included.
       </p>
       <p>Tagged imported points retained: {ids(preview.retainedTaggedNodeIds)}.</p>
       {preview.connections.length ? (
@@ -61,44 +50,19 @@ function WayRemovalDetails({
               <p className="text-muted-foreground">
                 {connection.explicitlyAccepted
                   ? connection.attachmentCandidateId
-                    ? applied
-                      ? "Explicit network connection applied."
-                      : "Explicit network connection selected."
+                    ? "Explicit network connection applied."
                     : "Already connected to this base point."
-                  : connection.attachmentCandidateId
-                    ? "Select this network connection before removing the way."
-                    : "No verified connection is available; keep the imported way."}
+                  : "No network connection was applied here."}
               </p>
-              {!applied && onReviewConnection && connection.attachmentCandidateId ? (
-                <ActionButton
-                  variant="outline"
-                  className="h-auto min-h-8 max-w-full text-left whitespace-normal"
-                  onAction={() => onReviewConnection(connection.sourceNodeId)}
-                >
-                  Review connection at imported point {connection.sourceNodeId}
-                </ActionButton>
-              ) : null}
             </li>
           ))}
         </ul>
       ) : (
-        <EmptyState className="p-0">No retained imported branches depend on this way</EmptyState>
+        <EmptyState className="p-0">No retained imported branches depended on this way</EmptyState>
       )}
-      {preview.blockedNodeIds.length ? (
-        <p className="text-destructive">
-          Removal checks not passed at imported points: {ids(preview.blockedNodeIds)}.
-        </p>
-      ) : null}
-      {preview.blockingRelationIds.length ? (
-        <p className="text-destructive">
-          Related OSM relations prevent removal: {ids(preview.blockingRelationIds)}. Keep the
-          imported way to preserve those memberships.
-        </p>
-      ) : null}
       <p className="text-muted-foreground">
-        {applied
-          ? "The imported way and its remaining attributes were removed. Copying selected tags was a separate action."
-          : "Removing this way also removes its remaining attributes. Choose Copy tags separately for selected values that should remain on the base."}
+        The imported way and its remaining attributes were removed. Copying selected tags was a
+        separate action.
       </p>
       <Details>
         <DetailsSummary>Original attributes on the imported way</DetailsSummary>
@@ -119,46 +83,34 @@ function WayRemovalDetails({
 }
 
 /**
- * Read the existing generated outcome; never create a second removal-preview state. A `Details`
+ * The applied way removals of a completed merge, read from its matching outcome. A `Details`
  * that reaches the edges of the flush section it sits in (the merge completion summary).
  */
-export function ConflationWayRemovalPreview({
+export function AppliedWayRemovals({
   baseOsmId,
   outcome,
-  applied = false,
 }: {
   baseOsmId: string;
   outcome: MergePlanMatchingOutcome;
-  applied?: boolean;
 }) {
   const remote = useOsmixRemote();
   const [page, setPage] = useState(0);
   const loaded = useWorkerPage(String(page), () =>
     remote.getMergeMatchingPage(baseOsmId, "way-removal", page, WAY_REMOVAL_PAGE_SIZE),
   );
-  return (
-    <WayRemovalSection
-      outcome={outcome}
-      applied={applied}
-      loaded={loaded}
-      page={page}
-      onPageChange={setPage}
-    />
-  );
+  return <WayRemovalSection outcome={outcome} loaded={loaded} page={page} onPageChange={setPage} />;
 }
 
 export const WAY_REMOVAL_PAGE_SIZE = 10;
 
-/** The way removal section for one loaded page (or its loading or failed state). */
+/** The applied way removals for one loaded page (or its loading or failed state). */
 export function WayRemovalSection({
   outcome,
-  applied,
   loaded,
   page,
   onPageChange,
 }: {
   outcome: MergePlanMatchingOutcome;
-  applied: boolean;
   loaded: WorkerPageState<MergeMatchingPage> | null;
   page: number;
   onPageChange: (page: number) => void;
@@ -167,38 +119,27 @@ export function WayRemovalSection({
     feature.wayRemoval ? [feature.wayRemoval] : [],
   );
   return (
-    <section aria-label={applied ? "Applied way removals" : "Way removal preview"}>
+    <section aria-label="Applied way removals">
       <Details>
-        <DetailsSummary>{applied ? "Applied way removals" : "Way removal preview"}</DetailsSummary>
+        <DetailsSummary>Applied way removals</DetailsSummary>
         <DetailsContent className="flex min-w-0 flex-col gap-2 p-inset">
           <p>
-            {applied ? "Removed imported ways" : "Imported ways to remove"}:{" "}
-            {outcome.wayRemovalFeatures.toLocaleString()}.{" "}
-            {applied ? "Removed orphan points" : "Orphan points to remove"}:{" "}
-            {outcome.summary.removedOrphanNodes ?? 0}.
+            Removed imported ways: {outcome.wayRemovalFeatures.toLocaleString()}. Removed orphan
+            points: {outcome.summary.removedOrphanNodes ?? 0}.
           </p>
-          <p>
-            {applied
-              ? "These removals were accepted in the plan and applied with it."
-              : "These removals are planned. The dataset changes only when you apply the plan."}
-          </p>
+          <p>These removals were included in the plan and applied with it.</p>
           {loaded === null ? <LoadingState /> : null}
           {loaded?.error !== undefined ? (
             <Alert variant="destructive">These details could not be loaded. {loaded.error}</Alert>
           ) : null}
           {removals.length ? (
-            <ul className="flex min-w-0 flex-col divide-y" aria-label="Imported way removal plans">
+            <ul className="flex min-w-0 flex-col divide-y" aria-label="Imported way removals">
               {removals.map((preview) => (
                 <li key={preview.sourceWayId} className="min-w-0 py-2">
-                  <WayRemovalDetails preview={preview} applied={applied} />
+                  <WayRemovalDetails preview={preview} />
                 </li>
               ))}
             </ul>
-          ) : null}
-          {outcome.wayRemovalFeatures === 0 ? (
-            <EmptyState className="p-0">
-              No imported way was selected for this removal action
-            </EmptyState>
           ) : null}
           <Pager
             label="Way removal pages"

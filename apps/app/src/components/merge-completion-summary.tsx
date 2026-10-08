@@ -28,7 +28,7 @@ import {
 } from "../lib/merge-plan-workflow";
 import { useWorkerPage } from "../lib/use-worker-page";
 import type { MergeCompletion } from "../state/merge-outcome";
-import { ConflationWayRemovalPreview } from "./conflation-way-removal";
+import { AppliedWayRemovals } from "./conflation-way-removal";
 
 const PAGE_SIZE = 10;
 const UNRESOLVED_LABELS = {
@@ -391,16 +391,16 @@ export function MergeCompletionSummary({
         </p>
       )}
       <p className="p-inset">
-        Skipping or leaving a match unresolved does not itself discard the import. Explicit way
-        removals are listed separately. Other additions remain under ordinary merge rules; exact
-        reconciliation can represent an imported feature with a base ID.
+        Leaving a proposal out does not discard its imported feature: the feature is added under the
+        ordinary merge rules. Applied way removals are listed separately. Exact reconciliation can
+        represent an imported feature with a base ID.
       </p>
       {outcome ? (
         <>
           <FeatureOutcomes baseOsmId={baseOsmId} outcome={outcome} />
           <UncopiedTags baseOsmId={baseOsmId} outcome={outcome} />
           {outcome.wayRemovalFeatures > 0 ? (
-            <ConflationWayRemovalPreview baseOsmId={baseOsmId} outcome={outcome} applied />
+            <AppliedWayRemovals baseOsmId={baseOsmId} outcome={outcome} />
           ) : null}
         </>
       ) : null}

@@ -19,7 +19,7 @@ describe("conflation workflow configuration", () => {
       maxDistanceMeters: Number.NaN,
     };
     expect(conflationFormErrors(invalid)).toEqual({
-      maxDistanceMeters: "Match distance must be greater than zero.",
+      maxDistanceMeters: "Search radius must be greater than zero.",
       propertyKeys: "Enter at least one OSM tag key to copy.",
     });
     expect(firstInvalidConflationInputId(invalid)).toBe("conflation-property-keys");
@@ -177,6 +177,6 @@ describe("conflation workflow configuration", () => {
         enabled: true,
         maxDistanceMeters: 0,
       }),
-    ).toBe("Match distance must be greater than zero.");
+    ).toBe("Search radius must be greater than zero.");
   });
 });

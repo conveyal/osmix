@@ -64,7 +64,7 @@ export function conflationFormErrors(state: ConflationFormState): ConflationForm
   const errors: ConflationFormErrors = {};
   if (!state.enabled) return errors;
   if (!Number.isFinite(state.maxDistanceMeters) || state.maxDistanceMeters <= 0) {
-    errors.maxDistanceMeters = "Match distance must be greater than zero.";
+    errors.maxDistanceMeters = "Search radius must be greater than zero.";
   }
   if (
     state.allowWayReplacement &&

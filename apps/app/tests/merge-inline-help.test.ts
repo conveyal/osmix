@@ -43,7 +43,8 @@ describe("merge inline guidance", () => {
     expect(html).toContain('aria-label="About transferable OSM tags"');
     expect(html).toContain('aria-label="About network attachment"');
     expect(html).toContain('aria-label="About candidate search radius"');
-    expect(html).toContain('aria-label="About automatic matching decisions"');
+    // Automation lives in the Plan section; matching settings have no automation control.
+    expect(html).not.toContain("Automatic decisions");
     expect(html).not.toContain("Distance alone never guarantees acceptance");
     expect(html).not.toContain("routing-affecting tags require review");
     expect(html).toContain("Imported geometry stays intact");

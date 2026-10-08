@@ -62,6 +62,11 @@ test("matching settings expose names, help, and field-specific errors", async ({
   });
   await expect(identical).toBeChecked();
   await expect(identical).toHaveAccessibleDescription(/waits for your decision/);
+  // Conservative decides nothing for you, so it turns identical-point merging off.
+  await page.getByRole("radio", { name: /^Conservative/ }).check();
+  await expect(identical).not.toBeChecked();
+  await page.getByRole("radio", { name: /^Recommended/ }).check();
+  await expect(identical).toBeChecked();
 });
 
 test("choices on a feature replan it, and removal waits for its connections", async ({ page }) => {

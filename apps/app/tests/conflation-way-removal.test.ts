@@ -32,7 +32,6 @@ describe("imported-way removal in a plan", () => {
     const html = renderToStaticMarkup(
       createElement(WayRemovalSection, {
         outcome,
-        applied: true,
         loaded: { page },
         page: 0,
         onPageChange: () => {},

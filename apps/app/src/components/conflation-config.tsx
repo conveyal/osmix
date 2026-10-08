@@ -57,7 +57,7 @@ export function ConflationConfig() {
               Copy tags
             </CheckboxLabel>
             <InfoTooltip label="About property transfer" side="right" align="start">
-              Copy only the selected OSM tags from an accepted imported match onto its base entity.
+              Copy only the selected OSM tags from an included imported match onto its base entity.
               Imported geometry stays intact, including matched ways and their connecting nodes.
               Missing imported values leave base tags unchanged. Direct merge and exact
               reconciliation apply their own rules separately.
@@ -76,7 +76,7 @@ export function ConflationConfig() {
                 Separate keys with commas or spaces. The defaults focus on crossing and kerb
                 accessibility data. Imported values replace base values only for these keys;
                 structural tags such as layer, bridge, tunnel, and area are protected, while
-                routing-affecting tags require review.
+                routing-affecting tags wait for review unless the automation level is Aggressive.
               </InfoTooltip>
             </div>
             <Input
@@ -119,7 +119,7 @@ export function ConflationConfig() {
               Connect network
             </CheckboxLabel>
             <InfoTooltip label="About network attachment" side="right" align="start">
-              Connect accepted imported ways by rewriting only patch-created way references to
+              Connect included imported ways by rewriting only patch-created way references to
               preserved base nodes. Base coordinates, base way references, and relation membership
               remain authoritative.
             </InfoTooltip>
@@ -172,9 +172,8 @@ export function ConflationConfig() {
             Review redundant way removal
           </CheckboxLabel>
           <p id="conflation-removal-help" className="text-muted-foreground">
-            Manual review only. Choose each imported way to remove and inspect its retained base
-            counterpart, connections, and orphan-point cleanup before applying. No geometry is
-            removed automatically.
+            Propose removing an imported way that duplicates a base way. Each removal waits for its
+            own Include in the review, at every automation level; nothing is removed automatically.
           </p>
           <CheckboxLabel className="min-h-8">
             <Checkbox
@@ -267,16 +266,6 @@ export function ConflationConfig() {
                 {errors.maxDistanceMeters}
               </p>
             ) : null}
-          </div>
-
-          <div className="flex items-center gap-1 text-muted-foreground">
-            Automatic decisions
-            <InfoTooltip label="About automatic matching decisions" side="right" align="start">
-              High-confidence actions are scheduled for the next preview. The dataset changes when
-              you apply that preview. Ambiguous, routing-affecting, and structurally uncertain
-              candidates remain available for review. Removing an imported way always requires its
-              own explicit choice.
-            </InfoTooltip>
           </div>
         </div>
       ) : null}

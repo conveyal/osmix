@@ -55,6 +55,7 @@ const BULK_LOADING_LABEL = {
  */
 export function PlanReview({
   detail,
+  error = null,
   filter,
   onBulk,
   onDecide,
@@ -67,6 +68,8 @@ export function PlanReview({
   preview,
 }: {
   detail: MergePlanFeatureDetail | null;
+  /** Why the last change to the plan failed; the plan is unchanged. */
+  error?: string | null;
   filter: MergePlanFilter;
   onBulk: (request: MergePlanBulkRequest) => unknown;
   onDecide: (
@@ -187,6 +190,11 @@ export function PlanReview({
             : null}
           Blocked proposals never change.
         </p>
+        {error ? (
+          <Alert variant="destructive" title="The plan was not updated">
+            <p>{error}</p>
+          </Alert>
+        ) : null}
         {pending ? (
           <Alert role="status" className="flex flex-col gap-2">
             <p>

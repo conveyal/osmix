@@ -70,7 +70,11 @@ export function PlanInputs({
               name="merge-automation"
               aria-describedby={`automation-${option.value}-help`}
               checked={automation === option.value}
-              onChange={() => setAutomation(option.value)}
+              onChange={() => {
+                setAutomation(option.value);
+                // Conservative decides nothing for you, identical points included.
+                setMergeIdenticalPoints(option.value !== "conservative");
+              }}
             />
             <span className="flex flex-col">
               <span className="font-medium">{option.label}</span>

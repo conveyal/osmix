@@ -128,6 +128,8 @@ export default function MergeBlock() {
   const taskLocked = useTaskLock();
   const [positiveIds, setPositiveIds] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  /** Why the last change to the plan in review failed; the plan is unchanged. */
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const baseFileName = base.file?.name ?? base.fileInfo?.fileName;
   const patchFileName = patch.file?.name ?? patch.fileInfo?.fileName;
@@ -137,6 +139,7 @@ export default function MergeBlock() {
   );
 
   const goTo = (next: typeof step) => {
+    setReviewError(null);
     selectEntity(null, null);
     setSelected(null);
     setStep(next);
@@ -144,6 +147,7 @@ export default function MergeBlock() {
 
   const resetDerivedState = () => {
     setDownloadError(null);
+    setReviewError(null);
     setPendingRefresh(null);
     updateOutcome({ type: "reset" });
     resetPlan();
@@ -238,6 +242,13 @@ export default function MergeBlock() {
     });
   };
 
+  /** Change the plan in review as a task; a failure is shown in the review, not only in Activity. */
+  const reviewTask = async (title: string, fn: (task: TaskHandle) => Promise<string>) => {
+    setReviewError(null);
+    const error = await runTask(title, fn);
+    if (error !== null) setReviewError(reviewErrorText(error));
+  };
+
   /** Replan with `decisions`, show the result and save it; returns the new plan. */
   const replanWith = async (baseOsmId: string, decisions: readonly PlanDecision[]) => {
     const next = await remote.setMergePlanDecisions(baseOsmId, [...decisions]);
@@ -267,7 +278,7 @@ export default function MergeBlock() {
     if (!base.osm || !savedOffer) return;
     const baseOsmId = base.osm.id;
     const { decisions } = savedOffer;
-    await runTask("Restore choices", async () => {
+    await reviewTask("Restore choices", async () => {
       const next = await replanWith(baseOsmId, decisions);
       return `Restored ${choicesText(decisions.length)}${staleText(next)}`;
     });
@@ -303,7 +314,7 @@ export default function MergeBlock() {
     if (!selected) return;
     const baseOsmId = base.osm.id;
     const current = overview;
-    await runTask("Import choices", async () => {
+    await reviewTask("Import choices", async () => {
       const file = parseMergeDecisionsFile(await selected.text());
       const next = await replanWith(baseOsmId, file.decisions);
       const elsewhere = sameInputs(file, current)
@@ -320,7 +331,7 @@ export default function MergeBlock() {
     const baseOsmId = base.osm.id;
     const patchOsmId = patch.osm.id;
     setPatchIds(mode);
-    await runTask("Plan merge", async () => {
+    await reviewTask("Plan merge", async () => {
       const planned = await remote.planMerge(baseOsmId, patchOsmId, options);
       await remote.setMergePlanFilter(baseOsmId, filter);
       setDraft(null);
@@ -356,7 +367,7 @@ export default function MergeBlock() {
     if (!base.osm || !draft) return;
     const baseOsmId = base.osm.id;
     const count = draftCount;
-    await runTask("Update plan", async () => {
+    await reviewTask("Update plan", async () => {
       await replanWith(baseOsmId, draft.decisions);
       setDraft(null);
       return `Applied ${choicesText(count)}`;
@@ -366,7 +377,7 @@ export default function MergeBlock() {
   const applyBulk = async (request: MergePlanBulkRequest) => {
     if (!base.osm) return;
     const baseOsmId = base.osm.id;
-    await runTask("Choose for shown features", async () => {
+    await reviewTask("Choose for shown features", async () => {
       const result = await remote.applyMergePlanBulk(baseOsmId, request);
       await showPlan(baseOsmId, result.overview, pageIndex);
       await saveChoices(result.overview);
@@ -484,6 +495,19 @@ export default function MergeBlock() {
         goTo("inputs");
         return;
       }
+      const issues = planned.diagnostics.integrity.length;
+      if (issues > 0) {
+        // Applying would be refused; open the plan so its issues and proposals can be reviewed.
+        await showPlan(baseOsmId, planned, 0);
+        goTo("review");
+        task.message(
+          `The plan has ${issues.toLocaleString()} integrity ${issues === 1 ? "issue" : "issues"}, ` +
+            "so nothing was applied. Review the plan to resolve them.",
+          "warn",
+        );
+        task.end("Plan needs review");
+        return;
+      }
       await applyAndRefresh(task, baseOsmId, () => {
         applied = true;
       });
@@ -512,6 +536,11 @@ export default function MergeBlock() {
           `Merge failed: ${error instanceof Error ? error.message : "Unknown error"}`,
         );
       }
+      // Nothing was applied; drop the plan rather than leave it behind the input step.
+      resetPlan();
+      remote.clearMergePlan(baseOsmId).catch((clearError: unknown) => {
+        console.error(`Failed to clear the merge plan for ${baseOsmId}`, clearError);
+      });
       goTo("inputs");
     }
   };
@@ -758,9 +787,17 @@ export default function MergeBlock() {
             onDecide={decide}
             pending={
               draftCount > 0
-                ? { count: draftCount, onApply: applyDraft, onDiscard: () => setDraft(null) }
+                ? {
+                    count: draftCount,
+                    onApply: applyDraft,
+                    onDiscard: () => {
+                      setReviewError(null);
+                      setDraft(null);
+                    },
+                  }
                 : null
             }
+            error={reviewError}
             onFilterChange={changeFilter}
             onPageChange={async (next) => {
               if (base.osm) await loadPage(base.osm.id, next);
@@ -824,7 +861,6 @@ export default function MergeBlock() {
   );
 }
 
-/** Run one step of the workflow as a task. A failure is recorded by the task and stays here. */
 const choicesText = (count: number) =>
   `${count.toLocaleString()} ${count === 1 ? "choice" : "choices"}`;
 
@@ -834,10 +870,25 @@ const staleText = (plan: MergePlanOverview) =>
     ? `; ${plan.staleDecisions.length.toLocaleString()} no longer apply to this plan`
     : "";
 
-async function runTask(title: string, fn: (task: TaskHandle) => Promise<string>) {
+/**
+ * Run one step of the workflow as a task. A failure is recorded by the task and returned, so the
+ * page can show it too; `null` when the task succeeded.
+ */
+async function runTask(title: string, fn: (task: TaskHandle) => Promise<string>): Promise<unknown> {
   try {
     await Tasks.run(title, fn, { summary: (summary) => summary });
+    return null;
   } catch (error) {
     if (error instanceof TaskAlreadyRunningError) throw error;
+    return error;
   }
+}
+
+/** A failed change to the plan in review, in words. The name survives the worker boundary. */
+function reviewErrorText(error: unknown) {
+  if (!(error instanceof Error)) return "The plan could not be updated.";
+  if (error.name === "MergePlanDecisionConflictError") {
+    return `These choices cannot apply together, so the plan is unchanged. ${error.message}`;
+  }
+  return `The plan could not be updated. ${error.message}`;
 }
