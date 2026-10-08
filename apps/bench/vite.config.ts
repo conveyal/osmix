@@ -38,7 +38,6 @@ export default defineConfig({
           browser: "chromium",
         },
       ],
-      headless: true,
     },
   },
 });
