@@ -27,6 +27,7 @@ import { pickNearestDecisions, type PlanChoices, planChoices } from "./choices.t
 import { findDecisionConflict } from "./decision-conflict.ts";
 import { planMatching } from "./matching.ts";
 import { type PatchIdRemap, planPatchIdRemap, remappedCount, remapPatch } from "./remap.ts";
+import { type PlanTagChanges, tagChangesOf } from "./tag-changes.ts";
 import type {
   MergePlan,
   MergePlanOptions,
@@ -367,6 +368,7 @@ function planCrossings(
         { type: "way", id: crossing.otherWayId },
       ],
       point: crossing.point,
+      ...(crossing.merges ? { merges: { ...crossing.merges } } : {}),
       // A snap that changes the base point's grade always waits for a person (MP-X1).
       status: crossing.reviewReasons?.length ? "review" : "automatic",
       reasons: crossing.reviewReasons ?? [],
@@ -434,6 +436,23 @@ export function applyPlan(plan: MergePlan, newOsmId?: string): MergePlanResult {
   changeset.releaseSearchCaches();
   const osm = applyChangesetToOsm(changeset, newOsmId);
   return { osm, summary: plan.summary, stats: changeset.stats };
+}
+
+/**
+ * What a proposal does to tags: the surviving entity's tags before and after, by the rule the
+ * planner applies, whether or not the proposal is included yet. Null when it changes no
+ * existing tags (an added feature, a connection).
+ */
+export function proposalTagChanges(plan: MergePlan, proposalId: string): PlanTagChanges | null {
+  const proposal = plan.proposals.get(proposalId);
+  if (!proposal) throw Error(`Unknown plan proposal ${proposalId}`);
+  const state = planState(plan);
+  const candidates = state.matched?.discovery.candidates ?? [];
+  return tagChangesOf(proposal, {
+    base: state.base,
+    patch: state.patch,
+    candidate: (id) => candidates.find((candidate) => candidate.id === id),
+  });
 }
 
 /** The matching candidate behind a matching proposal: its evidence and every assessment. */

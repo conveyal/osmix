@@ -1,6 +1,6 @@
 import { Radio, RadioLabel, StatusDot, type StatusDotStatus, useTaskLock } from "@osmix/ui";
 import { useAtomValue } from "jotai";
-import type { PlanConnectionRivalry, PlanDecision, PlanProposal } from "osmix";
+import type { PlanConnectionRivalry, PlanDecision, PlanProposal, PlanTagChanges } from "osmix";
 import { useId } from "react";
 
 import {
@@ -11,6 +11,7 @@ import {
   proposalStatusText,
 } from "../lib/merge-plan-workflow";
 import { planOverviewAtom, planPendingChoicesAtom } from "../state/merge-plan";
+import { tagChangesSummary } from "./plan-tag-changes";
 
 const EFFECT_DOT: Record<PlanProposal["effect"], StatusDotStatus> = {
   applied: "ok",
@@ -94,6 +95,7 @@ export function proposalTitle(proposal: PlanProposal) {
 export function PlanProposalActions({
   onDecide,
   proposal,
+  tagChanges,
 }: {
   onDecide: (
     proposalId: string,
@@ -102,6 +104,8 @@ export function PlanProposalActions({
     together?: readonly string[],
   ) => unknown;
   proposal: PlanProposal;
+  /** What the proposal does to tags, when it changes any. */
+  tagChanges?: PlanTagChanges | undefined;
 }) {
   const taskLocked = useTaskLock();
   const automation = useAtomValue(planOverviewAtom)?.options.automation ?? "recommended";
@@ -155,6 +159,11 @@ export function PlanProposalActions({
         {proposal.automated ? ` · Decided by ${AUTOMATION_LABEL[automation]}` : null}
         {pending ? " · Choice not applied yet" : null}
       </p>
+      {tagChanges ? (
+        <p className="text-muted-foreground">
+          {tagChangesSummary(tagChanges, proposal.effect === "applied")}
+        </p>
+      ) : null}
       {proposal.reasons.length > 0 ? (
         <ul className="list-disc pl-4 text-muted-foreground">
           {proposal.reasons.map((reason) => (

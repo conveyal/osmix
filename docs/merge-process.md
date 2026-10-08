@@ -486,6 +486,8 @@ When a patch's positive IDs name base entities, the review says how many and off
 
 ### Review controls and removal prerequisites
 
+Each proposal that changes existing tags says what it does to them, by the same rule the planner applies (`proposalTagChanges`): an identical-point merge or crossing snap takes the imported values (MP-X1), a copy writes the selected values that differ, a replacement's kept way gains the tags its base ways agree on (MP-R2), and a same-ID edit replaces them. It says so before the proposal is included.
+
 **Show on map and evidence** opens a feature: the map fits it and highlights it, and the row shows its matching evidence (selectable coordinates, measured differences, base and imported values, and explanations for protected or routing-affecting keys). Clicking a feature on the map opens its row. Filters, choices and evidence are keyboard accessible; a short distance does not override a blocked proposal.
 
 With **Review redundant way removal** enabled, a removal proposal stays blocked until the connections it needs are included; include them, then include the removal. Select **Copy tags** separately for source values that should remain on the base. **Back to inputs** discards the plan; nothing was changed.

@@ -40,7 +40,10 @@ tokens, spacing, primitives, map overlay primitives) lives in
   its base target, since one way's points can share a target), and a radio group per decidable proposal: **Include
   (automatic)** / **Leave out** for automatic proposals, **Decide later** /
   **Include** / **Leave out** for proposals that need review. Blocked
-  proposals show reasons and no choice. Filters (outcome, proposal kind) and
+  proposals show reasons and no choice. A proposal that changes existing tags
+  says how many ("Changes 2 tags" once in the plan, "Would change 2 tags"
+  otherwise); an opened feature lists each changed key, base value then result,
+  stacked, and counts the tags left unchanged. Filters (outcome, proposal kind) and
   bulk choices apply to the features shown. Each bulk button names how many
   features it would change ("Include 12,400 features") and results are counted
   in features; bulk Include skips removals and choices between competing

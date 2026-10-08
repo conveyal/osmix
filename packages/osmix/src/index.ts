@@ -121,6 +121,8 @@ export type {
   PatchIdMode,
   PlanChoiceGroup,
   PlanConnectionRivalry,
+  PlanTagChange,
+  PlanTagChanges,
   PlanDecision,
   PlanFeature,
   PlanInputIdentity,

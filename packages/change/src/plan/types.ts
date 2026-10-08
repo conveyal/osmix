@@ -199,6 +199,8 @@ export interface CrossingProposal extends PlanProposalBase {
   /** The imported way, then the way it crosses. Planned IDs. */
   ways: [EntityKey, EntityKey];
   point: [number, number];
+  /** For a snap that makes two vertices one: `replaced` becomes `survivor`. Planned IDs. */
+  merges?: { replaced: number; survivor: number };
 }
 
 /** A matching action: connect, copy tags or remove a way. */

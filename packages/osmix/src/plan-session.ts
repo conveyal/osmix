@@ -20,6 +20,8 @@ import {
   type PlanOutcome,
   type PlanProposal,
   type PlanProposalStatus,
+  type PlanTagChanges,
+  proposalTagChanges,
 } from "@osmix/change";
 import type { Osm } from "@osmix/core";
 import type { LonLat, OsmTags } from "@osmix/types";
@@ -76,6 +78,11 @@ export interface MergePlanFeatureView extends PlanFeature {
   name?: string;
   tags?: OsmTags;
   proposals: PlanProposal[];
+  /**
+   * What each proposal that changes existing tags does to them, by proposal ID, whether or not
+   * it is included yet. Proposals that change none (added features, connections) are absent.
+   */
+  tagChanges: Record<string, PlanTagChanges>;
 }
 
 export interface MergePlanPage {
@@ -262,11 +269,20 @@ function patchEntity(patch: Osm, feature: PlanFeature) {
 function featureView(plan: MergePlan, patch: Osm, feature: PlanFeature): MergePlanFeatureView {
   const tags = patchEntity(patch, feature)?.tags;
   const name = tags?.["name"];
+  const proposals = proposalsOf(plan, feature);
+  const tagChanges: Record<string, PlanTagChanges> = {};
+  for (const proposal of proposals) {
+    const changes = proposalTagChanges(plan, proposal.id);
+    if (changes && (changes.changes.length > 0 || changes.entity === null)) {
+      tagChanges[proposal.id] = changes;
+    }
+  }
   return structuredClone({
     ...feature,
     ...(tags ? { tags } : {}),
     ...(name != null ? { name: String(name) } : {}),
-    proposals: proposalsOf(plan, feature),
+    proposals,
+    tagChanges,
   });
 }
 

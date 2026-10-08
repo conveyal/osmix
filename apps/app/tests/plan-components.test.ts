@@ -63,6 +63,7 @@ function feature(outcome: PlanOutcome, proposals: PlanProposal[]): MergePlanFeat
     bbox: [0, 0, 0.001, 0],
     name: "Harbour Walk",
     proposals,
+    tagChanges: {},
   };
 }
 
@@ -307,6 +308,62 @@ describe("plan components", () => {
     expect(
       renderToStaticMarkup(createElement(Provider, { store }, createElement(PlanLegend))),
     ).not.toContain("the selected feature matches");
+  });
+
+  it("counts a proposal's tag changes on its row, in the tense of its effect", () => {
+    const tagChanges = {
+      entity: { type: "node" as const, id: 2 },
+      changes: [
+        { key: "kerb", before: "lowered", after: "raised" },
+        { key: "tactile_paving", after: "yes" },
+      ],
+      unchanged: 1,
+    };
+    const waiting = render(
+      createElement(PlanProposalActions, { proposal: connect(), onDecide: noop, tagChanges }),
+    );
+    expect(waiting).toContain("Would change 2 tags");
+    const applied = render(
+      createElement(PlanProposalActions, {
+        proposal: connect({ status: "automatic", effect: "applied" }),
+        onDecide: noop,
+        tagChanges,
+      }),
+    );
+    expect(applied).toContain("Changes 2 tags");
+    const crossing = render(
+      createElement(PlanProposalActions, {
+        proposal: connect(),
+        onDecide: noop,
+        tagChanges: { entity: null, changes: [{ key: "crossing", after: "yes" }], unchanged: 0 },
+      }),
+    );
+    expect(crossing).toContain("Would add a point tagged crossing=yes");
+  });
+
+  it("lists an opened feature's tag changes, base value to result", () => {
+    const proposal = connect({ id: "copy:n-2>n2", kind: "copy-tags" } as Partial<PlanProposal>);
+    const view = {
+      ...feature("needs-decision", [proposal]),
+      tagChanges: {
+        "copy:n-2>n2": {
+          entity: { type: "node" as const, id: 2 },
+          changes: [{ key: "kerb", before: "lowered", after: "raised" }],
+          unchanged: 3,
+        },
+      },
+    };
+    const html = render(
+      createElement(PlanFeatureRow, {
+        detail: { ...view, candidates: {}, coordinates: [], targets: {}, replaces: {} },
+        feature: view,
+        onDecide: noop,
+        onSelect: noop,
+      }),
+    );
+    expect(html).toContain("Tag changes: Copy tags from imported point -2 to base node 2");
+    expect(html).toMatch(/kerb.*changed.*Base value.*lowered.*Result.*raised/s);
+    expect(html).toContain("3 tags unchanged");
   });
 
   it("marks a row's choice that is not applied yet", () => {
