@@ -35,6 +35,7 @@ import type {
   MergePlan,
   MergePlanAutomation,
   MergePlanOptions,
+  PlanConnectionRivalry,
   PlanProposal,
 } from "./types.ts";
 import { demoteDrivableConnections } from "./validate.ts";
@@ -147,7 +148,7 @@ export function planMatching(
   // Automation settles choices before removal is assessed, since removal depends on which
   // connections apply. It needs the alternatives and competitors linked first.
   if (automation !== "conservative" && options.automatic !== "none") {
-    linkAlternatives(byCandidate);
+    linkAlternatives(byCandidate, (wayId) => builder.originalId("way", wayId));
     automateMatching(automation, builder.proposals, candidates);
   }
   // Removal eligibility depends on which connections are accepted, so assess it last.
@@ -159,7 +160,7 @@ export function planMatching(
       entry.remove = propose(entry.candidate, "remove-way", removal);
     }
   }
-  linkAlternatives(byCandidate);
+  linkAlternatives(byCandidate, (wayId) => builder.originalId("way", wayId));
   linkReplacementExclusions(replacements, builder.proposals, wayRefs);
   leaveOutExcluded(replacing, builder.proposals);
   const conflict = findDecisionConflict(builder.proposals, builder.decisionList());
@@ -223,7 +224,10 @@ function matchingDecisions(
 const tracesBase = (proposal: PlanProposal) =>
   proposal.status === "blocked" && proposal.reasons.includes("traces-base-way");
 
-function linkAlternatives(entries: readonly CandidateProposals[]) {
+function linkAlternatives(
+  entries: readonly CandidateProposals[],
+  originalWayId: (wayId: number) => number,
+) {
   for (const kind of ["connect", "copy", "remove"] as const) {
     const bySource = new Map<string, PlanProposal[]>();
     for (const entry of entries) {
@@ -240,7 +244,7 @@ function linkAlternatives(entries: readonly CandidateProposals[]) {
       }
     }
   }
-  linkCompetitors(entries);
+  linkCompetitors(entries, originalWayId);
 }
 
 /** A copy assessment blocked only because no selected tag differs. */
@@ -255,16 +259,25 @@ function nothingToCopy({ status, reasons }: OsmConflationActionAssessment) {
  * imported way's copy or removal. Several copies onto one base node can apply together, so
  * they do not compete.
  */
-function linkCompetitors(entries: readonly CandidateProposals[]) {
+function linkCompetitors(
+  entries: readonly CandidateProposals[],
+  /** A planned way ID as the patch has it, for naming a shared way. */
+  originalWayId: (wayId: number) => number,
+) {
   const connectByCandidate = new Map(
     entries.flatMap(({ candidate, connect }) => (connect ? [[candidate.id, connect]] : [])),
   );
   for (const { candidate, connect } of entries) {
     if (!connect || !("competitors" in connect) || tracesBase(connect)) continue;
-    connect.competitors = (candidate.connectionRivals ?? []).flatMap((id) => {
-      const rival = connectByCandidate.get(id);
-      return rival && !tracesBase(rival) ? [rival.id] : [];
-    });
+    const rivalries: Record<string, PlanConnectionRivalry> = {};
+    for (const { candidateId, sharedWayId } of candidate.connectionRivals ?? []) {
+      const rival = connectByCandidate.get(candidateId);
+      if (!rival || tracesBase(rival)) continue;
+      rivalries[rival.id] =
+        sharedWayId === undefined ? { grades: true } : { sharedWay: originalWayId(sharedWayId) };
+    }
+    connect.competitors = Object.keys(rivalries);
+    if (connect.competitors.length > 0 && connect.kind === "connect") connect.rivalries = rivalries;
   }
   const byTarget = new Map<string, MatchingProposal[]>();
   const add = (proposal: PlanProposal | undefined) => {

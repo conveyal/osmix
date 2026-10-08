@@ -120,6 +120,7 @@ export type {
   MergePlanSummary,
   PatchIdMode,
   PlanChoiceGroup,
+  PlanConnectionRivalry,
   PlanDecision,
   PlanFeature,
   PlanInputIdentity,

@@ -1,6 +1,6 @@
 import { Radio, RadioLabel, StatusDot, type StatusDotStatus, useTaskLock } from "@osmix/ui";
 import { useAtomValue } from "jotai";
-import type { PlanDecision, PlanProposal } from "osmix";
+import type { PlanConnectionRivalry, PlanDecision, PlanProposal } from "osmix";
 import { useId } from "react";
 
 import {
@@ -37,6 +37,27 @@ function importedSource({
 }) {
   const token = id.slice(id.indexOf(":") + 2, id.indexOf(">"));
   return `imported ${ENTITY_WORD[source.type]} ${token}`;
+}
+
+const TOKEN_TYPE = { n: "node", w: "way", r: "relation" } as const;
+
+/** The imported source a matching proposal ID names: `connect:n18731>n1` → "imported point 18731". */
+function importedSourceOfId(id: string) {
+  const token = id.slice(id.indexOf(":") + 1, id.indexOf(">"));
+  const type = TOKEN_TYPE[token.charAt(0) as keyof typeof TOKEN_TYPE] ?? "node";
+  return importedSource({ id, source: { type } });
+}
+
+/**
+ * Why a connection competes with a rival for its base node (MP-M5), in words: the two points
+ * share an imported way, or together they would join different grades there.
+ */
+function rivalryText(rivalId: string, rivalry: PlanConnectionRivalry, baseNodeId: number) {
+  const rival = importedSourceOfId(rivalId);
+  const named = rival.charAt(0).toUpperCase() + rival.slice(1);
+  return "sharedWay" in rivalry
+    ? `${named} is also on imported way ${rivalry.sharedWay}; connecting both would fold that way onto one point.`
+    : `${named} would join different grades with this point at base node ${baseNodeId}.`;
 }
 
 /**
@@ -153,7 +174,16 @@ export function PlanProposalActions({
           possible; include at most one.
         </p>
       ) : null}
-      {competitors > 0 && "target" in proposal ? (
+      {proposal.kind === "connect" && proposal.rivalries ? (
+        <div className="text-muted-foreground">
+          <ul className="list-disc pl-4">
+            {Object.entries(proposal.rivalries).map(([rivalId, rivalry]) => (
+              <li key={rivalId}>{rivalryText(rivalId, rivalry, proposal.target.id)}</li>
+            ))}
+          </ul>
+          <p>Include at most one; including this one leaves the others out.</p>
+        </div>
+      ) : competitors > 0 && "target" in proposal ? (
         <p className="text-muted-foreground">
           {competitors.toLocaleString()} other imported{" "}
           {proposal.kind === "connect"

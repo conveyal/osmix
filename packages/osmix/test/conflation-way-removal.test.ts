@@ -432,6 +432,7 @@ describe("explicit way removal through the facade and worker", () => {
     const worker = workerFor(base, patch, contenderOptions);
     expect(proposal(worker, base.id, "connect:n101>n1")).toMatchObject({
       competitors: ["connect:n201>n1"],
+      rivalries: { "connect:n201>n1": { sharedWay: 20 } },
     });
     expect(proposal(worker, base.id, "connect:n201>n1")).toMatchObject({
       competitors: ["connect:n101>n1"],

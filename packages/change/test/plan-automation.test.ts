@@ -263,6 +263,8 @@ describe("choices that still wait (MP-M7)", () => {
     expect(findProposal(planned, "connect:n201>n1").reasons).toContain("bearing-mismatch");
     expect(findProposal(planned, "connect:n201>n1")).toMatchObject({
       competitors: ["connect:n204>n1"],
+      // Both points are on imported way 30: connecting both would fold it onto node 1.
+      rivalries: { "connect:n204>n1": { sharedWay: 30 } },
     });
     expect(sumsToNeedsDecision(planned)).toMatchObject({ nearest: 0, bend: 1 });
     expect(pickNearestMergePlanDecisions(planned, ["connect:n201>n1", "connect:n204>n1"])).toEqual(

@@ -894,11 +894,13 @@ function applyManyToOneClassification(
     // Connections share the base node unless they conflict (MP-M5).
     const connecting = group.filter(({ networkAttachment }) => actionable(networkAttachment));
     for (const candidate of connecting) {
-      const rivals = connecting.filter(
-        (other) => other !== candidate && connectionsConflict(context, candidate, other, targetId),
-      );
+      const rivals = connecting.flatMap((other) => {
+        if (other === candidate) return [];
+        const conflict = connectionsConflict(context, candidate, other, targetId);
+        return conflict ? [{ candidateId: other.id, ...conflict }] : [];
+      });
       if (rivals.length === 0) continue;
-      candidate.connectionRivals = rivals.map(({ id }) => id);
+      candidate.connectionRivals = rivals;
       markReview(candidate, candidate.networkAttachment, "many-to-one");
     }
   }
@@ -922,21 +924,23 @@ function markReview(
 }
 
 /**
- * Whether two connections to one base node cannot both apply: their sources share an imported
- * way (connecting both would collapse or loop it), or the junction they would make together,
- * with the base highways there, joins different grades (each alone may pass, e.g. a bridge
- * ending at the node and a surface path through it). Pairs are enough: another way at the node
- * can only add a same-grade continuation, which never makes a junction worse.
+ * Why two connections to one base node cannot both apply, or null when they can: their sources
+ * share an imported way (connecting both would collapse or loop it; `sharedWayId` names it), or
+ * the junction they would make together, with the base highways there, joins different grades
+ * (each alone may pass, e.g. a bridge ending at the node and a surface path through it). Pairs
+ * are enough: another way at the node can only add a same-grade continuation, which never makes
+ * a junction worse.
  */
 function connectionsConflict(
   context: DiscoveryContext,
   a: OsmConflationCandidate,
   b: OsmConflationCandidate,
   targetId: number,
-) {
+): { sharedWayId?: number } | null {
   const aWays = a.evidence.patchWayIds ?? [];
   const bWays = new Set(b.evidence.patchWayIds ?? []);
-  if (aWays.some((id) => bWays.has(id))) return true;
+  const sharedWayId = aWays.find((id) => bWays.has(id));
+  if (sharedWayId !== undefined) return { sharedWayId };
   const sources = new Set([a.sourceId, b.sourceId]);
   const rewritten = [...new Set([...aWays, ...bWays])].flatMap((id) => {
     const way = context.patchView.getWay(id);
@@ -946,7 +950,7 @@ function connectionsConflict(
   const baseHighways = context.baseView
     .waysAtNode(targetId)
     .filter((way) => way.tags?.["highway"] != null);
-  return junctionHasIncompatibleGrades(targetId, [...baseHighways, ...rewritten]);
+  return junctionHasIncompatibleGrades(targetId, [...baseHighways, ...rewritten]) ? {} : null;
 }
 
 /** A candidate whose only action is a connection blocked as a copy of the base path. */
@@ -1287,10 +1291,12 @@ function validateAcceptedMappings(
       throw Error(`Conflation accepted unmatched candidate ${candidate.id}`);
     if (attach) {
       // A base node takes several connections, but never two that conflict (MP-M5).
-      const rival = candidate.connectionRivals?.find((id) => attached.has(id));
+      const rival = candidate.connectionRivals?.find(({ candidateId }) =>
+        attached.has(candidateId),
+      );
       if (rival) {
         throw Error(
-          `Conflation accepted connections ${rival} and ${candidate.id} that cannot share base node ${candidate.targetId}`,
+          `Conflation accepted connections ${rival.candidateId} and ${candidate.id} that cannot share base node ${candidate.targetId}`,
         );
       }
       attached.add(candidate.id);
