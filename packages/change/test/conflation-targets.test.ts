@@ -289,8 +289,8 @@ describe("one selected target per imported feature", () => {
       { proposalId: "connect:n103>n1", action: "accept" },
     ];
     expect(() => planMerge(base, oneWay, matchingOptions(options, decisions), quiet)).toThrow(
-      "would both connect to base node 1, but they are points of one imported way or would " +
-        "join different grades there. Include at most one",
+      "would both connect to base node 1, but they are points of one imported way, which " +
+        "connecting both would fold onto one point. Include at most one",
     );
   });
 

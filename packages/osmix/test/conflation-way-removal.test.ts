@@ -531,7 +531,7 @@ describe("explicit way removal through the facade and worker", () => {
         { proposalId: "connect:n201>n1", action: "accept" },
       ]),
     ).toThrow(
-      /^Imported node 101 \(on imported way 20\) and imported node 201 \(on imported way 20\) would both connect to base node 1, but they are points of one imported way or would join different grades there/,
+      /^Imported node 101 \(on imported way 20\) and imported node 201 \(on imported way 20\) would both connect to base node 1, but they are points of one imported way, which connecting both would fold onto one point/,
     );
     expect(worker.getMergePlanOverview(base.id)).toEqual(overview);
     expect(worker.getMergePlanPage(base.id, 0, 100)).toEqual(page);

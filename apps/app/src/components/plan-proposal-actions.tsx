@@ -51,14 +51,12 @@ function importedSourceOfId(id: string) {
 
 /**
  * Why a connection competes with a rival for its base node (MP-M5), in words: the two points
- * share an imported way, or together they would join different grades there.
+ * are on one imported way, which connecting both would fold onto one point.
  */
-function rivalryText(rivalId: string, rivalry: PlanConnectionRivalry, baseNodeId: number) {
+function rivalryText(rivalId: string, { sharedWay }: PlanConnectionRivalry) {
   const rival = importedSourceOfId(rivalId);
   const named = rival.charAt(0).toUpperCase() + rival.slice(1);
-  return "sharedWay" in rivalry
-    ? `${named} is also on imported way ${rivalry.sharedWay}; connecting both would fold that way onto one point.`
-    : `${named} would join different grades with this point at base node ${baseNodeId}.`;
+  return `${named} is also on imported way ${sharedWay}; connecting both would fold that way onto one point.`;
 }
 
 /**
@@ -187,7 +185,7 @@ export function PlanProposalActions({
         <div className="text-muted-foreground">
           <ul className="list-disc pl-4">
             {Object.entries(proposal.rivalries).map(([rivalId, rivalry]) => (
-              <li key={rivalId}>{rivalryText(rivalId, rivalry, proposal.target.id)}</li>
+              <li key={rivalId}>{rivalryText(rivalId, rivalry)}</li>
             ))}
           </ul>
           <p>Include at most one; including this one leaves the others out.</p>

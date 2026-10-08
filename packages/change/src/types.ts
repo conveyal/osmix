@@ -175,22 +175,20 @@ export interface OsmConflationCandidate {
   networkAttachment: OsmConflationActionAssessment | null;
   wayRemoval?: OsmConflationWayRemovalAssessment;
   /**
-   * Node candidates whose connection cannot share this candidate's base node, and why: points
-   * of the same imported way, or of ways whose junction there would join different grades
-   * (MP-M5). Absent when the connection competes with none.
+   * Node candidates whose connection cannot share this candidate's base node: points of the
+   * same imported way (MP-M5). Absent when the connection competes with none.
    */
   connectionRivals?: OsmConflationConnectionRival[];
   evidence: OsmConflationEvidence;
 }
 
 /**
- * A connection that cannot share a base node with another (MP-M5). `sharedWayId` names the
- * imported way both points are on, since connecting both would fold it onto one point; it is
- * absent when the two are on different ways whose junction there would join different grades.
+ * A connection that cannot share a base node with another (MP-M5): `sharedWayId` names the
+ * imported way both points are on, since connecting both would fold it onto one point.
  */
 export interface OsmConflationConnectionRival {
   candidateId: string;
-  sharedWayId?: number;
+  sharedWayId: number;
 }
 
 /** Explicit fuzzy-conflation configuration. Property transfer is disabled by an empty key list. */

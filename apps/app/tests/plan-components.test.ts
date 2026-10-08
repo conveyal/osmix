@@ -263,15 +263,12 @@ describe("plan components", () => {
     expect(html).toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*Include 3 features/);
   });
 
-  it("says why each rival connection competes for the base node", () => {
+  it("says which imported way a rival connection shares", () => {
     const html = render(
       createElement(PlanProposalActions, {
         proposal: connect({
-          competitors: ["connect:n18731>n2", "connect:n-9>n2"],
-          rivalries: {
-            "connect:n18731>n2": { sharedWay: 4674384 },
-            "connect:n-9>n2": { grades: true },
-          },
+          competitors: ["connect:n18731>n2"],
+          rivalries: { "connect:n18731>n2": { sharedWay: 4674384 } },
         } as Partial<PlanProposal>),
         onDecide: noop,
       }),
@@ -279,9 +276,6 @@ describe("plan components", () => {
     expect(html).toContain(
       "Imported point 18731 is also on imported way 4674384; connecting both would fold that " +
         "way onto one point.",
-    );
-    expect(html).toContain(
-      "Imported point -9 would join different grades with this point at base node 2.",
     );
     expect(html).toContain("Include at most one; including this one leaves the others out.");
   });

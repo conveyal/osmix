@@ -253,11 +253,10 @@ function nothingToCopy({ status, reasons }: OsmConflationActionAssessment) {
 }
 
 /**
- * Link proposals that cannot all apply (MP-M5). A base node takes several connections, but
- * not two from one imported way or two that would join different grades there (discovery's
- * `connectionRivals`). A base way takes one
- * imported way's copy or removal. Several copies onto one base node can apply together, so
- * they do not compete.
+ * Link proposals that cannot all apply (MP-M5). A base node takes several connections, but not
+ * two from one imported way (discovery's `connectionRivals`). A base way takes one imported
+ * way's copy or removal. Several copies onto one base node can apply together, so they do not
+ * compete.
  */
 function linkCompetitors(
   entries: readonly CandidateProposals[],
@@ -273,8 +272,7 @@ function linkCompetitors(
     for (const { candidateId, sharedWayId } of candidate.connectionRivals ?? []) {
       const rival = connectByCandidate.get(candidateId);
       if (!rival || tracesBase(rival)) continue;
-      rivalries[rival.id] =
-        sharedWayId === undefined ? { grades: true } : { sharedWay: originalWayId(sharedWayId) };
+      rivalries[rival.id] = { sharedWay: originalWayId(sharedWayId) };
     }
     connect.competitors = Object.keys(rivalries);
     if (connect.competitors.length > 0 && connect.kind === "connect") connect.rivalries = rivalries;

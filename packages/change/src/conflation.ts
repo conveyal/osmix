@@ -12,11 +12,7 @@ import {
   createConflationOutcomeReport,
   type ConflationApplicationTrace,
 } from "./conflation-outcome.ts";
-import {
-  assertConflationPreservesBaseTopology,
-  junctionHasIncompatibleGrades,
-  restrictionTopologyIssues,
-} from "./integrity.ts";
+import { assertConflationPreservesBaseTopology, restrictionTopologyIssues } from "./integrity.ts";
 import { featureTypeConflicts } from "./internal/feature-classification.ts";
 import { assessWayRemovals } from "./internal/way-removal.ts";
 import {
@@ -863,10 +859,7 @@ function discoverWayCandidates(context: DiscoveryContext) {
   return candidates;
 }
 
-function applyManyToOneClassification(
-  context: DiscoveryContext,
-  candidates: OsmConflationCandidate[],
-) {
+function applyManyToOneClassification(candidates: OsmConflationCandidate[]) {
   // Candidate discovery is local to each source. Enforce the batch-wide invariants only after
   // all otherwise plausible pairs are known. A point of a copy of the base path, with nothing
   // else to do at the target, competes with nothing (MP-M1).
@@ -877,7 +870,6 @@ function applyManyToOneClassification(
     byTarget.set(key, [...(byTarget.get(key) ?? []), candidate]);
   }
   for (const group of byTarget.values()) {
-    const targetId = group[0]!.targetId!;
     if (group[0]!.entityType === "way") {
       // One base way takes one imported way's copy or removal.
       if (group.length > 1)
@@ -896,8 +888,8 @@ function applyManyToOneClassification(
     for (const candidate of connecting) {
       const rivals = connecting.flatMap((other) => {
         if (other === candidate) return [];
-        const conflict = connectionsConflict(context, candidate, other, targetId);
-        return conflict ? [{ candidateId: other.id, ...conflict }] : [];
+        const sharedWayId = sharedImportedWay(candidate, other);
+        return sharedWayId === null ? [] : [{ candidateId: other.id, sharedWayId }];
       });
       if (rivals.length === 0) continue;
       candidate.connectionRivals = rivals;
@@ -924,33 +916,15 @@ function markReview(
 }
 
 /**
- * Why two connections to one base node cannot both apply, or null when they can: their sources
- * share an imported way (connecting both would collapse or loop it; `sharedWayId` names it), or
- * the junction they would make together, with the base highways there, joins different grades
- * (each alone may pass, e.g. a bridge ending at the node and a surface path through it). Pairs
- * are enough: another way at the node can only add a same-grade continuation, which never makes
- * a junction worse.
+ * The imported way two connections to one base node share, or null when they can both apply.
+ * Points of one way cannot both connect: that would collapse or loop the way (MP-M5). Points of
+ * different ways can: each connection alone already passed the junction's grade rule against
+ * every highway at the node, and no two that pass alone fail together
+ * (`test/connection-rivals.test.ts` checks this over small junctions).
  */
-function connectionsConflict(
-  context: DiscoveryContext,
-  a: OsmConflationCandidate,
-  b: OsmConflationCandidate,
-  targetId: number,
-): { sharedWayId?: number } | null {
-  const aWays = a.evidence.patchWayIds ?? [];
+function sharedImportedWay(a: OsmConflationCandidate, b: OsmConflationCandidate) {
   const bWays = new Set(b.evidence.patchWayIds ?? []);
-  const sharedWayId = aWays.find((id) => bWays.has(id));
-  if (sharedWayId !== undefined) return { sharedWayId };
-  const sources = new Set([a.sourceId, b.sourceId]);
-  const rewritten = [...new Set([...aWays, ...bWays])].flatMap((id) => {
-    const way = context.patchView.getWay(id);
-    if (!way?.tags?.["highway"]) return [];
-    return [{ ...way, refs: way.refs.map((ref) => (sources.has(ref) ? targetId : ref)) }];
-  });
-  const baseHighways = context.baseView
-    .waysAtNode(targetId)
-    .filter((way) => way.tags?.["highway"] != null);
-  return junctionHasIncompatibleGrades(targetId, [...baseHighways, ...rewritten]) ? {} : null;
+  return (a.evidence.patchWayIds ?? []).find((id) => bWays.has(id)) ?? null;
 }
 
 /** A candidate whose only action is a connection blocked as a copy of the base path. */
@@ -1015,7 +989,7 @@ function discoverOnViews(
       a.sourceId - b.sourceId ||
       (a.targetId ?? Number.POSITIVE_INFINITY) - (b.targetId ?? Number.POSITIVE_INFINITY),
   );
-  applyManyToOneClassification(context, candidates);
+  applyManyToOneClassification(candidates);
   const discovery = {
     baseOsmId: base.id,
     patchOsmId: patch.id,
