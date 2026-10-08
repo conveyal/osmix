@@ -127,6 +127,18 @@ function unresolvedKind(
   return "review";
 }
 
+/** One frozen empty list for every empty one: most entries of a large report have none. */
+export const NO_ITEMS = Object.freeze([]) as never[];
+
+/**
+ * `items` as a list, or the shared empty one. An outcome feature's lists are empty for most
+ * imported features: on Washington, 1.1 million of 1.5 million (T35).
+ */
+function listOf<T>(items: readonly T[] | ReadonlySet<T>): T[] {
+  if (Array.isArray(items)) return items.length > 0 ? (items as T[]) : NO_ITEMS;
+  return (items as ReadonlySet<T>).size > 0 ? [...items] : NO_ITEMS;
+}
+
 /** Build a detached report only after successful application and integrity validation. */
 export function createConflationOutcomeReport(
   base: Osm,
@@ -271,7 +283,7 @@ export function createConflationOutcomeReport(
       const tagReasons = targetCandidate
         ? targetCandidate.propertyTransfer.reasons
         : candidates.flatMap((candidate) => candidate.propertyTransfer.reasons);
-      tag.uncopied.push({ entityType, sourceId, reason, reasons: [...new Set(tagReasons)] });
+      tag.uncopied.push({ entityType, sourceId, reason, reasons: listOf(new Set(tagReasons)) });
       if (reason !== "not-selected") failedTags.push(reason);
     }
     const connectedWayIds: number[] = [];
@@ -309,8 +321,8 @@ export function createConflationOutcomeReport(
       sourceId,
       candidateIds: candidates.map((candidate) => candidate.id),
       targetId,
-      copiedKeys,
-      connectedWayIds,
+      copiedKeys: listOf(copiedKeys),
+      connectedWayIds: listOf(connectedWayIds),
       unresolved,
       skipped,
       retained,
@@ -318,7 +330,7 @@ export function createConflationOutcomeReport(
         retained &&
         entity(base, entityType, sourceId) == null &&
         entity(ordinaryBaseline, entityType, sourceId) != null,
-      reasons: [...reasons],
+      reasons: listOf(reasons),
       ...(wayRemoval ? { wayRemoval } : {}),
     });
   }

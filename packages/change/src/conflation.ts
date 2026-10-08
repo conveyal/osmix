@@ -10,6 +10,7 @@ import {
   conflationTagSourceKey,
   conflationTagTargetKey,
   createConflationOutcomeReport,
+  NO_ITEMS,
   type ConflationApplicationTrace,
 } from "./conflation-outcome.ts";
 import { assertConflationPreservesBaseTopology, restrictionTopologyIssues } from "./integrity.ts";
@@ -150,7 +151,6 @@ function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOp
  * source's routing families. They are frozen, so code that mutates one throws instead of
  * changing every candidate.
  */
-const NO_ITEMS = Object.freeze([]) as never[];
 const UNMATCHED: OsmConflationActionAssessment = Object.freeze({
   status: "unmatched",
   reasons: NO_ITEMS,

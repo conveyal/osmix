@@ -274,7 +274,10 @@ export type OsmConflationUncopiedTagReason =
   | "protected-tag"
   | "superseded";
 
-/** One imported feature affected by an uncopied configured tag. */
+/**
+ * One imported feature affected by an uncopied configured tag. Empty `reasons` lists are one
+ * shared frozen array.
+ */
 export interface OsmConflationUncopiedTagFeature {
   entityType: OsmConflationEntityType;
   sourceId: number;
@@ -293,7 +296,10 @@ export interface OsmConflationTagOutcome {
   uncopied: OsmConflationUncopiedTagFeature[];
 }
 
-/** Actual matching outcome for one source, regardless of its number of alternative candidates. */
+/**
+ * Actual matching outcome for one source, regardless of its number of alternative candidates.
+ * Its empty lists are one shared frozen array: copy a list before changing it.
+ */
 export interface OsmConflationOutcomeFeature {
   entityType: OsmConflationEntityType;
   sourceId: number;
