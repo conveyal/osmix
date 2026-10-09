@@ -11,6 +11,11 @@ export default defineConfig({
     tailwindcss(),
   ],
   publicDir: process.env.NODE_ENV === "development" ? "../../fixtures" : undefined,
+  optimizeDeps: {
+    // Only the app worker imports these, and Vite's dependency scan does not follow workers. Left
+    // to discovery, the dev server finds them on first load and reloads the page mid-render.
+    include: ["@osmix/app-core > hash-wasm", "@osmix/app-core > idb"],
+  },
   server: {
     host: process.env.HOST,
     port: process.env.PORT ? Number(process.env.PORT) : undefined,
