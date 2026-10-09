@@ -51,7 +51,7 @@ describe("proposalTagChanges", () => {
     expect(proposalTagChanges(waiting, "exact:n-1>n1")).toEqual(expected);
   });
 
-  it("replaces a same-ID entity's tags, and adds or connects without changing any", () => {
+  it("replaces a same-ID entity's tags, and adds without changing any", () => {
     const patch = dataset(
       "patch",
       [
@@ -68,6 +68,50 @@ describe("proposalTagChanges", () => {
     });
     expect(proposalTagChanges(plan, "add:w-1")).toBeNull();
     expect(() => proposalTagChanges(plan, "add:w-99")).toThrow("Unknown plan proposal add:w-99");
+  });
+
+  it("shows a connection merging its point's tags into the base point", () => {
+    const patch = dataset(
+      "patch",
+      [
+        { id: -5, lon: 0.000004, lat: 0, tags: { kerb: "flush" } },
+        { id: -6, lon: 0.000004, lat: 0.001 },
+      ],
+      [{ id: -1, refs: [-5, -6], tags: { highway: "footway" } }],
+    );
+    const plan = planMerge(
+      base(),
+      patch,
+      { matching: { propertyKeys: [], attachNetwork: true } },
+      quiet,
+    );
+    const connect = [...plan.proposals.values()].find(({ kind }) => kind === "connect");
+    if (!connect) throw Error("Expected a connection");
+    expect(proposalTagChanges(plan, connect.id)).toEqual({
+      entity: { type: "node", id: 1 },
+      changes: [{ key: "kerb", before: "lowered", after: "flush" }],
+      unchanged: 1,
+    });
+  });
+
+  it("shows a way reconcile's imported values winning, with an equivalent direction kept", () => {
+    const patch = dataset(
+      "patch",
+      [],
+      [
+        {
+          id: -1,
+          refs: [1, 2],
+          tags: { highway: "residential", oneway: "no", surface: "asphalt" },
+        },
+      ],
+    );
+    const plan = planMerge(base(), patch, { createIntersections: false }, quiet);
+    expect(proposalTagChanges(plan, "reconcile:w-1>w10")).toEqual({
+      entity: { type: "way", id: 10 },
+      changes: [{ key: "surface", after: "asphalt" }],
+      unchanged: 1,
+    });
   });
 
   it("creates a crossing node with crossing=yes", () => {

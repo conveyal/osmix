@@ -102,10 +102,11 @@ describe("Yakima fuzzy conflation", () => {
       expect(discovery.summary).toEqual({
         total: 11_689,
         accepted: 0,
-        // A connection no longer competes with another point copying tags onto its target (MP-M5).
-        automatic: 78,
-        review: 132,
-        blocked: 235,
+        // A connection merges its point's tags like an identical-point merge, so a node routing
+        // or barrier difference no longer blocks or reviews it (MP-M3).
+        automatic: 117,
+        review: 124,
+        blocked: 204,
         unmatched: 11_244,
         rejected: 0,
       });
@@ -133,11 +134,12 @@ describe("Yakima fuzzy conflation", () => {
 
       const accessibleCrossing = getCandidate(discovery, "node:2220318->11643002707");
       expectNonExact(accessibleCrossing, base, patch);
+      // The connection merges the crossing's tags into the base point, so nothing waits.
       expect(accessibleCrossing).toMatchObject({
-        status: "review",
-        reasons: ["node-context-conflict"],
+        status: "automatic",
+        reasons: [],
         propertyTransfer: { status: "automatic", reasons: [] },
-        networkAttachment: { status: "review", reasons: ["node-context-conflict"] },
+        networkAttachment: { status: "automatic", reasons: [] },
         evidence: {
           distanceMeters: 0.40797,
           sourceRoutingFamilies: ["pedestrian"],
@@ -161,20 +163,19 @@ describe("Yakima fuzzy conflation", () => {
         )?.tags,
       ).toMatchObject({ footway: "crossing", highway: "footway" });
 
-      const kerbConflict = getCandidate(discovery, "node:2475012->11643237283");
-      expectNonExact(kerbConflict, base, patch);
-      expect(kerbConflict).toMatchObject({
-        status: "blocked",
-        networkAttachment: {
-          status: "blocked",
-          reasons: expect.arrayContaining(["routing-family-conflict"]),
-        },
+      const kerb = getCandidate(discovery, "node:2475012->11643237283");
+      expectNonExact(kerb, base, patch);
+      // An imported kerb with no kerb value merges into a raised kerb without conflict; only the
+      // choice between two nearby base points waits.
+      expect(kerb).toMatchObject({
+        status: "review",
+        networkAttachment: { status: "review", reasons: ["multiple-targets"] },
       });
-      expect(patch.nodes.getById(kerbConflict.sourceId)?.tags).toMatchObject({
+      expect(patch.nodes.getById(kerb.sourceId)?.tags).toMatchObject({
         barrier: "kerb",
       });
-      expect(patch.nodes.getById(kerbConflict.sourceId)?.tags?.["kerb"]).toBeUndefined();
-      expect(base.nodes.getById(getTargetId(kerbConflict))?.tags).toMatchObject({
+      expect(patch.nodes.getById(kerb.sourceId)?.tags?.["kerb"]).toBeUndefined();
+      expect(base.nodes.getById(getTargetId(kerb))?.tags).toMatchObject({
         barrier: "kerb",
         kerb: "raised",
       });

@@ -155,7 +155,8 @@ describe("one selected target per imported feature", () => {
     const result = await merge(base, patch, planOptions, quiet);
     expect(result.nodes.getById(1)?.tags?.["name"]).toBe("A");
     expect(result.nodes.getById(2)?.tags?.["name"]).toBe("Imported");
-    expect(result.nodes.getById(3)?.tags?.["name"]).toBe("Other");
+    // The unrelated connection merges its point's tags into base node 3.
+    expect(result.nodes.getById(3)?.tags?.["name"]).toBe("Unrelated");
     expect(result.ways.getById(20)?.refs).toEqual([101, 102]);
     expect(result.ways.getById(21)?.refs).toEqual([3, 202]);
     expect(base.nodes.getById(2)?.tags?.["name"]).toBe("B");

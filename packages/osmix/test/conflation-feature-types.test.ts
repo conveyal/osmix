@@ -248,8 +248,11 @@ describe("feature classification conflicts through the public facade and worker"
     expect(candidate.networkAttachment?.status).toBe("automatic");
     const result = await merge(base, patch, planOptions);
     expect(result.nodes.getById(1)?.tags?.["name"]).toBe("Imported school");
-    expect(result.nodes.getById(1)?.tags?.["amenity"]).toBe(baseAmenity ?? undefined);
-    expect(result.nodes.getById(101)).toEqual(patch.nodes.getById(101));
+    // The connection merges the imported point's tags too: its values win, base-only ones stay.
+    expect(result.nodes.getById(1)?.tags?.["amenity"]).toBe(
+      patchAmenity ?? baseAmenity ?? undefined,
+    );
+    expect(result.nodes.getById(101)).toBeNull();
     expect(result.ways.getById(10)).toEqual(base.ways.getById(10));
     expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
   });

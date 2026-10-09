@@ -180,19 +180,23 @@ export interface OsmConflationCandidate {
   wayRemoval?: OsmConflationWayRemovalAssessment;
   /**
    * Node candidates whose connection cannot share this candidate's base node: points of the
-   * same imported way (MP-M5). Absent when the connection competes with none.
+   * same imported way, or points with different values for a key (MP-M5). Absent when the
+   * connection competes with none.
    */
   connectionRivals?: OsmConflationConnectionRival[];
   evidence: OsmConflationEvidence;
 }
 
 /**
- * A connection that cannot share a base node with another (MP-M5): `sharedWayId` names the
- * imported way both points are on, since connecting both would fold it onto one point.
+ * A connection that cannot share a base node with another (MP-M5), for one or both reasons:
+ * `sharedWayId` names the imported way both points are on, since connecting both would fold it
+ * onto one point; `conflictingKeys` are the keys the two points set to different values, since
+ * each connection merges its point's tags into the base node.
  */
 export interface OsmConflationConnectionRival {
   candidateId: string;
-  sharedWayId: number;
+  sharedWayId?: number;
+  conflictingKeys?: string[];
 }
 
 /** Explicit fuzzy-conflation configuration. Property transfer is disabled by an empty key list. */
@@ -321,10 +325,11 @@ export interface OsmConflationOutcomeFeature {
 export interface OsmConflationOutcomeSummary {
   features: number;
   appliedFeatures: number;
+  /** Features whose selected tags reached their base target, by a copy or a connection's merge. */
   tagCopyActions: number;
   copiedTagValues: number;
   networkAttachmentActions: number;
-  /** Untagged imported points dropped because a connection left them unused. */
+  /** Imported points dropped because a connection left them unused (their tags were merged). */
   removedConnectionOrphanNodes: number;
   wayRemovalActions?: number;
   removedOrphanNodes?: number;

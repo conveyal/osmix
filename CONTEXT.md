@@ -86,7 +86,7 @@ _Avoid_: Replace feature, remove duplicate geometry
 The API term for copying tags; it has the same attribute-only meaning.
 
 **Connect network**:
-A connectivity change that connects imported ways to preserved base nodes through accepted reference changes.
+A connectivity change that connects imported ways to preserved base nodes through accepted reference changes. Like an identical-point merge, it merges the imported point's tags into the base node, and the imported values win.
 _Avoid_: Copy tags, property transfer
 
 **Network attachment**:
@@ -106,7 +106,7 @@ The explicit removal of a redundant imported way with an equivalent retained bas
 The user-facing choice to schedule geometry removal for one reviewed imported way.
 
 **Orphan-node cleanup**:
-The removal of untagged imported points left without references by an explicitly removed way, by a network connection that replaced them, or by an intersection that reused a close vertex in their place.
+The removal of imported points left without references: untagged ones by an explicitly removed way, and any whose tags were merged into the point that replaced them, by a network connection or an intersection that reused a close vertex.
 
 **Scheduled action**:
 A proposal the plan currently includes, by its automatic rule or a decision.

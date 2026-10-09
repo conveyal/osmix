@@ -19,25 +19,30 @@ const exactMerge = (base: Osm, patch: Osm) =>
 
 describe("node-identity rulebook", () => {
   it("compares node grade normalized, so equivalent spellings match", () => {
-    expect(assessNodeTags("exact", { covered: "false" }, {}).hardReasons).toEqual([]);
-    expect(assessNodeTags("exact", { layer: "1" }, {}).hardReasons).toContain("grade-conflict");
+    expect(assessNodeTags({ covered: "false" }, {}).hardReasons).toEqual([]);
+    expect(assessNodeTags({ layer: "1" }, {}).hardReasons).toContain("grade-conflict");
   });
 
   it("checks the full namespaced access list", () => {
-    expect(assessNodeTags("exact", { wheelchair: "yes" }, {}).hardReasons).toContain(
+    expect(assessNodeTags({ wheelchair: "yes" }, {}).hardReasons).toContain(
       "routing-family-conflict",
     );
-    expect(assessNodeTags("exact", { "access:conditional": "no" }, {}).hardReasons).toContain(
+    expect(assessNodeTags({ "access:conditional": "no" }, {}).hardReasons).toContain(
       "routing-family-conflict",
     );
   });
 
-  it("merges tags for exact and crossing kinds but never for a connection", () => {
-    expect(assessNodeTags("exact", { a: "1" }, { a: "2" }).hardReasons).toContain("tag-conflict");
-    expect(assessNodeTags("connect", { a: "1" }, { a: "2" }).hardReasons).toEqual([]);
+  it("lets an imported point's values win, and waits only on a change of grade", () => {
+    expect(assessNodeTags({ a: "1" }, { a: "2" }).hardReasons).toContain("tag-conflict");
+    const imported = { sourceIsImported: true };
+    expect(assessNodeTags({ a: "1" }, { a: "2" }, imported)).toEqual({
+      hardReasons: [],
+      reviewReasons: [],
+    });
     expect(
-      assessNodeTags("connect", { barrier: "gate" }, { barrier: "gate" }).reviewReasons,
-    ).toEqual(["node-context-conflict"]);
+      assessNodeTags({ barrier: "kerb", kerb: "lowered" }, { barrier: "gate" }, imported),
+    ).toEqual({ hardReasons: [], reviewReasons: [] });
+    expect(assessNodeTags({ level: "1" }, {}, imported).reviewReasons).toEqual(["grade-change"]);
   });
 
   it("rejects a junction final validation would reject, and allows a portal", () => {

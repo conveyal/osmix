@@ -7,7 +7,7 @@ import type { Osm } from "@osmix/core";
 import type { OsmEntity, OsmEntityType, OsmTags } from "@osmix/types";
 
 import { mergeImportedTags } from "../rules/node-identity.ts";
-import { withNonConflictingDescriptiveTags } from "../rules/tags.ts";
+import { mergeImportedWayTags } from "../rules/tags.ts";
 import type { OsmConflationCandidate } from "../types.ts";
 import type { PlanProposal } from "./types.ts";
 
@@ -79,8 +79,8 @@ function agreedTags(ways: readonly (OsmEntity | null)[]): OsmTags {
 
 /**
  * The tag changes `proposal` makes, or null when it changes no existing tags: an added feature
- * and a connection keep their own. A crossing node is created with `crossing=yes`; a removed
- * imported way's tags go with it.
+ * keeps its own. A crossing node is created with `crossing=yes`; a removed imported way's tags
+ * go with it.
  */
 export function tagChangesOf(
   proposal: PlanProposal,
@@ -88,12 +88,12 @@ export function tagChangesOf(
 ): PlanTagChanges | null {
   switch (proposal.kind) {
     case "add":
-    case "connect":
       return null;
     case "same-id-replace": {
       const { type, id } = proposal.entity;
       return diff(proposal.entity, entityOf(base, type, id)?.tags, entityOf(patch, type, id)?.tags);
     }
+    case "connect":
     case "exact-merge": {
       const survivor = entityOf(base, proposal.target.type, proposal.target.id);
       const imported = entityOf(patch, proposal.source.type, proposal.source.id);
@@ -110,7 +110,7 @@ export function tagChangesOf(
       return diff(
         proposal.target,
         survivor.tags,
-        withNonConflictingDescriptiveTags(survivor, imported).tags,
+        mergeImportedWayTags(survivor.tags, imported.tags),
       );
     }
     case "copy-tags": {

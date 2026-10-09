@@ -306,7 +306,7 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
   {
     id: "X4",
     stage: "exact",
-    description: "The same, but one-way: routing differs, so the way is kept",
+    description: "The same, but one-way: the ways reconcile and the imported direction wins",
     features: [
       {
         id: id(8, 1),
@@ -314,7 +314,14 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
         tags: { ...footway, name: "Rue Princesse Florestine", oneway: "yes" },
       },
     ],
-    stages: [{ kind: "way-kept", feature: id(8, 1) }],
+    stages: [
+      {
+        kind: "way-reconciled",
+        feature: id(8, 1),
+        baseWay: 159170520,
+        filledTags: { name: "Rue Princesse Florestine", oneway: "yes" },
+      },
+    ],
     candidates: [],
   },
   {
@@ -378,7 +385,9 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
   {
     id: "M2",
     stage: "matching",
-    description: "A raised kerb next to a lowered one: a routing tag, so review",
+    description:
+      "A raised kerb next to a lowered one: connecting makes them one kerb and the imported value " +
+      "wins; copying alone is a routing tag, so review",
     features: [
       {
         id: id(11, 1),
@@ -392,7 +401,18 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
       },
     ],
     stages: [
-      { kind: "tags-unchanged", baseEntity: { type: "node", id: 1736938084 }, keys: ["kerb"] },
+      {
+        kind: "tags-copied",
+        runs: ["automatic"],
+        baseEntity: { type: "node", id: 1736938084 },
+        tags: { kerb: "raised" },
+      },
+      {
+        kind: "tags-unchanged",
+        runs: ["reviewed"],
+        baseEntity: { type: "node", id: 1736938084 },
+        keys: ["kerb"],
+      },
     ],
     candidates: [
       {
@@ -400,8 +420,8 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
         source: id(11, 1),
         target: 1736938084,
         status: "review",
-        reasons: ["node-context-conflict", "routing-family-conflict", "routing-property"],
-        actions: { copy: "review", attach: "blocked" },
+        reasons: ["routing-property"],
+        actions: { copy: "review", attach: "automatic" },
         decision: { action: "reject" },
       },
     ],
@@ -409,7 +429,9 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
   {
     id: "M3",
     stage: "matching",
-    description: "A viewpoint on another level: only a protected tag differs, so blocked",
+    description:
+      "A viewpoint on another level: copying a protected tag is blocked, and connecting would " +
+      "change the base point's level, so it waits",
     features: [
       {
         id: id(12, 1),
@@ -430,9 +452,9 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
         entityType: "node",
         source: id(12, 1),
         target: 1790048390,
-        status: "blocked",
-        reasons: ["grade-conflict", "node-context-conflict", "protected-tag"],
-        actions: { copy: "blocked", attach: "blocked" },
+        status: "review",
+        reasons: ["grade-change", "protected-tag"],
+        actions: { copy: "blocked", attach: "review" },
       },
     ],
   },
@@ -555,7 +577,9 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
   {
     id: "M7",
     stage: "matching",
-    description: "Two new footways each put tactile paving 0.5 m from one base node",
+    description:
+      "Two new footways each put tactile paving 0.5 m from one base node: both connect, and " +
+      "their values agree, so the base node gains it",
     features: [
       {
         id: id(16, 1),
@@ -585,10 +609,11 @@ export const MONACO_MERGE_SCENARIOS: MergeScenario[] = [
       },
     ],
     stages: [
+      // Each connection merges its point's tags into the base node; the two values agree.
       {
-        kind: "tags-unchanged",
+        kind: "tags-copied",
         baseEntity: { type: "node", id: 5596424436 },
-        keys: ["tactile_paving"],
+        tags: { tactile_paving: "yes" },
       },
     ],
     candidates: [

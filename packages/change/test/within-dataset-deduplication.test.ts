@@ -61,6 +61,19 @@ describe("planWithinDatasetDeduplication", () => {
     expect(planWithinDatasetDeduplication(cleaned, quiet).stats.totalChanges).toBe(0);
   });
 
+  it("keeps ways whose tags disagree, since both are existing data (MP-I5)", () => {
+    const osm = new Osm({ id: "surfaces" });
+    osm.nodes.addNode({ id: 1, lon: 0, lat: 0 });
+    osm.nodes.addNode({ id: 2, lon: 0.001, lat: 0 });
+    osm.ways.addWay({ id: 10, refs: [1, 2], tags: { highway: "footway", surface: "gravel" } });
+    osm.ways.addWay({ id: 20, refs: [1, 2], tags: { highway: "footway", surface: "asphalt" } });
+    osm.buildIndexes();
+    osm.buildSpatialIndexes();
+    const result = applyChangesetToOsm(planWithinDatasetDeduplication(osm, quiet));
+    expect(result.ways.getById(10)?.tags?.["surface"]).toBe("gravel");
+    expect(result.ways.getById(20)?.tags?.["surface"]).toBe("asphalt");
+  });
+
   it("finds what the staged same-dataset scan found", () => {
     const osm = duplicated();
     const staged = stagedChanges(osm, osm, { deduplicateNodes: true, deduplicateWays: true });

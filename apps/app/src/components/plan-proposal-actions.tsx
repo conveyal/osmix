@@ -51,12 +51,23 @@ function importedSourceOfId(id: string) {
 
 /**
  * Why a connection competes with a rival for its base node (MP-M5), in words: the two points
- * are on one imported way, which connecting both would fold onto one point.
+ * are on one imported way, which connecting both would fold onto one point, or they give a key
+ * different values, and each connection writes its point's values to the base node.
  */
-function rivalryText(rivalId: string, { sharedWay }: PlanConnectionRivalry) {
+function rivalryText(rivalId: string, { sharedWay, conflictingKeys }: PlanConnectionRivalry) {
   const rival = importedSourceOfId(rivalId);
   const named = rival.charAt(0).toUpperCase() + rival.slice(1);
-  return `${named} is also on imported way ${sharedWay}; connecting both would fold that way onto one point.`;
+  const reasons = [
+    ...(sharedWay === undefined
+      ? []
+      : [
+          `is also on imported way ${sharedWay}; connecting both would fold that way onto one point`,
+        ]),
+    ...(conflictingKeys === undefined
+      ? []
+      : [`gives ${conflictingKeys.join(", ")} a different value; the base node takes one value`]),
+  ];
+  return `${named} ${reasons.join(", and ")}.`;
 }
 
 /**

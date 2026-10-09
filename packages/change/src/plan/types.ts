@@ -154,11 +154,14 @@ interface MatchingProposalBase extends PlanProposalBase {
 }
 
 /**
- * Why a connection competes with another for one base node (MP-M5): both points are on one
- * imported way, named by its patch ID, and connecting both would fold it onto one point.
+ * Why a connection competes with another for one base node (MP-M5), for one or both reasons:
+ * both points are on one imported way, named by its patch ID (`sharedWay`), and connecting both
+ * would fold it onto one point; or the points set `conflictingKeys` to different values, and
+ * each connection merges its point's tags into the base node.
  */
 export interface PlanConnectionRivalry {
-  sharedWay: number;
+  sharedWay?: number;
+  conflictingKeys?: string[];
 }
 
 /** A nearby imported point becomes a base point in the network (MP-M3). */

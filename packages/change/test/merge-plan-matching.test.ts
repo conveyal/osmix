@@ -85,8 +85,9 @@ describe("matching proposals", () => {
     expect(merged.ways.getById(20)).toBeNull();
     expect(merged.ways.getById(30)?.refs).toEqual([2, 103]);
     expect(merged.ways.getById(10)?.tags).toEqual({ highway: "footway", name: "Harbour Walk" });
-    // A connection never merges tags, so the tagged imported point stays (MP-M2).
-    expect(merged.nodes.getById(101)?.tags).toEqual({ crossing: "marked" });
+    // A connection merges the imported point's tags into the base point, which it replaces.
+    expect(merged.nodes.getById(101)).toBeNull();
+    expect(merged.nodes.getById(1)?.tags).toMatchObject({ crossing: "marked" });
     expect(plan.matching?.outcome).toBeDefined();
   });
 

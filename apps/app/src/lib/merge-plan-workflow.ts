@@ -129,7 +129,7 @@ const REASON_LABEL: Record<string, string> = {
   "merged-into-base": "Merged into a base feature instead",
   "multiple-targets": "Multiple possible base targets",
   "no-transferable-properties": "No selected tags differ",
-  "node-context-conflict": "Connected paths have incompatible context",
+  "node-context-conflict": "Another imported point connecting here gives a tag a different value",
   "non-routing-target": "Base target is not routable",
   "protected-tag": "Protected structural tag differs",
   "relation-member": "Feature belongs to an OSM relation",

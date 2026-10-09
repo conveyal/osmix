@@ -89,7 +89,11 @@ describe("merge-process guide", () => {
     ]);
     const exact = applyPlan(identityPlan).osm;
     expect([...exact.nodes.sorted()].map((node) => node.id)).toEqual([1, 2, 201, 301, 302]);
-    expect([...exact.ways.sorted()]).toEqual([originalBase.ways[0], originalPatch.ways[1]]);
+    // Way 10 takes the survey's name: an imported way's values win a reconcile (MP-X2).
+    expect([...exact.ways.sorted()]).toEqual([
+      { ...originalBase.ways[0], tags: { highway: "footway", name: "Survey sidewalk" } },
+      originalPatch.ways[1],
+    ]);
 
     // Matching copies 201's tag onto 1; 201 itself stays.
     const conflation = { propertyKeys: ["tactile_paving"], attachNetwork: false };
@@ -120,7 +124,7 @@ describe("merge-process guide", () => {
       ...matching.nodes.sorted(),
     ]);
     expect([...final.ways.sorted()]).toEqual([
-      { id: 10, refs: [1, -1, 2], tags: { highway: "footway", name: "Base sidewalk" } },
+      { id: 10, refs: [1, -1, 2], tags: { highway: "footway", name: "Survey sidewalk" } },
       { id: 30, refs: [301, -1, 302], tags: { highway: "footway", name: "New link" } },
     ]);
     expect(entities(base)).toEqual(originalBase);

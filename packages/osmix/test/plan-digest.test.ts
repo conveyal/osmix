@@ -25,7 +25,9 @@ import {
  * the patch as a layer. A change to how the planner stores its state must leave every one
  * as it is. When a change to merge rules alters the output on purpose, record the new digests
  * here and say why in the commit. T36 blocks a replacement that joined grade-separated highways
- * (`replacement-grade-conflict`): Aggressive no longer includes it, so its plan applies.
+ * (`replacement-grade-conflict`): Aggressive no longer includes it, so its plan applies. T24 lets
+ * imported values win a way reconcile (X4 now reconciles, with or without matching) and makes a
+ * connection merge its point's tags (M2, M3 and M7 change).
  */
 
 let base: Osm;
@@ -57,9 +59,9 @@ const digest = (plan: MergePlan) =>
 describe("merge plan output on Monaco", () => {
   it("is unchanged without matching", () => {
     expect(digest(planMerge(base, patch, {}, quiet))).toEqual({
-      plan: "4e60094bd6251a40",
-      applied: "42770a36",
-      osc: "20e8e321a6d4d07c",
+      plan: "5613cf2d49f5d89b",
+      applied: "376f5c20",
+      osc: "9ba6e7249a757904",
     });
   });
 
@@ -73,9 +75,9 @@ describe("merge plan output on Monaco", () => {
         ]),
       ),
     ).toEqual({
-      conservative: { plan: "e584762ca976dc37", applied: "42770a36", osc: "20e8e321a6d4d07c" },
-      recommended: { plan: "df7e2ffb149d98fa", applied: "03605608", osc: "9c68884088a19925" },
-      aggressive: { plan: "41e8f195f02c9aba", applied: "43d93040", osc: "d552c3eecfb84fe8" },
+      conservative: { plan: "bdac21d1e4a2a453", applied: "376f5c20", osc: "9ba6e7249a757904" },
+      recommended: { plan: "0b22b0c4e2003ffd", applied: "dc374e92", osc: "c464052281d5e1df" },
+      aggressive: { plan: "70523cc7aca8c0c3", applied: "17925075", osc: "0b26800a4266c3a4" },
     });
   });
 
@@ -100,9 +102,9 @@ describe("merge plan output on Monaco", () => {
     const fresh = planMerge(base, patch, { ...matching, decisions }, quiet);
     expect(digest(plan)).toEqual(digest(fresh));
     expect(digest(plan)).toEqual({
-      plan: "552e741601f205c1",
-      applied: "7d9928ef",
-      osc: "573b7d76ae274a6a",
+      plan: "b3abb5ba8d3ae135",
+      applied: "cb170a40",
+      osc: "a9a91ce0efcb26a7",
     });
   });
 });

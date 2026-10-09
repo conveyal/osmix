@@ -512,7 +512,7 @@ function assessGroup(
     if (importedId === id || Object.keys(importedTags ?? {}).length === 0) continue;
     // The base node takes the imported vertex's place, and its tags, as an identical point would.
     const baseTags = baseNode(id)?.tags;
-    const { reviewReasons: nodeReview } = assessNodeTags("exact", importedTags, baseTags, {
+    const { reviewReasons: nodeReview } = assessNodeTags(importedTags, baseTags, {
       sourceIsImported: true,
     });
     if (nodeReview.includes("grade-change")) reviewReasons.add("grade-change");

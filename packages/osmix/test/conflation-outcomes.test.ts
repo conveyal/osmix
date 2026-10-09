@@ -304,12 +304,14 @@ describe("matching plan outcomes", () => {
         tagCopyActions: 2,
         copiedTagValues: 2,
         networkAttachmentActions: 2,
+        // Each connection merged its point's tags into the base point, so both points go.
+        removedConnectionOrphanNodes: 2,
       }),
     );
     expect(outcome.features.map((feature) => feature.connectedWayIds)).toEqual([[20], [20]]);
     expect(outcome.retainedImports).toEqual({
-      originalIds: { nodes: 2, ways: 1, relations: 0 },
-      ordinaryAdditions: { nodes: 2, ways: 1, relations: 0 },
+      originalIds: { nodes: 0, ways: 1, relations: 0 },
+      ordinaryAdditions: { nodes: 0, ways: 1, relations: 0 },
     });
     expect(publicResult.ways.getById(20)?.refs).toEqual([1, 2]);
     expect(publicResult.nodes.getById(1)?.tags?.["tactile_paving"]).toBe("yes");
@@ -446,7 +448,7 @@ describe("matching plan outcomes", () => {
     ]);
   });
 
-  it("reports uncopied selected attributes when a reviewed feature only connects the network", () => {
+  it("credits the values a connection merges when a reviewed feature only connects", () => {
     const { worker, base } = networkInputs();
     const outcome = outcomeOf(worker, base.id, [
       { proposalId: "connect:n101>n1", action: "accept" },
@@ -457,23 +459,23 @@ describe("matching plan outcomes", () => {
     expect(outcome.summary).toMatchObject({
       features: 2,
       appliedFeatures: 1,
-      tagCopyActions: 0,
-      copiedTagValues: 0,
+      tagCopyActions: 1,
+      copiedTagValues: 1,
       networkAttachmentActions: 1,
       skippedFeatures: 1,
     });
+    // The connection merged point 101's tags into base node 1 (MP-M3).
     expect(outcome.features.find((feature) => feature.sourceId === 101)).toMatchObject({
-      copiedKeys: [],
+      copiedKeys: ["tactile_paving"],
       connectedWayIds: [20],
       skipped: false,
     });
     expect(outcome.tags[0]?.uncopied).toEqual([
-      expect.objectContaining({ entityType: "node", sourceId: 101, reason: "not-selected" }),
       expect.objectContaining({ entityType: "node", sourceId: 102, reason: "not-selected" }),
     ]);
     worker.applyMergePlan(base.id);
     expect(worker.getOsm(base.id).ways.getById(20)?.refs).toEqual([1, 102]);
-    expect(worker.getOsm(base.id).nodes.getById(1)?.tags?.["tactile_paving"]).toBe("no");
+    expect(worker.getOsm(base.id).nodes.getById(1)?.tags?.["tactile_paving"]).toBe("yes");
     expect(worker.getOsm(base.id).nodes.getById(2)?.tags?.["tactile_paving"]).toBe("no");
   });
 });

@@ -131,6 +131,63 @@ describe("automation levels (MP-M6)", () => {
     }
   });
 
+  it("leaves two points that give one base point different values to a person (MP-M5)", () => {
+    // Imported footways end 0.1 m north and 0.3 m east of node 1, with different kerbs.
+    const patch = osm(
+      "patch",
+      [
+        { id: 101, lon: 0, lat: 0.1 * M, tags: { barrier: "kerb", kerb: "lowered" } },
+        { id: 102, lon: 0, lat: 0.001 },
+        { id: 301, lon: 0.3 * M, lat: 0, tags: { barrier: "kerb", kerb: "raised" } },
+        { id: 302, lon: 0.001, lat: 0 },
+      ],
+      [
+        { id: 20, refs: [101, 102], tags: { highway: "footway" } },
+        { id: 30, refs: [301, 302], tags: { highway: "footway" } },
+      ],
+    );
+    for (const level of ["recommended", "aggressive"] as const) {
+      const planned = plan(patch, level);
+      expect(findProposal(planned, "connect:n101>n1")).toMatchObject({
+        competitors: ["connect:n301>n1"],
+        rivalries: { "connect:n301>n1": { conflictingKeys: ["kerb"] } },
+        reasons: ["node-context-conflict"],
+        effect: "needs-decision",
+      });
+      expect(findProposal(planned, "connect:n301>n1")).toMatchObject({
+        competitors: ["connect:n101>n1"],
+        effect: "needs-decision",
+      });
+      expect(planned.summary.automated).toBe(0);
+    }
+    const chosen = plan(patch, "aggressive", {
+      decisions: [{ proposalId: "connect:n301>n1", action: "accept" }],
+    });
+    expect(findProposal(chosen, "connect:n301>n1").effect).toBe("applied");
+    expect(findProposal(chosen, "connect:n101>n1").effect).toBe("needs-decision");
+  });
+
+  it("leaves a way reconcile that changes the base way's grade to a person at every level", () => {
+    const patch = osm(
+      "patch",
+      [],
+      [{ id: 20, refs: [2, 1], tags: { highway: "footway", bridge: "yes", layer: "1" } }],
+    );
+    for (const level of ["conservative", "recommended", "aggressive"] as const) {
+      const planned = plan(patch, level, { createIntersections: false });
+      expect(findProposal(planned, "reconcile:w20>w10")).toMatchObject({
+        status: "review",
+        reasons: ["grade-change"],
+        effect: "needs-decision",
+      });
+    }
+    const included = plan(patch, "recommended", {
+      createIntersections: false,
+      decisions: [{ proposalId: "reconcile:w20>w10", action: "accept" }],
+    });
+    expect(findProposal(included, "reconcile:w20>w10").effect).toBe("applied");
+  });
+
   it("never replaces a person's choice, and a rival they left out still competes", () => {
     const leftOut = plan(sameWay(0.1, 0.7), "recommended", {
       decisions: [{ proposalId: "connect:n101>n1", action: "reject" }],

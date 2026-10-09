@@ -41,17 +41,17 @@ import {
   PlanOverlay,
 } from "./plan/overlay.ts";
 import { accessSignature, barrierSignature, NODE_ROUTING_CRITICAL_TAGS } from "./rules/access.ts";
+import { isAreaWay } from "./rules/area.ts";
 import { refsWouldCollapse } from "./rules/collapse.ts";
 import {
   assessNodeIdentity,
   assessNodeTags,
-  mergeImportedTags,
   canDropReplacedNode,
-  mergesTags,
   wayPairJoinable,
+  withImportedTags,
 } from "./rules/node-identity.ts";
 import {
-  isDescriptiveWayTag,
+  mergeImportedWayTags,
   routingSemanticTagsEqual,
   withNonConflictingDescriptiveTags,
   withNonConflictingTags,
@@ -147,22 +147,28 @@ function hashText(hash: number, value: string) {
 }
 
 /**
- * Produce a compact lookup key for exact way reconciliation. Hash collisions are
- * expected and harmless because candidates still pass the complete refs and tag
- * predicates before they can be accepted.
+ * Produce a compact lookup key for exact way reconciliation of an imported way: its ordered refs
+ * and whether it is a highway. Hash collisions are expected and harmless because candidates
+ * still pass the complete predicate before they can be accepted.
  */
 function exactWayHash(way: OsmWay) {
   let hash = 2_166_136_261;
   hash = hashText(hash, `${way.refs.length}:`);
   for (const ref of way.refs) hash = hashText(hash, `${ref},`);
-  hash = hashText(hash, `direction:${normalizedWayDirection(way.tags)};`);
-  for (const [key, value] of Object.entries(way.tags ?? {}).toSorted(([a], [b]) =>
-    a < b ? -1 : a > b ? 1 : 0,
-  )) {
-    if (key === "oneway" || isDescriptiveWayTag(key)) continue;
-    hash = hashText(hash, `${key.length}:${key}${String(value).length}:${String(value)}`);
-  }
-  return hash;
+  return hashText(hash, way.tags?.["highway"] == null ? "-" : "highway");
+}
+
+/**
+ * Whether an imported way and a base way with the same ordered refs are one feature (MP-X2):
+ * both or neither are highways, both or neither are areas, and the imported direction is one
+ * the planner understands. Their tags may differ; the imported values win.
+ */
+function importedWayReconciles(imported: OsmWay, base: OsmWay) {
+  return (
+    normalizedWayDirection(imported.tags) !== "unsupported" &&
+    (imported.tags?.["highway"] == null) === (base.tags?.["highway"] == null) &&
+    isAreaWay(imported) === isAreaWay(base)
+  );
 }
 
 function nodeRoutingTagCount(node: OsmNode) {
@@ -623,11 +629,7 @@ export class OsmChangeset {
     if (this.nodeChanges.get(source.id)?.changeType !== "create") {
       return withNonConflictingTags(survivor, source);
     }
-    const tags = mergeImportedTags(survivor.tags, source.tags);
-    const same =
-      Object.keys(tags).length === Object.keys(survivor.tags ?? {}).length &&
-      Object.entries(tags).every(([key, value]) => survivor.tags?.[key] === value);
-    return same ? survivor : { ...survivor, tags };
+    return withImportedTags(survivor, source);
   }
 
   private deleteReconciledNode(node: OsmNode, survivorId: number) {
@@ -683,13 +685,12 @@ export class OsmChangeset {
             (!sameDataset || baseNode.id > patchNode.id) &&
             this.nodeChanges.get(baseNode.id)?.changeType !== "delete" &&
             sameOsmCoordinate(currentPatchNode, baseNode) &&
-            assessNodeTags("exact", currentPatchNode.tags, baseNode.tags, {
+            assessNodeTags(currentPatchNode.tags, baseNode.tags, {
               sourceIsImported: !sameDataset,
             }).hardReasons.length === 0,
         );
       if (reviewReasons && candidateNodes.length === 1) {
         const { reviewReasons: reasons } = assessNodeTags(
-          "exact",
           currentPatchNode.tags,
           candidateNodes[0]!.tags,
           { sourceIsImported: !sameDataset },
@@ -885,7 +886,7 @@ export class OsmChangeset {
       ? [wayNode, intersectingWayNode]
       : [intersectingWayNode, wayNode];
     const oneImported = imported(wayNode.id) !== imported(intersectingWayNode.id);
-    const tagAssessment = assessNodeTags("crossing", importedNode.tags, existingNode.tags, {
+    const tagAssessment = assessNodeTags(importedNode.tags, existingNode.tags, {
       sourceIsImported: oneImported,
     });
     if (tagAssessment.hardReasons.length) return null;
@@ -955,7 +956,7 @@ export class OsmChangeset {
     const droppable = canDropReplacedNode({
       imported: patchNodeIds?.has(replaced.id) ?? false,
       tagged: Object.keys(replaced.tags ?? {}).length > 0,
-      tagsMerged: mergesTags("crossing"),
+      tagsMerged: true,
       // The replacement rewrote every incident way, so no way still uses the replaced node.
       referencedByWay: false,
       referencedByRelation,
@@ -999,15 +1000,15 @@ export class OsmChangeset {
 
   /**
    * De-duplicate the ways within this OSM changeset.
-   */
-  /**
-   * @param accept - Called with each exact way match; returning false leaves the pair
-   * separate. Every match is accepted without it.
+   *
+   * @param accept - Called with each exact way match and its review reasons (`grade-change`
+   * when the imported values would change the base way's grade, MP-X2); returning false leaves
+   * the pair separate. Every match is accepted without it.
    */
   *deduplicateWaysGenerator(
     ways: Ways,
     replacementMap: ReplacementMap = new Map(),
-    accept?: (patchWayId: number, baseWayId: number) => boolean,
+    accept?: (patchWayId: number, baseWayId: number, reviewReasons: string[]) => boolean,
   ) {
     const dedupedIdPairs = new IdPairs();
     const sameDataset = ways === this.osm.ways;
@@ -1026,8 +1027,8 @@ export class OsmChangeset {
   }
 
   /**
-   * Index immutable base targets by ordered refs and routing semantics. Candidate
-   * buckets are collision-checked with the complete reconciliation predicates.
+   * Index immutable base targets by ordered refs and highway presence. Candidate buckets are
+   * collision-checked with the complete reconciliation predicate.
    */
   private buildCrossDatasetExactWayIndex(): ExactWayIndex {
     const index: ExactWayIndex = new Map();
@@ -1101,7 +1102,7 @@ export class OsmChangeset {
     dedupedIdPairs: IdPairs,
     replacementMap: ReplacementMap,
     exactWayIndex?: ExactWayIndex,
-    accept?: (patchWayId: number, baseWayId: number) => boolean,
+    accept?: (patchWayId: number, baseWayId: number, reviewReasons: string[]) => boolean,
   ) {
     if (!this.osm.ways.ids.has(patchWay.id) && this.wayChanges.get(patchWay.id) == null) return 0;
     if (!sameDataset && this.wayChanges.get(patchWay.id)?.changeType !== "create") return 0;
@@ -1133,16 +1134,35 @@ export class OsmChangeset {
         const currentBaseWay = this.getCurrentWay(baseWay);
         if (!currentBaseWay) return false;
         if (!dequal(currentPatchWay.refs, currentBaseWay.refs)) return false;
-        return routingSemanticTagsEqual(currentPatchWay.tags, currentBaseWay.tags);
+        // Within one dataset both ways are existing data, so they must already agree (MP-I5).
+        return sameDataset
+          ? routingSemanticTagsEqual(currentPatchWay.tags, currentBaseWay.tags)
+          : importedWayReconciles(currentPatchWay, currentBaseWay);
       });
 
-    if (candidates.length === 0 || (!sameDataset && candidates.length !== 1)) return 0;
-    const baseWay = sameDataset ? candidates.toSorted((a, b) => b.id - a.id)[0] : candidates[0];
+    // Of several base ways on the same refs, an imported way reconciles with the one whose
+    // tags already agree, if exactly one does.
+    const agreeing =
+      !sameDataset && candidates.length > 1
+        ? candidates.filter((way) =>
+            routingSemanticTagsEqual(currentPatchWay.tags, this.getCurrentWay(way)?.tags),
+          )
+        : candidates;
+    if (agreeing.length === 0 || (!sameDataset && agreeing.length !== 1)) return 0;
+    const baseWay = sameDataset ? agreeing.toSorted((a, b) => b.id - a.id)[0] : agreeing[0];
     const currentBaseWay = this.getCurrentWay(baseWay!);
     if (!currentBaseWay) return 0;
-    if (accept && !accept(patchWay.id, currentBaseWay.id)) return 0;
+    // An imported way's values win; within one dataset only missing descriptive values are added.
+    const mergedWay = sameDataset
+      ? withNonConflictingDescriptiveTags(currentBaseWay, currentPatchWay)
+      : withImportedTags(currentBaseWay, currentPatchWay, mergeImportedWayTags);
+    // A change of grade can join paths on different levels, so it waits for a person (MP-X2).
+    const reviewReasons =
+      routingGradeSignature(mergedWay.tags) === routingGradeSignature(currentBaseWay.tags)
+        ? []
+        : ["grade-change"];
+    if (accept && !accept(patchWay.id, currentBaseWay.id, reviewReasons)) return 0;
 
-    const mergedWay = withNonConflictingDescriptiveTags(currentBaseWay, currentPatchWay);
     if (mergedWay !== currentBaseWay) this.modify("way", currentBaseWay.id, () => mergedWay);
 
     replacementMap.set(patchWay.id, currentBaseWay.id);

@@ -5,26 +5,25 @@
  * they share every check here and differ only where their kind says so. See MP-M3 and MP-J1 in
  * docs/merge-process.md.
  */
-import type { OsmNode, OsmTags, OsmWay } from "@osmix/types";
+import type { OsmEntity, OsmNode, OsmTags, OsmWay } from "@osmix/types";
 
 import { junctionHasIncompatibleGrades } from "../integrity.ts";
 import { accessSignature, barrierSignature } from "./access.ts";
 import { refsWouldCollapse } from "./collapse.ts";
 import { routingGradeSignature } from "./grade.ts";
-import { nodeRoutingSignature } from "./routing.ts";
 import { hasAnyTagConflict } from "./tags.ts";
 
 /**
- * - `exact`: identical 7-decimal coordinates; tags merge into the survivor.
- * - `connect`: an explicit, nearby network connection; tags never merge (copying is separate).
- * - `crossing`: a crossing within 1 m of an existing vertex; tags merge into the survivor.
+ * Every kind merges the source's tags into the survivor:
+ * - `exact`: identical 7-decimal coordinates.
+ * - `connect`: an explicit, nearby network connection.
+ * - `crossing`: a crossing within 1 m of an existing vertex.
  */
 export type NodeIdentityKind = "exact" | "connect" | "crossing";
 
 export type NodeIdentityReason =
   | "grade-change"
   | "grade-conflict"
-  | "node-context-conflict"
   | "routing-family-conflict"
   | "tag-conflict"
   | "would-collapse-way";
@@ -34,20 +33,24 @@ export interface NodeIdentityAssessment {
   hardReasons: NodeIdentityReason[];
   /** Plausible but uncertain; an explicit decision can accept them. */
   reviewReasons: NodeIdentityReason[];
-  /** Whether the source's tags are merged into the survivor. */
-  mergeTags: boolean;
 }
-
-const GRADE_KEYS = ["layer", "level", "bridge", "tunnel", "covered"] as const;
 
 /** The survivor's tags after merging an imported point into it: the imported values win. */
 export function mergeImportedTags(survivor: OsmTags | undefined, imported: OsmTags | undefined) {
   return { ...survivor, ...imported };
 }
 
-/** Whether the survivor absorbs the source's tags for this kind of identity. */
-export function mergesTags(kind: NodeIdentityKind) {
-  return kind !== "connect";
+/** `survivor` with `imported`'s tags merged in, or `survivor` itself when none change. */
+export function withImportedTags<T extends OsmEntity>(
+  survivor: T,
+  imported: OsmEntity,
+  merge = mergeImportedTags,
+): T {
+  const tags = merge(survivor.tags, imported.tags);
+  const same =
+    Object.keys(tags).length === Object.keys(survivor.tags ?? {}).length &&
+    Object.entries(tags).every(([key, value]) => survivor.tags?.[key] === value);
+  return same ? survivor : { ...survivor, tags };
 }
 
 /**
@@ -63,57 +66,36 @@ export function wayPairJoinable(a: OsmWay, b: OsmWay) {
 }
 
 /**
- * Node-level checks. When a kind that merges tags merges an imported point into existing data,
- * the imported values win: they replace conflicting values and may add access and barrier tags.
- * Only a change to the survivor's grade needs a person (`grade-change`, a review reason). Within
- * one dataset both sides are existing data, so their tags must agree and their signatures be
- * equal. A connection keeps the source's tags behind, so its node routing controls must match
- * exactly.
+ * Node-level checks. When an imported point merges into existing data, the imported values win:
+ * they replace conflicting values and may add or change access and barrier tags. Only a change
+ * to the survivor's grade needs a person (`grade-change`, a review reason). Within one dataset
+ * both sides are existing data, so their tags must agree and their signatures be equal.
  */
 export function assessNodeTags(
-  kind: NodeIdentityKind,
   source: OsmTags | undefined,
   target: OsmTags | undefined,
   options: { sourceIsImported?: boolean } = {},
 ): Pick<NodeIdentityAssessment, "hardReasons" | "reviewReasons"> {
   const hardReasons: NodeIdentityReason[] = [];
   const reviewReasons: NodeIdentityReason[] = [];
-  if (mergesTags(kind)) {
-    if (options.sourceIsImported) {
-      if (
-        routingGradeSignature(mergeImportedTags(target, source)) !== routingGradeSignature(target)
-      ) {
-        reviewReasons.push("grade-change");
-      }
-      return { hardReasons, reviewReasons };
-    }
-    // Within one dataset, merging must not silently pick one of two existing values.
-    if (hasAnyTagConflict(source, target)) hardReasons.push("tag-conflict");
-    if (routingGradeSignature(source) !== routingGradeSignature(target)) {
-      hardReasons.push("grade-conflict");
-    }
+  if (options.sourceIsImported) {
     if (
-      accessSignature(source) !== accessSignature(target) ||
-      barrierSignature(source) !== barrierSignature(target)
+      routingGradeSignature(mergeImportedTags(target, source)) !== routingGradeSignature(target)
     ) {
-      hardReasons.push("routing-family-conflict");
+      reviewReasons.push("grade-change");
     }
     return { hardReasons, reviewReasons };
   }
+  // Within one dataset, merging must not silently pick one of two existing values.
+  if (hasAnyTagConflict(source, target)) hardReasons.push("tag-conflict");
   if (routingGradeSignature(source) !== routingGradeSignature(target)) {
     hardReasons.push("grade-conflict");
   }
-  if (accessSignature(source) !== accessSignature(target)) {
+  if (
+    accessSignature(source) !== accessSignature(target) ||
+    barrierSignature(source) !== barrierSignature(target)
+  ) {
     hardReasons.push("routing-family-conflict");
-  }
-  const sourceBarrier = barrierSignature(source);
-  if (sourceBarrier !== barrierSignature(target)) hardReasons.push("routing-family-conflict");
-  if (nodeRoutingSignature(source) !== nodeRoutingSignature(target)) {
-    hardReasons.push("routing-family-conflict");
-  }
-  if (sourceBarrier !== "") reviewReasons.push("node-context-conflict");
-  if (GRADE_KEYS.some((key) => source?.[key] != null || target?.[key] != null)) {
-    reviewReasons.push("node-context-conflict");
   }
   return { hardReasons, reviewReasons };
 }
@@ -175,7 +157,7 @@ export function assessNodeIdentity(
   targetWays: readonly OsmWay[],
   options: { sourceIsImported?: boolean } = {},
 ): NodeIdentityAssessment {
-  const { hardReasons, reviewReasons } = assessNodeTags(kind, source.tags, target.tags, options);
+  const { hardReasons, reviewReasons } = assessNodeTags(source.tags, target.tags, options);
   hardReasons.push(
     ...assessJunction(target.id, source.id, sourceWays, targetWays, {
       // Identical coordinates are the same point: a zero-length segment between two merged
@@ -186,7 +168,6 @@ export function assessNodeIdentity(
   return {
     hardReasons: [...new Set(hardReasons)],
     reviewReasons: [...new Set(reviewReasons)],
-    mergeTags: mergesTags(kind),
   };
 }
 

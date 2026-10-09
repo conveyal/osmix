@@ -33,6 +33,14 @@ export function hasAnyTagConflict(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
   return Object.entries(a).some(([key, value]) => b[key] != null && b[key] !== value);
 }
 
+/** The keys `a` and `b` both set, to different values, in key order. */
+export function conflictingTagKeys(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
+  if (!a || !b) return [];
+  return Object.keys(a)
+    .filter((key) => b[key] != null && b[key] !== a[key])
+    .toSorted();
+}
+
 export function isDescriptiveWayTag(key: string) {
   return (
     DESCRIPTIVE_WAY_TAGS.has(key) ||
@@ -47,6 +55,20 @@ export function routingSemanticTagsEqual(a: OsmEntity["tags"], b: OsmEntity["tag
   return [...keys].every(
     (key) => key === "oneway" || isDescriptiveWayTag(key) || a?.[key] === b?.[key],
   );
+}
+
+/**
+ * An imported way's tags merged into a base way's (MP-X2): the imported values win and base-only
+ * keys stay. Direction is compared normalized (MP-X3), so an equivalent `oneway` spelling keeps
+ * the base's.
+ */
+export function mergeImportedWayTags(base: OsmEntity["tags"], imported: OsmEntity["tags"]) {
+  const tags = { ...base, ...imported };
+  if (normalizedWayDirection(base) === normalizedWayDirection(imported)) {
+    if (base?.["oneway"] === undefined) delete tags["oneway"];
+    else tags["oneway"] = base["oneway"];
+  }
+  return tags;
 }
 
 export function withNonConflictingTags<T extends OsmEntity>(base: T, patch: T): T {

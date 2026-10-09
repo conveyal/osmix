@@ -216,35 +216,14 @@ describe("routing-safe merge reconciliation", () => {
     expect(result.ways.getById(20)?.refs).toEqual([101, 102]);
   });
 
-  it("does not reconcile ways with conflicting routing tags", async () => {
+  it("lets an imported way's values win when ways reconcile, routing values included", async () => {
     const base = createOsm(
       "base",
       [
         { id: 1, lon: 0, lat: 0 },
         { id: 2, lon: 1, lat: 0 },
       ],
-      [{ id: 10, refs: [1, 2], tags: { highway: "residential" } }],
-    );
-    const patch = createOsm(
-      "patch",
-      [],
-      [{ id: 20, refs: [1, 2], tags: { highway: "residential", oneway: "yes" } }],
-    );
-
-    const result = await merge(base, patch, { createIntersections: false }, silent);
-
-    expect(result.ways.ids.has(10)).toBe(true);
-    expect(result.ways.ids.has(20)).toBe(true);
-  });
-
-  it("does not reconcile ways with conditional access semantics", async () => {
-    const base = createOsm(
-      "base",
-      [
-        { id: 1, lon: 0, lat: 0 },
-        { id: 2, lon: 1, lat: 0 },
-      ],
-      [{ id: 10, refs: [1, 2], tags: { highway: "residential" } }],
+      [{ id: 10, refs: [1, 2], tags: { highway: "residential", name: "Base", surface: "gravel" } }],
     );
     const patch = createOsm(
       "patch",
@@ -257,6 +236,7 @@ describe("routing-safe merge reconciliation", () => {
             "access:conditional": "no @ (Mo-Fr 07:00-09:00)",
             highway: "residential",
             name: "School Street",
+            oneway: "yes",
           },
         },
       ],
@@ -264,12 +244,56 @@ describe("routing-safe merge reconciliation", () => {
 
     const result = await merge(base, patch, { createIntersections: false }, silent);
 
-    expect(result.ways.ids.has(10)).toBe(true);
-    expect(result.ways.ids.has(20)).toBe(true);
-    expect(result.ways.getById(10)?.tags).toEqual({ highway: "residential" });
+    expect(result.ways.ids.has(20)).toBe(false);
+    // A key only the base has stays: a missing imported value never means delete.
+    expect(result.ways.getById(10)?.tags).toEqual({
+      "access:conditional": "no @ (Mo-Fr 07:00-09:00)",
+      highway: "residential",
+      name: "School Street",
+      oneway: "yes",
+      surface: "gravel",
+    });
   });
 
-  it("copies only non-conflicting descriptive tags when ways reconcile", async () => {
+  it("does not reconcile a highway with a way that is not one", async () => {
+    const base = createOsm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 1, lat: 0 },
+      ],
+      [{ id: 10, refs: [1, 2], tags: { barrier: "fence" } }],
+    );
+    const patch = createOsm("patch", [], [{ id: 20, refs: [1, 2], tags: { highway: "footway" } }]);
+
+    const result = await merge(base, patch, { createIntersections: false }, silent);
+
+    expect(result.ways.getById(10)?.tags).toEqual({ barrier: "fence" });
+    expect(result.ways.getById(20)?.refs).toEqual([1, 2]);
+  });
+
+  it("leaves a reconcile that would change the base way's grade for a person", async () => {
+    const base = createOsm(
+      "base",
+      [
+        { id: 1, lon: 0, lat: 0 },
+        { id: 2, lon: 1, lat: 0 },
+      ],
+      [{ id: 10, refs: [1, 2], tags: { highway: "footway" } }],
+    );
+    const patch = createOsm(
+      "patch",
+      [],
+      [{ id: 20, refs: [1, 2], tags: { highway: "footway", bridge: "yes", layer: "1" } }],
+    );
+
+    const result = await merge(base, patch, { createIntersections: false }, silent);
+
+    expect(result.ways.getById(10)?.tags).toEqual({ highway: "footway" });
+    expect(result.ways.ids.has(20)).toBe(true);
+  });
+
+  it("adds an imported way's name when ways reconcile", async () => {
     const base = createOsm(
       "base",
       [
@@ -293,7 +317,7 @@ describe("routing-safe merge reconciliation", () => {
     });
   });
 
-  it("checks complete way semantics when exact-index hashes collide", async () => {
+  it("reconciles with the one base way that agrees when two share the refs", async () => {
     const base = createOsm(
       "base",
       [

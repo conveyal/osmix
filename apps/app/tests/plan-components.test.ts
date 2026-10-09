@@ -280,6 +280,21 @@ describe("plan components", () => {
     expect(html).toContain("Include at most one; including this one leaves the others out.");
   });
 
+  it("says which keys a rival connection gives a different value", () => {
+    const html = render(
+      createElement(PlanProposalActions, {
+        proposal: connect({
+          competitors: ["connect:n18731>n2"],
+          rivalries: { "connect:n18731>n2": { conflictingKeys: ["barrier", "kerb"] } },
+        } as Partial<PlanProposal>),
+        onDecide: noop,
+      }),
+    );
+    expect(html).toContain(
+      "Imported point 18731 gives barrier, kerb a different value; the base node takes one value.",
+    );
+  });
+
   it("keys the selected feature's base targets in the legend, each target once", () => {
     const store = createStore();
     store.set(planMapAtom, { baseOsmId: "base", revision: 1 });

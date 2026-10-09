@@ -23,7 +23,7 @@ export interface ConflationApplicationTrace {
   tagWriters: Map<string, string>;
   alreadyEqualTagValues: Set<string>;
   wayRemovals?: Map<string, OsmConflationWayRemovalPreview>;
-  /** Imported nodes a connection left unused (untagged, unreferenced), so they were dropped. */
+  /** Imported nodes a connection left unreferenced (their tags merged), so they were dropped. */
   connectionOrphanNodeIds: Set<number>;
 }
 

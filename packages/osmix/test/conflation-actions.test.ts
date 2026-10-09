@@ -24,24 +24,34 @@ interface Actions {
   attachNetwork: boolean;
 }
 
+/**
+ * A base footway ending at entrance 1, and an imported footway starting 0.5 m from it. With
+ * `blockAttachment`, the base footway continues east and the imported one runs 0.4 m beside it
+ * through the entrance: a copy of the base path, whose point there is no junction (MP-M5).
+ */
 function inputs(blockAttachment = false) {
   const base = new Osm({ id: "actions-base" });
   base.nodes.addNode({ id: 1, lon: 0, lat: 0, tags: { name: "Base entrance" } });
   base.nodes.addNode({ id: 2, lon: -0.001, lat: 0 });
+  if (blockAttachment) base.nodes.addNode({ id: 3, lon: 0.001, lat: 0 });
   base.nodes.buildIndex();
-  base.ways.addWay({ id: 10, refs: [2, 1], tags: { highway: "footway" } });
+  base.ways.addWay({
+    id: 10,
+    refs: blockAttachment ? [2, 1, 3] : [2, 1],
+    tags: { highway: "footway" },
+  });
   base.buildIndexes();
   base.buildSpatialIndexes();
   const patch = new Osm({ id: "actions-patch" });
-  patch.nodes.addNode({
-    id: 101,
-    lon: 0.000005,
-    lat: 0,
-    tags: { name: "Imported entrance", ...(blockAttachment ? { barrier: "gate" } : {}) },
-  });
-  patch.nodes.addNode({ id: 102, lon: 0.001, lat: 0 });
+  patch.nodes.addNode({ id: 101, lon: 0.000005, lat: 0, tags: { name: "Imported entrance" } });
+  patch.nodes.addNode({ id: 102, lon: 0.001, lat: blockAttachment ? 0.000004 : 0 });
+  if (blockAttachment) patch.nodes.addNode({ id: 103, lon: -0.001, lat: 0.000004 });
   patch.nodes.buildIndex();
-  patch.ways.addWay({ id: 20, refs: [101, 102], tags: { highway: "footway" } });
+  patch.ways.addWay({
+    id: 20,
+    refs: blockAttachment ? [103, 101, 102] : [101, 102],
+    tags: { highway: "footway" },
+  });
   patch.buildIndexes();
   patch.buildSpatialIndexes();
   return { base, patch };
@@ -100,11 +110,14 @@ function expectEffects(features: { proposals: PlanProposal[] }[], actions: Actio
 }
 
 function expectResult(osm: Osm, base: Osm, patch: Osm, actions: Actions) {
-  const expectedNodes = [...base.nodes.sorted(), ...patch.nodes.sorted()].map((node) =>
-    node.id === 1 && actions.transferProperties
-      ? { ...node, tags: { ...node.tags, name: "Imported entrance" } }
-      : node,
-  );
+  // A connection merges the entrance's tags into base node 1 and drops imported point 101.
+  const expectedNodes = [...base.nodes.sorted(), ...patch.nodes.sorted()]
+    .filter((node) => node.id !== 101 || !actions.attachNetwork)
+    .map((node) =>
+      node.id === 1 && (actions.transferProperties || actions.attachNetwork)
+        ? { ...node, tags: { ...node.tags, name: "Imported entrance" } }
+        : node,
+    );
   const expectedWays = [...base.ways.sorted(), ...patch.ways.sorted()].map((way) =>
     way.id === 20 && actions.attachNetwork ? { ...way, refs: [1, 102] } : way,
   );
@@ -259,9 +272,10 @@ describe("scheduled matching actions", () => {
     expect(copy.effect).toBe("applied");
     expect(connect).toMatchObject({ decision: "accept", effect: "blocked" });
     worker.applyMergePlan(base.id);
-    expectResult(worker.getOsm(base.id), base, patch, {
-      transferProperties: true,
-      attachNetwork: false,
-    });
+    // The copy's ends connect to the base path's ends; the entrance stays its own point.
+    const result = worker.getOsm(base.id);
+    expect(result.nodes.getById(1)?.tags).toEqual({ name: "Imported entrance" });
+    expect(result.nodes.getById(101)).toEqual(patch.nodes.getById(101));
+    expect(result.ways.getById(20)?.refs).toEqual([2, 101, 3]);
   });
 });

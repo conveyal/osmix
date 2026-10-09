@@ -31,7 +31,7 @@ const attachmentOptions: OsmConflationOptions = {
 };
 
 describe("safe fuzzy conflation discovery", () => {
-  it("drops a connected imported node only when it is untagged and nothing else uses it", async () => {
+  it("drops a connected imported node once nothing else uses it", async () => {
     const base = createOsm(
       "base",
       [
@@ -62,10 +62,11 @@ describe("safe fuzzy conflation discovery", () => {
     expect(untagged.ways.getById(20)?.refs).toEqual([1, 102]);
     expect(untagged.nodes.ids.has(101)).toBe(false);
 
-    // A tagged point keeps values that were not copied.
+    // A tagged point's values merge into the base point, so it goes too.
     const tagged = await mergeWith(importWith({ tags: { note: "surveyed" } }));
     expect(tagged.ways.getById(20)?.refs).toEqual([1, 102]);
-    expect(tagged.nodes.getById(101)?.tags).toEqual({ note: "surveyed" });
+    expect(tagged.nodes.ids.has(101)).toBe(false);
+    expect(tagged.nodes.getById(1)?.tags).toEqual({ note: "surveyed" });
 
     // A wall is not a routing way, so the connection does not rewrite it and 101 stays in use.
     const shared = await mergeWith(
@@ -490,9 +491,9 @@ describe("safe fuzzy property transfer", () => {
       silent,
     );
     expect(result.nodes.getById(1)?.tags?.["ref"]).toBe("patch");
+    // On identical geometry the ways reconcile first, and the imported surface wins (MP-X2).
     expect(result.ways.getById(10)?.tags?.["surface"]).toBe("paved");
-    expect(result.ways.getById(20)?.refs).toEqual([1, 2]);
-    expect(result.ways.getById(20)?.tags?.["surface"]).toBe("paved");
+    expect(result.ways.ids.has(20)).toBe(false);
   });
 
   it("keeps same-ID patch updates authoritative over nearby fuzzy sources", async () => {
@@ -772,7 +773,7 @@ describe("safe fuzzy topology gates", () => {
     expect(result.nodes.ids.has(101)).toBe(true);
   });
 
-  it("blocks conflicting node grade and access context before network attachment", () => {
+  it("waits on a connection that would change the base point's grade, not its access", () => {
     const base = createOsm(
       "base",
       [
@@ -781,101 +782,60 @@ describe("safe fuzzy topology gates", () => {
       ],
       [{ id: 10, refs: [2, 1], tags: { highway: "footway" } }],
     );
-    const patch = createOsm(
-      "patch",
-      [
-        { id: 101, lon: 0.000005, lat: 0, tags: { layer: "-1", access: "private" } },
-        { id: 102, lon: 0.001, lat: 0 },
-      ],
-      [{ id: 20, refs: [101, 102], tags: { highway: "footway" } }],
-    );
-    const candidate = discoverConflationCandidates(base, patch, attachmentOptions).candidates.find(
-      (item) => item.sourceId === 101,
-    );
-    expect(candidate?.networkAttachment?.status).toBe("blocked");
-    expect(candidate?.networkAttachment?.reasons).toEqual(
-      expect.arrayContaining(["grade-conflict", "routing-family-conflict"]),
-    );
-  });
-
-  it("never auto-attaches barrier or floor nodes even when their contexts agree", () => {
-    const base = createOsm(
-      "base",
-      [
-        { id: 1, lon: 0, lat: 0, tags: { barrier: "gate", level: "1" } },
-        { id: 2, lon: -0.001, lat: 0 },
-      ],
-      [{ id: 10, refs: [2, 1], tags: { highway: "footway" } }],
-    );
-    const patch = createOsm(
-      "patch",
-      [
-        { id: 101, lon: 0.000005, lat: 0, tags: { barrier: "gate", level: "1" } },
-        { id: 102, lon: 0.001, lat: 0 },
-      ],
-      [{ id: 20, refs: [101, 102], tags: { highway: "footway" } }],
-    );
-    const candidate = discoverConflationCandidates(base, patch, attachmentOptions).candidates.find(
-      (item) => item.sourceId === 101,
-    );
-    expect(candidate?.networkAttachment).toMatchObject({
+    const patchWith = (tags: OsmNode["tags"]) =>
+      createOsm(
+        "patch",
+        [
+          { id: 101, lon: 0.000005, lat: 0, tags },
+          { id: 102, lon: 0.001, lat: 0 },
+        ],
+        [{ id: 20, refs: [101, 102], tags: { highway: "footway" } }],
+      );
+    const attachment = (tags: OsmNode["tags"]) =>
+      discoverConflationCandidates(base, patchWith(tags), attachmentOptions).candidates.find(
+        (item) => item.sourceId === 101,
+      )?.networkAttachment;
+    expect(attachment({ layer: "-1", access: "private" })).toEqual({
       status: "review",
-      reasons: ["node-context-conflict"],
+      reasons: ["grade-change"],
+    });
+    expect(attachment({ access: "private", barrier: "gate" })).toEqual({
+      status: "automatic",
+      reasons: [],
     });
   });
 
-  it("blocks incompatible crossing and kerb node context but permits exact context", () => {
+  it("lets a connected kerb ramp's values win, as an identical-point merge does", async () => {
     const base = createOsm(
       "base",
       [
-        {
-          id: 1,
-          lon: 0,
-          lat: 0,
-          tags: { highway: "crossing", crossing: "marked", kerb: "lowered" },
-        },
+        { id: 1, lon: 0, lat: 0, tags: { barrier: "kerb", crossing: "marked", kerb: "raised" } },
         { id: 2, lon: -0.001, lat: 0 },
       ],
       [{ id: 10, refs: [2, 1], tags: { highway: "footway" } }],
     );
+    const ramp = { barrier: "kerb", kerb: "lowered", tactile_paving: "yes" };
     const patch = createOsm(
       "patch",
       [
-        {
-          id: 101,
-          lon: 0.000005,
-          lat: 0,
-          tags: { highway: "crossing", crossing: "unmarked", kerb: "raised" },
-        },
+        { id: 101, lon: 0.000005, lat: 0, tags: ramp },
         { id: 102, lon: 0.001, lat: 0 },
       ],
       [{ id: 20, refs: [101, 102], tags: { highway: "footway" } }],
     );
-    const conflict = discoverConflationCandidates(base, patch, attachmentOptions).candidates.find(
+    const candidate = discoverConflationCandidates(base, patch, attachmentOptions).candidates.find(
       (item) => item.sourceId === 101,
     );
-    expect(conflict?.networkAttachment).toMatchObject({
-      status: "blocked",
-      reasons: ["routing-family-conflict"],
-    });
-
-    const exactPatch = createOsm(
-      "exact-patch",
-      [
-        {
-          id: 101,
-          lon: 0.000005,
-          lat: 0,
-          tags: { highway: "crossing", crossing: "marked", kerb: "lowered" },
-        },
-        { id: 102, lon: 0.001, lat: 0 },
-      ],
-      [{ id: 20, refs: [101, 102], tags: { highway: "footway" } }],
+    expect(candidate?.networkAttachment).toEqual({ status: "automatic", reasons: [] });
+    const result = await merge(
+      base,
+      patch,
+      { mergeIdenticalPoints: false, createIntersections: false, matching: attachmentOptions },
+      silent,
     );
-    const exact = discoverConflationCandidates(base, exactPatch, attachmentOptions).candidates.find(
-      (item) => item.sourceId === 101,
-    );
-    expect(exact?.networkAttachment).toEqual({ status: "automatic", reasons: [] });
+    expect(result.ways.getById(20)?.refs).toEqual([1, 102]);
+    expect(result.nodes.ids.has(101)).toBe(false);
+    expect(result.nodes.getById(1)?.tags).toEqual({ ...base.nodes.getById(1)?.tags, ...ramp });
   });
 
   it("blocks grade conflicts and reviews perpendicular attachments", () => {

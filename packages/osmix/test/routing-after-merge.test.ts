@@ -392,7 +392,12 @@ describe("routing after explicit fuzzy conflation", () => {
     expect(networkAttachment.ways.getById(849)?.refs.at(-1)).toBe(802);
     expect(networkAttachment.ways.getById(910)?.refs.at(0)).toBe(802);
     expect(networkAttachment.ways.getById(949)?.refs.at(-1)).toBe(902);
-    expect(networkAttachment.nodes.getById(901)).not.toBeNull();
+    // The connection merged tagged point 901 into 802, so 901 is gone and 802 has its tags.
+    expect(networkAttachment.nodes.getById(901)).toBeNull();
+    expect(networkAttachment.nodes.getById(802)?.tags).toMatchObject({
+      name: "Imported endpoint",
+      source: "synthetic survey",
+    });
     expectReportsToMatchCases(attachmentReports, SYNTHETIC_CONFLATION_ATTACHED_CASES);
 
     const ordinaryCar = ordinaryReports.find(
@@ -401,7 +406,12 @@ describe("routing after explicit fuzzy conflation", () => {
     const attachedCar = attachmentReports.find(
       (report) => report.caseId === "synthetic-conflation-car",
     );
-    expect(attachedCar?.graph).toEqual(ordinaryCar?.graph);
+    // The CAR graph keeps its edges and components; it counts one node fewer, since the
+    // connection merged imported point 901 into 802.
+    expect(attachedCar?.graph).toEqual({
+      ...ordinaryCar?.graph,
+      nodes: (ordinaryCar?.graph.nodes ?? 0) - 1,
+    });
 
     const ordinaryWalk = ordinaryReports.find(
       (report) => report.caseId === "synthetic-conflation-walk",

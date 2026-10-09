@@ -270,22 +270,20 @@ describe("hard conflation blockers survive combined review reasons", () => {
     expect([...result.relations]).toEqual([...patch.relations]);
   });
 
-  it("keeps safe property copying usable when relation and access context block attachment", async () => {
+  it("keeps safe property copying usable when relation and copy-of-path context block attachment", async () => {
     const base = new Osm({ id: "base" });
     base.nodes.addNode({ id: 1, lon: 0, lat: 0, tags: { name: "Base" } });
     base.nodes.addNode({ id: 2, lon: -0.001, lat: 0 });
-    base.ways.addWay({ id: 10, refs: [2, 1], tags: { highway: "footway" } });
+    base.nodes.addNode({ id: 3, lon: 0.001, lat: 0 });
+    base.ways.addWay({ id: 10, refs: [2, 1, 3], tags: { highway: "footway" } });
     base.buildIndexes();
     base.buildSpatialIndexes();
+    // Imported way 20 runs 0.4 m beside base way 10: a copy of it, so its point is no junction.
     const patch = new Osm({ id: "patch" });
-    patch.nodes.addNode({
-      id: 101,
-      lon: 0.000005,
-      lat: 0,
-      tags: { name: "Imported", access: "private" },
-    });
-    patch.nodes.addNode({ id: 102, lon: 0.001, lat: 0 });
-    patch.ways.addWay({ id: 20, refs: [101, 102], tags: { highway: "footway" } });
+    patch.nodes.addNode({ id: 101, lon: 0.000005, lat: 0, tags: { name: "Imported" } });
+    patch.nodes.addNode({ id: 102, lon: 0.001, lat: 0.000004 });
+    patch.nodes.addNode({ id: 103, lon: -0.001, lat: 0.000004 });
+    patch.ways.addWay({ id: 20, refs: [103, 101, 102], tags: { highway: "footway" } });
     patch.relations.addRelation({
       id: 200,
       tags: { type: "route", route: "foot" },
@@ -301,7 +299,7 @@ describe("hard conflation blockers survive combined review reasons", () => {
       propertyTransfer: { status: "automatic" },
       networkAttachment: {
         status: "blocked",
-        reasons: expect.arrayContaining(["routing-family-conflict", "relation-member"]),
+        reasons: expect.arrayContaining(["traces-base-way", "relation-member"]),
       },
     });
     const blockedAttachment: OsmConflationDecision = {
@@ -351,7 +349,7 @@ describe("hard conflation blockers survive combined review reasons", () => {
     );
     expect(result.nodes.getById(1)?.tags).toEqual({ name: "Imported" });
     expect(result.nodes.getById(101)).toEqual(patch.nodes.getById(101));
-    expect(result.ways.getById(20)?.refs).toEqual([101, 102]);
+    expect(result.ways.getById(20)?.refs).toEqual([103, 101, 102]);
     expect([...result.relations]).toEqual([...patch.relations]);
   });
 });

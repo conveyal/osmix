@@ -318,7 +318,7 @@ function planIdentity(
   }
   changeset.applyNodeReplacements(accepted);
 
-  const accept = (sourceId: number, targetId: number) => {
+  const accept = (sourceId: number, targetId: number, reasons: string[]) => {
     const feature = builder.featureOfWay(sourceId);
     if (!feature) throw Error(`Exact way match source ${sourceId} is not an imported way`);
     const proposal = builder.propose({
@@ -327,8 +327,9 @@ function planIdentity(
       feature: feature.key,
       source: { type: "way", id: sourceId },
       target: { type: "way", id: targetId },
-      status,
-      reasons: [],
+      // A reconcile that changes the base way's grade always waits for a person (MP-X2).
+      status: reasons.length > 0 ? "review" : status,
+      reasons,
     });
     return proposal.effect === "applied";
   };

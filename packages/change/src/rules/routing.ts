@@ -1,5 +1,5 @@
-/** Routing families, protected and routing-affecting keys, and node routing signatures. */
-import type { OsmTags, OsmWay } from "@osmix/types";
+/** Routing families, and protected and routing-affecting keys. */
+import type { OsmWay } from "@osmix/types";
 
 import type { OsmConflationRoutingFamily } from "../types.ts";
 import { accessSignature, ROUTING_ACCESS_KEYS } from "./access.ts";
@@ -42,22 +42,6 @@ export function isRoutingProperty(key: string) {
   return [...ROUTING_KEYS].some(
     (routingKey) => key === routingKey || key.startsWith(`${routingKey}:`),
   );
-}
-
-export function nodeRoutingSignature(tags: OsmTags | undefined) {
-  return Object.keys(tags ?? {})
-    .filter(
-      (key) =>
-        isRoutingProperty(key) &&
-        !ROUTING_ACCESS_KEYS.some(
-          (accessKey) => key === accessKey || key.startsWith(`${accessKey}:`),
-        ) &&
-        key !== "barrier" &&
-        !key.startsWith("barrier:"),
-    )
-    .toSorted()
-    .map((key) => `${key}=${String(tags?.[key] ?? "")}`)
-    .join("|");
 }
 
 export function wayRoutingFamily(way: OsmWay): OsmConflationRoutingFamily {

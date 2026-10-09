@@ -2,7 +2,7 @@
 
 import type { Osm } from "@osmix/core";
 import { haversineDistance } from "@osmix/geo/haversine-distance";
-import type { LonLat, OsmEntity, OsmNode, OsmWay } from "@osmix/types";
+import type { LonLat, OsmEntity, OsmNode, OsmTags, OsmWay } from "@osmix/types";
 import { normalizedWayDirection, type OsmWayDirection } from "@osmix/types/way-direction";
 
 import { OsmChangeset } from "./changeset.ts";
@@ -38,6 +38,7 @@ import {
   assessJunction,
   assessNodeTags,
   canDropReplacedNode,
+  mergeImportedTags,
   type NodeIdentityReason,
 } from "./rules/node-identity.ts";
 import {
@@ -48,9 +49,11 @@ import {
   wayGradeAccessCompatible,
   wayRoutingFamily,
 } from "./rules/routing.ts";
+import { conflictingTagKeys } from "./rules/tags.ts";
 import type {
   OsmConflationActionAssessment,
   OsmConflationCandidate,
+  OsmConflationConnectionRival,
   OsmConflationDecision,
   OsmConflationDecisionConflict,
   OsmConflationDiscovery,
@@ -374,9 +377,10 @@ function nodeSegments(view: DatasetView, nodeId: number, ways: readonly OsmWay[]
   return segments;
 }
 
-/** Rulebook reasons map onto the public reason codes; a tag conflict never applies to connect. */
+/** Rulebook reasons map onto the public reason codes; an imported point has no tag conflict. */
 function toReasonCode(reason: NodeIdentityReason): OsmConflationReasonCode {
-  return reason === "tag-conflict" ? "node-context-conflict" : reason;
+  if (reason === "tag-conflict") throw Error("A connection's imported point cannot conflict");
+  return reason;
 }
 
 /**
@@ -492,7 +496,8 @@ function nodeAttachmentAssessment(
 
   // Hard reasons describe invariants a manual decision cannot override. Review
   // reasons are plausible matches whose routing intent still needs a person.
-  const nodeTags = assessNodeTags("connect", source.tags, target.tags);
+  // The imported point's tags merge into the base point, as an identical-point merge's do.
+  const nodeTags = assessNodeTags(source.tags, target.tags, { sourceIsImported: true });
   const hardReasons: OsmConflationReasonCode[] = [...nodeTags.hardReasons].map(toReasonCode);
   const reviewReasons: OsmConflationReasonCode[] = [...nodeTags.reviewReasons].map(toReasonCode);
   const restrictionMember =
@@ -859,7 +864,10 @@ function discoverWayCandidates(context: DiscoveryContext) {
   return candidates;
 }
 
-function applyManyToOneClassification(candidates: OsmConflationCandidate[]) {
+function applyManyToOneClassification(
+  candidates: OsmConflationCandidate[],
+  sourceTags: (nodeId: number) => OsmTags | undefined,
+) {
   // Candidate discovery is local to each source. Enforce the batch-wide invariants only after
   // all otherwise plausible pairs are known. A point of a copy of the base path, with nothing
   // else to do at the target, competes with nothing (MP-M1).
@@ -886,14 +894,28 @@ function applyManyToOneClassification(candidates: OsmConflationCandidate[]) {
     // Connections share the base node unless they conflict (MP-M5).
     const connecting = group.filter(({ networkAttachment }) => actionable(networkAttachment));
     for (const candidate of connecting) {
-      const rivals = connecting.flatMap((other) => {
+      const rivals = connecting.flatMap((other): OsmConflationConnectionRival[] => {
         if (other === candidate) return [];
         const sharedWayId = sharedImportedWay(candidate, other);
-        return sharedWayId === null ? [] : [{ candidateId: other.id, sharedWayId }];
+        const keys = conflictingTagKeys(sourceTags(candidate.sourceId), sourceTags(other.sourceId));
+        if (sharedWayId === null && keys.length === 0) return [];
+        return [
+          {
+            candidateId: other.id,
+            ...(sharedWayId === null ? {} : { sharedWayId }),
+            ...(keys.length === 0 ? {} : { conflictingKeys: keys }),
+          },
+        ];
       });
       if (rivals.length === 0) continue;
       candidate.connectionRivals = rivals;
-      markReview(candidate, candidate.networkAttachment, "many-to-one");
+      // Points of one way are a choice of the nearest; two values for one key are a person's.
+      if (rivals.some(({ sharedWayId }) => sharedWayId !== undefined)) {
+        markReview(candidate, candidate.networkAttachment, "many-to-one");
+      }
+      if (rivals.some(({ conflictingKeys }) => conflictingKeys !== undefined)) {
+        markReview(candidate, candidate.networkAttachment, "node-context-conflict");
+      }
     }
   }
 }
@@ -989,7 +1011,7 @@ function discoverOnViews(
       a.sourceId - b.sourceId ||
       (a.targetId ?? Number.POSITIVE_INFINITY) - (b.targetId ?? Number.POSITIVE_INFINITY),
   );
-  applyManyToOneClassification(candidates);
+  applyManyToOneClassification(candidates, (id) => patchView.getNode(id)?.tags);
   const discovery = {
     baseOsmId: base.id,
     patchOsmId: patch.id,
@@ -1294,8 +1316,8 @@ export function removeImportedEntity(changeset: OsmChangeset, entity: OsmNode | 
 }
 
 /**
- * Drop each connected imported node the rewrite left unused (MP-M2): untagged and referenced by
- * no remaining way or relation. Tagged points stay, so uncopied values are never lost.
+ * Drop each connected imported node the rewrite left unused (MP-M2): referenced by no remaining
+ * way or relation. Its tags were merged into the base point, so no value is lost.
  */
 function removeConnectionOrphans(
   changeset: OsmChangeset,
@@ -1327,7 +1349,7 @@ function removeConnectionOrphans(
     const droppable = canDropReplacedNode({
       imported: provenance.isImported("node", sourceId),
       tagged: Object.keys(node.tags ?? {}).length > 0,
-      tagsMerged: false,
+      tagsMerged: true,
       referencedByWay: byWay,
       referencedByRelation: relationNodeMembers.has(sourceId),
     });
@@ -1413,6 +1435,21 @@ function applyDiscoveredConflation(
     if (!source)
       throw Error(`Conflation source ${candidate.entityType} ${candidate.sourceId} is missing`);
     transferSelectedProperties(changeset, candidate, source, trace);
+  }
+  // Each connected point's tags merge into its base point, after any copy: the imported values
+  // win (MP-M3), and the outcome credits the values the connection writes to its candidate.
+  for (const candidate of discovery.candidates) {
+    if (candidate.targetId == null || attachments.get(candidate.sourceId) !== candidate.targetId)
+      continue;
+    const tags = currentEntity(changeset, "node", candidate.sourceId)?.tags;
+    if (!tags || Object.keys(tags).length === 0) continue;
+    changeset.modify("node", candidate.targetId, (target) => {
+      for (const [key, value] of Object.entries(tags)) {
+        if (target.tags?.[key] !== value)
+          trace.tagWriters.set(conflationTagTargetKey(candidate, key), candidate.id);
+      }
+      return { ...target, tags: mergeImportedTags(target.tags, tags) };
+    });
   }
   const selectedRemovals = discovery.candidates.filter(
     (candidate) =>

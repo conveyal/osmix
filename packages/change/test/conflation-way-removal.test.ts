@@ -404,7 +404,12 @@ describe("explicit way removal topology contract", () => {
     expect(findProposal(plan, "reconcile:w20>w10").effect).toBe("applied");
     expect(plan.staleDecisions).toEqual(["remove:w20>w10"]);
     expect(result.ways.ids.has(20)).toBe(false);
-    expect(result.ways.getById(10)).toEqual(input.base.ways.getById(10));
+    // The reconciled base way takes the imported way's values (MP-X2).
+    const baseWay = input.base.ways.getById(10)!;
+    expect(result.ways.getById(10)).toEqual({
+      ...baseWay,
+      tags: { ...baseWay.tags, ...input.patch.ways.getById(20)?.tags },
+    });
   });
   it.each([
     [

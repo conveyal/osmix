@@ -11,6 +11,8 @@ interface DirectionCase {
   roundabout?: boolean;
   reversed?: boolean;
   compatible: boolean;
+  /** The imported direction is one the planner does not understand. */
+  unsupported?: boolean;
 }
 
 const directionCases: DirectionCase[] = [
@@ -55,18 +57,21 @@ const directionCases: DirectionCase[] = [
     base: "reversible",
     patch: "reversible",
     compatible: false,
+    unsupported: true,
   },
   {
     name: "matching unsupported alternating values",
     base: "alternating",
     patch: "alternating",
     compatible: false,
+    unsupported: true,
   },
   {
     name: "matching whitespace-padded values",
     base: " yes ",
     patch: " yes ",
     compatible: false,
+    unsupported: true,
   },
 ];
 
@@ -187,9 +192,16 @@ describe("way direction compatibility", () => {
   it.each(directionCases)("exact reconciliation respects $name", async (testCase) => {
     const { base, patch } = createFixture(testCase, true);
     const result = await merge(base, patch, { createIntersections: false }, () => {});
-    expect(result.ways.getById(10)).toEqual(base.ways.getById(10));
-    expect(result.ways.ids.has(20)).toBe(!testCase.compatible);
-    if (!testCase.compatible) expect(result.ways.getById(20)).toEqual(patch.ways.getById(20));
+    if (testCase.unsupported) {
+      expect(result.ways.getById(10)).toEqual(base.ways.getById(10));
+      expect(result.ways.getById(20)).toEqual(patch.ways.getById(20));
+      return;
+    }
+    // The imported values win; an equivalent direction keeps the base's spelling (MP-X3).
+    expect(result.ways.ids.has(20)).toBe(false);
+    const tags = result.ways.getById(10)?.tags;
+    expect(tags?.["name"]).toBe("Imported");
+    expect(tags?.["oneway"]).toBe(testCase.compatible ? testCase.base : testCase.patch);
   });
 
   it.each([...directionCases, ...reverseCases])(
