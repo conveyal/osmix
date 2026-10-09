@@ -15,6 +15,7 @@ Step 1 is partly done for large imports (T34 and T35, below). Step 2 (streaming 
 | Seattle, after T34 (2.08M)     | 6.35 GB                  | 8.34 GB | does not fit; Merge refuses it                                                                   |
 | Washington, after T35          | 2.15 GB                  | 2.88 GB | Chromium peak 1.6 GB, a replan included                                                          |
 | Seattle, after T35             | 3.98 GB                  | 4.59 GB | Chromium peak 2.9 GB; plans in the browser, but 129 integrity issues refuse Apply, as before T35 |
+| Washington, after T24          | 2.16 GB                  | 2.90 GB | plan ~151–191 s; 17,510 features need a decision at Recommended (24,270 before T24)              |
 
 For these imports **planning**, not apply, sets the peak: one or more JS objects per imported entity (change records, proposals, candidates) plus the structures built to search them. Step 2 would not help. T35 read the patch as a read-only layer of the plan, with records only for changed entities, and kept the crossings cache and search indexes in typed arrays; the plan's output is unchanged (digests in `packages/osmix/test/plan-digest.test.ts`, and for Washington and Seattle in T35's notes). What remains per imported entity is mostly proposals, features, matching candidates and the matching outcome report.
 

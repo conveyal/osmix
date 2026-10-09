@@ -82,7 +82,7 @@ test("the automatic workflow merges the Monaco scenario patch", async ({ page })
   expect(merged.nodes.getById(1031563224)?.tags?.["opening_hours"]).toBe("24/7"); // M1 copied
   expect(merged.ways.getById(scenarioFeatureId(17, 1))?.refs[0]).toBe(6487733397); // A1 attached
   expect(merged.ways.getById(4230116)?.tags?.["surface"]).toBe("asphalt"); // W1 copied
-  expect(merged.nodes.getById(1736938084)?.tags?.["kerb"]).toBe("lowered"); // M2 left for review
+  expect(merged.nodes.getById(1736938084)?.tags?.["kerb"]).toBe("raised"); // M2 connected (MP-M3)
   const i1 = merged.ways.getById(scenarioFeatureId(26, 1))?.refs ?? [];
   const crossed = new Set(merged.ways.getById(687577837)?.refs);
   const shared = i1.filter((ref) => crossed.has(ref));
