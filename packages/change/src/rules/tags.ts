@@ -33,6 +33,36 @@ export function hasAnyTagConflict(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
   return Object.entries(a).some(([key, value]) => b[key] != null && b[key] !== value);
 }
 
+/**
+ * The imported tags a merge may write into base data (MP-X4): an import's own keys can be left
+ * out, so they reach the result only on features the import adds.
+ */
+export type ImportedTags = (tags: OsmEntity["tags"]) => OsmEntity["tags"];
+
+/** Keep every imported key. */
+export const keepImportedTags: ImportedTags = (tags) => tags;
+
+/**
+ * Leave out the imported keys `patterns` name: each is a key, or a prefix ending in `*`
+ * (`ext:*`). Tags with none of them are returned as they are.
+ */
+export function droppingImportedKeys(patterns: readonly string[] = []): ImportedTags {
+  for (const pattern of patterns) {
+    const star = pattern.indexOf("*");
+    if (pattern === "" || pattern === "*" || (star !== -1 && star !== pattern.length - 1)) {
+      throw Error(`dropImportedKeys entry "${pattern}" must be a key or a prefix ending in *`);
+    }
+  }
+  if (patterns.length === 0) return keepImportedTags;
+  const keys = new Set(patterns.filter((pattern) => !pattern.endsWith("*")));
+  const prefixes = patterns.filter((pattern) => pattern.endsWith("*")).map((p) => p.slice(0, -1));
+  const dropped = (key: string) => keys.has(key) || prefixes.some((p) => key.startsWith(p));
+  return (tags) => {
+    if (!tags || !Object.keys(tags).some(dropped)) return tags;
+    return Object.fromEntries(Object.entries(tags).filter(([key]) => !dropped(key)));
+  };
+}
+
 /** The keys `a` and `b` both set, to different values, in key order. */
 export function conflictingTagKeys(a: OsmEntity["tags"], b: OsmEntity["tags"]) {
   if (!a || !b) return [];

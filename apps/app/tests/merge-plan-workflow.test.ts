@@ -39,7 +39,13 @@ describe("merge plan workflow", () => {
         mergeIdenticalPoints: true,
         patchIds: "osm",
       }),
-    ).toEqual({ automation: "recommended", mergeIdenticalPoints: true, patchIds: "osm" });
+    ).toEqual({
+      automation: "recommended",
+      mergeIdenticalPoints: true,
+      patchIds: "osm",
+      // An import's own metadata stays out of base data (MP-X4).
+      dropImportedKeys: ["ext:*"],
+    });
     const matching = { propertyKeys: ["kerb"], attachNetwork: true };
     const options = buildMergePlanOptions({
       automation: "aggressive",
@@ -51,6 +57,7 @@ describe("merge plan workflow", () => {
       automation: "aggressive",
       mergeIdenticalPoints: false,
       patchIds: "new",
+      dropImportedKeys: ["ext:*"],
       matching,
     });
     // The worker keeps its own copy of the keys.

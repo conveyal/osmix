@@ -15,6 +15,7 @@ import { throttle } from "@osmix/shared/throttle";
 import { applyChangesetToOsm } from "../apply-changeset.ts";
 import { type CrossingInsertion, OsmChangeset, type OsmChangesetCheckpoint } from "../changeset.ts";
 import { generateOscChanges, type OscOptions } from "../osc.ts";
+import { droppingImportedKeys } from "../rules/tags.ts";
 import type { OsmChangesetStats } from "../types.ts";
 import {
   entityToken,
@@ -112,16 +113,26 @@ export function planMerge(
       : {}),
     decisions: [...(options.decisions ?? [])],
   };
+  const importedTags = droppingImportedKeys(resolved.dropImportedKeys);
+  // A copy writes only the keys it selects, so selecting a dropped one is a contradiction.
+  const copied = resolved.matching?.propertyKeys.filter(
+    (key) => Object.keys(importedTags({ [key]: "" }) ?? {}).length === 0,
+  );
+  if (copied?.length) {
+    throw Error(`matching.propertyKeys selects ${copied.join(", ")}, which dropImportedKeys drops`);
+  }
   const remap = planPatchIdRemap(base, patch, resolved.patchIds!);
   const planned = remapPatch(patch, remap);
   const builder = new PlanBuilder(remap, resolved.decisions);
   builder.groupFeatures(patch);
+  const changeset = new OsmChangeset(base);
+  changeset.importedTags = importedTags;
   const state: PlanState = {
     base,
     patch: planned,
     remap,
     options: resolved,
-    changeset: new OsmChangeset(base),
+    changeset,
     builder,
     checkpoints: new Map(),
     log: (message) => onProgress(progressEvent(message)),
@@ -452,6 +463,7 @@ export function proposalTagChanges(plan: MergePlan, proposalId: string): PlanTag
   return tagChangesOf(proposal, {
     base: state.base,
     patch: state.patch,
+    importedTags: state.changeset.importedTags,
     candidate: (id) => candidates.find((candidate) => candidate.id === id),
   });
 }

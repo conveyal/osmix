@@ -49,6 +49,13 @@ export interface MergePlanOptions {
   /** How much the planner decides without a person. Defaults to `recommended`. */
   automation?: MergePlanAutomation;
   /**
+   * Imported keys that never reach base data (MP-X4): identical-point and way merges,
+   * connections, crossing snaps and replacement anchors leave them out, and points that differ
+   * only in them do not compete. Features the import adds keep them. Each entry is a key, or a
+   * prefix ending in `*`, such as `ext:*` for an import's own metadata. None by default.
+   */
+  dropImportedKeys?: readonly string[];
+  /**
    * Decisions a person made on proposals, by proposal ID. The plan is rebuilt with them
    * applied; the automation level never changes them.
    */

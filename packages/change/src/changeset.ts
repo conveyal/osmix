@@ -51,6 +51,8 @@ import {
   withImportedTags,
 } from "./rules/node-identity.ts";
 import {
+  type ImportedTags,
+  keepImportedTags,
   mergeImportedWayTags,
   routingSemanticTagsEqual,
   withNonConflictingDescriptiveTags,
@@ -285,6 +287,8 @@ export class OsmChangeset {
   intersectionNodesCreated = 0;
   /** Imported points an intersection replaced and left unused, so they were dropped. */
   intersectionNodesRemoved = 0;
+  /** The imported tags a merge may write into base data (MP-X4); a plan sets it. */
+  importedTags: ImportedTags = keepImportedTags;
 
   constructor(base: Osm) {
     this.osm = base;
@@ -614,6 +618,11 @@ export class OsmChangeset {
     }
   }
 
+  /** The tags `entity` brings to a merge: an import's, less the keys the plan drops (MP-X4). */
+  private mergedTagsOf(entity: OsmEntity, sameDataset: boolean) {
+    return sameDataset ? entity.tags : this.importedTags(entity.tags);
+  }
+
   private reconcileNodeTags(patchNode: OsmNode, baseNodeId: number) {
     const baseNode = this.getCurrentNode(baseNodeId);
     if (!baseNode) return;
@@ -629,7 +638,7 @@ export class OsmChangeset {
     if (this.nodeChanges.get(source.id)?.changeType !== "create") {
       return withNonConflictingTags(survivor, source);
     }
-    return withImportedTags(survivor, source);
+    return withImportedTags(survivor, { ...source, tags: this.importedTags(source.tags) });
   }
 
   private deleteReconciledNode(node: OsmNode, survivorId: number) {
@@ -685,13 +694,13 @@ export class OsmChangeset {
             (!sameDataset || baseNode.id > patchNode.id) &&
             this.nodeChanges.get(baseNode.id)?.changeType !== "delete" &&
             sameOsmCoordinate(currentPatchNode, baseNode) &&
-            assessNodeTags(currentPatchNode.tags, baseNode.tags, {
+            assessNodeTags(this.mergedTagsOf(currentPatchNode, sameDataset), baseNode.tags, {
               sourceIsImported: !sameDataset,
             }).hardReasons.length === 0,
         );
       if (reviewReasons && candidateNodes.length === 1) {
         const { reviewReasons: reasons } = assessNodeTags(
-          currentPatchNode.tags,
+          this.mergedTagsOf(currentPatchNode, sameDataset),
           candidateNodes[0]!.tags,
           { sourceIsImported: !sameDataset },
         );
@@ -886,9 +895,13 @@ export class OsmChangeset {
       ? [wayNode, intersectingWayNode]
       : [intersectingWayNode, wayNode];
     const oneImported = imported(wayNode.id) !== imported(intersectingWayNode.id);
-    const tagAssessment = assessNodeTags(importedNode.tags, existingNode.tags, {
-      sourceIsImported: oneImported,
-    });
+    const tagAssessment = assessNodeTags(
+      this.mergedTagsOf(importedNode, !oneImported),
+      existingNode.tags,
+      {
+        sourceIsImported: oneImported,
+      },
+    );
     if (tagAssessment.hardReasons.length) return null;
     const reviewReasons = tagAssessment.reviewReasons.length
       ? { reviewReasons: [...tagAssessment.reviewReasons] }
@@ -1155,7 +1168,11 @@ export class OsmChangeset {
     // An imported way's values win; within one dataset only missing descriptive values are added.
     const mergedWay = sameDataset
       ? withNonConflictingDescriptiveTags(currentBaseWay, currentPatchWay)
-      : withImportedTags(currentBaseWay, currentPatchWay, mergeImportedWayTags);
+      : withImportedTags(
+          currentBaseWay,
+          { ...currentPatchWay, tags: this.importedTags(currentPatchWay.tags) },
+          mergeImportedWayTags,
+        );
     // A change of grade can join paths on different levels, so it waits for a person (MP-X2).
     const reviewReasons =
       routingGradeSignature(mergedWay.tags) === routingGradeSignature(currentBaseWay.tags)

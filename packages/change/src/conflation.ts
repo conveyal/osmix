@@ -49,7 +49,7 @@ import {
   wayGradeAccessCompatible,
   wayRoutingFamily,
 } from "./rules/routing.ts";
-import { conflictingTagKeys } from "./rules/tags.ts";
+import { conflictingTagKeys, type ImportedTags, keepImportedTags } from "./rules/tags.ts";
 import type {
   OsmConflationActionAssessment,
   OsmConflationCandidate,
@@ -86,6 +86,8 @@ type DiscoveryContext = {
   patchView: DatasetView;
   baseRelations: EntityRelationContext;
   patchRelations: EntityRelationContext;
+  /** The imported tags a connection may merge into base data (MP-X4). */
+  importedTags: ImportedTags;
 };
 
 function resolvedOptions(options: OsmConflationOptions): ResolvedOsmConflationOptions {
@@ -497,7 +499,9 @@ function nodeAttachmentAssessment(
   // Hard reasons describe invariants a manual decision cannot override. Review
   // reasons are plausible matches whose routing intent still needs a person.
   // The imported point's tags merge into the base point, as an identical-point merge's do.
-  const nodeTags = assessNodeTags(source.tags, target.tags, { sourceIsImported: true });
+  const nodeTags = assessNodeTags(context.importedTags(source.tags), target.tags, {
+    sourceIsImported: true,
+  });
   const hardReasons: OsmConflationReasonCode[] = [...nodeTags.hardReasons].map(toReasonCode);
   const reviewReasons: OsmConflationReasonCode[] = [...nodeTags.reviewReasons].map(toReasonCode);
   const restrictionMember =
@@ -705,7 +709,9 @@ function discoverNodeCandidates(context: DiscoveryContext) {
           targetRoutingFamilies: routingFamilies(baseWays),
           tagDiff,
           featureTypeConflicts: typeConflicts.length > 0 ? typeConflicts : undefined,
-          ...(Object.keys(source.tags ?? {}).length > 0 ? { sourceTagged: true } : {}),
+          ...(Object.keys(context.importedTags(source.tags) ?? {}).length > 0
+            ? { sourceTagged: true }
+            : {}),
           ...attachment.evidence,
         },
       });
@@ -975,6 +981,8 @@ export function discoverPlannedConflationCandidates(
   planned: Osm,
   overlay: PlanOverlay,
   options: OsmConflationOptions,
+  /** The imported tags a connection may merge into base data (MP-X4). */
+  importedTags: ImportedTags = keepImportedTags,
 ): OsmConflationDiscovery {
   const { baseView, patchView } = plannedMatchingViews(
     overlay,
@@ -982,7 +990,7 @@ export function discoverPlannedConflationCandidates(
     planned,
     inputProvenance(base, planned),
   );
-  return discoverOnViews(base, planned, baseView, patchView, options);
+  return discoverOnViews(base, planned, baseView, patchView, options, importedTags);
 }
 
 function discoverOnViews(
@@ -991,6 +999,7 @@ function discoverOnViews(
   baseView: DatasetView,
   patchView: DatasetView,
   options: OsmConflationOptions,
+  importedTags: ImportedTags = keepImportedTags,
 ): OsmConflationDiscovery {
   const resolved = resolvedOptions(options);
   const context: DiscoveryContext = {
@@ -1002,6 +1011,7 @@ function discoverOnViews(
     patchView,
     baseRelations: baseView.relationMembership(),
     patchRelations: patchView.relationMembership(),
+    importedTags,
   };
   const candidates = [
     ...discoverNodeCandidates(context),
@@ -1012,7 +1022,7 @@ function discoverOnViews(
       a.sourceId - b.sourceId ||
       (a.targetId ?? Number.POSITIVE_INFINITY) - (b.targetId ?? Number.POSITIVE_INFINITY),
   );
-  applyManyToOneClassification(candidates, (id) => patchView.getNode(id)?.tags);
+  applyManyToOneClassification(candidates, (id) => importedTags(patchView.getNode(id)?.tags));
   const discovery = {
     baseOsmId: base.id,
     patchOsmId: patch.id,
@@ -1442,7 +1452,7 @@ function applyDiscoveredConflation(
   for (const candidate of discovery.candidates) {
     if (candidate.targetId == null || attachments.get(candidate.sourceId) !== candidate.targetId)
       continue;
-    const tags = currentEntity(changeset, "node", candidate.sourceId)?.tags;
+    const tags = changeset.importedTags(currentEntity(changeset, "node", candidate.sourceId)?.tags);
     if (!tags || Object.keys(tags).length === 0) continue;
     changeset.modify("node", candidate.targetId, (target) => {
       for (const [key, value] of Object.entries(tags)) {

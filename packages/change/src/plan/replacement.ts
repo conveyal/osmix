@@ -20,6 +20,7 @@ import { routingGradeSignature } from "../rules/grade.ts";
 import { lineBbox, pointLineDistance, sampleLine } from "../rules/line-geometry.ts";
 import { assessNodeTags, mergeImportedTags } from "../rules/node-identity.ts";
 import { familyCompatible, wayRoutingFamily } from "../rules/routing.ts";
+import { type ImportedTags, keepImportedTags } from "../rules/tags.ts";
 import type { DatasetView } from "../views.ts";
 
 /** Why a group cannot be replaced as it stands. */
@@ -167,6 +168,8 @@ export function discoverWayReplacements(
   baseView: DatasetView,
   patchView: DatasetView,
   tolerance: number,
+  /** The imported tags an anchor may take into base data (MP-X4). */
+  importedTags: ImportedTags = keepImportedTags,
 ): WayReplacementDiscovery {
   const components = new Components();
   const lines = new Map<string, LonLat[]>();
@@ -232,7 +235,7 @@ export function discoverWayReplacements(
       continue;
     }
     const assess = (forced?: ReadonlyMap<number, number>) =>
-      assessGroup(baseView, patchView, importedChain, baseChain, tolerance, forced);
+      assessGroup(baseView, patchView, importedChain, baseChain, tolerance, importedTags, forced);
     const vertices = new Set(importedChain.flatMap(({ way }) => way.refs));
     assessed.push({ group: assess(), assess, vertices });
   }
@@ -391,6 +394,7 @@ function assessGroup(
   importedChain: Chain,
   baseChain: Chain,
   tolerance: number,
+  importedTags: ImportedTags,
   /** Base anchors that must pair with the given imported vertex, to agree with a neighbour. */
   forced?: ReadonlyMap<number, number>,
 ): WayReplacementGroup {
@@ -508,15 +512,15 @@ function assessGroup(
     if (importedId !== id && importedMembership.nodes.has(importedId)) {
       reasons.add("replacement-relation-member");
     }
-    const importedTags = importedNode(importedId)?.tags;
-    if (importedId === id || Object.keys(importedTags ?? {}).length === 0) continue;
+    const vertexTags = importedTags(importedNode(importedId)?.tags);
+    if (importedId === id || Object.keys(vertexTags ?? {}).length === 0) continue;
     // The base node takes the imported vertex's place, and its tags, as an identical point would.
     const baseTags = baseNode(id)?.tags;
-    const { reviewReasons: nodeReview } = assessNodeTags(importedTags, baseTags, {
+    const { reviewReasons: nodeReview } = assessNodeTags(vertexTags, baseTags, {
       sourceIsImported: true,
     });
     if (nodeReview.includes("grade-change")) reviewReasons.add("grade-change");
-    mergedTags.push({ nodeId: id, tags: mergeImportedTags(baseTags, importedTags) });
+    mergedTags.push({ nodeId: id, tags: mergeImportedTags(baseTags, vertexTags) });
   }
 
   // The chains must be the same kind of way.

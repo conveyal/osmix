@@ -85,7 +85,13 @@ export function planMatching(
   }
   const discovery =
     cached?.discovery ??
-    discoverPlannedConflationCandidates(base, planned, changeset.overlay, options);
+    discoverPlannedConflationCandidates(
+      base,
+      planned,
+      changeset.overlay,
+      options,
+      changeset.importedTags,
+    );
   const demoted =
     cached?.demoted ??
     new Set(demoteDrivableConnections(discovery, changeset.overlay).map(({ id }) => id));
@@ -318,5 +324,5 @@ function discoverPlannedReplacements(
   );
   const tolerance = discovery.options.replacementToleranceMeters;
   if (tolerance == null) throw Error("Way replacement needs a replacement tolerance");
-  return discoverWayReplacements(baseView, patchView, tolerance);
+  return discoverWayReplacements(baseView, patchView, tolerance, changeset.importedTags);
 }

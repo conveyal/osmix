@@ -14,6 +14,12 @@ import type {
   PlanProposalStatus,
 } from "osmix";
 
+/**
+ * Imported keys Merge never writes into base data (MP-X4): an import's own metadata, such as
+ * OpenSidewalks' `ext:*` keys. Features the import adds keep them.
+ */
+const DROPPED_IMPORTED_KEYS = ["ext:*"];
+
 /** Plan options from the input step's settings. */
 export function buildMergePlanOptions({
   automation,
@@ -30,6 +36,7 @@ export function buildMergePlanOptions({
     automation,
     mergeIdenticalPoints,
     patchIds,
+    dropImportedKeys: DROPPED_IMPORTED_KEYS,
     ...(matching ? { matching: { ...matching, propertyKeys: [...matching.propertyKeys] } } : {}),
   };
 }

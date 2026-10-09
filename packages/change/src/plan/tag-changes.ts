@@ -7,7 +7,7 @@ import type { Osm } from "@osmix/core";
 import type { OsmEntity, OsmEntityType, OsmTags } from "@osmix/types";
 
 import { mergeImportedTags } from "../rules/node-identity.ts";
-import { mergeImportedWayTags } from "../rules/tags.ts";
+import { type ImportedTags, mergeImportedWayTags } from "../rules/tags.ts";
 import type { OsmConflationCandidate } from "../types.ts";
 import type { PlanProposal } from "./types.ts";
 
@@ -32,6 +32,8 @@ interface TagChangeInputs {
   base: Osm;
   /** The patch with planned IDs. */
   patch: Osm;
+  /** The imported tags a merge may write into base data (MP-X4). */
+  importedTags: ImportedTags;
   candidate: (candidateId: string) => OsmConflationCandidate | undefined;
 }
 
@@ -84,7 +86,7 @@ function agreedTags(ways: readonly (OsmEntity | null)[]): OsmTags {
  */
 export function tagChangesOf(
   proposal: PlanProposal,
-  { base, patch, candidate }: TagChangeInputs,
+  { base, patch, candidate, importedTags }: TagChangeInputs,
 ): PlanTagChanges | null {
   switch (proposal.kind) {
     case "add":
@@ -100,7 +102,7 @@ export function tagChangesOf(
       return diff(
         proposal.target,
         survivor?.tags,
-        mergeImportedTags(survivor?.tags, imported?.tags),
+        mergeImportedTags(survivor?.tags, importedTags(imported?.tags)),
       );
     }
     case "way-reconcile": {
@@ -110,7 +112,7 @@ export function tagChangesOf(
       return diff(
         proposal.target,
         survivor.tags,
-        mergeImportedWayTags(survivor.tags, imported.tags),
+        mergeImportedWayTags(survivor.tags, importedTags(imported.tags)),
       );
     }
     case "copy-tags": {
@@ -140,7 +142,9 @@ export function tagChangesOf(
       const survivor = node(proposal.merges.survivor);
       const replaced = node(proposal.merges.replaced);
       if (!survivor) return null;
-      const after = mergeImportedTags(survivor.tags, replaced?.tags);
+      const replacedTags =
+        replaced && patch.nodes.getById(replaced.id) ? importedTags(replaced.tags) : replaced?.tags;
+      const after = mergeImportedTags(survivor.tags, replacedTags);
       // A node where both ways pass through, rather than end, is a crossing (MP-J1).
       const merged = new Set([survivor.id, replaced?.id]);
       const throughBoth = proposal.ways.every(({ id }) => {

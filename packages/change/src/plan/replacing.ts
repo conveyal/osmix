@@ -255,10 +255,11 @@ export function applyWayReplacements(
     for (const [vertex, anchor] of anchorOf) {
       const imported = overlay.getNode(vertex);
       if (!imported) continue;
-      if (Object.keys(imported.tags ?? {}).length > 0) {
+      const tags = changeset.importedTags(imported.tags);
+      if (Object.keys(tags ?? {}).length > 0) {
         changeset.modify("node", anchor, (current) => ({
           ...current,
-          tags: mergeImportedTags(current.tags, imported.tags),
+          tags: mergeImportedTags(current.tags, tags),
         }));
       }
       if (overlay.waysAtNode(vertex).length === 0) removeImportedEntity(changeset, imported);

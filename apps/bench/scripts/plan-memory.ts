@@ -6,6 +6,7 @@
  *
  * Relative paths resolve against `fixtures/`. Matching runs with the settings of the
  * Washington review: copy the default keys, connect, replace and review removals, 1 m radius,
+ * drop the import's `ext:*` keys,
  * Recommended automation unless `--automation=conservative|recommended|aggressive` says otherwise.
  * Each line on stdout is one JSON measurement taken after two forced
  * garbage collections; `heapMb` is the V8 heap, `arrayBuffersMb` the typed columns, `cpuMs` the
@@ -82,6 +83,8 @@ const plan = planMerge(
     automation,
     mergeIdenticalPoints: true,
     patchIds: "osm",
+    // As Merge does: an import's own metadata stays out of base data (MP-X4).
+    dropImportedKeys: ["ext:*"],
     ...(flags.has("--no-matching")
       ? {}
       : {
