@@ -262,7 +262,7 @@ function Harness() {
           </section>
         </Provider>
         <section data-testid="plan-review-harness" className="flex flex-col gap-2">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
               size="sm"
