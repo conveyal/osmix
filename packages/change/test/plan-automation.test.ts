@@ -49,6 +49,26 @@ function sameWay(a: number, b: number) {
 }
 
 /**
+ * `sameWay`, with a kerb on the vertex `b` m from node 1 where another imported way, 19, starts
+ * north alongside way 20. Way 19 comes first, so the kerb is a vertex of its feature, not 20's.
+ */
+function sameWayWithKerb(a: number, b: number) {
+  return osm(
+    "patch",
+    [
+      { id: 101, lon: 0, lat: a * M },
+      { id: 102, lon: 0, lat: b * M, tags: { barrier: "kerb", kerb: "lowered" } },
+      { id: 103, lon: 0, lat: 0.001 },
+      { id: 104, lon: 0.00001, lat: 0.002 },
+    ],
+    [
+      { id: 19, refs: [102, 104], tags: { highway: "footway" } },
+      { id: 20, refs: [101, 102, 103], tags: { highway: "footway" } },
+    ],
+  );
+}
+
+/**
  * An imported footway ending 0.1 m north of node 1, and one running east-west through a point
  * 0.7 m east of it: a point along a way at right angles to the base way, so it bends.
  */
@@ -99,6 +119,39 @@ describe("automation levels (MP-M6)", () => {
       expect(planned.summary.automated).toBe(2);
       expect(planned.summary.features["needs-decision"]).toBe(0);
     }
+  });
+
+  it("connects a tagged point of one imported way over an untagged one it ties with", () => {
+    for (const level of [undefined, "recommended", "aggressive"] as const) {
+      const planned = plan(sameWayWithKerb(0.4, 0.6), level);
+      expect(findProposal(planned, "connect:n102>n1").feature).toBe("way:19");
+      expect(findProposal(planned, "connect:n101>n1").feature).toBe("way:20");
+      expect(decisionOf(planned, "connect:n102>n1")).toEqual({
+        decision: "accept",
+        automated: true,
+      });
+      expect(decisionOf(planned, "connect:n101>n1")).toEqual({
+        decision: "reject",
+        automated: true,
+      });
+      // The kerb's copy writes only what its connection merges, so it follows the connection.
+      expect(decisionOf(planned, "copy:n102>n1")).toEqual({ decision: "accept", automated: true });
+      expect(planned.summary.features["needs-decision"]).toBe(0);
+    }
+    // A clearly nearer untagged point still wins.
+    const nearer = plan(sameWayWithKerb(0.1, 0.7), "recommended");
+    expect(decisionOf(nearer, "connect:n101>n1").decision).toBe("accept");
+    expect(decisionOf(nearer, "connect:n102>n1").decision).toBe("reject");
+    // Conservative decides nothing; Pick nearest makes the same choice for a person.
+    const conservative = plan(sameWayWithKerb(0.4, 0.6), "conservative");
+    expect(findProposal(conservative, "connect:n102>n1").effect).toBe("needs-decision");
+    const ids = [...conservative.proposals.keys()];
+    expect(pickNearestMergePlanDecisions(conservative, ids)).toEqual(
+      expect.arrayContaining([
+        { proposalId: "connect:n102>n1", action: "accept" },
+        { proposalId: "connect:n101>n1", action: "reject" },
+      ]),
+    );
   });
 
   it("leaves everything in review when conservative", () => {

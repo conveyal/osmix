@@ -42,13 +42,22 @@ export function decide(proposal: PlanProposal, action: "accept" | "reject") {
   proposal.effect = action === "accept" ? "applied" : "skipped";
 }
 
-/** The evidence distance of a matching proposal's candidate, NaN when unknown. */
-export type ProposalDistance = (proposal: MatchingProposal) => number;
+/** What settles a choice between matching proposals: their candidates' evidence. */
+export interface ChoiceEvidence {
+  /** The evidence distance of a proposal's candidate, NaN when unknown. */
+  distance(proposal: MatchingProposal): number;
+  /** Whether a connection's imported point has tags. */
+  tagged(proposal: MatchingProposal): boolean;
+}
 
-export function proposalDistance(
+export function choiceEvidence(
   candidates: ReadonlyMap<string, OsmConflationCandidate>,
-): ProposalDistance {
-  return (proposal) => candidates.get(proposal.candidateId)?.evidence.distanceMeters ?? Number.NaN;
+): ChoiceEvidence {
+  const evidence = (proposal: MatchingProposal) => candidates.get(proposal.candidateId)?.evidence;
+  return {
+    distance: (proposal) => evidence(proposal)?.distanceMeters ?? Number.NaN,
+    tagged: (proposal) => evidence(proposal)?.sourceTagged === true,
+  };
 }
 
 /** The alternatives and competitors a proposal must be chosen over, excluding blocked ones. */
@@ -61,24 +70,47 @@ export function choiceRivals(
     .filter(isDecidable);
 }
 
+/** At most half as far, or at least 0.5 m nearer. */
+function clearlyNearer(own: number, theirs: number) {
+  return !Number.isFinite(theirs) || own <= theirs * MARGIN_RATIO || theirs - own >= MARGIN_METERS;
+}
+
+/** Whether two connections to one base point connect points of one imported way (MP-M5). */
+function sharesImportedWay(proposal: MatchingProposal, rival: MatchingProposal) {
+  return (
+    proposal.kind === "connect" &&
+    rival.kind === "connect" &&
+    proposal.rivalries?.[rival.id]?.sharedWay !== undefined
+  );
+}
+
 /**
- * Whether `proposal` is clearly the nearest of its rivals (MP-M6): at most half as far as each,
- * or at least 0.5 m nearer. A person's choice among them stands, and a rival they left out
- * still competes, so leaving out a winner never promotes the runner-up.
+ * Whether `proposal` connects a tagged point and `rival` an untagged point of the same imported
+ * way: connecting the tagged one merges its tags into the base point, so it wins a tie.
  */
-export function winsByClearMargin(
+function taggedOver(proposal: MatchingProposal, rival: MatchingProposal, evidence: ChoiceEvidence) {
+  return sharesImportedWay(proposal, rival) && evidence.tagged(proposal) && !evidence.tagged(rival);
+}
+
+/**
+ * Whether `proposal` clearly wins over each of its rivals (MP-M6): it is at most half as far as
+ * each, or at least 0.5 m nearer, or, when neither is clearly nearer, it connects a tagged point
+ * of the imported way the rival connects an untagged point of. A person's choice among them
+ * stands, and a rival they left out still competes, so leaving out a winner never promotes the
+ * runner-up.
+ */
+export function winsChoice(
   proposal: MatchingProposal,
   rivals: readonly MatchingProposal[],
-  distance: ProposalDistance,
+  evidence: ChoiceEvidence,
 ) {
   if (rivals.some((rival) => rival.decision === "accept" && !rival.automated)) return false;
-  const own = distance(proposal);
+  const own = evidence.distance(proposal);
   if (!Number.isFinite(own)) return false;
   return rivals.every((rival) => {
-    const theirs = distance(rival);
-    return (
-      !Number.isFinite(theirs) || own <= theirs * MARGIN_RATIO || theirs - own >= MARGIN_METERS
-    );
+    const theirs = evidence.distance(rival);
+    if (clearlyNearer(own, theirs)) return true;
+    return !clearlyNearer(theirs, own) && taggedOver(proposal, rival, evidence);
   });
 }
 
@@ -106,7 +138,7 @@ export function automateMatching(
 ): number {
   if (level === "conservative") return 0;
   const trusted = TRUSTED_REASONS[level];
-  const distance = proposalDistance(candidates);
+  const evidence = choiceEvidence(candidates);
 
   const accepted: Decidable[] = [];
   for (const proposal of proposals.values()) {
@@ -120,19 +152,20 @@ export function automateMatching(
       if (!proposal.reasons.some((reason) => CHOICE_REASONS.has(reason))) accepted.push(proposal);
       continue;
     }
-    // Recommended settles only points of one imported way competing for one base point.
+    // Recommended settles only points of one imported way competing for one base point. A
+    // vertex two imported ways share belongs to one of their features, so compare the way.
     if (
       level === "recommended" &&
       (proposal.alternatives.some((id) => isDecidable(proposals.get(id))) ||
-        rivals.some((rival) => rival.feature !== proposal.feature))
+        rivals.some((rival) => !sharesImportedWay(proposal, rival)))
     ) {
       continue;
     }
-    if (winsByClearMargin(proposal, rivals, distance)) accepted.push(proposal);
+    if (winsChoice(proposal, rivals, evidence)) accepted.push(proposal);
   }
 
   let decided = 0;
-  for (const proposal of agreeingPicks(accepted)) {
+  const include = (proposal: Decidable) => {
     decide(proposal, "accept");
     decided++;
     for (const rival of choiceRivals(proposal, proposals)) {
@@ -140,6 +173,20 @@ export function automateMatching(
       decide(rival, "reject");
       decided++;
     }
+  };
+  for (const proposal of agreeingPicks(accepted)) include(proposal);
+
+  // A connection merges its point's tags into the base point (MP-M3), so a copy of that point's
+  // tags onto the same base point writes nothing more: it follows its applied connection.
+  const connections = new Map<string, PlanProposal>();
+  for (const proposal of proposals.values())
+    if (proposal.kind === "connect") connections.set(proposal.candidateId, proposal);
+  for (const proposal of proposals.values()) {
+    if (!isDecidable(proposal) || proposal.kind !== "copy-tags") continue;
+    if (proposal.status !== "review" || proposal.decision) continue;
+    if (connections.get(proposal.candidateId)?.effect !== "applied") continue;
+    if (choiceRivals(proposal, proposals).some(({ decision }) => decision === "accept")) continue;
+    include(proposal);
   }
   return decided;
 }

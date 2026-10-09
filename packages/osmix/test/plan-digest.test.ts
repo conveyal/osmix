@@ -27,7 +27,8 @@ import {
  * here and say why in the commit. T36 blocks a replacement that joined grade-separated highways
  * (`replacement-grade-conflict`): Aggressive no longer includes it, so its plan applies. T24 lets
  * imported values win a way reconcile (X4 now reconciles, with or without matching) and makes a
- * connection merge its point's tags (M2, M3 and M7 change).
+ * connection merge its point's tags (M2, M3 and M7 change). Then a copy follows its applied
+ * connection at Recommended and Aggressive (M2's kerb copy), which changes only the plans.
  */
 
 let base: Osm;
@@ -76,8 +77,8 @@ describe("merge plan output on Monaco", () => {
       ),
     ).toEqual({
       conservative: { plan: "bdac21d1e4a2a453", applied: "376f5c20", osc: "9ba6e7249a757904" },
-      recommended: { plan: "0b22b0c4e2003ffd", applied: "dc374e92", osc: "c464052281d5e1df" },
-      aggressive: { plan: "70523cc7aca8c0c3", applied: "17925075", osc: "0b26800a4266c3a4" },
+      recommended: { plan: "acd38595f6085071", applied: "dc374e92", osc: "c464052281d5e1df" },
+      aggressive: { plan: "43fdfbedadfc6c67", applied: "17925075", osc: "0b26800a4266c3a4" },
     });
   });
 
@@ -102,7 +103,7 @@ describe("merge plan output on Monaco", () => {
     const fresh = planMerge(base, patch, { ...matching, decisions }, quiet);
     expect(digest(plan)).toEqual(digest(fresh));
     expect(digest(plan)).toEqual({
-      plan: "b3abb5ba8d3ae135",
+      plan: "a052f1b49bd66edd",
       applied: "cb170a40",
       osc: "a9a91ce0efcb26a7",
     });

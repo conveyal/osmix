@@ -8,8 +8,8 @@ import {
   choiceRivals,
   type Decidable,
   isDecidable,
-  proposalDistance,
-  winsByClearMargin,
+  choiceEvidence,
+  winsChoice,
 } from "./automation.ts";
 import type { MergePlan, PlanDecision, PlanProposal } from "./types.ts";
 
@@ -70,13 +70,13 @@ export function planChoices(
   plan: MergePlan,
   candidates: ReadonlyMap<string, OsmConflationCandidate>,
 ): PlanChoices {
-  const distance = proposalDistance(candidates);
+  const evidence = choiceEvidence(candidates);
   const waiting = (proposal: PlanProposal | undefined) => proposal?.effect === "needs-decision";
   const winners = new Set<string>();
   for (const proposal of plan.proposals.values()) {
     if (!waiting(proposal) || !isDecidable(proposal) || !canPick(proposal)) continue;
     const rivals = choiceRivals(proposal, plan.proposals);
-    if (rivals.length > 0 && winsByClearMargin(proposal, rivals, distance)) {
+    if (rivals.length > 0 && winsChoice(proposal, rivals, evidence)) {
       winners.add(proposal.id);
     }
   }
@@ -139,7 +139,7 @@ export function pickNearestDecisions(
   candidates: ReadonlyMap<string, OsmConflationCandidate>,
   proposalIds: Iterable<string>,
 ): PlanDecision[] {
-  const distance = proposalDistance(candidates);
+  const evidence = choiceEvidence(candidates);
   const picks: Decidable[] = [];
   for (const id of proposalIds) {
     const proposal = plan.proposals.get(id);
@@ -147,7 +147,7 @@ export function pickNearestDecisions(
       continue;
     }
     const rivals = choiceRivals(proposal, plan.proposals);
-    if (rivals.length > 0 && winsByClearMargin(proposal, rivals, distance)) picks.push(proposal);
+    if (rivals.length > 0 && winsChoice(proposal, rivals, evidence)) picks.push(proposal);
   }
   const decisions = new Map<string, PlanDecision["action"]>();
   for (const pick of agreeingPicks(picks)) {

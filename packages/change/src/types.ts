@@ -118,6 +118,11 @@ export interface OsmConflationEvidence {
   targetRoutingFamilies: OsmConflationRoutingFamily[];
   tagDiff: OsmConflationTagDiff[];
   featureTypeConflicts?: OsmConflationFeatureTypeConflict[];
+  /**
+   * The imported point has tags, which connecting it merges into the base point. Present only
+   * on node candidates whose point has tags; it settles a tie between connections (MP-M6).
+   */
+  sourceTagged?: true;
   patchWayIds?: number[];
   bearingDifferenceDegrees?: number;
   /** How far the imported way runs along the target's base way through the source (MP-M1). */

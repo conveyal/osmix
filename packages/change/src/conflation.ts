@@ -705,6 +705,7 @@ function discoverNodeCandidates(context: DiscoveryContext) {
           targetRoutingFamilies: routingFamilies(baseWays),
           tagDiff,
           featureTypeConflicts: typeConflicts.length > 0 ? typeConflicts : undefined,
+          ...(Object.keys(source.tags ?? {}).length > 0 ? { sourceTagged: true } : {}),
           ...attachment.evidence,
         },
       });
